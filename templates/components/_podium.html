@@ -1,0 +1,13 @@
+<div class="podium">
+  {% for slot in slots %}
+    <div class="podium-card rank-{{ slot.rank }}">
+      <div class="podium-rank">
+        {% if slot.rank == 1 %}<i data-lucide="trophy" class="icon-sm" style="color:var(--accent)"></i> 1st{% elif slot.rank == 2 %}2nd{% else %}3rd{% endif %}
+      </div>
+      <div class="avatar" style="width:56px;height:56px;font-size:18px;margin:0 auto 12px">{{ slot.user.display_name|slice:":1"|upper }}</div>
+      <div class="t-h3 mb-2" style="text-transform:none;letter-spacing:0">{{ slot.user.display_name }}</div>
+      <div class="stat-num {% if slot.rank == 1 %}text-accent{% endif %}">{{ slot.points }}</div>
+      <div class="t-small text-tertiary">{{ slot.tips_correct }}/{{ slot.tips_total }} correct</div>
+    </div>
+  {% endfor %}
+</div>

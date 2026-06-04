@@ -1,0 +1,51 @@
+{% extends "manage/_base.html" %}
+{% block manage_content %}
+<div class="section-header">
+  <div>
+    <span class="t-micro text-tertiary"><a href="{% url 'manage:orgs_list' %}" class="link">Orgs</a> / {{ org.name }} / Members</span>
+    <h1 class="t-h1 mt-2">Members</h1>
+  </div>
+</div>
+
+<div class="card-2 mb-8" style="padding:24px">
+  <h3 class="t-h3 mb-3"><i data-lucide="link" class="icon-sm" style="vertical-align:-3px"></i> Join link</h3>
+  <p class="t-small text-tertiary mb-3">Share this with anyone you want in the comp. Link valid 7 days.</p>
+  <input value="{{ join_url }}" readonly onclick="this.select()" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);border-color:var(--accent);background:var(--bg-page)">
+</div>
+
+<div class="table-card">
+  <table>
+    <thead><tr><th>Member</th><th>Email</th><th>Role</th><th>Joined</th><th></th></tr></thead>
+    <tbody>
+      {% for m in members %}
+        <tr>
+          <td>
+            <div class="row gap-3">
+              <span class="avatar" style="width:32px;height:32px;font-size:12px">{{ m.user.display_name|slice:":1"|upper }}</span>
+              <strong>{{ m.user.display_name }}</strong>
+            </div>
+          </td>
+          <td class="text-tertiary">{{ m.user.email }}</td>
+          <td>
+            <form method="post" style="display:inline">{% csrf_token %}
+              <input type="hidden" name="action" value="promote">
+              <input type="hidden" name="member_id" value="{{ m.id }}">
+              <button class="pill {% if m.role == 'admin' %}pill-accent{% endif %}" type="submit" style="border:1px solid var(--border-default);cursor:pointer">{{ m.role }}</button>
+            </form>
+          </td>
+          <td class="text-tertiary t-small">{{ m.joined_at|date:"j M Y" }}</td>
+          <td class="text-right">
+            <form method="post" style="display:inline">{% csrf_token %}
+              <input type="hidden" name="action" value="remove">
+              <input type="hidden" name="member_id" value="{{ m.id }}">
+              <button class="icon-btn" type="submit" title="Remove" style="color:var(--danger);border-color:rgba(239,68,68,0.3)"><i data-lucide="trash-2" class="icon-sm"></i></button>
+            </form>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="text-center text-tertiary" style="padding:32px">No members yet. Share the join link above.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

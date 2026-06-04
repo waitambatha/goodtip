@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}GoodTip — Good Tip, Mate.{% endblock %}
+{% block container_class %}{% endblock %}
+
+{% block content %}
+<header class="topnav">
+  <div class="topnav-inner">
+    <a href="/" class="topnav-brand">GOODTIP</a>
+    <div class="row gap-3">
+      <a href="{% url 'accounts:login' %}" class="topnav-link">Log in</a>
+      <a href="{% url 'accounts:signup' %}" class="btn-primary btn-sm">Start tipping</a>
+    </div>
+  </div>
+</header>
+
+<section class="landing-hero">
+  <div class="container" style="position:relative; z-index:1">
+    <div class="grid-2 gap-6" style="align-items:center">
+      <div>
+        <span class="t-micro text-accent">Australian Footy Tipping · For a Cause</span>
+        <h1>Tip Footy.<br>Raise Money.<br>Stay Mates.</h1>
+        <p class="t-body text-secondary" style="font-size:18px;max-width:520px">
+          Workplace and friend-group tipping where every entry fee goes to charity.
+          Not us. Them. AFL and NRL, every round, all season.
+        </p>
+        <div class="row gap-3 mt-8" style="flex-wrap:wrap">
+          <a href="{% url 'accounts:signup' %}" class="btn-primary btn-lg">Start Tipping <i data-lucide="arrow-right" class="icon-sm"></i></a>
+          <a href="#how" class="btn-ghost btn-lg">How it works</a>
+        </div>
+      </div>
+
+      <div>
+        <div class="landing-mock">
+          <div class="match-card">
+            <div class="color-strip">
+              <div style="background:#031A29"></div>
+              <div style="background:#000000"></div>
+            </div>
+            <div class="match-card-body">
+              <div class="row-between mb-3 t-micro text-tertiary">
+                <span>SAT 12 APR · 7:30 PM</span><span>MCG</span>
+              </div>
+              <div class="team-row">
+                <div class="team-meta">
+                  <span class="team-badge md" style="background:#031A29;color:#FFFFFF">C</span>
+                  <div><div class="team-name">Carlton</div><div class="team-sub">Home</div></div>
+                </div>
+                <span class="tip-label" style="background:var(--accent);border-color:var(--accent);color:#000">Pick Home</span>
+              </div>
+              <div class="team-row">
+                <div class="team-meta">
+                  <span class="team-badge md" style="background:#000000;color:#FFFFFF">C</span>
+                  <div><div class="team-name">Collingwood</div><div class="team-sub">Away</div></div>
+                </div>
+                <span class="tip-label">Pick Away</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how" class="container" style="padding:60px 24px">
+  <div class="text-center mb-8">
+    <span class="t-micro text-accent">How it works</span>
+    <h2 class="t-h1 mt-3">Three steps to comp time</h2>
+  </div>
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-num">01 · JOIN</div>
+      <h3 class="t-h3 mb-3" style="letter-spacing:0;text-transform:none;font-size:18px">Get the link, jump in</h3>
+      <p class="t-body text-secondary">Your group admin shares a join link. One click, you're in. No setup, no friction.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">02 · TIP</div>
+      <h3 class="t-h3 mb-3" style="letter-spacing:0;text-transform:none;font-size:18px">Pick winners every round</h3>
+      <p class="t-body text-secondary">Tap home or away for every match. We lock tips at first kickoff so you can change your mind right up to game time.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">03 · GIVE</div>
+      <h3 class="t-h3 mb-3" style="letter-spacing:0;text-transform:none;font-size:18px">100% to your charity</h3>
+      <p class="t-body text-secondary">Your group picks the cause. Beyond Blue, RUOK, anywhere local. Every dollar of entry goes straight there.</p>
+    </div>
+  </div>
+</section>
+
+<section class="container" style="padding:40px 24px 80px">
+  <div class="card" style="padding:32px;text-align:center">
+    <span class="t-micro text-tertiary">Causes we're built for</span>
+    <h3 class="t-h2 mt-3 mb-3">Your group picks. We just keep score.</h3>
+    <p class="t-body text-secondary" style="max-width:520px;margin:0 auto">
+      Beyond Blue. RUOK Day. Local junior footy clubs. Any cause your group cares about.
+      GoodTip handles the comp; you handle the give.
+    </p>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container row-between" style="flex-wrap:wrap;gap:16px">
+    <div>
+      <span class="topnav-brand" style="font-size:18px">GOODTIP</span>
+      <span class="text-tertiary" style="margin-left:12px">Good Tip, Mate.</span>
+    </div>
+    <div class="t-small text-tertiary">© {% now "Y" %} GoodTip · Made for the love of footy</div>
+  </div>
+</footer>
+{% endblock %}

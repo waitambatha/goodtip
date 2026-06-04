@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Profile — GoodTip{% endblock %}
+{% block content %}
+
+<div class="section-header">
+  <div class="row gap-4">
+    <span class="avatar" style="width:64px;height:64px;font-size:24px">{{ user.display_name|slice:":1"|upper }}</span>
+    <div>
+      <h1 class="t-h1">{{ user.display_name }}</h1>
+      <div class="section-title-sub">{{ user.email }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2 mb-6">
+  <div class="card" style="padding:24px">
+    <h3 class="t-h3 mb-4"><i data-lucide="user" class="icon-sm" style="vertical-align:-3px"></i> Account</h3>
+    <form method="post" class="stack gap-4">{% csrf_token %}
+      <div>
+        <label class="field-label">Display name</label>
+        {{ form.display_name }}
+        {% for e in form.display_name.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
+      </div>
+      <div>
+        <label class="field-label">Email</label>
+        <input value="{{ user.email }}" disabled>
+      </div>
+      <button class="btn-primary">Save changes</button>
+    </form>
+  </div>
+
+  <div class="card" style="padding:24px">
+    <h3 class="t-h3 mb-4"><i data-lucide="key-round" class="icon-sm" style="vertical-align:-3px"></i> Change password</h3>
+    <form method="post" class="stack gap-4">{% csrf_token %}
+      {% for field in pwd_form %}
+        <div>
+          <label class="field-label">{{ field.label }}</label>
+          {{ field }}
+          {% for e in field.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
+        </div>
+      {% endfor %}
+      <button class="btn-primary">Change password</button>
+    </form>
+  </div>
+</div>
+
+<div class="card" style="padding:24px">
+  <h3 class="t-h3 mb-4"><i data-lucide="users" class="icon-sm" style="vertical-align:-3px"></i> Your comps</h3>
+  <div class="stack gap-3">
+    {% for m in memberships %}
+      <div class="card-2 row-between" style="padding:16px;flex-wrap:wrap;gap:12px">
+        <div class="row gap-3" style="flex:1;min-width:0">
+          <span class="pill pill-mono">{{ m.org.sport }}</span>
+          <div>
+            <div class="team-name">{{ m.org.name }}</div>
+            <div class="t-small text-tertiary"><i data-lucide="heart" class="icon-sm" style="vertical-align:-3px;color:var(--accent)"></i> {{ m.org.charity_name }} · {{ m.org.season }}</div>
+          </div>
+        </div>
+        <div class="row gap-2">
+          <span class="pill {% if m.role == 'admin' %}pill-accent{% endif %}">{{ m.get_role_display }}</span>
+          <a href="{% url 'tipping:leaderboard' m.org.id %}" class="btn-ghost btn-sm">View</a>
+        </div>
+      </div>
+    {% empty %}
+      <p class="t-small text-tertiary">No comps yet.</p>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Admin — {{ block.super }}{% endblock %}
+{% block content %}
+<div class="admin-shell">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-label">Admin</div>
+    <nav class="admin-nav">
+      <a href="{% url 'manage:overview' %}" class="{% if request.resolver_match.url_name == 'overview' %}is-active{% endif %}"><i data-lucide="layout-dashboard" class="icon-sm"></i> Overview</a>
+      <a href="{% url 'manage:orgs_list' %}" class="{% if request.resolver_match.url_name == 'orgs_list' or 'org_' in request.resolver_match.url_name %}is-active{% endif %}"><i data-lucide="users" class="icon-sm"></i> Orgs</a>
+      <a href="{% url 'manage:sync' %}" class="{% if request.resolver_match.url_name == 'sync' %}is-active{% endif %}"><i data-lucide="refresh-cw" class="icon-sm"></i> Sync</a>
+    </nav>
+    <hr>
+    <div class="admin-sidebar-label">Account</div>
+    <nav class="admin-nav">
+      <a href="{% url 'dashboard' %}"><i data-lucide="home" class="icon-sm"></i> Back to app</a>
+    </nav>
+  </aside>
+  <div class="admin-content">
+    {% block manage_content %}{% endblock %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "manage/_base.html" %}
+{% block manage_content %}
+<div class="section-header">
+  <div>
+    <span class="t-micro text-tertiary">Admin / Orgs</span>
+    <h1 class="t-h1 mt-2">Organisations</h1>
+  </div>
+</div>
+
+<div class="card-2 mb-8" style="padding:24px">
+  <h3 class="t-h3 mb-4"><i data-lucide="plus" class="icon-sm" style="vertical-align:-3px"></i> New org</h3>
+  <form method="post" class="grid-2 gap-4">{% csrf_token %}
+    <div><label class="field-label">Name</label><input name="name" required></div>
+    <div><label class="field-label">Sport</label>
+      <select name="sport"><option value="AFL">AFL</option><option value="NRL">NRL</option><option value="BOTH">Both</option></select>
+    </div>
+    <div><label class="field-label">Season</label><input name="season" type="number" required value="2026"></div>
+    <div><label class="field-label">Charity name</label><input name="charity_name" required></div>
+    <div style="grid-column:1/-1"><label class="field-label">Charity URL (optional)</label><input name="charity_url" type="url"></div>
+    <div style="grid-column:1/-1"><button class="btn-primary">Create org</button></div>
+  </form>
+</div>
+
+<div class="table-card">
+  <table>
+    <thead><tr><th>Name</th><th>Sport</th><th>Season</th><th>Charity</th><th></th></tr></thead>
+    <tbody>
+      {% for o in orgs %}
+        <tr>
+          <td><strong>{{ o.name }}</strong></td>
+          <td><span class="pill pill-mono">{{ o.sport }}</span></td>
+          <td class="num">{{ o.season }}</td>
+          <td class="text-tertiary">{{ o.charity_name }}</td>
+          <td class="text-right">
+            <a href="{% url 'manage:org_rounds' o.id %}" class="btn-ghost btn-sm">Rounds</a>
+            <a href="{% url 'manage:org_members' o.id %}" class="btn-ghost btn-sm">Members</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="text-center text-tertiary" style="padding:32px">No orgs yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

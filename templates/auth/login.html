@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Log in — GoodTip{% endblock %}
+{% block container_class %}{% endblock %}
+{% block content %}
+<div class="auth-split">
+  <div class="auth-form-side">
+    <div class="container-tiny">
+      <a href="/" class="topnav-brand" style="font-size:22px;margin-bottom:32px;display:inline-block">GOODTIP</a>
+      <h1 class="t-h1 mb-3">Welcome back</h1>
+      <p class="t-body text-secondary mb-6">Log in to keep tipping for your cause.</p>
+      <form method="post" class="stack gap-4">
+        {% csrf_token %}
+        {% for field in form %}
+          <div>
+            <label class="field-label">{{ field.label }}</label>
+            {{ field }}
+            {% for e in field.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
+          </div>
+        {% endfor %}
+        <button class="btn-primary btn-block btn-lg mt-3">Log in</button>
+      </form>
+      <div class="row-between mt-6 t-small text-tertiary">
+        <a href="{% url 'accounts:signup' %}" class="link">Create account</a>
+        <a href="{% url 'password_reset' %}" class="link">Forgot password?</a>
+      </div>
+    </div>
+  </div>
+  <div class="auth-brand-side">
+    <div>
+      <span class="t-micro" style="color:rgba(0,0,0,0.7)">Australian Footy Tipping</span>
+      <div class="auth-brand-line mt-3">GOOD TIP, MATE.</div>
+    </div>
+    <div class="auth-brand-foot">
+      <strong>Workplace and friend-group footy comps,</strong> where every dollar of entry goes to the charity your group chose.
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,1 @@
+{% load team_extras %}{% team_colors team.slug as c %}<span class="team-badge {{ size|default:'md' }}{% if ring %} ring{% endif %}" style="background:{{ c.primary }};color:{{ c.text_on_primary }};{% if ring %}box-shadow:0 0 0 2px {{ c.secondary }};{% endif %}">{{ team.name|initials:"3" }}</span>

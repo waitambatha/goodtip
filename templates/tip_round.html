@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}R{{ round.round_number }} — {{ org.name }}{% endblock %}
+{% block content %}
+<div class="row mb-3"><a href="{% url 'dashboard' %}" class="t-small text-tertiary"><i data-lucide="arrow-left" class="icon-sm" style="vertical-align:-3px"></i> Back to dashboard</a></div>
+
+{% include "components/_page_header.html" with round_number=round.round_number title=org.name|add:" — Round "|add:round.round_number|stringformat:"s" subtitle=round.competition|add:" · "|add:org.charity_name %}
+
+<div class="card-2 mb-6" style="padding:20px">
+  <div class="row-between" style="flex-wrap:wrap;gap:16px">
+    <div>
+      {% if locked %}
+        <span class="pill pill-danger"><i data-lucide="lock" class="icon-sm"></i> Round locked</span>
+      {% else %}
+        <span class="pill pill-accent"><i data-lucide="clock" class="icon-sm"></i> Tips lock in {{ round.lockout_at|timeuntil }}</span>
+      {% endif %}
+    </div>
+    <div style="min-width:240px">
+      {% with submitted=rows|length %}
+      <div class="t-micro text-tertiary mb-2">Matches in round: {{ submitted }}</div>
+      {% endwith %}
+    </div>
+  </div>
+</div>
+
+<div class="stack gap-4">
+{% for row in rows %}
+  {% include "components/_match_card.html" with match=row.match tip_selection=row.tip locked=row.match.is_locked tip_save_url=row.save_url mode="" %}
+{% empty %}
+  {% include "components/_empty_state.html" with icon="calendar-x" title="No matches in this round yet" body="Hop hasn't added matches yet. Check back soon." %}
+{% endfor %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,13 @@
+{% load tz %}
+{% if round %}
+  {% if round.is_locked %}
+    <div class="row gap-3"><i data-lucide="lock" style="color:var(--text-muted)"></i><div class="countdown-display is-muted">LOCKED</div></div>
+  {% else %}
+    {% with secs=round.lockout_at|timeuntil %}
+      <div>
+        <div class="t-micro text-tertiary mb-2"><i data-lucide="clock" class="icon-sm" style="vertical-align:-3px"></i> TIPS LOCK IN</div>
+        <div class="countdown-display" id="countdown-num-{{ round.id }}">{{ secs|upper }}</div>
+      </div>
+    {% endwith %}
+  {% endif %}
+{% endif %}

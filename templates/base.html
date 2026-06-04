@@ -1,0 +1,90 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}GoodTip{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500;700&display=swap">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+{% if user.is_authenticated %}
+  {% include "components/_charity_strip.html" with org=primary_org %}
+  <nav class="topnav">
+    <div class="topnav-inner">
+      <div class="row gap-3">
+        <a href="{% url 'dashboard' %}" class="topnav-brand">GOODTIP</a>
+        {% if primary_org %}
+          <span class="topnav-brand-divider"></span>
+          <span class="topnav-org">{{ primary_org.name }}</span>
+        {% endif %}
+      </div>
+      <div class="topnav-links">
+        <a href="{% url 'dashboard' %}" class="topnav-link {% if request.resolver_match.url_name == 'dashboard' %}is-active{% endif %}">Dashboard</a>
+        {% if primary_org %}
+          <a href="{% url 'tipping:my_tips' primary_org.id %}" class="topnav-link {% if request.resolver_match.url_name == 'my_tips' %}is-active{% endif %}">My Tips</a>
+          <a href="{% url 'tipping:leaderboard' primary_org.id %}" class="topnav-link {% if request.resolver_match.url_name == 'leaderboard' %}is-active{% endif %}">Leaderboard</a>
+        {% endif %}
+        {% if user.is_staff %}
+          <a href="{% url 'manage:overview' %}" class="topnav-link {% if 'manage' in request.resolver_match.namespaces %}is-active{% endif %}">Admin</a>
+        {% endif %}
+      </div>
+      <div class="topnav-right">
+        <a href="{% url 'profile' %}" class="avatar" title="{{ user.display_name }}">{{ user.display_name|slice:":1"|upper }}</a>
+        <form method="post" action="{% url 'accounts:logout' %}" class="hidden-mobile">{% csrf_token %}
+          <button class="icon-btn" type="submit" title="Log out"><i data-lucide="log-out"></i></button>
+        </form>
+        <button class="menu-toggle" type="button" onclick="document.getElementById('mobile-sheet').classList.add('is-open')"><i data-lucide="menu"></i></button>
+      </div>
+    </div>
+  </nav>
+
+  <div id="mobile-sheet" class="mobile-sheet" onclick="if(event.target===this)this.classList.remove('is-open')">
+    <div class="mobile-sheet-panel">
+      <div class="row-between mb-4">
+        <span class="topnav-brand" style="font-size:18px">GOODTIP</span>
+        <button class="icon-btn" type="button" onclick="document.getElementById('mobile-sheet').classList.remove('is-open')"><i data-lucide="x"></i></button>
+      </div>
+      <a href="{% url 'dashboard' %}"><i data-lucide="home"></i> Dashboard</a>
+      {% if primary_org %}
+        <a href="{% url 'tipping:my_tips' primary_org.id %}"><i data-lucide="list-checks"></i> My Tips</a>
+        <a href="{% url 'tipping:leaderboard' primary_org.id %}"><i data-lucide="trophy"></i> Leaderboard</a>
+      {% endif %}
+      <a href="{% url 'profile' %}"><i data-lucide="user"></i> Profile</a>
+      {% if user.is_staff %}<a href="{% url 'manage:overview' %}"><i data-lucide="settings"></i> Admin</a>{% endif %}
+      <form method="post" action="{% url 'accounts:logout' %}" style="margin-top:auto">{% csrf_token %}
+        <button class="btn-ghost btn-block" type="submit"><i data-lucide="log-out"></i> Log out</button>
+      </form>
+    </div>
+  </div>
+{% endif %}
+
+<main>
+  <div class="{% block container_class %}container{% endblock %}">
+    {% if messages %}
+      <div class="mb-6">
+        {% for m in messages %}
+          <div class="flash {% if m.tags == 'success' %}is-success{% elif m.tags == 'error' %}is-error{% endif %}">
+            <i data-lucide="{% if m.tags == 'success' %}check-circle-2{% elif m.tags == 'error' %}alert-circle{% else %}info{% endif %}" class="icon-sm"></i>
+            <span>{{ m }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </div>
+</main>
+
+{% block footer %}{% endblock %}
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => { if (window.lucide) lucide.createIcons(); });
+  document.body.addEventListener('htmx:afterSwap', () => { if (window.lucide) lucide.createIcons(); });
+</script>
+</body>
+</html>

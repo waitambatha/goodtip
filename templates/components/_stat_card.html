@@ -1,0 +1,6 @@
+<div class="stat-card">
+  {% if icon %}<span class="stat-icon-wrap"><i data-lucide="{{ icon }}"></i></span>{% endif %}
+  <div class="stat-label">{{ label }}</div>
+  <div class="stat-num {% if accent %}text-accent{% endif %}">{{ value }}</div>
+  {% if sub %}<div class="stat-sub">{{ sub|safe }}</div>{% endif %}
+</div>

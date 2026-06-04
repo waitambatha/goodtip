@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block container_class %}container-tiny{% endblock %}
+{% block content %}
+<div class="card text-center" style="padding:48px;margin-top:64px">
+  <span class="empty-icon" style="background:rgba(239,68,68,0.15);color:var(--danger)"><i data-lucide="alert-triangle" class="icon-xl"></i></span>
+  <h1 class="t-h1 mt-4 mb-3">Invalid invite</h1>
+  <p class="t-body text-secondary">This join link is invalid or has expired. Ask the comp admin for a new one.</p>
+</div>
+{% endblock %}

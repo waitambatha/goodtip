@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}My Tips — {{ org.name }}{% endblock %}
+{% block content %}
+
+<div class="section-header">
+  <div>
+    <span class="t-micro text-tertiary">{{ org.name }}</span>
+    <h1 class="t-h1 mt-2">My Tips</h1>
+  </div>
+  <div class="text-right">
+    <div class="t-micro text-tertiary">Season points</div>
+    <div class="hero-num text-accent" style="font-size:48px">{{ points }}</div>
+  </div>
+</div>
+
+<div class="round-strip mb-6">
+  {% for r in rounds %}
+    <a hx-get="?round={{ r.id }}" hx-target="#round-pane" hx-push-url="true"
+       class="round-pill {% if selected_round and r.id == selected_round.id %}is-active{% endif %}">R{{ r.round_number }} · {{ r.competition }}</a>
+  {% empty %}
+    <div class="t-small text-tertiary">No rounds yet.</div>
+  {% endfor %}
+</div>
+
+<div id="round-pane">
+  {% include "partials/my_tips_round.html" with org=org round=selected_round rows=rows %}
+</div>
+
+{% endblock %}

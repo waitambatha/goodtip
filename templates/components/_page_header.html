@@ -1,0 +1,14 @@
+<div class="section-header">
+  <div class="section-header-meta">
+    {% if round_number %}
+      <span class="round-badge"><span class="r-label">Round</span><span class="r-num">{{ round_number }}</span></span>
+    {% elif icon %}
+      <span class="stat-icon-wrap" style="position:static;width:48px;height:48px;border-radius:12px"><i data-lucide="{{ icon }}" class="icon-lg"></i></span>
+    {% endif %}
+    <div>
+      <h1 class="t-h1">{{ title }}</h1>
+      {% if subtitle %}<div class="section-title-sub">{{ subtitle|safe }}</div>{% endif %}
+    </div>
+  </div>
+  {% if actions %}<div class="section-header-actions">{{ actions|safe }}</div>{% endif %}
+</div>

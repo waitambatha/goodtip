@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Dashboard — GoodTip{% endblock %}
+{% block content %}
+
+{% if not cards %}
+  {% include "components/_empty_state.html" with icon="user-plus" title="You're not in a comp yet" body="Ask your group admin for a join link, or wait for them to share one." %}
+{% else %}
+
+{% with c=cards.0 %}
+  <div class="section-header">
+    <div>
+      <span class="t-micro text-tertiary">Welcome back</span>
+      <h1 class="t-h1 mt-2" style="font-size:32px">{{ user.display_name|upper }}</h1>
+    </div>
+    <div class="hidden-mobile">
+      <a href="{% url 'tipping:leaderboard' c.org.id %}" class="btn-ghost btn-sm"><i data-lucide="trophy" class="icon-sm"></i> Leaderboard</a>
+    </div>
+  </div>
+
+  <div class="grid-3 mb-6">
+    {% include "components/_stat_card.html" with label="Season points" value=c.points accent=True icon="target" %}
+    {% include "components/_stat_card.html" with label="Your rank" value=c.rank|default:"—" icon="trending-up" sub="of all tippers" %}
+    {% include "components/_stat_card.html" with label="Tips submitted" value=c.tips_done sub=c.tips_total|stringformat:"of %s this round" icon="list-checks" %}
+  </div>
+
+  {# Zone 2 — active round #}
+  {% if c.round %}
+    <div class="active-round mb-6">
+      <div class="row-between" style="flex-wrap:wrap;gap:16px">
+        <div class="row gap-4" style="flex-wrap:wrap">
+          <span class="round-badge"><span class="r-label">Round</span><span class="r-num">{{ c.round.round_number }}</span></span>
+          <div>
+            <div class="t-micro text-tertiary mb-2">{{ c.round.competition }} · {{ c.org.name }}</div>
+            <div id="countdown-{{ c.org.id }}"
+                 hx-get="{% url 'accounts:dashboard_countdown' c.org.id %}"
+                 hx-trigger="every 60s"
+                 hx-swap="innerHTML">
+              {% include "components/_countdown.html" with round=c.round %}
+            </div>
+          </div>
+        </div>
+        <div style="flex:0 0 auto;min-width:240px">
+          <div class="t-micro text-tertiary mb-2">{{ c.tips_done }} / {{ c.tips_total }} tips submitted</div>
+          <div class="progress mb-4"><div class="progress-fill" style="width:{% widthratio c.tips_done c.tips_total|default:1 100 %}%"></div></div>
+          {% if c.round.is_locked %}
+            <a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="btn-ghost btn-block"><i data-lucide="eye" class="icon-sm"></i> Review tips</a>
+          {% elif c.tips_done < c.tips_total %}
+            <a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="btn-primary btn-block">Finish your tips <i data-lucide="arrow-right" class="icon-sm"></i></a>
+          {% else %}
+            <a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="btn-ghost btn-block"><i data-lucide="check-circle-2" class="icon-sm"></i> All tips in — review</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endwith %}
+
+{% if cards|length > 1 %}
+  <h2 class="t-h2 mt-8 mb-4">Your other comps</h2>
+  <div class="grid-2">
+    {% for c in cards|slice:"1:" %}
+      <div class="card card-interactive" style="padding:20px">
+        <div class="row-between mb-3">
+          <div>
+            <h3 class="t-h3" style="font-size:14px">{{ c.org.name }}</h3>
+            <div class="t-micro text-tertiary mt-2">{{ c.org.sport }} · {{ c.org.season }} · for {{ c.org.charity_name }}</div>
+          </div>
+          {% if c.rank %}<div class="text-right"><div class="t-micro text-tertiary">Rank</div><div class="stat-num">#{{ c.rank }}</div></div>{% endif %}
+        </div>
+        <div class="row gap-2">
+          <a href="{% url 'tipping:my_tips' c.org.id %}" class="btn-ghost btn-sm flex-1"><i data-lucide="list-checks" class="icon-sm"></i> Tips</a>
+          <a href="{% url 'tipping:leaderboard' c.org.id %}" class="btn-ghost btn-sm flex-1"><i data-lucide="trophy" class="icon-sm"></i> Board</a>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

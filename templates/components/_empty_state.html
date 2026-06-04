@@ -1,0 +1,8 @@
+<div class="empty">
+  <span class="empty-icon"><i data-lucide="{{ icon|default:'inbox' }}" class="icon-xl"></i></span>
+  <h2 class="t-h2 mb-2">{{ title }}</h2>
+  <p class="t-body text-secondary" style="max-width:420px">{{ body|safe }}</p>
+  {% if cta_url and cta_label %}
+    <a href="{{ cta_url }}" class="btn-primary mt-6">{{ cta_label }}</a>
+  {% endif %}
+</div>

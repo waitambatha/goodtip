@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard — {{ org.name }}{% endblock %}
+{% block content %}
+
+<div class="section-header">
+  <div>
+    <span class="t-micro text-tertiary">{{ org.name }}</span>
+    <h1 class="t-h1 mt-2">Leaderboard</h1>
+  </div>
+  <div class="row gap-2">
+    <form hx-get="{% url 'tipping:leaderboard' org.id %}" hx-target="#board" hx-trigger="change">
+      <select name="round" style="width:auto;min-width:200px">
+        <option value="all" {% if selected_round_id == "all" %}selected{% endif %}>Season total</option>
+        {% for r in rounds %}<option value="{{ r.id }}" {% if selected_round_id == r.id|stringformat:"s" %}selected{% endif %}>R{{ r.round_number }} · {{ r.competition }}</option>{% endfor %}
+      </select>
+    </form>
+    <button class="icon-btn" hx-get="{% url 'tipping:leaderboard' org.id %}?round={{ selected_round_id }}" hx-target="#board" title="Refresh"><i data-lucide="refresh-cw" class="icon-sm"></i></button>
+  </div>
+</div>
+
+<div id="board">
+  {% include "partials/leaderboard_table.html" with ranked=ranked me=request.user %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "manage/_base.html" %}
+{% block manage_content %}
+<div class="section-header">
+  <div>
+    <span class="t-micro text-tertiary">Admin / Sync</span>
+    <h1 class="t-h1 mt-2">API Sync</h1>
+  </div>
+</div>
+
+<div class="grid-2 mb-6">
+  <div class="card-2" style="padding:20px">
+    <div class="row gap-3 mb-3">
+      <span class="stat-icon-wrap" style="position:static"><i data-lucide="zap"></i></span>
+      <div>
+        <div class="t-h3" style="font-size:14px">Squiggle</div>
+        <div class="t-small text-tertiary">AFL · No key required</div>
+      </div>
+      <span class="pill pill-success" style="margin-left:auto">Ready</span>
+    </div>
+    <p class="t-small text-secondary">Free public API. Imports fixtures and final scores for any past or upcoming round.</p>
+  </div>
+  <div class="card-2" style="padding:20px">
+    <div class="row gap-3 mb-3">
+      <span class="stat-icon-wrap" style="position:static"><i data-lucide="key"></i></span>
+      <div>
+        <div class="t-h3" style="font-size:14px">TheSports API</div>
+        <div class="t-small text-tertiary">NRL · Requires THESPORTS_API_KEY</div>
+      </div>
+      <span class="pill pill-warning" style="margin-left:auto">Key needed</span>
+    </div>
+    <p class="t-small text-secondary">Drop your key in <code style="background:var(--bg-page);padding:2px 6px;border-radius:4px">.env</code>. Sync will report a clear error until then.</p>
+  </div>
+</div>
+
+<div class="card-2" style="padding:24px">
+  <h3 class="t-h3 mb-4"><i data-lucide="refresh-cw" class="icon-sm" style="vertical-align:-3px"></i> Run sync</h3>
+  <form method="post" class="grid-2 gap-4">{% csrf_token %}
+    <div><label class="field-label">Org</label>
+      <select name="org_id" required>{% for o in orgs %}<option value="{{ o.id }}">{{ o.name }} ({{ o.season }})</option>{% endfor %}</select>
+    </div>
+    <div><label class="field-label">Competition</label>
+      <select name="competition"><option value="AFL">AFL · Squiggle</option><option value="NRL">NRL · TheSports</option></select>
+    </div>
+    <div><label class="field-label">Round number</label><input name="round_number" type="number" required value="1"></div>
+    <div><label class="field-label">What to sync</label>
+      <select name="kind"><option value="fixtures">Fixtures</option><option value="results">Results</option></select>
+    </div>
+    <div style="grid-column:1/-1"><button class="btn-primary">Run sync</button></div>
+  </form>
+</div>
+{% endblock %}

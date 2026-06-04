@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Sign up — GoodTip{% endblock %}
+{% block container_class %}{% endblock %}
+{% block content %}
+<div class="auth-split">
+  <div class="auth-form-side">
+    <div class="container-tiny">
+      <a href="/" class="topnav-brand" style="font-size:22px;margin-bottom:32px;display:inline-block">GOODTIP</a>
+      <h1 class="t-h1 mb-3">Create your account</h1>
+      <p class="t-body text-secondary mb-6">Join your group's comp and start tipping for a cause.</p>
+      <form method="post" class="stack gap-4">
+        {% csrf_token %}
+        {% for field in form %}
+          <div>
+            <label class="field-label">{{ field.label }}</label>
+            {{ field }}
+            {% for e in field.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
+          </div>
+        {% endfor %}
+        <button class="btn-primary btn-block btn-lg mt-3">Sign up</button>
+      </form>
+      <p class="t-small text-tertiary mt-6">Already have an account? <a href="{% url 'accounts:login' %}" class="link">Log in</a></p>
+    </div>
+  </div>
+  <div class="auth-brand-side">
+    <div>
+      <span class="t-micro" style="color:rgba(0,0,0,0.7)">Australian Footy Tipping</span>
+      <div class="auth-brand-line mt-3">GOOD TIP, MATE.</div>
+    </div>
+    <div class="auth-brand-foot">
+      <strong>100% to charity.</strong><br>
+      Your group picks the cause. Every entry fee goes straight to them — not us, not a platform fee.
+    </div>
+  </div>
+</div>
+{% endblock %}

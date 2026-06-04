@@ -1,0 +1,82 @@
+{% load team_extras %}
+{% team_colors match.home_team.slug as home_c %}
+{% team_colors match.away_team.slug as away_c %}
+<div class="match-card">
+  <div class="color-strip">
+    <div style="background:{{ home_c.primary }}"></div>
+    <div style="background:{{ away_c.primary }}"></div>
+  </div>
+  <div class="match-card-body">
+    <div class="row-between mb-3 t-micro text-tertiary">
+      <span><i data-lucide="clock" class="icon-sm" style="vertical-align:-3px"></i> {{ match.kickoff_at|date:"D j M · g:i a" }}</span>
+      <span>{{ match.venue }}</span>
+    </div>
+
+    {% with home_selected=tip_selection|default:'' %}
+    <form {% if tip_save_url %}hx-post="{{ tip_save_url }}_home_" hx-target="#status-{{ match.id }}" hx-swap="innerHTML"{% endif %}
+          class="stack gap-2">
+      {% if tip_save_url %}{% csrf_token %}{% endif %}
+
+      <div class="team-row">
+        <div class="team-meta">
+          {% include "components/_team_badge.html" with team=match.home_team size="md" %}
+          <div>
+            <div class="team-name">{{ match.home_team.name }}</div>
+            <div class="team-sub">Home</div>
+          </div>
+        </div>
+        {% if mode == "result" %}
+          <div class="row gap-3">
+            {% if match.has_result %}<div class="font-mono text-secondary" style="font-size:18px">{{ match.home_score }}</div>{% endif %}
+            {% if tip and tip.selection == "home" %}
+              <span class="pill {% if tip.is_correct is True %}pill-success{% elif tip.is_correct is False %}pill-danger{% else %}pill-accent{% endif %}">
+                <i data-lucide="user" class="icon-sm"></i> Your tip
+              </span>
+            {% endif %}
+          </div>
+        {% elif locked %}
+          {% if tip_selection == "home" %}<span class="pill pill-accent"><i data-lucide="check" class="icon-sm"></i> Your tip</span>{% endif %}
+        {% else %}
+          <label class="row" style="position:relative">
+            <input type="radio" name="selection-{{ match.id }}" value="home" class="tip-radio"
+                   {% if tip_selection == "home" %}checked{% endif %}
+                   {% if tip_save_url %}hx-post="{{ tip_save_url }}" hx-vals='{"selection":"home"}' hx-target="#status-{{ match.id }}" hx-swap="innerHTML"{% endif %}>
+            <span class="tip-label">Pick Home</span>
+          </label>
+        {% endif %}
+      </div>
+
+      <div class="team-row">
+        <div class="team-meta">
+          {% include "components/_team_badge.html" with team=match.away_team size="md" %}
+          <div>
+            <div class="team-name">{{ match.away_team.name }}</div>
+            <div class="team-sub">Away</div>
+          </div>
+        </div>
+        {% if mode == "result" %}
+          <div class="row gap-3">
+            {% if match.has_result %}<div class="font-mono text-secondary" style="font-size:18px">{{ match.away_score }}</div>{% endif %}
+            {% if tip and tip.selection == "away" %}
+              <span class="pill {% if tip.is_correct is True %}pill-success{% elif tip.is_correct is False %}pill-danger{% else %}pill-accent{% endif %}">
+                <i data-lucide="user" class="icon-sm"></i> Your tip
+              </span>
+            {% endif %}
+          </div>
+        {% elif locked %}
+          {% if tip_selection == "away" %}<span class="pill pill-accent"><i data-lucide="check" class="icon-sm"></i> Your tip</span>{% endif %}
+        {% else %}
+          <label class="row" style="position:relative">
+            <input type="radio" name="selection-{{ match.id }}" value="away" class="tip-radio"
+                   {% if tip_selection == "away" %}checked{% endif %}
+                   {% if tip_save_url %}hx-post="{{ tip_save_url }}" hx-vals='{"selection":"away"}' hx-target="#status-{{ match.id }}" hx-swap="innerHTML"{% endif %}>
+            <span class="tip-label">Pick Away</span>
+          </label>
+        {% endif %}
+      </div>
+    </form>
+    {% endwith %}
+
+    <div id="status-{{ match.id }}" class="t-small text-tertiary mt-3" style="min-height:18px"></div>
+  </div>
+</div>
