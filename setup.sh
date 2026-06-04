@@ -3,17 +3,51 @@ set -euo pipefail
 
 echo "==> Goodtip local setup"
 
-if ! command -v docker >/dev/null 2>&1; then
-  echo "ERROR: Docker is not installed."
-  echo "Install Docker Desktop from https://www.docker.com/products/docker-desktop and re-run this script."
+# --- 1. Python -----------------------------------------------------------
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "ERROR: Python 3 is not installed."
+  echo "  macOS:  brew install python@3.12"
+  echo "  Linux:  sudo apt install python3 python3-venv python3-pip"
+  exit 1
+fi
+echo "    Found $(python3 --version)"
+
+# --- 2. Postgres ---------------------------------------------------------
+if ! command -v psql >/dev/null 2>&1; then
+  echo "ERROR: PostgreSQL client (psql) not found."
+  echo "  macOS:  brew install postgresql@16 && brew services start postgresql@16"
+  echo "  Linux:  sudo apt install postgresql postgresql-contrib"
   exit 1
 fi
 
-if ! docker compose version >/dev/null 2>&1; then
-  echo "ERROR: 'docker compose' is not available. Update Docker Desktop and try again."
-  exit 1
+echo "==> Ensuring Postgres role 'mbatha' and database 'goodtip' exist"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  PSQL_SUPER=(psql -d postgres)
+else
+  PSQL_SUPER=(sudo -u postgres psql)
 fi
 
+if ! "${PSQL_SUPER[@]}" -tAc "SELECT 1 FROM pg_roles WHERE rolname='mbatha'" | grep -q 1; then
+  echo "    Creating role 'mbatha'"
+  "${PSQL_SUPER[@]}" -c "CREATE ROLE mbatha WITH LOGIN PASSWORD 'masterclass' CREATEDB;"
+fi
+
+if ! "${PSQL_SUPER[@]}" -tAc "SELECT 1 FROM pg_database WHERE datname='goodtip'" | grep -q 1; then
+  echo "    Creating database 'goodtip'"
+  "${PSQL_SUPER[@]}" -c "CREATE DATABASE goodtip OWNER mbatha;"
+fi
+
+# --- 3. venv + dependencies ---------------------------------------------
+if [ ! -d venv ]; then
+  echo "==> Creating Python virtual environment in ./venv"
+  python3 -m venv venv
+fi
+
+echo "==> Installing Python dependencies"
+./venv/bin/pip install --quiet --upgrade pip
+./venv/bin/pip install --quiet -r requirements.txt
+
+# --- 4. .env -------------------------------------------------------------
 if [ ! -f .env ]; then
   echo "==> Creating .env from .env.example with a random SECRET_KEY"
   cp .env.example .env
@@ -23,19 +57,16 @@ else
   echo "==> .env already exists, leaving it as-is"
 fi
 
-echo "==> Building and starting containers (first run can take a few minutes)"
-docker compose up -d --build
+# --- 5. Migrate + seed ---------------------------------------------------
+echo "==> Running database migrations"
+./venv/bin/python manage.py migrate --noinput
 
-echo "==> Waiting for the app to respond on http://localhost:8000 ..."
-for i in $(seq 1 60); do
-  if curl -sf -o /dev/null http://localhost:8000/; then
-    break
-  fi
-  sleep 2
-done
+echo "==> Seeding teams"
+./venv/bin/python manage.py seed_teams || echo "    (seed_teams skipped)"
 
+# --- 6. Default admin user ----------------------------------------------
 echo "==> Ensuring default admin user (admin / admin)"
-docker compose exec -T web python manage.py shell -c "
+./venv/bin/python manage.py shell -c "
 from django.contrib.auth import get_user_model
 U = get_user_model()
 if not U.objects.filter(username='admin').exists():
@@ -45,16 +76,20 @@ else:
     print('Superuser admin already exists')
 "
 
+# --- 7. Run the dev server ----------------------------------------------
 cat <<EOF
 
 ============================================================
- Goodtip is running at: http://localhost:8000
- Admin panel:           http://localhost:8000/admin
+ Goodtip is ready.
+
+ Sign in:
+   URL:      http://localhost:8000/admin
    username: admin
    password: admin
 
- Stop:    docker compose down
- Restart: docker compose up -d
- Logs:    docker compose logs -f web
+ Starting the dev server now on http://localhost:8000
+ (press Ctrl+C to stop)
 ============================================================
+
 EOF
+exec ./venv/bin/python manage.py runserver 8000

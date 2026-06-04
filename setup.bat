@@ -1,16 +1,52 @@
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 
 echo ==^> Goodtip local setup
 
-where docker >nul 2>&1
+REM --- 1. Python ----------------------------------------------------------
+where python >nul 2>&1
 if errorlevel 1 (
-    echo ERROR: Docker is not installed.
-    echo Install Docker Desktop from https://www.docker.com/products/docker-desktop and re-run.
+    echo ERROR: Python is not installed.
+    echo Install Python 3.12+ from https://www.python.org/downloads/
+    echo Make sure to tick "Add Python to PATH" during install.
     pause
     exit /b 1
 )
 
+REM --- 2. Postgres --------------------------------------------------------
+where psql >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: PostgreSQL is not installed or psql is not on PATH.
+    echo Install PostgreSQL from https://www.postgresql.org/download/windows/
+    echo Make sure to add the PostgreSQL bin folder to PATH.
+    pause
+    exit /b 1
+)
+
+echo ==^> Ensuring Postgres role 'mbatha' and database 'goodtip' exist
+echo     You may be prompted for the postgres superuser password.
+psql -U postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='mbatha'" | findstr 1 >nul
+if errorlevel 1 (
+    echo     Creating role 'mbatha'
+    psql -U postgres -c "CREATE ROLE mbatha WITH LOGIN PASSWORD 'masterclass' CREATEDB;"
+)
+psql -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname='goodtip'" | findstr 1 >nul
+if errorlevel 1 (
+    echo     Creating database 'goodtip'
+    psql -U postgres -c "CREATE DATABASE goodtip OWNER mbatha;"
+)
+
+REM --- 3. venv + dependencies --------------------------------------------
+if not exist venv (
+    echo ==^> Creating Python virtual environment in .\venv
+    python -m venv venv
+)
+
+echo ==^> Installing Python dependencies
+venv\Scripts\python -m pip install --quiet --upgrade pip
+venv\Scripts\pip install --quiet -r requirements.txt
+
+REM --- 4. .env ------------------------------------------------------------
 if not exist .env (
     echo ==^> Creating .env from .env.example with a random SECRET_KEY
     powershell -NoProfile -Command "$bytes=New-Object byte[] 36; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes); $s=[Convert]::ToBase64String($bytes) -replace '[/+=]',''; (Get-Content .env.example) -replace '^SECRET_KEY=.*', \"SECRET_KEY=$s\" | Set-Content .env"
@@ -18,29 +54,30 @@ if not exist .env (
     echo ==^> .env already exists, leaving it as-is
 )
 
-echo ==^> Building and starting containers (first run can take a few minutes)
-docker compose up -d --build
-if errorlevel 1 (
-    echo ERROR: docker compose failed
-    pause
-    exit /b 1
-)
+REM --- 5. Migrate + seed --------------------------------------------------
+echo ==^> Running database migrations
+venv\Scripts\python manage.py migrate --noinput
 
-echo ==^> Waiting for the app to respond on http://localhost:8000 ...
-powershell -NoProfile -Command "for ($i=0; $i -lt 60; $i++) { try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 http://localhost:8000/ ^| Out-Null; break } catch { Start-Sleep 2 } }"
+echo ==^> Seeding teams
+venv\Scripts\python manage.py seed_teams
 
+REM --- 6. Default admin user ---------------------------------------------
 echo ==^> Ensuring default admin user (admin / admin)
-docker compose exec -T web python manage.py shell -c "from django.contrib.auth import get_user_model; U=get_user_model(); U.objects.filter(username='admin').exists() or U.objects.create_superuser('admin','admin@example.com','admin')"
+venv\Scripts\python manage.py shell -c "from django.contrib.auth import get_user_model; U=get_user_model(); U.objects.filter(username='admin').exists() or U.objects.create_superuser('admin','admin@example.com','admin')"
 
+REM --- 7. Run the dev server ---------------------------------------------
 echo.
 echo ============================================================
-echo  Goodtip is running at: http://localhost:8000
-echo  Admin panel:           http://localhost:8000/admin
+echo  Goodtip is ready.
+echo.
+echo  Sign in:
+echo    URL:      http://localhost:8000/admin
 echo    username: admin
 echo    password: admin
 echo.
-echo  Stop:    docker compose down
-echo  Restart: docker compose up -d
-echo  Logs:    docker compose logs -f web
+echo  Starting the dev server now on http://localhost:8000
+echo  (press Ctrl+C to stop)
 echo ============================================================
-pause
+echo.
+
+venv\Scripts\python manage.py runserver 8000
