@@ -26,6 +26,8 @@ setup.bat
 
 When the script finishes it starts the dev server. Open **http://localhost:8000**.
 
+> Prefer to do it by hand? Follow the step-by-step guide in [SETUP.md](SETUP.md).
+
 ## Sign in
 
 | Field    | Value                              |
