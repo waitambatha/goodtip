@@ -21,20 +21,24 @@ if ! command -v psql >/dev/null 2>&1; then
 fi
 
 echo "==> Ensuring Postgres role 'mbatha' and database 'goodtip' exist"
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  PSQL_SUPER=(psql -d postgres)
+if PGPASSWORD=masterclass psql -h localhost -U mbatha -d goodtip -c '\q' 2>/dev/null; then
+  echo "    Role and database already exist, skipping creation"
 else
-  PSQL_SUPER=(sudo -u postgres psql)
-fi
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    PSQL_SUPER=(psql -d postgres)
+  else
+    PSQL_SUPER=(sudo -u postgres psql)
+  fi
 
-if ! "${PSQL_SUPER[@]}" -tAc "SELECT 1 FROM pg_roles WHERE rolname='mbatha'" | grep -q 1; then
-  echo "    Creating role 'mbatha'"
-  "${PSQL_SUPER[@]}" -c "CREATE ROLE mbatha WITH LOGIN PASSWORD 'masterclass' CREATEDB;"
-fi
+  if ! "${PSQL_SUPER[@]}" -tAc "SELECT 1 FROM pg_roles WHERE rolname='mbatha'" | grep -q 1; then
+    echo "    Creating role 'mbatha'"
+    "${PSQL_SUPER[@]}" -c "CREATE ROLE mbatha WITH LOGIN PASSWORD 'masterclass' CREATEDB;"
+  fi
 
-if ! "${PSQL_SUPER[@]}" -tAc "SELECT 1 FROM pg_database WHERE datname='goodtip'" | grep -q 1; then
-  echo "    Creating database 'goodtip'"
-  "${PSQL_SUPER[@]}" -c "CREATE DATABASE goodtip OWNER mbatha;"
+  if ! "${PSQL_SUPER[@]}" -tAc "SELECT 1 FROM pg_database WHERE datname='goodtip'" | grep -q 1; then
+    echo "    Creating database 'goodtip'"
+    "${PSQL_SUPER[@]}" -c "CREATE DATABASE goodtip OWNER mbatha;"
+  fi
 fi
 
 # --- 3. venv + dependencies ---------------------------------------------
@@ -65,15 +69,15 @@ echo "==> Seeding teams"
 ./venv/bin/python manage.py seed_teams || echo "    (seed_teams skipped)"
 
 # --- 6. Default admin user ----------------------------------------------
-echo "==> Ensuring default admin user (admin / admin)"
+echo "==> Ensuring default admin user (admin@example.com / admin)"
 ./venv/bin/python manage.py shell -c "
 from django.contrib.auth import get_user_model
 U = get_user_model()
-if not U.objects.filter(username='admin').exists():
-    U.objects.create_superuser('admin', 'admin@example.com', 'admin')
-    print('Created superuser admin/admin')
+if not U.objects.filter(email='admin@example.com').exists():
+    U.objects.create_superuser(email='admin@example.com', password='admin', display_name='Admin')
+    print('Created superuser admin@example.com / admin')
 else:
-    print('Superuser admin already exists')
+    print('Superuser admin@example.com already exists')
 "
 
 # --- 7. Run the dev server ----------------------------------------------
@@ -84,7 +88,7 @@ cat <<EOF
 
  Sign in:
    URL:      http://localhost:8000/admin
-   username: admin
+   email:    admin@example.com
    password: admin
 
  Starting the dev server now on http://localhost:8000

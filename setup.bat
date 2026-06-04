@@ -62,8 +62,8 @@ echo ==^> Seeding teams
 venv\Scripts\python manage.py seed_teams
 
 REM --- 6. Default admin user ---------------------------------------------
-echo ==^> Ensuring default admin user (admin / admin)
-venv\Scripts\python manage.py shell -c "from django.contrib.auth import get_user_model; U=get_user_model(); U.objects.filter(username='admin').exists() or U.objects.create_superuser('admin','admin@example.com','admin')"
+echo ==^> Ensuring default admin user (admin@example.com / admin)
+venv\Scripts\python manage.py shell -c "from django.contrib.auth import get_user_model; U=get_user_model(); U.objects.filter(email='admin@example.com').exists() or U.objects.create_superuser(email='admin@example.com', password='admin', display_name='Admin')"
 
 REM --- 7. Run the dev server ---------------------------------------------
 echo.
@@ -72,7 +72,7 @@ echo  Goodtip is ready.
 echo.
 echo  Sign in:
 echo    URL:      http://localhost:8000/admin
-echo    username: admin
+echo    email:    admin@example.com
 echo    password: admin
 echo.
 echo  Starting the dev server now on http://localhost:8000

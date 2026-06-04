@@ -31,10 +31,10 @@ When the script finishes it starts the dev server. Open **http://localhost:8000*
 | Field    | Value                              |
 |----------|------------------------------------|
 | URL      | http://localhost:8000/admin        |
-| Username | `admin`                            |
+| Email    | `admin@example.com`                |
 | Password | `admin`                            |
 
-> Change this password before exposing the app to anyone else.
+> The app uses **email** as the login (no separate username). Change this password before exposing the app to anyone else.
 
 ## What the setup script does
 
@@ -43,7 +43,7 @@ When the script finishes it starts the dev server. Open **http://localhost:8000*
 3. Creates a Python virtual environment in `./venv` and installs `requirements.txt`.
 4. Copies `.env.example` to `.env` with a fresh random `SECRET_KEY`.
 5. Runs `migrate` and seeds teams.
-6. Creates the default `admin / admin` superuser.
+6. Creates the default `admin@example.com / admin` superuser (idempotent).
 7. Starts `python manage.py runserver 8000`.
 
 Safe to re-run — every step is idempotent.
