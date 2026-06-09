@@ -22,3 +22,6 @@ htmlcov/
 
 # Local Claude Code settings (may contain secrets)
 .claude/settings.local.json
+
+# LibreOffice/OpenOffice lock files
+.~lock.*#

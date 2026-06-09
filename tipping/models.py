@@ -4,16 +4,9 @@ from django.utils import timezone
 
 
 class Team(models.Model):
-    COMPETITION_CHOICES = [
-        ("AFL", "AFL"),
-        ("AFLW", "AFLW"),
-        ("NRL", "NRL"),
-        ("NRLW", "NRLW"),
-    ]
-
     name = models.CharField(max_length=100)
     slug = models.CharField(max_length=100)
-    competition = models.CharField(max_length=10, choices=COMPETITION_CHOICES)
+    competition = models.ForeignKey("catalog.Competition", on_delete=models.PROTECT, related_name="teams")
     external_id = models.CharField(max_length=100, blank=True)
 
     class Meta:
@@ -25,7 +18,6 @@ class Team(models.Model):
 
 
 class Round(models.Model):
-    COMPETITION_CHOICES = [("AFL", "AFL"), ("NRL", "NRL")]
     STATUS_CHOICES = [
         ("upcoming", "Upcoming"),
         ("open", "Open"),
@@ -35,7 +27,7 @@ class Round(models.Model):
 
     org = models.ForeignKey("orgs.Organisation", on_delete=models.CASCADE, related_name="rounds")
     round_number = models.IntegerField()
-    competition = models.CharField(max_length=10, choices=COMPETITION_CHOICES)
+    competition = models.ForeignKey("catalog.Competition", on_delete=models.PROTECT, related_name="rounds")
     lockout_at = models.DateTimeField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="upcoming")
 

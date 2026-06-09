@@ -50,7 +50,7 @@
     {% for m in memberships %}
       <div class="card-2 row-between" style="padding:16px;flex-wrap:wrap;gap:12px">
         <div class="row gap-3" style="flex:1;min-width:0">
-          <span class="pill pill-mono">{{ m.org.sport }}</span>
+          <span class="pill pill-mono">{{ m.org.sport_label }}</span>
           <div>
             <div class="team-name">{{ m.org.name }}</div>
             <div class="t-small text-tertiary"><i data-lucide="heart" class="icon-sm" style="vertical-align:-3px;color:var(--accent)"></i> {{ m.org.charity_name }} · {{ m.org.season }}</div>

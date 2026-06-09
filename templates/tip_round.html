@@ -3,7 +3,7 @@
 {% block content %}
 <div class="row mb-3"><a href="{% url 'dashboard' %}" class="t-small text-tertiary"><i data-lucide="arrow-left" class="icon-sm" style="vertical-align:-3px"></i> Back to dashboard</a></div>
 
-{% include "components/_page_header.html" with round_number=round.round_number title=org.name|add:" — Round "|add:round.round_number|stringformat:"s" subtitle=round.competition|add:" · "|add:org.charity_name %}
+{% include "components/_page_header.html" with round_number=round.round_number title=org.name|add:" — Round "|add:round.round_number|stringformat:"s" subtitle=round.competition.name|add:" · "|add:org.charity_name %}
 
 <div class="card-2 mb-6" style="padding:20px">
   <div class="row-between" style="flex-wrap:wrap;gap:16px">

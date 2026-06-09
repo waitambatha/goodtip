@@ -6,6 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import User
+from catalog.models import Competition, Season, Sport
 from orgs.models import OrgMember, Organisation
 from tipping.models import Match, Round, Team, Tip
 from tipping.services import record_match_result
@@ -87,22 +88,28 @@ class Command(BaseCommand):
             users.append(user)
 
         # 2. Orgs (idempotent)
+        season, _ = Season.objects.get_or_create(year=2026, defaults={"label": "2026"})
+        afl = Sport.objects.get(name="AFL")
+        nrl = Sport.objects.get(name="NRL")
+
         org1, _ = Organisation.objects.update_or_create(
             name="Test Friends Comp",
             defaults={
-                "sport": "AFL", "season": 2026,
+                "season": season,
                 "charity_name": "Beyond Blue",
                 "charity_url": "https://www.beyondblue.org.au",
             },
         )
+        org1.sports.set([afl])
         org2, _ = Organisation.objects.update_or_create(
             name="Office Footy Crew",
             defaults={
-                "sport": "BOTH", "season": 2026,
+                "season": season,
                 "charity_name": "R U OK?",
                 "charity_url": "https://www.ruok.org.au",
             },
         )
+        org2.sports.set([afl, nrl])
 
         # 3. Memberships
         for u in users:
@@ -161,8 +168,9 @@ class Command(BaseCommand):
         ))
 
     def _make_round(self, org, num, comp, lockout, status):
+        competition = Competition.objects.get(name=comp)
         return Round.objects.create(
-            org=org, round_number=num, competition=comp,
+            org=org, round_number=num, competition=competition,
             lockout_at=lockout, status=status,
         )
 

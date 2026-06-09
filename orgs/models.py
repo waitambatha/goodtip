@@ -3,11 +3,9 @@ from django.db import models
 
 
 class Organisation(models.Model):
-    SPORT_CHOICES = [("AFL", "AFL"), ("NRL", "NRL"), ("BOTH", "Both")]
-
     name = models.CharField(max_length=200)
-    sport = models.CharField(max_length=10, choices=SPORT_CHOICES)
-    season = models.IntegerField()
+    sports = models.ManyToManyField("catalog.Sport", related_name="organisations", blank=True)
+    season = models.ForeignKey("catalog.Season", on_delete=models.PROTECT, related_name="organisations")
     charity_name = models.CharField(max_length=200)
     charity_url = models.URLField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -17,6 +15,18 @@ class Organisation(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.season})"
+
+    @property
+    def sport_label(self) -> str:
+        """Human-readable list of the org's sports, e.g. 'AFL' or 'AFL + NRL'."""
+        return " + ".join(s.name for s in self.sports.all()) or "—"
+
+    @property
+    def available_competitions(self):
+        """Competitions selectable for this org, based on its sports."""
+        from catalog.models import Competition
+
+        return Competition.objects.filter(sport__in=self.sports.all())
 
 
 class OrgMember(models.Model):

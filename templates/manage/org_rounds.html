@@ -4,7 +4,7 @@
   <div>
     <span class="t-micro text-tertiary"><a href="{% url 'manage:orgs_list' %}" class="link">Orgs</a> / {{ org.name }} / Rounds</span>
     <h1 class="t-h1 mt-2">{{ org.name }}</h1>
-    <div class="section-title-sub">{{ org.sport }} · {{ org.season }} · for {{ org.charity_name }}</div>
+    <div class="section-title-sub">{{ org.sport_label }} · {{ org.season }} · for {{ org.charity_name }}</div>
   </div>
 </div>
 
@@ -15,8 +15,7 @@
     <div><label class="field-label">Round #</label><input type="number" name="round_number" required min="1"></div>
     <div><label class="field-label">Competition</label>
       <select name="competition">
-        {% if org.sport == "AFL" or org.sport == "BOTH" %}<option value="AFL">AFL</option>{% endif %}
-        {% if org.sport == "NRL" or org.sport == "BOTH" %}<option value="NRL">NRL</option>{% endif %}
+        {% for c in org.available_competitions %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
       </select>
     </div>
     <div><label class="field-label">Lockout (local time)</label><input type="datetime-local" name="lockout_at" required></div>

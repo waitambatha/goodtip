@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.humanize",
     "accounts",
+    "catalog",
     "orgs",
     "tipping",
     "data_sync",

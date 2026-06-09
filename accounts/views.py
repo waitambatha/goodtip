@@ -83,14 +83,14 @@ def dashboard_view(request):
     cards = []
     for m in memberships:
         org = m.org
-        comps = ["AFL", "NRL"] if org.sport == "BOTH" else [org.sport]
+        org_sports = org.sports.all()
         current_round = (
-            Round.objects.filter(org=org, competition__in=comps, lockout_at__gte=timezone.now())
+            Round.objects.filter(org=org, competition__sport__in=org_sports, lockout_at__gte=timezone.now())
             .order_by("lockout_at").first()
         )
         if current_round is None:
             current_round = (
-                Round.objects.filter(org=org, competition__in=comps)
+                Round.objects.filter(org=org, competition__sport__in=org_sports)
                 .order_by("-round_number").first()
             )
         stats = user_org_stats(request.user, org)
@@ -114,9 +114,8 @@ def dashboard_view(request):
 @login_required
 def dashboard_countdown_partial(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
-    comps = ["AFL", "NRL"] if org.sport == "BOTH" else [org.sport]
     current_round = (
-        Round.objects.filter(org=org, competition__in=comps, lockout_at__gte=timezone.now())
+        Round.objects.filter(org=org, competition__sport__in=org.sports.all(), lockout_at__gte=timezone.now())
         .order_by("lockout_at").first()
     )
     return render(request, "partials/countdown.html", {"round": current_round, "org": org})

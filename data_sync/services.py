@@ -11,6 +11,7 @@ from django.conf import settings
 from django.utils.text import slugify
 from django.utils import timezone
 
+from catalog.models import Competition
 from orgs.models import Organisation
 from tipping.models import Match, Round, Team
 from tipping.services import derive_result, record_match_result
@@ -33,7 +34,7 @@ def _normalise_team_name(name: str) -> str:
     return slugify(name.replace("&", "and"))
 
 
-def _resolve_team(competition: str, name: str, external_id: str = "") -> Team | None:
+def _resolve_team(competition: Competition, name: str, external_id: str = "") -> Team | None:
     slug = _normalise_team_name(name)
     if external_id:
         t = Team.objects.filter(competition=competition, external_id=external_id).first()
@@ -83,12 +84,13 @@ class SquiggleSyncService:
     def sync_fixtures(self, *, competition: str, round_number: int, org: Organisation) -> int:
         if competition != "AFL":
             raise SyncError("Squiggle service only handles AFL.")
-        year = org.season
+        afl = Competition.objects.get(name="AFL")
+        year = org.season.year
         games = self._games(round_number, year)
         if not games:
             return 0
         round_obj, _ = Round.objects.get_or_create(
-            org=org, round_number=round_number, competition="AFL",
+            org=org, round_number=round_number, competition=afl,
             defaults={
                 "lockout_at": _parse_dt(games[0]["date"]),
                 "status": "upcoming",
@@ -101,8 +103,8 @@ class SquiggleSyncService:
             round_obj.save(update_fields=["lockout_at"])
         n = 0
         for g in games:
-            home = _resolve_team("AFL", g["hteam"], str(g.get("hteamid", "")))
-            away = _resolve_team("AFL", g["ateam"], str(g.get("ateamid", "")))
+            home = _resolve_team(afl, g["hteam"], str(g.get("hteamid", "")))
+            away = _resolve_team(afl, g["ateam"], str(g.get("ateamid", "")))
             if not home or not away:
                 logger.warning("Skip game id=%s: unresolved teams %s/%s", g.get("id"), g["hteam"], g["ateam"])
                 continue
@@ -121,7 +123,7 @@ class SquiggleSyncService:
     def sync_results(self, *, competition: str, round_number: int, org: Organisation) -> int:
         if competition != "AFL":
             raise SyncError("Squiggle service only handles AFL.")
-        year = org.season
+        year = org.season.year
         games = self._games(round_number, year)
         n = 0
         for g in games:
