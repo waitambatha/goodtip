@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Competition, Season, Sport
+from .models import Charity, Competition, Season, Sport
 
 
 @admin.register(Sport)
@@ -17,3 +17,12 @@ class CompetitionAdmin(admin.ModelAdmin):
 @admin.register(Season)
 class SeasonAdmin(admin.ModelAdmin):
     list_display = ("year", "label")
+
+
+@admin.register(Charity)
+class CharityAdmin(admin.ModelAdmin):
+    list_display = ("name", "is_approved", "website", "slug")
+    list_filter = ("is_approved",)
+    search_fields = ("name",)
+    prepopulated_fields = {"slug": ("name",)}
+    list_editable = ("is_approved",)

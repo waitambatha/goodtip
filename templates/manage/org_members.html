@@ -30,7 +30,7 @@
             <form method="post" style="display:inline">{% csrf_token %}
               <input type="hidden" name="action" value="promote">
               <input type="hidden" name="member_id" value="{{ m.id }}">
-              <button class="pill {% if m.role == 'admin' %}pill-accent{% endif %}" type="submit" style="border:1px solid var(--border-default);cursor:pointer">{{ m.role }}</button>
+              <button class="pill {% if m.can_manage %}pill-accent{% endif %}" type="submit" style="border:1px solid var(--border-default);cursor:pointer" title="Toggle manager">{{ m.get_role_display }}{% if m.is_league_owner %} · Owner{% endif %}</button>
             </form>
           </td>
           <td class="text-tertiary t-small">{{ m.joined_at|date:"j M Y" }}</td>

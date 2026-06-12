@@ -4,7 +4,7 @@
 {% block content %}
 
 {% if not cards %}
-  {% include "components/_empty_state.html" with icon="user-plus" title="You're not in a comp yet" body="Ask your group admin for a join link, or wait for them to share one." %}
+  {% include "components/_empty_state.html" with icon="user-plus" title="You're not in a comp yet" body="Start your own league, or ask your group admin for a join link." cta_url=create_url cta_label="Start a league" %}
 {% else %}
 
 {% with c=cards.0 %}
@@ -12,8 +12,16 @@
     <div>
       <span class="t-micro text-tertiary">Welcome back</span>
       <h1 class="t-h1 mt-2" style="font-size:32px">{{ user.display_name|upper }}</h1>
+      <div class="row gap-2 mt-2">
+        {% for label in c.role_labels %}<span class="pill {% if label == 'Owner' %}pill-mono{% endif %}">{{ label }}</span>{% endfor %}
+      </div>
     </div>
-    <div class="hidden-mobile">
+    <div class="hidden-mobile row gap-2">
+      {% if c.is_admin %}
+        <a href="{% url 'orgs:members' c.org.id %}" class="btn-ghost btn-sm"><i data-lucide="users" class="icon-sm"></i> Members</a>
+        <a href="{% url 'orgs:invite' c.org.id %}" class="btn-ghost btn-sm"><i data-lucide="user-plus" class="icon-sm"></i> Invite</a>
+      {% endif %}
+      <a href="{% url 'orgs:create' %}" class="btn-ghost btn-sm"><i data-lucide="plus" class="icon-sm"></i> Start a league</a>
       <a href="{% url 'tipping:leaderboard' c.org.id %}" class="btn-ghost btn-sm"><i data-lucide="trophy" class="icon-sm"></i> Leaderboard</a>
     </div>
   </div>
@@ -23,6 +31,45 @@
     {% include "components/_stat_card.html" with label="Your rank" value=c.rank|default:"—" icon="trending-up" sub="of all tippers" %}
     {% include "components/_stat_card.html" with label="Tips submitted" value=c.tips_done sub=c.tips_total|stringformat:"of %s this round" icon="list-checks" %}
   </div>
+
+  {% if c.is_owner %}
+    {% if c.subscription %}
+      <div class="card row-between mb-6" style="padding:14px 20px;align-items:center">
+        <div class="row gap-3" style="align-items:center">
+          <i data-lucide="badge-check" class="icon-sm text-accent"></i>
+          <div>
+            <div class="t-body" style="font-weight:600">{{ c.subscription.get_tier_display }} plan · active</div>
+            <div class="t-micro text-tertiary">{{ c.subscription.participant_count }} / {{ c.subscription.seat_limit_label|cut:"Up to " }} seats used</div>
+          </div>
+        </div>
+        <a href="{% url 'billing:plans' c.org.id %}" class="btn-ghost btn-sm">Manage plan</a>
+      </div>
+    {% else %}
+      <a href="{% url 'billing:plans' c.org.id %}" class="card card-interactive row-between mb-6" style="padding:16px 20px;align-items:center;border-color:var(--accent);text-decoration:none">
+        <div class="row gap-3" style="align-items:center">
+          <i data-lucide="credit-card" class="icon-sm text-accent"></i>
+          <div>
+            <div class="t-body" style="font-weight:600">Choose a plan</div>
+            <div class="t-micro text-tertiary">Activate {{ c.org.name }} for the season</div>
+          </div>
+        </div>
+        <span class="btn-ghost btn-sm">View plans <i data-lucide="arrow-right" class="icon-sm"></i></span>
+      </a>
+    {% endif %}
+  {% endif %}
+
+  {% if c.charity_vote %}
+    <a href="{% url 'orgs:charity_vote' c.org.id %}" class="card card-interactive row-between mb-6" style="padding:16px 20px;align-items:center;border-color:var(--accent);text-decoration:none">
+      <div class="row gap-3" style="align-items:center">
+        <i data-lucide="heart" class="icon-sm text-accent"></i>
+        <div>
+          <div class="t-body" style="font-weight:600">Charity vote is open</div>
+          <div class="t-micro text-tertiary">{% if c.has_voted %}You've voted — you can still change it{% else %}Cast your vote for the cause{% endif %}</div>
+        </div>
+      </div>
+      <span class="btn-ghost btn-sm">{% if c.has_voted %}Review{% else %}Vote now{% endif %} <i data-lucide="arrow-right" class="icon-sm"></i></span>
+    </a>
+  {% endif %}
 
   {# Zone 2 — active round #}
   {% if c.round %}
@@ -71,6 +118,7 @@
         <div class="row gap-2">
           <a href="{% url 'tipping:my_tips' c.org.id %}" class="btn-ghost btn-sm flex-1"><i data-lucide="list-checks" class="icon-sm"></i> Tips</a>
           <a href="{% url 'tipping:leaderboard' c.org.id %}" class="btn-ghost btn-sm flex-1"><i data-lucide="trophy" class="icon-sm"></i> Board</a>
+          {% if c.is_admin %}<a href="{% url 'orgs:invite' c.org.id %}" class="btn-ghost btn-sm flex-1"><i data-lucide="user-plus" class="icon-sm"></i> Invite</a>{% endif %}
         </div>
       </div>
     {% endfor %}

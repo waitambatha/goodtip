@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Choose a plan — {{ org.name }}{% endblock %}
+{% block content %}
+<div class="section-header">
+  <div>
+    <span class="t-micro text-tertiary">{{ org.name }} · billing</span>
+    <h1 class="t-h1 mt-2">Choose your plan</h1>
+  </div>
+  <a href="{% url 'dashboard' %}" class="btn-ghost btn-sm"><i data-lucide="arrow-left" class="icon-sm"></i> Back</a>
+</div>
+
+{% if current %}
+  <div class="card mb-6" style="padding:18px;border-color:var(--accent)">
+    <span class="t-micro text-accent">Active plan</span>
+    <div class="row-between mt-1" style="align-items:center">
+      <div>
+        <span class="t-h3">{{ current.get_tier_display }}</span>
+        <span class="t-small text-tertiary"> · {{ current.seat_limit_label }} · {{ current.participant_count }} joined</span>
+      </div>
+      <span class="t-small text-tertiary">Paid {{ current.paid_at|date:"j M Y" }}</span>
+    </div>
+  </div>
+{% endif %}
+
+{% if not stripe_configured %}
+  <div class="flash is-error mb-6">
+    <i data-lucide="alert-circle" class="icon-sm"></i>
+    <span>Payments aren't switched on yet (Stripe keys pending). You can still pick a plan — we'll save your choice and you can pay once billing is live.</span>
+  </div>
+{% endif %}
+
+<p class="t-small text-tertiary mb-4">The platform fee is a one-off charge for the {{ org.season }} season. 100&#37; of your group's donations always go to charity — this fee only covers running GoodTip.</p>
+
+<div class="grid-3" style="align-items:start">
+  {% for t in tiers %}
+    <div class="card" style="padding:20px;{% if t.popular %}border-color:var(--accent){% endif %}">
+      {% if t.popular %}<span class="pill pill-accent mb-2" style="display:inline-block">Most popular</span>{% endif %}
+      <h3 class="t-h3">{{ t.label }}</h3>
+      <div class="mt-1 mb-1"><span class="stat-num" style="font-size:28px">${{ t.price }}</span><span class="t-small text-tertiary"> /season</span></div>
+      <div class="t-micro text-tertiary">{{ t.seat_label }} · {{ t.audience }}</div>
+      <ul class="stack gap-2 mt-4 mb-4" style="list-style:none;padding:0;margin:0">
+        {% for f in t.features %}
+          <li class="row gap-2 t-small"><i data-lucide="check" class="icon-sm text-accent"></i> {{ f }}</li>
+        {% endfor %}
+      </ul>
+      <form method="post" action="{% url 'billing:checkout' org.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="tier" value="{{ t.key }}">
+        <button class="btn-primary btn-block">Choose {{ t.label }}</button>
+      </form>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

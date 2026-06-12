@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import User
-from catalog.models import Competition, Season, Sport
+from catalog.models import Charity, Competition, Season, Sport
 from orgs.models import OrgMember, Organisation
 from tipping.models import Match, Round, Team, Tip
 from tipping.services import record_match_result
@@ -92,33 +92,36 @@ class Command(BaseCommand):
         afl = Sport.objects.get(name="AFL")
         nrl = Sport.objects.get(name="NRL")
 
+        beyond_blue, _ = Charity.objects.get_or_create(
+            name="Beyond Blue",
+            defaults={"slug": "beyond-blue", "website": "https://www.beyondblue.org.au", "is_approved": True},
+        )
+        ruok, _ = Charity.objects.get_or_create(
+            name="R U OK?",
+            defaults={"slug": "r-u-ok", "website": "https://www.ruok.org.au", "is_approved": True},
+        )
+
         org1, _ = Organisation.objects.update_or_create(
             name="Test Friends Comp",
-            defaults={
-                "season": season,
-                "charity_name": "Beyond Blue",
-                "charity_url": "https://www.beyondblue.org.au",
-            },
+            defaults={"season": season, "charity": beyond_blue},
         )
         org1.sports.set([afl])
         org2, _ = Organisation.objects.update_or_create(
             name="Office Footy Crew",
-            defaults={
-                "season": season,
-                "charity_name": "R U OK?",
-                "charity_url": "https://www.ruok.org.au",
-            },
+            defaults={"season": season, "charity": ruok},
         )
         org2.sports.set([afl, nrl])
 
-        # 3. Memberships
+        # 3. Memberships — the host runs and owns each league.
+        host_defaults = {"role": OrgMember.ROLE_BOTH, "is_league_owner": True}
+        member_defaults = {"role": OrgMember.ROLE_PARTICIPANT}
         for u in users:
             OrgMember.objects.get_or_create(
-                user=u, org=org1, defaults={"role": "admin" if u == hop else "member"}
+                user=u, org=org1, defaults=host_defaults if u == hop else member_defaults
             )
         for u in users[:7]:
             OrgMember.objects.get_or_create(
-                user=u, org=org2, defaults={"role": "admin" if u == hop else "member"}
+                user=u, org=org2, defaults=host_defaults if u == hop else member_defaults
             )
 
         # 4. Wipe existing rounds/matches/tips on the demo orgs (clean re-seed)

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}League created — GoodTip{% endblock %}
+{% block container_class %}container-tiny{% endblock %}
+{% block content %}
+<div class="text-center mb-6" style="margin-top:24px">
+  <span class="empty-icon" style="display:inline-flex"><i data-lucide="party-popper" class="icon-xl"></i></span>
+  <h1 class="t-h1 mt-4">{{ org.name }} is live</h1>
+  <p class="t-body text-secondary mt-2">{{ org.sport_label }} · {{ org.season }} · 100% to {{ org.charity_display }}</p>
+</div>
+
+{% include "orgs/_invite_link.html" with org=org invite_url=invite_url %}
+
+{% if vote %}
+  <div class="card mt-5" style="padding:20px;border-color:var(--accent)">
+    <span class="t-micro text-accent">Charity vote is open</span>
+    <p class="t-small text-secondary mt-2 mb-3">Your group will vote on the charity. The tally stays hidden until you close it.</p>
+    <a href="{% url 'orgs:charity_vote' org.id %}" class="btn-ghost btn-sm"><i data-lucide="heart" class="icon-sm"></i> View the vote</a>
+  </div>
+{% endif %}
+
+<div class="card mt-5" style="padding:20px">
+  <span class="t-micro text-tertiary">Next steps</span>
+  <ol class="t-small text-secondary mt-3" style="padding-left:18px;line-height:1.9">
+    <li>Share the invite link with your group.</li>
+    {% if vote %}<li>Once people join, they vote on the charity — then you close it.</li>{% endif %}
+    <li>Load this round's fixtures from the <a href="{% url 'manage:overview' %}" class="link">admin panel</a>.</li>
+    <li>Start tipping once fixtures are in.</li>
+  </ol>
+</div>
+
+<div class="row gap-3 mt-6">
+  <a href="{% url 'dashboard' %}" class="btn-primary flex-1">Go to dashboard <i data-lucide="arrow-right" class="icon-sm"></i></a>
+</div>
+{% endblock %}

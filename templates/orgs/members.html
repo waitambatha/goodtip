@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Members — {{ org.name }}{% endblock %}
+{% block container_class %}container{% endblock %}
+{% block content %}
+<div class="section-header">
+  <div>
+    <span class="t-micro text-tertiary">{{ org.name }}</span>
+    <h1 class="t-h1 mt-2">Members &amp; roles</h1>
+  </div>
+  <a href="{% url 'orgs:invite' org.id %}" class="btn-ghost btn-sm"><i data-lucide="user-plus" class="icon-sm"></i> Invite</a>
+</div>
+
+<div class="table-card">
+  <table>
+    <thead><tr><th>Member</th><th>Roles</th><th>Set role</th></tr></thead>
+    <tbody>
+      {% for m in members %}
+        <tr>
+          <td>
+            <strong>{{ m.user.display_name }}</strong>
+            <div class="t-micro text-tertiary">{{ m.user.email }}</div>
+          </td>
+          <td>
+            {% for label in m.role_labels %}
+              <span class="pill {% if label == 'Owner' %}pill-mono{% endif %}">{{ label }}</span>
+            {% endfor %}
+          </td>
+          <td>
+            <form method="post" class="row gap-2" style="align-items:center">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="set_role">
+              <input type="hidden" name="member_id" value="{{ m.id }}">
+              <select name="role" style="min-width:170px">
+                {% for value, label in role_choices %}
+                  <option value="{{ value }}" {% if m.role == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <button class="btn-ghost btn-sm">Save</button>
+            </form>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="3" class="text-center text-tertiary" style="padding:32px">No members yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if is_owner %}
+  <div class="card mt-6" style="padding:20px">
+    <span class="t-micro text-tertiary">League Owner</span>
+    <h3 class="t-h3 mt-2 mb-1">Nominate a Team Manager</h3>
+    <p class="t-small text-secondary mb-3">Enter the email of a member to make them a Team Manager.</p>
+    <form method="post" class="row gap-2" style="flex-wrap:wrap">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="nominate_manager">
+      <input type="email" name="email" placeholder="member@example.com" required class="flex-1" style="min-width:240px">
+      <button class="btn-ghost">Make manager</button>
+    </form>
+  </div>
+{% endif %}
+{% endblock %}

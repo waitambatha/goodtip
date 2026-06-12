@@ -40,3 +40,23 @@ class Season(models.Model):
 
     def __str__(self):
         return self.label or str(self.year)
+
+
+class Charity(models.Model):
+    """A charity a league can raise funds for.
+
+    Approved charities are vetted by GoodTip and appear in the public picker.
+    Custom charities added by a league creator start unapproved.
+    """
+
+    name = models.CharField(max_length=200, unique=True)
+    slug = models.SlugField(max_length=200, unique=True)
+    website = models.URLField(blank=True)
+    is_approved = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name_plural = "charities"
+
+    def __str__(self):
+        return self.name

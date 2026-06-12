@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Start a league — GoodTip{% endblock %}
+{% block container_class %}container-tiny{% endblock %}
+{% block content %}
+<div class="section-header">
+  <div>
+    <span class="t-micro text-tertiary">Set up your comp</span>
+    <h1 class="t-h1 mt-2">Start a league</h1>
+  </div>
+</div>
+<p class="t-body text-secondary mb-6">Name your comp, pick the sport, and decide the charity that 100&#37; of entry goes to. You'll get a shareable invite link next.</p>
+
+<form method="post" class="stack gap-5">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+    <div class="t-small text-danger">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  {% for field in form %}
+    {% if field.name == "charity_method" %}
+      <div>
+        <label class="field-label">{{ field.label }}</label>
+        {{ field }}
+        {% for e in field.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
+      </div>
+
+      {# Pick-a-charity block #}
+      <div id="charity-pick-block" class="stack gap-4 card" style="padding:18px">
+        <div>
+          <label class="field-label">{{ form.charity.label }}</label>
+          {{ form.charity }}
+          {% for e in form.charity.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
+        </div>
+        <div>
+          <label class="field-label">{{ form.new_charity_name.label }}</label>
+          {{ form.new_charity_name }}
+          {% for e in form.new_charity_name.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
+        </div>
+        <div>
+          <label class="field-label">{{ form.new_charity_url.label }}</label>
+          {{ form.new_charity_url }}
+          {% for e in form.new_charity_url.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+
+      {# Group-vote block #}
+      <div id="charity-vote-block" class="card" style="padding:18px">
+        <label class="field-label">{{ form.vote_charities.label }}</label>
+        <p class="t-small text-tertiary mb-3">The group votes after they join. The tally stays hidden until you close the vote.</p>
+        {{ form.vote_charities }}
+        {% for e in form.vote_charities.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
+      </div>
+    {% elif field.name == "charity" or field.name == "new_charity_name" or field.name == "new_charity_url" or field.name == "vote_charities" %}
+      {# rendered above inside the toggle blocks #}
+    {% else %}
+      <div>
+        <label class="field-label">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<div class="t-small text-tertiary mt-2">{{ field.help_text }}</div>{% endif %}
+        {% for e in field.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
+      </div>
+    {% endif %}
+  {% endfor %}
+
+  <div class="row gap-3 mt-3">
+    <a href="{% url 'dashboard' %}" class="btn-ghost">Cancel</a>
+    <button class="btn-primary flex-1">Create league <i data-lucide="arrow-right" class="icon-sm"></i></button>
+  </div>
+</form>
+
+<script>
+  (function () {
+    function sync() {
+      var checked = document.querySelector('input[name="charity_method"]:checked');
+      var method = checked ? checked.value : 'pick';
+      document.getElementById('charity-pick-block').style.display = method === 'pick' ? '' : 'none';
+      document.getElementById('charity-vote-block').style.display = method === 'vote' ? '' : 'none';
+    }
+    document.querySelectorAll('input[name="charity_method"]').forEach(function (r) {
+      r.addEventListener('change', sync);
+    });
+    sync();
+  })();
+</script>
+{% endblock %}

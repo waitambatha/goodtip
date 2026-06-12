@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "tipping",
     "data_sync",
     "admin_panel",
+    "billing",
 ]
 
 MIDDLEWARE = [
@@ -32,6 +33,7 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    "goodtip.middleware.ForceCsrfCookieMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -95,6 +97,14 @@ LOGOUT_REDIRECT_URL = "landing"
 
 if DEBUG:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+    # Browsers treat localhost and 127.0.0.1 as different sites with separate
+    # cookie stores. Trust both so invite links work regardless of which the
+    # admin used when generating the link.
+    ALLOWED_HOSTS += ["localhost", "127.0.0.1"]
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
 else:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
@@ -106,6 +116,12 @@ EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True").lower() == "true"
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "GoodTip <no-reply@goodtip.com.au>")
 
 THESPORTS_API_KEY = os.environ.get("THESPORTS_API_KEY", "")
+
+# Stripe (Phase 1: single-destination platform-fee charges via Checkout).
+# Left blank until test/live keys are supplied — billing stays dormant if unset.
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
 JOIN_LINK_MAX_AGE_DAYS = 7
 

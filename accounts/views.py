@@ -6,6 +6,8 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import ensure_csrf_cookie
 
 from orgs.models import OrgMember, Organisation
 from tipping.models import Round, Tip
@@ -15,20 +17,26 @@ from .forms import LoginForm, ProfileForm, SignupForm
 
 
 JOIN_SESSION_KEY = "pending_join_org_id"
+JOIN_INVITER_SESSION_KEY = "pending_join_inviter_id"
 
 
 def _consume_pending_join(request):
     org_id = request.session.pop(JOIN_SESSION_KEY, None)
+    inviter_id = request.session.pop(JOIN_INVITER_SESSION_KEY, None)
     if not org_id:
         return
     try:
         org = Organisation.objects.get(pk=org_id)
     except Organisation.DoesNotExist:
         return
-    OrgMember.objects.get_or_create(user=request.user, org=org, defaults={"role": "member"})
+    from orgs.services import add_member
+
+    add_member(request.user, org, inviter_id=inviter_id)
     messages.success(request, f"Joined {org.name}.")
 
 
+@never_cache
+@ensure_csrf_cookie
 def signup_view(request):
     if request.user.is_authenticated:
         return redirect("dashboard")
@@ -46,6 +54,8 @@ def signup_view(request):
     return render(request, "auth/signup.html", {"form": form})
 
 
+@never_cache
+@ensure_csrf_cookie
 def login_view(request):
     if request.user.is_authenticated:
         return redirect("dashboard")
@@ -100,6 +110,16 @@ def dashboard_view(request):
         if current_round:
             tips_total = current_round.matches.count()
             tips_done = Tip.objects.filter(user=request.user, match__round=current_round, org=org).count()
+        charity_vote = org.active_charity_vote
+        has_voted = bool(
+            charity_vote
+            and charity_vote.ballots.filter(user=request.user).exists()
+        )
+        subscription = None
+        if m.is_league_owner:
+            subscription = org.subscriptions.filter(
+                season=org.season, status="active"
+            ).first()
         cards.append({
             "org": org,
             "round": current_round,
@@ -107,8 +127,17 @@ def dashboard_view(request):
             "tips_total": tips_total,
             "points": stats["points"],
             "rank": rank,
+            "is_admin": m.can_manage,
+            "is_owner": m.is_league_owner,
+            "role_labels": m.role_labels,
+            "charity_vote": charity_vote,
+            "has_voted": has_voted,
+            "subscription": subscription,
         })
-    return render(request, "dashboard.html", {"cards": cards})
+    return render(request, "dashboard.html", {
+        "cards": cards,
+        "create_url": reverse("orgs:create"),
+    })
 
 
 @login_required

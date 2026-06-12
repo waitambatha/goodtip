@@ -1,0 +1,13 @@
+<div class="card" style="padding:20px">
+  <span class="t-micro text-tertiary">Shareable invite link</span>
+  <p class="t-small text-secondary mt-2 mb-3">Anyone with this link can join {{ org.name }}. Share it via Slack, email, or WhatsApp.</p>
+  <div class="row gap-2" style="flex-wrap:wrap">
+    <input type="text" id="invite-link" value="{{ invite_url }}" readonly
+           class="flex-1" style="min-width:240px" onclick="this.select()">
+    <button type="button" class="btn-ghost" onclick="
+      const i=document.getElementById('invite-link');
+      i.select(); navigator.clipboard.writeText(i.value);
+      this.querySelector('span').textContent='Copied';
+    "><i data-lucide="copy" class="icon-sm"></i> <span>Copy</span></button>
+  </div>
+</div>

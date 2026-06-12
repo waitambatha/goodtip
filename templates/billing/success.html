@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Payment received — {{ org.name }}{% endblock %}
+{% block container_class %}container-tiny{% endblock %}
+{% block content %}
+<div class="text-center" style="margin-top:32px">
+  <span class="empty-icon" style="display:inline-flex"><i data-lucide="check-circle-2" class="icon-xl text-accent"></i></span>
+  {% if sub %}
+    <h1 class="t-h1 mt-4">{{ sub.get_tier_display }} plan active</h1>
+    <p class="t-body text-secondary mt-2">{{ org.name }} is all set for the {{ org.season }} season — {{ sub.seat_limit_label }}.</p>
+  {% else %}
+    <h1 class="t-h1 mt-4">Thanks — payment received</h1>
+    <p class="t-body text-secondary mt-2">We're confirming your payment. Your plan will show as active on your dashboard in a moment.</p>
+  {% endif %}
+  <div class="row gap-3 mt-6" style="justify-content:center">
+    <a href="{% url 'dashboard' %}" class="btn-primary">Go to dashboard <i data-lucide="arrow-right" class="icon-sm"></i></a>
+  </div>
+</div>
+{% endblock %}

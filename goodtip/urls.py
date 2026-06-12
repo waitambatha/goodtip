@@ -4,6 +4,7 @@ from django.urls import include, path
 from django.views.generic import TemplateView
 
 from accounts.views import dashboard_view
+from billing.views import stripe_webhook
 from orgs.views import join_view
 
 
@@ -30,6 +31,9 @@ urlpatterns = [
     ), name="password_reset_complete"),
     path("profile/", include("accounts.profile_urls")),
     path("join/<int:org_id>/<str:token>/", join_view, name="join_org"),
+    path("leagues/", include("orgs.urls", namespace="orgs")),
+    path("billing/", include("billing.urls", namespace="billing")),
+    path("stripe/webhook/", stripe_webhook, name="stripe_webhook"),
     path("org/", include("tipping.urls", namespace="tipping")),
     path("manage/", include("admin_panel.urls", namespace="manage")),
 ]

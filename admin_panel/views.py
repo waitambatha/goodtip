@@ -5,8 +5,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from catalog.models import Competition, Season, Sport
+from catalog.models import Charity, Competition, Season, Sport
 from data_sync.services import get_sync_service, SyncError
+from orgs.forms import _unique_charity_slug
 from orgs.models import OrgMember, Organisation
 from orgs.signing import make_join_token
 from tipping.models import Match, Round, Team, Tip
@@ -38,11 +39,19 @@ def orgs_list(request):
             year=int(request.POST["season"]),
             defaults={"label": request.POST["season"].strip()},
         )
+        charity_name = request.POST["charity_name"].strip()
+        charity = Charity.objects.filter(name__iexact=charity_name).first()
+        if charity is None:
+            charity = Charity.objects.create(
+                name=charity_name,
+                slug=_unique_charity_slug(charity_name),
+                website=request.POST.get("charity_url", "").strip(),
+                is_approved=True,
+            )
         org = Organisation.objects.create(
             name=request.POST["name"].strip(),
             season=season,
-            charity_name=request.POST["charity_name"].strip(),
-            charity_url=request.POST.get("charity_url", "").strip(),
+            charity=charity,
         )
         sport_names = SPORT_FORM_MAP.get(request.POST["sport"], [])
         org.sports.set(Sport.objects.filter(name__in=sport_names))
@@ -121,7 +130,8 @@ def org_members(request, org_id: int):
         elif action == "promote":
             m = OrgMember.objects.filter(org=org, id=int(request.POST["member_id"])).first()
             if m:
-                m.role = "admin" if m.role == "member" else "member"
+                # Toggle between Participant and Manager+Captain.
+                m.role = OrgMember.ROLE_PARTICIPANT if m.is_manager else OrgMember.ROLE_BOTH
                 m.save(update_fields=["role"])
         return redirect("manage:org_members", org_id=org.id)
     members = OrgMember.objects.filter(org=org).select_related("user").order_by("joined_at")
