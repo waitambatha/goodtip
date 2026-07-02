@@ -1,51 +1,40 @@
-{% extends "manage/_base.html" %}
-{% block manage_content %}
-<div class="section-header">
-  <div>
-    <span class="t-micro text-tertiary">Admin / Sync</span>
-    <h1 class="t-h1 mt-2">API Sync</h1>
+{% extends "admin_base.html" %}
+{% block title %}Sync — Manage{% endblock %}
+{% block nav_sync %}on{% endblock %}
+{% block admin_content %}
+<h1 class="admin-h1" style="margin-bottom:6px;">Sync fixtures &amp; results</h1>
+<p class="app-sub" style="margin-bottom:20px;">Pull fixtures or results from the data provider into an org's rounds.</p>
+
+<div class="sync-providers">
+  <div class="prov">
+    <span class="prov-ic"><svg><use href="#ic-spark"/></svg></span>
+    <div><h4>Squiggle</h4><p>AFL &amp; AFLW &middot; free public API, no key required.</p></div>
+    <span class="status-pill open">Ready</span>
+  </div>
+  <div class="prov" style="border-left-color:var(--acc-4);">
+    <span class="prov-ic" style="background:rgba(178,120,40,.14);color:#8a5a12;"><svg><use href="#ic-lock"/></svg></span>
+    <div><h4>TheSports API</h4><p>NRL &amp; NRLW &middot; add <code style="background:rgba(15,46,34,.06);padding:1px 5px;border-radius:4px;">THESPORTS_API_KEY</code> to <code style="background:rgba(15,46,34,.06);padding:1px 5px;border-radius:4px;">.env</code>.</p></div>
+    <span class="status-pill draft">Key needed</span>
   </div>
 </div>
 
-<div class="grid-2 mb-6">
-  <div class="card-2" style="padding:20px">
-    <div class="row gap-3 mb-3">
-      <span class="stat-icon-wrap" style="position:static"><i data-lucide="zap"></i></span>
-      <div>
-        <div class="t-h3" style="font-size:14px">Squiggle</div>
-        <div class="t-small text-tertiary">AFL · No key required</div>
+<div class="mini-form" style="max-width:520px;">
+  <form method="post" action="{% url 'manage:sync' %}">
+    {% csrf_token %}
+    <div class="fld"><label for="sy_org">Org</label>
+      <select name="org_id" id="sy_org" required>{% for o in orgs %}<option value="{{ o.id }}">{{ o.name }} ({{ o.season }})</option>{% endfor %}</select>
+    </div>
+    <div class="fld"><label for="sy_comp">Competition</label>
+      <select name="competition" id="sy_comp"><option value="AFL">AFL &middot; Squiggle</option><option value="NRL">NRL &middot; TheSports</option></select>
+    </div>
+    <div class="fld"><label for="sy_round">Round number</label><input type="number" name="round_number" id="sy_round" required value="1" placeholder="15"></div>
+    <div class="fld"><label>What to sync</label>
+      <div class="opt-grid cols2">
+        <label class="opt-card radio"><input type="radio" name="kind" value="fixtures" checked><span class="oc-box"></span><span class="oc-title">Fixtures</span></label>
+        <label class="opt-card radio"><input type="radio" name="kind" value="results"><span class="oc-box"></span><span class="oc-title">Results</span></label>
       </div>
-      <span class="pill pill-success" style="margin-left:auto">Ready</span>
     </div>
-    <p class="t-small text-secondary">Free public API. Imports fixtures and final scores for any past or upcoming round.</p>
-  </div>
-  <div class="card-2" style="padding:20px">
-    <div class="row gap-3 mb-3">
-      <span class="stat-icon-wrap" style="position:static"><i data-lucide="key"></i></span>
-      <div>
-        <div class="t-h3" style="font-size:14px">TheSports API</div>
-        <div class="t-small text-tertiary">NRL · Requires THESPORTS_API_KEY</div>
-      </div>
-      <span class="pill pill-warning" style="margin-left:auto">Key needed</span>
-    </div>
-    <p class="t-small text-secondary">Drop your key in <code style="background:var(--bg-page);padding:2px 6px;border-radius:4px">.env</code>. Sync will report a clear error until then.</p>
-  </div>
-</div>
-
-<div class="card-2" style="padding:24px">
-  <h3 class="t-h3 mb-4"><i data-lucide="refresh-cw" class="icon-sm" style="vertical-align:-3px"></i> Run sync</h3>
-  <form method="post" class="grid-2 gap-4">{% csrf_token %}
-    <div><label class="field-label">Org</label>
-      <select name="org_id" required>{% for o in orgs %}<option value="{{ o.id }}">{{ o.name }} ({{ o.season }})</option>{% endfor %}</select>
-    </div>
-    <div><label class="field-label">Competition</label>
-      <select name="competition"><option value="AFL">AFL · Squiggle</option><option value="NRL">NRL · TheSports</option></select>
-    </div>
-    <div><label class="field-label">Round number</label><input name="round_number" type="number" required value="1"></div>
-    <div><label class="field-label">What to sync</label>
-      <select name="kind"><option value="fixtures">Fixtures</option><option value="results">Results</option></select>
-    </div>
-    <div style="grid-column:1/-1"><button class="btn-primary">Run sync</button></div>
+    <button type="submit" class="abtn abtn-primary abtn-block">Run sync</button>
   </form>
 </div>
 {% endblock %}

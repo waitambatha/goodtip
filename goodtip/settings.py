@@ -107,6 +107,12 @@ if DEBUG:
     ]
 else:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    # Production site domain. Extra hosts can still be added via ALLOWED_HOSTS env.
+    ALLOWED_HOSTS += ["goodtip.com.au", "www.goodtip.com.au"]
+    CSRF_TRUSTED_ORIGINS = [
+        "https://goodtip.com.au",
+        "https://www.goodtip.com.au",
+    ]
 
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
@@ -114,6 +120,8 @@ EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True").lower() == "true"
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "GoodTip <no-reply@goodtip.com.au>")
+# Where "suggest a charity" notifications go for manual review (deck slide 10).
+GOODTIP_TEAM_EMAIL = os.environ.get("GOODTIP_TEAM_EMAIL", "team@goodtip.com.au")
 
 THESPORTS_API_KEY = os.environ.get("THESPORTS_API_KEY", "")
 

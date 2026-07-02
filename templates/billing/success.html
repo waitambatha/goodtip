@@ -1,18 +1,18 @@
-{% extends "base.html" %}
-{% block title %}Payment received — {{ org.name }}{% endblock %}
-{% block container_class %}container-tiny{% endblock %}
-{% block content %}
-<div class="text-center" style="margin-top:32px">
-  <span class="empty-icon" style="display:inline-flex"><i data-lucide="check-circle-2" class="icon-xl text-accent"></i></span>
+{% extends "app_base.html" %}
+{% block title %}You're set — {{ org.name }}{% endblock %}
+{% block app_content %}
+<div style="max-width:560px;margin:0 auto;text-align:center;">
+  <div style="width:64px;height:64px;border-radius:50%;background:var(--lime);display:grid;place-items:center;margin:12px auto 20px;"><svg class="cic" style="width:34px;height:34px;stroke:var(--deep);stroke-width:2.4;"><use href="#ic-check"/></svg></div>
   {% if sub %}
-    <h1 class="t-h1 mt-4">{{ sub.get_tier_display }} plan active</h1>
-    <p class="t-body text-secondary mt-2">{{ org.name }} is all set for the {{ org.season }} season — {{ sub.seat_limit_label }}.</p>
+    <h1 class="app-h1">You're set for the season.</h1>
+    <p class="app-sub" style="font-size:16px;">{{ org.name }} is on the <strong>{{ sub.get_tier_display }}</strong> plan — {{ sub.seat_limit_label }}. Time to get your people tipping.</p>
   {% else %}
-    <h1 class="t-h1 mt-4">Thanks — payment received</h1>
-    <p class="t-body text-secondary mt-2">We're confirming your payment. Your plan will show as active on your dashboard in a moment.</p>
+    <h1 class="app-h1">Thanks — payment received.</h1>
+    <p class="app-sub" style="font-size:16px;">We're confirming it now; your plan will show as active on the dashboard in a moment.</p>
   {% endif %}
-  <div class="row gap-3 mt-6" style="justify-content:center">
-    <a href="{% url 'dashboard' %}" class="btn-primary">Go to dashboard <i data-lucide="arrow-right" class="icon-sm"></i></a>
+  <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px;">
+    <a href="{% url 'dashboard' %}" class="abtn abtn-primary">Go to dashboard</a>
+    <a href="{% url 'billing:receipt' org.id %}" class="abtn abtn-ghost">View receipt</a>
   </div>
 </div>
 {% endblock %}

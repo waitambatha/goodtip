@@ -1,65 +1,47 @@
-{% extends "base.html" %}
+{% extends "app_base.html" %}
 {% block title %}Charity vote — {{ org.name }}{% endblock %}
-{% block container_class %}container-tiny{% endblock %}
-{% block content %}
-<div class="section-header">
-  <div>
-    <span class="t-micro text-tertiary">{{ org.name }}</span>
-    <h1 class="t-h1 mt-2">Charity vote</h1>
-  </div>
-  <a href="{% url 'dashboard' %}" class="btn-ghost btn-sm"><i data-lucide="arrow-left" class="icon-sm"></i> Back</a>
-</div>
+{% block app_content %}
+<div class="app-head"><div><div class="app-eyebrow">{{ org.name }}</div><h1 class="app-h1">Where should the money go?</h1>
+  {% if vote and vote.is_open %}<p class="app-sub">Blind vote &mdash; tallies stay hidden until a manager closes it. You can change your pick any time before then.</p>{% endif %}</div>
+  {% if vote and vote.is_open %}<span class="badge-live">Vote open</span>{% endif %}</div>
 
 {% if not vote %}
-  {% include "components/_empty_state.html" with icon="heart" title="No charity vote" body="This league's charity was chosen directly — there's no vote to show." %}
+  <div class="card pad-lg" style="text-align:center;max-width:640px;"><div class="card-h">No vote running</div><p class="card-lead">This league's charity was chosen directly — there's no vote to show.</p></div>
 
 {% elif vote.is_open %}
-  <p class="t-body text-secondary mb-2">Pick the cause you want this league to play for. Results stay hidden until the vote closes.</p>
-  <p class="t-micro text-tertiary mb-5"><i data-lucide="users" class="icon-sm" style="vertical-align:-3px"></i> {{ ballot_count }} vote{{ ballot_count|pluralize }} cast so far</p>
-
-  <form method="post" action="{% url 'orgs:cast_charity_vote' org.id %}" class="stack gap-3">
+<div style="max-width:640px;">
+  <form method="post" action="{% url 'orgs:cast_charity_vote' org.id %}">
     {% csrf_token %}
-    {% for opt in options %}
-      <label class="card row gap-3" style="padding:16px;cursor:pointer;align-items:center;{% if opt.id == my_option_id %}border-color:var(--accent){% endif %}">
-        <input type="radio" name="option" value="{{ opt.id }}" {% if opt.id == my_option_id %}checked{% endif %} style="width:auto">
-        <div class="flex-1">
-          <div class="t-body" style="font-weight:600">{{ opt.charity.name }}</div>
-          {% if opt.charity.website %}<a href="{{ opt.charity.website }}" target="_blank" rel="noopener" class="link t-micro">{{ opt.charity.website }}</a>{% endif %}
-        </div>
-        {% if opt.id == my_option_id %}<span class="t-micro text-accent">Your vote</span>{% endif %}
-      </label>
-    {% endfor %}
-    <button class="btn-primary mt-2">{% if my_option_id %}Change my vote{% else %}Cast my vote{% endif %}</button>
+    <div class="opt-grid" style="margin-bottom:16px;">
+      {% for opt in options %}
+      <label class="opt-card radio"><input type="radio" name="option" value="{{ opt.id }}" {% if opt.id == my_option_id %}checked{% endif %}><span class="oc-box"></span><span><span class="oc-title">{{ opt.charity.name }}</span>{% if opt.charity.website %}<span class="oc-sub">{{ opt.charity.website }}</span>{% endif %}</span>{% if opt.id == my_option_id %}<span class="oc-right"><span class="pill-role">Your pick</span></span>{% endif %}</label>
+      {% endfor %}
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <span class="app-sub" style="margin:0;">{{ ballot_count }} ballot{{ ballot_count|pluralize }} cast</span>
+      <button type="submit" class="abtn abtn-primary">{% if my_option_id %}Change my vote{% else %}Save my vote{% endif %}</button>
+    </div>
   </form>
 
   {% if is_admin %}
-    <div class="card mt-6" style="padding:18px">
-      <span class="t-micro text-tertiary">Manager controls</span>
-      <p class="t-small text-secondary mt-2 mb-3">Closing the vote tallies the ballots and locks in the winning charity for the league.</p>
-      <form method="post" action="{% url 'orgs:close_charity_vote' org.id %}"
-            onsubmit="return confirm('Close the vote and lock in the winner?')">
-        {% csrf_token %}
-        <button class="btn-ghost"><i data-lucide="gavel" class="icon-sm"></i> Close vote</button>
-      </form>
+  <form method="post" action="{% url 'orgs:close_charity_vote' org.id %}" style="margin-top:22px;border-top:1px solid var(--app-line);padding-top:18px;" onsubmit="return confirm('Close the vote and lock in the winner?')">
+    {% csrf_token %}
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <span class="app-sub" style="margin:0;">Manager only &mdash; closing reveals the result and locks the charity.</span>
+      <button type="submit" class="abtn abtn-dark">Close the vote</button>
     </div>
+  </form>
   {% endif %}
+</div>
 
 {% else %}
-  {# Closed — reveal the result #}
-  <div class="card text-center mb-5" style="padding:28px">
-    <span class="t-micro text-tertiary">Winning charity</span>
-    <h2 class="t-h1 text-accent mt-2">{{ vote.winning_charity.name|default:"—" }}</h2>
-    <p class="t-small text-tertiary mt-2">Vote closed {{ vote.closed_at|date:"j M Y" }}</p>
+<div style="max-width:640px;">
+  <div class="card pad-lg" style="text-align:center;margin-bottom:16px;"><div class="app-eyebrow">Winning charity</div><h2 class="app-h1" style="color:var(--forest);margin-top:6px;">{{ vote.winning_charity.name|default:"—" }}</h2><p class="app-sub" style="margin-top:4px;">Vote closed {{ vote.closed_at|date:"j M Y" }}</p></div>
+  {% for opt in results %}
+  <div class="vote-card {% if opt.charity_id == vote.winning_charity_id %}win{% endif %}" style="margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;"><span class="oc-title">{{ opt.charity.name }}{% if opt.charity_id == vote.winning_charity_id %} &middot; Winner{% endif %}</span><b class="num">{{ opt.n }}</b></div>
   </div>
-
-  <span class="t-micro text-tertiary">Final tally</span>
-  <div class="stack gap-2 mt-3">
-    {% for opt in results %}
-      <div class="card row-between" style="padding:14px 16px;align-items:center">
-        <span class="t-body {% if opt.charity_id == vote.winning_charity_id %}text-accent{% endif %}" style="font-weight:600">{{ opt.charity.name }}</span>
-        <span class="t-small text-tertiary">{{ opt.n }} vote{{ opt.n|pluralize }}</span>
-      </div>
-    {% endfor %}
-  </div>
+  {% endfor %}
+</div>
 {% endif %}
 {% endblock %}

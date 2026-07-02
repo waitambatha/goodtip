@@ -1,0 +1,40 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Manage — GoodTip{% endblock %}</title>
+  <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:ital,wght@0,400;0,600;1,400&family=Barlow+Condensed:wght@600;900&family=Barlow+Semi+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
+</head>
+<body>
+  {% include "public/partials/_icons.html" %}
+  <div class="admin">
+    <aside class="admin-side">
+      <div class="as-brand">GOOD<span>TIP</span></div>
+      <div class="as-tag">Manage</div>
+      <a href="{% url 'manage:overview' %}" class="{% block nav_overview %}{% endblock %}"><svg><use href="#ic-chart"/></svg> Overview</a>
+      <a href="{% url 'manage:orgs_list' %}" class="{% block nav_orgs %}{% endblock %}"><svg><use href="#ic-users"/></svg> Orgs</a>
+      <a href="{% url 'manage:sync' %}" class="{% block nav_sync %}{% endblock %}"><svg><use href="#ic-recycle"/></svg> Sync</a>
+      <div class="as-foot"><a href="{% url 'dashboard' %}">&larr; Back to app</a></div>
+    </aside>
+    <main class="admin-main">
+      {% if messages %}
+        {% for m in messages %}
+          <div class="flash {% if m.tags == 'success' %}success{% elif m.tags == 'error' %}error{% else %}info{% endif %}"><span>{{ m }}</span></div>
+        {% endfor %}
+      {% endif %}
+      {% block admin_content %}{% endblock %}
+    </main>
+  </div>
+  <script>(function(){
+    document.querySelectorAll('[data-copy]').forEach(function(btn){
+      btn.addEventListener('click', function(){ var t=document.querySelector(btn.getAttribute('data-copy')); if(!t)return; var v=t.value!==undefined?t.value:t.textContent; if(navigator.clipboard)navigator.clipboard.writeText(v); var o=btn.innerHTML; btn.innerHTML='Copied &#10003;'; setTimeout(function(){btn.innerHTML=o;},1500); });
+    });
+    document.querySelectorAll('[data-dd]').forEach(function(dd){var btn=dd.querySelector('.dd-btn'),val=dd.querySelector('.dd-val'),sel=dd.querySelector('.dd-native');if(btn)btn.addEventListener('click',function(e){e.stopPropagation();document.querySelectorAll('[data-dd].open').forEach(function(o){if(o!==dd)o.classList.remove('open');});dd.classList.toggle('open');});dd.querySelectorAll('.dd-opt').forEach(function(opt){opt.addEventListener('click',function(){dd.querySelectorAll('.dd-opt').forEach(function(o){o.classList.remove('on');});opt.classList.add('on');if(val)val.textContent=opt.textContent;if(sel){sel.value=opt.getAttribute('data-val');sel.dispatchEvent(new Event('change',{bubbles:true}));}dd.classList.remove('open');});});});
+    document.addEventListener('click',function(){document.querySelectorAll('[data-dd].open').forEach(function(o){o.classList.remove('open');});});
+  })();</script>
+</body>
+</html>

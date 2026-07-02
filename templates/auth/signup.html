@@ -1,36 +1,42 @@
-{% extends "base.html" %}
+{% extends "auth_base.html" %}
 {% block title %}Sign up — GoodTip{% endblock %}
-{% block container_class %}{% endblock %}
-{% block content %}
-<div class="auth-split">
-  <div class="auth-form-side">
-    <div class="container-tiny">
-      <a href="/" class="topnav-brand" style="font-size:22px;margin-bottom:32px;display:inline-block">GOODTIP</a>
-      <h1 class="t-h1 mb-3">Create your account</h1>
-      <p class="t-body text-secondary mb-6">Join your group's comp and start tipping for a cause.</p>
-      <form method="post" class="stack gap-4">
-        {% csrf_token %}
-        {% for field in form %}
-          <div>
-            <label class="field-label">{{ field.label }}</label>
-            {{ field }}
-            {% for e in field.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
-          </div>
-        {% endfor %}
-        <button class="btn-primary btn-block btn-lg mt-3">Sign up</button>
-      </form>
-      <p class="t-small text-tertiary mt-6">Already have an account? <a href="{% url 'accounts:login' %}" class="link">Log in</a></p>
-    </div>
+{% block brand_head %}Join the comp. <em>Do some good.</em>{% endblock %}
+{% block auth_form %}
+<h1>Create your account</h1>
+<p class="sub">One account, every comp you're invited to.</p>
+{% if form.non_field_errors %}<div class="flash error" style="margin-bottom:16px;"><span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
+<form method="post" action="{% url 'accounts:signup' %}" novalidate>
+  {% csrf_token %}
+  <div class="fld">
+    <div class="fld-labelrow"><label for="id_display_name">Display name</label><button type="button" class="gen-btn" id="genName"><svg class="cic" style="width:12px;height:12px;stroke:currentColor;fill:none;"><use href="#ic-spark"/></svg> Suggest one</button></div>
+    <input type="text" name="display_name" id="id_display_name" value="{{ form.display_name.value|default:'' }}" placeholder="How your group sees you" autocomplete="name" autofocus>
+    {% if form.display_name.errors %}<div class="fld-err">{{ form.display_name.errors|join:" " }}</div>{% endif %}
   </div>
-  <div class="auth-brand-side">
-    <div>
-      <span class="t-micro" style="color:rgba(0,0,0,0.7)">Australian Footy Tipping</span>
-      <div class="auth-brand-line mt-3">GOOD TIP, MATE.</div>
-    </div>
-    <div class="auth-brand-foot">
-      <strong>100% to charity.</strong><br>
-      Your group picks the cause. Every entry fee goes straight to them — not us, not a platform fee.
-    </div>
+  <div class="fld">
+    <label for="id_email">Email</label>
+    <input type="email" name="email" id="id_email" value="{{ form.email.value|default:'' }}" placeholder="you@work.com.au" autocomplete="email">
+    {% if form.email.errors %}<div class="fld-err">{{ form.email.errors|join:" " }}</div>{% endif %}
   </div>
-</div>
+  <div class="fld">
+    <div class="fld-labelrow">
+      <label for="id_password1">Password</label>
+      <span class="gen-row">
+        <button type="button" class="gen-btn" id="genPassword"><svg class="cic" style="width:12px;height:12px;stroke:currentColor;fill:none;"><use href="#ic-spark"/></svg> Generate</button>
+        <button type="button" class="pw-toggle" data-pw-toggle="id_password1">Show</button>
+      </span>
+    </div>
+    <input type="password" name="password1" id="id_password1" data-pw-strength placeholder="At least 8 characters" autocomplete="new-password">
+    <div class="pw-meter"><i id="pwbar"></i></div>
+    <div class="pw-gen-out" id="pwGenOut"><span class="pwo-lab">Save it</span><span class="pwo-val"></span><button type="button" class="pwo-copy" id="pwGenCopy">Copy</button></div>
+    <div class="hint">Use 8+ characters with a mix of letters, numbers &amp; symbols — or hit Generate.</div>
+    {% if form.password1.errors %}<div class="fld-err">{{ form.password1.errors|join:" " }}</div>{% endif %}
+  </div>
+  <div class="fld">
+    <div class="fld-labelrow"><label for="id_password2">Confirm password</label><button type="button" class="pw-toggle" data-pw-toggle="id_password2">Show</button></div>
+    <input type="password" name="password2" id="id_password2" data-pw-match="id_password1" placeholder="Re-enter your password" autocomplete="new-password">
+    {% if form.password2.errors %}<div class="fld-err">{{ form.password2.errors|join:" " }}</div>{% endif %}
+  </div>
+  <button type="submit" class="abtn abtn-primary abtn-block">Create account &rarr;</button>
+</form>
+<p class="alt">Already have an account? <a href="{% url 'accounts:login' %}">Log in</a></p>
 {% endblock %}

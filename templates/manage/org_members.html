@@ -1,51 +1,28 @@
-{% extends "manage/_base.html" %}
-{% block manage_content %}
-<div class="section-header">
-  <div>
-    <span class="t-micro text-tertiary"><a href="{% url 'manage:orgs_list' %}" class="link">Orgs</a> / {{ org.name }} / Members</span>
-    <h1 class="t-h1 mt-2">Members</h1>
-  </div>
+{% extends "admin_base.html" %}
+{% block title %}Org members — Manage{% endblock %}
+{% block nav_orgs %}on{% endblock %}
+{% block admin_content %}
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;"><a href="{% url 'manage:orgs_list' %}" class="flink" style="color:var(--forest);">Orgs</a><span style="color:var(--muted);">/</span><h1 class="admin-h1" style="margin:0;">{{ org.name }} &middot; Members</h1></div>
+<div class="card" style="margin-bottom:16px;max-width:640px;">
+  <label style="font-size:13px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">Org join link</label>
+  <div class="copy-field"><input id="orgJoin" type="text" readonly value="{{ join_url }}"><button type="button" class="abtn abtn-dark" data-copy="#orgJoin">Copy</button></div>
 </div>
-
-<div class="card-2 mb-8" style="padding:24px">
-  <h3 class="t-h3 mb-3"><i data-lucide="link" class="icon-sm" style="vertical-align:-3px"></i> Join link</h3>
-  <p class="t-small text-tertiary mb-3">Share this with anyone you want in the comp. Link valid 7 days.</p>
-  <input value="{{ join_url }}" readonly onclick="this.select()" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);border-color:var(--accent);background:var(--bg-page)">
-</div>
-
-<div class="table-card">
-  <table>
-    <thead><tr><th>Member</th><th>Email</th><th>Role</th><th>Joined</th><th></th></tr></thead>
-    <tbody>
-      {% for m in members %}
-        <tr>
-          <td>
-            <div class="row gap-3">
-              <span class="avatar" style="width:32px;height:32px;font-size:12px">{{ m.user.display_name|slice:":1"|upper }}</span>
-              <strong>{{ m.user.display_name }}</strong>
-            </div>
-          </td>
-          <td class="text-tertiary">{{ m.user.email }}</td>
-          <td>
-            <form method="post" style="display:inline">{% csrf_token %}
-              <input type="hidden" name="action" value="promote">
-              <input type="hidden" name="member_id" value="{{ m.id }}">
-              <button class="pill {% if m.can_manage %}pill-accent{% endif %}" type="submit" style="border:1px solid var(--border-default);cursor:pointer" title="Toggle manager">{{ m.get_role_display }}{% if m.is_league_owner %} · Owner{% endif %}</button>
-            </form>
-          </td>
-          <td class="text-tertiary t-small">{{ m.joined_at|date:"j M Y" }}</td>
-          <td class="text-right">
-            <form method="post" style="display:inline">{% csrf_token %}
-              <input type="hidden" name="action" value="remove">
-              <input type="hidden" name="member_id" value="{{ m.id }}">
-              <button class="icon-btn" type="submit" title="Remove" style="color:var(--danger);border-color:rgba(239,68,68,0.3)"><i data-lucide="trash-2" class="icon-sm"></i></button>
-            </form>
-          </td>
-        </tr>
-      {% empty %}
-        <tr><td colspan="5" class="text-center text-tertiary" style="padding:32px">No members yet. Share the join link above.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="card"><div class="card-h" style="margin-bottom:10px;">Members</div>
+  <table class="atable compact"><thead><tr><th>Member</th><th>Role</th><th style="text-align:right;">Actions</th></tr></thead><tbody>
+  {% for m in members %}
+    <tr>
+      <td><b>{{ m.user.display_name }}</b><br><small style="color:var(--muted);">{{ m.user.email }}</small></td>
+      <td><span class="pill-role {% if m.is_league_owner %}owner{% elif m.is_manager %}manager{% elif m.is_captain %}captain{% endif %}">{{ m.get_role_display }}{% if m.is_league_owner %} &middot; Owner{% endif %}</span></td>
+      <td style="text-align:right;">
+        {% if not m.is_league_owner %}
+        <form method="post" action="{% url 'manage:org_members' org.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="action" value="promote"><input type="hidden" name="member_id" value="{{ m.id }}"><button class="abtn abtn-ghost abtn-sm" type="submit">{% if m.is_manager %}Make Participant{% else %}Make Manager{% endif %}</button></form>
+        <form method="post" action="{% url 'manage:org_members' org.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="member_id" value="{{ m.id }}"><button class="abtn abtn-ghost abtn-sm" type="submit" style="color:#9a2b2b;">Remove</button></form>
+        {% else %}<span style="color:var(--muted);">&mdash;</span>{% endif %}
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="3" style="text-align:center;color:var(--muted);">No members yet. Share the join link above.</td></tr>
+  {% endfor %}
+  </tbody></table>
 </div>
 {% endblock %}

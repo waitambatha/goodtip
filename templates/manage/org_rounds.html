@@ -1,60 +1,51 @@
-{% extends "manage/_base.html" %}
-{% block manage_content %}
-<div class="section-header">
-  <div>
-    <span class="t-micro text-tertiary"><a href="{% url 'manage:orgs_list' %}" class="link">Orgs</a> / {{ org.name }} / Rounds</span>
-    <h1 class="t-h1 mt-2">{{ org.name }}</h1>
-    <div class="section-title-sub">{{ org.sport_label }} · {{ org.season }} · for {{ org.charity_name }}</div>
+{% extends "admin_base.html" %}
+{% block title %}Rounds — Manage{% endblock %}
+{% block nav_orgs %}on{% endblock %}
+{% block admin_content %}
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;"><a href="{% url 'manage:orgs_list' %}" class="flink" style="color:var(--forest);">Orgs</a><span style="color:var(--muted);">/</span><h1 class="admin-h1" style="margin:0;">{{ org.name }} &middot; Rounds</h1></div>
+<div class="grid-app" style="grid-template-columns:1.4fr 1fr;gap:20px;align-items:start;">
+  <div class="card"><div class="card-h" style="margin-bottom:10px;">Rounds</div>
+    <table class="atable compact"><thead><tr><th>#</th><th>Series</th><th>Lockout</th><th>Status</th><th style="text-align:right;"></th></tr></thead><tbody>
+    {% for r in rounds %}
+      <tr>
+        <td class="r-rank">{{ r.round_number }}</td>
+        <td>{{ r.series }}<br><small style="color:var(--muted);">{{ r.get_stage_display }}</small></td>
+        <td style="color:var(--muted);">{{ r.lockout_at|date:"D j M &middot; g:i a" }}</td>
+        <td>
+          <form method="post" action="{% url 'manage:org_rounds' org.id %}" style="margin:0;">{% csrf_token %}
+            <input type="hidden" name="action" value="status"><input type="hidden" name="round_id" value="{{ r.id }}">
+            <select name="status" onchange="this.form.submit()" style="width:auto;font-size:12px;padding:6px 10px;">
+              <option value="upcoming" {% if r.status == 'upcoming' %}selected{% endif %}>Upcoming</option>
+              <option value="open" {% if r.status == 'open' %}selected{% endif %}>Open</option>
+              <option value="locked" {% if r.status == 'locked' %}selected{% endif %}>Locked</option>
+              <option value="complete" {% if r.status == 'complete' %}selected{% endif %}>Complete</option>
+            </select>
+          </form>
+        </td>
+        <td style="text-align:right;"><a href="{% url 'manage:round_matches' org.id r.id %}" class="flink" style="color:var(--forest);">Matches</a></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" style="text-align:center;color:var(--muted);">No rounds yet.</td></tr>
+    {% endfor %}
+    </tbody></table>
   </div>
-</div>
-
-<div class="card-2 mb-8" style="padding:24px">
-  <h3 class="t-h3 mb-4"><i data-lucide="plus" class="icon-sm" style="vertical-align:-3px"></i> New round</h3>
-  <form method="post" class="grid-2 gap-4">{% csrf_token %}
-    <input type="hidden" name="action" value="create">
-    <div><label class="field-label">Round #</label><input type="number" name="round_number" required min="1"></div>
-    <div><label class="field-label">Competition</label>
-      <select name="competition">
-        {% for c in org.available_competitions %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
-      </select>
-    </div>
-    <div><label class="field-label">Lockout (local time)</label><input type="datetime-local" name="lockout_at" required></div>
-    <div><label class="field-label">Status</label>
-      <select name="status"><option value="upcoming">Upcoming</option><option value="open">Open</option></select>
-    </div>
-    <div style="grid-column:1/-1"><button class="btn-primary">Create round</button></div>
-  </form>
-</div>
-
-<div class="table-card">
-  <table>
-    <thead><tr><th>Round</th><th>Comp</th><th>Lockout</th><th>Status</th><th></th></tr></thead>
-    <tbody>
-      {% for r in rounds %}
-        <tr>
-          <td class="num"><strong>R{{ r.round_number }}</strong></td>
-          <td><span class="pill pill-mono">{{ r.competition }}</span></td>
-          <td class="text-tertiary t-small">{{ r.lockout_at|date:"D j M · g:i a" }}</td>
-          <td>
-            <form method="post" style="display:inline">{% csrf_token %}
-              <input type="hidden" name="action" value="status">
-              <input type="hidden" name="round_id" value="{{ r.id }}">
-              <select name="status" onchange="this.form.submit()" style="width:auto;font-size:12px;padding:6px 10px">
-                <option value="upcoming" {% if r.status == "upcoming" %}selected{% endif %}>Upcoming</option>
-                <option value="open" {% if r.status == "open" %}selected{% endif %}>Open</option>
-                <option value="locked" {% if r.status == "locked" %}selected{% endif %}>Locked</option>
-                <option value="complete" {% if r.status == "complete" %}selected{% endif %}>Complete</option>
-              </select>
-            </form>
-          </td>
-          <td class="text-right">
-            <a href="{% url 'manage:round_matches' org.id r.id %}" class="btn-ghost btn-sm"><i data-lucide="swords" class="icon-sm"></i> Matches</a>
-          </td>
-        </tr>
-      {% empty %}
-        <tr><td colspan="5" class="text-center text-tertiary" style="padding:32px">No rounds yet.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="mini-form">
+    <div class="card-h" style="margin-bottom:14px;">Create round</div>
+    <form method="post" action="{% url 'manage:org_rounds' org.id %}">
+      {% csrf_token %}<input type="hidden" name="action" value="create">
+      <div class="fld"><label for="ar_num">Round number</label><input type="number" name="round_number" id="ar_num" required min="1" placeholder="15"></div>
+      <div class="fld"><label for="ar_series">Series</label>
+        <select name="series" id="ar_series" required>{% for s in org.available_series %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select>
+      </div>
+      <div class="fld"><label for="ar_stage">Match type</label>
+        <select name="stage" id="ar_stage"><option value="regular">Regular round (1 pt)</option><option value="finals">Finals (2 pts)</option><option value="origin">State of Origin (4 pts)</option></select>
+      </div>
+      <div class="fld"><label for="ar_lock">Lockout (local time)</label><input type="datetime-local" name="lockout_at" id="ar_lock" required></div>
+      <div class="fld"><label for="ar_status">Status</label>
+        <select name="status" id="ar_status"><option value="upcoming">Upcoming</option><option value="open">Open</option></select>
+      </div>
+      <button type="submit" class="abtn abtn-primary abtn-block">Create round</button>
+    </form>
+  </div>
 </div>
 {% endblock %}

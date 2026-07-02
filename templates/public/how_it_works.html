@@ -1,0 +1,103 @@
+{% extends "public/base.html" %}
+{% load static %}
+
+{% block title %}How It Works — GoodTip{% endblock %}
+{% block meta_description %}The entry fee goes to charity, not a prize pool. Here's the whole season, step by step.{% endblock %}
+{% block body_class %}page-how{% endblock %}
+
+{% block content %}
+
+<!-- SPLIT HERO -->
+<section class="hero-split">
+  <div class="hs-left">
+    <span class="pill" style="align-self:flex-start;margin-bottom:24px;"><span class="dot"></span>How it works</span>
+    <h1>The entry fee goes to charity. <em>Not a prize pool.</em></h1>
+    <p class="hero-sub">Same comp your group already runs. One change at the end: the money lands somewhere good.</p>
+    <div class="hero-ctas" style="justify-content:flex-start;"><a href="/#start" class="btn-primary">Set up your group &rarr;</a></div>
+  </div>
+  <div class="hs-right">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="shot active" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+    </div>
+    <div class="hs-veil" aria-hidden="true"></div>
+    <div class="hs-tagstrip"><span class="live-dot">Allianz Stadium</span></div>
+  </div>
+</section>
+
+<!-- TIMELINE FLOW -->
+<section class="section on-cream">
+  <div class="wrap">
+    <p class="eyebrow reveal">The season, end to end</p>
+    <h2 class="section-heading reveal">Feel the flow. Three moves, one season.</h2>
+    <div class="timeline" style="margin-top:36px;">
+      <div class="tl-step reveal from-left"><div class="tl-marker">01</div><div class="tl-card"><p class="tl-tag">Set up</p><h2>Set up your group. Run the Charity Vote.</h2><p>Name your comp, invite your team, set the entry fee. No payment until you're ready to launch. While the group fills, run the Charity Vote &mdash; everyone nominates, everyone votes, majority wins. That's where the season's money is headed before a single game is tipped.</p></div></div>
+      <div class="tl-step reveal from-left"><div class="tl-marker">02</div><div class="tl-card"><p class="tl-tag">Tip</p><h2>Tip and track, every round.</h2><p>AFL, AFLW, NRL and NRLW. Weekly tips, a live ladder, and the running charity total in the same place. State of Origin picks are worth four points; finals worth two. The Wall keeps the banter and the tally front and centre all season long.</p></div></div>
+      <div class="tl-step reveal from-left"><div class="tl-marker">03</div><div class="tl-card"><p class="tl-tag">Impact</p><h2>Season done well.</h2><p>Last grand final done. The Impact Report goes out: total raised, charity named, tipping results, the lot. One number your board can cite and your group can be proud of. Season done well.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- SCORING -->
+<section class="section on-paper">
+  <div class="wrap">
+    <p class="eyebrow reveal">Scoring</p>
+    <h2 class="section-heading reveal">Points that mean something.</h2>
+    <p class="section-sub reveal">Simple enough for the casual tipper, with just enough weighting to keep the big rounds interesting.</p>
+    <div class="score-cards reveal">
+      <div class="score-card"><span class="score-pts">1</span><p class="pts-lab">One point</p><h3>Correct tip</h3><p>One point for every game you pick right, across all four codes. The bread and butter of the ladder.</p></div>
+      <div class="score-card"><span class="score-pts">2</span><p class="pts-lab">Double</p><h3>Finals</h3><p>Finals tips are worth two points each. The run home is where ladders are won and lost.</p></div>
+      <div class="score-card"><span class="score-pts">4</span><p class="pts-lab">Quadruple</p><h3>State of Origin</h3><p>Origin picks are worth four points. Three nights that can flip the whole comp on its head.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ROLES -->
+<section class="section on-dark">
+  <div class="wrap">
+    <p class="eyebrow reveal">Roles</p>
+    <h2 class="section-heading reveal">Two roles. One season.</h2>
+    <div class="roles-2 reveal">
+      <div class="role-card r1"><div class="role-ic"><svg class="cic"><use href="#ic-vote"/></svg></div><span class="role-tag">Team Manager</span><h3>Sets it up. Keeps it running.</h3><p>Creates the comp, sets the entry fee, the base pledge and the matching cap. Runs the Charity Vote and invites the group. The one whose name is on it &mdash; in the good way.</p></div>
+      <div class="role-card r2"><div class="role-ic"><svg class="cic"><use href="#ic-flag"/></svg></div><span class="role-tag">Captain</span><h3>Nominated. Then owns the season.</h3><p>Voted in by the group to keep the energy up: chasing stragglers, stoking the Wall, and rallying the top-ups when the total needs a nudge. Every great comp has one.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- LEADERBOARD -->
+<section class="section on-cream">
+  <div class="wrap">
+    <p class="eyebrow reveal">The ladder</p>
+    <h2 class="section-heading reveal">The leaderboard nobody's seen before.</h2>
+    <p class="section-sub reveal">Your group's ladder is the heartbeat &mdash; but it doesn't stop there.</p>
+    <div class="ladder-3 reveal">
+      <div class="ladder-card"><div class="lrank">01</div><h3>Your group</h3><p>Live, round by round. Form lines, biggest movers, who's quietly cooking. The table your group argues about all week.</p></div>
+      <div class="ladder-card"><div class="lrank">02</div><h3>Industry ladder</h3><p>See how your organisation ranks against others in your sector &mdash; for tips and for dollars raised. Bragging rights at the next conference.</p></div>
+      <div class="ladder-card"><div class="lrank">03</div><h3>National ladder</h3><p>Every GoodTip group on one national table. Tipping nous and generosity, side by side.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- IMAGE BAND -->
+<section class="image-band">
+  <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')" aria-hidden="true"></div>
+  <div class="veil" aria-hidden="true"></div>
+  <div class="wrap reveal from-left">
+    <p class="eyebrow" style="color:var(--lime);">Reminders that work</p>
+    <blockquote>Polite nudges before each round close &mdash; until you're in. Nobody misses a round on our watch.</blockquote>
+    <p class="src">Round close &middot; every week of the season</p>
+  </div>
+</section>
+
+{% include "public/partials/_contact.html" with contact_id="contact" %}
+
+<!-- CTA -->
+<section class="cta-pro">
+  <div class="wrap reveal zoom">
+    <h2>Set up your group. Pay when you launch.</h2>
+    <p>Free to set up. Free to run the Charity Vote. You only pay when the first tips lock in. Finals start August 28.</p>
+    <a href="/#start" class="btn-dark">Set up your group &rarr;</a>
+  </div>
+</section>
+
+{% endblock %}

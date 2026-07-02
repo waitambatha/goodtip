@@ -1,129 +1,162 @@
-{% extends "base.html" %}
+{% extends "app_base.html" %}
+{% load static %}
 {% load humanize %}
 {% block title %}Dashboard — GoodTip{% endblock %}
-{% block content %}
+{% block nav_dash %}on{% endblock %}
+{% block app_content %}
 
 {% if not cards %}
-  {% include "components/_empty_state.html" with icon="user-plus" title="You're not in a comp yet" body="Start your own league, or ask your group admin for a join link." cta_url=create_url cta_label="Start a league" %}
+  <div class="card pad-lg" style="text-align:center;">
+    <div class="card-h" style="font-size:20px;">You're not in a comp yet</div>
+    <p class="card-lead" style="margin:6px 0 18px;">Start your own or ask a group manager for a join link.</p>
+    <a href="{% url 'orgs:create' %}" class="abtn abtn-primary">Start a league</a>
+  </div>
 {% else %}
-
 {% with c=cards.0 %}
-  <div class="section-header">
+
+<!-- greeting banner -->
+<div class="dash-banner">
+  <div class="bg" aria-hidden="true">
+    <div class="shot on" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+  </div>
+  <div class="veil"></div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;">
     <div>
-      <span class="t-micro text-tertiary">Welcome back</span>
-      <h1 class="t-h1 mt-2" style="font-size:32px">{{ user.display_name|upper }}</h1>
-      <div class="row gap-2 mt-2">
-        {% for label in c.role_labels %}<span class="pill {% if label == 'Owner' %}pill-mono{% endif %}">{{ label }}</span>{% endfor %}
-      </div>
+      {% if c.round %}<div class="app-eyebrow" style="color:var(--lime);opacity:.85;">Round {{ c.round.round_number }} &middot; {{ c.round.series }}</div>{% endif %}
+      <h1 class="app-h1" style="color:#fff;">Welcome back, {{ user.display_name }}</h1>
+      {% if c.rank %}<p style="color:var(--cream);opacity:.8;margin-top:4px;font-size:14px;">You're {{ c.rank|ordinal }} on the {{ c.org.name }} ladder.</p>{% endif %}
     </div>
-    <div class="hidden-mobile row gap-2">
-      {% if c.is_admin %}
-        <a href="{% url 'orgs:members' c.org.id %}" class="btn-ghost btn-sm"><i data-lucide="users" class="icon-sm"></i> Members</a>
-        <a href="{% url 'orgs:invite' c.org.id %}" class="btn-ghost btn-sm"><i data-lucide="user-plus" class="icon-sm"></i> Invite</a>
-      {% endif %}
-      <a href="{% url 'orgs:create' %}" class="btn-ghost btn-sm"><i data-lucide="plus" class="icon-sm"></i> Start a league</a>
-      <a href="{% url 'tipping:leaderboard' c.org.id %}" class="btn-ghost btn-sm"><i data-lucide="trophy" class="icon-sm"></i> Leaderboard</a>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      {% for label in c.role_labels %}<span class="pill-role {{ label|lower }}">{{ label }}</span>{% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- primary league card -->
+<div class="card pad-lg" style="margin-bottom:18px;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
+    <div><div class="card-h" style="font-size:20px;">{{ c.org.name }}</div><div class="card-lead">{{ c.org.sport_label }} &middot; {{ c.org.season }} &middot; raising for {{ c.org.charity_display }}</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      {% if c.is_admin %}<a href="{% url 'orgs:members' c.org.id %}" class="abtn abtn-ghost abtn-sm">Members</a>
+      <a href="{% url 'orgs:invite' c.org.id %}" class="abtn abtn-ghost abtn-sm">Invite</a>
+      <a href="{% url 'billing:season_summary' c.org.id %}" class="abtn abtn-ghost abtn-sm">Season summary</a>{% endif %}
+      <a href="{% url 'tipping:leaderboard' c.org.id %}" class="abtn abtn-dark abtn-sm">Leaderboard</a>
     </div>
   </div>
 
-  <div class="grid-3 mb-6">
-    {% include "components/_stat_card.html" with label="Season points" value=c.points accent=True icon="target" %}
-    {% include "components/_stat_card.html" with label="Your rank" value=c.rank|default:"—" icon="trending-up" sub="of all tippers" %}
-    {% include "components/_stat_card.html" with label="Tips submitted" value=c.tips_done sub=c.tips_total|stringformat:"of %s this round" icon="list-checks" %}
+  <div class="grid-app g-3" style="margin-bottom:18px;">
+    <div class="stat-card accent"><div class="s-lab">Season points</div><div class="s-num">{{ c.points }}</div><div class="s-sub">across the season</div></div>
+    <div class="stat-card"><div class="s-lab">Your rank</div><div class="s-num">{{ c.rank|default:"—" }}</div><div class="s-sub">of all tippers</div></div>
+    <div class="stat-card"><div class="s-lab">Tips this round</div><div class="s-num">{{ c.tips_done }}<span style="font-size:18px;color:var(--muted);"> / {{ c.tips_total }}</span></div><div class="s-sub">{% if c.tips_total > c.tips_done %}still open{% else %}all in{% endif %}</div></div>
   </div>
-
-  {% if c.is_owner %}
-    {% if c.subscription %}
-      <div class="card row-between mb-6" style="padding:14px 20px;align-items:center">
-        <div class="row gap-3" style="align-items:center">
-          <i data-lucide="badge-check" class="icon-sm text-accent"></i>
-          <div>
-            <div class="t-body" style="font-weight:600">{{ c.subscription.get_tier_display }} plan · active</div>
-            <div class="t-micro text-tertiary">{{ c.subscription.participant_count }} / {{ c.subscription.seat_limit_label|cut:"Up to " }} seats used</div>
-          </div>
-        </div>
-        <a href="{% url 'billing:plans' c.org.id %}" class="btn-ghost btn-sm">Manage plan</a>
-      </div>
-    {% else %}
-      <a href="{% url 'billing:plans' c.org.id %}" class="card card-interactive row-between mb-6" style="padding:16px 20px;align-items:center;border-color:var(--accent);text-decoration:none">
-        <div class="row gap-3" style="align-items:center">
-          <i data-lucide="credit-card" class="icon-sm text-accent"></i>
-          <div>
-            <div class="t-body" style="font-weight:600">Choose a plan</div>
-            <div class="t-micro text-tertiary">Activate {{ c.org.name }} for the season</div>
-          </div>
-        </div>
-        <span class="btn-ghost btn-sm">View plans <i data-lucide="arrow-right" class="icon-sm"></i></span>
-      </a>
-    {% endif %}
-  {% endif %}
 
   {% if c.charity_vote %}
-    <a href="{% url 'orgs:charity_vote' c.org.id %}" class="card card-interactive row-between mb-6" style="padding:16px 20px;align-items:center;border-color:var(--accent);text-decoration:none">
-      <div class="row gap-3" style="align-items:center">
-        <i data-lucide="heart" class="icon-sm text-accent"></i>
-        <div>
-          <div class="t-body" style="font-weight:600">Charity vote is open</div>
-          <div class="t-micro text-tertiary">{% if c.has_voted %}You've voted — you can still change it{% else %}Cast your vote for the cause{% endif %}</div>
-        </div>
-      </div>
-      <span class="btn-ghost btn-sm">{% if c.has_voted %}Review{% else %}Vote now{% endif %} <i data-lucide="arrow-right" class="icon-sm"></i></span>
-    </a>
+  <div class="flash info" style="justify-content:space-between;">
+    <span><svg class="cic" style="width:18px;height:18px;stroke:#245b66;"><use href="#ic-vote"/></svg> A charity vote is open for your group.</span>
+    <a href="{% url 'orgs:charity_vote' c.org.id %}" class="abtn abtn-dark abtn-sm">{% if c.has_voted %}Review{% else %}Vote now{% endif %}</a>
+  </div>
   {% endif %}
 
-  {# Zone 2 — active round #}
   {% if c.round %}
-    <div class="active-round mb-6">
-      <div class="row-between" style="flex-wrap:wrap;gap:16px">
-        <div class="row gap-4" style="flex-wrap:wrap">
-          <span class="round-badge"><span class="r-label">Round</span><span class="r-num">{{ c.round.round_number }}</span></span>
-          <div>
-            <div class="t-micro text-tertiary mb-2">{{ c.round.competition }} · {{ c.org.name }}</div>
-            <div id="countdown-{{ c.org.id }}"
-                 hx-get="{% url 'accounts:dashboard_countdown' c.org.id %}"
-                 hx-trigger="every 60s"
-                 hx-swap="innerHTML">
-              {% include "components/_countdown.html" with round=c.round %}
-            </div>
-          </div>
-        </div>
-        <div style="flex:0 0 auto;min-width:240px">
-          <div class="t-micro text-tertiary mb-2">{{ c.tips_done }} / {{ c.tips_total }} tips submitted</div>
-          <div class="progress mb-4"><div class="progress-fill" style="width:{% widthratio c.tips_done c.tips_total|default:1 100 %}%"></div></div>
-          {% if c.round.is_locked %}
-            <a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="btn-ghost btn-block"><i data-lucide="eye" class="icon-sm"></i> Review tips</a>
-          {% elif c.tips_done < c.tips_total %}
-            <a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="btn-primary btn-block">Finish your tips <i data-lucide="arrow-right" class="icon-sm"></i></a>
-          {% else %}
-            <a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="btn-ghost btn-block"><i data-lucide="check-circle-2" class="icon-sm"></i> All tips in — review</a>
-          {% endif %}
-        </div>
+  <div class="card" style="background:var(--app-card-2);margin-top:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+      <div>
+        <span class="badge-live">{% if c.round.is_locked %}Locked{% else %}Live &middot; locks soon{% endif %}</span>
+        <div class="card-h" style="margin-top:8px;">Round {{ c.round.round_number }} &middot; {{ c.round.series }}</div>
+        <div class="card-lead">{{ c.org.name }}</div>
+      </div>
+      <div id="countdown-{{ c.org.id }}" hx-get="{% url 'accounts:dashboard_countdown' c.org.id %}" hx-trigger="every 60s" hx-swap="innerHTML">
+        {% include "partials/countdown.html" with round=c.round %}
       </div>
     </div>
+    <div style="margin:18px 0 8px;display:flex;justify-content:space-between;font-size:13px;color:var(--muted);"><span>Tips submitted</span><span class="mono">{{ c.tips_done }} / {{ c.tips_total }}</span></div>
+    <div class="pbar"><i style="width:{% widthratio c.tips_done c.tips_total|default:1 100 %}%"></i></div>
+    <div style="margin-top:16px;">
+      {% if c.round.is_locked %}<a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="abtn abtn-ghost">Review tips &rarr;</a>
+      {% elif c.tips_done < c.tips_total %}<a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="abtn abtn-primary">Finish your tips &rarr;</a>
+      {% else %}<a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="abtn abtn-ghost">All tips in — review &rarr;</a>{% endif %}
+    </div>
+  </div>
   {% endif %}
-{% endwith %}
+
+  {% if c.is_owner %}
+  <div class="grid-app g-2" style="margin-top:18px;">
+    {% if c.subscription %}
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;"><div class="card-h">Plan</div><span class="pill-role owner">Active</span></div>
+      <div class="s-num" style="font-size:26px;margin:10px 0 2px;">{{ c.subscription.get_tier_display }}</div>
+      <div class="card-lead">{{ c.subscription.participant_count }} of {{ c.subscription.seat_limit_label|cut:"Up to " }} seats used</div>
+      <div style="display:flex;gap:8px;margin-top:16px;"><a href="{% url 'billing:receipt' c.org.id %}" class="abtn abtn-ghost abtn-sm">Receipt</a><a href="{% url 'billing:plans' c.org.id %}" class="abtn abtn-ghost abtn-sm">Manage plan</a></div>
+    </div>
+    {% else %}
+    <a href="{% url 'billing:plans' c.org.id %}" class="card" style="text-decoration:none;border-color:var(--lime);">
+      <div style="display:flex;justify-content:space-between;align-items:center;"><div class="card-h">Plan</div><span class="pill-role owner">Action needed</span></div>
+      <div class="s-num" style="font-size:22px;margin:10px 0 2px;">Choose a plan</div>
+      <div class="card-lead">Activate {{ c.org.name }} for the season &rarr;</div>
+    </a>
+    {% endif %}
+
+    {% if c.donation %}
+    <div class="card">
+      <div class="card-h">Donation pledge</div>
+      <div class="s-num" style="font-size:26px;margin:10px 0 2px;color:var(--forest);">${{ c.donation.raised|floatformat:0 }} <span style="font-size:14px;color:var(--muted);font-family:var(--body);font-weight:400;">for {{ c.donation.charity.name|default:c.org.charity_display }}</span></div>
+      <div class="dbreak">
+        <div class="row"><span>Base pledge</span><b>${{ c.donation.base|floatformat:0 }}</b></div>
+        <div class="row"><span>Top-ups</span><b>${{ c.donation.topups|floatformat:0 }}</b></div>
+        {% if c.donation.matching_enabled %}<div class="row"><span>Matched</span><b>${{ c.donation.matched|floatformat:0 }}</b></div>{% endif %}
+      </div>
+      <div class="pbar sm"><i style="width:{{ c.donation.pct }}%"></i></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:6px;"><span>{{ c.donation.pct }}% of ${{ c.donation.goal|floatformat:0 }} goal</span><a href="{% url 'billing:pledge' c.org.id %}" class="flink" style="color:var(--forest);font-weight:700;">Edit</a></div>
+    </div>
+    {% else %}
+    <a href="{% url 'billing:pledge' c.org.id %}" class="card" style="text-decoration:none;border-color:var(--lime);">
+      <div style="display:flex;justify-content:space-between;align-items:center;"><div class="card-h">Donation pledge</div><span class="pill-role owner">Action needed</span></div>
+      <div class="s-num" style="font-size:22px;margin:10px 0 2px;">Set your pledge</div>
+      <div class="card-lead">What {{ c.org.name }} commits to the charity &rarr;</div>
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- footy news (sample content) -->
+<div class="hub-h" style="margin-bottom:14px;"><span class="k">Around the grounds <span class="sample-tag">Sample</span></span><a href="#">More footy news &rarr;</a></div>
+<div class="grid-app g-3" style="margin-bottom:16px;">
+  <div class="news-lead"><div class="thumb" style="background-image:url('{% static 'img/news-afl.svg' %}')"><span class="sport-tag">AFL</span></div><div class="body"><h4>Finals race tightens as the top eight pulls away</h4><p>Two games separate fourth from ninth with three rounds to play — every tip counts from here.</p><div class="date">Sample story &middot; today</div></div></div>
+  <div class="news-lead"><div class="thumb" style="background-image:url('{% static 'img/news-nrl.svg' %}')"><span class="sport-tag">NRL</span></div><div class="body"><h4>Origin decider looms over Round 18 team lists</h4><p>Coaches juggle rep stars and rested forwards — a nightmare week for tipsters and a gift for the brave.</p><div class="date">Sample story &middot; 1 day ago</div></div></div>
+  <div class="news-lead"><div class="thumb" style="background-image:url('{% static 'img/news-aflw.svg' %}')"><span class="sport-tag">AFLW</span></div><div class="body"><h4>Round 1 squads locked as the women's season nears</h4><p>Every GoodTip AFL comp includes AFLW at no extra cost — same price, twice the footy.</p><div class="date">Sample story &middot; 2 days ago</div></div></div>
+</div>
+<div class="news-list" style="margin-bottom:22px;">
+  <div class="news-item"><span class="ntag afl">AFL</span><div><div class="nt">Expert tips: who to back across the weekend slate</div><div class="nd">Sample &middot; today</div></div></div>
+  <div class="news-item"><span class="ntag nrl">NRL</span><div><div class="nt">Injury cloud over the Broncos front row ahead of Friday</div><div class="nd">Sample &middot; 1 day ago</div></div></div>
+  <div class="news-item"><span class="ntag nrlw">NRLW</span><div><div class="nt">Roosters name a strong side for the season opener</div><div class="nd">Sample &middot; 2 days ago</div></div></div>
+  <div class="news-item"><span class="ntag afl">AFL</span><div><div class="nt">Ladder watch: the percentage battle for a home final</div><div class="nd">Sample &middot; 3 days ago</div></div></div>
+  <div class="news-item"><span class="ntag nrl">NRL</span><div><div class="nt">Halves shuffle as clubs manage the Origin period</div><div class="nd">Sample &middot; 3 days ago</div></div></div>
+</div>
 
 {% if cards|length > 1 %}
-  <h2 class="t-h2 mt-8 mb-4">Your other comps</h2>
-  <div class="grid-2">
-    {% for c in cards|slice:"1:" %}
-      <div class="card card-interactive" style="padding:20px">
-        <div class="row-between mb-3">
-          <div>
-            <h3 class="t-h3" style="font-size:14px">{{ c.org.name }}</h3>
-            <div class="t-micro text-tertiary mt-2">{{ c.org.sport_label }} · {{ c.org.season }} · for {{ c.org.charity_name }}</div>
-          </div>
-          {% if c.rank %}<div class="text-right"><div class="t-micro text-tertiary">Rank</div><div class="stat-num">#{{ c.rank }}</div></div>{% endif %}
-        </div>
-        <div class="row gap-2">
-          <a href="{% url 'tipping:my_tips' c.org.id %}" class="btn-ghost btn-sm flex-1"><i data-lucide="list-checks" class="icon-sm"></i> Tips</a>
-          <a href="{% url 'tipping:leaderboard' c.org.id %}" class="btn-ghost btn-sm flex-1"><i data-lucide="trophy" class="icon-sm"></i> Board</a>
-          {% if c.is_admin %}<a href="{% url 'orgs:invite' c.org.id %}" class="btn-ghost btn-sm flex-1"><i data-lucide="user-plus" class="icon-sm"></i> Invite</a>{% endif %}
-        </div>
+<div class="hub-h" style="margin-bottom:12px;"><span class="k">Your other comps</span><a href="{% url 'orgs:create' %}">Create a comp &rarr;</a></div>
+<div class="grid-app g-2" style="margin-bottom:26px;">
+  {% for oc in cards|slice:"1:" %}
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+      <div><div class="card-h">{{ oc.org.name }}</div><div class="card-lead">{{ oc.org.sport_label }} &middot; {{ oc.org.season }} &middot; {{ oc.org.charity_display }}</div></div>
+      <div style="display:flex;gap:6px;">
+        <a href="{% url 'tipping:my_tips' oc.org.id %}" class="abtn abtn-ghost abtn-sm">Tips</a>
+        <a href="{% url 'tipping:leaderboard' oc.org.id %}" class="abtn abtn-ghost abtn-sm">Board</a>
       </div>
-    {% endfor %}
+    </div>
+    <div class="comp-stats">
+      <div class="cs"><div class="k">Round</div><div class="v">{{ oc.tips_done }}<small>/{{ oc.tips_total }}</small></div></div>
+      <div class="cs"><div class="k">Comp rank</div><div class="v">{{ oc.rank|default:"—" }}</div></div>
+      <div class="cs"><div class="k">Points</div><div class="v">{{ oc.points }}</div></div>
+    </div>
   </div>
+  {% endfor %}
+</div>
 {% endif %}
 
+{% endwith %}
 {% endif %}
 {% endblock %}

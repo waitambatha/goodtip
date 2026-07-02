@@ -21,18 +21,27 @@ JOIN_INVITER_SESSION_KEY = "pending_join_inviter_id"
 
 
 def _consume_pending_join(request):
+    """Complete a pending invite join. Returns the joined Organisation, or None."""
     org_id = request.session.pop(JOIN_SESSION_KEY, None)
     inviter_id = request.session.pop(JOIN_INVITER_SESSION_KEY, None)
     if not org_id:
-        return
+        return None
     try:
         org = Organisation.objects.get(pk=org_id)
     except Organisation.DoesNotExist:
-        return
+        return None
     from orgs.services import add_member
 
     add_member(request.user, org, inviter_id=inviter_id)
     messages.success(request, f"Joined {org.name}.")
+    return org
+
+
+def post_join_redirect(org):
+    """After joining, show the one-time optional top-up prompt if a pledge exists."""
+    if org is not None and org.pledges.filter(season=org.season).exists():
+        return redirect("billing:topup", org_id=org.id)
+    return redirect("dashboard")
 
 
 @never_cache
@@ -47,8 +56,8 @@ def signup_view(request):
             user = authenticate(request, username=user.email, password=form.cleaned_data["password1"])
             if user is not None:
                 login(request, user)
-                _consume_pending_join(request)
-                return redirect("dashboard")
+                joined = _consume_pending_join(request)
+                return post_join_redirect(joined)
     else:
         form = SignupForm()
     return render(request, "auth/signup.html", {"form": form})
@@ -69,7 +78,9 @@ def login_view(request):
             )
             if user is not None:
                 login(request, user)
-                _consume_pending_join(request)
+                joined = _consume_pending_join(request)
+                if joined is not None:
+                    return post_join_redirect(joined)
                 next_url = request.GET.get("next") or reverse("dashboard")
                 return HttpResponseRedirect(next_url)
             messages.error(request, "Invalid email or password.")
@@ -93,14 +104,14 @@ def dashboard_view(request):
     cards = []
     for m in memberships:
         org = m.org
-        org_sports = org.sports.all()
+        org_comps = org.competitions.all()
         current_round = (
-            Round.objects.filter(org=org, competition__sport__in=org_sports, lockout_at__gte=timezone.now())
+            Round.objects.filter(org=org, competition__in=org_comps, lockout_at__gte=timezone.now())
             .order_by("lockout_at").first()
         )
         if current_round is None:
             current_round = (
-                Round.objects.filter(org=org, competition__sport__in=org_sports)
+                Round.objects.filter(org=org, competition__in=org_comps)
                 .order_by("-round_number").first()
             )
         stats = user_org_stats(request.user, org)
@@ -116,10 +127,14 @@ def dashboard_view(request):
             and charity_vote.ballots.filter(user=request.user).exists()
         )
         subscription = None
+        donation = None
         if m.is_league_owner:
             subscription = org.subscriptions.filter(
                 season=org.season, status="active"
             ).first()
+            from billing.donations import donation_summary
+
+            donation = donation_summary(org)
         cards.append({
             "org": org,
             "round": current_round,
@@ -133,6 +148,7 @@ def dashboard_view(request):
             "charity_vote": charity_vote,
             "has_voted": has_voted,
             "subscription": subscription,
+            "donation": donation,
         })
     return render(request, "dashboard.html", {
         "cards": cards,
@@ -144,7 +160,7 @@ def dashboard_view(request):
 def dashboard_countdown_partial(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     current_round = (
-        Round.objects.filter(org=org, competition__sport__in=org.sports.all(), lockout_at__gte=timezone.now())
+        Round.objects.filter(org=org, competition__in=org.competitions.all(), lockout_at__gte=timezone.now())
         .order_by("lockout_at").first()
     )
     return render(request, "partials/countdown.html", {"round": current_round, "org": org})

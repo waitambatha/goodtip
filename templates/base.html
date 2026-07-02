@@ -14,7 +14,7 @@
 </head>
 <body>
 {% if user.is_authenticated %}
-  {% include "components/_charity_strip.html" with org=primary_org %}
+  {% include "components/_charity_strip.html" with org=primary_org donation=primary_donation %}
   <nav class="topnav">
     <div class="topnav-inner">
       <div class="row gap-3">
@@ -86,5 +86,6 @@
   document.addEventListener('DOMContentLoaded', () => { if (window.lucide) lucide.createIcons(); });
   document.body.addEventListener('htmx:afterSwap', () => { if (window.lucide) lucide.createIcons(); });
 </script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

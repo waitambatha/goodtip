@@ -1,0 +1,189 @@
+{% extends "public/base.html" %}
+{% load static %}
+
+{% block title %}The Good List — GoodTip{% endblock %}
+{% block meta_description %}Your tips raise money for charity. The Good List ranks every group by what they've raised — nationally, by industry, by charity, by state.{% endblock %}
+{% block body_class %}page-leaderboard{% endblock %}
+
+{% block content %}
+
+<!-- SPLIT HERO -->
+<section class="hero-split">
+  <div class="hs-left">
+    <span class="pill" style="align-self:flex-start;margin-bottom:22px;"><span class="dot"></span>The Good List</span>
+    <h1>Your tips raise money <em>for charity.</em></h1>
+    <p class="hero-sub">Workplaces pick winners every round. The entry fees go to the charity their group voted for. No prize pool &mdash; the whole pot does good.</p>
+    <div class="lb-herostat">
+      <div class="big" data-countto="723410" data-prefix="$">$0</div>
+      <div class="lab">Raised across every group this season</div>
+    </div>
+    <p class="preseason" style="margin-top:20px;"><span class="live-dot"></span> Preview data &middot; goes live when Round 1 locks in</p>
+  </div>
+  <div class="hs-right">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="shot active" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+    </div>
+    <div class="hs-veil" aria-hidden="true"></div>
+    <div class="hs-tagstrip"><span class="live-dot">Updated live each round</span></div>
+  </div>
+</section>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tabs-inner" role="tablist">
+    <button class="tab-btn active" data-tab="national" role="tab">National</button>
+    <button class="tab-btn" data-tab="industry" role="tab">By Industry</button>
+    <button class="tab-btn" data-tab="charity" role="tab">By Charity</button>
+    <button class="tab-btn" data-tab="state" role="tab">By State</button>
+    <button class="tab-btn" data-tab="community" role="tab">Community</button>
+  </div>
+</div>
+
+<!-- NATIONAL -->
+<div class="tab-panel active" id="national">
+  <section class="section on-cream">
+    <div class="wrap">
+      <!-- featured -->
+      <div class="lb-featured reveal">
+        <div class="lb-shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"><div class="veil"></div><span class="spot-badge">Featured Workplace</span></div>
+        <div class="lb-copy">
+          <p class="eyebrow">Workplace spotlight</p>
+          <h3>Eclat, Hawthorn East</h3>
+          <p>A members' lounge in Hawthorn East. They ran GoodTip through the finals and again at the AFLW launch &mdash; and their charity took the proceeds both times.</p>
+          <div class="lb-figure">$14,280<small>Raised for Lifeline</small></div>
+        </div>
+      </div>
+
+      <div class="lb-head reveal">
+        <h2>National leaderboard</h2>
+        <div class="note">Every group, ranked by total raised. Preview figures &mdash; live once groups go active.</div>
+      </div>
+
+      <!-- podium -->
+      <div class="podium reveal">
+        <div class="pod second"><div class="medal">2</div><div class="pod-name">Meridian Partners</div><div class="pod-meta">Sydney, NSW &middot; Professional Services</div><span class="pod-chip">headspace</span><div class="pod-amt">$12,640</div></div>
+        <div class="pod first"><span class="crown"><svg class="cic"><use href="#ic-trophy"/></svg></span><div class="medal">1</div><div class="pod-name">Eclat</div><div class="pod-meta">Hawthorn East, VIC &middot; Hospitality</div><span class="pod-chip">Lifeline</span><div class="pod-amt">$14,280</div></div>
+        <div class="pod third"><div class="medal">3</div><div class="pod-name">Brightwater Group</div><div class="pod-meta">Brisbane, QLD &middot; Construction</div><span class="pod-chip">ReachOut</span><div class="pod-amt">$11,090</div></div>
+      </div>
+
+      <!-- rest of list -->
+      <div class="lb lb--orgs reveal">
+        <div class="lb-colhead"><span>Rank</span><span>Group</span><span>Charity</span><span class="r-amt">Raised</span></div>
+        <div class="lb-row"><span class="lb-rank">04</span><span class="lb-name"><b>Coastline Retail Co</b><small>Perth, WA &middot; Retail</small></span><span class="lb-chip">Lifeline</span><span class="lb-amt">$8,750</span></div>
+        <div class="lb-row"><span class="lb-rank">05</span><span class="lb-name"><b>Adelaide Mutual</b><small>Adelaide, SA &middot; Finance</small></span><span class="lb-chip">headspace</span><span class="lb-amt">$7,420</span></div>
+        <div class="lb-row"><span class="lb-rank">06</span><span class="lb-name"><b>Northshore Legal</b><small>Sydney, NSW &middot; Professional Services</small></span><span class="lb-chip">Lifeline</span><span class="lb-amt">$6,980</span></div>
+        <div class="lb-row"><span class="lb-rank">07</span><span class="lb-name"><b>Kirra Hospitality</b><small>Gold Coast, QLD &middot; Hospitality</small></span><span class="lb-chip">ReachOut</span><span class="lb-amt">$6,210</span></div>
+        <div class="lb-row"><span class="lb-rank">08</span><span class="lb-name"><b>Fremantle Works</b><small>Fremantle, WA &middot; Construction</small></span><span class="lb-chip">headspace</span><span class="lb-amt">$5,540</span></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- BY INDUSTRY -->
+<div class="tab-panel" id="industry">
+  <section class="section on-cream">
+    <div class="wrap">
+      <div class="lb-head reveal"><h2>Raised by industry</h2><div class="note">The sectors putting the most on the board. Preview figures.</div></div>
+      <div class="lb lb--metric reveal">
+        <div class="lb-colhead"><span>Rank</span><span>Industry</span><span class="r-amt">Groups</span><span class="r-amt">Raised</span></div>
+        <div class="lb-row t3"><span class="lb-rank">01</span><span class="lb-name"><b>Professional Services</b></span><span class="lb-count">128</span><span class="lb-amt">$186,400</span></div>
+        <div class="lb-row t3"><span class="lb-rank">02</span><span class="lb-name"><b>Hospitality</b></span><span class="lb-count">96</span><span class="lb-amt">$142,300</span></div>
+        <div class="lb-row t3"><span class="lb-rank">03</span><span class="lb-name"><b>Construction</b></span><span class="lb-count">74</span><span class="lb-amt">$118,900</span></div>
+        <div class="lb-row"><span class="lb-rank">04</span><span class="lb-name"><b>Retail</b></span><span class="lb-count">61</span><span class="lb-amt">$92,150</span></div>
+        <div class="lb-row"><span class="lb-rank">05</span><span class="lb-name"><b>Finance</b></span><span class="lb-count">58</span><span class="lb-amt">$88,700</span></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- BY CHARITY -->
+<div class="tab-panel" id="charity">
+  <section class="section on-cream">
+    <div class="wrap">
+      <div class="lb-head reveal"><h2>Raised by charity</h2><div class="note">Each group votes for one of three charities. Here's what they've raised.</div></div>
+      <div class="lb lb--metric reveal">
+        <div class="lb-colhead"><span>Rank</span><span>Charity</span><span class="r-amt">Groups</span><span class="r-amt">Raised</span></div>
+        <div class="lb-row t3"><span class="lb-rank">01</span><span class="lb-name"><b>Lifeline</b><small>Crisis support</small></span><span class="lb-count">214</span><span class="lb-amt">$312,800</span></div>
+        <div class="lb-row t3"><span class="lb-rank">02</span><span class="lb-name"><b>headspace</b><small>Youth mental health</small></span><span class="lb-count">176</span><span class="lb-amt">$268,400</span></div>
+        <div class="lb-row t3"><span class="lb-rank">03</span><span class="lb-name"><b>ReachOut</b><small>Online youth wellbeing</small></span><span class="lb-count">92</span><span class="lb-amt">$141,600</span></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- BY STATE -->
+<div class="tab-panel" id="state">
+  <section class="section on-cream">
+    <div class="wrap">
+      <div class="lb-head reveal"><h2>Raised by state</h2><div class="note">How the states stack up as groups onboard nationally. Preview figures.</div></div>
+      <div class="lb lb--metric reveal">
+        <div class="lb-colhead"><span>Rank</span><span>State</span><span class="r-amt">Groups</span><span class="r-amt">Raised</span></div>
+        <div class="lb-row t3"><span class="lb-rank">01</span><span class="lb-name"><b>Victoria</b></span><span class="lb-count">182</span><span class="lb-amt">$268,900</span></div>
+        <div class="lb-row t3"><span class="lb-rank">02</span><span class="lb-name"><b>New South Wales</b></span><span class="lb-count">168</span><span class="lb-amt">$251,300</span></div>
+        <div class="lb-row t3"><span class="lb-rank">03</span><span class="lb-name"><b>Queensland</b></span><span class="lb-count">121</span><span class="lb-amt">$178,400</span></div>
+        <div class="lb-row"><span class="lb-rank">04</span><span class="lb-name"><b>Western Australia</b></span><span class="lb-count">78</span><span class="lb-amt">$112,600</span></div>
+        <div class="lb-row"><span class="lb-rank">05</span><span class="lb-name"><b>South Australia</b></span><span class="lb-count">64</span><span class="lb-amt">$91,200</span></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- COMMUNITY -->
+<div class="tab-panel" id="community">
+  <section class="section on-cream">
+    <div class="wrap">
+      <div class="lb-featured reveal">
+        <div class="lb-shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"><div class="veil"></div><span class="spot-badge">Featured Community Group</span></div>
+        <div class="lb-copy">
+          <p class="eyebrow">Community spotlight</p>
+          <h3>2nd Davidson Scout Group</h3>
+          <p>Davidson, NSW &middot; Sydney North Region. Volunteers run it. They tip for fun and raise real money &mdash; with no corporate budget behind them.</p>
+          <div class="lb-figure">$6,340<small>Raised for Lifeline</small></div>
+        </div>
+      </div>
+      <div class="lb-head reveal"><h2>Clubs &amp; community groups</h2><div class="note">Volunteer-run groups sit apart from workplace teams &mdash; they compete against each other, not against corporate budgets.</div></div>
+      <div class="lb lb--orgs reveal">
+        <div class="lb-colhead"><span>Rank</span><span>Group</span><span>Charity</span><span class="r-amt">Raised</span></div>
+        <div class="lb-row t3"><span class="lb-rank">01</span><span class="lb-name"><b>2nd Davidson Scout Group</b><small>Davidson, NSW</small></span><span class="lb-chip">Lifeline</span><span class="lb-amt">$6,340</span></div>
+        <div class="lb-row t3"><span class="lb-rank">02</span><span class="lb-name"><b>Brunswick Cricket Club</b><small>Brunswick, VIC</small></span><span class="lb-chip">headspace</span><span class="lb-amt">$5,180</span></div>
+        <div class="lb-row t3"><span class="lb-rank">03</span><span class="lb-name"><b>Redcliffe Surf Life Saving</b><small>Redcliffe, QLD</small></span><span class="lb-chip">ReachOut</span><span class="lb-amt">$4,720</span></div>
+        <div class="lb-row"><span class="lb-rank">04</span><span class="lb-name"><b>Ballarat Rovers FC</b><small>Ballarat, VIC</small></span><span class="lb-chip">Lifeline</span><span class="lb-amt">$3,860</span></div>
+        <div class="lb-row"><span class="lb-rank">05</span><span class="lb-name"><b>Cronulla Nippers</b><small>Cronulla, NSW</small></span><span class="lb-chip">headspace</span><span class="lb-amt">$3,410</span></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+{% include "public/partials/_contact.html" with contact_id="contact" %}
+
+<!-- CTA -->
+<section class="cta-pro">
+  <div class="wrap reveal zoom">
+    <h2>Get your group on The Good List.</h2>
+    <p>Set up free, run the Charity Vote, and your total starts climbing the moment Round 1 locks in. Finals start August 28.</p>
+    <a href="/#start" class="btn-dark">Set up your group &rarr;</a>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+    /* ---- The Good List: tabs ---- */
+    (function () {
+      var btns = [].slice.call(document.querySelectorAll('.tab-btn'));
+      var panels = [].slice.call(document.querySelectorAll('.tab-panel'));
+      if (!btns.length) return;
+      btns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          btns.forEach(function (b) { b.classList.remove('active'); });
+          panels.forEach(function (p) { p.classList.remove('active'); });
+          btn.classList.add('active');
+          var panel = document.getElementById(btn.dataset.tab);
+          if (!panel) return;
+          panel.classList.add('active');
+          panel.querySelectorAll('.reveal, .stagger').forEach(function (el) { el.classList.add('in'); });
+        });
+      });
+    })();
+{% endblock %}

@@ -1,0 +1,19 @@
+{% comment %} Swap href values for {% url 'name' %} once urls.py is wired. {% endcomment %}
+<nav class="nav" data-open="false">
+  <div class="nav-inner">
+    <a href="/" class="wordmark">GOOD<span>TIP</span><span class="dot">.</span></a>
+    <button class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-menu">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-links" id="nav-menu">
+      {% if active != 'home' %}<li><a href="/">Home</a></li>{% endif %}
+      <li><a href="/how-it-works/" {% if active == 'how' %}aria-current="page"{% endif %}>How It Works</a></li>
+      <li><a href="/wall/" {% if active == 'wall' %}aria-current="page"{% endif %}>The Wall</a></li>
+      <li><a href="/leaderboard/" {% if active == 'leaderboard' %}aria-current="page"{% endif %}>The Good List</a></li>
+      <li><a href="/#charities" {% if active == 'charities' %}aria-current="page"{% endif %}>Charities</a></li>
+      <li><a href="/pricing/" {% if active == 'pricing' %}aria-current="page"{% endif %}>Pricing</a></li>
+      <li class="nav-auth"><a href="/login/" class="nav-login">Log in</a></li>
+      <li><a href="/signup/" class="btn-nav">Sign up</a></li>
+    </ul>
+  </div>
+</nav>

@@ -1,70 +1,57 @@
-{% extends "base.html" %}
+{% extends "app_base.html" %}
 {% block title %}Profile — GoodTip{% endblock %}
-{% block content %}
-
-<div class="section-header">
-  <div class="row gap-4">
-    <span class="avatar" style="width:64px;height:64px;font-size:24px">{{ user.display_name|slice:":1"|upper }}</span>
-    <div>
-      <h1 class="t-h1">{{ user.display_name }}</h1>
-      <div class="section-title-sub">{{ user.email }}</div>
-    </div>
+{% block app_content %}
+<div class="app-head">
+  <div style="display:flex;align-items:center;gap:16px;">
+    <span class="an-avatar" style="width:56px;height:56px;font-size:22px;">{{ user.display_name|slice:":1"|upper }}</span>
+    <div><h1 class="app-h1">{{ user.display_name }}</h1><p class="app-sub" style="margin:2px 0 0;">{{ user.email }}</p></div>
   </div>
 </div>
 
-<div class="grid-2 mb-6">
-  <div class="card" style="padding:24px">
-    <h3 class="t-h3 mb-4"><i data-lucide="user" class="icon-sm" style="vertical-align:-3px"></i> Account</h3>
-    <form method="post" class="stack gap-4">{% csrf_token %}
-      <div>
-        <label class="field-label">Display name</label>
-        {{ form.display_name }}
-        {% for e in form.display_name.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
-      </div>
-      <div>
-        <label class="field-label">Email</label>
-        <input value="{{ user.email }}" disabled>
-      </div>
-      <button class="btn-primary">Save changes</button>
+<div class="grid-app g-2" style="align-items:start;margin-bottom:18px;">
+  <div class="card pad-lg">
+    <div class="card-h" style="margin-bottom:14px;">Account</div>
+    <form method="post" action="{% url 'profile' %}">
+      {% csrf_token %}
+      <div class="fld"><label for="id_display_name">Display name</label><input type="text" name="display_name" id="id_display_name" value="{{ form.display_name.value|default:user.display_name }}">
+        {% if form.display_name.errors %}<div class="fld-err">{{ form.display_name.errors|join:" " }}</div>{% endif %}</div>
+      <div class="fld"><label>Email</label><input type="email" value="{{ user.email }}" disabled style="opacity:.6;"></div>
+      <button type="submit" class="abtn abtn-primary">Save changes</button>
     </form>
   </div>
 
-  <div class="card" style="padding:24px">
-    <h3 class="t-h3 mb-4"><i data-lucide="key-round" class="icon-sm" style="vertical-align:-3px"></i> Change password</h3>
-    <form method="post" class="stack gap-4">{% csrf_token %}
-      {% for field in pwd_form %}
-        <div>
-          <label class="field-label">{{ field.label }}</label>
-          {{ field }}
-          {% for e in field.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
-        </div>
+  <div class="card pad-lg">
+    <div class="card-h" style="margin-bottom:14px;">Change password</div>
+    {% if pwd_form.non_field_errors %}<div class="flash error" style="margin-bottom:12px;"><span>{{ pwd_form.non_field_errors|join:" " }}</span></div>{% endif %}
+    <form method="post" action="{% url 'profile' %}">
+      {% csrf_token %}
+      <div class="fld"><div class="fld-labelrow"><label for="id_old_password">Current password</label><button type="button" class="pw-toggle" data-pw-toggle="id_old_password">Show</button></div><input type="password" name="old_password" id="id_old_password" autocomplete="current-password">
+        {% if pwd_form.old_password.errors %}<div class="fld-err">{{ pwd_form.old_password.errors|join:" " }}</div>{% endif %}</div>
+      <div class="fld"><div class="fld-labelrow"><label for="id_new_password1">New password</label><button type="button" class="pw-toggle" data-pw-toggle="id_new_password1">Show</button></div><input type="password" name="new_password1" id="id_new_password1" autocomplete="new-password">
+        {% if pwd_form.new_password1.errors %}<div class="fld-err">{{ pwd_form.new_password1.errors|join:" " }}</div>{% endif %}</div>
+      <div class="fld"><div class="fld-labelrow"><label for="id_new_password2">Confirm new password</label><button type="button" class="pw-toggle" data-pw-toggle="id_new_password2">Show</button></div><input type="password" name="new_password2" id="id_new_password2" autocomplete="new-password">
+        {% if pwd_form.new_password2.errors %}<div class="fld-err">{{ pwd_form.new_password2.errors|join:" " }}</div>{% endif %}</div>
+      <button type="submit" class="abtn abtn-primary">Change password</button>
+    </form>
+  </div>
+</div>
+
+<div class="card pad-lg">
+  <div class="card-h" style="margin-bottom:12px;">Your comps</div>
+  {% if memberships %}
+  <div style="overflow-x:auto;">
+    <table class="atable"><tbody>
+      {% for m in memberships %}
+      <tr>
+        <td><b>{{ m.org.name }}</b><br><small style="color:var(--muted);">{{ m.org.sport_label }} &middot; {{ m.org.season }} &middot; {{ m.org.charity_display }}</small></td>
+        <td>{% for label in m.role_labels %}<span class="pill-role {{ label|lower }}">{{ label }}</span> {% endfor %}</td>
+        <td style="text-align:right;"><a href="{% url 'tipping:leaderboard' m.org.id %}" class="abtn abtn-ghost abtn-sm">View</a></td>
+      </tr>
       {% endfor %}
-      <button class="btn-primary">Change password</button>
-    </form>
+    </tbody></table>
   </div>
+  {% else %}
+  <p class="app-sub" style="margin:0;">You're not in any comps yet. <a href="{% url 'orgs:create' %}" class="flink" style="color:var(--forest);font-weight:700;">Start a league</a>.</p>
+  {% endif %}
 </div>
-
-<div class="card" style="padding:24px">
-  <h3 class="t-h3 mb-4"><i data-lucide="users" class="icon-sm" style="vertical-align:-3px"></i> Your comps</h3>
-  <div class="stack gap-3">
-    {% for m in memberships %}
-      <div class="card-2 row-between" style="padding:16px;flex-wrap:wrap;gap:12px">
-        <div class="row gap-3" style="flex:1;min-width:0">
-          <span class="pill pill-mono">{{ m.org.sport_label }}</span>
-          <div>
-            <div class="team-name">{{ m.org.name }}</div>
-            <div class="t-small text-tertiary"><i data-lucide="heart" class="icon-sm" style="vertical-align:-3px;color:var(--accent)"></i> {{ m.org.charity_name }} · {{ m.org.season }}</div>
-          </div>
-        </div>
-        <div class="row gap-2">
-          <span class="pill {% if m.role == 'admin' %}pill-accent{% endif %}">{{ m.get_role_display }}</span>
-          <a href="{% url 'tipping:leaderboard' m.org.id %}" class="btn-ghost btn-sm">View</a>
-        </div>
-      </div>
-    {% empty %}
-      <p class="t-small text-tertiary">No comps yet.</p>
-    {% endfor %}
-  </div>
-</div>
-
 {% endblock %}

@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import User
-from catalog.models import Charity, Competition, Season, Sport
+from catalog.models import Charity, Competition, Season, Series
 from orgs.models import OrgMember, Organisation
 from tipping.models import Match, Round, Team, Tip
 from tipping.services import record_match_result
@@ -89,8 +89,8 @@ class Command(BaseCommand):
 
         # 2. Orgs (idempotent)
         season, _ = Season.objects.get_or_create(year=2026, defaults={"label": "2026"})
-        afl = Sport.objects.get(name="AFL")
-        nrl = Sport.objects.get(name="NRL")
+        afl = Competition.objects.get(slug="afl", season=season)
+        nrl = Competition.objects.get(slug="nrl", season=season)
 
         beyond_blue, _ = Charity.objects.get_or_create(
             name="Beyond Blue",
@@ -105,12 +105,12 @@ class Command(BaseCommand):
             name="Test Friends Comp",
             defaults={"season": season, "charity": beyond_blue},
         )
-        org1.sports.set([afl])
+        org1.competitions.set([afl])
         org2, _ = Organisation.objects.update_or_create(
             name="Office Footy Crew",
             defaults={"season": season, "charity": ruok},
         )
-        org2.sports.set([afl, nrl])
+        org2.competitions.set([afl, nrl])
 
         # 3. Memberships — the host runs and owns each league.
         host_defaults = {"role": OrgMember.ROLE_BOTH, "is_league_owner": True}
@@ -171,16 +171,17 @@ class Command(BaseCommand):
         ))
 
     def _make_round(self, org, num, comp, lockout, status):
-        competition = Competition.objects.get(name=comp)
+        series = Series.objects.get(name=comp)
         return Round.objects.create(
-            org=org, round_number=num, competition=competition,
+            org=org, round_number=num, series=series,
+            competition=Competition.for_series(series, org.season),
             lockout_at=lockout, status=status,
         )
 
     def _make_matches(self, round_obj, fixtures, base_kickoff, id_prefix):
         for i, (home_slug, away_slug, venue) in enumerate(fixtures):
-            home = Team.objects.get(slug=home_slug, competition=round_obj.competition)
-            away = Team.objects.get(slug=away_slug, competition=round_obj.competition)
+            home = Team.objects.get(slug=home_slug, series=round_obj.series)
+            away = Team.objects.get(slug=away_slug, series=round_obj.series)
             Match.objects.create(
                 round=round_obj, home_team=home, away_team=away,
                 kickoff_at=base_kickoff + timedelta(hours=i * 3),

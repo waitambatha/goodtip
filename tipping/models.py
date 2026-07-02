@@ -6,15 +6,15 @@ from django.utils import timezone
 class Team(models.Model):
     name = models.CharField(max_length=100)
     slug = models.CharField(max_length=100)
-    competition = models.ForeignKey("catalog.Competition", on_delete=models.PROTECT, related_name="teams")
+    series = models.ForeignKey("catalog.Series", on_delete=models.PROTECT, related_name="teams")
     external_id = models.CharField(max_length=100, blank=True)
 
     class Meta:
-        unique_together = ("slug", "competition")
-        ordering = ["competition", "name"]
+        unique_together = ("slug", "series")
+        ordering = ["series", "name"]
 
     def __str__(self):
-        return f"{self.name} [{self.competition}]"
+        return f"{self.name} [{self.series}]"
 
 
 class Round(models.Model):
@@ -25,18 +25,46 @@ class Round(models.Model):
         ("complete", "Complete"),
     ]
 
+    # Match type drives the score weighting (Ambrose Hierarchy brief, slide 6):
+    # regular rounds are the baseline; finals raise the stakes; State of Origin is
+    # the prestige event worth the most.
+    STAGE_REGULAR = "regular"
+    STAGE_FINALS = "finals"
+    STAGE_ORIGIN = "origin"
+    STAGE_CHOICES = [
+        (STAGE_REGULAR, "Regular round"),
+        (STAGE_FINALS, "Finals"),
+        (STAGE_ORIGIN, "State of Origin"),
+    ]
+    POINTS_PER_STAGE = {
+        STAGE_REGULAR: 1,
+        STAGE_FINALS: 2,
+        STAGE_ORIGIN: 4,
+    }
+
     org = models.ForeignKey("orgs.Organisation", on_delete=models.CASCADE, related_name="rounds")
     round_number = models.IntegerField()
-    competition = models.ForeignKey("catalog.Competition", on_delete=models.PROTECT, related_name="rounds")
+    # The competition this round is tipped under (deck: fixtures keyed to a
+    # competition_id). The series says whether it's the men's/women's/Origin slate.
+    competition = models.ForeignKey(
+        "catalog.Competition", on_delete=models.PROTECT, related_name="rounds", null=True, blank=True
+    )
+    series = models.ForeignKey("catalog.Series", on_delete=models.PROTECT, related_name="rounds")
+    stage = models.CharField(max_length=10, choices=STAGE_CHOICES, default=STAGE_REGULAR)
     lockout_at = models.DateTimeField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="upcoming")
 
     class Meta:
         ordering = ["-round_number"]
-        unique_together = ("org", "round_number", "competition")
+        unique_together = ("org", "round_number", "series")
 
     def __str__(self):
-        return f"Round {self.round_number} [{self.competition}] — {self.org.name}"
+        return f"Round {self.round_number} [{self.series}] — {self.org.name}"
+
+    @property
+    def points_per_correct(self) -> int:
+        """Points awarded for each correct tip in this round (1 / 2 / 4)."""
+        return self.POINTS_PER_STAGE.get(self.stage, 1)
 
     @property
     def is_locked(self) -> bool:
@@ -90,6 +118,9 @@ class Tip(models.Model):
     selection = models.CharField(max_length=10, choices=SELECTION_CHOICES)
     submitted_at = models.DateTimeField(auto_now=True)
     is_correct = models.BooleanField(null=True, blank=True)
+    # Weighted score this tip earned once graded: round.points_per_correct if
+    # correct, else 0. Stored so the leaderboard can Sum() instead of Count().
+    points_awarded = models.PositiveIntegerField(default=0)
 
     class Meta:
         unique_together = ("user", "match", "org")

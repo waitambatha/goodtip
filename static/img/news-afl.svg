@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 220" role="img" aria-label="AFL">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0B2319"/><stop offset="1" stop-color="#1F5C3A"/></linearGradient>
+    <radialGradient id="s" cx="80%" cy="10%" r="70%"><stop offset="0" stop-color="rgba(200,241,53,.20)"/><stop offset="1" stop-color="rgba(200,241,53,0)"/></radialGradient>
+  </defs>
+  <rect width="400" height="220" fill="url(#g)"/>
+  <rect width="400" height="220" fill="url(#s)"/>
+  <ellipse cx="315" cy="60" rx="30" ry="44" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="3" transform="rotate(28 315 60)"/>
+  <line x1="315" y1="26" x2="315" y2="94" stroke="rgba(255,255,255,.35)" stroke-width="3" transform="rotate(28 315 60)"/>
+  <text x="34" y="150" font-family="Archivo Black, Arial Black, sans-serif" font-size="72" font-weight="900" fill="rgba(255,255,255,.10)">AFL</text>
+  <text x="36" y="196" font-family="Barlow Condensed, Arial, sans-serif" font-size="17" letter-spacing="3" fill="#C8F135">GOODTIP · AROUND THE GROUNDS</text>
+</svg>

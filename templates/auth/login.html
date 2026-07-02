@@ -1,38 +1,22 @@
-{% extends "base.html" %}
+{% extends "auth_base.html" %}
 {% block title %}Log in — GoodTip{% endblock %}
-{% block container_class %}{% endblock %}
-{% block content %}
-<div class="auth-split">
-  <div class="auth-form-side">
-    <div class="container-tiny">
-      <a href="/" class="topnav-brand" style="font-size:22px;margin-bottom:32px;display:inline-block">GOODTIP</a>
-      <h1 class="t-h1 mb-3">Welcome back</h1>
-      <p class="t-body text-secondary mb-6">Log in to keep tipping for your cause.</p>
-      <form method="post" class="stack gap-4">
-        {% csrf_token %}
-        {% for field in form %}
-          <div>
-            <label class="field-label">{{ field.label }}</label>
-            {{ field }}
-            {% for e in field.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
-          </div>
-        {% endfor %}
-        <button class="btn-primary btn-block btn-lg mt-3">Log in</button>
-      </form>
-      <div class="row-between mt-6 t-small text-tertiary">
-        <a href="{% url 'accounts:signup' %}" class="link">Create account</a>
-        <a href="{% url 'password_reset' %}" class="link">Forgot password?</a>
-      </div>
-    </div>
+{% block brand_head %}Welcome back. <em>The room's waiting.</em>{% endblock %}
+{% block auth_form %}
+<h1>Log in</h1>
+<p class="sub">Pick up where your group left off.</p>
+<form method="post" action="{% url 'accounts:login' %}" novalidate>
+  {% csrf_token %}
+  <div class="fld">
+    <label for="id_email">Email</label>
+    <input type="email" name="email" id="id_email" value="{{ form.email.value|default:'' }}" placeholder="you@work.com.au" autocomplete="email" autofocus>
+    {% if form.email.errors %}<div class="fld-err">{{ form.email.errors|join:" " }}</div>{% endif %}
   </div>
-  <div class="auth-brand-side">
-    <div>
-      <span class="t-micro" style="color:rgba(0,0,0,0.7)">Australian Footy Tipping</span>
-      <div class="auth-brand-line mt-3">GOOD TIP, MATE.</div>
-    </div>
-    <div class="auth-brand-foot">
-      <strong>Workplace and friend-group footy comps,</strong> where every dollar of entry goes to the charity your group chose.
-    </div>
+  <div class="fld">
+    <div class="fld-labelrow"><label for="id_password">Password</label><span class="gen-row"><button type="button" class="pw-toggle" data-pw-toggle="id_password">Show</button><a href="{% url 'password_reset' %}" class="flink" style="font-size:12px;">Forgot?</a></span></div>
+    <input type="password" name="password" id="id_password" placeholder="Your password" autocomplete="current-password">
+    {% if form.password.errors %}<div class="fld-err">{{ form.password.errors|join:" " }}</div>{% endif %}
   </div>
-</div>
+  <button type="submit" class="abtn abtn-primary abtn-block">Log in &rarr;</button>
+</form>
+<p class="alt">New here? <a href="{% url 'accounts:signup' %}">Create an account</a> &middot; joining a comp? Use your manager's invite link.</p>
 {% endblock %}

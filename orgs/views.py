@@ -8,13 +8,15 @@ from django.views.decorators.http import require_POST
 
 from accounts.views import JOIN_INVITER_SESSION_KEY, JOIN_SESSION_KEY
 from .forms import OrgCreateForm
-from .models import CharityVote, CharityVoteOption, OrgMember, Organisation
+from .models import CharityVote, CharityVoteOption, OrgCharitySelection, OrgMember, Organisation
 from .services import (
     add_member,
     cast_charity_ballot,
     close_charity_vote,
     nominate_manager_by_email,
+    notify_charity_suggestion,
     open_charity_vote,
+    record_charity_selection,
     set_member_role,
 )
 from .signing import make_join_token, parse_join_token
@@ -62,7 +64,16 @@ def create_org_view(request):
                 open_charity_vote(org, form.cleaned_data["vote_charities"])
                 messages.success(request, f"{org.name} created — charity vote is open.")
             else:
+                # Charity was picked at creation — start the timeline.
+                record_charity_selection(org, org.charity, source=OrgCharitySelection.SOURCE_INITIAL)
                 messages.success(request, f"{org.name} created.")
+            suggested = getattr(form, "suggested_charity", None)
+            if suggested is not None:
+                notify_charity_suggestion(suggested, org, request.user)
+                messages.info(
+                    request,
+                    f"{suggested.name} was sent to the GoodTip team for review.",
+                )
             return redirect("orgs:created", org_id=org.id)
     else:
         form = OrgCreateForm()
@@ -102,9 +113,13 @@ def join_view(request, org_id: int, token: str):
     org = get_object_or_404(Organisation, pk=org_id)
     inviter_id = parsed["inviter_id"]
     if request.user.is_authenticated:
+        already_member = _is_member(request.user, org)
         add_member(request.user, org, inviter_id=inviter_id)
         messages.success(request, f"Joined {org.name}.")
-        return redirect("dashboard")
+        from accounts.views import post_join_redirect
+
+        # Only nudge the optional top-up the first time they join.
+        return redirect("dashboard") if already_member else post_join_redirect(org)
     request.session[JOIN_SESSION_KEY] = org.id
     request.session[JOIN_INVITER_SESSION_KEY] = inviter_id
     signup_url = reverse("accounts:signup")

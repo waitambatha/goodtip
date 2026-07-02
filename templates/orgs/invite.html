@@ -1,41 +1,27 @@
-{% extends "base.html" %}
-{% block title %}Invite link — {{ org.name }}{% endblock %}
-{% block container_class %}container-tiny{% endblock %}
-{% block content %}
-<div class="section-header">
-  <div>
-    <span class="t-micro text-tertiary">{{ org.name }}</span>
-    <h1 class="t-h1 mt-2">Invite your group</h1>
-  </div>
-  <a href="{% url 'dashboard' %}" class="btn-ghost btn-sm"><i data-lucide="arrow-left" class="icon-sm"></i> Back</a>
-</div>
-
-{% include "orgs/_invite_link.html" with org=org invite_url=invite_url %}
-
-<div class="card mt-5" style="padding:20px">
-  <div class="row-between">
-    <div>
-      <span class="t-micro text-tertiary">Joined via your link</span>
-      <div class="stat-num" style="font-size:28px">{{ invitee_count }}</div>
+{% extends "app_base.html" %}
+{% block title %}Invite members — {{ org.name }}{% endblock %}
+{% block app_content %}
+<div class="app-head"><div><div class="app-eyebrow">{{ org.name }}</div><h1 class="app-h1">Invite members</h1></div></div>
+<div class="grid-app g-2" style="align-items:start;">
+  <div class="card pad-lg">
+    <div class="card-h">Share the link</div>
+    <p class="card-lead" style="margin:4px 0 14px;">Anyone with this link can join your comp.</p>
+    <div class="copy-field"><input id="inviteLink" type="text" readonly value="{{ invite_url }}"><button type="button" class="abtn abtn-dark" data-copy="#inviteLink">Copy</button></div>
+    <div style="display:flex;gap:22px;margin-top:20px;">
+      <div><div class="s-num num" style="font-size:26px;color:var(--forest);">{{ invitee_count }}</div><div class="s-sub" style="color:var(--muted);font-size:13px;">joined via your link</div></div>
     </div>
-    <i data-lucide="users" class="icon-lg text-tertiary"></i>
   </div>
-
-  {% if invitees %}
-    <details class="mt-4">
-      <summary class="link t-small" style="cursor:pointer">View names</summary>
-      <ul class="stack gap-2 mt-3" style="list-style:none;padding:0;margin:0">
-        {% for m in invitees %}
-          <li class="row gap-3" style="align-items:center">
-            <span class="avatar" style="width:28px;height:28px;font-size:12px">{{ m.user.display_name|slice:":1"|upper }}</span>
-            <span class="t-small flex-1">{{ m.user.display_name }}</span>
-            <span class="t-micro text-tertiary">{{ m.joined_at|date:"j M Y" }}</span>
-          </li>
-        {% endfor %}
-      </ul>
-    </details>
-  {% else %}
-    <p class="t-small text-tertiary mt-3">No one has joined via your link yet. Share it above to get started.</p>
-  {% endif %}
+  <div class="card pad-lg">
+    <div class="card-h" style="margin-bottom:12px;">People you've brought in</div>
+    {% if invitees %}
+    <table class="atable"><tbody>
+      {% for m in invitees %}
+      <tr><td>{{ m.user.display_name }}</td><td class="r-num" style="color:var(--muted);font-weight:400;">Joined {{ m.joined_at|date:"j M Y" }}</td></tr>
+      {% endfor %}
+    </tbody></table>
+    {% else %}
+    <p class="app-sub" style="margin:0;">No one has joined via your link yet — share it to get started.</p>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

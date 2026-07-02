@@ -1,38 +1,24 @@
 {% load team_extras %}
+<div id="tipslist" style="overflow-x:auto;">
 {% if not round %}
-  {% include "components/_empty_state.html" with icon="list-checks" title="Pick a round" body="Select a round above to see your tips." %}
+  <div class="card pad-lg" style="text-align:center;"><div class="card-h">Pick a round</div><p class="card-lead">Choose a round above to see your tips.</p></div>
 {% else %}
-<div class="stack gap-3">
-{% for r in rows %}
-  {% with m=r.match t=r.tip %}
-  <div class="result-row {% if t and t.is_correct is True %}is-correct{% elif t and t.is_correct is False %}is-incorrect{% endif %}">
-    <div class="row" style="flex:1;min-width:0">
-      <div class="hidden-mobile">{% include "components/_team_badge.html" with team=m.home_team size="md" %}</div>
-      <div style="min-width:0">
-        <div class="t-micro text-tertiary mb-2">{{ m.kickoff_at|date:"D j M · g:i a" }}{% if m.venue %} · {{ m.venue }}{% endif %}</div>
-        <div class="team-name">{{ m.home_team.name }} <span class="text-muted">v</span> {{ m.away_team.name }}</div>
-        {% if m.has_result %}
-          <div class="t-small text-secondary mt-2">Final: <span class="font-mono">{{ m.home_score }}–{{ m.away_score }}</span> · winner: <strong>{% if m.result == 'home' %}{{ m.home_team.name }}{% elif m.result == 'away' %}{{ m.away_team.name }}{% else %}Draw{% endif %}</strong></div>
-        {% endif %}
-      </div>
-    </div>
-    <div class="text-right" style="flex:0 0 auto">
-      {% if t %}
-        <div class="t-micro text-tertiary">Your tip</div>
-        <div class="team-name mt-2">{% if t.selection == "home" %}{{ m.home_team.name }}{% else %}{{ m.away_team.name }}{% endif %}</div>
-        <div class="mt-2">
-          {% if t.is_correct is True %}<span class="pill pill-success"><i data-lucide="check" class="icon-sm"></i> Correct</span>
-          {% elif t.is_correct is False %}<span class="pill pill-danger"><i data-lucide="x" class="icon-sm"></i> Missed</span>
-          {% else %}<span class="pill"><i data-lucide="clock" class="icon-sm"></i> Pending</span>{% endif %}
-        </div>
-      {% else %}
-        <span class="pill"><i data-lucide="x" class="icon-sm"></i> No tip</span>
-      {% endif %}
-    </div>
-  </div>
-  {% endwith %}
-{% empty %}
-  {% include "components/_empty_state.html" with icon="calendar-x" title="No matches in this round" body="Hop hasn't added matches yet." %}
-{% endfor %}
-</div>
+<table class="atable">
+  <thead><tr><th>Match</th><th>Your pick</th><th>Result</th><th style="text-align:right;">Outcome</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    {% with m=r.match t=r.tip %}
+    <tr>
+      <td>{% team_cell m.home_team %}<span class="vs-mini">v</span>{% team_cell m.away_team %}</td>
+      <td>{% if t %}<b>{% if t.selection == 'home' %}{{ m.home_team.name }}{% else %}{{ m.away_team.name }}{% endif %}</b>{% else %}<span class="res pending">No tip</span>{% endif %}</td>
+      <td>{% if m.has_result %}{% if m.result == 'home' %}{{ m.home_team.name }}{% elif m.result == 'away' %}{{ m.away_team.name }}{% else %}Draw{% endif %} &middot; {{ m.home_score }}&ndash;{{ m.away_score }}{% else %}&mdash;{% endif %}</td>
+      <td style="text-align:right;">{% if t.is_correct is True %}<span class="res correct">Correct</span>{% elif t.is_correct is False %}<span class="res incorrect">Missed</span>{% else %}<span class="res pending">Pending</span>{% endif %}</td>
+    </tr>
+    {% endwith %}
+  {% empty %}
+    <tr><td colspan="4" style="text-align:center;color:var(--muted);">No matches in this round yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
 {% endif %}
+</div>

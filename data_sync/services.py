@@ -11,7 +11,7 @@ from django.conf import settings
 from django.utils.text import slugify
 from django.utils import timezone
 
-from catalog.models import Competition
+from catalog.models import Competition, Series
 from orgs.models import Organisation
 from tipping.models import Match, Round, Team
 from tipping.services import derive_result, record_match_result
@@ -34,19 +34,19 @@ def _normalise_team_name(name: str) -> str:
     return slugify(name.replace("&", "and"))
 
 
-def _resolve_team(competition: Competition, name: str, external_id: str = "") -> Team | None:
+def _resolve_team(series: Series, name: str, external_id: str = "") -> Team | None:
     slug = _normalise_team_name(name)
     if external_id:
-        t = Team.objects.filter(competition=competition, external_id=external_id).first()
+        t = Team.objects.filter(series=series, external_id=external_id).first()
         if t:
             return t
-    t = Team.objects.filter(competition=competition, slug=slug).first()
+    t = Team.objects.filter(series=series, slug=slug).first()
     if t:
         if external_id and not t.external_id:
             t.external_id = external_id
             t.save(update_fields=["external_id"])
         return t
-    t = Team.objects.filter(competition=competition, name__iexact=name).first()
+    t = Team.objects.filter(series=series, name__iexact=name).first()
     if t and external_id and not t.external_id:
         t.external_id = external_id
         t.save(update_fields=["external_id"])
@@ -84,16 +84,17 @@ class SquiggleSyncService:
     def sync_fixtures(self, *, competition: str, round_number: int, org: Organisation) -> int:
         if competition != "AFL":
             raise SyncError("Squiggle service only handles AFL.")
-        afl = Competition.objects.get(name="AFL")
+        afl = Series.objects.get(name="AFL")
         year = org.season.year
         games = self._games(round_number, year)
         if not games:
             return 0
         round_obj, _ = Round.objects.get_or_create(
-            org=org, round_number=round_number, competition=afl,
+            org=org, round_number=round_number, series=afl,
             defaults={
                 "lockout_at": _parse_dt(games[0]["date"]),
                 "status": "upcoming",
+                "competition": Competition.for_series(afl, org.season),
             },
         )
         kickoffs = [_parse_dt(g["date"]) for g in games]

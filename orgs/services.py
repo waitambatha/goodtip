@@ -1,8 +1,44 @@
+import logging
+
+from django.conf import settings
+from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Count
 from django.utils import timezone
 
-from .models import CharityVote, CharityVoteBallot, CharityVoteOption, OrgMember
+from .models import (
+    CharityVote,
+    CharityVoteBallot,
+    CharityVoteOption,
+    OrgCharitySelection,
+    OrgMember,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def notify_charity_suggestion(charity, org, user) -> None:
+    """Email the GoodTip team that a league suggested an unlisted charity (deck slide 10).
+
+    Best-effort: a mail failure must never block league creation.
+    """
+    try:
+        send_mail(
+            subject=f"[GoodTip] Charity suggested for review: {charity.name}",
+            message=(
+                f"{user.display_name} ({user.email}) created the league "
+                f"\"{org.name}\" and suggested a charity for approval:\n\n"
+                f"  Name: {charity.name}\n"
+                f"  Website: {charity.website or '—'}\n"
+                f"  Slug: {charity.slug}\n\n"
+                "Review it in the admin and set is_approved once verified."
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[settings.GOODTIP_TEAM_EMAIL],
+            fail_silently=True,
+        )
+    except Exception:  # noqa: BLE001 — never let a mail error break signup
+        logger.exception("Failed to send charity-suggestion notification")
 
 
 def _resolve_inviter(org, inviter_id, joining_user):
@@ -64,6 +100,34 @@ def nominate_manager_by_email(org, email: str):
     return set_member_role(member, new_role)
 
 
+def record_charity_selection(org, charity, *, source=OrgCharitySelection.SOURCE_MANUAL):
+    """Append a timeline row for the charity an org is backing this season.
+
+    No-op when there's no charity, or when it matches the most recent selection
+    (so re-saving the same choice doesn't create duplicate history).
+    """
+    if charity is None:
+        return None
+    latest = org.charity_selections.first()
+    if latest and latest.charity_id == charity.id:
+        return latest
+    return OrgCharitySelection.objects.create(
+        org=org, season=org.season, charity=charity, source=source,
+    )
+
+
+@transaction.atomic
+def set_org_charity(org, charity, *, source=OrgCharitySelection.SOURCE_MANUAL):
+    """Set the org's current charity and append it to the timeline.
+
+    Past donations keep the charity frozen on their own payment rows, so changing
+    the charity here never rewrites history.
+    """
+    org.charity = charity
+    org.save(update_fields=["charity"])
+    return record_charity_selection(org, charity, source=source)
+
+
 @transaction.atomic
 def open_charity_vote(org, charities) -> CharityVote:
     """Open a blind charity vote for an org, seeded with candidate charities."""
@@ -102,7 +166,5 @@ def close_charity_vote(vote: CharityVote):
     vote.closed_at = timezone.now()
     vote.save(update_fields=["winning_charity", "status", "closed_at"])
     if winner is not None:
-        org = vote.org
-        org.charity = winner
-        org.save(update_fields=["charity"])
+        set_org_charity(vote.org, winner, source=OrgCharitySelection.SOURCE_VOTE)
     return winner

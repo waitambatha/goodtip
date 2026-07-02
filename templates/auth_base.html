@@ -1,0 +1,137 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}GoodTip{% endblock %}</title>
+  <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:ital,wght@0,400;0,600;1,400&family=Barlow+Condensed:wght@600;900&family=Barlow+Semi+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
+</head>
+<body>
+  {% include "public/partials/_icons.html" %}
+
+  {# ---- sport loader ---- #}
+  <div class="loader" id="loader" role="status" aria-label="Loading">
+    <div class="loader-inner">
+      <div class="pitch">
+        <svg class="posts" viewBox="0 0 240 150" aria-hidden="true">
+          <g stroke="#C8F135" stroke-width="4" fill="none" stroke-linecap="round"><line x1="84" y1="22" x2="84" y2="128"/><line x1="156" y1="22" x2="156" y2="128"/><line x1="84" y1="52" x2="156" y2="52"/></g>
+        </svg>
+        <span class="ball" aria-hidden="true"></span><span class="ground"></span>
+      </div>
+      <div class="loader-word">GOOD<span>TIP</span><span class="dot" style="color:var(--lime)">.</span></div>
+      <div class="loader-sport" id="loaderSport">Aussie Rules</div>
+      <div class="loader-bar"><i></i></div>
+    </div>
+  </div>
+
+  <div class="auth-shell">
+    <aside class="auth-brand">
+      <div class="ab-bg" aria-hidden="true">
+        <div class="shot on" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+        <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+      </div>
+      <div class="ab-veil" aria-hidden="true"></div>
+      <div class="ab-content">
+        <a href="/" class="ab-top">GOOD<span>TIP</span></a>
+        <div class="ab-mid">
+          <h2>{% block brand_head %}Footy tipping that <em>does good.</em>{% endblock %}</h2>
+          <p>{% block brand_sub %}Your team tips the games. The entry fees go to the charity your group voted for. The donation is the prize.{% endblock %}</p>
+          <div class="ab-stat"><span class="n">$8,420</span><span class="t">raised for Lifeline<br>by one group this season</span></div>
+        </div>
+        <div class="ab-foot">Not a gambling service &middot; &copy; 2026 GoodTip Pty Ltd</div>
+      </div>
+    </aside>
+    <main class="auth-main">
+      <div class="auth-card">
+        {% if messages %}
+          {% for m in messages %}
+            <div class="flash {% if m.tags == 'success' %}success{% elif m.tags == 'error' %}error{% else %}info{% endif %}" style="margin-bottom:16px;"><span>{{ m }}</span></div>
+          {% endfor %}
+        {% endif %}
+        {% block auth_form %}{% endblock %}
+      </div>
+      <div class="auth-foot-note"><svg><use href="#ic-heart"/></svg> 100% of entry fees go to charity &middot; not a gambling service</div>
+    </main>
+  </div>
+
+  <script>
+  (function(){
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /* loader */
+    (function(){
+      var L = document.getElementById('loader'); if (!L) return;
+      var S = [['oval','Aussie Rules'],['oval','Rugby League'],['round','Football']];
+      var p = S[Math.floor(Math.random()*S.length)];
+      var b = L.querySelector('.ball'); if (b) b.classList.add(p[0]);
+      var lab = document.getElementById('loaderSport'); if (lab) lab.textContent = p[1];
+      document.body.classList.add('loading');
+      setTimeout(function(){ L.classList.add('out'); document.body.classList.remove('loading'); setTimeout(function(){ L.style.display='none'; }, 600); }, reduce ? 250 : 1200);
+    })();
+
+    /* brand image crossfade */
+    var shots = document.querySelectorAll('.ab-bg .shot');
+    if (shots.length > 1 && !reduce) {
+      var i = 0; setInterval(function(){ shots[i].classList.remove('on'); i=(i+1)%shots.length; shots[i].classList.add('on'); }, 5000);
+    }
+
+    /* password strength meter */
+    document.querySelectorAll('[data-pw-strength]').forEach(function(inp){
+      var m=document.getElementById('pwbar'); if(!m)return;
+      inp.addEventListener('input',function(){var v=inp.value,s=0;if(v.length>7)s++;if(/[A-Z]/.test(v))s++;if(/[0-9]/.test(v))s++;if(/[^A-Za-z0-9]/.test(v))s++;m.style.width=(v?20+s*20:0)+'%';m.style.background=s<2?'#d98b2b':s<3?'#C8F135':'#2D7A3A';});
+    });
+
+    /* display-name suggester */
+    var gen = document.getElementById('genName');
+    if (gen) {
+      var A=['Mighty','Silent','Rampant','Flying','Clutch','Brave','Cheeky','Rowdy','Golden','Late'];
+      var B=['Magpie','Tiger','Blue','Sherrin','Tipster','Roo','Shark','Rooster','Demon','Sider'];
+      gen.addEventListener('click', function(){
+        var name = A[Math.floor(Math.random()*A.length)] + B[Math.floor(Math.random()*B.length)] + Math.floor(10+Math.random()*89);
+        var inp = document.getElementById('id_display_name');
+        if (inp){ inp.value = name; inp.focus(); }
+      });
+    }
+
+    /* password generator — fills both fields, reveals & updates strength */
+    function pick(s){ return s.charAt(Math.floor(Math.random()*s.length)); }
+    var pwGen = document.getElementById('genPassword');
+    if (pwGen) {
+      var UP='ABCDEFGHJKLMNPQRSTUVWXYZ', LO='abcdefghijkmnpqrstuvwxyz', NU='23456789', SY='!@#$%&*?';
+      var ALL=UP+LO+NU+SY;
+      pwGen.addEventListener('click', function(){
+        var chars=[pick(UP),pick(LO),pick(NU),pick(SY)];
+        for (var i=0;i<10;i++) chars.push(pick(ALL));
+        for (var j=chars.length-1;j>0;j--){ var k=Math.floor(Math.random()*(j+1)); var t=chars[j]; chars[j]=chars[k]; chars[k]=t; }
+        var pw=chars.join('');
+        var p1=document.querySelector('[data-pw-strength]'), p2=document.querySelector('[data-pw-match]');
+        if (p1){ p1.type='text'; p1.value=pw; p1.dispatchEvent(new Event('input',{bubbles:true})); }
+        if (p2){ p2.type='text'; p2.value=pw; p2.dispatchEvent(new Event('input',{bubbles:true})); }
+        var out=document.getElementById('pwGenOut');
+        if (out){ out.querySelector('.pwo-val').textContent=pw; out.classList.add('show'); }
+        document.querySelectorAll('[data-pw-toggle]').forEach(function(e){ e.classList.add('on'); });
+      });
+    }
+    /* generated-password copy */
+    var pwCopy = document.getElementById('pwGenCopy');
+    if (pwCopy) pwCopy.addEventListener('click', function(){
+      var v=document.querySelector('#pwGenOut .pwo-val'); if (!v) return;
+      navigator.clipboard && navigator.clipboard.writeText(v.textContent);
+      pwCopy.textContent='Copied'; setTimeout(function(){ pwCopy.textContent='Copy'; }, 1400);
+    });
+
+    /* show / hide password toggles */
+    document.querySelectorAll('[data-pw-toggle]').forEach(function(t){
+      t.addEventListener('click', function(){
+        var inp=document.getElementById(t.getAttribute('data-pw-toggle'));
+        if (inp){ inp.type = inp.type==='password' ? 'text' : 'password'; t.classList.toggle('on'); t.textContent = inp.type==='password' ? 'Show' : 'Hide'; }
+      });
+    });
+  })();
+  </script>
+</body>
+</html>

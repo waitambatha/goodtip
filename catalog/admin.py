@@ -1,6 +1,47 @@
 from django.contrib import admin
 
-from .models import Charity, Competition, Season, Sport
+from .models import (
+    Charity,
+    Competition,
+    GoodListConfig,
+    GroupType,
+    Industry,
+    Season,
+    Series,
+    State,
+    Sport,
+)
+
+
+@admin.register(State)
+class StateAdmin(admin.ModelAdmin):
+    list_display = ("name", "code", "sort_order")
+
+
+@admin.register(GroupType)
+class GroupTypeAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "sort_order")
+    prepopulated_fields = {"slug": ("name",)}
+
+
+@admin.register(Industry)
+class IndustryAdmin(admin.ModelAdmin):
+    list_display = ("name", "is_active", "slug")
+    list_filter = ("is_active",)
+    list_editable = ("is_active",)
+    prepopulated_fields = {"slug": ("name",)}
+
+
+@admin.register(GoodListConfig)
+class GoodListConfigAdmin(admin.ModelAdmin):
+    list_display = ("privacy_min_groups", "credibility_min_groups", "updated_at")
+
+    def has_add_permission(self, request):
+        # Singleton — edit the one row, never add more.
+        return not GoodListConfig.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Sport)
@@ -8,10 +49,17 @@ class SportAdmin(admin.ModelAdmin):
     list_display = ("name", "slug")
 
 
+@admin.register(Series)
+class SeriesAdmin(admin.ModelAdmin):
+    list_display = ("name", "sport", "category", "representation_type", "slug")
+    list_filter = ("sport", "category")
+
+
 @admin.register(Competition)
 class CompetitionAdmin(admin.ModelAdmin):
-    list_display = ("name", "sport", "is_womens", "slug")
-    list_filter = ("sport", "is_womens")
+    list_display = ("name", "season", "sport", "slug")
+    list_filter = ("season", "sport")
+    filter_horizontal = ("series",)
 
 
 @admin.register(Season)

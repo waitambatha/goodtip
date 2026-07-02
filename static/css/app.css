@@ -107,6 +107,70 @@ input[disabled] { opacity: 0.55; cursor: not-allowed; }
   margin-bottom: 6px;
   font-weight: 500;
 }
+.field-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Input with a trailing button (password reveal) */
+.input-group { position: relative; }
+.input-group > input { padding-right: 44px; }
+.pw-toggle {
+  position: absolute;
+  top: 0; right: 0;
+  height: 100%;
+  width: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: 0 10px 10px 0;
+  transition: color 0.15s;
+}
+.pw-toggle:hover { color: var(--accent); }
+.pw-toggle [data-lucide] { width: 18px; height: 18px; }
+input.is-mismatch { border-color: var(--danger); }
+input.is-mismatch:focus { box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15); }
+
+/* Generate-password link button */
+.btn-link {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.btn-link:hover { color: var(--accent-hover); }
+.btn-link [data-lucide] { width: 13px; height: 13px; }
+
+/* Password strength meter */
+.pw-meter { margin-top: 8px; display: flex; align-items: center; gap: 10px; }
+.pw-meter-bars { display: flex; gap: 4px; flex: 1; }
+.pw-meter-bars span {
+  height: 4px;
+  flex: 1;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  transition: background 0.2s;
+}
+.pw-meter[data-level="weak"] .pw-meter-bars span.is-on { background: var(--danger); }
+.pw-meter[data-level="fair"] .pw-meter-bars span.is-on { background: var(--warning); }
+.pw-meter[data-level="good"] .pw-meter-bars span.is-on { background: var(--info); }
+.pw-meter[data-level="strong"] .pw-meter-bars span.is-on { background: var(--success); }
+.pw-meter-label { white-space: nowrap; min-width: 56px; text-align: right; }
 
 /* Buttons */
 .btn-primary {

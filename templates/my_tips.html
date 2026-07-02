@@ -1,29 +1,28 @@
-{% extends "base.html" %}
-{% block title %}My Tips — {{ org.name }}{% endblock %}
-{% block content %}
-
-<div class="section-header">
-  <div>
-    <span class="t-micro text-tertiary">{{ org.name }}</span>
-    <h1 class="t-h1 mt-2">My Tips</h1>
+{% extends "app_base.html" %}
+{% load team_extras %}
+{% block title %}My tips — {{ org.name }}{% endblock %}
+{% block nav_tips %}on{% endblock %}
+{% block app_content %}
+<div class="app-head">
+  <div><div class="app-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div><h1 class="app-h1">My tips</h1></div>
+  <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+    <div class="stat-card" style="padding:12px 18px;"><div class="s-lab">Season points</div><div class="s-num" style="font-size:26px;">{{ points }}</div></div>
+    {% if rounds %}
+    <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:13px;color:var(--muted);">Round</span>
+      <div class="dd" data-dd>
+        <button type="button" class="dd-btn"><span class="dd-val">{% if selected_round %}Round {{ selected_round.round_number }}{% else %}&mdash;{% endif %}</span><svg class="dd-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+        <div class="dd-menu" role="listbox">
+          {% for r in rounds %}<button type="button" class="dd-opt {% if selected_round and r.id == selected_round.id %}on{% endif %}" data-val="{{ r.id }}">Round {{ r.round_number }}</button>{% endfor %}
+        </div>
+        <select class="dd-native" name="round" hx-get="{% url 'tipping:my_tips' org.id %}" hx-target="#tipslist" hx-swap="outerHTML" hx-trigger="change">
+          {% for r in rounds %}<option value="{{ r.id }}" {% if selected_round and r.id == selected_round.id %}selected{% endif %}>Round {{ r.round_number }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    {% endif %}
   </div>
-  <div class="text-right">
-    <div class="t-micro text-tertiary">Season points</div>
-    <div class="hero-num text-accent" style="font-size:48px">{{ points }}</div>
-  </div>
 </div>
 
-<div class="round-strip mb-6">
-  {% for r in rounds %}
-    <a hx-get="?round={{ r.id }}" hx-target="#round-pane" hx-push-url="true"
-       class="round-pill {% if selected_round and r.id == selected_round.id %}is-active{% endif %}">R{{ r.round_number }} · {{ r.competition }}</a>
-  {% empty %}
-    <div class="t-small text-tertiary">No rounds yet.</div>
-  {% endfor %}
-</div>
-
-<div id="round-pane">
-  {% include "partials/my_tips_round.html" with org=org round=selected_round rows=rows %}
-</div>
-
+{% include "partials/my_tips_round.html" with round=selected_round rows=rows %}
+<p class="app-sub" style="margin-top:14px;">Pending matches grade automatically when results land.</p>
 {% endblock %}

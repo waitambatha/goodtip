@@ -1,45 +1,31 @@
-{% extends "manage/_base.html" %}
-{% block manage_content %}
-<div class="section-header">
-  <div>
-    <span class="t-micro text-tertiary">Admin / Orgs</span>
-    <h1 class="t-h1 mt-2">Organisations</h1>
+{% extends "admin_base.html" %}
+{% block title %}Orgs — Manage{% endblock %}
+{% block nav_orgs %}on{% endblock %}
+{% block admin_content %}
+<h1 class="admin-h1" style="margin-bottom:18px;">Organisations</h1>
+<div class="grid-app" style="grid-template-columns:1.4fr 1fr;gap:20px;align-items:start;">
+  <div class="card"><div class="card-h" style="margin-bottom:10px;">All orgs</div>
+    <table class="atable compact"><thead><tr><th>Org</th><th>Sport</th><th style="text-align:right;">Links</th></tr></thead><tbody>
+    {% for o in orgs %}
+      <tr><td><b>{{ o.name }}</b><br><small style="color:var(--muted);">{{ o.charity_name }} &middot; {{ o.season }}</small></td><td>{{ o.sport_label }}</td><td style="text-align:right;"><a href="{% url 'manage:org_rounds' o.id %}" class="flink" style="color:var(--forest);">Rounds</a> &middot; <a href="{% url 'manage:org_members' o.id %}" class="flink" style="color:var(--forest);">Members</a></td></tr>
+    {% empty %}
+      <tr><td colspan="3" style="text-align:center;color:var(--muted);">No orgs yet.</td></tr>
+    {% endfor %}
+    </tbody></table>
   </div>
-</div>
-
-<div class="card-2 mb-8" style="padding:24px">
-  <h3 class="t-h3 mb-4"><i data-lucide="plus" class="icon-sm" style="vertical-align:-3px"></i> New org</h3>
-  <form method="post" class="grid-2 gap-4">{% csrf_token %}
-    <div><label class="field-label">Name</label><input name="name" required></div>
-    <div><label class="field-label">Sport</label>
-      <select name="sport"><option value="AFL">AFL</option><option value="NRL">NRL</option><option value="BOTH">Both</option></select>
-    </div>
-    <div><label class="field-label">Season</label><input name="season" type="number" required value="2026"></div>
-    <div><label class="field-label">Charity name</label><input name="charity_name" required></div>
-    <div style="grid-column:1/-1"><label class="field-label">Charity URL (optional)</label><input name="charity_url" type="url"></div>
-    <div style="grid-column:1/-1"><button class="btn-primary">Create org</button></div>
-  </form>
-</div>
-
-<div class="table-card">
-  <table>
-    <thead><tr><th>Name</th><th>Sport</th><th>Season</th><th>Charity</th><th></th></tr></thead>
-    <tbody>
-      {% for o in orgs %}
-        <tr>
-          <td><strong>{{ o.name }}</strong></td>
-          <td><span class="pill pill-mono">{{ o.sport_label }}</span></td>
-          <td class="num">{{ o.season }}</td>
-          <td class="text-tertiary">{{ o.charity_name }}</td>
-          <td class="text-right">
-            <a href="{% url 'manage:org_rounds' o.id %}" class="btn-ghost btn-sm">Rounds</a>
-            <a href="{% url 'manage:org_members' o.id %}" class="btn-ghost btn-sm">Members</a>
-          </td>
-        </tr>
-      {% empty %}
-        <tr><td colspan="5" class="text-center text-tertiary" style="padding:32px">No orgs yet.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="mini-form">
+    <div class="card-h" style="margin-bottom:14px;">Create org</div>
+    <form method="post" action="{% url 'manage:orgs_list' %}">
+      {% csrf_token %}
+      <div class="fld"><label for="ao_name">Org name</label><input type="text" name="name" id="ao_name" required placeholder="Organisation name"></div>
+      <div class="fld"><label for="ao_season">Season</label><input type="number" name="season" id="ao_season" required value="2026" placeholder="2026"></div>
+      <div class="fld"><label for="ao_cname">Charity name</label><input type="text" name="charity_name" id="ao_cname" required placeholder="Lifeline"></div>
+      <div class="fld"><label for="ao_curl">Charity URL <span style="color:var(--muted);font-weight:400;">(optional)</span></label><input type="url" name="charity_url" id="ao_curl" placeholder="https://"></div>
+      <div class="fld"><label for="ao_sport">Sport</label>
+        <select name="sport" id="ao_sport"><option value="AFL">AFL</option><option value="NRL">NRL</option><option value="BOTH">Both</option></select>
+      </div>
+      <button type="submit" class="abtn abtn-primary abtn-block">Create org</button>
+    </form>
+  </div>
 </div>
 {% endblock %}

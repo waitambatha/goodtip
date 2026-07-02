@@ -1,0 +1,191 @@
+"""Real 2026 fixtures transcribed from GoodTip_Fixtures_Reference_2026.docx.
+
+Covers the August home-and-away rounds active during the Aug 2026 soft launch:
+AFL R21–24, NRL R22–27, NRLW R5–7, AFLW R1–3. All times AEST. Finals and State
+of Origin are added separately once matchups are confirmed (matchups are TBD in
+the reference doc).
+
+Each round: (series_name, round_number, stage, [(kickoff "YYYY-MM-DD HH:MM",
+home, away, venue), ...]). Team names are resolved per series; for NRL/NRLW the
+display names are mapped to seeded slugs via NRL_ALIASES.
+"""
+
+# NRL/NRLW display name -> seeded team slug (AFL/AFLW resolve via slugify()).
+NRL_ALIASES = {
+    "Gold Coast Titans": "titans",
+    "New Zealand Warriors": "warriors",
+    "Penrith Panthers": "panthers",
+    "Canberra Raiders": "canberra-raiders",
+    "Brisbane Broncos": "brisbane-broncos",
+    "Newcastle Knights": "knights",
+    "Cronulla Sharks": "sharks",
+    "South Sydney Rabbitohs": "rabbitohs",
+    "Wests Tigers": "wests-tigers",
+    "Parramatta Eels": "eels",
+    "North Queensland Cowboys": "cowboys",
+    "Sydney Roosters": "roosters",
+    "Canterbury Bulldogs": "bulldogs",
+    "Melbourne Storm": "storm",
+    "Manly Sea Eagles": "sea-eagles",
+    "Dolphins": "dolphins",
+    "St George Illawarra Dragons": "dragons",
+}
+
+ROUNDS = [
+    # ---------------- AFL (Men's) ----------------
+    ("AFL", 21, "regular", [
+        ("2026-08-01 13:05", "St Kilda", "Sydney Swans", "Marvel Stadium"),
+        ("2026-08-01 13:35", "Hawthorn", "North Melbourne", "UTAS Stadium"),
+        ("2026-08-01 18:35", "Port Adelaide", "GWS Giants", "Adelaide Oval"),
+        ("2026-08-01 19:40", "Carlton", "Brisbane Lions", "Marvel Stadium"),
+        ("2026-08-02 13:10", "Richmond", "West Coast Eagles", "MCG"),
+        ("2026-08-02 15:15", "Gold Coast Suns", "Melbourne", "People First Stadium"),
+        ("2026-08-02 16:40", "Essendon", "Adelaide Crows", "Marvel Stadium"),
+    ]),
+    ("AFL", 22, "regular", [
+        ("2026-08-06 19:30", "Western Bulldogs", "North Melbourne", "Marvel Stadium"),
+        ("2026-08-07 19:40", "Brisbane Lions", "Hawthorn", "The Gabba"),
+        ("2026-08-08 13:15", "Melbourne", "Fremantle", "MCG"),
+        ("2026-08-08 16:15", "Sydney Swans", "Port Adelaide", "SCG"),
+        ("2026-08-08 16:35", "Geelong Cats", "Essendon", "GMHBA Stadium"),
+        ("2026-08-08 19:35", "Adelaide Crows", "Richmond", "Adelaide Oval"),
+        ("2026-08-09 13:10", "GWS Giants", "Gold Coast Suns", "Manuka Oval"),
+        ("2026-08-09 16:10", "West Coast Eagles", "Collingwood", "Optus Stadium"),
+        ("2026-08-09 19:20", "St Kilda", "Carlton", "Marvel Stadium"),
+    ]),
+    ("AFL", 23, "regular", [  # Super Saturday — all 13:00
+        ("2026-08-15 13:00", "Western Bulldogs", "Carlton", "Marvel Stadium"),
+        ("2026-08-15 13:00", "Brisbane Lions", "Gold Coast Suns", "The Gabba"),
+        ("2026-08-15 13:00", "GWS Giants", "West Coast Eagles", "ENGIE Stadium"),
+        ("2026-08-15 13:00", "Essendon", "Sydney Swans", "MCG"),
+        ("2026-08-15 13:00", "Fremantle", "Adelaide Crows", "Optus Stadium"),
+        ("2026-08-15 13:00", "Hawthorn", "Collingwood", "MCG"),
+        ("2026-08-15 13:00", "Richmond", "St Kilda", "MCG"),
+        ("2026-08-15 13:00", "North Melbourne", "Geelong Cats", "Marvel Stadium"),
+        ("2026-08-15 13:00", "Port Adelaide", "Melbourne", "Adelaide Oval"),
+    ]),
+    ("AFL", 24, "regular", [  # Final regular round — all 13:00
+        ("2026-08-22 13:00", "West Coast Eagles", "Hawthorn", "Optus Stadium"),
+        ("2026-08-22 13:00", "Collingwood", "Brisbane Lions", "MCG"),
+        ("2026-08-22 13:00", "Adelaide Crows", "GWS Giants", "Adelaide Oval"),
+        ("2026-08-22 13:00", "Carlton", "Fremantle", "Marvel Stadium"),
+        ("2026-08-22 13:00", "Geelong Cats", "Richmond", "GMHBA Stadium"),
+        ("2026-08-22 13:00", "St Kilda", "Gold Coast Suns", "Marvel Stadium"),
+        ("2026-08-22 13:00", "Essendon", "Port Adelaide", "Marvel Stadium"),
+        ("2026-08-22 13:00", "Melbourne", "Western Bulldogs", "MCG"),
+        ("2026-08-22 13:00", "Sydney Swans", "North Melbourne", "SCG"),
+    ]),
+    # ---------------- NRL (Men's) ----------------
+    ("NRL", 22, "regular", [
+        ("2026-08-01 15:00", "Gold Coast Titans", "New Zealand Warriors", "Cbus Super Stadium"),
+        ("2026-08-01 17:30", "Penrith Panthers", "Canberra Raiders", "Glen Willow, Mudgee"),
+        ("2026-08-01 19:30", "Brisbane Broncos", "Newcastle Knights", "Suncorp Stadium"),
+        ("2026-08-02 14:00", "Cronulla Sharks", "South Sydney Rabbitohs", "Sharks Stadium"),
+        ("2026-08-02 16:05", "Wests Tigers", "Parramatta Eels", "CommBank Stadium"),
+    ]),
+    ("NRL", 23, "regular", [
+        ("2026-08-06 19:50", "Gold Coast Titans", "North Queensland Cowboys", "Cbus Super Stadium"),
+        ("2026-08-07 18:00", "New Zealand Warriors", "Penrith Panthers", "Go Media Stadium"),
+        ("2026-08-07 20:00", "Sydney Roosters", "Canterbury Bulldogs", "Allianz Stadium"),
+        ("2026-08-08 15:00", "Melbourne Storm", "Manly Sea Eagles", "HBF Park, Perth"),
+        ("2026-08-08 17:30", "Dolphins", "Brisbane Broncos", "Suncorp Stadium"),
+        ("2026-08-08 19:30", "South Sydney Rabbitohs", "Parramatta Eels", "Allianz Stadium"),
+        ("2026-08-09 14:00", "Canberra Raiders", "Newcastle Knights", "GIO Stadium"),
+        ("2026-08-09 16:05", "St George Illawarra Dragons", "Cronulla Sharks", "Jubilee Park"),
+    ]),
+    ("NRL", 24, "regular", [
+        ("2026-08-13 19:50", "Penrith Panthers", "Sydney Roosters", "CommBank Stadium"),
+        ("2026-08-14 18:00", "Manly Sea Eagles", "Dolphins", "Brookvale Oval"),
+        ("2026-08-14 20:00", "Canterbury Bulldogs", "South Sydney Rabbitohs", "Accor Stadium"),
+        ("2026-08-15 15:00", "Cronulla Sharks", "Canberra Raiders", "Sharks Stadium"),
+        ("2026-08-15 17:30", "Parramatta Eels", "North Queensland Cowboys", "CommBank Stadium"),
+        ("2026-08-15 19:30", "Brisbane Broncos", "New Zealand Warriors", "Suncorp Stadium"),
+        ("2026-08-16 14:00", "Newcastle Knights", "Gold Coast Titans", "McDonald Jones Stadium"),
+        ("2026-08-16 16:05", "Wests Tigers", "St George Illawarra Dragons", "CommBank Stadium"),
+    ]),
+    ("NRL", 25, "regular", [
+        ("2026-08-20 19:50", "Melbourne Storm", "Penrith Panthers", "AAMI Park"),
+        ("2026-08-21 18:00", "Canberra Raiders", "Brisbane Broncos", "GIO Stadium"),
+        ("2026-08-21 20:00", "Dolphins", "Parramatta Eels", "Suncorp Stadium"),
+        ("2026-08-22 15:00", "Newcastle Knights", "Manly Sea Eagles", "McDonald Jones Stadium"),
+        ("2026-08-22 17:30", "South Sydney Rabbitohs", "New Zealand Warriors", "Accor Stadium"),
+        ("2026-08-22 19:30", "St George Illawarra Dragons", "Canterbury Bulldogs", "Allianz Stadium"),
+        ("2026-08-23 14:00", "Gold Coast Titans", "Cronulla Sharks", "Cbus Super Stadium"),
+        ("2026-08-23 16:05", "Sydney Roosters", "Wests Tigers", "Allianz Stadium"),
+    ]),
+    ("NRL", 26, "regular", [
+        ("2026-08-27 19:50", "Brisbane Broncos", "Melbourne Storm", "Suncorp Stadium"),
+        ("2026-08-28 18:00", "Manly Sea Eagles", "St George Illawarra Dragons", "Brookvale Oval"),
+        ("2026-08-28 20:00", "Penrith Panthers", "Canterbury Bulldogs", "CommBank Stadium"),
+        ("2026-08-29 15:00", "Gold Coast Titans", "South Sydney Rabbitohs", "Cbus Super Stadium"),
+        ("2026-08-29 17:30", "Sydney Roosters", "Dolphins", "Allianz Stadium"),
+        ("2026-08-29 19:30", "North Queensland Cowboys", "Wests Tigers", "Queensland Country Bank Stadium"),
+        ("2026-08-30 14:00", "New Zealand Warriors", "Newcastle Knights", "Go Media Stadium"),
+        ("2026-08-30 16:05", "Parramatta Eels", "Cronulla Sharks", "CommBank Stadium"),
+    ]),
+    ("NRL", 27, "regular", [  # Final regular round
+        ("2026-09-03 19:50", "Canterbury Bulldogs", "Brisbane Broncos", "Accor Stadium"),
+        ("2026-09-04 18:00", "Gold Coast Titans", "Dolphins", "Cbus Super Stadium"),
+        ("2026-09-04 20:00", "South Sydney Rabbitohs", "Sydney Roosters", "Allianz Stadium"),
+        ("2026-09-05 15:00", "New Zealand Warriors", "Manly Sea Eagles", "Go Media Stadium"),
+        ("2026-09-05 17:30", "North Queensland Cowboys", "Canberra Raiders", "Queensland Country Bank Stadium"),
+        ("2026-09-05 19:35", "Cronulla Sharks", "Melbourne Storm", "Ocean Protect Stadium"),
+        ("2026-09-06 14:00", "St George Illawarra Dragons", "Parramatta Eels", "WIN Stadium"),
+        ("2026-09-06 16:05", "Penrith Panthers", "Wests Tigers", "CommBank Stadium"),
+    ]),
+    # ---------------- NRLW (Women's) ----------------
+    ("NRLW", 5, "regular", [  # Magic Round, Geohex Park, Wagga Wagga
+        ("2026-08-01 12:15", "Cronulla Sharks", "Wests Tigers", "Geohex Park, Wagga Wagga"),
+        ("2026-08-01 14:15", "St George Illawarra Dragons", "Sydney Roosters", "Geohex Park, Wagga Wagga"),
+        ("2026-08-01 16:15", "Canberra Raiders", "North Queensland Cowboys", "Geohex Park, Wagga Wagga"),
+        ("2026-08-02 11:50", "Canterbury Bulldogs", "Brisbane Broncos", "Geohex Park, Wagga Wagga"),
+        ("2026-08-02 13:45", "New Zealand Warriors", "Gold Coast Titans", "Geohex Park, Wagga Wagga"),
+        ("2026-08-02 15:45", "Parramatta Eels", "Newcastle Knights", "Geohex Park, Wagga Wagga"),
+    ]),
+    ("NRLW", 6, "regular", [
+        ("2026-08-08 12:45", "Canterbury Bulldogs", "North Queensland Cowboys", ""),
+        ("2026-08-08 15:15", "Cronulla Sharks", "Gold Coast Titans", ""),
+        ("2026-08-08 17:15", "New Zealand Warriors", "Newcastle Knights", ""),
+        ("2026-08-09 11:35", "Canberra Raiders", "Brisbane Broncos", ""),
+        ("2026-08-09 13:35", "St George Illawarra Dragons", "Wests Tigers", ""),
+        ("2026-08-09 18:15", "Sydney Roosters", "Parramatta Eels", ""),
+    ]),
+    ("NRLW", 7, "regular", [
+        ("2026-08-15 12:45", "Gold Coast Titans", "St George Illawarra Dragons", ""),
+        ("2026-08-15 15:15", "Parramatta Eels", "Canterbury Bulldogs", ""),
+        ("2026-08-15 17:15", "Brisbane Broncos", "Sydney Roosters", ""),
+        ("2026-08-16 11:50", "Newcastle Knights", "Canberra Raiders", ""),
+    ]),
+    # ---------------- AFLW (Women's) ----------------
+    ("AFLW", 1, "regular", [
+        ("2026-08-09 16:35", "St Kilda", "Carlton", "Marvel Stadium"),
+        ("2026-08-13 19:15", "Hawthorn", "Melbourne", "IKON Park"),
+        ("2026-08-15 14:05", "Gold Coast Suns", "Western Bulldogs", "People First Stadium"),
+        ("2026-08-15 19:15", "Richmond", "Collingwood", "IKON Park"),
+        ("2026-08-16 12:35", "Essendon", "Brisbane Lions", "Windy Hill"),
+        ("2026-08-16 14:35", "Adelaide Crows", "Sydney Swans", "Thomas Farms Oval"),
+        ("2026-08-16 16:35", "Fremantle", "Port Adelaide", "Cockburn ARC"),
+    ]),
+    ("AFLW", 2, "regular", [
+        ("2026-08-17 14:05", "Sydney Swans", "Essendon", "SCG"),
+        ("2026-08-22 14:05", "Geelong Cats", "St Kilda", "GMHBA Stadium"),
+        ("2026-08-22 17:05", "Western Bulldogs", "Richmond", "Mission Whitten Oval"),
+        ("2026-08-22 19:15", "Brisbane Lions", "North Melbourne", "Hickey Park"),
+        ("2026-08-23 12:35", "Collingwood", "Fremantle", "Victoria Park"),
+        ("2026-08-23 13:05", "Carlton", "Adelaide Crows", "IKON Park"),
+        ("2026-08-23 14:35", "Melbourne", "GWS Giants", "Casey Fields"),
+        ("2026-08-23 15:05", "Port Adelaide", "Hawthorn", "Adelaide Oval"),
+        ("2026-08-23 17:05", "West Coast Eagles", "Gold Coast Suns", "Mineral Resources Park"),
+    ]),
+    ("AFLW", 3, "regular", [
+        ("2026-08-29 12:35", "North Melbourne", "Western Bulldogs", "Arden Street Oval"),
+        ("2026-08-29 14:35", "Adelaide Crows", "West Coast Eagles", "Norwood Oval"),
+        ("2026-08-29 16:35", "Sydney Swans", "St Kilda", "SCG"),
+        ("2026-08-30 12:35", "GWS Giants", "Port Adelaide", "Blacktown ISP Oval"),
+        ("2026-08-30 13:05", "Melbourne", "Brisbane Lions", "Casey Fields"),
+        ("2026-08-30 15:05", "Collingwood", "Hawthorn", "Victoria Park"),
+        ("2026-08-30 15:05", "Gold Coast Suns", "Geelong Cats", "People First Stadium"),
+        ("2026-08-30 17:05", "Fremantle", "Carlton", "Fremantle Oval"),
+        ("2026-08-30 19:15", "Essendon", "Richmond", "UTAS Stadium"),
+    ]),
+]

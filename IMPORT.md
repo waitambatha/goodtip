@@ -1,9 +1,9 @@
 # Importing the GoodTip database
 
-The file `goodtip_export.sql` (or the compressed `goodtip_export.sql.gz`) is a
-**portable PostgreSQL dump**. It was created with `--no-owner --no-privileges`,
-so it contains **no role/ownership statements and no credentials** — it imports
-cleanly under whatever PostgreSQL user you run it as.
+The file `goodtip_export.sql` is a **portable PostgreSQL dump**. It was created
+with `--no-owner --no-privileges`, so it contains **no role/ownership statements
+and no credentials** — it imports cleanly under whatever PostgreSQL user you run
+it as.
 
 ## Quick import (3 steps)
 
@@ -11,11 +11,8 @@ cleanly under whatever PostgreSQL user you run it as.
 # 1. Create an empty database (use any name you like)
 createdb goodtip
 
-# 2a. If you have the plain .sql file:
+# 2. Load the dump:
 psql -d goodtip -f goodtip_export.sql
-
-# 2b. ...or if you have the compressed .gz file:
-gunzip -c goodtip_export.sql.gz | psql -d goodtip
 
 # 3. Done — verify it loaded:
 psql -d goodtip -c "SELECT count(*) FROM catalog_charity;"

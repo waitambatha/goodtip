@@ -1,0 +1,63 @@
+{% extends "app_base.html" %}
+{% block title %}Season summary — {{ org.name }}{% endblock %}
+{% block app_content %}
+<div class="app-head"><div><div class="app-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div><h1 class="app-h1">Season summary</h1></div>
+  {% if subscription %}<a href="{% url 'billing:receipt' org.id %}" class="abtn abtn-ghost abtn-sm">Platform receipt</a>{% endif %}</div>
+
+{% if not summary %}
+  <div class="card pad-lg" style="text-align:center;"><div class="card-h">No donation pledge yet</div><p class="card-lead">This league hasn't set a pledge, so there's nothing to settle.</p></div>
+{% else %}
+
+{% if podium %}
+<div class="app-eyebrow" style="margin-bottom:12px;">Final ladder &middot; top 3</div>
+<div class="podium" style="margin-bottom:26px;">
+  {% with a=podium.0 b=podium.1 c=podium.2 %}
+  {% if b %}<div class="pod second"><div class="medal">2</div><div class="pod-name">{{ b.display_name }}</div><div class="pod-meta">{{ b.points }} pts</div><span class="pod-chip">Runner-up</span></div>{% endif %}
+  {% if a %}<div class="pod first"><span class="crown"><svg class="cic"><use href="#ic-trophy"/></svg></span><div class="medal">1</div><div class="pod-name">{{ a.display_name }}</div><div class="pod-meta">{{ a.points }} pts</div><span class="pod-chip">Champion</span></div>{% endif %}
+  {% if c %}<div class="pod third"><div class="medal">3</div><div class="pod-name">{{ c.display_name }}</div><div class="pod-meta">{{ c.points }} pts</div><span class="pod-chip">Third</span></div>{% endif %}
+  {% endwith %}
+</div>
+{% endif %}
+
+<div class="grid-app g-2" style="align-items:start;">
+  <div class="card pad-lg">
+    <div class="card-h">Raised for {{ summary.charity.name|default:org.charity_display }}</div>
+    <div class="s-num num" style="font-size:34px;color:var(--forest);margin:10px 0 4px;">${{ summary.raised|floatformat:0 }}</div>
+    <div class="pbar" style="margin:6px 0 12px;"><i style="width:{{ summary.pct }}%"></i></div>
+    <div class="dbreak">
+      <div class="row"><span>Base pledge</span><b>${{ summary.base|floatformat:0 }}</b></div>
+      <div class="row"><span>Participant top-ups</span><b>${{ summary.topups|floatformat:0 }}</b></div>
+      {% if summary.matching_enabled %}<div class="row"><span>Matched by {{ org.name }}</span><b>${{ summary.matched|floatformat:0 }}</b></div>{% endif %}
+      <div class="row total"><span>Total to charity</span><b>${{ summary.raised|floatformat:0 }}</b></div>
+    </div>
+  </div>
+  <div class="card pad-lg">
+    <div class="card-h">Platform &amp; reporting</div>
+    <div class="dbreak">
+      {% if subscription %}<div class="row"><span>Plan</span><b>{{ subscription.get_tier_display }} &middot; ${{ subscription.price_aud|floatformat:0 }}</b></div>{% else %}<div class="row"><span>Plan</span><b><a href="{% url 'billing:plans' org.id %}" class="flink" style="color:var(--forest);font-weight:700;">choose a plan</a></b></div>{% endif %}
+      <div class="row"><span>Season</span><b>{{ org.sport_label }} {{ org.season }}</b></div>
+      {% if is_owner %}<div class="row"><span>Pledge paid</span><b>${{ summary.paid|floatformat:0 }}</b></div><div class="row"><span>Pledge outstanding</span><b>${{ summary.outstanding|floatformat:0 }}</b></div>{% endif %}
+    </div>
+    {% if esg_allowed %}
+      <a href="{% url 'billing:esg_report' org.id %}" class="abtn abtn-dark abtn-block" style="margin-top:14px;"><svg class="cic" style="width:17px;height:17px;stroke:currentColor;fill:none;"><use href="#ic-doc"/></svg> Download ESG report (PDF)</a>
+    {% else %}
+      <p class="app-sub" style="font-size:12px;margin-top:12px;">ESG report export is available on Pro plans and above, for owners.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if disbursement %}
+  <div class="flash success" style="margin-top:16px;"><span>Settled ${{ disbursement.total_disbursed_aud|floatformat:0 }} for disbursement to {{ disbursement.charity.name }} on {{ disbursement.disbursed_at|date:"j M Y" }}.</span></div>
+  <a href="{% url 'orgs:create' %}" class="abtn abtn-primary" style="margin-top:14px;">Start a new season &rarr;</a>
+{% elif is_owner %}
+  <div class="card pad-lg" style="margin-top:16px;border-color:rgba(200,241,53,.4);">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
+      <div><div class="card-h">Close the season <span class="pill-role owner" style="vertical-align:middle;">Owner</span></div><p class="card-lead" style="margin-top:4px;">Settles the donation pool for disbursement to {{ summary.charity.name|default:org.charity_display }}. This can't be undone.</p></div>
+      <form method="post" action="{% url 'billing:season_summary' org.id %}">{% csrf_token %}<button type="submit" class="abtn abtn-primary">Close &amp; disburse</button></form>
+    </div>
+  </div>
+{% else %}
+  <p class="app-sub" style="margin-top:16px;">The League Owner will close the season and settle the donation pool.</p>
+{% endif %}
+{% endif %}
+{% endblock %}

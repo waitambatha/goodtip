@@ -1,1 +1,3 @@
-{% include "components/_countdown.html" with round=round %}
+{% load team_extras %}
+<div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px;text-align:right;">Locks in</div>
+{% if round %}{% countdown_cells round.lockout_at %}{% else %}<div class="cd-locked">No round</div>{% endif %}

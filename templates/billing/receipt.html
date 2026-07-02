@@ -1,0 +1,17 @@
+{% extends "app_base.html" %}
+{% block title %}Receipt — {{ org.name }}{% endblock %}
+{% block app_content %}
+<div style="display:flex;justify-content:flex-end;max-width:640px;margin:0 auto 14px;" class="no-print"><button type="button" class="abtn abtn-ghost abtn-sm" onclick="window.print()">Print / Save PDF</button></div>
+<div class="receipt">
+  <div class="receipt-head">
+    <div><div class="r-brand">GOOD<span>TIP</span></div><div style="font-size:12px;color:var(--muted);margin-top:4px;">GoodTip Pty Ltd</div></div>
+    <div class="receipt-meta">{% if sub.stripe_payment_intent_id %}Ref {{ sub.stripe_payment_intent_id }}<br>{% endif %}Issued {{ sub.paid_at|date:"j M Y"|default:"—" }}</div>
+  </div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">Billed to<br><strong style="color:var(--ink);">{{ org.name }}</strong></div>
+  <div class="receipt-row"><span class="k">Platform subscription — {{ sub.get_tier_display }} plan</span><span>${{ sub.price_aud|floatformat:2 }}</span></div>
+  <div class="receipt-row"><span class="k">Seats</span><span>{{ sub.seat_limit_label }}</span></div>
+  <div class="receipt-row"><span class="k">Season</span><span>{{ sub.season }}</span></div>
+  <div class="receipt-total"><span>Total paid</span><span class="num">${{ sub.price_aud|floatformat:2 }} AUD</span></div>
+  <p class="receipt-note">This is a receipt for the GoodTip platform service fee only. Charitable donations (base pledge, top-ups and matching) are handled separately and are not included in this amount. Not a tax-deductible donation receipt — those issue once the GoodTip Foundation has DGR status.</p>
+</div>
+{% endblock %}

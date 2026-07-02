@@ -1,54 +1,23 @@
-{% extends "base.html" %}
-{% block title %}Choose a plan — {{ org.name }}{% endblock %}
-{% block content %}
-<div class="section-header">
-  <div>
-    <span class="t-micro text-tertiary">{{ org.name }} · billing</span>
-    <h1 class="t-h1 mt-2">Choose your plan</h1>
-  </div>
-  <a href="{% url 'dashboard' %}" class="btn-ghost btn-sm"><i data-lucide="arrow-left" class="icon-sm"></i> Back</a>
-</div>
-
-{% if current %}
-  <div class="card mb-6" style="padding:18px;border-color:var(--accent)">
-    <span class="t-micro text-accent">Active plan</span>
-    <div class="row-between mt-1" style="align-items:center">
-      <div>
-        <span class="t-h3">{{ current.get_tier_display }}</span>
-        <span class="t-small text-tertiary"> · {{ current.seat_limit_label }} · {{ current.participant_count }} joined</span>
-      </div>
-      <span class="t-small text-tertiary">Paid {{ current.paid_at|date:"j M Y" }}</span>
-    </div>
-  </div>
-{% endif %}
+{% extends "app_base.html" %}
+{% block title %}Plans — {{ org.name }}{% endblock %}
+{% block app_content %}
+<div class="app-head"><div><div class="app-eyebrow">{{ org.name }} &middot; billing</div><h1 class="app-h1">Choose your plan</h1><p class="app-sub">Priced by group size. Every plan includes all four codes and the full platform. 100% of donations still go to charity — this fee only runs GoodTip.</p></div></div>
 
 {% if not stripe_configured %}
-  <div class="flash is-error mb-6">
-    <i data-lucide="alert-circle" class="icon-sm"></i>
-    <span>Payments aren't switched on yet (Stripe keys pending). You can still pick a plan — we'll save your choice and you can pay once billing is live.</span>
-  </div>
+<div class="flash info" style="margin-bottom:18px;"><svg class="cic" style="width:18px;height:18px;stroke:#245b66;fill:none;flex:none;"><use href="#ic-lock"/></svg><span>Payments aren't switched on yet — your choice is saved and we'll confirm before charging.</span></div>
 {% endif %}
 
-<p class="t-small text-tertiary mb-4">The platform fee is a one-off charge for the {{ org.season }} season. 100&#37; of your group's donations always go to charity — this fee only covers running GoodTip.</p>
-
-<div class="grid-3" style="align-items:start">
+<div class="tier-cards">
   {% for t in tiers %}
-    <div class="card" style="padding:20px;{% if t.popular %}border-color:var(--accent){% endif %}">
-      {% if t.popular %}<span class="pill pill-accent mb-2" style="display:inline-block">Most popular</span>{% endif %}
-      <h3 class="t-h3">{{ t.label }}</h3>
-      <div class="mt-1 mb-1"><span class="stat-num" style="font-size:28px">${{ t.price }}</span><span class="t-small text-tertiary"> /season</span></div>
-      <div class="t-micro text-tertiary">{{ t.seat_label }} · {{ t.audience }}</div>
-      <ul class="stack gap-2 mt-4 mb-4" style="list-style:none;padding:0;margin:0">
-        {% for f in t.features %}
-          <li class="row gap-2 t-small"><i data-lucide="check" class="icon-sm text-accent"></i> {{ f }}</li>
-        {% endfor %}
-      </ul>
-      <form method="post" action="{% url 'billing:checkout' org.id %}">
-        {% csrf_token %}
-        <input type="hidden" name="tier" value="{{ t.key }}">
-        <button class="btn-primary btn-block">Choose {{ t.label }}</button>
-      </form>
-    </div>
+  <div class="tier {% if t.popular %}featured{% endif %} {% if current and current.tier == t.key %}current{% endif %}">
+    {% if t.popular %}<span class="tier-flag">Popular</span>{% endif %}
+    {% if current and current.tier == t.key %}<span class="tier-current">Current</span>{% endif %}
+    <div class="tier-name">{{ t.label }}</div>
+    <div class="tier-for">{{ t.seat_label }} &middot; {{ t.audience }}</div>
+    <div class="tier-price">${{ t.price }}<span>/yr</span></div>
+    <ul class="tier-feats">{% for f in t.features %}<li><span class="tk">&check;</span> {{ f }}</li>{% endfor %}</ul>
+    <form method="post" action="{% url 'billing:checkout' org.id %}" style="margin-top:auto;">{% csrf_token %}<input type="hidden" name="tier" value="{{ t.key }}"><button class="tier-cta" type="submit">{% if current and current.tier == t.key %}Current plan{% else %}Choose {{ t.label }}{% endif %}</button></form>
+  </div>
   {% endfor %}
 </div>
 {% endblock %}

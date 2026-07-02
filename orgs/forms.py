@@ -1,7 +1,7 @@
 from django import forms
 from django.utils.text import slugify
 
-from catalog.models import Charity, Season, Sport
+from catalog.models import Charity, Competition, Season
 
 from .models import Organisation
 
@@ -22,10 +22,10 @@ class OrgCreateForm(forms.ModelForm):
         ("vote", "Let the group vote"),
     ]
 
-    sports = forms.ModelMultipleChoiceField(
-        queryset=Sport.objects.all(),
+    competitions = forms.ModelMultipleChoiceField(
+        queryset=Competition.objects.select_related("sport", "season"),
         widget=forms.CheckboxSelectMultiple,
-        label="Sport(s)",
+        label="Competition(s)",
     )
     charity_method = forms.ChoiceField(
         choices=CHARITY_METHOD_CHOICES,
@@ -58,7 +58,7 @@ class OrgCreateForm(forms.ModelForm):
 
     class Meta:
         model = Organisation
-        fields = ["name", "sports", "season", "team_size", "finals_only"]
+        fields = ["name", "competitions", "season", "team_size", "finals_only"]
         labels = {
             "name": "League name",
             "team_size": "Expected group size (optional)",
@@ -115,6 +115,8 @@ class OrgCreateForm(forms.ModelForm):
                     website=self.cleaned_data.get("new_charity_url") or "",
                     is_approved=False,
                 )
+                # Flag for the view to notify the GoodTip team for manual review.
+                self.suggested_charity = charity
         return charity
 
     def save(self, commit=True):

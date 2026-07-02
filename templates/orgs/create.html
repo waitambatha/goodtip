@@ -1,85 +1,79 @@
-{% extends "base.html" %}
-{% block title %}Start a league — GoodTip{% endblock %}
-{% block container_class %}container-tiny{% endblock %}
-{% block content %}
-<div class="section-header">
-  <div>
-    <span class="t-micro text-tertiary">Set up your comp</span>
-    <h1 class="t-h1 mt-2">Start a league</h1>
-  </div>
-</div>
-<p class="t-body text-secondary mb-6">Name your comp, pick the sport, and decide the charity that 100&#37; of entry goes to. You'll get a shareable invite link next.</p>
+{% extends "app_base.html" %}
+{% load team_extras %}
+{% block title %}Create a league — GoodTip{% endblock %}
+{% block app_content %}
+<div class="app-head"><div><div class="app-eyebrow">New comp</div><h1 class="app-h1">Create a league</h1><p class="app-sub">Stand up a tipping comp. You'll be the Owner, Manager and Captain to start.</p></div></div>
 
-<form method="post" class="stack gap-5">
+{% if form.non_field_errors %}<div class="flash error" style="margin-bottom:16px;"><span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
+
+<form method="post" action="{% url 'orgs:create' %}" style="max-width:720px;">
   {% csrf_token %}
-  {% if form.non_field_errors %}
-    <div class="t-small text-danger">{{ form.non_field_errors }}</div>
-  {% endif %}
-
-  {% for field in form %}
-    {% if field.name == "charity_method" %}
-      <div>
-        <label class="field-label">{{ field.label }}</label>
-        {{ field }}
-        {% for e in field.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
+  <div class="card pad-lg" style="margin-bottom:16px;">
+    <div class="fld"><label for="id_name">League name</label><input type="text" name="name" id="id_name" value="{{ form.name.value|default:'' }}" placeholder="e.g. Eclat Footy Tips">
+      {% if form.name.errors %}<div class="fld-err">{{ form.name.errors|join:" " }}</div>{% endif %}</div>
+    <div class="fld">
+      <label>Competitions</label>
+      <div class="opt-grid cols2">
+        {% for comp in form.fields.competitions.queryset %}
+        <label class="opt-card"><input type="checkbox" name="competitions" value="{{ comp.pk }}" {% is_checked form.competitions comp.pk %}><span class="oc-box"><svg><use href="#ic-check"/></svg></span><span><span class="oc-title">{{ comp.name }}</span><span class="oc-sub">{{ comp.season }}</span></span></label>
+        {% endfor %}
       </div>
-
-      {# Pick-a-charity block #}
-      <div id="charity-pick-block" class="stack gap-4 card" style="padding:18px">
-        <div>
-          <label class="field-label">{{ form.charity.label }}</label>
-          {{ form.charity }}
-          {% for e in form.charity.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
-        </div>
-        <div>
-          <label class="field-label">{{ form.new_charity_name.label }}</label>
-          {{ form.new_charity_name }}
-          {% for e in form.new_charity_name.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
-        </div>
-        <div>
-          <label class="field-label">{{ form.new_charity_url.label }}</label>
-          {{ form.new_charity_url }}
-          {% for e in form.new_charity_url.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
-        </div>
+      {% if form.competitions.errors %}<div class="fld-err">{{ form.competitions.errors|join:" " }}</div>{% endif %}
+    </div>
+    <div class="fld-row">
+      <div class="fld"><label for="id_season">Season</label>
+        <select name="season" id="id_season">
+          {% for s in form.fields.season.queryset %}<option value="{{ s.pk }}" {% is_checked form.season s.pk %}>{{ s }}</option>{% endfor %}
+        </select>
       </div>
-
-      {# Group-vote block #}
-      <div id="charity-vote-block" class="card" style="padding:18px">
-        <label class="field-label">{{ form.vote_charities.label }}</label>
-        <p class="t-small text-tertiary mb-3">The group votes after they join. The tally stays hidden until you close the vote.</p>
-        {{ form.vote_charities }}
-        {% for e in form.vote_charities.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
-      </div>
-    {% elif field.name == "charity" or field.name == "new_charity_name" or field.name == "new_charity_url" or field.name == "vote_charities" %}
-      {# rendered above inside the toggle blocks #}
-    {% else %}
-      <div>
-        <label class="field-label">{{ field.label }}</label>
-        {{ field }}
-        {% if field.help_text %}<div class="t-small text-tertiary mt-2">{{ field.help_text }}</div>{% endif %}
-        {% for e in field.errors %}<div class="t-small text-danger mt-2">{{ e }}</div>{% endfor %}
-      </div>
-    {% endif %}
-  {% endfor %}
-
-  <div class="row gap-3 mt-3">
-    <a href="{% url 'dashboard' %}" class="btn-ghost">Cancel</a>
-    <button class="btn-primary flex-1">Create league <i data-lucide="arrow-right" class="icon-sm"></i></button>
+      <div class="fld"><label for="id_team_size">Expected group size <span style="color:var(--muted);font-weight:400;">(optional)</span></label><input type="number" name="team_size" id="id_team_size" value="{{ form.team_size.value|default:'' }}" placeholder="e.g. 24"></div>
+    </div>
+    <label class="opt-card" style="margin-top:4px;"><input type="checkbox" name="finals_only" {% is_checked form.finals_only 'True' %}><span class="oc-box"><svg><use href="#ic-check"/></svg></span><span><span class="oc-title">Finals only</span><span class="oc-sub">Skip the regular season and tip finals only</span></span></label>
   </div>
-</form>
 
-<script>
-  (function () {
-    function sync() {
-      var checked = document.querySelector('input[name="charity_method"]:checked');
-      var method = checked ? checked.value : 'pick';
-      document.getElementById('charity-pick-block').style.display = method === 'pick' ? '' : 'none';
-      document.getElementById('charity-vote-block').style.display = method === 'vote' ? '' : 'none';
-    }
-    document.querySelectorAll('input[name="charity_method"]').forEach(function (r) {
-      r.addEventListener('change', sync);
-    });
-    sync();
-  })();
-</script>
+  <div class="card pad-lg" style="margin-bottom:16px;">
+    <div class="card-h" style="margin-bottom:12px;">Who picks the charity?</div>
+    <div class="opt-grid cols2" style="margin-bottom:8px;">
+      <label class="opt-card radio"><input type="radio" name="charity_method" value="pick" {% is_checked form.charity_method 'pick' %}><span class="oc-box"></span><span><span class="oc-title">I'll choose the charity</span><span class="oc-sub">Set it now for the whole group</span></span></label>
+      <label class="opt-card radio"><input type="radio" name="charity_method" value="vote" {% is_checked form.charity_method 'vote' %}><span class="oc-box"></span><span><span class="oc-title">Let the group vote</span><span class="oc-sub">Everyone nominates &amp; votes</span></span></label>
+    </div>
+
+    <div data-when="pick" class="show" style="margin-top:14px;">
+      <div class="fld"><label for="id_charity">Choose an approved charity</label>
+        <select name="charity" id="id_charity">
+          <option value="">— Choose an approved charity —</option>
+          {% for ch in form.fields.charity.queryset %}<option value="{{ ch.pk }}" {% is_checked form.charity ch.pk %}>{{ ch.name }}</option>{% endfor %}
+        </select>
+        {% if form.charity.errors %}<div class="fld-err">{{ form.charity.errors|join:" " }}</div>{% endif %}
+      </div>
+      <p class="app-sub" style="margin:10px 0;">Or suggest a new one for approval:</p>
+      <div class="fld-row"><div class="fld"><label for="id_new_charity_name">Charity name</label><input type="text" name="new_charity_name" id="id_new_charity_name" value="{{ form.new_charity_name.value|default:'' }}" placeholder="Charity name">{% if form.new_charity_name.errors %}<div class="fld-err">{{ form.new_charity_name.errors|join:" " }}</div>{% endif %}</div><div class="fld"><label for="id_new_charity_url">Website</label><input type="url" name="new_charity_url" id="id_new_charity_url" value="{{ form.new_charity_url.value|default:'' }}" placeholder="https://"></div></div>
+    </div>
+
+    <div data-when="vote" style="margin-top:14px;">
+      <label>Ballot options <span style="color:var(--muted);font-weight:400;">(pick at least 2)</span></label>
+      <div class="opt-grid cols2" style="margin-top:8px;">
+        {% for ch in form.fields.vote_charities.queryset %}
+        <label class="opt-card"><input type="checkbox" name="vote_charities" value="{{ ch.pk }}" {% is_checked form.vote_charities ch.pk %}><span class="oc-box"><svg><use href="#ic-check"/></svg></span><span class="oc-title">{{ ch.name }}</span></label>
+        {% endfor %}
+      </div>
+      {% if form.vote_charities.errors %}<div class="fld-err">{{ form.vote_charities.errors|join:" " }}</div>{% endif %}
+    </div>
+  </div>
+
+  <button type="submit" class="abtn abtn-primary">Create league &rarr;</button>
+</form>
+{% endblock %}
+
+{% block app_js %}
+    (function(){
+      var radios = document.querySelectorAll('input[name="charity_method"]');
+      function sync(){
+        var v = document.querySelector('input[name="charity_method"]:checked');
+        v = v ? v.value : 'pick';
+        document.querySelectorAll('[data-when]').forEach(function(el){ el.classList.toggle('show', el.getAttribute('data-when') === v); });
+      }
+      radios.forEach(function(r){ r.addEventListener('change', sync); });
+      sync();
+    })();
 {% endblock %}

@@ -1,57 +1,16 @@
-{% if not ranked %}
-  {% include "components/_empty_state.html" with icon="trophy" title="No tippers yet" body="Once people join and tip, they'll show up here." %}
-{% else %}
-
-{% with top3=ranked|slice:":3" rest=ranked|slice:"3:" %}
-  {% if top3 %}
-    <div class="mb-8">
-      <h2 class="t-h3 text-tertiary mb-4">Podium</h2>
-      <div class="podium">
-        {% for slot in top3 %}
-          <div class="podium-card rank-{{ slot.rank }}">
-            <div class="podium-rank">
-              {% if slot.rank == 1 %}<i data-lucide="trophy" class="icon-sm" style="color:var(--accent);vertical-align:-3px"></i> 1st{% elif slot.rank == 2 %}2nd{% else %}3rd{% endif %}
-            </div>
-            <div class="avatar" style="width:56px;height:56px;font-size:18px;margin:0 auto 12px">{{ slot.user.display_name|slice:":1"|upper }}</div>
-            <div class="team-name mb-2">{{ slot.user.display_name }}{% if slot.user.id == me.id %} <span class="text-accent t-small">(you)</span>{% endif %}</div>
-            <div class="stat-num {% if slot.rank == 1 %}text-accent{% endif %}">{{ slot.points }}</div>
-            <div class="t-small text-tertiary">{{ slot.tips_correct }}/{{ slot.tips_total }} correct</div>
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  {% endif %}
-
-  {% if rest %}
-    <h2 class="t-h3 text-tertiary mb-4">Everyone else</h2>
-    <div class="table-card">
-      <table>
-        <thead>
-          <tr>
-            <th style="width:64px">Rank</th>
-            <th>Tipper</th>
-            <th class="text-right">Pts</th>
-            <th class="text-right hidden-mobile">Correct</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in rest %}
-            <tr {% if row.user.id == me.id %}style="background:var(--accent-glow)"{% endif %}>
-              <td class="num">#{{ row.rank }}</td>
-              <td>
-                <div class="row gap-3">
-                  <span class="avatar" style="width:28px;height:28px;font-size:11px">{{ row.user.display_name|slice:":1"|upper }}</span>
-                  <span>{{ row.user.display_name }}{% if row.user.id == me.id %} <span class="text-accent t-small">(you)</span>{% endif %}</span>
-                </div>
-              </td>
-              <td class="text-right num {% if row.user.id == me.id %}text-accent{% endif %}" style="font-weight:700">{{ row.points }}</td>
-              <td class="text-right num text-tertiary hidden-mobile">{{ row.tips_correct }}/{{ row.tips_total }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  {% endif %}
-{% endwith %}
-
-{% endif %}
+{% load team_extras %}
+<table class="atable" id="lbtable">
+  <thead><tr><th>Rank</th><th>Tipper</th><th style="text-align:right;">Correct</th><th style="text-align:right;">Points</th></tr></thead>
+  <tbody>
+  {% for row in ranked %}
+    <tr class="{% if row.user.id == me.id %}me{% endif %}">
+      <td class="r-rank">{{ row.rank }}</td>
+      <td>{{ row.user.display_name }}{% if row.user.id == me.id %} <span class="pill-role" style="margin-left:6px;">You</span>{% endif %}</td>
+      <td class="r-num">{{ row.tips_correct }} / {{ row.tips_total }}</td>
+      <td class="r-pts">{{ row.points }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="4" style="text-align:center;color:var(--muted);">No tippers yet — once people join and tip, they'll show here.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>

@@ -1,34 +1,21 @@
-{% extends "base.html" %}
+{% extends "app_base.html" %}
 {% block title %}League created — GoodTip{% endblock %}
-{% block container_class %}container-tiny{% endblock %}
-{% block content %}
-<div class="text-center mb-6" style="margin-top:24px">
-  <span class="empty-icon" style="display:inline-flex"><i data-lucide="party-popper" class="icon-xl"></i></span>
-  <h1 class="t-h1 mt-4">{{ org.name }} is live</h1>
-  <p class="t-body text-secondary mt-2">{{ org.sport_label }} · {{ org.season }} · 100% to {{ org.charity_display }}</p>
-</div>
+{% block app_content %}
+<div style="max-width:640px;margin:0 auto;text-align:center;">
+  <div style="width:64px;height:64px;border-radius:50%;background:var(--lime);display:grid;place-items:center;margin:10px auto 20px;"><svg class="cic" style="width:34px;height:34px;stroke:var(--deep);stroke-width:2.4;"><use href="#ic-check"/></svg></div>
+  <h1 class="app-h1">{{ org.name }} is live.</h1>
+  <p class="app-sub" style="font-size:16px;">{{ org.sport_label }} &middot; {{ org.season }} &middot; 100% to {{ org.charity_display }}. Now bring your people in.</p>
 
-{% include "orgs/_invite_link.html" with org=org invite_url=invite_url %}
-
-{% if vote %}
-  <div class="card mt-5" style="padding:20px;border-color:var(--accent)">
-    <span class="t-micro text-accent">Charity vote is open</span>
-    <p class="t-small text-secondary mt-2 mb-3">Your group will vote on the charity. The tally stays hidden until you close it.</p>
-    <a href="{% url 'orgs:charity_vote' org.id %}" class="btn-ghost btn-sm"><i data-lucide="heart" class="icon-sm"></i> View the vote</a>
+  <div class="card pad-lg" style="text-align:left;margin:24px 0;">
+    <label style="font-size:13px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">Your invite link</label>
+    <div class="copy-field"><input id="inviteLink" type="text" readonly value="{{ invite_url }}"><button type="button" class="abtn abtn-dark" data-copy="#inviteLink">Copy</button></div>
+    {% if vote %}<div class="flash info" style="margin:16px 0 0;"><svg class="cic" style="width:18px;height:18px;stroke:#245b66;fill:none;flex:none;"><use href="#ic-vote"/></svg><span>You started a charity vote — share it so the group can pick where the money goes. <a href="{% url 'orgs:charity_vote' org.id %}" class="flink" style="color:#245b66;font-weight:700;">View the vote</a></span></div>{% endif %}
   </div>
-{% endif %}
 
-<div class="card mt-5" style="padding:20px">
-  <span class="t-micro text-tertiary">Next steps</span>
-  <ol class="t-small text-secondary mt-3" style="padding-left:18px;line-height:1.9">
-    <li>Share the invite link with your group.</li>
-    {% if vote %}<li>Once people join, they vote on the charity — then you close it.</li>{% endif %}
-    <li>Load this round's fixtures from the <a href="{% url 'manage:overview' %}" class="link">admin panel</a>.</li>
-    <li>Start tipping once fixtures are in.</li>
-  </ol>
-</div>
-
-<div class="row gap-3 mt-6">
-  <a href="{% url 'dashboard' %}" class="btn-primary flex-1">Go to dashboard <i data-lucide="arrow-right" class="icon-sm"></i></a>
+  <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+    <a href="{% url 'orgs:invite' org.id %}" class="abtn abtn-primary">Invite members</a>
+    <a href="{% url 'billing:pledge' org.id %}" class="abtn abtn-ghost">Set donation pledge</a>
+    <a href="{% url 'dashboard' %}" class="abtn abtn-ghost">Go to dashboard</a>
+  </div>
 </div>
 {% endblock %}

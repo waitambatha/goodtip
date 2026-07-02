@@ -1,14 +1,10 @@
-{% extends "base.html" %}
-{% block container_class %}container-tiny{% endblock %}
-{% block content %}
-<div class="card text-center" style="padding:48px;margin-top:64px">
-  <span class="t-micro text-accent">You've been invited</span>
-  <h1 class="t-h1 mt-3 mb-3">Join {{ org.name }}</h1>
-  <p class="t-body text-secondary mb-2">100% of entry goes to</p>
-  <p class="t-h2 text-accent mb-6">{{ org.charity_name }}</p>
-  <div class="stack gap-3">
-    <a href="{{ signup_url }}" class="btn-primary btn-lg">Sign up &amp; join</a>
-    <a href="{% url 'accounts:login' %}" class="link t-small">Already have an account? Log in</a>
-  </div>
-</div>
+{% extends "auth_base.html" %}
+{% block title %}You're invited — GoodTip{% endblock %}
+{% block brand_head %}You're in. <em>Let's tip.</em>{% endblock %}
+{% block auth_form %}
+<div class="flash info" style="margin-bottom:20px;"><svg class="cic" style="width:18px;height:18px;stroke:#245b66;fill:none;flex:none;"><use href="#ic-people"/></svg><span>You've been invited to join <strong>{{ org.name }}</strong>.</span></div>
+<h1>Join the comp</h1>
+<p class="sub">100% of entry goes to <strong>{{ org.charity_display }}</strong>. Create an account or log in &mdash; you'll join the group automatically.</p>
+<a href="{{ signup_url }}" class="abtn abtn-primary abtn-block" style="margin-bottom:10px;">Create an account &rarr;</a>
+<a href="{% url 'accounts:login' %}" class="abtn abtn-ghost abtn-block">I already have an account</a>
 {% endblock %}

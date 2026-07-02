@@ -1,0 +1,42 @@
+{% extends "app_base.html" %}
+{% load team_extras %}
+{% block title %}Donation pledge — {{ org.name }}{% endblock %}
+{% block app_content %}
+<div class="app-head"><div><div class="app-eyebrow">{{ org.name }} &middot; raising for {{ org.charity_display }}</div><h1 class="app-h1">Set your donation pledge</h1><p class="app-sub">Commit your group's donation for the season. This is separate from the platform subscription — every dollar goes to the charity.</p></div></div>
+
+{% if form.non_field_errors %}<div class="flash error" style="margin-bottom:16px;"><span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
+
+<form method="post" action="{% url 'billing:pledge' org.id %}" style="max-width:640px;">
+  {% csrf_token %}
+  <div class="card pad-lg" style="margin-bottom:16px;">
+    <div class="fld"><label for="id_pledged_amount">Base pledge (AUD)</label><div class="amount-input"><input type="number" name="pledged_amount" id="id_pledged_amount" value="{{ form.pledged_amount.value|default:'' }}" placeholder="5000"></div><div class="hint">Suggested minimum for a group your size: <strong>${{ suggested_minimum }}</strong>.</div>
+      {% if form.pledged_amount.errors %}<div class="fld-err">{{ form.pledged_amount.errors|join:" " }}</div>{% endif %}</div>
+    <div class="fld">
+      <label>Payment schedule</label>
+      <div class="opt-grid cols3">
+        {% for value, label in form.fields.payment_schedule.choices %}
+        <label class="opt-card radio"><input type="radio" name="payment_schedule" value="{{ value }}" {% is_checked form.payment_schedule value %}><span class="oc-box"></span><span class="oc-title">{{ label }}</span></label>
+        {% endfor %}
+      </div>
+      <div class="hint">The pledge is the commitment; the payment timing is flexible.</div>
+    </div>
+  </div>
+
+  <div class="card pad-lg" style="margin-bottom:16px;">
+    <label class="opt-card" id="matchToggle"><input type="checkbox" name="matching_enabled" {% is_checked form.matching_enabled 'True' %}><span class="oc-box"><svg><use href="#ic-check"/></svg></span><span><span class="oc-title">Match participant top-ups</span><span class="oc-sub">Match voluntary top-ups dollar-for-dollar, up to a cap</span></span></label>
+    <div class="fld" data-when="match" id="capField" style="margin-top:14px;"><label for="id_matching_cap">Matching cap (AUD)</label><div class="amount-input"><input type="number" name="matching_cap" id="id_matching_cap" value="{{ form.matching_cap.value|default:'' }}" placeholder="2500"></div><div class="hint">We'll stop matching once the total match reaches this cap.</div>
+      {% if form.matching_cap.errors %}<div class="fld-err">{{ form.matching_cap.errors|join:" " }}</div>{% endif %}</div>
+  </div>
+
+  <button type="submit" class="abtn abtn-primary">Save pledge &rarr;</button>
+</form>
+{% endblock %}
+
+{% block app_js %}
+    (function(){
+      var cb = document.querySelector('input[name="matching_enabled"]');
+      var cap = document.getElementById('capField');
+      function sync(){ if(cap) cap.classList.toggle('show', cb && cb.checked); }
+      if (cb) cb.addEventListener('change', sync); sync();
+    })();
+{% endblock %}

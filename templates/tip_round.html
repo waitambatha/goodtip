@@ -1,33 +1,57 @@
-{% extends "base.html" %}
-{% block title %}R{{ round.round_number }} — {{ org.name }}{% endblock %}
-{% block content %}
-<div class="row mb-3"><a href="{% url 'dashboard' %}" class="t-small text-tertiary"><i data-lucide="arrow-left" class="icon-sm" style="vertical-align:-3px"></i> Back to dashboard</a></div>
-
-{% include "components/_page_header.html" with round_number=round.round_number title=org.name|add:" — Round "|add:round.round_number|stringformat:"s" subtitle=round.competition.name|add:" · "|add:org.charity_name %}
-
-<div class="card-2 mb-6" style="padding:20px">
-  <div class="row-between" style="flex-wrap:wrap;gap:16px">
-    <div>
-      {% if locked %}
-        <span class="pill pill-danger"><i data-lucide="lock" class="icon-sm"></i> Round locked</span>
-      {% else %}
-        <span class="pill pill-accent"><i data-lucide="clock" class="icon-sm"></i> Tips lock in {{ round.lockout_at|timeuntil }}</span>
-      {% endif %}
-    </div>
-    <div style="min-width:240px">
-      {% with submitted=rows|length %}
-      <div class="t-micro text-tertiary mb-2">Matches in round: {{ submitted }}</div>
-      {% endwith %}
-    </div>
+{% extends "app_base.html" %}
+{% load team_extras %}
+{% block title %}Round {{ round.round_number }} tips — {{ org.name }}{% endblock %}
+{% block nav_tips %}on{% endblock %}
+{% block app_content %}
+<div class="app-head">
+  <div>
+    <div class="app-eyebrow">{{ org.name }} &middot; {{ org.sport_label }}</div>
+    <h1 class="app-h1">Round {{ round.round_number }} &mdash; your tips</h1>
+    <p class="app-sub">{% if locked %}This round is locked &mdash; tips are final.{% else %}Tap a team to pick it. Saves the instant you choose &mdash; no submit button.{% endif %}</p>
   </div>
+  {% countdown_cells round.lockout_at %}
 </div>
 
-<div class="stack gap-4">
+{% if locked %}
+<div class="locked-banner"><svg class="cic" style="width:18px;height:18px;stroke:currentColor;"><use href="#ic-lock"/></svg> This round is locked. Tips are final and shown read-only.</div>
+{% endif %}
+
 {% for row in rows %}
-  {% include "components/_match_card.html" with match=row.match tip_selection=row.tip locked=row.match.is_locked tip_save_url=row.save_url mode="" %}
+  {% with m=row.match %}
+  <div class="match-row">
+    <div class="match-meta"><span>{{ m.kickoff_at|date:"D j M &middot; g:i a" }}</span>{% if m.venue %}<span class="venue">{{ m.venue }}</span>{% endif %}</div>
+    <div class="pick">
+      <label class="team {% if row.tip == 'home' %}sel{% endif %}">{% crest m.home_team %}<span>{{ m.home_team.name }}</span>
+        <input type="radio" name="sel-{{ m.id }}" value="home" hidden {% if row.tip == 'home' %}checked{% endif %}
+               {% if not locked %}hx-post="{{ row.save_url }}" hx-vals='{"selection":"home"}' hx-trigger="change" hx-target="#s{{ m.id }}" hx-swap="outerHTML"{% else %}disabled{% endif %}></label>
+      <div class="vs">vs</div>
+      <label class="team away {% if row.tip == 'away' %}sel{% endif %}">{% crest m.away_team %}<span>{{ m.away_team.name }}</span>
+        <input type="radio" name="sel-{{ m.id }}" value="away" hidden {% if row.tip == 'away' %}checked{% endif %}
+               {% if not locked %}hx-post="{{ row.save_url }}" hx-vals='{"selection":"away"}' hx-trigger="change" hx-target="#s{{ m.id }}" hx-swap="outerHTML"{% else %}disabled{% endif %}></label>
+    </div>
+    <div class="saved-tick {% if row.tip %}show{% endif %}" id="s{{ m.id }}"><svg><use href="#ic-check"/></svg> Saved</div>
+  </div>
+  {% endwith %}
 {% empty %}
-  {% include "components/_empty_state.html" with icon="calendar-x" title="No matches in this round yet" body="Hop hasn't added matches yet. Check back soon." %}
+  <div class="card pad-lg" style="text-align:center;"><div class="card-h">No matches in this round yet</div><p class="card-lead">Matches haven't been added yet &mdash; check back soon.</p></div>
 {% endfor %}
-</div>
 
+<div style="margin-top:22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+  <a href="{% url 'dashboard' %}" class="app-sub" style="margin:0;text-decoration:none;">&larr; Back to dashboard</a>
+  <a href="{% url 'tipping:leaderboard' org.id %}" class="abtn abtn-ghost">View leaderboard &rarr;</a>
+</div>
+{% endblock %}
+
+{% block app_js %}
+    /* reflect the chosen team visually (htmx saves it server-side) */
+    document.querySelectorAll('.pick').forEach(function(pick){
+      pick.querySelectorAll('.team').forEach(function(team){
+        var input = team.querySelector('input');
+        if (input && input.disabled) return;
+        team.addEventListener('click', function(){
+          pick.querySelectorAll('.team').forEach(function(t){ t.classList.remove('sel'); });
+          team.classList.add('sel');
+        });
+      });
+    });
 {% endblock %}

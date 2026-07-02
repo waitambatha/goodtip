@@ -1,0 +1,39 @@
+<!-- CONTACT (shared across all pages) -->
+<section class="section on-dark" id="{{ contact_id|default:'start' }}">
+  <div class="wrap">
+    <p class="eyebrow reveal">Get in touch</p>
+    <h2 class="section-heading reveal">{{ contact_heading|default:"Let's set up your comp." }}</h2>
+    <p class="section-sub reveal">Running a comp, partnering as a charity, or just want to know if it's right for your group &mdash; tell us what you're thinking. Good Tip, Mate.</p>
+
+    <div class="contact-shell">
+      <div class="reveal from-left">
+        <a class="email-cta" href="mailto:hello@goodtip.com.au">
+          <span class="ec-ic"><svg><use href="#ic-mail"/></svg></span>
+          <span class="ec-txt"><small>Email us directly <span class="wave" aria-hidden="true">&#128075;</span></small><b>hello@goodtip.com.au</b></span>
+        </a>
+        <p class="contact-meta">We reply within one business day.<br>GoodTip Australia &middot; Mon&ndash;Fri</p>
+        <p class="cat-label" style="color:var(--lime);opacity:.8;">Or reach us on</p>
+        <div class="socials">
+          <a class="social-btn s-email" href="mailto:hello@goodtip.com.au"><svg><use href="#s-mail"/></svg> Email</a>
+          <a class="social-btn s-linkedin" href="#"><svg><use href="#s-linkedin"/></svg> LinkedIn</a>
+          <a class="social-btn s-facebook" href="#"><svg><use href="#s-facebook"/></svg> Facebook</a>
+          <a class="social-btn s-instagram" href="#"><svg><use href="#s-instagram"/></svg> Instagram</a>
+          <a class="social-btn s-whatsapp" href="#"><svg><use href="#s-whatsapp"/></svg> WhatsApp</a>
+          <a class="social-btn s-tiktok" href="#"><svg><use href="#s-tiktok"/></svg> TikTok</a>
+        </div>
+        <p class="social-note">Placeholder links &mdash; swap in real handles when ready.</p>
+      </div>
+
+      <form class="reveal from-right" onsubmit="return false;">
+        <div class="form-grid">
+          <div class="field"><input type="text" id="cf-name-{{ contact_id|default:'start' }}" placeholder=" "><label for="cf-name-{{ contact_id|default:'start' }}">Your name</label></div>
+          <div class="field"><input type="email" id="cf-email-{{ contact_id|default:'start' }}" placeholder=" "><label for="cf-email-{{ contact_id|default:'start' }}">Work email</label></div>
+          <div class="field col-span"><input type="text" id="cf-org-{{ contact_id|default:'start' }}" placeholder=" "><label for="cf-org-{{ contact_id|default:'start' }}">Organisation</label></div>
+          <div class="field col-span"><select id="cf-int-{{ contact_id|default:'start' }}"><option value=""></option><option>Running a workplace comp</option><option>Running a club or community comp</option><option>Partnering as a charity</option><option>General enquiry</option></select><label for="cf-int-{{ contact_id|default:'start' }}">I'm interested in&hellip;</label></div>
+          <div class="field col-span"><textarea id="cf-msg-{{ contact_id|default:'start' }}" placeholder=" "></textarea><label for="cf-msg-{{ contact_id|default:'start' }}">Anything you'd like us to know</label></div>
+          <div class="col-span"><button type="submit" class="form-submit">Send message &rarr;</button></div>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,190 @@
+{% extends "public/base.html" %}
+{% load static %}
+
+{% block title %}The Wall — GoodTip{% endblock %}
+{% block meta_description %}Where the group lives every round: tips, banter, the ladder shuffle, and the charity total ticking up in real time.{% endblock %}
+{% block body_class %}page-wall{% endblock %}
+
+{% block content %}
+
+<!-- SPLIT HERO -->
+<section class="hero-split">
+  <div class="hs-left">
+    <span class="pill" style="align-self:flex-start;margin-bottom:24px;"><span class="dot"></span>New for 2026</span>
+    <h1>The Wall. <em>Where the group lives.</em></h1>
+    <p class="hero-sub">The banter is half the reason people tip. Now it has a home &mdash; tips, sledges, the ladder shuffle, and the charity total ticking up, all in one feed your group actually checks.</p>
+    <div class="hero-ctas" style="justify-content:flex-start;">
+      <a href="/#start" class="btn-primary">Start a comp &rarr;</a>
+      <a href="/how-it-works/" class="btn-ghost">How it works</a>
+    </div>
+  </div>
+  <div class="hs-right">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="shot active" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+    </div>
+    <div class="hs-veil" aria-hidden="true"></div>
+    <div class="hs-tagstrip"><span class="live-dot">Live every round</span></div>
+  </div>
+</section>
+
+<!-- LIVE WALL DEMO -->
+<section class="section wall-stage" aria-label="The Wall">
+  <div class="wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:22px;position:relative;">
+      <h2 class="section-heading" style="margin:0;font-size:clamp(22px,3vw,30px);">Mid-season. Round 14. <em>The room's awake.</em></h2>
+      <span class="live-dot">Live feed</span>
+    </div>
+    <div class="wall-shell">
+
+      <!-- Left rail: ladder snapshot -->
+      <aside class="wall-side">
+        <div class="wall-card">
+          <h4>Group ladder &middot; R14</h4>
+          <div class="mini-row"><span class="r">1</span><span class="n">Sharon (Accounts)</span><span class="p">128</span></div>
+          <div class="mini-row"><span class="r">2</span><span class="n">Big Dave</span><span class="p">124</span></div>
+          <div class="mini-row"><span class="r">3</span><span class="n">The Quiet One</span><span class="p">119</span></div>
+          <div class="mini-row"><span class="r">4</span><span class="n">Mardi &amp; Mailroom</span><span class="p">112</span></div>
+          <div class="mini-row"><span class="r">5</span><span class="n">You</span><span class="p">108</span></div>
+        </div>
+        <div class="wall-card">
+          <h4>This round</h4>
+          <p class="note" style="color:var(--cream);opacity:.7;">Tips lock <b style="color:var(--lime);">Thu 7:50pm</b>. State of Origin pick worth <b style="color:var(--lime);">4 pts</b> this week.</p>
+        </div>
+      </aside>
+
+      <!-- Center: feed -->
+      <div class="wall-feed" id="wall-feed">
+
+        <div class="composer">
+          <span class="av">YO</span>
+          <div class="grow">
+            <textarea rows="2" placeholder="Lock your tip, talk it up, or sledge responsibly&hellip;" aria-label="Write a post"></textarea>
+            <div class="composer-actions">
+              <span class="hint">Be a good sport. Banter, not bile.</span>
+              <button class="btn-primary" style="padding:9px 18px;font-size:13px;" type="button">Post</button>
+            </div>
+          </div>
+        </div>
+
+        <article class="post">
+          <div class="post-head">
+            <span class="av">BD</span>
+            <span class="meta"><b>Big Dave</b><small>Round 14 &middot; 2h ago</small></span>
+            <span class="tag">Top tipper</span>
+          </div>
+          <p class="post-body">Backing the <span class="pick">&#9733; Pies</span> by 30+. If I'm wrong I'll match the room's top-ups myself. Screenshot this.</p>
+          <div class="post-foot">
+            <span class="react" data-on="false">&#128293; <span class="c">14</span></span>
+            <span class="react" data-on="false">&#128514; <span class="c">8</span></span>
+            <span class="react" data-on="false">Reply</span>
+          </div>
+        </article>
+
+        <article class="post">
+          <div class="post-head">
+            <span class="av" style="background:rgba(200,241,53,.15);">GT</span>
+            <span class="meta"><b>GoodTip</b><small>Auto &middot; Round 13 close</small></span>
+            <span class="tag sys">Tally</span>
+          </div>
+          <p class="post-body">Round 13 locked. The room added <strong style="color:var(--lime);">$220</strong> in top-ups &mdash; the company match made it <strong style="color:var(--lime);">$440</strong>. <b>headspace</b> season total now <strong style="color:var(--lime);">$8,420</strong>.</p>
+          <div class="post-foot">
+            <span class="react" data-on="true">&#10084; <span class="c">31</span></span>
+            <span class="react" data-on="false">&#127881; <span class="c">12</span></span>
+          </div>
+        </article>
+
+        <article class="post">
+          <div class="post-head">
+            <span class="av">SH</span>
+            <span class="meta"><b>Sharon (Accounts)</b><small>Round 14 &middot; 4h ago</small></span>
+            <span class="tag">No. 1</span>
+          </div>
+          <p class="post-body">Top of the ladder and chucking in <span class="pick">+$20</span> because Dave's about to find out. Cause &gt; cup, lads.</p>
+          <div class="post-foot">
+            <span class="react" data-on="false">&#128293; <span class="c">22</span></span>
+            <span class="react" data-on="false">&#128170; <span class="c">9</span></span>
+            <span class="react" data-on="false">Reply</span>
+          </div>
+        </article>
+
+        <article class="post">
+          <div class="post-head">
+            <span class="av" style="background:rgba(200,241,53,.15);">GT</span>
+            <span class="meta"><b>GoodTip</b><small>Auto &middot; Ladder update</small></span>
+            <span class="tag sys">Ladder</span>
+          </div>
+          <p class="post-body"><b>The Quiet One in Legal</b> just jumped to <strong style="color:var(--lime);">3rd</strong>. Three correct tips on the bounce. Watch your back, Dave.</p>
+          <div class="post-foot">
+            <span class="react" data-on="false">&#128064; <span class="c">17</span></span>
+            <span class="react" data-on="false">&#128514; <span class="c">11</span></span>
+          </div>
+        </article>
+
+      </div>
+
+      <!-- Right rail: live tally -->
+      <aside class="wall-side">
+        <div class="wall-tally">
+          <p class="eyebrow" style="color:var(--lime);opacity:.8;">Raised this season</p>
+          <div class="tally-num" data-countto="8420" data-prefix="$">$0</div>
+          <p class="tally-cap">For headspace &middot; voted by the group in March.</p>
+          <div class="tally-bar"><i data-pct="68"></i></div>
+          <div class="tally-meta"><span>68%</span><span>Goal $12,500</span></div>
+        </div>
+        <div class="wall-card">
+          <h4>Top givers</h4>
+          <div class="mini-row"><span class="r">&#129351;</span><span class="n">Sharon</span><span class="p">$140</span></div>
+          <div class="mini-row"><span class="r">&#129352;</span><span class="n">Big Dave</span><span class="p">$110</span></div>
+          <div class="mini-row"><span class="r">&#129353;</span><span class="n">Priya</span><span class="p">$85</span></div>
+        </div>
+      </aside>
+
+    </div>
+  </div>
+</section>
+
+<!-- WHY THE WALL -->
+<section class="section on-cream">
+  <div class="wrap">
+    <p class="eyebrow reveal">Why it matters</p>
+    <h2 class="section-heading reveal">Engagement is the whole game. <em>The Wall is how you win it.</em></h2>
+    <p class="section-sub reveal">Tipping comps live or die on whether people come back each round. The leaderboard gives them a reason; the Wall gives them a place. It's the one thing the big incumbents never bothered to build.</p>
+    <div class="grid-3 reveal">
+      <div class="for-card">
+        <span class="for-tag">Stickiness</span>
+        <h3>A reason to open it on a Tuesday.</h3>
+        <p>Round results, ladder moves, and the charity tally land in the feed automatically. The group has something to react to every day of the week, not just on game day.</p>
+      </div>
+      <div class="for-card">
+        <span class="for-tag">Giving, visible</span>
+        <h3>Generosity is contagious when it's seen.</h3>
+        <p>Every top-up and every company match posts to the Wall in real time. When people watch the total climb &mdash; and see who's chipping in &mdash; they give more. Quietly, the average donation rises.</p>
+      </div>
+      <div class="for-card">
+        <span class="for-tag">Culture</span>
+        <h3>The banter your team already has.</h3>
+        <p>It was happening in group chats and corridors anyway. The Wall just puts it where the comp is &mdash; moderated, on-brand, and pointed at a good cause instead of a prize pool.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% include "public/partials/_contact.html" with contact_id="contact" %}
+
+<!-- CTA -->
+<div class="founding">
+  <div class="founding-inner reveal">
+    <div>
+      <p class="eyebrow">Get your group on the Wall</p>
+      <h2>Set it up now. Tip when the season starts.</h2>
+      <p>The Wall comes with every plan, from Starter up. Set up your group for free, run the Charity Vote, and the feed is live the moment the first tips lock.</p>
+    </div>
+    <div class="founding-cta">
+      <a href="/#start" class="btn-dark">Set up your group &rarr;</a>
+      <span class="founding-deadline">Pay when you launch. That's the whole deal.</span>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

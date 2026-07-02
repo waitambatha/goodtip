@@ -1,0 +1,180 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}GoodTip{% endblock %}</title>
+  <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:ital,wght@0,400;0,600;1,400&family=Barlow+Condensed:wght@600;900&family=Barlow+Semi+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="app">
+  {% include "public/partials/_icons.html" %}
+
+  {# ---- sport loader (alternates per load) ---- #}
+  <div class="loader" id="loader" role="status" aria-label="Loading">
+    <div class="loader-inner">
+      <div class="pitch">
+        <svg class="posts" viewBox="0 0 240 150" aria-hidden="true">
+          <g stroke="#C8F135" stroke-width="4" fill="none" stroke-linecap="round">
+            <line x1="84" y1="22" x2="84" y2="128"/><line x1="156" y1="22" x2="156" y2="128"/><line x1="84" y1="52" x2="156" y2="52"/>
+          </g>
+        </svg>
+        <span class="ball" aria-hidden="true"></span><span class="ground"></span>
+      </div>
+      <div class="loader-word">GOOD<span>TIP</span><span class="dot" style="color:var(--lime)">.</span></div>
+      <div class="loader-sport" id="loaderSport">Aussie Rules</div>
+      <div class="loader-bar"><i></i></div>
+    </div>
+  </div>
+
+  {# ---- persistent charity strip ---- #}
+  {% block charity_strip %}
+  {% if primary_org %}
+  <div class="charity-strip">
+    <div class="cs-inner">
+      {% if primary_donation %}
+        <span class="cs-label"><svg><use href="#ic-heart"/></svg> Raised for {{ primary_donation.charity.name|default:primary_org.charity_display }}</span>
+        <span class="cs-amt">${{ primary_donation.raised|floatformat:0 }}</span>
+        <span class="cs-bar"><i style="width:{{ primary_donation.pct }}%"></i></span>
+        {% if primary_donation.goal %}<span class="cs-amt" style="opacity:.6;font-weight:400;">Goal ${{ primary_donation.goal|floatformat:0 }}</span>{% endif %}
+      {% else %}
+        <span class="cs-label"><svg><use href="#ic-heart"/></svg> Raising for {{ primary_org.charity_display }}</span>
+        <span class="cs-amt" style="opacity:.6;font-weight:400;">No pledge set yet</span>
+        <span class="cs-bar"><i style="width:0%"></i></span>
+      {% endif %}
+      <span class="cs-right">{{ primary_org.season }} &middot; {{ primary_org.sport_label }}</span>
+    </div>
+  </div>
+  {% endif %}
+  {% endblock %}
+
+  {# ---- top nav ---- #}
+  <nav class="app-nav">
+    <div class="an-inner">
+      <a href="{% url 'dashboard' %}" class="an-brand">GOOD<span>TIP</span></a>
+      {% if primary_org %}<span class="an-org">{{ primary_org.name }}</span>{% endif %}
+      <div class="an-links">
+        <a href="{% url 'dashboard' %}" class="{% block nav_dash %}{% endblock %}">Dashboard</a>
+        {% if primary_org %}
+          <a href="{% url 'tipping:my_tips' primary_org.id %}" class="{% block nav_tips %}{% endblock %}">My Tips</a>
+          <a href="{% url 'tipping:leaderboard' primary_org.id %}" class="{% block nav_board %}{% endblock %}">Leaderboard</a>
+        {% endif %}
+        {% if user.is_staff %}<a href="{% url 'manage:overview' %}" class="{% block nav_admin %}{% endblock %}">Admin</a>{% endif %}
+      </div>
+      <div class="an-right">
+        <a href="{% url 'profile' %}" class="an-profile" title="Profile"><span class="an-avatar">{{ user.display_name|slice:":1"|upper }}</span><span class="an-plabel">Profile</span></a>
+        <span class="an-divider"></span>
+        <a href="{% url 'accounts:logout' %}" class="an-logout" title="Log out"><svg><use href="#ic-logout"/></svg><span class="an-llabel">Log out</span></a>
+        <button class="an-burger" aria-label="Menu" data-sheet-open><svg><use href="#ic-menu"/></svg></button>
+      </div>
+    </div>
+  </nav>
+
+  {# ---- mobile sheet ---- #}
+  <div class="app-sheet" id="appSheet">
+    <div class="sheet-panel">
+      <a href="{% url 'dashboard' %}">Dashboard</a>
+      {% if primary_org %}
+        <a href="{% url 'tipping:my_tips' primary_org.id %}">My Tips</a>
+        <a href="{% url 'tipping:leaderboard' primary_org.id %}">Leaderboard</a>
+      {% endif %}
+      {% if user.is_staff %}<a href="{% url 'manage:overview' %}">Admin</a>{% endif %}
+      <a href="{% url 'profile' %}">Profile</a>
+      <a href="{% url 'accounts:logout' %}">Log out</a>
+    </div>
+  </div>
+
+  <main class="app-main">
+    {% if messages %}
+      <div class="flash-stack">
+        {% for m in messages %}
+          <div class="flash {% if m.tags == 'success' %}success{% elif m.tags == 'error' %}error{% else %}info{% endif %}">
+            <span>{{ m }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% block app_content %}{% endblock %}
+  </main>
+
+  <script>
+  (function(){
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /* sport loader */
+    (function(){
+      var L = document.getElementById('loader'); if (!L) return;
+      var S = [['oval','Aussie Rules'],['oval','Rugby League'],['round','Football']];
+      var p = S[Math.floor(Math.random()*S.length)];
+      var b = L.querySelector('.ball'); if (b) b.classList.add(p[0]);
+      var lab = document.getElementById('loaderSport'); if (lab) lab.textContent = p[1];
+      document.body.classList.add('loading');
+      setTimeout(function(){ L.classList.add('out'); document.body.classList.remove('loading'); setTimeout(function(){ L.style.display='none'; }, 600); }, reduce ? 250 : 1300);
+    })();
+
+    /* mobile sheet */
+    var burger = document.querySelector('[data-sheet-open]');
+    var sheet = document.getElementById('appSheet');
+    if (burger && sheet) {
+      burger.addEventListener('click', function(){ sheet.classList.add('open'); });
+      sheet.addEventListener('click', function(e){ if (e.target === sheet) sheet.classList.remove('open'); });
+    }
+
+    /* custom dropdowns synced to a hidden <select> (Django/htmx) */
+    document.querySelectorAll('[data-dd]').forEach(function(dd){
+      var btn = dd.querySelector('.dd-btn'), val = dd.querySelector('.dd-val'), sel = dd.querySelector('.dd-native');
+      if (btn) btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        document.querySelectorAll('[data-dd].open').forEach(function(o){ if(o!==dd) o.classList.remove('open'); });
+        dd.classList.toggle('open');
+      });
+      dd.querySelectorAll('.dd-opt').forEach(function(opt){
+        opt.addEventListener('click', function(){
+          dd.querySelectorAll('.dd-opt').forEach(function(o){ o.classList.remove('on'); });
+          opt.classList.add('on');
+          if (val) val.textContent = opt.textContent;
+          if (sel) { sel.value = opt.getAttribute('data-val'); sel.dispatchEvent(new Event('change', { bubbles: true })); }
+          dd.classList.remove('open');
+        });
+      });
+    });
+    document.addEventListener('click', function(){ document.querySelectorAll('[data-dd].open').forEach(function(o){ o.classList.remove('open'); }); });
+
+    /* copy-to-clipboard buttons (invite links etc.) */
+    document.querySelectorAll('[data-copy]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var t = document.querySelector(btn.getAttribute('data-copy'));
+        if (!t) return;
+        var v = (t.value !== undefined) ? t.value : t.textContent;
+        function done(){ var o = btn.getAttribute('data-label') || btn.innerHTML; if(!btn.getAttribute('data-label')) btn.setAttribute('data-label', o); btn.innerHTML = 'Copied &#10003;'; btn.classList.add('is-copied'); setTimeout(function(){ btn.innerHTML = btn.getAttribute('data-label'); btn.classList.remove('is-copied'); }, 1600); }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(v).then(done, function(){ t.select && t.select(); document.execCommand && document.execCommand('copy'); done(); });
+        } else { t.focus && t.focus(); t.select && t.select(); try { document.execCommand('copy'); } catch(e){} done(); }
+      });
+    });
+
+    /* show / hide password toggles */
+    document.querySelectorAll('[data-pw-toggle]').forEach(function(t){
+      t.addEventListener('click', function(){
+        var inp = document.getElementById(t.getAttribute('data-pw-toggle'));
+        if (inp){ inp.type = inp.type === 'password' ? 'text' : 'password'; t.classList.toggle('on'); t.textContent = inp.type === 'password' ? 'Show' : 'Hide'; }
+      });
+    });
+
+    /* banner image crossfade */
+    var bshots = document.querySelectorAll('.dash-banner .bg .shot');
+    if (bshots.length > 1 && !reduce) {
+      var bi = 0; setInterval(function(){ bshots[bi].classList.remove('on'); bi=(bi+1)%bshots.length; bshots[bi].classList.add('on'); }, 5000);
+    }
+    {% block app_js %}{% endblock %}
+  })();
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

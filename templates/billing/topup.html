@@ -1,0 +1,53 @@
+{% extends "app_base.html" %}
+{% block title %}Add to the cause — {{ org.name }}{% endblock %}
+{% block app_content %}
+<div class="app-head"><div><div class="app-eyebrow">{{ org.name }}</div><h1 class="app-h1">Add to the cause</h1><p class="app-sub">Chuck in a voluntary top-up{% if summary.matching_enabled and summary.matching_remaining %} &mdash; your organisation matches it dollar-for-dollar{% endif %}.</p></div></div>
+
+<div class="grid-app g-2" style="align-items:start;">
+  <div class="card pad-lg">
+    <div class="card-h">Raising for {{ summary.charity.name|default:org.charity_display }}</div>
+    <div class="s-num num" style="font-size:30px;color:var(--forest);margin:8px 0 2px;">${{ summary.raised|floatformat:0 }} <span style="font-size:14px;color:var(--muted);font-family:var(--body);font-weight:400;">of ${{ summary.goal|floatformat:0 }}</span></div>
+    <div class="pbar" style="margin:12px 0 6px;"><i style="width:{{ summary.pct }}%"></i></div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);"><span>{{ summary.pct }}% there</span>{% if summary.matching_enabled and summary.matching_remaining %}<span>${{ summary.matching_remaining|floatformat:0 }} match remaining</span>{% endif %}</div>
+    <div class="dbreak" style="margin-top:16px;">
+      <div class="row"><span>Base pledge</span><b>${{ summary.base|floatformat:0 }}</b></div>
+      <div class="row"><span>Top-ups so far</span><b>${{ summary.topups|floatformat:0 }}</b></div>
+      {% if summary.matching_enabled %}<div class="row"><span>Matched by {{ org.name }}</span><b>${{ summary.matched|floatformat:0 }}</b></div>{% endif %}
+      <div class="row total"><span>Raised</span><b>${{ summary.raised|floatformat:0 }}</b></div>
+    </div>
+  </div>
+  <div class="card pad-lg">
+    <div class="card-h" style="margin-bottom:14px;">Your top-up</div>
+    {% if form.non_field_errors %}<div class="flash error" style="margin-bottom:12px;"><span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
+    <form method="post" action="{% url 'billing:topup' org.id %}">
+      {% csrf_token %}
+      <div class="fld"><label for="id_amount">Amount (AUD)</label><div class="amount-input"><input type="number" name="amount" id="id_amount" value="{{ form.amount.value|default:'' }}" placeholder="20"></div>
+        {% if form.amount.errors %}<div class="fld-err">{{ form.amount.errors|join:" " }}</div>{% endif %}</div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button type="button" class="abtn abtn-ghost abtn-sm topup-quick" data-amt="10">$10</button>
+        <button type="button" class="abtn abtn-ghost abtn-sm topup-quick" data-amt="20">$20</button>
+        <button type="button" class="abtn abtn-ghost abtn-sm topup-quick" data-amt="50">$50</button>
+      </div>
+      <button type="submit" class="abtn abtn-primary abtn-block">Add to the cause &rarr;</button>
+      {% if summary.matching_enabled and summary.matching_remaining %}<p class="app-sub" style="text-align:center;margin-top:12px;font-size:13px;" id="match-preview">Every dollar you add is matched, up to ${{ summary.matching_remaining|floatformat:0 }} more.</p>{% endif %}
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block app_js %}
+    document.querySelectorAll('.topup-quick').forEach(function(b){ b.addEventListener('click', function(){ var i=document.getElementById('id_amount'); if(i){ i.value=b.getAttribute('data-amt'); i.dispatchEvent(new Event('input',{bubbles:true})); } }); });
+    {% if summary.matching_enabled and summary.matching_remaining %}
+    (function(){
+      var input=document.getElementById('id_amount'), preview=document.getElementById('match-preview');
+      var remaining={{ summary.matching_remaining|floatformat:0 }};
+      if(!input||!preview)return;
+      input.addEventListener('input',function(){
+        var v=parseFloat(input.value)||0;
+        if(v<=0){ preview.textContent='Every dollar you add is matched, up to $'+remaining+' more.'; return; }
+        var matched=Math.min(v,remaining);
+        preview.innerHTML='Your <strong>$'+v.toFixed(0)+'</strong> becomes <strong style="color:var(--forest);">$'+(v+matched).toFixed(0)+'</strong> after the match.';
+      });
+    })();
+    {% endif %}
+{% endblock %}

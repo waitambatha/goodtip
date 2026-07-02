@@ -1,9 +1,9 @@
-{% extends "base.html" %}
-{% block container_class %}container-tiny{% endblock %}
-{% block content %}
-<div class="card text-center" style="padding:48px;margin-top:64px">
-  <span class="empty-icon" style="background:rgba(239,68,68,0.15);color:var(--danger)"><i data-lucide="alert-triangle" class="icon-xl"></i></span>
-  <h1 class="t-h1 mt-4 mb-3">Invalid invite</h1>
-  <p class="t-body text-secondary">This join link is invalid or has expired. Ask the comp admin for a new one.</p>
-</div>
+{% extends "auth_base.html" %}
+{% block title %}Invite invalid — GoodTip{% endblock %}
+{% block brand_head %}No worries. <em>Grab a fresh link.</em>{% endblock %}
+{% block auth_form %}
+<div style="width:56px;height:56px;border-radius:50%;background:rgba(178,52,52,.12);display:grid;place-items:center;margin-bottom:18px;"><svg class="cic" style="width:28px;height:28px;stroke:#9a2b2b;"><use href="#ic-lock"/></svg></div>
+<h1>This invite link is invalid or expired</h1>
+<p class="sub">Ask whoever invited you to send a new link, or head to the homepage.</p>
+<a href="/" class="abtn abtn-ghost abtn-block">Back to home</a>
 {% endblock %}

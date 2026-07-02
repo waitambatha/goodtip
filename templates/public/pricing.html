@@ -1,0 +1,166 @@
+{% extends "public/base.html" %}
+{% load static %}
+
+{% block title %}Pricing — GoodTip{% endblock %}
+{% block meta_description %}One price. All year. All four codes. Priced by team size, nothing else.{% endblock %}
+{% block body_class %}page-pricing{% endblock %}
+
+{% block content %}
+
+<!-- SPLIT HERO -->
+<section class="hero-split">
+  <div class="hs-left">
+    <span class="pill" style="align-self:flex-start;margin-bottom:24px;"><span class="dot"></span>Pricing</span>
+    <h1>One price. <em>All year.</em> All sports.</h1>
+    <p class="hero-sub">One flat annual fee covering every season of every code. Entry is free for your people &mdash; the donation is the prize.</p>
+    <div class="hero-ctas" style="justify-content:flex-start;"><a href="#tiers" class="btn-primary">See the plans &rarr;</a></div>
+  </div>
+  <div class="hs-right">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="shot active" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+    </div>
+    <div class="hs-veil" aria-hidden="true"></div>
+    <div class="hs-tagstrip"><span class="live-dot">Four codes, one fee</span></div>
+  </div>
+</section>
+
+<!-- TIER CARDS (shaded) -->
+<section class="section on-cream" id="tiers">
+  <div class="wrap">
+    <p class="eyebrow reveal">Plans</p>
+    <h2 class="section-heading reveal">Priced by team size. Nothing else.</h2>
+    <p class="section-sub reveal">Every plan includes the full platform &mdash; no feature gates, no per-sport upsells.</p>
+    <div class="tier-table-wrap reveal">
+      <table class="tier-table">
+        <thead>
+          <tr>
+            <th>Tier</th>
+            <th>Team size</th>
+            <th>What changes</th>
+            <th class="ta-r">Annual price</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td data-label="Tier" class="tt-tier"><span class="tt-name">Starter</span><span class="tt-sub">Small teams</span></td>
+            <td data-label="Team size">Up to 20 people</td>
+            <td data-label="What changes">Full platform. Choose AFL, NRL or both. Women's competitions included. Charity Vote. Live leaderboard. Email support.</td>
+            <td data-label="Annual price" class="tt-priced"><span class="tt-price">$99<span>/yr</span></span><span class="tt-per">~$5 per person</span></td>
+          </tr>
+          <tr class="is-popular">
+            <td data-label="Tier" class="tt-tier"><span class="tt-name">Team <span class="tier-badge">Popular</span></span><span class="tt-sub">Growing teams</span></td>
+            <td data-label="Team size">21 to 50 people</td>
+            <td data-label="What changes">Everything in Starter, plus custom group branding and a round-by-round participation dashboard.</td>
+            <td data-label="Annual price" class="tt-priced"><span class="tt-price">$299<span>/yr</span></span><span class="tt-per">~$6 per person</span></td>
+          </tr>
+          <tr>
+            <td data-label="Tier" class="tt-tier"><span class="tt-name">Workplace</span><span class="tt-sub">Mid-size organisations</span></td>
+            <td data-label="Team size">51 to 150 people</td>
+            <td data-label="What changes">Everything in Team, plus priority support and a full CSR Impact Report at season end.</td>
+            <td data-label="Annual price" class="tt-priced"><span class="tt-price">$799<span>/yr</span></span><span class="tt-per">~$5&ndash;$16 per person</span></td>
+          </tr>
+          <tr>
+            <td data-label="Tier" class="tt-tier"><span class="tt-name">Organisation</span><span class="tt-sub">Large organisations</span></td>
+            <td data-label="Team size">151 to 500 people</td>
+            <td data-label="What changes">Everything in Workplace, plus a dedicated account manager and priority onboarding support.</td>
+            <td data-label="Annual price" class="tt-priced"><span class="tt-price">$1,299<span>/yr</span></span><span class="tt-per">~$3&ndash;$9 per person</span></td>
+          </tr>
+          <tr>
+            <td data-label="Tier" class="tt-tier"><span class="tt-name">Enterprise+</span><span class="tt-sub">Large enterprise</span></td>
+            <td data-label="Team size">501 to 2,499 people</td>
+            <td data-label="What changes">Full bespoke configuration. Multi-league setup, API access, flexible payment terms.</td>
+            <td data-label="Annual price" class="tt-priced"><span class="tt-price">$1,999<span>/yr</span></span><span class="tt-per">from ~$1 per person</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="pricing-footnote reveal">Founding Partner pricing closes December 31 &mdash; locked for good after that. <a href="/#founding">Learn more.</a></p>
+  </div>
+</section>
+
+<!-- EVERY PLAN — feature v2 -->
+<section class="section on-paper">
+  <div class="wrap">
+    <p class="eyebrow reveal">Every plan</p>
+    <h2 class="section-heading reveal">The full platform. No feature gates.</h2>
+    <p class="section-sub reveal">The same product whether you're twelve people or twelve hundred. You're paying for size, not features.</p>
+    <div class="feature-grid2 reveal">
+      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-flag"/></svg></div><h3>Your codes, all year</h3><p>AFL, AFLW, NRL, NRLW. Run one, run both. Women's comps come with the men's, same price.</p></div>
+      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-vote"/></svg></div><h3>Charity Vote</h3><p>Your group nominates and votes on where the season's money goes. Majority wins.</p></div>
+      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-trophy"/></svg></div><h3>Live ladder &amp; the Wall</h3><p>Round-by-round ladder, the running charity tally, and the social feed that keeps people coming back.</p></div>
+      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-bell"/></svg></div><h3>Round reminders</h3><p>Automated nudges before each round close, on email and the Wall, until your people are in.</p></div>
+      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-users"/></svg></div><h3>Captain &amp; Manager roles</h3><p>Clear ownership for setup and season energy, built in from the start.</p></div>
+      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-doc"/></svg></div><h3>Impact Report</h3><p>A clean, branded season summary your board and ESG team will actually use.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- TRANSPARENCY — animated flow -->
+<section class="section on-dark">
+  <div class="wrap">
+    <p class="eyebrow reveal">Transparency</p>
+    <h2 class="section-heading reveal">Three separate money flows. <em>Watch where it goes.</em></h2>
+    <p class="section-sub reveal">Only one of these stays with us &mdash; tap any step to hold it and read.</p>
+    <div class="flow-seq reveal">
+      <div class="flow-step c1"><div class="fs-illus"><svg><use href="#ic-spark"/></svg></div><div class="fs-body"><span class="fs-num">1</span><h4>Platform subscription</h4><p class="fs-lead">The flat annual fee, by team size.</p><div class="fs-detail"><p>This is the only money GoodTip keeps. It runs the platform &mdash; the ladder, the Wall, reminders, reporting. Nothing else is ours.</p></div></div></div>
+      <div class="flow-arrow"><svg class="cic" width="26" height="26"><use href="#ic-arrow"/></svg></div>
+      <div class="flow-step c2"><div class="fs-illus"><svg><use href="#ic-coins"/></svg></div><div class="fs-body"><span class="fs-num">2</span><h4>Base donation pledge</h4><p class="fs-lead">Your organisation's committed donation for the season.</p><div class="fs-detail"><p>Goes straight to the charity your group voted for. Paid however suits you &mdash; upfront, monthly, or at season close.</p></div></div></div>
+      <div class="flow-arrow"><svg class="cic" width="26" height="26"><use href="#ic-arrow"/></svg></div>
+      <div class="flow-step c3"><div class="fs-illus"><svg><use href="#ic-match"/></svg></div><div class="fs-body"><span class="fs-num">3</span><h4>Top-ups &amp; matching</h4><p class="fs-lead">Voluntary participant top-ups, matched by your organisation.</p><div class="fs-detail"><p>Every cent goes to the charity. The total on the ladder is exactly what the charity receives &mdash; we never touch it.</p></div></div></div>
+    </div>
+    <div class="flow-progress"><i class="on"></i><i></i><i></i></div>
+    <p class="flow-hint">The base pledge, top-ups and match all go directly to the charity. The subscription is the only thing we keep.</p>
+  </div>
+</section>
+
+<!-- ENTERPRISE / TALK TO US -->
+<section class="section on-cream" id="enterprise">
+  <div class="wrap">
+    <div class="fp-inner" style="grid-template-columns:1.3fr 1fr;">
+      <div class="reveal from-left">
+        <p class="eyebrow">Enterprise</p>
+        <h2 class="section-heading">2,500 people or more? Let's build it properly.</h2>
+        <p class="section-sub" style="margin-bottom:0;">For large enterprises and multi-site organisations, we build a bespoke rollout &mdash; white-label, dedicated account management, and reporting that maps to your CSR framework. Tell us the shape of it and we'll price it for you.</p>
+      </div>
+      <div class="reveal from-right" style="display:flex;flex-direction:column;gap:12px;align-items:flex-start;">
+        <a class="email-cta" href="mailto:hello@goodtip.com.au" style="background:var(--cream-2);border-color:rgba(15,46,34,.12);">
+          <span class="ec-ic"><svg><use href="#ic-mail"/></svg></span>
+          <span class="ec-txt"><small style="color:var(--forest);">Email our team</small><b style="color:var(--ink);">hello@goodtip.com.au</b></span>
+        </a>
+        <a href="/#start" class="btn-primary">Talk to us &rarr;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ v2 -->
+<section class="section on-paper">
+  <div class="wrap faq-grid">
+    <div class="faq-aside reveal from-left">
+      <p class="eyebrow">FAQ</p>
+      <h2 class="section-heading">Pricing, answered.</h2>
+      <p class="section-sub" style="margin-bottom:0;">The questions we get most about plans and money.</p>
+    </div>
+    <div class="reveal">
+      <div class="faq-item" data-open="true"><button class="faq-q"><span><span class="qn">01</span> Can we choose which sports we tip?</span><span class="qx"></span></button><div class="faq-a">Yes. Run AFL only, NRL only, or both. Women's competitions aren't optional &mdash; AFLW comes with AFL, NRLW comes with NRL. The price is the same either way. Women's sport is structural, not decorative.</div></div>
+      <div class="faq-item"><button class="faq-q"><span><span class="qn">02</span> What counts toward our team size?</span><span class="qx"></span></button><div class="faq-a">Active tippers in your comp. You can invite more than your tier allows during setup; you only move up a tier if you exceed the cap when the season locks.</div></div>
+      <div class="faq-item"><button class="faq-q"><span><span class="qn">03</span> When do we pay?</span><span class="qx"></span></button><div class="faq-a">When you launch. Set up the group, run the Charity Vote and invite your people for free. The subscription is charged when the first round of tips locks in.</div></div>
+      <div class="faq-item"><button class="faq-q"><span><span class="qn">04</span> Is the donation included in the price?</span><span class="qx"></span></button><div class="faq-a">No. The subscription only pays for the platform. The donation &mdash; base pledge, top-ups and match &mdash; is separate and goes entirely to your chosen charity.</div></div>
+      <div class="faq-item"><button class="faq-q"><span><span class="qn">05</span> What's Founding Partner pricing?</span><span class="qx"></span></button><div class="faq-a">Lock your current rate permanently if you join before December 31, 2026, plus first access to new sports and features in 2027. After the window, standard rates apply.</div></div>
+    </div>
+  </div>
+</section>
+
+{% include "public/partials/_contact.html" with contact_id="contact" contact_heading="Questions on pricing? Talk to us." %}
+
+<!-- CTA -->
+<section class="cta-pro">
+  <div class="wrap reveal zoom">
+    <h2>In before the finals. In for life.</h2>
+    <p>Founding Partners lock pricing for good and get first access to everything we ship next. The window closes December 31, 2026 &mdash; no late extensions.</p>
+    <a href="/#start" class="btn-dark">Set up your group &rarr;</a>
+  </div>
+</section>
+
+{% endblock %}

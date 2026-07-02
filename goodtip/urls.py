@@ -10,7 +10,27 @@ from orgs.views import join_view
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("", TemplateView.as_view(template_name="landing.html"), name="landing"),
+    # Public marketing pages (no login required)
+    path("", TemplateView.as_view(
+        template_name="public/home.html",
+        extra_context={"active": "home"},
+    ), name="landing"),
+    path("how-it-works/", TemplateView.as_view(
+        template_name="public/how_it_works.html",
+        extra_context={"active": "how"},
+    ), name="how_it_works"),
+    path("wall/", TemplateView.as_view(
+        template_name="public/wall.html",
+        extra_context={"active": "wall"},
+    ), name="wall"),
+    path("leaderboard/", TemplateView.as_view(
+        template_name="public/leaderboard.html",
+        extra_context={"active": "leaderboard"},
+    ), name="good_list"),
+    path("pricing/", TemplateView.as_view(
+        template_name="public/pricing.html",
+        extra_context={"active": "pricing"},
+    ), name="pricing"),
     path("dashboard/", dashboard_view, name="dashboard"),
     path("", include("accounts.urls", namespace="accounts")),
     path("password-reset/", auth_views.PasswordResetView.as_view(

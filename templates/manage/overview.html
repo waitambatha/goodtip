@@ -1,39 +1,21 @@
-{% extends "manage/_base.html" %}
-{% block manage_content %}
-<div class="section-header">
-  <div>
-    <span class="t-micro text-tertiary">Admin / Overview</span>
-    <h1 class="t-h1 mt-2">Platform overview</h1>
-  </div>
+{% extends "admin_base.html" %}
+{% block title %}Overview — Manage{% endblock %}
+{% block nav_overview %}on{% endblock %}
+{% block admin_content %}
+<h1 class="admin-h1" style="margin-bottom:18px;">Overview</h1>
+<div class="tiles" style="margin-bottom:24px;">
+  <div class="tile"><div class="t-num">{{ org_count }}</div><div class="t-lab">Orgs</div></div>
+  <div class="tile"><div class="t-num">{{ round_count }}</div><div class="t-lab">Rounds</div></div>
+  <div class="tile"><div class="t-num">{{ match_count }}</div><div class="t-lab">Matches</div></div>
+  <div class="tile"><div class="t-num">{{ tip_count }}</div><div class="t-lab">Tips</div></div>
 </div>
-
-<div class="grid-3 mb-8">
-  {% include "components/_stat_card.html" with label="Orgs" value=org_count accent=True icon="users" %}
-  {% include "components/_stat_card.html" with label="Rounds" value=round_count icon="calendar" %}
-  {% include "components/_stat_card.html" with label="Matches" value=match_count icon="swords" %}
-  {% include "components/_stat_card.html" with label="Tips" value=tip_count icon="list-checks" %}
-</div>
-
-<h2 class="t-h3 mb-4 text-tertiary">Recent orgs</h2>
-<div class="table-card">
-  <table>
-    <thead><tr><th>Name</th><th>Sport</th><th>Season</th><th>Charity</th><th></th></tr></thead>
-    <tbody>
-      {% for o in recent_orgs %}
-        <tr>
-          <td><strong>{{ o.name }}</strong></td>
-          <td><span class="pill pill-mono">{{ o.sport_label }}</span></td>
-          <td class="num">{{ o.season }}</td>
-          <td class="text-tertiary">{{ o.charity_name }}</td>
-          <td class="text-right">
-            <a href="{% url 'manage:org_rounds' o.id %}" class="btn-ghost btn-sm"><i data-lucide="calendar" class="icon-sm"></i> Rounds</a>
-            <a href="{% url 'manage:org_members' o.id %}" class="btn-ghost btn-sm"><i data-lucide="users" class="icon-sm"></i> Members</a>
-          </td>
-        </tr>
-      {% empty %}
-        <tr><td colspan="5" class="text-center text-tertiary" style="padding:32px">No orgs yet — create one in the Orgs tab.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="card"><div class="card-h" style="margin-bottom:10px;">Recent orgs</div>
+  <table class="atable compact"><thead><tr><th>Org</th><th>Sport</th><th>Charity</th><th style="text-align:right;">Created</th></tr></thead><tbody>
+  {% for o in recent_orgs %}
+    <tr><td><a href="{% url 'manage:org_rounds' o.id %}" style="color:var(--forest);font-weight:700;">{{ o.name }}</a></td><td>{{ o.sport_label }}</td><td>{{ o.charity_name }}</td><td style="text-align:right;color:var(--muted);">{{ o.created_at|date:"j M Y" }}</td></tr>
+  {% empty %}
+    <tr><td colspan="4" style="text-align:center;color:var(--muted);">No orgs yet — create one in the Orgs tab.</td></tr>
+  {% endfor %}
+  </tbody></table>
 </div>
 {% endblock %}

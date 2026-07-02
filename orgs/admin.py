@@ -17,8 +17,13 @@ class OrgMemberInline(admin.TabularInline):
 
 @admin.register(Organisation)
 class OrganisationAdmin(admin.ModelAdmin):
-    list_display = ("name", "season", "charity", "created_at")
-    list_filter = ("season", "sports")
+    list_display = (
+        "name", "group_type", "state", "industry",
+        "is_public_listed", "season", "charity", "created_at",
+    )
+    list_filter = ("group_type", "state", "industry", "is_public_listed", "season", "competitions")
+    list_editable = ("is_public_listed",)
+    readonly_fields = ("public_consent_at", "public_consent_by", "public_consent_reconfirmed")
     search_fields = ("name",)
     inlines = [OrgMemberInline]
 

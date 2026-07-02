@@ -80,6 +80,39 @@ def create_checkout_session(sub: PlanSubscription, *, success_url: str, cancel_u
     return session
 
 
+def create_donation_checkout_session(pledge, participant, amount, *, success_url: str, cancel_url: str):
+    """Create a Stripe Checkout session for a participant top-up.
+
+    The top-up is only recorded once the webhook confirms payment, so the amount
+    and identifiers travel in the session metadata.
+    """
+    client = _client()
+    charity_name = pledge.charity.name if pledge.charity_id else "the charity"
+    session = client.checkout.Session.create(
+        mode="payment",
+        line_items=[{
+            "quantity": 1,
+            "price_data": {
+                "currency": "aud",
+                "unit_amount": int(amount * 100),
+                "product_data": {
+                    "name": f"Donation to {charity_name}",
+                    "description": f"Your top-up via {pledge.org.name}",
+                },
+            },
+        }],
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata={
+            "kind": "donation",
+            "pledge_id": str(pledge.id),
+            "participant_id": str(participant.id),
+            "amount": str(amount),
+        },
+    )
+    return session
+
+
 def mark_paid(sub: PlanSubscription, *, payment_intent_id: str = "") -> PlanSubscription:
     """Activate a subscription once payment is confirmed (idempotent)."""
     if sub.status == PlanSubscription.STATUS_ACTIVE:

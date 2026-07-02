@@ -7,10 +7,38 @@ User = get_user_model()
 
 
 class SignupForm(forms.Form):
-    display_name = forms.CharField(max_length=100)
-    email = forms.EmailField()
-    password1 = forms.CharField(widget=forms.PasswordInput, label="Password")
-    password2 = forms.CharField(widget=forms.PasswordInput, label="Confirm password")
+    display_name = forms.CharField(
+        max_length=100,
+        label="Your name",
+        widget=forms.TextInput(attrs={
+            "placeholder": "Jordan Smith",
+            "autocomplete": "name",
+            "autofocus": True,
+        }),
+    )
+    email = forms.EmailField(
+        label="Work email",
+        widget=forms.EmailInput(attrs={
+            "placeholder": "you@company.com.au",
+            "autocomplete": "email",
+        }),
+    )
+    password1 = forms.CharField(
+        label="Password",
+        widget=forms.PasswordInput(attrs={
+            "placeholder": "Create a password",
+            "autocomplete": "new-password",
+            "data-pw-strength": "",
+        }),
+    )
+    password2 = forms.CharField(
+        label="Confirm password",
+        widget=forms.PasswordInput(attrs={
+            "placeholder": "Re-enter your password",
+            "autocomplete": "new-password",
+            "data-pw-match": "id_password1",
+        }),
+    )
 
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()
@@ -40,8 +68,21 @@ class SignupForm(forms.Form):
 
 
 class LoginForm(forms.Form):
-    email = forms.EmailField()
-    password = forms.CharField(widget=forms.PasswordInput)
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(attrs={
+            "placeholder": "you@company.com.au",
+            "autocomplete": "email",
+            "autofocus": True,
+        }),
+    )
+    password = forms.CharField(
+        label="Password",
+        widget=forms.PasswordInput(attrs={
+            "placeholder": "Your password",
+            "autocomplete": "current-password",
+        }),
+    )
 
 
 class ProfileForm(forms.ModelForm):

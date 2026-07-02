@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from catalog.models import Charity, Competition, Season, Sport
+from catalog.models import Charity, Competition, Season, Series
 from data_sync.services import get_sync_service, SyncError
 from orgs.forms import _unique_charity_slug
 from orgs.models import OrgMember, Organisation
@@ -14,8 +14,8 @@ from tipping.models import Match, Round, Team, Tip
 from tipping.services import record_match_result
 
 
-# Map the org-creation form's sport value to one or more catalog Sport names.
-SPORT_FORM_MAP = {"AFL": ["AFL"], "NRL": ["NRL"], "BOTH": ["AFL", "NRL"]}
+# Map the org-creation form's value to one or more Competition slugs.
+COMP_FORM_MAP = {"AFL": ["afl"], "NRL": ["nrl"], "BOTH": ["afl", "nrl"]}
 
 
 @staff_member_required
@@ -53,8 +53,8 @@ def orgs_list(request):
             season=season,
             charity=charity,
         )
-        sport_names = SPORT_FORM_MAP.get(request.POST["sport"], [])
-        org.sports.set(Sport.objects.filter(name__in=sport_names))
+        comp_slugs = COMP_FORM_MAP.get(request.POST["sport"], [])
+        org.competitions.set(Competition.objects.filter(slug__in=comp_slugs, season=season))
         messages.success(request, "Org created.")
         return redirect("manage:orgs_list")
     orgs = Organisation.objects.order_by("-created_at")
@@ -67,10 +67,13 @@ def org_rounds(request, org_id: int):
     if request.method == "POST":
         action = request.POST.get("action", "create")
         if action == "create":
+            series = get_object_or_404(Series, pk=int(request.POST["series"]))
             Round.objects.create(
                 org=org,
                 round_number=int(request.POST["round_number"]),
-                competition=get_object_or_404(Competition, pk=int(request.POST["competition"])),
+                series=series,
+                competition=Competition.for_series(series, org.season),
+                stage=request.POST.get("stage", Round.STAGE_REGULAR),
                 lockout_at=request.POST["lockout_at"],
                 status=request.POST.get("status", "upcoming"),
             )
@@ -112,8 +115,8 @@ def round_matches(request, org_id: int, round_id: int):
             messages.success(request, f"Result saved. {n} tip(s) graded.")
         return redirect("manage:round_matches", org_id=org.id, round_id=round_obj.id)
     matches = round_obj.matches.select_related("home_team", "away_team").order_by("kickoff_at")
-    # Teams from any competition under the same sport (e.g. an AFL round can draw on AFL + AFLW).
-    teams = Team.objects.filter(competition__sport=round_obj.competition.sport).select_related("competition")
+    # Teams from any series under the same sport (e.g. an AFL round can draw on AFL + AFLW).
+    teams = Team.objects.filter(series__sport=round_obj.series.sport).select_related("series")
     return render(request, "manage/round_matches.html", {
         "org": org, "round": round_obj, "matches": matches, "teams": teams,
     })

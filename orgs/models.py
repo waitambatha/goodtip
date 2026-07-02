@@ -1,10 +1,43 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Organisation(models.Model):
     name = models.CharField(max_length=200)
-    sports = models.ManyToManyField("catalog.Sport", related_name="organisations", blank=True)
+    # A league is either a workplace team or a volunteer-run community group.
+    # The Good List keeps the two apart so clubs don't rank against corporate
+    # budgets (spec §8). Lookup FKs keep the DB normalised.
+    group_type = models.ForeignKey(
+        "catalog.GroupType", on_delete=models.PROTECT,
+        related_name="organisations", null=True, blank=True,
+    )
+    # Location + sector power the Good List's "By State" / "By Industry"
+    # aggregates. Both optional — a league can rank nationally without them.
+    state = models.ForeignKey(
+        "catalog.State", on_delete=models.SET_NULL,
+        related_name="organisations", null=True, blank=True,
+    )
+    industry = models.ForeignKey(
+        "catalog.Industry", on_delete=models.SET_NULL,
+        related_name="organisations", null=True, blank=True,
+    )
+    # --- Public Good List consent (spec §4) ---
+    # The manager opts in to public display of THIS group's name + total.
+    # Default OFF; opt-in only; revocable. Never gates the private in-app board.
+    is_public_listed = models.BooleanField(default=False)
+    public_consent_at = models.DateTimeField(null=True, blank=True)
+    public_consent_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name="public_consents_given", null=True, blank=True,
+    )
+    # §5.5 — consent given at signup is consent at zero. Once the group has a
+    # real total, we re-ask; this records that the re-confirm has been handled.
+    public_consent_reconfirmed = models.BooleanField(default=False)
+    # A league joins one or more Competitions (the deck's "what orgs join & tip
+    # on" level), e.g. "NRL (2026)". Each Competition bundles its men's, women's
+    # and representative Series into one leaderboard.
+    competitions = models.ManyToManyField("catalog.Competition", related_name="organisations", blank=True)
     season = models.ForeignKey("catalog.Season", on_delete=models.PROTECT, related_name="organisations")
     charity = models.ForeignKey(
         "catalog.Charity",
@@ -47,16 +80,39 @@ class Organisation(models.Model):
         return self.charity.website if self.charity_id else ""
 
     @property
+    def competition_label(self) -> str:
+        """Human-readable list of the org's competitions, e.g. 'AFL' or 'AFL + NRL'."""
+        return " + ".join(c.name for c in self.competitions.all()) or "—"
+
+    # Backwards-compatible alias — older templates/exports call sport_label.
+    @property
     def sport_label(self) -> str:
-        """Human-readable list of the org's sports, e.g. 'AFL' or 'AFL + NRL'."""
-        return " + ".join(s.name for s in self.sports.all()) or "—"
+        return self.competition_label
 
     @property
-    def available_competitions(self):
-        """Competitions selectable for this org, based on its sports."""
-        from catalog.models import Competition
+    def available_series(self):
+        """Series tipped in this org, drawn from its competitions (e.g. joining
+        NRL exposes NRL, NRLW and State of Origin)."""
+        from catalog.models import Series
 
-        return Competition.objects.filter(sport__in=self.sports.all())
+        return Series.objects.filter(competitions__organisations=self).distinct()
+
+    def set_public_consent(self, *, granted: bool, by_user=None):
+        """Opt this group in/out of public naming on the Good List (spec §4).
+
+        Records who consented and when. Revoking pulls the group from the public
+        board immediately but never touches its private in-app standing.
+        """
+        self.is_public_listed = granted
+        if granted:
+            self.public_consent_at = timezone.now()
+            self.public_consent_by = by_user
+            # An explicit choice with a total in hand also settles the §5.5 re-ask.
+            self.public_consent_reconfirmed = True
+        self.save(update_fields=[
+            "is_public_listed", "public_consent_at",
+            "public_consent_by", "public_consent_reconfirmed",
+        ])
 
 
 class OrgMember(models.Model):
@@ -170,3 +226,37 @@ class CharityVoteBallot(models.Model):
 
     def __str__(self):
         return f"{self.user} → {self.option.charity.name}"
+
+
+class OrgCharitySelection(models.Model):
+    """Append-only history of which charity an org backed, and from when.
+
+    ``Organisation.charity`` holds the *current* choice as a convenience cache;
+    this table is the historical record. Because a league can change its charity
+    over time — a different cause next season, or a re-run vote — donations and
+    reports can always be traced to the charity that was active at the time
+    rather than whatever the org points at now.
+    """
+
+    SOURCE_INITIAL = "initial"
+    SOURCE_VOTE = "vote"
+    SOURCE_MANUAL = "manual"
+    SOURCE_CHOICES = [
+        (SOURCE_INITIAL, "Set at league creation"),
+        (SOURCE_VOTE, "Won the charity vote"),
+        (SOURCE_MANUAL, "Changed manually"),
+    ]
+
+    org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name="charity_selections")
+    # Denormalised from org.season so the timeline is queryable by season directly.
+    season = models.ForeignKey("catalog.Season", on_delete=models.PROTECT, related_name="charity_selections")
+    charity = models.ForeignKey("catalog.Charity", on_delete=models.PROTECT, related_name="selections")
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=SOURCE_MANUAL)
+    effective_from = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-effective_from", "-id"]
+
+    def __str__(self):
+        return f"{self.org.name} → {self.charity.name} ({self.season}, {self.source})"

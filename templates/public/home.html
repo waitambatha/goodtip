@@ -1,0 +1,314 @@
+{% extends "public/base.html" %}
+{% load static %}
+
+{% block title %}GoodTip — Footy Tipping, For Good.{% endblock %}
+{% block body_class %}page-home{% endblock %}
+
+{% block content %}
+
+<!-- HERO (full crossfading image) -->
+<section class="hero has-shots">
+  <div class="hero-bg" aria-hidden="true">
+    <div class="shot active" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+  </div>
+  <div class="hero-veil" aria-hidden="true"></div>
+  <span class="pill"><span class="dot"></span>Finals start August 28 &middot; Are you in?</span>
+  <h1>Footy tipping <em>that does good.</em></h1>
+  <p class="hero-sub">Your team tips the games. The entry fees go to charity. Your group picks which one.</p>
+  <div class="hero-ctas">
+    <a href="/how-it-works/" class="btn-ghost">How it works</a>
+    <a href="/#start" class="btn-primary">Set up your group &rarr;</a>
+  </div>
+  <p class="cta-subtext">Set up your group. Pay when you launch.</p>
+
+  <div class="scoreboard" id="scoreboard" role="group" aria-label="GoodTip at a glance">
+    <div class="sb-cell">
+      <div class="sb-ring" data-ring>
+        <svg viewBox="0 0 86 86"><circle class="track" cx="43" cy="43" r="36"/><circle class="bar" cx="43" cy="43" r="36"/></svg>
+        <span class="pct" data-countto="100" data-suffix="%">0%</span>
+      </div>
+      <div class="sb-label">of entry fees to charity</div>
+    </div>
+    <div class="sb-cell">
+      <div class="sb-num" data-countto="23" data-suffix="+">0</div>
+      <div class="sb-pips" data-pips="9"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="sb-label">rounds a season</div>
+    </div>
+    <div class="sb-cell">
+      <div class="sb-num" data-countto="4">0</div>
+      <div class="sb-chips" data-chips><span class="sb-chip">AFL</span><span class="sb-chip">AFLW</span><span class="sb-chip">NRL</span><span class="sb-chip">NRLW</span></div>
+      <div class="sb-label">codes, every season</div>
+    </div>
+  </div>
+</section>
+
+<!-- LADDER SIGNATURE -->
+<section class="ladder-band">
+  <div class="wrap reveal" style="margin-bottom:32px;">
+    <p class="eyebrow" style="color:var(--lime);opacity:.8;">Live this season</p>
+    <h2 class="section-heading" style="color:var(--white);">The ladder still runs. The total just goes somewhere good.</h2>
+  </div>
+  <div class="ladder-shell reveal">
+    <div class="ladder" aria-label="Sample group ladder">
+      <div class="ladder-head"><span class="label">Group ladder &middot; Round 14</span><span class="round">Top of the table</span></div>
+      <div class="ladder-row top"><span class="rank">1</span><span class="who">Sharon from Accounts<small>Tipped 11/12 last round</small></span><span class="form"><i class="w"></i><i class="w"></i><i class="w"></i><i></i><i class="w"></i></span><span class="pts">128</span></div>
+      <div class="ladder-row"><span class="rank">2</span><span class="who">Big Dave<small>Origin bonus locked in</small></span><span class="form"><i class="w"></i><i></i><i class="w"></i><i class="w"></i><i class="w"></i></span><span class="pts">124</span></div>
+      <div class="ladder-row"><span class="rank">3</span><span class="who">The Quiet One in Legal<small>Quietly cooking</small></span><span class="form"><i class="w"></i><i class="w"></i><i></i><i class="w"></i><i></i></span><span class="pts">119</span></div>
+      <div class="ladder-row"><span class="rank">4</span><span class="who">Mardi &amp; the Mailroom<small>One good week away</small></span><span class="form"><i></i><i class="w"></i><i class="w"></i><i></i><i class="w"></i></span><span class="pts">112</span></div>
+    </div>
+    <div class="tally">
+      <p class="eyebrow">Raised so far &middot; this group</p>
+      <div class="tally-num" data-countto="8420" data-prefix="$">$0</div>
+      <p class="tally-cap">Base pledge + voluntary top-ups + the company match. Every dollar here lands with the charity your group voted for &mdash; nothing skimmed.</p>
+      <div class="tally-bar"><i data-pct="68"></i></div>
+      <div class="tally-meta"><span>68% to season goal</span><span>Goal $12,500</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON -->
+<section class="section on-cream">
+  <div class="wrap">
+    <h2 class="section-heading reveal">Every other tipping comp ends the same way.</h2>
+    <p class="section-sub reveal">Someone wins the money. Everyone else waits until next year. With GoodTip, the money never sits in a prize pool &mdash; it goes to the charity your group voted for before the season started.</p>
+    <div class="compare-frame reveal">
+      <div class="compare-col col-them">
+        <div class="compare-header"><div class="lab">Right now</div><h3>Your current footy tipping</h3></div>
+        <div class="compare-cell"><span class="cell-icon icon-no">&times;</span>Entry fee goes to the winner</div>
+        <div class="compare-cell"><span class="cell-icon icon-no">&times;</span>Zero ESG or CSR value</div>
+        <div class="compare-cell"><span class="cell-icon icon-no">&times;</span>Nothing to show for it</div>
+        <div class="compare-cell"><span class="cell-icon icon-no">&times;</span>No engagement data</div>
+        <div class="compare-cell"><span class="cell-icon icon-no">&times;</span>Season ends, nothing lasts</div>
+      </div>
+      <div class="compare-col col-us">
+        <div class="compare-header"><div class="lab">With GoodTip</div><h3>Same comp. Better outcome.</h3></div>
+        <div class="compare-cell"><span class="cell-icon icon-yes">&check;</span>Entry fee goes to the charity the group chose</div>
+        <div class="compare-cell"><span class="cell-icon icon-yes">&check;</span>Measurable impact, reportable</div>
+        <div class="compare-cell"><span class="cell-icon icon-yes">&check;</span>Impact Report at season end</div>
+        <div class="compare-cell"><span class="cell-icon icon-yes">&check;</span>Participation data every round</div>
+        <div class="compare-cell"><span class="cell-icon icon-yes">&check;</span>A community story worth telling</div>
+      </div>
+    </div>
+    <div class="compare-callout reveal"><span class="mark">&ldquo;</span><p>Your group still tips every round. The leaderboard still runs. The result on Saturday still matters. The only difference: when the season ends, the entry fees go to the charity they voted for at the start. <strong>Same ritual. The money just goes somewhere good.</strong></p></div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS (3 steps) -->
+<section class="section on-paper" id="how">
+  <div class="wrap">
+    <p class="eyebrow reveal">How it works</p>
+    <h2 class="section-heading reveal">Same game. Different stakes.</h2>
+    <p class="section-sub reveal">Three steps. One season. A donation your group made together &mdash; without anyone having to organise a fundraiser.</p>
+    <div class="step-flow reveal">
+      <div class="step s1"><span class="step-num">Step 01</span><div class="step-icon"><svg class="cic" style="stroke:#0F2E22"><use href="#ic-users"/></svg></div><h3>Set up your group. Run the Charity Vote.</h3><p>Name it. Invite your team. Set the entry fee. No payment until you're ready to go. While your group fills, run the Charity Vote.</p></div>
+      <div class="flow-conn" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></div>
+      <div class="step s2"><span class="step-num">Step 02</span><div class="step-icon"><svg class="cic" style="stroke:#0F2E22"><use href="#ic-clock"/></svg></div><h3>Tip and track.</h3><p>AFL. AFLW. NRL. NRLW. Weekly tips. Live leaderboard. Running charity total. State of Origin tips worth four points. Finals worth two.</p></div>
+      <div class="flow-conn" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></div>
+      <div class="step s3"><span class="step-num">Step 03</span><div class="step-icon"><svg class="cic" style="stroke:#0F2E22"><use href="#ic-trophy"/></svg></div><h3>Season done well.</h3><p>Last grand final done. Impact Report goes out. Total raised. Charity named. Tipping results. Season done well.</p></div>
+    </div>
+    <p class="note mt-m reveal"><a href="/how-it-works/">See the full breakdown &rarr;</a></p>
+  </div>
+</section>
+
+<!-- WHO IT'S FOR -->
+<section class="section on-cream">
+  <div class="wrap">
+    <p class="eyebrow reveal">Who it's for</p>
+    <h2 class="section-heading reveal">Your community already tips. Now it does something with it.</h2>
+    <p class="section-sub reveal">Tipping comps are the best community engagement tool in Australian sport. GoodTip keeps all of that and adds one thing: somewhere worth going when the season ends.</p>
+    <div class="grid-3 reveal">
+      <div class="for-card"><span class="for-tag">Workplaces</span><h3>A culture tool your team actually enjoys.</h3><p>Your team tips every round. The entry fees go to a charity they voted for. At season end you get an Impact Report with a real number your board can cite. It sits in culture budgets. It belongs in ESG reporting. And people actually look forward to it.</p><a href="/#start" class="for-link">Get started &rarr;</a></div>
+      <div class="for-card"><span class="for-tag">Sporting clubs</span><h3>Run a season-long comp for members.</h3><p>Your members already tip. GoodTip gives it somewhere to land. Entry fees go to the cause your club votes for. The leaderboard runs all season. The money is real at the end of it.</p><a href="/#start" class="for-link">Get started &rarr;</a></div>
+      <div class="for-card"><span class="for-tag">Community groups</span><h3>Bring people together around the footy.</h3><p>Tipping already happens. GoodTip makes it count. Your community votes for the charity, tips the games, and raises real money for a cause they chose themselves. Something worth coming back for every round.</p><a href="/#start" class="for-link">Get in touch &rarr;</a></div>
+    </div>
+  </div>
+</section>
+
+<!-- IMAGE BAND (players) -->
+<section class="image-band">
+  <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')" aria-hidden="true"></div>
+  <div class="veil" aria-hidden="true"></div>
+  <div class="wrap reveal from-left">
+    <p class="eyebrow" style="color:var(--lime);">Women's sport included, always</p>
+    <blockquote>AFLW comes with AFL. NRLW comes with NRL. Same price, same season.</blockquote>
+    <p class="src">Sydney Roosters NRLW &middot; Allianz Stadium</p>
+  </div>
+</section>
+
+<!-- QUOTE BREAK -->
+<div class="quote-break reveal">
+  <blockquote>Your group picks the charity. <em>Then tips for it all season.</em></blockquote>
+  <p class="quote-attr">That's the bit that changes everything.</p>
+</div>
+
+<!-- THE WALL TEASER -->
+<section class="section wall-stage">
+  <div class="wrap">
+    <p class="eyebrow reveal">New for 2026 &middot; The Wall</p>
+    <h2 class="section-heading reveal">The banter is half the reason people tip. <em>Now it has a home.</em></h2>
+    <p class="section-sub reveal">Every round, the Wall is where the group lives: tips, sledges, the leaderboard shuffle, and the charity total ticking up in real time. It's the bit ESPN FootyTips never built &mdash; and the reason your group keeps showing up.</p>
+    <div class="reveal" style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;max-width:920px;">
+      <div class="post" style="margin-top:0;">
+        <div class="post-head"><span class="av">BD</span><span class="meta"><b>Big Dave</b><small>Round 14 &middot; 2h ago</small></span><span class="tag">Top tipper</span></div>
+        <p class="post-body">Backing the <span class="pick">&#9733; Pies</span> by 30+. If I'm wrong I'll match the room's top-ups myself.</p>
+        <div class="post-foot"><span class="react" data-on="false">&#128293; <span class="c">14</span></span><span class="react" data-on="false">&#128514; <span class="c">8</span></span><span class="react" data-on="false">Reply</span></div>
+      </div>
+      <div class="post" style="margin-top:0;">
+        <div class="post-head"><span class="av" style="background:rgba(200,241,53,.15);">GT</span><span class="meta"><b>GoodTip</b><small>Auto &middot; Round 14 close</small></span><span class="tag sys">Tally</span></div>
+        <p class="post-body">Round 14 locked. The room added <strong style="color:var(--lime);">$220</strong> in top-ups &mdash; the company match made it <strong style="color:var(--lime);">$440</strong>. headspace total now <strong style="color:var(--lime);">$8,420</strong>.</p>
+        <div class="post-foot"><span class="react" data-on="true">&#10084; <span class="c">31</span></span><span class="react" data-on="false">&#127881; <span class="c">12</span></span></div>
+      </div>
+    </div>
+    <p class="mt-m reveal"><a href="/wall/" class="btn-ghost">See the Wall &rarr;</a></p>
+  </div>
+</section>
+
+<!-- AMBASSADORS (alternating carousel) -->
+<section class="section on-paper">
+  <div class="wrap">
+    <p class="eyebrow reveal">Ambassadors</p>
+    <h2 class="section-heading reveal">People who get it.</h2>
+    <p class="section-sub reveal">People who've led teams, built cultures, and know what it takes to make a group show up for something bigger than the scoreboard.</p>
+
+    <div class="amb-carousel reveal" aria-roledescription="carousel">
+      <div class="amb-stage">
+        <div class="amb-slide on">
+          <div class="amb-portrait"><img src="{% static 'img/nick-maxwell.jpg' %}" alt="Nick Maxwell"><span class="pbadge">Ambassador</span></div>
+          <div class="amb-quote"><div class="qmark">&ldquo;</div><blockquote>Same ritual the rooms have always had. Now it leaves something behind.</blockquote><div class="who">Nick Maxwell</div><div class="role">Premiership Captain</div></div>
+        </div>
+        <div class="amb-slide">
+          <div class="amb-portrait"><div class="pinitials">AFLW</div><span class="pbadge">Announcing soon</span></div>
+          <div class="amb-quote"><div class="qmark">&ldquo;</div><blockquote>The women's game deserves the same Saturday energy &mdash; and a cause behind it.</blockquote><div class="who">Announcing soon</div><div class="role">AFLW Ambassador</div></div>
+        </div>
+        <div class="amb-slide">
+          <div class="amb-portrait"><div class="pinitials">NRL</div><span class="pbadge">Announcing soon</span></div>
+          <div class="amb-quote"><div class="qmark">&ldquo;</div><blockquote>Footy brings the room together. This gives the room something to play for.</blockquote><div class="who">Announcing soon</div><div class="role">NRL &amp; NRLW Ambassador</div></div>
+        </div>
+      </div>
+      <div class="amb-controls">
+        <div class="amb-dots"><button class="amb-dot on" aria-label="Slide 1"></button><button class="amb-dot" aria-label="Slide 2"></button><button class="amb-dot" aria-label="Slide 3"></button></div>
+        <button class="amb-pausebtn">&#10073;&#10073;&nbsp; Pause</button>
+        <span class="amb-hint">Tap to pause &amp; read</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CHARITIES (icon cards) -->
+<section class="section on-cream" id="charities">
+  <div class="wrap">
+    <p class="eyebrow reveal">Charity partners</p>
+    <h2 class="section-heading reveal">Supporting the causes closest to Australian hearts.</h2>
+    <p class="section-sub reveal">Your group votes on which charity receives the season's donations. Choose from our donation pool, or pair with a hands-on activity partner for something your whole group can do together.</p>
+
+    <p class="cat-label reveal">Donation partners</p>
+    <div class="grid-4 reveal" style="margin-bottom:44px;">
+      <div class="charity-card"><div class="charity-icon"><svg><use href="#ic-lifebuoy"/></svg></div><h4>Lifeline</h4><p>Crisis support</p><span class="cgive">Funds go here &rarr;</span></div>
+      <div class="charity-card"><div class="charity-icon"><svg><use href="#ic-mind"/></svg></div><h4>headspace</h4><p>Youth mental health</p><span class="cgive">Funds go here &rarr;</span></div>
+      <div class="charity-card"><div class="charity-icon"><svg><use href="#ic-people"/></svg></div><h4>ReachOut</h4><p>Online youth wellbeing</p><span class="cgive">Funds go here &rarr;</span></div>
+      <div class="charity-card"><div class="charity-icon"><svg><use href="#ic-mustache"/></svg></div><h4>Movember</h4><p>Men's health</p><span class="cgive">Funds go here &rarr;</span></div>
+      <div class="charity-card"><div class="charity-icon"><svg><use href="#ic-flask"/></svg></div><h4>Black Dog Institute</h4><p>Mental health research</p><span class="cgive">Funds go here &rarr;</span></div>
+      <div class="charity-card"><div class="charity-icon"><svg><use href="#ic-ribbon"/></svg></div><h4>McGrath Foundation</h4><p>Breast cancer support</p><span class="cgive">Funds go here &rarr;</span></div>
+      <div class="charity-card"><div class="charity-icon"><svg><use href="#ic-cross"/></svg></div><h4>Australian Red Cross</h4><p>Humanitarian</p><span class="cgive">Funds go here &rarr;</span></div>
+      <div class="charity-card"><div class="charity-icon"><svg><use href="#ic-cap"/></svg></div><h4>The Smith Family</h4><p>Children's education</p><span class="cgive">Funds go here &rarr;</span></div>
+    </div>
+
+    <p class="cat-label reveal">Hands-on activity partners</p>
+    <div class="grid-4 reveal" style="margin-bottom:24px;">
+      <div class="charity-card"><div class="charity-icon alt"><svg><use href="#ic-bowl"/></svg></div><h4>Foodbank Australia</h4><p>Food relief</p><span class="cgive">Warehouse shifts</span></div>
+      <div class="charity-card"><div class="charity-icon alt"><svg><use href="#ic-home"/></svg></div><h4>Habitat for Humanity</h4><p>Housing</p><span class="cgive">Build days</span></div>
+      <div class="charity-card"><div class="charity-icon alt"><svg><use href="#ic-leaf"/></svg></div><h4>Clean Up Australia</h4><p>Environment</p><span class="cgive">Community clean-ups</span></div>
+      <div class="charity-card"><div class="charity-icon alt"><svg><use href="#ic-recycle"/></svg></div><h4>OzHarvest</h4><p>Food rescue</p><span class="cgive">Food rescue shifts</span></div>
+    </div>
+    <p class="note reveal">Want your charity in the pool? <a href="/#start">Get in touch.</a></p>
+  </div>
+</section>
+
+<!-- PRICING TEASER -->
+<section class="section on-paper" id="pricing">
+  <div class="wrap">
+    <p class="eyebrow reveal">Pricing</p>
+    <h2 class="section-heading reveal">One flat fee. All year. All four codes.</h2>
+    <p class="section-sub reveal">Priced by team size &mdash; nothing else. Entry to the comp is free for your people; they can donate and you can match it. The donation is the prize.</p>
+    <div class="pricing-grid reveal">
+      <div class="price-card"><div class="price-ic"><svg><use href="#ic-spark"/></svg></div><div class="price-tier">Starter</div><div class="price-size">Up to 20 people</div><div class="price-num">$99</div><div class="price-period">/year</div><div class="price-per">~$5 per person</div><p class="price-desc">The full platform &mdash; AFL, AFLW, NRL, NRLW. Charity Vote, live ladder, the Wall, email reminders.</p></div>
+      <div class="price-card featured"><div class="price-badge">Most popular</div><div class="price-ic"><svg><use href="#ic-users"/></svg></div><div class="price-tier">Team</div><div class="price-size">Up to 50 people</div><div class="price-num">$299</div><div class="price-period">/year</div><div class="price-per">~$6 per person</div><p class="price-desc">Everything in Starter, plus your group's name and logo and a round-by-round participation dashboard.</p></div>
+      <div class="price-card"><div class="price-ic"><svg><use href="#ic-doc"/></svg></div><div class="price-tier">Workplace</div><div class="price-size">Up to 150 people</div><div class="price-num">$799</div><div class="price-period">/year</div><div class="price-per">~$5 per person</div><p class="price-desc">Everything in Team, plus priority support and a full CSR Impact Report for your board and ESG team.</p></div>
+      <div class="price-card"><div class="price-ic"><svg><use href="#ic-globe"/></svg></div><div class="price-tier">Organisation</div><div class="price-size">Up to 500 people</div><div class="price-num">$1,299</div><div class="price-period">/year</div><div class="price-per">from ~$3 per person</div><p class="price-desc">White-label platform, dedicated account manager, bespoke onboarding. Make it feel entirely your own.</p></div>
+    </div>
+    <p class="pricing-footnote reveal">2,500+ people? <a href="/pricing/#enterprise">Let's talk Enterprise.</a> &middot; Founding Partner pricing closes December 31. <a href="/#founding">Learn more.</a></p>
+  </div>
+</section>
+
+<!-- HOW THE DONATION WORKS — animated flow -->
+<section class="section on-dark">
+  <div class="wrap">
+    <p class="eyebrow reveal">How the donation works</p>
+    <h2 class="section-heading reveal">Three ways the money grows. <em>Watch it flow.</em></h2>
+    <p class="section-sub reveal">It builds left to right across the season &mdash; tap any step to hold it and read.</p>
+    <div class="flow-seq reveal">
+      <div class="flow-step c1">
+        <div class="fs-illus"><svg><use href="#ic-coins"/></svg></div>
+        <div class="fs-body"><span class="fs-num">1</span><h4>Base pledge</h4><p class="fs-lead">Your organisation sets a donation amount at the start of the season.</p><div class="fs-detail"><p>Paid however suits you &mdash; upfront, monthly, or at season close. This is the floor: the number the group can already see climbing on day one.</p></div></div>
+      </div>
+      <div class="flow-arrow"><svg class="cic" width="26" height="26"><use href="#ic-arrow"/></svg></div>
+      <div class="flow-step c2">
+        <div class="fs-illus"><svg><use href="#ic-vote"/></svg></div>
+        <div class="fs-body"><span class="fs-num">2</span><h4>Participant top-ups</h4><p class="fs-lead">Anyone in the group can add a voluntary top-up on top of their entry.</p><div class="fs-detail"><p>Entirely optional. Nobody's chased for it. But when the running total is visible all season on the ladder and the Wall, people give &mdash; and the average creeps up.</p></div></div>
+      </div>
+      <div class="flow-arrow"><svg class="cic" width="26" height="26"><use href="#ic-arrow"/></svg></div>
+      <div class="flow-step c3">
+        <div class="fs-illus"><svg><use href="#ic-match"/></svg></div>
+        <div class="fs-body"><span class="fs-num">3</span><h4>Organisation match</h4><p class="fs-lead">Your organisation matches top-ups dollar for dollar, up to a cap.</p><div class="fs-detail"><p>The group watches it happen in real time. That's the moment a tipping comp becomes a movement &mdash; and the total on the ladder is exactly what the charity receives.</p></div></div>
+      </div>
+    </div>
+    <div class="flow-progress"><i class="on"></i><i></i><i></i></div>
+    <p class="flow-hint">Three separate flows. The subscription runs the platform &mdash; every donated dollar reaches the charity. Nothing skimmed.</p>
+  </div>
+</section>
+
+<!-- FOUNDING (premium band) -->
+<div class="founding-pro" id="founding">
+  <div class="fp-inner">
+    <div class="reveal from-left">
+      <span class="fp-badge"><span class="live-dot"></span> Founding Partner Program</span>
+      <h2>In before the finals. <em>In for life.</em></h2>
+      <p class="lead">Founding Partners lock their pricing permanently &mdash; not for year one, for good. Plus first access to new sports and features in 2027, and your name on the list of organisations that backed it before it was obvious.</p>
+      <ul class="fp-benefits">
+        <li><span class="bk">&check;</span> Pricing locked permanently &mdash; never increases</li>
+        <li><span class="bk">&check;</span> First access to every new sport and feature in 2027</li>
+        <li><span class="bk">&check;</span> Founding Partner recognition across the platform</li>
+      </ul>
+    </div>
+    <div class="fp-card reveal from-right">
+      <div class="dl-label">Window closes</div>
+      <div class="fp-deadline">Dec 31, 2026</div>
+      <p class="dl-sub">After that, standard rates. No exceptions, no late extensions. Set up your group free today and pay only when you launch.</p>
+      <a href="/#start" class="btn-primary" style="width:100%;justify-content:center;">Set up your group &rarr;</a>
+    </div>
+  </div>
+</div>
+
+<!-- FAQ v2 -->
+<section class="section on-cream">
+  <div class="wrap faq-grid">
+    <div class="faq-aside reveal from-left">
+      <p class="eyebrow">FAQ</p>
+      <h2 class="section-heading">Fair questions.</h2>
+      <p class="section-sub" style="margin-bottom:0;">The honest answers, up front. Anything else &mdash; just ask.</p>
+    </div>
+    <div class="reveal">
+      <div class="faq-item" data-open="true"><button class="faq-q"><span><span class="qn">01</span> Is this gambling?</span><span class="qx"></span></button><div class="faq-a">No. There is no prize pool. Entry fees go to charity, not back to participants. GoodTip is not a gambling service.</div></div>
+      <div class="faq-item"><button class="faq-q"><span><span class="qn">02</span> How does GoodTip make money?</span><span class="qx"></span></button><div class="faq-a">Your organisation pays the subscription. Every dollar of the entry fee goes to the charity your group voted for. Nothing skimmed off the top.</div></div>
+      <div class="faq-item"><button class="faq-q"><span><span class="qn">03</span> Who picks the charity?</span><span class="qx"></span></button><div class="faq-a">Your group does. Everyone nominates. Everyone votes. Majority wins. That's where the money goes.</div></div>
+      <div class="faq-item"><button class="faq-q"><span><span class="qn">04</span> Which sports are included?</span><span class="qx"></span></button><div class="faq-a">AFL, AFLW, NRL, and NRLW at launch. Four codes, all season. Women's competitions come with the men's &mdash; same price either way. More in 2027.</div></div>
+      <div class="faq-item"><button class="faq-q"><span><span class="qn">05</span> How does donation matching work?</span><span class="qx"></span></button><div class="faq-a">Your organisation sets a base pledge and a matching cap at the start of the season. Participants can add voluntary top-ups. Your organisation matches those dollar for dollar, up to the cap. The running total is visible all season; at the end, the full amount goes to the chosen charity.</div></div>
+      <div class="faq-item"><button class="faq-q"><span><span class="qn">06</span> When can we start?</span><span class="qx"></span></button><div class="faq-a">Set up your group now, free. Pay when you launch. Finals start August 28.</div></div>
+    </div>
+  </div>
+</section>
+
+{% include "public/partials/_contact.html" %}
+
+{% endblock %}

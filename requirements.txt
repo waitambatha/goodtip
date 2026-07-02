@@ -6,9 +6,11 @@ Django==5.2.14
 gunicorn==26.0.0
 idna==3.18
 packaging==26.2
+pillow==12.2.0
 psycopg==3.3.4
 psycopg-binary==3.3.4
 python-dotenv==1.2.2
+reportlab==4.5.1
 requests==2.34.2
 sqlparse==0.5.5
 stripe==15.2.0
