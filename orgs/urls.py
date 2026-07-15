@@ -7,6 +7,8 @@ app_name = "orgs"
 
 urlpatterns = [
     path("new/", views.create_org_view, name="create"),
+    path("search/", views.org_search_view, name="search"),
+    path("search.json", views.org_search_json, name="search_json"),
     path("<int:org_id>/created/", views.org_created_view, name="created"),
     path("<int:org_id>/invite/", views.org_invite_view, name="invite"),
     path("<int:org_id>/members/", views.members_view, name="members"),

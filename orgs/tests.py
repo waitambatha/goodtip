@@ -457,3 +457,63 @@ class MembershipRequestTests(TestCase):
         self.client.force_login(self.joiner)
         self.client.get(f"/join/{self.org.id}/{token}/")
         self.assertTrue(OrgMember.objects.filter(user=self.joiner, org=self.org).exists())
+
+
+class OrgSearchTests(TestCase):
+    """Org-structure note §2/§4: search surfaces close matches and, per match,
+    both paths — ask to join, or create a child org under its parent."""
+
+    def setUp(self):
+        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True}
+        )
+        self.parent = Organisation.objects.create(
+            name="National Tiles", season=self.season, charity=self.charity
+        )
+        self.child = Organisation.objects.create(
+            name="National Tiles Mitcham", season=self.season,
+            charity=self.charity, parent=self.parent,
+        )
+        self.user = User.objects.create_user(
+            email="searcher@example.com", password="x", display_name="Searcher",
+        )
+        self.client.force_login(self.user)
+
+    def test_json_returns_close_matches_with_root_for_child_creation(self):
+        resp = self.client.get("/leagues/search.json", {"q": "mitcham"})
+        rows = resp.json()["results"]
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["name"], "National Tiles Mitcham")
+        self.assertEqual(row["parent"], "National Tiles")
+        # The create-a-child path points at the match's TOP-LEVEL parent.
+        self.assertEqual(row["root_id"], self.parent.id)
+        self.assertFalse(row["is_member"])
+        self.assertFalse(row["pending"])
+
+    def test_json_flags_membership_and_pending_request(self):
+        OrgMember.objects.create(user=self.user, org=self.parent)
+        request_to_join(self.user, self.child)
+        rows = self.client.get("/leagues/search.json", {"q": "national"}).json()["results"]
+        by_name = {r["name"]: r for r in rows}
+        self.assertTrue(by_name["National Tiles"]["is_member"])
+        self.assertTrue(by_name["National Tiles Mitcham"]["pending"])
+
+    def test_json_requires_min_chars(self):
+        rows = self.client.get("/leagues/search.json", {"q": "n"}).json()["results"]
+        self.assertEqual(rows, [])
+
+    def test_search_page_offers_both_paths(self):
+        resp = self.client.get("/leagues/search/", {"q": "national tiles"})
+        self.assertContains(resp, "Ask to join")
+        self.assertContains(resp, f"?parent={self.parent.id}")
+
+    def test_search_page_offers_create_when_no_match(self):
+        resp = self.client.get("/leagues/search/", {"q": "zzz nothing"})
+        self.assertContains(resp, "No groups match")
+
+    def test_search_requires_login(self):
+        self.client.logout()
+        resp = self.client.get("/leagues/search/")
+        self.assertEqual(resp.status_code, 302)

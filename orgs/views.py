@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -230,6 +230,72 @@ def lock_fundraising_view(request, org_id: int):
     except ValueError as e:
         messages.error(request, str(e))
     return redirect("orgs:charity_vote", org_id=org.id)
+
+
+# Minimum characters before search matches anything — also the typeahead
+# trigger threshold in the search/create templates.
+SEARCH_MIN_CHARS = 2
+
+
+def _search_orgs(q: str, *, limit: int = 10):
+    """Close-match org lookup for search and duplicate detection (§2, §4)."""
+    return (
+        Organisation.objects.filter(name__icontains=q)
+        .select_related("parent", "group_type", "state")
+        .prefetch_related("sub_categories")
+        .annotate(_member_count=Count("members", distinct=True))
+        .order_by("name")[:limit]
+    )
+
+
+def _search_payload(user, q: str) -> list[dict]:
+    """JSON-safe rows for the typeahead: who the org is, how big, and where
+    THIS user stands with it (member / request pending / free to ask)."""
+    member_ids = set(user.memberships.values_list("org_id", flat=True))
+    pending_ids = set(
+        user.membership_requests.filter(
+            status=MembershipRequest.STATUS_PENDING,
+        ).values_list("org_id", flat=True)
+    )
+    return [
+        {
+            "id": org.id,
+            "name": org.name,
+            "parent": org.parent.name if org.parent_id else None,
+            "category": org.category_label,
+            "state": org.state.code if org.state_id else None,
+            "members": org._member_count,
+            "is_member": org.id in member_ids,
+            "pending": org.id in pending_ids,
+            # §2's second path: create a new child org under this match's
+            # top-level parent (the match itself when it IS top-level).
+            "root_id": org.root.id,
+            "root_name": org.root.name,
+        }
+        for org in _search_orgs(q)
+    ]
+
+
+@login_required
+def org_search_view(request):
+    """Find-your-group page (org-structure §2): each match offers BOTH paths —
+    request to join it, or create a new child org under its top-level parent."""
+    q = (request.GET.get("q") or "").strip()
+    results = _search_payload(request.user, q) if len(q) >= SEARCH_MIN_CHARS else []
+    return render(request, "orgs/search.html", {
+        "q": q,
+        "results": results,
+        "min_chars": SEARCH_MIN_CHARS,
+    })
+
+
+@login_required
+def org_search_json(request):
+    """Typeahead endpoint — also Stage 1 of duplicate detection (§4): the
+    create form queries it as the user types an org name."""
+    q = (request.GET.get("q") or "").strip()
+    results = _search_payload(request.user, q) if len(q) >= SEARCH_MIN_CHARS else []
+    return JsonResponse({"results": results})
 
 
 @login_required

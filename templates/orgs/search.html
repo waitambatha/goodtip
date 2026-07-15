@@ -1,0 +1,72 @@
+{% extends "app_base.html" %}
+{% block title %}Find your group — GoodTip{% endblock %}
+{% block loader_task %}Searching groups{% endblock %}
+{% block app_content %}
+<div class="app-head"><div><div class="app-eyebrow">Groups</div><h1 class="app-h1">Find your group</h1><p class="app-sub">Search for your workplace, club or crew. Ask to join, or start a new group under theirs.</p></div>
+  <a href="{% url 'orgs:create' %}" class="abtn abtn-ghost abtn-sm">Create a group</a></div>
+
+<form method="get" action="{% url 'orgs:search' %}" style="margin-bottom:22px;">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <input type="search" name="q" id="orgSearch" value="{{ q }}" required minlength="{{ min_chars }}"
+           placeholder="e.g. National Tiles" autocomplete="off" autofocus
+           style="flex:1;min-width:240px;padding:12px 14px;border:1px solid var(--app-line);border-radius:10px;font-family:var(--body);font-size:15px;">
+    <button type="submit" class="abtn abtn-primary">Search</button>
+  </div>
+</form>
+
+<div id="orgResults">
+{% if q %}
+  {% if results %}
+  <div style="overflow-x:auto;">
+  <table class="atable">
+    <thead><tr><th>Group</th><th>Members</th><th style="text-align:right;"></th></tr></thead>
+    <tbody>
+    {% for r in results %}
+      <tr>
+        <td>
+          <b>{{ r.name }}</b>{% if r.parent %} <small style="color:var(--muted);">part of {{ r.parent }}</small>{% endif %}<br>
+          <small style="color:var(--muted);">{{ r.category }}{% if r.state %} &middot; {{ r.state }}{% endif %}</small>
+        </td>
+        <td style="color:var(--muted);">{{ r.members }}</td>
+        <td style="text-align:right;white-space:nowrap;">
+          {% if r.is_member %}
+            <span class="pill-role participant">Member</span>
+          {% elif r.pending %}
+            <span class="pill-role captain">Request pending</span>
+          {% else %}
+            <form method="post" action="{% url 'orgs:request_join' r.id %}" style="display:inline;">
+              {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button type="submit" class="abtn abtn-primary abtn-sm">Ask to join</button>
+            </form>
+          {% endif %}
+          <a href="{% url 'orgs:create' %}?parent={{ r.root_id }}" class="abtn abtn-ghost abtn-sm">New group under {{ r.root_name }}</a>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <div class="card pad-lg" style="text-align:center;">
+    <div class="card-h">No groups match “{{ q }}”</div>
+    <p class="card-lead" style="margin:6px 0 18px;">Start it yourself — you'll be its admin.</p>
+    <a href="{% url 'orgs:create' %}" class="abtn abtn-primary">Create “{{ q }}”</a>
+  </div>
+  {% endif %}
+{% endif %}
+</div>
+
+<script>
+// Live typeahead: progressive enhancement over the server-rendered results.
+(function () {
+  var input = document.getElementById("orgSearch");
+  var form = input.form;
+  var timer = null;
+  input.addEventListener("input", function () {
+    clearTimeout(timer);
+    if (input.value.trim().length < {{ min_chars }}) return;
+    timer = setTimeout(function () { form.requestSubmit(); }, 450);
+  });
+})();
+</script>
+{% endblock %}

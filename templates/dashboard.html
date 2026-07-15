@@ -9,8 +9,9 @@
 {% if not cards %}
   <div class="card pad-lg" style="text-align:center;">
     <div class="card-h" style="font-size:20px;">You're not in a comp yet</div>
-    <p class="card-lead" style="margin:6px 0 18px;">Start your own or ask a group manager for a join link.</p>
+    <p class="card-lead" style="margin:6px 0 18px;">Start your own, find your group, or ask a group manager for a join link.</p>
     <a href="{% url 'orgs:create' %}" class="abtn abtn-primary abtn-lg">Create a competition</a>
+    <a href="{% url 'orgs:search' %}" class="abtn abtn-ghost abtn-lg">Find your group</a>
   </div>
 {% else %}
 {% with c=selected %}
@@ -47,6 +48,7 @@
     </select>
     <noscript><button type="submit" class="abtn abtn-dark abtn-sm">Go</button></noscript>
   </form>
+  <a href="{% url 'orgs:search' %}" class="abtn abtn-ghost abtn-xl">Find a group</a>
   <a href="{% url 'orgs:create' %}" class="abtn abtn-primary abtn-xl">+ Create a competition</a>
 </div>
 
