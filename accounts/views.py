@@ -135,6 +135,12 @@ def dashboard_view(request):
             from billing.donations import donation_summary
 
             donation = donation_summary(org)
+        # §7: EVERY member of a family org sees local + national side by side,
+        # never combined. None for standalone orgs (the majority) — no extra
+        # queries and no second figure to show.
+        from billing.donations import family_totals
+
+        family = family_totals(org)
         cards.append({
             "org": org,
             "round": current_round,
@@ -149,6 +155,7 @@ def dashboard_view(request):
             "has_voted": has_voted,
             "subscription": subscription,
             "donation": donation,
+            "family": family,
         })
     # The dashboard is built around ONE comp at a time: a dropdown picks it,
     # its games come forth for tipping. Default to the next comp to lock that

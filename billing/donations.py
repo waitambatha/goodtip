@@ -173,6 +173,33 @@ def donation_summary(org) -> dict | None:
     }
 
 
+def org_raised(org) -> Decimal:
+    """An org's own standalone charity total — §7's 'local' figure.
+    Zero when no pledge exists yet."""
+    summary = donation_summary(org)
+    return summary["raised"] if summary else Decimal("0.00")
+
+
+def family_totals(org) -> dict | None:
+    """The two §7 figures members always see, kept distinct and never blended:
+    'local' (this org's own total) and 'national' (automatic roll-up across
+    the top-level parent and ALL its children — a dollar total regardless of
+    which charity each org picked, §5). None for a standalone org, where no
+    separate national figure exists.
+    """
+    family = list(org.family())
+    if len(family) <= 1:
+        return None
+    local = org_raised(org)
+    national = sum((org_raised(o) for o in family), Decimal("0.00"))
+    return {
+        "local": _q(local),
+        "national": _q(national),
+        "root": org.root,
+        "org_count": len(family),
+    }
+
+
 @transaction.atomic
 def create_disbursement(org) -> CharityDisbursement:
     """Aggregate the season's donations into a single disbursement record."""

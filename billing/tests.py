@@ -14,6 +14,76 @@ from .pricing import PRO, STARTER, tier_config
 User = get_user_model()
 
 
+class FamilyTotalsTests(TestCase):
+    """Org-structure note §7: local and national totals, always separate,
+    with child org totals rolling up into the parent automatically."""
+
+    def setUp(self):
+        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test Season"})
+        self.lifeline, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True}
+        )
+        self.beyondblue, _ = Charity.objects.get_or_create(
+            slug="beyond-blue", defaults={"name": "Beyond Blue", "is_approved": True}
+        )
+        self.parent = Organisation.objects.create(
+            name="National Tiles", season=self.season, charity=self.lifeline
+        )
+        self.mitcham = Organisation.objects.create(
+            name="National Tiles Mitcham", season=self.season,
+            charity=self.beyondblue, parent=self.parent,
+        )
+        self.preston = Organisation.objects.create(
+            name="National Tiles Preston", season=self.season,
+            charity=self.lifeline, parent=self.parent,
+        )
+
+    def test_standalone_org_has_no_national_figure(self):
+        loner = Organisation.objects.create(
+            name="Loner", season=self.season, charity=self.lifeline
+        )
+        donations.set_pledge(loner, pledged_amount=Decimal("100"))
+        self.assertIsNone(donations.family_totals(loner))
+
+    def test_rollup_spans_parent_and_all_children_across_charities(self):
+        donations.set_pledge(self.parent, pledged_amount=Decimal("1000"))
+        donations.set_pledge(self.mitcham, pledged_amount=Decimal("200"))
+        donations.set_pledge(self.preston, pledged_amount=Decimal("300"))
+        totals = donations.family_totals(self.mitcham)
+        # Local stays the child's own figure; national is the whole family —
+        # a dollar total regardless of each org's charity choice (§5).
+        self.assertEqual(totals["local"], Decimal("200.00"))
+        self.assertEqual(totals["national"], Decimal("1500.00"))
+        self.assertEqual(totals["root"], self.parent)
+        self.assertEqual(totals["org_count"], 3)
+
+    def test_parent_sees_same_national_with_its_own_local(self):
+        donations.set_pledge(self.parent, pledged_amount=Decimal("1000"))
+        donations.set_pledge(self.mitcham, pledged_amount=Decimal("200"))
+        totals = donations.family_totals(self.parent)
+        self.assertEqual(totals["local"], Decimal("1000.00"))
+        self.assertEqual(totals["national"], Decimal("1200.00"))
+
+    def test_orgs_without_pledges_count_as_zero(self):
+        donations.set_pledge(self.mitcham, pledged_amount=Decimal("200"))
+        totals = donations.family_totals(self.preston)
+        self.assertEqual(totals["local"], Decimal("0.00"))
+        self.assertEqual(totals["national"], Decimal("200.00"))
+
+    def test_dashboard_shows_both_figures_to_child_member(self):
+        donations.set_pledge(self.parent, pledged_amount=Decimal("1000"))
+        donations.set_pledge(self.mitcham, pledged_amount=Decimal("200"))
+        member = User.objects.create_user(
+            email="m@example.com", password="x", display_name="M",
+        )
+        OrgMember.objects.create(user=member, org=self.mitcham)
+        self.client.force_login(member)
+        resp = self.client.get(reverse("dashboard"))
+        self.assertContains(resp, "National Tiles national total")
+        self.assertContains(resp, "$1,200")
+        self.assertContains(resp, "$200")
+
+
 def _activate_plan(org, tier):
     cfg = tier_config(tier)
     return PlanSubscription.objects.create(

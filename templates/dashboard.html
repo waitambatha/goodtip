@@ -112,6 +112,22 @@
   </div>
   {% endif %}
 
+  {% if c.family %}
+  <!-- §7: local and national totals, side by side, never combined -->
+  <div class="grid-app g-2" style="margin-top:18px;">
+    <div class="card">
+      <div class="card-h">{{ c.org.name }} total</div>
+      <div class="s-num" style="font-size:26px;margin:10px 0 2px;color:var(--forest);">${{ c.family.local|floatformat:0|intcomma }}</div>
+      <div class="card-lead">Raised by your group for {{ c.org.charity_display }}</div>
+    </div>
+    <div class="card">
+      <div class="card-h">{{ c.family.root.name }} national total</div>
+      <div class="s-num" style="font-size:26px;margin:10px 0 2px;color:var(--forest);">${{ c.family.national|floatformat:0|intcomma }}</div>
+      <div class="card-lead">Across all {{ c.family.org_count }} {{ c.family.root.name }} groups</div>
+    </div>
+  </div>
+  {% endif %}
+
   {% if c.is_owner %}
   <div class="grid-app g-2" style="margin-top:18px;">
     {% if c.subscription %}
