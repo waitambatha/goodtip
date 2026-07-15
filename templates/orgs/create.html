@@ -14,12 +14,24 @@
     <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
   </div>
 </div>
-<div class="app-head head-center"><div><div class="app-eyebrow">New competition</div><h1 class="app-h1">Create a competition</h1><p class="app-sub">Stand up a tipping comp. You'll be the Owner, Manager and Captain to start.</p></div></div>
+<div class="app-head head-center"><div><div class="app-eyebrow">{% if parent_org %}New group under {{ parent_org.name }}{% else %}New competition{% endif %}</div><h1 class="app-h1">Create a competition</h1><p class="app-sub">Stand up a tipping comp. You'll be the Owner, Manager and Captain to start.</p></div></div>
 
 {% if form.non_field_errors %}<div class="flash error" style="margin-bottom:16px;"><span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
 
 <form method="post" action="{% url 'orgs:create' %}" class="form-centered form-lime">
   {% csrf_token %}
+  {% if parent_org %}
+  <input type="hidden" name="parent" value="{{ parent_org.id }}">
+  <div class="card pad-lg" style="margin-bottom:16px;background:rgba(45,122,58,.06);border-color:rgba(45,122,58,.35);">
+    <div class="card-h">Part of {{ parent_org.name }}</div>
+    <p class="card-lead" style="margin:4px 0 0;">
+      Your group will sit under <b>{{ parent_org.name }}</b>. It runs its own comp,
+      has its own members and picks its own charity — and its totals roll up into
+      {{ parent_org.name }}'s national figure. You'll be this group's admin.
+      <a href="{% url 'orgs:create' %}">Not part of {{ parent_org.name }}?</a>
+    </p>
+  </div>
+  {% endif %}
   <div class="card pad-lg" style="margin-bottom:16px;">
     <div class="fld"><label for="id_name">League name</label><input type="text" name="name" id="id_name" value="{{ form.name.value|default:'' }}" placeholder="e.g. Eclat Footy Tips" autocomplete="off">
       {% if form.name.errors %}<div class="fld-err">{{ form.name.errors|join:" " }}</div>{% endif %}

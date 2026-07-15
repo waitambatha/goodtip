@@ -62,8 +62,20 @@ def _invitees(request, org):
     )
 
 
+def _requested_parent(request):
+    """The top-level org a child is being created under (§2's second path),
+    from ?parent= on GET or the posted form value on re-renders. None for the
+    standalone default case (§1) or any invalid/child id."""
+    pid = request.POST.get("parent") or request.GET.get("parent")
+    if not pid:
+        return None
+    return Organisation.objects.filter(parent__isnull=True, pk__in=[pid]).first() \
+        if str(pid).isdigit() else None
+
+
 @login_required
 def create_org_view(request):
+    parent_org = _requested_parent(request)
     if request.method == "POST":
         form = OrgCreateForm(request.POST)
         if form.is_valid():
@@ -77,6 +89,7 @@ def create_org_view(request):
                 return render(request, "orgs/create.html", {
                     "form": form,
                     "duplicates": duplicates,
+                    "parent_org": parent_org,
                 })
             org = form.save()
             # The creator runs and owns the league: Manager + Captain + Owner.
@@ -100,8 +113,8 @@ def create_org_view(request):
                 )
             return redirect("orgs:created", org_id=org.id)
     else:
-        form = OrgCreateForm()
-    return render(request, "orgs/create.html", {"form": form})
+        form = OrgCreateForm(initial={"parent": parent_org})
+    return render(request, "orgs/create.html", {"form": form, "parent_org": parent_org})
 
 
 @login_required

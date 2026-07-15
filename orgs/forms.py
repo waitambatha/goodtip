@@ -17,6 +17,16 @@ class OrgCreateForm(forms.ModelForm):
         ("vote", "Let the group vote"),
     ]
 
+    # Org-structure note §3: a child sits under one TOP-LEVEL parent, so the
+    # queryset excludes children (two levels max). Hidden — the parent is
+    # chosen on the search page (§2's create-a-child path), never typed here;
+    # §1: a standalone creator must see no hierarchy question at all.
+    parent = forms.ModelChoiceField(
+        queryset=Organisation.objects.filter(parent__isnull=True),
+        required=False,
+        widget=forms.HiddenInput,
+    )
+
     group_type = forms.ModelChoiceField(
         queryset=GroupType.objects.all(),  # ordered by sort_order per the spec
         label="Organisation type",
@@ -77,7 +87,7 @@ class OrgCreateForm(forms.ModelForm):
     class Meta:
         model = Organisation
         fields = [
-            "name", "group_type", "sub_categories", "informal_label", "state",
+            "name", "parent", "group_type", "sub_categories", "informal_label", "state",
             "competitions", "season", "team_size", "finals_only",
         ]
         labels = {

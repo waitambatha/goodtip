@@ -574,3 +574,81 @@ class DuplicateDetectionTests(TestCase):
         resp = self.create_post("Totally Original Name")
         self.assertEqual(resp.status_code, 302)
         self.assertTrue(Organisation.objects.filter(name="Totally Original Name").exists())
+
+
+class ChildOrgCreationTests(TestCase):
+    """Org-structure note §0/§2/§3: creating a child org under an existing
+    parent makes the creator that CHILD's admin — they do not join the parent.
+    """
+
+    def setUp(self):
+        from catalog.models import Competition, GroupType
+
+        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
+        sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
+        self.comp, _ = Competition.objects.get_or_create(
+            sport=sport, season=self.season, slug="afl", defaults={"name": "AFL"},
+        )
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
+        )
+        self.charities_type = GroupType.objects.get(slug="charities")
+        self.parent = Organisation.objects.create(
+            name="National Tiles", season=self.season, charity=self.charity,
+        )
+        self.user = User.objects.create_user(
+            email="franchisee@example.com", password="x", display_name="Franchisee",
+        )
+        self.client.force_login(self.user)
+
+    def create_post(self, name, **extra):
+        data = {
+            "name": name, "season": self.season.pk, "competitions": [self.comp.pk],
+            "group_type": self.charities_type.pk,
+            "charity_method": "pick", "charity": self.charity.pk,
+        }
+        data.update(extra)
+        return self.client.post("/leagues/new/", data)
+
+    def test_get_with_parent_preloads_banner_and_hidden_field(self):
+        resp = self.client.get(f"/leagues/new/?parent={self.parent.id}")
+        self.assertContains(resp, f"Part of {self.parent.name}")
+        self.assertContains(resp, f'name="parent" value="{self.parent.id}"')
+
+    def test_creator_becomes_child_admin_not_parent_member(self):
+        resp = self.create_post("National Tiles Mitcham", parent=self.parent.pk)
+        self.assertEqual(resp.status_code, 302)
+        child = Organisation.objects.get(name="National Tiles Mitcham")
+        self.assertEqual(child.parent, self.parent)
+        # §0: admin of the child they created…
+        self.assertTrue(
+            OrgMember.objects.filter(user=self.user, org=child, is_league_owner=True).exists()
+        )
+        # …and NOT a member (let alone admin) of the parent.
+        self.assertFalse(OrgMember.objects.filter(user=self.user, org=self.parent).exists())
+
+    def test_child_org_cannot_be_a_parent_option(self):
+        child = Organisation.objects.create(
+            name="National Tiles Mitcham", season=self.season,
+            charity=self.charity, parent=self.parent,
+        )
+        resp = self.create_post("Mitcham Warehouse Crew", parent=child.pk)
+        # Two levels only (§3): a child is not a valid parent choice.
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Organisation.objects.filter(name="Mitcham Warehouse Crew").exists())
+
+    def test_child_creation_still_passes_duplicate_check(self):
+        Organisation.objects.create(
+            name="National Tiles Mitcham", season=self.season,
+            charity=self.charity, parent=self.parent,
+        )
+        resp = self.create_post("National Tiles Mitcham", parent=self.parent.pk)
+        self.assertContains(resp, "already exists")
+        # The parent banner survives the §4 confirmation re-render.
+        self.assertContains(resp, f"Part of {self.parent.name}")
+        self.assertEqual(Organisation.objects.filter(name="National Tiles Mitcham").count(), 1)
+
+    def test_invalid_parent_param_falls_back_to_standalone(self):
+        resp = self.client.get("/leagues/new/?parent=999999")
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, "Part of ")
