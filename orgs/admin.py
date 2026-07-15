@@ -5,6 +5,7 @@ from .models import (
     CharityVote,
     CharityVoteBallot,
     CharityVoteOption,
+    MembershipRequest,
     OrgMember,
     Organisation,
 )
@@ -48,6 +49,14 @@ class OrganisationAdmin(admin.ModelAdmin):
     @admin.display(description="Sub-category")
     def category_label(self, obj):
         return obj.category_label
+
+
+@admin.register(MembershipRequest)
+class MembershipRequestAdmin(admin.ModelAdmin):
+    list_display = ("user", "org", "status", "created_at", "decided_at", "decided_by")
+    list_filter = ("status",)
+    raw_id_fields = ("user", "org", "decided_by")
+    search_fields = ("user__email", "user__display_name", "org__name")
 
 
 class CharityVoteOptionInline(admin.TabularInline):

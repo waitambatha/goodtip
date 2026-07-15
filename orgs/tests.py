@@ -8,15 +8,19 @@ from catalog.models import Charity, Season, Sport
 from .models import (
     CharityVote,
     CharityVoteOption,
+    MembershipRequest,
     OrgCharitySelection,
     OrgMember,
     Organisation,
 )
 from .services import (
+    approve_membership_request,
     cast_charity_ballot,
     close_charity_vote,
+    decline_membership_request,
     open_charity_vote,
     record_charity_selection,
+    request_to_join,
     set_org_charity,
 )
 
@@ -339,3 +343,117 @@ class OrgHierarchyTests(TestCase):
         # §5: no forced inheritance in either direction.
         self.assertEqual(mitcham.charity, beyondblue)
         self.assertEqual(self.parent.charity, self.charity)
+
+
+class MembershipRequestTests(TestCase):
+    """Org-structure note §2, client amendment: joining an org found via
+    search goes through the org's admin — request, then approve/decline.
+    """
+
+    def setUp(self):
+        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True}
+        )
+        self.org = Organisation.objects.create(
+            name="National Tiles", season=self.season, charity=self.charity
+        )
+        self.admin = User.objects.create_user(
+            email="admin@example.com", password="x", display_name="Admin",
+        )
+        OrgMember.objects.create(
+            user=self.admin, org=self.org, role=OrgMember.ROLE_BOTH, is_league_owner=True,
+        )
+        self.joiner = User.objects.create_user(
+            email="joiner@example.com", password="x", display_name="Joiner",
+        )
+
+    def test_request_does_not_create_membership(self):
+        req = request_to_join(self.joiner, self.org)
+        self.assertTrue(req.is_pending)
+        self.assertFalse(OrgMember.objects.filter(user=self.joiner, org=self.org).exists())
+
+    def test_repeat_request_returns_existing_pending(self):
+        first = request_to_join(self.joiner, self.org)
+        second = request_to_join(self.joiner, self.org)
+        self.assertEqual(first.pk, second.pk)
+        self.assertEqual(MembershipRequest.objects.count(), 1)
+
+    def test_member_cannot_request(self):
+        OrgMember.objects.create(user=self.joiner, org=self.org)
+        with self.assertRaises(ValueError):
+            request_to_join(self.joiner, self.org)
+
+    def test_approve_creates_participant_and_records_decision(self):
+        req = request_to_join(self.joiner, self.org)
+        member = approve_membership_request(req, by_user=self.admin)
+        req.refresh_from_db()
+        self.assertEqual(req.status, MembershipRequest.STATUS_APPROVED)
+        self.assertEqual(req.decided_by, self.admin)
+        self.assertIsNotNone(req.decided_at)
+        self.assertEqual(member.role, OrgMember.ROLE_PARTICIPANT)
+        self.assertTrue(OrgMember.objects.filter(user=self.joiner, org=self.org).exists())
+
+    def test_decline_leaves_no_membership_and_allows_reask(self):
+        req = request_to_join(self.joiner, self.org)
+        decline_membership_request(req, by_user=self.admin)
+        req.refresh_from_db()
+        self.assertEqual(req.status, MembershipRequest.STATUS_DECLINED)
+        self.assertFalse(OrgMember.objects.filter(user=self.joiner, org=self.org).exists())
+        # A declined user may ask again — a NEW pending request is created.
+        again = request_to_join(self.joiner, self.org)
+        self.assertNotEqual(again.pk, req.pk)
+        self.assertTrue(again.is_pending)
+
+    def test_decided_request_cannot_be_decided_twice(self):
+        req = request_to_join(self.joiner, self.org)
+        approve_membership_request(req, by_user=self.admin)
+        with self.assertRaises(ValueError):
+            decline_membership_request(req, by_user=self.admin)
+
+    def test_request_join_endpoint_creates_pending_request(self):
+        self.client.force_login(self.joiner)
+        resp = self.client.post(f"/leagues/{self.org.id}/request-join/", follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(
+            MembershipRequest.objects.filter(
+                user=self.joiner, org=self.org, status=MembershipRequest.STATUS_PENDING,
+            ).exists()
+        )
+
+    def test_members_page_lists_pending_and_admin_can_approve(self):
+        req = request_to_join(self.joiner, self.org)
+        self.client.force_login(self.admin)
+        resp = self.client.get(f"/leagues/{self.org.id}/members/")
+        self.assertContains(resp, "Join requests")
+        self.assertContains(resp, "Joiner")
+        resp = self.client.post(
+            f"/leagues/{self.org.id}/members/",
+            {"action": "approve_request", "request_id": req.id},
+            follow=True,
+        )
+        self.assertContains(resp, "Joiner is now a member.")
+        self.assertTrue(OrgMember.objects.filter(user=self.joiner, org=self.org).exists())
+
+    def test_non_admin_cannot_approve(self):
+        req = request_to_join(self.joiner, self.org)
+        outsider = User.objects.create_user(
+            email="outsider@example.com", password="x", display_name="Outsider",
+        )
+        self.client.force_login(outsider)
+        resp = self.client.post(
+            f"/leagues/{self.org.id}/members/",
+            {"action": "approve_request", "request_id": req.id},
+        )
+        self.assertEqual(resp.status_code, 403)
+        req.refresh_from_db()
+        self.assertTrue(req.is_pending)
+
+    def test_invite_link_still_joins_without_approval(self):
+        # The signed invite token IS the admin's authorisation — no queue.
+        from .signing import make_join_token
+
+        token = make_join_token(self.org.id, inviter_id=self.admin.id)
+        self.client.force_login(self.joiner)
+        self.client.get(f"/join/{self.org.id}/{token}/")
+        self.assertTrue(OrgMember.objects.filter(user=self.joiner, org=self.org).exists())

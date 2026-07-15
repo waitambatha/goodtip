@@ -253,6 +253,58 @@ class OrgMember(models.Model):
         return labels
 
 
+class MembershipRequest(models.Model):
+    """A user asking to join an org they found by searching (org-structure
+    note §2, amended by the client: a search-and-join is not instant — the
+    org's admin approves or declines each request. Invite-link joins bypass
+    this queue because the signed token IS the admin's authorisation.)
+
+    Declined users may ask again — only one *pending* request per user/org
+    is enforced, so the history of past decisions is kept.
+    """
+
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_DECLINED = "declined"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_APPROVED, "Approved"),
+        (STATUS_DECLINED, "Declined"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name="membership_requests",
+    )
+    org = models.ForeignKey(
+        Organisation, on_delete=models.CASCADE, related_name="membership_requests",
+    )
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="membership_requests_decided",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "org"],
+                condition=models.Q(status="pending"),
+                name="one_pending_membership_request_per_user_org",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user} → {self.org.name} ({self.status})"
+
+    @property
+    def is_pending(self) -> bool:
+        return self.status == self.STATUS_PENDING
+
+
 class CharityVote(models.Model):
     STATUS_CHOICES = [("open", "Open"), ("closed", "Closed")]
 

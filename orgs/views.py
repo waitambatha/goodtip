@@ -4,21 +4,32 @@ from django.db.models import Count
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from accounts.views import JOIN_INVITER_SESSION_KEY, JOIN_SESSION_KEY
 from .forms import OrgCreateForm
-from .models import CharityVote, CharityVoteOption, OrgCharitySelection, OrgMember, Organisation
+from .models import (
+    CharityVote,
+    CharityVoteOption,
+    MembershipRequest,
+    OrgCharitySelection,
+    OrgMember,
+    Organisation,
+)
 from .services import (
     add_member,
+    approve_membership_request,
     can_lock_fundraising,
     cast_charity_ballot,
     close_charity_vote,
+    decline_membership_request,
     lock_fundraising_to_self,
     nominate_manager_by_email,
     notify_charity_suggestion,
     open_charity_vote,
     record_charity_selection,
+    request_to_join,
     set_member_role,
 )
 from .signing import make_join_token, parse_join_token
@@ -222,6 +233,26 @@ def lock_fundraising_view(request, org_id: int):
 
 
 @login_required
+@require_POST
+def request_join_view(request, org_id: int):
+    """Ask to join an org found via search (org-structure §2, client
+    amendment: joining goes through the org's admin, not straight in)."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    try:
+        request_to_join(request.user, org)
+        messages.success(
+            request,
+            f"Request sent — {org.name}'s admin will review it.",
+        )
+    except ValueError as e:
+        messages.info(request, str(e))
+    next_url = request.POST.get("next", "")
+    if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        next_url = ""
+    return redirect(next_url or "dashboard")
+
+
+@login_required
 def members_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     me = _membership(request.user, org)
@@ -247,6 +278,19 @@ def members_view(request, org_id: int):
                 messages.success(request, f"{member.user.display_name} is now a Team Manager.")
             else:
                 messages.error(request, "No member in this league has that email yet.")
+        elif action in ("approve_request", "decline_request"):
+            join_req = get_object_or_404(
+                MembershipRequest, pk=request.POST.get("request_id"), org=org,
+            )
+            try:
+                if action == "approve_request":
+                    approve_membership_request(join_req, by_user=request.user)
+                    messages.success(request, f"{join_req.user.display_name} is now a member.")
+                else:
+                    decline_membership_request(join_req, by_user=request.user)
+                    messages.info(request, f"{join_req.user.display_name}'s request was declined.")
+            except ValueError as e:
+                messages.error(request, str(e))
         return redirect("orgs:members", org_id=org.id)
 
     members = (
@@ -254,9 +298,15 @@ def members_view(request, org_id: int):
         .select_related("user")
         .order_by("-is_league_owner", "role", "joined_at")
     )
+    pending_requests = (
+        org.membership_requests.filter(status=MembershipRequest.STATUS_PENDING)
+        .select_related("user")
+        .order_by("created_at")
+    )
     return render(request, "orgs/members.html", {
         "org": org,
         "members": members,
+        "pending_requests": pending_requests,
         "role_choices": OrgMember.ROLE_CHOICES,
         "is_owner": me.is_league_owner,
     })

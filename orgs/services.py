@@ -11,6 +11,7 @@ from .models import (
     CharityVote,
     CharityVoteBallot,
     CharityVoteOption,
+    MembershipRequest,
     OrgCharitySelection,
     OrgMember,
 )
@@ -80,6 +81,78 @@ def add_member(user, org, *, inviter_id=None, role=OrgMember.ROLE_PARTICIPANT) -
         member.invited_by = inviter
         member.save(update_fields=["invited_by"])
     return member
+
+
+def _notify_join_request(req: MembershipRequest) -> None:
+    """Email the org's managers that someone asked to join (best-effort:
+    a mail failure must never block the request itself)."""
+    from django.db.models import Q
+
+    manager_emails = list(
+        OrgMember.objects.filter(org=req.org)
+        .filter(Q(role__in=[OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH]) | Q(is_league_owner=True))
+        .values_list("user__email", flat=True)
+    )
+    if not manager_emails:
+        return
+    try:
+        send_mail(
+            subject=f"[GoodTip] {req.user.display_name} wants to join {req.org.name}",
+            message=(
+                f"{req.user.display_name} ({req.user.email}) has asked to join "
+                f"\"{req.org.name}\".\n\n"
+                "Approve or decline the request from your Members page."
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=manager_emails,
+            fail_silently=True,
+        )
+    except Exception:  # noqa: BLE001 — never let a mail error break the request
+        logger.exception("Failed to send join-request notification")
+
+
+def request_to_join(user, org) -> MembershipRequest:
+    """A user asks to join an org they found via search (org-structure §2,
+    client amendment: the org's admin must approve). Idempotent: asking again
+    while a request is pending returns the existing one; a declined user may
+    ask again (new pending row).
+    """
+    if OrgMember.objects.filter(user=user, org=org).exists():
+        raise ValueError("You're already a member of this organisation.")
+    existing = MembershipRequest.objects.filter(
+        user=user, org=org, status=MembershipRequest.STATUS_PENDING,
+    ).first()
+    if existing:
+        return existing
+    req = MembershipRequest.objects.create(user=user, org=org)
+    _notify_join_request(req)
+    return req
+
+
+@transaction.atomic
+def approve_membership_request(req: MembershipRequest, *, by_user) -> OrgMember:
+    """Admin approves a join request: the requester becomes a participant.
+
+    Raises ValueError if the request was already decided.
+    """
+    if not req.is_pending:
+        raise ValueError("This request has already been decided.")
+    req.status = MembershipRequest.STATUS_APPROVED
+    req.decided_at = timezone.now()
+    req.decided_by = by_user
+    req.save(update_fields=["status", "decided_at", "decided_by"])
+    return add_member(req.user, req.org)
+
+
+def decline_membership_request(req: MembershipRequest, *, by_user) -> MembershipRequest:
+    """Admin declines a join request. The user may request again later."""
+    if not req.is_pending:
+        raise ValueError("This request has already been decided.")
+    req.status = MembershipRequest.STATUS_DECLINED
+    req.decided_at = timezone.now()
+    req.decided_by = by_user
+    req.save(update_fields=["status", "decided_at", "decided_by"])
+    return req
 
 
 def set_member_role(member: OrgMember, role: str) -> OrgMember:

@@ -5,6 +5,33 @@
 <div class="app-head"><div><div class="app-eyebrow">{{ org.name }}</div><h1 class="app-h1">Members</h1><p class="app-sub">Manage roles for your group.{% if is_owner %} Owners can nominate managers.{% endif %}</p></div>
   <a href="{% url 'orgs:invite' org.id %}" class="abtn abtn-ghost abtn-sm">Invite</a></div>
 
+{% if pending_requests %}
+<div class="card pad-lg" style="margin-bottom:22px;">
+  <div class="card-h">Join requests <span class="pill-role manager" style="vertical-align:middle;">{{ pending_requests|length }} pending</span></div>
+  <p class="card-lead" style="margin:4px 0 14px;">These people asked to join {{ org.name }}. Approve to add them as participants.</p>
+  <table class="atable">
+    <tbody>
+    {% for r in pending_requests %}
+      <tr>
+        <td><b>{{ r.user.display_name }}</b><br><small style="color:var(--muted);">{{ r.user.email }}</small></td>
+        <td style="color:var(--muted);">Asked {{ r.created_at|date:"j M Y" }}</td>
+        <td style="text-align:right;">
+          <form method="post" action="{% url 'orgs:members' org.id %}" style="display:inline;">
+            {% csrf_token %}<input type="hidden" name="action" value="approve_request"><input type="hidden" name="request_id" value="{{ r.id }}">
+            <button type="submit" class="abtn abtn-primary abtn-sm">Approve</button>
+          </form>
+          <form method="post" action="{% url 'orgs:members' org.id %}" style="display:inline;">
+            {% csrf_token %}<input type="hidden" name="action" value="decline_request"><input type="hidden" name="request_id" value="{{ r.id }}">
+            <button type="submit" class="abtn abtn-ghost abtn-sm">Decline</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
 <div style="overflow-x:auto;">
 <table class="atable">
   <thead><tr><th>Member</th><th>Roles</th><th>Joined</th><th style="text-align:right;">Set role</th></tr></thead>
