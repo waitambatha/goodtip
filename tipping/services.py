@@ -52,19 +52,42 @@ def submit_tip(*, user, match: Match, org, selection: str) -> Tip:
     return tip
 
 
-def leaderboard_for_org(org, round_id: int | None = None):
+def _leaderboard(org_ids, tip_filter):
     from accounts.models import User
-    qs = User.objects.filter(memberships__org=org).distinct()
-    tip_filter = Q(tips__org=org)
-    if round_id is not None:
-        tip_filter &= Q(tips__match__round_id=round_id)
-    qs = qs.annotate(
+    qs = User.objects.filter(memberships__org_id__in=org_ids).distinct()
+    return qs.annotate(
         # Weighted score: sum of points_awarded (finals and Origin count for more).
         points=Coalesce(Sum("tips__points_awarded", filter=tip_filter), Value(0)),
         tips_total=Count("tips", filter=tip_filter & Q(tips__is_correct__isnull=False)),
         tips_correct=Count("tips", filter=tip_filter & Q(tips__is_correct=True)),
     ).order_by("-points", "display_name")
-    return qs
+
+
+def leaderboard_for_org(org, round_id: int | None = None):
+    tip_filter = Q(tips__org=org)
+    if round_id is not None:
+        tip_filter &= Q(tips__match__round_id=round_id)
+    return _leaderboard([org.id], tip_filter)
+
+
+def leaderboard_for_family(org, round_id: int | None = None):
+    """The §8 national board: every member across the top-level parent and
+    all its children, ranked together. Same underlying competition as the
+    local board — each member's points come from their own org's tips.
+
+    Rounds are per-org rows, so a round filter is aligned across the family
+    by (round_number, series) rather than by the id of one org's round.
+    """
+    family_ids = org.family_ids()
+    tip_filter = Q(tips__org_id__in=family_ids)
+    if round_id is not None:
+        rnd = Round.objects.filter(pk=round_id).only("round_number", "series_id").first()
+        if rnd is not None:
+            tip_filter &= Q(
+                tips__match__round__round_number=rnd.round_number,
+                tips__match__round__series_id=rnd.series_id,
+            )
+    return _leaderboard(family_ids, tip_filter)
 
 
 def user_org_stats(user, org):

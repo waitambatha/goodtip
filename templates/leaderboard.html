@@ -15,13 +15,22 @@
         <button type="button" class="dd-opt {% if selected_round_id == 'all' %}on{% endif %}" data-val="all">All rounds</button>
         {% for r in rounds %}<button type="button" class="dd-opt {% if selected_round_id == r.id|stringformat:'s' %}on{% endif %}" data-val="{{ r.id }}">Round {{ r.round_number }}</button>{% endfor %}
       </div>
-      <select class="dd-native" name="round" hx-get="{% url 'tipping:leaderboard' org.id %}" hx-target="#lbtable" hx-swap="outerHTML" hx-trigger="change">
+      <select class="dd-native" name="round" hx-get="{% url 'tipping:leaderboard' org.id %}?scope={{ scope }}" hx-target="#lbtable" hx-swap="outerHTML" hx-trigger="change">
         <option value="all" {% if selected_round_id == 'all' %}selected{% endif %}>All rounds</option>
         {% for r in rounds %}<option value="{{ r.id }}" {% if selected_round_id == r.id|stringformat:'s' %}selected{% endif %}>Round {{ r.round_number }}</option>{% endfor %}
       </select>
     </div>
   </div>
 </div>
+
+{% if is_family %}
+<!-- §8: same competition, two views — local standings and the national board -->
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
+  <a href="?scope=local" class="abtn abtn-sm {% if scope == 'local' %}abtn-dark{% else %}abtn-ghost{% endif %}">{{ org.name }}</a>
+  <a href="?scope=national" class="abtn abtn-sm {% if scope == 'national' %}abtn-dark{% else %}abtn-ghost{% endif %}">National &middot; {{ org.root.name }}</a>
+</div>
+{% if scope == 'national' %}<p class="app-sub" style="margin:-6px 0 18px;">Every tipper across {{ org.root.name }} and all its groups, ranked together.</p>{% endif %}
+{% endif %}
 
 {% if ranked %}
 <div class="podium" style="margin-bottom:24px;">

@@ -6,7 +6,7 @@ from django.views.decorators.http import require_POST
 
 from orgs.models import OrgMember, Organisation
 from .models import Match, Round, Tip
-from .services import leaderboard_for_org, submit_tip, user_org_stats
+from .services import leaderboard_for_family, leaderboard_for_org, submit_tip, user_org_stats
 
 
 def _require_member(user, org):
@@ -100,7 +100,16 @@ def leaderboard_view(request, org_id: int):
             round_filter = int(selected_round_id)
         except ValueError:
             round_filter = None
-    board = leaderboard_for_org(org, round_id=round_filter)
+    # §8: one underlying competition, two views. "national" ranks every
+    # member across the parent org and all its children; "local" (default)
+    # filters to this org only. Standalone orgs only ever see local.
+    is_family = org.is_child or org.children.exists()
+    scope = request.GET.get("scope", "local")
+    if scope == "national" and is_family:
+        board = leaderboard_for_family(org, round_id=round_filter)
+    else:
+        scope = "local"
+        board = leaderboard_for_org(org, round_id=round_filter)
     ranked = []
     last_points = None
     rank = 0
@@ -119,4 +128,5 @@ def leaderboard_view(request, org_id: int):
     return render(request, "leaderboard.html", {
         "org": org, "rounds": rounds, "selected_round_id": selected_round_id or "all",
         "ranked": ranked, "me": request.user,
+        "scope": scope, "is_family": is_family,
     })
