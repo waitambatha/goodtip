@@ -652,3 +652,99 @@ class ChildOrgCreationTests(TestCase):
         resp = self.client.get("/leagues/new/?parent=999999")
         self.assertEqual(resp.status_code, 200)
         self.assertNotContains(resp, "Part of ")
+
+
+class ChildAdminManagementTests(TestCase):
+    """Org-structure note §6: parent org admins can remove or reassign a
+    child org's admin — e.g. when a location closes down."""
+
+    def setUp(self):
+        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True}
+        )
+        self.parent = Organisation.objects.create(
+            name="National Tiles", season=self.season, charity=self.charity
+        )
+        self.child = Organisation.objects.create(
+            name="National Tiles Mitcham", season=self.season,
+            charity=self.charity, parent=self.parent,
+        )
+        self.parent_admin = User.objects.create_user(
+            email="hq@example.com", password="x", display_name="HQ",
+        )
+        OrgMember.objects.create(
+            user=self.parent_admin, org=self.parent,
+            role=OrgMember.ROLE_BOTH, is_league_owner=True,
+        )
+        self.child_admin = User.objects.create_user(
+            email="mitcham@example.com", password="x", display_name="Mitcham Boss",
+        )
+        self.child_admin_member = OrgMember.objects.create(
+            user=self.child_admin, org=self.child,
+            role=OrgMember.ROLE_BOTH, is_league_owner=True,
+        )
+
+    def test_parent_admin_sees_child_groups_panel(self):
+        self.client.force_login(self.parent_admin)
+        resp = self.client.get(f"/leagues/{self.parent.id}/members/")
+        self.assertContains(resp, "Child groups")
+        self.assertContains(resp, "National Tiles Mitcham")
+        self.assertContains(resp, "Mitcham Boss")
+
+    def test_child_admin_page_has_no_child_groups_panel(self):
+        self.client.force_login(self.child_admin)
+        resp = self.client.get(f"/leagues/{self.child.id}/members/")
+        self.assertNotContains(resp, "Child groups")
+
+    def test_parent_admin_can_demote_child_admin(self):
+        self.client.force_login(self.parent_admin)
+        self.client.post(f"/leagues/{self.parent.id}/members/", {
+            "action": "demote_child_admin", "member_id": self.child_admin_member.id,
+        })
+        self.child_admin_member.refresh_from_db()
+        # Hats off, but they stay a member of the child org.
+        self.assertEqual(self.child_admin_member.role, OrgMember.ROLE_PARTICIPANT)
+        self.assertFalse(self.child_admin_member.is_league_owner)
+
+    def test_parent_admin_can_reassign_child_admin_to_new_user(self):
+        successor = User.objects.create_user(
+            email="new-boss@example.com", password="x", display_name="New Boss",
+        )
+        self.client.force_login(self.parent_admin)
+        self.client.post(f"/leagues/{self.parent.id}/members/", {
+            "action": "assign_child_admin", "child_id": self.child.id,
+            "email": "new-boss@example.com",
+        })
+        m = OrgMember.objects.get(user=successor, org=self.child)
+        # §6 rationale: the target needn't be a member yet — they're added.
+        self.assertTrue(m.is_league_owner)
+        self.assertEqual(m.role, OrgMember.ROLE_BOTH)
+
+    def test_demote_scoped_to_own_children(self):
+        other_parent = Organisation.objects.create(
+            name="Rival Corp", season=self.season, charity=self.charity
+        )
+        rival_admin = User.objects.create_user(
+            email="rival@example.com", password="x", display_name="Rival",
+        )
+        OrgMember.objects.create(
+            user=rival_admin, org=other_parent,
+            role=OrgMember.ROLE_BOTH, is_league_owner=True,
+        )
+        self.client.force_login(rival_admin)
+        # Rival Corp's admin cannot touch National Tiles Mitcham's admin.
+        resp = self.client.post(f"/leagues/{other_parent.id}/members/", {
+            "action": "demote_child_admin", "member_id": self.child_admin_member.id,
+        })
+        self.assertEqual(resp.status_code, 404)
+        self.child_admin_member.refresh_from_db()
+        self.assertTrue(self.child_admin_member.is_league_owner)
+
+    def test_child_admin_cannot_use_parent_page(self):
+        self.client.force_login(self.child_admin)
+        resp = self.client.post(f"/leagues/{self.parent.id}/members/", {
+            "action": "demote_child_admin", "member_id": self.child_admin_member.id,
+        })
+        # Not a member of the parent org at all → forbidden.
+        self.assertEqual(resp.status_code, 403)

@@ -186,6 +186,38 @@ def nominate_manager_by_email(org, email: str):
     return set_member_role(member, new_role)
 
 
+def demote_child_org_admin(member: OrgMember) -> OrgMember:
+    """Parent-admin action (org-structure §6): strip a child org's admin back
+    to participant. They stay a member — only the admin hats come off."""
+    member.role = OrgMember.ROLE_PARTICIPANT
+    member.is_league_owner = False
+    member.save(update_fields=["role", "is_league_owner"])
+    return member
+
+
+@transaction.atomic
+def reassign_child_org_admin(child, email: str, *, by_user):
+    """Parent-admin action (org-structure §6): hand a child org's admin role
+    to a user by email. §6's rationale is a closed-down location: the parent
+    must be able to step in, so the target needn't already be a member — an
+    existing GoodTip user (including the parent admin) is added if needed.
+    Returns the admin OrgMember, or None if no user has that email.
+    """
+    from accounts.models import User
+
+    email = (email or "").strip().lower()
+    if not email:
+        return None
+    user = User.objects.filter(email__iexact=email).first()
+    if user is None:
+        return None
+    member, _ = OrgMember.objects.get_or_create(user=user, org=child)
+    member.role = OrgMember.ROLE_BOTH
+    member.is_league_owner = True
+    member.save(update_fields=["role", "is_league_owner"])
+    return member
+
+
 def record_charity_selection(org, charity, *, source=OrgCharitySelection.SOURCE_MANUAL):
     """Append a timeline row for the charity an org is backing this season.
 

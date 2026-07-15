@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import models
 from django.db.models import Count
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -24,7 +25,9 @@ from .services import (
     cast_charity_ballot,
     close_charity_vote,
     decline_membership_request,
+    demote_child_org_admin,
     lock_fundraising_to_self,
+    reassign_child_org_admin,
     nominate_manager_by_email,
     notify_charity_suggestion,
     open_charity_vote,
@@ -368,6 +371,26 @@ def members_view(request, org_id: int):
                 messages.success(request, f"{member.user.display_name} is now a Team Manager.")
             else:
                 messages.error(request, "No member in this league has that email yet.")
+        elif action == "demote_child_admin":
+            # §6: parent org admins may strip a CHILD org admin's hats. The
+            # org__parent=org filter scopes it to this org's own children.
+            member = get_object_or_404(
+                OrgMember, pk=request.POST.get("member_id"), org__parent=org,
+            )
+            demote_child_org_admin(member)
+            messages.success(
+                request,
+                f"{member.user.display_name} is no longer an admin of {member.org.name}.",
+            )
+        elif action == "assign_child_admin":
+            child = get_object_or_404(
+                Organisation, pk=request.POST.get("child_id"), parent=org,
+            )
+            member = reassign_child_org_admin(child, request.POST.get("email", ""), by_user=request.user)
+            if member:
+                messages.success(request, f"{member.user.display_name} now runs {child.name}.")
+            else:
+                messages.error(request, "No GoodTip account has that email.")
         elif action in ("approve_request", "decline_request"):
             join_req = get_object_or_404(
                 MembershipRequest, pk=request.POST.get("request_id"), org=org,
@@ -393,10 +416,32 @@ def members_view(request, org_id: int):
         .select_related("user")
         .order_by("created_at")
     )
+    # §6: parent org admins see each child group with its admins, so they can
+    # step in (remove/reassign) if a location closes. Day-to-day member
+    # management stays with the child's own admin — only admin hats show here.
+    child_groups = None
+    if not org.is_child:
+        children = list(org.children.order_by("name"))
+        if children:
+            admins_by_org = {}
+            admin_members = (
+                OrgMember.objects.filter(org__in=children)
+                .filter(
+                    models.Q(role__in=[OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH])
+                    | models.Q(is_league_owner=True)
+                )
+                .select_related("user", "org")
+            )
+            for m in admin_members:
+                admins_by_org.setdefault(m.org_id, []).append(m)
+            child_groups = [
+                {"org": c, "admins": admins_by_org.get(c.id, [])} for c in children
+            ]
     return render(request, "orgs/members.html", {
         "org": org,
         "members": members,
         "pending_requests": pending_requests,
+        "child_groups": child_groups,
         "role_choices": OrgMember.ROLE_CHOICES,
         "is_owner": me.is_league_owner,
     })
