@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.db.models import Count
 
 from .models import (
     CharityVote,
@@ -18,7 +19,7 @@ class OrgMemberInline(admin.TabularInline):
 @admin.register(Organisation)
 class OrganisationAdmin(admin.ModelAdmin):
     list_display = (
-        "name", "group_type", "category_label", "state",
+        "name", "parent", "child_count", "group_type", "category_label", "state",
         "is_charity_partner", "is_public_listed", "season", "charity", "created_at",
     )
     # is_charity_partner is set HERE and only here (categories doc: partner
@@ -30,9 +31,19 @@ class OrganisationAdmin(admin.ModelAdmin):
     )
     list_editable = ("is_charity_partner", "is_public_listed")
     filter_horizontal = ("sub_categories",)
+    autocomplete_fields = ("parent",)
     readonly_fields = ("public_consent_at", "public_consent_by", "public_consent_reconfirmed")
     search_fields = ("name",)
     inlines = [OrgMemberInline]
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("parent").annotate(
+            _child_count=Count("children", distinct=True)
+        )
+
+    @admin.display(description="Children", ordering="_child_count")
+    def child_count(self, obj):
+        return obj._child_count
 
     @admin.display(description="Sub-category")
     def category_label(self, obj):

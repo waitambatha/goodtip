@@ -1,10 +1,22 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
 
 class Organisation(models.Model):
     name = models.CharField(max_length=200)
+    # Org-structure note (§1, §3): a standalone org IS a parent org with zero
+    # children — no separate object type, no hierarchy question at creation.
+    # A child sits under exactly one parent (FK enforces that); a parent can
+    # have unlimited children. Two levels only for now — the permission model
+    # (§6) defines just parent and child admins — enforced in clean().
+    # PROTECT: a parent with live children can't be silently deleted; support
+    # must move or remove the children first.
+    parent = models.ForeignKey(
+        "self", on_delete=models.PROTECT,
+        related_name="children", null=True, blank=True,
+    )
     # Self-selected at sign-up (categories doc, 7 Jul 2026): one of the five
     # organisation types — Community, Business, Education, Charities, Informal.
     # Drives the Good List's type filter. Lookup FKs keep the DB normalised.
@@ -66,6 +78,45 @@ class Organisation(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.season})"
+
+    def clean(self):
+        super().clean()
+        if self.parent_id:
+            if self.parent_id == self.pk:
+                raise ValidationError({"parent": "An organisation cannot be its own parent."})
+            if self.parent.parent_id:
+                raise ValidationError({
+                    "parent": "Child organisations can only sit under a top-level organisation."
+                })
+            if self.pk and self.children.exists():
+                raise ValidationError({
+                    "parent": "This organisation has child organisations of its own, "
+                              "so it cannot become a child."
+                })
+
+    # --- Hierarchy helpers (org-structure note §3, §7) ---
+
+    @property
+    def is_child(self) -> bool:
+        return self.parent_id is not None
+
+    @property
+    def root(self) -> "Organisation":
+        """The top of this org's family: its parent, or itself if top-level."""
+        return self.parent if self.parent_id else self
+
+    def family(self):
+        """Every org in this org's family: the root plus all its children.
+
+        Viewed from a child, the family is still the WHOLE tree (§7: a member
+        of a child org sees the national roll-up across the parent and all
+        its siblings, not just their own branch).
+        """
+        root = self.root
+        return Organisation.objects.filter(models.Q(pk=root.pk) | models.Q(parent=root))
+
+    def family_ids(self) -> list[int]:
+        return list(self.family().values_list("id", flat=True))
 
     @property
     def active_charity_vote(self):

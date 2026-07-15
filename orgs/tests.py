@@ -1,4 +1,6 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.db.models import ProtectedError
 from django.test import TestCase
 
 from catalog.models import Charity, Season, Sport
@@ -264,3 +266,76 @@ class CharityPartnerWorkflowTests(TestCase):
         self.client.force_login(self.user)
         resp = self.client.get(f"/leagues/{org.id}/charity-vote/")
         self.assertContains(resp, "Lock fundraising to us")
+
+
+class OrgHierarchyTests(TestCase):
+    """Org-structure note §1/§3: standalone orgs are parents with zero
+    children; a child sits under exactly one top-level parent; two levels only.
+    """
+
+    def setUp(self):
+        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True}
+        )
+        self.parent = Organisation.objects.create(
+            name="National Tiles", season=self.season, charity=self.charity
+        )
+
+    def make_org(self, name, **kwargs):
+        return Organisation.objects.create(
+            name=name, season=self.season, charity=self.charity, **kwargs
+        )
+
+    def test_standalone_org_is_its_own_root_and_family(self):
+        self.assertFalse(self.parent.is_child)
+        self.assertEqual(self.parent.root, self.parent)
+        self.assertEqual(self.parent.family_ids(), [self.parent.id])
+
+    def test_family_spans_root_and_all_children_from_any_member(self):
+        mitcham = self.make_org("National Tiles Mitcham", parent=self.parent)
+        preston = self.make_org("National Tiles Preston", parent=self.parent)
+        expected = {self.parent.id, mitcham.id, preston.id}
+        # §7: a child org's member sees the WHOLE family roll-up, siblings included.
+        self.assertEqual(set(mitcham.family_ids()), expected)
+        self.assertEqual(set(self.parent.family_ids()), expected)
+        self.assertEqual(mitcham.root, self.parent)
+        self.assertTrue(mitcham.is_child)
+
+    def test_child_cannot_have_children(self):
+        mitcham = self.make_org("National Tiles Mitcham", parent=self.parent)
+        grandchild = Organisation(
+            name="Mitcham Warehouse Crew", season=self.season,
+            charity=self.charity, parent=mitcham,
+        )
+        with self.assertRaises(ValidationError):
+            grandchild.full_clean()
+
+    def test_org_cannot_be_its_own_parent(self):
+        self.parent.parent = self.parent
+        with self.assertRaises(ValidationError):
+            self.parent.full_clean()
+
+    def test_org_with_children_cannot_become_a_child(self):
+        self.make_org("National Tiles Mitcham", parent=self.parent)
+        other = self.make_org("Some Other Org")
+        self.parent.parent = other
+        with self.assertRaises(ValidationError):
+            self.parent.full_clean()
+
+    def test_deleting_parent_with_children_is_protected(self):
+        self.make_org("National Tiles Mitcham", parent=self.parent)
+        with self.assertRaises(ProtectedError):
+            self.parent.delete()
+
+    def test_child_keeps_its_own_charity_independent_of_parent(self):
+        beyondblue, _ = Charity.objects.get_or_create(
+            slug="beyond-blue", defaults={"name": "Beyond Blue", "is_approved": True}
+        )
+        mitcham = self.make_org("National Tiles Mitcham", parent=self.parent)
+        set_org_charity(mitcham, beyondblue, source=OrgCharitySelection.SOURCE_MANUAL)
+        mitcham.refresh_from_db()
+        self.parent.refresh_from_db()
+        # §5: no forced inheritance in either direction.
+        self.assertEqual(mitcham.charity, beyondblue)
+        self.assertEqual(self.parent.charity, self.charity)
