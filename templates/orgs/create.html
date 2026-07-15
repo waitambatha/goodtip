@@ -21,8 +21,12 @@
 <form method="post" action="{% url 'orgs:create' %}" class="form-centered form-lime">
   {% csrf_token %}
   <div class="card pad-lg" style="margin-bottom:16px;">
-    <div class="fld"><label for="id_name">League name</label><input type="text" name="name" id="id_name" value="{{ form.name.value|default:'' }}" placeholder="e.g. Eclat Footy Tips">
-      {% if form.name.errors %}<div class="fld-err">{{ form.name.errors|join:" " }}</div>{% endif %}</div>
+    <div class="fld"><label for="id_name">League name</label><input type="text" name="name" id="id_name" value="{{ form.name.value|default:'' }}" placeholder="e.g. Eclat Footy Tips" autocomplete="off">
+      {% if form.name.errors %}<div class="fld-err">{{ form.name.errors|join:" " }}</div>{% endif %}
+      <div id="dupeHint" style="display:none;margin-top:8px;padding:12px 14px;border:1px solid rgba(180,120,0,.4);background:rgba(255,180,0,.08);border-radius:10px;font-size:14px;">
+        <b>These groups already exist</b> — did you mean to join one?
+        <ul id="dupeHintList" style="margin:6px 0 0;padding-left:18px;"></ul>
+      </div></div>
 
     <div class="fld"><label for="id_group_type">Organisation type</label>
       <select name="group_type" id="id_group_type">
@@ -114,7 +118,25 @@
     </div>
   </div>
 
-  <button type="submit" class="abtn abtn-primary abtn-lg">Create competition &rarr;</button>
+  {% if duplicates %}
+  <div class="card pad-lg" style="margin-bottom:16px;border-color:rgba(180,120,0,.5);background:rgba(255,180,0,.07);" id="dupeConfirm">
+    <div class="card-h">{{ duplicates.0.name }} already exists</div>
+    <p class="card-lead" style="margin:6px 0 12px;">
+      You are about to create another group with this name. The existing
+      {{ duplicates|length|pluralize:"group is,groups are" }} listed below —
+      if it's yours, ask to join it instead.
+    </p>
+    <ul style="margin:0 0 14px;padding-left:18px;">
+      {% for d in duplicates %}
+      <li>{{ d.name }}{% if d.parent %} <small style="color:var(--muted);">part of {{ d.parent.name }}</small>{% endif %}
+        — <a href="{% url 'orgs:search' %}?q={{ d.name|urlencode }}">view &amp; ask to join</a></li>
+      {% endfor %}
+    </ul>
+    <input type="hidden" name="duplicate_confirmed" value="1">
+    <p class="card-lead" style="margin:0;">Continue only if your group really is separate.</p>
+  </div>
+  {% endif %}
+  <button type="submit" class="abtn abtn-primary abtn-lg">{% if duplicates %}Yes, create a separate group &rarr;{% else %}Create competition &rarr;{% endif %}</button>
 </form>
 {% endblock %}
 
@@ -165,5 +187,37 @@
       });
       typeSel.addEventListener('change', function(){ sync(true); });
       sync(false); /* keep server-rendered state on validation re-render */
+    })();
+
+    /* §4 Stage 1 duplicate detection: as the name is typed, surface existing
+       close matches and offer the join path instead. Warn, don't block. */
+    (function(){
+      var input = document.getElementById('id_name');
+      var box = document.getElementById('dupeHint');
+      var list = document.getElementById('dupeHintList');
+      if (!input || !box) return;
+      var timer = null;
+      function esc(s){ var d = document.createElement('span'); d.textContent = s; return d.innerHTML; }
+      function check(){
+        var q = input.value.trim();
+        if (q.length < 2) { box.style.display = 'none'; return; }
+        fetch('{% url "orgs:search_json" %}?q=' + encodeURIComponent(q), {credentials: 'same-origin'})
+          .then(function(r){ return r.json(); })
+          .then(function(data){
+            var rows = data.results || [];
+            if (!rows.length) { box.style.display = 'none'; return; }
+            list.innerHTML = rows.map(function(r){
+              var who = esc(r.name) + (r.parent ? ' <small>part of ' + esc(r.parent) + '</small>' : '');
+              return '<li>' + who + ' — <a href="{% url "orgs:search" %}?q=' +
+                     encodeURIComponent(r.name) + '">ask to join instead</a></li>';
+            }).join('');
+            box.style.display = '';
+          })
+          .catch(function(){ box.style.display = 'none'; });
+      }
+      input.addEventListener('input', function(){
+        clearTimeout(timer);
+        timer = setTimeout(check, 400);
+      });
     })();
 {% endblock %}

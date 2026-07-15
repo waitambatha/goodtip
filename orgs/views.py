@@ -67,6 +67,17 @@ def create_org_view(request):
     if request.method == "POST":
         form = OrgCreateForm(request.POST)
         if form.is_valid():
+            # §4 Stage 2: same-named org(s) exist → one explicit confirmation
+            # before creating anyway. Friction, not prevention: the resubmit
+            # carries duplicate_confirmed and sails through.
+            duplicates = Organisation.objects.filter(
+                name__iexact=form.cleaned_data["name"].strip(),
+            ).select_related("parent")
+            if duplicates.exists() and request.POST.get("duplicate_confirmed") != "1":
+                return render(request, "orgs/create.html", {
+                    "form": form,
+                    "duplicates": duplicates,
+                })
             org = form.save()
             # The creator runs and owns the league: Manager + Captain + Owner.
             OrgMember.objects.get_or_create(

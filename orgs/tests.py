@@ -517,3 +517,60 @@ class OrgSearchTests(TestCase):
         self.client.logout()
         resp = self.client.get("/leagues/search/")
         self.assertEqual(resp.status_code, 302)
+
+
+class DuplicateDetectionTests(TestCase):
+    """Org-structure note §4 Stage 2: creating an org whose name already
+    exists needs one explicit confirmation — friction, not prevention."""
+
+    def setUp(self):
+        from catalog.models import Competition, GroupType
+
+        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
+        sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
+        self.comp, _ = Competition.objects.get_or_create(
+            sport=sport, season=self.season, slug="afl", defaults={"name": "AFL"},
+        )
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
+        )
+        self.charities_type = GroupType.objects.get(slug="charities")
+        self.existing = Organisation.objects.create(
+            name="National Tiles Mitcham", season=self.season, charity=self.charity,
+        )
+        self.user = User.objects.create_user(
+            email="creator@example.com", password="x", display_name="Creator",
+        )
+        self.client.force_login(self.user)
+
+    def create_post(self, name, **extra):
+        data = {
+            "name": name, "season": self.season.pk, "competitions": [self.comp.pk],
+            "group_type": self.charities_type.pk,
+            "charity_method": "pick", "charity": self.charity.pk,
+        }
+        data.update(extra)
+        return self.client.post("/leagues/new/", data)
+
+    def test_same_name_shows_confirmation_and_creates_nothing(self):
+        resp = self.create_post("national tiles mitcham")  # case-insensitive
+        self.assertContains(resp, "already exists")
+        self.assertContains(resp, "duplicate_confirmed")
+        self.assertEqual(Organisation.objects.filter(name__iexact="national tiles mitcham").count(), 1)
+
+    def test_confirmed_resubmit_creates_independent_duplicate(self):
+        resp = self.create_post("National Tiles Mitcham", duplicate_confirmed="1")
+        self.assertEqual(resp.status_code, 302)
+        dupes = Organisation.objects.filter(name="National Tiles Mitcham")
+        self.assertEqual(dupes.count(), 2)
+        # Fully independent: the new org has its own admin, not the old org's.
+        new_org = dupes.exclude(pk=self.existing.pk).get()
+        self.assertTrue(
+            OrgMember.objects.filter(user=self.user, org=new_org, is_league_owner=True).exists()
+        )
+        self.assertFalse(OrgMember.objects.filter(user=self.user, org=self.existing).exists())
+
+    def test_unique_name_creates_without_confirmation(self):
+        resp = self.create_post("Totally Original Name")
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(Organisation.objects.filter(name="Totally Original Name").exists())
