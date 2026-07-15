@@ -1,9 +1,10 @@
 {% extends "public/base.html" %}
-{% load static %}
+{% load static humanize %}
 
 {% block title %}The Good List — GoodTip{% endblock %}
-{% block meta_description %}Your tips raise money for charity. The Good List ranks every group by what they've raised — nationally, by industry, by charity, by state.{% endblock %}
+{% block meta_description %}Your tips raise money for charity. The Good List ranks every group by what they've raised — filter by organisation type, sub-category, and state.{% endblock %}
 {% block body_class %}page-leaderboard{% endblock %}
+{% block loader_task %}Loading The Good List{% endblock %}
 
 {% block content %}
 
@@ -12,12 +13,16 @@
   <div class="hs-left">
     <span class="pill" style="align-self:flex-start;margin-bottom:22px;"><span class="dot"></span>The Good List</span>
     <h1>Your tips raise money <em>for charity.</em></h1>
-    <p class="hero-sub">Workplaces pick winners every round. The entry fees go to the charity their group voted for. No prize pool &mdash; the whole pot does good.</p>
+    <p class="hero-sub">Groups pick winners every round. The money goes to the charity their group chose. No prize pool &mdash; the whole pot does good.</p>
     <div class="lb-herostat">
-      <div class="big" data-countto="723410" data-prefix="$">$0</div>
+      {% if national_total > 0 %}
+      <div class="big" data-countto="{{ national_total|floatformat:0 }}" data-prefix="$">$0</div>
       <div class="lab">Raised across every group this season</div>
+      {% else %}
+      <div class="big">$0</div>
+      <div class="lab">The season hasn't started &mdash; totals appear the moment the first donations settle.</div>
+      {% endif %}
     </div>
-    <p class="preseason" style="margin-top:20px;"><span class="live-dot"></span> Preview data &middot; goes live when Round 1 locks in</p>
   </div>
   <div class="hs-right">
     <div class="hero-bg" aria-hidden="true">
@@ -32,67 +37,63 @@
 <!-- TABS -->
 <div class="tabs">
   <div class="tabs-inner" role="tablist">
-    <button class="tab-btn active" data-tab="national" role="tab">National</button>
-    <button class="tab-btn" data-tab="industry" role="tab">By Industry</button>
+    <button class="tab-btn active" data-tab="groups" role="tab">By Group</button>
     <button class="tab-btn" data-tab="charity" role="tab">By Charity</button>
+    <button class="tab-btn" data-tab="category" role="tab">By Category</button>
     <button class="tab-btn" data-tab="state" role="tab">By State</button>
-    <button class="tab-btn" data-tab="community" role="tab">Community</button>
   </div>
 </div>
 
-<!-- NATIONAL -->
-<div class="tab-panel active" id="national">
+<!-- BY GROUP -->
+<div class="tab-panel active" id="groups">
   <section class="section on-cream">
     <div class="wrap">
-      <!-- featured -->
-      <div class="lb-featured reveal">
-        <div class="lb-shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"><div class="veil"></div><span class="spot-badge">Featured Workplace</span></div>
-        <div class="lb-copy">
-          <p class="eyebrow">Workplace spotlight</p>
-          <h3>Eclat, Hawthorn East</h3>
-          <p>A members' lounge in Hawthorn East. They ran GoodTip through the finals and again at the AFLW launch &mdash; and their charity took the proceeds both times.</p>
-          <div class="lb-figure">$14,280<small>Raised for Lifeline</small></div>
-        </div>
-      </div>
-
       <div class="lb-head reveal">
-        <h2>National leaderboard</h2>
-        <div class="note">Every group, ranked by total raised. Preview figures &mdash; live once groups go active.</div>
+        <h2>The Good List</h2>
+        <div class="note">Every named group, ranked by total raised. Groups appear here only after they opt in to public listing.</div>
       </div>
 
-      <!-- podium -->
-      <div class="podium reveal">
-        <div class="pod second"><div class="medal">2</div><div class="pod-name">Meridian Partners</div><div class="pod-meta">Sydney, NSW &middot; Professional Services</div><span class="pod-chip">headspace</span><div class="pod-amt">$12,640</div></div>
-        <div class="pod first"><span class="crown"><svg class="cic"><use href="#ic-trophy"/></svg></span><div class="medal">1</div><div class="pod-name">Eclat</div><div class="pod-meta">Hawthorn East, VIC &middot; Hospitality</div><span class="pod-chip">Lifeline</span><div class="pod-amt">$14,280</div></div>
-        <div class="pod third"><div class="medal">3</div><div class="pod-name">Brightwater Group</div><div class="pod-meta">Brisbane, QLD &middot; Construction</div><span class="pod-chip">ReachOut</span><div class="pod-amt">$11,090</div></div>
-      </div>
+      <form method="get" action="{% url 'good_list' %}" id="glFilters" class="gl-filterbar reveal">
+        <select name="type" id="glType" aria-label="Organisation type">
+          <option value="">All organisation types</option>
+          {% for gt in group_types %}<option value="{{ gt.slug }}" {% if sel_type == gt.slug %}selected{% endif %}>{{ gt.name }}</option>{% endfor %}
+        </select>
+        <select name="cat" id="glCat" aria-label="Sub-category">
+          <option value="">All sub-categories</option>
+          {% for gt in group_types %}{% for sc in gt.sub_categories.all %}{% if sc.is_active %}<option value="{{ sc.slug }}" data-type="{{ gt.slug }}" {% if sel_type == gt.slug and sel_cat == sc.slug %}selected{% endif %}>{{ sc.name }}</option>{% endif %}{% endfor %}{% endfor %}
+        </select>
+        <select name="state" id="glState" aria-label="State or territory">
+          <option value="">All states &amp; territories</option>
+          {% for st in states %}<option value="{{ st.code }}" {% if sel_state == st.code %}selected{% endif %}>{{ st.name }}</option>{% endfor %}
+        </select>
+        <noscript><button type="submit" class="btn-dark">Filter</button></noscript>
+      </form>
 
-      <!-- rest of list -->
+      {% if not board_live %}
+      <div class="gl-empty reveal">
+        <span class="ge-ic"><svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg></span>
+        <h3>The board is warming up.</h3>
+        <p class="note">Named rankings appear once at least {{ credibility_min }} groups with settled totals have opted in to public listing. No sample figures here &mdash; when you see a number on The Good List, it's real money, raised and settled.</p>
+      </div>
+      {% elif not groups %}
+      <div class="gl-empty reveal">
+        <span class="ge-ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></span>
+        <h3>No groups match this filter yet.</h3>
+        <p class="note">Try a different organisation type, sub-category, or state.</p>
+      </div>
+      {% else %}
       <div class="lb lb--orgs reveal">
         <div class="lb-colhead"><span>Rank</span><span>Group</span><span>Charity</span><span class="r-amt">Raised</span></div>
-        <div class="lb-row"><span class="lb-rank">04</span><span class="lb-name"><b>Coastline Retail Co</b><small>Perth, WA &middot; Retail</small></span><span class="lb-chip">Lifeline</span><span class="lb-amt">$8,750</span></div>
-        <div class="lb-row"><span class="lb-rank">05</span><span class="lb-name"><b>Adelaide Mutual</b><small>Adelaide, SA &middot; Finance</small></span><span class="lb-chip">headspace</span><span class="lb-amt">$7,420</span></div>
-        <div class="lb-row"><span class="lb-rank">06</span><span class="lb-name"><b>Northshore Legal</b><small>Sydney, NSW &middot; Professional Services</small></span><span class="lb-chip">Lifeline</span><span class="lb-amt">$6,980</span></div>
-        <div class="lb-row"><span class="lb-rank">07</span><span class="lb-name"><b>Kirra Hospitality</b><small>Gold Coast, QLD &middot; Hospitality</small></span><span class="lb-chip">ReachOut</span><span class="lb-amt">$6,210</span></div>
-        <div class="lb-row"><span class="lb-rank">08</span><span class="lb-name"><b>Fremantle Works</b><small>Fremantle, WA &middot; Construction</small></span><span class="lb-chip">headspace</span><span class="lb-amt">$5,540</span></div>
+        {% for row in groups %}
+        <div class="lb-row {% if forloop.counter <= 3 %}t3{% endif %}">
+          <span class="lb-rank">{{ forloop.counter|stringformat:"02d" }}</span>
+          <span class="lb-name"><b>{{ row.name }}</b><small>{% if row.category %}{{ row.category }}{% endif %}{% if row.category and row.state %} &middot; {% endif %}{{ row.state }}</small></span>
+          <span class="lb-chip">{{ row.charity.name|default:"—" }}</span>
+          <span class="lb-amt">${{ row.raised|floatformat:0|intcomma }}</span>
+        </div>
+        {% endfor %}
       </div>
-    </div>
-  </section>
-</div>
-
-<!-- BY INDUSTRY -->
-<div class="tab-panel" id="industry">
-  <section class="section on-cream">
-    <div class="wrap">
-      <div class="lb-head reveal"><h2>Raised by industry</h2><div class="note">The sectors putting the most on the board. Preview figures.</div></div>
-      <div class="lb lb--metric reveal">
-        <div class="lb-colhead"><span>Rank</span><span>Industry</span><span class="r-amt">Groups</span><span class="r-amt">Raised</span></div>
-        <div class="lb-row t3"><span class="lb-rank">01</span><span class="lb-name"><b>Professional Services</b></span><span class="lb-count">128</span><span class="lb-amt">$186,400</span></div>
-        <div class="lb-row t3"><span class="lb-rank">02</span><span class="lb-name"><b>Hospitality</b></span><span class="lb-count">96</span><span class="lb-amt">$142,300</span></div>
-        <div class="lb-row t3"><span class="lb-rank">03</span><span class="lb-name"><b>Construction</b></span><span class="lb-count">74</span><span class="lb-amt">$118,900</span></div>
-        <div class="lb-row"><span class="lb-rank">04</span><span class="lb-name"><b>Retail</b></span><span class="lb-count">61</span><span class="lb-amt">$92,150</span></div>
-        <div class="lb-row"><span class="lb-rank">05</span><span class="lb-name"><b>Finance</b></span><span class="lb-count">58</span><span class="lb-amt">$88,700</span></div>
-      </div>
+      {% endif %}
     </div>
   </section>
 </div>
@@ -101,13 +102,44 @@
 <div class="tab-panel" id="charity">
   <section class="section on-cream">
     <div class="wrap">
-      <div class="lb-head reveal"><h2>Raised by charity</h2><div class="note">Each group votes for one of three charities. Here's what they've raised.</div></div>
+      <div class="lb-head reveal"><h2>Raised by charity</h2><div class="note">Where the money is going, across every group.</div></div>
+      {% if by_charity %}
       <div class="lb lb--metric reveal">
         <div class="lb-colhead"><span>Rank</span><span>Charity</span><span class="r-amt">Groups</span><span class="r-amt">Raised</span></div>
-        <div class="lb-row t3"><span class="lb-rank">01</span><span class="lb-name"><b>Lifeline</b><small>Crisis support</small></span><span class="lb-count">214</span><span class="lb-amt">$312,800</span></div>
-        <div class="lb-row t3"><span class="lb-rank">02</span><span class="lb-name"><b>headspace</b><small>Youth mental health</small></span><span class="lb-count">176</span><span class="lb-amt">$268,400</span></div>
-        <div class="lb-row t3"><span class="lb-rank">03</span><span class="lb-name"><b>ReachOut</b><small>Online youth wellbeing</small></span><span class="lb-count">92</span><span class="lb-amt">$141,600</span></div>
+        {% for row in by_charity %}
+        <div class="lb-row {% if forloop.counter <= 3 %}t3{% endif %}"><span class="lb-rank">{{ forloop.counter|stringformat:"02d" }}</span><span class="lb-name"><b>{{ row.label }}</b></span><span class="lb-count">{{ row.groups }}</span><span class="lb-amt">${{ row.raised|floatformat:0|intcomma }}</span></div>
+        {% endfor %}
       </div>
+      {% else %}
+      <div class="gl-empty reveal">
+        <span class="ge-ic"><svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></span>
+        <h3>Nothing to show here yet.</h3>
+        <p class="note">Charity totals appear once at least {{ privacy_min }} groups sit behind a figure &mdash; that keeps any single group's giving private.</p>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+<!-- BY CATEGORY -->
+<div class="tab-panel" id="category">
+  <section class="section on-cream">
+    <div class="wrap">
+      <div class="lb-head reveal"><h2>Raised by category</h2><div class="note">Sub-categories putting the most on the board &mdash; sports clubs, finance teams, schools and more.</div></div>
+      {% if by_sub_category %}
+      <div class="lb lb--metric reveal">
+        <div class="lb-colhead"><span>Rank</span><span>Category</span><span class="r-amt">Groups</span><span class="r-amt">Raised</span></div>
+        {% for row in by_sub_category %}
+        <div class="lb-row {% if forloop.counter <= 3 %}t3{% endif %}"><span class="lb-rank">{{ forloop.counter|stringformat:"02d" }}</span><span class="lb-name"><b>{{ row.label }}</b></span><span class="lb-count">{{ row.groups }}</span><span class="lb-amt">${{ row.raised|floatformat:0|intcomma }}</span></div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="gl-empty reveal">
+        <span class="ge-ic"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></span>
+        <h3>Nothing to show here yet.</h3>
+        <p class="note">Category totals appear once at least {{ privacy_min }} groups sit behind a figure &mdash; that keeps any single group's giving private.</p>
+      </div>
+      {% endif %}
     </div>
   </section>
 </div>
@@ -116,41 +148,21 @@
 <div class="tab-panel" id="state">
   <section class="section on-cream">
     <div class="wrap">
-      <div class="lb-head reveal"><h2>Raised by state</h2><div class="note">How the states stack up as groups onboard nationally. Preview figures.</div></div>
+      <div class="lb-head reveal"><h2>Raised by state</h2><div class="note">How the states &amp; territories stack up.</div></div>
+      {% if by_state %}
       <div class="lb lb--metric reveal">
         <div class="lb-colhead"><span>Rank</span><span>State</span><span class="r-amt">Groups</span><span class="r-amt">Raised</span></div>
-        <div class="lb-row t3"><span class="lb-rank">01</span><span class="lb-name"><b>Victoria</b></span><span class="lb-count">182</span><span class="lb-amt">$268,900</span></div>
-        <div class="lb-row t3"><span class="lb-rank">02</span><span class="lb-name"><b>New South Wales</b></span><span class="lb-count">168</span><span class="lb-amt">$251,300</span></div>
-        <div class="lb-row t3"><span class="lb-rank">03</span><span class="lb-name"><b>Queensland</b></span><span class="lb-count">121</span><span class="lb-amt">$178,400</span></div>
-        <div class="lb-row"><span class="lb-rank">04</span><span class="lb-name"><b>Western Australia</b></span><span class="lb-count">78</span><span class="lb-amt">$112,600</span></div>
-        <div class="lb-row"><span class="lb-rank">05</span><span class="lb-name"><b>South Australia</b></span><span class="lb-count">64</span><span class="lb-amt">$91,200</span></div>
+        {% for row in by_state %}
+        <div class="lb-row {% if forloop.counter <= 3 %}t3{% endif %}"><span class="lb-rank">{{ forloop.counter|stringformat:"02d" }}</span><span class="lb-name"><b>{{ row.label }}</b></span><span class="lb-count">{{ row.groups }}</span><span class="lb-amt">${{ row.raised|floatformat:0|intcomma }}</span></div>
+        {% endfor %}
       </div>
-    </div>
-  </section>
-</div>
-
-<!-- COMMUNITY -->
-<div class="tab-panel" id="community">
-  <section class="section on-cream">
-    <div class="wrap">
-      <div class="lb-featured reveal">
-        <div class="lb-shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"><div class="veil"></div><span class="spot-badge">Featured Community Group</span></div>
-        <div class="lb-copy">
-          <p class="eyebrow">Community spotlight</p>
-          <h3>2nd Davidson Scout Group</h3>
-          <p>Davidson, NSW &middot; Sydney North Region. Volunteers run it. They tip for fun and raise real money &mdash; with no corporate budget behind them.</p>
-          <div class="lb-figure">$6,340<small>Raised for Lifeline</small></div>
-        </div>
+      {% else %}
+      <div class="gl-empty reveal">
+        <span class="ge-ic"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+        <h3>Nothing to show here yet.</h3>
+        <p class="note">State totals appear once at least {{ privacy_min }} groups sit behind a figure &mdash; that keeps any single group's giving private.</p>
       </div>
-      <div class="lb-head reveal"><h2>Clubs &amp; community groups</h2><div class="note">Volunteer-run groups sit apart from workplace teams &mdash; they compete against each other, not against corporate budgets.</div></div>
-      <div class="lb lb--orgs reveal">
-        <div class="lb-colhead"><span>Rank</span><span>Group</span><span>Charity</span><span class="r-amt">Raised</span></div>
-        <div class="lb-row t3"><span class="lb-rank">01</span><span class="lb-name"><b>2nd Davidson Scout Group</b><small>Davidson, NSW</small></span><span class="lb-chip">Lifeline</span><span class="lb-amt">$6,340</span></div>
-        <div class="lb-row t3"><span class="lb-rank">02</span><span class="lb-name"><b>Brunswick Cricket Club</b><small>Brunswick, VIC</small></span><span class="lb-chip">headspace</span><span class="lb-amt">$5,180</span></div>
-        <div class="lb-row t3"><span class="lb-rank">03</span><span class="lb-name"><b>Redcliffe Surf Life Saving</b><small>Redcliffe, QLD</small></span><span class="lb-chip">ReachOut</span><span class="lb-amt">$4,720</span></div>
-        <div class="lb-row"><span class="lb-rank">04</span><span class="lb-name"><b>Ballarat Rovers FC</b><small>Ballarat, VIC</small></span><span class="lb-chip">Lifeline</span><span class="lb-amt">$3,860</span></div>
-        <div class="lb-row"><span class="lb-rank">05</span><span class="lb-name"><b>Cronulla Nippers</b><small>Cronulla, NSW</small></span><span class="lb-chip">headspace</span><span class="lb-amt">$3,410</span></div>
-      </div>
+      {% endif %}
     </div>
   </section>
 </div>
@@ -185,5 +197,31 @@
           panel.querySelectorAll('.reveal, .stagger').forEach(function (el) { el.classList.add('in'); });
         });
       });
+    })();
+
+    /* ---- The Good List: type -> sub-category filter, auto-apply ---- */
+    (function () {
+      var form = document.getElementById('glFilters');
+      if (!form) return;
+      var typeSel = document.getElementById('glType');
+      var catSel = document.getElementById('glCat');
+      function syncCats(reset) {
+        var t = typeSel.value;
+        var visible = 0;
+        [].slice.call(catSel.options).forEach(function (o) {
+          if (!o.value) return;
+          var show = !!t && o.getAttribute('data-type') === t;
+          o.hidden = !show;
+          o.disabled = !show;
+          if (show) visible++;
+          if (!show && o.selected && reset) o.selected = false;
+        });
+        if (reset) catSel.value = '';
+        catSel.disabled = !visible;
+      }
+      typeSel.addEventListener('change', function () { syncCats(true); form.submit(); });
+      catSel.addEventListener('change', function () { form.submit(); });
+      document.getElementById('glState').addEventListener('change', function () { form.submit(); });
+      syncCats(false);
     })();
 {% endblock %}

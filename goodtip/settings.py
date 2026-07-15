@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import sys
 import dj_database_url
 from dotenv import load_dotenv
 
@@ -30,6 +31,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    "goodtip.staging_gate.StagingGateMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -77,6 +79,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+    {"NAME": "accounts.validators.PasswordComplexityValidator"},
 ]
 
 LANGUAGE_CODE = "en-au"
@@ -87,7 +90,20 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+# Django 5.1+ only reads STORAGES (the old STATICFILES_STORAGE is ignored).
+# Manifest storage gives content-hashed filenames, so nginx's long-lived
+# "immutable" caching of /static/ can never serve a stale file after a deploy.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    },
+}
+
+# User uploads (profile photos). Served by Django via the /media/ route in
+# goodtip/urls.py — fine at this scale, swap for nginx/S3 if uploads grow.
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -132,6 +148,22 @@ STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
 JOIN_LINK_MAX_AGE_DAYS = 7
+
+# Pre-launch staging gate (branded replacement for nginx auth_basic).
+# STAGING_GATE=true locks the whole site behind /gate/; credentials are
+# "name:password,name:password" pairs (one for the team, one for the client).
+# Unset or set to false at launch to open the site.
+STAGING_GATE = os.environ.get("STAGING_GATE", "False").lower() == "true"
+STAGING_GATE_USERS = os.environ.get("STAGING_GATE_USERS", "")
+if "test" in sys.argv:
+    # Never let a developer's .env lock the test client out of every view;
+    # gate tests enable the gate explicitly via override_settings.
+    STAGING_GATE = False
+    # Manifest storage requires a collectstatic-built manifest, which the test
+    # environment doesn't have; hashed URLs aren't what tests assert on anyway.
+    STORAGES["staticfiles"] = {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+    }
 
 LOGGING = {
     "version": 1,

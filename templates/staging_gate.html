@@ -1,0 +1,75 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Private preview — GoodTip</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;600&family=Barlow+Condensed:wght@600;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --deep:#0F2E22; --deep2:#0B2319; --panel:#152B1E; --forest:#2D7A3A; --lime:#C8F135; --cream:#E8E4D5; --muted:#93A796; }
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+      font-family: 'Archivo', system-ui, sans-serif; color: var(--cream);
+      background: radial-gradient(1100px 700px at 70% -10%, #1A3D2B 0%, var(--deep) 55%, var(--deep2) 100%);
+    }
+    .gate { width: 100%; max-width: 400px; text-align: center; }
+    .wordmark { font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 34px; letter-spacing: .02em; color: #fff; text-transform: uppercase; }
+    .wordmark span { color: var(--lime); }
+    .lock {
+      width: 54px; height: 54px; margin: 26px auto 0; border-radius: 50%;
+      background: rgba(200,241,53,.12); border: 1px solid rgba(200,241,53,.35);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .lock svg { width: 24px; height: 24px; stroke: var(--lime); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    h1 { font-family: 'Archivo Black', sans-serif; font-size: 24px; color: #fff; margin-top: 16px; }
+    .sub { font-size: 14px; line-height: 1.55; color: var(--muted); margin: 10px auto 26px; max-width: 320px; }
+    .card {
+      background: var(--panel); border: 1px solid rgba(255,255,255,.10); border-radius: 16px;
+      padding: 26px 24px; text-align: left; box-shadow: 0 24px 60px rgba(0,0,0,.35);
+    }
+    label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin: 0 0 7px; }
+    input {
+      width: 100%; padding: 12px 14px; margin-bottom: 16px; font: inherit; font-size: 15px; color: #fff;
+      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.16); border-radius: 10px; outline: none;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    input:focus { border-color: var(--lime); box-shadow: 0 0 0 3px rgba(200,241,53,.18); }
+    .err {
+      display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #ffb4a8;
+      background: rgba(180,60,45,.18); border: 1px solid rgba(180,60,45,.4); border-radius: 10px;
+      padding: 10px 12px; margin-bottom: 16px;
+    }
+    button {
+      width: 100%; padding: 13px; font: inherit; font-weight: 600; font-size: 15px; color: var(--deep);
+      background: var(--lime); border: 0; border-radius: 10px; cursor: pointer; transition: filter .15s ease, transform .1s ease;
+    }
+    button:hover { filter: brightness(1.06); }
+    button:active { transform: translateY(1px); }
+    .foot { font-size: 12px; color: var(--muted); margin-top: 22px; }
+  </style>
+</head>
+<body>
+  <main class="gate">
+    <div class="wordmark">Good<span>Tip</span></div>
+    <div class="lock" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.4"/></svg>
+    </div>
+    <h1>Private preview</h1>
+    <p class="sub">GoodTip is still being built. Enter your access details to view the site, then log in or sign up as usual.</p>
+    <form method="post" class="card" action="/gate/">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      {% if error %}<div class="err">Those access details didn't match. Try again.</div>{% endif %}
+      <label for="gate_user">Access name</label>
+      <input type="text" id="gate_user" name="username" autocomplete="username" autocapitalize="none" autofocus required>
+      <label for="gate_pass">Access password</label>
+      <input type="password" id="gate_pass" name="password" autocomplete="current-password" required>
+      <button type="submit">Unlock preview &rarr;</button>
+    </form>
+    <p class="foot">&copy; 2026 GoodTip Pty Ltd &middot; Access is limited while the site is in development.</p>
+  </main>
+</body>
+</html>

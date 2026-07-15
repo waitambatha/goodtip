@@ -1,5 +1,6 @@
 {% extends "app_base.html" %}
 {% block title %}Receipt — {{ org.name }}{% endblock %}
+{% block loader_task %}Fetching your receipt{% endblock %}
 {% block app_content %}
 <div style="display:flex;justify-content:flex-end;max-width:640px;margin:0 auto 14px;" class="no-print"><button type="button" class="abtn abtn-ghost abtn-sm" onclick="window.print()">Print / Save PDF</button></div>
 <div class="receipt">

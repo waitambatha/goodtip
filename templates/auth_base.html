@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:ital,wght@0,400;0,600;1,400&family=Barlow+Condensed:wght@600;900&family=Barlow+Semi+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
+  <script src="{% static 'js/pw-checklist.js' %}" defer></script>
 </head>
 <body>
   {% include "public/partials/_icons.html" %}
@@ -24,6 +25,7 @@
       </div>
       <div class="loader-word">GOOD<span>TIP</span><span class="dot" style="color:var(--lime)">.</span></div>
       <div class="loader-sport" id="loaderSport">Aussie Rules</div>
+      <div class="loader-task">{% block loader_task %}Getting things ready{% endblock %}</div>
       <div class="loader-bar"><i></i></div>
     </div>
   </div>
@@ -45,7 +47,8 @@
         <div class="ab-foot">Not a gambling service &middot; &copy; 2026 GoodTip Pty Ltd</div>
       </div>
     </aside>
-    <main class="auth-main">
+    {# mood-green: deep GoodTip green behind the white form (default) — signup overrides to mood-lime #}
+    <main class="auth-main {% block auth_mood %}mood-green{% endblock %}">
       <div class="auth-card">
         {% if messages %}
           {% for m in messages %}
@@ -73,17 +76,14 @@
       setTimeout(function(){ L.classList.add('out'); document.body.classList.remove('loading'); setTimeout(function(){ L.style.display='none'; }, 600); }, reduce ? 250 : 1200);
     })();
 
-    /* brand image crossfade */
+    /* brand imagery crossfades; the form side keeps its single mood colour */
     var shots = document.querySelectorAll('.ab-bg .shot');
     if (shots.length > 1 && !reduce) {
-      var i = 0; setInterval(function(){ shots[i].classList.remove('on'); i=(i+1)%shots.length; shots[i].classList.add('on'); }, 5000);
+      var i = 0;
+      setInterval(function(){
+        shots[i].classList.remove('on'); i=(i+1)%shots.length; shots[i].classList.add('on');
+      }, 5000);
     }
-
-    /* password strength meter */
-    document.querySelectorAll('[data-pw-strength]').forEach(function(inp){
-      var m=document.getElementById('pwbar'); if(!m)return;
-      inp.addEventListener('input',function(){var v=inp.value,s=0;if(v.length>7)s++;if(/[A-Z]/.test(v))s++;if(/[0-9]/.test(v))s++;if(/[^A-Za-z0-9]/.test(v))s++;m.style.width=(v?20+s*20:0)+'%';m.style.background=s<2?'#d98b2b':s<3?'#C8F135':'#2D7A3A';});
-    });
 
     /* display-name suggester */
     var gen = document.getElementById('genName');

@@ -1,6 +1,7 @@
 {% extends "app_base.html" %}
 {% load team_extras %}
 {% block title %}Donation pledge — {{ org.name }}{% endblock %}
+{% block loader_task %}Opening your donation pledge{% endblock %}
 {% block app_content %}
 <div class="app-head"><div><div class="app-eyebrow">{{ org.name }} &middot; raising for {{ org.charity_display }}</div><h1 class="app-h1">Set your donation pledge</h1><p class="app-sub">Commit your group's donation for the season. This is separate from the platform subscription — every dollar goes to the charity.</p></div></div>
 

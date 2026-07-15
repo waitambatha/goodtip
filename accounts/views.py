@@ -13,7 +13,7 @@ from orgs.models import OrgMember, Organisation
 from tipping.models import Round, Tip
 from tipping.services import user_org_stats, user_rank_in_org
 
-from .forms import LoginForm, ProfileForm, SignupForm
+from .forms import AvatarForm, LoginForm, ProfileForm, SignupForm
 
 
 JOIN_SESSION_KEY = "pending_join_org_id"
@@ -150,8 +150,48 @@ def dashboard_view(request):
             "subscription": subscription,
             "donation": donation,
         })
+    # The dashboard is built around ONE comp at a time: a dropdown picks it,
+    # its games come forth for tipping. Default to the next comp to lock that
+    # still needs tips — that's the one the user should act on.
+    now = timezone.now()
+    selected = None
+    org_param = request.GET.get("org")
+    if org_param:
+        selected = next((c for c in cards if str(c["org"].id) == org_param), None)
+    if selected is None and cards:
+        live = [c for c in cards if c["round"] and c["round"].lockout_at >= now]
+        needing = [c for c in live if c["tips_done"] < c["tips_total"]]
+        pool = needing or live
+        selected = min(pool, key=lambda c: c["round"].lockout_at) if pool else cards[0]
+
+    games = []
+    if selected and selected["round"]:
+        tipped_ids = set(
+            Tip.objects.filter(
+                user=request.user, match__round=selected["round"], org=selected["org"]
+            ).values_list("match_id", flat=True)
+        )
+        for g in (
+            selected["round"].matches
+            .select_related("home_team", "away_team")
+            .order_by("kickoff_at", "id")
+        ):
+            g.tipped = g.id in tipped_ids
+            games.append(g)
+
+    locking_soon = sorted(
+        (
+            c for c in cards
+            if c is not selected and c["round"] and c["round"].lockout_at >= now
+        ),
+        key=lambda c: c["round"].lockout_at,
+    )
+
     return render(request, "dashboard.html", {
         "cards": cards,
+        "selected": selected,
+        "games": games,
+        "locking_soon": locking_soon,
         "create_url": reverse("orgs:create"),
     })
 
@@ -176,6 +216,22 @@ def profile_view(request):
             form.save()
             messages.success(request, "Profile updated.")
             return redirect("profile")
+    elif request.method == "POST" and "avatar" in request.FILES:
+        old_name = request.user.avatar.name if request.user.avatar else ""
+        avatar_form = AvatarForm(request.POST, request.FILES, instance=request.user)
+        if avatar_form.is_valid():
+            avatar_form.save()
+            if old_name and old_name != request.user.avatar.name:
+                request.user.avatar.storage.delete(old_name)
+            messages.success(request, "Profile photo updated.")
+        else:
+            messages.error(request, avatar_form.errors["avatar"].as_text().lstrip("* "))
+        return redirect("profile")
+    elif request.method == "POST" and "remove_avatar" in request.POST:
+        if request.user.avatar:
+            request.user.avatar.delete(save=True)
+            messages.success(request, "Profile photo removed.")
+        return redirect("profile")
     elif request.method == "POST" and "old_password" in request.POST:
         pwd_form = PasswordChangeForm(request.user, request.POST)
         if pwd_form.is_valid():

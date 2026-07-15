@@ -1,10 +1,26 @@
 {% extends "app_base.html" %}
 {% block title %}Profile — GoodTip{% endblock %}
+{% block loader_task %}Opening your profile{% endblock %}
 {% block app_content %}
 <div class="app-head">
-  <div style="display:flex;align-items:center;gap:16px;">
-    <span class="an-avatar" style="width:56px;height:56px;font-size:22px;">{{ user.display_name|slice:":1"|upper }}</span>
-    <div><h1 class="app-h1">{{ user.display_name }}</h1><p class="app-sub" style="margin:2px 0 0;">{{ user.email }}</p></div>
+  <div style="display:flex;align-items:center;gap:18px;">
+    <div>
+      <form method="post" action="{% url 'profile' %}" enctype="multipart/form-data" id="avatarForm">
+        {% csrf_token %}
+        <label class="avatar-edit" title="Add or update your profile photo">
+          <span class="av-face">{% if user.avatar %}<img src="{{ user.avatar.url }}" alt="Your profile photo">{% else %}{{ user.display_name|slice:":1"|upper }}{% endif %}</span>
+          <span class="av-badge" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
+          <input type="file" name="avatar" accept="image/*" hidden onchange="document.getElementById('avatarForm').submit()">
+        </label>
+      </form>
+      {% if user.avatar %}
+      <form method="post" action="{% url 'profile' %}" style="text-align:center;">
+        {% csrf_token %}
+        <button type="submit" name="remove_avatar" value="1" class="avatar-remove">Remove photo</button>
+      </form>
+      {% endif %}
+    </div>
+    <div><h1 class="app-h1">{{ user.display_name }}</h1><p class="app-sub" style="margin:2px 0 0;">{{ user.email }}</p><p class="app-sub" style="margin:2px 0 0;font-size:12.5px;">Click the photo to add or update it.</p></div>
   </div>
 </div>
 

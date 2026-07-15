@@ -1,5 +1,6 @@
 {% extends "app_base.html" %}
 {% block title %}Add to the cause — {{ org.name }}{% endblock %}
+{% block loader_task %}Opening top-ups{% endblock %}
 {% block app_content %}
 <div class="app-head"><div><div class="app-eyebrow">{{ org.name }}</div><h1 class="app-h1">Add to the cause</h1><p class="app-sub">Chuck in a voluntary top-up{% if summary.matching_enabled and summary.matching_remaining %} &mdash; your organisation matches it dollar-for-dollar{% endif %}.</p></div></div>
 

@@ -5,21 +5,33 @@ from django.utils import timezone
 
 class Organisation(models.Model):
     name = models.CharField(max_length=200)
-    # A league is either a workplace team or a volunteer-run community group.
-    # The Good List keeps the two apart so clubs don't rank against corporate
-    # budgets (spec §8). Lookup FKs keep the DB normalised.
+    # Self-selected at sign-up (categories doc, 7 Jul 2026): one of the five
+    # organisation types — Community, Business, Education, Charities, Informal.
+    # Drives the Good List's type filter. Lookup FKs keep the DB normalised.
     group_type = models.ForeignKey(
         "catalog.GroupType", on_delete=models.PROTECT,
         related_name="organisations", null=True, blank=True,
     )
-    # Location + sector power the Good List's "By State" / "By Industry"
-    # aggregates. Both optional — a league can rank nationally without them.
+    # Sub-categories within the type (Business → Finance, Community → Sports
+    # Club…). M2M because an Education org running both a primary and a
+    # secondary school selects both and must surface under BOTH Good List
+    # filters (categories doc build note). Charities/Informal orgs have none.
+    sub_categories = models.ManyToManyField(
+        "catalog.SubCategory", related_name="organisations", blank=True,
+    )
+    # Informal groups have no sub-category list — they self-describe ("Book
+    # Club", "Cycling Crew") and that label shows next to their name on the
+    # Good List.
+    informal_label = models.CharField(max_length=60, blank=True)
+    # Confirmed GoodTip partner charity (categories doc: Charity Partner
+    # Workflow). NEVER self-declared — set only by GoodTip staff in admin.
+    # True lets a Charities-type org lock fundraising to itself (no vote);
+    # false routes it through the standard vote plus a partner CTA.
+    is_charity_partner = models.BooleanField(default=False)
+    # Location is optional — for orgs that operate nationally — and powers the
+    # Good List's state/territory filter.
     state = models.ForeignKey(
         "catalog.State", on_delete=models.SET_NULL,
-        related_name="organisations", null=True, blank=True,
-    )
-    industry = models.ForeignKey(
-        "catalog.Industry", on_delete=models.SET_NULL,
         related_name="organisations", null=True, blank=True,
     )
     # --- Public Good List consent (spec §4) ---
@@ -78,6 +90,19 @@ class Organisation(models.Model):
     def charity_url(self) -> str:
         """Backwards-compatible accessor for templates/code expecting a URL."""
         return self.charity.website if self.charity_id else ""
+
+    @property
+    def category_label(self) -> str:
+        """What shows next to the org's name on the Good List: the informal
+        self-description for Informal groups, otherwise its sub-categories
+        ("Primary School + Secondary School"), otherwise the bare type name.
+        """
+        if self.group_type_id and self.group_type.is_informal:
+            return self.informal_label
+        subs = " + ".join(s.name for s in self.sub_categories.all())
+        if subs:
+            return subs
+        return self.group_type.name if self.group_type_id else ""
 
     @property
     def competition_label(self) -> str:
@@ -241,10 +266,14 @@ class OrgCharitySelection(models.Model):
     SOURCE_INITIAL = "initial"
     SOURCE_VOTE = "vote"
     SOURCE_MANUAL = "manual"
+    SOURCE_SELF = "self"
     SOURCE_CHOICES = [
         (SOURCE_INITIAL, "Set at league creation"),
         (SOURCE_VOTE, "Won the charity vote"),
         (SOURCE_MANUAL, "Changed manually"),
+        # Charity Partner Workflow (categories doc): a confirmed partner
+        # charity locked fundraising to itself — no participant vote.
+        (SOURCE_SELF, "Locked to own charity"),
     ]
 
     org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name="charity_selections")

@@ -13,6 +13,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:ital,wght@0,400;0,600;1,400&family=Barlow+Condensed:wght@600;900&family=Barlow+Semi+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
+  <script src="{% static 'js/gt-ui.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
@@ -41,6 +42,7 @@
       </div>
       <div class="loader-word">GOOD<span>TIP</span><span class="dot" style="color:var(--lime)">.</span></div>
       <div class="loader-sport" id="loaderSport">Aussie Rules</div>
+      <div class="loader-task">{% block loader_task %}Loading the good stuff{% endblock %}</div>
       <div class="loader-bar"><i></i></div>
     </div>
   </div>

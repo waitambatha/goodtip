@@ -18,14 +18,25 @@ class OrgMemberInline(admin.TabularInline):
 @admin.register(Organisation)
 class OrganisationAdmin(admin.ModelAdmin):
     list_display = (
-        "name", "group_type", "state", "industry",
-        "is_public_listed", "season", "charity", "created_at",
+        "name", "group_type", "category_label", "state",
+        "is_charity_partner", "is_public_listed", "season", "charity", "created_at",
     )
-    list_filter = ("group_type", "state", "industry", "is_public_listed", "season", "competitions")
-    list_editable = ("is_public_listed",)
+    # is_charity_partner is set HERE and only here (categories doc: partner
+    # status is never self-declared) — the org creation flow reads it to pick
+    # the lock-to-self vs vote-plus-CTA workflow.
+    list_filter = (
+        "group_type", "sub_categories", "state",
+        "is_charity_partner", "is_public_listed", "season", "competitions",
+    )
+    list_editable = ("is_charity_partner", "is_public_listed")
+    filter_horizontal = ("sub_categories",)
     readonly_fields = ("public_consent_at", "public_consent_by", "public_consent_reconfirmed")
     search_fields = ("name",)
     inlines = [OrgMemberInline]
+
+    @admin.display(description="Sub-category")
+    def category_label(self, obj):
+        return obj.category_label
 
 
 class CharityVoteOptionInline(admin.TabularInline):

@@ -122,13 +122,23 @@ class State(models.Model):
 
 
 class GroupType(models.Model):
-    """How a league is classified — workplace vs. community group.
+    """The organisation type an org self-selects at sign-up (categories doc,
+    7 Jul 2026): Community, Business, Education, Charities, Informal — in that
+    order, which drives both the sign-up dropdown and the Good List filters.
 
-    A lookup table (not a char choice) so the Good List keeps the two surfaces
-    apart by id, and new classifications can be added without a schema change.
+    A lookup table (not a char choice) so the Good List filters by a stable id,
+    and new classifications can be added without a schema change.
     """
 
-    slug = models.SlugField(max_length=30, unique=True)  # workplace, community
+    # Slugs with behaviour attached (categories doc): Charities gets the partner
+    # workflow, Informal self-describes instead of picking a sub-category.
+    SLUG_COMMUNITY = "community"
+    SLUG_BUSINESS = "business"
+    SLUG_EDUCATION = "education"
+    SLUG_CHARITIES = "charities"
+    SLUG_INFORMAL = "informal"
+
+    slug = models.SlugField(max_length=30, unique=True)
     name = models.CharField(max_length=50, unique=True)
     sort_order = models.PositiveIntegerField(default=0)
 
@@ -138,26 +148,53 @@ class GroupType(models.Model):
     def __str__(self):
         return self.name
 
+    @property
+    def has_sub_categories(self) -> bool:
+        return self.sub_categories.filter(is_active=True).exists()
 
-class Industry(models.Model):
-    """A workplace sector, used to group organisations for the Good List's
-    "By Industry" aggregate (Good List spec §3, §8).
+    @property
+    def is_education(self) -> bool:
+        return self.slug == self.SLUG_EDUCATION
 
-    Seeded with a starter taxonomy; the GoodTip team can edit the list in admin
-    without a redeploy. New leagues pick one when they set up.
+    @property
+    def is_charity_type(self) -> bool:
+        return self.slug == self.SLUG_CHARITIES
+
+    @property
+    def is_informal(self) -> bool:
+        return self.slug == self.SLUG_INFORMAL
+
+
+class SubCategory(models.Model):
+    """A sub-category within an organisation type (categories doc, 7 Jul 2026),
+    e.g. Business → Finance, Community → Sports Club, Education → University.
+
+    Replaces the old flat ``Industry`` table: the same idea, but scoped to its
+    parent ``GroupType`` so the sign-up dropdown and the Good List filters show
+    only the sub-categories that belong to the selected type. Charities and
+    Informal deliberately have none — Informal orgs self-describe instead.
+
+    Seeded from the spec; the GoodTip team can edit the list in admin without a
+    redeploy.
     """
 
-    name = models.CharField(max_length=80, unique=True)
-    slug = models.SlugField(max_length=80, unique=True)
-    # Hidden industries drop out of the picker without deleting historical data.
+    group_type = models.ForeignKey(GroupType, on_delete=models.CASCADE, related_name="sub_categories")
+    name = models.CharField(max_length=80)
+    slug = models.SlugField(max_length=80)
+    sort_order = models.PositiveIntegerField(default=0)
+    # Hidden sub-categories drop out of the picker without deleting history.
     is_active = models.BooleanField(default=True)
 
     class Meta:
-        ordering = ["name"]
-        verbose_name_plural = "industries"
+        ordering = ["group_type__sort_order", "sort_order", "name"]
+        verbose_name_plural = "sub-categories"
+        constraints = [
+            models.UniqueConstraint(fields=["group_type", "slug"], name="uniq_subcategory_slug_per_type"),
+            models.UniqueConstraint(fields=["group_type", "name"], name="uniq_subcategory_name_per_type"),
+        ]
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.group_type.name})"
 
 
 class GoodListConfig(models.Model):

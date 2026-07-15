@@ -1,6 +1,7 @@
 {% extends "app_base.html" %}
 {% load team_extras %}
 {% block title %}Round {{ round.round_number }} tips — {{ org.name }}{% endblock %}
+{% block loader_task %}Loading this round's games{% endblock %}
 {% block nav_tips %}on{% endblock %}
 {% block app_content %}
 <div class="app-head">

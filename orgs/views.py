@@ -11,8 +11,10 @@ from .forms import OrgCreateForm
 from .models import CharityVote, CharityVoteOption, OrgCharitySelection, OrgMember, Organisation
 from .services import (
     add_member,
+    can_lock_fundraising,
     cast_charity_ballot,
     close_charity_vote,
+    lock_fundraising_to_self,
     nominate_manager_by_email,
     notify_charity_suggestion,
     open_charity_vote,
@@ -131,9 +133,20 @@ def charity_vote_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _is_member(request.user, org):
         return HttpResponseForbidden()
+    is_admin = _can_manage(request.user, org)
+    # Charity Partner Workflow (categories doc): partners can lock fundraising
+    # to themselves; non-partner charity orgs see the become-a-partner CTA.
+    already_self = bool(org.charity_id and org.charity.name.lower() == org.name.lower())
+    partner_ctx = {
+        "can_lock_fundraising": is_admin and can_lock_fundraising(org) and not already_self,
+        "show_partner_cta": (
+            is_admin and org.group_type_id
+            and org.group_type.is_charity_type and not org.is_charity_partner
+        ),
+    }
     vote = org.charity_votes.first()
     if vote is None:
-        return render(request, "orgs/charity_vote.html", {"org": org, "vote": None})
+        return render(request, "orgs/charity_vote.html", {"org": org, "vote": None, **partner_ctx})
 
     options = list(vote.options.select_related("charity"))
     my_ballot = vote.ballots.filter(user=request.user).first()
@@ -152,7 +165,8 @@ def charity_vote_view(request, org_id: int):
         "my_option_id": my_ballot.option_id if my_ballot else None,
         "ballot_count": vote.ballots.count(),
         "results": results,
-        "is_admin": _can_manage(request.user, org),
+        "is_admin": is_admin,
+        **partner_ctx,
     })
 
 
@@ -187,6 +201,23 @@ def close_charity_vote_view(request, org_id: int):
             messages.success(request, f"Vote closed — {winner.name} won.")
         else:
             messages.error(request, "Vote closed, but no ballots were cast.")
+    return redirect("orgs:charity_vote", org_id=org.id)
+
+
+@login_required
+@require_POST
+def lock_fundraising_view(request, org_id: int):
+    """Charity Partner Workflow: a confirmed partner charity locks fundraising
+    to itself — manager-only, and only once GoodTip staff set the partner flag.
+    """
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _can_manage(request.user, org):
+        return HttpResponseForbidden()
+    try:
+        lock_fundraising_to_self(org)
+        messages.success(request, f"Fundraising locked to {org.name} — no vote needed.")
+    except ValueError as e:
+        messages.error(request, str(e))
     return redirect("orgs:charity_vote", org_id=org.id)
 
 

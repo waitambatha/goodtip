@@ -1,16 +1,69 @@
 {% extends "app_base.html" %}
-{% load team_extras %}
-{% block title %}Create a league — GoodTip{% endblock %}
+{% load team_extras static %}
+{% block title %}Create a competition — GoodTip{% endblock %}
+{% block loader_task %}Opening the competition builder{% endblock %}
+{% block body_class %}page-deep{% endblock %}
 {% block app_content %}
-<div class="app-head"><div><div class="app-eyebrow">New comp</div><h1 class="app-h1">Create a league</h1><p class="app-sub">Stand up a tipping comp. You'll be the Owner, Manager and Captain to start.</p></div></div>
+<div class="page-scenes" aria-hidden="true">
+  <div class="scene left">
+    <div class="shot on" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+  </div>
+  <div class="scene right">
+    <div class="shot on" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+  </div>
+</div>
+<div class="app-head head-center"><div><div class="app-eyebrow">New competition</div><h1 class="app-h1">Create a competition</h1><p class="app-sub">Stand up a tipping comp. You'll be the Owner, Manager and Captain to start.</p></div></div>
 
 {% if form.non_field_errors %}<div class="flash error" style="margin-bottom:16px;"><span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
 
-<form method="post" action="{% url 'orgs:create' %}" style="max-width:720px;">
+<form method="post" action="{% url 'orgs:create' %}" class="form-centered form-lime">
   {% csrf_token %}
   <div class="card pad-lg" style="margin-bottom:16px;">
     <div class="fld"><label for="id_name">League name</label><input type="text" name="name" id="id_name" value="{{ form.name.value|default:'' }}" placeholder="e.g. Eclat Footy Tips">
       {% if form.name.errors %}<div class="fld-err">{{ form.name.errors|join:" " }}</div>{% endif %}</div>
+
+    <div class="fld"><label for="id_group_type">Organisation type</label>
+      <select name="group_type" id="id_group_type">
+        <option value="">— Choose your organisation type —</option>
+        {% for gt in form.fields.group_type.queryset %}<option value="{{ gt.pk }}" data-slug="{{ gt.slug }}" {% if form.group_type.value|stringformat:'s' == gt.pk|stringformat:'s' %}selected{% endif %}>{{ gt.name }}</option>{% endfor %}
+      </select>
+      {% if form.group_type.errors %}<div class="fld-err">{{ form.group_type.errors|join:" " }}</div>{% endif %}
+    </div>
+
+    <div class="fld" data-cat="community business education" style="display:none;">
+      <label>Sub-category <span id="subcatHint" style="color:var(--muted);font-weight:400;"></span></label>
+      <div class="opt-grid cols2" style="margin-top:8px;" id="subcatGrid">
+        {% for sc in form.fields.sub_categories.queryset %}
+        <label class="opt-card" data-type="{{ sc.group_type.slug }}"><input type="checkbox" name="sub_categories" value="{{ sc.pk }}" {% is_checked form.sub_categories sc.pk %}><span class="oc-box"><svg><use href="#ic-check"/></svg></span><span class="oc-title">{{ sc.name }}</span></label>
+        {% endfor %}
+      </div>
+      {% if form.sub_categories.errors %}<div class="fld-err">{{ form.sub_categories.errors|join:" " }}</div>{% endif %}
+    </div>
+
+    <div class="fld" data-cat="informal" style="display:none;">
+      <label for="id_informal_label">What kind of group are you?</label>
+      <input type="text" name="informal_label" id="id_informal_label" maxlength="60" value="{{ form.informal_label.value|default:'' }}" placeholder="e.g. Book Club, Gaming Group, Cycling Crew">
+      <div class="hint">This label shows next to your name on The Good List.</div>
+      {% if form.informal_label.errors %}<div class="fld-err">{{ form.informal_label.errors|join:" " }}</div>{% endif %}
+    </div>
+
+    <div class="fld" data-cat="charities" style="display:none;">
+      <div class="card pad-lg" style="background:rgba(45,122,58,.06);border-color:rgba(45,122,58,.35);">
+        <div class="card-h">Fundraising for your own charity?</div>
+        <p class="card-lead" style="margin-bottom:0;">Confirmed <b>GoodTip Partner Charities</b> can lock their league's fundraising to themselves — no participant vote. Once your league is created, our team confirms your partner status and the lock option appears on your charity page. Not a partner yet? <a href="mailto:partnerships@goodtip.com.au?subject=Partner%20Charity%20enquiry">Contact the partnerships team</a>. Until then, the standard charity selection below applies.</p>
+      </div>
+    </div>
+
+    <div class="fld"><label for="id_state">State or territory <span style="color:var(--muted);font-weight:400;">(optional — skip it if you operate nationally)</span></label>
+      <select name="state" id="id_state">
+        <option value="">— We operate nationally —</option>
+        {% for st in form.fields.state.queryset %}<option value="{{ st.pk }}" {% if form.state.value|stringformat:'s' == st.pk|stringformat:'s' %}selected{% endif %}>{{ st.name }}</option>{% endfor %}
+      </select>
+      {% if form.state.errors %}<div class="fld-err">{{ form.state.errors|join:" " }}</div>{% endif %}
+    </div>
+
     <div class="fld">
       <label>Competitions</label>
       <div class="opt-grid cols2">
@@ -61,7 +114,7 @@
     </div>
   </div>
 
-  <button type="submit" class="abtn abtn-primary">Create league &rarr;</button>
+  <button type="submit" class="abtn abtn-primary abtn-lg">Create competition &rarr;</button>
 </form>
 {% endblock %}
 
@@ -75,5 +128,42 @@
       }
       radios.forEach(function(r){ r.addEventListener('change', sync); });
       sync();
+    })();
+
+    /* organisation type -> dependent sub-category / informal / charity blocks */
+    (function(){
+      var typeSel = document.getElementById('id_group_type');
+      if (!typeSel) return;
+      var hint = document.getElementById('subcatHint');
+      var cards = document.querySelectorAll('#subcatGrid .opt-card');
+      function slug(){
+        var o = typeSel.options[typeSel.selectedIndex];
+        return o ? (o.getAttribute('data-slug') || '') : '';
+      }
+      function sync(clear){
+        var s = slug();
+        document.querySelectorAll('[data-cat]').forEach(function(el){
+          el.style.display = el.getAttribute('data-cat').split(' ').indexOf(s) !== -1 ? '' : 'none';
+        });
+        cards.forEach(function(c){
+          var mine = c.getAttribute('data-type') === s;
+          c.style.display = mine ? '' : 'none';
+          if (!mine && clear) c.querySelector('input').checked = false;
+        });
+        if (hint) hint.textContent = s === 'education' ? '(Primary and Secondary can be combined)' : '(pick one)';
+      }
+      /* single-pick behaviour for every type except Education */
+      cards.forEach(function(c){
+        c.querySelector('input').addEventListener('change', function(){
+          if (slug() === 'education' || !this.checked) return;
+          var me = this;
+          cards.forEach(function(o){
+            var i = o.querySelector('input');
+            if (i !== me) i.checked = false;
+          });
+        });
+      });
+      typeSel.addEventListener('change', function(){ sync(true); });
+      sync(false); /* keep server-rendered state on validation re-render */
     })();
 {% endblock %}

@@ -11,9 +11,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:ital,wght@0,400;0,600;1,400&family=Barlow+Condensed:wght@600;900&family=Barlow+Semi+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script src="{% static 'js/gt-ui.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
 </head>
-<body class="app">
+<body class="app {% block body_class %}{% endblock %}">
   {% include "public/partials/_icons.html" %}
 
   {# ---- sport loader (alternates per load) ---- #}
@@ -29,6 +30,7 @@
       </div>
       <div class="loader-word">GOOD<span>TIP</span><span class="dot" style="color:var(--lime)">.</span></div>
       <div class="loader-sport" id="loaderSport">Aussie Rules</div>
+      <div class="loader-task">{% block loader_task %}Getting things ready{% endblock %}</div>
       <div class="loader-bar"><i></i></div>
     </div>
   </div>
@@ -68,7 +70,7 @@
         {% if user.is_staff %}<a href="{% url 'manage:overview' %}" class="{% block nav_admin %}{% endblock %}">Admin</a>{% endif %}
       </div>
       <div class="an-right">
-        <a href="{% url 'profile' %}" class="an-profile" title="Profile"><span class="an-avatar">{{ user.display_name|slice:":1"|upper }}</span><span class="an-plabel">Profile</span></a>
+        <a href="{% url 'profile' %}" class="an-profile" title="Profile">{% if user.avatar %}<span class="an-avatar has-img"><img src="{{ user.avatar.url }}" alt=""></span>{% else %}<span class="an-avatar">{{ user.display_name|slice:":1"|upper }}</span>{% endif %}<span class="an-plabel">Profile</span></a>
         <span class="an-divider"></span>
         <a href="{% url 'accounts:logout' %}" class="an-logout" title="Log out"><svg><use href="#ic-logout"/></svg><span class="an-llabel">Log out</span></a>
         <button class="an-burger" aria-label="Menu" data-sheet-open><svg><use href="#ic-menu"/></svg></button>

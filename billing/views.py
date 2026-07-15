@@ -8,14 +8,63 @@ from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
+from catalog.models import GoodListConfig, GroupType, State
 from orgs.models import OrgMember, Organisation
 
-from . import donations, services
+from . import donations, goodlist, services
 from .forms import DonationPledgeForm, TopUpForm
 from .models import DonationPledge, PlanSubscription
 from .pricing import TIERS, seat_limit_label
 
 logger = logging.getLogger(__name__)
+
+
+def good_list_view(request):
+    """The public Good List (/leaderboard/) — live, privacy-gated data only.
+
+    Never renders placeholder or example figures (categories doc reminder).
+    The By Group board filters by organisation type, sub-category within that
+    type, and state/territory via GET params.
+    """
+    type_slug = request.GET.get("type", "")
+    cat_slug = request.GET.get("cat", "")
+    state_code = request.GET.get("state", "")
+
+    group_types = list(GroupType.objects.prefetch_related("sub_categories"))
+    states = list(State.objects.all())
+    # Drop unknown / mismatched filter values rather than 404ing a public page.
+    if type_slug and not any(gt.slug == type_slug for gt in group_types):
+        type_slug = ""
+    if cat_slug and (not type_slug or not any(
+        sc.slug == cat_slug
+        for gt in group_types if gt.slug == type_slug
+        for sc in gt.sub_categories.all()
+    )):
+        cat_slug = ""
+    if state_code and not any(s.code == state_code for s in states):
+        state_code = ""
+
+    cfg = GoodListConfig.get()
+    return render(request, "public/leaderboard.html", {
+        "active": "leaderboard",
+        "national_total": goodlist.national_total(),
+        "board_live": goodlist.board_is_live(),
+        "groups": goodlist.by_group(
+            group_type_slug=type_slug or None,
+            sub_category_slug=cat_slug or None,
+            state_code=state_code or None,
+        ),
+        "by_charity": goodlist.by_charity(),
+        "by_state": goodlist.by_state(),
+        "by_sub_category": goodlist.by_sub_category(),
+        "group_types": group_types,
+        "states": states,
+        "sel_type": type_slug,
+        "sel_cat": cat_slug,
+        "sel_state": state_code,
+        "privacy_min": cfg.privacy_min_groups,
+        "credibility_min": cfg.credibility_min_groups,
+    })
 
 
 def _require_owner(user, org):

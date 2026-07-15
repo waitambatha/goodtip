@@ -1,5 +1,6 @@
 {% extends "app_base.html" %}
 {% block title %}Members — {{ org.name }}{% endblock %}
+{% block loader_task %}Loading your members{% endblock %}
 {% block app_content %}
 <div class="app-head"><div><div class="app-eyebrow">{{ org.name }}</div><h1 class="app-h1">Members</h1><p class="app-sub">Manage roles for your group.{% if is_owner %} Owners can nominate managers.{% endif %}</p></div>
   <a href="{% url 'orgs:invite' org.id %}" class="abtn abtn-ghost abtn-sm">Invite</a></div>

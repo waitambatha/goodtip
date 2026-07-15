@@ -1,9 +1,27 @@
 {% extends "app_base.html" %}
 {% block title %}Charity vote — {{ org.name }}{% endblock %}
+{% block loader_task %}Opening the charity vote{% endblock %}
 {% block app_content %}
 <div class="app-head"><div><div class="app-eyebrow">{{ org.name }}</div><h1 class="app-h1">Where should the money go?</h1>
   {% if vote and vote.is_open %}<p class="app-sub">Blind vote &mdash; tallies stay hidden until a manager closes it. You can change your pick any time before then.</p>{% endif %}</div>
   {% if vote and vote.is_open %}<span class="badge-live">Vote open</span>{% endif %}</div>
+
+{% if can_lock_fundraising %}
+<div class="card pad-lg" style="max-width:640px;margin-bottom:16px;border-color:var(--forest);">
+  <div class="card-h">You're a GoodTip Partner Charity</div>
+  <p class="card-lead">You can lock this league's fundraising to {{ org.name }} — no participant vote needed.{% if vote and vote.is_open %} This will close the open vote.{% endif %}</p>
+  <form method="post" action="{% url 'orgs:lock_fundraising' org.id %}" onsubmit="return confirm('Lock all fundraising to {{ org.name|escapejs }}?')">
+    {% csrf_token %}
+    <button type="submit" class="abtn abtn-primary">Lock fundraising to us &rarr;</button>
+  </form>
+</div>
+{% elif show_partner_cta %}
+<div class="card pad-lg" style="max-width:640px;margin-bottom:16px;">
+  <div class="card-h">Want to become a GoodTip Partner Charity?</div>
+  <p class="card-lead">Partner charities can lock their league's fundraising to themselves — no vote needed. Get in touch with our partnerships team to get confirmed.</p>
+  <a class="abtn abtn-dark" href="mailto:partnerships@goodtip.com.au?subject=Partner%20Charity%20enquiry%20&mdash;%20{{ org.name|urlencode }}">Contact the partnerships team &rarr;</a>
+</div>
+{% endif %}
 
 {% if not vote %}
   <div class="card pad-lg" style="text-align:center;max-width:640px;"><div class="card-h">No vote running</div><p class="card-lead">This league's charity was chosen directly — there's no vote to show.</p></div>

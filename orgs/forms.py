@@ -1,19 +1,14 @@
 from django import forms
-from django.utils.text import slugify
 
-from catalog.models import Charity, Competition, Season
+from catalog.models import Charity, Competition, GroupType, Season, State, SubCategory
 
 from .models import Organisation
+from .services import unique_charity_slug as _unique_charity_slug
 
-
-def _unique_charity_slug(name: str) -> str:
-    base = slugify(name)[:200] or "charity"
-    slug = base
-    i = 2
-    while Charity.objects.filter(slug=slug).exists():
-        slug = f"{base}-{i}"
-        i += 1
-    return slug
+# The only allowed sub-category pairing (categories doc build note): a school
+# running both levels selects Primary + Secondary and surfaces under both
+# Good List filters. Every other type picks exactly one sub-category.
+EDUCATION_PAIR = {"primary-school", "secondary-school"}
 
 
 class OrgCreateForm(forms.ModelForm):
@@ -22,6 +17,29 @@ class OrgCreateForm(forms.ModelForm):
         ("vote", "Let the group vote"),
     ]
 
+    group_type = forms.ModelChoiceField(
+        queryset=GroupType.objects.all(),  # ordered by sort_order per the spec
+        label="Organisation type",
+        empty_label="— Choose your organisation type —",
+    )
+    sub_categories = forms.ModelMultipleChoiceField(
+        queryset=SubCategory.objects.filter(is_active=True).select_related("group_type"),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label="Sub-category",
+    )
+    informal_label = forms.CharField(
+        required=False,
+        max_length=60,
+        label="What kind of group are you?",
+        widget=forms.TextInput(attrs={"placeholder": "e.g. Book Club, Gaming Group, Cycling Crew"}),
+    )
+    state = forms.ModelChoiceField(
+        queryset=State.objects.all(),
+        required=False,
+        label="State or territory (optional)",
+        empty_label="— We operate nationally —",
+    )
     competitions = forms.ModelMultipleChoiceField(
         queryset=Competition.objects.select_related("sport", "season"),
         widget=forms.CheckboxSelectMultiple,
@@ -58,7 +76,10 @@ class OrgCreateForm(forms.ModelForm):
 
     class Meta:
         model = Organisation
-        fields = ["name", "competitions", "season", "team_size", "finals_only"]
+        fields = [
+            "name", "group_type", "sub_categories", "informal_label", "state",
+            "competitions", "season", "team_size", "finals_only",
+        ]
         labels = {
             "name": "League name",
             "team_size": "Expected group size (optional)",
@@ -74,8 +95,40 @@ class OrgCreateForm(forms.ModelForm):
         self.fields["season"].queryset = Season.objects.all()
         self.fields["season"].empty_label = None
 
+    def _clean_categories(self, cleaned):
+        """Per-type rules from the categories doc: Community/Business pick one
+        sub-category, Education picks one or the Primary+Secondary pair,
+        Charities has none, Informal self-describes instead.
+        """
+        gt = cleaned.get("group_type")
+        if gt is None:
+            return
+        # Ignore stale checkboxes from a previously-selected type.
+        subs = [s for s in cleaned.get("sub_categories") or [] if s.group_type_id == gt.id]
+        cleaned["sub_categories"] = subs
+
+        if gt.is_informal:
+            if not (cleaned.get("informal_label") or "").strip():
+                self.add_error("informal_label", "Tell us what kind of group you are — it shows next to your name on The Good List.")
+            return
+        cleaned["informal_label"] = ""
+
+        if gt.is_charity_type:
+            cleaned["sub_categories"] = []
+            return
+
+        if not subs:
+            self.add_error("sub_categories", "Pick a sub-category.")
+        elif gt.is_education:
+            slugs = {s.slug for s in subs}
+            if len(subs) > 1 and not slugs <= EDUCATION_PAIR:
+                self.add_error("sub_categories", "Pick one — only Primary School and Secondary School can be combined.")
+        elif len(subs) > 1:
+            self.add_error("sub_categories", "Pick just one sub-category.")
+
     def clean(self):
         cleaned = super().clean()
+        self._clean_categories(cleaned)
         method = cleaned.get("charity_method")
         if method == "vote":
             candidates = cleaned.get("vote_charities")

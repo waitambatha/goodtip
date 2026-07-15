@@ -3,16 +3,17 @@
 {% load humanize %}
 {% block title %}Dashboard — GoodTip{% endblock %}
 {% block nav_dash %}on{% endblock %}
+{% block loader_task %}Opening your dashboard{% endblock %}
 {% block app_content %}
 
 {% if not cards %}
   <div class="card pad-lg" style="text-align:center;">
     <div class="card-h" style="font-size:20px;">You're not in a comp yet</div>
     <p class="card-lead" style="margin:6px 0 18px;">Start your own or ask a group manager for a join link.</p>
-    <a href="{% url 'orgs:create' %}" class="abtn abtn-primary">Start a league</a>
+    <a href="{% url 'orgs:create' %}" class="abtn abtn-primary abtn-lg">Create a competition</a>
   </div>
 {% else %}
-{% with c=cards.0 %}
+{% with c=selected %}
 
 <!-- greeting banner -->
 <div class="dash-banner">
@@ -27,13 +28,29 @@
       <h1 class="app-h1" style="color:#fff;">Welcome back, {{ user.display_name }}</h1>
       {% if c.rank %}<p style="color:var(--cream);opacity:.8;margin-top:4px;font-size:14px;">You're {{ c.rank|ordinal }} on the {{ c.org.name }} ladder.</p>{% endif %}
     </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
       {% for label in c.role_labels %}<span class="pill-role {{ label|lower }}">{{ label }}</span>{% endfor %}
     </div>
   </div>
 </div>
 
-<!-- primary league card -->
+<!-- comp picker + create -->
+<div class="dash-ctl">
+  <form method="get" action="" class="dc-pick">
+    <span class="dc-lab">Your comps</span>
+    <select name="org" id="dashOrg" aria-label="Choose a competition" onchange="this.form.submit()">
+      {% for oc in cards %}
+      <option value="{{ oc.org.id }}" {% if oc.org.id == c.org.id %}selected{% endif %}>
+        {{ oc.org.name }}{% if oc.tips_total %} — {{ oc.tips_done }}/{{ oc.tips_total }} tipped{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+    <noscript><button type="submit" class="abtn abtn-dark abtn-sm">Go</button></noscript>
+  </form>
+  <a href="{% url 'orgs:create' %}" class="abtn abtn-primary abtn-xl">+ Create a competition</a>
+</div>
+
+<!-- selected comp -->
 <div class="card pad-lg" style="margin-bottom:18px;">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
     <div><div class="card-h" style="font-size:20px;">{{ c.org.name }}</div><div class="card-lead">{{ c.org.sport_label }} &middot; {{ c.org.season }} &middot; raising for {{ c.org.charity_display }}</div></div>
@@ -41,6 +58,7 @@
       {% if c.is_admin %}<a href="{% url 'orgs:members' c.org.id %}" class="abtn abtn-ghost abtn-sm">Members</a>
       <a href="{% url 'orgs:invite' c.org.id %}" class="abtn abtn-ghost abtn-sm">Invite</a>
       <a href="{% url 'billing:season_summary' c.org.id %}" class="abtn abtn-ghost abtn-sm">Season summary</a>{% endif %}
+      <a href="{% url 'tipping:my_tips' c.org.id %}" class="abtn abtn-ghost abtn-sm">My tips</a>
       <a href="{% url 'tipping:leaderboard' c.org.id %}" class="abtn abtn-dark abtn-sm">Leaderboard</a>
     </div>
   </div>
@@ -70,12 +88,24 @@
         {% include "partials/countdown.html" with round=c.round %}
       </div>
     </div>
+
+    <!-- this round's games: see the slate, tip it, done -->
+    <div class="fixtures">
+      {% for g in games %}
+      <div class="fx {% if g.tipped %}done{% endif %}">
+        <span class="fx-teams"><b>{{ g.home_team.name }}</b><i>vs</i><b>{{ g.away_team.name }}</b></span>
+        <span class="fx-meta">{{ g.kickoff_at|date:"D j M · g:i A" }}{% if g.venue %} &middot; {{ g.venue }}{% endif %}</span>
+        <span class="fx-pill">{% if g.tipped %}Tipped{% else %}Open{% endif %}</span>
+      </div>
+      {% endfor %}
+    </div>
+
     <div style="margin:18px 0 8px;display:flex;justify-content:space-between;font-size:13px;color:var(--muted);"><span>Tips submitted</span><span class="mono">{{ c.tips_done }} / {{ c.tips_total }}</span></div>
     <div class="pbar"><i style="width:{% widthratio c.tips_done c.tips_total|default:1 100 %}%"></i></div>
     <div style="margin-top:16px;">
-      {% if c.round.is_locked %}<a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="abtn abtn-ghost">Review tips &rarr;</a>
-      {% elif c.tips_done < c.tips_total %}<a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="abtn abtn-primary">Finish your tips &rarr;</a>
-      {% else %}<a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="abtn abtn-ghost">All tips in — review &rarr;</a>{% endif %}
+      {% if c.round.is_locked %}<a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="abtn abtn-primary abtn-lg">Review tips &rarr;</a>
+      {% elif c.tips_done < c.tips_total %}<a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="abtn abtn-primary abtn-lg">Make your tips &rarr;</a>
+      {% else %}<a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="abtn abtn-primary abtn-lg">All tips in — review &rarr;</a>{% endif %}
     </div>
   </div>
   {% endif %}
@@ -120,6 +150,22 @@
   {% endif %}
 </div>
 
+<!-- what's locking across your other comps -->
+{% if locking_soon %}
+<div class="hub-h" style="margin-bottom:12px;"><span class="k">Locking soon in your other comps</span></div>
+<div class="locksoon">
+  {% for oc in locking_soon|slice:":6" %}
+  <a class="ls-row" href="?org={{ oc.org.id }}">
+    <span class="ls-live">Live</span>
+    <span class="ls-name">{{ oc.org.name }}</span>
+    <span class="ls-round">R{{ oc.round.round_number }} &middot; {{ oc.round.series }}</span>
+    <span class="ls-tips {% if oc.tips_done < oc.tips_total %}warn{% endif %}">{{ oc.tips_done }}/{{ oc.tips_total }}</span>
+    <span class="ls-lock">locks in {{ oc.round.lockout_at|timeuntil }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
 <!-- footy news (sample content) -->
 <div class="hub-h" style="margin-bottom:14px;"><span class="k">Around the grounds <span class="sample-tag">Sample</span></span><a href="#">More footy news &rarr;</a></div>
 <div class="grid-app g-3" style="margin-bottom:16px;">
@@ -134,28 +180,6 @@
   <div class="news-item"><span class="ntag afl">AFL</span><div><div class="nt">Ladder watch: the percentage battle for a home final</div><div class="nd">Sample &middot; 3 days ago</div></div></div>
   <div class="news-item"><span class="ntag nrl">NRL</span><div><div class="nt">Halves shuffle as clubs manage the Origin period</div><div class="nd">Sample &middot; 3 days ago</div></div></div>
 </div>
-
-{% if cards|length > 1 %}
-<div class="hub-h" style="margin-bottom:12px;"><span class="k">Your other comps</span><a href="{% url 'orgs:create' %}">Create a comp &rarr;</a></div>
-<div class="grid-app g-2" style="margin-bottom:26px;">
-  {% for oc in cards|slice:"1:" %}
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
-      <div><div class="card-h">{{ oc.org.name }}</div><div class="card-lead">{{ oc.org.sport_label }} &middot; {{ oc.org.season }} &middot; {{ oc.org.charity_display }}</div></div>
-      <div style="display:flex;gap:6px;">
-        <a href="{% url 'tipping:my_tips' oc.org.id %}" class="abtn abtn-ghost abtn-sm">Tips</a>
-        <a href="{% url 'tipping:leaderboard' oc.org.id %}" class="abtn abtn-ghost abtn-sm">Board</a>
-      </div>
-    </div>
-    <div class="comp-stats">
-      <div class="cs"><div class="k">Round</div><div class="v">{{ oc.tips_done }}<small>/{{ oc.tips_total }}</small></div></div>
-      <div class="cs"><div class="k">Comp rank</div><div class="v">{{ oc.rank|default:"—" }}</div></div>
-      <div class="cs"><div class="k">Points</div><div class="v">{{ oc.points }}</div></div>
-    </div>
-  </div>
-  {% endfor %}
-</div>
-{% endif %}
 
 {% endwith %}
 {% endif %}

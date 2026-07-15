@@ -89,3 +89,17 @@ class ProfileForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ["display_name"]
+
+
+class AvatarForm(forms.ModelForm):
+    MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+
+    class Meta:
+        model = User
+        fields = ["avatar"]
+
+    def clean_avatar(self):
+        avatar = self.cleaned_data.get("avatar")
+        if avatar and avatar.size > self.MAX_BYTES:
+            raise forms.ValidationError("Please choose an image under 5 MB.")
+        return avatar

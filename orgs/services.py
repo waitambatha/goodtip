@@ -5,6 +5,7 @@ from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Count
 from django.utils import timezone
+from django.utils.text import slugify
 
 from .models import (
     CharityVote,
@@ -15,6 +16,18 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def unique_charity_slug(name: str) -> str:
+    from catalog.models import Charity
+
+    base = slugify(name)[:200] or "charity"
+    slug = base
+    i = 2
+    while Charity.objects.filter(slug=slug).exists():
+        slug = f"{base}-{i}"
+        i += 1
+    return slug
 
 
 def notify_charity_suggestion(charity, org, user) -> None:
@@ -168,3 +181,38 @@ def close_charity_vote(vote: CharityVote):
     if winner is not None:
         set_org_charity(vote.org, winner, source=OrgCharitySelection.SOURCE_VOTE)
     return winner
+
+
+def can_lock_fundraising(org) -> bool:
+    """Charity Partner Workflow (categories doc): only a Charities-type org
+    whose partner flag GoodTip staff have set in admin may lock fundraising
+    to itself. The flag is never self-declared.
+    """
+    return bool(org.group_type_id and org.group_type.is_charity_type and org.is_charity_partner)
+
+
+@transaction.atomic
+def lock_fundraising_to_self(org):
+    """Point the org's fundraising at itself — no participant vote required.
+
+    Creates (or reuses) a Charity record carrying the org's own name and makes
+    it the org's charity. Any open vote is closed unresolved: the lock
+    supersedes it. The org's own Charity record stays ``is_approved=False`` so
+    it doesn't enter every other league's public picker.
+    """
+    from catalog.models import Charity
+
+    if not can_lock_fundraising(org):
+        raise ValueError("Only confirmed GoodTip Partner Charities can lock fundraising to themselves.")
+    vote = org.active_charity_vote
+    if vote is not None:
+        vote.status = "closed"
+        vote.closed_at = timezone.now()
+        vote.save(update_fields=["status", "closed_at"])
+    charity = Charity.objects.filter(name__iexact=org.name).first()
+    if charity is None:
+        charity = Charity.objects.create(
+            name=org.name, slug=unique_charity_slug(org.name), is_approved=False,
+        )
+    set_org_charity(org, charity, source=OrgCharitySelection.SOURCE_SELF)
+    return charity

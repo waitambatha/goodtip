@@ -1,14 +1,18 @@
+from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import include, path
 from django.views.generic import TemplateView
+from django.views.static import serve as static_serve
 
 from accounts.views import dashboard_view
-from billing.views import stripe_webhook
+from billing.views import good_list_view, stripe_webhook
+from goodtip.staging_gate import gate_view
 from orgs.views import join_view
 
 
 urlpatterns = [
+    path("gate/", gate_view, name="staging_gate"),
     path("admin/", admin.site.urls),
     # Public marketing pages (no login required)
     path("", TemplateView.as_view(
@@ -23,10 +27,8 @@ urlpatterns = [
         template_name="public/wall.html",
         extra_context={"active": "wall"},
     ), name="wall"),
-    path("leaderboard/", TemplateView.as_view(
-        template_name="public/leaderboard.html",
-        extra_context={"active": "leaderboard"},
-    ), name="good_list"),
+    # The Good List — live, privacy-gated data (no placeholder figures).
+    path("leaderboard/", good_list_view, name="good_list"),
     path("pricing/", TemplateView.as_view(
         template_name="public/pricing.html",
         extra_context={"active": "pricing"},
@@ -56,4 +58,7 @@ urlpatterns = [
     path("stripe/webhook/", stripe_webhook, name="stripe_webhook"),
     path("org/", include("tipping.urls", namespace="tipping")),
     path("manage/", include("admin_panel.urls", namespace="manage")),
+    # User uploads (profile photos). Served by Django regardless of DEBUG —
+    # fine at avatar scale; move behind nginx/S3 if uploads ever grow.
+    path("media/<path:path>", static_serve, {"document_root": settings.MEDIA_ROOT}, name="media"),
 ]

@@ -8,17 +8,24 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:ital,wght@0,400;0,600;1,400&family=Barlow+Condensed:wght@600;900&family=Barlow+Semi+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
+  <script src="{% static 'js/gt-ui.js' %}" defer></script>
 </head>
 <body>
   {% include "public/partials/_icons.html" %}
   <div class="admin">
+    <div class="page-scenes" aria-hidden="true">
+      <div class="scene right">
+        <div class="shot on" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+        <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+      </div>
+    </div>
     <aside class="admin-side">
       <div class="as-brand">GOOD<span>TIP</span></div>
       <div class="as-tag">Manage</div>
+      <a href="{% url 'dashboard' %}" class="as-back">&larr; Back to app</a>
       <a href="{% url 'manage:overview' %}" class="{% block nav_overview %}{% endblock %}"><svg><use href="#ic-chart"/></svg> Overview</a>
       <a href="{% url 'manage:orgs_list' %}" class="{% block nav_orgs %}{% endblock %}"><svg><use href="#ic-users"/></svg> Orgs</a>
       <a href="{% url 'manage:sync' %}" class="{% block nav_sync %}{% endblock %}"><svg><use href="#ic-recycle"/></svg> Sync</a>
-      <div class="as-foot"><a href="{% url 'dashboard' %}">&larr; Back to app</a></div>
     </aside>
     <main class="admin-main">
       {% if messages %}

@@ -1,0 +1,14 @@
+{% comment %}
+Live password-requirements checklist. Ticks go green as each rule is met.
+Usage: {% include "partials/pw_checklist.html" with input_id="id_password1" confirm_id="id_password2" %}
+Driven by static/js/pw-checklist.js; the data-req keys mirror
+accounts.validators.PasswordComplexityValidator + MinimumLengthValidator.
+{% endcomment %}
+<ul class="pw-checks" data-pw-checks="{{ input_id }}"{% if confirm_id %} data-pw-confirm="{{ confirm_id }}"{% endif %} aria-live="polite">
+  <li data-req="len"><span class="pwc-ic" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 6.5l2.5 2.5 4.5-5.5"/></svg></span>At least 8 characters</li>
+  <li data-req="upper"><span class="pwc-ic" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 6.5l2.5 2.5 4.5-5.5"/></svg></span>One uppercase letter (A&ndash;Z)</li>
+  <li data-req="lower"><span class="pwc-ic" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 6.5l2.5 2.5 4.5-5.5"/></svg></span>One lowercase letter (a&ndash;z)</li>
+  <li data-req="digit"><span class="pwc-ic" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 6.5l2.5 2.5 4.5-5.5"/></svg></span>One number (0&ndash;9)</li>
+  <li data-req="symbol"><span class="pwc-ic" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 6.5l2.5 2.5 4.5-5.5"/></svg></span>One symbol (! @ # $ %&hellip;)</li>
+  {% if confirm_id %}<li data-req="match"><span class="pwc-ic" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 6.5l2.5 2.5 4.5-5.5"/></svg></span>Passwords match</li>{% endif %}
+</ul>

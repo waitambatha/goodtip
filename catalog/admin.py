@@ -5,11 +5,11 @@ from .models import (
     Competition,
     GoodListConfig,
     GroupType,
-    Industry,
     Season,
     Series,
     State,
     Sport,
+    SubCategory,
 )
 
 
@@ -24,11 +24,11 @@ class GroupTypeAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
 
 
-@admin.register(Industry)
-class IndustryAdmin(admin.ModelAdmin):
-    list_display = ("name", "is_active", "slug")
-    list_filter = ("is_active",)
-    list_editable = ("is_active",)
+@admin.register(SubCategory)
+class SubCategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "group_type", "is_active", "sort_order", "slug")
+    list_filter = ("group_type", "is_active")
+    list_editable = ("is_active", "sort_order")
     prepopulated_fields = {"slug": ("name",)}
 
 

@@ -1,5 +1,7 @@
 {% extends "auth_base.html" %}
 {% block title %}Sign up — GoodTip{% endblock %}
+{% block loader_task %}Setting up your signup{% endblock %}
+{% block auth_mood %}mood-lime{% endblock %}
 {% block brand_head %}Join the comp. <em>Do some good.</em>{% endblock %}
 {% block auth_form %}
 <h1>Create your account</h1>
@@ -28,12 +30,12 @@
     <input type="password" name="password1" id="id_password1" data-pw-strength placeholder="At least 8 characters" autocomplete="new-password">
     <div class="pw-meter"><i id="pwbar"></i></div>
     <div class="pw-gen-out" id="pwGenOut"><span class="pwo-lab">Save it</span><span class="pwo-val"></span><button type="button" class="pwo-copy" id="pwGenCopy">Copy</button></div>
-    <div class="hint">Use 8+ characters with a mix of letters, numbers &amp; symbols — or hit Generate.</div>
     {% if form.password1.errors %}<div class="fld-err">{{ form.password1.errors|join:" " }}</div>{% endif %}
   </div>
   <div class="fld">
     <div class="fld-labelrow"><label for="id_password2">Confirm password</label><button type="button" class="pw-toggle" data-pw-toggle="id_password2">Show</button></div>
     <input type="password" name="password2" id="id_password2" data-pw-match="id_password1" placeholder="Re-enter your password" autocomplete="new-password">
+    {% include "partials/pw_checklist.html" with input_id="id_password1" confirm_id="id_password2" %}
     {% if form.password2.errors %}<div class="fld-err">{{ form.password2.errors|join:" " }}</div>{% endif %}
   </div>
   <button type="submit" class="abtn abtn-primary abtn-block">Create account &rarr;</button>

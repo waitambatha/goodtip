@@ -1,5 +1,6 @@
 {% extends "app_base.html" %}
 {% block title %}Season summary — {{ org.name }}{% endblock %}
+{% block loader_task %}Building your season summary{% endblock %}
 {% block app_content %}
 <div class="app-head"><div><div class="app-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div><h1 class="app-h1">Season summary</h1></div>
   {% if subscription %}<a href="{% url 'billing:receipt' org.id %}" class="abtn abtn-ghost abtn-sm">Platform receipt</a>{% endif %}</div>

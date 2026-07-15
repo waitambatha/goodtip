@@ -6,11 +6,14 @@ enforces:
 
 * Settled money only (§5.3) — pledged / in-progress money never counts.
 * National total is always safe to show; it names no group.
-* By-charity / by-state / by-industry aggregates are hidden until at least
+* By-charity / by-state / by-sub-category aggregates are hidden until at least
   ``privacy_min_groups`` groups sit behind them (§5.2, §7.1).
 * The By-Group board (real names + totals) shows only groups that have
   consented (§4), and the whole board stays hidden until at least
   ``credibility_min_groups`` such groups exist (§7.2).
+* The board is filterable by organisation type, sub-category within that type,
+  and state/territory (categories doc, 7 Jul 2026). An Education org holding
+  both Primary and Secondary sub-categories surfaces under both filters.
 
 Both thresholds are read from ``GoodListConfig`` so they're tunable in admin
 without a redeploy.
@@ -21,12 +24,12 @@ from decimal import Decimal
 
 from django.db.models import Count, Sum
 
-from catalog.models import GoodListConfig
+from catalog.models import GoodListConfig, GroupType
 from orgs.models import Organisation
 
 from .models import DonationPayment
 
-COMMUNITY_SLUG = "community"
+COMMUNITY_SLUG = GroupType.SLUG_COMMUNITY
 
 
 def _q(value) -> Decimal:
@@ -78,22 +81,45 @@ def by_state() -> list[dict]:
     return _aggregate_by("org__state__name")
 
 
-def by_industry() -> list[dict]:
-    return _aggregate_by("org__industry__name")
+def by_sub_category() -> list[dict]:
+    """Raised per sub-category (the old "By Industry", generalised). An org
+    holding two sub-categories (Primary + Secondary school) counts under both.
+    """
+    return _aggregate_by("org__sub_categories__name")
 
 
-def _consenting_org_totals(group_type_slug: str | None = None):
-    """Settled totals for publicly-consenting orgs, ranked. Excludes $0 groups."""
+def by_type() -> list[dict]:
+    """Raised per organisation type (Community, Business, …)."""
+    return _aggregate_by("org__group_type__name")
+
+
+def _consenting_org_totals(
+    group_type_slug: str | None = None,
+    sub_category_slug: str | None = None,
+    state_code: str | None = None,
+):
+    """Settled totals for publicly-consenting orgs, ranked. Excludes $0 groups.
+
+    The three optional filters are the Good List's public controls (categories
+    doc): organisation type, sub-category within that type, state/territory.
+    """
     qs = Organisation.objects.filter(
         is_public_listed=True,
         donation_payments__settled_at__isnull=False,
     )
-    if group_type_slug is not None:
+    if group_type_slug:
         qs = qs.filter(group_type__slug=group_type_slug)
+    if sub_category_slug:
+        # M2M: matches every org holding the sub-category, so a Primary +
+        # Secondary school appears under both school filters (build note).
+        qs = qs.filter(sub_categories__slug=sub_category_slug)
+    if state_code:
+        qs = qs.filter(state__code=state_code)
     return (
         qs.annotate(raised=Sum("donation_payments__amount_aud"))
         .filter(raised__gt=0)
-        .select_related("charity", "industry", "state")
+        .select_related("charity", "group_type", "state")
+        .prefetch_related("sub_categories")
         .order_by("-raised", "name")
         .distinct()
     )
@@ -109,11 +135,16 @@ def board_is_live() -> bool:
     return consenting_group_count() >= GoodListConfig.get().credibility_min_groups
 
 
-def by_group(group_type_slug: str | None = None) -> list[dict]:
+def by_group(
+    group_type_slug: str | None = None,
+    sub_category_slug: str | None = None,
+    state_code: str | None = None,
+) -> list[dict]:
     """Ranked public By-Group board — empty until the board goes live (§7.2).
 
-    Pass ``COMMUNITY_SLUG`` for the Community surface so clubs rank among
-    themselves rather than against corporate budgets (§8).
+    Filterable by organisation type, sub-category, and state/territory
+    (categories doc). Pass ``COMMUNITY_SLUG`` for the Community surface so
+    clubs rank among themselves rather than against corporate budgets (§8).
     """
     if not board_is_live():
         return []
@@ -122,18 +153,35 @@ def by_group(group_type_slug: str | None = None) -> list[dict]:
             "org": org,
             "name": org.name,
             "charity": org.charity,
+            "type": org.group_type.name if org.group_type_id else "",
+            # Informal groups show their self-description; others their
+            # sub-categories ("Primary School + Secondary School").
+            "category": org.category_label,
             "state": org.state.name if org.state_id else "",
-            "industry": org.industry.name if org.industry_id else "",
             "raised": _q(org.raised),
         }
-        for org in _consenting_org_totals(group_type_slug=group_type_slug)
+        for org in _consenting_org_totals(
+            group_type_slug=group_type_slug,
+            sub_category_slug=sub_category_slug,
+            state_code=state_code,
+        )
     ]
 
 
+# What an unnamed group is called on the private board, per type.
+_ANON_KINDS = {
+    GroupType.SLUG_COMMUNITY: "A community group",
+    GroupType.SLUG_BUSINESS: "A business",
+    GroupType.SLUG_EDUCATION: "An education group",
+    GroupType.SLUG_CHARITIES: "A charity",
+    GroupType.SLUG_INFORMAL: "An informal group",
+}
+
+
 def _anonymised_label(org) -> str:
-    kind = "community group" if (org.group_type_id and org.group_type.slug == COMMUNITY_SLUG) else "workplace"
+    kind = _ANON_KINDS.get(org.group_type.slug if org.group_type_id else "", "A group")
     where = org.state.name if org.state_id else "Australia"
-    return f"A {kind} in {where}"
+    return f"{kind} in {where}"
 
 
 def private_board(viewer_org) -> list[dict]:

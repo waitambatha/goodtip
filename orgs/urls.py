@@ -13,4 +13,5 @@ urlpatterns = [
     path("<int:org_id>/charity-vote/", views.charity_vote_view, name="charity_vote"),
     path("<int:org_id>/charity-vote/cast/", views.cast_charity_vote, name="cast_charity_vote"),
     path("<int:org_id>/charity-vote/close/", views.close_charity_vote_view, name="close_charity_vote"),
+    path("<int:org_id>/lock-fundraising/", views.lock_fundraising_view, name="lock_fundraising"),
 ]
