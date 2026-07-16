@@ -1,10 +1,23 @@
 {% extends "app_base.html" %}
 {% load static %}
 {% load humanize %}
+{% load team_extras %}
 {% block title %}Dashboard — GoodTip{% endblock %}
 {% block nav_dash %}on{% endblock %}
 {% block loader_task %}Opening your dashboard{% endblock %}
 {% block app_content %}
+
+<!-- translucent side imagery: fills the void either side of the centred content -->
+<div class="page-scenes" aria-hidden="true">
+  <div class="scene left">
+    <div class="shot on" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+  </div>
+  <div class="scene right">
+    <div class="shot on" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+  </div>
+</div>
 
 {% if not cards %}
   <div class="card pad-lg" style="text-align:center;">
@@ -38,11 +51,11 @@
 <!-- comp picker + create -->
 <div class="dash-ctl">
   <form method="get" action="" class="dc-pick">
-    <span class="dc-lab">Your comps</span>
+    <span class="dc-lab">Your competition</span>
     <select name="org" id="dashOrg" aria-label="Choose a competition" onchange="this.form.submit()">
       {% for oc in cards %}
       <option value="{{ oc.org.id }}" {% if oc.org.id == c.org.id %}selected{% endif %}>
-        {{ oc.org.name }}{% if oc.tips_total %} — {{ oc.tips_done }}/{{ oc.tips_total }} tipped{% endif %}
+        {{ oc.org.name }}{% if oc.tips_total %} — {{ oc.tips_done }} of {{ oc.tips_total }} matches tipped{% endif %}
       </option>
       {% endfor %}
     </select>
@@ -91,24 +104,45 @@
       </div>
     </div>
 
-    <!-- this round's games: see the slate, tip it, done -->
-    <div class="fixtures">
-      {% for g in games %}
-      <div class="fx {% if g.tipped %}done{% endif %}">
-        <span class="fx-teams"><b>{{ g.home_team.name }}</b><i>vs</i><b>{{ g.away_team.name }}</b></span>
-        <span class="fx-meta">{{ g.kickoff_at|date:"D j M · g:i A" }}{% if g.venue %} &middot; {{ g.venue }}{% endif %}</span>
-        <span class="fx-pill">{% if g.tipped %}Tipped{% else %}Open{% endif %}</span>
-      </div>
-      {% endfor %}
-    </div>
+    <!-- this round's games: pick your teams right here, then confirm -->
+    <form method="post" action="{% url 'tipping:tip_confirm' c.org.id c.round.id %}" id="tipSlip">
+      {% csrf_token %}
 
-    <div style="margin:18px 0 8px;display:flex;justify-content:space-between;font-size:13px;color:var(--muted);"><span>Tips submitted</span><span class="mono">{{ c.tips_done }} / {{ c.tips_total }}</span></div>
-    <div class="pbar"><i style="width:{% widthratio c.tips_done c.tips_total|default:1 100 %}%"></i></div>
-    <div style="margin-top:16px;">
-      {% if c.round.is_locked %}<a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="abtn abtn-primary abtn-lg">Review tips &rarr;</a>
-      {% elif c.tips_done < c.tips_total %}<a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="abtn abtn-primary abtn-lg">Make your tips &rarr;</a>
-      {% else %}<a href="{% url 'tipping:tip_round' c.org.id c.round.id %}" class="abtn abtn-primary abtn-lg">All tips in — review &rarr;</a>{% endif %}
-    </div>
+      {% if c.round.is_locked %}
+      <div class="slip-bar locked">
+        <div class="slip-info"><b>This round is locked</b><span>Tips are final and shown read-only below.</span></div>
+        <a href="{% url 'tipping:my_tips' c.org.id %}" class="abtn abtn-dark">Review in My Tips &rarr;</a>
+      </div>
+      {% else %}
+      <div class="slip-bar">
+        <div class="slip-info"><b>Make your tips right here</b><span>Tap the team you think wins each match, then confirm. You can change any pick until the round locks.</span></div>
+        <div class="slip-meter"><b id="slipCount">{{ c.tips_done }}</b> of {{ c.tips_total }} picked</div>
+        <button type="submit" class="abtn abtn-primary abtn-lg">Confirm my tips</button>
+      </div>
+      <div class="pbar slim" style="margin-bottom:14px;"><i id="slipBar" style="width:{% widthratio c.tips_done c.tips_total|default:1 100 %}%"></i></div>
+      {% endif %}
+
+      <div class="fixtures">
+        {% for g in games %}
+        <div class="fxp {% if g.tipped %}done{% endif %}">
+          <div class="fxp-meta">
+            <span class="fxp-date">{{ g.kickoff_at|date:"D j M · g:i A" }}</span>
+            {% if g.venue %}<span class="fxp-venue">{{ g.venue }}</span>{% endif %}
+            <span class="fxp-state">{% if g.tipped %}Tipped{% else %}Open{% endif %}</span>
+          </div>
+          <div class="pick pick-sm">
+            <label class="team {% if g.my_tip == 'home' %}sel{% endif %}">{% crest g.home_team %}<span>{{ g.home_team.name }}</span>
+              <input type="radio" name="match_{{ g.id }}" value="home" hidden {% if g.my_tip == 'home' %}checked{% endif %} {% if c.round.is_locked or g.is_locked %}disabled{% endif %}>
+            </label>
+            <div class="vs">vs</div>
+            <label class="team away {% if g.my_tip == 'away' %}sel{% endif %}">{% crest g.away_team %}<span>{{ g.away_team.name }}</span>
+              <input type="radio" name="match_{{ g.id }}" value="away" hidden {% if g.my_tip == 'away' %}checked{% endif %} {% if c.round.is_locked or g.is_locked %}disabled{% endif %}>
+            </label>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </form>
   </div>
   {% endif %}
 
@@ -184,21 +218,72 @@
 </div>
 {% endif %}
 
-<!-- footy news (sample content) -->
-<div class="hub-h" style="margin-bottom:14px;"><span class="k">Around the grounds <span class="sample-tag">Sample</span></span><a href="#">More footy news &rarr;</a></div>
+<!-- news & blog — cards click through to the full story -->
+{% if news_leads %}
+<div class="hub-h" style="margin-bottom:14px;"><span class="k">News &amp; blog</span><a href="{% url 'news_index' %}">All news &amp; blog &rarr;</a></div>
 <div class="grid-app g-3" style="margin-bottom:16px;">
-  <div class="news-lead"><div class="thumb" style="background-image:url('{% static 'img/news-afl.svg' %}')"><span class="sport-tag">AFL</span></div><div class="body"><h4>Finals race tightens as the top eight pulls away</h4><p>Two games separate fourth from ninth with three rounds to play — every tip counts from here.</p><div class="date">Sample story &middot; today</div></div></div>
-  <div class="news-lead"><div class="thumb" style="background-image:url('{% static 'img/news-nrl.svg' %}')"><span class="sport-tag">NRL</span></div><div class="body"><h4>Origin decider looms over Round 18 team lists</h4><p>Coaches juggle rep stars and rested forwards — a nightmare week for tipsters and a gift for the brave.</p><div class="date">Sample story &middot; 1 day ago</div></div></div>
-  <div class="news-lead"><div class="thumb" style="background-image:url('{% static 'img/news-aflw.svg' %}')"><span class="sport-tag">AFLW</span></div><div class="body"><h4>Round 1 squads locked as the women's season nears</h4><p>Every GoodTip AFL comp includes AFLW at no extra cost — same price, twice the footy.</p><div class="date">Sample story &middot; 2 days ago</div></div></div>
+  {% for p in news_leads %}
+  <a class="news-lead news-link" href="{% url 'news_detail' p.id %}">
+    {% if p.image %}
+    <div class="thumb" style="background-image:url('{{ p.image.url }}')"><span class="sport-tag">{{ p.get_tag_display }}</span></div>
+    {% else %}
+    <div class="thumb noimg"><span class="sport-tag">{{ p.get_tag_display }}</span><span class="noimg-mark">GOOD<span>TIP</span></span></div>
+    {% endif %}
+    <div class="body">
+      <h4>{{ p.title }}</h4>
+      {% if p.excerpt %}<p>{{ p.excerpt|truncatechars:140 }}</p>{% endif %}
+      <div class="date">{{ p.published_at|naturaltime }} &middot; <span class="read-on">Read the full story &rarr;</span></div>
+    </div>
+  </a>
+  {% endfor %}
 </div>
+{% if news_more %}
 <div class="news-list" style="margin-bottom:22px;">
-  <div class="news-item"><span class="ntag afl">AFL</span><div><div class="nt">Expert tips: who to back across the weekend slate</div><div class="nd">Sample &middot; today</div></div></div>
-  <div class="news-item"><span class="ntag nrl">NRL</span><div><div class="nt">Injury cloud over the Broncos front row ahead of Friday</div><div class="nd">Sample &middot; 1 day ago</div></div></div>
-  <div class="news-item"><span class="ntag nrlw">NRLW</span><div><div class="nt">Roosters name a strong side for the season opener</div><div class="nd">Sample &middot; 2 days ago</div></div></div>
-  <div class="news-item"><span class="ntag afl">AFL</span><div><div class="nt">Ladder watch: the percentage battle for a home final</div><div class="nd">Sample &middot; 3 days ago</div></div></div>
-  <div class="news-item"><span class="ntag nrl">NRL</span><div><div class="nt">Halves shuffle as clubs manage the Origin period</div><div class="nd">Sample &middot; 3 days ago</div></div></div>
+  {% for p in news_more %}
+  <a class="news-item news-link" href="{% url 'news_detail' p.id %}">
+    <span class="ntag {{ p.tag|lower }}">{{ p.get_tag_display }}</span>
+    <div>
+      <div class="nt">{{ p.title }}</div>
+      <div class="nd">{{ p.published_at|naturaltime }}</div>
+    </div>
+  </a>
+  {% endfor %}
 </div>
+{% endif %}
+{% endif %}
 
 {% endwith %}
 {% endif %}
+{% endblock %}
+
+{% block app_js %}
+    /* dashboard tip slip: reflect picks visually + keep the count live */
+    var slip = document.getElementById('tipSlip');
+    if (slip) {
+      var rows = slip.querySelectorAll('.fxp');
+      var count = document.getElementById('slipCount');
+      var bar = document.getElementById('slipBar');
+      function slipRefresh(){
+        var n = 0;
+        rows.forEach(function(r){ if (r.querySelector('input:checked')) n++; });
+        if (count) count.textContent = n;
+        if (bar && rows.length) bar.style.width = Math.round(n / rows.length * 100) + '%';
+      }
+      rows.forEach(function(row){
+        row.querySelectorAll('.team').forEach(function(team){
+          var input = team.querySelector('input');
+          if (!input || input.disabled) return;
+          team.addEventListener('click', function(){
+            row.querySelectorAll('.team').forEach(function(t){ t.classList.remove('sel'); });
+            team.classList.add('sel');
+            input.checked = true;
+            row.classList.add('picked');
+            var st = row.querySelector('.fxp-state');
+            if (st) st.textContent = 'Picked — press confirm';
+            slipRefresh();
+          });
+        });
+      });
+      slipRefresh();
+    }
 {% endblock %}

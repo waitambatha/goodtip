@@ -10,7 +10,7 @@
     {% with m=r.match t=r.tip %}
     <tr>
       <td>{% team_cell m.home_team %}<span class="vs-mini">v</span>{% team_cell m.away_team %}</td>
-      <td>{% if t %}<b>{% if t.selection == 'home' %}{{ m.home_team.name }}{% else %}{{ m.away_team.name }}{% endif %}</b>{% else %}<span class="res pending">No tip</span>{% endif %}</td>
+      <td>{% include "partials/tip_pick_cell.html" with org=org match=m selection=t.selection editable=r.editable %}</td>
       <td>{% if m.has_result %}{% if m.result == 'home' %}{{ m.home_team.name }}{% elif m.result == 'away' %}{{ m.away_team.name }}{% else %}Draw{% endif %} &middot; {{ m.home_score }}&ndash;{{ m.away_score }}{% else %}&mdash;{% endif %}</td>
       <td style="text-align:right;">{% if t.is_correct is True %}<span class="res correct">Correct</span>{% elif t.is_correct is False %}<span class="res incorrect">Missed</span>{% else %}<span class="res pending">Pending</span>{% endif %}</td>
     </tr>

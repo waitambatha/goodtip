@@ -1,0 +1,19 @@
+{# Shared fields for the news create / edit forms. Pass `post` (may be unset). #}
+<div class="fld"><label for="np_title">Headline</label><input type="text" name="title" id="np_title" required maxlength="200" value="{{ post.title|default:'' }}" placeholder="Finals race tightens as the top eight pulls away"></div>
+<div class="fld"><label for="np_tag">Tag</label>
+  <select name="tag" id="np_tag">
+    {% for val, label in tag_choices %}
+    <option value="{{ val }}" {% if post.tag == val %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div class="fld"><label for="np_excerpt">Teaser <span style="color:var(--muted);font-weight:400;">(one or two sentences shown on the dashboard)</span></label><textarea name="excerpt" id="np_excerpt" rows="2" placeholder="Two games separate fourth from ninth with three rounds to play.">{{ post.excerpt|default:'' }}</textarea></div>
+<div class="fld"><label for="np_body">Full story <span style="color:var(--muted);font-weight:400;">(optional)</span></label><textarea name="body" id="np_body" rows="6">{{ post.body|default:'' }}</textarea></div>
+<div class="fld"><label for="np_image">Image {% if post.image %}<span style="color:var(--muted);font-weight:400;">(uploading replaces the current one)</span>{% endif %}</label><input type="file" name="image" id="np_image" accept="image/*">
+  {% if post.image %}<div style="margin-top:8px;"><img src="{{ post.image.url }}" alt="" style="max-width:220px;border-radius:10px;border:1px solid rgba(15,46,34,.2);"></div>{% endif %}
+</div>
+<div class="fld"><label for="np_link">Link to full story <span style="color:var(--muted);font-weight:400;">(optional)</span></label><input type="url" name="link_url" id="np_link" value="{{ post.link_url|default:'' }}" placeholder="https://"></div>
+<div class="fld" style="display:flex;align-items:center;gap:10px;">
+  <input type="checkbox" name="is_published" id="np_pub" style="width:auto;" {% if post %}{% if post.is_published %}checked{% endif %}{% else %}checked{% endif %}>
+  <label for="np_pub" style="margin:0;">Published (visible on every member's dashboard)</label>
+</div>

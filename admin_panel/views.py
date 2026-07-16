@@ -167,3 +167,92 @@ def sync_panel(request):
         return redirect("manage:sync")
     orgs = Organisation.objects.all()
     return render(request, "manage/sync.html", {"orgs": orgs})
+
+
+# ---------------------------------------------------------------------------
+# News & blog — super admin only (the platform owner, not group admins and
+# not ordinary staff). Posts feed the member dashboard.
+# ---------------------------------------------------------------------------
+from django.contrib.auth.decorators import user_passes_test  # noqa: E402
+
+from .models import NewsPost  # noqa: E402
+
+superuser_required = user_passes_test(
+    lambda u: u.is_active and u.is_superuser, login_url="/admin/login/"
+)
+
+
+def _apply_news_form(request, post: NewsPost) -> NewsPost:
+    post.title = request.POST["title"].strip()
+    post.tag = request.POST.get("tag", "NEWS")
+    post.excerpt = request.POST.get("excerpt", "").strip()
+    post.body = request.POST.get("body", "").strip()
+    post.link_url = request.POST.get("link_url", "").strip()
+    post.is_published = bool(request.POST.get("is_published"))
+    if request.FILES.get("image"):
+        post.image = request.FILES["image"]
+    post.save()
+    return post
+
+
+@superuser_required
+def news_list(request):
+    if request.method == "POST":
+        post = NewsPost(created_by=request.user, published_at=timezone.now())
+        _apply_news_form(request, post)
+        messages.success(request, "Post published." if post.is_published else "Post saved as a draft.")
+        return redirect("manage:news")
+    posts = NewsPost.objects.all()
+    return render(request, "manage/news.html", {
+        "posts": posts, "tag_choices": NewsPost.TAG_CHOICES,
+    })
+
+
+@superuser_required
+def news_edit(request, post_id: int):
+    post = get_object_or_404(NewsPost, pk=post_id)
+    if request.method == "POST":
+        _apply_news_form(request, post)
+        messages.success(request, "Post updated.")
+        return redirect("manage:news")
+    return render(request, "manage/news_edit.html", {
+        "post": post, "tag_choices": NewsPost.TAG_CHOICES,
+    })
+
+
+@superuser_required
+def news_toggle(request, post_id: int):
+    post = get_object_or_404(NewsPost, pk=post_id)
+    if request.method == "POST":
+        post.is_published = not post.is_published
+        post.save(update_fields=["is_published"])
+        messages.success(request, "Post published." if post.is_published else "Post unpublished.")
+    return redirect("manage:news")
+
+
+@superuser_required
+def news_delete(request, post_id: int):
+    post = get_object_or_404(NewsPost, pk=post_id)
+    if request.method == "POST":
+        post.delete()
+        messages.success(request, "Post deleted.")
+    return redirect("manage:news")
+
+
+# ---- member-facing news pages (any logged-in user) ------------------------
+from django.contrib.auth.decorators import login_required  # noqa: E402
+
+
+@login_required
+def news_index(request):
+    """All published posts — the "more news" destination."""
+    posts = NewsPost.objects.filter(is_published=True)
+    return render(request, "news_index.html", {"posts": posts})
+
+
+@login_required
+def news_detail(request, post_id: int):
+    """Full story page a dashboard card clicks through to."""
+    post = get_object_or_404(NewsPost, pk=post_id, is_published=True)
+    more = NewsPost.objects.filter(is_published=True).exclude(pk=post.pk)[:5]
+    return render(request, "news_detail.html", {"post": post, "more": more})

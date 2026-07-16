@@ -8,6 +8,10 @@ class Team(models.Model):
     slug = models.CharField(max_length=100)
     series = models.ForeignKey("catalog.Series", on_delete=models.PROTECT, related_name="teams")
     external_id = models.CharField(max_length=100, blank=True)
+    # Real club logo. Uploaded files win; otherwise the crest template tag
+    # falls back to a bundled static file (static/img/teams/<slug>.png) and
+    # finally to the generated monogram badge.
+    logo = models.ImageField(upload_to="team_logos/", blank=True, null=True)
 
     class Meta:
         unique_together = ("slug", "series")

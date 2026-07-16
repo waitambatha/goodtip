@@ -6,6 +6,7 @@ from django.views.generic import TemplateView
 from django.views.static import serve as static_serve
 
 from accounts.views import dashboard_view
+from admin_panel.views import news_detail, news_index
 from billing.views import good_list_view, stripe_webhook
 from goodtip.staging_gate import gate_view
 from orgs.views import join_view
@@ -34,6 +35,9 @@ urlpatterns = [
         extra_context={"active": "pricing"},
     ), name="pricing"),
     path("dashboard/", dashboard_view, name="dashboard"),
+    # News & blog (members) — full-story pages behind the dashboard cards
+    path("news/", news_index, name="news_index"),
+    path("news/<int:post_id>/", news_detail, name="news_detail"),
     path("", include("accounts.urls", namespace="accounts")),
     path("password-reset/", auth_views.PasswordResetView.as_view(
         template_name="auth/password_reset.html",

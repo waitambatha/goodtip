@@ -2,71 +2,145 @@
 {% block title %}Find your group — GoodTip{% endblock %}
 {% block loader_task %}Searching groups{% endblock %}
 {% block app_content %}
-<div class="app-head"><div><div class="app-eyebrow">Groups</div><h1 class="app-h1">Find your group</h1><p class="app-sub">Search for your workplace, club or crew. Ask to join, or start a new group under theirs.</p></div>
+<div class="app-head"><div><div class="app-eyebrow">Groups</div><h1 class="app-h1">Find your group</h1><p class="app-sub">Start typing your workplace, club or crew — matches appear as you type. Ask to join one, or start a new group under theirs.</p></div>
   <a href="{% url 'orgs:create' %}" class="abtn abtn-ghost abtn-sm">Create a group</a></div>
 
-<form method="get" action="{% url 'orgs:search' %}" style="margin-bottom:22px;">
-  <div style="display:flex;gap:8px;flex-wrap:wrap;">
-    <input type="search" name="q" id="orgSearch" value="{{ q }}" required minlength="{{ min_chars }}"
-           placeholder="e.g. National Tiles" autocomplete="off" autofocus
-           style="flex:1;min-width:240px;padding:12px 14px;border:1px solid var(--app-line);border-radius:10px;font-family:var(--body);font-size:15px;">
-    <button type="submit" class="abtn abtn-primary">Search</button>
-  </div>
-</form>
+{# csrf seed for the ask-to-join forms the autocomplete builds #}
+<form id="csrfSeed" hidden>{% csrf_token %}</form>
 
-<div id="orgResults">
-{% if q %}
-  {% if results %}
-  <div style="overflow-x:auto;">
-  <table class="atable">
-    <thead><tr><th>Group</th><th>Members</th><th style="text-align:right;"></th></tr></thead>
-    <tbody>
-    {% for r in results %}
-      <tr>
-        <td>
-          <b>{{ r.name }}</b>{% if r.parent %} <small style="color:var(--muted);">part of {{ r.parent }}</small>{% endif %}<br>
-          <small style="color:var(--muted);">{{ r.category }}{% if r.state %} &middot; {{ r.state }}{% endif %}</small>
-        </td>
-        <td style="color:var(--muted);">{{ r.members }}</td>
-        <td style="text-align:right;white-space:nowrap;">
-          {% if r.is_member %}
-            <span class="pill-role participant">Member</span>
-          {% elif r.pending %}
-            <span class="pill-role captain">Request pending</span>
-          {% else %}
-            <form method="post" action="{% url 'orgs:request_join' r.id %}" style="display:inline;">
-              {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
-              <button type="submit" class="abtn abtn-primary abtn-sm">Ask to join</button>
-            </form>
-          {% endif %}
-          <a href="{% url 'orgs:create' %}?parent={{ r.root_id }}" class="abtn abtn-ghost abtn-sm">New group under {{ r.root_name }}</a>
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
+<div class="ac" id="orgAc">
+  <div class="ac-box">
+    <svg class="ac-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <input type="search" id="orgSearch" placeholder="e.g. National Tiles" autocomplete="off" autofocus
+           role="combobox" aria-expanded="false" aria-controls="acPanel" aria-autocomplete="list">
+    <span class="ac-spin" id="acSpin" hidden></span>
   </div>
-  {% else %}
-  <div class="card pad-lg" style="text-align:center;">
-    <div class="card-h">No groups match “{{ q }}”</div>
-    <p class="card-lead" style="margin:6px 0 18px;">Start it yourself — you'll be its admin.</p>
-    <a href="{% url 'orgs:create' %}" class="abtn abtn-primary">Create “{{ q }}”</a>
-  </div>
-  {% endif %}
-{% endif %}
+  <div class="ac-panel" id="acPanel" role="listbox" hidden></div>
 </div>
+<p class="app-sub" style="margin-top:10px;font-size:13px;">Type at least {{ min_chars }} letters. Only matching groups are shown — pick one to see what you can do.</p>
+
+<div id="orgSelected" style="margin-top:22px;"></div>
 
 <script>
-// Live typeahead: progressive enhancement over the server-rendered results.
 (function () {
+  var MIN = {{ min_chars }};
+  var URL_JSON = "{% url 'orgs:search_json' %}";
+  var URL_CREATE = "{% url 'orgs:create' %}";
   var input = document.getElementById("orgSearch");
-  var form = input.form;
-  var timer = null;
+  var panel = document.getElementById("acPanel");
+  var ac = document.getElementById("orgAc");
+  var spin = document.getElementById("acSpin");
+  var out = document.getElementById("orgSelected");
+  var csrf = document.querySelector("#csrfSeed input[name=csrfmiddlewaretoken]").value;
+  var timer = null, seq = 0, items = [], hi = -1;
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function close() { panel.hidden = true; input.setAttribute("aria-expanded", "false"); hi = -1; }
+
+  function meta(r) {
+    var bits = [];
+    if (r.parent) bits.push("part of " + esc(r.parent));
+    if (r.category) bits.push(esc(r.category));
+    if (r.state) bits.push(esc(r.state));
+    bits.push(r.members + " member" + (r.members === 1 ? "" : "s"));
+    return bits.join(" · ");
+  }
+
+  function chip(r) {
+    if (r.is_member) return '<span class="ac-chip member">Member</span>';
+    if (r.pending) return '<span class="ac-chip pending">Request pending</span>';
+    return "";
+  }
+
+  function render(list, q) {
+    items = list;
+    if (!list.length) {
+      panel.innerHTML =
+        '<div class="ac-empty">No groups match “' + esc(q) + '”.' +
+        '<a class="abtn abtn-primary abtn-sm" href="' + URL_CREATE + '">Create “' + esc(q) + '”</a></div>';
+    } else {
+      panel.innerHTML = list.map(function (r, i) {
+        return '<button type="button" class="ac-opt" role="option" data-i="' + i + '">' +
+          '<span class="ac-name">' + esc(r.name) + "</span>" +
+          '<span class="ac-meta">' + meta(r) + "</span>" + chip(r) + "</button>";
+      }).join("");
+    }
+    panel.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+    hi = -1;
+  }
+
+  function select(r) {
+    close();
+    input.value = r.name;
+    var action;
+    if (r.is_member) {
+      action = '<span class="pill-role participant">You&#39;re already a member</span>';
+    } else if (r.pending) {
+      action = '<span class="pill-role captain">Request pending — a group admin will approve it</span>';
+    } else {
+      action =
+        '<form method="post" action="/leagues/' + r.id + '/request-join/" style="display:inline;">' +
+        '<input type="hidden" name="csrfmiddlewaretoken" value="' + csrf + '">' +
+        '<input type="hidden" name="next" value="{{ request.path }}">' +
+        '<button type="submit" class="abtn abtn-primary">Ask to join</button></form>';
+    }
+    out.innerHTML =
+      '<div class="card pad-lg">' +
+      '<div class="card-h" style="font-size:20px;">' + esc(r.name) + "</div>" +
+      '<p class="card-lead" style="margin:4px 0 16px;">' + meta(r) + "</p>" +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' + action +
+      '<a href="' + URL_CREATE + "?parent=" + r.root_id + '" class="abtn abtn-ghost">Start a new group under ' + esc(r.root_name) + "</a>" +
+      "</div></div>";
+  }
+
+  function search(q) {
+    var mine = ++seq;
+    spin.hidden = false;
+    fetch(URL_JSON + "?q=" + encodeURIComponent(q), { headers: { "Accept": "application/json" } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (mine !== seq) return;
+        spin.hidden = true;
+        render(data.results || [], q);
+      })
+      .catch(function () { if (mine === seq) spin.hidden = true; });
+  }
+
   input.addEventListener("input", function () {
     clearTimeout(timer);
-    if (input.value.trim().length < {{ min_chars }}) return;
-    timer = setTimeout(function () { form.requestSubmit(); }, 450);
+    out.innerHTML = "";
+    var q = input.value.trim();
+    if (q.length < MIN) { close(); spin.hidden = true; return; }
+    timer = setTimeout(function () { search(q); }, 220);
   });
+
+  input.addEventListener("keydown", function (e) {
+    var opts = panel.querySelectorAll(".ac-opt");
+    if (e.key === "Escape") { close(); return; }
+    if (panel.hidden || !opts.length) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      hi = e.key === "ArrowDown" ? (hi + 1) % opts.length : (hi - 1 + opts.length) % opts.length;
+      opts.forEach(function (o, i) { o.classList.toggle("hi", i === hi); });
+      opts[hi].scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (hi >= 0) select(items[+opts[hi].dataset.i]);
+    }
+  });
+
+  panel.addEventListener("click", function (e) {
+    var b = e.target.closest(".ac-opt");
+    if (b) select(items[+b.dataset.i]);
+  });
+
+  document.addEventListener("click", function (e) { if (!ac.contains(e.target)) close(); });
 })();
 </script>
 {% endblock %}

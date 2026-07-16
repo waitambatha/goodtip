@@ -6,12 +6,49 @@ clubs' real (trademarked) logos; licensed logo files can be dropped in later
 behind the same tags.
 """
 from django import template
+from django.contrib.staticfiles import finders
+from django.templatetags.static import static
 from django.utils import timezone
 from django.utils.html import format_html
 
 from ..team_colors import get_team_colors, team_initials
 
 register = template.Library()
+
+# slug -> static url (or None) so we only hit the staticfiles finders once
+# per team per process.
+_STATIC_LOGOS: dict = {}
+
+
+def _logo_url(team):
+    """URL of the club's real logo, or None to fall back to the monogram.
+
+    Priority: uploaded Team.logo file, then a bundled static file at
+    img/teams/<slug>.png (or .svg).
+    """
+    logo = getattr(team, "logo", None)
+    if logo:
+        try:
+            return logo.url
+        except ValueError:
+            pass
+    slug = _slug(team)
+    if not slug:
+        return None
+    if slug not in _STATIC_LOGOS:
+        url = None
+        for ext in ("png", "svg", "webp"):
+            rel = f"img/teams/{slug}.{ext}"
+            if finders.find(rel):
+                try:
+                    url = static(rel)
+                except ValueError:
+                    # file exists on disk but isn't in the staticfiles
+                    # manifest yet (collectstatic pending) — use the monogram
+                    url = None
+                break
+        _STATIC_LOGOS[slug] = url
+    return _STATIC_LOGOS[slug]
 
 
 # Nice, recognisable codes per club slug; anything unlisted falls back to
@@ -66,9 +103,15 @@ def _code(team):
 
 @register.simple_tag
 def crest(team):
-    """A standalone club badge (monogram in club colours)."""
+    """A standalone club badge — real logo when we have one, monogram otherwise."""
     if team is None:
         return ""
+    url = _logo_url(team)
+    if url:
+        return format_html(
+            '<span class="crest has-logo"><img src="{}" alt="{}" loading="lazy"></span>',
+            url, _name(team),
+        )
     c = get_team_colors(_slug(team))
     return format_html(
         '<span class="crest" style="--crest-bg:{};--crest-fg:{}">{}</span>',
@@ -81,6 +124,12 @@ def team_cell(team):
     """A club badge next to the club name — for table cells."""
     if team is None:
         return ""
+    url = _logo_url(team)
+    if url:
+        return format_html(
+            '<span class="team-cell"><span class="crest has-logo"><img src="{}" alt="" loading="lazy"></span>{}</span>',
+            url, _name(team),
+        )
     c = get_team_colors(_slug(team))
     return format_html(
         '<span class="team-cell"><span class="crest" style="--crest-bg:{};--crest-fg:{}">{}</span>{}</span>',

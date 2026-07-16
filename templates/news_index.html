@@ -1,0 +1,28 @@
+{% extends "app_base.html" %}
+{% load humanize %}
+{% block title %}News &amp; blog — GoodTip{% endblock %}
+{% block loader_task %}Fetching the latest stories{% endblock %}
+{% block app_content %}
+<div class="app-head"><div><div class="app-eyebrow">Around the grounds</div><h1 class="app-h1">News &amp; blog</h1><p class="app-sub">Stories, previews and updates from the GoodTip team.</p></div></div>
+
+{% if posts %}
+<div class="grid-app g-3">
+  {% for p in posts %}
+  <a class="news-lead news-link" href="{% url 'news_detail' p.id %}">
+    {% if p.image %}<div class="thumb" style="background-image:url('{{ p.image.url }}')"><span class="sport-tag">{{ p.get_tag_display }}</span></div>
+    {% else %}<div class="thumb noimg"><span class="sport-tag">{{ p.get_tag_display }}</span><span class="noimg-mark">GOOD<span>TIP</span></span></div>{% endif %}
+    <div class="body">
+      <h4>{{ p.title }}</h4>
+      {% if p.excerpt %}<p>{{ p.excerpt|truncatechars:140 }}</p>{% endif %}
+      <div class="date">{{ p.published_at|naturaltime }}</div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card pad-lg" style="text-align:center;">
+  <div class="card-h">Nothing posted yet</div>
+  <p class="card-lead">Check back soon — stories land here as they're published.</p>
+</div>
+{% endif %}
+{% endblock %}

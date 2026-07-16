@@ -26,6 +26,7 @@
       <a href="{% url 'manage:overview' %}" class="{% block nav_overview %}{% endblock %}"><svg><use href="#ic-chart"/></svg> Overview</a>
       <a href="{% url 'manage:orgs_list' %}" class="{% block nav_orgs %}{% endblock %}"><svg><use href="#ic-users"/></svg> Orgs</a>
       <a href="{% url 'manage:sync' %}" class="{% block nav_sync %}{% endblock %}"><svg><use href="#ic-recycle"/></svg> Sync</a>
+      {% if user.is_superuser %}<a href="{% url 'manage:news' %}" class="{% block nav_news %}{% endblock %}"><svg><use href="#ic-doc"/></svg> News &amp; blog</a>{% endif %}
     </aside>
     <main class="admin-main">
       {% if messages %}

@@ -1,0 +1,16 @@
+{% extends "admin_base.html" %}
+{% block title %}Edit post — Manage{% endblock %}
+{% block nav_news %}on{% endblock %}
+{% block admin_content %}
+<h1 class="admin-h1" style="margin-bottom:18px;">Edit post</h1>
+<div class="mini-form" style="max-width:640px;">
+  <form method="post" action="{% url 'manage:news_edit' post.id %}" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% include "manage/_news_form_fields.html" %}
+    <div style="display:flex;gap:10px;margin-top:6px;">
+      <button type="submit" class="abtn abtn-primary">Save changes</button>
+      <a href="{% url 'manage:news' %}" class="abtn abtn-ghost">Back to all posts</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

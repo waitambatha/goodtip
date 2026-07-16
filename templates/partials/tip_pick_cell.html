@@ -1,0 +1,27 @@
+{% load team_extras %}
+{# Your-pick cell on My Tips: tap either team to change the tip while the match is open. #}
+<div class="pick-mini" id="pick-{{ match.id }}">
+  {% if editable %}
+    <button type="button" class="pm-btn {% if selection == 'home' %}on{% endif %}"
+            hx-post="{% url 'tipping:tip_save' org.id match.round_id match.id %}"
+            hx-vals='{"selection":"home","view":"mytips"}'
+            hx-target="#pick-{{ match.id }}" hx-swap="outerHTML"
+            title="Tip {{ match.home_team.name }}">
+      {% crest match.home_team %}<span>{{ match.home_team.name }}</span>
+    </button>
+    <button type="button" class="pm-btn {% if selection == 'away' %}on{% endif %}"
+            hx-post="{% url 'tipping:tip_save' org.id match.round_id match.id %}"
+            hx-vals='{"selection":"away","view":"mytips"}'
+            hx-target="#pick-{{ match.id }}" hx-swap="outerHTML"
+            title="Tip {{ match.away_team.name }}">
+      {% crest match.away_team %}<span>{{ match.away_team.name }}</span>
+    </button>
+    {% if saved %}<span class="pm-saved">Saved &#10003;</span>{% endif %}
+  {% elif selection == 'home' %}
+    <b>{{ match.home_team.name }}</b>
+  {% elif selection == 'away' %}
+    <b>{{ match.away_team.name }}</b>
+  {% else %}
+    <span class="res pending">No tip</span>
+  {% endif %}
+</div>

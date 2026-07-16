@@ -14,7 +14,7 @@
   <script src="{% static 'js/gt-ui.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
 </head>
-<body class="app {% block body_class %}{% endblock %}">
+<body class="app {% block body_class %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   {% include "public/partials/_icons.html" %}
 
   {# ---- sport loader (alternates per load) ---- #}
@@ -35,7 +35,8 @@
     </div>
   </div>
 
-  {# ---- persistent charity strip ---- #}
+  {# ---- sticky header: charity strip + nav travel as one unit ---- #}
+  <header class="app-topbar">
   {% block charity_strip %}
   {% if primary_org %}
   <div class="charity-strip">
@@ -77,6 +78,7 @@
       </div>
     </div>
   </nav>
+  </header>
 
   {# ---- mobile sheet ---- #}
   <div class="app-sheet" id="appSheet">

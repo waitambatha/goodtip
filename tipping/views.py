@@ -1,3 +1,4 @@
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
@@ -48,7 +49,51 @@ def tip_save_partial(request, org_id: int, round_id: int, match_id: int):
         submit_tip(user=request.user, match=match, org=org, selection=selection)
     except ValueError as e:
         return HttpResponse(f"<span class='text-red-400 text-xs'>{e}</span>", status=400)
+    if request.POST.get("view") == "mytips":
+        return render(request, "partials/tip_pick_cell.html", {
+            "org": org, "match": match, "selection": selection,
+            "editable": True, "saved": True,
+        })
     return render(request, "partials/tip_saved.html", {"match": match, "selection": selection})
+
+
+@login_required
+@require_POST
+def tip_round_confirm(request, org_id: int, round_id: int):
+    """Bulk-confirm a slate of picks made inline on the dashboard.
+
+    Each fixture posts as match_<id>=home|away; anything unpicked is simply
+    absent. Picks stay editable (here, on the round page or from My Tips)
+    until the round locks.
+    """
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_member(request.user, org):
+        return HttpResponseForbidden()
+    round_obj = get_object_or_404(Round, pk=round_id, org=org)
+    dest = f"{reverse('dashboard')}?org={org.id}"
+    if round_obj.is_locked:
+        messages.error(request, "This round is locked — tips are final.")
+        return redirect(dest)
+    saved, skipped = 0, 0
+    for match in round_obj.matches.all():
+        selection = request.POST.get(f"match_{match.id}")
+        if selection not in ("home", "away"):
+            continue
+        try:
+            submit_tip(user=request.user, match=match, org=org, selection=selection)
+            saved += 1
+        except ValueError:
+            skipped += 1
+    if saved:
+        note = f"{saved} tip{'s' if saved != 1 else ''} confirmed — find them under My Tips. You can change any pick until the round locks."
+        if skipped:
+            note += f" ({skipped} match{'es' if skipped != 1 else ''} had already kicked off and couldn't be changed.)"
+        messages.success(request, note)
+    elif skipped:
+        messages.error(request, "Those matches have already kicked off — tips there are final.")
+    else:
+        messages.info(request, "Tap a team on each match to pick it, then press Confirm my tips.")
+    return redirect(dest)
 
 
 @login_required
@@ -74,8 +119,14 @@ def my_tips_view(request, org_id: int):
             t.match_id: t
             for t in Tip.objects.filter(user=request.user, match__in=matches, org=org)
         }
+        round_open = not selected_round.is_locked
         for m in matches:
-            tip_rows.append({"match": m, "tip": tips.get(m.id)})
+            tip_rows.append({
+                "match": m,
+                "tip": tips.get(m.id),
+                # a pick can change until the round locks or the match kicks off
+                "editable": round_open and not m.is_locked,
+            })
     stats = user_org_stats(request.user, org)
     if request.headers.get("HX-Request"):
         return render(request, "partials/my_tips_round.html", {

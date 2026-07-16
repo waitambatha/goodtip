@@ -173,17 +173,18 @@ def dashboard_view(request):
 
     games = []
     if selected and selected["round"]:
-        tipped_ids = set(
+        my_picks = dict(
             Tip.objects.filter(
                 user=request.user, match__round=selected["round"], org=selected["org"]
-            ).values_list("match_id", flat=True)
+            ).values_list("match_id", "selection")
         )
         for g in (
             selected["round"].matches
             .select_related("home_team", "away_team")
             .order_by("kickoff_at", "id")
         ):
-            g.tipped = g.id in tipped_ids
+            g.my_tip = my_picks.get(g.id)
+            g.tipped = g.my_tip is not None
             games.append(g)
 
     locking_soon = sorted(
@@ -194,12 +195,19 @@ def dashboard_view(request):
         key=lambda c: c["round"].lockout_at,
     )
 
+    # News & blog — posted by the super admin from /manage/news/.
+    from admin_panel.models import NewsPost
+
+    news_posts = list(NewsPost.objects.filter(is_published=True)[:9])
+
     return render(request, "dashboard.html", {
         "cards": cards,
         "selected": selected,
         "games": games,
         "locking_soon": locking_soon,
         "create_url": reverse("orgs:create"),
+        "news_leads": news_posts[:3],
+        "news_more": news_posts[3:],
     })
 
 

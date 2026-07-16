@@ -1,0 +1,42 @@
+{% extends "admin_base.html" %}
+{% block title %}News &amp; blog — Manage{% endblock %}
+{% block nav_news %}on{% endblock %}
+{% block admin_content %}
+<h1 class="admin-h1" style="margin-bottom:6px;">News &amp; blog</h1>
+<p style="color:var(--muted);font-size:14px;margin-bottom:18px;">Everything published here appears on every member's dashboard. Only the super admin can post.</p>
+
+<div class="grid-app" style="grid-template-columns:1.4fr 1fr;gap:20px;align-items:start;">
+  <div class="card"><div class="card-h" style="margin-bottom:10px;">All posts</div>
+    <table class="atable compact"><thead><tr><th>Post</th><th>Tag</th><th>Status</th><th style="text-align:right;">Actions</th></tr></thead><tbody>
+    {% for p in posts %}
+      <tr>
+        <td>
+          <div style="display:flex;gap:12px;align-items:center;">
+            {% if p.image %}<img src="{{ p.image.url }}" alt="" style="width:56px;height:40px;object-fit:cover;border-radius:8px;flex:none;">{% endif %}
+            <div><b>{{ p.title }}</b><br><small style="color:var(--muted);">{{ p.published_at|date:"j M Y, g:i a" }}{% if p.created_by %} &middot; {{ p.created_by.display_name }}{% endif %}</small></div>
+          </div>
+        </td>
+        <td>{{ p.get_tag_display }}</td>
+        <td>{% if p.is_published %}<span class="res correct">Live</span>{% else %}<span class="res pending">Draft</span>{% endif %}</td>
+        <td style="text-align:right;white-space:nowrap;">
+          <a href="{% url 'manage:news_edit' p.id %}" class="flink" style="color:var(--forest);">Edit</a>
+          <form method="post" action="{% url 'manage:news_toggle' p.id %}" style="display:inline;">{% csrf_token %}<button type="submit" class="flink" style="color:var(--forest);background:none;border:0;cursor:pointer;font:inherit;">{% if p.is_published %}Unpublish{% else %}Publish{% endif %}</button></form>
+          <form method="post" action="{% url 'manage:news_delete' p.id %}" style="display:inline;" onsubmit="return confirm('Delete this post for good?');">{% csrf_token %}<button type="submit" class="flink" style="color:#9a2b2b;background:none;border:0;cursor:pointer;font:inherit;">Delete</button></form>
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" style="text-align:center;color:var(--muted);">Nothing posted yet — publish your first story with the form on the right.</td></tr>
+    {% endfor %}
+    </tbody></table>
+  </div>
+
+  <div class="mini-form">
+    <div class="card-h" style="margin-bottom:14px;">New post</div>
+    <form method="post" action="{% url 'manage:news' %}" enctype="multipart/form-data">
+      {% csrf_token %}
+      {% include "manage/_news_form_fields.html" %}
+      <button type="submit" class="abtn abtn-primary abtn-block" style="margin-top:6px;">Save post</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
