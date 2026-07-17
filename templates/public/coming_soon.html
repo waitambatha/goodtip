@@ -1,0 +1,75 @@
+{% extends "public/base.html" %}
+{% load static %}
+
+{% block title %}GoodTip — Footy tips that do good.{% endblock %}
+{% block loader_task %}Warming up for launch{% endblock %}
+{% block meta_description %}GoodTip is footy tipping, rebuilt around your community. Every entry fee goes to the charity your group chooses. Launching 28 August 2026.{% endblock %}
+{% block body_class %}page-soon{% endblock %}
+
+{% block content %}
+
+<!-- HERO -->
+<section class="hero-split">
+  <div class="hs-left">
+    <span class="pill" style="align-self:flex-start;margin-bottom:24px;"><span class="dot"></span>Launching 28 August 2026</span>
+    <h1>Footy tips that <em>do good.</em></h1>
+    <p class="hero-sub">GoodTip is footy tipping, rebuilt around your community. Every entry fee goes to the charity your group chooses. Together.</p>
+    <div class="hero-ctas" style="justify-content:flex-start;"><a href="#lock-in" class="btn-primary">Lock in your spot &darr;</a></div>
+  </div>
+  <div class="hs-right">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="shot active" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
+    </div>
+    <div class="hs-veil" aria-hidden="true"></div>
+    <div class="hs-tagstrip"><span class="live-dot">Coming soon</span></div>
+  </div>
+</section>
+
+<!-- VALUE PROPS -->
+<section class="section on-paper">
+  <div class="wrap">
+    <div class="score-cards reveal">
+      <div class="score-card"><span class="score-pts">4</span><p class="pts-lab">All four codes</p><h3>AFL · AFLW · NRL · NRLW</h3><p>Every code, every round, one comp for your whole group.</p></div>
+      <div class="score-card"><span class="score-pts">&#10003;</span><p class="pts-lab">Your call</p><h3>You choose the charity</h3><p>Voted by your group, not decided for you.</p></div>
+      <div class="score-card"><span class="score-pts">1</span><p class="pts-lab">Flat fee</p><h3>One platform fee</h3><p>No cut taken from what you raise.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- LOCK-IN FORM -->
+<section class="section on-cream" id="lock-in">
+  <div class="wrap">
+    <p class="eyebrow reveal">Before we launch</p>
+    <h2 class="section-heading reveal">Be first to know when we go live.</h2>
+    <p class="section-sub reveal">Leave your details below. We'll email you the moment sign-ups open.</p>
+
+    <div class="soon-form reveal">
+      {% if locked_in %}
+      <div class="soon-done">
+        <h3>You're locked in.</h3>
+        <p>We'll email you the moment GoodTip goes live. Thanks for backing it early.</p>
+      </div>
+      {% else %}
+      <form method="post" action="{% url 'coming_soon' %}#lock-in">
+        {% csrf_token %}
+        {% if error %}<p class="soon-error">{{ error }}</p>{% endif %}
+        <label>Name<input type="text" name="name" required maxlength="120" autocomplete="name"></label>
+        <label>Email<input type="email" name="email" required autocomplete="email"></label>
+        <label>What are you tipping with now? <span class="opt">(optional)</span>
+          <select name="current_platform">
+            <option value="">Select one</option>
+            {% for val, lab in platforms %}<option value="{{ val }}">{{ lab }}</option>{% endfor %}
+          </select>
+        </label>
+        <button type="submit" class="btn-primary" style="width:100%;">Lock in my spot</button>
+        <p class="soon-note">No spam. One email, the day we go live.</p>
+      </form>
+      {% endif %}
+    </div>
+
+    <p class="soon-login reveal">Already part of the GoodTip team? <a href="/login/">Log in &rarr;</a></p>
+  </div>
+</section>
+
+{% endblock %}

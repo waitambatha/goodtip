@@ -1,0 +1,17 @@
+G'day {{ user.display_name }},
+
+The charity election for {{ org.name }} is open.
+
+{% if vote.admin_message %}A note from your admin:
+"{{ vote.admin_message }}"
+
+{% endif %}Your group is deciding where this season's money goes. The candidates:
+{% for opt in options %}  - {{ opt.charity.name }}
+{% endfor %}
+Cast your vote: {{ vote_url }}
+
+It's a blind vote — tallies stay hidden until the vote closes, and you can
+change your pick any time before then.
+
+— The GoodTip team
+Footy tipping, for good. · goodtip.com.au

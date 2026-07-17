@@ -1,3 +1,10 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import LaunchSignup
+
+
+@admin.register(LaunchSignup)
+class LaunchSignupAdmin(admin.ModelAdmin):
+    list_display = ("name", "email", "current_platform", "created_at")
+    list_filter = ("current_platform",)
+    search_fields = ("name", "email")

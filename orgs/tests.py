@@ -505,9 +505,15 @@ class OrgSearchTests(TestCase):
         self.assertEqual(rows, [])
 
     def test_search_page_offers_both_paths(self):
+        # The page is JS-driven: it carries the join button and the
+        # create-under-parent link builder; search.json supplies the root_id
+        # the builder plugs into ?parent=.
         resp = self.client.get("/leagues/search/", {"q": "national tiles"})
         self.assertContains(resp, "Ask to join")
-        self.assertContains(resp, f"?parent={self.parent.id}")
+        self.assertContains(resp, "?parent=")
+        rows = self.client.get("/leagues/search.json", {"q": "national tiles"}).json()["results"]
+        by_name = {r["name"]: r for r in rows}
+        self.assertEqual(by_name["National Tiles"]["root_id"], self.parent.id)
 
     def test_search_page_offers_create_when_no_match(self):
         resp = self.client.get("/leagues/search/", {"q": "zzz nothing"})

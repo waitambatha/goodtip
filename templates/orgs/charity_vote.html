@@ -26,6 +26,23 @@
 {% if not vote %}
   <div class="card pad-lg" style="text-align:center;max-width:640px;"><div class="card-h">No vote running</div><p class="card-lead">This league's charity was chosen directly — there's no vote to show.</p></div>
 
+{% elif vote.is_pending_setup %}
+<div style="max-width:640px;">
+  <div class="card pad-lg" style="text-align:center;">
+    <div class="app-eyebrow">Charity election</div>
+    {% if vote.status == "scheduled" and vote.scheduled_open_at %}
+      <h2 class="app-h1" style="color:var(--forest);margin-top:6px;">Opens {{ vote.scheduled_open_at|date:"l j F, g:i A" }}</h2>
+      <p class="app-sub" style="margin-top:8px;">You'll get an email and an in-app heads-up the moment voting opens.</p>
+    {% else %}
+      <h2 class="app-h1" style="color:var(--forest);margin-top:6px;">Not open yet</h2>
+      <p class="app-sub" style="margin-top:8px;">Your admin hasn't scheduled the election yet. You'll be notified the moment it opens.</p>
+    {% endif %}
+    {% if is_admin %}
+    <a href="{% url 'orgs:election_setup' org.id %}" class="abtn abtn-primary" style="margin-top:18px;">{% if vote.status == "scheduled" %}Reschedule or start now{% else %}Set up the election{% endif %} &rarr;</a>
+    {% endif %}
+  </div>
+</div>
+
 {% elif vote.is_open %}
 <div style="max-width:640px;">
   <form method="post" action="{% url 'orgs:cast_charity_vote' org.id %}">

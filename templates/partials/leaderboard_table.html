@@ -1,6 +1,6 @@
 {% load team_extras %}
 <table class="atable" id="lbtable">
-  <thead><tr><th>Rank</th><th>Tipper</th><th style="text-align:right;">Correct</th><th style="text-align:right;">Points</th></tr></thead>
+  <thead><tr><th style="width:56px;">Rank</th><th>Tipper</th><th class="num fit">Correct</th><th class="num fit">Points</th></tr></thead>
   <tbody>
   {% for row in ranked %}
     <tr class="{% if row.user.id == me.id %}me{% endif %}">

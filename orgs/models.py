@@ -124,6 +124,11 @@ class Organisation(models.Model):
         return self.charity_votes.filter(status="open").first()
 
     @property
+    def pending_election(self):
+        """A draft or scheduled (not yet open) charity election, or None."""
+        return self.charity_votes.filter(status__in=("draft", "scheduled")).first()
+
+    @property
     def charity_display(self) -> str:
         """Charity name, or a placeholder while a vote decides it."""
         if self.charity_id:
@@ -306,12 +311,33 @@ class MembershipRequest(models.Model):
 
 
 class CharityVote(models.Model):
-    STATUS_CHOICES = [("open", "Open"), ("closed", "Closed")]
+    """A charity election.
+
+    Lifecycle: draft (created with the comp, waiting for the admin to set it
+    up) → scheduled (admin picked a date, or "now") → open (members voting,
+    notified by email + in-app) → closed (winner locked in).
+    Legacy votes created before scheduling existed go straight to "open".
+    """
+
+    STATUS_DRAFT = "draft"
+    STATUS_SCHEDULED = "scheduled"
+    STATUS_OPEN = "open"
+    STATUS_CLOSED = "closed"
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Draft"),
+        (STATUS_SCHEDULED, "Scheduled"),
+        (STATUS_OPEN, "Open"),
+        (STATUS_CLOSED, "Closed"),
+    ]
 
     org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name="charity_votes")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="open")
     opened_at = models.DateTimeField(auto_now_add=True)
     closed_at = models.DateTimeField(null=True, blank=True)
+    # When the admin schedules the election rather than starting it now.
+    scheduled_open_at = models.DateTimeField(null=True, blank=True)
+    # The admin's note to members — lands in the email and the in-app popup.
+    admin_message = models.TextField(blank=True)
     winning_charity = models.ForeignKey(
         "catalog.Charity",
         on_delete=models.PROTECT,
@@ -328,7 +354,11 @@ class CharityVote(models.Model):
 
     @property
     def is_open(self) -> bool:
-        return self.status == "open"
+        return self.status == self.STATUS_OPEN
+
+    @property
+    def is_pending_setup(self) -> bool:
+        return self.status in (self.STATUS_DRAFT, self.STATUS_SCHEDULED)
 
 
 class CharityVoteOption(models.Model):
@@ -392,3 +422,40 @@ class OrgCharitySelection(models.Model):
 
     def __str__(self):
         return f"{self.org.name} → {self.charity.name} ({self.season}, {self.source})"
+
+
+class Notification(models.Model):
+    """An in-app notification — the popup + bell-panel side of what email
+    delivers. Kept after dismissal so the panel doubles as a small feed of
+    what the admin has said.
+    """
+
+    KIND_ELECTION_OPEN = "election_open"
+    KIND_ELECTION_RESULT = "election_result"
+    KIND_ADMIN_NOTE = "admin_note"
+    KIND_CHOICES = [
+        (KIND_ELECTION_OPEN, "Charity election open"),
+        (KIND_ELECTION_RESULT, "Charity election result"),
+        (KIND_ADMIN_NOTE, "Note from your admin"),
+    ]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications")
+    org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name="notifications", null=True, blank=True)
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, default=KIND_ADMIN_NOTE)
+    title = models.CharField(max_length=200)
+    message = models.TextField(blank=True)
+    link_url = models.CharField(max_length=300, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    # Dismissed = the popup was cleared; the row stays visible in the panel.
+    dismissed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.get_kind_display()} → {self.user}"
+
+    @property
+    def is_unread(self) -> bool:
+        return self.read_at is None

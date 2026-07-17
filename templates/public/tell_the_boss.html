@@ -1,0 +1,150 @@
+{% extends "public/base.html" %}
+{% load static %}
+
+{% block title %}Tell the Boss — GoodTip{% endblock %}
+{% block loader_task %}Drafting the note{% endblock %}
+{% block meta_description %}A real note, ready to send. Copy it, paste it, and let the person who says yes actually see it.{% endblock %}
+{% block body_class %}page-boss{% endblock %}
+
+{% block content %}
+
+<!-- SPLIT HERO -->
+<section class="hero-split">
+  <div class="hs-left">
+    <span class="pill" style="align-self:flex-start;margin-bottom:24px;"><span class="dot"></span>Tell the boss &middot; takes 5 minutes</span>
+    <h1>We already do a comp. <em>Just not like this.</em></h1>
+    <p class="hero-sub">A real note, ready to send. Copy it, paste it, and let the person who says yes actually see it.</p>
+    <div class="hero-ctas" style="justify-content:flex-start;">
+      <a href="#note" class="btn-primary">Copy this note &darr;</a>
+      <a href="/how-it-works/" class="btn-ghost">See how it works</a>
+    </div>
+    <div class="boss-stats" aria-label="Quick facts">
+      <div><b>100%</b><span>Of entry fees to charity</span></div>
+      <div><b>4</b><span>Codes, every season</span></div>
+      <div><b>0</b><span>Sign-up needed to look</span></div>
+    </div>
+  </div>
+  <div class="hs-right">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="shot active" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
+    </div>
+    <div class="hs-veil" aria-hidden="true"></div>
+    <div class="hs-tagstrip"><span class="live-dot">Same comp. Better outcome.</span></div>
+  </div>
+</section>
+
+<!-- THE NOTE -->
+<section class="section on-cream" id="note">
+  <div class="wrap">
+    <p class="eyebrow reveal">Real note. Copy it.</p>
+    <h2 class="section-heading reveal">Stick it somewhere they'll actually see it.</h2>
+    <div class="boss-note reveal">
+      <div class="bn-paper">
+        <p>Dear Boss,</p>
+        <p>What if our footy tips actually did some good?</p>
+        <p>We're already picking teams and checking the ladder every Monday. GoodTip just sends our entry fees to a charity we choose. Together.</p>
+        <p>Five minutes to set up. Nothing to lose but bragging rights.</p>
+        <p>Can we do this?</p>
+        <p>&mdash; [Your name]</p>
+      </div>
+      <div class="bn-actions">
+        <span class="bn-hint">Real text. Edit the name, hit send.</span>
+        <button type="button" class="btn-primary" data-copy-note>Copy this note</button>
+      </div>
+      <textarea id="bossNote" aria-hidden="true" tabindex="-1" style="position:absolute;left:-9999px;top:0;">Dear Boss,
+
+What if our footy tips actually did some good?
+
+We're already picking teams and checking the ladder every Monday. GoodTip just sends our entry fees to a charity we choose. Together.
+
+Five minutes to set up. Nothing to lose but bragging rights.
+
+Can we do this?
+
+— [Your name]</textarea>
+    </div>
+  </div>
+</section>
+
+<!-- THE REFRAME -->
+<section class="section on-dark">
+  <div class="wrap">
+    <p class="eyebrow reveal">The reframe</p>
+    <h2 class="section-heading reveal">Same comp. Different point to it.</h2>
+    <div class="roles-2 reveal">
+      <div class="role-card r1">
+        <span class="role-tag">Right now</span>
+        <h3>Your current tipping comp</h3>
+        <ul class="cmp-list bad">
+          <li>Entry fee goes to the winner</li>
+          <li>Bragging rights until round two</li>
+          <li>Money sits in someone's account till finals</li>
+          <li>Season ends, nothing lasts</li>
+        </ul>
+      </div>
+      <div class="role-card r2">
+        <span class="role-tag">With GoodTip</span>
+        <h3>Same comp. Better outcome.</h3>
+        <ul class="cmp-list good">
+          <li>Entry fee goes to the charity the group chose</li>
+          <li>Ladder still counts. Bragging rights still real</li>
+          <li>Money moves to charity, not a winner's pocket</li>
+          <li>Season ends, the impact stays</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- THREE STEPS -->
+<section class="section on-paper">
+  <div class="wrap">
+    <p class="eyebrow reveal">How it starts</p>
+    <h2 class="section-heading reveal">Three steps. No admin headache.</h2>
+    <div class="timeline" style="margin-top:36px;">
+      <div class="tl-step reveal from-left"><div class="tl-marker">01</div><div class="tl-card"><p class="tl-tag">Set up</p><h2>Set up your group</h2><p>Takes minutes. Works for an office floor, a school year group or a club committee.</p></div></div>
+      <div class="tl-step reveal from-left"><div class="tl-marker">02</div><div class="tl-card"><p class="tl-tag">Choose</p><h2>Pick a charity together</h2><p>The group decides. Democratic, not handed down from the top.</p></div></div>
+      <div class="tl-step reveal from-left"><div class="tl-marker">03</div><div class="tl-card"><p class="tl-tag">Tip</p><h2>Tip every round</h2><p>Your organisation pays one flat platform fee. Every entry fee on top goes straight to the charity your group picked.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- IMAGE BAND -->
+<section class="image-band">
+  <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')" aria-hidden="true"></div>
+  <div class="veil" aria-hidden="true"></div>
+  <div class="wrap reveal from-left">
+    <p class="eyebrow" style="color:var(--lime);">No sign-up needed to look</p>
+    <blockquote>No payment to read this page. Just send it to the person who says yes.</blockquote>
+    <p class="src">Tell the boss &middot; takes 5 minutes</p>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-pro">
+  <div class="wrap reveal zoom">
+    <h2>Send this to whoever can make the call.</h2>
+    <p>Copy the note, or copy the link to this page — either way, it lands on the desk that matters.</p>
+    <button type="button" class="btn-dark" data-copy-note>Copy the note</button>
+    <button type="button" class="btn-dark" data-copy-link>Copy the link</button>
+  </div>
+</section>
+
+<script>
+(function(){
+  function flash(btn){ var o = btn.textContent; btn.textContent = 'Copied ✓'; setTimeout(function(){ btn.textContent = o; }, 1600); }
+  function put(text, btn){
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(function(){ flash(btn); }); }
+    else { var t = document.getElementById('bossNote'); t.value = text; t.focus(); t.select(); try { document.execCommand('copy'); } catch(e){} flash(btn); }
+  }
+  document.querySelectorAll('[data-copy-note]').forEach(function(btn){
+    btn.addEventListener('click', function(){ put(document.getElementById('bossNote').value, btn); });
+  });
+  document.querySelectorAll('[data-copy-link]').forEach(function(btn){
+    btn.addEventListener('click', function(){ put(window.location.origin + window.location.pathname, btn); });
+  });
+})();
+</script>
+
+{% endblock %}

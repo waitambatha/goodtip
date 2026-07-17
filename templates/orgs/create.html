@@ -6,12 +6,14 @@
 {% block app_content %}
 <div class="page-scenes" aria-hidden="true">
   <div class="scene left">
-    <div class="shot on" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
-    <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+    <div class="shot on" style="background-image:url('{% static 'img/scenes/afl-ball-grass.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
   </div>
   <div class="scene right">
-    <div class="shot on" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
-    <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+    <div class="shot on" style="background-image:url('{% static 'img/scenes/nrl-ball-grass.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/mcg-stadium.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
   </div>
 </div>
 <div class="app-head head-center"><div><div class="app-eyebrow">{% if parent_org %}New group under {{ parent_org.name }}{% else %}New competition{% endif %}</div><h1 class="app-h1">Create a competition</h1><p class="app-sub">Stand up a tipping comp. You'll be the Owner, Manager and Captain to start.</p></div></div>

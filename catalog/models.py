@@ -100,8 +100,12 @@ class Competition(models.Model):
 
     @classmethod
     def for_series(cls, series, season):
-        """The competition that includes this series in the given season (or None)."""
-        return cls.objects.filter(series=series, season=season).first()
+        """The competition that includes this series in the given season (or None).
+
+        Ordered by id so a stray duplicate competition can never make rounds
+        land under two different comps (the "AFL + AFL 2026" bug).
+        """
+        return cls.objects.filter(series=series, season=season).order_by("id").first()
 
 
 class State(models.Model):

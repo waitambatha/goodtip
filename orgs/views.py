@@ -14,6 +14,7 @@ from .models import (
     CharityVote,
     CharityVoteOption,
     MembershipRequest,
+    Notification,
     OrgCharitySelection,
     OrgMember,
     Organisation,
@@ -24,15 +25,18 @@ from .services import (
     can_lock_fundraising,
     cast_charity_ballot,
     close_charity_vote,
+    create_charity_election,
     decline_membership_request,
     demote_child_org_admin,
     lock_fundraising_to_self,
+    open_due_elections,
     reassign_child_org_admin,
     nominate_manager_by_email,
     notify_charity_suggestion,
     open_charity_vote,
     record_charity_selection,
     request_to_join,
+    schedule_charity_election,
     set_member_role,
 )
 from .signing import make_join_token, parse_join_token
@@ -101,8 +105,14 @@ def create_org_view(request):
                 defaults={"role": OrgMember.ROLE_BOTH, "is_league_owner": True},
             )
             if form.is_vote:
-                open_charity_vote(org, form.cleaned_data["vote_charities"])
-                messages.success(request, f"{org.name} created — charity vote is open.")
+                # The election is created in draft — the admin schedules it
+                # (or starts it now) from the dashboard, and members are
+                # notified by email + in-app when it actually opens.
+                create_charity_election(org, form.cleaned_data["vote_charities"])
+                messages.success(
+                    request,
+                    f"{org.name} created — set up the charity election when you're ready.",
+                )
             else:
                 # Charity was picked at creation — start the timeline.
                 record_charity_selection(org, org.charity, source=OrgCharitySelection.SOURCE_INITIAL)
@@ -182,14 +192,17 @@ def charity_vote_view(request, org_id: int):
             and org.group_type.is_charity_type and not org.is_charity_partner
         ),
     }
+    # A scheduled election whose time has come opens on first visit.
+    open_due_elections(orgs=[org])
     vote = org.charity_votes.first()
     if vote is None:
         return render(request, "orgs/charity_vote.html", {"org": org, "vote": None, **partner_ctx})
+    vote.refresh_from_db()
 
     options = list(vote.options.select_related("charity"))
     my_ballot = vote.ballots.filter(user=request.user).first()
     results = None
-    if not vote.is_open:
+    if vote.status == CharityVote.STATUS_CLOSED:
         # Tallies are revealed only once the vote has closed (blind vote).
         results = list(
             vote.options.select_related("charity")
@@ -445,3 +458,75 @@ def members_view(request, org_id: int):
         "role_choices": OrgMember.ROLE_CHOICES,
         "is_owner": me.is_league_owner,
     })
+
+
+@login_required
+def election_setup_view(request, org_id: int):
+    """Admin schedules the charity election — pick a time or start it now."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _can_manage(request.user, org):
+        return HttpResponseForbidden()
+    vote = org.charity_votes.first()
+    if vote is None:
+        messages.info(request, "This league has no charity election — its charity was picked directly.")
+        return redirect("dashboard")
+    if not vote.is_pending_setup:
+        return redirect("orgs:charity_vote", org_id=org.id)
+
+    if request.method == "POST":
+        from django.utils import timezone as tz
+        from django.utils.dateparse import parse_datetime
+
+        message = (request.POST.get("admin_message") or "").strip()
+        if request.POST.get("action") == "now":
+            schedule_charity_election(vote, when=tz.now(), message=message)
+            messages.success(request, "Election open — members have been notified by email and in the app.")
+            return redirect("orgs:charity_vote", org_id=org.id)
+        raw = request.POST.get("scheduled_open_at") or ""
+        when = parse_datetime(raw)
+        if when is None:
+            messages.error(request, "Pick a date and time for the election to open.")
+        else:
+            if tz.is_naive(when):
+                when = tz.make_aware(when, tz.get_current_timezone())
+            schedule_charity_election(vote, when=when, message=message)
+            if vote.status == CharityVote.STATUS_OPEN:
+                messages.success(request, "That time has already passed, so the election opened straight away — members have been notified.")
+                return redirect("orgs:charity_vote", org_id=org.id)
+            messages.success(request, f"Election scheduled — members will be notified when it opens.")
+            return redirect("orgs:election_setup", org_id=org.id)
+
+    return render(request, "orgs/election_setup.html", {
+        "org": org,
+        "vote": vote,
+        "options": vote.options.select_related("charity"),
+    })
+
+
+@login_required
+@require_POST
+def dismiss_notification(request, note_id: int):
+    """Clear the popup. The row stays in the bell panel as history."""
+    from django.utils import timezone as tz
+
+    note = get_object_or_404(Notification, pk=note_id, user=request.user)
+    if note.dismissed_at is None:
+        note.dismissed_at = tz.now()
+        if note.read_at is None:
+            note.read_at = tz.now()
+        note.save(update_fields=["dismissed_at", "read_at"])
+    from django.http import HttpResponse
+
+    return HttpResponse("")
+
+
+@login_required
+@require_POST
+def notifications_read_all(request):
+    """Opening the bell panel marks everything read (badge clears)."""
+    from django.utils import timezone as tz
+
+    request.user.notifications.filter(read_at__isnull=True).update(read_at=tz.now())
+    from django.http import HttpResponse
+
+    return HttpResponse("")

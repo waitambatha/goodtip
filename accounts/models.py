@@ -42,3 +42,35 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.display_name or self.email
+
+
+class LaunchSignup(models.Model):
+    """A pre-launch 'lock in my spot' lead from the coming-soon page.
+
+    Stored, not mailed: the launch announcement goes out as a single batch
+    when sign-ups open, so all we need here is the list.
+    """
+
+    PLATFORM_CHOICES = [
+        ("footytips", "footytips (ESPN)"),
+        ("afl", "Official AFL Tipping"),
+        ("nrl", "Official NRL Tipping"),
+        ("supercoach", "SuperCoach Tips"),
+        ("itipfooty", "iTipFooty"),
+        ("other", "Another platform"),
+        ("none", "We don't run a tipping comp yet"),
+        ("na", "Prefer not to say"),
+    ]
+
+    name = models.CharField(max_length=120)
+    email = models.EmailField(unique=True)
+    current_platform = models.CharField(
+        max_length=20, choices=PLATFORM_CHOICES, blank=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.name} <{self.email}>"

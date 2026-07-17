@@ -17,4 +17,7 @@ urlpatterns = [
     path("<int:org_id>/charity-vote/cast/", views.cast_charity_vote, name="cast_charity_vote"),
     path("<int:org_id>/charity-vote/close/", views.close_charity_vote_view, name="close_charity_vote"),
     path("<int:org_id>/lock-fundraising/", views.lock_fundraising_view, name="lock_fundraising"),
+    path("<int:org_id>/election/", views.election_setup_view, name="election_setup"),
+    path("notifications/<int:note_id>/dismiss/", views.dismiss_notification, name="dismiss_notification"),
+    path("notifications/read-all/", views.notifications_read_all, name="notifications_read_all"),
 ]

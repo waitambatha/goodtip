@@ -3,8 +3,8 @@
 {% if not round %}
   <div class="card pad-lg" style="text-align:center;"><div class="card-h">Pick a round</div><p class="card-lead">Choose a round above to see your tips.</p></div>
 {% else %}
-<table class="atable">
-  <thead><tr><th>Match</th><th>Your pick</th><th>Result</th><th style="text-align:right;">Outcome</th></tr></thead>
+<table class="atable tips-table">
+  <thead><tr><th>Match</th><th>Your pick</th><th>Result</th><th class="num">Outcome</th></tr></thead>
   <tbody>
   {% for r in rows %}
     {% with m=r.match t=r.tip %}

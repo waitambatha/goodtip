@@ -10,7 +10,8 @@
   <div class="card pad-lg" style="text-align:left;margin:24px 0;">
     <label style="font-size:13px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">Your invite link</label>
     <div class="copy-field"><input id="inviteLink" type="text" readonly value="{{ invite_url }}"><button type="button" class="abtn abtn-dark" data-copy="#inviteLink">Copy</button></div>
-    {% if vote %}<div class="flash info" style="margin:16px 0 0;"><svg class="cic" style="width:18px;height:18px;stroke:#245b66;fill:none;flex:none;"><use href="#ic-vote"/></svg><span>You started a charity vote — share it so the group can pick where the money goes. <a href="{% url 'orgs:charity_vote' org.id %}" class="flink" style="color:#245b66;font-weight:700;">View the vote</a></span></div>{% endif %}
+    {% if vote %}<div class="flash info" style="margin:16px 0 0;"><svg class="cic" style="width:18px;height:18px;stroke:#245b66;fill:none;flex:none;"><use href="#ic-vote"/></svg><span>You started a charity vote — share it so the group can pick where the money goes. <a href="{% url 'orgs:charity_vote' org.id %}" class="flink" style="color:#245b66;font-weight:700;">View the vote</a></span></div>
+    {% elif org.pending_election %}<div class="flash info" style="margin:16px 0 0;"><svg class="cic" style="width:18px;height:18px;stroke:#245b66;fill:none;flex:none;"><use href="#ic-vote"/></svg><span>Your group votes on the charity — schedule the election (or start it now) and every member gets notified. <a href="{% url 'orgs:election_setup' org.id %}" class="flink" style="color:#245b66;font-weight:700;">Set up the election</a></span></div>{% endif %}
   </div>
 
   <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">

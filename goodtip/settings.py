@@ -135,9 +135,13 @@ EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True").lower() == "true"
+# Never let a slow/unconfigured SMTP host hang a request.
+EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "10"))
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "GoodTip <no-reply@goodtip.com.au>")
 # Where "suggest a charity" notifications go for manual review (deck slide 10).
 GOODTIP_TEAM_EMAIL = os.environ.get("GOODTIP_TEAM_EMAIL", "team@goodtip.com.au")
+# Absolute base URL used in outbound email links.
+SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://goodtip.com.au")
 
 THESPORTS_API_KEY = os.environ.get("THESPORTS_API_KEY", "")
 

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Charity election open</title></head>
+<body style="margin:0;padding:0;background:#F2EFE6;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2EFE6;padding:28px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
+        <!-- header -->
+        <tr><td style="background:#0F2E22;border-radius:14px 14px 0 0;padding:26px 32px;text-align:center;">
+          <span style="font-size:26px;font-weight:900;letter-spacing:.5px;color:#ffffff;">GOOD<span style="color:#C8F135;">TIP</span><span style="color:#C8F135;">.</span></span>
+          <div style="color:#C8F135;font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-top:6px;">Charity election open</div>
+        </td></tr>
+        <!-- body -->
+        <tr><td style="background:#ffffff;padding:32px;">
+          <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">G'day {{ user.display_name }},</p>
+          <p style="margin:0 0 18px;font-size:16px;line-height:1.6;color:#1A1A14;">
+            <b>{{ org.name }}</b> is deciding where this season's money goes — and your vote is one of the ones that picks it.
+          </p>
+          {% if vote.admin_message %}
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;">
+            <tr><td style="background:#F7F6EC;border-left:4px solid #C8F135;border-radius:0 10px 10px 0;padding:14px 18px;">
+              <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#6b6b5e;margin-bottom:6px;">A note from your admin</div>
+              <div style="font-size:15px;line-height:1.6;color:#1A1A14;">{{ vote.admin_message|linebreaksbr }}</div>
+            </td></tr>
+          </table>
+          {% endif %}
+          <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#6b6b5e;margin-bottom:10px;">The candidates</div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            {% for opt in options %}
+            <tr><td style="padding:10px 14px;border:1px solid #E4E1D2;{% if not forloop.first %}border-top:0;{% endif %}{% if forloop.first %}border-radius:10px 10px 0 0;{% endif %}{% if forloop.last %}border-radius:0 0 10px 10px;{% endif %}{% if forloop.first and forloop.last %}border-radius:10px;{% endif %}font-size:15px;font-weight:bold;color:#0F2E22;">
+              {{ opt.charity.name }}
+            </td></tr>
+            {% endfor %}
+          </table>
+          <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 10px;">
+            <tr><td style="background:#C8F135;border-radius:10px;">
+              <a href="{{ vote_url }}" style="display:inline-block;padding:15px 34px;font-size:16px;font-weight:bold;color:#0F2E22;text-decoration:none;">Cast your vote &rarr;</a>
+            </td></tr>
+          </table>
+          <p style="margin:14px 0 0;font-size:13px;line-height:1.6;color:#6b6b5e;text-align:center;">
+            Blind vote — tallies stay hidden until it closes. You can change your pick any time before then.
+          </p>
+        </td></tr>
+        <!-- footer -->
+        <tr><td style="background:#0F2E22;border-radius:0 0 14px 14px;padding:18px 32px;text-align:center;">
+          <div style="color:#F2EFE6;font-size:12px;line-height:1.7;opacity:.85;">
+            Footy tipping, for good. &middot; goodtip.com.au<br>
+            &copy; 2026 GoodTip Pty Ltd &middot; Not affiliated with the AFL or NRL.
+          </div>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

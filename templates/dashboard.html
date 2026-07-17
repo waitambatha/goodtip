@@ -7,16 +7,32 @@
 {% block loader_task %}Opening your dashboard{% endblock %}
 {% block app_content %}
 
-<!-- translucent side imagery: fills the void either side of the centred content -->
+<!-- clear side imagery, no wash — rotates through the client's shots,
+     leading with the code this group actually tips -->
 <div class="page-scenes" aria-hidden="true">
+  {% if primary_sport == "Rugby League" %}
   <div class="scene left">
-    <div class="shot on" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
-    <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+    <div class="shot on" style="background-image:url('{% static 'img/scenes/nrl-goal-posts.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-ball-grass.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
   </div>
   <div class="scene right">
     <div class="shot on" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-posts-sunset.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
+  </div>
+  {% else %}
+  <div class="scene left">
+    <div class="shot on" style="background-image:url('{% static 'img/scenes/afl-goal-posts.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/afl-training.jpg' %}')"></div>
     <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
   </div>
+  <div class="scene right">
+    <div class="shot on" style="background-image:url('{% static 'img/scenes/mcg-stadium.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+  </div>
+  {% endif %}
 </div>
 
 {% if not cards %}
@@ -32,8 +48,9 @@
 <!-- greeting banner -->
 <div class="dash-banner">
   <div class="bg" aria-hidden="true">
-    <div class="shot on" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
-    <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+    <div class="shot on" style="background-image:url('{% static 'img/scenes/stadium-panorama.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
   </div>
   <div class="veil"></div>
   <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;">
@@ -90,6 +107,15 @@
     <a href="{% url 'orgs:charity_vote' c.org.id %}" class="abtn abtn-dark abtn-sm">{% if c.has_voted %}Review{% else %}Vote now{% endif %}</a>
   </div>
   {% endif %}
+
+  {% if c.is_admin %}{% with pe=c.org.pending_election %}{% if pe %}
+  <div class="flash {% if pe.status == 'scheduled' %}info{% else %}error{% endif %}" style="justify-content:space-between;">
+    <span><svg class="cic" style="width:18px;height:18px;stroke:currentColor;"><use href="#ic-vote"/></svg>
+      {% if pe.status == 'scheduled' %}Charity election scheduled for {{ pe.scheduled_open_at|date:"D j M, g:i A" }}.{% else %}Your charity election isn't set up yet — members can't vote until it opens.{% endif %}
+    </span>
+    <a href="{% url 'orgs:election_setup' c.org.id %}" class="abtn abtn-dark abtn-sm">{% if pe.status == 'scheduled' %}Reschedule{% else %}Set up the election{% endif %}</a>
+  </div>
+  {% endif %}{% endwith %}{% endif %}
 
   {% if c.round %}
   <div class="card" style="background:var(--app-card-2);margin-top:16px;">

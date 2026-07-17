@@ -321,3 +321,137 @@ def lock_fundraising_to_self(org):
         )
     set_org_charity(org, charity, source=OrgCharitySelection.SOURCE_SELF)
     return charity
+
+
+# --------------------------------------------------------------------------
+# Charity elections — scheduled votes with member notification (client ask,
+# Jul 2026): creating a member-vote comp no longer opens the vote silently.
+# The admin schedules the election (or starts it now); when it opens, every
+# member gets a branded email plus an in-app popup + notification entry.
+# --------------------------------------------------------------------------
+
+@transaction.atomic
+def create_charity_election(org, charities) -> CharityVote:
+    """Create the election in draft, seeded with candidate charities.
+
+    Nothing is announced yet — the admin schedules it from their dashboard.
+    """
+    vote = CharityVote.objects.create(org=org, status=CharityVote.STATUS_DRAFT)
+    for charity in charities:
+        CharityVoteOption.objects.create(vote=vote, charity=charity)
+    return vote
+
+
+def schedule_charity_election(vote: CharityVote, *, when, message="") -> CharityVote:
+    """Schedule the election to open at `when` (or open immediately if due)."""
+    if vote.status not in (CharityVote.STATUS_DRAFT, CharityVote.STATUS_SCHEDULED):
+        raise ValueError("This election has already opened.")
+    vote.admin_message = (message or "").strip()
+    vote.scheduled_open_at = when
+    vote.status = CharityVote.STATUS_SCHEDULED
+    vote.save(update_fields=["admin_message", "scheduled_open_at", "status"])
+    if when <= timezone.now():
+        open_charity_election(vote)
+    return vote
+
+
+@transaction.atomic
+def open_charity_election(vote: CharityVote) -> CharityVote:
+    """Open the election and tell every member: email + in-app notification."""
+    if vote.status == CharityVote.STATUS_OPEN:
+        return vote
+    if vote.status == CharityVote.STATUS_CLOSED:
+        raise ValueError("This election has already closed.")
+    vote.status = CharityVote.STATUS_OPEN
+    vote.opened_at = timezone.now()
+    vote.save(update_fields=["status", "opened_at"])
+
+    from .models import Notification
+
+    members = list(vote.org.members.select_related("user"))
+    title = f"Charity election open — {vote.org.name}"
+    body = vote.admin_message or (
+        "Your group is choosing where this season's money goes. Cast your vote!"
+    )
+    link = f"/leagues/{vote.org_id}/charity-vote/"
+    Notification.objects.bulk_create([
+        Notification(
+            user=m.user, org=vote.org,
+            kind=Notification.KIND_ELECTION_OPEN,
+            title=title, message=body, link_url=link,
+        )
+        for m in members
+    ])
+    transaction.on_commit(lambda: send_election_open_emails(vote))
+    return vote
+
+
+def send_election_open_emails(vote: CharityVote) -> int:
+    """Branded HTML email to every member. Best-effort, never raises."""
+    from django.core.mail import EmailMultiAlternatives
+    from django.template.loader import render_to_string
+
+    # SMTP not fully configured yet (pre-launch): skip quietly rather than
+    # hammer a dead connection per member. In-app notifications still go out;
+    # emails start flowing the moment the SMTP credentials land in the env.
+    if "smtp" in settings.EMAIL_BACKEND and not (
+        settings.EMAIL_HOST and settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD
+    ):
+        logger.warning(
+            "Election %s opened but SMTP credentials are not configured — emails skipped.",
+            vote.pk,
+        )
+        return 0
+
+    sent = 0
+    options = list(vote.options.select_related("charity"))
+    base = getattr(settings, "SITE_BASE_URL", "https://goodtip.com.au").rstrip("/")
+    vote_url = f"{base}/leagues/{vote.org_id}/charity-vote/"
+    for m in vote.org.members.select_related("user"):
+        user = m.user
+        if not user.email:
+            continue
+        ctx = {
+            "user": user,
+            "org": vote.org,
+            "vote": vote,
+            "options": options,
+            "vote_url": vote_url,
+        }
+        try:
+            msg = EmailMultiAlternatives(
+                subject=f"Vote now — where should {vote.org.name}'s money go?",
+                body=render_to_string("emails/election_open.txt", ctx),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[user.email],
+            )
+            msg.attach_alternative(
+                render_to_string("emails/election_open.html", ctx), "text/html"
+            )
+            msg.send(fail_silently=True)
+            sent += 1
+        except Exception:  # noqa: BLE001 — mail must never break the open
+            logger.exception("Election-open email failed for %s", user.email)
+    return sent
+
+
+def open_due_elections(orgs=None) -> int:
+    """Open every scheduled election whose time has come.
+
+    Called lazily from the dashboard/vote views and by the
+    `open_due_elections` management command (cron).
+    """
+    qs = CharityVote.objects.filter(
+        status=CharityVote.STATUS_SCHEDULED,
+        scheduled_open_at__lte=timezone.now(),
+    )
+    if orgs is not None:
+        qs = qs.filter(org__in=orgs)
+    n = 0
+    for vote in qs.select_related("org"):
+        try:
+            open_charity_election(vote)
+            n += 1
+        except Exception:  # noqa: BLE001 — one bad vote must not block the rest
+            logger.exception("Failed to open election %s", vote.pk)
+    return n

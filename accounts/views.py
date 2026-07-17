@@ -258,3 +258,38 @@ def profile_view(request):
     return render(request, "profile.html", {
         "form": form, "pwd_form": pwd_form, "memberships": memberships,
     })
+
+
+def coming_soon_view(request):
+    """Pre-launch 'lock in your spot' page (client's index template).
+
+    Public by design; the staging gate still fronts it until launch. Saves a
+    LaunchSignup lead and re-renders with the locked-in confirmation.
+    """
+    from .models import LaunchSignup
+
+    locked_in = False
+    error = ""
+    if request.method == "POST":
+        name = (request.POST.get("name") or "").strip()
+        email = (request.POST.get("email") or "").strip().lower()
+        platform = (request.POST.get("current_platform") or "").strip()
+        valid_platforms = {c[0] for c in LaunchSignup.PLATFORM_CHOICES}
+        if platform not in valid_platforms:
+            platform = ""
+        if not name or not email:
+            error = "Both name and email are needed to lock in your spot."
+        else:
+            try:
+                LaunchSignup.objects.update_or_create(
+                    email=email,
+                    defaults={"name": name, "current_platform": platform},
+                )
+                locked_in = True
+            except Exception:
+                error = "That didn't save — check the email address and try again."
+    return render(request, "public/coming_soon.html", {
+        "locked_in": locked_in,
+        "error": error,
+        "platforms": LaunchSignup.PLATFORM_CHOICES,
+    })

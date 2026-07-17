@@ -5,7 +5,7 @@ from django.urls import include, path
 from django.views.generic import TemplateView
 from django.views.static import serve as static_serve
 
-from accounts.views import dashboard_view
+from accounts.views import coming_soon_view, dashboard_view
 from admin_panel.views import news_detail, news_index
 from billing.views import good_list_view, stripe_webhook
 from goodtip.staging_gate import gate_view
@@ -34,6 +34,11 @@ urlpatterns = [
         template_name="public/pricing.html",
         extra_context={"active": "pricing"},
     ), name="pricing"),
+    path("coming-soon/", coming_soon_view, name="coming_soon"),
+    path("tell-the-boss/", TemplateView.as_view(
+        template_name="public/tell_the_boss.html",
+        extra_context={"active": "boss"},
+    ), name="tell_the_boss"),
     path("dashboard/", dashboard_view, name="dashboard"),
     # News & blog (members) — full-story pages behind the dashboard cards
     path("news/", news_index, name="news_index"),

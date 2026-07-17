@@ -10,34 +10,84 @@
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
   <script src="{% static 'js/gt-ui.js' %}" defer></script>
 </head>
-<body>
+<body class="app manage-app">
   {% include "public/partials/_icons.html" %}
-  <div class="admin">
-    <div class="page-scenes" aria-hidden="true">
-      <div class="scene right">
-        <div class="shot on" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
-        <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+
+  {# ---- same sticky nav as the app, wearing the Manage links ---- #}
+  <nav class="app-nav">
+    <div class="an-inner">
+      <a href="{% url 'manage:overview' %}" class="an-brand">GOOD<span>TIP</span></a>
+      <span class="an-org">Manage</span>
+      <div class="an-links">
+        <a href="{% url 'manage:overview' %}" class="{% block nav_overview %}{% endblock %}">Overview</a>
+        <a href="{% url 'manage:orgs_list' %}" class="{% block nav_orgs %}{% endblock %}">Orgs</a>
+        <a href="{% url 'manage:sync' %}" class="{% block nav_sync %}{% endblock %}">Sync</a>
+        {% if user.is_superuser %}<a href="{% url 'manage:news' %}" class="{% block nav_news %}{% endblock %}">News &amp; blog</a>{% endif %}
+      </div>
+      <div class="an-right">
+        <a href="{% url 'dashboard' %}" class="an-logout" title="Back to app"><span class="an-llabel">&larr; Back to app</span></a>
+        <button class="an-burger" aria-label="Menu" data-sheet-open><svg><use href="#ic-menu"/></svg></button>
       </div>
     </div>
-    <aside class="admin-side">
-      <div class="as-brand">GOOD<span>TIP</span></div>
-      <div class="as-tag">Manage</div>
-      <a href="{% url 'dashboard' %}" class="as-back">&larr; Back to app</a>
-      <a href="{% url 'manage:overview' %}" class="{% block nav_overview %}{% endblock %}"><svg><use href="#ic-chart"/></svg> Overview</a>
-      <a href="{% url 'manage:orgs_list' %}" class="{% block nav_orgs %}{% endblock %}"><svg><use href="#ic-users"/></svg> Orgs</a>
-      <a href="{% url 'manage:sync' %}" class="{% block nav_sync %}{% endblock %}"><svg><use href="#ic-recycle"/></svg> Sync</a>
-      {% if user.is_superuser %}<a href="{% url 'manage:news' %}" class="{% block nav_news %}{% endblock %}"><svg><use href="#ic-doc"/></svg> News &amp; blog</a>{% endif %}
-    </aside>
-    <main class="admin-main">
-      {% if messages %}
+  </nav>
+
+  {# ---- mobile sheet ---- #}
+  <div class="app-sheet" id="appSheet">
+    <div class="sheet-panel">
+      <a href="{% url 'manage:overview' %}">Overview</a>
+      <a href="{% url 'manage:orgs_list' %}">Orgs</a>
+      <a href="{% url 'manage:sync' %}">Sync</a>
+      {% if user.is_superuser %}<a href="{% url 'manage:news' %}">News &amp; blog</a>{% endif %}
+      <a href="{% url 'dashboard' %}">&larr; Back to app</a>
+    </div>
+  </div>
+
+  {# ---- side imagery, same treatment as the dashboard ---- #}
+  <div class="page-scenes" aria-hidden="true">
+    <div class="scene left">
+      <div class="shot on" style="background-image:url('{% static 'img/scenes/afl-ground.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/afl-goal-posts.jpg' %}')"></div>
+    </div>
+    <div class="scene right">
+      <div class="shot on" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-posts-sunset.jpg' %}')"></div>
+    </div>
+  </div>
+
+  <main class="app-main">
+    {% if messages %}
+      <div class="flash-stack">
         {% for m in messages %}
           <div class="flash {% if m.tags == 'success' %}success{% elif m.tags == 'error' %}error{% else %}info{% endif %}"><span>{{ m }}</span></div>
         {% endfor %}
-      {% endif %}
-      {% block admin_content %}{% endblock %}
-    </main>
-  </div>
+      </div>
+    {% endif %}
+
+    {% block admin_hero %}
+    <div class="dash-banner" style="padding:20px 28px;">
+      <div class="bg" aria-hidden="true">
+        <div class="shot on" style="background-image:url('{% static 'img/scenes/stadium-panorama.jpg' %}')"></div>
+      </div>
+      <div class="veil"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
+        <div>
+          <div class="app-eyebrow" style="color:var(--lime);opacity:.85;">GoodTip HQ</div>
+          <div style="font-family:var(--display);font-size:22px;color:#fff;">{% block hero_title %}Manage{% endblock %}</div>
+        </div>
+        <span class="pill-role" style="background:rgba(200,241,53,.18);color:var(--lime);">{{ user.display_name }}</span>
+      </div>
+    </div>
+    {% endblock %}
+
+    {% block admin_content %}{% endblock %}
+  </main>
   <script>(function(){
+    var burger = document.querySelector('[data-sheet-open]');
+    var sheet = document.getElementById('appSheet');
+    if (burger && sheet) {
+      burger.addEventListener('click', function(){ sheet.classList.add('open'); });
+      sheet.addEventListener('click', function(e){ if (e.target === sheet) sheet.classList.remove('open'); });
+    }
     document.querySelectorAll('[data-copy]').forEach(function(btn){
       btn.addEventListener('click', function(){ var t=document.querySelector(btn.getAttribute('data-copy')); if(!t)return; var v=t.value!==undefined?t.value:t.textContent; if(navigator.clipboard)navigator.clipboard.writeText(v); var o=btn.innerHTML; btn.innerHTML='Copied &#10003;'; setTimeout(function(){btn.innerHTML=o;},1500); });
     });
