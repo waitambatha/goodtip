@@ -25,3 +25,4 @@ htmlcov/
 
 # LibreOffice/OpenOffice lock files
 .~lock.*#
+.claude/
