@@ -1,0 +1,47 @@
+{% extends "public/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}{{ post.title }} — GoodTip{% endblock %}
+{% block loader_task %}Opening the story{% endblock %}
+{% block meta_description %}{{ post.excerpt|default:post.title|truncatechars:150 }}{% endblock %}
+{% block body_class %}page-news{% endblock %}
+
+{% block content %}
+<section class="section on-cream" style="padding-top:56px;">
+  <div class="wrap">
+    <div class="pnews-article">
+      <a href="{% url 'news_index' %}" class="pn-back">&larr; All news</a>
+      {% if post.image %}<div class="pn-hero" style="background-image:url('{{ post.image.url }}')"><span class="pn-tag">{{ post.get_tag_display }}</span></div>{% endif %}
+      <h1>{{ post.title }}</h1>
+      <div class="pn-meta">{{ post.published_at|date:"l j F Y" }} &middot; {{ post.published_at|naturaltime }}</div>
+      {% if post.excerpt %}<p class="pn-lead">{{ post.excerpt }}</p>{% endif %}
+      {% if post.body %}<div class="pn-prose">{{ post.body|linebreaks }}</div>{% endif %}
+      {% if post.link_url %}<a href="{{ post.link_url }}" target="_blank" rel="noopener" class="btn-primary" style="margin-top:20px;display:inline-block;">Read the original story &rarr;</a>{% endif %}
+    </div>
+
+    {% if more %}
+    <div class="pnews-more">
+      <p class="eyebrow">More news</p>
+      <div class="pnews-grid">
+        {% for p in more|slice:":3" %}
+        <a class="pnews-card" href="{% url 'news_detail' p.id %}">
+          {% if p.image %}<div class="pn-thumb" style="background-image:url('{{ p.image.url }}')"><span class="pn-tag">{{ p.get_tag_display }}</span></div>
+          {% else %}<div class="pn-thumb noimg"><span class="pn-tag">{{ p.get_tag_display }}</span></div>{% endif %}
+          <div class="pn-body"><h3>{{ p.title }}</h3><span class="pn-date">{{ p.published_at|naturaltime }}</span></div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="cta-pro">
+  <div class="wrap reveal zoom">
+    <h2>Get your workplace tipping, for good.</h2>
+    <p>Set up your group in minutes. Entry fees go to the charity your group chooses.</p>
+    <a href="{% url 'tell_the_boss' %}" class="btn-dark">Tell your boss</a>
+  </div>
+</section>
+{% endblock %}

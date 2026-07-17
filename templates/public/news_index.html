@@ -1,0 +1,96 @@
+{% extends "public/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}News — GoodTip{% endblock %}
+{% block loader_task %}Fetching the latest stories{% endblock %}
+{% block meta_description %}Stories, previews and updates from the GoodTip team — AFL, AFLW, NRL and NRLW.{% endblock %}
+{% block body_class %}page-news{% endblock %}
+
+{% block content %}
+
+<!-- HERO -->
+<section class="hero-split">
+  <div class="hs-left">
+    <span class="pill" style="align-self:flex-start;margin-bottom:24px;"><span class="dot"></span>Around the grounds</span>
+    <h1>News that moves <em>the comp.</em></h1>
+    <p class="hero-sub">Stories, previews and updates from the GoodTip team — across all four codes.</p>
+  </div>
+  <div class="hs-right">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="shot active" style="background-image:url('{% static 'img/scenes/afl-training.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-goal-posts.jpg' %}')"></div>
+    </div>
+    <div class="hs-veil" aria-hidden="true"></div>
+    <div class="hs-tagstrip"><span class="live-dot">AFL · AFLW · NRL · NRLW</span></div>
+  </div>
+</section>
+
+<!-- STORIES -->
+<section class="section on-cream">
+  <div class="wrap">
+    <p class="eyebrow reveal">League news</p>
+    <h2 class="section-heading reveal">What's moving this week.</h2>
+    {% if posts %}
+    <div class="pnews-grid reveal">
+      {% for p in posts %}
+      <a class="pnews-card" href="{% url 'news_detail' p.id %}">
+        {% if p.image %}<div class="pn-thumb" style="background-image:url('{{ p.image.url }}')"><span class="pn-tag">{{ p.get_tag_display }}</span></div>
+        {% else %}<div class="pn-thumb noimg"><span class="pn-tag">{{ p.get_tag_display }}</span></div>{% endif %}
+        <div class="pn-body">
+          <h3>{{ p.title }}</h3>
+          {% if p.excerpt %}<p>{{ p.excerpt|truncatechars:140 }}</p>{% endif %}
+          <span class="pn-date">{{ p.published_at|naturaltime }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="section-sub reveal">Stories land here as they're published — check back soon.</p>
+    {% endif %}
+  </div>
+</section>
+
+<!-- JULIE'S TIPS -->
+<section class="section on-paper">
+  <div class="wrap">
+    <p class="eyebrow reveal">Julie's Tips</p>
+    <h2 class="section-heading reveal">Meet this round's featured tipper.</h2>
+    <p class="section-sub reveal">Julie's Tips puts one everyday tipper in the spotlight each round. Real instinct, not analyst credentials. The first feature runs once the season kicks off.</p>
+    <div class="reveal" style="margin-top:22px;"><a href="mailto:hello@goodtip.com.au?subject=Julie%27s%20Tips%20nomination" class="btn-primary">Nominate a tipper &rarr;</a></div>
+  </div>
+</section>
+
+<!-- FROM THE COMMUNITY -->
+<section class="section on-dark">
+  <div class="wrap">
+    <p class="eyebrow reveal">From the community</p>
+    <h2 class="section-heading reveal">The stories only GoodTip groups can tell.</h2>
+    <div class="roles-2 reveal">
+      <div class="role-card r1">
+        <span class="role-tag">Preview &middot; illustrative example</span>
+        <h3>The tips comp finally means something.</h3>
+        <p>&ldquo;We've run this comp for six years. The loser still shouts the office a case of beer. But this year $340 went to youth mental health, and that's the bit everyone's actually proud of.&rdquo;</p>
+        <p style="opacity:.6;font-size:13px;margin-top:10px;">A GoodTip group, once the season starts</p>
+      </div>
+      <div class="role-card r2">
+        <span class="role-tag">Preview &middot; illustrative example</span>
+        <h3>Bragging rights, plus something that lasts.</h3>
+        <p>&ldquo;The ladder still gets screenshotted every Monday. The difference is what happens at the end of the season. This year it's not a trophy, it's a donation the whole group picked.&rdquo;</p>
+        <p style="opacity:.6;font-size:13px;margin-top:10px;">A GoodTip group, once the season starts</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-pro">
+  <div class="wrap reveal zoom">
+    <h2>Get your workplace tipping, for good.</h2>
+    <p>Set up your group in minutes. Entry fees go to the charity your group chooses, not a winner's pocket.</p>
+    <a href="{% url 'tell_the_boss' %}" class="btn-dark">Tell your boss</a>
+    <a href="{% url 'how_it_works' %}" class="btn-dark">See how it works</a>
+  </div>
+</section>
+
+{% endblock %}

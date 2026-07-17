@@ -243,16 +243,19 @@ def news_delete(request, post_id: int):
 from django.contrib.auth.decorators import login_required  # noqa: E402
 
 
-@login_required
 def news_index(request):
-    """All published posts — the "more news" destination."""
+    """All published posts. Public page (client site structure) — anonymous
+    visitors get the marketing design, members the in-app feed. The staging
+    gate still fronts it until launch.
+    """
     posts = NewsPost.objects.filter(is_published=True)
-    return render(request, "news_index.html", {"posts": posts})
+    tpl = "news_index.html" if request.user.is_authenticated else "public/news_index.html"
+    return render(request, tpl, {"posts": posts, "active": "news"})
 
 
-@login_required
 def news_detail(request, post_id: int):
-    """Full story page a dashboard card clicks through to."""
+    """Full story page. Public, same split as the index."""
     post = get_object_or_404(NewsPost, pk=post_id, is_published=True)
     more = NewsPost.objects.filter(is_published=True).exclude(pk=post.pk)[:5]
-    return render(request, "news_detail.html", {"post": post, "more": more})
+    tpl = "news_detail.html" if request.user.is_authenticated else "public/news_detail.html"
+    return render(request, tpl, {"post": post, "more": more, "active": "news"})
