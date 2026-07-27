@@ -5,11 +5,11 @@ from django.urls import include, path
 from django.views.generic import TemplateView
 from django.views.static import serve as static_serve
 
-from accounts.views import coming_soon_view, dashboard_view
+from accounts.views import coming_soon_view, dashboard_view, tell_the_boss_view
 from admin_panel.views import news_detail, news_index
 from billing.views import good_list_view, stripe_webhook
 from goodtip.staging_gate import gate_view
-from orgs.views import join_view
+from orgs.views import join_view, public_wall_reply, public_wall_view
 
 
 urlpatterns = [
@@ -24,10 +24,9 @@ urlpatterns = [
         template_name="public/how_it_works.html",
         extra_context={"active": "how"},
     ), name="how_it_works"),
-    path("wall/", TemplateView.as_view(
-        template_name="public/wall.html",
-        extra_context={"active": "wall"},
-    ), name="wall"),
+    # The Wall — live cross-group feed of posts members chose to share.
+    path("wall/", public_wall_view, name="wall"),
+    path("wall/<int:post_id>/reply/", public_wall_reply, name="public_wall_reply"),
     # The Good List — live, privacy-gated data (no placeholder figures).
     path("leaderboard/", good_list_view, name="good_list"),
     path("pricing/", TemplateView.as_view(
@@ -35,10 +34,7 @@ urlpatterns = [
         extra_context={"active": "pricing"},
     ), name="pricing"),
     path("coming-soon/", coming_soon_view, name="coming_soon"),
-    path("tell-the-boss/", TemplateView.as_view(
-        template_name="public/tell_the_boss.html",
-        extra_context={"active": "boss"},
-    ), name="tell_the_boss"),
+    path("tell-the-boss/", tell_the_boss_view, name="tell_the_boss"),
     path("dashboard/", dashboard_view, name="dashboard"),
     # News & blog (members) — full-story pages behind the dashboard cards
     path("news/", news_index, name="news_index"),

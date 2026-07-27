@@ -2,7 +2,7 @@
 {% block title %}Rounds — Manage{% endblock %}
 {% block nav_orgs %}on{% endblock %}
 {% block admin_content %}
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;"><a href="{% url 'manage:orgs_list' %}" class="flink" style="color:var(--forest);">Orgs</a><span style="color:var(--muted);">/</span><h1 class="admin-h1" style="margin:0;">{{ org.name }} &middot; Rounds</h1></div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;"><a href="{% url 'manage:orgs_list' %}" class="flink" style="color:var(--lime);">Orgs</a><span style="color:rgba(245,241,230,.5);">/</span><h1 class="admin-h1" style="margin:0;">{{ org.name }} &middot; Rounds</h1></div>
 <div class="grid-app" style="grid-template-columns:1.4fr 1fr;gap:20px;align-items:start;">
   <div class="card"><div class="card-h" style="margin-bottom:10px;">Rounds</div>
     <table class="atable compact"><thead><tr><th>#</th><th>Series</th><th>Lockout</th><th>Status</th><th style="text-align:right;"></th></tr></thead><tbody>

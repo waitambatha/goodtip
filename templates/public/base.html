@@ -186,16 +186,66 @@
       }
     }
 
-    /* ---- Hero image crossfade (dynamic, changing) ---- */
-    var shots = document.querySelectorAll('.hero-bg .shot');
-    if (shots.length > 1 && !reduce) {
+    /* ---- Image crossfade: every hero and image band rotates its shots.
+           Each container runs on its own slightly-desynced clock so pages
+           with several bands don't all flip in unison. ---- */
+    document.querySelectorAll('.hero-bg:not(.collage), .image-band').forEach(function (box) {
+      var shots = box.querySelectorAll('.shot');
+      if (shots.length < 2 || reduce) return;
       var si = 0;
+      for (var k = 0; k < shots.length; k++) if (shots[k].classList.contains('active')) si = k;
       setInterval(function () {
         shots[si].classList.remove('active');
         si = (si + 1) % shots.length;
         shots[si].classList.add('active');
-      }, 5200);
-    }
+      }, 3200 + Math.random() * 900);
+    });
+
+    /* ---- Hero collage: one full image <-> two-way split, every ~3s.
+           While a pane is tucked away it quietly advances to its next
+           image, so no state ever repeats the same picture. ---- */
+    document.querySelectorAll('.hero-bg.collage').forEach(function (col) {
+      var panes = [].slice.call(col.querySelectorAll('.pane'));
+      if (panes.length < 2) return;
+      col.classList.add('split');
+      if (reduce) return;
+      var idx = panes.map(function (p) {
+        var s = p.querySelectorAll('.shot'), n = 0;
+        for (var k = 0; k < s.length; k++) if (s[k].classList.contains('active')) n = k;
+        return n;
+      });
+      function advance(n) {
+        var s = panes[n].querySelectorAll('.shot');
+        s[idx[n]].classList.remove('active');
+        idx[n] = (idx[n] + 1) % s.length;
+        s[idx[n]].classList.add('active');
+      }
+      var states = ['split', 'full-0', 'split', 'full-1'];
+      var si = 0;
+      setInterval(function () {
+        si = (si + 1) % states.length;
+        var st = states[si];
+        col.classList.toggle('split', st === 'split');
+        panes[0].classList.toggle('closed', st === 'full-1');
+        panes[1].classList.toggle('closed', st === 'full-0');
+        // swap the hidden pane's picture once it's fully tucked away
+        if (st === 'full-0') setTimeout(function () { advance(1); }, 1200);
+        if (st === 'full-1') setTimeout(function () { advance(0); }, 1200);
+      }, 3200);
+    });
+
+    /* ---- Rotating copy lines (Wall teaser etc.): next line every 4s ---- */
+    document.querySelectorAll('[data-rotate-lines]').forEach(function (box) {
+      var lines = box.querySelectorAll('.rline');
+      if (lines.length < 2 || reduce) return;
+      var li = 0;
+      for (var k = 0; k < lines.length; k++) if (lines[k].classList.contains('on')) li = k;
+      setInterval(function () {
+        lines[li].classList.remove('on');
+        li = (li + 1) % lines.length;
+        lines[li].classList.add('on');
+      }, 4000);
+    });
 
     /* ---- Staggered card reveal on scroll ---- */
     var GRID_SEL = '.grid-3, .grid-4, .pricing-grid, .feature-grid, .steps, .flow';

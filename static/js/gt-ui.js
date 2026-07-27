@@ -89,7 +89,7 @@
 
   /* ---------------- side scenes crossfade ---------------- */
   function runScenes() {
-    document.querySelectorAll('.page-scenes .scene').forEach(function (scene) {
+    document.querySelectorAll('.page-scenes .scene, .page-backdrop').forEach(function (scene) {
       var shots = scene.querySelectorAll('.shot');
       if (shots.length < 2 || reduce) return;
       var i = 0;

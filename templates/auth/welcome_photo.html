@@ -1,0 +1,49 @@
+{% extends "auth_base.html" %}
+{% block title %}Add your photo — GoodTip{% endblock %}
+{% block loader_task %}Setting up your profile{% endblock %}
+{% block auth_mood %}mood-lime{% endblock %}
+{% block brand_head %}Put a face on <em>the ladder.</em>{% endblock %}
+{% block brand_sub %}Your photo shows up next to your tips, your sledges on the Wall, and your spot on the ladder. Groups with faces give more grief — and more to charity.{% endblock %}
+{% block auth_form %}
+<h1>You're in. Add a photo?</h1>
+<p class="sub">Totally optional — skip it and your group sees your initials instead.</p>
+{% if error %}<div class="flash error" style="margin-bottom:16px;"><span>{{ error }}</span></div>{% endif %}
+
+<form method="post" enctype="multipart/form-data" class="wp-form">
+  {% csrf_token %}
+  <div class="wp-stage">
+    <div class="wp-avatar" id="wpAvatar" data-empty="true">
+      <span class="wp-initials" id="wpInitials">{{ user.display_name|slice:":2"|upper }}</span>
+      <img id="wpPreview" alt="" hidden>
+      <span class="wp-ring" aria-hidden="true"></span>
+    </div>
+    <label class="abtn abtn-ghost wp-pick" for="wpFile">Choose a photo</label>
+    <input type="file" name="avatar" id="wpFile" accept="image/*" hidden>
+    <p class="wp-hint">JPG or PNG, under 5&nbsp;MB. You can change it any time from your profile.</p>
+  </div>
+  <div class="wp-actions">
+    <button type="submit" class="abtn abtn-primary abtn-block" id="wpSave" disabled>Save my photo &rarr;</button>
+    <button type="submit" name="skip" value="1" class="wp-skip" formnovalidate>Skip for now — take me to the comp</button>
+  </div>
+</form>
+
+<script>
+(function(){
+  var file = document.getElementById('wpFile');
+  var img = document.getElementById('wpPreview');
+  var wrap = document.getElementById('wpAvatar');
+  var save = document.getElementById('wpSave');
+  var initials = document.getElementById('wpInitials');
+  if (!file) return;
+  file.addEventListener('change', function(){
+    var f = file.files && file.files[0];
+    if (!f) return;
+    var url = URL.createObjectURL(f);
+    img.src = url; img.hidden = false;
+    if (initials) initials.hidden = true;
+    wrap.setAttribute('data-empty', 'false');
+    save.disabled = false;
+  });
+})();
+</script>
+{% endblock %}

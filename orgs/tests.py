@@ -12,6 +12,7 @@ from .models import (
     OrgCharitySelection,
     OrgMember,
     Organisation,
+    WallPost,
 )
 from .services import (
     approve_membership_request,
@@ -754,3 +755,326 @@ class ChildAdminManagementTests(TestCase):
         })
         # Not a member of the parent org at all → forbidden.
         self.assertEqual(resp.status_code, 403)
+
+
+class RoundRecapTests(TestCase):
+    """AI Group Recap launch-minimum (docs/ai-group-recap-spec.md §§1–4, 7, 10)."""
+
+    def setUp(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from catalog.models import Season, Series, Sport
+        from tipping.models import Match, Round, Team
+
+        self.sport = Sport.objects.create(name="Recap Footy", slug="recap-footy")
+        self.series = Series.objects.create(sport=self.sport, name="Recap Series", slug="recap-series")
+        self.season = Season.objects.create(year=2098, label="2098")
+        self.org = Organisation.objects.create(name="Recap League", season=self.season)
+        self.user = User.objects.create_user(email="r@b.com", password="x", display_name="Dave")
+        OrgMember.objects.create(user=self.user, org=self.org)
+        self.home = Team.objects.create(name="Pies", slug="pies-r", series=self.series)
+        self.away = Team.objects.create(name="Roos", slug="roos-r", series=self.series)
+        self.rnd = Round.objects.create(
+            org=self.org, round_number=1, series=self.series,
+            stage=Round.STAGE_REGULAR,
+            lockout_at=timezone.now() - timedelta(days=2),
+        )
+        self.match = Match.objects.create(
+            round=self.rnd, home_team=self.home, away_team=self.away,
+            kickoff_at=timezone.now() - timedelta(days=1),
+        )
+
+    def _tip_and_settle(self):
+        from tipping.models import Tip
+        from tipping.services import record_match_result
+
+        Tip.objects.create(user=self.user, match=self.match, org=self.org, selection="home")
+        record_match_result(self.match, 30, 10)
+
+    def test_nobody_tipped_means_silence(self):
+        from tipping.services import record_match_result
+
+        from .recaps import generate_recaps
+
+        record_match_result(self.match, 30, 10)
+        with self.settings(ANTHROPIC_API_KEY="test-key"):
+            results = generate_recaps(org=self.org)
+        self.assertEqual(results, [])
+        self.assertFalse(WallPost.objects.filter(org=self.org).exists())
+
+    def test_unresolved_round_is_not_ready(self):
+        from tipping.models import Tip
+
+        from .recaps import generate_recaps, round_ready_for_recap
+
+        Tip.objects.create(user=self.user, match=self.match, org=self.org, selection="home")
+        self.assertFalse(round_ready_for_recap(self.rnd))
+        with self.settings(ANTHROPIC_API_KEY="test-key"):
+            self.assertEqual(generate_recaps(org=self.org), [])
+
+    def test_recap_posts_once_and_pins(self):
+        from unittest.mock import patch
+
+        from .models import RoundRecap
+        from .recaps import generate_recaps
+
+        self._tip_and_settle()
+        fake = "Dave backed the Pies and got the points. He tops the ladder on 1."
+        with self.settings(ANTHROPIC_API_KEY="test-key"), \
+             patch("orgs.recaps.generate_recap_text", return_value=fake):
+            first = generate_recaps(org=self.org)
+            second = generate_recaps(org=self.org)
+        self.assertEqual(len(first), 1)
+        self.assertEqual(second, [])  # idempotent — one per (org, round)
+        post = WallPost.objects.get(org=self.org, kind=WallPost.KIND_RECAP)
+        self.assertEqual(post.body, fake)
+        self.assertIsNone(post.author)
+        recap = RoundRecap.objects.get(org=self.org, round=self.rnd)
+        self.assertEqual(recap.post, post)
+        self.assertFalse(recap.fallback_used)
+
+    def test_model_failure_uses_factual_fallback(self):
+        from unittest.mock import patch
+
+        from .models import RoundRecap
+        from .recaps import generate_recaps
+
+        self._tip_and_settle()
+        with self.settings(ANTHROPIC_API_KEY="test-key"), \
+             patch("orgs.recaps.generate_recap_text", side_effect=RuntimeError("api down")):
+            results = generate_recaps(org=self.org)
+        self.assertEqual(len(results), 1)
+        recap = RoundRecap.objects.get(org=self.org, round=self.rnd)
+        self.assertTrue(recap.fallback_used)
+        self.assertIn("Dave", recap.post.body)
+        self.assertIn("1 point", recap.post.body)
+
+    def test_no_api_key_skips_without_burning_the_slot(self):
+        from unittest.mock import patch
+
+        from .models import RoundRecap
+        from .recaps import generate_recaps
+
+        self._tip_and_settle()
+        with self.settings(ANTHROPIC_API_KEY=""), \
+             patch("orgs.recaps.generate_recap_text") as gen:
+            results = generate_recaps(org=self.org)
+        gen.assert_not_called()
+        self.assertEqual(results, [])
+        self.assertFalse(RoundRecap.objects.filter(org=self.org).exists())
+
+    def test_facts_are_real_results_only(self):
+        from .recaps import build_recap_facts
+
+        self._tip_and_settle()
+        facts = build_recap_facts(self.org, self.rnd)
+        self.assertEqual(facts["group"]["name"], "Recap League")
+        self.assertTrue(facts["group"]["first_round_for_group"])
+        member = facts["members"][0]
+        self.assertEqual(member["name"], "Dave")
+        self.assertEqual(member["correct"], 1)
+        self.assertTrue(member["perfect_round"])
+        self.assertFalse(facts["round"]["is_origin"])
+
+    def test_result_correction_flags_recap_for_review(self):
+        from unittest.mock import patch
+
+        from tipping.services import record_match_result
+
+        from .models import RoundRecap
+        from .recaps import generate_recaps
+
+        self._tip_and_settle()
+        with self.settings(ANTHROPIC_API_KEY="test-key"), \
+             patch("orgs.recaps.generate_recap_text", return_value="Dave got the points."):
+            generate_recaps(org=self.org)
+        recap = RoundRecap.objects.get(org=self.org, round=self.rnd)
+        self.assertFalse(recap.needs_review)
+        record_match_result(self.match, 10, 30)  # admin corrects the score
+        recap.refresh_from_db()
+        self.assertTrue(recap.needs_review)
+        # Not regenerated, not rewritten — same single post (spec §3).
+        self.assertEqual(WallPost.objects.filter(org=self.org, kind="recap").count(), 1)
+
+
+class PublicWallTests(TestCase):
+    """The two-consent rule for public posts, and how outsiders reply."""
+
+    def setUp(self):
+        self.season, _ = Season.objects.get_or_create(year=2097, defaults={"label": "2097"})
+        self.org = Organisation.objects.create(name="Open Room", season=self.season, is_public_listed=True)
+        self.shut = Organisation.objects.create(name="Closed Room", season=self.season, is_public_listed=False)
+        self.member = User.objects.create_user(email="m@w.com", password="x", display_name="Dave")
+        self.outsider = User.objects.create_user(email="o@w.com", password="x", display_name="Nige")
+        OrgMember.objects.create(user=self.member, org=self.org)
+        OrgMember.objects.create(user=self.member, org=self.shut)
+
+    def _post(self, org, *, is_public):
+        return WallPost.objects.create(
+            org=org, author=self.member, body="Backing the Pies", is_public=is_public,
+        )
+
+    def test_public_feed_needs_both_consents(self):
+        shared = self._post(self.org, is_public=True)
+        self._post(self.org, is_public=False)          # author kept it in
+        self._post(self.shut, is_public=True)          # group isn't listed
+        self.assertEqual(list(WallPost.public_feed()), [shared])
+
+    def test_revoking_group_listing_pulls_posts_immediately(self):
+        self._post(self.org, is_public=True)
+        self.assertEqual(WallPost.public_feed().count(), 1)
+        self.org.is_public_listed = False
+        self.org.save(update_fields=["is_public_listed"])
+        self.assertEqual(WallPost.public_feed().count(), 0)
+
+    def test_share_toggle_is_ignored_for_an_unlisted_group(self):
+        self.client.force_login(self.member)
+        self.client.post(
+            f"/leagues/{self.shut.id}/wall/post/",
+            {"body": "Sneaking this out", "share_public": "1"},
+        )
+        post = WallPost.objects.get(org=self.shut)
+        self.assertFalse(post.is_public)
+
+    def test_composer_defaults_to_group_only(self):
+        self.client.force_login(self.member)
+        self.client.post(f"/leagues/{self.org.id}/wall/post/", {"body": "Just for us"})
+        self.assertFalse(WallPost.objects.get(org=self.org).is_public)
+
+    def test_guest_reply_is_held_for_approval(self):
+        from .models import WallReply
+
+        post = self._post(self.org, is_public=True)
+        self.client.post(f"/wall/{post.id}/reply/", {
+            "body": "Go the Pies", "guest_name": "Sam", "guest_email": "sam@example.com",
+        })
+        reply = WallReply.objects.get()
+        self.assertFalse(reply.is_approved)
+        self.assertEqual(reply.guest_email, "sam@example.com")
+        # ...and it stays off the public page until a staffer clears it.
+        self.assertNotContains(self.client.get("/wall/"), "Go the Pies")
+        reply.is_approved = True
+        reply.save(update_fields=["is_approved"])
+        self.assertContains(self.client.get("/wall/"), "Go the Pies")
+
+    def test_guest_reply_without_an_email_is_refused(self):
+        from .models import WallReply
+
+        post = self._post(self.org, is_public=True)
+        self.client.post(f"/wall/{post.id}/reply/", {"body": "Anonymous sledge"})
+        self.assertEqual(WallReply.objects.count(), 0)
+
+    def test_honeypot_silently_swallows_the_bot(self):
+        from .models import WallReply
+
+        post = self._post(self.org, is_public=True)
+        resp = self.client.post(f"/wall/{post.id}/reply/", {
+            "body": "cheap watches", "guest_email": "bot@spam.com", "website": "http://spam",
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(WallReply.objects.count(), 0)
+
+    def test_group_member_replying_from_the_public_page_goes_straight_up(self):
+        from .models import WallReply
+
+        post = self._post(self.org, is_public=True)
+        self.client.force_login(self.member)
+        self.client.post(f"/wall/{post.id}/reply/", {"body": "My own thread"})
+        self.assertTrue(WallReply.objects.get().is_approved)
+
+    def test_signed_in_outsider_still_waits_for_approval(self):
+        from .models import WallReply
+
+        post = self._post(self.org, is_public=True)
+        self.client.force_login(self.outsider)
+        self.client.post(f"/wall/{post.id}/reply/", {"body": "Butting in"})
+        reply = WallReply.objects.get()
+        self.assertFalse(reply.is_approved)
+        self.assertEqual(reply.guest_email, self.outsider.email)
+
+    def test_private_post_cannot_be_replied_to_from_the_public_page(self):
+        from .models import WallReply
+
+        private = self._post(self.org, is_public=False)
+        resp = self.client.post(f"/wall/{private.id}/reply/", {
+            "body": "Prying", "guest_email": "sam@example.com",
+        })
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(WallReply.objects.count(), 0)
+
+    def test_private_posts_never_reach_the_public_page(self):
+        WallPost.objects.create(org=self.org, author=self.member, body="Secret group business")
+        self.assertNotContains(self.client.get("/wall/"), "Secret group business")
+
+
+class WallReplyNotificationTests(TestCase):
+    """Replies are what put something in the bell."""
+
+    def setUp(self):
+        self.season, _ = Season.objects.get_or_create(year=2096, defaults={"label": "2096"})
+        self.org = Organisation.objects.create(name="Chatty Room", season=self.season)
+        self.author = User.objects.create_user(email="a@w.com", password="x", display_name="Ann")
+        self.other = User.objects.create_user(email="b@w.com", password="x", display_name="Bob")
+        self.third = User.objects.create_user(email="c@w.com", password="x", display_name="Cal")
+        for u in (self.author, self.other, self.third):
+            OrgMember.objects.create(user=u, org=self.org)
+        self.post = WallPost.objects.create(org=self.org, author=self.author, body="Pies by 30")
+
+    def test_reply_notifies_the_post_author(self):
+        from .models import Notification
+
+        self.client.force_login(self.other)
+        self.client.post(f"/leagues/{self.org.id}/wall/{self.post.id}/reply/", {"body": "Dreaming"})
+        note = self.author.notifications.get(kind=Notification.KIND_WALL_REPLY)
+        self.assertIn("Bob", note.title)
+        self.assertIn(f"#post-{self.post.id}", note.link_url)
+
+    def test_replying_to_yourself_notifies_nobody(self):
+        from .models import Notification
+
+        self.client.force_login(self.author)
+        self.client.post(f"/leagues/{self.org.id}/wall/{self.post.id}/reply/", {"body": "Adding to this"})
+        self.assertEqual(Notification.objects.filter(kind=Notification.KIND_WALL_REPLY).count(), 0)
+
+    def test_later_replies_reach_everyone_in_the_thread(self):
+        from .models import Notification
+
+        self.client.force_login(self.other)
+        self.client.post(f"/leagues/{self.org.id}/wall/{self.post.id}/reply/", {"body": "Dreaming"})
+        self.client.force_login(self.third)
+        self.client.post(f"/leagues/{self.org.id}/wall/{self.post.id}/reply/", {"body": "Agreed"})
+        self.assertTrue(self.author.notifications.filter(kind=Notification.KIND_WALL_REPLY).exists())
+        self.assertTrue(self.other.notifications.filter(kind=Notification.KIND_WALL_REPLY).exists())
+        self.assertFalse(self.third.notifications.filter(kind=Notification.KIND_WALL_REPLY).exists())
+
+    def test_new_post_tells_the_rest_of_the_group(self):
+        from .models import Notification
+
+        self.client.force_login(self.other)
+        self.client.post(f"/leagues/{self.org.id}/wall/post/", {"body": "Anyone watching this?"})
+        self.assertTrue(self.author.notifications.filter(kind=Notification.KIND_WALL_POST).exists())
+        self.assertTrue(self.third.notifications.filter(kind=Notification.KIND_WALL_POST).exists())
+        self.assertFalse(self.other.notifications.filter(kind=Notification.KIND_WALL_POST).exists())
+
+    def test_outsider_cannot_reply_to_a_private_group_post(self):
+        from .models import WallReply
+
+        stranger = User.objects.create_user(email="x@w.com", password="x", display_name="Stranger")
+        self.client.force_login(stranger)
+        resp = self.client.post(f"/leagues/{self.org.id}/wall/{self.post.id}/reply/", {"body": "Nope"})
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(WallReply.objects.count(), 0)
+
+    def test_feed_endpoint_only_returns_what_is_new(self):
+        self.client.force_login(self.other)
+        self.client.post(f"/leagues/{self.org.id}/wall/{self.post.id}/reply/", {"body": "Dreaming"})
+        self.client.force_login(self.author)
+        data = self.client.get("/leagues/notifications/feed.json").json()
+        self.assertEqual(len(data["items"]), 1)
+        self.assertEqual(data["unread"], 1)
+        latest = data["latest_id"]
+        # Nothing new since — the page shouldn't toast the same thing twice.
+        again = self.client.get(f"/leagues/notifications/feed.json?since={latest}").json()
+        self.assertEqual(again["items"], [])

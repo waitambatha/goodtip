@@ -17,9 +17,52 @@
   </div>
   <div class="ac-panel" id="acPanel" role="listbox" hidden></div>
 </div>
-<p class="app-sub" style="margin-top:10px;font-size:13px;">Type at least {{ min_chars }} letters. Only matching groups are shown — pick one to see what you can do.</p>
+<p class="app-sub" style="margin-top:10px;font-size:13px;">Type at least {{ min_chars }} letters — or browse the full list below.</p>
 
 <div id="orgSelected" style="margin-top:22px;"></div>
+
+{# browse everything — parents with their child groups beneath them #}
+<div style="margin-top:30px;">
+  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+    <h2 class="card-h" style="font-size:19px;margin:0;">All groups</h2>
+    <span class="app-sub" style="margin:0;font-size:13px;">{{ browse_total }} group{{ browse_total|pluralize }} on GoodTip</span>
+  </div>
+  {% for row in browse %}
+  <div class="card" style="margin-bottom:10px;padding:16px 18px;">
+    <div class="bl-row">
+      <div class="bl-main">
+        <span class="bl-name">{{ row.org.name }}</span>
+        <span class="bl-meta">{% if row.org.category_label %}{{ row.org.category_label }} &middot; {% endif %}{% if row.org.state %}{{ row.org.state.code }} &middot; {% endif %}{{ row.org.member_count }} member{{ row.org.member_count|pluralize }}</span>
+      </div>
+      <div class="bl-actions">
+        {% if row.is_member %}<span class="pill-role participant">Member</span>
+        {% elif row.pending %}<span class="pill-role captain">Request pending</span>
+        {% else %}
+        <form method="post" action="{% url 'orgs:request_join' row.org.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}"><button type="submit" class="abtn abtn-primary abtn-sm">Ask to join</button></form>
+        {% endif %}
+        <a href="{% url 'orgs:create' %}?parent={{ row.org.id }}" class="abtn abtn-ghost abtn-sm">Start a group under this</a>
+      </div>
+    </div>
+    {% for kid in row.children %}
+    <div class="bl-row bl-child">
+      <div class="bl-main">
+        <span class="bl-name">{{ kid.org.name }}</span>
+        <span class="bl-meta">part of {{ row.org.name }}{% if kid.org.state %} &middot; {{ kid.org.state.code }}{% endif %} &middot; {{ kid.org.member_count }} member{{ kid.org.member_count|pluralize }}</span>
+      </div>
+      <div class="bl-actions">
+        {% if kid.is_member %}<span class="pill-role participant">Member</span>
+        {% elif kid.pending %}<span class="pill-role captain">Request pending</span>
+        {% else %}
+        <form method="post" action="{% url 'orgs:request_join' kid.org.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}"><button type="submit" class="abtn abtn-primary abtn-sm">Ask to join</button></form>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% empty %}
+  <div class="card pad-lg" style="text-align:center;"><p class="card-lead">No groups yet — be the first to <a href="{% url 'orgs:create' %}" style="color:var(--forest);font-weight:700;">create one</a>.</p></div>
+  {% endfor %}
+</div>
 
 <script>
 (function () {

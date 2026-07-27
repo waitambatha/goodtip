@@ -1,21 +1,90 @@
 {% extends "admin_base.html" %}
 {% block title %}Overview — Manage{% endblock %}
 {% block nav_overview %}on{% endblock %}
+{% block hero_title %}Manage{% endblock %}
+{% block hero_lead %}Run your leagues. Empower your community.{% endblock %}
 {% block admin_content %}
-<h1 class="admin-h1" style="margin-bottom:18px;">Overview</h1>
-<div class="tiles" style="margin-bottom:24px;">
-  <div class="tile"><div class="t-num">{{ org_count }}</div><div class="t-lab">Orgs</div></div>
-  <div class="tile"><div class="t-num">{{ round_count }}</div><div class="t-lab">Rounds</div></div>
-  <div class="tile"><div class="t-num">{{ match_count }}</div><div class="t-lab">Matches</div></div>
-  <div class="tile"><div class="t-num">{{ tip_count }}</div><div class="t-lab">Tips</div></div>
+
+<div class="gt-stats">
+  <a class="gt-stat" href="{% url 'manage:orgs_list' %}">
+    <span class="gs-ic"><svg><use href="#ic-people"/></svg></span>
+    <span class="gs-body">
+      <span class="gs-num">{{ org_count }}</span>
+      <span class="gs-lab">Orgs</span>
+      <span class="gs-sub">Active organisations</span>
+    </span>
+    <span class="gs-go"><svg><use href="#ic-arrow-right"/></svg></span>
+  </a>
+  <div class="gt-stat">
+    <span class="gs-ic"><svg><use href="#ic-calendar"/></svg></span>
+    <span class="gs-body">
+      <span class="gs-num">{{ round_count }}</span>
+      <span class="gs-lab">Rounds</span>
+      <span class="gs-sub">Across all leagues</span>
+    </span>
+  </div>
+  <div class="gt-stat">
+    <span class="gs-ic"><svg><use href="#ic-match"/></svg></span>
+    <span class="gs-body">
+      <span class="gs-num">{{ match_count }}</span>
+      <span class="gs-lab">Matches</span>
+      <span class="gs-sub">Scheduled and played</span>
+    </span>
+  </div>
+  <div class="gt-stat">
+    <span class="gs-ic"><svg><use href="#ic-trophy"/></svg></span>
+    <span class="gs-body">
+      <span class="gs-num">{{ tip_count }}</span>
+      <span class="gs-lab">Tips</span>
+      <span class="gs-sub">Tips submitted</span>
+    </span>
+  </div>
 </div>
-<div class="card"><div class="card-h" style="margin-bottom:10px;">Recent orgs</div>
-  <table class="atable compact"><thead><tr><th>Org</th><th>Sport</th><th>Charity</th><th style="text-align:right;">Created</th></tr></thead><tbody>
-  {% for o in recent_orgs %}
-    <tr><td><a href="{% url 'manage:org_rounds' o.id %}" style="color:var(--forest);font-weight:700;">{{ o.name }}</a></td><td>{{ o.sport_label }}</td><td>{{ o.charity_name }}</td><td style="text-align:right;color:var(--muted);">{{ o.created_at|date:"j M Y" }}</td></tr>
-  {% empty %}
-    <tr><td colspan="4" style="text-align:center;color:var(--muted);">No orgs yet — create one in the Orgs tab.</td></tr>
-  {% endfor %}
-  </tbody></table>
+
+<section class="gt-panel">
+  <div class="gt-panel-head">
+    <span class="gp-ic"><svg><use href="#ic-org"/></svg></span>
+    <div><h2>Recent orgs</h2></div>
+    <div class="gp-right">
+      <a href="{% url 'manage:orgs_list' %}" class="gt-pill">View all orgs <svg><use href="#ic-arrow-right"/></svg></a>
+    </div>
+  </div>
+
+  <div class="gt-tablewrap">
+    <table class="gt-table">
+      <thead><tr><th>Org</th><th>Sport</th><th>Charity</th><th>Created</th><th class="fit"></th></tr></thead>
+      <tbody>
+      {% for o in recent_orgs %}
+        <tr>
+          <td>
+            <span class="gt-namecell">
+              <span class="gt-rowic"><svg><use href="#ic-org"/></svg></span>
+              <span>
+                <a href="{% url 'manage:org_rounds' o.id %}">{{ o.name }}</a>
+                <small>ID: ORG-{{ o.id|stringformat:"05d" }}</small>
+              </span>
+            </span>
+          </td>
+          <td><span class="gt-with-ic"><svg><use href="#ic-flag"/></svg>{{ o.sport_label|default:"—" }}</span></td>
+          <td><span class="gt-with-ic"><svg><use href="#ic-heart"/></svg>{{ o.charity_display }}</span></td>
+          <td><span class="gt-with-ic"><svg><use href="#ic-calendar"/></svg>{{ o.created_at|date:"j M Y" }}</span></td>
+          <td class="fit"><a href="{% url 'manage:org_rounds' o.id %}" class="gt-go" aria-label="Open {{ o.name }}"><svg><use href="#ic-arrow-right"/></svg></a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="gt-empty">No orgs yet — create your first one in the Orgs tab.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="gt-trust one">
+  <div class="gtr">
+    <span class="gtr-ic"><svg><use href="#ic-shield"/></svg></span>
+    <div>
+      <b>Secure. Organised. Built for impact.</b>
+      <p>Manage with confidence and keep your community first.</p>
+    </div>
+  </div>
 </div>
 {% endblock %}

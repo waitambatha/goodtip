@@ -9,8 +9,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:ital,wght@0,400;0,600;1,400&family=Barlow+Condensed:wght@600;900&family=Barlow+Semi+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
   <script src="{% static 'js/gt-ui.js' %}" defer></script>
+  {% block extra_head %}{% endblock %}
 </head>
-<body class="app manage-app">
+<body class="app manage-app gt-v2 gt-sheet">
   {% include "public/partials/_icons.html" %}
 
   {# ---- same sticky nav as the app, wearing the Manage links ---- #}
@@ -25,7 +26,30 @@
         {% if user.is_superuser %}<a href="{% url 'manage:news' %}" class="{% block nav_news %}{% endblock %}">News &amp; blog</a>{% endif %}
       </div>
       <div class="an-right">
-        <a href="{% url 'dashboard' %}" class="an-logout" title="Back to app"><span class="an-llabel">&larr; Back to app</span></a>
+        <a href="{% url 'dashboard' %}" class="an-backpill" title="Back to app"><svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2"><use href="#ic-arrow-left"/></svg><span>Back to app</span></a>
+        <div class="an-bell" id="anBell">
+          <button type="button" class="bell-btn" aria-label="Notifications" data-bell>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+            {% if unread_notification_count %}<span class="bell-badge">{{ unread_notification_count }}</span>{% endif %}
+          </button>
+          <div class="bell-panel" id="bellPanel">
+            <div class="bp-head">Notifications</div>
+            {% for n in my_notifications %}
+            <a class="bp-item {% if n.is_unread %}unread{% endif %}" href="{{ n.link_url|default:'#' }}">
+              <span class="bp-title">{{ n.title }}</span>
+              {% if n.message %}<span class="bp-msg">{{ n.message|truncatechars:120 }}</span>{% endif %}
+              <span class="bp-meta">{% if n.org %}{{ n.org.name }} &middot; {% endif %}{{ n.created_at|date:"j M, g:i A" }}</span>
+            </a>
+            {% empty %}
+            <div class="bp-empty">Nothing yet — admin messages and election news land here.</div>
+            {% endfor %}
+          </div>
+        </div>
+        <a href="{% url 'profile' %}" class="an-chip" title="Profile">
+          {% if user.avatar %}<span class="an-avatar has-img"><img src="{{ user.avatar.url }}" alt=""></span>
+          {% else %}<span class="an-avatar">{{ user.display_name|slice:":1"|upper }}</span>{% endif %}
+          <span class="cn"><b>{{ user.display_name }}</b><small>{% if user.is_superuser %}Super admin{% else %}Administrator{% endif %}</small></span>
+        </a>
         <button class="an-burger" aria-label="Menu" data-sheet-open><svg><use href="#ic-menu"/></svg></button>
       </div>
     </div>
@@ -38,20 +62,16 @@
       <a href="{% url 'manage:orgs_list' %}">Orgs</a>
       <a href="{% url 'manage:sync' %}">Sync</a>
       {% if user.is_superuser %}<a href="{% url 'manage:news' %}">News &amp; blog</a>{% endif %}
+      <a href="{% url 'profile' %}">Profile</a>
       <a href="{% url 'dashboard' %}">&larr; Back to app</a>
     </div>
   </div>
 
-  {# ---- side imagery, same treatment as the dashboard ---- #}
-  <div class="page-scenes" aria-hidden="true">
-    <div class="scene left">
-      <div class="shot on" style="background-image:url('{% static 'img/scenes/afl-ground.jpg' %}')"></div>
-      <div class="shot" style="background-image:url('{% static 'img/scenes/afl-goal-posts.jpg' %}')"></div>
-    </div>
-    <div class="scene right">
-      <div class="shot on" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
-      <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-posts-sunset.jpg' %}')"></div>
-    </div>
+  {# ---- full-bleed stadium backdrop; the cream sheet sits on top of it ---- #}
+  <div class="page-backdrop" aria-hidden="true">
+    <div class="shot on" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
+    <div class="wash"></div>
   </div>
 
   <main class="app-main">
@@ -64,19 +84,21 @@
     {% endif %}
 
     {% block admin_hero %}
-    <div class="dash-banner" style="padding:20px 28px;">
-      <div class="bg" aria-hidden="true">
-        <div class="shot on" style="background-image:url('{% static 'img/scenes/stadium-panorama.jpg' %}')"></div>
+    <header class="gt-hero">
+      <div class="gh-shot" style="background-image:url('{% block hero_shot %}{% static 'img/scenes/stadium-panorama.jpg' %}{% endblock %}')"></div>
+      <div class="gh-veil"></div>
+      <div>
+        <div class="gh-eyebrow">GoodTip HQ</div>
+        <h1>{% block hero_title %}Manage{% endblock %}</h1>
+        <p>{% block hero_lead %}Run your leagues. Empower your community.{% endblock %}</p>
       </div>
-      <div class="veil"></div>
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
-        <div>
-          <div class="app-eyebrow" style="color:var(--lime);opacity:.85;">GoodTip HQ</div>
-          <div style="font-family:var(--display);font-size:22px;color:#fff;">{% block hero_title %}Manage{% endblock %}</div>
-        </div>
-        <span class="pill-role" style="background:rgba(200,241,53,.18);color:var(--lime);">{{ user.display_name }}</span>
+      {% block hero_aside %}
+      <div class="gh-who">
+        <span class="av">{% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{{ user.display_name|slice:":1"|upper }}{% endif %}</span>
+        <span><b>{{ user.display_name }}</b><small>{% if user.is_superuser %}Super admin{% else %}Administrator{% endif %}</small></span>
       </div>
-    </div>
+      {% endblock %}
+    </header>
     {% endblock %}
 
     {% block admin_content %}{% endblock %}
@@ -88,11 +110,29 @@
       burger.addEventListener('click', function(){ sheet.classList.add('open'); });
       sheet.addEventListener('click', function(e){ if (e.target === sheet) sheet.classList.remove('open'); });
     }
+    /* notifications bell */
+    var bell = document.querySelector('[data-bell]');
+    var panel = document.getElementById('bellPanel');
+    if (bell && panel) {
+      bell.addEventListener('click', function(e){
+        e.stopPropagation();
+        var opening = !panel.classList.contains('open');
+        panel.classList.toggle('open');
+        if (opening) {
+          var badge = bell.querySelector('.bell-badge');
+          if (badge) { fetch('{% url "orgs:notifications_read_all" %}', { method:'POST', headers:{ 'X-CSRFToken': '{{ csrf_token }}' } }); badge.remove(); }
+        }
+      });
+      document.addEventListener('click', function(e){ if (!panel.contains(e.target)) panel.classList.remove('open'); });
+    }
+    /* backdrop crossfade */
+    var shots = document.querySelectorAll('.page-backdrop .shot');
+    if (shots.length > 1 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      var i = 0; setInterval(function(){ shots[i].classList.remove('on'); i=(i+1)%shots.length; shots[i].classList.add('on'); }, 9000);
+    }
     document.querySelectorAll('[data-copy]').forEach(function(btn){
       btn.addEventListener('click', function(){ var t=document.querySelector(btn.getAttribute('data-copy')); if(!t)return; var v=t.value!==undefined?t.value:t.textContent; if(navigator.clipboard)navigator.clipboard.writeText(v); var o=btn.innerHTML; btn.innerHTML='Copied &#10003;'; setTimeout(function(){btn.innerHTML=o;},1500); });
     });
-    document.querySelectorAll('[data-dd]').forEach(function(dd){var btn=dd.querySelector('.dd-btn'),val=dd.querySelector('.dd-val'),sel=dd.querySelector('.dd-native');if(btn)btn.addEventListener('click',function(e){e.stopPropagation();document.querySelectorAll('[data-dd].open').forEach(function(o){if(o!==dd)o.classList.remove('open');});dd.classList.toggle('open');});dd.querySelectorAll('.dd-opt').forEach(function(opt){opt.addEventListener('click',function(){dd.querySelectorAll('.dd-opt').forEach(function(o){o.classList.remove('on');});opt.classList.add('on');if(val)val.textContent=opt.textContent;if(sel){sel.value=opt.getAttribute('data-val');sel.dispatchEvent(new Event('change',{bubbles:true}));}dd.classList.remove('open');});});});
-    document.addEventListener('click',function(){document.querySelectorAll('[data-dd].open').forEach(function(o){o.classList.remove('open');});});
   })();</script>
 </body>
 </html>

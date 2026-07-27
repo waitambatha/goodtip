@@ -27,26 +27,39 @@
 </section>
 
 <!-- STORIES -->
-<section class="section on-cream">
+<section class="section on-cream" id="stories">
   <div class="wrap">
     <p class="eyebrow reveal">League news</p>
     <h2 class="section-heading reveal">What's moving this week.</h2>
+
+    <!-- Filter by code -->
+    <div class="news-filters reveal" role="navigation" aria-label="Filter stories by code">
+      <a href="{% url 'news_index' %}#stories" class="fchip {% if not active_tag %}on{% endif %}">All codes</a>
+      {% for tag, label in news_tags %}
+      <a href="{% url 'news_index' %}?code={{ tag }}#stories" class="fchip {% if active_tag == tag %}on{% endif %}">{{ label }}</a>
+      {% endfor %}
+    </div>
+
     {% if posts %}
     <div class="pnews-grid reveal">
       {% for p in posts %}
-      <a class="pnews-card" href="{% url 'news_detail' p.id %}">
+      <a class="pnews-card {% if forloop.first and not active_tag %}lead{% endif %}" href="{% url 'news_detail' p.id %}">
         {% if p.image %}<div class="pn-thumb" style="background-image:url('{{ p.image.url }}')"><span class="pn-tag">{{ p.get_tag_display }}</span></div>
         {% else %}<div class="pn-thumb noimg"><span class="pn-tag">{{ p.get_tag_display }}</span></div>{% endif %}
         <div class="pn-body">
+          {% if forloop.first and not active_tag %}<span class="pn-lead-flag">Latest story</span>{% endif %}
           <h3>{{ p.title }}</h3>
           {% if p.excerpt %}<p>{{ p.excerpt|truncatechars:140 }}</p>{% endif %}
-          <span class="pn-date">{{ p.published_at|naturaltime }}</span>
+          <span class="pn-date">{{ p.published_at|naturaltime }} &middot; Read the story &rarr;</span>
         </div>
       </a>
       {% endfor %}
     </div>
     {% else %}
-    <p class="section-sub reveal">Stories land here as they're published — check back soon.</p>
+    <div class="news-empty reveal">
+      <p class="ne-big">Nothing filed under {{ active_tag|default:"this" }} yet.</p>
+      <p class="section-sub" style="margin:0;">Stories land here as they're published — try <a href="{% url 'news_index' %}#stories">all codes</a> or check back soon.</p>
+    </div>
     {% endif %}
   </div>
 </section>

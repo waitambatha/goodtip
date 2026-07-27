@@ -1,40 +1,119 @@
 {% extends "admin_base.html" %}
+{% load static %}
 {% block title %}Sync — Manage{% endblock %}
 {% block nav_sync %}on{% endblock %}
+{% block hero_title %}Manage{% endblock %}
+{% block hero_lead %}Keep your data in sync. Accurate tips. Better results.{% endblock %}
+{% block hero_shot %}{% static 'img/scenes/stadium-lights-grass.jpg' %}{% endblock %}
+{% block hero_aside %}
+<span class="gh-glyph" aria-hidden="true"><svg><use href="#ic-cloud-sync"/></svg></span>
+{% endblock %}
 {% block admin_content %}
-<h1 class="admin-h1" style="margin-bottom:6px;">Sync fixtures &amp; results</h1>
-<p class="app-sub" style="margin-bottom:20px;">Pull fixtures or results from the data provider into an org's rounds.</p>
 
-<div class="sync-providers">
-  <div class="prov">
-    <span class="prov-ic"><svg><use href="#ic-spark"/></svg></span>
-    <div><h4>Squiggle</h4><p>AFL &amp; AFLW &middot; free public API, no key required.</p></div>
-    <span class="status-pill open">Ready</span>
-  </div>
-  <div class="prov" style="border-left-color:var(--acc-4);">
-    <span class="prov-ic" style="background:rgba(178,120,40,.14);color:#8a5a12;"><svg><use href="#ic-lock"/></svg></span>
-    <div><h4>TheSports API</h4><p>NRL &amp; NRLW &middot; add <code style="background:rgba(15,46,34,.06);padding:1px 5px;border-radius:4px;">THESPORTS_API_KEY</code> to <code style="background:rgba(15,46,34,.06);padding:1px 5px;border-radius:4px;">.env</code>.</p></div>
-    <span class="status-pill draft">Key needed</span>
+<div class="gt-panel-head" style="margin-bottom:24px;">
+  <span class="gp-ic" style="background:var(--lime);color:var(--gt-deep);"><svg><use href="#ic-sync"/></svg></span>
+  <div>
+    <h2 style="font-size:29px;">Sync fixtures &amp; results</h2>
+    <div class="gp-sub">Pull fixtures or results from your data provider into your org's rounds.</div>
   </div>
 </div>
 
-<div class="mini-form" style="max-width:520px;">
-  <form method="post" action="{% url 'manage:sync' %}">
-    {% csrf_token %}
-    <div class="fld"><label for="sy_org">Org</label>
-      <select name="org_id" id="sy_org" required>{% for o in orgs %}<option value="{{ o.id }}">{{ o.name }} ({{ o.season }})</option>{% endfor %}</select>
+<div class="gt-provs">
+  <div class="gt-prov ok">
+    <span class="gpv-ic"><svg><use href="#ic-spark"/></svg></span>
+    <div>
+      <div class="gpv-top"><h3>Squiggle</h3><span class="gt-chip ready">Ready</span></div>
+      <p>AFL &amp; AFLW &middot; free public API, no key required.</p>
+      <span class="gpv-state"><svg><use href="#ic-check"/></svg> Connected</span>
     </div>
-    <div class="fld"><label for="sy_comp">Competition</label>
-      <select name="competition" id="sy_comp"><option value="AFL">AFL &middot; Squiggle</option><option value="NRL">NRL &middot; TheSports</option></select>
-    </div>
-    <div class="fld"><label for="sy_round">Round number</label><input type="number" name="round_number" id="sy_round" required value="1" placeholder="15"></div>
-    <div class="fld"><label>What to sync</label>
-      <div class="opt-grid cols2">
-        <label class="opt-card radio"><input type="radio" name="kind" value="fixtures" checked><span class="oc-box"></span><span class="oc-title">Fixtures</span></label>
-        <label class="opt-card radio"><input type="radio" name="kind" value="results"><span class="oc-box"></span><span class="oc-title">Results</span></label>
+  </div>
+  <div class="gt-prov {% if thesports_ready %}ok{% else %}wait{% endif %}">
+    <span class="gpv-ic"><svg><use href="#ic-lock"/></svg></span>
+    <div>
+      <div class="gpv-top"><h3>TheSports API</h3>
+        {% if thesports_ready %}<span class="gt-chip ready">Ready</span>{% else %}<span class="gt-chip needs">Key needed</span>{% endif %}
       </div>
+      <p>NRL &amp; NRLW &middot; add <code>THESPORTS_API_KEY</code> to <code>.env</code>.</p>
+      {% if thesports_ready %}
+        <span class="gpv-state"><svg><use href="#ic-check"/></svg> Connected</span>
+      {% else %}
+        <span class="gpv-state"><svg><use href="#ic-flag"/></svg> Not connected</span>
+      {% endif %}
     </div>
-    <button type="submit" class="abtn abtn-primary abtn-block">Run sync</button>
+  </div>
+</div>
+
+<div class="gt-shell gt-shell-wide">
+  <form method="post" action="{% url 'manage:sync' %}" class="gt-dark">
+    {% csrf_token %}
+    <div class="gd-head"><svg><use href="#ic-sliders"/></svg><span>Sync configuration</span></div>
+
+    <div class="gd-fld">
+      <label for="sy_org">Organisation</label>
+      <select name="org_id" id="sy_org" required>
+        {% for o in orgs %}<option value="{{ o.id }}">{{ o.name }} ({{ o.season }})</option>{% empty %}<option value="">No orgs yet</option>{% endfor %}
+      </select>
+    </div>
+
+    <div class="gd-fld">
+      <label for="sy_comp">Competition</label>
+      <select name="competition" id="sy_comp">
+        <option value="AFL">AFL &middot; Squiggle</option>
+        <option value="NRL">NRL &middot; TheSports</option>
+      </select>
+    </div>
+
+    <div class="gd-inline">
+      <label for="sy_round">Round number</label>
+      <input type="number" name="round_number" id="sy_round" required value="1" min="1">
+    </div>
+
+    <label style="margin-bottom:12px;">What do you want to sync?</label>
+    <div class="gt-choices">
+      <label class="gt-choice">
+        <input type="radio" name="kind" value="fixtures" checked>
+        <span class="gc-ic"><svg><use href="#ic-calendar"/></svg></span>
+        <span class="gc-txt">
+          <b><span class="gc-dot"></span> Fixtures</b>
+          <p>Pull upcoming fixtures into this round.</p>
+        </span>
+      </label>
+      <label class="gt-choice">
+        <input type="radio" name="kind" value="results">
+        <span class="gc-ic"><svg><use href="#ic-trophy"/></svg></span>
+        <span class="gc-txt">
+          <b><span class="gc-dot"></span> Results</b>
+          <p>Pull completed results into this round.</p>
+        </span>
+      </label>
+    </div>
+
+    <button type="submit" class="gt-go-btn"><svg><use href="#ic-sync"/></svg> Run sync</button>
   </form>
+
+  <aside>
+    <section class="gt-panel">
+      <h2 style="font-family:var(--mark);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:12.5px;color:var(--ink);margin-bottom:22px;">How it works</h2>
+      <ol class="gt-steps">
+        <li class="gt-step">
+          <span class="gst-ic"><svg><use href="#ic-org"/></svg></span>
+          <div><b>Choose your org &amp; round</b><p>Select the organisation, competition and round you want to update.</p></div>
+        </li>
+        <li class="gt-step">
+          <span class="gst-ic"><svg><use href="#ic-calendar"/></svg></span>
+          <div><b>Choose what to sync</b><p>Fixtures brings in upcoming games. Results brings in completed scores.</p></div>
+        </li>
+        <li class="gt-step">
+          <span class="gst-ic"><svg><use href="#ic-cloud-sync"/></svg></span>
+          <div><b>We do the rest</b><p>We pull the data and place it right into your org.</p></div>
+        </li>
+      </ol>
+      <hr style="border:0;border-top:1px solid var(--gt-hair);margin:22px 0;">
+      <div class="gt-step" style="gap:15px;">
+        <span class="gst-ic" style="background:rgba(45,122,58,.10);color:var(--forest);"><svg><use href="#ic-shield-check"/></svg></span>
+        <div><b>Safe &amp; secure</b><p>Nothing is overwritten outside the round you pick, and results only ever grade tips already submitted.</p></div>
+      </div>
+    </section>
+  </aside>
 </div>
 {% endblock %}

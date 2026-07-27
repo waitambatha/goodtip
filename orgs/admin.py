@@ -8,6 +8,8 @@ from .models import (
     MembershipRequest,
     OrgMember,
     Organisation,
+    WallPost,
+    WallReply,
 )
 
 
@@ -74,3 +76,46 @@ class CharityVoteAdmin(admin.ModelAdmin):
 @admin.register(CharityVoteBallot)
 class CharityVoteBallotAdmin(admin.ModelAdmin):
     list_display = ("vote", "user", "option", "cast_at")
+
+
+@admin.register(WallPost)
+class WallPostAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "org", "author", "kind", "is_public", "is_hidden", "created_at")
+    list_filter = ("kind", "is_public", "is_hidden", "org")
+    list_editable = ("is_public", "is_hidden")
+    raw_id_fields = ("org", "author", "tip")
+    search_fields = ("body", "author__display_name", "org__name")
+
+
+@admin.register(WallReply)
+class WallReplyAdmin(admin.ModelAdmin):
+    """The moderation desk for guest replies left on the public /wall/ page.
+
+    Filter to is_approved=No to see the queue; approving publishes it.
+    """
+
+    list_display = ("display_name", "post", "excerpt", "is_guest", "is_approved", "is_hidden", "created_at")
+    list_filter = ("is_approved", "is_hidden", "created_at")
+    list_editable = ("is_approved", "is_hidden")
+    raw_id_fields = ("post", "author")
+    readonly_fields = ("created_at", "ip_address")
+    search_fields = ("body", "guest_name", "guest_email", "author__display_name")
+    actions = ("approve_replies", "reject_replies")
+
+    @admin.display(description="Reply")
+    def excerpt(self, obj):
+        return obj.body[:70] + ("…" if len(obj.body) > 70 else "")
+
+    @admin.display(description="Guest", boolean=True)
+    def is_guest(self, obj):
+        return obj.author_id is None
+
+    @admin.action(description="Approve selected replies (publishes them)")
+    def approve_replies(self, request, queryset):
+        n = queryset.update(is_approved=True, is_hidden=False)
+        self.message_user(request, f"{n} repl{'y' if n == 1 else 'ies'} published.")
+
+    @admin.action(description="Reject selected replies (hides them)")
+    def reject_replies(self, request, queryset):
+        n = queryset.update(is_approved=False, is_hidden=True)
+        self.message_user(request, f"{n} repl{'y' if n == 1 else 'ies'} rejected.")

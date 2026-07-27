@@ -2,7 +2,7 @@
 {% block title %}Org members — Manage{% endblock %}
 {% block nav_orgs %}on{% endblock %}
 {% block admin_content %}
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;"><a href="{% url 'manage:orgs_list' %}" class="flink" style="color:var(--forest);">Orgs</a><span style="color:var(--muted);">/</span><h1 class="admin-h1" style="margin:0;">{{ org.name }} &middot; Members</h1></div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;"><a href="{% url 'manage:orgs_list' %}" class="flink" style="color:var(--lime);">Orgs</a><span style="color:rgba(245,241,230,.5);">/</span><h1 class="admin-h1" style="margin:0;">{{ org.name }} &middot; Members</h1></div>
 <div class="card" style="margin-bottom:16px;max-width:640px;">
   <label style="font-size:13px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">Org join link</label>
   <div class="copy-field"><input id="orgJoin" type="text" readonly value="{{ join_url }}"><button type="button" class="abtn abtn-dark" data-copy="#orgJoin">Copy</button></div>

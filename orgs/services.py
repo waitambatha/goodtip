@@ -342,16 +342,34 @@ def create_charity_election(org, charities) -> CharityVote:
     return vote
 
 
-def schedule_charity_election(vote: CharityVote, *, when, message="") -> CharityVote:
-    """Schedule the election to open at `when` (or open immediately if due)."""
+def schedule_charity_election(vote: CharityVote, *, when, close_at=None, message="") -> CharityVote:
+    """Schedule the election to open at `when` (or open immediately if due).
+
+    `close_at` optionally sets an automatic end time; the admin can still
+    close the vote manually at any point while it's open.
+    """
     if vote.status not in (CharityVote.STATUS_DRAFT, CharityVote.STATUS_SCHEDULED):
         raise ValueError("This election has already opened.")
+    if close_at is not None and close_at <= when:
+        raise ValueError("The election must close after it opens.")
     vote.admin_message = (message or "").strip()
     vote.scheduled_open_at = when
+    vote.scheduled_close_at = close_at
     vote.status = CharityVote.STATUS_SCHEDULED
-    vote.save(update_fields=["admin_message", "scheduled_open_at", "status"])
+    vote.save(update_fields=["admin_message", "scheduled_open_at", "scheduled_close_at", "status"])
     if when <= timezone.now():
         open_charity_election(vote)
+    return vote
+
+
+def set_election_close_time(vote: CharityVote, close_at) -> CharityVote:
+    """Set/change (or clear, with None) the automatic end time of an open vote."""
+    if not vote.is_open:
+        raise ValueError("Only an open election can have its end time changed.")
+    if close_at is not None and close_at <= timezone.now():
+        raise ValueError("Pick an end time in the future — or just close the vote now.")
+    vote.scheduled_close_at = close_at
+    vote.save(update_fields=["scheduled_close_at"])
     return vote
 
 
@@ -454,4 +472,26 @@ def open_due_elections(orgs=None) -> int:
             n += 1
         except Exception:  # noqa: BLE001 — one bad vote must not block the rest
             logger.exception("Failed to open election %s", vote.pk)
+    return n
+
+
+def close_due_elections(orgs=None) -> int:
+    """Close every open election whose scheduled end time has passed.
+
+    Called lazily from the vote view and by the `open_due_elections`
+    management command (cron), so results reveal on time either way.
+    """
+    qs = CharityVote.objects.filter(
+        status=CharityVote.STATUS_OPEN,
+        scheduled_close_at__lte=timezone.now(),
+    )
+    if orgs is not None:
+        qs = qs.filter(org__in=orgs)
+    n = 0
+    for vote in qs.select_related("org"):
+        try:
+            close_charity_vote(vote)
+            n += 1
+        except Exception:  # noqa: BLE001 — one bad vote must not block the rest
+            logger.exception("Failed to close election %s", vote.pk)
     return n

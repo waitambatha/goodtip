@@ -143,6 +143,11 @@ GOODTIP_TEAM_EMAIL = os.environ.get("GOODTIP_TEAM_EMAIL", "team@goodtip.com.au")
 # Absolute base URL used in outbound email links.
 SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://goodtip.com.au")
 
+# AI Group Recap (docs/ai-group-recap-spec.md). Generation is skipped —
+# silently, with a log line — until the key is set, mirroring the SMTP setup.
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+RECAP_MODEL = os.environ.get("RECAP_MODEL", "claude-opus-4-8")
+
 THESPORTS_API_KEY = os.environ.get("THESPORTS_API_KEY", "")
 
 # Stripe (Phase 1: single-destination platform-fee charges via Checkout).

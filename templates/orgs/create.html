@@ -142,7 +142,7 @@
     </p>
     <ul style="margin:0 0 14px;padding-left:18px;">
       {% for d in duplicates %}
-      <li>{{ d.name }}{% if d.parent %} <small style="color:var(--muted);">part of {{ d.parent.name }}</small>{% endif %}
+      <li>{{ d.name }} <small style="color:var(--muted);">{% if d.parent %}part of {{ d.parent.name }}{% if d.state %} &middot; {% endif %}{% endif %}{% if d.state %}{{ d.state.code }}{% endif %}</small>
         — <a href="{% url 'orgs:search' %}?q={{ d.name|urlencode }}">view &amp; ask to join</a></li>
       {% endfor %}
     </ul>

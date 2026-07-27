@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
@@ -14,6 +16,8 @@ from tipping.models import Round, Tip
 from tipping.services import user_org_stats, user_rank_in_org
 
 from .forms import AvatarForm, LoginForm, ProfileForm, SignupForm
+
+logger = logging.getLogger(__name__)
 
 
 JOIN_SESSION_KEY = "pending_join_org_id"
@@ -57,10 +61,45 @@ def signup_view(request):
             if user is not None:
                 login(request, user)
                 joined = _consume_pending_join(request)
-                return post_join_redirect(joined)
+                # Park the real destination and detour via the one-time
+                # "add a profile photo?" step — skippable, never repeated.
+                next_url = request.GET.get("next") or request.POST.get("next") or ""
+                if not next_url.startswith("/"):
+                    next_url = ""
+                request.session[POST_SIGNUP_NEXT_KEY] = (
+                    next_url or post_join_redirect(joined).url
+                )
+                return redirect("accounts:welcome_photo")
     else:
         form = SignupForm()
     return render(request, "auth/signup.html", {"form": form})
+
+
+POST_SIGNUP_NEXT_KEY = "post_signup_next"
+
+
+@never_cache
+@login_required
+def welcome_photo_view(request):
+    """One-time step right after signup: add a profile photo, or skip.
+
+    The face next to your name is what makes the Wall and the ladder feel
+    like your group — but nobody's forced. Skip keeps the initials avatar.
+    """
+    next_url = request.session.get(POST_SIGNUP_NEXT_KEY) or reverse("dashboard")
+    if request.method == "POST":
+        if "skip" not in request.POST and request.FILES.get("avatar"):
+            avatar_form = AvatarForm(request.POST, request.FILES, instance=request.user)
+            if avatar_form.is_valid():
+                avatar_form.save()
+                messages.success(request, "Looking good — photo saved.")
+            else:
+                return render(request, "auth/welcome_photo.html", {
+                    "error": avatar_form.errors["avatar"].as_text().lstrip("* "),
+                })
+        request.session.pop(POST_SIGNUP_NEXT_KEY, None)
+        return HttpResponseRedirect(next_url)
+    return render(request, "auth/welcome_photo.html", {})
 
 
 @never_cache
@@ -92,6 +131,114 @@ def login_view(request):
 def logout_view(request):
     logout(request)
     return redirect("landing")
+
+
+def _dashboard_prompts(user, card, games):
+    """The rotating line under "Welcome back" — what this member should know
+    or do right now, most urgent first.
+
+    Each entry is {icon, text, cta, url}. Everything is derived from state we
+    already loaded for the card, so this costs no extra queries beyond the
+    Wall count.
+    """
+    if not card:
+        return []
+    org = card["org"]
+    rnd = card["round"]
+    prompts = []
+
+    # 1. An open charity vote they haven't cast — the most time-boxed thing
+    #    on the dashboard.
+    if card["charity_vote"] and not card["has_voted"]:
+        prompts.append({
+            "icon": "ic-vote",
+            "text": f"A charity vote is open for {org.name} — you haven't had your say yet.",
+            "cta": "Vote now",
+            "url": reverse("orgs:charity_vote", args=[org.id]),
+        })
+    elif card["charity_vote"]:
+        prompts.append({
+            "icon": "ic-vote",
+            "text": f"Your vote's in. {org.name} is still deciding where this season's money goes.",
+            "cta": "See the runners",
+            "url": reverse("orgs:charity_vote", args=[org.id]),
+        })
+
+    # 2. Tips outstanding, with the deadline attached.
+    left = (card["tips_total"] or 0) - (card["tips_done"] or 0)
+    if rnd and left > 0:
+        when = ""
+        if rnd.lockout_at and rnd.lockout_at >= timezone.now():
+            when = f" Tips lock {timezone.localtime(rnd.lockout_at).strftime('%a %-d %b, %-I:%M%p').replace('AM', 'am').replace('PM', 'pm')}."
+        prompts.append({
+            "icon": "ic-clock",
+            "text": f"{left} match{'es' if left != 1 else ''} still untipped in Round {rnd.round_number}.{when}",
+            "cta": "Tip now",
+            "url": reverse("tipping:my_tips", args=[org.id]),
+        })
+    elif rnd and card["tips_total"]:
+        prompts.append({
+            "icon": "ic-check",
+            "text": f"All {card['tips_total']} tips are in for Round {rnd.round_number}. Now we wait.",
+            "cta": "Review your picks",
+            "url": reverse("tipping:my_tips", args=[org.id]),
+        })
+
+    # 3. The next game on the board — named, so it reads like a question.
+    now = timezone.now()
+    nxt = next((g for g in games if g.kickoff_at and g.kickoff_at >= now), None)
+    if nxt:
+        kick = timezone.localtime(nxt.kickoff_at).strftime("%a %-I:%M%p").replace("AM", "am").replace("PM", "pm")
+        if nxt.tipped:
+            backing = nxt.home_team.name if nxt.my_tip == "home" else nxt.away_team.name
+            text = f"{nxt.home_team.name} v {nxt.away_team.name}, {kick} — you're backing {backing}."
+        else:
+            text = f"{nxt.home_team.name} v {nxt.away_team.name} kicks off {kick}. Who are you taking?"
+        prompts.append({
+            "icon": "ic-match",
+            "text": text,
+            "cta": "Make the call",
+            "url": reverse("tipping:my_tips", args=[org.id]),
+        })
+
+    # 4. Where they sit.
+    if card["rank"]:
+        prompts.append({
+            "icon": "ic-trophy",
+            "text": f"You're {card['rank']}{_ordinal_suffix(card['rank'])} on the {org.name} ladder on {card['points']} points.",
+            "cta": "See the ladder",
+            "url": reverse("tipping:leaderboard", args=[org.id]),
+        })
+
+    # 5. What it's all for.
+    if card["donation"] and card["donation"].get("raised"):
+        prompts.append({
+            "icon": "ic-heart",
+            "text": f"{org.name} has raised ${card['donation']['raised']:,.0f} for {org.charity_display} so far.",
+            "cta": "Add to it",
+            "url": reverse("billing:topup", args=[org.id]),
+        })
+
+    # 6. The Wall, always last — the nudge that keeps the room warm.
+    from orgs.models import WallPost
+
+    wall_count = WallPost.objects.filter(org=org, is_hidden=False).count()
+    prompts.append({
+        "icon": "ic-msg",
+        "text": (
+            f"{wall_count} post{'s' if wall_count != 1 else ''} on the Wall. Talk up your picks."
+            if wall_count else "The Wall's empty. First tip talk wins the room."
+        ),
+        "cta": "Open the Wall",
+        "url": reverse("orgs:wall", args=[org.id]),
+    })
+    return prompts
+
+
+def _ordinal_suffix(n: int) -> str:
+    if 11 <= (n % 100) <= 13:
+        return "th"
+    return {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
 
 
 @login_required
@@ -208,6 +355,7 @@ def dashboard_view(request):
         "create_url": reverse("orgs:create"),
         "news_leads": news_posts[:3],
         "news_more": news_posts[3:],
+        "prompts": _dashboard_prompts(request.user, selected, games),
     })
 
 
@@ -292,4 +440,96 @@ def coming_soon_view(request):
         "locked_in": locked_in,
         "error": error,
         "platforms": LaunchSignup.PLATFORM_CHOICES,
+    })
+
+
+# The boss letter is fixed copy — senders only fill in the two names, so the
+# form can't be turned into an open relay for arbitrary text.
+BOSS_LETTER = (
+    "Dear {boss},\n"
+    "\n"
+    "What if our footy tips actually did some good?\n"
+    "\n"
+    "We're already picking teams and checking the ladder every Monday. "
+    "GoodTip just sends our entry fees to a charity we choose. Together.\n"
+    "\n"
+    "Five minutes to set up. Nothing to lose but bragging rights.\n"
+    "\n"
+    "Can we do this?\n"
+    "\n"
+    "— {name}"
+)
+BOSS_SEND_LIMIT = 5          # per session…
+BOSS_SEND_WINDOW = 3600      # …per hour
+
+
+def tell_the_boss_view(request):
+    """Public tell-the-boss page. Besides copy-paste, the letter can be sent
+    by GoodTip itself: the visitor fills in their name and the boss's email
+    and we deliver the (fixed) note for them.
+    """
+    import time
+
+    from django.conf import settings
+    from django.core.mail import send_mail
+    from django.core.validators import validate_email
+    from django.core.exceptions import ValidationError
+
+    sent = False
+    error = ""
+    your_name = ""
+    boss_name = ""
+    if request.method == "POST" and not request.user.is_authenticated:
+        # Sending is a member perk — the template hides the form, but guard
+        # the POST too so the relay can't be driven anonymously.
+        error = "Sending is a member thing — sign up free first, then we'll deliver it."
+    elif request.method == "POST":
+        your_name = (request.POST.get("your_name") or "").strip()[:80]
+        boss_name = (request.POST.get("boss_name") or "").strip()[:80]
+        boss_email = (request.POST.get("boss_email") or "").strip()
+        now = time.time()
+        recent = [
+            t for t in request.session.get("boss_sends", [])
+            if now - t < BOSS_SEND_WINDOW
+        ]
+        if request.POST.get("company"):  # honeypot — bots fill every field
+            sent = True
+        elif not your_name or not boss_email:
+            error = "Your name and the boss's email are both needed."
+        elif len(recent) >= BOSS_SEND_LIMIT:
+            error = "That's a few notes already — give it an hour and try again."
+        else:
+            try:
+                validate_email(boss_email)
+            except ValidationError:
+                error = "That email address doesn't look right — check it and try again."
+            else:
+                letter = BOSS_LETTER.format(boss=boss_name or "Boss", name=your_name)
+                try:
+                    send_mail(
+                        subject=f"{your_name} wants your tipping comp to do some good",
+                        message=(
+                            f"{letter}\n\n"
+                            "----\n"
+                            f"{your_name} asked GoodTip to pass this note on. "
+                            "See how it works: https://goodtip.com.au/tell-the-boss/\n"
+                            "This is a one-off — you're not on any list."
+                        ),
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[boss_email],
+                        fail_silently=False,
+                    )
+                except Exception:
+                    logger.exception("Failed to send tell-the-boss note")
+                    error = "The note didn't send — try again in a minute, or just copy it."
+                else:
+                    sent = True
+                    recent.append(now)
+                    request.session["boss_sends"] = recent
+    return render(request, "public/tell_the_boss.html", {
+        "active": "boss",
+        "sent": sent,
+        "boss_error": error,
+        "your_name": your_name,
+        "boss_name": boss_name,
     })

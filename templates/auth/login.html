@@ -5,7 +5,7 @@
 {% block auth_form %}
 <h1>Log in</h1>
 <p class="sub">Pick up where your group left off.</p>
-<form method="post" action="{% url 'accounts:login' %}" novalidate>
+<form method="post" action="{% url 'accounts:login' %}{% if request.GET.next %}?next={{ request.GET.next|urlencode }}{% endif %}" novalidate>
   {% csrf_token %}
   <div class="fld">
     <label for="id_email">Email</label>

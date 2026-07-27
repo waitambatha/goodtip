@@ -336,6 +336,9 @@ class CharityVote(models.Model):
     closed_at = models.DateTimeField(null=True, blank=True)
     # When the admin schedules the election rather than starting it now.
     scheduled_open_at = models.DateTimeField(null=True, blank=True)
+    # Optional end time — the vote auto-closes when this passes. The admin
+    # can always close manually before (or instead of) this.
+    scheduled_close_at = models.DateTimeField(null=True, blank=True)
     # The admin's note to members — lands in the email and the in-app popup.
     admin_message = models.TextField(blank=True)
     winning_charity = models.ForeignKey(
@@ -433,11 +436,24 @@ class Notification(models.Model):
     KIND_ELECTION_OPEN = "election_open"
     KIND_ELECTION_RESULT = "election_result"
     KIND_ADMIN_NOTE = "admin_note"
+    KIND_WALL_REPLY = "wall_reply"
+    KIND_WALL_POST = "wall_post"
     KIND_CHOICES = [
         (KIND_ELECTION_OPEN, "Charity election open"),
         (KIND_ELECTION_RESULT, "Charity election result"),
         (KIND_ADMIN_NOTE, "Note from your admin"),
+        (KIND_WALL_REPLY, "Reply to your post"),
+        (KIND_WALL_POST, "New post on your Wall"),
     ]
+
+    # Bell-panel icon + accent per kind, so the panel scans at a glance.
+    ICONS = {
+        KIND_ELECTION_OPEN: "ic-vote",
+        KIND_ELECTION_RESULT: "ic-vote",
+        KIND_ADMIN_NOTE: "ic-msg",
+        KIND_WALL_REPLY: "ic-msg",
+        KIND_WALL_POST: "ic-flame",
+    }
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications")
     org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name="notifications", null=True, blank=True)
@@ -459,3 +475,199 @@ class Notification(models.Model):
     @property
     def is_unread(self) -> bool:
         return self.read_at is None
+
+    @property
+    def icon(self) -> str:
+        return self.ICONS.get(self.kind, "ic-msg")
+
+
+class WallPost(models.Model):
+    """A post on a group's Wall — the members-only in-app feed.
+
+    Private to the org by default: every read and write goes through a
+    membership check. The ONE exception is is_public, which the author sets
+    themselves on the composer ("also show this on the public wall"). A post
+    reaches the public /wall/ page only when the author opted that post in
+    AND the group's manager opted the group into public listing — two
+    separate consents, either of which revokes it (see public_feed()).
+
+    kind="recap" is reserved for the AI Group Recap card
+    (docs/ai-group-recap-spec.md §2: one per round, pinned at the top of the
+    feed, author=None). Recap generation isn't built yet; the feed already
+    renders the kind so it lands without a schema change.
+    """
+
+    KIND_MEMBER = "member"
+    KIND_SYSTEM = "system"
+    KIND_RECAP = "recap"
+    KIND_CHOICES = [
+        (KIND_MEMBER, "Member post"),
+        (KIND_SYSTEM, "GoodTip update"),
+        (KIND_RECAP, "AI Group Recap"),
+    ]
+
+    org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name="wall_posts")
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        null=True, blank=True, related_name="wall_posts",
+    )
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default=KIND_MEMBER)
+    body = models.TextField(max_length=500)
+    # Optional: the author's own pick this post talks up — renders as a
+    # "★ Pies to win" chip so reacting to the games you tipped is one tap.
+    tip = models.ForeignKey(
+        "tipping.Tip", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="wall_posts",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    # Admin hide (recap spec §11): gone from the feed, data kept.
+    is_hidden = models.BooleanField(default=False)
+    # Author's own choice, per post, default off — never inherited from a
+    # previous post and never set on their behalf.
+    is_public = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["org", "-created_at"]),
+            models.Index(fields=["is_public", "-created_at"]),
+        ]
+
+    def __str__(self):
+        who = self.author or "GoodTip"
+        return f"{who} on {self.org.name} wall ({self.kind})"
+
+    @classmethod
+    def public_feed(cls):
+        """Every post cleared for the world: the author opted this post in and
+        the group is publicly listed. Both consents are live — revoking either
+        pulls the post off the public page on the next request.
+
+        System and recap cards stay out of it: they carry a group's internal
+        numbers (ladder moves, donation totals) that nobody consented to
+        publish.
+        """
+        return (
+            cls.objects.filter(
+                is_public=True,
+                is_hidden=False,
+                kind=cls.KIND_MEMBER,
+                org__is_public_listed=True,
+                author__isnull=False,
+            )
+            .select_related(
+                "author", "org", "org__group_type", "org__season",
+                "tip__match__home_team", "tip__match__away_team",
+            )
+            # The card prints the group's category and competitions, so pull
+            # them in one go rather than per post.
+            .prefetch_related("org__sub_categories", "org__competitions")
+            .annotate(reaction_total=models.Count("reactions", distinct=True))
+        )
+
+
+class RoundRecap(models.Model):
+    """One AI Group Recap per (org, round) — docs/ai-group-recap-spec.md.
+
+    The row is the idempotency lock: generation skips any pair that already
+    has one, so a recap is never silently rewritten (§3 — if an admin
+    corrects a result, flag needs_review instead of regenerating).
+    """
+
+    org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name="round_recaps")
+    round = models.ForeignKey("tipping.Round", on_delete=models.CASCADE, related_name="recaps")
+    post = models.OneToOneField(
+        WallPost, on_delete=models.SET_NULL, null=True, blank=True, related_name="recap",
+    )
+    # True when the LLM call failed and the plain factual line was posted
+    # instead (§10) — worth re-running by hand once the API is reachable.
+    fallback_used = models.BooleanField(default=False)
+    model_used = models.CharField(max_length=60, blank=True)
+    # Set when a result correction touches this round after the recap posted
+    # (§3): surfaced to the admin rather than silently regenerated.
+    needs_review = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("org", "round")
+
+    def __str__(self):
+        return f"Recap R{self.round.round_number} — {self.org.name}"
+
+
+class WallReply(models.Model):
+    """A reply under a wall post.
+
+    Two ways in, with different trust:
+
+    * A signed-in member of the post's org — posts straight into the thread,
+      exactly like the post itself.
+    * A visitor on the public /wall/ page — leaves a name and an email and the
+      reply is held (is_approved=False) until a staffer clears it in the admin.
+      Nothing an anonymous visitor types appears on a public marketing page
+      before a human has read it.
+
+    Guest email is contact detail for moderation, never rendered anywhere.
+    """
+
+    post = models.ForeignKey(WallPost, on_delete=models.CASCADE, related_name="replies")
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        null=True, blank=True, related_name="wall_replies",
+    )
+    guest_name = models.CharField(max_length=80, blank=True)
+    guest_email = models.EmailField(blank=True)
+    body = models.TextField(max_length=500)
+    created_at = models.DateTimeField(auto_now_add=True)
+    # Members are approved on arrival; guests wait for a staff review.
+    is_approved = models.BooleanField(default=True)
+    is_hidden = models.BooleanField(default=False)
+    # Kept for rate-limiting and abuse follow-up on guest replies only.
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [models.Index(fields=["post", "created_at"])]
+        verbose_name_plural = "wall replies"
+
+    def __str__(self):
+        return f"{self.display_name} on #{self.post_id}"
+
+    @property
+    def is_guest(self) -> bool:
+        return self.author_id is None
+
+    @property
+    def display_name(self) -> str:
+        if self.author_id:
+            return self.author.display_name
+        return self.guest_name or "Guest"
+
+    @property
+    def initials(self) -> str:
+        return (self.display_name or "?")[:2].upper()
+
+
+class WallReaction(models.Model):
+    """One member's emoji reaction to one wall post. Toggled, not stacked —
+    a member can add each emoji to a post once.
+    """
+
+    EMOJI_CHOICES = [
+        ("fire", "🔥"),
+        ("laugh", "😂"),
+        ("heart", "❤️"),
+        ("clap", "👏"),
+        ("eyes", "👀"),
+    ]
+
+    post = models.ForeignKey(WallPost, on_delete=models.CASCADE, related_name="reactions")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="wall_reactions")
+    emoji = models.CharField(max_length=8, choices=EMOJI_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("post", "user", "emoji")
+
+    def __str__(self):
+        return f"{self.user} {self.get_emoji_display()} on #{self.post_id}"

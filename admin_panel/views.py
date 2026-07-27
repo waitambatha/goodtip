@@ -1,11 +1,13 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from catalog.models import Charity, Competition, Season, Series
+from catalog.models import Charity, Competition, Season, Series, Sport
 from data_sync.services import get_sync_service, SyncError
 from orgs.forms import _unique_charity_slug
 from orgs.models import OrgMember, Organisation
@@ -57,8 +59,28 @@ def orgs_list(request):
         org.competitions.set(Competition.objects.filter(slug__in=comp_slugs, season=season))
         messages.success(request, "Org created.")
         return redirect("manage:orgs_list")
-    orgs = Organisation.objects.order_by("-created_at")
-    return render(request, "manage/orgs_list.html", {"orgs": orgs})
+    orgs = (
+        Organisation.objects
+        .select_related("charity", "season")
+        .prefetch_related("competitions__sport")
+        .order_by("-created_at")
+    )
+    # The list doubles as a finder once there are more than a screenful:
+    # free-text over org and charity name, plus a sport filter.
+    q = (request.GET.get("q") or "").strip()
+    if q:
+        orgs = orgs.filter(Q(name__icontains=q) | Q(charity__name__icontains=q))
+    sport = (request.GET.get("sport") or "").strip()
+    if sport:
+        orgs = orgs.filter(competitions__sport__name=sport)
+    orgs = orgs.distinct()
+    sports = list(
+        Sport.objects.filter(competitions__organisations__isnull=False)
+        .order_by("name").values_list("name", flat=True).distinct()
+    )
+    return render(request, "manage/orgs_list.html", {
+        "orgs": orgs, "q": q, "sport": sport, "sports": sports,
+    })
 
 
 @staff_member_required
@@ -165,8 +187,12 @@ def sync_panel(request):
         except SyncError as e:
             messages.error(request, str(e))
         return redirect("manage:sync")
-    orgs = Organisation.objects.all()
-    return render(request, "manage/sync.html", {"orgs": orgs})
+    orgs = Organisation.objects.select_related("season").all()
+    return render(request, "manage/sync.html", {
+        "orgs": orgs,
+        # Squiggle needs no key; TheSports does, so the panel shows its real state.
+        "thesports_ready": bool(settings.THESPORTS_API_KEY),
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -249,8 +275,20 @@ def news_index(request):
     gate still fronts it until launch.
     """
     posts = NewsPost.objects.filter(is_published=True)
+    # ?code=AFL filters by tag; anything unknown falls back to all stories.
+    valid_tags = {t for t, _ in NewsPost.TAG_CHOICES}
+    active_tag = (request.GET.get("code") or "").upper()
+    if active_tag in valid_tags:
+        posts = posts.filter(tag=active_tag)
+    else:
+        active_tag = ""
     tpl = "news_index.html" if request.user.is_authenticated else "public/news_index.html"
-    return render(request, tpl, {"posts": posts, "active": "news"})
+    return render(request, tpl, {
+        "posts": posts,
+        "active": "news",
+        "news_tags": NewsPost.TAG_CHOICES,
+        "active_tag": active_tag,
+    })
 
 
 def news_detail(request, post_id: int):

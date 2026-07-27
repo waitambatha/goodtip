@@ -14,11 +14,10 @@
   <script src="{% static 'js/gt-ui.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
 </head>
-<body class="app {% block body_class %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<body class="app gt-v2 {% block body_class %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   {% include "public/partials/_icons.html" %}
 
-  {# ---- sport loader — post shape follows the code (AFL: four posts, no
-        crossbar · NRL: one H frame). Never one shape recoloured for both. ---- #}
+  {# ---- sport loader — post shape follows the code (AFL: four posts, no crossbar · NRL: one H frame). Never one shape recoloured for both. ---- #}
   <div class="loader" id="loader" role="status" aria-label="Loading">
     <div class="loader-inner">
       <div class="pitch">
@@ -50,8 +49,7 @@
     </div>
   </div>
 
-  {# ---- nav is the only sticky element; the charity strip sits under it
-        and scrolls away with the page ---- #}
+  {# ---- nav is the only sticky element; the charity strip sits under it and scrolls away with the page ---- #}
   <nav class="app-nav">
     <div class="an-inner">
       <a href="{% url 'dashboard' %}" class="an-brand">GOOD<span>TIP</span></a>
@@ -61,6 +59,7 @@
         {% if primary_org %}
           <a href="{% url 'tipping:my_tips' primary_org.id %}" class="{% block nav_tips %}{% endblock %}">My Tips</a>
           <a href="{% url 'tipping:leaderboard' primary_org.id %}" class="{% block nav_board %}{% endblock %}">Leaderboard</a>
+          <a href="{% url 'orgs:wall' primary_org.id %}" class="{% block nav_wall %}{% endblock %}">The Wall</a>
         {% endif %}
         {% if user.is_staff %}<a href="{% url 'manage:overview' %}" class="{% block nav_admin %}{% endblock %}">Admin</a>{% endif %}
       </div>
@@ -71,16 +70,21 @@
             {% if unread_notification_count %}<span class="bell-badge">{{ unread_notification_count }}</span>{% endif %}
           </button>
           <div class="bell-panel" id="bellPanel">
-            <div class="bp-head">Notifications</div>
-            {% for n in my_notifications %}
-            <a class="bp-item {% if n.is_unread %}unread{% endif %}" href="{{ n.link_url|default:'#' }}">
-              <span class="bp-title">{{ n.title }}</span>
-              {% if n.message %}<span class="bp-msg">{{ n.message|truncatechars:120 }}</span>{% endif %}
-              <span class="bp-meta">{% if n.org %}{{ n.org.name }} &middot; {% endif %}{{ n.created_at|date:"j M, g:i A" }}</span>
-            </a>
-            {% empty %}
-            <div class="bp-empty">Nothing yet — admin messages and election news land here.</div>
-            {% endfor %}
+            <div class="bp-head">Notifications{% if unread_notification_count %} <i>{{ unread_notification_count }} new</i>{% endif %}</div>
+            <div class="bp-list" id="bellList">
+              {% for n in my_notifications %}
+              <a class="bp-item {% if n.is_unread %}unread{% endif %}" href="{{ n.link_url|default:'#' }}" data-note="{{ n.id }}">
+                <span class="bp-ic"><svg><use href="#{{ n.icon }}"/></svg></span>
+                <span class="bp-txt">
+                  <span class="bp-title">{{ n.title }}</span>
+                  {% if n.message %}<span class="bp-msg">{{ n.message|truncatechars:120 }}</span>{% endif %}
+                  <span class="bp-meta">{% if n.org %}{{ n.org.name }} &middot; {% endif %}{{ n.created_at|date:"j M, g:i A" }}</span>
+                </span>
+              </a>
+              {% empty %}
+              <div class="bp-empty">Nothing yet — replies, election news and admin messages land here.</div>
+              {% endfor %}
+            </div>
           </div>
         </div>
         <a href="{% url 'profile' %}" class="an-profile" title="Profile">{% if user.avatar %}<span class="an-avatar has-img"><img src="{{ user.avatar.url }}" alt=""></span>{% else %}<span class="an-avatar">{{ user.display_name|slice:":1"|upper }}</span>{% endif %}<span class="an-plabel">Profile</span></a>
@@ -90,6 +94,12 @@
       </div>
     </div>
   </nav>
+
+  {% comment %}
+  Live toasts: a notification that arrives while you're on the page slams in,
+  sits for a few seconds, then leaves. Click to go there.
+  {% endcomment %}
+  <div class="gt-toasts" id="gtToasts" aria-live="polite" aria-atomic="false"></div>
 
   {# ---- election / admin-note popup: clean, dismissible, one at a time ---- #}
   {% if popup_notification %}
@@ -135,12 +145,16 @@
       {% if primary_org %}
         <a href="{% url 'tipping:my_tips' primary_org.id %}">My Tips</a>
         <a href="{% url 'tipping:leaderboard' primary_org.id %}">Leaderboard</a>
+        <a href="{% url 'orgs:wall' primary_org.id %}">The Wall</a>
       {% endif %}
       {% if user.is_staff %}<a href="{% url 'manage:overview' %}">Admin</a>{% endif %}
       <a href="{% url 'profile' %}">Profile</a>
       <a href="{% url 'accounts:logout' %}">Log out</a>
     </div>
   </div>
+
+  {# ---- full-bleed imagery, painted behind the page sheet (never inside it) ---- #}
+  {% block page_backdrop %}{% endblock %}
 
   <main class="app-main">
     {% if messages %}
@@ -193,6 +207,84 @@
       });
       var pop = document.getElementById('notePop');
       if (pop) setTimeout(function(){ pop.classList.add('in'); }, reduce ? 0 : 3200);
+
+      /* clicking a bell item marks it read before it navigates */
+      var list = document.getElementById('bellList');
+      if (list) {
+        list.addEventListener('click', function(e){
+          var item = e.target.closest('[data-note]');
+          if (!item) return;
+          item.classList.remove('unread');
+          post('/leagues/notifications/' + item.getAttribute('data-note') + '/open/');
+        });
+      }
+
+      /* ---- live notifications ----------------------------------------
+         Poll for anything new and slam it in as a toast. Only while the tab
+         is actually being looked at — a backgrounded tab polls nothing. */
+      var toasts = document.getElementById('gtToasts');
+      if (!toasts) return;
+      var seen = {{ latest_notification_id|default:0 }};
+      var POLL_MS = 45000;
+      var pollTimer = null;
+
+      function toast(n){
+        var el = document.createElement(n.url ? 'a' : 'div');
+        el.className = 'gt-toast';
+        if (n.url) el.href = n.url;
+        el.innerHTML =
+          '<span class="gtt-ic"><svg><use href="#' + n.icon + '"/></svg></span>' +
+          '<span class="gtt-body"><span class="gtt-eyebrow"></span>' +
+          '<span class="gtt-title"></span><span class="gtt-msg"></span></span>' +
+          '<button type="button" class="gtt-x" aria-label="Dismiss">&times;</button>';
+        el.querySelector('.gtt-eyebrow').textContent = n.org || 'GoodTip';
+        el.querySelector('.gtt-title').textContent = n.title || '';
+        el.querySelector('.gtt-msg').textContent = n.message || '';
+        el.querySelector('.gtt-x').addEventListener('click', function(e){
+          e.preventDefault(); e.stopPropagation(); dropIt();
+        });
+        if (n.url) el.addEventListener('click', function(){ post('/leagues/notifications/' + n.id + '/open/'); });
+        toasts.appendChild(el);
+        requestAnimationFrame(function(){ el.classList.add('in'); });
+        var timer = setTimeout(dropIt, 7000);
+        function dropIt(){
+          clearTimeout(timer);
+          el.classList.remove('in'); el.classList.add('out');
+          setTimeout(function(){ el.remove(); }, 400);
+        }
+        el.addEventListener('mouseenter', function(){ clearTimeout(timer); });
+        el.addEventListener('mouseleave', function(){ timer = setTimeout(dropIt, 3000); });
+      }
+
+      function badge(count){
+        if (!bell) return;
+        var b = bell.querySelector('.bell-badge');
+        if (!count) { if (b) b.remove(); return; }
+        if (!b) { b = document.createElement('span'); b.className = 'bell-badge'; bell.appendChild(b); }
+        b.textContent = count;
+        bell.classList.add('ring');
+        setTimeout(function(){ bell.classList.remove('ring'); }, 900);
+      }
+
+      function poll(){
+        if (document.hidden) return;
+        fetch('{% url "orgs:notifications_feed" %}?since=' + seen, { headers: { 'X-Requested-With': 'fetch' } })
+          .then(function(r){ return r.ok ? r.json() : null; })
+          .then(function(d){
+            if (!d) return;
+            if (d.latest_id > seen) seen = d.latest_id;
+            badge(d.unread);
+            // Newest last, so they stack in the order they happened.
+            d.items.slice().reverse().forEach(toast);
+          })
+          .catch(function(){ /* offline — try again next tick */ });
+      }
+      function startPoll(){ if (!pollTimer) pollTimer = setInterval(poll, POLL_MS); }
+      function stopPoll(){ if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+      document.addEventListener('visibilitychange', function(){
+        if (document.hidden) { stopPoll(); } else { startPoll(); poll(); }
+      });
+      startPoll();
     })();
 
     /* mobile sheet */
@@ -202,26 +294,6 @@
       burger.addEventListener('click', function(){ sheet.classList.add('open'); });
       sheet.addEventListener('click', function(e){ if (e.target === sheet) sheet.classList.remove('open'); });
     }
-
-    /* custom dropdowns synced to a hidden <select> (Django/htmx) */
-    document.querySelectorAll('[data-dd]').forEach(function(dd){
-      var btn = dd.querySelector('.dd-btn'), val = dd.querySelector('.dd-val'), sel = dd.querySelector('.dd-native');
-      if (btn) btn.addEventListener('click', function(e){
-        e.stopPropagation();
-        document.querySelectorAll('[data-dd].open').forEach(function(o){ if(o!==dd) o.classList.remove('open'); });
-        dd.classList.toggle('open');
-      });
-      dd.querySelectorAll('.dd-opt').forEach(function(opt){
-        opt.addEventListener('click', function(){
-          dd.querySelectorAll('.dd-opt').forEach(function(o){ o.classList.remove('on'); });
-          opt.classList.add('on');
-          if (val) val.textContent = opt.textContent;
-          if (sel) { sel.value = opt.getAttribute('data-val'); sel.dispatchEvent(new Event('change', { bubbles: true })); }
-          dd.classList.remove('open');
-        });
-      });
-    });
-    document.addEventListener('click', function(){ document.querySelectorAll('[data-dd].open').forEach(function(o){ o.classList.remove('open'); }); });
 
     /* copy-to-clipboard buttons (invite links etc.) */
     document.querySelectorAll('[data-copy]').forEach(function(btn){

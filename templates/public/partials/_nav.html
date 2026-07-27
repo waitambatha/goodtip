@@ -6,7 +6,7 @@
       <span></span><span></span><span></span>
     </button>
     <ul class="nav-links" id="nav-menu">
-      {% if active != 'home' %}<li><a href="/">Home</a></li>{% endif %}
+      <li><a href="/" {% if active == 'home' %}aria-current="page"{% endif %}>Home</a></li>
       <li><a href="/how-it-works/" {% if active == 'how' %}aria-current="page"{% endif %}>How It Works</a></li>
       <li><a href="/tell-the-boss/" {% if active == 'boss' %}aria-current="page"{% endif %}>Tell the Boss</a></li>
       <li><a href="/news/" {% if active == 'news' %}aria-current="page"{% endif %}>News</a></li>

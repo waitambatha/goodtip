@@ -1,16 +1,19 @@
 {% load team_extras %}
-<table class="atable" id="lbtable">
-  <thead><tr><th style="width:56px;">Rank</th><th>Tipper</th><th class="num fit">Correct</th><th class="num fit">Points</th></tr></thead>
-  <tbody>
+<div class="gt-board" id="lbtable">
+  <div class="gb-head">
+    <span>Rank</span><span>Tipper</span><span class="h-correct" style="text-align:right;">Correct</span><span style="text-align:right;">Points</span>
+  </div>
   {% for row in ranked %}
-    <tr class="{% if row.user.id == me.id %}me{% endif %}">
-      <td class="r-rank">{{ row.rank }}</td>
-      <td>{{ row.user.display_name }}{% if row.user.id == me.id %} <span class="pill-role" style="margin-left:6px;">You</span>{% endif %}</td>
-      <td class="r-num">{{ row.tips_correct }} / {{ row.tips_total }}</td>
-      <td class="r-pts">{{ row.points }}</td>
-    </tr>
+    <div class="gb-row {% if row.user.id == me.id %}me{% endif %}">
+      <span class="gb-rank">{{ row.rank }}</span>
+      <span class="gb-who">
+        <span class="gb-av">{% if row.user.avatar %}<img src="{{ row.user.avatar.url }}" alt="" loading="lazy">{% else %}{{ row.user.display_name|slice:":1"|upper }}{% endif %}</span>
+        <span class="gb-name">{{ row.user.display_name }}{% if row.user.id == me.id %} <span class="pill-role">You</span>{% endif %}</span>
+      </span>
+      <span class="gb-correct">{{ row.tips_correct }} <span>/ {{ row.tips_total }}</span></span>
+      <span class="gb-pts">{{ row.points }}</span>
+    </div>
   {% empty %}
-    <tr><td colspan="4" style="text-align:center;color:var(--muted);">No tippers yet — once people join and tip, they'll show here.</td></tr>
+    <div class="gb-empty">No tippers yet — once people join and tip, they'll show here.</div>
   {% endfor %}
-  </tbody>
-</table>
+</div>

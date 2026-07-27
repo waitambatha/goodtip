@@ -3,7 +3,7 @@
 {% block loader_task %}Opening the charity vote{% endblock %}
 {% block app_content %}
 <div class="app-head"><div><div class="app-eyebrow">{{ org.name }}</div><h1 class="app-h1">Where should the money go?</h1>
-  {% if vote and vote.is_open %}<p class="app-sub">Blind vote &mdash; tallies stay hidden until a manager closes it. You can change your pick any time before then.</p>{% endif %}</div>
+  {% if vote and vote.is_open %}<p class="app-sub">Blind vote &mdash; tallies stay hidden until voting ends{% if vote.scheduled_close_at %} ({{ vote.scheduled_close_at|date:"l j F, g:i A" }}){% endif %}. You can change your pick any time before then.</p>{% endif %}</div>
   {% if vote and vote.is_open %}<span class="badge-live">Vote open</span>{% endif %}</div>
 
 {% if can_lock_fundraising %}
@@ -45,6 +45,17 @@
 
 {% elif vote.is_open %}
 <div style="max-width:640px;">
+
+  {# live stats — counts only, never who voted or how the tallies stand #}
+  <div class="vz-live" role="group" aria-label="Election status">
+    <div class="vz-tile"><b>{{ eligible_count }}</b><small>eligible voter{{ eligible_count|pluralize }}</small></div>
+    <div class="vz-tile"><b>{{ ballot_count }}</b><small>ballot{{ ballot_count|pluralize }} in</small></div>
+    <div class="vz-tile"><b>{{ turnout_pct }}%</b><small>turnout</small></div>
+    {% if vote.scheduled_close_at %}<div class="vz-tile"><b>{{ vote.scheduled_close_at|date:"D g:i A" }}</b><small>voting ends</small></div>{% endif %}
+  </div>
+  <div class="vz-meter" aria-hidden="true"><i style="width:{{ turnout_pct }}%"></i></div>
+  <p class="app-sub" style="margin:8px 0 18px;">Blind vote &mdash; who has voted and where the tallies stand stays hidden until voting {% if vote.scheduled_close_at %}ends {{ vote.scheduled_close_at|date:"l j F, g:i A" }}{% else %}is closed by a manager{% endif %}.</p>
+
   <form method="post" action="{% url 'orgs:cast_charity_vote' org.id %}">
     {% csrf_token %}
     <div class="opt-grid" style="margin-bottom:16px;">
@@ -52,31 +63,85 @@
       <label class="opt-card radio"><input type="radio" name="option" value="{{ opt.id }}" {% if opt.id == my_option_id %}checked{% endif %}><span class="oc-box"></span><span><span class="oc-title">{{ opt.charity.name }}</span>{% if opt.charity.website %}<span class="oc-sub">{{ opt.charity.website }}</span>{% endif %}</span>{% if opt.id == my_option_id %}<span class="oc-right"><span class="pill-role">Your pick</span></span>{% endif %}</label>
       {% endfor %}
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-      <span class="app-sub" style="margin:0;">{{ ballot_count }} ballot{{ ballot_count|pluralize }} cast</span>
+    <div style="display:flex;justify-content:flex-end;align-items:center;gap:12px;flex-wrap:wrap;">
       <button type="submit" class="abtn abtn-primary">{% if my_option_id %}Change my vote{% else %}Save my vote{% endif %}</button>
     </div>
   </form>
 
   {% if is_admin %}
-  <form method="post" action="{% url 'orgs:close_charity_vote' org.id %}" style="margin-top:22px;border-top:1px solid var(--app-line);padding-top:18px;" onsubmit="return confirm('Close the vote and lock in the winner?')">
-    {% csrf_token %}
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-      <span class="app-sub" style="margin:0;">Manager only &mdash; closing reveals the result and locks the charity.</span>
-      <button type="submit" class="abtn abtn-dark">Close the vote</button>
-    </div>
-  </form>
+  <div style="margin-top:22px;border-top:1px solid var(--app-line);padding-top:18px;">
+    <div class="app-eyebrow" style="margin-bottom:10px;">Manager controls</div>
+    <form method="post" action="{% url 'orgs:election_close_time' org.id %}" style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+      {% csrf_token %}
+      <div class="fld" style="margin:0;">
+        <label for="closeAt">Voting ends automatically at</label>
+        <input type="datetime-local" id="closeAt" name="scheduled_close_at" class="election-when" value="{% if vote.scheduled_close_at %}{{ vote.scheduled_close_at|date:'Y-m-d\TH:i' }}{% endif %}">
+      </div>
+      <button type="submit" class="abtn abtn-ghost abtn-sm">Save end time</button>
+      {% if vote.scheduled_close_at %}<button type="submit" class="abtn abtn-ghost abtn-sm" onclick="document.getElementById('closeAt').value='';">Remove</button>{% endif %}
+    </form>
+    <form method="post" action="{% url 'orgs:close_charity_vote' org.id %}" onsubmit="return confirm('Close the vote and lock in the winner?')">
+      {% csrf_token %}
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span class="app-sub" style="margin:0;">Closing reveals the result and locks the charity.</span>
+        <button type="submit" class="abtn abtn-dark">Close the vote now</button>
+      </div>
+    </form>
+  </div>
   {% endif %}
 </div>
 
 {% else %}
-<div style="max-width:640px;">
+<div style="max-width:860px;">
   <div class="card pad-lg" style="text-align:center;margin-bottom:16px;"><div class="app-eyebrow">Winning charity</div><h2 class="app-h1" style="color:var(--forest);margin-top:6px;">{{ vote.winning_charity.name|default:"—" }}</h2><p class="app-sub" style="margin-top:4px;">Vote closed {{ vote.closed_at|date:"j M Y" }}</p></div>
+
+  {% if stats %}
+  <div class="vz-grid">
+    {# 1 — how the vote fell, charity by charity #}
+    <div class="card vz-card vz-span">
+      <div class="vz-h">How the vote fell</div>
+      <div class="vz-bars">
+        {% for opt in results %}
+        <div class="vz-row">
+          <span class="vz-lab">{{ opt.charity.name }}{% if opt.charity_id == vote.winning_charity_id %} <span class="pill-role" style="margin-left:6px;">Winner</span>{% endif %}</span>
+          <span class="vz-track"><i class="{% if opt.charity_id == vote.winning_charity_id %}win{% endif %}" style="width:{{ opt.bar }}%"></i></span>
+          <span class="vz-num">{{ opt.n }} <small>({{ opt.pct }}%)</small></span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# 2 — turnout: who showed up out of everyone eligible #}
+    <div class="card vz-card">
+      <div class="vz-h">Turnout</div>
+      <div class="vz-donut" style="--deg:{{ stats.turnout_deg }}deg;"><b>{{ stats.turnout_pct }}%</b></div>
+      <p class="vz-cap">{{ stats.ballots }} of {{ stats.eligible }} eligible member{{ stats.eligible|pluralize }} voted &middot; {{ stats.abstained }} didn't</p>
+    </div>
+
+    {# 3 — how convincing the win was #}
+    <div class="card vz-card">
+      <div class="vz-h">Winning share</div>
+      <div class="vz-donut" style="--deg:{{ stats.winner_deg }}deg;"><b>{{ stats.winner_share }}%</b></div>
+      <p class="vz-cap">{{ vote.winning_charity.name|default:"The winner" }} took {{ stats.winner_share }}% of ballots cast</p>
+    </div>
+
+    {# 4 — when the votes landed #}
+    <div class="card vz-card vz-span">
+      <div class="vz-h">When the votes landed</div>
+      <div class="vz-days">
+        {% for d in stats.timeline %}
+        <div class="vz-day"><span class="vz-daybar"><span class="vz-count">{{ d.n }}</span><i style="height:{{ d.h }}%"></i></span><small>{{ d.day|date:"j M" }}</small></div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% else %}
   {% for opt in results %}
   <div class="vote-card {% if opt.charity_id == vote.winning_charity_id %}win{% endif %}" style="margin-bottom:10px;">
     <div style="display:flex;justify-content:space-between;align-items:center;"><span class="oc-title">{{ opt.charity.name }}{% if opt.charity_id == vote.winning_charity_id %} &middot; Winner{% endif %}</span><b class="num">{{ opt.n }}</b></div>
   </div>
   {% endfor %}
+  {% endif %}
 </div>
 {% endif %}
 {% endblock %}

@@ -1,5 +1,6 @@
 {% extends "public/base.html" %}
 {% load static %}
+{% load humanize %}
 
 {% block title %}The Wall — GoodTip{% endblock %}
 {% block loader_task %}Loading the Wall{% endblock %}
@@ -8,18 +9,35 @@
 
 {% block content %}
 
-<!-- SPLIT HERO -->
-<section class="hero-split">
+{% comment %}
+Split hero: the live cards sit on the green, top-aligned, so the imagery on
+the right is never covered. Cards swap every 2s.
+{% endcomment %}
+<section class="hero-split wall-hero">
   <div class="hs-left">
-    <span class="pill" style="align-self:flex-start;margin-bottom:24px;"><span class="dot"></span>New for 2026</span>
+    <span class="pill" style="align-self:flex-start;margin-bottom:14px;"><span class="dot"></span>New for 2026</span>
     <h1>The Wall. <em>Where the group lives.</em></h1>
-    <p class="hero-sub">The banter is half the reason people tip. Now it has a home &mdash; tips, sledges, the ladder shuffle, and the charity total ticking up, all in one feed your group actually checks.</p>
+
+    <div class="wall-rotor">
+      <div class="wr-stack" data-rotor data-interval="2000" aria-live="polite">
+        {% if has_live_posts %}
+          {% for post in rotator_posts %}
+          <div class="wr-slot{% if forloop.first %} on{% endif %}">{% include "public/partials/_wall_card.html" with post=post compact=1 %}</div>
+          {% endfor %}
+        {% else %}
+          {% include "public/partials/_wall_samples.html" with compact=1 %}
+        {% endif %}
+      </div>
+      <div class="wr-dots" data-rotor-dots aria-hidden="true"></div>
+    </div>
+
     <div class="hero-ctas" style="justify-content:flex-start;">
       <a href="/#start" class="btn-primary">Start a comp &rarr;</a>
-      <a href="/how-it-works/" class="btn-ghost">How it works</a>
+      <a href="#feed" class="btn-ghost">Read the feed</a>
     </div>
   </div>
-  <div class="hs-right">
+
+  <div class="hs-right wall-shot-side">
     <div class="hero-bg" aria-hidden="true">
       <div class="shot active" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
       <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-panorama.jpg' %}')"></div>
@@ -30,119 +48,78 @@
   </div>
 </section>
 
-<!-- LIVE WALL DEMO -->
-<section class="section wall-stage" aria-label="The Wall">
+<!-- THE WIDE FEED -->
+<section class="section wall-stage" id="feed" aria-label="The Wall">
   <div class="wrap">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:22px;position:relative;">
-      <h2 class="section-heading" style="margin:0;font-size:clamp(22px,3vw,30px);">Mid-season. Round 14. <em>The room's awake.</em></h2>
+    <div class="wall-feed-head">
+      <div>
+        <p class="eyebrow" style="color:var(--lime);opacity:.85;">The public Wall</p>
+        <h2 class="section-heading" style="margin:0;font-size:clamp(22px,3vw,32px);">Every room, one feed. <em>Jump in.</em></h2>
+      </div>
       <span class="live-dot">Live feed</span>
     </div>
-    <div class="wall-shell">
 
-      <!-- Left rail: ladder snapshot -->
-      <aside class="wall-side">
-        <div class="wall-card">
-          <h4>Group ladder &middot; R14</h4>
-          <div class="mini-row"><span class="r">1</span><span class="n">Sharon (Accounts)</span><span class="p">128</span></div>
-          <div class="mini-row"><span class="r">2</span><span class="n">Big Dave</span><span class="p">124</span></div>
-          <div class="mini-row"><span class="r">3</span><span class="n">The Quiet One</span><span class="p">119</span></div>
-          <div class="mini-row"><span class="r">4</span><span class="n">Mardi &amp; Mailroom</span><span class="p">112</span></div>
-          <div class="mini-row"><span class="r">5</span><span class="n">You</span><span class="p">108</span></div>
-        </div>
-        <div class="wall-card">
-          <h4>This round</h4>
-          <p class="note" style="color:var(--cream);opacity:.7;">Tips lock <b style="color:var(--lime);">Thu 7:50pm</b>. State of Origin pick worth <b style="color:var(--lime);">4 pts</b> this week.</p>
-        </div>
-      </aside>
+    {% if messages %}
+    <div class="wall-flash-stack">
+      {% for m in messages %}<div class="wall-flash {% if m.tags == 'error' %}bad{% endif %}">{{ m }}</div>{% endfor %}
+    </div>
+    {% endif %}
 
-      <!-- Center: feed -->
-      <div class="wall-feed" id="wall-feed">
+    {% if has_live_posts %}
+    <div class="wallfeed">
+      {% for post in posts %}
+      <div class="wf-item">
+        {% include "public/partials/_wall_card.html" with post=post %}
 
-        <div class="composer">
-          <span class="av">YO</span>
-          <div class="grow">
-            <textarea rows="2" placeholder="Lock your tip, talk it up, or sledge responsibly&hellip;" aria-label="Write a post"></textarea>
-            <div class="composer-actions">
-              <span class="hint">Be a good sport. Banter, not bile.</span>
-              <button class="btn-primary" style="padding:9px 18px;font-size:13px;" type="button">Post</button>
+        {% if post.thread %}
+        <div class="wf-thread">
+          {% for r in post.thread %}
+          <div class="wf-reply">
+            <span class="wf-rav{% if r.is_guest %} guest{% endif %}">{{ r.initials }}</span>
+            <div>
+              <b>{{ r.display_name }}{% if r.is_guest %} <i class="wf-guest">visitor</i>{% endif %}</b>
+              <small>{{ r.created_at|naturaltime }}</small>
+              <p>{{ r.body|linebreaksbr }}</p>
             </div>
           </div>
+          {% endfor %}
         </div>
+        {% endif %}
 
-        <article class="post">
-          <div class="post-head">
-            <span class="av">BD</span>
-            <span class="meta"><b>Big Dave</b><small>Round 14 &middot; 2h ago</small></span>
-            <span class="tag">Top tipper</span>
+        <form method="post" action="{% url 'public_wall_reply' post.id %}" class="wf-replybox">
+          {% csrf_token %}
+          {% if not post.can_reply_direct %}
+          <div class="wf-guestfields">
+            {% if user.is_authenticated %}
+              <p class="wf-note">Replying as <b>{{ user.display_name }}</b> &mdash; you're not in this group, so it goes up once we've checked it.</p>
+            {% else %}
+              <input type="text" name="guest_name" placeholder="Your name" maxlength="80" autocomplete="name">
+              <input type="email" name="guest_email" placeholder="you@work.com.au" maxlength="254" required autocomplete="email">
+            {% endif %}
           </div>
-          <p class="post-body">Backing the <span class="pick">&#9733; Pies</span> by 30+. If I'm wrong I'll match the room's top-ups myself. Screenshot this.</p>
-          <div class="post-foot">
-            <span class="react" data-on="false">&#128293; <span class="c">14</span></span>
-            <span class="react" data-on="false">&#128514; <span class="c">8</span></span>
-            <span class="react" data-on="false">Reply</span>
+          {# Honeypot — hidden from people, catnip for bots. #}
+          <div class="wf-hp" aria-hidden="true"><label>Website<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+          {% endif %}
+          <div class="wf-replyrow">
+            <textarea name="body" rows="1" maxlength="500" placeholder="{% if post.can_reply_direct %}Reply in your group's thread&hellip;{% else %}Say something back&hellip;{% endif %}" aria-label="Reply to {{ post.author.display_name }}" required></textarea>
+            <button type="submit" class="btn-primary">Reply</button>
           </div>
-        </article>
-
-        <article class="post">
-          <div class="post-head">
-            <span class="av" style="background:rgba(200,241,53,.15);">GT</span>
-            <span class="meta"><b>GoodTip</b><small>Auto &middot; Round 13 close</small></span>
-            <span class="tag sys">Tally</span>
-          </div>
-          <p class="post-body">Round 13 locked. The room added <strong style="color:var(--lime);">$220</strong> in top-ups &mdash; the company match made it <strong style="color:var(--lime);">$440</strong>. <b>headspace</b> season total now <strong style="color:var(--lime);">$8,420</strong>.</p>
-          <div class="post-foot">
-            <span class="react" data-on="true">&#10084; <span class="c">31</span></span>
-            <span class="react" data-on="false">&#127881; <span class="c">12</span></span>
-          </div>
-        </article>
-
-        <article class="post">
-          <div class="post-head">
-            <span class="av">SH</span>
-            <span class="meta"><b>Sharon (Accounts)</b><small>Round 14 &middot; 4h ago</small></span>
-            <span class="tag">No. 1</span>
-          </div>
-          <p class="post-body">Top of the ladder and chucking in <span class="pick">+$20</span> because Dave's about to find out. Cause &gt; cup, lads.</p>
-          <div class="post-foot">
-            <span class="react" data-on="false">&#128293; <span class="c">22</span></span>
-            <span class="react" data-on="false">&#128170; <span class="c">9</span></span>
-            <span class="react" data-on="false">Reply</span>
-          </div>
-        </article>
-
-        <article class="post">
-          <div class="post-head">
-            <span class="av" style="background:rgba(200,241,53,.15);">GT</span>
-            <span class="meta"><b>GoodTip</b><small>Auto &middot; Ladder update</small></span>
-            <span class="tag sys">Ladder</span>
-          </div>
-          <p class="post-body"><b>The Quiet One in Legal</b> just jumped to <strong style="color:var(--lime);">3rd</strong>. Three correct tips on the bounce. Watch your back, Dave.</p>
-          <div class="post-foot">
-            <span class="react" data-on="false">&#128064; <span class="c">17</span></span>
-            <span class="react" data-on="false">&#128514; <span class="c">11</span></span>
-          </div>
-        </article>
-
+          {% if not post.can_reply_direct %}
+          <p class="wf-fine">Replies from outside the group go up after a quick check. We only use your email to contact you about the reply.</p>
+          {% endif %}
+        </form>
       </div>
-
-      <!-- Right rail: live tally -->
-      <aside class="wall-side">
-        <div class="wall-tally">
-          <p class="eyebrow" style="color:var(--lime);opacity:.8;">Raised this season</p>
-          <div class="tally-num" data-countto="8420" data-prefix="$">$0</div>
-          <p class="tally-cap">For headspace &middot; voted by the group in March.</p>
-          <div class="tally-bar"><i data-pct="68"></i></div>
-          <div class="tally-meta"><span>68%</span><span>Goal $12,500</span></div>
-        </div>
-        <div class="wall-card">
-          <h4>Top givers</h4>
-          <div class="mini-row"><span class="r">&#129351;</span><span class="n">Sharon</span><span class="p">$140</span></div>
-          <div class="mini-row"><span class="r">&#129352;</span><span class="n">Big Dave</span><span class="p">$110</span></div>
-          <div class="mini-row"><span class="r">&#129353;</span><span class="n">Priya</span><span class="p">$85</span></div>
-        </div>
-      </aside>
-
+      {% endfor %}
     </div>
+    {% else %}
+    <div class="wall-preview-note">
+      <b>Nobody's shared a post publicly yet.</b>
+      <span>Members choose, post by post, whether their banter goes beyond the group. Here's what it looks like when they do.</span>
+    </div>
+    <div class="wallfeed is-preview">
+      {% include "public/partials/_wall_samples.html" %}
+    </div>
+    {% endif %}
   </div>
 </section>
 
@@ -151,22 +128,21 @@
   <div class="wrap">
     <p class="eyebrow reveal">Why it matters</p>
     <h2 class="section-heading reveal">Engagement is the whole game. <em>The Wall is how you win it.</em></h2>
-    <p class="section-sub reveal">Tipping comps live or die on whether people come back each round. The leaderboard gives them a reason; the Wall gives them a place. It's the one thing the big incumbents never bothered to build.</p>
     <div class="grid-3 reveal">
       <div class="for-card">
         <span class="for-tag">Stickiness</span>
         <h3>A reason to open it on a Tuesday.</h3>
-        <p>Round results, ladder moves, and the charity tally land in the feed automatically. The group has something to react to every day of the week, not just on game day.</p>
+        <p>Every correct tip, every ladder jump, every bit of sledging lands on the Wall in real time. Something to react to all week, not just on game day.</p>
       </div>
       <div class="for-card">
-        <span class="for-tag">Giving, visible</span>
-        <h3>Generosity is contagious when it's seen.</h3>
-        <p>Every top-up and every company match posts to the Wall in real time. When people watch the total climb &mdash; and see who's chipping in &mdash; they give more. Quietly, the average donation rises.</p>
+        <span class="for-tag">Private by default</span>
+        <h3>Your room stays your room.</h3>
+        <p>A post is group-only unless the person who wrote it shares it, and their group has to be listed publicly too. Two switches, both theirs, both reversible.</p>
       </div>
       <div class="for-card">
         <span class="for-tag">Culture</span>
         <h3>The banter your team already has.</h3>
-        <p>It was happening in group chats and corridors anyway. The Wall just puts it where the comp is &mdash; moderated, on-brand, and pointed at a good cause instead of a prize pool.</p>
+        <p>It was happening in group chats and corridors anyway. The Wall just puts it where the comp is.</p>
       </div>
     </div>
   </div>
@@ -189,4 +165,57 @@
   </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+/* Hero rotator — one post at a time, swapping on a timer. Pauses on hover
+   and for anyone who asked for reduced motion. */
+(function(){
+  var stack = document.querySelector('[data-rotor]');
+  if (!stack) return;
+  var slots = Array.prototype.slice.call(stack.children);
+  if (!slots.length) return;
+  slots.forEach(function(s, i){ s.classList.add('wr-slot'); if (i === 0) s.classList.add('on'); });
+
+  var dots = document.querySelector('[data-rotor-dots]');
+  if (dots && slots.length > 1) {
+    slots.forEach(function(_, i){
+      var d = document.createElement('span');
+      d.className = 'wr-dot' + (i === 0 ? ' on' : '');
+      d.addEventListener('click', function(){ go(i); });
+      dots.appendChild(d);
+    });
+  }
+
+  var i = 0, timer = null;
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var wait = parseInt(stack.getAttribute('data-interval'), 10) || 3000;
+
+  function go(n){
+    slots[i].classList.remove('on');
+    slots[i].classList.add('out');
+    var prev = slots[i];
+    setTimeout(function(){ prev.classList.remove('out'); }, 600);
+    i = (n + slots.length) % slots.length;
+    slots[i].classList.add('on');
+    if (dots) {
+      Array.prototype.forEach.call(dots.children, function(d, k){ d.classList.toggle('on', k === i); });
+    }
+  }
+  function start(){ if (!reduce && slots.length > 1 && !timer) timer = setInterval(function(){ go(i + 1); }, wait); }
+  function stop(){ if (timer) { clearInterval(timer); timer = null; } }
+
+  stack.addEventListener('mouseenter', stop);
+  stack.addEventListener('mouseleave', start);
+  document.addEventListener('visibilitychange', function(){ document.hidden ? stop() : start(); });
+  start();
+})();
+
+/* Reply boxes grow with what you type. */
+document.querySelectorAll('.wf-replyrow textarea').forEach(function(t){
+  t.addEventListener('input', function(){
+    t.style.height = 'auto';
+    t.style.height = Math.min(t.scrollHeight, 160) + 'px';
+  });
+});
 {% endblock %}

@@ -3,27 +3,124 @@
 {% block title %}My tips — {{ org.name }}{% endblock %}
 {% block loader_task %}Fetching your tips{% endblock %}
 {% block nav_tips %}on{% endblock %}
+{% block body_class %}gt-sheet{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+
 {% block app_content %}
-<div class="app-head">
-  <div><div class="app-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div><h1 class="app-h1">My tips</h1></div>
-  <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
-    <div class="stat-card" style="padding:12px 18px;"><div class="s-lab">Season points</div><div class="s-num" style="font-size:26px;">{{ points }}</div></div>
-    {% if rounds %}
-    <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:13px;color:var(--muted);">Round</span>
-      <div class="dd" data-dd>
-        <button type="button" class="dd-btn"><span class="dd-val">{% if selected_round %}Round {{ selected_round.round_number }}{% else %}&mdash;{% endif %}</span><svg class="dd-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
-        <div class="dd-menu" role="listbox">
-          {% for r in rounds %}<button type="button" class="dd-opt {% if selected_round and r.id == selected_round.id %}on{% endif %}" data-val="{{ r.id }}">Round {{ r.round_number }}</button>{% endfor %}
-        </div>
-        <select class="dd-native" name="round" hx-get="{% url 'tipping:my_tips' org.id %}" hx-target="#tipslist" hx-swap="outerHTML" hx-trigger="change">
-          {% for r in rounds %}<option value="{{ r.id }}" {% if selected_round and r.id == selected_round.id %}selected{% endif %}>Round {{ r.round_number }}</option>{% endfor %}
-        </select>
-      </div>
-    </div>
-    {% endif %}
+
+<div class="gt-head">
+  <div>
+    <div class="gh-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div>
+    <h1>My tips</h1>
+    <p class="gh-lead">Make your picks, earn points, support a cause.</p>
   </div>
+  {% if selected_round %}
+  <div class="gh-actions">
+    <div class="gt-rounder">
+      <a href="?round={{ prev_round.id }}" class="rnd-btn {% if not prev_round %}off{% endif %}" aria-label="Previous round"><svg><use href="#ic-chev-left"/></svg></a>
+      <div>
+        <div class="rnd-now">
+          <b>Round {{ selected_round.round_number }}</b>
+          <small>of {{ round_total }}</small>
+        </div>
+        <div class="rnd-when"><svg><use href="#ic-clock"/></svg> Locks {{ selected_round.lockout_at|date:"j M, g:i A" }}</div>
+      </div>
+      <a href="?round={{ next_round.id }}" class="rnd-btn solid {% if not next_round %}off{% endif %}" aria-label="Next round"><svg><use href="#ic-arrow-right"/></svg></a>
+    </div>
+  </div>
+  {% endif %}
 </div>
 
-{% include "partials/my_tips_round.html" with round=selected_round rows=rows %}
-<p class="app-sub" style="margin-top:14px;">Pending matches grade automatically when results land.</p>
+<div class="gt-shell">
+  <div>
+    <div class="gt-strip">
+      <div class="gsp">
+        <span class="gsp-ic"><svg><use href="#ic-trophy"/></svg></span>
+        <div>
+          <div class="gsp-lab">Season points</div>
+          <div class="gsp-num">{{ points }}</div>
+          <div class="gsp-sub">{% if points %}Banked so far{% else %}Keep tipping!{% endif %}</div>
+        </div>
+      </div>
+      <div class="gsp">
+        <span class="gsp-ic"><svg><use href="#ic-doc"/></svg></span>
+        <div>
+          <div class="gsp-lab">Tips made</div>
+          <div class="gsp-num">{{ tips_this_round }} / {{ total_matches }}</div>
+          <div class="gsp-sub">This round</div>
+        </div>
+      </div>
+      <div class="gsp">
+        <span class="gsp-ic"><svg><use href="#ic-target"/></svg></span>
+        <div>
+          <div class="gsp-lab">Completion</div>
+          <div class="gsp-num">{{ round_pct }}%</div>
+          <div class="gsp-sub">{% if round_pct == 100 %}All done{% elif round_pct >= 75 %}Almost there!{% else %}Round in progress{% endif %}</div>
+        </div>
+      </div>
+    </div>
+
+    {% include "partials/my_tips_round.html" with round=selected_round rows=rows %}
+
+    <div class="gt-note">
+      <svg><use href="#ic-shield-check"/></svg>
+      Pending matches grade automatically when results land.
+    </div>
+  </div>
+
+  <aside class="gt-side">
+    <section class="gt-scard">
+      <div class="gsc-head"><svg><use href="#ic-trophy"/></svg><span>Your season</span></div>
+      <div class="gt-rankrow">
+        <div class="rk">
+          <small>Rank</small>
+          <b>{% if rank %}{{ rank }}{% else %}&mdash;{% endif %}</b>
+          <i>of {{ total_tippers }}</i>
+        </div>
+        <span class="shield"><svg><use href="#ic-shield-star"/></svg></span>
+        <div class="rk r">
+          <small>Percentile</small>
+          <b>{% if percentile %}{{ percentile }}%{% else %}&mdash;{% endif %}</b>
+          <i>of the field</i>
+        </div>
+      </div>
+      {% if percentile %}
+      <p class="gsc-note">{% if percentile >= 75 %}Top of the table stuff — keep it going.{% elif percentile >= 40 %}Right in the mix. A good round moves you up.{% else %}Plenty of season left to climb.{% endif %}</p>
+      <div class="pbar sm"><i style="width:{{ percentile }}%"></i></div>
+      {% endif %}
+    </section>
+
+    <section class="gt-scard">
+      <div class="gsc-head"><svg><use href="#ic-heart"/></svg><span>Your cause</span></div>
+      <div class="gt-cause">
+        <span class="gcz-ic"><svg><use href="#ic-heart"/></svg></span>
+        <div>
+          <b>{{ org.charity_display }}</b>
+          <small>{% if donation.raised %}${{ donation.raised|floatformat:0 }} raised so far{% else %}Make every tip count.{% endif %}</small>
+        </div>
+      </div>
+      <a href="{% url 'billing:topup' org.id %}" class="gt-pill" style="width:100%;justify-content:center;margin-top:16px;">Add to the cause <svg><use href="#ic-arrow-right"/></svg></a>
+    </section>
+
+    {% if selected_round %}
+    <section class="gt-scard">
+      <div class="gsc-head"><svg><use href="#ic-calendar"/></svg><span>Round summary</span></div>
+      <div class="gsc-row"><span>Total matches</span><b>{{ total_matches }}</b></div>
+      <div class="gsc-row"><span>Tips submitted</span><b>{{ tips_this_round }}</b></div>
+      <div class="gsc-row"><span>Remaining</span><b {% if tips_remaining %}class="lime"{% endif %}>{{ tips_remaining }}</b></div>
+      {% if selected_round.is_locked %}
+        <div class="gsc-row"><span>Locked</span><b>{{ selected_round.lockout_at|date:"j M, g:i A" }}</b></div>
+      {% else %}
+        <div class="gsc-row"><span>Locks in</span><b class="lime">{{ selected_round.lockout_at|timeuntil }}</b></div>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    <section class="gt-quote">
+      <span class="qm">&ldquo;</span>
+      <p>Good tips. Good cause.<br>Great impact.</p>
+      <svg class="swoosh" viewBox="0 0 110 8"><path d="M2 6C25 2 85 2 108 5"/></svg>
+    </section>
+  </aside>
+</div>
 {% endblock %}

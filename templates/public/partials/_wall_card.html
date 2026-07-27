@@ -1,0 +1,29 @@
+{% load humanize %}
+{% comment %}
+One shared post card. Used by the hero rotator and the wide feed, so a post
+looks the same wherever it lands. `compact` is the bigger hero treatment.
+{% endcomment %}
+<article class="wr-card{% if compact %} is-compact{% endif %}" {% if not compact %}id="post-{{ post.id }}"{% endif %}>
+  <div class="wr-top">
+    <span class="wr-av">{% if post.author.avatar %}<img src="{{ post.author.avatar.url }}" alt="">{% else %}{{ post.author.display_name|slice:":2"|upper }}{% endif %}</span>
+    <span class="wr-who">
+      <b>{{ post.author.display_name }}</b>
+      <small><svg class="wr-gic"><use href="#ic-users"/></svg> {{ post.org.name }}{% if post.org.category_label %} &middot; {{ post.org.category_label }}{% endif %}</small>
+    </span>
+    <span class="wr-when">{{ post.created_at|naturaltime }}</span>
+  </div>
+
+  {% if post.tip %}
+  <span class="wr-pick">&#9733; {% if post.tip.selection == 'home' %}{{ post.tip.match.home_team.name }}{% else %}{{ post.tip.match.away_team.name }}{% endif %}
+    to beat {% if post.tip.selection == 'home' %}{{ post.tip.match.away_team.name }}{% else %}{{ post.tip.match.home_team.name }}{% endif %}{% if post.tip.is_correct is not None %}
+    &middot; {% if post.tip.is_correct %}<b class="hit">got it &#10003;</b>{% else %}<b class="miss">didn't land</b>{% endif %}{% endif %}</span>
+  {% endif %}
+
+  <p class="wr-body">{{ post.body|linebreaksbr }}</p>
+
+  <div class="wr-foot">
+    {% if post.reaction_total %}<span class="wr-chip">&#128293; {{ post.reaction_total }}</span>{% endif %}
+    {% if post.reply_count %}<span class="wr-chip">&#128172; {{ post.reply_count }}</span>{% endif %}
+    <span class="wr-chip ghost">{{ post.org.sport_label }} {{ post.org.season }}</span>
+  </div>
+</article>

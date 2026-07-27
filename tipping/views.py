@@ -5,9 +5,13 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from billing.donations import donation_summary
 from orgs.models import OrgMember, Organisation
 from .models import Match, Round, Tip
-from .services import leaderboard_for_family, leaderboard_for_org, submit_tip, user_org_stats
+from .services import (
+    leaderboard_for_family, leaderboard_for_org, submit_tip, user_org_stats,
+    user_rank_in_org,
+)
 
 
 def _require_member(user, org):
@@ -132,9 +136,37 @@ def my_tips_view(request, org_id: int):
         return render(request, "partials/my_tips_round.html", {
             "org": org, "round": selected_round, "rows": tip_rows,
         })
+
+    # ---- sidebar: where this member sits, and what's left to do this round.
+    # `rounds` is newest-first, so "previous round" is the next item along.
+    prev_round = next_round = None
+    if selected_round:
+        idx = rounds.index(selected_round)
+        prev_round = rounds[idx + 1] if idx + 1 < len(rounds) else None
+        next_round = rounds[idx - 1] if idx > 0 else None
+
+    total_matches = len(tip_rows)
+    tips_this_round = sum(1 for r in tip_rows if r["tip"])
+    board = list(leaderboard_for_org(org).values("id", "points"))
+    total_tippers = len(board)
+    rank = user_rank_in_org(request.user, org)
+    # Percentile = share of the field this member is ahead of or level with.
+    percentile = None
+    if rank and total_tippers:
+        percentile = round((total_tippers - rank + 1) / total_tippers * 100)
+
     return render(request, "my_tips.html", {
         "org": org, "rounds": rounds, "selected_round": selected_round,
         "rows": tip_rows, "points": stats["points"],
+        "prev_round": prev_round, "next_round": next_round,
+        "round_position": len(rounds) - rounds.index(selected_round) if selected_round else 0,
+        "round_total": len(rounds),
+        "total_matches": total_matches,
+        "tips_this_round": tips_this_round,
+        "tips_remaining": total_matches - tips_this_round,
+        "round_pct": round(tips_this_round / total_matches * 100) if total_matches else 0,
+        "rank": rank, "total_tippers": total_tippers, "percentile": percentile,
+        "donation": donation_summary(org),
     })
 
 
@@ -176,8 +208,19 @@ def leaderboard_view(request, org_id: int):
         return render(request, "partials/leaderboard_table.html", {
             "ranked": ranked, "me": request.user,
         })
+    # ---- sidebar summary. "Perfect scores" counts tippers who got every
+    # graded tip right in the view being shown, so it tracks the round filter.
+    perfect = sum(
+        1 for r in ranked if r["tips_total"] and r["tips_correct"] == r["tips_total"]
+    )
+    current_round = rounds.first()
     return render(request, "leaderboard.html", {
         "org": org, "rounds": rounds, "selected_round_id": selected_round_id or "all",
         "ranked": ranked, "me": request.user,
         "scope": scope, "is_family": is_family,
+        "total_tippers": len(ranked),
+        "perfect_scores": perfect,
+        "total_rounds": rounds.count(),
+        "current_round": current_round,
+        "donation": donation_summary(org),
     })

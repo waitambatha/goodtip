@@ -15,7 +15,7 @@
   {% if vote.status == "scheduled" and vote.scheduled_open_at %}
   <div class="card pad-lg" style="margin-bottom:16px;border-color:var(--forest);">
     <div class="card-h">Currently scheduled</div>
-    <p class="card-lead">The election opens <b>{{ vote.scheduled_open_at|date:"l j F Y, g:i A" }}</b>. Members will be notified then. Rescheduling below replaces this time.</p>
+    <p class="card-lead">The election opens <b>{{ vote.scheduled_open_at|date:"l j F Y, g:i A" }}</b>{% if vote.scheduled_close_at %} and closes <b>{{ vote.scheduled_close_at|date:"l j F Y, g:i A" }}</b>{% endif %}. Members will be notified then. Rescheduling below replaces this time.</p>
   </div>
   {% endif %}
 
@@ -44,6 +44,12 @@
       <button type="button" class="abtn abtn-ghost abtn-sm" data-preset="today19">Tonight 7 PM</button>
       <button type="button" class="abtn abtn-ghost abtn-sm" data-preset="tomorrow9">Tomorrow 9 AM</button>
       <button type="button" class="abtn abtn-ghost abtn-sm" data-preset="monday9">Monday 9 AM</button>
+    </div>
+
+    <div class="fld" style="margin:18px 0 8px;">
+      <label for="closeAt">When should voting end? <span style="font-weight:400;color:var(--muted);">(optional — it closes and reveals results automatically; you can always end it manually)</span></label>
+      <input type="datetime-local" id="closeAt" name="scheduled_close_at" class="election-when"
+             value="{% if vote.scheduled_close_at %}{{ vote.scheduled_close_at|date:'Y-m-d\TH:i' }}{% endif %}">
     </div>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:22px;align-items:center;">

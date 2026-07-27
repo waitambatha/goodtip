@@ -1,0 +1,12 @@
+<div class="gwp-reacts" id="reacts-{{ post.id }}">
+  {% for r in bar %}
+  <button type="button" class="gwp-react {% if r.mine %}on{% endif %}"
+          hx-post="{% url 'orgs:wall_react' org.id post.id %}"
+          hx-vals='{"emoji": "{{ r.emoji }}"}'
+          hx-target="#reacts-{{ post.id }}" hx-swap="outerHTML"
+          aria-pressed="{{ r.mine|yesno:'true,false' }}"
+          aria-label="React {{ r.glyph }}">
+    {{ r.glyph }}{% if r.count %}<span class="c">{{ r.count }}</span>{% endif %}
+  </button>
+  {% endfor %}
+</div>

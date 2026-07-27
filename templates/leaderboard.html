@@ -3,47 +3,114 @@
 {% block title %}Leaderboard — {{ org.name }}{% endblock %}
 {% block loader_task %}Loading the leaderboard{% endblock %}
 {% block nav_board %}on{% endblock %}
+{% block body_class %}gt-sheet{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+
 {% block app_content %}
-<div class="app-head">
-  <div><div class="app-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div><h1 class="app-h1">Leaderboard</h1></div>
-  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-    <a href="{% url 'billing:topup' org.id %}" class="abtn abtn-ghost abtn-sm"><svg class="cic" style="width:15px;height:15px;stroke:currentColor;"><use href="#ic-heart"/></svg> Add to the cause</a>
-    <span style="font-size:13px;color:var(--muted);">Round</span>
-    <div class="dd" data-dd>
-      <button type="button" class="dd-btn"><span class="dd-val">{% if selected_round_id == 'all' %}All rounds{% else %}{% for r in rounds %}{% if selected_round_id == r.id|stringformat:'s' %}Round {{ r.round_number }}{% endif %}{% endfor %}{% endif %}</span><svg class="dd-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
-      <div class="dd-menu" role="listbox">
-        <button type="button" class="dd-opt {% if selected_round_id == 'all' %}on{% endif %}" data-val="all">All rounds</button>
-        {% for r in rounds %}<button type="button" class="dd-opt {% if selected_round_id == r.id|stringformat:'s' %}on{% endif %}" data-val="{{ r.id }}">Round {{ r.round_number }}</button>{% endfor %}
-      </div>
-      <select class="dd-native" name="round" hx-get="{% url 'tipping:leaderboard' org.id %}?scope={{ scope }}" hx-target="#lbtable" hx-swap="outerHTML" hx-trigger="change">
-        <option value="all" {% if selected_round_id == 'all' %}selected{% endif %}>All rounds</option>
-        {% for r in rounds %}<option value="{{ r.id }}" {% if selected_round_id == r.id|stringformat:'s' %}selected{% endif %}>Round {{ r.round_number }}</option>{% endfor %}
-      </select>
-    </div>
+
+<div class="gt-head">
+  <div>
+    <div class="gh-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div>
+    <h1>Leaderboard</h1>
+    <p class="gh-lead">Compete. Climb. Make an impact.</p>
+  </div>
+  <div class="gh-actions">
+    <a href="{% url 'billing:topup' org.id %}" class="gt-pill"><svg><use href="#ic-heart"/></svg> Add to the cause</a>
+    <span class="lbl">Round</span>
+    <select name="round" class="gt-select"
+            hx-get="{% url 'tipping:leaderboard' org.id %}?scope={{ scope }}"
+            hx-target="#lbtable" hx-swap="outerHTML" hx-trigger="change">
+      <option value="all" {% if selected_round_id == 'all' %}selected{% endif %}>All rounds</option>
+      {% for r in rounds %}<option value="{{ r.id }}" {% if selected_round_id == r.id|stringformat:'s' %}selected{% endif %}>Round {{ r.round_number }}</option>{% endfor %}
+    </select>
   </div>
 </div>
 
 {% if is_family %}
-<!-- §8: same competition, two views — local standings and the national board -->
-<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
-  <a href="?scope=local" class="abtn abtn-sm {% if scope == 'local' %}abtn-dark{% else %}abtn-ghost{% endif %}">{{ org.name }}</a>
-  <a href="?scope=national" class="abtn abtn-sm {% if scope == 'national' %}abtn-dark{% else %}abtn-ghost{% endif %}">National &middot; {{ org.root.name }}</a>
+{# §8: same competition, two views — local standings and the national board #}
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+  <a href="?scope=local" class="gt-pill {% if scope == 'local' %}solid{% endif %}">{{ org.name }}</a>
+  <a href="?scope=national" class="gt-pill {% if scope == 'national' %}solid{% endif %}">National &middot; {{ org.root.name }}</a>
 </div>
-{% if scope == 'national' %}<p class="app-sub" style="margin:-6px 0 18px;">Every tipper across {{ org.root.name }} and all its groups, ranked together.</p>{% endif %}
+{% if scope == 'national' %}<p class="gh-lead" style="margin:-10px 0 20px;">Every tipper across {{ org.root.name }} and all its groups, ranked together.</p>{% endif %}
 {% endif %}
 
 {% if ranked %}
-<div class="podium" style="margin-bottom:24px;">
+<div class="gt-podium">
   {% with a=ranked.0 b=ranked.1 c=ranked.2 %}
-  {% if b %}<div class="pod second"><div class="medal">2</div><div class="pod-name">{{ b.user.display_name }}</div><div class="pod-meta">{{ b.points }} pts</div><span class="pod-chip">{{ b.tips_correct }}/{{ b.tips_total }} correct</span></div>{% endif %}
-  {% if a %}<div class="pod first"><span class="crown"><svg class="cic"><use href="#ic-trophy"/></svg></span><div class="medal">1</div><div class="pod-name">{{ a.user.display_name }}</div><div class="pod-meta">{{ a.points }} pts</div><span class="pod-chip">{{ a.tips_correct }}/{{ a.tips_total }} correct</span></div>{% endif %}
-  {% if c %}<div class="pod third"><div class="medal">3</div><div class="pod-name">{{ c.user.display_name }}</div><div class="pod-meta">{{ c.points }} pts</div><span class="pod-chip">{{ c.tips_correct }}/{{ c.tips_total }} correct</span></div>{% endif %}
+  {% if b %}
+  <div class="gt-pod p2">
+    <div class="gp-avwrap">
+      <span class="gp-av">{% if b.user.avatar %}<img src="{{ b.user.avatar.url }}" alt="">{% else %}{{ b.user.display_name|slice:":1"|upper }}{% endif %}</span>
+      <span class="gp-rank">2</span>
+    </div>
+    <div class="gp-name">{{ b.user.display_name }}</div>
+    <div class="gp-pts">{{ b.points }}<small>pts</small></div>
+    <span class="gp-chip">{{ b.tips_correct }}/{{ b.tips_total }} correct</span>
+  </div>
+  {% else %}<div></div>{% endif %}
+  {% if a %}
+  <div class="gt-pod p1">
+    <span class="crown"><svg><use href="#ic-trophy"/></svg></span>
+    <div class="gp-avwrap">
+      <span class="gp-av">{% if a.user.avatar %}<img src="{{ a.user.avatar.url }}" alt="">{% else %}{{ a.user.display_name|slice:":1"|upper }}{% endif %}</span>
+      <span class="gp-rank">1</span>
+    </div>
+    <div class="gp-name">{{ a.user.display_name }}</div>
+    <div class="gp-pts">{{ a.points }}<small>pts</small></div>
+    <span class="gp-chip">{{ a.tips_correct }}/{{ a.tips_total }} correct</span>
+  </div>
+  {% endif %}
+  {% if c %}
+  <div class="gt-pod p3">
+    <div class="gp-avwrap">
+      <span class="gp-av">{% if c.user.avatar %}<img src="{{ c.user.avatar.url }}" alt="">{% else %}{{ c.user.display_name|slice:":1"|upper }}{% endif %}</span>
+      <span class="gp-rank">3</span>
+    </div>
+    <div class="gp-name">{{ c.user.display_name }}</div>
+    <div class="gp-pts">{{ c.points }}<small>pts</small></div>
+    <span class="gp-chip">{{ c.tips_correct }}/{{ c.tips_total }} correct</span>
+  </div>
+  {% else %}<div></div>{% endif %}
   {% endwith %}
 </div>
 {% endif %}
 
-<div style="overflow-x:auto;">
-{% include "partials/leaderboard_table.html" with ranked=ranked me=request.user %}
+<div class="gt-shell">
+  <div>
+    {% include "partials/leaderboard_table.html" with ranked=ranked me=request.user %}
+    <div class="gt-note">
+      <svg><use href="#ic-shield-check"/></svg>
+      Ties share a rank. Correct counts tips right out of graded tips this {% if selected_round_id == 'all' %}season{% else %}round{% endif %}.
+    </div>
+  </div>
+
+  <aside class="gt-side">
+    <section class="gt-scard dark">
+      <div class="gsc-head"><svg><use href="#ic-chart"/></svg><span>Leaderboard summary</span></div>
+      <div class="gsc-row"><span>Total tippers</span><b>{{ total_tippers }}</b></div>
+      <div class="gsc-row"><span>Perfect scores</span><b>{{ perfect_scores }}</b></div>
+      <div class="gsc-row"><span>Total rounds</span><b>{{ total_rounds }}</b></div>
+      {% if current_round %}<div class="gsc-row"><span>Latest round</span><b>{{ current_round.round_number }}</b></div>{% endif %}
+    </section>
+
+    <section class="gt-scard">
+      <div class="gsc-head"><svg><use href="#ic-heart"/></svg><span>Your impact</span></div>
+      <div class="gt-cause">
+        <span class="gcz-ic"><svg><use href="#ic-heart"/></svg></span>
+        <div>
+          <b>{{ org.charity_display }}</b>
+          <small>{% if donation.raised %}${{ donation.raised|floatformat:0 }} raised so far{% else %}Every tip makes a difference.{% endif %}</small>
+        </div>
+      </div>
+      <a href="{% url 'billing:topup' org.id %}" class="gt-pill" style="width:100%;justify-content:center;margin-top:16px;">Add to the cause <svg><use href="#ic-arrow-right"/></svg></a>
+    </section>
+
+    <section class="gt-quote">
+      <span class="qm">&ldquo;</span>
+      <p>Great tips. Greater cause. Game on.</p>
+      <svg class="swoosh" viewBox="0 0 110 8"><path d="M2 6C25 2 85 2 108 5"/></svg>
+    </section>
+  </aside>
 </div>
-<p class="app-sub" style="margin-top:14px;">Ties share a rank. Correct = tips right / graded tips this {% if selected_round_id == 'all' %}season{% else %}round{% endif %}.</p>
 {% endblock %}

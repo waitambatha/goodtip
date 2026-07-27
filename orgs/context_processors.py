@@ -38,4 +38,7 @@ def user_orgs(request):
         "my_notifications": notes,
         "unread_notification_count": unread,
         "popup_notification": popup,
+        # Watermark for the live poll: the page only toasts things that
+        # arrive after it was rendered.
+        "latest_notification_id": notes[0].id if notes else 0,
     }

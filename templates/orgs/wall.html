@@ -1,0 +1,263 @@
+{% extends "app_base.html" %}
+{% load humanize %}
+{% load static %}
+{% block title %}The Wall — {{ org.name }}{% endblock %}
+{% block loader_task %}Opening the Wall{% endblock %}
+{% block nav_wall %}on{% endblock %}
+{% block body_class %}gt-sheet{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+
+{% block app_content %}
+
+{% comment %}
+Hero split: what the wider GoodTip room is saying on one side, the imagery on
+the other. No composer here — posting is a button in the group header.
+{% endcomment %}
+<section class="gwall-hero">
+  <div class="gwh-feed">
+    <div class="gwh-top">
+      <span class="gwh-eyebrow"><span class="live-dot">Across GoodTip</span></span>
+      <a href="{% url 'wall' %}" class="gwh-link">Public Wall &rarr;</a>
+    </div>
+    {% if global_posts %}
+    <div class="gwh-stack" data-rotor data-interval="2000" aria-live="polite">
+      {% for p in global_posts %}
+      <div class="gwh-slot{% if forloop.first %} on{% endif %}">{% include "public/partials/_wall_card.html" with post=p compact=1 %}</div>
+      {% endfor %}
+    </div>
+    <div class="gwh-dots" data-rotor-dots aria-hidden="true"></div>
+    {% else %}
+    <div class="gwh-quiet">
+      <h2>Nothing shared yet.</h2>
+      <p>When members tick <b>share publicly</b> on a post, it lands here for every other room to see.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="gwh-shots" aria-hidden="true">
+    <div class="shot on" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-panorama.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
+    <div class="gwh-veil"></div>
+  </div>
+</section>
+
+{# ---- your group's room: the messages from your own members ---- #}
+<div class="gt-head gwall-head">
+  <div>
+    <div class="gh-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div>
+    <h1>Your group</h1>
+    <p class="gh-lead">What your members are saying this round. Only {{ org.name }} sees this.</p>
+  </div>
+  <div class="gh-actions">
+    <span class="gt-pill" title="Only members of {{ org.name }} can see this feed"><svg><use href="#ic-users"/></svg> Group only</span>
+    <button type="button" class="gt-pill gt-pill-go" data-composer-open>
+      <svg><use href="#ic-send"/></svg> Write a post
+    </button>
+  </div>
+</div>
+
+{% if posts %}
+<div class="gt-feed">
+  {% for p in posts %}
+  <article class="gt-post {% if p.kind == 'recap' %}is-recap{% elif p.kind == 'system' %}is-system{% endif %}" id="post-{{ p.id }}">
+    <div class="gpt-head">
+      {% if p.kind == 'member' and p.author %}
+        <span class="gpt-av">{% if p.author.avatar %}<img src="{{ p.author.avatar.url }}" alt="">{% else %}{{ p.author.display_name|slice:":2"|upper }}{% endif %}</span>
+        <span class="gpt-meta"><b>{{ p.author.display_name }}</b><small>{{ p.created_at|naturaltime }}</small></span>
+        {% if p.is_public %}<span class="gpt-tag pub" title="This post is on the public Wall too"><svg><use href="#ic-globe"/></svg> Public</span>{% endif %}
+      {% else %}
+        <span class="gpt-av sys">GT</span>
+        <span class="gpt-meta"><b>GoodTip</b><small>{{ p.created_at|naturaltime }}</small></span>
+        {% if p.kind == 'recap' %}<span class="gpt-tag">Round recap</span>{% else %}<span class="gpt-tag">Update</span>{% endif %}
+      {% endif %}
+      {% if p.can_remove %}{# admins can also hide a recap/system card — recap spec §11 #}
+      <form method="post" action="{% url 'orgs:wall_remove' org.id p.id %}" class="gpt-x" onsubmit="return confirm('Remove this post?');">
+        {% csrf_token %}<button type="submit" title="{% if p.author_id == user.id %}Delete post{% else %}Hide post (admin){% endif %}">&times;</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if p.tip %}
+    <span class="gpt-pick">&#9733; {% if p.tip.selection == 'home' %}{{ p.tip.match.home_team.name }}{% else %}{{ p.tip.match.away_team.name }}{% endif %} to beat {% if p.tip.selection == 'home' %}{{ p.tip.match.away_team.name }}{% else %}{{ p.tip.match.home_team.name }}{% endif %}{% if p.tip.is_correct is not None %} &middot; {% if p.tip.is_correct %}<b class="hit">got it &#10003;</b>{% else %}<b class="miss">didn't land</b>{% endif %}{% endif %}</span>
+    {% endif %}
+    {% if p.body %}<p class="gpt-body">{{ p.body|linebreaksbr }}</p>{% endif %}
+    {% include "partials/wall_reactions.html" with post=p bar=p.reaction_bar %}
+
+    {% if p.thread %}
+    <div class="gpt-thread">
+      {% for r in p.thread %}
+      <div class="gpt-reply">
+        <span class="gpr-av{% if r.is_guest %} guest{% endif %}">{{ r.initials }}</span>
+        <div class="gpr-body">
+          <b>{{ r.display_name }}{% if r.is_guest %} <i>visitor</i>{% endif %}</b>
+          <small>{{ r.created_at|naturaltime }}</small>
+          <p>{{ r.body|linebreaksbr }}</p>
+        </div>
+        {% if r.can_remove %}
+        <form method="post" action="{% url 'orgs:wall_reply_remove' org.id r.id %}" class="gpr-x" onsubmit="return confirm('Remove this reply?');">
+          {% csrf_token %}<button type="submit" title="Remove reply">&times;</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'orgs:wall_reply' org.id p.id %}" class="gpt-replybox">
+      {% csrf_token %}
+      <span class="gpr-av mine">{% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{{ user.display_name|slice:":2"|upper }}{% endif %}</span>
+      <textarea name="body" rows="1" maxlength="500" placeholder="Reply&hellip;" aria-label="Reply to {% if p.author %}{{ p.author.display_name }}{% else %}GoodTip{% endif %}" required data-grow></textarea>
+      <button type="submit" class="abtn abtn-dark abtn-sm">Reply</button>
+    </form>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="gt-empty" style="margin-top:20px;">
+  <span class="ge-ic"><svg><use href="#ic-msg"/></svg></span>
+  <div>
+    <h3>Quiet in here.</h3>
+    <p>Nobody's posted yet. First tip talk wins the room — and once rounds are graded, the round recap lands up top automatically.</p>
+  </div>
+</div>
+{% endif %}
+
+{# ---- the composer, in a modal. Same form as before, it just arrives with a flourish. ---- #}
+<div class="gwall-modal" id="composerModal" role="dialog" aria-modal="true" aria-label="Write a post" hidden>
+  <div class="gwm-scrim" data-composer-close></div>
+  <form method="post" action="{% url 'orgs:wall_post' org.id %}" class="gt-dark gt-composer gwm-panel">
+    {% csrf_token %}
+    <button type="button" class="gwm-x" aria-label="Close" data-composer-close>&times;</button>
+    <div class="gcm-main">
+      <span class="gcm-av">{% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{{ user.display_name|slice:":2"|upper }}{% endif %}</span>
+      <div class="gcm-body">
+        <h3>Your turn.</h3>
+        <p class="gcm-lead">Lock your tip, talk it up, or throw a little shade.</p>
+        <textarea name="body" maxlength="500" placeholder="Lock your tip, talk it up, or sledge&hellip;" aria-label="Write a post" data-count></textarea>
+        <div class="gcm-count"><span data-count-out>0</span>/500</div>
+        <div class="gcm-pick">
+          <span>Attach a pick <i>(optional)</i></span>
+          <select name="tip">
+            <option value="">No pick</option>
+            {% for t in my_tips %}
+            <option value="{{ t.id }}">{% if t.selection == 'home' %}{{ t.match.home_team.name }}{% else %}{{ t.match.away_team.name }}{% endif %} &mdash; v {% if t.selection == 'home' %}{{ t.match.away_team.name }}{% else %}{{ t.match.home_team.name }}{% endif %}</option>
+            {% empty %}
+            <option value="" disabled>Tip this round and your picks appear here</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {# Sharing wide is a per-post choice, off every time. #}
+        <div class="gcm-share">
+          {% if can_share_public %}
+          <label class="gcm-switch">
+            <input type="checkbox" name="share_public" value="1">
+            <span class="gcm-track"><i></i></span>
+            <span class="gcm-slabel"><b>Also show this on the public Wall</b><small>Your name, your group's name and this post go on goodtip.com.au/wall. Off by default; you can delete it any time.</small></span>
+          </label>
+          {% else %}
+          <p class="gcm-locked"><svg><use href="#ic-lock"/></svg> This post stays inside {{ org.name }}. Sharing to the public Wall opens up once your manager lists the group publicly.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="gcm-side">
+      <div class="gcm-rule">
+        <svg><use href="#ic-shield"/></svg>
+        <div><b>Be respectful</b><p>Keep it fun for everyone.</p></div>
+      </div>
+      <div class="gcm-rule">
+        <svg><use href="#ic-msg"/></svg>
+        <div><b>No spam</b><p>One post at a time.</p></div>
+      </div>
+      <div class="gcm-rule">
+        <svg><use href="#ic-lock"/></svg>
+        <div><b>Your group only</b><p>Unless you tick the box, what's said here stays here.</p></div>
+      </div>
+      <div class="gcm-post">
+        <button type="submit">Post <svg><use href="#ic-send"/></svg></button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block app_js %}
+/* live character count on the composer */
+var ta = document.querySelector('[data-count]');
+var out = document.querySelector('[data-count-out]');
+if (ta && out) { ta.addEventListener('input', function(){ out.textContent = ta.value.length; }); }
+
+/* the composer modal — opens on the trigger, closes on scrim / × / Escape */
+(function(){
+  var modal = document.getElementById('composerModal');
+  if (!modal) return;
+  function open(){
+    modal.hidden = false;
+    document.body.classList.add('gwm-open');
+    requestAnimationFrame(function(){ modal.classList.add('in'); });
+    setTimeout(function(){ if (ta) ta.focus(); }, 260);
+  }
+  function close(){
+    modal.classList.remove('in');
+    document.body.classList.remove('gwm-open');
+    setTimeout(function(){ modal.hidden = true; }, 320);
+  }
+  document.querySelectorAll('[data-composer-open]').forEach(function(b){ b.addEventListener('click', open); });
+  document.querySelectorAll('[data-composer-close]').forEach(function(b){ b.addEventListener('click', close); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !modal.hidden) close(); });
+})();
+
+/* hero rotator — the cross-group posts, one card at a time */
+(function(){
+  var stack = document.querySelector('[data-rotor]');
+  if (!stack) return;
+  var slots = Array.prototype.slice.call(stack.children);
+  if (slots.length < 2) return;
+  var dots = document.querySelector('[data-rotor-dots]');
+  if (dots) {
+    slots.forEach(function(_, n){
+      var d = document.createElement('span');
+      d.className = 'gwh-dot' + (n === 0 ? ' on' : '');
+      d.addEventListener('click', function(){ go(n); });
+      dots.appendChild(d);
+    });
+  }
+  var i = 0, timer = null;
+  var wait = parseInt(stack.getAttribute('data-interval'), 10) || 3000;
+  function go(n){
+    var prev = slots[i];
+    prev.classList.remove('on'); prev.classList.add('out');
+    setTimeout(function(){ prev.classList.remove('out'); }, 600);
+    i = (n + slots.length) % slots.length;
+    slots[i].classList.add('on');
+    if (dots) Array.prototype.forEach.call(dots.children, function(d, k){ d.classList.toggle('on', k === i); });
+  }
+  function start(){ if (!reduce && !timer) timer = setInterval(function(){ go(i + 1); }, wait); }
+  function stop(){ if (timer) { clearInterval(timer); timer = null; } }
+  stack.addEventListener('mouseenter', stop);
+  stack.addEventListener('mouseleave', start);
+  document.addEventListener('visibilitychange', function(){ document.hidden ? stop() : start(); });
+  start();
+
+  /* the imagery beside it crossfades on its own, slower */
+  var shots = document.querySelectorAll('.gwh-shots .shot');
+  if (shots.length > 1 && !reduce) {
+    var s = 0;
+    setInterval(function(){
+      shots[s].classList.remove('on');
+      s = (s + 1) % shots.length;
+      shots[s].classList.add('on');
+    }, 6000);
+  }
+})();
+
+/* reply boxes grow with what you type */
+document.querySelectorAll('[data-grow]').forEach(function(t){
+  t.addEventListener('input', function(){
+    t.style.height = 'auto';
+    t.style.height = Math.min(t.scrollHeight, 150) + 'px';
+  });
+});
+{% endblock %}

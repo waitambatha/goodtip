@@ -9,11 +9,17 @@
 
 <!-- HERO (full crossfading image) -->
 <section class="hero has-shots">
-  <div class="hero-bg" aria-hidden="true">
-    <div class="shot active" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
-    <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
-    <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
-    <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-posts-sunset.jpg' %}')"></div>
+  <div class="hero-bg collage" aria-hidden="true">
+    <div class="pane">
+      <div class="shot active" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-panorama.jpg' %}')"></div>
+    </div>
+    <div class="pane">
+      <div class="shot active" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-posts-sunset.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/afl-posts-mcg.jpg' %}')"></div>
+    </div>
   </div>
   <div class="hero-veil" aria-hidden="true"></div>
   <span class="pill"><span class="dot"></span>Finals start August 28 &middot; Are you in?</span>
@@ -130,7 +136,9 @@
 
 <!-- IMAGE BAND (players) -->
 <section class="image-band">
+  <div class="shot active" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')" aria-hidden="true"></div>
   <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')" aria-hidden="true"></div>
+  <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')" aria-hidden="true"></div>
   <div class="veil" aria-hidden="true"></div>
   <div class="wrap reveal from-left">
     <p class="eyebrow" style="color:var(--lime);">Women's sport included, always</p>
@@ -150,17 +158,23 @@
   <div class="wrap">
     <p class="eyebrow reveal">New for 2026 &middot; The Wall</p>
     <h2 class="section-heading reveal">The banter is half the reason people tip. <em>Now it has a home.</em></h2>
-    <p class="section-sub reveal">Every round, the Wall is where the group lives: tips, sledges, the leaderboard shuffle, and the charity total ticking up in real time. It's the bit ESPN FootyTips never built &mdash; and the reason your group keeps showing up.</p>
+    <p class="section-sub reveal rotate-lines" data-rotate-lines aria-live="polite">
+      <span class="rline on">Every round, the Wall is where the group lives: tips, sledges, and the leaderboard shuffle, in real time.</span>
+      <span class="rline">Big Dave just backed the Pies by 30+ and told the whole room to screenshot it. That's the Wall.</span>
+      <span class="rline">Monday's ladder screenshot posts itself now &mdash; and the room does the rest.</span>
+      <span class="rline">The quiet one in Legal tipped 12 from 12 and said nothing. The Wall said it for them.</span>
+      <span class="rline">It's the bit ESPN FootyTips never built &mdash; and the reason your group keeps showing up every round.</span>
+    </p>
     <div class="reveal" style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;max-width:920px;">
       <div class="post" style="margin-top:0;">
         <div class="post-head"><span class="av">BD</span><span class="meta"><b>Big Dave</b><small>Round 14 &middot; 2h ago</small></span><span class="tag">Top tipper</span></div>
-        <p class="post-body">Backing the <span class="pick">&#9733; Pies</span> by 30+. If I'm wrong I'll match the room's top-ups myself.</p>
+        <p class="post-body">Backing the <span class="pick">&#9733; Pies</span> by 30+. Screenshot this if I'm wrong.</p>
         <div class="post-foot"><span class="react" data-on="false">&#128293; <span class="c">14</span></span><span class="react" data-on="false">&#128514; <span class="c">8</span></span><span class="react" data-on="false">Reply</span></div>
       </div>
       <div class="post" style="margin-top:0;">
-        <div class="post-head"><span class="av" style="background:rgba(200,241,53,.15);">GT</span><span class="meta"><b>GoodTip</b><small>Auto &middot; Round 14 close</small></span><span class="tag sys">Tally</span></div>
-        <p class="post-body">Round 14 locked. The room added <strong style="color:var(--lime);">$220</strong> in top-ups &mdash; the company match made it <strong style="color:var(--lime);">$440</strong>. headspace total now <strong style="color:var(--lime);">$8,420</strong>.</p>
-        <div class="post-foot"><span class="react" data-on="true">&#10084; <span class="c">31</span></span><span class="react" data-on="false">&#127881; <span class="c">12</span></span></div>
+        <div class="post-head"><span class="av" style="background:rgba(200,241,53,.15);">GT</span><span class="meta"><b>GoodTip</b><small>Auto &middot; Round 14 close</small></span><span class="tag sys">Ladder</span></div>
+        <p class="post-body">Round 14 locked. <b style="color:#fff;">The Quiet One in Legal</b> went 9 from 9 and jumped to <strong style="color:var(--lime);">3rd</strong>. Three on the bounce. Watch your back, Dave.</p>
+        <div class="post-foot"><span class="react" data-on="true">&#128064; <span class="c">31</span></span><span class="react" data-on="false">&#127881; <span class="c">12</span></span></div>
       </div>
     </div>
     <p class="mt-m reveal"><a href="/wall/" class="btn-ghost">See the Wall &rarr;</a></p>

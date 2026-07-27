@@ -1,31 +1,107 @@
 {% extends "admin_base.html" %}
+{% load static %}
 {% block title %}Orgs — Manage{% endblock %}
 {% block nav_orgs %}on{% endblock %}
+{% block hero_title %}Manage Organisations{% endblock %}
+{% block hero_lead %}Build. Organise. Grow your tipping community.{% endblock %}
+{% block hero_shot %}{% static 'img/scenes/mcg-stadium.jpg' %}{% endblock %}
 {% block admin_content %}
-<h1 class="admin-h1" style="margin-bottom:18px;">Organisations</h1>
-<div class="grid-app" style="grid-template-columns:1.4fr 1fr;gap:20px;align-items:start;">
-  <div class="card"><div class="card-h" style="margin-bottom:10px;">All orgs</div>
-    <table class="atable compact"><thead><tr><th>Org</th><th>Sport</th><th style="text-align:right;">Links</th></tr></thead><tbody>
-    {% for o in orgs %}
-      <tr><td><b>{{ o.name }}</b><br><small style="color:var(--muted);">{{ o.charity_name }} &middot; {{ o.season }}</small></td><td>{{ o.sport_label }}</td><td style="text-align:right;"><a href="{% url 'manage:org_rounds' o.id %}" class="flink" style="color:var(--forest);">Rounds</a> &middot; <a href="{% url 'manage:org_members' o.id %}" class="flink" style="color:var(--forest);">Members</a></td></tr>
-    {% empty %}
-      <tr><td colspan="3" style="text-align:center;color:var(--muted);">No orgs yet.</td></tr>
-    {% endfor %}
-    </tbody></table>
-  </div>
-  <div class="mini-form">
-    <div class="card-h" style="margin-bottom:14px;">Create org</div>
-    <form method="post" action="{% url 'manage:orgs_list' %}">
-      {% csrf_token %}
-      <div class="fld"><label for="ao_name">Org name</label><input type="text" name="name" id="ao_name" required placeholder="Organisation name"></div>
-      <div class="fld"><label for="ao_season">Season</label><input type="number" name="season" id="ao_season" required value="2026" placeholder="2026"></div>
-      <div class="fld"><label for="ao_cname">Charity name</label><input type="text" name="charity_name" id="ao_cname" required placeholder="Lifeline"></div>
-      <div class="fld"><label for="ao_curl">Charity URL <span style="color:var(--muted);font-weight:400;">(optional)</span></label><input type="url" name="charity_url" id="ao_curl" placeholder="https://"></div>
-      <div class="fld"><label for="ao_sport">Sport</label>
-        <select name="sport" id="ao_sport"><option value="AFL">AFL</option><option value="NRL">NRL</option><option value="BOTH">Both</option></select>
+
+<div class="gt-shell gt-shell-wide">
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-org"/></svg></span>
+      <div>
+        <h2>All organisations</h2>
+        <div class="gp-sub">{{ orgs|length }} organisation{{ orgs|length|pluralize }}{% if q or sport %} matching{% endif %}</div>
       </div>
-      <button type="submit" class="abtn abtn-primary abtn-block">Create org</button>
-    </form>
+      <form class="gp-right" method="get" action="{% url 'manage:orgs_list' %}">
+        <span class="gt-search">
+          <svg><use href="#ic-search"/></svg>
+          <input type="search" name="q" value="{{ q }}" placeholder="Search organisations&hellip;" aria-label="Search organisations">
+        </span>
+        <select name="sport" class="gt-select" onchange="this.form.submit()" aria-label="Filter by sport">
+          <option value="">All sports</option>
+          {% for s in sports %}<option value="{{ s }}" {% if s == sport %}selected{% endif %}>{{ s }}</option>{% endfor %}
+        </select>
+        <noscript><button type="submit" class="gt-pill">Filter</button></noscript>
+      </form>
+    </div>
+
+    <div class="gt-tablewrap">
+      <table class="gt-table gt-t-orgs">
+        <thead><tr><th>Org</th><th>Sport</th><th class="fit">Links</th></tr></thead>
+        <tbody>
+        {% for o in orgs %}
+          <tr>
+            <td>
+              <span class="gt-namecell">
+                <span class="gt-rowic"><svg><use href="#ic-org"/></svg></span>
+                <span>
+                  <span class="gt-nameline">
+                    <b>{{ o.name }}</b>
+                    {% if o.active_charity_vote %}<span class="gt-chip needs">Vote open</span>
+                    {% elif o.charity_id %}<span class="gt-chip ready">Active</span>
+                    {% else %}<span class="gt-chip draft">Setup</span>{% endif %}
+                  </span>
+                  <small>{% if o.charity_id %}{{ o.charity.name }} &middot; {% endif %}{{ o.season }}</small>
+                </span>
+              </span>
+            </td>
+            <td><span class="gt-with-ic"><svg><use href="#ic-flag"/></svg>{{ o.sport_label|default:"—" }}</span></td>
+            <td class="fit">
+              <span class="gt-linkstack">
+                <a href="{% url 'manage:org_rounds' o.id %}">Rounds <svg><use href="#ic-arrow"/></svg></a>
+                <a href="{% url 'manage:org_members' o.id %}">Members <svg><use href="#ic-arrow"/></svg></a>
+              </span>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" class="gt-empty">{% if q or sport %}Nothing matches that search. <a href="{% url 'manage:orgs_list' %}" style="color:var(--forest);font-weight:700;">Clear filters</a>{% else %}No orgs yet — create your first one with the form beside this list.{% endif %}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <aside>
+    <section class="gt-panel gt-form">
+      <div class="gt-panel-head">
+        <span class="gp-ic"><svg><use href="#ic-org-add"/></svg></span>
+        <div>
+          <h2>Create organisation</h2>
+          <div class="gp-sub">Set up a new organisation and start tipping.</div>
+        </div>
+      </div>
+      <form method="post" action="{% url 'manage:orgs_list' %}">
+        {% csrf_token %}
+        <div class="gf-fld"><label for="ao_name">Organisation name</label><input type="text" name="name" id="ao_name" required placeholder="Organisation name"></div>
+        <div class="gf-fld"><label for="ao_season">Season</label><input type="number" name="season" id="ao_season" required value="2026" placeholder="2026"></div>
+        <div class="gf-fld"><label for="ao_cname">Charity name</label><input type="text" name="charity_name" id="ao_cname" required placeholder="Charity name"></div>
+        <div class="gf-fld"><label for="ao_curl">Charity URL <i>(optional)</i></label>
+          <span class="gf-with"><svg><use href="#ic-link"/></svg><input type="url" name="charity_url" id="ao_curl" placeholder="https://"></span>
+        </div>
+        <div class="gf-fld"><label for="ao_sport">Sport</label>
+          <select name="sport" id="ao_sport"><option value="AFL">AFL</option><option value="NRL">NRL</option><option value="BOTH">Both</option></select>
+        </div>
+        <button type="submit" class="gt-go-btn">Create organisation <svg><use href="#ic-arrow-right"/></svg></button>
+      </form>
+    </section>
+  </aside>
+</div>
+
+<div class="gt-trust">
+  <div class="gtr">
+    <span class="gtr-ic"><svg><use href="#ic-shield"/></svg></span>
+    <div><b>Secure &amp; private</b><p>Member data stays inside the organisation that collected it.</p></div>
+  </div>
+  <div class="gtr">
+    <span class="gtr-ic"><svg><use href="#ic-people"/></svg></span>
+    <div><b>Member management</b><p>Invite members, set permissions, and manage access.</p></div>
+  </div>
+  <div class="gtr">
+    <span class="gtr-ic"><svg><use href="#ic-trend"/></svg></span>
+    <div><b>Track &amp; grow</b><p>Watch rounds, tips and the charity total climb together.</p></div>
   </div>
 </div>
 {% endblock %}

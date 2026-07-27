@@ -1,24 +1,50 @@
 {% load team_extras %}
-<div id="tipslist" style="overflow-x:auto;">
+{# One card per fixture: both clubs, the two pick buttons, then the state. #}
+<div id="tipslist" class="gt-fixtures">
 {% if not round %}
-  <div class="card pad-lg" style="text-align:center;"><div class="card-h">Pick a round</div><p class="card-lead">Choose a round above to see your tips.</p></div>
+  <div class="gt-empty">
+    <span class="ge-ic"><svg><use href="#ic-calendar"/></svg></span>
+    <div>
+      <h3>Pick a round</h3>
+      <p>Choose a round above to see your tips for it.</p>
+    </div>
+  </div>
 {% else %}
-<table class="atable tips-table">
-  <thead><tr><th>Match</th><th>Your pick</th><th>Result</th><th class="num">Outcome</th></tr></thead>
-  <tbody>
   {% for r in rows %}
-    {% with m=r.match t=r.tip %}
-    <tr>
-      <td>{% team_cell m.home_team %}<span class="vs-mini">v</span>{% team_cell m.away_team %}</td>
-      <td>{% include "partials/tip_pick_cell.html" with org=org match=m selection=t.selection editable=r.editable %}</td>
-      <td>{% if m.has_result %}{% if m.result == 'home' %}{{ m.home_team.name }}{% elif m.result == 'away' %}{{ m.away_team.name }}{% else %}Draw{% endif %} &middot; {{ m.home_score }}&ndash;{{ m.away_score }}{% else %}&mdash;{% endif %}</td>
-      <td style="text-align:right;">{% if t.is_correct is True %}<span class="res correct">Correct</span>{% elif t.is_correct is False %}<span class="res incorrect">Missed</span>{% else %}<span class="res pending">Pending</span>{% endif %}</td>
-    </tr>
-    {% endwith %}
+  {% with m=r.match t=r.tip %}
+  <article class="gt-fix {% if t.is_correct is True %}correct{% elif t.is_correct is False %}missed{% elif t %}tipped{% endif %}">
+    <div class="gfx-teams">
+      {% team_cell m.home_team %}
+      <span class="gfx-vs">vs</span>
+      {% team_cell m.away_team %}
+    </div>
+
+    <div class="gfx-pick">
+      {% include "partials/tip_pick_cell.html" with org=org match=m selection=t.selection editable=r.editable %}
+      <span class="gfx-when">
+        <svg><use href="#ic-clock"/></svg>
+        {{ m.kickoff_at|date:"D j M, g:i A" }}{% if m.venue %} &middot; {{ m.venue }}{% endif %}
+      </span>
+    </div>
+
+    <div class="gfx-state">
+      {% if m.has_result %}
+        <span class="gfx-score">{{ m.home_score }}&ndash;{{ m.away_score }}</span>
+      {% endif %}
+      {% if t.is_correct is True %}<span class="res correct">Correct</span>
+      {% elif t.is_correct is False %}<span class="res incorrect">Missed</span>
+      {% else %}<span class="res pending">Pending</span>{% endif %}
+    </div>
+  </article>
+  {% endwith %}
   {% empty %}
-    <tr><td colspan="4" style="text-align:center;color:var(--muted);">No matches in this round yet.</td></tr>
+  <div class="gt-empty">
+    <span class="ge-ic"><svg><use href="#ic-calendar"/></svg></span>
+    <div>
+      <h3>No matches yet</h3>
+      <p>Round {{ round.round_number }} has no fixtures loaded. They'll appear here as soon as your admin syncs them.</p>
+    </div>
+  </div>
   {% endfor %}
-  </tbody>
-</table>
 {% endif %}
 </div>

@@ -17,10 +17,17 @@ def derive_result(home_score: int | None, away_score: int | None) -> str | None:
 
 @transaction.atomic
 def record_match_result(match: Match, home_score: int, away_score: int) -> int:
+    had_result = match.result is not None
     match.home_score = home_score
     match.away_score = away_score
     match.result = derive_result(home_score, away_score)
     match.save(update_fields=["home_score", "away_score", "result"])
+    if had_result:
+        # A correction after grading: any recap already posted for this round
+        # is flagged for admin review, never silently rewritten (recap spec §3).
+        from orgs.models import RoundRecap
+
+        RoundRecap.objects.filter(round=match.round).update(needs_review=True)
     return _recalculate_tips_for_match(match)
 
 

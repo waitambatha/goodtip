@@ -7,7 +7,7 @@
 <h1>Create your account</h1>
 <p class="sub">One account, every comp you're invited to.</p>
 {% if form.non_field_errors %}<div class="flash error" style="margin-bottom:16px;"><span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
-<form method="post" action="{% url 'accounts:signup' %}" novalidate>
+<form method="post" action="{% url 'accounts:signup' %}{% if request.GET.next %}?next={{ request.GET.next|urlencode }}{% endif %}" novalidate>
   {% csrf_token %}
   <div class="fld">
     <div class="fld-labelrow"><label for="id_display_name">Display name</label><button type="button" class="gen-btn" id="genName"><svg class="cic" style="width:12px;height:12px;stroke:currentColor;fill:none;"><use href="#ic-spark"/></svg> Suggest one</button></div>
