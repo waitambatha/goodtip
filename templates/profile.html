@@ -50,6 +50,27 @@
       <button type="submit" class="abtn abtn-primary">Change password</button>
     </form>
   </div>
+
+  <div class="card pad-lg">
+    <div class="card-h" style="margin-bottom:6px;">Two-step verification</div>
+    <p class="card-lead" style="margin:0 0 16px;font-size:14px;">
+      When this is on we email you a 6-digit code each time you sign in, so a
+      stolen password isn't enough on its own.
+    </p>
+    <form method="post" action="{% url 'profile' %}">
+      {% csrf_token %}
+      <label class="tog-row">
+        <input type="checkbox" name="two_factor_enabled" class="tog-input"
+               {% if user.two_factor_enabled %}checked{% endif %}>
+        <span class="tog-track" aria-hidden="true"><span class="tog-knob"></span></span>
+        <span class="tog-text">
+          <b>Ask for a code when I sign in</b>
+          <span>{% if user.two_factor_enabled %}On — codes go to {{ user.email }}{% else %}Off — your password alone signs you in{% endif %}</span>
+        </span>
+      </label>
+      <button type="submit" name="two_factor" value="1" class="abtn abtn-primary" style="margin-top:16px;">Save</button>
+    </form>
+  </div>
 </div>
 
 <div class="card pad-lg">

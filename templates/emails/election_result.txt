@@ -1,0 +1,16 @@
+G'day {{ user.display_name }},
+
+Voting has closed. {{ org.name }} is raising for:
+
+  {{ winner.name }}
+
+{% if results %}HOW IT FINISHED
+{% for row in results %}- {{ row.charity.name }}: {{ row.votes }} vote{{ row.votes|pluralize }}{% if row.is_winner %}  (winner){% endif %}
+{% endfor %}{% endif %}
+From here, every entry fee your group pays goes to {{ winner.name }}.
+Keep tipping — that's all it takes.
+
+Open your dashboard: {{ dashboard_url }}
+
+--
+Footy tipping, for good. · goodtip.com.au

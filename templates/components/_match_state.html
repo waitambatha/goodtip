@@ -1,0 +1,35 @@
+{% comment %}
+Match state, betting-board style. Expects `match`.
+
+Three shapes, one per phase:
+  live      — pulsing dot, the clock ("Q3 12:45"), and the running score
+  complete  — final score plus when it finished
+  upcoming  — kickoff day/time and how long until it starts
+
+Venue and city come from match.venue_label so the ground shows everywhere the
+fixture does.
+{% endcomment %}
+<div class="ms ms-{{ match.phase }}">
+  {% if match.phase == "live" %}
+    <span class="ms-badge live"><i class="ms-dot"></i>{% if match.live_label %}{{ match.live_label }}{% else %}Live{% endif %}</span>
+    {% if match.score_line %}<span class="ms-score">{{ match.score_line }}</span>{% endif %}
+    {% if match.progress %}<span class="ms-prog" aria-hidden="true"><i style="width:{{ match.progress }}%"></i></span>{% endif %}
+
+  {% elif match.phase == "complete" %}
+    {% if match.score_line %}
+      <span class="ms-score final">{{ match.score_line }}</span>
+      <span class="ms-badge done">{% if match.period %}{{ match.period }}{% else %}Final{% endif %}</span>
+    {% else %}
+      <span class="ms-badge done">Awaiting result</span>
+    {% endif %}
+    <span class="ms-when"><svg><use href="#ic-clock"/></svg>{{ match.kickoff_at|date:"D j M, g:i A" }}</span>
+
+  {% else %}
+    <span class="ms-badge soon"><svg><use href="#ic-clock"/></svg>{{ match.kickoff_at|date:"D j M, g:i A" }}</span>
+    <span class="ms-when">Starts in {{ match.kickoff_at|timeuntil }}</span>
+  {% endif %}
+
+  {% if match.venue_label %}
+    <span class="ms-venue"><svg><use href="#ic-pin"/></svg>{{ match.venue_label }}</span>
+  {% endif %}
+</div>

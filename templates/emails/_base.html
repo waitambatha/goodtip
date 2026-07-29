@@ -1,0 +1,60 @@
+{% comment %}
+Shared layout for every GoodTip email.
+
+Table-based with inline styles on purpose — that is still what Outlook and the
+Gmail app reliably render. Extracted from the original election-open template so
+every message shares one header, footer and set of brand colours; if the brand
+moves, it moves here once.
+
+Blocks a message fills in:
+  eyebrow    small caps line under the wordmark (what this email is)
+  preheader  the grey snippet shown next to the subject in an inbox list
+  content    the body, inside the white card
+  footnote   small print above the footer
+{% endcomment %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}GoodTip{% endblock %}</title>
+</head>
+<body style="margin:0;padding:0;background:#F2EFE6;font-family:Arial,Helvetica,sans-serif;">
+
+  {% comment %}
+  Inbox preview text. Hidden in the body, but it's the second line a reader sees
+  after the subject, so it's worth setting per message.
+  {% endcomment %}
+  <div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+    {% block preheader %}Footy tipping that does good.{% endblock %}
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2EFE6;padding:28px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
+
+        <!-- header -->
+        <tr><td style="background:#0F2E22;border-radius:14px 14px 0 0;padding:26px 32px;text-align:center;">
+          <span style="font-size:26px;font-weight:900;letter-spacing:.5px;color:#ffffff;">GOOD<span style="color:#C8F135;">TIP</span><span style="color:#C8F135;">.</span></span>
+          <div style="color:#C8F135;font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-top:6px;">{% block eyebrow %}Footy tipping, for good{% endblock %}</div>
+        </td></tr>
+
+        <!-- body -->
+        <tr><td style="background:#ffffff;padding:32px;">
+          {% block content %}{% endblock %}
+        </td></tr>
+
+        {% block after_card %}{% endblock %}
+
+        <!-- footer -->
+        <tr><td style="background:#0F2E22;border-radius:0 0 14px 14px;padding:18px 32px;text-align:center;">
+          <div style="color:#F2EFE6;font-size:12px;line-height:1.7;opacity:.85;">
+            {% block footnote %}Footy tipping, for good.{% endblock %} &middot; goodtip.com.au<br>
+            &copy; 2026 GoodTip Pty Ltd &middot; Not affiliated with the AFL or NRL.
+          </div>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

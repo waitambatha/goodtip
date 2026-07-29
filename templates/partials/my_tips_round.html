@@ -1,6 +1,44 @@
 {% load team_extras %}
-{# One card per fixture: both clubs, the two pick buttons, then the state. #}
-<div id="tipslist" class="gt-fixtures">
+{% comment %}
+One card per fixture: both clubs, the two pick buttons, then live/final state.
+
+The filter tabs and the list are both inside this partial so an htmx swap
+replaces them together and the active tab stays in step with what's shown.
+The list scrolls inside .gt-scroll rather than growing the page.
+
+While a game is in play the block re-fetches itself so the clock and score
+move without a reload. The poll is attached ONLY when the round actually has
+a live match — outside a game window there is nothing to refresh, and polling
+every open tab all week would be traffic for an unchanged page. The round and
+state filter ride along in the URL so a swap keeps the tab you're on.
+{% endcomment %}
+<div id="tipslist" class="gt-listwrap"
+     {% if phase_counts.live %}
+     hx-get="{% url 'tipping:my_tips' org.id %}?round={{ round.id }}{% if state != 'all' %}&amp;state={{ state }}{% endif %}"
+     hx-trigger="every 30s"
+     hx-swap="outerHTML"
+     {% endif %}>
+
+{% if round and total_all %}
+  <div class="gt-filters" role="tablist" aria-label="Filter tips by match state">
+    {% url 'tipping:my_tips' org.id as base %}
+    <a role="tab" aria-selected="{% if state == 'all' %}true{% else %}false{% endif %}"
+       class="gt-filter {% if state == 'all' %}on{% endif %}"
+       href="{{ base }}?round={{ round.id }}">All <i>{{ total_all }}</i></a>
+    <a role="tab" aria-selected="{% if state == 'live' %}true{% else %}false{% endif %}"
+       class="gt-filter live {% if state == 'live' %}on{% endif %}"
+       href="{{ base }}?round={{ round.id }}&amp;state=live">
+      {% if phase_counts.live %}<i class="ms-dot"></i>{% endif %}Live <i>{{ phase_counts.live }}</i></a>
+    <a role="tab" aria-selected="{% if state == 'complete' %}true{% else %}false{% endif %}"
+       class="gt-filter {% if state == 'complete' %}on{% endif %}"
+       href="{{ base }}?round={{ round.id }}&amp;state=complete">Completed <i>{{ phase_counts.complete }}</i></a>
+    <a role="tab" aria-selected="{% if state == 'upcoming' %}true{% else %}false{% endif %}"
+       class="gt-filter {% if state == 'upcoming' %}on{% endif %}"
+       href="{{ base }}?round={{ round.id }}&amp;state=upcoming">Not started <i>{{ phase_counts.upcoming }}</i></a>
+  </div>
+{% endif %}
+
+<div class="gt-scroll gt-fixtures" data-scroll-list>
 {% if not round %}
   <div class="gt-empty">
     <span class="ge-ic"><svg><use href="#ic-calendar"/></svg></span>
@@ -12,7 +50,7 @@
 {% else %}
   {% for r in rows %}
   {% with m=r.match t=r.tip %}
-  <article class="gt-fix {% if t.is_correct is True %}correct{% elif t.is_correct is False %}missed{% elif t %}tipped{% endif %}">
+  <article class="gt-fix phase-{{ r.phase }} {% if t.is_correct is True %}correct{% elif t.is_correct is False %}missed{% elif t %}tipped{% endif %}">
     <div class="gfx-teams">
       {% team_cell m.home_team %}
       <span class="gfx-vs">vs</span>
@@ -21,30 +59,40 @@
 
     <div class="gfx-pick">
       {% include "partials/tip_pick_cell.html" with org=org match=m selection=t.selection editable=r.editable %}
-      <span class="gfx-when">
-        <svg><use href="#ic-clock"/></svg>
-        {{ m.kickoff_at|date:"D j M, g:i A" }}{% if m.venue %} &middot; {{ m.venue }}{% endif %}
-      </span>
     </div>
 
     <div class="gfx-state">
-      {% if m.has_result %}
-        <span class="gfx-score">{{ m.home_score }}&ndash;{{ m.away_score }}</span>
+      {% if t %}
+        <span class="gfx-picked">You tipped <b>{% if t.selection == 'home' %}{{ m.home_team.name }}{% else %}{{ m.away_team.name }}{% endif %}</b></span>
+      {% else %}
+        <span class="gfx-picked none">No tip made</span>
       {% endif %}
-      {% if t.is_correct is True %}<span class="res correct">Correct</span>
+      {% if t.is_correct is True %}<span class="res correct">Correct &middot; +{{ t.points_awarded }}</span>
       {% elif t.is_correct is False %}<span class="res incorrect">Missed</span>
+      {% elif r.phase == 'live' %}<span class="res live">In play</span>
       {% else %}<span class="res pending">Pending</span>{% endif %}
+      {% if t %}<span class="gfx-stamp">Tipped {{ t.submitted_at|date:"j M, g:i A" }}</span>{% endif %}
     </div>
+
+    {# clock, score and ground get their own row (see .gt-fix .ms in the CSS) #}
+    {% include "components/_match_state.html" with match=m %}
   </article>
   {% endwith %}
   {% empty %}
   <div class="gt-empty">
     <span class="ge-ic"><svg><use href="#ic-calendar"/></svg></span>
     <div>
-      <h3>No matches yet</h3>
-      <p>Round {{ round.round_number }} has no fixtures loaded. They'll appear here as soon as your admin syncs them.</p>
+      {% if state != 'all' %}
+        <h3>Nothing here right now</h3>
+        <p>No {% if state == 'complete' %}completed{% elif state == 'live' %}in-play{% else %}upcoming{% endif %}
+           matches in round {{ round.round_number }}. Try <a href="{% url 'tipping:my_tips' org.id %}?round={{ round.id }}">all matches</a>.</p>
+      {% else %}
+        <h3>No matches yet</h3>
+        <p>Round {{ round.round_number }} has no fixtures loaded. They'll appear here as soon as your admin syncs them.</p>
+      {% endif %}
     </div>
   </div>
   {% endfor %}
 {% endif %}
+</div>
 </div>

@@ -58,7 +58,9 @@ the other. No composer here — posting is a button in the group header.
 </div>
 
 {% if posts %}
-<div class="gt-feed">
+{# the feed scrolls in place so the composer above it stays reachable #}
+<div class="gt-listwrap">
+<div class="gt-feed gt-scroll">
   {% for p in posts %}
   <article class="gt-post {% if p.kind == 'recap' %}is-recap{% elif p.kind == 'system' %}is-system{% endif %}" id="post-{{ p.id }}">
     <div class="gpt-head">
@@ -111,6 +113,7 @@ the other. No composer here — posting is a button in the group header.
     </form>
   </article>
   {% endfor %}
+</div>
 </div>
 {% else %}
 <div class="gt-empty" style="margin-top:20px;">
@@ -241,16 +244,7 @@ if (ta && out) { ta.addEventListener('input', function(){ out.textContent = ta.v
   document.addEventListener('visibilitychange', function(){ document.hidden ? stop() : start(); });
   start();
 
-  /* the imagery beside it crossfades on its own, slower */
-  var shots = document.querySelectorAll('.gwh-shots .shot');
-  if (shots.length > 1 && !reduce) {
-    var s = 0;
-    setInterval(function(){
-      shots[s].classList.remove('on');
-      s = (s + 1) % shots.length;
-      shots[s].classList.add('on');
-    }, 6000);
-  }
+  /* the imagery beside it rotates via gt-scenes.js */
 })();
 
 /* reply boxes grow with what you type */

@@ -6,19 +6,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}GoodTip{% endblock %}</title>
   <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:ital,wght@0,400;0,600;1,400&family=Barlow+Condensed:wght@600;900&family=Barlow+Semi+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
+  {% include "partials/_fonts.html" %}
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
-  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  {# vendored: unpkg was a blocking third-party round-trip on every page load #}
+  <script src="{% static 'js/htmx-1.9.12.min.js' %}" defer></script>
   <script src="{% static 'js/gt-ui.js' %}" defer></script>
+  <script src="{% static 'js/gt-scenes.js' %}" defer></script>
+  <script src="{% static 'js/gt-lists.js' %}" defer></script>
+  <script src="{% static 'js/gt-loader.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
 </head>
 <body class="app gt-v2 {% block body_class %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   {% include "public/partials/_icons.html" %}
 
   {# ---- sport loader — post shape follows the code (AFL: four posts, no crossbar · NRL: one H frame). Never one shape recoloured for both. ---- #}
-  <div class="loader" id="loader" role="status" aria-label="Loading">
+  <div class="loader" id="loader" role="status" aria-label="Loading" data-min="2000">
     <div class="loader-inner">
       <div class="pitch">
         {% if primary_sport == "Rugby League" %}
@@ -173,12 +175,8 @@
   (function(){
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    /* sport loader — shape and label are rendered server-side per code */
-    (function(){
-      var L = document.getElementById('loader'); if (!L) return;
-      document.body.classList.add('loading');
-      setTimeout(function(){ L.classList.add('out'); document.body.classList.remove('loading'); setTimeout(function(){ L.style.display='none'; }, 600); }, reduce ? 250 : 3000);
-    })();
+    /* Sport loader is handled by gt-loader.js — shape and label stay as
+       rendered server-side, since in the app they name the org's own code. */
 
     /* notifications: bell panel + popup dismiss */
     (function(){
@@ -316,11 +314,7 @@
       });
     });
 
-    /* banner image crossfade */
-    var bshots = document.querySelectorAll('.dash-banner .bg .shot');
-    if (bshots.length > 1 && !reduce) {
-      var bi = 0; setInterval(function(){ bshots[bi].classList.remove('on'); bi=(bi+1)%bshots.length; bshots[bi].classList.add('on'); }, 5000);
-    }
+    /* banner image rotation is handled by gt-scenes.js */
     {% block app_js %}{% endblock %}
   })();
   </script>

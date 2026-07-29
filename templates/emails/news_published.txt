@@ -1,0 +1,11 @@
+{{ post.title }}
+{{ post.published_at|date:"j F Y" }}
+
+{% if post.excerpt %}{{ post.excerpt }}
+
+{% endif %}Read the full story: {{ post_url }}
+
+--
+You're getting this because you're a GoodTip member.
+Manage your email preferences: {{ prefs_url }}
+Footy tipping, for good. · goodtip.com.au

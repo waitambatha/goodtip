@@ -1,0 +1,21 @@
+G'day,
+
+{{ inviter_name }} has invited you to join {{ org.name }} on GoodTip — the footy
+tipping comp where the entry fees go to a charity your group votes on, not a
+prize pool.
+{% if message %}
+  "{{ message }}"
+  — {{ inviter_name }}
+{% endif %}
+WHAT YOU'RE JOINING
+1. Tip each round — pick who wins. Takes a minute before lockout.
+2. Climb the ladder — and talk it up on the Wall.
+3. Vote on the charity — {{ org.name }} decides where the money goes.
+
+Join {{ org.name }}:
+{{ join_url }}
+
+This invite link expires in {{ expires_days }} days. Not expecting this? You can
+ignore it — nothing happens until you click.
+
+— GoodTip

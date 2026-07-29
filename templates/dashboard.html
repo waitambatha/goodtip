@@ -30,13 +30,24 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;">
     <div style="min-width:0;flex:1;">
       {% if c.round %}<div class="app-eyebrow" style="color:var(--lime);opacity:.85;">Round {{ c.round.round_number }} &middot; {{ c.round.series }}</div>{% endif %}
-      <h1 class="app-h1" style="color:#fff;">Welcome back, {{ user.display_name }}</h1>
 
-      {# The banner does the talking: one thing at a time, most urgent first. #}
+      {% comment %}
+      The headline is a message channel, not a nameplate. It opens on the
+      greeting and then moves through what this member should actually do —
+      the vote that's open, the game about to start, where they sit.
+
+      The h1 is kept for document structure but hidden: the visible line
+      rewrites itself every few seconds, and a heading that changes underneath
+      you is not a landmark anyone can navigate by.
+      {% endcomment %}
       {% if prompts %}
-      <div class="dash-prompt" data-prompts aria-live="polite">
+      <h1 class="sr-only">Dashboard — {{ c.org.name }}</h1>
+      <div class="dash-prompt has-greet" data-prompts aria-live="polite">
+        <div class="dp-line dp-greet on">
+          <span class="dp-txt">Welcome back, {{ user.display_name }}</span>
+        </div>
         {% for p in prompts %}
-        <div class="dp-line{% if forloop.first %} on{% endif %}">
+        <div class="dp-line">
           <span class="dp-ic"><svg><use href="#{{ p.icon }}"/></svg></span>
           <span class="dp-txt">{{ p.text }}</span>
           {% if p.url %}<a href="{{ p.url }}" class="dp-cta">{{ p.cta }} <svg><use href="#ic-arrow-right"/></svg></a>{% endif %}
@@ -44,8 +55,11 @@
         {% endfor %}
       </div>
       <div class="dp-dots" data-prompt-dots aria-hidden="true"></div>
-      {% elif c.rank %}
+      {% else %}
+      <h1 class="app-h1" style="color:#fff;">Welcome back, {{ user.display_name }}</h1>
+      {% if c.rank %}
       <p style="color:var(--cream);opacity:.8;margin-top:4px;font-size:14px;">You're {{ c.rank|ordinal }} on the {{ c.org.name }} ladder.</p>
+      {% endif %}
       {% endif %}
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
@@ -133,12 +147,14 @@
       <div class="slip-bar">
         <div class="slip-info"><b>Make your tips right here</b><span>Tap the team you think wins each match, then confirm. You can change any pick until the round locks.</span></div>
         <div class="slip-meter"><b id="slipCount">{{ c.tips_done }}</b> of {{ c.tips_total }} picked</div>
-        <button type="submit" class="abtn abtn-primary abtn-lg">Confirm my tips</button>
+        {# opens the review sheet; the sheet's own button does the real submit #}
+        <button type="button" class="abtn abtn-primary abtn-lg" id="slipReview">Confirm my tips</button>
       </div>
       <div class="pbar slim" style="margin-bottom:14px;"><i id="slipBar" style="width:{% widthratio c.tips_done c.tips_total|default:1 100 %}%"></i></div>
       {% endif %}
 
-      <div class="fixtures">
+      {# the round's fixtures scroll in place, keeping Confirm reachable below #}
+      <div class="fixtures gt-scroll">
         {% for g in games %}
         <div class="fxp {% if g.tipped %}done{% endif %}">
           <div class="fxp-meta">
@@ -157,6 +173,37 @@
           </div>
         </div>
         {% endfor %}
+      </div>
+
+      {% comment %}
+      Review sheet. Lives inside the form so its confirm button is a plain
+      submit — no JS re-submission, and it still works if the script fails.
+      The list of picks is built from the form's own radios when it opens, so it
+      can never disagree with what is about to be posted.
+      {% endcomment %}
+      <div class="tipsheet" id="tipSheet" hidden aria-hidden="true">
+        <div class="ts-veil" data-sheet-close></div>
+        <div class="ts-panel" role="dialog" aria-modal="true" aria-labelledby="tsTitle">
+          <header class="ts-head">
+            <div>
+              <h3 id="tsTitle">Check your tips</h3>
+              <p class="ts-sub"><b id="tsCount">0</b> of {{ c.tips_total }} picked &middot; Round {{ c.round.round_number }}</p>
+            </div>
+            <button type="button" class="ts-x" data-sheet-close aria-label="Close">&times;</button>
+          </header>
+
+          <div class="ts-list gt-scroll" id="tsList"></div>
+
+          <div class="ts-miss" id="tsMiss" hidden>
+            <svg><use href="#ic-clock"/></svg>
+            <span><b id="tsMissN">0</b> match<span id="tsMissP">es</span> still without a tip. You can come back and fill them in until the round locks.</span>
+          </div>
+
+          <footer class="ts-foot">
+            <button type="button" class="abtn abtn-dark" data-sheet-close>Keep editing</button>
+            <button type="submit" class="abtn abtn-primary">Confirm and save &rarr;</button>
+          </footer>
+        </div>
       </div>
     </form>
   </div>
@@ -296,7 +343,12 @@
     lines[i].classList.add('on');
     if (dots) Array.prototype.forEach.call(dots.children, function(d, k){ d.classList.toggle('on', k === i); });
   }
-  function start(){ if (!reduce && !timer) timer = setInterval(function(){ show(i + 1); }, 5200); }
+  /* 3s on the greeting, then keep moving. This runs under reduced motion too:
+     the banner is a message channel, and freezing it there hides information
+     rather than calming it. What reduced motion drops is the slide — the CSS
+     leaves a plain fade — and the dwell lengthens so it is a gentler read.
+     Hover pause and the dots remain the manual controls either way. */
+  function start(){ if (!timer) timer = setInterval(function(){ show(i + 1); }, reduce ? 5200 : 3000); }
   function stop(){ if (timer) { clearInterval(timer); timer = null; } }
   function restart(){ stop(); start(); }
   wrap.addEventListener('mouseenter', stop);
@@ -333,5 +385,104 @@
         });
       });
       slipRefresh();
+
+      /* ---- review sheet ----
+         Built from the form's own radios each time it opens, so the list shown
+         is exactly what the submit will post. */
+      var sheet = document.getElementById('tipSheet');
+      var reviewBtn = document.getElementById('slipReview');
+      if (sheet && reviewBtn) {
+        var tsList = document.getElementById('tsList');
+        var tsCount = document.getElementById('tsCount');
+        var tsMiss = document.getElementById('tsMiss');
+        var tsMissN = document.getElementById('tsMissN');
+        var tsMissP = document.getElementById('tsMissP');
+        var lastFocus = null;
+
+        function buildSheet(){
+          tsList.innerHTML = '';
+          var picked = 0, missing = 0;
+          rows.forEach(function(row){
+            var chosen = row.querySelector('input:checked');
+            var teams = row.querySelectorAll('.team');
+            /* :not(.crest) matters — the crest tag emits its own <span> before
+               the name, and plain querySelector('span') returns that one (which
+               holds only an <img>), so the names came out blank. */
+            function nameOf(el){
+              var s = el && el.querySelector('span:not(.crest)');
+              return s ? s.textContent.trim() : '';
+            }
+            var homeName = nameOf(teams[0]);
+            var awayName = nameOf(teams[1]);
+            var meta = row.querySelector('.fxp-date');
+            var venue = row.querySelector('.fxp-venue');
+
+            var item = document.createElement('div');
+            item.className = 'ts-item' + (chosen ? '' : ' none');
+
+            var pickName = '';
+            if (chosen) {
+              picked++;
+              pickName = chosen.value === 'home' ? homeName : awayName;
+            } else {
+              missing++;
+            }
+
+            var vsLine = homeName + ' v ' + awayName;
+            var when = meta ? meta.textContent.trim() : '';
+            if (venue) when += ' · ' + venue.textContent.trim();
+
+            item.innerHTML =
+              '<div class="tsi-match"><b></b><small></small></div>' +
+              '<div class="tsi-pick"><span></span></div>';
+            item.querySelector('.tsi-match b').textContent = vsLine;
+            item.querySelector('.tsi-match small').textContent = when;
+            var badge = item.querySelector('.tsi-pick span');
+            if (chosen) { badge.className = 'tsi-yes'; badge.textContent = pickName; }
+            else { badge.className = 'tsi-no'; badge.textContent = 'No tip'; }
+            tsList.appendChild(item);
+          });
+
+          if (tsCount) tsCount.textContent = picked;
+          if (tsMiss) {
+            tsMiss.hidden = missing === 0;
+            if (tsMissN) tsMissN.textContent = missing;
+            if (tsMissP) tsMissP.textContent = missing === 1 ? '' : 'es';
+          }
+        }
+
+        function openSheet(){
+          buildSheet();
+          lastFocus = document.activeElement;
+          sheet.hidden = false;
+          sheet.setAttribute('aria-hidden', 'false');
+          document.body.classList.add('sheet-open');
+          var first = sheet.querySelector('.ts-x');
+          if (first) first.focus();
+        }
+        function closeSheet(){
+          sheet.hidden = true;
+          sheet.setAttribute('aria-hidden', 'true');
+          document.body.classList.remove('sheet-open');
+          if (lastFocus) lastFocus.focus();
+        }
+
+        reviewBtn.addEventListener('click', openSheet);
+        sheet.querySelectorAll('[data-sheet-close]').forEach(function(el){
+          el.addEventListener('click', closeSheet);
+        });
+        document.addEventListener('keydown', function(e){
+          if (e.key === 'Escape' && !sheet.hidden) closeSheet();
+        });
+        /* Keep focus inside the dialog while it's open. */
+        sheet.addEventListener('keydown', function(e){
+          if (e.key !== 'Tab') return;
+          var f = sheet.querySelectorAll('button, [href], input, select, textarea');
+          if (!f.length) return;
+          var first = f[0], last = f[f.length - 1];
+          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        });
+      }
     }
 {% endblock %}

@@ -6,16 +6,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}GoodTip{% endblock %}</title>
   <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
-  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:ital,wght@0,400;0,600;1,400&family=Barlow+Condensed:wght@600;900&family=Barlow+Semi+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
+  {% include "partials/_fonts.html" %}
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
   <script src="{% static 'js/pw-checklist.js' %}" defer></script>
+  <script src="{% static 'js/gt-scenes.js' %}" defer></script>
+  <script src="{% static 'js/gt-loader.js' %}" defer></script>
 </head>
-<body>
+<body class="auth-body">
   {% include "public/partials/_icons.html" %}
 
   {# ---- sport loader ---- #}
-  <div class="loader" id="loader" role="status" aria-label="Loading">
+  <div class="loader" id="loader" role="status" aria-label="Loading"
+       data-min="2000" data-cycle-sports>
     <div class="loader-inner">
       <div class="pitch">
         <svg class="posts" viewBox="0 0 240 150" aria-hidden="true">
@@ -30,63 +32,94 @@
     </div>
   </div>
 
-  <div class="auth-shell">
-    <aside class="auth-brand">
-      <div class="ab-bg" aria-hidden="true">
-        <div class="shot on" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+  <div class="auth-stage">
+
+    {% comment %}
+    The big two-panel split, pushed back into being a backdrop. Both sides
+    rotate (data-shots is picked up by gt-scenes.js); a heavy veil sits over the
+    top so it reads as atmosphere behind the card rather than imagery competing
+    with the form.
+    {% endcomment %}
+    <div class="auth-bg" aria-hidden="true">
+      <div class="ab-pane left" data-shots>
+        <div class="shot on" style="background-image:url('{% static 'img/scenes/mcg-stadium.jpg' %}')"></div>
         <div class="shot" style="background-image:url('{% static 'img/scenes/afl-goal-posts.jpg' %}')"></div>
-        <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-posts-sunset.jpg' %}')"></div>
+        <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
+        <div class="shot" style="background-image:url('{% static 'img/scenes/afl-training.jpg' %}')"></div>
+      </div>
+      <div class="ab-pane right" data-shots>
+        <div class="shot on" style="background-image:url('{% static 'img/scenes/nrl-posts-sunset.jpg' %}')"></div>
         <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
-        <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+        <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+        <div class="shot" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
       </div>
-      <div class="ab-veil" aria-hidden="true"></div>
-      <div class="ab-content">
-        <a href="/" class="ab-top">GOOD<span>TIP</span></a>
-        <div class="ab-mid">
-          <h2>{% block brand_head %}Footy tipping that <em>does good.</em>{% endblock %}</h2>
-          <p>{% block brand_sub %}Your group tips every round. GoodTip funds the donation. You pick who gets it.{% endblock %}</p>
-          <div class="ab-stat"><span class="n">$8,420</span><span class="t">raised for Lifeline<br>by one group this season</span></div>
-        </div>
-        <div class="ab-foot">Footy tipping, for good. &middot; &copy; 2026 GoodTip Pty Ltd</div>
-      </div>
-    </aside>
-    {# mood-green: deep GoodTip green behind the white form (default) — signup overrides to mood-lime #}
-    <main class="auth-main {% block auth_mood %}mood-green{% endblock %}">
-      <div class="auth-card">
+      <div class="ab-veil"></div>
+    </div>
+
+    {% comment %}
+    The card: form on one side, rotating imagery + instructions on the other.
+    mood-green is the default; signup overrides to mood-lime.
+    {% endcomment %}
+    {% comment %}
+    `solo` drops the brand aside and centres the form between the two backdrop
+    panes — used by short, single-purpose steps like the code screen, where a
+    column of marketing alongside would be noise.
+    {% endcomment %}
+    <main class="auth-panel {% block auth_mood %}mood-green{% endblock %}">
+
+      <section class="ap-form">
+        <a href="/" class="ap-mark">GOOD<span>TIP</span><span class="dot">.</span></a>
+
         {% if messages %}
           {% for m in messages %}
-            <div class="flash {% if m.tags == 'success' %}success{% elif m.tags == 'error' %}error{% else %}info{% endif %}" style="margin-bottom:16px;"><span>{{ m }}</span></div>
+            <div class="flash {% if m.tags == 'success' %}success{% elif m.tags == 'error' %}error{% else %}info{% endif %}"><span>{{ m }}</span></div>
           {% endfor %}
         {% endif %}
+
         {% block auth_form %}{% endblock %}
-      </div>
-      <div class="auth-foot-note"><svg><use href="#ic-heart"/></svg> Free to play &middot; GoodTip funds the donation</div>
+      </section>
+
+      {% block auth_aside %}
+      <aside class="auth-aside">
+        <div class="aa-bg" aria-hidden="true">
+          {% block aside_shots %}
+          <div class="shot on" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+          <div class="shot" style="background-image:url('{% static 'img/scenes/afl-player-training.jpg' %}')"></div>
+          <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-ball-grass.jpg' %}')"></div>
+          <div class="shot" style="background-image:url('{% static 'img/scenes/afl-posts-mcg.jpg' %}')"></div>
+          {% endblock %}
+        </div>
+        <div class="aa-veil" aria-hidden="true"></div>
+        <div class="aa-content">
+          <h2>{% block brand_head %}Footy tipping that <em>does good.</em>{% endblock %}</h2>
+          <p class="aa-sub">{% block brand_sub %}Your group tips every round. GoodTip funds the donation. You pick who gets it.{% endblock %}</p>
+
+          {% block aside_body %}
+          <ol class="aa-steps">
+            <li><span class="n">1</span><span class="t"><b>Pick your teams</b> each round — takes a minute.</span></li>
+            <li><span class="n">2</span><span class="t"><b>Your group's entry fees</b> go to a charity, not a prize pool.</span></li>
+            <li><span class="n">3</span><span class="t"><b>You vote</b> on which charity gets the lot.</span></li>
+          </ol>
+          {% endblock %}
+
+          <div class="aa-stat">
+            <span class="n">$8,420</span>
+            <span class="t">raised for Lifeline<br>by one group this season</span>
+          </div>
+        </div>
+      </aside>
+      {% endblock %}
     </main>
+
+    <div class="auth-foot-note">
+      <svg><use href="#ic-heart"/></svg> Free to play &middot; GoodTip funds the donation
+    </div>
   </div>
 
   <script>
   (function(){
-    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    /* loader */
-    (function(){
-      var L = document.getElementById('loader'); if (!L) return;
-      var S = [['oval','Aussie Rules'],['oval','Rugby League'],['round','Football']];
-      var p = S[Math.floor(Math.random()*S.length)];
-      var b = L.querySelector('.ball'); if (b) b.classList.add(p[0]);
-      var lab = document.getElementById('loaderSport'); if (lab) lab.textContent = p[1];
-      document.body.classList.add('loading');
-      setTimeout(function(){ L.classList.add('out'); document.body.classList.remove('loading'); setTimeout(function(){ L.style.display='none'; }, 600); }, reduce ? 250 : 1200);
-    })();
-
-    /* brand imagery crossfades; the form side keeps its single mood colour */
-    var shots = document.querySelectorAll('.ab-bg .shot');
-    if (shots.length > 1 && !reduce) {
-      var i = 0;
-      setInterval(function(){
-        shots[i].classList.remove('on'); i=(i+1)%shots.length; shots[i].classList.add('on');
-      }, 5000);
-    }
+    /* Sport loader is handled by gt-loader.js.
+       Background + aside imagery rotation is handled by gt-scenes.js. */
 
     /* display-name suggester */
     var gen = document.getElementById('genName');
@@ -116,7 +149,8 @@
         if (p2){ p2.type='text'; p2.value=pw; p2.dispatchEvent(new Event('input',{bubbles:true})); }
         var out=document.getElementById('pwGenOut');
         if (out){ out.querySelector('.pwo-val').textContent=pw; out.classList.add('show'); }
-        document.querySelectorAll('[data-pw-toggle]').forEach(function(e){ e.classList.add('on'); });
+        {# generating reveals both fields, so the eyes must show the open state #}
+        document.querySelectorAll('[data-pw-toggle]').forEach(function(e){ setEye(e, true); });
       });
     }
     /* generated-password copy */
@@ -127,11 +161,21 @@
       pwCopy.textContent='Copied'; setTimeout(function(){ pwCopy.textContent='Copy'; }, 1400);
     });
 
-    /* show / hide password toggles */
+    /* show / hide password toggles — the button is an eye icon inside the
+       field, so state is carried by the icon and aria-label rather than by
+       swapping the word Show/Hide. */
+    function setEye(btn, revealed){
+      var use = btn.querySelector('use');
+      if (use) use.setAttribute('href', revealed ? '#ic-eye-off' : '#ic-eye');
+      btn.setAttribute('aria-label', revealed ? 'Hide password' : 'Show password');
+      btn.classList.toggle('on', revealed);
+    }
     document.querySelectorAll('[data-pw-toggle]').forEach(function(t){
       t.addEventListener('click', function(){
         var inp=document.getElementById(t.getAttribute('data-pw-toggle'));
-        if (inp){ inp.type = inp.type==='password' ? 'text' : 'password'; t.classList.toggle('on'); t.textContent = inp.type==='password' ? 'Show' : 'Hide'; }
+        if (!inp) return;
+        inp.type = inp.type==='password' ? 'text' : 'password';
+        setEye(t, inp.type !== 'password');
       });
     });
   })();

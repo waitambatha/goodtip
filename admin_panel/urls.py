@@ -15,5 +15,6 @@ urlpatterns = [
     path("news/", views.news_list, name="news"),
     path("news/<int:post_id>/edit/", views.news_edit, name="news_edit"),
     path("news/<int:post_id>/toggle/", views.news_toggle, name="news_toggle"),
+    path("news/<int:post_id>/announce/", views.news_announce, name="news_announce"),
     path("news/<int:post_id>/delete/", views.news_delete, name="news_delete"),
 ]

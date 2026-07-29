@@ -5,6 +5,45 @@ from django.db.models.functions import Coalesce
 from .models import Match, Round, Tip
 
 
+def annotate_play_state(rounds):
+    """Add the per-round counts ``current_round`` reads.
+
+    Kept next to ``current_round`` because the two are a pair: calling the
+    latter on an unannotated queryset raises AttributeError, and doing the
+    counting per round instead would be a query each.
+    """
+    return rounds.annotate(
+        match_count=Count("matches", distinct=True),
+        unplayed=Count(
+            "matches",
+            filter=~Q(matches__status=Match.STATUS_COMPLETE),
+            distinct=True,
+        ),
+    )
+
+
+def current_round(rounds):
+    """The round a member actually cares about: the earliest one still in play.
+
+    Expects an ``annotate_play_state`` queryset evaluated newest-first, so this
+    walks backwards to the oldest round that hasn't finished.
+
+    Deliberately NOT keyed on ``Round.is_locked``. A round locks at its first
+    kickoff, so the locked round is usually the one being played right now —
+    picking the first unlocked round would skip the whole weekend's games while
+    they were still going and land the member on a round nobody can tip yet.
+    "Every fixture graded" is the only thing that means a round is genuinely done.
+
+    A round with no fixtures yet counts as unfinished, so one freshly created by
+    a fixtures sync isn't stepped over before its games land.
+    """
+    for r in reversed(rounds):
+        if r.unplayed > 0 or r.match_count == 0:
+            return r
+    # Every round has been played out — end of season. Show the most recent.
+    return rounds[0] if rounds else None
+
+
 def derive_result(home_score: int | None, away_score: int | None) -> str | None:
     if home_score is None or away_score is None:
         return None

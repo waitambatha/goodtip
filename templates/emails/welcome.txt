@@ -1,0 +1,16 @@
+G'day {{ user.display_name }},
+
+Your GoodTip account is live. Same footy tipping you already do on a Monday —
+except the entry fees end up somewhere that matters.
+
+HOW IT WORKS
+1. Join your group — or start one. Your workplace, club or crew.
+2. Tip each round — pick who wins. Takes a minute before lockout.
+3. Vote on the charity — your group decides where the money goes.
+
+Open your dashboard: {{ dashboard_url }}
+
+Free to play. GoodTip funds the donation — no prize pool, no catch.
+
+--
+Footy tipping, for good. · goodtip.com.au

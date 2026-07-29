@@ -1,0 +1,23 @@
+{% extends "emails/_base.html" %}
+{% block title %}{{ post.title }}{% endblock %}
+{% block eyebrow %}{% if post.get_tag_display %}{{ post.get_tag_display }}{% else %}From GoodTip{% endif %}{% endblock %}
+{% block preheader %}{{ post.title }}{% endblock %}
+{% block content %}
+  <h1 style="margin:0 0 6px;font-size:24px;line-height:1.25;color:#0F2E22;">{{ post.title }}</h1>
+  <div style="font-size:12px;color:#6b6b5e;margin-bottom:20px;">{{ post.published_at|date:"j F Y" }}</div>
+
+  {% if post_image_url %}
+  <img src="{{ post_image_url }}" alt="" width="496" style="width:100%;max-width:496px;border-radius:12px;display:block;margin:0 0 20px;">
+  {% endif %}
+
+  {% if post.excerpt %}
+  <p style="margin:0 0 18px;font-size:16px;line-height:1.65;color:#1A1A14;">{{ post.excerpt }}</p>
+  {% endif %}
+
+  {% include "emails/_bits.html" with bit="button" url=post_url label="Read the full story" %}
+
+  <p style="margin:20px 0 0;font-size:12px;line-height:1.6;color:#6b6b5e;text-align:center;">
+    You're getting this because you're a GoodTip member.
+    <a href="{{ prefs_url }}" style="color:#2D7A3A;">Manage your email preferences</a>.
+  </p>
+{% endblock %}

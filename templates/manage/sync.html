@@ -83,7 +83,15 @@
         <span class="gc-ic"><svg><use href="#ic-trophy"/></svg></span>
         <span class="gc-txt">
           <b><span class="gc-dot"></span> Results</b>
-          <p>Pull completed results into this round.</p>
+          <p>Pull final scores and grade tips for this round.</p>
+        </span>
+      </label>
+      <label class="gt-choice">
+        <input type="radio" name="kind" value="live">
+        <span class="gc-ic"><svg><use href="#ic-clock"/></svg></span>
+        <span class="gc-txt">
+          <b><span class="gc-dot"></span> Live scores</b>
+          <p>Refresh in-play score, quarter and clock. Doesn't grade tips.</p>
         </span>
       </label>
     </div>
@@ -113,6 +121,40 @@
         <span class="gst-ic" style="background:rgba(45,122,58,.10);color:var(--forest);"><svg><use href="#ic-shield-check"/></svg></span>
         <div><b>Safe &amp; secure</b><p>Nothing is overwritten outside the round you pick, and results only ever grade tips already submitted.</p></div>
       </div>
+    </section>
+
+    {% comment %}
+    Feed freshness. The scheduled sync_matches command runs far more often than
+    anyone opens this page, so this is the honest answer to "are the games up to
+    date?" — and a stale or failing stamp is the first sign a cron has stopped.
+    {% endcomment %}
+    <section class="gt-panel" style="margin-top:18px;">
+      <h2 style="font-family:var(--mark);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:12.5px;color:var(--ink);margin-bottom:18px;">Feed freshness</h2>
+      <div class="gsc-row"><span>Live scores</span>
+        <b>{% if last_live %}{{ last_live.started_at|timesince }} ago{% else %}never{% endif %}</b></div>
+      <div class="gsc-row"><span>Results</span>
+        <b>{% if last_results %}{{ last_results.started_at|timesince }} ago{% else %}never{% endif %}</b></div>
+      <div class="gsc-row"><span>Fixtures</span>
+        <b>{% if last_fixtures %}{{ last_fixtures.started_at|timesince }} ago{% else %}never{% endif %}</b></div>
+
+      {% if recent_runs %}
+      <hr style="border:0;border-top:1px solid var(--gt-hair);margin:18px 0 12px;">
+      <div class="gt-listwrap">
+        <div class="gt-scroll" style="max-height:230px;">
+          {% for run in recent_runs %}
+          <div class="gsc-row" style="font-size:12px;">
+            <span>{{ run.started_at|date:"j M H:i" }} &middot; {{ run.get_kind_display }} {{ run.competition }}{% if run.round_number %} R{{ run.round_number }}{% endif %}</span>
+            <b style="color:{% if run.ok %}var(--forest){% else %}#C0392B{% endif %};">{% if run.ok %}{{ run.matches_touched }}{% else %}failed{% endif %}</b>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <p class="card-lead" style="margin-top:14px;font-size:12px;">
+        Scheduled by <code>manage.py sync_matches</code> — live every 2 min,
+        results every 15, fixtures nightly. See DEPLOYMENT.md.
+      </p>
     </section>
   </aside>
 </div>

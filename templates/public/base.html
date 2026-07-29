@@ -8,12 +8,13 @@
   <meta name="description" content="{% block meta_description %}Your team tips the games. The entry fees go to charity. Your group picks which one.{% endblock %}">
   <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:ital,wght@0,400;0,600;1,400&family=Barlow+Condensed:wght@600;900&family=Barlow+Semi+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
+  {% include "partials/_fonts.html" %}
 
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
   <script src="{% static 'js/gt-ui.js' %}" defer></script>
+  <script src="{% static 'js/gt-scenes.js' %}" defer></script>
+  <script src="{% static 'js/gt-lists.js' %}" defer></script>
+  <script src="{% static 'js/gt-loader.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
@@ -23,7 +24,8 @@
   <div class="scroll-progress" aria-hidden="true"><i></i></div>
 
   <!-- SPORT LOADER (alternates per load) -->
-  <div class="loader" id="loader" role="status" aria-label="Loading">
+  <div class="loader" id="loader" role="status" aria-label="Loading"
+       data-min="2000" data-cycle-sports>
     <div class="loader-inner">
       <div class="pitch">
         <svg class="posts" viewBox="0 0 240 150" aria-hidden="true">
@@ -60,23 +62,7 @@
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-    /* ---- Sport loader (alternates each load) ---- */
-    (function () {
-      var L = document.getElementById('loader');
-      if (!L) return;
-      var SPORTS = [['oval','Aussie Rules'], ['oval','Rugby League'], ['oval','NFL'], ['round','Football']];
-      var pick = SPORTS[Math.floor(Math.random() * SPORTS.length)];
-      var ball = L.querySelector('.ball'); if (ball) ball.classList.add(pick[0]);
-      var lab = document.getElementById('loaderSport'); if (lab) lab.textContent = pick[1];
-      document.body.classList.add('loading');
-      function done() {
-        L.classList.add('out');
-        document.body.classList.remove('loading');
-        document.body.classList.add('ready');
-        setTimeout(function () { L.style.display = 'none'; }, 600);
-      }
-      setTimeout(done, reduce ? 250 : 1550);
-    })();
+    /* Sport loader is handled by gt-loader.js. */
 
     /* ---- Mobile nav ---- */
     var nav = document.querySelector('.nav');
@@ -186,53 +172,7 @@
       }
     }
 
-    /* ---- Image crossfade: every hero and image band rotates its shots.
-           Each container runs on its own slightly-desynced clock so pages
-           with several bands don't all flip in unison. ---- */
-    document.querySelectorAll('.hero-bg:not(.collage), .image-band').forEach(function (box) {
-      var shots = box.querySelectorAll('.shot');
-      if (shots.length < 2 || reduce) return;
-      var si = 0;
-      for (var k = 0; k < shots.length; k++) if (shots[k].classList.contains('active')) si = k;
-      setInterval(function () {
-        shots[si].classList.remove('active');
-        si = (si + 1) % shots.length;
-        shots[si].classList.add('active');
-      }, 3200 + Math.random() * 900);
-    });
-
-    /* ---- Hero collage: one full image <-> two-way split, every ~3s.
-           While a pane is tucked away it quietly advances to its next
-           image, so no state ever repeats the same picture. ---- */
-    document.querySelectorAll('.hero-bg.collage').forEach(function (col) {
-      var panes = [].slice.call(col.querySelectorAll('.pane'));
-      if (panes.length < 2) return;
-      col.classList.add('split');
-      if (reduce) return;
-      var idx = panes.map(function (p) {
-        var s = p.querySelectorAll('.shot'), n = 0;
-        for (var k = 0; k < s.length; k++) if (s[k].classList.contains('active')) n = k;
-        return n;
-      });
-      function advance(n) {
-        var s = panes[n].querySelectorAll('.shot');
-        s[idx[n]].classList.remove('active');
-        idx[n] = (idx[n] + 1) % s.length;
-        s[idx[n]].classList.add('active');
-      }
-      var states = ['split', 'full-0', 'split', 'full-1'];
-      var si = 0;
-      setInterval(function () {
-        si = (si + 1) % states.length;
-        var st = states[si];
-        col.classList.toggle('split', st === 'split');
-        panes[0].classList.toggle('closed', st === 'full-1');
-        panes[1].classList.toggle('closed', st === 'full-0');
-        // swap the hidden pane's picture once it's fully tucked away
-        if (st === 'full-0') setTimeout(function () { advance(1); }, 1200);
-        if (st === 'full-1') setTimeout(function () { advance(0); }, 1200);
-      }, 3200);
-    });
+    /* Image rotation (heroes, bands, collage) is handled by gt-scenes.js. */
 
     /* ---- Rotating copy lines (Wall teaser etc.): next line every 4s ---- */
     document.querySelectorAll('[data-rotate-lines]').forEach(function (box) {

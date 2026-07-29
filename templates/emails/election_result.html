@@ -1,0 +1,40 @@
+{% extends "emails/_base.html" %}
+{% block title %}The vote's in{% endblock %}
+{% block eyebrow %}The vote's in{% endblock %}
+{% block preheader %}{{ org.name }} picked {{ winner.name }}. Here's how the vote landed.{% endblock %}
+{% block content %}
+  <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">G'day {{ user.display_name }},</p>
+  <p style="margin:0 0 20px;font-size:16px;line-height:1.6;color:#1A1A14;">
+    Voting has closed. <b>{{ org.name }}</b> is raising for:
+  </p>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+    <tr><td style="background:#0F2E22;border-radius:12px;padding:22px;text-align:center;">
+      <div style="color:#C8F135;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Your group's cause</div>
+      <div style="color:#ffffff;font-size:23px;font-weight:900;">{{ winner.name }}</div>
+    </td></tr>
+  </table>
+
+  {% if results %}
+  {% include "emails/_bits.html" with bit="eyebrow" label="How it finished" %}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
+    {% for row in results %}
+    <tr>
+      <td style="padding:10px 14px;border:1px solid #E4E1D2;{% if not forloop.first %}border-top:0;{% endif %}font-size:15px;color:#1A1A14;{% if row.is_winner %}font-weight:bold;color:#0F2E22;background:#F7FBEA;{% endif %}">
+        {{ row.charity.name }}{% if row.is_winner %} &nbsp;&#10003;{% endif %}
+      </td>
+      <td align="right" style="padding:10px 14px;border:1px solid #E4E1D2;border-left:0;{% if not forloop.first %}border-top:0;{% endif %}font-size:15px;font-weight:bold;color:#2D7A3A;white-space:nowrap;{% if row.is_winner %}background:#F7FBEA;{% endif %}">
+        {{ row.votes }} vote{{ row.votes|pluralize }}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  <p style="margin:0 0 4px;font-size:15px;line-height:1.6;color:#1A1A14;">
+    From here, every entry fee your group pays goes to {{ winner.name }}. Keep tipping —
+    that's all it takes.
+  </p>
+
+  {% include "emails/_bits.html" with bit="button" url=dashboard_url label="Open your dashboard" %}
+{% endblock %}

@@ -1,0 +1,16 @@
+G'day {{ user.display_name }},
+
+Round {{ round.round_number }} is done and graded for {{ org.name }}.
+
+You got {{ correct }} of {{ graded }}{% if rank %} — you're {{ rank }} of {{ total_tippers }} on the ladder{% endif %}.
+
+YOUR TIPS
+{% for row in rows %}- {{ row.match.home_team.name }} v {{ row.match.away_team.name }}{% if row.match.score_line %} ({{ row.match.score_line }}){% endif %}
+  {% if row.tip %}you tipped {{ row.picked_name }} — {% if row.correct %}correct, +{{ row.points }}{% else %}missed{% endif %}{% else %}no tip made{% endif %}{% if row.match.venue %} · {{ row.match.venue }}{% endif %}
+{% endfor %}
+{% if org.charity_display %}Every round your group plays puts more toward {{ org.charity_display }}.{% endif %}
+
+See the ladder: {{ leaderboard_url }}
+
+--
+Footy tipping, for good. · goodtip.com.au

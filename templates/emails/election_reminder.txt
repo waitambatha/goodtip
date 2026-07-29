@@ -1,0 +1,15 @@
+G'day {{ user.display_name }},
+
+{% if urgency == "hour" %}Last call — {{ org.name }}'s charity vote closes at {{ vote.scheduled_close_at|date:"g:i A" }},
+about an hour from now, and your vote isn't in yet. It takes one tap.{% else %}Quick reminder: {{ org.name }}'s charity vote closes {{ vote.scheduled_close_at|date:"l j F, g:i A" }}
+— that's tomorrow — and you haven't picked yet.{% endif %}
+
+ON THE BALLOT
+{% for opt in options %}- {{ opt.charity.name }}
+{% endfor %}
+Vote before it closes: {{ vote_url }}
+
+If you've already voted since this was queued, ignore this — nothing to do.
+
+--
+Footy tipping, for good. · goodtip.com.au

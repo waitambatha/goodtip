@@ -1,0 +1,15 @@
+G'day {{ user.display_name }},
+
+{% if purpose == "signup" %}Welcome aboard. Enter this code to confirm your email address and
+finish setting up your account.{% else %}Someone asked to sign in to your GoodTip account. Enter this code to
+continue.{% endif %}
+
+    {{ code }}
+
+This code expires in {{ minutes }} minutes.
+
+Didn't ask for this? You can ignore this email — the code only works alongside
+your password, and nobody can sign in without it.{% if purpose == "login" %}
+If you keep getting codes you didn't ask for, change your password.{% endif %}
+
+— GoodTip

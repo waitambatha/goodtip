@@ -1,8 +1,14 @@
 {% load team_extras %}
-<div class="gt-board" id="lbtable">
+{% comment %}
+The ladder can run to hundreds of rows, so the rows scroll inside .gt-scroll
+while the header row stays put above them — scrolling the whole page would take
+the column headings with it and you'd lose track of which number is which.
+{% endcomment %}
+<div class="gt-board gt-listwrap" id="lbtable">
   <div class="gb-head">
     <span>Rank</span><span>Tipper</span><span class="h-correct" style="text-align:right;">Correct</span><span style="text-align:right;">Points</span>
   </div>
+  <div class="gt-scroll gb-rows">
   {% for row in ranked %}
     <div class="gb-row {% if row.user.id == me.id %}me{% endif %}">
       <span class="gb-rank">{{ row.rank }}</span>
@@ -16,4 +22,5 @@
   {% empty %}
     <div class="gb-empty">No tippers yet — once people join and tip, they'll show here.</div>
   {% endfor %}
+  </div>
 </div>

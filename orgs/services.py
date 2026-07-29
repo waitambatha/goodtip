@@ -405,52 +405,31 @@ def open_charity_election(vote: CharityVote) -> CharityVote:
 
 
 def send_election_open_emails(vote: CharityVote) -> int:
-    """Branded HTML email to every member. Best-effort, never raises."""
-    from django.core.mail import EmailMultiAlternatives
-    from django.template.loader import render_to_string
+    """Branded HTML email to every member. Best-effort, never raises.
 
-    # SMTP not fully configured yet (pre-launch): skip quietly rather than
-    # hammer a dead connection per member. In-app notifications still go out;
-    # emails start flowing the moment the SMTP credentials land in the env.
-    if "smtp" in settings.EMAIL_BACKEND and not (
-        settings.EMAIL_HOST and settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD
-    ):
-        logger.warning(
-            "Election %s opened but SMTP credentials are not configured — emails skipped.",
-            vote.pk,
-        )
-        return 0
+    Rendering and delivery go through goodtip.mail, which handles the
+    "email isn't configured yet" case and batches the send over one connection
+    instead of opening one per member.
+    """
+    from goodtip.mail import build, send_bulk
+    from orgs.notifications import _vote_url
 
-    sent = 0
     options = list(vote.options.select_related("charity"))
-    base = getattr(settings, "SITE_BASE_URL", "https://goodtip.com.au").rstrip("/")
-    vote_url = f"{base}/leagues/{vote.org_id}/charity-vote/"
-    for m in vote.org.members.select_related("user"):
-        user = m.user
-        if not user.email:
-            continue
-        ctx = {
-            "user": user,
-            "org": vote.org,
-            "vote": vote,
-            "options": options,
-            "vote_url": vote_url,
-        }
-        try:
-            msg = EmailMultiAlternatives(
-                subject=f"Vote now — where should {vote.org.name}'s money go?",
-                body=render_to_string("emails/election_open.txt", ctx),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[user.email],
-            )
-            msg.attach_alternative(
-                render_to_string("emails/election_open.html", ctx), "text/html"
-            )
-            msg.send(fail_silently=True)
-            sent += 1
-        except Exception:  # noqa: BLE001 — mail must never break the open
-            logger.exception("Election-open email failed for %s", user.email)
-    return sent
+    vote_url = _vote_url(vote.org_id)
+    messages = [
+        build(
+            "election_open",
+            subject=f"Vote now — where should {vote.org.name}'s money go?",
+            to=m.user.email,
+            context={
+                "user": m.user, "org": vote.org, "vote": vote,
+                "options": options, "vote_url": vote_url,
+            },
+        )
+        for m in vote.org.members.select_related("user")
+        if m.user.email
+    ]
+    return send_bulk(messages)
 
 
 def open_due_elections(orgs=None) -> int:

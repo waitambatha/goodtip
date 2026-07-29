@@ -1,0 +1,44 @@
+{% extends "auth_base.html" %}
+{% block title %}Enter your code — GoodTip{% endblock %}
+{% block loader_task %}Checking it's you{% endblock %}
+
+{% comment %}
+Single-purpose step: the brand aside is dropped and the card sits centred
+between the two rotating backdrop panes.
+{% endcomment %}
+{% block auth_mood %}mood-green solo{% endblock %}
+{% block auth_aside %}{% endblock %}
+
+{% block auth_form %}
+<div class="otp-head">
+  <span class="otp-badge"><svg><use href="#ic-shield-check"/></svg></span>
+  <h1>{% if purpose == "signup" %}Confirm your email{% else %}Two-step verification{% endif %}</h1>
+  <p class="sub">
+    We've sent a {{ form.code.max_length }}-digit code to<br>
+    <b class="otp-email">{{ email }}</b>
+  </p>
+</div>
+
+<form method="post" action="{% url 'accounts:verify' %}" novalidate>
+  {% csrf_token %}
+  <div class="fld">
+    <label for="id_code" class="sr-only">Verification code</label>
+    {{ form.code }}
+    {% if form.code.errors %}<div class="fld-err">{{ form.code.errors|join:" " }}</div>{% endif %}
+  </div>
+  <button type="submit" class="abtn abtn-primary abtn-block">Verify &rarr;</button>
+</form>
+
+<form method="post" action="{% url 'accounts:verify' %}" class="otp-resend">
+  {% csrf_token %}
+  <p class="sub">
+    Code expires in {{ minutes }} minutes. Didn't get it? Check your spam folder, or
+    <button type="submit" name="resend" value="1" class="flink otp-resend-btn">send a new one</button>.
+  </p>
+</form>
+
+<p class="alt">
+  {% if purpose == "signup" %}Wrong address?{% else %}Not you?{% endif %}
+  <a href="{% url 'accounts:login' %}">Back to log in</a>
+</p>
+{% endblock %}

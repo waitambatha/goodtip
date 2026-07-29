@@ -1,0 +1,27 @@
+{% comment %}
+Presentation B — the note on the desk.
+
+A lined note card tilted a few degrees clockwise, sitting on a dark green
+envelope tilted the other way, with the pen and inkwell laid out to its left.
+The counter-rotation between note and envelope is what gives it the "just put
+down on the desk" feel; matching angles would look pasted on.
+{% endcomment %}
+<div class="ttb-stage ttb-desk" data-letter-style="desk" role="group" aria-label="The note, as a card on a desk">
+
+  <div class="dk-props" aria-hidden="true">
+    <svg class="ttb-prop inkwell" viewBox="0 0 150 150"><use href="#ttb-inkwell"/></svg>
+    {# the black barrel comes from --pen-barrel, set on .ttb-desk in CSS #}
+    <svg class="ttb-prop pen" viewBox="0 0 420 96"><use href="#ttb-pen"/></svg>
+  </div>
+
+  <div class="dk-stack">
+    <div class="dk-envelope" aria-hidden="true">
+      <span class="dk-flap"></span>
+    </div>
+    <div class="dk-note">
+      <div class="dk-rule" aria-hidden="true"></div>
+      {% include "public/partials/_boss_letter_body.html" %}
+      <svg class="ttb-prop seal" viewBox="0 0 120 120" aria-hidden="true"><use href="#ttb-seal"/></svg>
+    </div>
+  </div>
+</div>

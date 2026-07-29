@@ -348,6 +348,11 @@ class CharityVote(models.Model):
         null=True,
         blank=True,
     )
+    # Stamps for the outbound emails, so a cron that runs every ten minutes
+    # can't send the same reminder six times. Set once, then checked.
+    reminder_day_sent_at = models.DateTimeField(null=True, blank=True)
+    reminder_hour_sent_at = models.DateTimeField(null=True, blank=True)
+    result_email_sent_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-opened_at"]

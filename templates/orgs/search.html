@@ -3,7 +3,7 @@
 {% block loader_task %}Searching groups{% endblock %}
 {% block app_content %}
 <div class="app-head"><div><div class="app-eyebrow">Groups</div><h1 class="app-h1">Find your group</h1><p class="app-sub">Start typing your workplace, club or crew — matches appear as you type. Ask to join one, or start a new group under theirs.</p></div>
-  <a href="{% url 'orgs:create' %}" class="abtn abtn-ghost abtn-sm">Create a group</a></div>
+  <a href="{% url 'orgs:create' %}" class="abtn abtn-dark"><svg class="abtn-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>Create a group</a></div>
 
 {# csrf seed for the ask-to-join forms the autocomplete builds #}
 <form id="csrfSeed" hidden>{% csrf_token %}</form>
@@ -23,13 +23,33 @@
 
 {# browse everything — parents with their child groups beneath them #}
 <div style="margin-top:30px;">
-  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-    <h2 class="card-h" style="font-size:19px;margin:0;">All groups</h2>
-    <span class="app-sub" style="margin:0;font-size:13px;">{{ browse_total }} group{{ browse_total|pluralize }} on GoodTip</span>
+  <div class="browse-head">
+    <div class="browse-title">
+      <h2 class="card-h" style="font-size:19px;margin:0;">All groups</h2>
+      <span class="browse-count">{{ browse_total }} group{{ browse_total|pluralize }} on GoodTip</span>
+    </div>
+    {% comment %}
+    Plain GET form so sorting survives a reload, works without JS, and keeps
+    any active search in the URL. Auto-submits on change — no Apply button.
+    {% endcomment %}
+    <form method="get" class="browse-sort">
+      {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+      <label for="orgSort">Sort by:</label>
+      <div class="browse-sel">
+        <select name="sort" id="orgSort" onchange="this.form.submit()">
+          {% for value, label in sorts %}
+          <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+      <noscript><button type="submit" class="abtn abtn-ghost abtn-sm">Apply</button></noscript>
+    </form>
   </div>
   {% for row in browse %}
   <div class="card" style="margin-bottom:10px;padding:16px 18px;">
     <div class="bl-row">
+      <span class="bl-ic" aria-hidden="true"><svg><use href="#{{ row.icon }}"/></svg></span>
       <div class="bl-main">
         <span class="bl-name">{{ row.org.name }}</span>
         <span class="bl-meta">{% if row.org.category_label %}{{ row.org.category_label }} &middot; {% endif %}{% if row.org.state %}{{ row.org.state.code }} &middot; {% endif %}{{ row.org.member_count }} member{{ row.org.member_count|pluralize }}</span>

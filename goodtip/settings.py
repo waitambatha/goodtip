@@ -111,8 +111,18 @@ LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "landing"
 
+# Postmark is the transactional email provider. The token lives only in .env.
+POSTMARK_SERVER_TOKEN = os.environ.get("POSTMARK_SERVER_TOKEN", "")
+POSTMARK_MESSAGE_STREAM = os.environ.get("POSTMARK_MESSAGE_STREAM", "outbound")
+
 if DEBUG:
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+    # Console by default so local work never sends real mail. Set
+    # EMAIL_SEND_FOR_REAL=true in .env when you want to check live delivery or
+    # how a template renders in an actual client.
+    if os.environ.get("EMAIL_SEND_FOR_REAL", "False").lower() == "true" and POSTMARK_SERVER_TOKEN:
+        EMAIL_BACKEND = "goodtip.email_backends.PostmarkEmailBackend"
+    else:
+        EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
     # Browsers treat localhost and 127.0.0.1 as different sites with separate
     # cookie stores. Trust both so invite links work regardless of which the
     # admin used when generating the link.
@@ -122,7 +132,12 @@ if DEBUG:
         "http://127.0.0.1:8000",
     ]
 else:
-    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    # Postmark when there's a token, SMTP as the fallback so an environment
+    # without one behaves exactly as it did before.
+    EMAIL_BACKEND = (
+        "goodtip.email_backends.PostmarkEmailBackend" if POSTMARK_SERVER_TOKEN
+        else "django.core.mail.backends.smtp.EmailBackend"
+    )
     # Production site domain. Extra hosts can still be added via ALLOWED_HOSTS env.
     ALLOWED_HOSTS += ["goodtip.com.au", "www.goodtip.com.au"]
     CSRF_TRUSTED_ORIGINS = [

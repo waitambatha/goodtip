@@ -37,116 +37,30 @@
 <!-- THE NOTE -->
 <section class="section on-cream" id="note">
   <div class="wrap">
-    <p class="eyebrow reveal">Real note. Send it.</p>
-    <h2 class="section-heading reveal">Stick it somewhere they'll actually see it.</h2>
+    {# centred, because the two letters below it are a symmetric pair #}
+    <p class="eyebrow reveal ttb-centre">Real note. Send it.</p>
+    <h2 class="section-heading reveal ttb-centre">Stick it somewhere they'll actually see it.</h2>
+    <p class="ttb-lede reveal ttb-centre">Two ways to put it in front of them. Same words either way &mdash; pick whichever suits your office.</p>
+    {% comment %}
+    Both presentations of the same note, side by side as a hero split — the
+    parchment scroll and the card on a desk. They share the letter body partial
+    and the props (pen, inkwell, seal), so the wording exists once and the copy
+    button gets the same text whichever half caught your eye.
+    {% endcomment %}
+    {% include "public/partials/_boss_letter_props.html" %}
+
     <div class="boss-note reveal">
-      <div class="bn-scroll">
-        <div class="bn-roll" aria-hidden="true"></div>
-        <div class="bn-paper aged">
-          <span class="bn-stain s1" aria-hidden="true"></span>
-          <span class="bn-stain s2" aria-hidden="true"></span>
-
-          <!-- the writing desk: inkwell with spare quills up top,
-               and the working feather asleep on the page below -->
-          <svg class="bn-inkwell" viewBox="0 0 170 210" aria-hidden="true">
-            <defs>
-              <linearGradient id="iwGlass" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="#6B4A26"/>
-                <stop offset=".45" stop-color="#3A2712"/>
-                <stop offset="1" stop-color="#1C1207"/>
-              </linearGradient>
-              <linearGradient id="iwPlumeA" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="#F3E8CE"/>
-                <stop offset=".6" stop-color="#C9B488"/>
-                <stop offset="1" stop-color="#8A6C3F"/>
-              </linearGradient>
-              <linearGradient id="iwPlumeB" x1="1" y1="0" x2="0" y2="1">
-                <stop offset="0" stop-color="#E8D9B4"/>
-                <stop offset="1" stop-color="#7A5B33"/>
-              </linearGradient>
-            </defs>
-            <!-- shadow the pot throws on the paper -->
-            <ellipse cx="85" cy="197" rx="56" ry="9" fill="rgba(59,42,22,.28)"/>
-            <!-- spare quill, leaning left -->
-            <g transform="rotate(-9 85 130)">
-              <path d="M62 128 C 58 96, 52 62, 40 30" fill="none" stroke="#332412" stroke-width="3" stroke-linecap="round"/>
-              <path d="M40 30 C 30 44, 28 70, 38 96 C 46 78, 52 52, 40 30 Z" fill="url(#iwPlumeA)"/>
-              <path d="M40 30 C 52 46, 58 74, 56 100 C 46 82, 38 54, 40 30 Z" fill="url(#iwPlumeB)" opacity=".9"/>
-            </g>
-            <!-- spare quill, leaning right -->
-            <g transform="rotate(12 85 130)">
-              <path d="M104 128 C 110 98, 118 66, 132 38 C 120 48, 108 66, 100 90" fill="none" stroke="#3B2A16" stroke-width="2.6" stroke-linecap="round"/>
-              <path d="M132 38 C 116 46, 104 68, 100 94 C 114 82, 126 62, 132 38 Z" fill="url(#iwPlumeB)"/>
-              <path d="M132 38 C 138 58, 134 84, 122 104 C 118 84, 122 58, 132 38 Z" fill="url(#iwPlumeA)" opacity=".85"/>
-            </g>
-            <!-- pot: neck, body, mouth with ink -->
-            <path d="M66 118 h38 v14 h-38 z" fill="url(#iwGlass)"/>
-            <path d="M54 132 C 40 152, 42 178, 62 189 C 78 197, 92 197, 108 189 C 128 178, 130 152, 116 132 Z" fill="url(#iwGlass)"/>
-            <path d="M60 140 C 52 154, 53 172, 66 182" fill="none" stroke="rgba(255,244,214,.35)" stroke-width="5" stroke-linecap="round"/>
-            <ellipse cx="85" cy="118" rx="22" ry="7.5" fill="#120B04"/>
-            <ellipse cx="85" cy="117" rx="22" ry="7.5" fill="none" stroke="#7A5B33" stroke-width="2.4"/>
-            <ellipse cx="82" cy="118" rx="13" ry="4" fill="#241505" opacity=".9"/>
-            <ellipse cx="78" cy="117" rx="5" ry="1.6" fill="rgba(255,244,214,.28)"/>
-          </svg>
-
-          <svg class="bn-feather" viewBox="0 0 300 110" aria-hidden="true">
-            <defs>
-              <linearGradient id="ftTop" x1="0" y1="1" x2="1" y2="0">
-                <stop offset="0" stop-color="#8A6C3F"/>
-                <stop offset=".5" stop-color="#D8C69A"/>
-                <stop offset="1" stop-color="#F6EDD6"/>
-              </linearGradient>
-              <linearGradient id="ftBot" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="#6B4F26"/>
-                <stop offset="1" stop-color="#C9B488"/>
-              </linearGradient>
-            </defs>
-            <!-- soft shadow: the feather lies ON the paper -->
-            <ellipse cx="150" cy="96" rx="132" ry="7" fill="rgba(59,42,22,.22)"/>
-            <!-- bottom vane -->
-            <path d="M270 16 C 206 26, 118 50, 52 78 C 40 83, 30 87, 24 90 C 80 92, 170 76, 240 46 C 254 40, 264 28, 270 16 Z" fill="url(#ftBot)"/>
-            <!-- top vane -->
-            <path d="M270 16 C 214 4, 128 12, 60 48 C 44 57, 32 68, 24 90 C 84 66, 178 38, 248 26 C 256 24, 264 20, 270 16 Z" fill="url(#ftTop)"/>
-            <!-- barbs -->
-            <g stroke="rgba(90,64,30,.35)" stroke-width="1">
-              <path d="M226 20 L 208 44" fill="none"/><path d="M196 26 L 178 52" fill="none"/>
-              <path d="M164 34 L 148 60" fill="none"/><path d="M132 44 L 118 68" fill="none"/>
-              <path d="M100 56 L 88 76" fill="none"/><path d="M72 68 L 62 84" fill="none"/>
-            </g>
-            <!-- spine + bare quill tip -->
-            <path d="M270 16 C 200 34, 100 62, 24 90" fill="none" stroke="#4A3621" stroke-width="2.6" stroke-linecap="round"/>
-            <path d="M24 90 C 16 93, 10 96, 4 100" fill="none" stroke="#2C1E0F" stroke-width="3" stroke-linecap="round"/>
-            <path d="M4 100 l 7 -2 -4 5 z" fill="#1E140A"/>
-          </svg>
-
-          <p>Dear <span data-letter-boss>{% firstof boss_name "Boss" %}</span>,</p>
-          <p>What if our footy tips actually did some good?</p>
-          <p>We're already picking teams and checking the ladder every Monday. GoodTip just sends our entry fees to a charity we choose. Together.</p>
-          <p>Five minutes to set up. Nothing to lose but bragging rights.</p>
-          <p>Can we do this?</p>
-          <p class="bn-sign">&mdash; <span data-letter-name>{% firstof your_name "[Your name]" %}</span></p>
-
-          <!-- red wax seal -->
-          <div class="bn-seal reveal zoom" aria-hidden="true">
-            <svg viewBox="0 0 120 120">
-              <defs>
-                <radialGradient id="waxg" cx="38%" cy="32%" r="75%">
-                  <stop offset="0" stop-color="#C9463C"/>
-                  <stop offset=".55" stop-color="#9E2B24"/>
-                  <stop offset="1" stop-color="#701712"/>
-                </radialGradient>
-                <path id="sealArc" d="M60 17a43 43 0 1 1-.001 0z" fill="none"/>
-              </defs>
-              <path fill="url(#waxg)" d="M60 4c9-3 17 4 26 4 8 0 15 6 18 13 4 8 12 13 11 22-1 8 4 16 1 24-3 9-1 19-8 25-6 6-8 16-16 19-8 4-16-1-25 1-9 1-17 6-25 2-8-3-17-3-22-10-6-7-14-11-15-20-1-8-5-16-2-24 3-9-2-19 4-26 5-7 6-17 14-21 7-4 14-9 23-9 5 0 11 2 16 0z"/>
-              <circle cx="60" cy="60" r="45" fill="none" stroke="rgba(255,225,210,.5)" stroke-width="1.6"/>
-              <circle cx="60" cy="60" r="34" fill="none" stroke="rgba(60,8,5,.55)" stroke-width="1.4"/>
-              <text class="seal-ring" dy="3"><textPath href="#sealArc" startOffset="0">&#9733; GOODTIP &#9733; FOOTY FOR GOOD</textPath></text>
-              <text class="seal-mono" x="60" y="72" text-anchor="middle">GT</text>
-            </svg>
-          </div>
+      <div class="ttb-split">
+        <div class="ttb-half">
+          <span class="ttb-tag">Print it &middot; pin it up</span>
+          {% include "public/partials/_boss_letter_scroll.html" %}
         </div>
-        <div class="bn-roll bottom" aria-hidden="true"></div>
+        <div class="ttb-half">
+          <span class="ttb-tag">Write it &middot; leave it on the desk</span>
+          {% include "public/partials/_boss_letter_desk.html" %}
+        </div>
       </div>
+
       <div class="bn-actions">
         <span class="bn-hint">Real text. Fill in the names below — the letter follows.</span>
         <button type="button" class="btn-ghost" data-copy-note>Copy this note</button>
@@ -265,19 +179,32 @@
 
 <script>
 (function(){
-  var bossSpan = document.querySelector('[data-letter-boss]');
-  var nameSpan = document.querySelector('[data-letter-name]');
+  /* The letter renders twice — once per presentation — so every name span has
+     to be updated, not just the first one found. */
+  var bossSpans = document.querySelectorAll('[data-letter-boss]');
+  var nameSpans = document.querySelectorAll('[data-letter-name]');
   var bossIn = document.getElementById('bnBossName');
   var nameIn = document.getElementById('bnYourName');
   var note = document.getElementById('bossNote');
 
   function letterText(){
-    var ps = document.querySelectorAll('.bn-paper p');
-    return Array.prototype.map.call(ps, function(p){ return p.textContent; }).join('\n\n');
+    /* Both halves show the same wording, so read the first and stop — walking
+       every .bn-body on the page would hand over the letter twice. */
+    var one = document.querySelector('.bn-body');
+    if (!one) return '';
+    return [].map.call(one.querySelectorAll('p'), function(p){
+      return p.textContent.trim();
+    }).join('\n\n');
   }
   function sync(){
-    if (bossSpan && bossIn) bossSpan.textContent = bossIn.value.trim() || 'Boss';
-    if (nameSpan && nameIn) nameSpan.textContent = nameIn.value.trim() || '[Your name]';
+    if (bossIn) {
+      var b = bossIn.value.trim() || 'Boss';
+      bossSpans.forEach(function(s){ s.textContent = b; });
+    }
+    if (nameIn) {
+      var n = nameIn.value.trim() || '[Your name]';
+      nameSpans.forEach(function(s){ s.textContent = n; });
+    }
     note.value = letterText();
   }
   if (bossIn) bossIn.addEventListener('input', sync);

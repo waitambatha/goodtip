@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from catalog.models import Charity, Competition, Season, Series, Sport
+from data_sync.models import SyncRun
 from data_sync.services import get_sync_service, SyncError
 from orgs.forms import _unique_charity_slug
 from orgs.models import OrgMember, Organisation
@@ -175,15 +176,19 @@ def sync_panel(request):
         round_number = int(request.POST["round_number"])
         org = get_object_or_404(Organisation, pk=int(request.POST["org_id"]))
         kind = request.POST.get("kind", "fixtures")
+        LABELS = {"fixtures": "fixtures", "results": "results", "live": "live scores"}
+        if kind not in LABELS:
+            kind = "fixtures"
         try:
-            svc = get_sync_service(comp)
-            if kind == "fixtures":
-                n = svc.sync_fixtures(competition=comp, round_number=round_number, org=org)
-                msg = f"Synced {n} fixtures."
-            else:
-                n = svc.sync_results(competition=comp, round_number=round_number, org=org)
-                msg = f"Wrote {n} results."
-            messages.success(request, msg)
+            # Recorded like a scheduled run, so a manual sync shows up in the
+            # same history and refreshes the same "last updated" stamps.
+            with SyncRun.record(kind=kind, competition=comp, org=org, round_number=round_number) as run:
+                svc = get_sync_service(comp)
+                n = getattr(svc, f"sync_{kind}")(
+                    competition=comp, round_number=round_number, org=org,
+                )
+                run.matches_touched = n
+            messages.success(request, f"Synced {n} {LABELS[kind]}.")
         except SyncError as e:
             messages.error(request, str(e))
         return redirect("manage:sync")
@@ -192,6 +197,12 @@ def sync_panel(request):
         "orgs": orgs,
         # Squiggle needs no key; TheSports does, so the panel shows its real state.
         "thesports_ready": bool(settings.THESPORTS_API_KEY),
+        # Freshness per feed kind, so "are the games up to date?" is answerable
+        # from the panel rather than from the server logs.
+        "last_live": SyncRun.last_success(kind=SyncRun.KIND_LIVE),
+        "last_results": SyncRun.last_success(kind=SyncRun.KIND_RESULTS),
+        "last_fixtures": SyncRun.last_success(kind=SyncRun.KIND_FIXTURES),
+        "recent_runs": SyncRun.objects.select_related("org")[:12],
     })
 
 
@@ -253,6 +264,41 @@ def news_toggle(request, post_id: int):
         post.is_published = not post.is_published
         post.save(update_fields=["is_published"])
         messages.success(request, "Post published." if post.is_published else "Post unpublished.")
+    return redirect("manage:news")
+
+
+@superuser_required
+def news_announce(request, post_id: int):
+    """Email a published post to every member — once.
+
+    Kept separate from publishing on purpose: publishing is reversible and gets
+    toggled, and nobody should get the same announcement twice because an admin
+    unpublished and republished a post.
+    """
+    post = get_object_or_404(NewsPost, pk=post_id)
+    if request.method != "POST":
+        return redirect("manage:news")
+
+    if not post.is_published:
+        messages.error(request, "Publish the post before emailing it out.")
+    elif post.announced_at:
+        stamp = timezone.localtime(post.announced_at)
+        messages.info(request, f"Already emailed to members on {stamp:%d %b %Y at %H:%M}.")
+    else:
+        from accounts.models import User
+        from orgs.notifications import send_news_published
+
+        recipients = User.objects.filter(is_active=True).exclude(email="")
+        sent = send_news_published(post, recipients)
+        if sent:
+            post.announced_at = timezone.now()
+            post.save(update_fields=["announced_at"])
+            messages.success(request, f"Emailed to {sent} member{'s' if sent != 1 else ''}.")
+        else:
+            messages.error(
+                request,
+                "Nothing sent — check the email settings and the server log.",
+            )
     return redirect("manage:news")
 
 

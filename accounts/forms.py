@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import PasswordResetForm as DjangoPasswordResetForm
 from django.contrib.auth.password_validation import validate_password
 
 
@@ -83,6 +84,67 @@ class LoginForm(forms.Form):
             "autocomplete": "current-password",
         }),
     )
+
+
+class VerifyCodeForm(forms.Form):
+    # Deliberately looser than six characters. People paste "123 456" straight
+    # out of the email and phone keyboards add a trailing space; a max_length
+    # of 6 would reject those before clean_code ever got to tidy them up. The
+    # real "exactly six digits" rule lives in clean_code, after stripping.
+    code = forms.CharField(
+        label="Verification code",
+        max_length=16,
+        widget=forms.TextInput(attrs={
+            "placeholder": "000000",
+            "autocomplete": "one-time-code",
+            "inputmode": "numeric",
+            "autofocus": True,
+            "class": "otp-input",
+            "maxlength": "16",
+        }),
+    )
+
+    def clean_code(self):
+        digits = "".join(c for c in self.cleaned_data["code"] if c.isdigit())
+        if len(digits) != 6:
+            raise forms.ValidationError("Enter the 6-digit code from your email.")
+        return digits
+
+
+class SecurityForm(forms.ModelForm):
+    """The two-step verification switch on the settings page."""
+
+    two_factor_enabled = forms.BooleanField(
+        required=False,
+        label="Require a code emailed to me when I sign in",
+    )
+
+    class Meta:
+        model = User
+        fields = ["two_factor_enabled"]
+
+
+class RegisteredEmailPasswordResetForm(DjangoPasswordResetForm):
+    """Password reset that says so when the address isn't registered.
+
+    Django's default accepts any address silently, on purpose: replying
+    "no such account" tells an attacker which addresses exist. That
+    protection is being traded away here deliberately, because a member who
+    mistypes their address otherwise waits forever for an email that was
+    never going to arrive and has no way to find out why.
+
+    The trade is narrowed rather than taken wholesale — the view rate-limits
+    per session, so the page can't be used to enumerate a list at speed.
+    """
+
+    def clean_email(self):
+        email = self.cleaned_data["email"]
+        if not User.objects.filter(email__iexact=email, is_active=True).exists():
+            raise forms.ValidationError(
+                "We don't have an account for that email. "
+                "Check the address for typos, or sign up instead."
+            )
+        return email
 
 
 class ProfileForm(forms.ModelForm):

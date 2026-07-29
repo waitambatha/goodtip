@@ -1078,3 +1078,116 @@ class WallReplyNotificationTests(TestCase):
         # Nothing new since — the page shouldn't toast the same thing twice.
         again = self.client.get(f"/leagues/notifications/feed.json?since={latest}").json()
         self.assertEqual(again["items"], [])
+
+
+class InviteByEmailTests(TestCase):
+    """The emailed invite carries the same signed link as the Copy button."""
+
+    def setUp(self):
+        from django.urls import reverse
+
+        self.season = Season.objects.create(year=2031)
+        self.org = Organisation.objects.create(name="Invite FC", season=self.season)
+        self.admin = User.objects.create_user(
+            email="boss@example.com", password="Str0ng!pass", display_name="Erick Boss"
+        )
+        OrgMember.objects.create(
+            user=self.admin, org=self.org,
+            role=OrgMember.ROLE_MANAGER, is_league_owner=True,
+        )
+        self.url = reverse("orgs:invite", args=[self.org.id])
+        self.client.force_login(self.admin)
+
+    def _post(self, emails, message=""):
+        return self.client.post(self.url, {"emails": emails, "message": message})
+
+    def test_sends_one_email_per_address(self):
+        from django.core import mail
+
+        self._post("a@example.com, b@example.com")
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(
+            sorted(m.to[0] for m in mail.outbox), ["a@example.com", "b@example.com"]
+        )
+
+    def test_subject_names_the_inviter_and_group(self):
+        from django.core import mail
+
+        self._post("a@example.com")
+        self.assertEqual(
+            mail.outbox[0].subject,
+            "Erick Boss invited you to join Invite FC on GoodTip",
+        )
+
+    def test_body_carries_a_working_join_link(self):
+        from django.core import mail
+
+        from .signing import parse_join_token
+
+        self._post("a@example.com")
+        body = mail.outbox[0].body
+        token = body.split(f"/join/{self.org.id}/")[1].split("/")[0]
+        parsed = parse_join_token(token)
+        self.assertEqual(parsed["org_id"], self.org.id)
+        self.assertEqual(parsed["inviter_id"], self.admin.pk)
+
+    def test_reply_goes_to_the_inviter(self):
+        from django.core import mail
+
+        self._post("a@example.com")
+        self.assertEqual(mail.outbox[0].reply_to, ["boss@example.com"])
+
+    def test_optional_note_is_included(self):
+        from django.core import mail
+
+        self._post("a@example.com", message="Righto team.")
+        self.assertIn("Righto team.", mail.outbox[0].body)
+
+    def test_existing_members_are_skipped(self):
+        from django.core import mail
+
+        mate = User.objects.create_user(
+            email="mate@example.com", password="Str0ng!pass", display_name="Mate"
+        )
+        OrgMember.objects.create(user=mate, org=self.org)
+        self._post("mate@example.com, fresh@example.com")
+        self.assertEqual([m.to[0] for m in mail.outbox], ["fresh@example.com"])
+
+    def test_separators_and_duplicates_are_tolerated(self):
+        from django.core import mail
+
+        # Comma, semicolon, newline and space all work; the repeat is dropped.
+        self._post("a@example.com; b@example.com\nc@example.com a@example.com")
+        self.assertEqual(len(mail.outbox), 3)
+
+    def test_invalid_address_is_reported_and_nothing_sent(self):
+        from django.core import mail
+
+        resp = self._post("a@example.com, not-an-email")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("emails", resp.context["email_form"].errors)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_batch_size_is_capped(self):
+        from django.core import mail
+
+        from .forms import InviteByEmailForm
+
+        too_many = ", ".join(
+            f"p{n}@example.com" for n in range(InviteByEmailForm.MAX_PER_SEND + 1)
+        )
+        resp = self._post(too_many)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("emails", resp.context["email_form"].errors)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_non_managers_cannot_invite(self):
+        from django.core import mail
+
+        rando = User.objects.create_user(
+            email="rando@example.com", password="Str0ng!pass", display_name="Rando"
+        )
+        self.client.force_login(rando)
+        resp = self._post("a@example.com")
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(len(mail.outbox), 0)

@@ -5,10 +5,11 @@
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Manage — GoodTip{% endblock %}</title>
   <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
-  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:ital,wght@0,400;0,600;1,400&family=Barlow+Condensed:wght@600;900&family=Barlow+Semi+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
+  {% include "partials/_fonts.html" %}
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
   <script src="{% static 'js/gt-ui.js' %}" defer></script>
+  <script src="{% static 'js/gt-scenes.js' %}" defer></script>
+  <script src="{% static 'js/gt-lists.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
 </head>
 <body class="app manage-app gt-v2 gt-sheet">
@@ -125,11 +126,7 @@
       });
       document.addEventListener('click', function(e){ if (!panel.contains(e.target)) panel.classList.remove('open'); });
     }
-    /* backdrop crossfade */
-    var shots = document.querySelectorAll('.page-backdrop .shot');
-    if (shots.length > 1 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      var i = 0; setInterval(function(){ shots[i].classList.remove('on'); i=(i+1)%shots.length; shots[i].classList.add('on'); }, 9000);
-    }
+    /* backdrop rotation is handled by gt-scenes.js */
     document.querySelectorAll('[data-copy]').forEach(function(btn){
       btn.addEventListener('click', function(){ var t=document.querySelector(btn.getAttribute('data-copy')); if(!t)return; var v=t.value!==undefined?t.value:t.textContent; if(navigator.clipboard)navigator.clipboard.writeText(v); var o=btn.innerHTML; btn.innerHTML='Copied &#10003;'; setTimeout(function(){btn.innerHTML=o;},1500); });
     });

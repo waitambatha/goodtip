@@ -1,0 +1,16 @@
+{% comment %}
+The letter copy itself — the single source of truth.
+
+Both letter presentations (the parchment scroll and the desk note) include this,
+so the wording only ever lives in one place and the "copy this note" button can
+read whichever presentation is currently on screen. The two name spans are
+filled in from the form below the letter, hence the data- hooks.
+{% endcomment %}
+<div class="bn-body">
+  <p class="bn-greet">Dear <span data-letter-boss>{% firstof boss_name "Boss" %}</span>,</p>
+  <p>What if our footy tips actually did some good?</p>
+  <p>We're already picking teams and checking the ladder every Monday. GoodTip just sends our entry fees to a charity we choose. Together.</p>
+  <p>Five minutes to set up. Nothing to lose but bragging rights.</p>
+  <p>Can we do this?</p>
+  <p class="bn-sign">&mdash; <span data-letter-name>{% firstof your_name "[Your name]" %}</span></p>
+</div>

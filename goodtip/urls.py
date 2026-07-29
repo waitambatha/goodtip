@@ -5,6 +5,7 @@ from django.urls import include, path
 from django.views.generic import TemplateView
 from django.views.static import serve as static_serve
 
+from accounts.forms import RegisteredEmailPasswordResetForm
 from accounts.views import coming_soon_view, dashboard_view, tell_the_boss_view
 from admin_panel.views import news_detail, news_index
 from billing.views import good_list_view, stripe_webhook
@@ -42,7 +43,13 @@ urlpatterns = [
     path("", include("accounts.urls", namespace="accounts")),
     path("password-reset/", auth_views.PasswordResetView.as_view(
         template_name="auth/password_reset.html",
+        # Tells the member when the address isn't registered instead of
+        # accepting anything silently — see the form for the trade-off.
+        form_class=RegisteredEmailPasswordResetForm,
         email_template_name="auth/password_reset_email.txt",
+        # Branded HTML alongside the text part, so the reset email matches
+        # every other message rather than arriving as bare text.
+        html_email_template_name="auth/password_reset_email.html",
         subject_template_name="auth/password_reset_subject.txt",
         success_url="/password-reset/done/",
     ), name="password_reset"),

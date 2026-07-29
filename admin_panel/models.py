@@ -27,6 +27,10 @@ class NewsPost(models.Model):
     link_url = models.URLField(blank=True, help_text="Optional: send readers to a full story elsewhere.")
     is_published = models.BooleanField(default=True)
     published_at = models.DateTimeField(default=timezone.now)
+    # When this post was emailed to members. Emailing is a deliberate, separate
+    # action from publishing — otherwise toggling publish off and on would mail
+    # everyone again — and the stamp makes it once-only.
+    announced_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="news_posts",

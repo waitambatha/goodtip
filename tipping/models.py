@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -57,6 +59,9 @@ class Round(models.Model):
     stage = models.CharField(max_length=10, choices=STAGE_CHOICES, default=STAGE_REGULAR)
     lockout_at = models.DateTimeField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="upcoming")
+    # Set when the "how your tips went" emails go out for this round, so the
+    # scheduled job can't mail everyone twice.
+    results_email_sent_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-round_number"]
@@ -88,18 +93,48 @@ class Round(models.Model):
 class Match(models.Model):
     RESULT_CHOICES = [("home", "Home"), ("away", "Away"), ("draw", "Draw")]
 
+    # Live state, refreshed by the data_sync live poller. Kept separate from
+    # ``result``: result is the graded outcome that scores tips and must not
+    # move once set, while these fields churn every few minutes during play.
+    STATUS_SCHEDULED = "scheduled"
+    STATUS_LIVE = "live"
+    STATUS_COMPLETE = "complete"
+    STATUS_POSTPONED = "postponed"
+    STATUS_CHOICES = [
+        (STATUS_SCHEDULED, "Scheduled"),
+        (STATUS_LIVE, "In play"),
+        (STATUS_COMPLETE, "Complete"),
+        (STATUS_POSTPONED, "Postponed"),
+    ]
+
     round = models.ForeignKey(Round, on_delete=models.CASCADE, related_name="matches")
     home_team = models.ForeignKey(Team, on_delete=models.PROTECT, related_name="home_matches")
     away_team = models.ForeignKey(Team, on_delete=models.PROTECT, related_name="away_matches")
     kickoff_at = models.DateTimeField()
     venue = models.CharField(max_length=200, blank=True)
+    # Split out so "where is this being played" can be shown as a place, not
+    # just a ground name that only locals recognise.
+    venue_city = models.CharField(max_length=100, blank=True)
     result = models.CharField(max_length=10, choices=RESULT_CHOICES, null=True, blank=True)
     home_score = models.IntegerField(null=True, blank=True)
     away_score = models.IntegerField(null=True, blank=True)
     external_id = models.CharField(max_length=100, blank=True)
 
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
+    # Free text from the feed: "Q3", "Half Time", "2nd Half", "Full Time".
+    period = models.CharField(max_length=32, blank=True)
+    # Clock within the period as the feed words it: "12:45", "66'".
+    clock = models.CharField(max_length=16, blank=True)
+    # 0–100. Squiggle reports this directly; other feeds can derive it.
+    progress = models.PositiveSmallIntegerField(default=0)
+    live_updated_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ["kickoff_at"]
+        indexes = [
+            # The live poller and the My Tips filters both slice on these.
+            models.Index(fields=["status", "kickoff_at"]),
+        ]
 
     def __str__(self):
         return f"{self.home_team.name} v {self.away_team.name}"
@@ -111,6 +146,56 @@ class Match(models.Model):
     @property
     def has_result(self) -> bool:
         return self.result is not None
+
+    # Longest a match is presumed to still be in progress once it has started,
+    # for fixtures the live poller has never reached. Covers a long AFL game
+    # plus a delay; past it, an ungraded match is over rather than in play.
+    ASSUMED_MAX_DURATION = timedelta(hours=4)
+
+    @property
+    def phase(self) -> str:
+        """Which bucket this match belongs in: upcoming / live / complete.
+
+        Derived rather than read straight off ``status`` so the My Tips filters
+        still sort correctly for matches the live poller has never touched.
+        Two cases it has to get right without any feed data: a fixture that
+        kicked off minutes ago is live, and one that kicked off last month is
+        finished — not still running.
+        """
+        if self.status == self.STATUS_COMPLETE or self.result is not None:
+            return "complete"
+        if self.status == self.STATUS_LIVE:
+            return "live"
+        if self.status == self.STATUS_POSTPONED:
+            return "upcoming"
+        if not self.is_locked:
+            return "upcoming"
+        started_ago = timezone.now() - self.kickoff_at
+        return "live" if started_ago <= self.ASSUMED_MAX_DURATION else "complete"
+
+    @property
+    def is_live(self) -> bool:
+        return self.phase == "live"
+
+    @property
+    def live_label(self) -> str:
+        """The betting-board style clock: "Q3 12:45", "66'", "Half Time"."""
+        parts = [p for p in (self.period, self.clock) if p]
+        if parts:
+            return " ".join(parts)
+        return "In play" if self.phase == "live" else ""
+
+    @property
+    def score_line(self) -> str:
+        if self.home_score is None or self.away_score is None:
+            return ""
+        return f"{self.home_score}–{self.away_score}"
+
+    @property
+    def venue_label(self) -> str:
+        if self.venue and self.venue_city:
+            return f"{self.venue}, {self.venue_city}"
+        return self.venue or self.venue_city or ""
 
 
 class Tip(models.Model):

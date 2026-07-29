@@ -157,6 +157,107 @@ sudo systemctl status goodtip-sync.timer
 sudo journalctl -u goodtip-sync.service -n 50
 ```
 
+## Scheduled Jobs (match data, elections, recaps)
+
+These are **application** jobs, separate from `goodtip-sync.timer` (which only
+deploys code from GitHub). None of them can run inside a web request — a feed
+round-trip is far too slow for a page load — so they must be scheduled.
+
+Add to the app user's crontab (`crontab -e`):
+
+```cron
+APP=/home/mbatha-goodtip/projects/goodtip
+
+# In-play scores, quarter and clock. This is what puts "Q3 12:45" and a live
+# score on the fixtures. Only touches rounds with a game near kickoff, so
+# outside match windows it costs almost nothing.
+*/2 * * * *  cd $APP && venv/bin/python manage.py sync_matches --live >> /var/log/goodtip/sync.log 2>&1
+
+# Final scores. This is the job that grades tips and awards points.
+*/15 * * * * cd $APP && venv/bin/python manage.py sync_matches --results >> /var/log/goodtip/sync.log 2>&1
+
+# The draw itself — kickoff times and venues. Barely moves, so nightly.
+30 4 * * *   cd $APP && venv/bin/python manage.py sync_matches --fixtures --all-rounds >> /var/log/goodtip/sync.log 2>&1
+
+# Charity elections: open the ones whose start time has passed, close the ones
+# whose end time has passed.
+*/10 * * * * cd $APP && venv/bin/python manage.py open_due_elections >> /var/log/goodtip/jobs.log 2>&1
+
+# Vote reminders to members who haven't voted — one a day out, one an hour out.
+# Each is stamped on the vote once sent, so running often doesn't mean nagging.
+*/10 * * * * cd $APP && venv/bin/python manage.py send_election_reminders >> /var/log/goodtip/jobs.log 2>&1
+
+# Result emails: per-member round scorecards (only once every fixture in the
+# round is graded) and closed-election outcomes.
+0 * * * *    cd $APP && venv/bin/python manage.py send_result_emails >> /var/log/goodtip/jobs.log 2>&1
+
+# AI round recaps for graded rounds (skipped silently unless ANTHROPIC_API_KEY is set).
+15 6 * * *   cd $APP && venv/bin/python manage.py generate_recaps >> /var/log/goodtip/jobs.log 2>&1
+```
+
+```bash
+sudo mkdir -p /var/log/goodtip && sudo chown mbatha-goodtip /var/log/goodtip
+```
+
+### Checking it's working
+
+Every attempt is recorded as a `data_sync.SyncRun` row, so freshness is visible
+in the app rather than only in logs:
+
+- **Admin → Sync** shows "last successful run" per feed kind plus the last dozen
+  runs. A stamp that stops advancing is the first sign a cron has died.
+- Django admin → *Sync runs* has the full history with error messages.
+
+```bash
+# one-off manual run, verbose
+cd $APP && venv/bin/python manage.py sync_matches --live --round 12
+```
+
+### Feed coverage
+
+| Competition | Feed | Fixtures | Final scores | Live clock + score |
+| --- | --- | --- | --- | --- |
+| AFL | Squiggle (no key needed) | yes | yes | yes (`complete` %, `timestr`) |
+| NRL / NRLW | TheSports API | **not implemented** | **not implemented** | **not implemented** |
+
+`TheSportsAPISyncService` is still a stub and raises `SyncError`; the scheduled
+command logs that and carries on with the competitions that do work, so an
+unimplemented feed never blocks AFL. Wiring NRL needs `THESPORTS_API_KEY` in
+`.env` plus the client methods.
+
+## Email (Postmark)
+
+Transactional email goes through the Postmark API via
+`goodtip.email_backends.PostmarkEmailBackend`, which is a normal Django email
+backend — every `send_mail` / `EmailMultiAlternatives` caller in the codebase
+works through it unchanged.
+
+- Set `POSTMARK_SERVER_TOKEN` in `.env` and production uses Postmark.
+- Leave it blank and production falls back to SMTP (`EMAIL_HOST` etc.), exactly
+  as before.
+- With `DEBUG=True` email prints to the console. Set `EMAIL_SEND_FOR_REAL=true`
+  to actually deliver while developing.
+
+Messages live in `templates/emails/`, each as an `.html` + `.txt` pair sharing
+`emails/_base.html`:
+
+| Template | Sent when |
+| --- | --- |
+| `welcome` | on signup |
+| `election_open` | an election opens |
+| `election_reminder` | 1 day and 1 hour before a vote closes (non-voters only) |
+| `election_result` | a vote closes |
+| `tip_results` | a round is fully graded |
+| `news_published` | a news post goes out |
+| `tell_the_boss` | a member sends the boss note |
+
+Senders live in `orgs/notifications.py`; `goodtip/mail.py` renders both parts and
+batches the fan-out sends. Every send path is best-effort — a mail failure is
+logged and never breaks the action that triggered it.
+
+Before launch: verify the sending domain in Postmark (DKIM + Return-Path), or
+delivery will be rejected.
+
 ## GitHub SSH Setup
 
 SSH key for GitHub is configured at `~/.ssh/github_key`. The public key has been added to your GitHub account.

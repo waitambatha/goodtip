@@ -1,0 +1,46 @@
+{% extends "emails/_base.html" %}
+{% block title %}{{ inviter_name }} invited you to {{ org.name }}{% endblock %}
+{% block eyebrow %}You're invited{% endblock %}
+{% block preheader %}{{ inviter_name }} wants you in {{ org.name }} on GoodTip — footy tipping that funds a charity.{% endblock %}
+{% block content %}
+  <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">G'day,</p>
+  <p style="margin:0 0 20px;font-size:16px;line-height:1.6;color:#1A1A14;">
+    <b>{{ inviter_name }}</b> has invited you to join
+    <b>{{ org.name }}</b> on GoodTip — the footy tipping comp where the entry
+    fees go to a charity your group votes on, not a prize pool.
+  </p>
+
+  {% if message %}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
+    <tr>
+      <td style="padding:16px 18px;background:#F4F3EC;border-left:3px solid #2D7A3A;border-radius:6px;font-size:15px;line-height:1.6;color:#1A1A14;font-style:italic;">
+        &ldquo;{{ message }}&rdquo;
+        <div style="margin-top:8px;font-style:normal;font-size:13px;color:#6b6b5e;">— {{ inviter_name }}</div>
+      </td>
+    </tr>
+  </table>
+  {% endif %}
+
+  {% include "emails/_bits.html" with bit="eyebrow" label="What you're joining" %}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
+    <tr>
+      <td width="34" valign="top" style="padding:0 0 14px;"><span style="display:inline-block;width:24px;height:24px;line-height:24px;text-align:center;background:#C8F135;color:#0F2E22;border-radius:50%;font-size:12px;font-weight:bold;">1</span></td>
+      <td valign="top" style="padding:0 0 14px;font-size:15px;line-height:1.55;color:#1A1A14;"><b>Tip each round</b> — pick who wins. Takes a minute before lockout.</td>
+    </tr>
+    <tr>
+      <td width="34" valign="top" style="padding:0 0 14px;"><span style="display:inline-block;width:24px;height:24px;line-height:24px;text-align:center;background:#C8F135;color:#0F2E22;border-radius:50%;font-size:12px;font-weight:bold;">2</span></td>
+      <td valign="top" style="padding:0 0 14px;font-size:15px;line-height:1.55;color:#1A1A14;"><b>Climb the ladder</b> — and talk it up on the Wall.</td>
+    </tr>
+    <tr>
+      <td width="34" valign="top" style="padding:0;"><span style="display:inline-block;width:24px;height:24px;line-height:24px;text-align:center;background:#C8F135;color:#0F2E22;border-radius:50%;font-size:12px;font-weight:bold;">3</span></td>
+      <td valign="top" style="padding:0;font-size:15px;line-height:1.55;color:#1A1A14;"><b>Vote on the charity</b> — {{ org.name }} decides where the money goes.</td>
+    </tr>
+  </table>
+
+  {% include "emails/_bits.html" with bit="button" url=join_url label="Join "|add:org.name %}
+
+  <p style="margin:18px 0 0;font-size:13px;line-height:1.6;color:#6b6b5e;text-align:center;">
+    This invite link expires in {{ expires_days }} days. Not expecting this?
+    You can ignore it — nothing happens until you click.
+  </p>
+{% endblock %}

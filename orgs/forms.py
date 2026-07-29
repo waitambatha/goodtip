@@ -190,3 +190,67 @@ class OrgCreateForm(forms.ModelForm):
             org.save()
             self.save_m2m()
         return org
+
+
+class InviteByEmailForm(forms.Form):
+    """Send the join link to specific people.
+
+    Accepts a list rather than one address because inviting a team is the
+    normal case — asking someone to submit the form six times to add six
+    colleagues is the kind of friction that stops a group forming at all.
+    """
+
+    MAX_PER_SEND = 25
+
+    emails = forms.CharField(
+        label="Email addresses",
+        widget=forms.Textarea(attrs={
+            "rows": 3,
+            "placeholder": "sam@work.com.au, jo@work.com.au",
+        }),
+        help_text="Separate addresses with a comma, a space, or a new line.",
+    )
+    message = forms.CharField(
+        label="Add a note (optional)",
+        required=False,
+        max_length=500,
+        widget=forms.Textarea(attrs={
+            "rows": 2,
+            "placeholder": "Righto team — this is our tipping comp for the year.",
+        }),
+    )
+
+    def clean_emails(self):
+        raw = self.cleaned_data["emails"]
+        # People paste from a spreadsheet, a mail client, or type them out —
+        # accept all three rather than insisting on one separator.
+        parts = [
+            p.strip().strip("<>,;")
+            for p in raw.replace(",", " ").replace(";", " ").split()
+        ]
+        seen, cleaned, bad = set(), [], []
+        for part in parts:
+            if not part:
+                continue
+            try:
+                forms.EmailField().clean(part)
+            except forms.ValidationError:
+                bad.append(part)
+                continue
+            key = part.lower()
+            if key not in seen:
+                seen.add(key)
+                cleaned.append(part)
+        if bad:
+            raise forms.ValidationError(
+                "These don't look like email addresses: " + ", ".join(bad[:5])
+                + ("…" if len(bad) > 5 else "")
+            )
+        if not cleaned:
+            raise forms.ValidationError("Enter at least one email address.")
+        if len(cleaned) > self.MAX_PER_SEND:
+            raise forms.ValidationError(
+                f"That's {len(cleaned)} addresses — {self.MAX_PER_SEND} at a time is the limit. "
+                "Send the rest in a second batch."
+            )
+        return cleaned

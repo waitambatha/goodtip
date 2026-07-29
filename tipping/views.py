@@ -9,8 +9,8 @@ from billing.donations import donation_summary
 from orgs.models import OrgMember, Organisation
 from .models import Match, Round, Tip
 from .services import (
-    leaderboard_for_family, leaderboard_for_org, submit_tip, user_org_stats,
-    user_rank_in_org,
+    annotate_play_state, current_round, leaderboard_for_family,
+    leaderboard_for_org, submit_tip, user_org_stats, user_rank_in_org,
 )
 
 
@@ -105,18 +105,21 @@ def my_tips_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _require_member(request.user, org):
         return HttpResponseForbidden()
+    # Annotated so current_round can pick the round in play without a query per
+    # round. Kept newest-first: the prev/next sidebar below indexes into this
+    # list and depends on that order.
     rounds = list(
-        Round.objects.filter(org=org).order_by("-round_number")
+        annotate_play_state(Round.objects.filter(org=org)).order_by("-round_number")
     )
     selected_round_id = request.GET.get("round")
     if selected_round_id:
         try:
             selected_round = next(r for r in rounds if str(r.id) == selected_round_id)
         except StopIteration:
-            selected_round = rounds[0] if rounds else None
+            selected_round = current_round(rounds)
     else:
-        selected_round = rounds[0] if rounds else None
-    tip_rows = []
+        selected_round = current_round(rounds)
+    all_rows = []
     if selected_round:
         matches = selected_round.matches.select_related("home_team", "away_team").all()
         tips = {
@@ -125,16 +128,29 @@ def my_tips_view(request, org_id: int):
         }
         round_open = not selected_round.is_locked
         for m in matches:
-            tip_rows.append({
+            all_rows.append({
                 "match": m,
                 "tip": tips.get(m.id),
                 # a pick can change until the round locks or the match kicks off
                 "editable": round_open and not m.is_locked,
+                # upcoming / live / complete — drives the state filter below
+                "phase": m.phase,
             })
+
+    # ---- state filter. Counts are always over the whole round, so the tab
+    # labels don't change as you move between them.
+    STATES = ("upcoming", "live", "complete")
+    phase_counts = {s: sum(1 for r in all_rows if r["phase"] == s) for s in STATES}
+    state = request.GET.get("state", "all")
+    if state not in STATES:
+        state = "all"
+    tip_rows = all_rows if state == "all" else [r for r in all_rows if r["phase"] == state]
+
     stats = user_org_stats(request.user, org)
     if request.headers.get("HX-Request"):
         return render(request, "partials/my_tips_round.html", {
             "org": org, "round": selected_round, "rows": tip_rows,
+            "state": state, "phase_counts": phase_counts, "total_all": len(all_rows),
         })
 
     # ---- sidebar: where this member sits, and what's left to do this round.
@@ -145,8 +161,9 @@ def my_tips_view(request, org_id: int):
         prev_round = rounds[idx + 1] if idx + 1 < len(rounds) else None
         next_round = rounds[idx - 1] if idx > 0 else None
 
-    total_matches = len(tip_rows)
-    tips_this_round = sum(1 for r in tip_rows if r["tip"])
+    # Round-level stats describe the whole round, not the filtered view.
+    total_matches = len(all_rows)
+    tips_this_round = sum(1 for r in all_rows if r["tip"])
     board = list(leaderboard_for_org(org).values("id", "points"))
     total_tippers = len(board)
     rank = user_rank_in_org(request.user, org)
@@ -158,6 +175,7 @@ def my_tips_view(request, org_id: int):
     return render(request, "my_tips.html", {
         "org": org, "rounds": rounds, "selected_round": selected_round,
         "rows": tip_rows, "points": stats["points"],
+        "state": state, "phase_counts": phase_counts, "total_all": len(all_rows),
         "prev_round": prev_round, "next_round": next_round,
         "round_position": len(rounds) - rounds.index(selected_round) if selected_round else 0,
         "round_total": len(rounds),

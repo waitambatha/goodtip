@@ -39,6 +39,13 @@
               <span class="gt-actions">
                 <a href="{% url 'manage:news_edit' p.id %}">Edit</a>
                 <form method="post" action="{% url 'manage:news_toggle' p.id %}">{% csrf_token %}<button type="submit">{% if p.is_published %}Unpublish{% else %}Publish{% endif %}</button></form>
+                {% if p.is_published %}
+                  {% if p.announced_at %}
+                    <span title="Emailed {{ p.announced_at|date:'j M Y, g:i A' }}" style="font-size:12px;color:var(--muted);align-self:center;">Emailed &#10003;</span>
+                  {% else %}
+                    <form method="post" action="{% url 'manage:news_announce' p.id %}" onsubmit="return confirm('Email this post to every member? This can only be done once.');">{% csrf_token %}<button type="submit">Email members</button></form>
+                  {% endif %}
+                {% endif %}
                 <form method="post" action="{% url 'manage:news_delete' p.id %}" onsubmit="return confirm('Delete this post for good?');">{% csrf_token %}<button type="submit" class="danger">Delete</button></form>
               </span>
             </td>

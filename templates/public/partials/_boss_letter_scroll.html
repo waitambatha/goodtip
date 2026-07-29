@@ -1,0 +1,28 @@
+{% comment %}
+Presentation A — the parchment scroll.
+
+A rolled scroll centred on the page, pen resting to its left and inkwell to its
+right, red wax seal pressed into the bottom-right corner. The paper's side edges
+are deckled (torn) rather than straight, which is what stops it reading as a
+plain rounded rectangle.
+{% endcomment %}
+<div class="ttb-stage ttb-scroll" data-letter-style="scroll" role="group" aria-label="The note, as a parchment scroll">
+
+  <svg class="ttb-prop pen" viewBox="0 0 420 96" aria-hidden="true"><use href="#ttb-pen"/></svg>
+
+  <div class="ttb-inkgroup" aria-hidden="true">
+    <svg class="ttb-prop inkwell" viewBox="0 0 150 150"><use href="#ttb-inkwell"/></svg>
+    <svg class="ttb-prop splatter" viewBox="0 0 120 80"><use href="#ttb-splatter"/></svg>
+  </div>
+
+  <div class="sc-scroll">
+    <div class="sc-roll top" aria-hidden="true"><i></i><i></i></div>
+    <div class="sc-paper">
+      <span class="sc-stain a" aria-hidden="true"></span>
+      <span class="sc-stain b" aria-hidden="true"></span>
+      {% include "public/partials/_boss_letter_body.html" %}
+      <svg class="ttb-prop seal" viewBox="0 0 120 120" aria-hidden="true"><use href="#ttb-seal"/></svg>
+    </div>
+    <div class="sc-roll bottom" aria-hidden="true"><i></i><i></i></div>
+  </div>
+</div>

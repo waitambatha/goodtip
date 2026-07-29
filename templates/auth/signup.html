@@ -1,8 +1,16 @@
 {% extends "auth_base.html" %}
+{% load static %}
 {% block title %}Sign up — GoodTip{% endblock %}
 {% block loader_task %}Setting up your signup{% endblock %}
 {% block auth_mood %}mood-lime{% endblock %}
 {% block brand_head %}Join the comp. <em>Do some good.</em>{% endblock %}
+{% block brand_sub %}Free to play. Five minutes to set up. The entry fees go somewhere that matters.{% endblock %}
+{% block aside_shots %}
+  <div class="shot on" style="background-image:url('{% static 'img/scenes/afl-player-training.jpg' %}')"></div>
+  <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
+  <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-goal-posts.jpg' %}')"></div>
+  <div class="shot" style="background-image:url('{% static 'img/scenes/mcg-stadium.jpg' %}')"></div>
+{% endblock %}
 {% block auth_form %}
 <h1>Create your account</h1>
 <p class="sub">One account, every comp you're invited to.</p>
@@ -20,21 +28,29 @@
     {% if form.email.errors %}<div class="fld-err">{{ form.email.errors|join:" " }}</div>{% endif %}
   </div>
   <div class="fld">
-    <div class="fld-labelrow">
-      <label for="id_password1">Password</label>
-      <span class="gen-row">
-        <button type="button" class="gen-btn" id="genPassword"><svg class="cic" style="width:12px;height:12px;stroke:currentColor;fill:none;"><use href="#ic-spark"/></svg> Generate</button>
-        <button type="button" class="pw-toggle" data-pw-toggle="id_password1">Show</button>
-      </span>
+    {% comment %}
+    Label row carries the label alone. Generate used to sit up here next to
+    Show, which crowded three controls into one narrow line; it now has its
+    own row under the strength meter where it has room to breathe.
+    {% endcomment %}
+    <div class="fld-labelrow"><label for="id_password1">Password</label></div>
+    <div class="pw-field">
+      <input type="password" name="password1" id="id_password1" data-pw-strength placeholder="At least 8 characters" autocomplete="new-password">
+      <button type="button" class="pw-eye" data-pw-toggle="id_password1" aria-label="Show password"><svg aria-hidden="true"><use href="#ic-eye"/></svg></button>
     </div>
-    <input type="password" name="password1" id="id_password1" data-pw-strength placeholder="At least 8 characters" autocomplete="new-password">
     <div class="pw-meter"><i id="pwbar"></i></div>
+    <div class="pw-genrow">
+      <button type="button" class="gen-btn" id="genPassword"><svg class="cic" style="width:13px;height:13px;stroke:currentColor;fill:none;"><use href="#ic-spark"/></svg> Generate a strong password</button>
+    </div>
     <div class="pw-gen-out" id="pwGenOut"><span class="pwo-lab">Save it</span><span class="pwo-val"></span><button type="button" class="pwo-copy" id="pwGenCopy">Copy</button></div>
     {% if form.password1.errors %}<div class="fld-err">{{ form.password1.errors|join:" " }}</div>{% endif %}
   </div>
   <div class="fld">
-    <div class="fld-labelrow"><label for="id_password2">Confirm password</label><button type="button" class="pw-toggle" data-pw-toggle="id_password2">Show</button></div>
-    <input type="password" name="password2" id="id_password2" data-pw-match="id_password1" placeholder="Re-enter your password" autocomplete="new-password">
+    <div class="fld-labelrow"><label for="id_password2">Confirm password</label></div>
+    <div class="pw-field">
+      <input type="password" name="password2" id="id_password2" data-pw-match="id_password1" placeholder="Re-enter your password" autocomplete="new-password">
+      <button type="button" class="pw-eye" data-pw-toggle="id_password2" aria-label="Show password"><svg aria-hidden="true"><use href="#ic-eye"/></svg></button>
+    </div>
     {% include "partials/pw_checklist.html" with input_id="id_password1" confirm_id="id_password2" %}
     {% if form.password2.errors %}<div class="fld-err">{{ form.password2.errors|join:" " }}</div>{% endif %}
   </div>

@@ -1,0 +1,26 @@
+{{ your_name }} asked us to pass this on to you.
+
+----
+Dear {{ boss_name|default:"Boss" }},
+
+What if our footy tips actually did some good?
+
+We're already picking teams and checking the ladder every Monday. GoodTip just
+sends our entry fees to a charity we choose. Together.
+
+Five minutes to set up. Nothing to lose but bragging rights.
+
+Can we do this?
+
+— {{ your_name }}
+----
+
+WHAT GOODTIP ACTUALLY IS
+A footy tipping comp for your workplace or club where the entry fees go to a
+charity your group votes on, instead of a prize pool. Free to play, about five
+minutes to set up.
+
+See how it works: {{ how_url }}
+
+This is a one-off note sent at {{ your_name }}'s request — you're not on any
+mailing list and we won't email you again.

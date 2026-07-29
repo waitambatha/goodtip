@@ -2,10 +2,9 @@
    - "ddx" elegant dropdowns: progressively replaces native <select> elements
      (skips any select marked data-native) while keeping the native element as
      the source of truth, so existing change-listeners and form posts keep working.
-   - Page scenes: side imagery that crossfades behind the cream backdrop. */
+   Image rotation lives in gt-scenes.js. */
 (function () {
   'use strict';
-  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------------- elegant dropdowns ---------------- */
   function closeAll(except) {
@@ -87,25 +86,10 @@
 
   document.addEventListener('click', function () { closeAll(null); });
 
-  /* ---------------- side scenes crossfade ---------------- */
-  function runScenes() {
-    document.querySelectorAll('.page-scenes .scene, .page-backdrop').forEach(function (scene) {
-      var shots = scene.querySelectorAll('.shot');
-      if (shots.length < 2 || reduce) return;
-      var i = 0;
-      setInterval(function () {
-        shots[i].classList.remove('on');
-        i = (i + 1) % shots.length;
-        shots[i].classList.add('on');
-      }, 6000);
-    });
-  }
-
   function init() {
     document.querySelectorAll(
       '.app-main select, .admin-main select, .gl-filterbar select, .mini-form select'
     ).forEach(enhanceSelect);
-    runScenes();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

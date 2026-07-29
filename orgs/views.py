@@ -10,7 +10,8 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from accounts.views import JOIN_INVITER_SESSION_KEY, JOIN_SESSION_KEY
-from .forms import OrgCreateForm
+from .forms import InviteByEmailForm, OrgCreateForm
+from .notifications import send_org_invites
 from .models import (
     CharityVote,
     CharityVoteOption,
@@ -150,12 +151,57 @@ def org_invite_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _can_manage(request.user, org):
         return HttpResponseForbidden()
+    invite_url = _invite_url(request, org)
+    email_form = InviteByEmailForm()
+
+    if request.method == "POST":
+        email_form = InviteByEmailForm(request.POST)
+        if email_form.is_valid():
+            emails = email_form.cleaned_data["emails"]
+            # Anyone already in the group gets nothing — a "come join us" mail
+            # to someone who is already a member reads as a system that isn't
+            # paying attention.
+            existing = set(
+                OrgMember.objects.filter(org=org, user__email__in=emails)
+                .values_list("user__email", flat=True)
+            )
+            existing_lower = {e.lower() for e in existing}
+            to_send = [e for e in emails if e.lower() not in existing_lower]
+
+            sent = 0
+            if to_send:
+                sent = send_org_invites(
+                    org, request.user, to_send, invite_url,
+                    message=email_form.cleaned_data.get("message", ""),
+                )
+            if sent:
+                messages.success(
+                    request,
+                    f"Invitation sent to {sent} "
+                    f"{'person' if sent == 1 else 'people'}.",
+                )
+            elif to_send:
+                messages.error(
+                    request,
+                    "We couldn't send those invitations just now. "
+                    "Copy the link and share it directly, or try again shortly.",
+                )
+            skipped = len(emails) - len(to_send)
+            if skipped:
+                messages.info(
+                    request,
+                    f"{skipped} of those {'is' if skipped == 1 else 'are'} "
+                    f"already in {org.name}, so we skipped them.",
+                )
+            return redirect("orgs:invite", org_id=org.id)
+
     invitees = _invitees(request, org)
     return render(request, "orgs/invite.html", {
         "org": org,
-        "invite_url": _invite_url(request, org),
+        "invite_url": invite_url,
         "invitees": invitees,
         "invitee_count": invitees.count(),
+        "email_form": email_form,
     })
 
 
@@ -387,6 +433,25 @@ def _search_payload(user, q: str) -> list[dict]:
     ]
 
 
+# A tile icon per group, so the browse list reads as a set of things rather
+# than a wall of text. Keyed on the org id rather than picked at random, so a
+# group keeps the same tile on every visit — a list that reshuffled its own
+# icons each load would read as a rendering bug.
+BROWSE_ICONS = [
+    "ic-trophy", "ic-people", "ic-leaf", "ic-chart", "ic-cloud-sync",
+    "ic-calendar", "ic-target", "ic-spark", "ic-globe", "ic-flag",
+    "ic-heart", "ic-cap", "ic-flame", "ic-ribbon", "ic-users",
+]
+
+# Order of the browse list. "Most members" leads because the biggest groups are
+# the ones a newcomer is most likely to be looking for.
+BROWSE_SORTS = [
+    ("members", "Most members"),
+    ("name", "A–Z"),
+    ("new", "Newest"),
+]
+
+
 @login_required
 def org_search_view(request):
     """Find-your-group page (org-structure §2): each match offers BOTH paths —
@@ -416,6 +481,7 @@ def org_search_view(request):
             "org": org,
             "is_member": org.id in member_ids,
             "pending": org.id in pending_ids,
+            "icon": BROWSE_ICONS[org.id % len(BROWSE_ICONS)],
         }
 
     children = {}
@@ -428,12 +494,29 @@ def org_search_view(request):
         for org in all_orgs
         if org.parent_id is None
     ]
+
+    # Sorting applies to the top-level rows only; children stay in name order
+    # beneath whichever parent they belong to, so a family group doesn't get
+    # torn apart by the sort. Done in Python because `browse` is already built
+    # and re-querying to reorder 24 rows would cost more than it saves.
+    sort = request.GET.get("sort", "members")
+    if sort not in dict(BROWSE_SORTS):
+        sort = "members"
+    if sort == "members":
+        browse.sort(key=lambda r: (-r["org"].member_count, r["org"].name.lower()))
+    elif sort == "new":
+        browse.sort(key=lambda r: r["org"].created_at, reverse=True)
+    else:
+        browse.sort(key=lambda r: r["org"].name.lower())
+
     return render(request, "orgs/search.html", {
         "q": q,
         "results": results,
         "min_chars": SEARCH_MIN_CHARS,
         "browse": browse,
         "browse_total": len(all_orgs),
+        "sort": sort,
+        "sorts": BROWSE_SORTS,
     })
 
 

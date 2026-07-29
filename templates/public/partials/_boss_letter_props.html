@@ -1,0 +1,101 @@
+{% comment %}
+Desk props shared by both letter presentations: a fountain pen, a glass
+inkwell with splatter, and the red wax seal. Kept as one <svg defs> block plus
+<use>-able symbols so the two presentations can place the same objects at
+different angles and sizes without duplicating the path data.
+
+Included once per page, before either presentation.
+{% endcomment %}
+<svg class="ttb-props" width="0" height="0" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="penGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F6E4A8"/>
+      <stop offset=".4" stop-color="#C9A24A"/>
+      <stop offset=".7" stop-color="#8F6B22"/>
+      <stop offset="1" stop-color="#E3C878"/>
+    </linearGradient>
+    <linearGradient id="glassBody" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5A5F62"/>
+      <stop offset=".3" stop-color="#1B1F21"/>
+      <stop offset=".68" stop-color="#0A0C0D"/>
+      <stop offset="1" stop-color="#2E3437"/>
+    </linearGradient>
+    <radialGradient id="waxRed" cx="36%" cy="30%" r="78%">
+      <stop offset="0" stop-color="#D2544A"/>
+      <stop offset=".5" stop-color="#A32E26"/>
+      <stop offset="1" stop-color="#6B1410"/>
+    </radialGradient>
+
+    {% comment %}
+    Fountain pen, lying at rest. Drawn horizontally with the nib at the left, so
+    a presentation only has to rotate it into place.
+    {% endcomment %}
+    <symbol id="ttb-pen" viewBox="0 0 420 96">
+      <ellipse cx="215" cy="80" rx="180" ry="9" fill="rgba(40,30,14,.22)"/>
+      {# nib #}
+      <path d="M18 48 L58 33 L58 63 Z" fill="url(#penGold)"/>
+      <path d="M30 48 L58 40 L58 56 Z" fill="#7A5A18" opacity=".55"/>
+      <circle cx="52" cy="48" r="3.4" fill="#0C0C0C"/>
+      {# grip section #}
+      <path d="M58 34 h34 a6 6 0 0 1 0 28 H58 Z" fill="#14100C"/>
+      {# gold band #}
+      <rect x="92" y="31" width="15" height="34" rx="4" fill="url(#penGold)"/>
+      {% comment %}
+      Barrel and cap take currentColor so both presentations can share one pen
+      and still show different bodies — bottle green on the scroll, near-black
+      on the desk. Recolouring symbol content from outside only works through an
+      inherited property, and colour is the one that reliably crosses into the
+      shadow tree: a descendant CSS selector does not reach in, a presentation
+      attribute cannot hold a var(), and an inherited fill set to a gradient
+      reference did not render. The lacquer sheen comes from the white highlight
+      strokes below rather than a gradient.
+      {% endcomment %}
+      <path d="M107 30 h214 a10 10 0 0 1 0 36 H107 Z" fill="currentColor"/>
+      {# second gold band + cap finial #}
+      <rect x="321" y="29" width="13" height="38" rx="4" fill="url(#penGold)"/>
+      <path d="M334 31 h56 a14 19 0 0 1 0 34 h-56 Z" fill="currentColor"/>
+      <ellipse cx="392" cy="48" rx="7" ry="15" fill="url(#penGold)"/>
+      {# highlight along the top, so it reads as a lacquered cylinder #}
+      <path d="M112 37 h206" stroke="rgba(255,255,255,.30)" stroke-width="4" stroke-linecap="round" fill="none"/>
+      <path d="M340 38 h46" stroke="rgba(255,255,255,.24)" stroke-width="3.4" stroke-linecap="round" fill="none"/>
+    </symbol>
+
+    {# ---- glass inkwell: squat pot, ink inside, gloss on the shoulder ---- #}
+    <symbol id="ttb-inkwell" viewBox="0 0 150 150">
+      <ellipse cx="75" cy="138" rx="56" ry="9" fill="rgba(40,30,14,.26)"/>
+      <path d="M22 58 h106 a10 10 0 0 1 10 10 v48 a16 16 0 0 1-16 16 H28 a16 16 0 0 1-16-16 V68 a10 10 0 0 1 10-10 Z" fill="url(#glassBody)"/>
+      {# ink surface + neck #}
+      <rect x="46" y="40" width="58" height="20" rx="3" fill="#16191A"/>
+      <ellipse cx="75" cy="41" rx="29" ry="8" fill="#07090A"/>
+      <ellipse cx="75" cy="40" rx="29" ry="8" fill="none" stroke="#4E5457" stroke-width="2"/>
+      <ellipse cx="68" cy="40" rx="15" ry="4" fill="#0E1112"/>
+      {# gloss #}
+      <path d="M32 70 C 26 86, 27 106, 38 120" stroke="rgba(255,255,255,.28)" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <path d="M120 74 C 126 88, 125 104, 116 116" stroke="rgba(255,255,255,.14)" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <ellipse cx="62" cy="38" rx="6" ry="2" fill="rgba(255,255,255,.22)"/>
+    </symbol>
+
+    {# ---- red wax seal, "GOOD TIPS" over two lines ---- #}
+    <symbol id="ttb-seal" viewBox="0 0 120 120">
+      <path fill="url(#waxRed)" d="M60 4c9-3 17 4 26 4 8 0 15 6 18 13 4 8 12 13 11 22-1 8 4 16 1 24-3 9-1 19-8 25-6 6-8 16-16 19-8 4-16-1-25 1-9 1-17 6-25 2-8-3-17-3-22-10-6-7-14-11-15-20-1-8-5-16-2-24 3-9-2-19 4-26 5-7 6-17 14-21 7-4 14-9 23-9 5 0 11 2 16 0z"/>
+      <circle cx="60" cy="60" r="45" fill="none" stroke="rgba(255,225,210,.42)" stroke-width="1.6"/>
+      <circle cx="60" cy="60" r="36" fill="none" stroke="rgba(60,8,5,.5)" stroke-width="1.4"/>
+      <g class="seal-crown" fill="rgba(255,226,206,.85)">
+        <path d="M53 34 l3 5 4-6 4 6 3-5 1 7 H52 Z"/>
+      </g>
+      <text class="ttb-seal-t" x="60" y="62" text-anchor="middle">GOOD</text>
+      <text class="ttb-seal-t" x="60" y="82" text-anchor="middle">TIPS</text>
+    </symbol>
+
+    {# ---- ink splatter that sits beside the inkwell ---- #}
+    <symbol id="ttb-splatter" viewBox="0 0 120 80">
+      <g fill="#15100A">
+        <circle cx="24" cy="52" r="6.5"/><circle cx="44" cy="64" r="3.6"/>
+        <circle cx="58" cy="44" r="2.4"/><circle cx="72" cy="58" r="4.6"/>
+        <circle cx="90" cy="40" r="2"/><circle cx="14" cy="34" r="2.2"/>
+        <circle cx="100" cy="62" r="3"/><circle cx="36" cy="30" r="1.6"/>
+        <circle cx="66" cy="24" r="1.4"/><circle cx="84" cy="70" r="1.8"/>
+      </g>
+    </symbol>
+  </defs>
+</svg>
