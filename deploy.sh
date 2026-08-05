@@ -23,7 +23,7 @@ python manage.py collectstatic --noinput
 # fresh server is never left with an app that runs but never pulls any data.
 bash "$PROJECT_DIR/deploy/install-timers.sh"
 
-# Restart the service
-sudo systemctl restart goodtipservice
+# Restart the service (graceful gunicorn reload — no sudo needed)
+pkill -HUP -f "gunicorn.*goodtip.wsgi" || true
 
 echo "Deployment completed successfully"
