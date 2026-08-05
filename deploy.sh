@@ -19,9 +19,10 @@ python manage.py migrate
 # Collect static files
 python manage.py collectstatic --noinput
 
-# Install/refresh the scheduled-job units. Scheduling ships with the code so a
-# fresh server is never left with an app that runs but never pulls any data.
-bash "$PROJECT_DIR/deploy/install-timers.sh"
+# Install/refresh the scheduled-job units only when the unit files changed.
+if git diff HEAD~1 --name-only 2>/dev/null | grep -q "^deploy/systemd/"; then
+  bash "$PROJECT_DIR/deploy/install-timers.sh"
+fi
 
 # Restart the service (graceful gunicorn reload — no sudo needed)
 pkill -HUP -f "gunicorn.*goodtip.wsgi" || true
