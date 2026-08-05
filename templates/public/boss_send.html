@@ -1,0 +1,62 @@
+{% extends "auth_base.html" %}
+{% comment %}
+The send step gets the auth layout rather than the marketing page: two image
+panes either side, one centred card, nothing else on screen.
+
+The full tell-the-boss page exists to convince someone. By this point they are
+convinced — they have signed up and come back to send it — so continuing to
+show them the pitch, the sample letter and the FAQ buries the three fields that
+are the only thing left to do.
+{% endcomment %}
+{% block title %}Send the note — GoodTip{% endblock %}
+{% block loader_task %}Getting the note ready{% endblock %}
+{% block auth_mood %}mood-lime{% endblock %}
+{% block brand_head %}Get your workplace <em>on the board.</em>{% endblock %}
+{% block brand_sub %}We'll put the note on their desk with your name on it. When they start a comp, you're in it automatically.{% endblock %}
+{% block aside_body %}
+<ol class="aa-steps">
+  <li><span class="n">1</span><span class="t"><b>We send the note</b> to your boss, from you.</span></li>
+  <li><span class="n">2</span><span class="t"><b>They sign up</b> and set up the comp.</span></li>
+  <li><span class="n">3</span><span class="t"><b>You're added automatically</b> — no asking to join.</span></li>
+</ol>
+{% endblock %}
+
+{% block auth_form %}
+<h1>Send it to the boss</h1>
+<p class="sub">Three fields. The letter itself is fixed — you're not writing it, so it can't go wrong.</p>
+
+{% if boss_error %}<div class="flash error" style="margin-bottom:16px;"><span>{{ boss_error }}</span></div>{% endif %}
+
+<form method="post" action="{% url 'tell_the_boss' %}" novalidate data-busy="Sending the note">
+  {% csrf_token %}
+  <div class="fld">
+    <label for="bsYourName">Your name</label>
+    <input type="text" name="your_name" id="bsYourName" value="{{ your_name }}"
+           maxlength="80" autocomplete="name" placeholder="e.g. Sam from accounts" autofocus>
+    <div class="hint">This is the name the note goes out under.</div>
+  </div>
+
+  <div class="fld">
+    <label for="bsBossName">Boss's name <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+    <input type="text" name="boss_name" id="bsBossName" value="{{ boss_name }}"
+           maxlength="80" autocomplete="off" placeholder="e.g. Priya">
+  </div>
+
+  <div class="fld">
+    <label for="bsBossEmail">Boss's email</label>
+    <input type="email" name="boss_email" id="bsBossEmail" value="{{ boss_email_draft }}"
+           autocomplete="off" placeholder="boss@yourwork.com.au">
+    <div class="hint">They'll be able to reply straight to you.</div>
+  </div>
+
+  {% comment %}Bots fill every field; a human never sees this one.{% endcomment %}
+  <input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true"
+         style="position:absolute;left:-9999px;width:1px;height:1px;">
+
+  <button type="submit" class="abtn abtn-primary abtn-block">Send the note &rarr;</button>
+</form>
+
+<p class="sub" style="margin-top:16px;text-align:center;">
+  Rather do it yourself? <a href="{% url 'tell_the_boss' %}?copy=1">Copy the letter instead</a>
+</p>
+{% endblock %}

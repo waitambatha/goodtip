@@ -17,6 +17,14 @@
     if (sel.dataset.ddx || sel.hasAttribute('data-native') || sel.multiple) return;
     sel.dataset.ddx = '1';
 
+    /* Tell the floating-label field it no longer holds a native select. The
+       label is positioned over the control and floats up when the select has
+       focus or a value — neither of which happens any more, because the select
+       is now a hidden 1px element and the visible control is a button beside
+       it. Without this the label sits on top of the button's text. */
+    var field = sel.closest('.field');
+    if (field) field.classList.add('has-ddx');
+
     var dd = document.createElement('div');
     dd.className = 'ddx';
     sel.parentNode.insertBefore(dd, sel);
@@ -87,11 +95,42 @@
   document.addEventListener('click', function () { closeAll(null); });
 
   function init() {
+    /* The public contact form was missing from this list, so its "I'm
+       interested in…" field was the one raw native select left on the site —
+       an OS-drawn popup in the middle of a designed dark panel. */
     document.querySelectorAll(
-      '.app-main select, .admin-main select, .gl-filterbar select, .mini-form select'
+      '.app-main select, .admin-main select, .gl-filterbar select, ' +
+      '.mini-form select, .contact-shell select'
     ).forEach(enhanceSelect);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
+})();
+
+/* Nav "Manage" dropdown. Click to open, click-away / Escape to close. */
+(function () {
+  'use strict';
+  document.querySelectorAll('[data-anmenu]').forEach(function (menu) {
+    var btn = menu.querySelector('.an-menu-btn');
+    var panel = menu.querySelector('.an-menu-panel');
+    if (!btn || !panel) return;
+
+    function close() {
+      panel.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+    }
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = panel.hidden;
+      panel.hidden = !open;
+      btn.setAttribute('aria-expanded', String(open));
+    });
+    document.addEventListener('click', function (e) {
+      if (!menu.contains(e.target)) close();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') close();
+    });
+  });
 })();

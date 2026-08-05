@@ -1,0 +1,18 @@
+[Unit]
+# Pulls fixtures, live scores and results from the upstream feeds.
+# Separate from goodtip-sync.service, which only deploys code from GitHub.
+Description=GoodTip — run due sports data syncs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=mbatha-goodtip
+WorkingDirectory=/home/mbatha-goodtip/projects/goodtip
+ExecStart=/home/mbatha-goodtip/projects/goodtip/venv/bin/python manage.py run_due_syncs
+# A hung feed must not leave a run wedged until the next tick collides with it.
+TimeoutStartSec=600
+# The command decides internally what is due, so a failure here is a real
+# failure worth seeing in the journal rather than something to retry blindly.
+StandardOutput=journal
+StandardError=journal

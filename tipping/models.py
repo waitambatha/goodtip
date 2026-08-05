@@ -80,6 +80,19 @@ class Round(models.Model):
         return self.status in ("locked", "complete") or timezone.now() >= self.lockout_at
 
     @property
+    def has_open_matches(self) -> bool:
+        """Any fixture in this round that has not kicked off yet.
+
+        The distinction that matters once tipping is per-match: `is_locked` asks
+        whether the round's first game has started, which says nothing about
+        whether there is still something to tip. A Thursday-night opener locks
+        the round while Saturday and Sunday are wide open.
+        """
+        if self.status == "complete":
+            return False
+        return self.matches.filter(kickoff_at__gt=timezone.now()).exists()
+
+    @property
     def effective_status(self) -> str:
         if self.status == "complete":
             return "complete"
@@ -216,3 +229,49 @@ class Tip(models.Model):
 
     def __str__(self):
         return f"{self.user} → {self.selection} for {self.match}"
+
+
+class LadderEntry(models.Model):
+    """One team's position on the competition ladder.
+
+    Keyed to (series, season) rather than to an organisation. A ladder is a fact
+    about the competition — Fremantle are top of the AFL whichever league you
+    tip in — so unlike Round and Match it is stored once and read by everyone.
+    That also means the sync fetches it once per competition per season instead
+    of once per league.
+
+    Refreshed wholesale from the feed: the provider computes rank, percentage
+    and premiership points under rules that differ per competition (percentage
+    in the AFL, for-and-against in the NRL), and recomputing them locally would
+    be a second implementation to keep in step for no gain.
+    """
+
+    series = models.ForeignKey("catalog.Series", on_delete=models.CASCADE, related_name="ladder_entries")
+    season = models.ForeignKey("catalog.Season", on_delete=models.CASCADE, related_name="ladder_entries")
+    team = models.ForeignKey("tipping.Team", on_delete=models.CASCADE, related_name="ladder_entries")
+
+    rank = models.PositiveIntegerField()
+    played = models.PositiveIntegerField(default=0)
+    wins = models.PositiveIntegerField(default=0)
+    losses = models.PositiveIntegerField(default=0)
+    draws = models.PositiveIntegerField(default=0)
+    points = models.IntegerField(default=0)
+    # AFL percentage is points-for/against x100 and runs well over 100, so this
+    # is not a 0-100 value.
+    percentage = models.FloatField(default=0)
+    points_for = models.IntegerField(default=0)
+    points_against = models.IntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["series", "rank"]
+        unique_together = ("series", "season", "team")
+        verbose_name_plural = "ladder entries"
+
+    def __str__(self):
+        return f"{self.rank}. {self.team.name} ({self.series} {self.season})"
+
+    @property
+    def played_check(self) -> int:
+        """Wins+losses+draws. Differs from `played` only if the feed is mid-update."""
+        return self.wins + self.losses + self.draws

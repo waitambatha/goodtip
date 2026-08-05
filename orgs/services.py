@@ -83,6 +83,48 @@ def add_member(user, org, *, inviter_id=None, role=OrgMember.ROLE_PARTICIPANT) -
     return member
 
 
+def notify(users, *, kind, title, message="", link_url="", org=None) -> int:
+    """Drop an in-app notification in one or more people's bell panel.
+
+    The email side of a process event and the in-app side had drifted: joining
+    emailed the admins and told the requester nothing, so after "Ask to join"
+    the app went quiet until an admin happened to act. Everything that emails
+    about a process now writes here too, through this one call.
+
+    Best-effort by design — a notification is a courtesy, and failing to write
+    one must never roll back the join or the vote that triggered it.
+    """
+    from .models import Notification
+
+    users = [u for u in users if u is not None]
+    if not users:
+        return 0
+    try:
+        rows = Notification.objects.bulk_create([
+            Notification(
+                user=u, org=org, kind=kind,
+                title=title, message=message, link_url=link_url,
+            )
+            for u in users
+        ])
+        return len(rows)
+    except Exception:  # noqa: BLE001 — never let the bell panel break the action
+        logger.exception("Could not write %r notification for %d user(s)", kind, len(users))
+        return 0
+
+
+def org_admin_users(org):
+    """Everyone who can act on an admin decision for this org."""
+    from django.db.models import Q
+
+    return [
+        m.user
+        for m in OrgMember.objects.filter(org=org)
+        .filter(Q(role__in=[OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH]) | Q(is_league_owner=True))
+        .select_related("user")
+    ]
+
+
 def _notify_join_request(req: MembershipRequest) -> None:
     """Email the org's managers that someone asked to join (best-effort:
     a mail failure must never block the request itself)."""
@@ -126,7 +168,39 @@ def request_to_join(user, org) -> MembershipRequest:
         return existing
     req = MembershipRequest.objects.create(user=user, org=org)
     _notify_join_request(req)
+    _notify_join_request_in_app(req)
     return req
+
+
+def _notify_join_request_in_app(req: MembershipRequest) -> None:
+    """Both sides of a pending request: the asker sees they're in the queue,
+    the admins see there's something waiting on them."""
+    from .models import Notification
+
+    notify(
+        [req.user], org=req.org,
+        kind=Notification.KIND_JOIN_REQUESTED,
+        title=f"Request sent to {req.org.name}",
+        message=(
+            f"You've asked to join {req.org.name}. An admin there reviews every "
+            "request, so it may take a little while. We'll let you know here as "
+            "soon as they've had a look — once you're in you can tip each round, "
+            "climb the ladder and help pick the charity your group raises for."
+        ),
+        link_url="/dashboard/",
+    )
+    notify(
+        org_admin_users(req.org), org=req.org,
+        kind=Notification.KIND_JOIN_REVIEW,
+        title=f"{req.user.display_name} wants to join",
+        message=(
+            f"{req.user.display_name} has asked to join {req.org.name}. "
+            "Open this to see them and approve or decline — they're waiting to hear back."
+        ),
+        # Straight to the one request, not the Members page: from a notification
+        # the admin should land on the person, with the buttons already there.
+        link_url=f"/leagues/{req.org_id}/requests/{req.id}/",
+    )
 
 
 @transaction.atomic
@@ -141,7 +215,21 @@ def approve_membership_request(req: MembershipRequest, *, by_user) -> OrgMember:
     req.decided_at = timezone.now()
     req.decided_by = by_user
     req.save(update_fields=["status", "decided_at", "decided_by"])
-    return add_member(req.user, req.org)
+    member = add_member(req.user, req.org)
+    from .models import Notification
+
+    notify(
+        [req.user], org=req.org,
+        kind=Notification.KIND_JOIN_APPROVED,
+        title=f"You're in — welcome to {req.org.name}",
+        message=(
+            f"An admin approved your request to join {req.org.name}. Your tips "
+            "count from the next round, and you'll get a say when the group votes "
+            "on the charity it raises for. Head to your dashboard to get started."
+        ),
+        link_url="/dashboard/",
+    )
+    return member
 
 
 def decline_membership_request(req: MembershipRequest, *, by_user) -> MembershipRequest:
@@ -152,6 +240,21 @@ def decline_membership_request(req: MembershipRequest, *, by_user) -> Membership
     req.decided_at = timezone.now()
     req.decided_by = by_user
     req.save(update_fields=["status", "decided_at", "decided_by"])
+    from .models import Notification
+
+    # Deliberately gentle and non-final: a decline is often "wrong group" or
+    # "we don't know you yet", and the model allows asking again.
+    notify(
+        [req.user], org=req.org,
+        kind=Notification.KIND_JOIN_DECLINED,
+        title=f"Your request to join {req.org.name} wasn't approved",
+        message=(
+            f"An admin at {req.org.name} didn't approve this one. If you think "
+            "it's a mix-up, have a word with them and you're welcome to ask "
+            "again — or find another group, or start your own."
+        ),
+        link_url="/leagues/search/",
+    )
     return req
 
 
@@ -285,6 +388,27 @@ def close_charity_vote(vote: CharityVote):
     vote.save(update_fields=["winning_charity", "status", "closed_at"])
     if winner is not None:
         set_org_charity(vote.org, winner, source=OrgCharitySelection.SOURCE_VOTE)
+
+    from .models import Notification
+
+    if winner is not None:
+        title = f"{winner.name} won your charity vote"
+        body = (
+            f"{vote.org.name} has chosen {winner.name}. Everything your group "
+            "raises from here goes to them — thanks for having your say."
+        )
+    else:
+        title = f"Charity vote closed — {vote.org.name}"
+        body = (
+            "The vote has closed without a result, so no charity was chosen this "
+            "time. Your admin can start another one whenever the group's ready."
+        )
+    notify(
+        [m.user for m in vote.org.members.select_related("user")], org=vote.org,
+        kind=Notification.KIND_ELECTION_RESULT,
+        title=title, message=body,
+        link_url=f"/leagues/{vote.org_id}/charity-vote/",
+    )
     return winner
 
 
@@ -359,6 +483,36 @@ def schedule_charity_election(vote: CharityVote, *, when, close_at=None, message
     vote.save(update_fields=["admin_message", "scheduled_open_at", "scheduled_close_at", "status"])
     if when <= timezone.now():
         open_charity_election(vote)
+        return vote
+
+    # Only worth announcing when it's genuinely in the future — an election that
+    # opens immediately sends its own "vote now" notification from
+    # open_charity_election, and both would land in the same second.
+    from django.utils import formats
+
+    from .models import Notification
+
+    opens = formats.date_format(timezone.localtime(when), "DATETIME_FORMAT")
+    closes = (
+        formats.date_format(timezone.localtime(close_at), "DATETIME_FORMAT")
+        if close_at else ""
+    )
+    notify(
+        [m.user for m in vote.org.members.select_related("user")], org=vote.org,
+        kind=Notification.KIND_ELECTION_SCHEDULED,
+        title=f"Charity vote coming up — {vote.org.name}",
+        message=(
+            f"Your group is about to choose the charity it raises for this season. "
+            f"Voting opens {opens}"
+            + (f" and closes {closes}" if closes else "")
+            # em dash, not a full stop: the localised time already ends in one
+            # ("5:14 p.m."), and a period after it reads as a typo.
+            + " — every member gets one vote, so keep an eye out. We'll let you "
+            "know here the moment it opens."
+            + (f"\n\nFrom your admin: {vote.admin_message}" if vote.admin_message else "")
+        ),
+        link_url=f"/leagues/{vote.org_id}/charity-vote/",
+    )
     return vote
 
 

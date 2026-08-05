@@ -1,4 +1,13 @@
-{% comment %} Swap href values for {% url 'name' %} once urls.py is wired. {% endcomment %}
+{% comment %}
+Home is deliberately absent when you are already on it — a nav item that points
+at the page you are reading is a dead control, and the wordmark to its left
+already goes there. Everywhere else it stays, because that is where it is
+actually useful.
+
+The two auth actions sit in their own group with a divider. They are the only
+items that change your state rather than move you around, so grouping them by
+what they DO is more honest than leaving them as the last two of nine links.
+{% endcomment %}
 <nav class="nav" data-open="false">
   <div class="nav-inner">
     <a href="/" class="wordmark">GOOD<span>TIP</span><span class="dot">.</span></a>
@@ -6,7 +15,9 @@
       <span></span><span></span><span></span>
     </button>
     <ul class="nav-links" id="nav-menu">
-      <li><a href="/" {% if active == 'home' %}aria-current="page"{% endif %}>Home</a></li>
+      {% if active != 'home' %}
+      <li><a href="/">Home</a></li>
+      {% endif %}
       <li><a href="/how-it-works/" {% if active == 'how' %}aria-current="page"{% endif %}>How It Works</a></li>
       <li><a href="/tell-the-boss/" {% if active == 'boss' %}aria-current="page"{% endif %}>Tell the Boss</a></li>
       <li><a href="/news/" {% if active == 'news' %}aria-current="page"{% endif %}>News</a></li>
@@ -14,8 +25,10 @@
       <li><a href="/leaderboard/" {% if active == 'leaderboard' %}aria-current="page"{% endif %}>The Good List</a></li>
       <li><a href="/#charities" {% if active == 'charities' %}aria-current="page"{% endif %}>Charities</a></li>
       <li><a href="/pricing/" {% if active == 'pricing' %}aria-current="page"{% endif %}>Pricing</a></li>
+
+      <li class="nav-sep" aria-hidden="true"></li>
       <li class="nav-auth"><a href="/login/" class="nav-login">Log in</a></li>
-      <li><a href="/signup/" class="btn-nav">Sign up</a></li>
+      <li class="nav-auth"><a href="/signup/" class="btn-nav">Sign up free</a></li>
     </ul>
   </div>
 </nav>

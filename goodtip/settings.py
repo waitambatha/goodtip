@@ -39,7 +39,17 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Traffic-driven fallback, enabled only by opting in — see AUTOSYNC_ENABLED.
+    "data_sync.autosync.AutoSyncMiddleware",
 ]
+
+# Syncing runs on the server's clock via goodtip-matchsync.timer, NOT on site
+# traffic: data has to be current when a visitor arrives, not fetched because
+# one did. This flag turns on a traffic-driven fallback and exists only for an
+# environment with no timer (a bare container, a staging box). Off by default —
+# on, it would sync only while someone happened to be browsing, and its work
+# would die with the web worker on every restart.
+AUTOSYNC_ENABLED = os.environ.get("AUTOSYNC_ENABLED", "False").lower() == "true"
 
 ROOT_URLCONF = "goodtip.urls"
 
@@ -54,6 +64,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "orgs.context_processors.user_orgs",
+                "orgs.context_processors.contact_form",
             ],
         },
     },
@@ -115,10 +126,17 @@ LOGOUT_REDIRECT_URL = "landing"
 POSTMARK_SERVER_TOKEN = os.environ.get("POSTMARK_SERVER_TOKEN", "")
 POSTMARK_MESSAGE_STREAM = os.environ.get("POSTMARK_MESSAGE_STREAM", "outbound")
 
+# Print one-time sign-in codes to the terminal. This was the stand-in while
+# Postmark approval was pending; now that mail really sends it defaults off, so
+# a code lives in an inbox rather than in a terminal anyone can scroll back
+# through. Turn it on in .env when working offline. Only ever consulted when
+# DEBUG is on (see accounts.notifications), so a live server can't leak one.
+SHOW_OTP_IN_CONSOLE = os.environ.get("SHOW_OTP_IN_CONSOLE", "False").lower() == "true"
+
 if DEBUG:
-    # Console by default so local work never sends real mail. Set
-    # EMAIL_SEND_FOR_REAL=true in .env when you want to check live delivery or
-    # how a template renders in an actual client.
+    # Postmark when EMAIL_SEND_FOR_REAL says so, console otherwise. Both paths
+    # are kept: the console one is what to fall back to offline, or when you
+    # don't want dev traffic counted against the Postmark quota.
     if os.environ.get("EMAIL_SEND_FOR_REAL", "False").lower() == "true" and POSTMARK_SERVER_TOKEN:
         EMAIL_BACKEND = "goodtip.email_backends.PostmarkEmailBackend"
     else:
@@ -163,7 +181,16 @@ SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://goodtip.com.au")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 RECAP_MODEL = os.environ.get("RECAP_MODEL", "claude-opus-4-8")
 
-THESPORTS_API_KEY = os.environ.get("THESPORTS_API_KEY", "")
+# NRL fixtures, scores and results come from API-SPORTS (v1.rugby.api-sports.io).
+# THESPORTS_API_KEY is the old name, kept as a fallback so an existing .env keeps
+# working — the host it was written for (api.thesportsapi.com) has no DNS record
+# and never did, so nothing can be depending on the old client.
+APISPORTS_KEY = os.environ.get("APISPORTS_KEY") or os.environ.get("THESPORTS_API_KEY", "")
+THESPORTS_API_KEY = APISPORTS_KEY  # legacy alias
+# The NRL's league id within API-SPORTS' rugby catalogue. Discovered from
+# /leagues on first use when left unset, then worth pinning here to save a
+# request per sync.
+APISPORTS_NRL_LEAGUE_ID = os.environ.get("APISPORTS_NRL_LEAGUE_ID", "")
 
 # Stripe (Phase 1: single-destination platform-fee charges via Checkout).
 # Left blank until test/live keys are supplied — billing stays dormant if unset.

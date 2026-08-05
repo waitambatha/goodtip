@@ -1,0 +1,85 @@
+{% extends "admin_base.html" %}
+{% load static %}
+{% block title %}{{ enquiry.name }} — Enquiries{% endblock %}
+{% block nav_enquiries %}on{% endblock %}
+{% block hero_title %}{{ enquiry.name }}{% endblock %}
+{% block hero_lead %}{{ enquiry.email }}{% if enquiry.organisation %} &middot; {{ enquiry.organisation }}{% endif %}{% endblock %}
+{% block hero_shot %}{% static 'img/scenes/mcg-stadium.jpg' %}{% endblock %}
+{% block admin_content %}
+
+<div class="gt-shell gt-shell-wide">
+  <p class="gt-back"><a href="{% url 'manage:enquiries' %}">&larr; All enquiries</a></p>
+
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-mail"/></svg></span>
+      <div>
+        <h2>Their message</h2>
+        <div class="gp-sub">
+          Sent {{ enquiry.created_at|date:"j M Y, g:i a" }}
+          {% if enquiry.interest %} &middot; {{ enquiry.interest }}{% endif %}
+          {% if enquiry.source_page %} &middot; from {{ enquiry.source_page }}{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="enq-body">{{ enquiry.message|linebreaks }}</div>
+
+    <dl class="enq-meta">
+      <div><dt>Name</dt><dd>{{ enquiry.name }}</dd></div>
+      <div><dt>Email</dt><dd><a href="mailto:{{ enquiry.email }}">{{ enquiry.email }}</a></dd></div>
+      {% if enquiry.organisation %}<div><dt>Organisation</dt><dd>{{ enquiry.organisation }}</dd></div>{% endif %}
+      {% if enquiry.interest %}<div><dt>Interested in</dt><dd>{{ enquiry.interest }}</dd></div>{% endif %}
+    </dl>
+  </section>
+
+  {% if enquiry.status == 'replied' %}
+  {# Already answered: show what was said rather than an empty box, so a second
+     person opening this can see the answer instead of writing another one. #}
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-heart"/></svg></span>
+      <div>
+        <h2>Our reply</h2>
+        <div class="gp-sub">
+          Sent {{ enquiry.replied_at|date:"j M Y, g:i a" }}
+          {% if enquiry.replied_by %} by {{ enquiry.replied_by.display_name|default:enquiry.replied_by.email }}{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="enq-body enq-reply">{{ enquiry.reply_body|linebreaks }}</div>
+    <form method="post" class="enq-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="reopen">
+      <button type="submit" class="abtn abtn-quiet">Reopen this enquiry</button>
+    </form>
+  </section>
+
+  {% else %}
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-mail"/></svg></span>
+      <div>
+        <h2>Reply</h2>
+        <div class="gp-sub">This goes to {{ enquiry.email }} as an email from GoodTip. Their original message is quoted underneath it.</div>
+      </div>
+    </div>
+
+    <form method="post" class="enq-form" data-busy="Sending your reply">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="reply">
+      <label class="enq-label" for="reply_body">Your reply to {{ enquiry.name }}</label>
+      <textarea name="reply_body" id="reply_body" class="enq-textarea" rows="10"
+                placeholder="Hi {{ enquiry.name }}, thanks for getting in touch&hellip;" required></textarea>
+      <div class="enq-actions">
+        <button type="submit" class="abtn abtn-primary">Send reply &rarr;</button>
+        <button type="submit" name="action" value="close" class="abtn abtn-quiet" formnovalidate data-busy-skip>
+          Close without replying
+        </button>
+      </div>
+    </form>
+  </section>
+  {% endif %}
+</div>
+
+{% endblock %}

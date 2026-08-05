@@ -20,7 +20,8 @@
 {% block auth_form %}
 <h1>Log in</h1>
 <p class="sub">Pick up where your group left off.</p>
-<form method="post" action="{% url 'accounts:login' %}{% if request.GET.next %}?next={{ request.GET.next|urlencode }}{% endif %}" novalidate>
+<form method="post" action="{% url 'accounts:login' %}{% if request.GET.next %}?next={{ request.GET.next|urlencode }}{% endif %}" novalidate
+      data-busy="Signing you in">
   {% csrf_token %}
   <div class="fld">
     <label for="id_email">Email</label>
@@ -28,13 +29,15 @@
     {% if form.email.errors %}<div class="fld-err">{{ form.email.errors|join:" " }}</div>{% endif %}
   </div>
   <div class="fld">
-    <div class="fld-labelrow"><label for="id_password">Password</label><a href="{% url 'password_reset' %}" class="flink" style="font-size:12px;">Forgot?</a></div>
-    {# reveal sits inside the field, so the label row is just label + Forgot #}
+    <label for="id_password">Password</label>
+    {# the reveal eye sits inside the field #}
     <div class="pw-field">
       <input type="password" name="password" id="id_password" placeholder="Your password" autocomplete="current-password">
       <button type="button" class="pw-eye" data-pw-toggle="id_password" aria-label="Show password"><svg aria-hidden="true"><use href="#ic-eye"/></svg></button>
     </div>
     {% if form.password.errors %}<div class="fld-err">{{ form.password.errors|join:" " }}</div>{% endif %}
+    {# under the field, spelled out — as a small "Forgot?" up on the label row it went unnoticed #}
+    <a href="{% url 'password_reset' %}" class="flink flink-lg">Forgot your password?</a>
   </div>
   <button type="submit" class="abtn abtn-primary abtn-block">Log in &rarr;</button>
 </form>

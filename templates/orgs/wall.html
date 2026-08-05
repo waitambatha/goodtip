@@ -4,7 +4,7 @@
 {% block title %}The Wall — {{ org.name }}{% endblock %}
 {% block loader_task %}Opening the Wall{% endblock %}
 {% block nav_wall %}on{% endblock %}
-{% block body_class %}gt-sheet{% endblock %}
+{% block body_class %}page-deep sheet-page{% endblock %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 
 {% block app_content %}
@@ -74,7 +74,7 @@ the other. No composer here — posting is a button in the group header.
         {% if p.kind == 'recap' %}<span class="gpt-tag">Round recap</span>{% else %}<span class="gpt-tag">Update</span>{% endif %}
       {% endif %}
       {% if p.can_remove %}{# admins can also hide a recap/system card — recap spec §11 #}
-      <form method="post" action="{% url 'orgs:wall_remove' org.id p.id %}" class="gpt-x" onsubmit="return confirm('Remove this post?');">
+      <form method="post" action="{% url 'orgs:wall_remove' org.id p.id %}" class="gpt-x" data-confirm="This removes the post and its replies for everyone in the group. It cannot be undone." data-confirm-title="Remove this post?" data-confirm-ok="Remove post" data-confirm-danger>
         {% csrf_token %}<button type="submit" title="{% if p.author_id == user.id %}Delete post{% else %}Hide post (admin){% endif %}">&times;</button>
       </form>
       {% endif %}
@@ -96,7 +96,7 @@ the other. No composer here — posting is a button in the group header.
           <p>{{ r.body|linebreaksbr }}</p>
         </div>
         {% if r.can_remove %}
-        <form method="post" action="{% url 'orgs:wall_reply_remove' org.id r.id %}" class="gpr-x" onsubmit="return confirm('Remove this reply?');">
+        <form method="post" action="{% url 'orgs:wall_reply_remove' org.id r.id %}" class="gpr-x" data-confirm="The reply will be removed for everyone. It cannot be undone." data-confirm-title="Remove this reply?" data-confirm-ok="Remove reply" data-confirm-danger>
           {% csrf_token %}<button type="submit" title="Remove reply">&times;</button>
         </form>
         {% endif %}

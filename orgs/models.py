@@ -6,6 +6,12 @@ from django.utils import timezone
 
 class Organisation(models.Model):
     name = models.CharField(max_length=200)
+    # The org's own logo. Search is where this earns its place: names collide
+    # ("Acme Footy Tips" exists three times across three states), and a member
+    # hunting for their workplace recognises the mark long before they can pick
+    # the right row out of a list of near-identical names. Optional — a group
+    # that has no logo falls back to its initials rather than being blocked.
+    logo = models.ImageField(upload_to="org_logos/", blank=True)
     # Org-structure note (§1, §3): a standalone org IS a parent org with zero
     # children — no separate object type, no hierarchy question at creation.
     # A child sits under exactly one parent (FK enforces that); a parent can
@@ -258,6 +264,37 @@ class OrgMember(models.Model):
         return labels
 
 
+class OrgDraft(models.Model):
+    """A part-finished trip through the create-a-group wizard.
+
+    Creating a group asks for a fair bit — who you are, which codes you tip,
+    and which charity — and people put that down mid-way to go and ask someone.
+    Keeping it in the session meant a logout or a different browser threw the
+    lot away and they started at step one. This is a row, so it survives both.
+
+    The shape of `data` is deliberately just the raw form field values, keyed by
+    field name, exactly as OrgCreateForm expects them. Nothing here interprets
+    them — the one form still owns every validation rule, and the wizard only
+    decides which of its errors to show on which step.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="org_draft",
+    )
+    data = models.JSONField(default=dict, blank=True)
+    step = models.PositiveSmallIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Draft group for {self.user} (step {self.step})"
+
+    @property
+    def is_started(self) -> bool:
+        """Whether there's anything worth offering to resume."""
+        return bool(self.data.get("name"))
+
+
 class MembershipRequest(models.Model):
     """A user asking to join an org they found by searching (org-structure
     note §2, amended by the client: a search-and-join is not instant — the
@@ -440,24 +477,42 @@ class Notification(models.Model):
 
     KIND_ELECTION_OPEN = "election_open"
     KIND_ELECTION_RESULT = "election_result"
+    KIND_ELECTION_SCHEDULED = "election_sched"
     KIND_ADMIN_NOTE = "admin_note"
     KIND_WALL_REPLY = "wall_reply"
     KIND_WALL_POST = "wall_post"
+    # Joining is a conversation with an admin, not an instant action, so each
+    # step of it reports back here — otherwise the wait after "Ask to join"
+    # looks like nothing happened.
+    KIND_JOIN_REQUESTED = "join_requested"
+    KIND_JOIN_REVIEW = "join_review"
+    KIND_JOIN_APPROVED = "join_approved"
+    KIND_JOIN_DECLINED = "join_declined"
     KIND_CHOICES = [
         (KIND_ELECTION_OPEN, "Charity election open"),
         (KIND_ELECTION_RESULT, "Charity election result"),
+        (KIND_ELECTION_SCHEDULED, "Charity election scheduled"),
         (KIND_ADMIN_NOTE, "Note from your admin"),
         (KIND_WALL_REPLY, "Reply to your post"),
         (KIND_WALL_POST, "New post on your Wall"),
+        (KIND_JOIN_REQUESTED, "Join request sent"),
+        (KIND_JOIN_REVIEW, "Join request to review"),
+        (KIND_JOIN_APPROVED, "Join request approved"),
+        (KIND_JOIN_DECLINED, "Join request declined"),
     ]
 
     # Bell-panel icon + accent per kind, so the panel scans at a glance.
     ICONS = {
         KIND_ELECTION_OPEN: "ic-vote",
         KIND_ELECTION_RESULT: "ic-vote",
+        KIND_ELECTION_SCHEDULED: "ic-calendar",
         KIND_ADMIN_NOTE: "ic-msg",
         KIND_WALL_REPLY: "ic-msg",
         KIND_WALL_POST: "ic-flame",
+        KIND_JOIN_REQUESTED: "ic-clock",
+        KIND_JOIN_REVIEW: "ic-people",
+        KIND_JOIN_APPROVED: "ic-check",
+        KIND_JOIN_DECLINED: "ic-msg",
     }
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications")

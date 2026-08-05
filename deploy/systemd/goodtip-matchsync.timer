@@ -1,0 +1,18 @@
+[Unit]
+Description=GoodTip — tick the sports data syncs every 2 minutes
+
+[Timer]
+# Fires on the server's clock, with no dependence on site traffic: results are
+# in before anyone arrives to look for them. The 2-minute tick is the fastest
+# cadence any sync needs (live scores); run_due_syncs then decides which kinds
+# are actually due, so results and fixtures still run at their own intervals.
+OnBootSec=2min
+OnUnitActiveSec=2min
+# Without this a restart storm could align every tick; jitter keeps the feed
+# request rate flat.
+RandomizedDelaySec=15
+AccuracySec=30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

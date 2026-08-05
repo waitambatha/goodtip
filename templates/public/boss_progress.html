@@ -1,0 +1,92 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}Your note to the boss — GoodTip{% endblock %}
+{% block loader_task %}Checking on your note{% endblock %}
+{% block body_class %}page-deep sheet-page{% endblock %}
+{% block page_backdrop %}
+{% comment %}Side imagery lives outside the sheet: .page-sheet creates a
+stacking context, so a strip rendered inside it paints over the sheet.
+{% endcomment %}
+{% include "partials/page_scenes.html" %}
+{% endblock %}
+
+{% block app_content %}
+<div class="wiz-top">
+  <div>
+    <div class="app-eyebrow">Tell the boss</div>
+    <h1 class="app-h1">Your note is on its way</h1>
+    <p class="app-sub">Here's where it's up to. You'll be added to their comp automatically once they start one.</p>
+  </div>
+</div>
+
+{% if latest %}
+{% comment %}
+Same rail as the competition builder, and deliberately so: a person who has
+seen one three-step track on this site should recognise the second without
+having to learn it. The difference is that the steps here are not yours to
+complete — two of the three are somebody else's move — which is exactly why
+showing them matters. Without this the sender is left wondering whether
+anything happened at all.
+{% endcomment %}
+<div class="wiz-rail" role="list">
+  {% for s in "123" %}
+  {% with n=forloop.counter %}
+  <div class="wiz-step {% if n == latest.step %}current{% elif n < latest.step %}done{% endif %}" role="listitem">
+    <span class="wz-num">{% if n < latest.step %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 13 4 4L19 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>{% else %}{{ n }}{% endif %}</span>
+    <span class="wz-text">
+      <span class="wz-label">{% if n == 1 %}Note sent{% elif n == 2 %}They signed up{% else %}You're in{% endif %}</span>
+      <span class="wz-sub">{% if n == 1 %}Delivered to their inbox{% elif n == 2 %}Waiting on them{% else %}Added to their comp{% endif %}</span>
+    </span>
+  </div>
+  {% if not forloop.last %}<span class="wz-line {% if n < latest.step %}done{% endif %}" aria-hidden="true"></span>{% endif %}
+  {% endwith %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if invites %}
+<div class="gt-listwrap">
+  {% for inv in invites %}
+  <div class="card pad-lg bp-card">
+    <div class="bp-head">
+      <div>
+        <div class="card-h">{{ inv.boss_name|default:inv.boss_email }}</div>
+        <div class="card-lead">{{ inv.boss_email }} &middot; sent {{ inv.sent_at|timesince }} ago</div>
+      </div>
+      <span class="bp-state is-{{ inv.status }}">{{ inv.get_status_display }}</span>
+    </div>
+
+    <p class="bp-note">
+      {% if inv.status == 'sent' %}
+        Delivered. Nothing more for you to do — we'll add you to their comp the moment they create one.
+      {% elif inv.status == 'joined' %}
+        {{ inv.boss_name|default:"They" }} signed up. As soon as they set up a competition you'll be added to it automatically.
+      {% else %}
+        Done — you're a member of <b>{{ inv.org.name }}</b>.
+        <a href="{% url 'dashboard' %}?org={{ inv.org.id }}">Open it &rarr;</a>
+      {% endif %}
+    </p>
+
+    {% if inv.body_preview %}
+    {% comment %}
+    Collapsed by default: it is reassurance, not reading. Sent in your name, so
+    it has to be available — but it is the same fixed letter every time and does
+    not need to take up the page on every visit.
+    {% endcomment %}
+    <details class="bp-preview">
+      <summary>See what we sent</summary>
+      <div class="bp-subject">{{ inv.subject }}</div>
+      <pre>{{ inv.body_preview }}</pre>
+    </details>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card pad-lg" style="text-align:center;">
+  <div class="card-h" style="font-size:20px;">No notes sent yet</div>
+  <p class="card-lead" style="margin:6px 0 18px;">Ask whoever runs your workplace comp to start one on GoodTip.</p>
+  <a href="{% url 'tell_the_boss' %}" class="abtn abtn-primary abtn-lg">Write the note &rarr;</a>
+</div>
+{% endif %}
+{% endblock %}

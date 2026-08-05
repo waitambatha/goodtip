@@ -14,13 +14,15 @@
   <script src="{% static 'js/gt-scenes.js' %}" defer></script>
   <script src="{% static 'js/gt-lists.js' %}" defer></script>
   <script src="{% static 'js/gt-loader.js' %}" defer></script>
+  <script src="{% static 'js/gt-busy.js' %}" defer></script>
+  <script src="{% static 'js/gt-confirm.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
 </head>
 <body class="app gt-v2 {% block body_class %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   {% include "public/partials/_icons.html" %}
 
   {# ---- sport loader — post shape follows the code (AFL: four posts, no crossbar · NRL: one H frame). Never one shape recoloured for both. ---- #}
-  <div class="loader" id="loader" role="status" aria-label="Loading" data-min="2000">
+  <div class="loader" id="loader" role="status" aria-label="Loading" data-min="400">
     <div class="loader-inner">
       <div class="pitch">
         {% if primary_sport == "Rugby League" %}
@@ -61,7 +63,39 @@
         {% if primary_org %}
           <a href="{% url 'tipping:my_tips' primary_org.id %}" class="{% block nav_tips %}{% endblock %}">My Tips</a>
           <a href="{% url 'tipping:leaderboard' primary_org.id %}" class="{% block nav_board %}{% endblock %}">Leaderboard</a>
+          <a href="{% url 'tipping:ladder' primary_org.id %}" class="{% block nav_ladder %}{% endblock %}">Ladder</a>
           <a href="{% url 'orgs:wall' primary_org.id %}" class="{% block nav_wall %}{% endblock %}">The Wall</a>
+          {% comment %}
+          Admin-only, and only two items: Members is the hub for everything to
+          do with people (invites, join requests, roles), and Season summary is
+          the money. These were buttons buried on the dashboard's org card,
+          which is not where anyone looks for them.
+          {% endcomment %}
+          {% if primary_org_is_admin %}
+          {% comment %}
+          Admin destinations collapse into one control. Eight top-level items
+          did not fit the bar at laptop widths, and the two that get used least
+          are these — but they still have to be reachable in one hop, which a
+          burger-only fallback would not give.
+          {% endcomment %}
+          <div class="an-menu" data-anmenu>
+            <button type="button" class="an-menu-btn {% block nav_manage %}{% endblock %}" aria-expanded="false" aria-haspopup="true">
+              Manage
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div class="an-menu-panel" hidden>
+              <a href="{% url 'orgs:members' primary_org.id %}">
+                <b>Members</b><i>Invites, join requests and roles</i>
+              </a>
+              <a href="{% url 'billing:season_summary' primary_org.id %}">
+                <b>Season summary</b><i>Entries, donations and totals</i>
+              </a>
+              <a href="{% url 'orgs:charity_vote' primary_org.id %}">
+                <b>Charity election</b><i>Set it up, or see how the vote is going</i>
+              </a>
+            </div>
+          </div>
+          {% endif %}
         {% endif %}
         {% if user.is_staff %}<a href="{% url 'manage:overview' %}" class="{% block nav_admin %}{% endblock %}">Admin</a>{% endif %}
       </div>
@@ -158,6 +192,16 @@
   {# ---- full-bleed imagery, painted behind the page sheet (never inside it) ---- #}
   {% block page_backdrop %}{% endblock %}
 
+  {% comment %}
+  The sheet: a dark green panel that the page's cream cards sit on. A page opts
+  in with {% block sheet %}on{% endblock %} plus `page-deep sheet-page` on the
+  body, so nothing changes for a page that has not asked for it — this wraps
+  every app screen, and silently restyling the lot would be a bigger change than
+  any one of them asked for.
+
+  The edge photo strips go outside the sheet, never inside: they belong to the
+  page background, and a sheet drawn over them is the whole point of the look.
+  {% endcomment %}
   <main class="app-main">
     {% if messages %}
       <div class="flash-stack">
@@ -168,7 +212,9 @@
         {% endfor %}
       </div>
     {% endif %}
-    {% block app_content %}{% endblock %}
+    <div class="page-sheet">
+      {% block app_content %}{% endblock %}
+    </div>
   </main>
 
   <script>

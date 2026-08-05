@@ -1,0 +1,16 @@
+Hi {{ enquiry.name }},
+
+Thanks for getting in touch with GoodTip. Here's our reply:
+
+{{ reply_body }}
+
+--
+For reference, this is what you sent us on {{ enquiry.created_at|date:"j F Y" }}:
+
+"{{ enquiry.message }}"
+
+Just reply to this email if you'd like to keep the conversation going — it
+comes straight back to us.
+
+— The GoodTip team
+{{ site_url }}

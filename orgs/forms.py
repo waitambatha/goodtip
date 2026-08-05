@@ -1,4 +1,5 @@
 from django import forms
+from django.utils import timezone
 
 from catalog.models import Charity, Competition, GroupType, Season, State, SubCategory
 
@@ -104,6 +105,20 @@ class OrgCreateForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["season"].queryset = Season.objects.all()
         self.fields["season"].empty_label = None
+        # Season.Meta orders by -year, so the first choice was always the
+        # furthest-future season on file. With empty_label off that became the
+        # silent default, and every new league was created into a season nobody
+        # is playing — the upstream feeds have no draw for it, so the league
+        # syncs no fixtures and shows an empty dashboard with nothing obviously
+        # wrong. Default to the season actually in play.
+        if not self.is_bound and not self.initial.get("season"):
+            current = (
+                Season.objects.filter(year=timezone.now().year).first()
+                or Season.objects.filter(year__lte=timezone.now().year).first()
+                or Season.objects.first()
+            )
+            if current:
+                self.initial["season"] = current.pk
 
     def _clean_categories(self, cleaned):
         """Per-type rules from the categories doc: Community/Business pick one

@@ -17,13 +17,39 @@
       <img id="wpPreview" alt="" hidden>
       <span class="wp-ring" aria-hidden="true"></span>
     </div>
-    <label class="abtn abtn-ghost wp-pick" for="wpFile">Choose a photo</label>
+    {% comment %} Camera is added by JS and stays hidden otherwise: getUserMedia needs a
+       secure context, so on plain http (or a browser with no camera) the button
+       would be a dead control. Better absent than broken. {% endcomment %}
+    <div class="wp-pickrow">
+      <label class="abtn abtn-ghost wp-pick" for="wpFile">Choose a photo</label>
+      <button type="button" class="abtn abtn-ghost wp-cam" id="wpCam" hidden>
+        <span class="wp-camdot" aria-hidden="true"></span> Take a photo
+      </button>
+    </div>
     <input type="file" name="avatar" id="wpFile" accept="image/*" hidden>
     <p class="wp-hint">JPG or PNG, under 5&nbsp;MB. You can change it any time from your profile.</p>
   </div>
+
+  {% comment %} Live camera. Sits in the flow only while active so it never reserves space
+     on a page most people skip straight past. {% endcomment %}
+  <div class="wp-cam-stage" id="wpCamStage" hidden>
+    <video id="wpVideo" playsinline muted autoplay></video>
+    <div class="wp-cam-actions">
+      <button type="button" class="abtn abtn-primary" id="wpShoot">Capture</button>
+      <button type="button" class="abtn abtn-ghost" id="wpCamCancel">Cancel</button>
+    </div>
+    <p class="wp-hint" id="wpCamErr" hidden></p>
+  </div>
+
   <div class="wp-actions">
     <button type="submit" class="abtn abtn-primary abtn-block" id="wpSave" disabled>Save my photo &rarr;</button>
-    <button type="submit" name="skip" value="1" class="wp-skip" formnovalidate>Skip for now — take me to the comp</button>
+    {% comment %} Was a bare 13px link that read as fine print and got missed entirely.
+       It is one of the two real choices on this page, so it now looks like a
+       choice — full width, bordered, same hit area as the primary. {% endcomment %}
+    <button type="submit" name="skip" value="1" class="abtn abtn-quiet abtn-block wp-skip" formnovalidate>
+      Skip for now — I'll add a photo later
+    </button>
+    <p class="wp-skip-note">You can add or change your photo any time from your profile.</p>
   </div>
 </form>
 
@@ -35,15 +61,85 @@
   var save = document.getElementById('wpSave');
   var initials = document.getElementById('wpInitials');
   if (!file) return;
-  file.addEventListener('change', function(){
-    var f = file.files && file.files[0];
-    if (!f) return;
-    var url = URL.createObjectURL(f);
+
+  function accept(blobOrFile) {
+    var url = URL.createObjectURL(blobOrFile);
     img.src = url; img.hidden = false;
     if (initials) initials.hidden = true;
     wrap.setAttribute('data-empty', 'false');
     save.disabled = false;
+  }
+
+  file.addEventListener('change', function(){
+    var f = file.files && file.files[0];
+    if (!f) return;
+    accept(f);
   });
+
+  /* ---- camera capture ---- */
+  var camBtn = document.getElementById('wpCam');
+  var stage = document.getElementById('wpCamStage');
+  var video = document.getElementById('wpVideo');
+  var shoot = document.getElementById('wpShoot');
+  var cancel = document.getElementById('wpCamCancel');
+  var camErr = document.getElementById('wpCamErr');
+  var stream = null;
+
+  var supported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia &&
+                     window.DataTransfer && window.HTMLCanvasElement);
+  if (!supported || !camBtn) return;
+  camBtn.hidden = false;
+
+  function stop() {
+    if (stream) { stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
+    stage.hidden = true;
+  }
+
+  camBtn.addEventListener('click', function(){
+    camErr.hidden = true;
+    // facingMode 'user' asks for the front camera on a phone; on a laptop it is
+    // ignored and the only camera is used.
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 } }, audio: false })
+      .then(function(s){ stream = s; video.srcObject = s; stage.hidden = false; })
+      .catch(function(err){
+        camErr.textContent = (err && err.name === 'NotAllowedError')
+          ? 'Camera access was blocked. Allow it in your browser settings, or choose a photo instead.'
+          : 'No camera available. Choose a photo instead.';
+        camErr.hidden = false;
+      });
+  });
+
+  cancel.addEventListener('click', stop);
+
+  shoot.addEventListener('click', function(){
+    if (!stream) return;
+    // Crop to a centred square before writing the file — the avatar is round,
+    // so sending a 16:9 webcam frame would upload mostly wall and ceiling.
+    var w = video.videoWidth, h = video.videoHeight;
+    var side = Math.min(w, h);
+    var canvas = document.createElement('canvas');
+    canvas.width = canvas.height = side;
+    var ctx = canvas.getContext('2d');
+    // Mirror horizontally so the capture matches the preview people were
+    // posing against; an unmirrored selfie looks wrong to its own subject.
+    ctx.translate(side, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, (w - side) / 2, (h - side) / 2, side, side, 0, 0, side, side);
+
+    canvas.toBlob(function(blob){
+      if (!blob) return;
+      // Hand the capture to the same file input the picker uses, so the form
+      // posts one field either way and the server needs no camera-specific path.
+      var f = new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' });
+      var dt = new DataTransfer();
+      dt.items.add(f);
+      file.files = dt.files;
+      accept(f);
+      stop();
+    }, 'image/jpeg', 0.9);
+  });
+
+  window.addEventListener('pagehide', stop);
 })();
 </script>
 {% endblock %}

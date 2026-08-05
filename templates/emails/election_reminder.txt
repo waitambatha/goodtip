@@ -1,4 +1,4 @@
-G'day {{ user.display_name }},
+Hello {{ user.display_name }},
 
 {% if urgency == "hour" %}Last call — {{ org.name }}'s charity vote closes at {{ vote.scheduled_close_at|date:"g:i A" }},
 about an hour from now, and your vote isn't in yet. It takes one tap.{% else %}Quick reminder: {{ org.name }}'s charity vote closes {{ vote.scheduled_close_at|date:"l j F, g:i A" }}

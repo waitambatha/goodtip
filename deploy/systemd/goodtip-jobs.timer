@@ -1,0 +1,15 @@
+[Unit]
+Description=GoodTip — tick the email/notification jobs every 10 minutes
+
+[Timer]
+# 10 minutes is set by the tightest promise the product makes: a vote reminder
+# "an hour before closing". Anything slower and that reminder is late enough to
+# be useless. Each job is stamped once sent, so the frequency costs nothing.
+OnBootSec=5min
+OnUnitActiveSec=10min
+RandomizedDelaySec=60
+AccuracySec=60
+Persistent=true
+
+[Install]
+WantedBy=timers.target

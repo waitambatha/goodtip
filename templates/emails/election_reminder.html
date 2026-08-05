@@ -7,7 +7,7 @@ the hour-out one rather than sending the same message twice.
 {% block eyebrow %}{% if urgency == "hour" %}Closes within the hour{% else %}Closes tomorrow{% endif %}{% endblock %}
 {% block preheader %}{{ org.name }}'s charity vote closes {% if urgency == "hour" %}within the hour{% else %}tomorrow{% endif %} and you haven't voted yet.{% endblock %}
 {% block content %}
-  <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">G'day {{ user.display_name }},</p>
+  <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">Hello {{ user.display_name }},</p>
 
   {% if urgency == "hour" %}
   <p style="margin:0 0 18px;font-size:16px;line-height:1.6;color:#1A1A14;">

@@ -1,4 +1,14 @@
 <!-- CONTACT (shared across all pages) -->
+{% comment %}
+The form posts to a real endpoint now. It used to carry onsubmit="return false"
+with no action, no method, no field names and no CSRF token — it looked finished
+and discarded everything typed into it, without so much as an error, because as
+far as the page was concerned nothing had happened.
+
+Because this partial is included on five pages, the view redirects back to
+whichever one the visitor was on rather than rendering a response of its own;
+`source` is what carries that, and ?sent=1 brings back the confirmation.
+{% endcomment %}
 <section class="section on-dark" id="{{ contact_id|default:'start' }}">
   <div class="wrap">
     <p class="eyebrow reveal">Get in touch</p>
@@ -24,16 +34,55 @@
         <p class="social-note">Placeholder links &mdash; swap in real handles when ready.</p>
       </div>
 
-      <form class="reveal from-right" onsubmit="return false;">
-        <div class="form-grid">
-          <div class="field"><input type="text" id="cf-name-{{ contact_id|default:'start' }}" placeholder=" "><label for="cf-name-{{ contact_id|default:'start' }}">Your name</label></div>
-          <div class="field"><input type="email" id="cf-email-{{ contact_id|default:'start' }}" placeholder=" "><label for="cf-email-{{ contact_id|default:'start' }}">Work email</label></div>
-          <div class="field col-span"><input type="text" id="cf-org-{{ contact_id|default:'start' }}" placeholder=" "><label for="cf-org-{{ contact_id|default:'start' }}">Organisation</label></div>
-          <div class="field col-span"><select id="cf-int-{{ contact_id|default:'start' }}"><option value=""></option><option>Running a workplace comp</option><option>Running a club or community comp</option><option>Partnering as a charity</option><option>General enquiry</option></select><label for="cf-int-{{ contact_id|default:'start' }}">I'm interested in&hellip;</label></div>
-          <div class="field col-span"><textarea id="cf-msg-{{ contact_id|default:'start' }}" placeholder=" "></textarea><label for="cf-msg-{{ contact_id|default:'start' }}">Anything you'd like us to know</label></div>
-          <div class="col-span"><button type="submit" class="form-submit">Send message &rarr;</button></div>
+      <div class="reveal from-right" id="contact-form">
+        {% if request.GET.sent %}
+        <div class="contact-sent" role="status">
+          <span class="cs-tick" aria-hidden="true"><svg><use href="#ic-heart"/></svg></span>
+          <h3>Got it. Thanks.</h3>
+          <p>Your message is with the GoodTip team and we'll come back to you within one business day &mdash; keep an eye on the inbox you gave us.</p>
         </div>
-      </form>
+        {% else %}
+        <form method="post" action="{% url 'contact_submit' %}" novalidate
+              data-busy="Sending your message" data-busy-scope>
+          {% csrf_token %}
+          <input type="hidden" name="source" value="{{ request.path }}">
+          {# honeypot: invisible to people, irresistible to bots #}
+          <input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;top:0;">
+
+          {% if enquiry_error %}<p class="contact-err" role="alert">{{ enquiry_error }}</p>{% endif %}
+
+          <div class="form-grid">
+            <div class="field">
+              <input type="text" name="name" id="cf-name-{{ contact_id|default:'start' }}" value="{{ enquiry_draft.name|default:'' }}" placeholder=" " maxlength="120" required autocomplete="name">
+              <label for="cf-name-{{ contact_id|default:'start' }}">Your name</label>
+            </div>
+            <div class="field">
+              <input type="email" name="email" id="cf-email-{{ contact_id|default:'start' }}" value="{{ enquiry_draft.email|default:'' }}" placeholder=" " maxlength="254" required autocomplete="email">
+              <label for="cf-email-{{ contact_id|default:'start' }}">Work email</label>
+            </div>
+            <div class="field col-span">
+              <input type="text" name="organisation" id="cf-org-{{ contact_id|default:'start' }}" value="{{ enquiry_draft.organisation|default:'' }}" placeholder=" " maxlength="160" autocomplete="organization">
+              <label for="cf-org-{{ contact_id|default:'start' }}">Organisation</label>
+            </div>
+            <div class="field col-span">
+              <select name="interest" id="cf-int-{{ contact_id|default:'start' }}">
+                <option value=""></option>
+                <option{% if enquiry_draft.interest == "Running a workplace comp" %} selected{% endif %}>Running a workplace comp</option>
+                <option{% if enquiry_draft.interest == "Running a club or community comp" %} selected{% endif %}>Running a club or community comp</option>
+                <option{% if enquiry_draft.interest == "Partnering as a charity" %} selected{% endif %}>Partnering as a charity</option>
+                <option{% if enquiry_draft.interest == "General enquiry" %} selected{% endif %}>General enquiry</option>
+              </select>
+              <label for="cf-int-{{ contact_id|default:'start' }}">I'm interested in&hellip;</label>
+            </div>
+            <div class="field col-span">
+              <textarea name="message" id="cf-msg-{{ contact_id|default:'start' }}" placeholder=" " maxlength="4000" required>{{ enquiry_draft.message|default:'' }}</textarea>
+              <label for="cf-msg-{{ contact_id|default:'start' }}">Anything you'd like us to know</label>
+            </div>
+            <div class="col-span"><button type="submit" class="form-submit">Send message &rarr;</button></div>
+          </div>
+        </form>
+        {% endif %}
+      </div>
     </div>
   </div>
 </section>

@@ -10,7 +10,9 @@
 <div class="card pad-lg" style="max-width:640px;margin-bottom:16px;border-color:var(--forest);">
   <div class="card-h">You're a GoodTip Partner Charity</div>
   <p class="card-lead">You can lock this league's fundraising to {{ org.name }} — no participant vote needed.{% if vote and vote.is_open %} This will close the open vote.{% endif %}</p>
-  <form method="post" action="{% url 'orgs:lock_fundraising' org.id %}" onsubmit="return confirm('Lock all fundraising to {{ org.name|escapejs }}?')">
+  <form method="post" action="{% url 'orgs:lock_fundraising' org.id %}"
+        data-confirm="All fundraising is locked to {{ org.name }}. Members will no longer vote on where the money goes."
+        data-confirm-title="Lock fundraising to your charity?" data-confirm-ok="Lock fundraising" data-confirm-danger>
     {% csrf_token %}
     <button type="submit" class="abtn abtn-primary">Lock fundraising to us &rarr;</button>
   </form>
@@ -80,7 +82,9 @@
       <button type="submit" class="abtn abtn-ghost abtn-sm">Save end time</button>
       {% if vote.scheduled_close_at %}<button type="submit" class="abtn abtn-ghost abtn-sm" onclick="document.getElementById('closeAt').value='';">Remove</button>{% endif %}
     </form>
-    <form method="post" action="{% url 'orgs:close_charity_vote' org.id %}" onsubmit="return confirm('Close the vote and lock in the winner?')">
+    <form method="post" action="{% url 'orgs:close_charity_vote' org.id %}"
+          data-confirm="Voting ends immediately and the leading charity is locked in. Members who have not voted will miss out."
+          data-confirm-title="Close the vote now?" data-confirm-ok="Close voting">
       {% csrf_token %}
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
         <span class="app-sub" style="margin:0;">Closing reveals the result and locks the charity.</span>

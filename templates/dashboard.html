@@ -5,17 +5,122 @@
 {% block title %}Dashboard — GoodTip{% endblock %}
 {% block nav_dash %}on{% endblock %}
 {% block loader_task %}Opening your dashboard{% endblock %}
+{% block body_class %}page-deep sheet-page{% endblock %}
+{% block page_backdrop %}
+{% comment %}Side imagery lives outside the sheet: .gt-sheet creates a
+stacking context, so a strip rendered inside it paints over the sheet.
+{% endcomment %}
+{% include "partials/page_scenes.html" %}
+{% endblock %}
+
 {% block app_content %}
 
-{% include "partials/page_scenes.html" %}
 
 {% if not cards %}
+  <div class="app-head head-center">
+    <div class="app-eyebrow">Dashboard</div>
+    <h1 class="app-h1">Welcome to GoodTip, {{ user.display_name }}</h1>
+    <p class="app-sub">Here's what's coming up. Tipping happens inside a group — join one or start your own and these games are yours.</p>
+  </div>
+
   <div class="card pad-lg" style="text-align:center;">
-    <div class="card-h" style="font-size:20px;">You're not in a comp yet</div>
+    <div class="card-h" style="font-size:20px;">You're not in a group yet</div>
     <p class="card-lead" style="margin:6px 0 18px;">Start your own, find your group, or ask a group manager for a join link.</p>
-    <a href="{% url 'orgs:create' %}" class="abtn abtn-primary abtn-lg">Create a competition</a>
+    <a href="{% url 'orgs:create' %}" class="abtn abtn-primary abtn-lg">Create a group</a>
     <a href="{% url 'orgs:search' %}" class="abtn abtn-ghost abtn-lg">Find your group</a>
   </div>
+
+  {% if preview_round %}
+  {% comment %}
+  Real fixtures, no group required. Deliberately NOT wrapped in a form: there is
+  nothing to post to, so the teams are buttons that open the join dialog rather
+  than radios that could look tippable.
+  {% endcomment %}
+  <div class="card" style="background:var(--app-card-2);margin-top:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+      <div>
+        <span class="badge-live">{% if preview_round.is_locked %}Locked{% else %}Live &middot; locks soon{% endif %}</span>
+        <div class="card-h" style="margin-top:8px;">Round {{ preview_round.round_number }} &middot; {{ preview_round.series }}</div>
+        <div class="card-lead">Coming up on GoodTip</div>
+      </div>
+    </div>
+
+    <div class="slip-bar">
+      <div class="slip-info"><b>Want to tip these?</b><span>Join a group to lock in your picks, climb the ladder and raise for your charity.</span></div>
+      <button type="button" class="abtn abtn-primary abtn-lg" data-needs-group>Start tipping</button>
+    </div>
+
+    <div class="gt-listwrap">
+      <div class="fixtures gt-scroll">
+        {% for g in games %}
+        <div class="fxp">
+          <div class="fxp-meta">
+            <span class="fxp-date">{{ g.kickoff_at|date:"D j M · g:i A" }}</span>
+            {% if g.venue %}<span class="fxp-venue">{{ g.venue }}</span>{% endif %}
+            {# Preview for visitors with no group: honest about the round's own
+               state rather than always claiming Open. #}
+            <span class="fxp-state {% if g.is_locked %}is-missed{% else %}is-open{% endif %}">{% if g.is_locked %}Closed{% else %}Open{% endif %}</span>
+          </div>
+          <div class="pick pick-sm">
+            <button type="button" class="team" data-needs-group>{% crest g.home_team %}<span>{{ g.home_team.name }}</span></button>
+            <div class="vs">vs</div>
+            <button type="button" class="team away" data-needs-group>{% crest g.away_team %}<span>{{ g.away_team.name }}</span></button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% comment %}Shown when anything marked data-needs-group is touched.{% endcomment %}
+  <div class="tipsheet" id="needGroup" hidden aria-hidden="true">
+    <div class="ts-veil" data-sheet-close></div>
+    <div class="ts-panel ng-panel" role="dialog" aria-modal="true" aria-labelledby="ngTitle">
+      <header class="ts-head">
+        <div>
+          <div class="ng-emoji" aria-hidden="true">😔</div>
+          <h3 id="ngTitle">Ah — you'll need a group first</h3>
+          <p class="ts-sub">Tips are counted inside a group. That's where your ladder, your rivals and the money you're raising all live — so there's nowhere to put this pick just yet.</p>
+        </div>
+        <button type="button" class="ts-x" data-sheet-close aria-label="Close">&times;</button>
+      </header>
+      <footer class="ts-foot">
+        <a href="{% url 'orgs:search' %}" class="abtn abtn-primary">Find your group &rarr;</a>
+        <a href="{% url 'orgs:create' %}" class="abtn abtn-dark">Create a group</a>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    var sheet = document.getElementById("needGroup");
+    if (!sheet) return;
+    var lastTrigger = null;
+    function open(e) {
+      e.preventDefault();
+      lastTrigger = e.currentTarget;
+      sheet.hidden = false;
+      sheet.setAttribute("aria-hidden", "false");
+      var first = sheet.querySelector(".abtn");
+      if (first) first.focus();
+    }
+    function close() {
+      sheet.hidden = true;
+      sheet.setAttribute("aria-hidden", "true");
+      if (lastTrigger) lastTrigger.focus();
+    }
+    document.querySelectorAll("[data-needs-group]").forEach(function (el) {
+      el.addEventListener("click", open);
+    });
+    sheet.querySelectorAll("[data-sheet-close]").forEach(function (el) {
+      el.addEventListener("click", close);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !sheet.hidden) close();
+    });
+  })();
+  </script>
 {% else %}
 {% with c=selected %}
 
@@ -89,21 +194,8 @@
 <div class="card pad-lg" style="margin-bottom:18px;">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
     <div><div class="card-h" style="font-size:20px;">{{ c.org.name }}</div><div class="card-lead">{{ c.org.sport_label }} &middot; {{ c.org.season }} &middot; raising for {{ c.org.charity_display }}</div></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      {% if c.is_admin %}<a href="{% url 'orgs:members' c.org.id %}" class="abtn abtn-ghost abtn-sm">Members</a>
-      <a href="{% url 'orgs:invite' c.org.id %}" class="abtn abtn-ghost abtn-sm">Invite</a>
-      <a href="{% url 'billing:season_summary' c.org.id %}" class="abtn abtn-ghost abtn-sm">Season summary</a>{% endif %}
-      <a href="{% url 'tipping:my_tips' c.org.id %}" class="abtn abtn-ghost abtn-sm">My tips</a>
-      <a href="{% url 'orgs:wall' c.org.id %}" class="abtn abtn-ghost abtn-sm">The Wall</a>
-      <a href="{% url 'tipping:leaderboard' c.org.id %}" class="abtn abtn-dark abtn-sm">Leaderboard</a>
-    </div>
   </div>
 
-  <div class="grid-app g-3" style="margin-bottom:18px;">
-    <div class="stat-card accent"><div class="s-lab">Season points</div><div class="s-num">{{ c.points }}</div><div class="s-sub">across the season</div></div>
-    <div class="stat-card"><div class="s-lab">Your rank</div><div class="s-num">{{ c.rank|default:"—" }}</div><div class="s-sub">of all tippers</div></div>
-    <div class="stat-card"><div class="s-lab">Tips this round</div><div class="s-num">{{ c.tips_done }}<span style="font-size:18px;color:var(--muted);"> / {{ c.tips_total }}</span></div><div class="s-sub">{% if c.tips_total > c.tips_done %}still open{% else %}all in{% endif %}</div></div>
-  </div>
 
   {% if c.charity_vote %}
   <div class="flash info" style="justify-content:space-between;">
@@ -112,35 +204,69 @@
   </div>
   {% endif %}
 
+  {% comment %}
+  The election notice is a toast rather than a banner in the page. As a banner
+  it sat between the competition header and the round card on every single
+  load, pushing the fixtures down and being scrolled past — a permanent strip
+  that says "not done yet" stops being read after the second visit. As a toast
+  it arrives, is seen, and gets out of the way, while the action it wants stays
+  one click away for as long as it is on screen.
+  {% endcomment %}
   {% if c.is_admin %}{% with pe=c.org.pending_election %}{% if pe %}
-  <div class="flash {% if pe.status == 'scheduled' %}info{% else %}error{% endif %}" style="justify-content:space-between;">
-    <span><svg class="cic" style="width:18px;height:18px;stroke:currentColor;"><use href="#ic-vote"/></svg>
-      {% if pe.status == 'scheduled' %}Charity election scheduled for {{ pe.scheduled_open_at|date:"D j M, g:i A" }}.{% else %}Your charity election isn't set up yet — members can't vote until it opens.{% endif %}
-    </span>
-    <a href="{% url 'orgs:election_setup' c.org.id %}" class="abtn abtn-dark abtn-sm">{% if pe.status == 'scheduled' %}Reschedule{% else %}Set up the election{% endif %}</a>
-  </div>
+  <div data-auto-toast
+       data-toast-eyebrow="{{ c.org.name }}"
+       data-toast-title="{% if pe.status == 'scheduled' %}Charity election scheduled{% else %}Charity election not set up{% endif %}"
+       data-toast-msg="{% if pe.status == 'scheduled' %}Opens {{ pe.scheduled_open_at|date:'D j M, g:i A' }}.{% else %}Members can't vote until it opens.{% endif %}"
+       data-toast-cta="{% if pe.status == 'scheduled' %}Reschedule{% else %}Set it up{% endif %}"
+       data-toast-url="{% url 'orgs:election_setup' c.org.id %}"
+       data-toast-icon="ic-vote"
+       data-toast-ms="6000"
+       hidden></div>
   {% endif %}{% endwith %}{% endif %}
 
   {% if c.round %}
   <div class="card" style="background:var(--app-card-2);margin-top:16px;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
       <div>
-        <span class="badge-live">{% if c.round.is_locked %}Locked{% else %}Live &middot; locks soon{% endif %}</span>
+        <span class="badge-live">{% if not open_games %}All started{% elif c.round.is_locked %}Part-locked{% else %}Live &middot; locks soon{% endif %}</span>
         <div class="card-h" style="margin-top:8px;">Round {{ c.round.round_number }} &middot; {{ c.round.series }}</div>
-        <div class="card-lead">{{ c.org.name }}</div>
+        {% comment %}The org name headlines the card directly above this one —
+        repeating it here just pushed the countdown further down.{% endcomment %}
+        <div class="card-lead">{{ c.round.get_stage_display }}</div>
       </div>
       <div id="countdown-{{ c.org.id }}" hx-get="{% url 'accounts:dashboard_countdown' c.org.id %}" hx-trigger="every 60s" hx-swap="innerHTML">
         {% include "partials/countdown.html" with round=c.round %}
       </div>
     </div>
 
+    {% comment %}
+    Your standing sits under the round it belongs to. Above the round card it
+    was answering "how am I going?" before the page had said which round we are
+    even in — and "Tips this round 0 / 9" is meaningless until the reader knows
+    that the round is 22 and it locks in a day.
+    {% endcomment %}
+    <div class="grid-app g-3 dash-stats">
+      <div class="stat-card accent"><div class="s-lab">Season points</div><div class="s-num">{{ c.points }}</div><div class="s-sub">across the season</div></div>
+      <div class="stat-card"><div class="s-lab">Your rank</div><div class="s-num">{{ c.rank|default:"—" }}</div><div class="s-sub">of all tippers</div></div>
+      <div class="stat-card"><div class="s-lab">Tips this round</div><div class="s-num">{{ c.tips_done }}<span style="font-size:18px;color:var(--muted);"> / {{ c.tips_total }}</span></div><div class="s-sub">{% if c.tips_total > c.tips_done %}still open{% else %}all in{% endif %}</div></div>
+    </div>
+
     <!-- this round's games: pick your teams right here, then confirm -->
-    <form method="post" action="{% url 'tipping:tip_confirm' c.org.id c.round.id %}" id="tipSlip">
+    {% comment %}
+Posts to the org, not to a round: the slate below spans whatever rounds still
+have unplayed games, so a round-scoped URL could not accept it.
+{% endcomment %}
+<form method="post" action="{% url 'tipping:tip_confirm_upcoming' c.org.id %}" id="tipSlip">
       {% csrf_token %}
 
-      {% if c.round.is_locked %}
+      {% comment %}
+      Read-only only when every game has started. The old test was the round's
+      lockout — its FIRST kickoff — so this banner appeared while most of the
+      round was still days away and perfectly tippable.
+      {% endcomment %}
+      {% if not open_games %}
       <div class="slip-bar locked">
-        <div class="slip-info"><b>This round is locked</b><span>Tips are final and shown read-only below.</span></div>
+        <div class="slip-info"><b>Every game in this round has started</b><span>Tips are final and shown read-only below.</span></div>
         <a href="{% url 'tipping:my_tips' c.org.id %}" class="abtn abtn-dark">Review in My Tips &rarr;</a>
       </div>
       {% else %}
@@ -155,23 +281,49 @@
 
       {# the round's fixtures scroll in place, keeping Confirm reachable below #}
       <div class="fixtures gt-scroll">
-        {% for g in games %}
+        {% regroup games by round as round_groups %}
+        {% for grp in round_groups %}
+        {% comment %}
+        The list runs in kickoff order across rounds, so without a heading a
+        member cannot tell where one round ends and the next begins — which
+        matters, because points and ladders are counted per round.
+        {% endcomment %}
+        <div class="fx-roundhead">
+          <span class="fxr-n">Round {{ grp.grouper.round_number }}</span>
+          <span class="fxr-series">{{ grp.grouper.series }}</span>
+          <span class="fxr-locks">Locks {{ grp.grouper.lockout_at|date:"D j M, g:i A" }}</span>
+        </div>
+        {% for g in grp.list %}
         <div class="fxp {% if g.tipped %}done{% endif %}">
           <div class="fxp-meta">
             <span class="fxp-date">{{ g.kickoff_at|date:"D j M · g:i A" }}</span>
             {% if g.venue %}<span class="fxp-venue">{{ g.venue }}</span>{% endif %}
-            <span class="fxp-state">{% if g.tipped %}Tipped{% else %}Open{% endif %}</span>
+            {% comment %}
+            This label describes YOUR tip, not whether tipping is available —
+            "Open" used to show on every untipped game including ones in a
+            locked round, which read as "you can still tip this" directly under
+            a banner saying the round was closed. Once the round locks, an
+            untipped game is a missed one and has to say so.
+            {% endcomment %}
+            {% if g.tipped %}
+              <span class="fxp-state is-tipped">Tipped</span>
+            {% elif g.is_locked %}
+              <span class="fxp-state is-missed">No tip</span>
+            {% else %}
+              <span class="fxp-state is-open">Open</span>
+            {% endif %}
           </div>
           <div class="pick pick-sm">
             <label class="team {% if g.my_tip == 'home' %}sel{% endif %}">{% crest g.home_team %}<span>{{ g.home_team.name }}</span>
-              <input type="radio" name="match_{{ g.id }}" value="home" hidden {% if g.my_tip == 'home' %}checked{% endif %} {% if c.round.is_locked or g.is_locked %}disabled{% endif %}>
+              <input type="radio" name="match_{{ g.id }}" value="home" hidden {% if g.my_tip == 'home' %}checked{% endif %} {% if g.is_locked %}disabled{% endif %}>
             </label>
             <div class="vs">vs</div>
             <label class="team away {% if g.my_tip == 'away' %}sel{% endif %}">{% crest g.away_team %}<span>{{ g.away_team.name }}</span>
-              <input type="radio" name="match_{{ g.id }}" value="away" hidden {% if g.my_tip == 'away' %}checked{% endif %} {% if c.round.is_locked or g.is_locked %}disabled{% endif %}>
+              <input type="radio" name="match_{{ g.id }}" value="away" hidden {% if g.my_tip == 'away' %}checked{% endif %} {% if g.is_locked %}disabled{% endif %}>
             </label>
           </div>
         </div>
+        {% endfor %}
         {% endfor %}
       </div>
 
@@ -379,7 +531,12 @@
             input.checked = true;
             row.classList.add('picked');
             var st = row.querySelector('.fxp-state');
-            if (st) st.textContent = 'Picked — press confirm';
+            if (st) {
+              st.textContent = 'Picked — press confirm';
+              // Keep the class in step with the words, or a pick keeps the
+              // grey "Open" styling while claiming to be chosen.
+              st.className = 'fxp-state is-picked';
+            }
             slipRefresh();
           });
         });

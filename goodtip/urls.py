@@ -6,7 +6,10 @@ from django.views.generic import TemplateView
 from django.views.static import serve as static_serve
 
 from accounts.forms import RegisteredEmailPasswordResetForm
-from accounts.views import coming_soon_view, dashboard_view, tell_the_boss_view
+from accounts.views import (
+    boss_progress_view, coming_soon_view, contact_submit_view, dashboard_view,
+    tell_the_boss_view,
+)
 from admin_panel.views import news_detail, news_index
 from billing.views import good_list_view, stripe_webhook
 from goodtip.staging_gate import gate_view
@@ -35,7 +38,9 @@ urlpatterns = [
         extra_context={"active": "pricing"},
     ), name="pricing"),
     path("coming-soon/", coming_soon_view, name="coming_soon"),
+    path("contact/", contact_submit_view, name="contact_submit"),
     path("tell-the-boss/", tell_the_boss_view, name="tell_the_boss"),
+    path("tell-the-boss/progress/", boss_progress_view, name="boss_progress"),
     path("dashboard/", dashboard_view, name="dashboard"),
     # News & blog (members) — full-story pages behind the dashboard cards
     path("news/", news_index, name="news_index"),

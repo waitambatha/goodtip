@@ -12,6 +12,7 @@ urlpatterns = [
     path("<int:org_id>/created/", views.org_created_view, name="created"),
     path("<int:org_id>/invite/", views.org_invite_view, name="invite"),
     path("<int:org_id>/members/", views.members_view, name="members"),
+    path("<int:org_id>/requests/<int:req_id>/", views.review_request_view, name="review_request"),
     path("<int:org_id>/request-join/", views.request_join_view, name="request_join"),
     path("<int:org_id>/charity-vote/", views.charity_vote_view, name="charity_vote"),
     path("<int:org_id>/charity-vote/cast/", views.cast_charity_vote, name="cast_charity_vote"),

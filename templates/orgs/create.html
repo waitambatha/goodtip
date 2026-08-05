@@ -2,26 +2,67 @@
 {% load team_extras static %}
 {% block title %}Create a competition — GoodTip{% endblock %}
 {% block loader_task %}Opening the competition builder{% endblock %}
-{% block body_class %}page-deep{% endblock %}
+{% block body_class %}page-deep sheet-page wiz-page{% endblock %}
+{% block page_backdrop %}
+{% comment %}Side imagery lives outside the sheet: .gt-sheet creates a
+stacking context, so a strip rendered inside it paints over the sheet.
+{% endcomment %}
+{% include "partials/page_scenes.html" %}
+{% endblock %}
+
 {% block app_content %}
-<div class="page-scenes" aria-hidden="true">
-  <div class="scene left">
-    <div class="shot on" style="background-image:url('{% static 'img/scenes/afl-ball-grass.jpg' %}')"></div>
-    <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
-    <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+{% comment %} Title row and the draft chip share a line: the chip is reassurance about the
+   thing the subtitle just promised, so it belongs beside it rather than buried
+   at the foot of the form. {% endcomment %}
+<div class="wiz-top">
+  <div>
+    <div class="app-eyebrow">{% if parent_org %}New group under {{ parent_org.name }}{% else %}New competition{% endif %}</div>
+    <h1 class="app-h1">Create a competition</h1>
+    <p class="app-sub">Four short steps. We save as you go, so you can finish it later.</p>
   </div>
-  <div class="scene right">
-    <div class="shot on" style="background-image:url('{% static 'img/scenes/nrl-ball-grass.jpg' %}')"></div>
-    <div class="shot" style="background-image:url('{% static 'img/scenes/mcg-stadium.jpg' %}')"></div>
-    <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+  {% comment %} Always present, but it does not claim a save that has not happened: an
+     untouched wizard has nothing saved, and a chip reading "Draft saved" over
+     an empty form is the kind of small lie that costs trust the first time
+     someone closes the tab and finds nothing waiting. {% endcomment %}
+  <div class="draft-chip{% if not draft.is_started %} idle{% endif %}" role="status">
+    <span class="dc-ic" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>
+      </svg>
+    </span>
+    <span class="dc-txt">
+      {% if draft.is_started %}<b>Draft saved</b><i>{{ draft_saved_label }}</i>
+      {% else %}<b>Autosave on</b><i>Saved as you go</i>{% endif %}
+    </span>
   </div>
 </div>
-<div class="app-head head-center"><div><div class="app-eyebrow">{% if parent_org %}New group under {{ parent_org.name }}{% else %}New competition{% endif %}</div><h1 class="app-h1">Create a competition</h1><p class="app-sub">Stand up a tipping comp. You'll be the Owner, Manager and Captain to start.</p></div></div>
+
+{% comment %}
+Progress rail. Steps already passed are links back — the wizard keeps every
+answer, so going back to change one costs nothing.
+{% endcomment %}
+<div class="wiz-rail" role="list">
+  {% for s in steps %}
+  <div class="wiz-step {% if s.current %}current{% elif s.done %}done{% endif %}" role="listitem"
+       {% if s.current %}aria-current="step"{% endif %}>
+    <span class="wz-num">{% if s.done %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 13 4 4L19 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>{% else %}{{ s.n }}{% endif %}</span>
+    <span class="wz-text">
+      <span class="wz-label">{{ s.label }}</span>
+      <span class="wz-sub">{{ s.sub }}</span>
+    </span>
+  </div>
+  {% if s.connector %}<span class="wz-line {% if s.done %}done{% endif %}" aria-hidden="true"></span>{% endif %}
+  {% endfor %}
+</div>
 
 {% if form.non_field_errors %}<div class="flash error" style="margin-bottom:16px;"><span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
 
-<form method="post" action="{% url 'orgs:create' %}" class="form-centered form-lime">
+{% comment %} Not .form-lime: that paints the step card in the lime gradient, which the
+   design replaces with cream. The lime is spent on the one thing you are meant
+   to press instead of on the whole panel. {% endcomment %}
+<form method="post" action="{% url 'orgs:create' %}" class="wiz-form" enctype="multipart/form-data" data-busy="Saving">
   {% csrf_token %}
+  <input type="hidden" name="step" value="{{ step }}">
   {% if parent_org %}
   <input type="hidden" name="parent" value="{{ parent_org.id }}">
   <div class="card pad-lg" style="margin-bottom:16px;background:rgba(45,122,58,.06);border-color:rgba(45,122,58,.35);">
@@ -34,19 +75,85 @@
     </p>
   </div>
   {% endif %}
-  <div class="card pad-lg" style="margin-bottom:16px;">
-    <div class="fld"><label for="id_name">League name</label><input type="text" name="name" id="id_name" value="{{ form.name.value|default:'' }}" placeholder="e.g. Eclat Footy Tips" autocomplete="off">
+
+  {% if step == 1 %}
+  <div class="card pad-lg wiz-card" style="margin-bottom:16px;">
+    <div class="wc-head">
+      <span class="wc-ic" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </span>
+      <div><h2>Let's start with your group</h2><p>Tell us a few basics about your competition.</p></div>
+    </div>
+    <div class="fld"><label for="id_name">League name</label>
+      <div class="fld-ic">
+        <span class="fi-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M6 4h12v5a6 6 0 0 1-12 0zM8 21h8M12 15v6"/>
+          </svg>
+        </span>
+        <input type="text" name="name" id="id_name" value="{{ form.name.value|default:'' }}" placeholder="e.g. Eclat Footy Tips" autocomplete="off">
+      </div>
+      <div class="hint">This is the name your members will see.</div>
       {% if form.name.errors %}<div class="fld-err">{{ form.name.errors|join:" " }}</div>{% endif %}
+      {% comment %}
+      Logo sits with the name because the two do the same job — they are how a
+      member finds this group on the search page. Names collide across states
+      and workplaces; the mark is what settles "yes, that is us". Optional, and
+      it says so, because a group without artwork to hand must not be stopped
+      here. It is uploaded the moment it is chosen rather than at the end: the
+      draft is a JSON column and cannot hold a file, so the path is what gets
+      remembered between steps.
+      {% endcomment %}
+      <div class="org-logo" id="orgLogo">
+        <div class="ol-preview" id="olPreview" {% if draft.data.logo %}data-has="1"{% endif %}>
+          {% if draft.data.logo %}
+            <img src="{{ draft_logo_url }}" alt="">
+          {% else %}
+            <span class="ol-fallback" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="9" r="1.8"/><path d="m21 15-5-5L5 21"/>
+              </svg>
+            </span>
+          {% endif %}
+        </div>
+        <div class="ol-body">
+          <div class="ol-title">Group logo <span>optional</span></div>
+          <p class="ol-hint">Helps members recognise you when they search. JPG, PNG, WEBP or SVG, under 5&nbsp;MB.</p>
+          <div class="ol-actions">
+            <label class="ol-pick" for="orgLogoFile">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+              </svg>
+              {% if draft.data.logo %}Replace logo{% else %}Upload a logo{% endif %}
+            </label>
+            {% if draft.data.logo %}
+            <button type="submit" name="action" value="logo_clear" class="ol-remove" formnovalidate data-busy-skip>Remove</button>
+            {% endif %}
+          </div>
+          <p class="ol-drop-note">or drop an image anywhere on this panel</p>
+        </div>
+        <input type="file" name="logo" id="orgLogoFile" accept="image/*" hidden>
+      </div>
+      {% if draft.data.logo_error %}<div class="fld-err">{{ draft.data.logo_error }}</div>{% endif %}
       <div id="dupeHint" style="display:none;margin-top:8px;padding:12px 14px;border:1px solid rgba(180,120,0,.4);background:rgba(255,180,0,.08);border-radius:10px;font-size:14px;">
         <b>These groups already exist</b> — did you mean to join one?
         <ul id="dupeHintList" style="margin:6px 0 0;padding-left:18px;"></ul>
       </div></div>
 
     <div class="fld"><label for="id_group_type">Organisation type</label>
+      <div class="fld-ic">
+        <span class="fi-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          </svg>
+        </span>
       <select name="group_type" id="id_group_type">
         <option value="">— Choose your organisation type —</option>
         {% for gt in form.fields.group_type.queryset %}<option value="{{ gt.pk }}" data-slug="{{ gt.slug }}" {% if form.group_type.value|stringformat:'s' == gt.pk|stringformat:'s' %}selected{% endif %}>{{ gt.name }}</option>{% endfor %}
       </select>
+      </div>
       {% if form.group_type.errors %}<div class="fld-err">{{ form.group_type.errors|join:" " }}</div>{% endif %}
     </div>
 
@@ -74,14 +181,25 @@
       </div>
     </div>
 
-    <div class="fld"><label for="id_state">State or territory <span style="color:var(--muted);font-weight:400;">(optional — skip it if you operate nationally)</span></label>
-      <select name="state" id="id_state">
-        <option value="">— We operate nationally —</option>
-        {% for st in form.fields.state.queryset %}<option value="{{ st.pk }}" {% if form.state.value|stringformat:'s' == st.pk|stringformat:'s' %}selected{% endif %}>{{ st.name }}</option>{% endfor %}
-      </select>
+    <div class="fld"><label for="id_state">State or territory <span style="color:var(--muted);font-weight:400;">(optional — skip if it's not nationally)</span></label>
+      <div class="fld-ic">
+        <span class="fi-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+          </svg>
+        </span>
+        <select name="state" id="id_state">
+          <option value="">— We operate nationally —</option>
+          {% for st in form.fields.state.queryset %}<option value="{{ st.pk }}" {% if form.state.value|stringformat:'s' == st.pk|stringformat:'s' %}selected{% endif %}>{{ st.name }}</option>{% endfor %}
+        </select>
+      </div>
       {% if form.state.errors %}<div class="fld-err">{{ form.state.errors|join:" " }}</div>{% endif %}
     </div>
+  </div>
+  {% endif %}
 
+  {% if step == 2 %}
+  <div class="card pad-lg" style="margin-bottom:16px;">
     <div class="fld">
       <label>Competitions</label>
       <div class="opt-grid cols2">
@@ -101,7 +219,9 @@
     </div>
     <label class="opt-card" style="margin-top:4px;"><input type="checkbox" name="finals_only" {% is_checked form.finals_only 'True' %}><span class="oc-box"><svg><use href="#ic-check"/></svg></span><span><span class="oc-title">Finals only</span><span class="oc-sub">Skip the regular season and tip finals only</span></span></label>
   </div>
+  {% endif %}
 
+  {% if step == 3 %}
   <div class="card pad-lg" style="margin-bottom:16px;">
     <div class="card-h" style="margin-bottom:12px;">Who picks the charity?</div>
     <div class="opt-grid cols2" style="margin-bottom:8px;">
@@ -131,6 +251,32 @@
       {% if form.vote_charities.errors %}<div class="fld-err">{{ form.vote_charities.errors|join:" " }}</div>{% endif %}
     </div>
   </div>
+  {% endif %}
+
+  {% if step == last_step %}
+  <div class="card pad-lg" style="margin-bottom:16px;">
+    <div class="card-h" style="margin-bottom:4px;">Check it over</div>
+    <p class="card-lead" style="margin:0 0 14px;">Nothing's created until you press the button. Step back to change anything.</p>
+    <table class="atable wiz-summary">
+      <tbody>
+      {% for row in summary %}
+        <tr><th style="text-align:left;white-space:nowrap;">{{ row.label }}</th><td>{{ row.value }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if step_errors %}
+  {# Something invalid slipped through from an earlier step — name it and say where. #}
+  <div class="flash error" style="margin-bottom:16px;">
+    <span>
+      Not quite there yet:
+      {% for field, errs in step_errors.items %}{{ errs|join:" " }}{% if not forloop.last %} {% endif %}{% endfor %}
+      Step back to fix it.
+    </span>
+  </div>
+  {% endif %}
+  {% endif %}
 
   {% if duplicates %}
   <div class="card pad-lg" style="margin-bottom:16px;border-color:rgba(180,120,0,.5);background:rgba(255,180,0,.07);" id="dupeConfirm">
@@ -150,11 +296,93 @@
     <p class="card-lead" style="margin:0;">Continue only if your group really is separate.</p>
   </div>
   {% endif %}
-  <button type="submit" class="abtn abtn-primary abtn-lg">{% if duplicates %}Yes, create a separate group &rarr;{% else %}Create competition &rarr;{% endif %}</button>
+  {% comment %} Footer bar. The autosave promise and the button that leaves the page belong
+     together — the reassurance is only worth anything at the moment someone is
+     deciding whether it is safe to click away. {% endcomment %}
+  <div class="wiz-foot">
+    <div class="wf-note">
+      <span class="wf-ic" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>
+        </svg>
+      </span>
+      <span class="wf-txt">
+        <b>Your progress is automatically saved</b>
+        <i>You can come back anytime.{% if draft.is_started %}
+          <button type="submit" name="action" value="restart" class="wiz-restart" formnovalidate data-busy-skip>Start again</button>
+        {% endif %}</i>
+      </span>
+    </div>
+    <div class="wiz-nav">
+      {% if step > 1 %}
+      <button type="submit" name="action" value="back" class="abtn abtn-ghost abtn-lg" formnovalidate data-busy-skip>&larr; Back</button>
+      {% endif %}
+      {% comment %}
+      Save keeps you on this step. formnovalidate so the browser does not block
+      the post with its own bubble — the server checks the same fields and can
+      mark every one of them at once, where the native popup names only the
+      first and vanishes on the next click.
+      {% endcomment %}
+      {% if step != last_step %}
+      <button type="submit" name="action" value="save" class="abtn abtn-ghost abtn-lg wiz-save" formnovalidate>Save draft</button>
+      {% endif %}
+      {% if step == last_step %}
+      <button type="submit" name="action" value="next" class="abtn abtn-primary abtn-lg">{% if duplicates %}Yes, create a separate group &rarr;{% else %}Create competition &rarr;{% endif %}</button>
+      {% else %}
+      <button type="submit" name="action" value="next" class="abtn abtn-primary abtn-lg">Continue &rarr;</button>
+      {% endif %}
+    </div>
+  </div>
 </form>
 {% endblock %}
 
 {% block app_js %}
+    (function(){
+      /* Preview the chosen logo before it is uploaded. The file still posts on
+         the next Continue/Save — this only removes the beat where you pick an
+         image and the page gives no sign it registered. */
+      var input = document.getElementById('orgLogoFile');
+      var box = document.getElementById('olPreview');
+      var panel = document.getElementById('orgLogo');
+      if (!input || !box || !panel) return;
+
+      function paint(f) {
+        if (!f || !/^image\//.test(f.type)) return;
+        var img = box.querySelector('img');
+        if (!img) { box.innerHTML = ''; img = document.createElement('img'); img.alt = ''; box.appendChild(img); }
+        img.src = URL.createObjectURL(f);
+        box.setAttribute('data-has', '1');
+      }
+
+      input.addEventListener('change', function(){
+        paint(input.files && input.files[0]);
+      });
+
+      /* Drop anywhere on the panel. The file is handed to the same input the
+         picker fills, so the form posts one field either way and the server
+         needs no separate drag path. */
+      ['dragenter','dragover'].forEach(function(ev){
+        panel.addEventListener(ev, function(e){
+          e.preventDefault(); panel.classList.add('is-drop');
+        });
+      });
+      ['dragleave','drop'].forEach(function(ev){
+        panel.addEventListener(ev, function(e){
+          e.preventDefault();
+          if (ev === 'dragleave' && panel.contains(e.relatedTarget)) return;
+          panel.classList.remove('is-drop');
+        });
+      });
+      panel.addEventListener('drop', function(e){
+        var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (!f || !window.DataTransfer) return;
+        var dt = new DataTransfer();
+        dt.items.add(f);
+        input.files = dt.files;
+        paint(f);
+      });
+    })();
+
     (function(){
       var radios = document.querySelectorAll('input[name="charity_method"]');
       function sync(){

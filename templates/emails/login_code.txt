@@ -1,15 +1,18 @@
-G'day {{ user.display_name }},
+Hello {{ user.display_name }},
 
-{% if purpose == "signup" %}Welcome aboard. Enter this code to confirm your email address and
-finish setting up your account.{% else %}Someone asked to sign in to your GoodTip account. Enter this code to
-continue.{% endif %}
+{% if purpose == "signup" %}Welcome to GoodTip. Enter the code below to confirm your email address and
+finish setting up your account.{% else %}We received a request to sign in to your GoodTip account. Enter the code
+below to continue.{% endif %}
 
     {{ code }}
 
 This code expires in {{ minutes }} minutes.
 
-Didn't ask for this? You can ignore this email — the code only works alongside
-your password, and nobody can sign in without it.{% if purpose == "login" %}
-If you keep getting codes you didn't ask for, change your password.{% endif %}
+Did not request this? You can safely ignore this email. The code works only
+alongside your password, so it cannot be used to sign in on its own.{% if purpose == "login" %}
+If these codes continue to arrive unexpectedly, please change your password.{% endif %}
+
+GoodTip will never ask you for this code by phone, text message or reply to
+this email.
 
 — GoodTip

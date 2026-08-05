@@ -1,4 +1,4 @@
-G'day {{ user.display_name }},
+Hello {{ user.display_name }},
 
 Voting has closed. {{ org.name }} is raising for:
 

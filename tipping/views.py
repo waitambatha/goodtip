@@ -7,7 +7,7 @@ from django.views.decorators.http import require_POST
 
 from billing.donations import donation_summary
 from orgs.models import OrgMember, Organisation
-from .models import Match, Round, Tip
+from .models import LadderEntry, Match, Round, Tip
 from .services import (
     annotate_play_state, current_round, leaderboard_for_family,
     leaderboard_for_org, submit_tip, user_org_stats, user_rank_in_org,
@@ -37,7 +37,11 @@ def tip_round_view(request, org_id: int, round_id: int):
             "save_url": reverse("tipping:tip_save", args=[org.id, round_obj.id, m.id]),
         })
     return render(request, "tip_round.html", {
-        "org": org, "round": round_obj, "rows": rows, "locked": round_obj.is_locked,
+        # "locked" now means every match has started, not that the round's
+        # first kickoff has passed — the page is only read-only once there is
+        # genuinely nothing left to tip.
+        "org": org, "round": round_obj, "rows": rows,
+        "locked": all(m["match"].is_locked for m in rows) if rows else round_obj.is_locked,
     })
 
 
@@ -75,9 +79,11 @@ def tip_round_confirm(request, org_id: int, round_id: int):
         return HttpResponseForbidden()
     round_obj = get_object_or_404(Round, pk=round_id, org=org)
     dest = f"{reverse('dashboard')}?org={org.id}"
-    if round_obj.is_locked:
-        messages.error(request, "This round is locked — tips are final.")
-        return redirect(dest)
+    # No round-level gate. A round's lockout is its FIRST kickoff, so refusing
+    # the whole submission once that passed also refused games three days away
+    # that had not started — someone who missed Thursday night lost Saturday
+    # too. Locking is a property of a match, and submit_tip already enforces it
+    # per match, so a late tipper keeps every game that has not begun.
     saved, skipped = 0, 0
     for match in round_obj.matches.all():
         selection = request.POST.get(f"match_{match.id}")
@@ -98,6 +104,65 @@ def tip_round_confirm(request, org_id: int, round_id: int):
     else:
         messages.info(request, "Tap a team on each match to pick it, then press Confirm my tips.")
     return redirect(dest)
+
+
+@login_required
+@require_POST
+def tip_confirm_upcoming(request, org_id: int):
+    """Confirm picks across whatever fixtures were on screen, in any round.
+
+    The dashboard used to show one round at a time and post to a round-scoped
+    URL. That fell apart once "show me everything still to play" became the
+    rule: a member looking at the back half of this round and the whole of the
+    next has a slate that spans rounds, and a per-round endpoint cannot accept
+    it.
+
+    Matches are read from the posted keys rather than from a round, and each is
+    re-fetched scoped to this org — a member cannot confirm a tip into someone
+    else's league by editing the form, whatever ids they post. submit_tip
+    enforces the per-match lock, so a game that kicked off while the page was
+    open is skipped and reported rather than silently accepted.
+    """
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_member(request.user, org):
+        return HttpResponseForbidden()
+
+    ids = []
+    for key, value in request.POST.items():
+        if not key.startswith("match_") or value not in ("home", "away"):
+            continue
+        raw = key[len("match_"):]
+        if raw.isdigit():
+            ids.append(int(raw))
+    matches = {
+        m.id: m
+        for m in Match.objects.filter(pk__in=ids, round__org=org).select_related("round")
+    }
+
+    saved, skipped = 0, 0
+    for mid in ids:
+        match = matches.get(mid)
+        if match is None:
+            continue  # not this org's match — ignore rather than error
+        try:
+            submit_tip(user=request.user, match=match, org=org,
+                       selection=request.POST[f"match_{mid}"])
+            saved += 1
+        except ValueError:
+            skipped += 1
+
+    if saved:
+        note = (f"{saved} tip{'s' if saved != 1 else ''} confirmed — find them under "
+                "My Tips. You can change any pick until that game kicks off.")
+        if skipped:
+            note += (f" ({skipped} match{'es' if skipped != 1 else ''} had already "
+                     "started and couldn't be changed.)")
+        messages.success(request, note)
+    elif skipped:
+        messages.error(request, "Those matches have already kicked off — tips there are final.")
+    else:
+        messages.info(request, "Tap a team on each match to pick it, then press Confirm my tips.")
+    return redirect(f"{reverse('dashboard')}?org={org.id}")
 
 
 @login_required
@@ -126,13 +191,14 @@ def my_tips_view(request, org_id: int):
             t.match_id: t
             for t in Tip.objects.filter(user=request.user, match__in=matches, org=org)
         }
-        round_open = not selected_round.is_locked
         for m in matches:
             all_rows.append({
                 "match": m,
                 "tip": tips.get(m.id),
-                # a pick can change until the round locks or the match kicks off
-                "editable": round_open and not m.is_locked,
+                # A pick can change until THIS match kicks off. The round's own
+                # lockout is its first kickoff, so gating on it closed games
+                # that had not started yet.
+                "editable": not m.is_locked,
                 # upcoming / live / complete — drives the state filter below
                 "phase": m.phase,
             })
@@ -185,6 +251,60 @@ def my_tips_view(request, org_id: int):
         "round_pct": round(tips_this_round / total_matches * 100) if total_matches else 0,
         "rank": rank, "total_tippers": total_tippers, "percentile": percentile,
         "donation": donation_summary(org),
+    })
+
+
+@login_required
+def ladder_view(request, org_id: int):
+    """The competition ladder — where the TEAMS sit, not the members.
+
+    Distinct from the leaderboard, which ranks tippers. Both are "the table" in
+    conversation, so the page says which one it is up front.
+
+    Entries are per (series, season) and shared across every league, so this
+    reads rows the sync wrote once rather than anything computed per org.
+    """
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_member(request.user, org):
+        return HttpResponseForbidden()
+
+    series_list = [
+        s
+        for comp in org.competitions.select_related().prefetch_related("series")
+        for s in comp.series.all()
+    ]
+    # De-duplicate while keeping the org's own ordering.
+    seen, ordered = set(), []
+    for s in series_list:
+        if s.id not in seen:
+            seen.add(s.id)
+            ordered.append(s)
+
+    wanted = request.GET.get("series")
+    selected = next((s for s in ordered if str(s.id) == wanted), None) or (ordered[0] if ordered else None)
+
+    entries = []
+    if selected:
+        entries = list(
+            LadderEntry.objects.filter(series=selected, season=org.season)
+            .select_related("team")
+            .order_by("rank")
+        )
+
+    # Which teams this member has tipped most, so the ladder connects to their
+    # own season rather than being a bare table.
+    my_team_ids = set(
+        Tip.objects.filter(user=request.user, org=org, is_correct=True)
+        .values_list("match__home_team_id", flat=True)
+    )
+
+    return render(request, "ladder.html", {
+        "org": org,
+        "series_options": ordered,
+        "selected_series": selected,
+        "entries": entries,
+        "my_team_ids": my_team_ids,
+        "updated_at": entries[0].updated_at if entries else None,
     })
 
 

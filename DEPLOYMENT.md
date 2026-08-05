@@ -163,6 +163,48 @@ These are **application** jobs, separate from `goodtip-sync.timer` (which only
 deploys code from GitHub). None of them can run inside a web request — a feed
 round-trip is far too slow for a page load — so they must be scheduled.
 
+
+### Automatic syncing — how it runs
+
+Match data syncing runs on a **systemd timer**, `goodtip-matchsync.timer`,
+firing every 2 minutes. It is installed automatically: `deploy.sh` calls
+`deploy/install-timers.sh` on every deploy, so scheduling ships with the code
+and a fresh server is never left running an app that never pulls data.
+
+The timer calls one command:
+
+```bash
+venv/bin/python manage.py run_due_syncs
+```
+
+`run_due_syncs` reads the `SyncSchedule` table to decide what is actually due —
+live every 2 min, results every 15 min, fixtures hourly — so a 2-minute tick
+does not mean three feed calls every two minutes. Claiming a slot is a single
+conditional UPDATE, so a slow run still going when the next tick fires cannot
+double-hit a feed.
+
+**This is deliberately independent of site traffic.** Data has to be current
+when a visitor arrives, not fetched because one did — someone opening the
+dashboard at 3am must find last night's results already in.
+
+Checking it:
+
+```bash
+systemctl status goodtip-matchsync.timer
+systemctl list-timers goodtip-matchsync.timer
+journalctl -u goodtip-matchsync.service -n 50
+manage.py run_due_syncs --force        # run everything now, ignoring schedule
+```
+
+`AUTOSYNC_ENABLED=True` in `.env` turns on a traffic-driven fallback for an
+environment with no systemd (a bare container, a staging box). Leave it off in
+production: it only syncs while someone is browsing, and its work runs on a web
+worker thread that dies mid-sync whenever the service restarts.
+
+The crontab entries below are the equivalent for a server without systemd. Use
+one mechanism or the other — both claim through the same lock, so running both
+is harmless but pointless.
+
 Add to the app user's crontab (`crontab -e`):
 
 ```cron
@@ -176,8 +218,12 @@ APP=/home/mbatha-goodtip/projects/goodtip
 # Final scores. This is the job that grades tips and awards points.
 */15 * * * * cd $APP && venv/bin/python manage.py sync_matches --results >> /var/log/goodtip/sync.log 2>&1
 
-# The draw itself — kickoff times and venues. Barely moves, so nightly.
-30 4 * * *   cd $APP && venv/bin/python manage.py sync_matches --fixtures --all-rounds >> /var/log/goodtip/sync.log 2>&1
+# The draw. Runs in DISCOVERY mode: asks each feed which rounds it is
+# publishing and creates whatever is missing, rather than refreshing the rounds
+# already held. This is the only job that can bring a NEW round or game into
+# the database, and it is what makes a league created today have fixtures today
+# — so hourly, not nightly. One feed request per competition per league.
+7 * * * *    cd $APP && venv/bin/python manage.py sync_matches --fixtures >> /var/log/goodtip/sync.log 2>&1
 
 # Charity elections: open the ones whose start time has passed, close the ones
 # whose end time has passed.
@@ -235,8 +281,22 @@ works through it unchanged.
 - Set `POSTMARK_SERVER_TOKEN` in `.env` and production uses Postmark.
 - Leave it blank and production falls back to SMTP (`EMAIL_HOST` etc.), exactly
   as before.
-- With `DEBUG=True` email prints to the console. Set `EMAIL_SEND_FOR_REAL=true`
-  to actually deliver while developing.
+- With `DEBUG=True`, `EMAIL_SEND_FOR_REAL` picks the backend: `true` (the
+  current default) delivers through Postmark, `false` prints to the console.
+- `DEFAULT_FROM_EMAIL` must be an address Postmark has verified as a sender
+  signature. The `goodtip.com.au` domain is approved, so `no-reply@goodtip.com.au`
+  is the sender.
+
+Check it end to end without going through a signup:
+
+```bash
+venv/bin/python manage.py check_email you@example.com            # sends one
+venv/bin/python manage.py check_email you@example.com --dry-run  # config only
+```
+
+It prints the resolved backend, sender and token, then reports Postmark's own
+verdict — including the per-message rejection (e.g. `[300]` for an unverified
+`From`) that the backend otherwise only writes to a log.
 
 Messages live in `templates/emails/`, each as an `.html` + `.txt` pair sharing
 `emails/_base.html`:
@@ -255,8 +315,8 @@ Senders live in `orgs/notifications.py`; `goodtip/mail.py` renders both parts an
 batches the fan-out sends. Every send path is best-effort — a mail failure is
 logged and never breaks the action that triggered it.
 
-Before launch: verify the sending domain in Postmark (DKIM + Return-Path), or
-delivery will be rejected.
+The `goodtip.com.au` sending domain is verified in Postmark (DKIM +
+Return-Path). Any new sending domain needs the same before it will deliver.
 
 ## GitHub SSH Setup
 

@@ -43,10 +43,10 @@
                   {% if p.announced_at %}
                     <span title="Emailed {{ p.announced_at|date:'j M Y, g:i A' }}" style="font-size:12px;color:var(--muted);align-self:center;">Emailed &#10003;</span>
                   {% else %}
-                    <form method="post" action="{% url 'manage:news_announce' p.id %}" onsubmit="return confirm('Email this post to every member? This can only be done once.');">{% csrf_token %}<button type="submit">Email members</button></form>
+                    <form method="post" action="{% url 'manage:news_announce' p.id %}" data-confirm="Every member with email notifications on will receive this post. This cannot be recalled." data-confirm-title="Email this to all members?" data-confirm-ok="Send email">{% csrf_token %}<button type="submit">Email members</button></form>
                   {% endif %}
                 {% endif %}
-                <form method="post" action="{% url 'manage:news_delete' p.id %}" onsubmit="return confirm('Delete this post for good?');">{% csrf_token %}<button type="submit" class="danger">Delete</button></form>
+                <form method="post" action="{% url 'manage:news_delete' p.id %}" data-confirm="The post will be removed from the site permanently." data-confirm-title="Delete this post?" data-confirm-ok="Delete" data-confirm-danger>{% csrf_token %}<button type="submit" class="danger">Delete</button></form>
               </span>
             </td>
           </tr>

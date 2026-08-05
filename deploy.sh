@@ -19,6 +19,10 @@ python manage.py migrate
 # Collect static files
 python manage.py collectstatic --noinput
 
+# Install/refresh the scheduled-job units. Scheduling ships with the code so a
+# fresh server is never left with an app that runs but never pulls any data.
+bash "$PROJECT_DIR/deploy/install-timers.sh"
+
 # Restart the service
 sudo systemctl restart goodtipservice
 

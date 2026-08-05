@@ -8,6 +8,7 @@
   {% include "partials/_fonts.html" %}
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
   <script src="{% static 'js/gt-ui.js' %}" defer></script>
+  <script src="{% static 'js/gt-confirm.js' %}" defer></script>
   <script src="{% static 'js/gt-scenes.js' %}" defer></script>
   <script src="{% static 'js/gt-lists.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
@@ -22,8 +23,11 @@
       <span class="an-org">Manage</span>
       <div class="an-links">
         <a href="{% url 'manage:overview' %}" class="{% block nav_overview %}{% endblock %}">Overview</a>
+        {# count rides on the link so a waiting request is visible from any admin page #}
+        <a href="{% url 'manage:approvals' %}" class="{% block nav_approvals %}{% endblock %}">Approvals{% if pending_approval_count %} <span class="an-count">{{ pending_approval_count }}</span>{% endif %}</a>
         <a href="{% url 'manage:orgs_list' %}" class="{% block nav_orgs %}{% endblock %}">Orgs</a>
         <a href="{% url 'manage:sync' %}" class="{% block nav_sync %}{% endblock %}">Sync</a>
+        <a href="{% url 'manage:enquiries' %}" class="{% block nav_enquiries %}{% endblock %}">Enquiries{% if open_enquiry_count %} <span class="an-count">{{ open_enquiry_count }}</span>{% endif %}</a>
         {% if user.is_superuser %}<a href="{% url 'manage:news' %}" class="{% block nav_news %}{% endblock %}">News &amp; blog</a>{% endif %}
       </div>
       <div class="an-right">
@@ -60,8 +64,10 @@
   <div class="app-sheet" id="appSheet">
     <div class="sheet-panel">
       <a href="{% url 'manage:overview' %}">Overview</a>
+      <a href="{% url 'manage:approvals' %}">Approvals{% if pending_approval_count %} ({{ pending_approval_count }}){% endif %}</a>
       <a href="{% url 'manage:orgs_list' %}">Orgs</a>
       <a href="{% url 'manage:sync' %}">Sync</a>
+      <a href="{% url 'manage:enquiries' %}">Enquiries{% if open_enquiry_count %} ({{ open_enquiry_count }}){% endif %}</a>
       {% if user.is_superuser %}<a href="{% url 'manage:news' %}">News &amp; blog</a>{% endif %}
       <a href="{% url 'profile' %}">Profile</a>
       <a href="{% url 'dashboard' %}">&larr; Back to app</a>

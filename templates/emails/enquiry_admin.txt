@@ -1,0 +1,26 @@
+Hey boss,
+
+{{ enquiry.name }}{% if enquiry.organisation %} from {{ enquiry.organisation }}{% endif %} has just sent GoodTip an enquiry.
+
+WHO
+Name: {{ enquiry.name }}
+Email: {{ enquiry.email }}
+{% if enquiry.organisation %}Organisation: {{ enquiry.organisation }}
+{% endif %}{% if enquiry.interest %}Interested in: {{ enquiry.interest }}
+{% endif %}{% if enquiry.source_page %}Sent from: {{ enquiry.source_page }}
+{% endif %}
+WHAT THEY SAID
+{{ enquiry.message }}
+
+Read it and reply here:
+{{ enquiry_url }}
+
+That link goes straight to the enquiry. If you're not signed in it'll ask you
+first and then take you there. Replying on that page emails {{ enquiry.name }}
+directly — no need to start a new message.
+
+You can also just hit reply to this email; it goes to {{ enquiry.email }}. Doing
+it on the site keeps the answer on the record, though, so the next person can
+see it was handled.
+
+— GoodTip

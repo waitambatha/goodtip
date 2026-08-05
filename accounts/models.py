@@ -168,3 +168,64 @@ class LaunchSignup(models.Model):
 
     def __str__(self):
         return f"{self.name} <{self.email}>"
+
+
+class BossInvite(models.Model):
+    """One "tell the boss" note, and what became of it.
+
+    The send used to be fire-and-forget: an email left the building and the
+    member never learned whether their boss opened it, joined, or ignored it.
+    That is the whole point of the feature — you are asking a colleague to start
+    something — so the note is now a tracked object with three states the sender
+    can watch move.
+
+    Matched to the boss by email address rather than by a token in a link. A
+    boss who ignores the link and signs up from the homepage a week later should
+    still close the loop, and the address is the only thing both sides agree on.
+    """
+
+    STATUS_SENT = "sent"
+    STATUS_JOINED = "joined"
+    STATUS_COMPLETE = "complete"
+    STATUS_CHOICES = [
+        (STATUS_SENT, "Note sent"),
+        (STATUS_JOINED, "Boss signed up"),
+        (STATUS_COMPLETE, "Group created"),
+    ]
+
+    sender = models.ForeignKey(
+        "accounts.User", on_delete=models.CASCADE, related_name="boss_invites",
+    )
+    boss_name = models.CharField(max_length=80, blank=True)
+    boss_email = models.EmailField()
+    # Stored so the sender can see exactly what was sent on their behalf —
+    # a note written in your name that you cannot read is a strange thing to ask
+    # someone to trust.
+    subject = models.CharField(max_length=200, blank=True)
+    body_preview = models.TextField(blank=True)
+
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_SENT)
+    sent_at = models.DateTimeField(default=timezone.now)
+    joined_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    boss_user = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="boss_invites_received",
+    )
+    org = models.ForeignKey(
+        "orgs.Organisation", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="from_boss_invites",
+    )
+
+    class Meta:
+        ordering = ["-sent_at"]
+        indexes = [models.Index(fields=["boss_email", "status"])]
+
+    def __str__(self):
+        return f"{self.sender} → {self.boss_email} ({self.status})"
+
+    @property
+    def step(self) -> int:
+        """1-3, for the progress rail."""
+        return {self.STATUS_SENT: 1, self.STATUS_JOINED: 2, self.STATUS_COMPLETE: 3}[self.status]

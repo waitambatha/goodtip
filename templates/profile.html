@@ -1,7 +1,18 @@
 {% extends "app_base.html" %}
+{% load static %}
 {% block title %}Profile — GoodTip{% endblock %}
 {% block loader_task %}Opening your profile{% endblock %}
+{% block body_class %}page-deep sheet-page{% endblock %}
+{% block page_backdrop %}
+{% comment %}Side imagery lives outside the sheet: .gt-sheet creates a
+stacking context, so a strip rendered inside it paints over the sheet.
+{% endcomment %}
+{% include "partials/page_scenes.html" %}
+{% endblock %}
+
 {% block app_content %}
+
+
 <div class="app-head">
   <div style="display:flex;align-items:center;gap:18px;">
     <div>

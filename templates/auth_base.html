@@ -11,13 +11,15 @@
   <script src="{% static 'js/pw-checklist.js' %}" defer></script>
   <script src="{% static 'js/gt-scenes.js' %}" defer></script>
   <script src="{% static 'js/gt-loader.js' %}" defer></script>
+  <script src="{% static 'js/gt-busy.js' %}" defer></script>
+  <script src="{% static 'js/gt-confirm.js' %}" defer></script>
 </head>
 <body class="auth-body">
   {% include "public/partials/_icons.html" %}
 
   {# ---- sport loader ---- #}
   <div class="loader" id="loader" role="status" aria-label="Loading"
-       data-min="2000" data-cycle-sports>
+       data-min="400" data-cycle-sports data-full-shot>
     <div class="loader-inner">
       <div class="pitch">
         <svg class="posts" viewBox="0 0 240 150" aria-hidden="true">
@@ -67,7 +69,14 @@
     {% endcomment %}
     <main class="auth-panel {% block auth_mood %}mood-green{% endblock %}">
 
-      <section class="ap-form">
+      {% comment %}
+      data-busy-scope marks this whole column — wordmark, heading, fields,
+      button, the lot — as the thing that goes translucent behind a spinner
+      while a submit is in flight. It sits here rather than on each form so
+      every screen built on this base gets it: log in, sign up, the code step,
+      and both halves of a password reset.
+      {% endcomment %}
+      <section class="ap-form" data-busy-scope>
         <a href="/" class="ap-mark">GOOD<span>TIP</span><span class="dot">.</span></a>
 
         {% if messages %}

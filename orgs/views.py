@@ -1,3 +1,6 @@
+from pathlib import Path
+from uuid import uuid4
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import models
@@ -5,8 +8,10 @@ from django.db.models import Count
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.core.files.storage import default_storage
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.timesince import timesince
 from django.views.decorators.http import require_POST
 
 from accounts.views import JOIN_INVITER_SESSION_KEY, JOIN_SESSION_KEY
@@ -18,6 +23,7 @@ from .models import (
     MembershipRequest,
     Notification,
     OrgCharitySelection,
+    OrgDraft,
     OrgMember,
     Organisation,
 )
@@ -84,12 +90,161 @@ def _requested_parent(request):
         if str(pid).isdigit() else None
 
 
+# The create form, cut into steps. Each entry is (number, label, field names).
+# The field lists are the ONLY thing that decides which errors surface on which
+# step — validation itself stays entirely in OrgCreateForm, so there is one
+# source of truth for the rules and the wizard just decides what to show when.
+# (number, label, sub-label, fields). The sub-label is what the rail shows under
+# the step name — "Your group" alone does not tell you whether the step wants a
+# name or a whole charity policy, and the rail is the only place someone can see
+# what is still ahead of them before committing to start.
+WIZARD_STEPS = [
+    (1, "Your group", "Basic details",
+     ["name", "group_type", "sub_categories", "informal_label", "state"]),
+    (2, "The tipping", "Scoring & rules",
+     ["competitions", "season", "team_size", "finals_only"]),
+    (3, "The charity", "Choose a cause",
+     ["charity_method", "charity", "new_charity_name",
+      "new_charity_url", "vote_charities"]),
+    (4, "Review", "Check & create", []),
+]
+LAST_STEP = WIZARD_STEPS[-1][0]
+# Fields the browser posts as a list rather than a single value.
+WIZARD_MULTI_FIELDS = {"sub_categories", "competitions", "vote_charities"}
+# Unchecked checkboxes post nothing at all, so "absent" has to mean False for
+# these rather than "leave whatever was there before".
+WIZARD_BOOLEAN_FIELDS = {"finals_only"}
+
+
+def _wizard_fields(step: int) -> list:
+    return next((f for n, _, _sub, f in WIZARD_STEPS if n == step), [])
+
+
+LOGO_MAX_BYTES = 5 * 1024 * 1024
+LOGO_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}
+
+
+def _absorb_step(draft, post, step: int, files=None) -> None:
+    """Fold one step's posted values into the draft."""
+    for name in _wizard_fields(step):
+        if name in WIZARD_MULTI_FIELDS:
+            draft.data[name] = post.getlist(name)
+        elif name in WIZARD_BOOLEAN_FIELDS:
+            draft.data[name] = bool(post.get(name))
+        else:
+            draft.data[name] = post.get(name, "")
+
+    # The draft is a JSON column, so an uploaded file cannot be stored in it.
+    # Write the upload to storage straight away and keep only its path: the
+    # wizard can span days and machines, so neither holding the bytes in the
+    # session nor asking for the file again at the final step would survive the
+    # way this form is actually used.
+    upload = (files or {}).get("logo")
+    if upload:
+        suffix = Path(upload.name).suffix.lower()
+        if suffix in LOGO_SUFFIXES and upload.size <= LOGO_MAX_BYTES:
+            draft.data["logo"] = default_storage.save(
+                f"org_logos/drafts/{uuid4().hex}{suffix}", upload
+            )
+        else:
+            draft.data["logo_error"] = (
+                "That file is over 5 MB." if upload.size > LOGO_MAX_BYTES
+                else "Use a JPG, PNG, WEBP, GIF or SVG."
+            )
+            return
+    draft.data.pop("logo_error", None)
+
+
+def _step_errors(form, step: int) -> dict:
+    """Only this step's errors. The form validates everything every time, so
+    without this filter step one would refuse to advance over a missing charity."""
+    fields = set(_wizard_fields(step))
+    return {name: errs for name, errs in form.errors.items() if name in fields}
+
+
 @login_required
 def create_org_view(request):
-    parent_org = _requested_parent(request)
+    """Create a group, one step at a time, resumable.
+
+    A single long form was a wall: people abandoned it part-way to go and ask
+    which charity the office wanted, and lost everything. Progress now lands in
+    an OrgDraft row after every step, so leaving and coming back — even on
+    another machine — picks up where they left off.
+    """
+    draft, _ = OrgDraft.objects.get_or_create(user=request.user)
+    # Keep the raw value, valid or not: the form's queryset is what rejects a
+    # child-as-parent (§3, two levels only), and dropping a bad id here would
+    # quietly create a top-level group instead of refusing.
+    raw_parent = request.POST.get("parent") or request.GET.get("parent")
+    if raw_parent:
+        draft.data["parent"] = raw_parent
+    # Resolved only for display — the banner and hidden field have to survive
+    # the redirect between steps, which carries no query string.
+    parent_org = _requested_parent(request) or _parent_from_draft(draft)
+
+    step = draft.step or 1
+    errors, duplicates = {}, None
+
     if request.method == "POST":
-        form = OrgCreateForm(request.POST)
-        if form.is_valid():
+        action = request.POST.get("action", "next")
+        step = int(request.POST.get("step") or step)
+
+        if action == "restart":
+            draft.data, draft.step = {}, 1
+            draft.save()
+            messages.info(request, "Started again — nothing was created.")
+            return redirect("orgs:create")
+
+        # Absorb first, so going back never loses what was just typed.
+        if step != LAST_STEP:
+            _absorb_step(draft, request.POST, step, request.FILES)
+
+        if action == "back":
+            draft.step = max(1, step - 1)
+            draft.save()
+            return redirect("orgs:create")
+
+        if action == "logo_clear":
+            _absorb_step(draft, request.POST, step, None)
+            draft.data.pop("logo", None)
+            draft.data.pop("logo_error", None)
+            draft.save()
+            return redirect("orgs:create")
+
+        if action == "save":
+            # Save without advancing. Until this existed, "save" and "next" were
+            # the same button: the only way to keep what you had typed was to
+            # complete the step and move on, so anyone who wanted to stop
+            # half-way had to guess whether their work was safe.
+            form = _draft_form(draft, parent_org, bound=True)
+            errors = _step_errors(form, step)
+            if not errors:
+                draft.save()
+                messages.success(
+                    request, "Draft saved — pick it up here whenever you like."
+                )
+                return redirect("orgs:create")
+            # Fall through to the render below so the offending fields are named
+            # and marked, rather than reporting a bare "could not save".
+            messages.error(request, "Fill these in first, then we can save your draft.")
+            return _render_wizard(
+                request, draft, form, step, parent_org, errors=errors,
+            )
+
+        form = _draft_form(draft, parent_org, bound=True)
+        errors = _step_errors(form, step)
+        if not errors and step < LAST_STEP:
+            draft.step = step + 1
+            draft.save()
+            return redirect("orgs:create")
+
+        # The review step owns no fields, so nothing would surface a problem
+        # carried over from an earlier one. Show the lot rather than a button
+        # that silently does nothing.
+        if step == LAST_STEP and not form.is_valid():
+            errors = dict(form.errors)
+
+        if not errors and step == LAST_STEP:
             # §4 Stage 2: same-named org(s) exist → one explicit confirmation
             # before creating anyway. Friction, not prevention: the resubmit
             # carries duplicate_confirmed and sails through.
@@ -97,12 +252,26 @@ def create_org_view(request):
                 name__iexact=form.cleaned_data["name"].strip(),
             ).select_related("parent", "state")
             if duplicates.exists() and request.POST.get("duplicate_confirmed") != "1":
-                return render(request, "orgs/create.html", {
-                    "form": form,
-                    "duplicates": duplicates,
-                    "parent_org": parent_org,
-                })
+                return _render_wizard(
+                    request, draft, form, step, parent_org, duplicates=duplicates,
+                )
             org = form.save()
+            # Anyone who talked this person into starting a comp gets added to
+            # it automatically — see accounts.boss for the three-step flow.
+            from accounts.boss import complete_boss_invites
+
+            brought_in = complete_boss_invites(org, request.user)
+            if brought_in:
+                messages.info(
+                    request,
+                    f"{brought_in} colleague{'s' if brought_in != 1 else ''} who asked you "
+                    "to start this comp have been added automatically.",
+                )
+            # The logo was written to storage during step one; attach the path
+            # now that there is a row to attach it to.
+            if draft.data.get("logo"):
+                org.logo.name = draft.data["logo"]
+                org.save(update_fields=["logo"])
             # The creator runs and owns the league: Manager + Captain + Owner.
             OrgMember.objects.get_or_create(
                 user=request.user, org=org,
@@ -128,10 +297,112 @@ def create_org_view(request):
                     request,
                     f"{suggested.name} was sent to the GoodTip team for review.",
                 )
+            # The draft has served its purpose.
+            draft.delete()
             return redirect("orgs:created", org_id=org.id)
     else:
-        form = OrgCreateForm(initial={"parent": parent_org})
-    return render(request, "orgs/create.html", {"form": form, "parent_org": parent_org})
+        draft.save()
+        form = _draft_form(draft, parent_org, bound=False)
+
+    return _render_wizard(
+        request, draft, form, step, parent_org, errors=errors, duplicates=duplicates,
+    )
+
+
+def _parent_from_draft(draft):
+    pid = draft.data.get("parent")
+    if not pid or not str(pid).isdigit():
+        return None
+    return Organisation.objects.filter(parent__isnull=True, pk=pid).first()
+
+
+def _draft_form(draft, parent_org, *, bound: bool) -> OrgCreateForm:
+    """The one create form, fed from the draft.
+
+    Bound when we're checking a step (so errors exist to filter), unbound with
+    the same values as `initial` when we're only drawing the page — an unbound
+    form shows the values back without painting every not-yet-visited field red.
+    """
+    data = dict(draft.data)
+    return OrgCreateForm(data) if bound else OrgCreateForm(initial=data)
+
+
+def _render_wizard(request, draft, form, step, parent_org, *, errors=None, duplicates=None):
+    steps = [
+        {"n": n, "label": label, "sub": sub,
+         "done": n < draft.step, "current": n == step,
+         # The connector is drawn by the step to its left, so the last one has
+         # none — otherwise the rail ends in a line pointing at nothing.
+         "connector": n < len(WIZARD_STEPS)}
+        for n, label, sub, _ in WIZARD_STEPS
+    ]
+    return render(request, "orgs/create.html", {
+        "form": form,
+        "parent_org": parent_org,
+        "draft": draft,
+        "step": step,
+        "steps": steps,
+        "last_step": LAST_STEP,
+        "step_errors": errors or {},
+        "duplicates": duplicates,
+        "summary": _draft_summary(form, draft) if step == LAST_STEP else None,
+        "draft_saved_label": _saved_label(draft),
+        # Built here rather than as {{ MEDIA_URL }}{{ path }} in the template:
+        # that only works if the media context processor happens to be enabled,
+        # and storage backends are free to serve from somewhere else entirely.
+        "draft_logo_url": (
+            default_storage.url(draft.data["logo"]) if draft.data.get("logo") else ""
+        ),
+    })
+
+
+def _saved_label(draft):
+    """Human wording for the draft chip.
+
+    timesince() renders anything under a minute as "0 minutes", and "saved 0
+    minutes ago" beside a form someone just typed into reads as a bug. Under a
+    minute is the common case here, so it gets its own words.
+    """
+    if not draft.updated_at:
+        return "Just now"
+    seconds = (timezone.now() - draft.updated_at).total_seconds()
+    if seconds < 60:
+        return "Just now"
+    return f"{timesince(draft.updated_at)} ago"
+
+
+def _draft_summary(form, draft) -> list:
+    """Plain-language read-back of the answers, for the review step."""
+    def label_for(field, pk):
+        if not pk:
+            return ""
+        obj = form.fields[field].queryset.filter(pk=pk).first()
+        return str(obj) if obj else ""
+
+    def labels_for(field, pks):
+        qs = form.fields[field].queryset.filter(pk__in=pks or [])
+        return ", ".join(str(o) for o in qs)
+
+    d = draft.data
+    charity = (
+        "The group votes on it"
+        if d.get("charity_method") == "vote"
+        else (label_for("charity", d.get("charity")) or d.get("new_charity_name") or "")
+    )
+    rows = [
+        ("Group name", d.get("name", "")),
+        ("Type", label_for("group_type", d.get("group_type"))),
+        ("Sub-category", labels_for("sub_categories", d.get("sub_categories"))),
+        ("Described as", d.get("informal_label", "")),
+        ("State", label_for("state", d.get("state")) or "National"),
+        ("Competitions", labels_for("competitions", d.get("competitions"))),
+        ("Season", label_for("season", d.get("season"))),
+        ("Expected size", d.get("team_size", "")),
+        ("Finals only", "Yes" if d.get("finals_only") else ""),
+        ("Charity", charity),
+        ("On the ballot", labels_for("vote_charities", d.get("vote_charities"))),
+    ]
+    return [{"label": k, "value": v} for k, v in rows if v]
 
 
 @login_required
@@ -547,6 +818,53 @@ def request_join_view(request, org_id: int):
     if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
         next_url = ""
     return redirect(next_url or "dashboard")
+
+
+@login_required
+def review_request_view(request, org_id: int, req_id: int):
+    """One join request, with Approve and Decline right there.
+
+    The bell-panel notification links straight here. Sending admins to the
+    Members page instead meant hunting for the right row among a hundred
+    members — and if they weren't an admin of that org they just got a blank
+    403, with nothing explaining why.
+    """
+    org = get_object_or_404(Organisation, pk=org_id)
+    join_req = get_object_or_404(
+        MembershipRequest.objects.select_related("user", "org", "decided_by"),
+        pk=req_id, org=org,
+    )
+    me = _membership(request.user, org)
+    if me is None or not me.can_manage:
+        messages.error(
+            request,
+            f"Only an admin of {org.name} can approve join requests.",
+        )
+        return redirect("dashboard")
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        try:
+            if action == "approve":
+                approve_membership_request(join_req, by_user=request.user)
+                messages.success(
+                    request, f"{join_req.user.display_name} is now a member of {org.name}."
+                )
+            elif action == "decline":
+                decline_membership_request(join_req, by_user=request.user)
+                messages.info(request, f"{join_req.user.display_name}'s request was declined.")
+        except ValueError as e:
+            # Two admins acting on the same request — say so rather than 500.
+            messages.info(request, str(e))
+        return redirect("orgs:members", org_id=org.id)
+
+    return render(request, "orgs/review_request.html", {
+        "org": org,
+        "join_req": join_req,
+        "other_pending": org.membership_requests.filter(
+            status=MembershipRequest.STATUS_PENDING,
+        ).exclude(pk=join_req.pk).count(),
+    })
 
 
 @login_required

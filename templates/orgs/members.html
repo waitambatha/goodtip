@@ -1,9 +1,23 @@
 {% extends "app_base.html" %}
 {% block title %}Members — {{ org.name }}{% endblock %}
 {% block loader_task %}Loading your members{% endblock %}
+{% block nav_manage %}on{% endblock %}
 {% block app_content %}
-<div class="app-head"><div><div class="app-eyebrow">{{ org.name }}</div><h1 class="app-h1">Members</h1><p class="app-sub">Manage roles for your group.{% if is_owner %} Owners can nominate managers.{% endif %}</p></div>
-  <a href="{% url 'orgs:invite' org.id %}" class="abtn abtn-ghost abtn-sm">Invite</a></div>
+{% comment %}
+Everything to do with people lives on this one page: who is in, who is asking
+to get in, who runs the place, and how to bring more. It used to be split
+across here and a separate Invite screen reached from a button on the
+dashboard, which meant "add someone to my league" was two hops from anywhere
+anyone would look for it.
+{% endcomment %}
+<div class="app-head">
+  <div>
+    <div class="app-eyebrow">{{ org.name }}</div>
+    <h1 class="app-h1">Members</h1>
+    <p class="app-sub">Invite people, approve requests and set roles.{% if is_owner %} Owners can nominate managers.{% endif %}</p>
+  </div>
+  <a href="{% url 'orgs:invite' org.id %}" class="abtn abtn-primary abtn-sm">Invite people &rarr;</a>
+</div>
 
 {% if pending_requests %}
 <div class="card pad-lg" style="margin-bottom:22px;">

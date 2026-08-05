@@ -54,7 +54,8 @@
 
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:22px;align-items:center;">
       <button type="submit" name="action" value="schedule" class="abtn abtn-dark">Schedule the election</button>
-      <button type="submit" name="action" value="now" class="abtn abtn-primary" onclick="return confirm('Open the election right now? Every member gets emailed immediately.')">Start it now &rarr;</button>
+      <button type="submit" name="action" value="now" class="abtn abtn-primary" data-confirm="Every member is emailed and notified straight away, and voting opens immediately."
+              data-confirm-title="Open the election now?" data-confirm-ok="Open election">Start it now &rarr;</button>
     </div>
     <p class="app-sub" style="margin-top:12px;">Voting is blind — tallies stay hidden until you close it from the vote page.</p>
   </form>

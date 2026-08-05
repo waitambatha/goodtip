@@ -1,0 +1,74 @@
+{% extends "admin_base.html" %}
+{% load static %}
+{% block title %}Enquiries — Manage{% endblock %}
+{% block nav_enquiries %}on{% endblock %}
+{% block hero_title %}Customer enquiries{% endblock %}
+{% block hero_lead %}Messages from the contact form on the public site. Reply here and the answer is emailed straight back.{% endblock %}
+{% block hero_shot %}{% static 'img/scenes/mcg-stadium.jpg' %}{% endblock %}
+{% block admin_content %}
+
+<div class="gt-shell gt-shell-wide">
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-mail"/></svg></span>
+      <div>
+        <h2>Inbox</h2>
+        <div class="gp-sub">
+          {% if open_count %}{{ open_count }} waiting on a reply{% else %}Nothing waiting — all caught up.{% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# Open first by default: what matters is whether someone has dealt with it. #}
+    <div class="enq-tabs">
+      <a href="?show=open" class="{% if show == 'open' %}on{% endif %}">Open{% if open_count %} <span class="an-count">{{ open_count }}</span>{% endif %}</a>
+      <a href="?show=replied" class="{% if show == 'replied' %}on{% endif %}">Replied ({{ replied_count }})</a>
+      <a href="?show=all" class="{% if show == 'all' %}on{% endif %}">All ({{ total_count }})</a>
+    </div>
+
+    {% if enquiries %}
+    <div class="gt-tablewrap">
+      <table class="gt-table">
+        <thead><tr><th>From</th><th>About</th><th>Received</th><th>Status</th><th class="fit">&nbsp;</th></tr></thead>
+        <tbody>
+        {% for e in enquiries %}
+          <tr>
+            <td>
+              <span class="gt-namecell">
+                <span>
+                  <b>{{ e.name }}</b>
+                  <small>{{ e.email }}{% if e.organisation %} &middot; {{ e.organisation }}{% endif %}</small>
+                </span>
+              </span>
+            </td>
+            <td>
+              {% if e.interest %}<span class="gt-with-ic"><svg><use href="#ic-flag"/></svg>{{ e.interest }}</span>{% else %}<span class="gt-muted">&mdash;</span>{% endif %}
+              <small class="enq-snip">{{ e.message|truncatechars:90 }}</small>
+            </td>
+            <td>{{ e.created_at|date:"j M Y, g:i a" }}</td>
+            <td>
+              {% if e.status == 'new' %}<span class="gt-chip draft">Open</span>
+              {% elif e.status == 'replied' %}<span class="gt-chip live">Replied</span>
+              {% else %}<span class="gt-chip">Closed</span>{% endif %}
+            </td>
+            <td class="fit">
+              <span class="gt-actions">
+                <a href="{% url 'manage:enquiry_detail' e.id %}">{% if e.status == 'new' %}Reply{% else %}View{% endif %}</a>
+              </span>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="gt-empty">
+      {% if show == 'open' %}No enquiries waiting on a reply.
+      {% elif show == 'replied' %}Nothing replied to yet.
+      {% else %}No enquiries yet. They arrive here from the contact form on the public site.{% endif %}
+    </p>
+    {% endif %}
+  </section>
+</div>
+
+{% endblock %}

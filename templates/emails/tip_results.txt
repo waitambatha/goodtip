@@ -1,4 +1,4 @@
-G'day {{ user.display_name }},
+Hello {{ user.display_name }},
 
 Round {{ round.round_number }} is done and graded for {{ org.name }}.
 

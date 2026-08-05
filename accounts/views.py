@@ -9,6 +9,7 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
@@ -16,7 +17,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 
 from orgs.models import OrgMember, Organisation
 from orgs.notifications import send_welcome
-from tipping.models import Round, Tip
+from tipping.models import Match, Round, Tip
 from tipping.services import (
     annotate_play_state, current_round, user_org_stats, user_rank_in_org,
 )
@@ -71,6 +72,12 @@ def signup_view(request):
             # Welcome email is fire-and-forget: send_welcome swallows its own
             # failures, so a mail outage can never block a signup.
             transaction.on_commit(lambda u=user: send_welcome(u))
+            # If a colleague sent them a "tell the boss" note, this is the
+            # moment it advances — matched on the address they just signed up
+            # with, so it works whether or not they used the link in the email.
+            from .boss import link_boss_signup
+
+            link_boss_signup(user)
             next_url = request.GET.get("next") or request.POST.get("next") or ""
             if not next_url.startswith("/"):
                 next_url = ""
@@ -378,6 +385,11 @@ def _ordinal_suffix(n: int) -> str:
     return {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
 
 
+# How many upcoming fixtures the dashboard lists. ~4 AFL rounds: far enough to
+# plan ahead, short enough that the panel is not a wall of games.
+UPCOMING_LIMIT = 40
+
+
 @login_required
 def dashboard_view(request):
     memberships = (
@@ -454,26 +466,71 @@ def dashboard_view(request):
     if org_param:
         selected = next((c for c in cards if str(c["org"].id) == org_param), None)
     if selected is None and cards:
-        live = [c for c in cards if c["round"] and c["round"].lockout_at >= now]
+        # Land on a round that still has something to tip. lockout_at is the
+        # round's FIRST kickoff, so selecting on it dropped a round the moment
+        # its opening game began — even with six fixtures still days away — and
+        # sent members to a read-only screen while their week was still live.
+        live = [c for c in cards if c["round"] and c["round"].has_open_matches]
         needing = [c for c in live if c["tips_done"] < c["tips_total"]]
         pool = needing or live
-        selected = min(pool, key=lambda c: c["round"].lockout_at) if pool else cards[0]
+        if pool:
+            selected = min(pool, key=lambda c: c["round"].lockout_at)
+        else:
+            # Nothing left to tip anywhere: fall back to the round in play so
+            # the member sees results rather than an empty screen.
+            selected = cards[0]
 
+    # Everything still to play, across rounds — not one round at a time.
+    # Anchoring on a single round meant the panel emptied out as that round was
+    # played, while the next fortnight of fixtures sat invisible: a member with
+    # nothing left in this round was shown a read-only screen rather than the
+    # games they could actually tip. Fixtures are listed by kickoff and grouped
+    # by round in the template, so "what can I tip right now" is the whole list.
     games = []
-    if selected and selected["round"]:
+    open_games = 0
+    if selected:
+        upcoming = (
+            Match.objects.filter(
+                round__org=selected["org"],
+                round__competition__in=selected["org"].competitions.all(),
+                kickoff_at__gt=now,
+            )
+            .select_related("home_team", "away_team", "round", "round__series")
+            .order_by("kickoff_at", "id")[:UPCOMING_LIMIT]
+        )
+        upcoming = list(upcoming)
         my_picks = dict(
             Tip.objects.filter(
-                user=request.user, match__round=selected["round"], org=selected["org"]
+                user=request.user, match__in=upcoming, org=selected["org"]
             ).values_list("match_id", "selection")
         )
-        for g in (
-            selected["round"].matches
-            .select_related("home_team", "away_team")
-            .order_by("kickoff_at", "id")
-        ):
+        for g in upcoming:
             g.my_tip = my_picks.get(g.id)
             g.tipped = g.my_tip is not None
+            open_games += 1
             games.append(g)
+
+    # Someone who hasn't joined a group yet used to land on an empty page, which
+    # reads as "nothing on" rather than "you're one step away". Rounds hang off
+    # an org, so there is no such thing as a global fixture list — we borrow the
+    # next round to lock anywhere on GoodTip and show it read-only. Touching a
+    # team opens the join prompt instead of recording anything: no org means no
+    # Tip row could be written even if the POST were attempted.
+    preview_round = None
+    if not cards:
+        preview_round = (
+            Round.objects.filter(lockout_at__gte=now)
+            .select_related("series", "org")
+            .order_by("lockout_at")
+            .first()
+            or Round.objects.select_related("series", "org").order_by("-lockout_at").first()
+        )
+        if preview_round:
+            games = list(
+                preview_round.matches
+                .select_related("home_team", "away_team")
+                .order_by("kickoff_at", "id")
+            )
 
     locking_soon = sorted(
         (
@@ -492,6 +549,12 @@ def dashboard_view(request):
         "cards": cards,
         "selected": selected,
         "games": games,
+        # How many fixtures in the shown round have not kicked off. The panel
+        # goes read-only on this rather than on the round's lockout, which is
+        # only its FIRST kickoff and said "locked" while most of the round was
+        # still days away.
+        "open_games": open_games,
+        "preview_round": preview_round,
         "locking_soon": locking_soon,
         "create_url": reverse("orgs:create"),
         "news_leads": news_posts[:3],
@@ -627,8 +690,16 @@ def tell_the_boss_view(request):
     boss_name = ""
     if request.method == "POST" and not request.user.is_authenticated:
         # Sending is a member perk — the template hides the form, but guard
-        # the POST too so the relay can't be driven anonymously.
-        error = "Sending is a member thing — sign up free first, then we'll deliver it."
+        # the POST too so the relay can't be driven anonymously. Carry them to
+        # signup and back rather than dead-ending: they filled the form in,
+        # and losing that to a login wall is how people give up.
+        request.session["boss_draft"] = {
+            "your_name": (request.POST.get("your_name") or "").strip()[:80],
+            "boss_name": (request.POST.get("boss_name") or "").strip()[:80],
+            "boss_email": (request.POST.get("boss_email") or "").strip()[:254],
+        }
+        messages.info(request, "Create your free account and we'll send that note straight away.")
+        return redirect(f"{reverse('accounts:signup')}?next={reverse('tell_the_boss')}")
     elif request.method == "POST":
         your_name = (request.POST.get("your_name") or "").strip()[:80]
         boss_name = (request.POST.get("boss_name") or "").strip()[:80]
@@ -670,12 +741,177 @@ def tell_the_boss_view(request):
                     sent = True
                     recent.append(now)
                     request.session["boss_sends"] = recent
+                    # Recorded so the sender can watch it move, and so the
+                    # boss's eventual signup has something to match against.
+                    from .models import BossInvite
+
+                    BossInvite.objects.create(
+                        sender=request.user,
+                        boss_name=boss_name,
+                        boss_email=boss_email,
+                        subject=f"{your_name} wants your tipping comp to do some good",
+                        body_preview=render_to_string(
+                            "emails/tell_the_boss.txt",
+                            {"your_name": your_name, "boss_name": boss_name,
+                             "how_url": site_url("/tell-the-boss/")},
+                        ),
+                    )
+                    request.session.pop("boss_draft", None)
+                    return redirect("boss_progress")
                 else:
                     error = "The note didn't send — try again in a minute, or just copy it."
+    draft = request.session.get("boss_draft") or {}
+    # A signed-in member who has not asked to read the pitch gets the focused
+    # send page: two image panes, one card, three fields. The full marketing
+    # page is still there behind ?copy=1 for anyone who wants the letter to
+    # paste themselves.
+    if request.user.is_authenticated and request.GET.get("copy") != "1":
+        return render(request, "public/boss_send.html", {
+            "boss_error": error,
+            "your_name": your_name or draft.get("your_name", "") or request.user.display_name,
+            "boss_name": boss_name or draft.get("boss_name", ""),
+            "boss_email_draft": draft.get("boss_email", ""),
+        })
     return render(request, "public/tell_the_boss.html", {
         "active": "boss",
         "sent": sent,
         "boss_error": error,
-        "your_name": your_name,
-        "boss_name": boss_name,
+        "your_name": your_name or draft.get("your_name", "") or (
+            request.user.display_name if request.user.is_authenticated else ""
+        ),
+        "boss_name": boss_name or draft.get("boss_name", ""),
+        "boss_email_draft": draft.get("boss_email", ""),
+        "my_invites": (
+            request.user.boss_invites.select_related("org", "boss_user")[:5]
+            if request.user.is_authenticated else []
+        ),
     })
+
+
+@login_required
+def boss_progress_view(request):
+    """Where a sender watches their note travel: sent -> joined -> in the group.
+
+    Its own page rather than a strip on the dashboard, because the interesting
+    thing is the sequence, and a sequence needs room to be drawn.
+    """
+    invites = list(
+        request.user.boss_invites.select_related("org", "boss_user")
+    )
+    return render(request, "public/boss_progress.html", {
+        "invites": invites,
+        "latest": invites[0] if invites else None,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Public contact form
+# ---------------------------------------------------------------------------
+
+ENQUIRY_LIMIT = 4            # per session…
+ENQUIRY_WINDOW = 3600        # …per hour
+
+
+def contact_submit_view(request):
+    """Take a message from the public contact form.
+
+    The form used to be a mockup: `onsubmit="return false"`, no action, no
+    method, no field names and no CSRF token. It looked complete and did
+    nothing — every enquiry typed into it was thrown away on submit, with the
+    visitor shown no error because as far as the page was concerned nothing had
+    gone wrong. So this is a new path rather than a fix to an existing one.
+
+    Enquiries are stored first and emailed second, deliberately. If Postmark is
+    down or misconfigured, the message is still recorded and still shows up in
+    the manage inbox — losing a sales lead to a mail outage is the one failure
+    worth engineering against here.
+    """
+    import time
+
+    from django.core.exceptions import ValidationError
+    from django.core.validators import validate_email
+
+    from admin_panel.models import Enquiry
+    from goodtip.mail import send_template, site_url
+
+    back = request.POST.get("source") or "/"
+    if not back.startswith("/"):
+        back = "/"
+
+    if request.method != "POST":
+        return redirect(back)
+
+    # Honeypot: a field no human sees, that bots fill in anyway. Answer as
+    # though it worked — telling a bot it was caught only helps it try again.
+    if request.POST.get("company"):
+        return redirect(f"{back}?sent=1#contact-form")
+
+    name = (request.POST.get("name") or "").strip()[:120]
+    email = (request.POST.get("email") or "").strip()[:254]
+    organisation = (request.POST.get("organisation") or "").strip()[:160]
+    interest = (request.POST.get("interest") or "").strip()[:120]
+    message = (request.POST.get("message") or "").strip()[:4000]
+
+    now = time.time()
+    recent = [t for t in request.session.get("enquiries", []) if now - t < ENQUIRY_WINDOW]
+
+    error = ""
+    if not name or not email or not message:
+        error = "Your name, email and a message are all needed."
+    elif len(recent) >= ENQUIRY_LIMIT:
+        error = "That's a few messages already — give it an hour and try again."
+    else:
+        try:
+            validate_email(email)
+        except ValidationError:
+            error = "That email address doesn't look right — check it and try again."
+
+    if error:
+        # Held in the session rather than re-rendered, because the form is an
+        # include on five different pages: bouncing back to whichever one they
+        # were on is the only way to return them to the page they were reading.
+        request.session["enquiry_error"] = error
+        request.session["enquiry_draft"] = {
+            "name": name, "email": email, "organisation": organisation,
+            "interest": interest, "message": message,
+        }
+        return redirect(f"{back}#contact-form")
+
+    enquiry = Enquiry.objects.create(
+        name=name, email=email, organisation=organisation,
+        interest=interest, message=message, source_page=back,
+    )
+
+    recent.append(now)
+    request.session["enquiries"] = recent
+    request.session.pop("enquiry_error", None)
+    request.session.pop("enquiry_draft", None)
+
+    # Everyone who can act on it. Staff rather than superusers only: the point
+    # is that somebody answers, and narrowing it to one account means one
+    # person's holiday is an unanswered enquiry.
+    staff_emails = list(
+        User.objects.filter(is_staff=True, is_active=True)
+        .exclude(email="")
+        .values_list("email", flat=True)
+    )
+    if staff_emails:
+        send_template(
+            "enquiry_admin",
+            subject=f"New enquiry — {name}" + (f" ({organisation})" if organisation else ""),
+            to=staff_emails,
+            context={
+                "enquiry": enquiry,
+                # Straight to the one enquiry. Not logged in? staff_member_required
+                # sends them to the login page carrying this as ?next=, so they
+                # land here the moment they are through it.
+                "enquiry_url": site_url(
+                    reverse("manage:enquiry_detail", args=[enquiry.pk])
+                ),
+            },
+            # Reply-to the enquirer, so hitting reply in a mail client works
+            # even when nobody feels like opening the admin.
+            reply_to=[email],
+        )
+
+    return redirect(f"{back}?sent=1#contact-form")

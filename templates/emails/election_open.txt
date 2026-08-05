@@ -1,4 +1,4 @@
-G'day {{ user.display_name }},
+Hello {{ user.display_name }},
 
 The charity election for {{ org.name }} is open.
 

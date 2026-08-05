@@ -1,0 +1,16 @@
+[Unit]
+# The email/notification jobs: election opens and closes, vote reminders,
+# round scorecards, recaps. Separate unit from goodtip-matchsync so a feed
+# outage and a mail outage are distinguishable in the journal.
+Description=GoodTip — run due application jobs (email, elections, recaps)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=mbatha-goodtip
+WorkingDirectory=/home/mbatha-goodtip/projects/goodtip
+ExecStart=/home/mbatha-goodtip/projects/goodtip/venv/bin/python manage.py run_due_jobs
+TimeoutStartSec=900
+StandardOutput=journal
+StandardError=journal

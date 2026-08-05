@@ -7,7 +7,7 @@ the ladder. Expects rows of {match, tip, correct, points}.
 {% block eyebrow %}Round {{ round.round_number }} results{% endblock %}
 {% block preheader %}You got {{ correct }} of {{ graded }} in round {{ round.round_number }}{% if rank %} — you're {{ rank }} of {{ total_tippers }}{% endif %}.{% endblock %}
 {% block content %}
-  <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">G'day {{ user.display_name }},</p>
+  <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">Hello {{ user.display_name }},</p>
   <p style="margin:0 0 20px;font-size:16px;line-height:1.6;color:#1A1A14;">
     Round {{ round.round_number }} is done and graded for <b>{{ org.name }}</b>.
   </p>

@@ -1,4 +1,4 @@
-G'day {{ user.display_name }},
+Hello {{ user.display_name }},
 
 Your GoodTip account is live. Same footy tipping you already do on a Monday —
 except the entry fees end up somewhere that matters.

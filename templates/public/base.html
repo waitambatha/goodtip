@@ -59,7 +59,26 @@
 
   <script>
   (function () {
-    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    /* ---- Motion gate ----
+       The stylesheet has a blanket `animation: none !important` under reduced
+       motion, so with that setting on, NOTHING on the site moves — which is
+       correct for a visitor and useless for anyone building the thing, who
+       then cannot see their own motion design without changing an OS setting.
+
+       `?motion=1` in the URL forces motion on and remembers it; `?motion=0`
+       clears it. The class it sets is what the blanket rule checks. Nobody
+       arrives at a URL with that parameter by accident, so a real visitor with
+       the setting on is unaffected. */
+    var forceMotion = false;
+    try {
+      var q = new URLSearchParams(location.search).get('motion');
+      if (q === '1') localStorage.setItem('gtMotion', '1');
+      if (q === '0') localStorage.removeItem('gtMotion');
+      forceMotion = localStorage.getItem('gtMotion') === '1';
+    } catch (err) { /* private mode / storage disabled — just stay off */ }
+    if (forceMotion) document.documentElement.classList.add('gt-motion');
+
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches && !forceMotion;
     var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
     /* Sport loader is handled by gt-loader.js. */
@@ -73,15 +92,132 @@
       btn.setAttribute('aria-expanded', String(!open));
     });
 
-    /* ---- Scroll reveal ---- */
+    /* ---- Scroll reveal ----
+       Two behaviours, because two kinds of content are being revealed.
+
+       A FLOW is an ordered sequence — the numbered steps, the timeline, the
+       pledge/top-up/match explainer. Its members arrive as a WAVE: a swell
+       passes along the sequence, lifting each one and letting it settle.
+
+       Two things make that read as a wave rather than as items sliding in.
+       First, each member overshoots and comes back — a buoy lifted by a swell
+       rises past its resting point and drops onto it, which is why this runs
+       as a keyframe animation and not a transition (a transition can only go
+       from A to B). Second, the stagger is much shorter than the animation, so
+       a member is still settling as the next one starts to lift, and the crest
+       is continuous along the row instead of three separate hops.
+
+       Which way the crest travels is measured, not declared. If the first two
+       members share a row the sequence runs across the page and the wave goes
+       left to right, with each card rising and falling in place — the water
+       does not travel, the crest does. If they are stacked it runs down the
+       page and the wave washes in from the left instead. Measuring at the
+       moment the group appears is what keeps it right on mobile, where the
+       horizontal flows stack and the crest has to turn through 90° with them.
+
+       CARDS are a set, not a sequence — the three audience cards, the four
+       price tiers. Nothing is first, so staggering them would invent an order
+       that is not there. They scale up together instead.
+
+       Marked up as data-flow / data-cards on the container; every .reveal
+       inside inherits the right treatment, so a template opts in once. */
+    function revealNow(el, delay) {
+      if (delay) {
+        el.style.transitionDelay = delay + 'ms';
+        // Cards still use a transition, waves use an animation; both read this.
+        el.style.setProperty('--rv-delay', delay + 'ms');
+      }
+      el.classList.add('in');
+    }
+
+    /* Side by side or stacked? Measured as the total spread of the sequence
+       along each axis — first member to last — and whichever is larger is the
+       way the sequence runs.
+
+       Comparing adjacent members instead does not work, and did not: the
+       members include the decorative chevrons between steps, which are small
+       and vertically centred, so a chevron's top sits far below the top of the
+       tall card beside it. Every horizontal row measured as a column. First to
+       last is immune to that, because it does not care what any individual
+       member's height is — only where the sequence begins and ends. */
+    function waveAxis(kids) {
+      if (kids.length < 2) return 'y';
+      var a = kids[0].getBoundingClientRect();
+      var z = kids[kids.length - 1].getBoundingClientRect();
+      return Math.abs(z.left - a.left) > Math.abs(z.top - a.top) ? 'x' : 'y';
+    }
+
+    /* Only the missing-IntersectionObserver case bails out to "show everything
+       instantly" now. Reduced motion used to bail out here too, which meant the
+       wave classes were never applied at all and the sequences simply appeared
+       — no swell, no ripple, nothing. It gets the wave at a third of the travel
+       instead, scaled by --wv in the stylesheet. */
     var items = document.querySelectorAll('.reveal');
-    if (reduce || !('IntersectionObserver' in window)) {
-      items.forEach(function (el) { el.classList.add('in'); });
+    if (!('IntersectionObserver' in window)) {
+      items.forEach(function (el) { revealNow(el, 0); });
     } else {
+      // Groups first: a container reveals its children as one wave, so the
+      // delays are relative to the group entering rather than to each child
+      // crossing the threshold on its own.
+      var groups = document.querySelectorAll('[data-flow], [data-cards]');
+      var grouped = new Set();
+      groups.forEach(function (group) {
+        var isFlow = group.hasAttribute('data-flow');
+        // Most of these containers carry .reveal themselves and their children
+        // carry nothing, so fall back to the element children — and give them
+        // the class, since the CSS keys off it.
+        var kids = group.querySelectorAll(':scope > .reveal');
+        if (!kids.length) {
+          // A flow takes ALL its children, including the decorative chevrons
+          // and arrows between steps. They are aria-hidden, which is right for
+          // a screen reader and wrong for the wave: skipped, they would hold
+          // still while the cards either side of them rose and fell, and the
+          // row would visibly come apart at each joint. A set of cards has
+          // nothing between its members, so it keeps excluding them.
+          kids = group.querySelectorAll(isFlow ? ':scope > *' : ':scope > *:not([aria-hidden="true"])');
+          kids.forEach(function (k) { k.classList.add('reveal'); });
+        }
+        group.classList.remove('reveal');   // the group itself no longer fades
+        group.classList.add('in');
+        kids.forEach(function (k) { grouped.add(k); });
+        group.classList.add(isFlow ? 'rv-flow' : 'rv-cards');
+        var gio = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            if (!e.isIntersecting) return;
+            // Measured here, not at setup: by now the group is on screen and
+            // laid out at the width it will actually animate in.
+            if (isFlow) group.classList.add('rv-wave-' + waveAxis(kids));
+            kids.forEach(function (k, n) {
+              revealNow(k, isFlow ? n * 150 : n * 60);
+              /* The entrance swell plays once. A wave does not stop, so when
+                 it finishes the member switches to the standing ripple that
+                 runs from then on — the flag, rather than a single flap. It
+                 has to be a handoff and not both at once, because two
+                 animations on the same transform would fight. */
+              if (isFlow) {
+                k.style.setProperty('--rv-i', n);
+                var live = function () { k.classList.add('wave-live'); };
+                // animationend is the precise handoff — it fires exactly as the
+                // entrance lands, so the standing wave picks up from rest with
+                // no jump. The timer is a safety net: if the entrance never
+                // runs or never completes (a backgrounded tab, a member that
+                // was display:none when it started), the event never fires and
+                // without this the ripple would simply never begin. Adding the
+                // class twice is harmless.
+                k.addEventListener('animationend', live, { once: true });
+                setTimeout(live, n * 150 + 1600);
+              }
+            });
+            gio.unobserve(e.target);
+          });
+        }, { threshold: 0.15 });
+        gio.observe(group);
+      });
+
       var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
       }, { threshold: 0.12 });
-      items.forEach(function (el) { io.observe(el); });
+      items.forEach(function (el) { if (!grouped.has(el)) io.observe(el); });
     }
 
     /* ---- FAQ accordions ---- */

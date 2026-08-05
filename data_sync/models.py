@@ -14,10 +14,12 @@ class SyncRun(models.Model):
     KIND_FIXTURES = "fixtures"
     KIND_RESULTS = "results"
     KIND_LIVE = "live"
+    KIND_LADDER = "ladder"
     KIND_CHOICES = [
         (KIND_FIXTURES, "Fixtures"),
         (KIND_RESULTS, "Results"),
         (KIND_LIVE, "Live scores"),
+        (KIND_LADDER, "Ladder"),
     ]
 
     kind = models.CharField(max_length=10, choices=KIND_CHOICES)
@@ -93,3 +95,29 @@ class _RunRecorder:
         # Propagate the exception — the caller decides whether a feed outage is
         # fatal. The failure is on record either way.
         return False
+
+
+class SyncSchedule(models.Model):
+    """One row per sync kind, holding when that kind is next due.
+
+    The scheduling state has to live somewhere every web worker can see, and it
+    has to be updatable atomically — otherwise two workers both read "due",
+    both start a sync, and the feed gets hit twice for the same round. A single
+    conditional UPDATE against this row is the lock (see data_sync.autosync).
+
+    Cron and the in-app autosync both claim through here, so running both is
+    safe: whichever arrives first moves next_run_at forward and the other finds
+    nothing due.
+    """
+
+    kind = models.CharField(max_length=10, unique=True, choices=SyncRun.KIND_CHOICES)
+    # Due immediately by default, so a fresh deploy syncs on its first request
+    # rather than waiting out a full interval with an empty dashboard.
+    next_run_at = models.DateTimeField(default=timezone.now)
+    last_started_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["kind"]
+
+    def __str__(self):
+        return f"{self.kind} due {self.next_run_at:%Y-%m-%d %H:%M}"

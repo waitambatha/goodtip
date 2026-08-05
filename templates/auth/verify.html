@@ -19,7 +19,7 @@ between the two rotating backdrop panes.
   </p>
 </div>
 
-<form method="post" action="{% url 'accounts:verify' %}" novalidate>
+<form method="post" action="{% url 'accounts:verify' %}" novalidate data-busy="Checking your code">
   {% csrf_token %}
   <div class="fld">
     <label for="id_code" class="sr-only">Verification code</label>

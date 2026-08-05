@@ -85,7 +85,8 @@
         <span class="bn-hint" style="display:block;margin-top:14px;">Two minutes. No payment. Then the note sends with your name on it.</span>
       </div>
       {% else %}
-      <form method="post" class="bn-send" id="send" action="{% url 'tell_the_boss' %}#send">
+      <form method="post" class="bn-send" id="send" action="{% url 'tell_the_boss' %}#send"
+            data-busy="Sending the note" data-busy-scope>
         {% csrf_token %}
         <h3>Or let us send it for you.</h3>
         {% if boss_error %}<p class="bn-error" role="alert">{{ boss_error }}</p>{% endif %}
@@ -146,7 +147,7 @@
   <div class="wrap">
     <p class="eyebrow reveal">How it starts</p>
     <h2 class="section-heading reveal">Three steps. No admin headache.</h2>
-    <div class="timeline" style="margin-top:36px;">
+    <div class="timeline" style="margin-top:36px;" data-flow>
       <div class="tl-step reveal from-left"><div class="tl-marker">01</div><div class="tl-card"><p class="tl-tag">Set up</p><h2>Set up your group</h2><p>Takes minutes. Works for an office floor, a school year group or a club committee.</p></div></div>
       <div class="tl-step reveal from-left"><div class="tl-marker">02</div><div class="tl-card"><p class="tl-tag">Choose</p><h2>Pick a charity together</h2><p>The group decides. Democratic, not handed down from the top.</p></div></div>
       <div class="tl-step reveal from-left"><div class="tl-marker">03</div><div class="tl-card"><p class="tl-tag">Tip</p><h2>Tip every round</h2><p>Your organisation pays one flat platform fee. Every entry fee on top goes straight to the charity your group picked.</p></div></div>

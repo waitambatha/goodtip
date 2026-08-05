@@ -4,14 +4,15 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 
 from catalog.models import Charity, Competition, Season, Series, Sport
 from data_sync.models import SyncRun
 from data_sync.services import get_sync_service, SyncError
 from orgs.forms import _unique_charity_slug
-from orgs.models import OrgMember, Organisation
+from orgs.models import MembershipRequest, OrgMember, Organisation
+from orgs.services import approve_membership_request, decline_membership_request
 from orgs.signing import make_join_token
 from tipping.models import Match, Round, Team, Tip
 from tipping.services import record_match_result
@@ -32,6 +33,66 @@ def overview(request):
         "org_count": org_count, "round_count": round_count,
         "match_count": match_count, "tip_count": tip_count,
         "recent_orgs": recent_orgs,
+    })
+
+
+@staff_member_required
+def approvals(request):
+    """Every join request waiting on somebody, across all orgs.
+
+    Approval is normally the org admin's job on their own Members page, but
+    that leaves a request stuck when a group's admin is away or the group has
+    no admin at all. This is the staff view of the same queue — one list, act
+    on any of it, so nothing sits pending unnoticed.
+    """
+    if request.method == "POST":
+        join_req = get_object_or_404(
+            MembershipRequest, pk=request.POST.get("request_id"),
+        )
+        action = request.POST.get("action")
+        try:
+            if action == "approve":
+                approve_membership_request(join_req, by_user=request.user)
+                messages.success(
+                    request,
+                    f"{join_req.user.display_name} is now a member of {join_req.org.name}.",
+                )
+            elif action == "decline":
+                decline_membership_request(join_req, by_user=request.user)
+                messages.info(
+                    request,
+                    f"{join_req.user.display_name}'s request to {join_req.org.name} was declined.",
+                )
+        except ValueError as e:
+            messages.info(request, str(e))
+        return redirect("manage:approvals")
+
+    pending = (
+        MembershipRequest.objects
+        .filter(status=MembershipRequest.STATUS_PENDING)
+        .select_related("user", "org")
+        .order_by("org__name", "created_at")
+    )
+    # Who else could act on each one — an empty list is the reason a request is
+    # sitting here, so it's worth showing rather than leaving staff to guess.
+    admins_by_org = {}
+    for m in (
+        OrgMember.objects
+        .filter(org__in=[r.org_id for r in pending])
+        .filter(Q(role__in=[OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH]) | Q(is_league_owner=True))
+        .select_related("user", "org")
+    ):
+        admins_by_org.setdefault(m.org_id, []).append(m.user)
+
+    rows = [{"req": r, "admins": admins_by_org.get(r.org_id, [])} for r in pending]
+    recent = (
+        MembershipRequest.objects
+        .exclude(status=MembershipRequest.STATUS_PENDING)
+        .select_related("user", "org", "decided_by")
+        .order_by("-decided_at")[:10]
+    )
+    return render(request, "manage/approvals.html", {
+        "rows": rows, "pending_count": len(rows), "recent": recent,
     })
 
 
@@ -343,3 +404,111 @@ def news_detail(request, post_id: int):
     more = NewsPost.objects.filter(is_published=True).exclude(pk=post.pk)[:5]
     tpl = "news_detail.html" if request.user.is_authenticated else "public/news_detail.html"
     return render(request, tpl, {"post": post, "more": more, "active": "news"})
+
+
+# ---------------------------------------------------------------------------
+# Customer enquiries
+# ---------------------------------------------------------------------------
+
+# The manage area normally leans on staff_member_required's default, which
+# sends you to Django's own /admin/login/. That is fine for pages you reach by
+# already being in the admin, but the enquiry link is emailed out and may well
+# be opened cold on a phone — landing on a bare Django form that looks nothing
+# like GoodTip, and that bypasses the normal email-code sign-in, is the wrong
+# door. These two go to the real login, which already honours ?next=.
+staff_login_required = staff_member_required(login_url=reverse_lazy("accounts:login"))
+
+
+@staff_login_required
+def enquiries(request):
+    """The enquiry inbox.
+
+    Unanswered first regardless of age, because the thing that matters about an
+    enquiry is whether somebody has dealt with it, not when it arrived — a
+    three-day-old unanswered message should not be buried under this morning's
+    answered ones.
+    """
+    from .models import Enquiry
+
+    show = request.GET.get("show") or "open"
+    qs = Enquiry.objects.select_related("replied_by")
+    if show == "open":
+        qs = qs.filter(status=Enquiry.STATUS_NEW)
+    elif show == "replied":
+        qs = qs.filter(status=Enquiry.STATUS_REPLIED)
+
+    return render(request, "manage/enquiries.html", {
+        "enquiries": qs[:200],
+        "show": show,
+        "open_count": Enquiry.objects.filter(status=Enquiry.STATUS_NEW).count(),
+        "replied_count": Enquiry.objects.filter(status=Enquiry.STATUS_REPLIED).count(),
+        "total_count": Enquiry.objects.count(),
+    })
+
+
+@staff_login_required
+def enquiry_detail(request, enquiry_id):
+    """One enquiry, and the box to answer it in.
+
+    This is where the link in the notification email lands. It is behind
+    staff_member_required, which is what makes that link work for someone not
+    yet signed in: Django bounces them to the login page carrying this URL as
+    ?next=, and drops them back here the moment they are through.
+    """
+    from django.utils import timezone as tz
+
+    from goodtip.mail import send_template
+
+    from .models import Enquiry
+
+    enquiry = get_object_or_404(Enquiry, pk=enquiry_id)
+
+    if request.method == "POST":
+        action = request.POST.get("action") or "reply"
+
+        if action == "close":
+            enquiry.status = Enquiry.STATUS_CLOSED
+            enquiry.save(update_fields=["status"])
+            messages.success(request, "Enquiry closed without a reply.")
+            return redirect("manage:enquiries")
+
+        if action == "reopen":
+            enquiry.status = Enquiry.STATUS_NEW
+            enquiry.save(update_fields=["status"])
+            messages.info(request, "Enquiry reopened.")
+            return redirect("manage:enquiry_detail", enquiry_id=enquiry.pk)
+
+        body = (request.POST.get("reply_body") or "").strip()
+        if not body:
+            messages.error(request, "Write something before sending.")
+            return redirect("manage:enquiry_detail", enquiry_id=enquiry.pk)
+
+        sent = send_template(
+            "enquiry_reply",
+            subject="Re: your GoodTip enquiry",
+            to=enquiry.email,
+            context={"enquiry": enquiry, "reply_body": body},
+            # Their reply should reach a person, not the no-reply sender.
+            reply_to=[request.user.email] if request.user.email else None,
+        )
+
+        if not sent:
+            # Not marked replied. A reply that never left is not a reply, and
+            # recording it as one is how an enquiry gets silently dropped —
+            # it would vanish from the open list with nobody having been told.
+            messages.error(
+                request,
+                "That couldn't be sent — the enquiry is still open. Check the mail "
+                "settings and try again.",
+            )
+            return redirect("manage:enquiry_detail", enquiry_id=enquiry.pk)
+
+        enquiry.reply_body = body
+        enquiry.replied_at = tz.now()
+        enquiry.replied_by = request.user
+        enquiry.status = Enquiry.STATUS_REPLIED
+        enquiry.save(update_fields=["reply_body", "replied_at", "replied_by", "status"])
+        messages.success(request, f"Replied to {enquiry.name} at {enquiry.email}.")
+        return redirect("manage:enquiries")
+
+    return render(request, "manage/enquiry_detail.html", {"enquiry": enquiry})

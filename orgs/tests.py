@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db.models import ProtectedError
@@ -526,6 +528,33 @@ class OrgSearchTests(TestCase):
         self.assertEqual(resp.status_code, 302)
 
 
+def _walk_create_wizard(client, case, name, **extra):
+    """Drive the create-a-group wizard end to end and return the final response.
+
+    The wizard replaced a single all-fields POST. These callers care about what
+    happens at the end — a duplicate warning, a child org, a redirect — not
+    about the steps, so the stepping lives here rather than in every test.
+    """
+    url = "/leagues/new/"
+    parent = extra.get("parent", "")
+    client.post(url, {
+        "step": 1, "action": "next", "name": name,
+        "group_type": case.charities_type.pk, "parent": parent,
+    })
+    client.post(url, {
+        "step": 2, "action": "next",
+        "competitions": [case.comp.pk], "season": case.season.pk, "parent": parent,
+    })
+    client.post(url, {
+        "step": 3, "action": "next",
+        "charity_method": "pick", "charity": case.charity.pk, "parent": parent,
+    })
+    final = {"step": 4, "action": "next", "parent": parent}
+    if extra.get("duplicate_confirmed"):
+        final["duplicate_confirmed"] = extra["duplicate_confirmed"]
+    return client.post(url, final)
+
+
 class DuplicateDetectionTests(TestCase):
     """Org-structure note §4 Stage 2: creating an org whose name already
     exists needs one explicit confirmation — friction, not prevention."""
@@ -551,13 +580,9 @@ class DuplicateDetectionTests(TestCase):
         self.client.force_login(self.user)
 
     def create_post(self, name, **extra):
-        data = {
-            "name": name, "season": self.season.pk, "competitions": [self.comp.pk],
-            "group_type": self.charities_type.pk,
-            "charity_method": "pick", "charity": self.charity.pk,
-        }
-        data.update(extra)
-        return self.client.post("/leagues/new/", data)
+        """Creating is a four-step wizard now — walk it and return the last
+        response, so these tests still describe the outcome, not the mechanics."""
+        return _walk_create_wizard(self.client, self, name, **extra)
 
     def test_same_name_shows_confirmation_and_creates_nothing(self):
         resp = self.create_post("national tiles mitcham")  # case-insensitive
@@ -609,13 +634,7 @@ class ChildOrgCreationTests(TestCase):
         self.client.force_login(self.user)
 
     def create_post(self, name, **extra):
-        data = {
-            "name": name, "season": self.season.pk, "competitions": [self.comp.pk],
-            "group_type": self.charities_type.pk,
-            "charity_method": "pick", "charity": self.charity.pk,
-        }
-        data.update(extra)
-        return self.client.post("/leagues/new/", data)
+        return _walk_create_wizard(self.client, self, name, **extra)
 
     def test_get_with_parent_preloads_banner_and_hidden_field(self):
         resp = self.client.get(f"/leagues/new/?parent={self.parent.id}")
@@ -1191,3 +1210,284 @@ class InviteByEmailTests(TestCase):
         resp = self._post("a@example.com")
         self.assertEqual(resp.status_code, 403)
         self.assertEqual(len(mail.outbox), 0)
+
+
+class ProcessNotificationTests(TestCase):
+    """Joining and elections are multi-step and slow, so each step reports back
+    to the bell panel — not just to email."""
+
+    def setUp(self):
+        self.season, _ = Season.objects.get_or_create(year=2097, defaults={"label": "2097"})
+        self.org = Organisation.objects.create(name="Waiting Room FC", season=self.season)
+        self.admin = User.objects.create_user(email="boss@w.com", password="x", display_name="Bea")
+        OrgMember.objects.create(user=self.admin, org=self.org, is_league_owner=True)
+        self.joiner = User.objects.create_user(email="new@w.com", password="x", display_name="Nia")
+
+    def test_asking_to_join_tells_both_sides(self):
+        from .models import Notification
+        from .services import request_to_join
+
+        req = request_to_join(self.joiner, self.org)
+        mine = self.joiner.notifications.get(kind=Notification.KIND_JOIN_REQUESTED)
+        self.assertIn(self.org.name, mine.title)
+        theirs = self.admin.notifications.get(kind=Notification.KIND_JOIN_REVIEW)
+        self.assertIn("Nia", theirs.title)
+        # Straight to the request itself, where the buttons are.
+        self.assertEqual(theirs.link_url, f"/leagues/{self.org.id}/requests/{req.id}/")
+
+    def test_approval_and_decline_both_reach_the_requester(self):
+        from .models import Notification
+        from .services import (
+            approve_membership_request, decline_membership_request, request_to_join,
+        )
+
+        req = request_to_join(self.joiner, self.org)
+        decline_membership_request(req, by_user=self.admin)
+        self.assertTrue(
+            self.joiner.notifications.filter(kind=Notification.KIND_JOIN_DECLINED).exists()
+        )
+        # A declined user may ask again — the second round must notify too.
+        again = request_to_join(self.joiner, self.org)
+        approve_membership_request(again, by_user=self.admin)
+        self.assertTrue(
+            self.joiner.notifications.filter(kind=Notification.KIND_JOIN_APPROVED).exists()
+        )
+
+    def test_scheduling_an_election_announces_the_date(self):
+        from django.utils import timezone
+
+        from .models import CharityVote, Notification
+        from .services import schedule_charity_election
+
+        vote = CharityVote.objects.create(org=self.org, status=CharityVote.STATUS_DRAFT)
+        schedule_charity_election(vote, when=timezone.now() + timedelta(days=5))
+        note = self.admin.notifications.get(kind=Notification.KIND_ELECTION_SCHEDULED)
+        self.assertIn("vote", note.title.lower())
+        # The date is the whole point of the message.
+        self.assertIn("2", note.message)
+
+    def test_an_election_opening_now_does_not_also_announce_a_date(self):
+        """Otherwise "it's coming" and "it's open" land in the same second."""
+        from django.utils import timezone
+
+        from .models import CharityVote, Notification
+        from .services import schedule_charity_election
+
+        vote = CharityVote.objects.create(org=self.org, status=CharityVote.STATUS_DRAFT)
+        schedule_charity_election(vote, when=timezone.now() - timedelta(minutes=1))
+        self.assertFalse(
+            Notification.objects.filter(kind=Notification.KIND_ELECTION_SCHEDULED).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(kind=Notification.KIND_ELECTION_OPEN).exists()
+        )
+
+    def test_closing_an_election_announces_the_winner(self):
+        from django.utils import timezone
+
+        from .models import CharityVote, Notification
+        from .services import close_charity_vote, open_charity_election
+
+        charity = Charity.objects.create(name="Beyond Reach")
+        vote = CharityVote.objects.create(org=self.org, status=CharityVote.STATUS_DRAFT)
+        vote.options.create(charity=charity)
+        open_charity_election(vote)
+        close_charity_vote(vote)
+        note = self.admin.notifications.get(kind=Notification.KIND_ELECTION_RESULT)
+        self.assertIn("Beyond Reach", note.title)
+
+
+class ReviewRequestPageTests(TestCase):
+    """The notification links straight to one request, buttons already there."""
+
+    def setUp(self):
+        self.season, _ = Season.objects.get_or_create(year=2098, defaults={"label": "2098"})
+        self.org = Organisation.objects.create(name="Gatekeepers", season=self.season)
+        self.admin = User.objects.create_user(email="ad@w.com", password="x", display_name="Ada")
+        OrgMember.objects.create(user=self.admin, org=self.org, is_league_owner=True)
+        self.joiner = User.objects.create_user(email="jo@w.com", password="x", display_name="Jo")
+
+    def _request(self):
+        from .services import request_to_join
+
+        return request_to_join(self.joiner, self.org)
+
+    def test_the_notification_links_to_the_review_page(self):
+        from .models import Notification
+
+        req = self._request()
+        note = self.admin.notifications.get(kind=Notification.KIND_JOIN_REVIEW)
+        self.assertEqual(note.link_url, f"/leagues/{self.org.id}/requests/{req.id}/")
+
+    def test_admin_can_approve_from_that_page(self):
+        req = self._request()
+        self.client.force_login(self.admin)
+        self.client.post(
+            f"/leagues/{self.org.id}/requests/{req.id}/", {"action": "approve"}
+        )
+        self.assertTrue(OrgMember.objects.filter(user=self.joiner, org=self.org).exists())
+
+    def test_a_non_admin_is_redirected_not_shown_a_blank_403(self):
+        req = self._request()
+        self.client.force_login(self.joiner)
+        r = self.client.get(f"/leagues/{self.org.id}/requests/{req.id}/")
+        self.assertEqual(r.status_code, 302)
+        self.assertFalse(OrgMember.objects.filter(user=self.joiner, org=self.org).exists())
+
+    def test_an_already_decided_request_still_opens(self):
+        """Clicking a stale notification must explain, not crash."""
+        from .services import approve_membership_request
+
+        req = self._request()
+        approve_membership_request(req, by_user=self.admin)
+        self.client.force_login(self.admin)
+        r = self.client.get(f"/leagues/{self.org.id}/requests/{req.id}/")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"Already", r.content)
+
+
+class StaffApprovalsPageTests(TestCase):
+    """The admin menu's Approvals queue — every pending request in one place."""
+
+    def setUp(self):
+        self.season, _ = Season.objects.get_or_create(year=2094, defaults={"label": "2094"})
+        self.org = Organisation.objects.create(name="Orphan Group", season=self.season)
+        self.staff = User.objects.create_user(
+            email="staff@w.com", password="x", display_name="Sam", is_staff=True,
+        )
+        self.joiner = User.objects.create_user(email="kim@w.com", password="x", display_name="Kim")
+        self.req = request_to_join(self.joiner, self.org)
+
+    def test_the_queue_lists_pending_requests(self):
+        self.client.force_login(self.staff)
+        r = self.client.get("/manage/approvals/")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"kim@w.com", r.content)
+
+    def test_staff_can_approve_a_group_with_no_admin_of_its_own(self):
+        """The reason this page exists: nobody else can clear this request."""
+        self.client.force_login(self.staff)
+        self.client.post(
+            "/manage/approvals/", {"action": "approve", "request_id": self.req.id}
+        )
+        self.assertTrue(OrgMember.objects.filter(user=self.joiner, org=self.org).exists())
+
+    def test_the_nav_carries_the_waiting_count(self):
+        self.client.force_login(self.staff)
+        self.assertIn(b'class="an-count">1<', self.client.get("/manage/").content)
+
+    def test_a_non_staff_member_cannot_reach_it(self):
+        self.client.force_login(self.joiner)
+        r = self.client.get("/manage/approvals/")
+        self.assertEqual(r.status_code, 302)
+        # Bounced to the admin login rather than served the queue.
+        self.assertTrue(r["Location"].startswith("/admin/login/"))
+
+
+class CreateWizardTests(TestCase):
+    """Creating a group is four saved steps, resumable after you walk away."""
+
+    URL = "/leagues/new/"
+
+    def setUp(self):
+        from catalog.models import Competition, GroupType
+
+        self.season, _ = Season.objects.get_or_create(year=2093, defaults={"label": "2093"})
+        self.sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
+        self.comp, _ = Competition.objects.get_or_create(
+            sport=self.sport, season=self.season, slug="afl", defaults={"name": "AFL"},
+        )
+        self.gtype = GroupType.objects.get(slug="informal")
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
+        )
+        self.user = User.objects.create_user(email="w@w.com", password="x", display_name="Wiz")
+        self.client.force_login(self.user)
+
+    def _step1(self, name="Wizard Group"):
+        return self.client.post(self.URL, {
+            "step": 1, "action": "next", "name": name,
+            "group_type": self.gtype.pk, "informal_label": "Book Club",
+        })
+
+    def _step2(self):
+        return self.client.post(self.URL, {
+            "step": 2, "action": "next",
+            "competitions": [self.comp.pk], "season": self.season.pk,
+        })
+
+    def _step3(self):
+        return self.client.post(self.URL, {
+            "step": 3, "action": "next",
+            "charity_method": "pick", "charity": self.charity.pk,
+        })
+
+    def test_one_step_shows_at_a_time(self):
+        body = self.client.get(self.URL).content
+        self.assertIn(b'id="id_name"', body)
+        self.assertNotIn(b'id="id_season"', body)
+        self._step1()
+        body = self.client.get(self.URL).content
+        self.assertIn(b'id="id_season"', body)
+        self.assertNotIn(b'id="id_name"', body)
+
+    def test_a_missing_answer_holds_you_on_that_step(self):
+        from .models import OrgDraft
+
+        self.client.post(self.URL, {"step": 1, "action": "next", "name": ""})
+        self.assertEqual(OrgDraft.objects.get(user=self.user).step, 1)
+
+    def test_a_later_step_does_not_block_an_earlier_one(self):
+        """Step 1 must not fail because no charity has been chosen yet."""
+        from .models import OrgDraft
+
+        self._step1()
+        self.assertEqual(OrgDraft.objects.get(user=self.user).step, 2)
+
+    def test_progress_survives_a_brand_new_session(self):
+        self._step1()
+        self._step2()
+        self.client.logout()
+        self.client.force_login(self.user)
+        body = self.client.get(self.URL).content
+        # Straight back to step 3, with the earlier answers intact.
+        self.assertIn(b"charity_method", body)
+        self.assertNotIn(b'id="id_name"', body)
+
+    def test_going_back_keeps_what_was_typed(self):
+        self._step1()
+        self._step2()
+        self.client.post(self.URL, {"step": 3, "action": "back"})
+        body = self.client.get(self.URL).content
+        self.assertIn(b'id="id_season"', body)
+        self.assertIn(str(self.comp.pk).encode(), body)
+
+    def test_the_review_step_reads_the_answers_back(self):
+        self._step1()
+        self._step2()
+        self._step3()
+        body = self.client.get(self.URL).content
+        self.assertIn(b"Wizard Group", body)
+        self.assertIn(b"Lifeline", body)
+
+    def test_finishing_creates_the_group_and_clears_the_draft(self):
+        from .models import OrgDraft
+
+        self._step1()
+        self._step2()
+        self._step3()
+        self.client.post(self.URL, {"step": 4, "action": "next"})
+        org = Organisation.objects.get(name="Wizard Group")
+        self.assertTrue(
+            OrgMember.objects.filter(org=org, user=self.user, is_league_owner=True).exists()
+        )
+        self.assertFalse(OrgDraft.objects.filter(user=self.user).exists())
+
+    def test_start_again_empties_the_draft(self):
+        from .models import OrgDraft
+
+        self._step1()
+        self.client.post(self.URL, {"step": 2, "action": "restart"})
+        draft = OrgDraft.objects.get(user=self.user)
+        self.assertEqual(draft.step, 1)
+        self.assertEqual(draft.data, {})

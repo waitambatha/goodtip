@@ -1,4 +1,4 @@
-G'day,
+Hello,
 
 {{ inviter_name }} has invited you to join {{ org.name }} on GoodTip — the footy
 tipping comp where the entry fees go to a charity your group votes on, not a

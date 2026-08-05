@@ -33,10 +33,15 @@ Blocks a message fills in:
       <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
 
         <!-- header -->
-        <tr><td style="background:#0F2E22;border-radius:14px 14px 0 0;padding:26px 32px;text-align:center;">
-          <span style="font-size:26px;font-weight:900;letter-spacing:.5px;color:#ffffff;">GOOD<span style="color:#C8F135;">TIP</span><span style="color:#C8F135;">.</span></span>
-          <div style="color:#C8F135;font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-top:6px;">{% block eyebrow %}Footy tipping, for good{% endblock %}</div>
+        <tr><td style="background:#0F2E22;border-radius:14px 14px 0 0;padding:30px 32px 26px;text-align:center;">
+          <span style="font-size:28px;font-weight:900;letter-spacing:.5px;color:#ffffff;">GOOD<span style="color:#C8F135;">TIP</span><span style="color:#C8F135;">.</span></span>
+          <div style="color:#C8F135;font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-top:8px;">{% block eyebrow %}Footy tipping, for good{% endblock %}</div>
         </td></tr>
+
+        <!-- Lime rule. The header and the white card met as two flat blocks;
+             this gives the join an edge and carries the brand colour down the
+             message. A 3px table cell renders everywhere a border does not. -->
+        <tr><td style="background:#C8F135;font-size:0;line-height:0;height:3px;">&nbsp;</td></tr>
 
         <!-- body -->
         <tr><td style="background:#ffffff;padding:32px;">
