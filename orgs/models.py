@@ -1,4 +1,8 @@
+import secrets
+from datetime import timedelta
+
 from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
@@ -79,6 +83,59 @@ class Organisation(models.Model):
     finals_only = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # --- Departments (children of a top-level org) ---
+    # What kind of department this is. Two fields rather than one because the
+    # picker is a convenience, not a taxonomy: department_type holds the row
+    # when they chose from the list (so departments stay comparable across
+    # orgs), department_label holds whatever they typed when they didn't. A
+    # big organisation carves itself up the way it actually is, and a dropdown
+    # that refuses "The Cave" just gets a department called "Other".
+    department_type = models.ForeignKey(
+        "catalog.DepartmentType", on_delete=models.SET_NULL,
+        related_name="organisations", null=True, blank=True,
+    )
+    department_label = models.CharField(max_length=80, blank=True)
+
+    # A department raised by an ordinary member is a REQUEST until an admin of
+    # the parent says yes. Admins of the parent skip the queue, because asking
+    # someone to approve their own request is theatre.
+    #
+    # Default is APPROVED and that is deliberate: every top-level org, and
+    # every department that already exists, is approved by definition. Only
+    # the member-initiated path sets PENDING, so this column can be added to a
+    # live table without a data migration deciding anything on anyone's behalf.
+    APPROVAL_APPROVED = "approved"
+    APPROVAL_PENDING = "pending"
+    APPROVAL_CHOICES = [
+        (APPROVAL_APPROVED, "Approved"),
+        (APPROVAL_PENDING, "Pending approval"),
+    ]
+    approval_status = models.CharField(
+        max_length=10, choices=APPROVAL_CHOICES, default=APPROVAL_APPROVED,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name="organisations_created", null=True, blank=True,
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name="departments_approved", null=True, blank=True,
+    )
+
+    # --- Work-domain verification ---
+    # The domain this organisation was proved against, e.g. "acme.com.au", and
+    # the role the person who proved it said they hold. Proof is a code emailed
+    # to an address AT that domain: holding the mailbox is the evidence, so the
+    # role is a self-declared label for context, never a permission.
+    domain = models.CharField(max_length=253, blank=True)
+    domain_verified_at = models.DateTimeField(null=True, blank=True)
+    contact_role = models.CharField(max_length=120, blank=True)
+
+    @property
+    def is_domain_verified(self) -> bool:
+        return bool(self.domain and self.domain_verified_at)
+
     class Meta:
         ordering = ["name"]
 
@@ -123,6 +180,39 @@ class Organisation(models.Model):
 
     def family_ids(self) -> list[int]:
         return list(self.family().values_list("id", flat=True))
+
+    # --- Department helpers ---
+
+    @property
+    def is_department(self) -> bool:
+        """A department is just a child org, named for what it is to members."""
+        return self.parent_id is not None
+
+    @property
+    def is_pending_approval(self) -> bool:
+        return self.approval_status == self.APPROVAL_PENDING
+
+    @property
+    def department_kind(self) -> str:
+        """What to show beside the name: the picked type, or what they typed."""
+        if self.department_type_id:
+            return self.department_type.name
+        return self.department_label
+
+    def approve(self, by_user=None):
+        """Let a pending department into the org.
+
+        Idempotent on purpose: two admins clicking Approve on the same request
+        within a few seconds of each other is normal, and the second click
+        should be a no-op rather than an error page or a second notification.
+        """
+        if self.approval_status == self.APPROVAL_APPROVED:
+            return False
+        self.approval_status = self.APPROVAL_APPROVED
+        self.approved_at = timezone.now()
+        self.approved_by = by_user
+        self.save(update_fields=["approval_status", "approved_at", "approved_by"])
+        return True
 
     @property
     def active_charity_vote(self):
@@ -731,3 +821,138 @@ class WallReaction(models.Model):
 
     def __str__(self):
         return f"{self.user} {self.get_emoji_display()} on #{self.post_id}"
+
+
+class WorkEmailVerification(models.Model):
+    """Proof that whoever is creating an organisation actually works there.
+
+    The claim is "I am at acme.com.au". The evidence is a six-digit code sent
+    to an address at that domain: if you can read mail there, you are inside
+    the organisation, which is the only thing we can check without asking a
+    human. The stated role is context for the GoodTip team, never a permission.
+
+    Built to the same three limits as accounts.LoginCode, for the same reason
+    six digits is only 1,000,000 possibilities: short lifetime, hard attempt
+    cap, single use. Two more limits matter here because the address is chosen
+    by the person being checked rather than already on file:
+
+      * resends are throttled and capped, so this cannot be used to post mail
+        at an address the sender does not control, and
+      * the code is bound to the exact address it was sent to. Changing the
+        email means a new code, so a code mailed to sam@acme.com.au can never
+        be redeemed against a different address.
+    """
+
+    TTL = timedelta(minutes=15)
+    MAX_ATTEMPTS = 5
+    MAX_SENDS = 5
+    RESEND_AFTER = timedelta(seconds=60)
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name="work_email_verifications",
+    )
+    # Null while the wizard is still a draft: the org does not exist yet, and
+    # this is the check that decides whether it should.
+    org = models.ForeignKey(
+        Organisation, on_delete=models.CASCADE, null=True, blank=True,
+        related_name="work_email_verifications",
+    )
+    role = models.CharField(max_length=120)
+    domain = models.CharField(max_length=253)
+    email = models.EmailField()
+    code_hash = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    sends = models.PositiveSmallIntegerField(default=1)
+    last_sent_at = models.DateTimeField(default=timezone.now)
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["user", "verified_at"])]
+
+    def __str__(self):
+        return f"{self.email} ({'verified' if self.verified_at else 'pending'})"
+
+    @classmethod
+    def issue(cls, *, user, role, domain, email) -> tuple["WorkEmailVerification", str]:
+        """Start a fresh check, returning the row and the plaintext to email.
+
+        Any earlier unverified attempt by this user is discarded first. Two
+        live codes at once is how someone ends up verifying a domain they
+        typed two minutes ago and then changed their mind about.
+        """
+        cls.objects.filter(user=user, verified_at__isnull=True).delete()
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        row = cls.objects.create(
+            user=user,
+            role=(role or "").strip(),
+            domain=domain,
+            email=email,
+            code_hash=make_password(code),
+            expires_at=timezone.now() + cls.TTL,
+        )
+        return row, code
+
+    @property
+    def is_verified(self) -> bool:
+        return self.verified_at is not None
+
+    @property
+    def is_usable(self) -> bool:
+        return (
+            self.verified_at is None
+            and self.attempts < self.MAX_ATTEMPTS
+            and timezone.now() < self.expires_at
+        )
+
+    @property
+    def can_resend(self) -> bool:
+        return (
+            self.verified_at is None
+            and self.sends < self.MAX_SENDS
+            and timezone.now() >= self.last_sent_at + self.RESEND_AFTER
+        )
+
+    @property
+    def resend_wait_seconds(self) -> int:
+        """Whole seconds until a resend is allowed, for the countdown."""
+        if self.verified_at or self.sends >= self.MAX_SENDS:
+            return 0
+        remaining = (self.last_sent_at + self.RESEND_AFTER) - timezone.now()
+        return max(0, int(remaining.total_seconds()) + 1)
+
+    def reissue(self) -> str:
+        """Send the same check again with a NEW code.
+
+        Reusing the old code would mean a resend extends its life indefinitely,
+        which quietly undoes the TTL. Callers must check can_resend first.
+        """
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        self.code_hash = make_password(code)
+        self.expires_at = timezone.now() + self.TTL
+        self.attempts = 0
+        self.sends += 1
+        self.last_sent_at = timezone.now()
+        self.save(update_fields=[
+            "code_hash", "expires_at", "attempts", "sends", "last_sent_at",
+        ])
+        return code
+
+    def verify(self, code: str) -> bool:
+        """Check a submitted code, counting the attempt either way.
+
+        The attempt is banked before the comparison so a caller that dies
+        mid-check cannot be replayed for free guesses.
+        """
+        if not self.is_usable:
+            return False
+        self.attempts += 1
+        self.save(update_fields=["attempts"])
+        if not check_password((code or "").strip(), self.code_hash):
+            return False
+        self.verified_at = timezone.now()
+        self.save(update_fields=["verified_at"])
+        return True

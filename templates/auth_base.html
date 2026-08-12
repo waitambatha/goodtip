@@ -13,6 +13,7 @@
   <script src="{% static 'js/gt-loader.js' %}" defer></script>
   <script src="{% static 'js/gt-busy.js' %}" defer></script>
   <script src="{% static 'js/gt-confirm.js' %}" defer></script>
+  {% include "partials/_analytics.html" %}
 </head>
 <body class="auth-body">
   {% include "public/partials/_icons.html" %}
@@ -106,7 +107,7 @@
           {% block aside_body %}
           <ol class="aa-steps">
             <li><span class="n">1</span><span class="t"><b>Pick your teams</b> each round — takes a minute.</span></li>
-            <li><span class="n">2</span><span class="t"><b>Your group's entry fees</b> go to a charity, not a prize pool.</span></li>
+            <li><span class="n">2</span><span class="t"><b>GoodTip gives</b> to a charity your group picks. You never pay a cent.</span></li>
             <li><span class="n">3</span><span class="t"><b>You vote</b> on which charity gets the lot.</span></li>
           </ol>
           {% endblock %}

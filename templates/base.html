@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  {% include "partials/_analytics.html" %}
 </head>
 <body>
 {% if user.is_authenticated %}

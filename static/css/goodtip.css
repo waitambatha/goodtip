@@ -6895,3 +6895,1316 @@ body.gtc-open { overflow: hidden; }
    is already asking the question, so it is dropped from the list. Interest is
    an optional field; nobody needs a way back to un-answering it. */
 .contact-shell .ddx-opt:empty { display: none; }
+
+/* ==========================================================================
+   ============ v32 — nav glyphs · account cluster ==========================
+   ========================================================================== */
+
+/* ---------- GLYPHS IN BOTH BARS ------------------------------------------
+   Every destination now carries an icon beside its label, in both the public
+   bar and the member bar. The reason is the same in each: several labels are
+   near-neighbours until you have actually read them — News / The Wall / The
+   Good List / Charities on the public side, Leaderboard / Ladder on the
+   member side — and a glyph separates them at a glance in a way that a bolder
+   weight or a wider gap cannot.
+
+   Nothing about the palette moves. The icons take the label's own colour via
+   currentColor and sit a step back from it, so the row still reads as one
+   line of text with a mark in front of each item rather than as an icon strip
+   with captions. Lime stays where it already was: the current page, and hover.
+
+   They are an enhancement to the row, never a change to it. Both bars were
+   measured to the pixel — v18 for the member bar, v23/v24 for the public one
+   — and a glyph plus its gap is ~22px an item, which is more spare room than
+   either has at laptop widths. So below the width where the room exists the
+   glyphs drop out and the row is byte-for-byte the layout it was before. The
+   drawers keep them, because stacked there is nothing to compete for. */
+
+.nav-links a,
+.gt-v2 .an-links a,
+.an-menu-btn,
+.app-sheet a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-ic,
+.an-ic {
+  width: 16px; height: 16px;
+  flex: none;
+  stroke: currentColor; fill: none;
+  stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round;
+  opacity: .62;
+  transition: opacity .15s var(--ease), color .15s var(--ease);
+}
+
+/* Current page and hover light the glyph lime while the label stays white —
+   two signals from one state, and the brighter of the two is the mark rather
+   than the word, so the row's typographic colour does not jump around. */
+.nav-links a:hover .nav-ic,
+.nav-links a:focus-visible .nav-ic,
+.nav-links a[aria-current="page"] .nav-ic,
+.gt-v2 .an-links a:hover .an-ic,
+.gt-v2 .an-links a.on .an-ic,
+.an-menu-btn:hover .an-ic,
+.an-menu-btn.on .an-ic,
+.an-menu-btn[aria-expanded="true"] .an-ic {
+  color: var(--lime);
+  opacity: 1;
+}
+
+/* The two auth actions are buttons, not links, so their glyphs belong to the
+   button's own colour at full strength — a 62% mark inside a solid lime pill
+   reads as a printing fault. */
+.nav-links .nav-login,
+.nav-links .btn-nav {
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.nav-links .nav-login .nav-ic { opacity: .9; }
+.nav-links .btn-nav .nav-ic { opacity: 1; stroke-width: 2.1; }
+.nav-links .nav-login:hover .nav-ic { color: var(--lime); opacity: 1; }
+
+/* The Manage chevron is not one of these: it is a state indicator for the
+   panel, sized and rotated by v18, and must keep its own rules. */
+.an-menu-btn .an-ic { width: 16px; height: 16px; }
+
+/* ---------- WHERE THE GLYPHS FIT -----------------------------------------
+   Public bar: eight links plus two auth actions. Full size starts at 1440px,
+   the first width where the 1180px cap plus glyphs clears comfortably. From
+   1121–1439px the row is already compacted by v23/v24 and has nothing to
+   spare, so the glyphs step out. Below 1121px it is a drawer and they return.
+   Member bar: the row itself is gone below 1181px, and 1181–1360px is v18's
+   compaction tier, so the same rule applies one tier lower. */
+@media (min-width: 1121px) and (max-width: 1439px) {
+  .nav-links .nav-ic { display: none; }
+}
+@media (max-width: 1360px) {
+  .gt-v2 .an-links .an-ic,
+  .an-menu-btn .an-ic { display: none; }
+}
+
+/* Stacked, a row is 17px of label against a whole screen width — the glyph
+   can be bigger, and it wants a fixed column so the labels line up down the
+   drawer instead of stepping in and out with each icon's width. */
+@media (max-width: 1120px) {
+  /* The drawer's `li` is a block, so the anchor inside it is the only thing
+     that can carry the row. Full width is what makes the hairline rule span
+     the panel rather than stopping at the end of each label. */
+  .nav-links a { gap: 14px; width: 100%; }
+  .nav-links .nav-ic { display: inline-block; width: 20px; height: 20px; opacity: .8; }
+  /* v23/v24 make these two `display:block` for centring; flex centres them
+     just as well and keeps the glyph on the same line as the label. */
+  .nav-links .nav-login,
+  .nav-links .btn-nav { display: flex; justify-content: center; }
+}
+
+/* ---------- THE MEMBER BAR'S ACCOUNT CLUSTER -----------------------------
+   Profile and Log out used to be two unrelated shapes standing side by side:
+   a 38px avatar with a lime ring, then a hairline outlined pill. The pill was
+   the only outlined control anywhere on that bar, which is what made it look
+   unfinished — an outline reads as a placeholder when nothing around it is
+   drawn the same way, and next to a filled lime ring it reads as a fainter
+   copy of the thing beside it.
+
+   They are one control group now. Both live inside a single raised pill on
+   the panel fill the bar already uses for an active item, split by a hairline
+   — so the two halves are visibly one thing about you, sitting apart from the
+   destinations to their left. No new colour: --gt-deep-2 and lime are both
+   already in this bar. */
+.gt-v2 .an-right { gap: 12px; }
+
+.gt-v2 .an-account {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 100px;
+  background: var(--gt-deep-2);
+  border: 1px solid rgba(255,255,255,.06);
+  transition: border-color .15s var(--ease);
+}
+.gt-v2 .an-account:hover { border-color: rgba(255,255,255,.11); }
+
+.gt-v2 .an-account .an-profile {
+  padding: 2px 14px 2px 2px;
+  border-radius: 100px;
+}
+.gt-v2 .an-account .an-profile:hover { background: rgba(255,255,255,.06); }
+.gt-v2 .an-account .an-profile .an-avatar { width: 34px; height: 34px; font-size: 14px; }
+
+.gt-v2 .an-acc-sep {
+  width: 1px; height: 20px;
+  background: rgba(255,255,255,.10);
+  flex: none;
+}
+
+/* No border of its own — the cluster provides the edge. It is a quiet item at
+   rest, because logging out is not something anyone needs help finding, and
+   it lights up on hover like every other control on the bar. */
+.gt-v2 .an-account .an-logout {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 0; background: none;
+  border-radius: 100px;
+  padding: 9px 15px 9px 13px;
+  color: var(--cream); opacity: .72;
+  font-size: 13.5px; font-weight: 700; letter-spacing: .005em;
+  transition: background .15s var(--ease), color .15s var(--ease), opacity .15s var(--ease);
+}
+.gt-v2 .an-account .an-logout svg {
+  width: 17px; height: 17px; flex: none;
+  stroke: currentColor; fill: none;
+  stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round;
+  transition: transform .18s var(--ease);
+}
+.gt-v2 .an-account .an-logout:hover {
+  background: rgba(200,241,53,.12);
+  color: var(--lime);
+  opacity: 1;
+}
+/* The glyph is a door with an arrow leaving through it. On hover the arrow
+   takes the step — the whole meaning of the control, in 2px. */
+.gt-v2 .an-account .an-logout:hover svg { transform: translateX(-2px); }
+
+/* Narrow: labels go, and both halves become square-ish taps inside the same
+   pill. Restated in full because v11's `@media (max-width: 900px)` sets a
+   padding on the old bare pill that would otherwise squash this one. */
+@media (max-width: 900px) {
+  .gt-v2 .an-account { padding: 3px; }
+  .gt-v2 .an-account .an-profile { padding: 2px; }
+  .gt-v2 .an-account .an-logout { padding: 10px 12px; }
+}
+
+/* ---------- THE BURGER'S MISSING BAND ------------------------------------
+   .an-links goes at 1180px (v18) but the burger only appeared at 760px, so
+   between 761 and 1180 the member bar had no links AND no way to open the
+   drawer — every tablet was left with a bar it could not navigate from. The
+   burger now appears exactly where the row leaves. */
+@media (max-width: 1180px) {
+  .an-burger { display: inline-grid; }
+}
+
+/* ---------- THE DRAWER ---------------------------------------------------
+   Same glyph column as the public drawer, plus a section label for the admin
+   block — three destinations that belong together and are not peers of
+   Dashboard, exactly as the Manage menu groups them on the bar. */
+.app-sheet .sheet-panel { gap: 4px; overflow-y: auto; }
+.app-sheet a { gap: 13px; }
+.app-sheet .an-ic { width: 19px; height: 19px; opacity: .7; }
+.app-sheet a:hover .an-ic { color: var(--lime); opacity: 1; }
+
+.app-sheet .sheet-label {
+  font-family: var(--mark);
+  font-size: 11px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: rgba(232,228,213,.42);
+  padding: 16px 14px 6px;
+}
+
+/* Log out is the one item that undoes you, so it is pushed to the foot of the
+   panel with a rule above it rather than sitting as the ninth link in a list. */
+.app-sheet .sheet-logout {
+  margin-top: auto;
+  border-top: 1px solid rgba(255,255,255,.09);
+  border-radius: 0;
+  padding-top: 18px;
+}
+.app-sheet .sheet-logout:hover { background: rgba(200,241,53,.10); }
+
+/* ==========================================================================
+   ============ v33 — the menus on a phone ==================================
+   ========================================================================== */
+
+/* Both menus were desktop layouts with a stacking rule bolted on. Neither was
+   a panel: the public one was a list of hairline rules hanging off the bar
+   with the page still scrolling behind it, and the member one was a 300px
+   strip with the links in it and no indication of whose account you were in.
+
+   Below, both become the same thing — a panel that covers what it covers, is
+   dismissed the way a panel is dismissed, and puts its glyph column, its
+   groups and its exit in the same places the desktop bars put them. The
+   palette does not move; these are the same greens and the same lime. */
+
+/* ---------- SCROLL LOCK --------------------------------------------------
+   The page behind an open panel holds still. Paired with overscroll-behavior
+   on the panels themselves, which is the half that matters on a phone: it
+   stops a flick that reaches the end of the panel's own list from handing the
+   scroll on to whatever is underneath. The width pin keeps the desktop
+   scrollbar's width reserved, so the page does not jump sideways as the lock
+   goes on and off. */
+body.nav-open,
+body.sheet-open {
+  overflow: hidden;
+  width: 100%;
+}
+
+/* ---------- PUBLIC DRAWER ------------------------------------------------ */
+@media (max-width: 1120px) {
+  /* A scrim, so the drawer sits ON the page rather than being an extension of
+     the bar. It is painted by the nav itself — there is no element for it, and
+     inventing one would mean the drawer could not be opened without it. */
+  /* This can be position:fixed inside a sticky bar only because v24 already
+     turns the scrolled bar's own backdrop-filter off while it is open — a
+     filtered ancestor would become the containing block and the scrim would
+     be pinned to the 56px bar instead of to the viewport. The two rules go
+     together; neither is safe to drop on its own. */
+  .nav[data-open="true"]::after {
+    content: "";
+    position: fixed; left: 0; right: 0; bottom: 0; top: 66px;
+    background: rgba(6,20,13,.62);
+    backdrop-filter: blur(3px);
+    z-index: 1;
+  }
+  .nav.scrolled[data-open="true"]::after { top: 56px; }
+  .nav-links { z-index: 2; }
+
+  /* The panel: rounded off at the bottom so it reads as a sheet that has come
+     down and stopped, not as a list that has been cut off by the viewport. */
+  .nav-links {
+    border-bottom: 0;
+    border-radius: 0 0 20px 20px;
+    padding: 10px clamp(16px, 4vw, 26px) clamp(18px, 4vw, 26px);
+    max-height: calc(100vh - 66px);
+    max-height: calc(100dvh - 66px);       /* phone chrome moves; dvh follows it */
+    overflow-y: auto;
+    overscroll-behavior: contain;          /* a flick at the end stays in here */
+  }
+  /* Restated, because the unconditional max-height above lands after v24's
+     scrolled variant and would otherwise leave the panel 10px too tall once
+     the bar has shrunk. */
+  .nav.scrolled .nav-links { max-height: calc(100dvh - 56px); }
+
+  /* Rows are taps, not text. A row is the full width of the panel, the glyph
+     holds a fixed column so the labels line up, and the pressed state is a
+     filled pill rather than a colour change — on a phone the finger is on top
+     of the label at the moment the feedback is needed. */
+  .nav-links a {
+    padding: 15px 12px;
+    margin: 1px 0;
+    border-bottom: 0;
+    border-radius: 12px;
+    font-size: 16.5px;
+    min-height: 52px;
+  }
+  .nav-links a:active { background: rgba(200,241,53,.14); }
+  .nav-links a[aria-current="page"] {
+    background: rgba(200,241,53,.10);
+    color: var(--lime);
+  }
+  .nav-links a[aria-current="page"] .nav-ic { color: var(--lime); opacity: 1; }
+
+  /* The hairline between every pair is gone. Eight rules down a panel read as
+     a table of data; one rule above the auth block reads as the division that
+     is actually there — places to go, then things to do. */
+  /* The `> li` selector that makes the drawer's rows full width also catches
+     the separator, which is an li too — and 100% plus horizontal margins is
+     wider than the panel's content box, which put a horizontal scrollbar
+     across the bottom of the menu. It gets its width back explicitly. */
+  .nav-sep {
+    display: block; height: 1px;
+    margin: 12px 6px 6px;
+    background: rgba(255,255,255,.10);
+  }
+  .nav-links > li.nav-sep { width: auto; }
+  .nav-auth { margin-top: 0; }
+  .nav-links .nav-login { margin-top: 8px; min-height: 52px; }
+
+  /* Sign up free was invisible in this drawer: v24 kills the background on
+     every `.nav-links a` so the stacked rows are flat, and that beats
+     .btn-nav's own lime by one specificity point — leaving --deep text on the
+     --deep panel. It has been unreadable on a phone since v24; the drawer just
+     had nothing else in it bold enough to make the gap obvious. Restated here
+     rather than in v24 so the flat-row rule stays a single simple statement. */
+  .nav-links .btn-nav {
+    margin-top: 8px; min-height: 52px;
+    background: var(--lime);
+    color: var(--deep) !important;
+  }
+  .nav-links .btn-nav:active { background: #b9e02c; }
+
+  /* Rows arrive in sequence behind the panel's own drop — a short one, since
+     this is a menu and not a hero. Reduced motion drops it entirely below. */
+  .nav[data-open="true"] .nav-links > li {
+    animation: navRowIn .26s var(--ease) backwards;
+    animation-delay: calc(var(--r, 0) * 22ms);
+  }
+  .nav-links > li:nth-child(1) { --r: 1; }
+  .nav-links > li:nth-child(2) { --r: 2; }
+  .nav-links > li:nth-child(3) { --r: 3; }
+  .nav-links > li:nth-child(4) { --r: 4; }
+  .nav-links > li:nth-child(5) { --r: 5; }
+  .nav-links > li:nth-child(6) { --r: 6; }
+  .nav-links > li:nth-child(7) { --r: 7; }
+  .nav-links > li:nth-child(8) { --r: 8; }
+  .nav-links > li:nth-child(9) { --r: 9; }
+  .nav-links > li:nth-child(n+10) { --r: 10; }
+
+  /* The wordmark is the biggest thing on a phone bar and does not need to be.
+     A step down gives the row back to the toggle, which is the only control
+     up there that anyone is aiming at. */
+  .nav-inner { height: 66px; }
+  .wordmark { font-size: 24px; }
+}
+
+@keyframes navRowIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---------- MEMBER BAR ON A PHONE ---------------------------------------- */
+
+/* Below 760px the bar is brand, notifications, menu — and nothing else. The
+   account cluster comes off it because at that width both its halves lose
+   their labels and become two unexplained taps next to a third; all of it is
+   in the sheet, under the user's own name, where it can be read. Above 760 the
+   row is gone but the width is still a tablet's, so the cluster stays. */
+@media (max-width: 760px) {
+  .gt-v2 .an-account { display: none; }
+  .gt-v2 .app-nav .an-inner { height: 60px; gap: 10px; padding: 0 16px; }
+  .gt-v2 .an-brand { font-size: 21px; }
+  .gt-v2 .an-right { gap: 4px; margin-left: auto; }
+  .an-burger { padding: 9px; border-radius: 10px; }
+  .an-burger:active { background: rgba(255,255,255,.08); }
+}
+
+/* The charity strip is the one thing on these pages that is pure status. On a
+   phone it was a four-part row squeezed into 320px; the label and the bar are
+   what matter, so the season/sport tail goes and the rest is given the width. */
+@media (max-width: 560px) {
+  .gt-v2 .charity-strip .cs-inner { flex-wrap: wrap; gap: 6px 10px; padding: 9px 16px; }
+  .gt-v2 .charity-strip .cs-right { display: none; }
+  .gt-v2 .charity-strip .cs-bar { flex: 1 0 100%; }
+  .gt-v2 .charity-strip .cs-label { font-size: 12px; }
+}
+
+/* ---------- MEMBER SHEET ------------------------------------------------- */
+
+.app-sheet { backdrop-filter: blur(3px); }
+.app-sheet .sheet-panel {
+  width: min(340px, 88vw);
+  padding: 0 14px 14px;
+  box-shadow: -30px 0 70px -30px rgba(0,0,0,.8);
+  overscroll-behavior: contain;
+}
+
+/* Header: who you are, which org, and the way out of the panel. This is the
+   member bar's account cluster, unpacked — on a phone there is room to say
+   the name instead of standing for it with a single letter. */
+.app-sheet .sheet-head {
+  display: flex; align-items: center; gap: 10px;
+  position: sticky; top: 0; z-index: 2;
+  margin: 0 -14px 6px;
+  padding: 14px;
+  background: var(--deep);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.app-sheet .sheet-me {
+  display: flex; align-items: center; gap: 11px;
+  flex: 1 1 auto; min-width: 0;
+  padding: 4px; border-radius: 100px;
+}
+.app-sheet .sheet-me .an-avatar { width: 40px; height: 40px; font-size: 16px; flex: none; }
+.app-sheet .sheet-me-txt { min-width: 0; line-height: 1.2; }
+.app-sheet .sheet-me-txt b {
+  display: block; font-size: 15px; font-weight: 700; color: var(--white);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.app-sheet .sheet-me-txt i {
+  display: block; font-style: normal; font-size: 12.5px;
+  color: rgba(232,228,213,.55);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.app-sheet .sheet-x {
+  flex: none; width: 40px; height: 40px;
+  display: grid; place-items: center;
+  background: none; border: 0; border-radius: 50%;
+  color: var(--cream); opacity: .7; cursor: pointer;
+  transition: background .15s var(--ease), opacity .15s var(--ease);
+}
+.app-sheet .sheet-x:hover, .app-sheet .sheet-x:active { background: rgba(255,255,255,.09); opacity: 1; }
+.app-sheet .sheet-x svg {
+  width: 20px; height: 20px;
+  stroke: currentColor; fill: none;
+  stroke-width: 2; stroke-linecap: round;
+}
+
+/* Rows sized for a thumb, same 52px floor as the public drawer. */
+.app-sheet a { min-height: 52px; padding: 14px 12px; border-radius: 12px; }
+.app-sheet a:active { background: rgba(200,241,53,.14); }
+
+/* Log out keeps its rule and its place at the foot, but not the square corners
+   the border gave it — it is still a row in this list, just the last one. */
+.app-sheet .sheet-logout {
+  border-radius: 12px;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 0;
+  position: relative;
+}
+.app-sheet .sheet-logout::before {
+  content: "";
+  position: absolute; left: 6px; right: 6px; top: -7px;
+  height: 1px; background: rgba(255,255,255,.10);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav[data-open="true"] .nav-links > li { animation: none; }
+}
+
+/* ==========================================================================
+   ============ v34 — the member bar decides what gives ====================
+   ========================================================================== */
+
+/* Adding glyphs to the member row made it wide enough to need a millimetre
+   from somewhere, and flex took it from the wrong place: every child was
+   shrinkable, so the account cluster was squeezed until "Log out" wrapped onto
+   two lines and the pill grew taller than the 68px bar it sits in.
+
+   Only one thing in this row can lose width without losing meaning, and that
+   is the org name — it truncates to an ellipsis and stays readable, and the
+   full name is on the dashboard, in the sheet header, and in its own title
+   attribute. Everything else is a fixed control or a set of labels that must
+   not wrap, so everything else is now immovable.
+
+   The arithmetic this guarantees: brand 74 + links 781 (seven items, glyphs
+   on, the widest this row ever gets) + right cluster 259 + gaps 66 = 1180
+   against a 1300 cap, so the org always has at least 120px and the row can
+   never overflow no matter how the org is named. */
+.gt-v2 .an-brand,
+.gt-v2 .an-links,
+.gt-v2 .an-right,
+.gt-v2 .an-account { flex: none; }
+
+.gt-v2 .an-org {
+  flex: 0 1 auto;
+  min-width: 0;                     /* without this a flex item will not shrink
+                                       below its content, ellipsis or not */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gt-v2 .an-account .an-profile,
+.gt-v2 .an-account .an-logout,
+.gt-v2 .an-plabel,
+.gt-v2 .an-llabel { white-space: nowrap; }
+
+/* Room, measured rather than hoped for. With glyphs on and a staff account
+   showing all seven items, the row needs 1271px of content and the 1300px cap
+   leaves 1212px once its 44px gutters are taken out — a 59px deficit, which
+   under v34's rules lands entirely on the org name and truncates it to
+   nothing. Two things pay it back, and both are things the row is better off
+   without:
+
+   The word "Profile" beside the avatar. A ringed avatar in the corner of an
+   app bar is already the most legible profile control there is, it carries a
+   title, and the phone sheet spells it out in full under the user's own name.
+   That is ~51px for a label nobody reads. Log out keeps its word, because a
+   lone door glyph is genuinely ambiguous and it is the control that was
+   called out as looking unfinished in the first place.
+
+   And a millimetre off each glyph — 15px on a 7px gap inside 11px of padding
+   rather than 16/8/13. That is ~42px across seven items and is invisible at
+   a glance; the truncated org name was not. Together: ~93px against a 59px
+   deficit, so the org keeps its full width with room to spare. */
+@media (min-width: 1361px) {
+  .gt-v2 .an-plabel { display: none; }
+  .gt-v2 .an-account .an-profile { padding: 2px; }
+  .gt-v2 .an-links .an-ic,
+  .an-menu-btn .an-ic { width: 15px; height: 15px; }
+  .gt-v2 .an-links a,
+  .an-menu-btn { gap: 7px; padding: 9px 11px; }
+}
+
+/* ==========================================================================
+   ============ v35 — My Tips: the fixture card gets its room ==============
+   ========================================================================== */
+
+/* The card was laid out when it held three things: two clubs, a pick, and a
+   result badge. It now holds seven — clubs, pick buttons, "you tipped X", a
+   state badge, a timestamp, the kickoff/venue row and, mid-game, a clock and
+   score. Every one of those was added into the same 14px of padding and the
+   same 6px row gap, so the card reads as one dense block with no grouping:
+   the timestamp sits as close to the badge above it as the badge does to the
+   line above that, and nothing tells you which lines belong together.
+
+   Nothing here is a rewrite. It is the same three columns and the same state
+   row; they are given the space the content now needs, and the gaps are made
+   to mean something — tight inside a group, wider between groups. */
+
+.gt-fixtures { gap: 14px; }
+
+.gt-fix {
+  padding: 18px 20px;
+  /* Column gap up from 14: the state column is right-aligned text running
+     back toward the pick buttons, and 14px between two hard edges was not
+     enough to read as a gutter. Row gap up from 6 so the match-state row
+     below is separated from the pick row by more than a hairline. */
+  gap: 14px 22px;
+  /* The state column carried three stacked lines in 0.9fr while the pick
+     column had 1.15fr for two buttons. "Tipped 5 Aug, 7:39 PM" wrapped in it,
+     which is what made the card look broken rather than merely tight. */
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
+/* One rhythm down the state column instead of a 4px gap plus a stray 3px
+   margin on the last line. The badge gets a touch more air than the text
+   either side of it, because it is the one thing here that is a control-shaped
+   object rather than a sentence. */
+.gt-fix .gfx-state { gap: 7px; }
+.gt-fix .gfx-state .res { margin: 1px 0; }
+.gt-fix .gfx-stamp { margin-top: 0; }
+.gt-fix .gfx-picked { line-height: 1.45; }
+
+/* The kickoff/venue row is about the match, not the pick, so the rule above it
+   is a real division and is spaced like one — even air above and below rather
+   than 4px up and 10px down. */
+.gt-fix .ms {
+  margin-top: 2px;
+  padding-top: 14px;
+  gap: 8px 12px;
+}
+
+/* The clubs row: 12px between a crest-and-name pair and the "vs" disc read as
+   the same distance as the gap inside the pair itself. */
+.gt-fix .gfx-teams { gap: 16px; }
+
+/* ---------- STACKED ------------------------------------------------------
+   Below 900 the three columns become three blocks down the card, and the
+   column gap no longer applies — so the row gap is the only thing separating
+   a set of pick buttons from the sentence about them. It has to be bigger
+   than the gaps inside each block, or the card is one undifferentiated run of
+   text, which is exactly how it read. */
+@media (max-width: 900px) {
+  .gt-fix { gap: 16px; padding: 16px 16px 18px; }
+  .gt-fix .gfx-state {
+    gap: 6px;
+    padding-top: 14px;
+    border-top: 1px solid var(--gt-hair);
+  }
+  /* The state block is now fenced by its own rule, so the match-state row
+     underneath does not need a second one directly below it. */
+  .gt-fix .ms { border-top: 0; padding-top: 0; margin-top: -2px; }
+}
+
+/* Under 560 the two clubs stack and the "vs" disc is hidden, which left two
+   club names in a column with nothing to say they are opponents rather than a
+   list. A hairline between them says it without costing a row. */
+@media (max-width: 560px) {
+  .gt-fix .gfx-teams { gap: 0; }
+  .gt-fix .gfx-teams > .team-cell:first-child {
+    padding-bottom: 11px;
+    margin-bottom: 11px;
+    border-bottom: 1px solid var(--gt-hair);
+  }
+}
+
+/* ---------- THE STAT STRIP AND FILTER TABS -------------------------------
+   Same complaint one level up: the three stat tiles and the filter row sat
+   14px from the list with no more separation than the cards have from each
+   other, so the page had no top-level grouping either. */
+.gt-strip { gap: 14px; margin-bottom: 22px; }
+.gt-filters { margin-bottom: 18px; gap: 8px; }
+
+/* ---------- THE OVERLAP --------------------------------------------------
+   The card is three columns wide, but it does not live at page width — it
+   sits in the left half of .gt-shell beside the sidebar, so on a 1920px
+   screen the card is about 610px and each of its three columns gets ~200px.
+   Two club cells and a "vs" disc do not fit in 200px, and the club name is a
+   bare text node inside a flex row: an anonymous flex item, which cannot
+   shrink below its own min-content and so does not wrap or ellipsis — it
+   simply runs out of the cell. That is the overlap. "Essendon" ran into the
+   vs disc and "Richmond" ran under the NO TIP pill, on every card.
+
+   Widening the columns cannot fix it, because there is no width to give. The
+   fixture is two facts, not three: WHO is playing, and WHAT you did about it.
+   So the clubs take a full row of their own — at ~570px they are never short
+   — and the pick and its state share the row underneath, which is also the
+   order you read the card in. Same DOM, same three blocks; only the grid
+   changes. */
+.gt-fix {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+.gt-fix .gfx-teams { grid-column: 1 / -1; }
+.gt-fix .gfx-pick  { grid-column: 1; align-self: center; }
+.gt-fix .gfx-state { grid-column: 2; align-self: center; }
+.gt-fix .ms        { grid-column: 1 / -1; }
+
+/* Belt and braces for the anonymous-flex-item problem above: if a club name
+   ever is longer than the row it now has, it wraps inside its own cell
+   instead of leaving it. A name is worth two lines; it is not worth landing
+   on the control next to it. */
+.gt-fix .team-cell { overflow: hidden; }
+/* Guarded: unscoped, this restated the three-up clubs row on top of the ≤560
+   rule that stacks them, and phone-width names went back to breaking mid-word
+   ("Adelai / Crows"). It only ever meant to hold at the widths where the two
+   clubs sit side by side. */
+@media (min-width: 561px) {
+  .gt-fix .gfx-teams { grid-template-columns: minmax(0,1fr) 34px minmax(0,1fr); }
+}
+
+/* The clubs row is now the card's headline, so it gets the size to match and
+   a hairline under it — the same division the match-state row already has. */
+.gt-fix .team-cell { font-size: 15.5px; line-height: 1.35; }
+.gt-fix .gfx-teams {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--gt-hair);
+}
+
+/* Stacked, the pick and state go under each other, and .gfx-state's own rule
+   from the block above would then double up with the clubs rule. */
+@media (max-width: 900px) {
+  .gt-fix { grid-template-columns: 1fr; }
+  .gt-fix .gfx-pick, .gt-fix .gfx-state { grid-column: 1; }
+}
+@media (max-width: 560px) {
+  /* the two clubs stack, so the pair rule and the per-club rule would stack too */
+  .gt-fix .gfx-teams > .team-cell:first-child { border-bottom-color: var(--gt-hair); }
+}
+
+/* ==========================================================================
+   ============ v36 — the bar's corner is one set of icon buttons ==========
+   ========================================================================== */
+
+/* Notifications, profile and log out are now three controls on one rhythm:
+   same 40px round target, same hover, same gap. Previously they were a round
+   bell, then a raised pill containing a ringed avatar and the word "Profile",
+   then a second pill with a door and the words "Log out" — three different
+   shapes for three peers, and ~90px of labels in a row that was already
+   short of room (which is what was pushing the org name to an ellipsis).
+
+   The words are gone, not lost: both carry title and aria-label, the phone
+   sheet still spells them out in full under the user's own name, and an
+   avatar and a door at 40px are not glyphs anyone has to decode. */
+
+.gt-v2 .an-right { gap: 8px; align-items: center; }
+
+.gt-v2 .an-iconbtn {
+  width: 40px; height: 40px;
+  flex: none;
+  display: grid; place-items: center;
+  border: 0; border-radius: 50%;
+  background: transparent;
+  color: var(--cream);
+  text-decoration: none;
+  transition: background .15s var(--ease), color .15s var(--ease);
+}
+.gt-v2 .an-iconbtn:hover { background: rgba(255,255,255,.09); }
+.gt-v2 .an-iconbtn:focus-visible {
+  outline: 2px solid var(--lime); outline-offset: 2px; background: rgba(255,255,255,.09);
+}
+
+/* The avatar is the button's face, so it fills it rather than sitting inside
+   a second shape. The lime ring is what marks it as yours. */
+.gt-v2 .an-profile .an-avatar {
+  width: 36px; height: 36px;
+  border: 2px solid rgba(200,241,53,.55);
+  background: var(--gt-deep-3); color: var(--lime);
+  font-size: 14px; overflow: hidden;
+  transition: border-color .15s var(--ease);
+}
+.gt-v2 .an-profile:hover { background: transparent; }
+.gt-v2 .an-profile:hover .an-avatar { border-color: var(--lime); }
+
+/* Log out is the only destructive-ish control up here, so it is the only one
+   that changes colour rather than just lifting — lime on hover, and the arrow
+   steps out of the door. */
+.gt-v2 .an-logout {
+  border: 0; padding: 0; opacity: .78;
+  background: transparent;
+}
+.gt-v2 .an-logout svg {
+  width: 19px; height: 19px;
+  stroke: currentColor; fill: none;
+  stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round;
+  transition: transform .18s var(--ease);
+}
+.gt-v2 .an-logout:hover {
+  background: rgba(200,241,53,.14);
+  color: var(--lime);
+  opacity: 1;
+}
+.gt-v2 .an-logout:hover svg { transform: translateX(-2px); }
+
+/* The bell joins the set: it was a 6px-padded square with an 8px radius. */
+.gt-v2 .bell-btn {
+  width: 40px; height: 40px; padding: 0;
+  border-radius: 50%; opacity: .78;
+}
+.gt-v2 .bell-btn:hover { background: rgba(255,255,255,.09); opacity: 1; }
+.gt-v2 .bell-btn svg { width: 19px; height: 19px; }
+.gt-v2 .bell-badge { top: 2px; right: 2px; }
+
+/* With the labels gone the row has ~90px back, so the glyph metrics that v34
+   shaved to buy that room are no longer needed — the links go back to their
+   full size and the org name keeps its width. */
+@media (min-width: 1361px) {
+  .gt-v2 .an-links .an-ic,
+  .an-menu-btn .an-ic { width: 16px; height: 16px; }
+  .gt-v2 .an-links a,
+  .an-menu-btn { gap: 8px; padding: 9px 13px; }
+}
+
+/* ==========================================================================
+   ============ v37 — the wizard's dropdowns are clickable =================
+   ========================================================================== */
+
+/* Organisation type and State/territory did nothing when you clicked them, and
+   the reason is a two-part miss rather than a broken control.
+
+   The wizard field is a flex row — a 46px icon cell, then the control — and
+   the rule that makes the control fill the rest names `> input, > select,
+   > textarea`. It was written when the select was still a native select. But
+   gt-ui.js progressively replaces every select in .app-main with a .ddx
+   widget and moves the real select inside it, so the flex child is a .ddx,
+   which matches none of those three, gets no flex, and shrink-wraps to its
+   own content: a 302px button sitting in a 968px field.
+
+   The other 666px — 68% of what looks like the control — is the wrapper. A
+   click there lands on .fld-ic and nothing happens, which is exactly the
+   report. The menu itself was fine all along; it opened correctly every time
+   it was actually reached.
+
+   So .ddx joins the three element names as a thing that fills the field, and
+   drops its own frame while it is in there — the wrapper draws the border,
+   the background and the focus ring, and a bordered button inside a bordered
+   field was a box in a box. */
+
+.wiz-form .fld-ic > .ddx { flex: 1 1 auto; min-width: 0; }
+
+.wiz-form .fld-ic > .ddx .ddx-btn {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  /* matches the padding the inputs beside it get, so a text field and a
+     dropdown in the same column have their text on the same line */
+  padding: 15px 16px;
+  font-size: 15px;
+}
+.wiz-form .fld-ic > .ddx .ddx-btn:hover { background: rgba(15,46,34,.02); box-shadow: none; }
+.wiz-form .fld-ic > .ddx.open .ddx-btn { box-shadow: none; }
+
+/* Focus and open state belong to the wrapper, the same way :focus-within
+   already handles the text inputs. */
+.wiz-form .fld-ic:has(> .ddx.open) {
+  border-color: var(--forest);
+  box-shadow: 0 0 0 3px rgba(45,122,58,.18);
+}
+.wiz-form .fld-ic:has(> .ddx.open) > .fi-mark { color: var(--forest); }
+
+/* The menu is positioned against .ddx, which now spans the field, so it drops
+   the full width of the control instead of a third of it. It also has to
+   escape the wrapper: .wiz-form .fld-ic sets overflow:hidden to clip the icon
+   cell against the rounded corner, and that was clipping the open menu too. */
+.wiz-form .fld-ic { overflow: visible; }
+.wiz-form .fld-ic > .fi-mark { border-radius: 10px 0 0 10px; }
+.wiz-form .fld-ic > .ddx .ddx-menu { top: calc(100% + 10px); }
+
+/* Nothing in the wrapper should swallow a click meant for the control. */
+.wiz-form .fld-ic > .fi-mark,
+.wiz-form .fld-ic::after { pointer-events: none; }
+
+/* ==========================================================================
+   ============ v38 — the department directory ============================
+   ========================================================================== */
+
+/* A directory, not a table. Someone arriving here is scanning for one name
+   they already know ("where's IT?"), so the layout is a grid of cards sized to
+   be swept rather than read row by row, and the name is the biggest thing in
+   each one. */
+
+.dept-search { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+.dept-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+  gap: 14px;
+}
+
+.dept-card {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 18px;
+  background: var(--gt-card);
+  border: 1px solid var(--gt-hair);
+  border-left: 4px solid var(--gt-hair);
+  border-radius: var(--gt-r-sm);
+  transition: border-color .16s var(--ease), box-shadow .16s var(--ease);
+}
+.dept-card:hover { border-left-color: var(--forest); box-shadow: 0 16px 34px -26px rgba(15,46,34,.5); }
+
+/* A pending department is visibly not one of the real ones yet: it is in the
+   list only for the people who can act on it, and it should not read as a
+   destination while it waits. */
+.dept-card.is-pending {
+  border-left-color: #C79A2B;
+  background: linear-gradient(90deg, rgba(199,154,43,.09), var(--gt-card) 60%);
+}
+
+.dept-card .dc-top { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.dept-card .dc-mark {
+  width: 40px; height: 40px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 11px;
+  background: rgba(45,122,58,.10); color: var(--forest);
+}
+.dept-card .dc-mark svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.dept-card .dc-name { min-width: 0; line-height: 1.25; }
+.dept-card .dc-name b {
+  display: block; font-size: 16px; font-weight: 700; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dept-card .dc-name i {
+  display: block; font-style: normal; font-size: 12.5px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.dept-card .dc-meta {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  font-size: 12.5px; color: var(--muted);
+}
+.dept-card .dc-meta > span { display: inline-flex; align-items: center; gap: 6px; }
+.dept-card .dc-meta svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.9; }
+.dept-card .dc-flag {
+  font-family: var(--mark); font-size: 10.5px; font-weight: 800;
+  letter-spacing: .07em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 100px;
+  background: rgba(199,154,43,.18); color: #7a5c10;
+}
+
+/* The action sits on its own line at the foot so every card's button lands on
+   the same baseline regardless of how long the name above it ran. */
+.dept-card .dc-actions { margin-top: auto; padding-top: 2px; }
+.dept-card .dc-note { font-size: 12.5px; color: var(--muted); font-style: italic; }
+
+.dept-form { max-width: 560px; }
+.dept-form .fld { margin-bottom: 14px; }
+
+@media (max-width: 560px) {
+  .dept-grid { grid-template-columns: 1fr; }
+  .dept-search .abtn { flex: 1; justify-content: center; }
+}
+
+/* ==========================================================================
+   ============ v39 — the work-email check =================================
+   ========================================================================== */
+
+/* The code field. Six digits read back off a phone, so they get the treatment
+   the email gives them: monospaced, spaced out, and large enough that a
+   transposed pair is obvious before it is submitted. */
+.code-input {
+  font-family: var(--score), 'Courier New', monospace;
+  font-size: 26px !important;
+  font-weight: 800;
+  letter-spacing: .34em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.code-input::placeholder { letter-spacing: .34em; opacity: .3; font-weight: 700; }
+
+.verify-sent p { margin: 0 0 16px; font-size: 14.5px; line-height: 1.6; color: var(--muted); }
+.verify-sent b { color: var(--ink); }
+
+.verify-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+/* A disabled resend is a countdown, not a dead control: it says when it will
+   work, so it must not look like something that is broken. */
+.verify-actions .abtn[disabled] { opacity: .5; cursor: not-allowed; pointer-events: none; }
+
+.verify-done {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 18px; border-radius: var(--gt-r-sm);
+  background: rgba(45,122,58,.09);
+  border: 1px solid rgba(45,122,58,.28);
+}
+.verify-done .vd-tick {
+  width: 38px; height: 38px; flex: none;
+  display: grid; place-items: center; border-radius: 50%;
+  background: var(--forest); color: #fff;
+}
+.verify-done .vd-tick svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2.6; }
+.verify-done b { display: block; font-size: 16px; color: var(--ink); }
+.verify-done i { display: block; font-style: normal; font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+@media (max-width: 560px) {
+  .verify-actions .abtn { flex: 1 1 100%; justify-content: center; }
+}
+
+/* ==========================================================================
+   ============ v40 — ghost buttons on the dark sheet ======================
+   ========================================================================== */
+
+/* .abtn-ghost is drawn for a cream card: dark ink, hairline border. The
+   dashboard and every other sheet-page paints a dark green gradient behind
+   it, so those buttons were dark-on-dark with a border nobody could see.
+   "Departments" and "Find a group" were invisible; the lime primary beside
+   them was fine, which is exactly why it read as two missing buttons rather
+   than a broken row.
+   The wizard footer already solved this for itself (v-wiz), which left the
+   same fix missing everywhere else the sheet is used. This generalises it. */
+
+.sheet-page .page-sheet .abtn-ghost {
+  color: var(--cream);
+  border-color: rgba(255,255,255,.28);
+  background: rgba(255,255,255,.04);
+}
+.sheet-page .page-sheet .abtn-ghost:hover {
+  color: #fff;
+  border-color: var(--lime);
+  background: rgba(200,241,53,.12);
+}
+.sheet-page .page-sheet .abtn-ghost svg { stroke: currentColor; }
+
+/* The same problem for the small ghost buttons inside cards on the sheet
+   (Remove admin, Make admin, Decline). Those sit on .card, which IS cream,
+   so they must keep the dark treatment — scoped to direct sheet children
+   rather than everything inside it. */
+.sheet-page .page-sheet .card .abtn-ghost {
+  color: var(--ink);
+  border-color: var(--app-line);
+  background: transparent;
+}
+.sheet-page .page-sheet .card .abtn-ghost:hover {
+  color: var(--forest);
+  border-color: var(--forest);
+  background: transparent;
+}
+
+/* Labels and plain text directly on the sheet need the same consideration:
+   .dc-lab is --muted, tuned for cream. */
+.sheet-page .page-sheet .dash-ctl .dc-lab { color: rgba(232,228,213,.6); }
+
+/* The field that caused a verification error is marked, not just annotated:
+   the message underneath is easy to miss on a form of three near-identical
+   boxes, and the red edge is what draws the eye to the right one. */
+.wiz-form .fld.has-err .fld-ic {
+  border-color: #C0392B;
+  box-shadow: 0 0 0 3px rgba(192,57,43,.14);
+}
+.wiz-form .fld.has-err .fld-ic > .fi-mark { color: #C0392B; }
+
+/* ==========================================================================
+   ============ v41 — icons with some life in them =========================
+   ========================================================================== */
+
+/* The glyph set is a single-weight line drawing, which is fine at 16px in a
+   nav row and thin and lifeless anywhere it has to carry a block of content.
+   Two changes, no new artwork:
+
+   1. Weight. 1.8–1.9 stroke on a 20px glyph reads as a wireframe. Content
+      glyphs go to 2.0–2.2, which is the difference between a diagram and an
+      icon.
+   2. A ground to stand on. A glyph floating in text has nothing holding it;
+      the same glyph in a tinted rounded tile reads as an object. That is the
+      treatment in the department mockup and it is what gives these presence
+      without commissioning a filled set. */
+
+/* ---- the tile ---- */
+.gt-ic-tile {
+  width: 42px; height: 42px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 13px;
+  background: linear-gradient(150deg, rgba(200,241,53,.22), rgba(45,122,58,.14));
+  border: 1px solid rgba(45,122,58,.20);
+  color: var(--forest);
+  transition: background .18s var(--ease), border-color .18s var(--ease), transform .18s var(--ease);
+}
+.gt-ic-tile svg {
+  width: 21px; height: 21px;
+  stroke: currentColor; fill: none;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.gt-ic-tile.sm { width: 34px; height: 34px; border-radius: 11px; }
+.gt-ic-tile.sm svg { width: 17px; height: 17px; }
+.gt-ic-tile.lg { width: 52px; height: 52px; border-radius: 16px; }
+.gt-ic-tile.lg svg { width: 26px; height: 26px; }
+
+/* On the dark sheet the cream-card tint disappears, so it gets its own. */
+.sheet-page .page-sheet > .gt-ic-tile,
+.page-deep .gt-ic-tile.on-dark {
+  background: rgba(200,241,53,.14);
+  border-color: rgba(200,241,53,.30);
+  color: var(--lime);
+}
+
+/* A tile inside something clickable lifts with it. */
+a:hover > .gt-ic-tile,
+.dept-card:hover .gt-ic-tile,
+.gt-scard:hover .gt-ic-tile {
+  background: linear-gradient(150deg, rgba(200,241,53,.34), rgba(45,122,58,.20));
+  border-color: rgba(45,122,58,.34);
+}
+
+/* ---- existing glyphs, given weight ----------------------------------------
+   Scoped to content areas. The nav is deliberately excluded: at 15–16px a
+   heavier stroke closes up the counters and the row starts to look shouty. */
+.page-sheet .card svg:not(.gt-ic-tile svg):not(.ddx-chev),
+.gt-scard svg,
+.gt-empty .ge-ic svg,
+.wc-ic svg {
+  stroke-width: 2;
+}
+
+/* Section heads inside cards: the glyph was the same size and weight as the
+   body copy beside it, so it read as punctuation rather than a marker. */
+.gt-scard .gsc-head svg { width: 18px; height: 18px; stroke-width: 2.2; color: var(--forest); }
+.gt-empty .ge-ic {
+  width: 54px; height: 54px; border-radius: 16px;
+  background: linear-gradient(150deg, rgba(200,241,53,.20), rgba(45,122,58,.12));
+  border: 1px solid rgba(45,122,58,.18);
+  color: var(--forest);
+  display: grid; place-items: center;
+}
+.gt-empty .ge-ic svg { width: 26px; height: 26px; stroke-width: 2; }
+
+/* ==========================================================================
+   ============ v42 — departments to the mockup · Manage menu ==============
+   ========================================================================== */
+
+/* ---- the directory grid ---- */
+/* Four across on a wide sheet, per the design. minmax with auto-fit rather
+   than a fixed four, so it degrades to 3/2/1 on the way down instead of
+   forcing a horizontal scroll. */
+.dept-grid { grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); gap: 16px; }
+
+.dept-card {
+  gap: 14px;
+  padding: 18px 18px 20px;
+  background: #fff;
+  border: 1px solid var(--gt-hair);
+  border-left: 1px solid var(--gt-hair);   /* the mockup has no accent stripe */
+  border-radius: 16px;
+  box-shadow: 0 2px 4px -2px rgba(15,46,34,.06);
+}
+.dept-card:hover {
+  border-color: rgba(45,122,58,.4);
+  box-shadow: 0 18px 38px -26px rgba(15,46,34,.45);
+  transform: translateY(-2px);
+}
+.dept-card .dc-top { gap: 13px; align-items: flex-start; }
+.dept-card .dc-name b { font-size: 16.5px; white-space: normal; line-height: 1.25; }
+.dept-card .dc-meta { font-size: 12.5px; }
+
+/* The wall button is the point of the card, so it is the solid lime one and
+   it spans the card rather than hugging its label. */
+.dept-card .dc-actions .abtn { width: 100%; justify-content: center; }
+.dept-card .dc-actions .abtn-primary { font-size: 13.5px; padding: 11px 14px; }
+
+/* A pending department keeps its amber edge — it is genuinely a different
+   state and the mockup has no equivalent to borrow from. */
+.dept-card.is-pending { border-left: 4px solid #C79A2B; }
+
+/* ---- search ---- */
+/* One rounded field with the button beside it, on its own card, per the
+   design. The input carries the magnifier inside it rather than outside. */
+.dept-search .fld-ic {
+  background: #F7F6F0;
+  border: 1px solid var(--gt-hair);
+  border-radius: 12px;
+  display: flex; align-items: stretch; overflow: hidden;
+}
+.dept-search .fld-ic > .fi-mark {
+  width: 44px; flex: none; display: grid; place-items: center;
+  color: var(--muted); background: transparent; border: 0;
+}
+.dept-search .fld-ic > .fi-mark svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+.dept-search input[type="search"] {
+  flex: 1 1 auto; min-width: 0;
+  border: 0 !important; background: transparent !important;
+  padding: 14px 16px 14px 0 !important; font-size: 15px;
+  box-shadow: none !important; outline: none;
+}
+.dept-search .fld-ic:focus-within { border-color: var(--forest); box-shadow: 0 0 0 3px rgba(45,122,58,.16); }
+
+/* ---- create form ---- */
+.dept-form { max-width: none; }
+.dept-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 6px 24px;
+  margin-bottom: 18px;
+}
+.fld-opt {
+  font-family: var(--mark); font-size: 10.5px; font-weight: 800;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); margin-left: 6px;
+  padding: 2px 7px; border-radius: 100px; background: rgba(15,46,34,.06);
+}
+
+/* The departments page is a sheet page, so its cards are cream on dark. The
+   create panel is the one place a form sits directly on a card here, and its
+   inputs need the same frame the wizard gives them. */
+.dept-form .fld-ic {
+  display: flex; align-items: stretch; position: relative;
+  background: #fff; border: 1px solid rgba(15,46,34,.15); border-radius: 11px;
+  overflow: visible;
+}
+.dept-form .fld-ic > .fi-mark {
+  position: static; transform: none;
+  width: 44px; height: auto; flex: none;
+  display: grid; place-items: center;
+  border-right: 1px solid rgba(15,46,34,.10);
+  background: rgba(15,46,34,.025);
+  color: rgba(15,46,34,.5);
+  border-radius: 10px 0 0 10px;
+  pointer-events: none;
+}
+.dept-form .fld-ic > .fi-mark svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+.dept-form .fld-ic > input,
+.dept-form .fld-ic > select {
+  flex: 1 1 auto; min-width: 0;
+  border: 0 !important; border-radius: 0 !important;
+  background: transparent !important;
+  padding: 14px 16px !important;
+  box-shadow: none !important; outline: none;
+}
+/* Same fix the wizard needed: the ddx widget replaces the select and must
+   fill the field, or two thirds of the control does nothing when clicked. */
+.dept-form .fld-ic > .ddx { flex: 1 1 auto; min-width: 0; }
+.dept-form .fld-ic > .ddx .ddx-btn {
+  width: 100%; border: 0; border-radius: 0; background: transparent;
+  box-shadow: none; padding: 14px 16px; font-size: 15px;
+}
+.dept-form .fld-ic:has(> .ddx.open),
+.dept-form .fld-ic:focus-within {
+  border-color: var(--forest); box-shadow: 0 0 0 3px rgba(45,122,58,.16);
+}
+.dept-form .hint { margin-top: 6px; }
+
+/* ---- the Manage dropdown ------------------------------------------------
+   It was a flat dark panel with two lines of text per row. Given the same
+   glyph tiles as everything else, the rows become scannable and the panel
+   stops looking like a context menu from another product. */
+.an-menu-panel {
+  min-width: 296px; padding: 8px;
+  border-radius: 16px;
+  background: linear-gradient(165deg, #14392655, var(--gt-deep-2));
+  border: 1px solid rgba(200,241,53,.16);
+  box-shadow: 0 34px 70px -28px rgba(0,0,0,.8);
+  backdrop-filter: blur(10px);
+}
+.an-menu-panel a {
+  flex-direction: row; align-items: center; gap: 12px;
+  padding: 11px 12px; border-radius: 11px;
+}
+.an-menu-panel a .mi-ic {
+  width: 34px; height: 34px; flex: none;
+  display: grid; place-items: center; border-radius: 10px;
+  background: rgba(200,241,53,.12);
+  border: 1px solid rgba(200,241,53,.2);
+  color: var(--lime);
+}
+.an-menu-panel a .mi-ic svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 2; }
+.an-menu-panel a .mi-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.an-menu-panel a:hover { background: rgba(200,241,53,.14); }
+.an-menu-panel a:hover .mi-ic { background: rgba(200,241,53,.24); border-color: rgba(200,241,53,.45); }
+.an-menu-panel a b { font-size: 14.5px; color: #fff; }
+.an-menu-panel a i { font-size: 12px; line-height: 1.35; }
+
+/* The base .fld-ic .fi-mark is position:absolute, so making the wrapper a
+   flex row is not enough — the icon stayed pinned over the input and landed
+   on top of the placeholder ("Sear(o)h departments"). It has to be returned
+   to the flow to become a flex item. Same reset the wizard field needed. */
+.dept-search .fld-ic > .fi-mark,
+.dept-form .fld-ic > .fi-mark {
+  position: static;
+  transform: none;
+  height: auto;
+}
+
+/* ==========================================================================
+   ============ v43 — photography in the app ===============================
+   ========================================================================== */
+
+/* The client's match-day shots were doing one job: side strips behind the
+   page sheet, at the very edge of vision. That is decoration. These give them
+   somewhere to actually be seen, on the screens where a photograph says
+   something the copy cannot — the moment an organisation goes live, the
+   screen where you invite your team, and the empty states that are otherwise
+   a sentence in a box. */
+
+.photo-banner {
+  position: relative;
+  min-height: 208px;
+  border-radius: 20px;
+  overflow: hidden;
+  display: flex; align-items: flex-end;
+  margin-bottom: 22px;
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: 0 30px 60px -34px rgba(0,0,0,.7);
+}
+.photo-banner.is-tall { min-height: 300px; }
+
+.photo-banner .pb-img {
+  position: absolute; inset: 0;
+  background-size: cover;
+  /* Framed low: these are phone shots where the subject sits below centre,
+     and a plain `center` crop cuts the heads off at banner ratios. */
+  background-position: center 32%;
+  transform: scale(1.02);      /* hides any edge softness from the resize */
+}
+.photo-banner .pb-scrim {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(180deg, rgba(7,22,15,.18) 0%, rgba(7,22,15,.62) 58%, rgba(7,22,15,.92) 100%),
+    linear-gradient(90deg, rgba(7,22,15,.55) 0%, rgba(7,22,15,0) 62%);
+}
+.photo-banner .pb-body {
+  position: relative; z-index: 1;
+  padding: clamp(20px, 3vw, 32px);
+  max-width: 640px;
+}
+.photo-banner.is-centred { align-items: center; justify-content: center; text-align: center; }
+.photo-banner.is-centred .pb-body { max-width: 620px; }
+
+.photo-banner .pb-eyebrow {
+  font-family: var(--mark); font-size: 11.5px; font-weight: 800;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--lime); margin-bottom: 8px;
+}
+.photo-banner .pb-head {
+  margin: 0; color: #fff;
+  font-family: var(--display, var(--mark)); font-weight: 800;
+  font-size: clamp(24px, 3.4vw, 34px); line-height: 1.1; letter-spacing: -.01em;
+}
+.photo-banner .pb-lead {
+  margin: 10px 0 0; color: rgba(255,255,255,.82);
+  font-size: 15.5px; line-height: 1.55;
+}
+.photo-banner .pb-slot { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+.photo-banner.is-centred .pb-slot { justify-content: center; }
+
+@media (max-width: 560px) {
+  .photo-banner { min-height: 180px; border-radius: 16px; }
+  .photo-banner.is-tall { min-height: 230px; }
+  /* On a narrow screen the horizontal half of the scrim does nothing but
+     darken the whole frame, so it goes and the vertical one carries it. */
+  .photo-banner .pb-scrim {
+    background: linear-gradient(180deg, rgba(7,22,15,.25) 0%, rgba(7,22,15,.7) 55%, rgba(7,22,15,.94) 100%);
+  }
+}
+
+/* ---- empty states get a photograph too ----------------------------------
+   A department directory with nothing in it, or a wall with no posts, was a
+   sentence in a bordered box. Same component, shorter, with the message on
+   it — so the first thing anyone sees on a brand new org still looks like
+   the product rather than an error. */
+.gt-empty.has-photo {
+  position: relative; overflow: hidden;
+  border: 0; border-radius: 18px;
+  min-height: 200px; padding: 0;
+  display: flex; align-items: flex-end;
+}
+.gt-empty.has-photo .ge-photo {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center 38%;
+}
+.gt-empty.has-photo .ge-scrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(7,22,15,.2), rgba(7,22,15,.88));
+}
+.gt-empty.has-photo > div { position: relative; z-index: 1; padding: 24px; }
+.gt-empty.has-photo h3 { color: #fff; }
+.gt-empty.has-photo p { color: rgba(255,255,255,.78); }
+.gt-empty.has-photo a { color: var(--lime); }

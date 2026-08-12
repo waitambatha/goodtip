@@ -249,3 +249,41 @@ class Charity(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class DepartmentType(models.Model):
+    """A ready-made department name, offered when someone creates a department
+    inside an organisation (e.g. Business → IT, Finance, People & Culture).
+
+    Scoped to a ``GroupType`` the same way ``SubCategory`` is, so a bank is
+    offered banking-shaped departments and a school is offered Year Levels
+    rather than a Warehouse. ``group_type`` NULL means "offer this to
+    everyone" — Finance and IT exist in almost every organisation, and
+    duplicating them under all five types would be a list to maintain in five
+    places.
+
+    A picker, never a constraint. The create form keeps a free-text field
+    beside this list, because the point of departments is that a big
+    organisation carves itself up the way IT ACTUALLY is, not the way a
+    dropdown assumed. The typed name is stored on the org as
+    ``department_label`` and no row is created here, so one team calling
+    itself "The Cave" does not pollute the list everybody else sees.
+    """
+
+    group_type = models.ForeignKey(
+        GroupType, on_delete=models.CASCADE, related_name="department_types",
+        null=True, blank=True,
+    )
+    name = models.CharField(max_length=80)
+    slug = models.SlugField(max_length=80)
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["sort_order", "name"]
+        # Same name may exist under different types (Education "Admin" is not
+        # Business "Admin"), so uniqueness is per type rather than global.
+        unique_together = [("group_type", "slug")]
+
+    def __str__(self):
+        return f"{self.group_type.name} → {self.name}" if self.group_type_id else self.name

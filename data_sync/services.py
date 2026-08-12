@@ -72,11 +72,18 @@ TEAM_SLUG_ALIASES = {
 
 
 def _normalise_team_name(name: str) -> str:
-    slug = slugify(name.replace("&", "and"))
+    # Squiggle publishes a fixture before both sides are known: finals slots and
+    # the pre-season round arrive with hteam/ateam as null, and the draw fills
+    # them in as qualifying games are played. That is normal feed data, not a
+    # fault, so the name has to be allowed to be missing rather than crashing
+    # the whole sync run on the first such row.
+    slug = slugify((name or "").replace("&", "and"))
     return TEAM_SLUG_ALIASES.get(slug, slug)
 
 
 def _resolve_team(series: Series, name: str, external_id: str = "") -> Team | None:
+    if not name:
+        return None
     slug = _normalise_team_name(name)
     if external_id:
         t = Team.objects.filter(series=series, external_id=external_id).first()
@@ -700,7 +707,441 @@ TheSportsAPISyncService = ApiSportsRugbySyncService
 def get_sync_service(competition: str) -> DataSyncService:
     comp = competition.upper()
     if comp == "AFL":
-        return SquiggleSyncService()
+        # Scraped from afl.com.au, not Squiggle. Squiggle is AFL only, so AFLW
+        # had no feed at all, and it rate-limits: it began returning 403 within
+        # minutes of traffic-driven syncing being enabled. SquiggleSyncService
+        # is still used for the ladder and can be swapped back in here.
+        return AflScrapeSyncService()
     if comp == "NRL":
-        return ApiSportsRugbySyncService()
+        # Scraped from nrl.com, not API-SPORTS. The API path needed a paid key
+        # that was never issued, so every NRL sync in this project's history
+        # failed with "APISPORTS_KEY is not set" and no NRL org ever had a
+        # fixture. ApiSportsRugbySyncService is kept below for reference and
+        # can be swapped back in by changing this one line if a key appears.
+        return NrlScrapeSyncService()
     raise SyncError(f"Unsupported competition: {competition}")
+
+
+# NRL nickNames that do not slugify to our Team slug. Only two of seventeen,
+# because nrl.com's nickName ("Sharks", "Cowboys") already matches how the
+# Team table slugs most clubs; these two are stored under their full name.
+NRL_SLUG_ALIASES = {
+    "broncos": "brisbane-broncos",
+    "raiders": "canberra-raiders",
+    # Canterbury-Bankstown are stored under the bare slug "bulldogs". This
+    # entry exists to STOP the AFL map being consulted for them: it maps
+    # "bulldogs" to Western Bulldogs, an AFL club, so every Canterbury game was
+    # being skipped as an unresolved team. Codes share nicknames, and a single
+    # global alias table cannot serve both.
+    "bulldogs": "bulldogs",
+}
+
+
+def _resolve_nrl_team(series: Series, nickname: str, external_id: str = "") -> Team | None:
+    """Team lookup for the scraped NRL feed.
+
+    Resolution is deliberately self-contained rather than delegating to
+    _resolve_team: that helper runs names through _normalise_team_name, which
+    applies the AFL alias map, and rugby league shares nicknames with Aussie
+    rules. Backfilling external_id from nrl.com's stable teamId is the useful
+    side effect — after one sync every club matches by id and the name mapping
+    stops mattering.
+    """
+    if not nickname:
+        return None
+
+    def _stamp(team):
+        if team and external_id and not team.external_id:
+            team.external_id = external_id
+            team.save(update_fields=["external_id"])
+        return team
+
+    if external_id:
+        t = Team.objects.filter(series=series, external_id=external_id).first()
+        if t:
+            return t
+    slug = slugify(nickname.replace("&", "and"))
+    slug = NRL_SLUG_ALIASES.get(slug, slug)
+    t = Team.objects.filter(series=series, slug=slug).first()
+    if t:
+        return _stamp(t)
+    # Full name, then a nickname that is the tail of the stored club name
+    # ("Dragons" inside "St. George Illawarra Dragons").
+    t = Team.objects.filter(series=series, name__iexact=nickname).first()
+    if t:
+        return _stamp(t)
+    return _stamp(Team.objects.filter(series=series, name__iendswith=nickname).first())
+
+
+class NrlScrapeSyncService:
+    """NRL, NRLW and State of Origin, from nrl.com's own draw page.
+
+    Replaces ApiSportsRugbySyncService, which could never run: the original
+    host had no DNS record, and its replacement needs a paid key that was
+    never issued. Every NRL sync in this project's history has failed with
+    "APISPORTS_KEY is not set".
+
+    One service instance per sync run holds one scraper, so its page cache and
+    its request pacing are shared across every org tipping the same round.
+
+    ``competition`` here is the catalog Competition name ("NRL"), while the
+    scraper works in Series ("NRL", "NRLW", "State of Origin"). One page load
+    per series per round covers all of them, which is why every method loops
+    the series rather than taking one.
+    """
+
+    #: Catalog Series this service covers, in the order they are synced.
+    SERIES = ["NRL", "NRLW", "State of Origin"]
+
+    def __init__(self):
+        from .scrapers.nrl import NrlDrawScraper
+        self._scraper = NrlDrawScraper()
+
+    def _check(self, competition: str) -> None:
+        if competition != "NRL":
+            raise SyncError("The nrl.com scraper handles the NRL competition only.")
+
+    def _series_rows(self, series_name: str, round_number: int, year: int) -> tuple[Series | None, list[dict]]:
+        from .scrapers.nrl import NrlScrapeError
+        series = Series.objects.filter(name=series_name).first()
+        if series is None:
+            return None, []
+        try:
+            rows = self._scraper.fixtures(
+                series=series_name.upper(), season=year, round_number=round_number,
+            )
+        except NrlScrapeError as e:
+            # One series failing (Origin has no round 24) must not abort the
+            # others, which are the ones anybody is tipping.
+            logger.info("nrl.com %s round %s: %s", series_name, round_number, e)
+            return series, []
+        return series, rows
+
+    def discover_rounds(self, *, competition: str, org: Organisation,
+                        horizon_days: int = 21, back_days: int = 3) -> list[int]:
+        self._check(competition)
+        from .scrapers.nrl import NrlScrapeError
+        found: set[int] = set()
+        for name in self.SERIES:
+            try:
+                found.update(self._scraper.rounds_in_window(
+                    series=name.upper(), season=org.season.year,
+                    horizon_days=horizon_days, back_days=back_days,
+                ))
+            except NrlScrapeError as e:
+                logger.info("nrl.com discover %s: %s", name, e)
+        return sorted(found)
+
+    def sync_fixtures(self, *, competition: str, round_number: int, org: Organisation) -> int:
+        self._check(competition)
+        year = org.season.year
+        n = 0
+        for name in self.SERIES:
+            series, rows = self._series_rows(name, round_number, year)
+            if not rows:
+                continue
+            round_obj, _ = Round.objects.get_or_create(
+                org=org, round_number=round_number, series=series,
+                defaults={
+                    "lockout_at": min(r["kickoff_at"] for r in rows),
+                    "status": "upcoming",
+                    "competition": Competition.for_series(series, org.season),
+                },
+            )
+            earliest = min(r["kickoff_at"] for r in rows)
+            if round_obj.lockout_at != earliest:
+                round_obj.lockout_at = earliest
+                round_obj.save(update_fields=["lockout_at"])
+            _ensure_round_competition(round_obj, series, org)
+
+            for r in rows:
+                home = _resolve_nrl_team(series, r["home_name"], r["home_external_id"])
+                away = _resolve_nrl_team(series, r["away_name"], r["away_external_id"])
+                if not home or not away:
+                    logger.warning(
+                        "Skip nrl.com game %s: unresolved teams %s/%s",
+                        r["external_id"], r["home_name"], r["away_name"],
+                    )
+                    continue
+                match = _resolve_match(round_obj, r["external_id"], home, away)
+                if match is None:
+                    Match.objects.create(
+                        round=round_obj, external_id=r["external_id"],
+                        home_team=home, away_team=away,
+                        kickoff_at=r["kickoff_at"],
+                        venue=r["venue"], venue_city=r["venue_city"],
+                    )
+                else:
+                    match.external_id = r["external_id"]
+                    match.home_team, match.away_team = home, away
+                    match.kickoff_at = r["kickoff_at"]
+                    match.venue, match.venue_city = r["venue"], r["venue_city"]
+                    match.save(update_fields=[
+                        "external_id", "home_team", "away_team",
+                        "kickoff_at", "venue", "venue_city",
+                    ])
+                n += 1
+        return n
+
+    def sync_live(self, *, competition: str, round_number: int, org: Organisation) -> int:
+        """In-play score and clock. Deliberately does NOT grade tips.
+
+        Same discipline as the AFL service: a score mid-game is provisional,
+        and grading on it would award points that a later correction takes
+        away. Grading happens once, in sync_results, when the game is over.
+        """
+        self._check(competition)
+        year = org.season.year
+        n = 0
+        for name in self.SERIES:
+            series, rows = self._series_rows(name, round_number, year)
+            if not rows:
+                continue
+            round_obj = Round.objects.filter(org=org, round_number=round_number, series=series).first()
+            if round_obj is None:
+                continue
+            for r in rows:
+                if r["status"] == "scheduled":
+                    continue
+                home = _resolve_nrl_team(series, r["home_name"], r["home_external_id"])
+                away = _resolve_nrl_team(series, r["away_name"], r["away_external_id"])
+                if not home or not away:
+                    continue
+                match = _resolve_match(round_obj, r["external_id"], home, away)
+                if match is None:
+                    continue
+                match.home_score = r["home_score"]
+                match.away_score = r["away_score"]
+                match.status = r["status"]
+                match.period = r["period"][:32]
+                match.clock = (r["clock"] or "")[:16]
+                match.live_updated_at = timezone.now()
+                match.save(update_fields=[
+                    "home_score", "away_score", "status", "period", "clock", "live_updated_at",
+                ])
+                n += 1
+        return n
+
+    def sync_results(self, *, competition: str, round_number: int, org: Organisation) -> int:
+        """Final scores, and the grading that follows from them."""
+        self._check(competition)
+        year = org.season.year
+        n = 0
+        for name in self.SERIES:
+            series, rows = self._series_rows(name, round_number, year)
+            if not rows:
+                continue
+            round_obj = Round.objects.filter(org=org, round_number=round_number, series=series).first()
+            if round_obj is None:
+                continue
+            for r in rows:
+                # Only a finished game grades. Anything else is provisional.
+                if r["status"] != "complete" or r["home_score"] is None:
+                    continue
+                home = _resolve_nrl_team(series, r["home_name"], r["home_external_id"])
+                away = _resolve_nrl_team(series, r["away_name"], r["away_external_id"])
+                if not home or not away:
+                    continue
+                match = _resolve_match(round_obj, r["external_id"], home, away)
+                if match is None:
+                    continue
+                match.status = "complete"
+                match.period = r["period"][:32]
+                match.save(update_fields=["status", "period"])
+                # Writes the scores, derives the result and regrades every tip
+                # on this match. Also flags an already-published recap for
+                # review if the score is a correction rather than a first
+                # result, which is why the scores go through here and are not
+                # written directly above.
+                record_match_result(match, int(r["home_score"]), int(r["away_score"]))
+                n += 1
+        return n
+
+    def sync_ladder(self, *, competition: str, org: Organisation, **kw) -> int:
+        """Not scraped yet.
+
+        The draw page carries no standings; they live on /ladder/ in a
+        different payload. Raising rather than returning 0 keeps the failure
+        visible in SyncRun instead of looking like a ladder with no movement.
+        """
+        self._check(competition)
+        raise SyncError(
+            "NRL ladder is not scraped yet — nrl.com serves standings from "
+            "/ladder/, which needs its own collector."
+        )
+
+
+class AflScrapeSyncService:
+    """AFL and AFLW from afl.com.au's own CFS API.
+
+    Replaces SquiggleSyncService. Squiggle worked, but it is AFL only, so AFLW
+    — one of the four codes GoodTip launches with — had no feed at all; and it
+    rate-limits, returning 403 within minutes of traffic-driven syncing being
+    enabled.
+
+    Structured like NrlScrapeSyncService: ``competition`` is the catalog
+    Competition name ("AFL"), while the scraper works in Series ("AFL",
+    "AFLW"), and each method loops the series because one round of one series
+    is one request.
+    """
+
+    SERIES = ["AFL", "AFLW"]
+
+    def __init__(self):
+        from .scrapers.afl import AflApiScraper
+        self._scraper = AflApiScraper()
+
+    def _check(self, competition: str) -> None:
+        if competition != "AFL":
+            raise SyncError("The afl.com.au scraper handles the AFL competition only.")
+
+    def _series_rows(self, series_name: str, round_number: int, year: int):
+        from .scrapers.afl import AflScrapeError
+        series = Series.objects.filter(name=series_name).first()
+        if series is None:
+            return None, []
+        try:
+            rows = self._scraper.fixtures(
+                series=series_name, season=year, round_number=round_number,
+            )
+        except AflScrapeError as e:
+            logger.info("afl.com.au %s round %s: %s", series_name, round_number, e)
+            return series, []
+        return series, rows
+
+    def discover_rounds(self, *, competition: str, org: Organisation,
+                        horizon_days: int = 21, back_days: int = 3) -> list[int]:
+        self._check(competition)
+        from .scrapers.afl import AflScrapeError
+        found: set[int] = set()
+        for name in self.SERIES:
+            try:
+                found.update(self._scraper.rounds_in_window(
+                    series=name, season=org.season.year,
+                    horizon_days=horizon_days, back_days=back_days,
+                ))
+            except AflScrapeError as e:
+                logger.info("afl.com.au discover %s: %s", name, e)
+        return sorted(found)
+
+    def sync_fixtures(self, *, competition: str, round_number: int, org: Organisation) -> int:
+        self._check(competition)
+        year = org.season.year
+        n = 0
+        for name in self.SERIES:
+            series, rows = self._series_rows(name, round_number, year)
+            if not rows:
+                continue
+            round_obj, _ = Round.objects.get_or_create(
+                org=org, round_number=round_number, series=series,
+                defaults={
+                    "lockout_at": min(r["kickoff_at"] for r in rows),
+                    "status": "upcoming",
+                    "competition": Competition.for_series(series, org.season),
+                },
+            )
+            earliest = min(r["kickoff_at"] for r in rows)
+            if round_obj.lockout_at != earliest:
+                round_obj.lockout_at = earliest
+                round_obj.save(update_fields=["lockout_at"])
+            _ensure_round_competition(round_obj, series, org)
+
+            for r in rows:
+                home = _resolve_team(series, r["home_name"], r["home_external_id"])
+                away = _resolve_team(series, r["away_name"], r["away_external_id"])
+                if not home or not away:
+                    logger.warning(
+                        "Skip afl.com.au game %s: unresolved teams %s/%s",
+                        r["external_id"], r["home_name"], r["away_name"],
+                    )
+                    continue
+                match = _resolve_match(round_obj, r["external_id"], home, away)
+                if match is None:
+                    Match.objects.create(
+                        round=round_obj, external_id=r["external_id"],
+                        home_team=home, away_team=away,
+                        kickoff_at=r["kickoff_at"],
+                        venue=r["venue"], venue_city=r["venue_city"],
+                    )
+                else:
+                    match.external_id = r["external_id"]
+                    match.home_team, match.away_team = home, away
+                    match.kickoff_at = r["kickoff_at"]
+                    match.venue, match.venue_city = r["venue"], r["venue_city"]
+                    match.save(update_fields=[
+                        "external_id", "home_team", "away_team",
+                        "kickoff_at", "venue", "venue_city",
+                    ])
+                n += 1
+        return n
+
+    def sync_live(self, *, competition: str, round_number: int, org: Organisation) -> int:
+        """In-play score. Does NOT grade — a mid-game score is provisional."""
+        self._check(competition)
+        year = org.season.year
+        n = 0
+        for name in self.SERIES:
+            series, rows = self._series_rows(name, round_number, year)
+            if not rows:
+                continue
+            round_obj = Round.objects.filter(org=org, round_number=round_number, series=series).first()
+            if round_obj is None:
+                continue
+            for r in rows:
+                if r["status"] == "scheduled":
+                    continue
+                home = _resolve_team(series, r["home_name"], r["home_external_id"])
+                away = _resolve_team(series, r["away_name"], r["away_external_id"])
+                if not home or not away:
+                    continue
+                match = _resolve_match(round_obj, r["external_id"], home, away)
+                if match is None:
+                    continue
+                match.home_score = r["home_score"]
+                match.away_score = r["away_score"]
+                match.status = r["status"]
+                match.period = r["period"][:32]
+                match.live_updated_at = timezone.now()
+                match.save(update_fields=[
+                    "home_score", "away_score", "status", "period", "live_updated_at",
+                ])
+                n += 1
+        return n
+
+    def sync_results(self, *, competition: str, round_number: int, org: Organisation) -> int:
+        self._check(competition)
+        year = org.season.year
+        n = 0
+        for name in self.SERIES:
+            series, rows = self._series_rows(name, round_number, year)
+            if not rows:
+                continue
+            round_obj = Round.objects.filter(org=org, round_number=round_number, series=series).first()
+            if round_obj is None:
+                continue
+            for r in rows:
+                if r["status"] != "complete" or r["home_score"] is None:
+                    continue
+                home = _resolve_team(series, r["home_name"], r["home_external_id"])
+                away = _resolve_team(series, r["away_name"], r["away_external_id"])
+                if not home or not away:
+                    continue
+                match = _resolve_match(round_obj, r["external_id"], home, away)
+                if match is None:
+                    continue
+                match.status = "complete"
+                match.period = r["period"][:32]
+                match.save(update_fields=["status", "period"])
+                record_match_result(match, int(r["home_score"]), int(r["away_score"]))
+                n += 1
+        return n
+
+    def sync_ladder(self, *, competition: str, org: Organisation, **kw) -> int:
+        """Still Squiggle's job.
+
+        The CFS ladder endpoint is behind the premium tier, and Squiggle's
+        standings work and are not what was rate-limiting us — the draw calls
+        were. Delegated rather than reimplemented.
+        """
+        self._check(competition)
+        return SquiggleSyncService().sync_ladder(competition=competition, org=org, **kw)

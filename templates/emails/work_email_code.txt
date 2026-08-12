@@ -1,0 +1,16 @@
+Your GoodTip verification code
+
+Someone is setting up a GoodTip tipping competition for {{ domain }} and gave
+this address as their work email. Enter the code below to confirm the address
+is yours.
+
+    {{ code }}
+
+This code expires in {{ minutes }} minutes.
+
+Were you not expecting this? You can safely ignore this email. Nothing is set
+up in your organisation's name unless this code is entered, and the code
+expires on its own.
+
+GoodTip will never ask you for this code by phone, text message, or in a reply
+to this email.

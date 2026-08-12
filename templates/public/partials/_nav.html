@@ -7,6 +7,13 @@ actually useful.
 The two auth actions sit in their own group with a divider. They are the only
 items that change your state rather than move you around, so grouping them by
 what they DO is more honest than leaving them as the last two of nine links.
+
+Each item carries a glyph. Four of these labels are near-neighbours at a
+glance — News, The Wall, The Good List, Charities are all "somewhere with a
+list of stuff on it" until you have read them — and the glyph is what tells
+them apart before you finish. The stylesheet drops the glyphs at the widths
+where the row has no room for them, so this markup is the full design and the
+narrow layouts are unchanged.
 {% endcomment %}
 <nav class="nav" data-open="false">
   <div class="nav-inner">
@@ -16,19 +23,19 @@ what they DO is more honest than leaving them as the last two of nine links.
     </button>
     <ul class="nav-links" id="nav-menu">
       {% if active != 'home' %}
-      <li><a href="/">Home</a></li>
+      <li><a href="/"><svg class="nav-ic" aria-hidden="true"><use href="#ic-home"/></svg><span>Home</span></a></li>
       {% endif %}
-      <li><a href="/how-it-works/" {% if active == 'how' %}aria-current="page"{% endif %}>How It Works</a></li>
-      <li><a href="/tell-the-boss/" {% if active == 'boss' %}aria-current="page"{% endif %}>Tell the Boss</a></li>
-      <li><a href="/news/" {% if active == 'news' %}aria-current="page"{% endif %}>News</a></li>
-      <li><a href="/wall/" {% if active == 'wall' %}aria-current="page"{% endif %}>The Wall</a></li>
-      <li><a href="/leaderboard/" {% if active == 'leaderboard' %}aria-current="page"{% endif %}>The Good List</a></li>
-      <li><a href="/#charities" {% if active == 'charities' %}aria-current="page"{% endif %}>Charities</a></li>
-      <li><a href="/pricing/" {% if active == 'pricing' %}aria-current="page"{% endif %}>Pricing</a></li>
+      <li><a href="/how-it-works/" {% if active == 'how' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-lifebuoy"/></svg><span>How It Works</span></a></li>
+      <li><a href="/tell-the-boss/" {% if active == 'boss' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-send"/></svg><span>Tell the Boss</span></a></li>
+      <li><a href="/news/" {% if active == 'news' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-doc"/></svg><span>News</span></a></li>
+      <li><a href="/wall/" {% if active == 'wall' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-msg"/></svg><span>The Wall</span></a></li>
+      <li><a href="/leaderboard/" {% if active == 'leaderboard' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-trophy"/></svg><span>The Good List</span></a></li>
+      <li><a href="/#charities" {% if active == 'charities' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-heart"/></svg><span>Charities</span></a></li>
+      <li><a href="/pricing/" {% if active == 'pricing' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-coins"/></svg><span>Pricing</span></a></li>
 
       <li class="nav-sep" aria-hidden="true"></li>
-      <li class="nav-auth"><a href="/login/" class="nav-login">Log in</a></li>
-      <li class="nav-auth"><a href="/signup/" class="btn-nav">Sign up free</a></li>
+      <li class="nav-auth"><a href="/login/" class="nav-login"><svg class="nav-ic" aria-hidden="true"><use href="#ic-login"/></svg><span>Log in</span></a></li>
+      <li class="nav-auth"><a href="/signup/" class="btn-nav"><svg class="nav-ic" aria-hidden="true"><use href="#ic-people"/></svg><span>Sign up free</span></a></li>
     </ul>
   </div>
 </nav>

@@ -60,7 +60,7 @@ anything happened at all.
       {% if inv.status == 'sent' %}
         Delivered. Nothing more for you to do — we'll add you to their comp the moment they create one.
       {% elif inv.status == 'joined' %}
-        {{ inv.boss_name|default:"They" }} signed up. As soon as they set up a competition you'll be added to it automatically.
+        {{ inv.boss_name|default:"They" }} signed up. As soon as they set up an organisation you'll be added to it automatically.
       {% else %}
         Done — you're a member of <b>{{ inv.org.name }}</b>.
         <a href="{% url 'dashboard' %}?org={{ inv.org.id }}">Open it &rarr;</a>

@@ -1,0 +1,22 @@
+{% comment %}
+Google Analytics 4.
+
+Gated on GA_MEASUREMENT_ID being set, which settings only populates when
+DEBUG is off. Local development therefore sends nothing: every page you load
+while building would otherwise land in the same property as real traffic, and
+a fortnight of that makes the numbers useless for the thing they exist for.
+Set GA_MEASUREMENT_ID in .env to turn it on anywhere, including locally, if
+you ever need to test the tag itself.
+
+Loaded async so it never blocks first paint, and it is the last thing in the
+head for the same reason.
+{% endcomment %}
+{% if GA_MEASUREMENT_ID %}
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ GA_MEASUREMENT_ID }}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', '{{ GA_MEASUREMENT_ID }}');
+</script>
+{% endif %}

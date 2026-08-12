@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "orgs",
     "tipping",
     "data_sync",
+    "matchreader",
     "admin_panel",
     "billing",
 ]
@@ -65,10 +66,20 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "orgs.context_processors.user_orgs",
                 "orgs.context_processors.contact_form",
+                "goodtip.context_processors.analytics",
             ],
         },
     },
 ]
+
+# --- Google Analytics 4 -----------------------------------------------------
+# Empty means the tag does not render at all. Defaulted OFF in development so
+# that building the site does not fill the property with your own page views;
+# put GA_MEASUREMENT_ID in .env to force it on anywhere.
+GA_MEASUREMENT_ID = os.environ.get(
+    "GA_MEASUREMENT_ID",
+    "" if DEBUG else "G-ESB1RHRW49",
+)
 
 WSGI_APPLICATION = "goodtip.wsgi.application"
 

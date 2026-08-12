@@ -48,13 +48,28 @@ NRL_TEAMS = [
 
 NRLW_EXCLUDED_SLUGS = {"dolphins", "sea-eagles", "storm", "panthers", "rabbitohs"}
 
+# State of Origin is two representative sides, not clubs, and it was the one
+# series seeded with no teams at all. The scraper found the fixtures and then
+# skipped every one of them ("unresolved teams Maroons/Blues") because there
+# was nothing to attach them to.
+#
+# The slugs are the nickNames nrl.com publishes, so they resolve without an
+# alias. The names carry the state because "Blues" alone is ambiguous to
+# anyone outside rugby league, and this label is what a tipper reads on the
+# fixture card.
+ORIGIN_TEAMS = [
+    ("Queensland Maroons", "maroons"),
+    ("New South Wales Blues", "blues"),
+]
+
 
 class Command(BaseCommand):
     help = "Seed AFL/AFLW/NRL/NRLW teams. Idempotent."
 
     def handle(self, *args, **options):
-        comp = {c.name: c for c in Series.objects.filter(name__in=("AFL", "AFLW", "NRL", "NRLW"))}
-        missing = {"AFL", "AFLW", "NRL", "NRLW"} - set(comp)
+        wanted = ("AFL", "AFLW", "NRL", "NRLW", "State of Origin")
+        comp = {c.name: c for c in Series.objects.filter(name__in=wanted)}
+        missing = set(wanted) - set(comp)
         if missing:
             self.stderr.write(self.style.ERROR(
                 f"Missing series {sorted(missing)}. Run migrations first."
@@ -81,7 +96,14 @@ class Command(BaseCommand):
                     series=comp["NRLW"], slug=slug, defaults={"name": name},
                 )
                 created += int(was_created)
-        totals = {c: Team.objects.filter(series=comp[c]).count() for c in ("AFL", "AFLW", "NRL", "NRLW")}
+        for name, slug in ORIGIN_TEAMS:
+            _, was_created = Team.objects.update_or_create(
+                series=comp["State of Origin"], slug=slug, defaults={"name": name},
+            )
+            created += int(was_created)
+        totals = {c: Team.objects.filter(series=comp[c]).count() for c in wanted}
         self.stdout.write(self.style.SUCCESS(
-            f"Seed complete. New: {created}. Totals → AFL={totals['AFL']} AFLW={totals['AFLW']} NRL={totals['NRL']} NRLW={totals['NRLW']}"
+            f"Seed complete. New: {created}. Totals → AFL={totals['AFL']} "
+            f"AFLW={totals['AFLW']} NRL={totals['NRL']} NRLW={totals['NRLW']} "
+            f"Origin={totals['State of Origin']}"
         ))

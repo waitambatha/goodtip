@@ -2,15 +2,24 @@
 {# clear side imagery, no wash — rotates through the client's shots, leading with the code this group actually tips #}
 <div class="page-scenes" aria-hidden="true">
   {% if primary_sport == "Rugby League" %}
+  {% comment %}
+  The client's own match-day photographs lead the rugby league rotation. They
+  are the real thing — a player at the fence, a ground filling at dusk, a
+  scoreboard at full time — where the stock shots they sit beside are
+  generic. Portraits go in the side strips, which are tall and narrow, and
+  the landscapes carry the wider slots.
+  {% endcomment %}
   <div class="scene left">
-    <div class="shot on" style="background-image:url('{% static 'img/scenes/nrl-goal-posts.jpg' %}')"></div>
+    <div class="shot on" style="background-image:url('{% static 'img/scenes/nrl-ground-dusk.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-player-fence.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-goal-posts.jpg' %}')"></div>
     <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-ball-grass.jpg' %}')"></div>
-    <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
   </div>
   <div class="scene right">
-    <div class="shot on" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
+    <div class="shot on" style="background-image:url('{% static 'img/scenes/nrl-players-fans.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-warmup.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-scoreboard.jpg' %}')"></div>
     <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-posts-sunset.jpg' %}')"></div>
-    <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
   </div>
   {% else %}
   <div class="scene left">

@@ -4,7 +4,7 @@ from uuid import uuid4
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import models
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -15,6 +15,7 @@ from django.utils.timesince import timesince
 from django.views.decorators.http import require_POST
 
 from accounts.views import JOIN_INVITER_SESSION_KEY, JOIN_SESSION_KEY
+from catalog.models import DepartmentType
 from .forms import InviteByEmailForm, OrgCreateForm
 from .notifications import send_org_invites
 from .models import (
@@ -28,14 +29,22 @@ from .models import (
     Organisation,
 )
 from .services import (
+    active_work_verification,
     add_member,
+    apply_verification_to_org,
     approve_membership_request,
+    resend_work_email_code,
+    start_work_email_verification,
     can_lock_fundraising,
     cast_charity_ballot,
     close_charity_vote,
+    approve_department,
     close_due_elections,
     create_charity_election,
+    create_department,
+    decline_department,
     decline_membership_request,
+    departments_for,
     demote_child_org_admin,
     lock_fundraising_to_self,
     open_due_elections,
@@ -79,15 +88,37 @@ def _invitees(request, org):
     )
 
 
-def _requested_parent(request):
-    """The top-level org a child is being created under (§2's second path),
-    from ?parent= on GET or the posted form value on re-renders. None for the
-    standalone default case (§1) or any invalid/child id."""
-    pid = request.POST.get("parent") or request.GET.get("parent")
-    if not pid:
+def _parent_for(user, pid):
+    """Resolve a department's parent org, or None.
+
+    Three things have to hold, and only the first two used to be checked:
+    the id has to be real, the org has to be top-level (§3 — two levels, so a
+    department cannot have departments), and THE USER HAS TO RUN IT.
+
+    That last one was missing. `?parent=` was read straight off the query
+    string and trusted, so any signed-in user could append the id of any
+    organisation on the platform and create a department inside it — becoming
+    its admin, appearing in that org's Manage screen, and rolling their totals
+    into that org's national figure. Nothing in the wizard asked whether they
+    had ever heard of the place. Departments are the feature that makes that
+    reachable from the UI, so the check lands with it.
+    """
+    if not pid or not str(pid).isdigit():
         return None
-    return Organisation.objects.filter(parent__isnull=True, pk__in=[pid]).first() \
-        if str(pid).isdigit() else None
+    org = Organisation.objects.filter(parent__isnull=True, pk=pid).first()
+    if org is None or not _can_manage(user, org):
+        return None
+    return org
+
+
+def _requested_parent(request):
+    """The top-level org a department is being created under (§2's second
+    path), from ?parent= on GET or the posted form value on re-renders. None
+    for the standalone default case (§1), for an invalid or child id, or when
+    the user does not manage the org they named."""
+    return _parent_for(
+        request.user, request.POST.get("parent") or request.GET.get("parent")
+    )
 
 
 # The create form, cut into steps. Each entry is (number, label, field names).
@@ -95,19 +126,32 @@ def _requested_parent(request):
 # step — validation itself stays entirely in OrgCreateForm, so there is one
 # source of truth for the rules and the wizard just decides what to show when.
 # (number, label, sub-label, fields). The sub-label is what the rail shows under
-# the step name — "Your group" alone does not tell you whether the step wants a
-# name or a whole charity policy, and the rail is the only place someone can see
-# what is still ahead of them before committing to start.
+# the step name — "Your organisation" alone does not tell you whether the step
+# wants a name or a whole charity policy, and the rail is the only place someone
+# can see what is still ahead of them before committing to start.
 WIZARD_STEPS = [
-    (1, "Your group", "Basic details",
+    (1, "Your organisation", "Basic details",
      ["name", "group_type", "sub_categories", "informal_label", "state"]),
-    (2, "The tipping", "Scoring & rules",
+    # Step 2 owns no form fields: it is the work-email check, and it is held in
+    # its own table rather than in the draft's JSON because a hashed code with
+    # an expiry, an attempt count and a send count is not a form value. It sits
+    # here, straight after the name, so nobody fills in three more screens
+    # before finding out they cannot prove the organisation is theirs.
+    (2, "Verify", "Prove it's yours", []),
+    (3, "The tipping", "Scoring & rules",
      ["competitions", "season", "team_size", "finals_only"]),
-    (3, "The charity", "Choose a cause",
+    (4, "The charity", "Choose a cause",
      ["charity_method", "charity", "new_charity_name",
       "new_charity_url", "vote_charities"]),
-    (4, "Review", "Check & create", []),
+    (5, "Review", "Check & create", []),
 ]
+VERIFY_STEP = 2
+
+# Types that have a work domain to prove. A book club or a cycling crew has no
+# organisational domain and never will, so requiring one would block exactly the
+# groups the Informal type exists for. They skip the step; everyone whose whole
+# claim is "I represent this employer" does not.
+VERIFY_REQUIRED_SLUGS = {"business", "education", "charities"}
 LAST_STEP = WIZARD_STEPS[-1][0]
 # Fields the browser posts as a list rather than a single value.
 WIZARD_MULTI_FIELDS = {"sub_categories", "competitions", "vote_charities"}
@@ -118,6 +162,23 @@ WIZARD_BOOLEAN_FIELDS = {"finals_only"}
 
 def _wizard_fields(step: int) -> list:
     return next((f for n, _, _sub, f in WIZARD_STEPS if n == step), [])
+
+
+def _verification_required(draft) -> bool:
+    """Does this draft have to prove a work domain before it can go on?
+
+    Read off the type chosen at step one. Unknown or unset counts as NOT
+    required: a draft that has not reached the question yet must not be
+    blocked by it, and the gate is re-evaluated on every submit, so choosing
+    Business later still brings the requirement with it.
+    """
+    from catalog.models import GroupType
+
+    gt_id = draft.data.get("group_type")
+    if not gt_id or not str(gt_id).isdigit():
+        return False
+    slug = GroupType.objects.filter(pk=gt_id).values_list("slug", flat=True).first()
+    return slug in VERIFY_REQUIRED_SLUGS
 
 
 LOGO_MAX_BYTES = 5 * 1024 * 1024
@@ -231,6 +292,91 @@ def create_org_view(request):
                 request, draft, form, step, parent_org, errors=errors,
             )
 
+        # ---- the verify step ----------------------------------------------
+        # Its own actions, and its own gate. Handled before the form path
+        # because it owns no form fields at all: the state lives in
+        # WorkEmailVerification, which is the only place a hashed code with an
+        # expiry and an attempt count can honestly live.
+        if step == VERIFY_STEP:
+            row = active_work_verification(request.user)
+
+            if action == "send_code":
+                try:
+                    row = start_work_email_verification(
+                        user=request.user,
+                        role=request.POST.get("role", ""),
+                        domain=request.POST.get("domain", ""),
+                        email=request.POST.get("work_email", ""),
+                    )
+                    messages.success(request, f"Code sent to {row.email}. It expires in 15 minutes.")
+                    return redirect("orgs:create")
+                except ValueError as e:
+                    # Render rather than redirect, so the message can sit under
+                    # the field that caused it AND the other two keep what was
+                    # typed. A redirect would empty the form and leave one
+                    # anonymous banner above three blank boxes.
+                    field = getattr(e, "field", None)
+                    return _render_wizard(
+                        request, draft, _draft_form(draft, parent_org, bound=False),
+                        step, parent_org,
+                        verify_error={"field": field, "message": str(e)},
+                        verify_values={
+                            "role": request.POST.get("role", ""),
+                            "domain": request.POST.get("domain", ""),
+                            "work_email": request.POST.get("work_email", ""),
+                        },
+                    )
+
+            if action == "resend_code":
+                try:
+                    resend_work_email_code(row) if row else None
+                    messages.success(request, "Another code is on its way.")
+                except ValueError as e:
+                    messages.error(request, str(e))
+                return redirect("orgs:create")
+
+            if action == "change_email":
+                # Abandon the current check so the form comes back blank. The
+                # row is unverified by definition here, so nothing is lost.
+                if row and not row.is_verified:
+                    row.delete()
+                return redirect("orgs:create")
+
+            if action == "verify_code":
+                if row is None:
+                    messages.error(request, "Send yourself a code first.")
+                elif row.is_verified:
+                    pass                                  # already through
+                elif row.verify(request.POST.get("code", "")):
+                    messages.success(request, f"{row.domain} verified. Nice one.")
+                    draft.step = step + 1
+                    draft.save()
+                    return redirect("orgs:create")
+                elif row.attempts >= row.MAX_ATTEMPTS:
+                    messages.error(
+                        request,
+                        "That's too many wrong codes. Send yourself a fresh one to try again.",
+                    )
+                else:
+                    left = row.MAX_ATTEMPTS - row.attempts
+                    messages.error(
+                        request,
+                        f"That code isn't right. {left} attempt{'s' if left != 1 else ''} left, "
+                        "or send yourself a new one.",
+                    )
+                return redirect("orgs:create")
+
+            if action == "next":
+                if _verification_required(draft) and not (row and row.is_verified):
+                    messages.error(
+                        request,
+                        "Verify a work email at your organisation's domain before you go on.",
+                    )
+                    return redirect("orgs:create")
+                draft.step = step + 1
+                draft.save()
+                return redirect("orgs:create")
+
         form = _draft_form(draft, parent_org, bound=True)
         errors = _step_errors(form, step)
         if not errors and step < LAST_STEP:
@@ -256,6 +402,12 @@ def create_org_view(request):
                     request, draft, form, step, parent_org, duplicates=duplicates,
                 )
             org = form.save()
+            org.created_by = request.user
+            org.save(update_fields=["created_by"])
+            # Carry the work-email check onto the org it was done for. Belt and
+            # braces on the gate above: an org whose type does not require
+            # verification still records one if its creator did it anyway.
+            apply_verification_to_org(org, active_work_verification(request.user))
             # Anyone who talked this person into starting a comp gets added to
             # it automatically — see accounts.boss for the three-step flow.
             from accounts.boss import complete_boss_invites
@@ -310,10 +462,14 @@ def create_org_view(request):
 
 
 def _parent_from_draft(draft):
-    pid = draft.data.get("parent")
-    if not pid or not str(pid).isdigit():
-        return None
-    return Organisation.objects.filter(parent__isnull=True, pk=pid).first()
+    """Same three checks as _requested_parent, re-run every time.
+
+    A draft survives for as long as the user leaves it, so the permission it
+    was started under is not evidence of the permission they have now — an
+    admin who is removed from the parent between opening the wizard and
+    finishing it must not still be creating departments inside it.
+    """
+    return _parent_for(draft.user, draft.data.get("parent"))
 
 
 def _draft_form(draft, parent_org, *, bound: bool) -> OrgCreateForm:
@@ -327,7 +483,8 @@ def _draft_form(draft, parent_org, *, bound: bool) -> OrgCreateForm:
     return OrgCreateForm(data) if bound else OrgCreateForm(initial=data)
 
 
-def _render_wizard(request, draft, form, step, parent_org, *, errors=None, duplicates=None):
+def _render_wizard(request, draft, form, step, parent_org, *, errors=None, duplicates=None,
+                   verify_error=None, verify_values=None):
     steps = [
         {"n": n, "label": label, "sub": sub,
          "done": n < draft.step, "current": n == step,
@@ -347,6 +504,15 @@ def _render_wizard(request, draft, form, step, parent_org, *, errors=None, dupli
         "duplicates": duplicates,
         "summary": _draft_summary(form, draft) if step == LAST_STEP else None,
         "draft_saved_label": _saved_label(draft),
+        # Verify step state. Cheap enough to always provide: the template only
+        # reads it on step 2, and computing it conditionally would mean the
+        # "verified" tick could not show on the review step.
+        "verification": active_work_verification(request.user),
+        "verify_required": _verification_required(draft),
+        "verify_step": VERIFY_STEP,
+        # {"field": "domain"|"work_email"|"role"|None, "message": str}
+        "verify_error": verify_error,
+        "verify_values": verify_values or {},
         # Built here rather than as {{ MEDIA_URL }}{{ path }} in the template:
         # that only works if the media context processor happens to be enabled,
         # and storage backends are free to serve from somewhere else entirely.
@@ -1535,3 +1701,154 @@ def notification_open(request, note_id: int):
     from django.http import HttpResponse
 
     return HttpResponse("")
+
+
+# ---------------------------------------------------------------------------
+# Departments
+# ---------------------------------------------------------------------------
+
+
+# Department name or type -> a glyph that means something. Matched on the
+# words people actually use, so a department called "IT Support" and one of
+# type "IT" get the same mark. Ordered: the first hit wins, so the specific
+# terms sit above the general ones.
+_DEPARTMENT_ICONS = [
+    # "product" sits above the IT rule: a Product team matched "dev" and got
+    # the same sliders glyph as IT, which defeats the point of per-type icons.
+    (("product", "design", "ux"), "ic-spark"),
+    (("it", "tech", "engineering", "developer", "dev", "data", "analytics"), "ic-sliders"),
+    (("finance", "account", "payroll", "procurement", "treasury"), "ic-coins"),
+    (("people", "hr", "culture", "recruit", "talent"), "ic-users"),
+    (("sales", "business development", "account management"), "ic-trend"),
+    (("marketing", "brand", "comms", "communications", "media"), "ic-spark"),
+    (("legal", "risk", "compliance", "governance"), "ic-shield"),
+    (("customer", "service", "support", "call centre", "helpdesk"), "ic-lifebuoy"),
+    (("warehouse", "logistics", "depot", "supply", "field"), "ic-org"),
+    (("retail", "store", "branch", "floor"), "ic-flag"),
+    (("exec", "executive", "leadership", "board", "committee"), "ic-shield-star"),
+    (("teach", "faculty", "student", "year level", "school"), "ic-cap"),
+    (("volunteer", "fundraising", "program", "partnership"), "ic-heart"),
+    (("admin", "operations", "ops"), "ic-target"),
+    (("night", "shift", "crew", "team"), "ic-clock"),
+]
+
+
+def _department_icon(dept) -> str:
+    """A glyph for a department, from its type or its name.
+
+    Falls back to the generic org mark rather than guessing: a wrong icon is
+    worse than a neutral one, because it says something untrue about the team.
+    """
+    haystack = " ".join(filter(None, [
+        (dept.department_type.name if dept.department_type_id else ""),
+        dept.department_label or "",
+        dept.name or "",
+    ])).lower()
+    for words, icon in _DEPARTMENT_ICONS:
+        if any(w in haystack for w in words):
+            return icon
+    return "ic-org"
+
+
+@login_required
+def departments_view(request, org_id: int):
+    """The department directory: find yours, join it, or start it.
+
+    Open to every member of the organisation, not just admins. That is the
+    whole point — in an organisation big enough to need departments, the
+    person who knows which one you belong to is you.
+    """
+    org = get_object_or_404(Organisation, pk=org_id)
+    root = org.root
+    if not _is_member(request.user, root) and not _is_member(request.user, org):
+        return HttpResponseForbidden()
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+
+        if action == "create":
+            dept_type = None
+            raw_type = request.POST.get("department_type") or ""
+            if raw_type.isdigit():
+                dept_type = DepartmentType.objects.filter(pk=raw_type, is_active=True).first()
+            try:
+                dept = create_department(
+                    root,
+                    name=request.POST.get("name", ""),
+                    by_user=request.user,
+                    department_type=dept_type,
+                    department_label=request.POST.get("department_label", ""),
+                )
+                if dept.is_pending_approval:
+                    messages.success(
+                        request,
+                        f"{dept.name} has been sent to {root.name}'s admins to approve. "
+                        "You'll get a notification when they decide.",
+                    )
+                else:
+                    messages.success(request, f"{dept.name} is live. Invite your team.")
+            except ValueError as e:
+                messages.error(request, str(e))
+            return redirect("orgs:departments", org_id=root.pk)
+
+        # Everything below is an admin decision on a pending department.
+        dept = get_object_or_404(Organisation, pk=request.POST.get("dept_id"), parent=root)
+        if not _can_manage(request.user, root):
+            return HttpResponseForbidden()
+        if action == "approve":
+            approve_department(dept, by_user=request.user)
+            messages.success(request, f"{dept.name} is live.")
+        elif action == "decline":
+            name = dept.name
+            try:
+                decline_department(dept, by_user=request.user)
+                messages.info(request, f"{name} was declined.")
+            except ValueError as e:
+                messages.error(request, str(e))
+        return redirect("orgs:departments", org_id=root.pk)
+
+    q = (request.GET.get("q") or "").strip()
+    depts = departments_for(root, include_pending_for=request.user)
+    if q:
+        depts = depts.filter(
+            Q(name__icontains=q)
+            | Q(department_label__icontains=q)
+            | Q(department_type__name__icontains=q)
+        )
+
+    # One query for "which of these am I already in", rather than one per row.
+    my_dept_ids = set(
+        OrgMember.objects.filter(user=request.user, org__parent=root)
+        .values_list("org_id", flat=True)
+    )
+    pending_join_ids = set(
+        MembershipRequest.objects.filter(
+            user=request.user, org__parent=root,
+            status=MembershipRequest.STATUS_PENDING,
+        ).values_list("org_id", flat=True)
+    )
+
+    rows = []
+    for d in depts.annotate(member_count=Count("members", distinct=True)).order_by("name"):
+        rows.append({
+            "org": d,
+            "is_member": d.pk in my_dept_ids,
+            "join_pending": d.pk in pending_join_ids,
+            "awaiting_approval": d.is_pending_approval,
+            "icon": _department_icon(d),
+        })
+
+    # The picker: types for this org's business type, plus the ones offered to
+    # everyone. Ordered so the general ones do not bury the specific ones.
+    type_choices = DepartmentType.objects.filter(is_active=True).filter(
+        Q(group_type__isnull=True) | Q(group_type=root.group_type_id)
+    ).order_by("group_type__id", "sort_order", "name")
+
+    return render(request, "orgs/departments.html", {
+        "org": root,
+        "rows": rows,
+        "q": q,
+        "type_choices": type_choices,
+        "is_admin": _can_manage(request.user, root),
+        "pending_count": sum(1 for r in rows if r["awaiting_approval"]),
+    })

@@ -24,7 +24,7 @@
   <div class="hero-veil" aria-hidden="true"></div>
   <span class="pill"><span class="dot"></span>Finals start August 28 &middot; Are you in?</span>
   <h1>Footy tipping <em>that does good.</em></h1>
-  <p class="hero-sub">Your team tips the games. The entry fees go to charity. Your group picks which one.</p>
+  <p class="hero-sub">You tip. GoodTip gives. Your group picks the charity, and tipping is free for everyone playing.</p>
   <div class="hero-ctas">
     <a href="/how-it-works/" class="btn-ghost">How it works</a>
     <a href="/#start" class="btn-primary">Set up your group &rarr;</a>
@@ -35,9 +35,12 @@
     <div class="sb-cell">
       <div class="sb-ring" data-ring>
         <svg viewBox="0 0 86 86"><circle class="track" cx="43" cy="43" r="36"/><circle class="bar" cx="43" cy="43" r="36"/></svg>
-        <span class="pct" data-countto="100" data-suffix="%">0%</span>
+        {# was a 100% donation stat. The model doc forbids stating any donation
+           percentage, so the ring carries a non-financial fact instead: what a
+           participant pays, which is nothing. #}
+        <span class="pct">FREE</span>
       </div>
-      <div class="sb-label">of entry fees to charity</div>
+      <div class="sb-label">to play, for every participant</div>
     </div>
     <div class="sb-cell">
       <div class="sb-num" data-countto="23" data-suffix="+">0</div>
@@ -80,11 +83,11 @@
 <section class="section on-cream">
   <div class="wrap">
     <h2 class="section-heading reveal">Every other tipping comp ends the same way.</h2>
-    <p class="section-sub reveal">Someone wins the money. Everyone else waits until next year. With GoodTip, the money never sits in a prize pool &mdash; it goes to the charity your group voted for before the season started.</p>
+    <p class="section-sub reveal">Someone wins the money. Everyone else waits until next year. With GoodTip nobody puts money in at all. Your organisation pays one platform fee, and GoodTip gives a share of it to the charity your group picks.</p>
     <div class="compare-frame reveal">
       <div class="compare-col col-them">
         <div class="compare-header"><div class="lab">Right now</div><h3>Your current footy tipping</h3></div>
-        <div class="compare-cell"><span class="cell-icon icon-no">&times;</span>Entry fee goes to the winner</div>
+        <div class="compare-cell"><span class="cell-icon icon-no">&times;</span>Everyone chips in, one person collects</div>
         <div class="compare-cell"><span class="cell-icon icon-no">&times;</span>Zero ESG or CSR value</div>
         <div class="compare-cell"><span class="cell-icon icon-no">&times;</span>Nothing to show for it</div>
         <div class="compare-cell"><span class="cell-icon icon-no">&times;</span>No engagement data</div>
@@ -92,14 +95,14 @@
       </div>
       <div class="compare-col col-us">
         <div class="compare-header"><div class="lab">With GoodTip</div><h3>Same comp. Better outcome.</h3></div>
-        <div class="compare-cell"><span class="cell-icon icon-yes">&check;</span>Entry fee goes to the charity the group chose</div>
+        <div class="compare-cell"><span class="cell-icon icon-yes">&check;</span>Free to play, and GoodTip gives to your charity</div>
         <div class="compare-cell"><span class="cell-icon icon-yes">&check;</span>Measurable impact, reportable</div>
         <div class="compare-cell"><span class="cell-icon icon-yes">&check;</span>Impact Report at season end</div>
         <div class="compare-cell"><span class="cell-icon icon-yes">&check;</span>Participation data every round</div>
         <div class="compare-cell"><span class="cell-icon icon-yes">&check;</span>A community story worth telling</div>
       </div>
     </div>
-    <div class="compare-callout reveal"><span class="mark">&ldquo;</span><p>Your group still tips every round. The leaderboard still runs. The result on Saturday still matters. The only difference: when the season ends, the entry fees go to the charity they voted for at the start. <strong>Same ritual. The money just goes somewhere good.</strong></p></div>
+    <div class="compare-callout reveal"><span class="mark">&ldquo;</span><p>Your group still tips every round. The leaderboard still runs. The result on Saturday still matters. The only difference: nobody has to put a cent in for any of it to count. <strong>Same ritual. Something good comes out the other end.</strong></p></div>
   </div>
 </section>
 
@@ -110,7 +113,7 @@
     <h2 class="section-heading reveal">Same game. Different stakes.</h2>
     <p class="section-sub reveal">Three steps. One season. A donation your group made together &mdash; without anyone having to organise a fundraiser.</p>
     <div class="step-flow reveal" data-flow>
-      <div class="step s1"><span class="step-num">Step 01</span><div class="step-icon"><svg class="cic" style="stroke:#0F2E22"><use href="#ic-users"/></svg></div><h3>Set up your group. Run the Charity Vote.</h3><p>Name it. Invite your team. Set the entry fee. No payment until you're ready to go. While your group fills, run the Charity Vote.</p></div>
+      <div class="step s1"><span class="step-num">Step 01</span><div class="step-icon"><svg class="cic" style="stroke:#0F2E22"><use href="#ic-users"/></svg></div><h3>Set up your group. Run the Charity Vote.</h3><p>Name it. Invite your team. No payment until you're ready to go. While your group fills, run the Charity Vote.</p></div>
       <div class="flow-conn" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></div>
       <div class="step s2"><span class="step-num">Step 02</span><div class="step-icon"><svg class="cic" style="stroke:#0F2E22"><use href="#ic-clock"/></svg></div><h3>Tip and track.</h3><p>AFL. AFLW. NRL. NRLW. Weekly tips. Live leaderboard. Running charity total. State of Origin tips worth four points. Finals worth two.</p></div>
       <div class="flow-conn" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></div>
@@ -127,8 +130,8 @@
     <h2 class="section-heading reveal">Your community already tips. Now it does something with it.</h2>
     <p class="section-sub reveal">Tipping comps are the best community engagement tool in Australian sport. GoodTip keeps all of that and adds one thing: somewhere worth going when the season ends.</p>
     <div class="grid-3 reveal" data-cards>
-      <div class="for-card"><span class="for-tag">Workplaces</span><h3>A culture tool your team actually enjoys.</h3><p>Your team tips every round. The entry fees go to a charity they voted for. At season end you get an Impact Report with a real number your board can cite. It sits in culture budgets. It belongs in ESG reporting. And people actually look forward to it.</p><a href="/#start" class="for-link">Get started &rarr;</a></div>
-      <div class="for-card"><span class="for-tag">Sporting clubs</span><h3>Run a season-long comp for members.</h3><p>Your members already tip. GoodTip gives it somewhere to land. Entry fees go to the cause your club votes for. The leaderboard runs all season. The money is real at the end of it.</p><a href="/#start" class="for-link">Get started &rarr;</a></div>
+      <div class="for-card"><span class="for-tag">Workplaces</span><h3>A culture tool your team actually enjoys.</h3><p>Your team tips every round, free. GoodTip gives to the charity they voted for. At season end you get an Impact Report with a real number your board can cite. It sits in culture budgets. It belongs in ESG reporting. And people actually look forward to it.</p><a href="/#start" class="for-link">Get started &rarr;</a></div>
+      <div class="for-card"><span class="for-tag">Sporting clubs</span><h3>Run a season-long comp for members.</h3><p>Your members already tip. GoodTip gives it somewhere to land. Your club picks the cause and GoodTip gives to it. The leaderboard runs all season. The giving is real at the end of it.</p><a href="/#start" class="for-link">Get started &rarr;</a></div>
       <div class="for-card"><span class="for-tag">Community groups</span><h3>Bring people together around the footy.</h3><p>Tipping already happens. GoodTip makes it count. Your community votes for the charity, tips the games, and raises real money for a cause they chose themselves. Something worth coming back for every round.</p><a href="/#start" class="for-link">Get in touch &rarr;</a></div>
     </div>
   </div>
@@ -316,8 +319,8 @@
       <p class="section-sub" style="margin-bottom:0;">The honest answers, up front. Anything else &mdash; just ask.</p>
     </div>
     <div class="reveal">
-      <div class="faq-item" data-open="true"><button class="faq-q"><span><span class="qn">01</span> Is this gambling?</span><span class="qx"></span></button><div class="faq-a">No. There is no prize pool. Entry fees go to charity, not back to participants. GoodTip is not a gambling service.</div></div>
-      <div class="faq-item"><button class="faq-q"><span><span class="qn">02</span> How does GoodTip make money?</span><span class="qx"></span></button><div class="faq-a">Your organisation pays the subscription. Every dollar of the entry fee goes to the charity your group voted for. Nothing skimmed off the top.</div></div>
+      <div class="faq-item" data-open="true"><button class="faq-q"><span><span class="qn">01</span> Is this gambling?</span><span class="qx"></span></button><div class="faq-a">No. Participants never pay anything and never receive anything. There is no entry fee, no prize pool and no money of yours in play at any point. GoodTip is not a gambling service.</div></div>
+      <div class="faq-item"><button class="faq-q"><span><span class="qn">02</span> How does GoodTip make money?</span><span class="qx"></span></button><div class="faq-a">Your organisation pays one platform fee. GoodTip gives a share of that fee to the charity your group picks, from its own revenue. Tipping is free for every participant. It always will be.</div></div>
       <div class="faq-item"><button class="faq-q"><span><span class="qn">03</span> Who picks the charity?</span><span class="qx"></span></button><div class="faq-a">Your group does. Everyone nominates. Everyone votes. Majority wins. That's where the money goes.</div></div>
       <div class="faq-item"><button class="faq-q"><span><span class="qn">04</span> Which sports are included?</span><span class="qx"></span></button><div class="faq-a">AFL, AFLW, NRL, and NRLW at launch. Four codes, all season. Women's competitions come with the men's &mdash; same price either way. More in 2027.</div></div>
       <div class="faq-item"><button class="faq-q"><span><span class="qn">05</span> How does donation matching work?</span><span class="qx"></span></button><div class="faq-a">Your organisation sets a base pledge and a matching cap at the start of the season. Participants can add voluntary top-ups. Your organisation matches those dollar for dollar, up to the cap. The running total is visible all season; at the end, the full amount goes to the chosen charity.</div></div>

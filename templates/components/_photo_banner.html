@@ -1,0 +1,37 @@
+{% load static %}
+{% comment %}
+A full-bleed photograph with content sitting on it.
+
+Built as a component because the same shape kept being wanted in five places
+and each would otherwise have grown its own slightly different version. Takes:
+
+    image     path under static/, e.g. "img/scenes/nrl-players-fans.jpg"
+    eyebrow   small label above the heading (optional)
+    heading   the line that carries the moment
+    lead      a sentence under it (optional)
+    tall      "1" for a taller banner where the photo is the point
+    align     "center" to centre the text; default is left
+
+Two rules the photos forced:
+
+  * A SCRIM, always. These are real match-day phone shots, not art-directed
+    plates: the sky in one is bright dusk, another is a lit scoreboard at
+    night. White text over the raw image is legible on some and not on
+    others, and "some" is not a standard. The gradient runs dark at the
+    bottom where the text sits and lifts toward the top so the photo still
+    reads as a photo.
+
+  * object-position on the focal point rather than a bare cover. A crowd shot
+    cropped to its centre is a photo of somebody's shoulder; these are framed
+    low, so the subject survives the crop at banner ratios.
+{% endcomment %}
+<div class="photo-banner{% if tall %} is-tall{% endif %}{% if align == 'center' %} is-centred{% endif %}">
+  <div class="pb-img" style="background-image:url('{% static image %}')" aria-hidden="true"></div>
+  <div class="pb-scrim" aria-hidden="true"></div>
+  <div class="pb-body">
+    {% if eyebrow %}<div class="pb-eyebrow">{{ eyebrow }}</div>{% endif %}
+    <h2 class="pb-head">{{ heading }}</h2>
+    {% if lead %}<p class="pb-lead">{{ lead }}</p>{% endif %}
+    {% if slot %}<div class="pb-slot">{{ slot }}</div>{% endif %}
+  </div>
+</div>

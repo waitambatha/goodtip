@@ -3,7 +3,7 @@ import logging
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -185,7 +185,7 @@ def _notify_join_request_in_app(req: MembershipRequest) -> None:
             f"You've asked to join {req.org.name}. An admin there reviews every "
             "request, so it may take a little while. We'll let you know here as "
             "soon as they've had a look — once you're in you can tip each round, "
-            "climb the ladder and help pick the charity your group raises for."
+            "climb the ladder and help pick the charity your organisation raises for."
         ),
         link_url="/dashboard/",
     )
@@ -394,7 +394,7 @@ def close_charity_vote(vote: CharityVote):
     if winner is not None:
         title = f"{winner.name} won your charity vote"
         body = (
-            f"{vote.org.name} has chosen {winner.name}. Everything your group "
+            f"{vote.org.name} has chosen {winner.name}. Everything your organisation "
             "raises from here goes to them — thanks for having your say."
         )
     else:
@@ -502,7 +502,7 @@ def schedule_charity_election(vote: CharityVote, *, when, close_at=None, message
         kind=Notification.KIND_ELECTION_SCHEDULED,
         title=f"Charity vote coming up — {vote.org.name}",
         message=(
-            f"Your group is about to choose the charity it raises for this season. "
+            f"Your organisation is about to choose the charity it raises for this season. "
             f"Voting opens {opens}"
             + (f" and closes {closes}" if closes else "")
             # em dash, not a full stop: the localised time already ends in one
@@ -543,7 +543,7 @@ def open_charity_election(vote: CharityVote) -> CharityVote:
     members = list(vote.org.members.select_related("user"))
     title = f"Charity election open — {vote.org.name}"
     body = vote.admin_message or (
-        "Your group is choosing where this season's money goes. Cast your vote!"
+        "Your organisation is choosing where this season's money goes. Cast your vote!"
     )
     link = f"/leagues/{vote.org_id}/charity-vote/"
     Notification.objects.bulk_create([
@@ -628,3 +628,355 @@ def close_due_elections(orgs=None) -> int:
         except Exception:  # noqa: BLE001 — one bad vote must not block the rest
             logger.exception("Failed to close election %s", vote.pk)
     return n
+
+
+# ---------------------------------------------------------------------------
+# Departments
+# ---------------------------------------------------------------------------
+#
+# A department is a child org, named for what it is to the people in it. The
+# point is scale: in a bank of 20,000 nobody knows who they are tipping
+# against, and a single leaderboard of 20,000 is not a community. Twelve people
+# in IT who eat lunch together is.
+#
+# Everything but the name and the type is inherited from the parent. A
+# department does not re-answer which codes it tips, which season it is in, or
+# which charity it raises for, because those are the organisation's answers and
+# a department that could contradict them would fragment the roll-up the parent
+# exists to produce. That is also why creating one is a two-field form and not
+# the four-step wizard a top-level org goes through.
+
+
+def create_department(parent, *, name, by_user, department_type=None, department_label=""):
+    """Create a department under ``parent``.
+
+    Who is asking decides whether it is live or a request. An admin of the
+    parent creates it outright; anyone else raises it for approval, because
+    the alternative is any of 20,000 staff being able to mint official-looking
+    sub-groups of the organisation unchecked.
+
+    Either way the creator becomes the department's admin. They are the person
+    who wanted it to exist and who knows who belongs in it, and a department
+    nobody can administer is worse than no department.
+    """
+    from .models import Organisation, OrgMember
+
+    name = (name or "").strip()
+    if not name:
+        raise ValueError("Give the department a name.")
+    if parent.parent_id:
+        # Two levels only. Guarded here as well as in Organisation.clean()
+        # because this path builds the org in code and never runs full_clean.
+        raise ValueError("Departments sit under a top-level organisation, not under another department.")
+
+    is_admin = OrgMember.objects.filter(
+        user=by_user, org=parent, role__in=[OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH],
+    ).exists()
+
+    if Organisation.objects.filter(parent=parent, name__iexact=name).exists():
+        raise ValueError(f"{parent.name} already has a department called {name}.")
+
+    with transaction.atomic():
+        dept = Organisation.objects.create(
+            parent=parent,
+            name=name,
+            department_type=department_type,
+            department_label=(department_label or "").strip(),
+            created_by=by_user,
+            approval_status=(
+                Organisation.APPROVAL_APPROVED if is_admin else Organisation.APPROVAL_PENDING
+            ),
+            approved_at=timezone.now() if is_admin else None,
+            approved_by=by_user if is_admin else None,
+            # Inherited, never re-asked.
+            group_type=parent.group_type,
+            state=parent.state,
+            season=parent.season,
+            charity=parent.charity,
+            finals_only=parent.finals_only,
+        )
+        dept.competitions.set(parent.competitions.all())
+        add_member(by_user, dept, role=OrgMember.ROLE_BOTH)
+
+    if dept.is_pending_approval:
+        _notify_department_request(dept)
+    return dept
+
+
+def _notify_department_request(dept) -> None:
+    """Tell the parent's admins there is a department waiting on them."""
+    admins = org_admin_users(dept.parent)
+    if not admins:
+        return
+    who = getattr(dept.created_by, "display_name", "A member")
+    notify(
+        admins,
+        kind="department_request",
+        title=f"New department: {dept.name}",
+        message=f"{who} wants to start {dept.name} inside {dept.parent.name}. Approve it to make it visible to everyone.",
+        link_url=f"/leagues/{dept.parent_id}/departments/",
+        org=dept.parent,
+    )
+
+
+def approve_department(dept, *, by_user):
+    """Approve a pending department and tell the person who asked for it."""
+    if not dept.approve(by_user=by_user):
+        return dept          # already approved; someone got there first
+    if dept.created_by_id:
+        notify(
+            [dept.created_by],
+            kind="department_approved",
+            title=f"{dept.name} is live",
+            message=f"Your department inside {dept.parent.name} was approved. Invite your team and start tipping.",
+            link_url=f"/leagues/{dept.pk}/wall/",
+            org=dept,
+        )
+    return dept
+
+
+def decline_department(dept, *, by_user):
+    """Decline a pending department.
+
+    The row is deleted rather than kept in a declined state. A department that
+    was never approved has no members but its creator, no tips and no history,
+    so there is nothing to preserve, and leaving rejected rows behind would put
+    ghost departments in the very directory this feature exists to keep clean.
+    Declining is only ever offered while the department is still pending.
+    """
+    from .models import Organisation, OrgMember
+
+    if dept.approval_status != Organisation.APPROVAL_PENDING:
+        raise ValueError("That department has already been approved.")
+
+    parent_name, dept_name, creator = dept.parent.name, dept.name, dept.created_by
+    with transaction.atomic():
+        OrgMember.objects.filter(org=dept).delete()
+        dept.competitions.clear()
+        dept.sub_categories.clear()
+        dept.delete()
+
+    if creator:
+        notify(
+            [creator],
+            kind="department_declined",
+            title=f"{dept_name} wasn't approved",
+            message=f"An admin of {parent_name} declined the request. Have a word with them if you think it should exist.",
+            org=None,
+        )
+    return True
+
+
+def departments_for(org, *, include_pending_for=None):
+    """The departments of an org, for showing in the directory.
+
+    Pending ones are hidden from the membership at large. Two people see them:
+    an admin of the parent, who has to decide on them, and the member who
+    raised the request, so their own department does not silently vanish while
+    it waits.
+    """
+    from .models import Organisation, OrgMember
+
+    root = org.root
+    qs = Organisation.objects.filter(parent=root).select_related("department_type", "created_by")
+
+    if include_pending_for is None:
+        return qs.filter(approval_status=Organisation.APPROVAL_APPROVED)
+
+    is_admin = OrgMember.objects.filter(
+        user=include_pending_for, org=root,
+        role__in=[OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH],
+    ).exists()
+    if is_admin:
+        return qs
+    return qs.filter(
+        Q(approval_status=Organisation.APPROVAL_APPROVED)
+        | Q(created_by=include_pending_for)
+    )
+
+
+# ---------------------------------------------------------------------------
+# Work-email / domain verification
+# ---------------------------------------------------------------------------
+#
+# The claim being checked is "this organisation is mine to create". The
+# evidence is a code delivered to a mailbox at the organisation's own domain.
+# That is not proof of employment and it is not meant to be. It is proof that
+# whoever is asking can read mail inside the organisation, which is the
+# strongest thing obtainable without a human in the loop, and it is enough to
+# stop a stranger registering a bank.
+
+
+# Domains anyone can get an address at in thirty seconds. An address here
+# proves you hold a mailbox and nothing whatsoever about where you work, so
+# the whole check would be theatre. Deliberately a denylist and not an
+# allowlist: we cannot enumerate every legitimate company domain on earth, but
+# we can name the handful that carry no signal.
+PUBLIC_EMAIL_DOMAINS = {
+    "gmail.com", "googlemail.com", "yahoo.com", "yahoo.com.au", "ymail.com",
+    "hotmail.com", "hotmail.co.uk", "hotmail.com.au", "outlook.com",
+    "outlook.com.au", "live.com", "live.com.au", "msn.com", "icloud.com",
+    "me.com", "mac.com", "aol.com", "proton.me", "protonmail.com",
+    "gmx.com", "mail.com", "zoho.com", "yandex.com", "fastmail.com",
+    "bigpond.com", "bigpond.net.au", "optusnet.com.au", "iinet.net.au",
+    "tpg.com.au", "internode.on.net", "westnet.com.au",
+    # Throwaway services. Not exhaustive, and not trying to be: this is a
+    # speed bump for the lazy, not a defence against the determined.
+    "mailinator.com", "guerrillamail.com", "10minutemail.com",
+    "tempmail.com", "trashmail.com", "yopmail.com", "sharklasers.com",
+}
+
+
+class VerificationError(ValueError):
+    """A verification problem that knows which field caused it.
+
+    Every one of these used to surface as the same anonymous flash at the top
+    of the page: three inputs on screen, one red banner, and no indication of
+    which box to fix. ``field`` is what lets the form mark the offending input
+    and put the sentence underneath it, which is where someone is already
+    looking when they get it wrong.
+    """
+
+    def __init__(self, message, field=None):
+        super().__init__(message)
+        self.field = field
+
+
+def normalise_domain(raw: str) -> str:
+    """Reduce whatever someone typed to a bare hostname, or raise ValueError.
+
+    People paste "https://www.acme.com.au/careers", type "ACME.COM.AU", or
+    give their email address instead. All three mean the same domain and all
+    three should be accepted, because rejecting them teaches nothing and
+    costs a signup.
+    """
+    value = (raw or "").strip().lower()
+    if not value:
+        raise VerificationError("Enter your organisation's website domain, e.g. acme.com.au", "domain")
+    if "@" in value:                      # they pasted an email address
+        value = value.rsplit("@", 1)[1]
+    for prefix in ("https://", "http://", "//"):
+        if value.startswith(prefix):
+            value = value[len(prefix):]
+    value = value.split("/")[0].split("?")[0].split("#")[0]
+    value = value.split(":")[0]           # strip any port
+    if value.startswith("www."):
+        value = value[4:]
+    value = value.strip(".")
+
+    if "." not in value or len(value) > 253:
+        raise VerificationError(f"\u201c{raw.strip()}\u201d isn't a domain we recognise. Enter just the domain, like acme.com.au", "domain")
+    labels = value.split(".")
+    if any(not l or len(l) > 63 for l in labels):
+        raise ValueError(f"'{raw.strip()}' doesn't look like a domain. Try something like acme.com.au")
+    allowed = set("abcdefghijklmnopqrstuvwxyz0123456789-")
+    if any(set(l) - allowed or l.startswith("-") or l.endswith("-") for l in labels):
+        raise ValueError(f"'{raw.strip()}' doesn't look like a domain. Try something like acme.com.au")
+    return value
+
+
+def email_domain(email: str) -> str:
+    return (email or "").strip().lower().rsplit("@", 1)[-1]
+
+
+def start_work_email_verification(*, user, role, domain, email):
+    """Issue and send a code to a work address at ``domain``.
+
+    Every rule that matters is here rather than in the view, so the HTTP layer
+    cannot be bypassed into skipping one.
+    """
+    from .models import WorkEmailVerification
+
+    role = (role or "").strip()
+    if not role:
+        raise VerificationError("Tell us your role, e.g. Operations Manager. It helps our team know who we are dealing with.", "role")
+
+    domain = normalise_domain(domain)
+    email = (email or "").strip().lower()
+    if "@" not in email:
+        raise VerificationError("Enter the work email address we should send your code to.", "work_email")
+
+    at = email_domain(email)
+    if domain in PUBLIC_EMAIL_DOMAINS:
+        raise VerificationError(
+            f"{domain} is a public email provider, not an organisation's domain. "
+            "Anyone can get an address there, so it can't show where you work. "
+            "Enter the domain from your organisation's website instead.",
+            "domain",
+        )
+    if at in PUBLIC_EMAIL_DOMAINS:
+        raise VerificationError(
+            f"{at} is a public email provider. Use your work address at "
+            f"{domain} so we can confirm you're inside the organisation.",
+            "work_email",
+        )
+
+    # The address must live AT the claimed domain, or at a subdomain of it
+    # (mail.acme.com.au, au.acme.com are the same organisation). Without this
+    # the domain field would be a free-text label with no evidence behind it.
+    if at != domain and not at.endswith("." + domain):
+        raise VerificationError(
+            f"This address is at {at}, but you said your organisation's domain is "
+            f"{domain}. They need to match. Either use an address ending in "
+            f"@{domain}, or correct the domain above.",
+            "work_email",
+        )
+
+    row, code = WorkEmailVerification.issue(user=user, role=role, domain=domain, email=email)
+    _send_work_email_code(row, code)
+    return row
+
+
+def resend_work_email_code(row):
+    """Send a fresh code for an existing check, if the limits allow it."""
+    if row.is_verified:
+        raise ValueError("That address is already verified.")
+    if row.sends >= row.MAX_SENDS:
+        raise ValueError(
+            "That's the last code we can send to this address. Check your spam folder, "
+            "or start again with a different address."
+        )
+    if not row.can_resend:
+        raise ValueError(f"Hang on {row.resend_wait_seconds} seconds before asking for another code.")
+    code = row.reissue()
+    _send_work_email_code(row, code)
+    return row
+
+
+def _send_work_email_code(row, code: str) -> None:
+    from django.template.loader import render_to_string
+
+    ctx = {"code": code, "domain": row.domain, "email": row.email,
+           "minutes": int(row.TTL.total_seconds() // 60)}
+    try:
+        send_mail(
+            subject=f"{code} is your GoodTip verification code",
+            message=render_to_string("emails/work_email_code.txt", ctx),
+            html_message=render_to_string("emails/work_email_code.html", ctx),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[row.email],
+            fail_silently=False,
+        )
+    except Exception:
+        # The row is already saved. Logging rather than raising means a
+        # provider hiccup does not destroy a code the user may yet receive,
+        # and Resend is one click away on the screen they are already on.
+        logger.exception("work email code send failed for %s", row.email)
+
+
+def active_work_verification(user):
+    """This user's current check, verified or not. None if they never started."""
+    from .models import WorkEmailVerification
+    return WorkEmailVerification.objects.filter(user=user).order_by("-created_at").first()
+
+
+def apply_verification_to_org(org, row) -> None:
+    """Stamp a completed check onto the organisation it was done for."""
+    if not row or not row.is_verified:
+        return
+    org.domain = row.domain
+    org.contact_role = row.role
+    org.domain_verified_at = row.verified_at
+    org.save(update_fields=["domain", "contact_role", "domain_verified_at"])
+    row.org = org
+    row.save(update_fields=["org"])

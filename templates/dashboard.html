@@ -176,8 +176,8 @@ stacking context, so a strip rendered inside it paints over the sheet.
 <!-- comp picker + create -->
 <div class="dash-ctl">
   <form method="get" action="" class="dc-pick">
-    <span class="dc-lab">Your competition</span>
-    <select name="org" id="dashOrg" aria-label="Choose a competition" onchange="this.form.submit()">
+    <span class="dc-lab">Your organisation</span>
+    <select name="org" id="dashOrg" aria-label="Choose an organisation" onchange="this.form.submit()">
       {% for oc in cards %}
       <option value="{{ oc.org.id }}" {% if oc.org.id == c.org.id %}selected{% endif %}>
         {{ oc.org.name }}{% if oc.tips_total %} — {{ oc.tips_done }} of {{ oc.tips_total }} matches tipped{% endif %}
@@ -186,8 +186,19 @@ stacking context, so a strip rendered inside it paints over the sheet.
     </select>
     <noscript><button type="submit" class="abtn abtn-dark abtn-sm">Go</button></noscript>
   </form>
+  {% comment %}
+  Departments, for everyone. This is the control an ordinary member needs most
+  and the one they had no route to: the organisation they joined might have
+  twenty thousand people in it, and the twelve they actually want to tip
+  against are in their own department. Sits beside the org picker because it
+  belongs to the org you have selected, not to the platform.
+  {% endcomment %}
+  <a href="{% url 'orgs:departments' c.org.root.id %}" class="abtn abtn-ghost abtn-xl">
+    <svg style="width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.9;" aria-hidden="true"><use href="#ic-org"/></svg>
+    Departments
+  </a>
   <a href="{% url 'orgs:search' %}" class="abtn abtn-ghost abtn-xl">Find a group</a>
-  <a href="{% url 'orgs:create' %}" class="abtn abtn-primary abtn-xl">+ Create a competition</a>
+  <a href="{% url 'orgs:create' %}" class="abtn abtn-primary abtn-xl">+ Create an organisation</a>
 </div>
 
 <!-- selected comp -->

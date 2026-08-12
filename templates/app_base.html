@@ -17,6 +17,7 @@
   <script src="{% static 'js/gt-busy.js' %}" defer></script>
   <script src="{% static 'js/gt-confirm.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
+  {% include "partials/_analytics.html" %}
 </head>
 <body class="app gt-v2 {% block body_class %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   {% include "public/partials/_icons.html" %}
@@ -57,14 +58,20 @@
   <nav class="app-nav">
     <div class="an-inner">
       <a href="{% url 'dashboard' %}" class="an-brand">GOOD<span>TIP</span></a>
-      {% if primary_org %}<span class="an-org">{{ primary_org.name }}</span>{% endif %}
+      {# truncates with an ellipsis when the row is tight — the title carries the rest #}
+      {% if primary_org %}<span class="an-org" title="{{ primary_org.name }}">{{ primary_org.name }}</span>{% endif %}
       <div class="an-links">
-        <a href="{% url 'dashboard' %}" class="{% block nav_dash %}{% endblock %}">Dashboard</a>
+        <a href="{% url 'dashboard' %}" class="{% block nav_dash %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-home"/></svg><span>Dashboard</span></a>
         {% if primary_org %}
-          <a href="{% url 'tipping:my_tips' primary_org.id %}" class="{% block nav_tips %}{% endblock %}">My Tips</a>
-          <a href="{% url 'tipping:leaderboard' primary_org.id %}" class="{% block nav_board %}{% endblock %}">Leaderboard</a>
-          <a href="{% url 'tipping:ladder' primary_org.id %}" class="{% block nav_ladder %}{% endblock %}">Ladder</a>
-          <a href="{% url 'orgs:wall' primary_org.id %}" class="{% block nav_wall %}{% endblock %}">The Wall</a>
+          {% comment %}
+          Glyphs, for the same reason the public bar has them: Leaderboard and
+          Ladder are one letter apart at a glance and mean opposite things —
+          how the members are going versus how the clubs are going.
+          {% endcomment %}
+          <a href="{% url 'tipping:my_tips' primary_org.id %}" class="{% block nav_tips %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-vote"/></svg><span>My Tips</span></a>
+          <a href="{% url 'tipping:leaderboard' primary_org.id %}" class="{% block nav_board %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-trophy"/></svg><span>Leaderboard</span></a>
+          <a href="{% url 'tipping:ladder' primary_org.id %}" class="{% block nav_ladder %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-chart"/></svg><span>Ladder</span></a>
+          <a href="{% url 'orgs:wall' primary_org.id %}" class="{% block nav_wall %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-msg"/></svg><span>The Wall</span></a>
           {% comment %}
           Admin-only, and only two items: Members is the hub for everything to
           do with people (invites, join requests, roles), and Season summary is
@@ -80,24 +87,35 @@
           {% endcomment %}
           <div class="an-menu" data-anmenu>
             <button type="button" class="an-menu-btn {% block nav_manage %}{% endblock %}" aria-expanded="false" aria-haspopup="true">
-              Manage
+              <svg class="an-ic" aria-hidden="true"><use href="#ic-sliders"/></svg>
+              <span>Manage</span>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
             </button>
             <div class="an-menu-panel" hidden>
               <a href="{% url 'orgs:members' primary_org.id %}">
-                <b>Members</b><i>Invites, join requests and roles</i>
+                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-users"/></svg></span>
+                <span class="mi-txt"><b>Members</b><i>Invites, join requests and roles</i></span>
               </a>
+              {# departments live under a top-level org only — two levels, no nesting #}
+              {% if not primary_org.parent_id %}
+              <a href="{% url 'orgs:departments' primary_org.id %}">
+                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-org"/></svg></span>
+                <span class="mi-txt"><b>Departments</b><i>Sites, branches and teams under you</i></span>
+              </a>
+              {% endif %}
               <a href="{% url 'billing:season_summary' primary_org.id %}">
-                <b>Season summary</b><i>Entries, donations and totals</i>
+                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-coins"/></svg></span>
+                <span class="mi-txt"><b>Season summary</b><i>Entries, donations and totals</i></span>
               </a>
               <a href="{% url 'orgs:charity_vote' primary_org.id %}">
-                <b>Charity election</b><i>Set it up, or see how the vote is going</i>
+                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-heart"/></svg></span>
+                <span class="mi-txt"><b>Charity election</b><i>Set it up, or see how the vote is going</i></span>
               </a>
             </div>
           </div>
           {% endif %}
         {% endif %}
-        {% if user.is_staff %}<a href="{% url 'manage:overview' %}" class="{% block nav_admin %}{% endblock %}">Admin</a>{% endif %}
+        {% if user.is_staff %}<a href="{% url 'manage:overview' %}" class="{% block nav_admin %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-shield"/></svg><span>Admin</span></a>{% endif %}
       </div>
       <div class="an-right">
         <div class="an-bell" id="anBell">
@@ -123,10 +141,17 @@
             </div>
           </div>
         </div>
-        <a href="{% url 'profile' %}" class="an-profile" title="Profile">{% if user.avatar %}<span class="an-avatar has-img"><img src="{{ user.avatar.url }}" alt=""></span>{% else %}<span class="an-avatar">{{ user.display_name|slice:":1"|upper }}</span>{% endif %}<span class="an-plabel">Profile</span></a>
-        <span class="an-divider"></span>
-        <a href="{% url 'accounts:logout' %}" class="an-logout" title="Log out"><svg><use href="#ic-logout"/></svg><span class="an-llabel">Log out</span></a>
-        <button class="an-burger" aria-label="Menu" data-sheet-open><svg><use href="#ic-menu"/></svg></button>
+        {% comment %}
+        Three icon buttons on one rhythm — notifications, you, and the way out.
+        Each is the same round 40px target with the same hover, so the corner
+        reads as one set of controls instead of a bell, then a pill, then a
+        second differently-shaped pill. The labels live in title/aria-label:
+        an avatar and a door are both unambiguous at this size, and the words
+        were costing the row ~90px that the link bar needed.
+        {% endcomment %}
+        <a href="{% url 'profile' %}" class="an-iconbtn an-profile" title="Profile" aria-label="Profile">{% if user.avatar %}<span class="an-avatar has-img"><img src="{{ user.avatar.url }}" alt=""></span>{% else %}<span class="an-avatar">{{ user.display_name|slice:":1"|upper }}</span>{% endif %}</a>
+        <a href="{% url 'accounts:logout' %}" class="an-iconbtn an-logout" title="Log out" aria-label="Log out"><svg aria-hidden="true"><use href="#ic-logout"/></svg></a>
+        <button class="an-burger" aria-label="Menu" aria-expanded="false" aria-controls="appSheet" data-sheet-open><svg><use href="#ic-menu"/></svg></button>
       </div>
     </div>
   </nav>
@@ -174,18 +199,49 @@
   {% endif %}
   {% endblock %}
 
-  {# ---- mobile sheet ---- #}
+  {% comment %}
+  ---- mobile sheet ----
+  The drawer is the whole bar once the row is gone, so it carries the whole
+  bar: Ladder and the three Manage destinations were only ever reachable from
+  the desktop row, which left an admin on a phone with no way to their own
+  members list. Log out sits apart at the bottom for the same reason it is
+  grouped apart on the desktop bar — it is the one item that undoes you.
+  {% endcomment %}
   <div class="app-sheet" id="appSheet">
-    <div class="sheet-panel">
-      <a href="{% url 'dashboard' %}">Dashboard</a>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-label="Menu">
+      {% comment %}
+      The header answers "who am I and which org am I in" — the two things the
+      bar says on a desktop and cannot fit on a phone, which is why the account
+      cluster steps off the bar at this width instead of being crushed into two
+      unlabelled taps beside the burger.
+      {% endcomment %}
+      <div class="sheet-head">
+        <a href="{% url 'profile' %}" class="sheet-me">
+          {% if user.avatar %}<span class="an-avatar has-img"><img src="{{ user.avatar.url }}" alt=""></span>{% else %}<span class="an-avatar">{{ user.display_name|slice:":1"|upper }}</span>{% endif %}
+          <span class="sheet-me-txt">
+            <b>{{ user.display_name }}</b>
+            {% if primary_org %}<i>{{ primary_org.name }}</i>{% endif %}
+          </span>
+        </a>
+        {# ic-cross is the medical plus, not a dismiss glyph — this one is its own #}
+        <button type="button" class="sheet-x" aria-label="Close menu" data-sheet-close><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      </div>
+      <a href="{% url 'dashboard' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-home"/></svg><span>Dashboard</span></a>
       {% if primary_org %}
-        <a href="{% url 'tipping:my_tips' primary_org.id %}">My Tips</a>
-        <a href="{% url 'tipping:leaderboard' primary_org.id %}">Leaderboard</a>
-        <a href="{% url 'orgs:wall' primary_org.id %}">The Wall</a>
+        <a href="{% url 'tipping:my_tips' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-vote"/></svg><span>My Tips</span></a>
+        <a href="{% url 'tipping:leaderboard' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-trophy"/></svg><span>Leaderboard</span></a>
+        <a href="{% url 'tipping:ladder' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-chart"/></svg><span>Ladder</span></a>
+        <a href="{% url 'orgs:wall' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-msg"/></svg><span>The Wall</span></a>
+        {% if primary_org_is_admin %}
+          <span class="sheet-label">Manage</span>
+          <a href="{% url 'orgs:members' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-users"/></svg><span>Members</span></a>
+          <a href="{% url 'billing:season_summary' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-coins"/></svg><span>Season summary</span></a>
+          <a href="{% url 'orgs:charity_vote' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-heart"/></svg><span>Charity election</span></a>
+        {% endif %}
       {% endif %}
-      {% if user.is_staff %}<a href="{% url 'manage:overview' %}">Admin</a>{% endif %}
-      <a href="{% url 'profile' %}">Profile</a>
-      <a href="{% url 'accounts:logout' %}">Log out</a>
+      {% if user.is_staff %}<a href="{% url 'manage:overview' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-shield"/></svg><span>Admin</span></a>{% endif %}
+      {# Profile is the header — a second row for it would point at the panel's own top #}
+      <a href="{% url 'accounts:logout' %}" class="sheet-logout"><svg class="an-ic" aria-hidden="true"><use href="#ic-logout"/></svg><span>Log out</span></a>
     </div>
   </div>
 
@@ -331,12 +387,24 @@
       startPoll();
     })();
 
-    /* mobile sheet */
+    /* mobile sheet — same contract as the public drawer: the scrim closes it,
+       so does Escape and the X, and the page behind it does not scroll while
+       it is open. It also closes on resize past the width where the bar gets
+       its own row back, so the lock cannot outlive the panel. */
     var burger = document.querySelector('[data-sheet-open]');
     var sheet = document.getElementById('appSheet');
     if (burger && sheet) {
-      burger.addEventListener('click', function(){ sheet.classList.add('open'); });
-      sheet.addEventListener('click', function(e){ if (e.target === sheet) sheet.classList.remove('open'); });
+      var setSheet = function(open){
+        sheet.classList.toggle('open', open);
+        burger.setAttribute('aria-expanded', String(open));
+        document.body.classList.toggle('sheet-open', open);
+      };
+      burger.addEventListener('click', function(){ setSheet(true); });
+      sheet.addEventListener('click', function(e){
+        if (e.target === sheet || e.target.closest('[data-sheet-close]')) setSheet(false);
+      });
+      document.addEventListener('keydown', function(e){ if (e.key === 'Escape') setSheet(false); });
+      window.addEventListener('resize', function(){ if (window.innerWidth > 1180) setSheet(false); });
     }
 
     /* copy-to-clipboard buttons (invite links etc.) */

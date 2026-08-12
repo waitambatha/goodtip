@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}GoodTip — Footy Tipping, For Good.{% endblock %}</title>
-  <meta name="description" content="{% block meta_description %}Your team tips the games. The entry fees go to charity. Your group picks which one.{% endblock %}">
+  <meta name="description" content="{% block meta_description %}You tip. GoodTip gives. Your organisation pays one platform fee and GoodTip gives a share of it to the charity your group picks. Tipping is free.{% endblock %}">
   <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
 
   {% include "partials/_fonts.html" %}
@@ -16,6 +16,7 @@
   <script src="{% static 'js/gt-lists.js' %}" defer></script>
   <script src="{% static 'js/gt-loader.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
+  {% include "partials/_analytics.html" %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
 
@@ -83,14 +84,45 @@
 
     /* Sport loader is handled by gt-loader.js. */
 
-    /* ---- Mobile nav ---- */
+    /* ---- Mobile nav ----
+       The drawer covers the page, so it has to behave like something that
+       covers the page: tapping away from it closes it, Escape closes it, and
+       the page underneath does not scroll while it is open. Without the last
+       one, a flick aimed at the drawer's own list scrolls the hero behind it
+       instead, which on a phone reads as the menu being broken.
+
+       Tapping a link closes it too. Most links navigate and the drawer dies
+       with the page anyway — but /#charities is an anchor on the home page,
+       and there the drawer would otherwise stay sitting over the section it
+       had just jumped to. */
     var nav = document.querySelector('.nav');
     var btn = nav && nav.querySelector('.nav-toggle');
+    function setNavOpen(open) {
+      if (!nav) return;
+      nav.setAttribute('data-open', String(open));
+      if (btn) btn.setAttribute('aria-expanded', String(open));
+      document.body.classList.toggle('nav-open', open);
+    }
     if (btn) btn.addEventListener('click', function () {
-      var open = nav.getAttribute('data-open') === 'true';
-      nav.setAttribute('data-open', String(!open));
-      btn.setAttribute('aria-expanded', String(!open));
+      setNavOpen(nav.getAttribute('data-open') !== 'true');
     });
+    if (nav) {
+      document.addEventListener('click', function (e) {
+        if (nav.getAttribute('data-open') !== 'true') return;
+        if (e.target.closest('.nav-toggle')) return;          // its own handler
+        if (e.target.closest('.nav-links') && !e.target.closest('a')) return;
+        setNavOpen(false);
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') setNavOpen(false);
+      });
+      /* Resizing past the breakpoint leaves data-open="true" on a bar that is
+         now a row, which is harmless to look at and not harmless to scroll:
+         the lock would stay on the body. */
+      window.addEventListener('resize', function () {
+        if (window.innerWidth > 1120) setNavOpen(false);
+      });
+    }
 
     /* ---- Scroll reveal ----
        Two behaviours, because two kinds of content are being revealed.

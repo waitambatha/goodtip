@@ -92,12 +92,12 @@ class OrgCreateForm(forms.ModelForm):
             "competitions", "season", "team_size", "finals_only",
         ]
         labels = {
-            "name": "League name",
+            "name": "Organisation name",
             "team_size": "Expected group size (optional)",
             "finals_only": "Finals only (skip the regular season)",
         }
         widgets = {
-            "name": forms.TextInput(attrs={"placeholder": "e.g. Acme Corp Footy Tips"}),
+            "name": forms.TextInput(attrs={"placeholder": "e.g. Acme Corp"}),
             "team_size": forms.NumberInput(attrs={"min": 1, "placeholder": "e.g. 12"}),
         }
 

@@ -1,7 +1,7 @@
 {% extends "app_base.html" %}
 {% load team_extras static %}
-{% block title %}Create a competition — GoodTip{% endblock %}
-{% block loader_task %}Opening the competition builder{% endblock %}
+{% block title %}Create an organisation — GoodTip{% endblock %}
+{% block loader_task %}Opening the organisation builder{% endblock %}
 {% block body_class %}page-deep sheet-page wiz-page{% endblock %}
 {% block page_backdrop %}
 {% comment %}Side imagery lives outside the sheet: .gt-sheet creates a
@@ -16,8 +16,8 @@ stacking context, so a strip rendered inside it paints over the sheet.
    at the foot of the form. {% endcomment %}
 <div class="wiz-top">
   <div>
-    <div class="app-eyebrow">{% if parent_org %}New group under {{ parent_org.name }}{% else %}New competition{% endif %}</div>
-    <h1 class="app-h1">Create a competition</h1>
+    <div class="app-eyebrow">{% if parent_org %}New department under {{ parent_org.name }}{% else %}New organisation{% endif %}</div>
+    <h1 class="app-h1">{% if parent_org %}Create a department{% else %}Create an organisation{% endif %}</h1>
     <p class="app-sub">Four short steps. We save as you go, so you can finish it later.</p>
   </div>
   {% comment %} Always present, but it does not claim a save that has not happened: an
@@ -68,9 +68,9 @@ answer, so going back to change one costs nothing.
   <div class="card pad-lg" style="margin-bottom:16px;background:rgba(45,122,58,.06);border-color:rgba(45,122,58,.35);">
     <div class="card-h">Part of {{ parent_org.name }}</div>
     <p class="card-lead" style="margin:4px 0 0;">
-      Your group will sit under <b>{{ parent_org.name }}</b>. It runs its own comp,
-      has its own members and picks its own charity — and its totals roll up into
-      {{ parent_org.name }}'s national figure. You'll be this group's admin.
+      This department will sit under <b>{{ parent_org.name }}</b>. It runs its own comp,
+      has its own members and picks its own charity, and its totals roll up into
+      {{ parent_org.name }}'s national figure. You'll be this department's admin.
       <a href="{% url 'orgs:create' %}">Not part of {{ parent_org.name }}?</a>
     </p>
   </div>
@@ -84,16 +84,16 @@ answer, so going back to change one costs nothing.
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
         </svg>
       </span>
-      <div><h2>Let's start with your group</h2><p>Tell us a few basics about your competition.</p></div>
+      <div><h2>Let's start with your organisation</h2><p>Tell us a few basics about {% if parent_org %}this department{% else %}your organisation{% endif %}.</p></div>
     </div>
-    <div class="fld"><label for="id_name">League name</label>
+    <div class="fld"><label for="id_name">{% if parent_org %}Department name{% else %}Organisation name{% endif %}</label>
       <div class="fld-ic">
         <span class="fi-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M6 4h12v5a6 6 0 0 1-12 0zM8 21h8M12 15v6"/>
           </svg>
         </span>
-        <input type="text" name="name" id="id_name" value="{{ form.name.value|default:'' }}" placeholder="e.g. Eclat Footy Tips" autocomplete="off">
+        <input type="text" name="name" id="id_name" value="{{ form.name.value|default:'' }}" placeholder="{% if parent_org %}e.g. Finance{% else %}e.g. Acme Corp{% endif %}" autocomplete="off">
       </div>
       <div class="hint">This is the name your members will see.</div>
       {% if form.name.errors %}<div class="fld-err">{{ form.name.errors|join:" " }}</div>{% endif %}
@@ -119,7 +119,7 @@ answer, so going back to change one costs nothing.
           {% endif %}
         </div>
         <div class="ol-body">
-          <div class="ol-title">Group logo <span>optional</span></div>
+          <div class="ol-title">{% if parent_org %}Department logo{% else %}Organisation logo{% endif %} <span>optional</span></div>
           <p class="ol-hint">Helps members recognise you when they search. JPG, PNG, WEBP or SVG, under 5&nbsp;MB.</p>
           <div class="ol-actions">
             <label class="ol-pick" for="orgLogoFile">
@@ -177,7 +177,7 @@ answer, so going back to change one costs nothing.
     <div class="fld" data-cat="charities" style="display:none;">
       <div class="card pad-lg" style="background:rgba(45,122,58,.06);border-color:rgba(45,122,58,.35);">
         <div class="card-h">Fundraising for your own charity?</div>
-        <p class="card-lead" style="margin-bottom:0;">Confirmed <b>GoodTip Partner Charities</b> can lock their league's fundraising to themselves — no participant vote. Once your league is created, our team confirms your partner status and the lock option appears on your charity page. Not a partner yet? <a href="mailto:partnerships@goodtip.com.au?subject=Partner%20Charity%20enquiry">Contact the partnerships team</a>. Until then, the standard charity selection below applies.</p>
+        <p class="card-lead" style="margin-bottom:0;">Confirmed <b>GoodTip Partner Charities</b> can lock their organisation's fundraising to themselves — no participant vote. Once your organisation is created, our team confirms your partner status and the lock option appears on your charity page. Not a partner yet? <a href="mailto:partnerships@goodtip.com.au?subject=Partner%20Charity%20enquiry">Contact the partnerships team</a>. Until then, the standard charity selection below applies.</p>
       </div>
     </div>
 
@@ -198,7 +198,118 @@ answer, so going back to change one costs nothing.
   </div>
   {% endif %}
 
-  {% if step == 2 %}
+  {% comment %}
+  Step 2, the work-email check. Three states, one at a time: nothing started,
+  a code in flight, or done. Never two forms on screen at once, because the
+  question "which box do I type the code into" is the whole failure mode of
+  this pattern.
+
+  The submit buttons here carry their own name/value and the footer's Continue
+  is hidden on this step, so the only way forward is through the check.
+  {% endcomment %}
+  {% if step == verify_step %}
+  <div class="card pad-lg wiz-card" style="margin-bottom:16px;">
+    <div class="wc-head">
+      <span class="wc-ic" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3l7 3v6c0 4.4-3 7.9-7 9-4-1.1-7-4.6-7-9V6Z"/><path d="m9 12 2 2 4-4.5"/>
+        </svg>
+      </span>
+      <div>
+        <h2>{% if verification.is_verified %}Verified{% else %}Prove it's your organisation{% endif %}</h2>
+        <p>
+          {% if verification.is_verified %}
+            We sent a code to {{ verification.email }} and you entered it. That's all we needed.
+          {% elif verify_required %}
+            We send a code to an email address at your organisation's own domain. Reading that
+            inbox is what tells us you're on the inside.
+          {% else %}
+            Optional for a group like yours, but it puts a verified mark on your organisation.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    {% if verification.is_verified %}
+      <div class="verify-done">
+        <span class="vd-tick" aria-hidden="true"><svg><use href="#ic-check"/></svg></span>
+        <div>
+          <b>{{ verification.domain }}</b>
+          <i>{{ verification.email }}{% if verification.role %} &middot; {{ verification.role }}{% endif %}</i>
+        </div>
+      </div>
+
+    {% elif verification %}
+      {# a code is in flight #}
+      <div class="verify-sent">
+        <p>We sent a six-digit code to <b>{{ verification.email }}</b>. It expires 15 minutes after it was sent.</p>
+      </div>
+      <div class="fld">
+        <label for="id_code">Enter the code</label>
+        <div class="fld-ic">
+          <span class="fi-mark" aria-hidden="true"><svg><use href="#ic-lock"/></svg></span>
+          <input type="text" name="code" id="id_code" inputmode="numeric" autocomplete="one-time-code"
+                 pattern="[0-9]*" maxlength="6" placeholder="123456" class="code-input" autofocus>
+        </div>
+      </div>
+      <div class="verify-actions">
+        <button type="submit" name="action" value="verify_code" class="abtn abtn-primary">Verify &rarr;</button>
+        <button type="submit" name="action" value="resend_code" class="abtn abtn-ghost"
+                {% if not verification.can_resend %}disabled{% endif %}>
+          {% if verification.sends >= 5 %}No codes left
+          {% elif verification.resend_wait_seconds %}Resend in {{ verification.resend_wait_seconds }}s
+          {% else %}Send another code{% endif %}
+        </button>
+        <button type="submit" name="action" value="change_email" class="abtn abtn-ghost">Use a different address</button>
+      </div>
+
+    {% else %}
+      {# nothing started yet #}
+      {% comment %}
+      Errors land under the field that caused them, not as one banner above
+      three boxes. The message says which of the two domains is the problem,
+      because "that doesn't match" is useless when both are on screen and
+      either could be the wrong one.
+      {% endcomment %}
+      <div class="fld{% if verify_error.field == 'role' %} has-err{% endif %}">
+        <label for="id_role">Your role at the organisation</label>
+        <div class="fld-ic">
+          <span class="fi-mark" aria-hidden="true"><svg><use href="#ic-people"/></svg></span>
+          <input type="text" name="role" id="id_role" maxlength="120" placeholder="e.g. Operations Manager"
+                 value="{{ verify_values.role|default:verification.role|default:'' }}" autocomplete="organization-title">
+        </div>
+        {% if verify_error.field == 'role' %}<div class="fld-err">{{ verify_error.message }}</div>
+        {% else %}<div class="hint">So we know who we're dealing with. It isn't a permission.</div>{% endif %}
+      </div>
+      <div class="fld{% if verify_error.field == 'domain' %} has-err{% endif %}">
+        <label for="id_domain">Your organisation's domain</label>
+        <div class="fld-ic">
+          <span class="fi-mark" aria-hidden="true"><svg><use href="#ic-globe"/></svg></span>
+          <input type="text" name="domain" id="id_domain" maxlength="253" placeholder="e.g. acme.com.au"
+                 value="{{ verify_values.domain|default:'' }}" autocomplete="off">
+        </div>
+        {% if verify_error.field == 'domain' %}<div class="fld-err">{{ verify_error.message }}</div>
+        {% else %}<div class="hint">Paste the website if it's easier. We'll tidy it up.</div>{% endif %}
+      </div>
+      <div class="fld{% if verify_error.field == 'work_email' %} has-err{% endif %}">
+        <label for="id_work_email">Your work email</label>
+        <div class="fld-ic">
+          <span class="fi-mark" aria-hidden="true"><svg><use href="#ic-mail"/></svg></span>
+          <input type="email" name="work_email" id="id_work_email" placeholder="you@acme.com.au"
+                 value="{{ verify_values.work_email|default:'' }}" autocomplete="email">
+        </div>
+        {% if verify_error.field == 'work_email' %}<div class="fld-err">{{ verify_error.message }}</div>
+        {% else %}<div class="hint">Has to be at the domain above. Gmail and the like can't show where you work.</div>{% endif %}
+      </div>
+      {% if verify_error and not verify_error.field %}
+      <div class="flash error" style="margin-bottom:14px;"><span>{{ verify_error.message }}</span></div>
+      {% endif %}
+      <button type="submit" name="action" value="send_code" class="abtn abtn-primary">Send me a code &rarr;</button>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if step == 3 %}
   <div class="card pad-lg" style="margin-bottom:16px;">
     <div class="fld">
       <label>Competitions</label>
@@ -221,7 +332,7 @@ answer, so going back to change one costs nothing.
   </div>
   {% endif %}
 
-  {% if step == 3 %}
+  {% if step == 4 %}
   <div class="card pad-lg" style="margin-bottom:16px;">
     <div class="card-h" style="margin-bottom:12px;">Who picks the charity?</div>
     <div class="opt-grid cols2" style="margin-bottom:8px;">
@@ -323,11 +434,23 @@ answer, so going back to change one costs nothing.
       mark every one of them at once, where the native popup names only the
       first and vanishes on the next click.
       {% endcomment %}
-      {% if step != last_step %}
+      {% if step != last_step and step != verify_step %}
       <button type="submit" name="action" value="save" class="abtn abtn-ghost abtn-lg wiz-save" formnovalidate>Save draft</button>
       {% endif %}
+      {% comment %}
+      On the verify step the footer's Continue is only offered once the check
+      is done, or when the org's type does not require one. The server refuses
+      it either way; hiding it as well means the button on screen is never one
+      that will bounce you back with an error.
+      {% endcomment %}
       {% if step == last_step %}
-      <button type="submit" name="action" value="next" class="abtn abtn-primary abtn-lg">{% if duplicates %}Yes, create a separate group &rarr;{% else %}Create competition &rarr;{% endif %}</button>
+      <button type="submit" name="action" value="next" class="abtn abtn-primary abtn-lg">{% if duplicates %}Yes, create a separate one &rarr;{% elif parent_org %}Create department &rarr;{% else %}Create organisation &rarr;{% endif %}</button>
+      {% elif step == verify_step %}
+        {% if verification.is_verified %}
+        <button type="submit" name="action" value="next" class="abtn abtn-primary abtn-lg">Continue &rarr;</button>
+        {% elif not verify_required %}
+        <button type="submit" name="action" value="next" class="abtn abtn-ghost abtn-lg" formnovalidate>Skip for now &rarr;</button>
+        {% endif %}
       {% else %}
       <button type="submit" name="action" value="next" class="abtn abtn-primary abtn-lg">Continue &rarr;</button>
       {% endif %}
