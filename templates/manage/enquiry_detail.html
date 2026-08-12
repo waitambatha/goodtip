@@ -34,8 +34,10 @@
   </section>
 
   {% if enquiry.status == 'replied' %}
-  {# Already answered: show what was said rather than an empty box, so a second
-     person opening this can see the answer instead of writing another one. #}
+  {% comment %}
+  Already answered: show what was said rather than an empty box, so a second
+  person opening this can see the answer instead of writing another one.
+  {% endcomment %}
   <section class="gt-panel">
     <div class="gt-panel-head">
       <span class="gp-ic"><svg><use href="#ic-heart"/></svg></span>

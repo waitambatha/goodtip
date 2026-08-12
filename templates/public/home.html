@@ -35,9 +35,11 @@
     <div class="sb-cell">
       <div class="sb-ring" data-ring>
         <svg viewBox="0 0 86 86"><circle class="track" cx="43" cy="43" r="36"/><circle class="bar" cx="43" cy="43" r="36"/></svg>
-        {# was a 100% donation stat. The model doc forbids stating any donation
-           percentage, so the ring carries a non-financial fact instead: what a
-           participant pays, which is nothing. #}
+        {% comment %}
+        was a 100% donation stat. The model doc forbids stating any donation
+        percentage, so the ring carries a non-financial fact instead: what a
+        participant pays, which is nothing.
+        {% endcomment %}
         <span class="pct">FREE</span>
       </div>
       <div class="sb-label">to play, for every participant</div>

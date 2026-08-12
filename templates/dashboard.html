@@ -57,8 +57,10 @@ stacking context, so a strip rendered inside it paints over the sheet.
           <div class="fxp-meta">
             <span class="fxp-date">{{ g.kickoff_at|date:"D j M · g:i A" }}</span>
             {% if g.venue %}<span class="fxp-venue">{{ g.venue }}</span>{% endif %}
-            {# Preview for visitors with no group: honest about the round's own
-               state rather than always claiming Open. #}
+            {% comment %}
+            Preview for visitors with no group: honest about the round's own
+            state rather than always claiming Open.
+            {% endcomment %}
             <span class="fxp-state {% if g.is_locked %}is-missed{% else %}is-open{% endif %}">{% if g.is_locked %}Closed{% else %}Open{% endif %}</span>
           </div>
           <div class="pick pick-sm">
