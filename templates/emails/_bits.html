@@ -18,7 +18,7 @@ Usage:
 
 {% elif bit == "note" %}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;">
-  <tr><td style="background:#F7F6EC;border-left:4px solid #C8F135;border-radius:0 10px 10px 0;padding:14px 18px;">
+  <tr><td style="background:#F2F1E7;border-left:4px solid #C8F135;border-radius:0 10px 10px 0;padding:14px 18px;">
     {% if note_label %}<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#6b6b5e;margin-bottom:6px;">{{ note_label }}</div>{% endif %}
     <div style="font-size:15px;line-height:1.6;color:#1A1A14;">{{ note_body|linebreaksbr }}</div>
   </td></tr>
@@ -27,9 +27,72 @@ Usage:
 {% elif bit == "stat" %}
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
   <tr>
-    <td style="background:#F7F6EC;border:1px solid #E4E1D2;border-radius:12px;padding:16px 20px;">
+    <td style="background:#F2F1E7;border:1px solid #E4E1D2;border-radius:12px;padding:16px 20px;">
       <span style="font-size:30px;font-weight:900;color:#2D7A3A;">{{ stat_num }}</span>
       <span style="font-size:13px;color:#6b6b5e;padding-left:8px;">{{ stat_label }}</span>
+    </td>
+  </tr>
+</table>
+
+{% elif bit == "code" %}
+{% comment %}
+The six-digit code. Shared by login_code and work_email_code so the two
+security emails cannot drift apart.
+
+Separate cells rather than one letter-spaced string: easier to read back off a
+phone, immune to a client reflowing letter-spacing, and it stops Apple Mail
+and Outlook turning a bare six-digit run into a tappable phone number.
+
+The plain line underneath is the COPYABLE one, and it is not decoration.
+Long-pressing across six table cells yields "6 9 1 7 1 8" — the whitespace
+between the cells comes with it and the paste fails. So the code also appears
+once as a single unbroken token, which is what a person actually presses and
+holds. It sits inside this panel rather than below it because a whole extra
+block underneath was the single biggest thing pushing this email off-screen.
+{% endcomment %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td bgcolor="#143326" style="background-color:#143326;border-radius:14px;padding:18px 14px 16px;text-align:center;">
+
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
+        <tr>
+          <td style="width:22px;height:1px;background-color:#4d6b52;font-size:0;line-height:0;">&nbsp;</td>
+          <td style="padding:0 9px;color:#C8F135;font-size:10.5px;font-weight:bold;letter-spacing:2.5px;text-transform:uppercase;white-space:nowrap;">{{ code_label|default:"Your code" }}</td>
+          <td style="width:22px;height:1px;background-color:#4d6b52;font-size:0;line-height:0;">&nbsp;</td>
+        </tr>
+      </table>
+
+      {% comment %}
+      make_list splits the code into characters, so the boxes follow the code
+      rather than six hand-written cells that break the day its length
+      changes.
+
+      {# #} only ever comments ONE line in Django. Spread over three it stops
+      being a comment and the text renders — which is exactly what happened
+      here, in a sent email. Multi-line always uses {% comment %}.
+      {% endcomment %}
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:14px auto 0;">
+        <tr>
+          {% for digit in code|make_list %}
+          <td style="padding:0 3px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr><td class="gt-digit" align="center" width="46" height="56"
+                      style="width:46px;height:56px;background-color:#0F2A1F;border:1.5px solid #5f8a33;
+                             border-radius:9px;text-align:center;">
+                <span style="font-family:Arial,Helvetica,sans-serif;font-size:29px;font-weight:bold;color:#ffffff;line-height:56px;">{{ digit }}</span>
+              </td></tr>
+            </table>
+          </td>
+          {% endfor %}
+        </tr>
+      </table>
+
+      <div style="margin-top:12px;">
+        <span style="display:inline-block;padding:7px 15px;border-radius:100px;border:1px solid #3c5c42;background-color:#0F2A1F;color:#DDE7D9;font-size:12.5px;">
+          &#128337;&nbsp; Expires in <span style="color:#C8F135;font-weight:bold;">{{ minutes }} minutes</span>
+        </span>
+      </div>
+
     </td>
   </tr>
 </table>

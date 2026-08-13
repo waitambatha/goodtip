@@ -3,7 +3,7 @@
 <html lang="en" class="no-js">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Manage — GoodTip{% endblock %}</title>
+  <title>{% block title %}Manage &middot; GoodTip{% endblock %}</title>
   <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
   {% include "partials/_fonts.html" %}
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
@@ -47,7 +47,7 @@
               <span class="bp-meta">{% if n.org %}{{ n.org.name }} &middot; {% endif %}{{ n.created_at|date:"j M, g:i A" }}</span>
             </a>
             {% empty %}
-            <div class="bp-empty">Nothing yet — admin messages and election news land here.</div>
+            <div class="bp-empty">Nothing yet, admin messages and election news land here.</div>
             {% endfor %}
           </div>
         </div>

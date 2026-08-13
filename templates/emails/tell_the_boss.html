@@ -8,6 +8,7 @@ the decent thing and what keeps this out of spam folders.
 {% endcomment %}
 {% block title %}A note from {{ your_name }}{% endblock %}
 {% block eyebrow %}A note passed on{% endblock %}
+{% block badge %}&#9993;{% endblock %}{# envelope — a note being sent #}
 {% block preheader %}{{ your_name }} reckons your tipping comp could raise money for a charity.{% endblock %}
 {% block content %}
   <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#6b6b5e;">
@@ -22,7 +23,7 @@ the decent thing and what keeps this out of spam folders.
       <p style="margin:0 0 13px;font-size:15px;line-height:1.75;color:#2A2114;font-family:Georgia,'Times New Roman',serif;">We're already picking teams and checking the ladder every Monday. With GoodTip it stays free for all of us, and GoodTip gives to a charity we choose. Together.</p>
       <p style="margin:0 0 13px;font-size:15px;line-height:1.75;color:#2A2114;font-family:Georgia,'Times New Roman',serif;">Five minutes to set up. Nothing to lose but bragging rights.</p>
       <p style="margin:0 0 16px;font-size:15px;line-height:1.75;color:#2A2114;font-family:Georgia,'Times New Roman',serif;">Can we do this?</p>
-      <p style="margin:0;font-size:16px;font-style:italic;font-weight:bold;color:#6B2B1E;font-family:Georgia,'Times New Roman',serif;">&mdash; {{ your_name }}</p>
+      <p style="margin:0;font-size:16px;font-style:italic;font-weight:bold;color:#6B2B1E;font-family:Georgia,'Times New Roman',serif;">, {{ your_name }}</p>
     </td></tr>
   </table>
 
@@ -36,7 +37,7 @@ the decent thing and what keeps this out of spam folders.
   {% include "emails/_bits.html" with bit="button" url=how_url label="See how it works" %}
 
   <p style="margin:20px 0 0;font-size:12px;line-height:1.65;color:#6b6b5e;text-align:center;">
-    This is a one-off note sent at {{ your_name }}'s request &mdash; you're not on
+    This is a one-off note sent at {{ your_name }}'s request, you're not on
     any mailing list and we won't email you again.
   </p>
 {% endblock %}

@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}GoodTip — Footy Tipping, For Good.{% endblock %}</title>
+  <title>{% block title %}GoodTip. Footy Tipping, For Good.{% endblock %}</title>
   <meta name="description" content="{% block meta_description %}You tip. GoodTip gives. Your organisation pays one platform fee and GoodTip gives a share of it to the charity your group picks. Tipping is free.{% endblock %}">
   <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
 
@@ -15,6 +15,7 @@
   <script src="{% static 'js/gt-scenes.js' %}" defer></script>
   <script src="{% static 'js/gt-lists.js' %}" defer></script>
   <script src="{% static 'js/gt-loader.js' %}" defer></script>
+  <script src="{% static 'js/gt-video.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
   {% include "partials/_analytics.html" %}
 </head>

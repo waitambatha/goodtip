@@ -1,8 +1,8 @@
 {% extends "public/base.html" %}
 {% load static humanize %}
 
-{% block title %}The Good List — GoodTip{% endblock %}
-{% block meta_description %}Your tips raise money for charity. The Good List ranks every group by what they've raised — filter by organisation type, sub-category, and state.{% endblock %}
+{% block title %}The Good List &middot; GoodTip{% endblock %}
+{% block meta_description %}Your tips raise money for charity. The Good List ranks every group by what they've raised, filter by organisation type, sub-category, and state.{% endblock %}
 {% block body_class %}page-leaderboard{% endblock %}
 {% block loader_task %}Loading The Good List{% endblock %}
 
@@ -20,7 +20,7 @@
       <div class="lab">Raised across every group this season</div>
       {% else %}
       <div class="big">$0</div>
-      <div class="lab">The season hasn't started &mdash; totals appear the moment the first donations settle.</div>
+      <div class="lab">The season hasn't started, totals appear the moment the first donations settle.</div>
       {% endif %}
     </div>
   </div>
@@ -74,7 +74,7 @@
       <div class="gl-empty reveal">
         <span class="ge-ic"><svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg></span>
         <h3>The board is warming up.</h3>
-        <p class="note">Named rankings appear once at least {{ credibility_min }} groups with settled totals have opted in to public listing. No sample figures here &mdash; when you see a number on The Good List, it's real money, raised and settled.</p>
+        <p class="note">Named rankings appear once at least {{ credibility_min }} groups with settled totals have opted in to public listing. No sample figures here, when you see a number on The Good List, it's real money, raised and settled.</p>
       </div>
       {% elif not groups %}
       <div class="gl-empty reveal">
@@ -89,7 +89,7 @@
         <div class="lb-row {% if forloop.counter <= 3 %}t3{% endif %}">
           <span class="lb-rank">{{ forloop.counter|stringformat:"02d" }}</span>
           <span class="lb-name"><b>{{ row.name }}</b><small>{% if row.category %}{{ row.category }}{% endif %}{% if row.category and row.state %} &middot; {% endif %}{{ row.state }}</small></span>
-          <span class="lb-chip">{{ row.charity.name|default:"—" }}</span>
+          <span class="lb-chip">{{ row.charity.name|default:"-" }}</span>
           <span class="lb-amt">${{ row.raised|floatformat:0|intcomma }}</span>
         </div>
         {% endfor %}
@@ -115,7 +115,7 @@
       <div class="gl-empty reveal">
         <span class="ge-ic"><svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></span>
         <h3>Nothing to show here yet.</h3>
-        <p class="note">Charity totals appear once at least {{ privacy_min }} groups sit behind a figure &mdash; that keeps any single group's giving private.</p>
+        <p class="note">Charity totals appear once at least {{ privacy_min }} groups sit behind a figure, that keeps any single group's giving private.</p>
       </div>
       {% endif %}
     </div>
@@ -126,7 +126,7 @@
 <div class="tab-panel" id="category">
   <section class="section on-cream">
     <div class="wrap">
-      <div class="lb-head reveal"><h2>Raised by category</h2><div class="note">Sub-categories putting the most on the board &mdash; sports clubs, finance teams, schools and more.</div></div>
+      <div class="lb-head reveal"><h2>Raised by category</h2><div class="note">Sub-categories putting the most on the board, sports clubs, finance teams, schools and more.</div></div>
       {% if by_sub_category %}
       <div class="lb lb--metric reveal">
         <div class="lb-colhead"><span>Rank</span><span>Category</span><span class="r-amt">Groups</span><span class="r-amt">Raised</span></div>
@@ -138,7 +138,7 @@
       <div class="gl-empty reveal">
         <span class="ge-ic"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></span>
         <h3>Nothing to show here yet.</h3>
-        <p class="note">Category totals appear once at least {{ privacy_min }} groups sit behind a figure &mdash; that keeps any single group's giving private.</p>
+        <p class="note">Category totals appear once at least {{ privacy_min }} groups sit behind a figure, that keeps any single group's giving private.</p>
       </div>
       {% endif %}
     </div>
@@ -161,7 +161,7 @@
       <div class="gl-empty reveal">
         <span class="ge-ic"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
         <h3>Nothing to show here yet.</h3>
-        <p class="note">State totals appear once at least {{ privacy_min }} groups sit behind a figure &mdash; that keeps any single group's giving private.</p>
+        <p class="note">State totals appear once at least {{ privacy_min }} groups sit behind a figure, that keeps any single group's giving private.</p>
       </div>
       {% endif %}
     </div>

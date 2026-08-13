@@ -16,6 +16,9 @@
   <script src="{% static 'js/gt-loader.js' %}" defer></script>
   <script src="{% static 'js/gt-busy.js' %}" defer></script>
   <script src="{% static 'js/gt-confirm.js' %}" defer></script>
+  <script src="{% static 'js/gt-video.js' %}" defer></script>
+  <script src="{% static 'js/gt-dept.js' %}" defer></script>
+  <script src="{% static 'js/gt-fixture.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
   {% include "partials/_analytics.html" %}
 </head>
@@ -61,17 +64,17 @@
       {# truncates with an ellipsis when the row is tight — the title carries the rest #}
       {% if primary_org %}<span class="an-org" title="{{ primary_org.name }}">{{ primary_org.name }}</span>{% endif %}
       <div class="an-links">
-        <a href="{% url 'dashboard' %}" class="{% block nav_dash %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-home"/></svg><span>Dashboard</span></a>
+        <a href="{% url 'dashboard' %}" class="{% block nav_dash %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-home"/></svg><span>Dashboard</span></a>
         {% if primary_org %}
           {% comment %}
           Glyphs, for the same reason the public bar has them: Leaderboard and
           Ladder are one letter apart at a glance and mean opposite things —
           how the members are going versus how the clubs are going.
           {% endcomment %}
-          <a href="{% url 'tipping:my_tips' primary_org.id %}" class="{% block nav_tips %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-vote"/></svg><span>My Tips</span></a>
-          <a href="{% url 'tipping:leaderboard' primary_org.id %}" class="{% block nav_board %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-trophy"/></svg><span>Leaderboard</span></a>
-          <a href="{% url 'tipping:ladder' primary_org.id %}" class="{% block nav_ladder %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-chart"/></svg><span>Ladder</span></a>
-          <a href="{% url 'orgs:wall' primary_org.id %}" class="{% block nav_wall %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-msg"/></svg><span>The Wall</span></a>
+          <a href="{% url 'tipping:my_tips' primary_org.id %}" class="{% block nav_tips %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-vote"/></svg><span>My Tips</span></a>
+          <a href="{% url 'tipping:leaderboard' primary_org.id %}" class="{% block nav_board %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>Leaderboard</span></a>
+          <a href="{% url 'tipping:ladder' primary_org.id %}" class="{% block nav_ladder %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg><span>Ladder</span></a>
+          <a href="{% url 'orgs:wall' primary_org.id %}" class="{% block nav_wall %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-msg"/></svg><span>The Wall</span></a>
           {% comment %}
           Admin-only, and only two items: Members is the hub for everything to
           do with people (invites, join requests, roles), and Season summary is
@@ -87,35 +90,35 @@
           {% endcomment %}
           <div class="an-menu" data-anmenu>
             <button type="button" class="an-menu-btn {% block nav_manage %}{% endblock %}" aria-expanded="false" aria-haspopup="true">
-              <svg class="an-ic" aria-hidden="true"><use href="#ic-sliders"/></svg>
+              <svg class="an-ic" aria-hidden="true"><use href="#ic-f-sliders"/></svg>
               <span>Manage</span>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
             </button>
             <div class="an-menu-panel" hidden>
               <a href="{% url 'orgs:members' primary_org.id %}">
-                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-users"/></svg></span>
+                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-users"/></svg></span>
                 <span class="mi-txt"><b>Members</b><i>Invites, join requests and roles</i></span>
               </a>
               {# departments live under a top-level org only — two levels, no nesting #}
               {% if not primary_org.parent_id %}
               <a href="{% url 'orgs:departments' primary_org.id %}">
-                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-org"/></svg></span>
+                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-org"/></svg></span>
                 <span class="mi-txt"><b>Departments</b><i>Sites, branches and teams under you</i></span>
               </a>
               {% endif %}
               <a href="{% url 'billing:season_summary' primary_org.id %}">
-                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-coins"/></svg></span>
+                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-coins"/></svg></span>
                 <span class="mi-txt"><b>Season summary</b><i>Entries, donations and totals</i></span>
               </a>
               <a href="{% url 'orgs:charity_vote' primary_org.id %}">
-                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-heart"/></svg></span>
+                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-heart"/></svg></span>
                 <span class="mi-txt"><b>Charity election</b><i>Set it up, or see how the vote is going</i></span>
               </a>
             </div>
           </div>
           {% endif %}
         {% endif %}
-        {% if user.is_staff %}<a href="{% url 'manage:overview' %}" class="{% block nav_admin %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-shield"/></svg><span>Admin</span></a>{% endif %}
+        {% if user.is_staff %}<a href="{% url 'manage:overview' %}" class="{% block nav_admin %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Admin</span></a>{% endif %}
       </div>
       <div class="an-right">
         <div class="an-bell" id="anBell">
@@ -136,7 +139,7 @@
                 </span>
               </a>
               {% empty %}
-              <div class="bp-empty">Nothing yet — replies, election news and admin messages land here.</div>
+              <div class="bp-empty">Nothing yet, replies, election news and admin messages land here.</div>
               {% endfor %}
             </div>
           </div>
@@ -226,12 +229,12 @@
         {# ic-cross is the medical plus, not a dismiss glyph — this one is its own #}
         <button type="button" class="sheet-x" aria-label="Close menu" data-sheet-close><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
       </div>
-      <a href="{% url 'dashboard' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-home"/></svg><span>Dashboard</span></a>
+      <a href="{% url 'dashboard' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-home"/></svg><span>Dashboard</span></a>
       {% if primary_org %}
-        <a href="{% url 'tipping:my_tips' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-vote"/></svg><span>My Tips</span></a>
-        <a href="{% url 'tipping:leaderboard' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-trophy"/></svg><span>Leaderboard</span></a>
-        <a href="{% url 'tipping:ladder' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-chart"/></svg><span>Ladder</span></a>
-        <a href="{% url 'orgs:wall' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-msg"/></svg><span>The Wall</span></a>
+        <a href="{% url 'tipping:my_tips' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-vote"/></svg><span>My Tips</span></a>
+        <a href="{% url 'tipping:leaderboard' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>Leaderboard</span></a>
+        <a href="{% url 'tipping:ladder' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg><span>Ladder</span></a>
+        <a href="{% url 'orgs:wall' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-msg"/></svg><span>The Wall</span></a>
         {% if primary_org_is_admin %}
           <span class="sheet-label">Manage</span>
           <a href="{% url 'orgs:members' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-users"/></svg><span>Members</span></a>
@@ -239,7 +242,7 @@
           <a href="{% url 'orgs:charity_vote' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-heart"/></svg><span>Charity election</span></a>
         {% endif %}
       {% endif %}
-      {% if user.is_staff %}<a href="{% url 'manage:overview' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-shield"/></svg><span>Admin</span></a>{% endif %}
+      {% if user.is_staff %}<a href="{% url 'manage:overview' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Admin</span></a>{% endif %}
       {# Profile is the header — a second row for it would point at the panel's own top #}
       <a href="{% url 'accounts:logout' %}" class="sheet-logout"><svg class="an-ic" aria-hidden="true"><use href="#ic-logout"/></svg><span>Log out</span></a>
     </div>

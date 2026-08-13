@@ -5,7 +5,8 @@ the ladder. Expects rows of {match, tip, correct, points}.
 {% endcomment %}
 {% block title %}Round {{ round.round_number }} results{% endblock %}
 {% block eyebrow %}Round {{ round.round_number }} results{% endblock %}
-{% block preheader %}You got {{ correct }} of {{ graded }} in round {{ round.round_number }}{% if rank %} — you're {{ rank }} of {{ total_tippers }}{% endif %}.{% endblock %}
+{% block badge %}&#9733;{% endblock %}{# star — results are the celebratory one #}
+{% block preheader %}You got {{ correct }} of {{ graded }} in round {{ round.round_number }}{% if rank %}, you're {{ rank }} of {{ total_tippers }}{% endif %}.{% endblock %}
 {% block content %}
   <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">Hello {{ user.display_name }},</p>
   <p style="margin:0 0 20px;font-size:16px;line-height:1.6;color:#1A1A14;">
@@ -14,7 +15,7 @@ the ladder. Expects rows of {match, tip, correct, points}.
 
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
     <tr>
-      <td width="50%" style="background:#0F2E22;border-radius:12px 0 0 12px;padding:20px;text-align:center;">
+      <td width="50%" style="background:#143326;border-radius:12px 0 0 12px;padding:20px;text-align:center;">
         <div style="color:#C8F135;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">This round</div>
         <div style="color:#ffffff;font-size:27px;font-weight:900;">{{ correct }}<span style="font-size:17px;opacity:.7;">/{{ graded }}</span></div>
       </td>
@@ -43,7 +44,7 @@ the ladder. Expects rows of {match, tip, correct, points}.
         {% elif row.tip %}
           <span style="display:inline-block;background:#F3E3E1;color:#A3342A;font-size:11px;font-weight:bold;letter-spacing:.5px;padding:5px 10px;border-radius:100px;">MISSED</span>
         {% else %}
-          <span style="display:inline-block;background:#EFEDE3;color:#6b6b5e;font-size:11px;font-weight:bold;letter-spacing:.5px;padding:5px 10px;border-radius:100px;">&mdash;</span>
+          <span style="display:inline-block;background:#EFEDE3;color:#6b6b5e;font-size:11px;font-weight:bold;letter-spacing:.5px;padding:5px 10px;border-radius:100px;">-</span>
         {% endif %}
       </td>
     </tr>

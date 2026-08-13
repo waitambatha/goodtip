@@ -1,7 +1,7 @@
 {% extends "app_base.html" %}
 {% load humanize %}
 {% load static %}
-{% block title %}The Wall — {{ org.name }}{% endblock %}
+{% block title %}The Wall, {{ org.name }}{% endblock %}
 {% block loader_task %}Opening the Wall{% endblock %}
 {% block nav_wall %}on{% endblock %}
 {% block body_class %}page-deep sheet-page{% endblock %}
@@ -83,6 +83,9 @@ the other. No composer here — posting is a button in the group header.
     <span class="gpt-pick">&#9733; {% if p.tip.selection == 'home' %}{{ p.tip.match.home_team.name }}{% else %}{{ p.tip.match.away_team.name }}{% endif %} to beat {% if p.tip.selection == 'home' %}{{ p.tip.match.away_team.name }}{% else %}{{ p.tip.match.home_team.name }}{% endif %}{% if p.tip.is_correct is not None %} &middot; {% if p.tip.is_correct %}<b class="hit">got it &#10003;</b>{% else %}<b class="miss">didn't land</b>{% endif %}{% endif %}</span>
     {% endif %}
     {% if p.body %}<p class="gpt-body">{{ p.body|linebreaksbr }}</p>{% endif %}
+    {% if p.kind == 'recap' and p.recap %}
+      {% include "partials/wall_recap.html" with recap=p.recap post=p %}
+    {% endif %}
     {% include "partials/wall_reactions.html" with post=p bar=p.reaction_bar %}
 
     {% if p.thread %}
@@ -120,7 +123,7 @@ the other. No composer here — posting is a button in the group header.
   <span class="ge-ic"><svg><use href="#ic-msg"/></svg></span>
   <div>
     <h3>Quiet in here.</h3>
-    <p>Nobody's posted yet. First tip talk wins the room — and once rounds are graded, the round recap lands up top automatically.</p>
+    <p>Nobody's posted yet. First tip talk wins the room, and once rounds are graded, the round recap lands up top automatically.</p>
   </div>
 </div>
 {% endif %}
@@ -143,7 +146,7 @@ the other. No composer here — posting is a button in the group header.
           <select name="tip">
             <option value="">No pick</option>
             {% for t in my_tips %}
-            <option value="{{ t.id }}">{% if t.selection == 'home' %}{{ t.match.home_team.name }}{% else %}{{ t.match.away_team.name }}{% endif %} &mdash; v {% if t.selection == 'home' %}{{ t.match.away_team.name }}{% else %}{{ t.match.home_team.name }}{% endif %}</option>
+            <option value="{{ t.id }}">{% if t.selection == 'home' %}{{ t.match.home_team.name }}{% else %}{{ t.match.away_team.name }}{% endif %}, v {% if t.selection == 'home' %}{{ t.match.away_team.name }}{% else %}{{ t.match.home_team.name }}{% endif %}</option>
             {% empty %}
             <option value="" disabled>Tip this round and your picks appear here</option>
             {% endfor %}
@@ -192,7 +195,7 @@ var ta = document.querySelector('[data-count]');
 var out = document.querySelector('[data-count-out]');
 if (ta && out) { ta.addEventListener('input', function(){ out.textContent = ta.value.length; }); }
 
-/* the composer modal — opens on the trigger, closes on scrim / × / Escape */
+/* the composer modal, opens on the trigger, closes on scrim / × / Escape */
 (function(){
   var modal = document.getElementById('composerModal');
   if (!modal) return;
@@ -212,7 +215,7 @@ if (ta && out) { ta.addEventListener('input', function(){ out.textContent = ta.v
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !modal.hidden) close(); });
 })();
 
-/* hero rotator — the cross-group posts, one card at a time */
+/* hero rotator, the cross-group posts, one card at a time */
 (function(){
   var stack = document.querySelector('[data-rotor]');
   if (!stack) return;

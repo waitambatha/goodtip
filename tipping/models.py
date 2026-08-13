@@ -157,6 +157,16 @@ class Match(models.Model):
         return timezone.now() >= self.kickoff_at
 
     @property
+    def is_open(self) -> bool:
+        """Still tippable. The positive form of is_locked, for templates.
+
+        Django templates have no `not`, so a card that wanted "editable while
+        unlocked" was reaching for `is_locked|yesno:",True"` — correct, and
+        unreadable. The negation belongs here where it can be named.
+        """
+        return not self.is_locked
+
+    @property
     def has_result(self) -> bool:
         return self.result is not None
 

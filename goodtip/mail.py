@@ -43,6 +43,77 @@ def site_url(path: str = "") -> str:
     return f"{base}/{path.lstrip('/')}"
 
 
+# The photographs behind each message's header, keyed by template name.
+#
+# A LIST per template, not one image. The same picture on every sign-in code
+# turns the header into furniture — after the fifth one nobody sees it. Pulling
+# from a small set per message keeps the same feeling and stops the email
+# looking like the one before it.
+#
+# Chosen so the picture matches the moment: floodlit grounds for the security
+# messages that usually arrive at night, crowds for the ones about people
+# joining, a scoreboard for results.
+EMAIL_SCENES = {
+    "login_code": [
+        "img/scenes/stadium-lights-grass.jpg",
+        "img/scenes/nrl-ground-dusk.jpg",
+        "img/scenes/nrl-posts-sunset.jpg",
+        "img/scenes/afl-posts-mcg.jpg",
+    ],
+    "work_email_code": [
+        "img/scenes/stadium-lights-grass.jpg",
+        "img/scenes/mcg-stadium.jpg",
+        "img/scenes/afl-goal-posts.jpg",
+    ],
+    "welcome": [
+        "img/scenes/aussie-crowd-flag.jpg",
+        "img/scenes/nrl-players-fans.jpg",
+        "img/scenes/mcg-match.jpg",
+    ],
+    "org_invite": [
+        "img/scenes/nrl-players-fans.jpg",
+        "img/scenes/aussie-crowd-flag.jpg",
+        "img/scenes/nrl-player-fence.jpg",
+    ],
+    "tell_the_boss": ["img/scenes/mcg-stadium.jpg", "img/scenes/stadium-panorama.jpg"],
+    "tip_results": [
+        "img/scenes/nrl-scoreboard.jpg",
+        "img/scenes/afl-ball-grass.jpg",
+        "img/scenes/nrl-ball-grass.jpg",
+    ],
+    "election_open": ["img/scenes/mcg-match.jpg", "img/scenes/stadium-panorama.jpg"],
+    "election_reminder": ["img/scenes/mcg-match.jpg", "img/scenes/afl-ground.jpg"],
+    "election_result": ["img/scenes/aussie-crowd-flag.jpg", "img/scenes/mcg-match.jpg"],
+    "news_published": ["img/scenes/afl-ground.jpg", "img/scenes/afl-training.jpg"],
+    "enquiry_admin": ["img/scenes/stadium-panorama.jpg"],
+    "enquiry_reply": ["img/scenes/stadium-panorama.jpg"],
+}
+DEFAULT_EMAIL_SCENES = [
+    "img/scenes/stadium-panorama.jpg",
+    "img/scenes/stadium-lights-grass.jpg",
+]
+
+
+def scene_url(name: str) -> str:
+    """Absolute URL of a header photograph for one template.
+
+    Picked at random from that template's set, so two of the same message do
+    not arrive looking identical. Never raises: a missing file or an
+    un-collected manifest must not be able to cancel a sign-in code over a
+    decorative image.
+    """
+    import random
+
+    choices = EMAIL_SCENES.get(name) or DEFAULT_EMAIL_SCENES
+    try:
+        from accounts.templatetags.email_extras import email_image
+
+        return email_image(random.choice(choices))
+    except Exception:                           # noqa: BLE001 — decoration only
+        logger.warning("Could not resolve email scene for %r", name)
+        return ""
+
+
 def build(name: str, *, subject: str, to, context: dict, reply_to=None) -> EmailMultiAlternatives | None:
     """Render one message from emails/<name>.html + emails/<name>.txt."""
     if isinstance(to, str):
@@ -51,7 +122,8 @@ def build(name: str, *, subject: str, to, context: dict, reply_to=None) -> Email
     if not to:
         return None
 
-    ctx = {"site_url": site_url(), **context}
+    # scene_url before **context so a caller can still override it per message.
+    ctx = {"site_url": site_url(), "scene_url": scene_url(name), **context}
     try:
         text = render_to_string(f"emails/{name}.txt", ctx)
         html = render_to_string(f"emails/{name}.html", ctx)

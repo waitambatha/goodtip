@@ -1,6 +1,6 @@
 {% extends "app_base.html" %}
 {% load static %}
-{% block title %}Find your group — GoodTip{% endblock %}
+{% block title %}Find your group &middot; GoodTip{% endblock %}
 {% block loader_task %}Searching groups{% endblock %}
 {% block body_class %}page-deep sheet-page{% endblock %}
 {% block page_backdrop %}
@@ -13,7 +13,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
 {% block app_content %}
 
 
-<div class="app-head"><div><div class="app-eyebrow">Groups</div><h1 class="app-h1">Find your group</h1><p class="app-sub">Start typing your workplace, club or crew — matches appear as you type. Ask to join one, or start a new group under theirs.</p></div>
+<div class="app-head"><div><div class="app-eyebrow">Groups</div><h1 class="app-h1">Find your group</h1><p class="app-sub">Start typing your workplace, club or crew, matches appear as you type. Ask to join one, or start a new group under theirs.</p></div>
   <a href="{% url 'orgs:create' %}" class="abtn abtn-dark"><svg class="abtn-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>Create a group</a></div>
 
 {# csrf seed for the ask-to-join forms the autocomplete builds #}
@@ -28,7 +28,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
   </div>
   <div class="ac-panel" id="acPanel" role="listbox" hidden></div>
 </div>
-<p class="app-sub" style="margin-top:10px;font-size:13px;">Type at least {{ min_chars }} letters — or browse the full list below.</p>
+<p class="app-sub" style="margin-top:10px;font-size:13px;">Type at least {{ min_chars }} letters, or browse the full list below.</p>
 
 <div id="orgSelected" style="margin-top:22px;"></div>
 
@@ -97,7 +97,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
     {% endfor %}
   </div>
   {% empty %}
-  <div class="card pad-lg" style="text-align:center;"><p class="card-lead">No groups yet — be the first to <a href="{% url 'orgs:create' %}" style="color:var(--forest);font-weight:700;">create one</a>.</p></div>
+  <div class="card pad-lg" style="text-align:center;"><p class="card-lead">No groups yet, be the first to <a href="{% url 'orgs:create' %}" style="color:var(--forest);font-weight:700;">create one</a>.</p></div>
   {% endfor %}
   </div>
   </div>

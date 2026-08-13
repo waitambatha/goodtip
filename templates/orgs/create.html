@@ -1,6 +1,6 @@
 {% extends "app_base.html" %}
 {% load team_extras static %}
-{% block title %}Create an organisation — GoodTip{% endblock %}
+{% block title %}Create an organisation &middot; GoodTip{% endblock %}
 {% block loader_task %}Opening the organisation builder{% endblock %}
 {% block body_class %}page-deep sheet-page wiz-page{% endblock %}
 {% block page_backdrop %}
@@ -138,7 +138,7 @@ answer, so going back to change one costs nothing.
       </div>
       {% if draft.data.logo_error %}<div class="fld-err">{{ draft.data.logo_error }}</div>{% endif %}
       <div id="dupeHint" style="display:none;margin-top:8px;padding:12px 14px;border:1px solid rgba(180,120,0,.4);background:rgba(255,180,0,.08);border-radius:10px;font-size:14px;">
-        <b>These groups already exist</b> — did you mean to join one?
+        <b>These groups already exist</b>, did you mean to join one?
         <ul id="dupeHintList" style="margin:6px 0 0;padding-left:18px;"></ul>
       </div></div>
 
@@ -150,7 +150,7 @@ answer, so going back to change one costs nothing.
           </svg>
         </span>
       <select name="group_type" id="id_group_type">
-        <option value="">— Choose your organisation type —</option>
+        <option value="">Choose your organisation type</option>
         {% for gt in form.fields.group_type.queryset %}<option value="{{ gt.pk }}" data-slug="{{ gt.slug }}" {% if form.group_type.value|stringformat:'s' == gt.pk|stringformat:'s' %}selected{% endif %}>{{ gt.name }}</option>{% endfor %}
       </select>
       </div>
@@ -177,11 +177,11 @@ answer, so going back to change one costs nothing.
     <div class="fld" data-cat="charities" style="display:none;">
       <div class="card pad-lg" style="background:rgba(45,122,58,.06);border-color:rgba(45,122,58,.35);">
         <div class="card-h">Fundraising for your own charity?</div>
-        <p class="card-lead" style="margin-bottom:0;">Confirmed <b>GoodTip Partner Charities</b> can lock their organisation's fundraising to themselves — no participant vote. Once your organisation is created, our team confirms your partner status and the lock option appears on your charity page. Not a partner yet? <a href="mailto:partnerships@goodtip.com.au?subject=Partner%20Charity%20enquiry">Contact the partnerships team</a>. Until then, the standard charity selection below applies.</p>
+        <p class="card-lead" style="margin-bottom:0;">Confirmed <b>GoodTip Partner Charities</b> can lock their organisation's fundraising to themselves, no participant vote. Once your organisation is created, our team confirms your partner status and the lock option appears on your charity page. Not a partner yet? <a href="mailto:partnerships@goodtip.com.au?subject=Partner%20Charity%20enquiry">Contact the partnerships team</a>. Until then, the standard charity selection below applies.</p>
       </div>
     </div>
 
-    <div class="fld"><label for="id_state">State or territory <span style="color:var(--muted);font-weight:400;">(optional — skip if it's not nationally)</span></label>
+    <div class="fld"><label for="id_state">State or territory <span style="color:var(--muted);font-weight:400;">(optional, skip if it's not nationally)</span></label>
       <div class="fld-ic">
         <span class="fi-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -189,7 +189,7 @@ answer, so going back to change one costs nothing.
           </svg>
         </span>
         <select name="state" id="id_state">
-          <option value="">— We operate nationally —</option>
+          <option value="">We operate nationally</option>
           {% for st in form.fields.state.queryset %}<option value="{{ st.pk }}" {% if form.state.value|stringformat:'s' == st.pk|stringformat:'s' %}selected{% endif %}>{{ st.name }}</option>{% endfor %}
         </select>
       </div>
@@ -275,8 +275,17 @@ answer, so going back to change one costs nothing.
         <label for="id_role">Your role at the organisation</label>
         <div class="fld-ic">
           <span class="fi-mark" aria-hidden="true"><svg><use href="#ic-people"/></svg></span>
+          {% comment %}
+          firstof, not default:verification.role. This block only renders when
+          nothing has been started, which is exactly when `verification` is
+          None — and a filter ARGUMENT is resolved eagerly, so `verification.role`
+          raised VariableDoesNotExist and 500'd the whole page. {% if %} and a
+          bare {{ verification.email }} swallow that same failure, which is why
+          it hid here and nowhere else on the step. firstof resolves with
+          ignore_failures and escapes its output like any other variable.
+          {% endcomment %}
           <input type="text" name="role" id="id_role" maxlength="120" placeholder="e.g. Operations Manager"
-                 value="{{ verify_values.role|default:verification.role|default:'' }}" autocomplete="organization-title">
+                 value="{% firstof verify_values.role verification.role '' %}" autocomplete="organization-title">
         </div>
         {% if verify_error.field == 'role' %}<div class="fld-err">{{ verify_error.message }}</div>
         {% else %}<div class="hint">So we know who we're dealing with. It isn't a permission.</div>{% endif %}
@@ -343,7 +352,7 @@ answer, so going back to change one costs nothing.
     <div data-when="pick" class="show" style="margin-top:14px;">
       <div class="fld"><label for="id_charity">Choose an approved charity</label>
         <select name="charity" id="id_charity">
-          <option value="">— Choose an approved charity —</option>
+          <option value="">Choose an approved charity</option>
           {% for ch in form.fields.charity.queryset %}<option value="{{ ch.pk }}" {% is_checked form.charity ch.pk %}>{{ ch.name }}</option>{% endfor %}
         </select>
         {% if form.charity.errors %}<div class="fld-err">{{ form.charity.errors|join:" " }}</div>{% endif %}
@@ -394,13 +403,12 @@ answer, so going back to change one costs nothing.
     <div class="card-h">{{ duplicates.0.name }} already exists</div>
     <p class="card-lead" style="margin:6px 0 12px;">
       You are about to create another group with this name. The existing
-      {{ duplicates|length|pluralize:"group is,groups are" }} listed below —
-      if it's yours, ask to join it instead.
+      {{ duplicates|length|pluralize:"group is,groups are" }} listed below, if it's yours, ask to join it instead.
     </p>
     <ul style="margin:0 0 14px;padding-left:18px;">
       {% for d in duplicates %}
       <li>{{ d.name }} <small style="color:var(--muted);">{% if d.parent %}part of {{ d.parent.name }}{% if d.state %} &middot; {% endif %}{% endif %}{% if d.state %}{{ d.state.code }}{% endif %}</small>
-        — <a href="{% url 'orgs:search' %}?q={{ d.name|urlencode }}">view &amp; ask to join</a></li>
+        <a href="{% url 'orgs:search' %}?q={{ d.name|urlencode }}">view &amp; ask to join</a></li>
       {% endfor %}
     </ul>
     <input type="hidden" name="duplicate_confirmed" value="1">
@@ -462,7 +470,7 @@ answer, so going back to change one costs nothing.
 {% block app_js %}
     (function(){
       /* Preview the chosen logo before it is uploaded. The file still posts on
-         the next Continue/Save — this only removes the beat where you pick an
+         the next Continue/Save, this only removes the beat where you pick an
          image and the page gives no sign it registered. */
       var input = document.getElementById('orgLogoFile');
       var box = document.getElementById('olPreview');
@@ -573,7 +581,7 @@ answer, so going back to change one costs nothing.
             if (!rows.length) { box.style.display = 'none'; return; }
             list.innerHTML = rows.map(function(r){
               var who = esc(r.name) + (r.parent ? ' <small>part of ' + esc(r.parent) + '</small>' : '');
-              return '<li>' + who + ' — <a href="{% url "orgs:search" %}?q=' +
+              return '<li>' + who + ' <a href="{% url "orgs:search" %}?q=' +
                      encodeURIComponent(r.name) + '">ask to join instead</a></li>';
             }).join('');
             box.style.display = '';

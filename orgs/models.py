@@ -641,10 +641,9 @@ class WallPost(models.Model):
     AND the group's manager opted the group into public listing — two
     separate consents, either of which revokes it (see public_feed()).
 
-    kind="recap" is reserved for the AI Group Recap card
-    (docs/ai-group-recap-spec.md §2: one per round, pinned at the top of the
-    feed, author=None). Recap generation isn't built yet; the feed already
-    renders the kind so it lands without a schema change.
+    kind="recap" is the Group Recap card (docs/ai-group-recap-spec.md §2: one
+    per round, pinned at the top of the feed, author=None). Its leaderboard
+    and conversation starters hang off the RoundRecap row below.
     """
 
     KIND_MEMBER = "member"
@@ -717,11 +716,16 @@ class WallPost(models.Model):
 
 
 class RoundRecap(models.Model):
-    """One AI Group Recap per (org, round) — docs/ai-group-recap-spec.md.
+    """One Group Recap per (org, round) — docs/ai-group-recap-spec.md.
 
     The row is the idempotency lock: generation skips any pair that already
     has one, so a recap is never silently rewritten (§3 — if an admin
     corrects a result, flag needs_review instead of regenerating).
+
+    The leaderboard and talking points are snapshotted here rather than
+    recomputed on render, so the card keeps describing the round it was
+    written about. A ladder that quietly updates underneath a two-week-old
+    recap contradicts the sentence sitting above it.
     """
 
     org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name="round_recaps")
@@ -729,10 +733,17 @@ class RoundRecap(models.Model):
     post = models.OneToOneField(
         WallPost, on_delete=models.SET_NULL, null=True, blank=True, related_name="recap",
     )
-    # True when the LLM call failed and the plain factual line was posted
-    # instead (§10) — worth re-running by hand once the API is reachable.
+    # True when the round was too thin for the writer to find two sentences in
+    # and the plain factual line went up instead (§10).
     fallback_used = models.BooleanField(default=False)
+    # Which version of orgs.recaps wrote this card (RECAP_ENGINE).
     model_used = models.CharField(max_length=60, blank=True)
+    # Season table as it stood at this round: [{name, rank, season_points,
+    # round_points, moved, tipped_this_round}, ...]
+    leaderboard = models.JSONField(default=list, blank=True)
+    # Openers for the thread underneath. Offered to members to send, never
+    # posted by anyone: nothing on the Wall speaks in a member's voice.
+    talking_points = models.JSONField(default=list, blank=True)
     # Set when a result correction touches this round after the recap posted
     # (§3): surfaced to the admin rather than silently regenerated.
     needs_review = models.BooleanField(default=False)

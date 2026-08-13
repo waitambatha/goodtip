@@ -1,6 +1,6 @@
 {% extends "admin_base.html" %}
 {% load static %}
-{% block title %}Edit post — Manage{% endblock %}
+{% block title %}Edit post. Manage{% endblock %}
 {% block nav_news %}on{% endblock %}
 {% block hero_title %}Edit post{% endblock %}
 {% block hero_lead %}{{ post.title }}{% endblock %}
@@ -12,7 +12,7 @@
     <span class="gp-ic"><svg><use href="#ic-doc"/></svg></span>
     <div>
       <h2>Edit post</h2>
-      <div class="gp-sub">{% if post.is_published %}Live on every member's dashboard.{% else %}Saved as a draft — not visible to members yet.{% endif %}</div>
+      <div class="gp-sub">{% if post.is_published %}Live on every member's dashboard.{% else %}Saved as a draft, not visible to members yet.{% endif %}</div>
     </div>
   </div>
   <form method="post" action="{% url 'manage:news_edit' post.id %}" enctype="multipart/form-data">

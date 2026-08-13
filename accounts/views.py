@@ -435,12 +435,12 @@ def dashboard_view(request):
             from billing.donations import donation_summary
 
             donation = donation_summary(org)
-        # §7: EVERY member of a family org sees local + national side by side,
-        # never combined. None for standalone orgs (the majority) — no extra
-        # queries and no second figure to show.
-        from billing.donations import family_totals
-
-        family = family_totals(org)
+        # §7's local + national totals came off the dashboard — both read $0
+        # for every group until money moves. family_totals is NOT called any
+        # more: it walks the whole family tree per org card, and this loop
+        # already runs once per league a member belongs to, so computing two
+        # figures nothing renders was pure cost. billing.donations still has
+        # it for whenever the totals find a home.
         cards.append({
             "org": org,
             "round": round_in_play,
@@ -455,7 +455,6 @@ def dashboard_view(request):
             "has_voted": has_voted,
             "subscription": subscription,
             "donation": donation,
-            "family": family,
         })
     # The dashboard is built around ONE comp at a time: a dropdown picks it,
     # its games come forth for tipping. Default to the next comp to lock that
@@ -488,13 +487,28 @@ def dashboard_view(request):
     # by round in the template, so "what can I tip right now" is the whole list.
     games = []
     open_games = 0
+    org_series, active_slugs = [], []
     if selected:
+        # ---- competition filter. An org tipping two codes gets both slates
+        # interleaved by kickoff, which is right for "what is on this week" and
+        # wrong for "just show me the NRL". Filtering here rather than in the
+        # template so the UPCOMING_LIMIT applies to the code being looked at.
+        from tipping.services import competition_filter
+
+        org_series, active_series = competition_filter(
+            selected["org"], request.GET.getlist("series")
+        )
+        active_slugs = [s.slug for s in active_series if s in org_series]
+
+        upcoming = Match.objects.filter(
+            round__org=selected["org"],
+            round__competition__in=selected["org"].competitions.all(),
+            kickoff_at__gt=now,
+        )
+        if active_series:
+            upcoming = upcoming.filter(round__series__in=active_series)
         upcoming = (
-            Match.objects.filter(
-                round__org=selected["org"],
-                round__competition__in=selected["org"].competitions.all(),
-                kickoff_at__gt=now,
-            )
+            upcoming
             .select_related("home_team", "away_team", "round", "round__series")
             .order_by("kickoff_at", "id")[:UPCOMING_LIMIT]
         )
@@ -504,9 +518,42 @@ def dashboard_view(request):
                 user=request.user, match__in=upcoming, org=selected["org"]
             ).values_list("match_id", "selection")
         )
+        # MatchReader's read on each upcoming game. Attached here rather than
+        # queried from the template so the work is visible and bounded: these
+        # are the next few fixtures, not a whole season.
+        #
+        # Batched deliberately. Read one fixture at a time this cost three
+        # queries each and put the dashboard well past two minutes on a remote
+        # database; the batched call answers the same for the whole slate in a
+        # handful.
+        readers = {}
+        try:
+            from matchreader.services import read_matches_verbose
+
+            readers = read_matches_verbose(upcoming)
+        except Exception:                       # noqa: BLE001 — never break the dashboard
+            logger.exception("MatchReader failed for the dashboard slate")
+
+        # Only the rounds inside the tipping window may be picked. submit_tip
+        # enforces this regardless; marking it here is so the screen says so
+        # up front, and names the round it is waiting on — "locked" without a
+        # reason is indistinguishable from "you missed it".
+        from tipping.services import tip_window
+
+        window = tip_window(selected["org"])
         for g in upcoming:
             g.my_tip = my_picks.get(g.id)
             g.tipped = g.my_tip is not None
+            g.reader = readers.get(g.id)
+            state = window.get(g.round_id, {"open": True, "waits_for": None})
+            g.round_open = state["open"]
+            g.can_tip = g.round_open and not g.is_locked
+            g.lock_note = ""
+            if not g.round_open and state["waits_for"] is not None:
+                g.lock_note = (
+                    f"Locked. You can tip this once round "
+                    f"{state['waits_for'].round_number} is over."
+                )
             open_games += 1
             games.append(g)
 
@@ -554,6 +601,10 @@ def dashboard_view(request):
         # only its FIRST kickoff and said "locked" while most of the round was
         # still days away.
         "open_games": open_games,
+        # Competition filter: the series this org actually has rounds in, and
+        # which are selected.
+        "org_series": org_series,
+        "active_slugs": active_slugs,
         "preview_round": preview_round,
         "locking_soon": locking_soon,
         "create_url": reverse("orgs:create"),

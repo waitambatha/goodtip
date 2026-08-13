@@ -705,7 +705,20 @@ TheSportsAPISyncService = ApiSportsRugbySyncService
 
 
 def get_sync_service(competition: str) -> DataSyncService:
+    """The provider for a competition.
+
+    Sportradar first: it is the source the client commissioned, it covers all
+    four launch codes from one key, and it is a commercial feed rather than a
+    site we read politely. The scrapers stay as the fallback because the key
+    is a TRIAL that stops on 11 Sep 2026 — the week that happens is not the
+    week to start writing a replacement.
+    """
     comp = competition.upper()
+    if getattr(settings, "SPORTRADAR_API_KEY", "") and comp in SportradarSyncService.SERIES_FOR:
+        try:
+            return SportradarSyncService(comp)
+        except Exception:                       # noqa: BLE001
+            logger.exception("Sportradar unavailable for %s; falling back to scraping", comp)
     if comp == "AFL":
         # Scraped from afl.com.au, not Squiggle. Squiggle is AFL only, so AFLW
         # had no feed at all, and it rate-limits: it began returning 403 within
@@ -720,6 +733,32 @@ def get_sync_service(competition: str) -> DataSyncService:
         # can be swapped back in by changing this one line if a key appears.
         return NrlScrapeSyncService()
     raise SyncError(f"Unsupported competition: {competition}")
+
+
+def competition_for_series(series_name: str) -> str | None:
+    """The competition key that covers a Series, or None if no feed does.
+
+    Feeds are keyed by COMPETITION ("AFL", "NRL"), and each sync service loops
+    the Series that competition bundles internally: AFL covers AFLW, NRL
+    covers NRLW and State of Origin. A caller that starts from a Round holds a
+    SERIES, so it has to come back through here first.
+
+    Handing a Series name straight to get_sync_service is what made every
+    AFLW, NRLW and Origin round fail with "Unsupported competition: AFLW"
+    while the AFL round sitting beside it synced fine — the two names happen
+    to match for the men's series and nowhere else.
+
+    Derived from the services' own SERIES lists rather than a second hardcoded
+    table, so adding a series to a feed cannot leave this behind.
+    """
+    wanted = (series_name or "").strip().upper()
+    for competition, service in (
+        ("AFL", AflScrapeSyncService),
+        ("NRL", NrlScrapeSyncService),
+    ):
+        if wanted in {s.upper() for s in service.SERIES}:
+            return competition
+    return None
 
 
 # NRL nickNames that do not slugify to our Team slug. Only two of seventeen,
@@ -1145,3 +1184,256 @@ class AflScrapeSyncService:
         """
         self._check(competition)
         return SquiggleSyncService().sync_ladder(competition=competition, org=org, **kw)
+
+
+def slug_candidates(clean_name: str) -> list[str]:
+    """Slugs to try for a club name, most specific first.
+
+    Pure and ordered, because the ORDER is the whole strategy and getting it
+    wrong is silent: a name resolves to the wrong club, or to none, and the
+    fixture is simply dropped from history with a log line nobody reads.
+
+        Carlton Blues              -> carlton-blues, carlton, blues
+        North Melbourne Kangaroos  -> north-melbourne-kangaroos,
+                                      melbourne-kangaroos, north-melbourne,
+                                      north, kangaroos
+
+    Four passes, in this order:
+
+      1. The full slug. A club stored under its whole broadcast name must
+         match itself before any shortening is attempted, or "West Coast
+         Eagles" would resolve on the prefix "west-coast".
+      2. The trailing two words, which is where a nickname usually sits.
+      3. LEADING words, longest prefix first. Sportradar sends "Carlton
+         Blues" where the Team table holds "Carlton"; only the trailing words
+         were tried before, so ten of eighteen AFLW clubs never resolved and
+         their games never entered history. Longest first so "North Melbourne
+         Kangaroos" reaches "north-melbourne" and never settles for "north".
+      4. The last word alone, the loosest guess, tried only once everything
+         more specific has failed.
+    """
+    words = slugify((clean_name or "").replace("&", "and")).split("-")
+    words = [w for w in words if w]
+    if not words:
+        return []
+    out = ["-".join(words)]
+    if len(words) >= 2:
+        out.append("-".join(words[-2:]))
+    for cut in range(len(words) - 1, 0, -1):
+        out.append("-".join(words[:cut]))
+    out.append(words[-1])
+    # Order-preserving dedupe: a two-word name generates the same slug more
+    # than once, and re-querying it is pure waste.
+    seen, unique = set(), []
+    for slug in out:
+        if slug not in seen:
+            seen.add(slug)
+            unique.append(slug)
+    return unique
+
+
+def _resolve_sr_team(series: Series, name: str, external_id: str = "") -> Team | None:
+    """Team lookup for Sportradar names.
+
+    Sportradar uses the broadcast name ("Manly Sea Eagles", "St George
+    Illawarra Dragons") where the Team table stores the full registered name
+    ("Manly Warringah Sea Eagles") under a nickname slug ("sea-eagles"). Neither
+    an exact slug nor an exact name matches, so both sides were being skipped
+    and whole fixtures silently dropped.
+
+    Resolution walks from most to least specific and stops at the first hit:
+    the stable Sportradar id, the full slug, then the trailing one or two words
+    as a slug — which is where the nickname always lives in these names.
+    """
+    if not name:
+        return None
+
+    def stamp(t):
+        if t and external_id and not t.external_id:
+            t.external_id = external_id
+            t.save(update_fields=["external_id"])
+        return t
+
+    if external_id:
+        t = Team.objects.filter(series=series, external_id=external_id).first()
+        if t:
+            return t
+
+    # Sportradar disambiguates clubs that share a name across codes by
+    # appending the competition: "Dolphins (Nrl)". That suffix is not part of
+    # the club's name and slugifies into it ("dolphins-nrl"), so it is stripped
+    # before any lookup.
+    clean = re.sub(r"\s*\([^)]*\)\s*", " ", name).strip()
+    candidates = slug_candidates(clean)
+    for slug in candidates:
+        t = Team.objects.filter(series=series, slug=slug).first()
+        if t:
+            return stamp(t)
+
+    t = Team.objects.filter(series=series, name__iexact=clean).first()
+    if t:
+        return stamp(t)
+    # Last resort: the stored name ends with the nickname we were given.
+    for slug in candidates[1:]:
+        t = Team.objects.filter(series=series, name__iendswith=slug.replace("-", " ")).first()
+        if t:
+            return stamp(t)
+    return None
+
+
+class SportradarSyncService:
+    """Fixtures and results from Sportradar, for whichever codes a competition
+    bundles.
+
+    One class serves both competitions because the only thing that differs is
+    which Series it loops. The client caches a whole season per request, so a
+    twelve-round sync costs one call, not twelve — which matters on a trial
+    key rated at one request per second.
+    """
+
+    #: catalog Competition name -> the Series it covers
+    SERIES_FOR = {
+        "AFL": ["AFL", "AFLW"],
+        "NRL": ["NRL", "NRLW"],
+    }
+
+    def __init__(self, competition: str):
+        from .providers_sportradar import SportradarClient
+        self.competition = competition.upper()
+        if self.competition not in self.SERIES_FOR:
+            raise SyncError(f"Sportradar does not cover {competition!r}.")
+        self._client = SportradarClient()
+
+    @property
+    def series_names(self):
+        return self.SERIES_FOR[self.competition]
+
+    def _check(self, competition: str) -> None:
+        if competition.upper() != self.competition:
+            raise SyncError(f"This service handles {self.competition}, not {competition!r}.")
+
+    def _rows(self, series_name: str, round_number: int, year: int):
+        from .providers_sportradar import SportradarError
+        series = Series.objects.filter(name=series_name).first()
+        if series is None:
+            return None, []
+        try:
+            return series, self._client.fixtures(
+                series=series_name, season=year, round_number=round_number)
+        except SportradarError as e:
+            logger.info("Sportradar %s round %s: %s", series_name, round_number, e)
+            return series, []
+
+    def discover_rounds(self, *, competition: str, org: Organisation,
+                        horizon_days: int = 21, back_days: int = 3) -> list[int]:
+        self._check(competition)
+        from .providers_sportradar import SportradarError
+        found: set[int] = set()
+        for name in self.series_names:
+            try:
+                found.update(self._client.rounds_in_window(
+                    series=name, season=org.season.year,
+                    horizon_days=horizon_days, back_days=back_days))
+            except SportradarError as e:
+                logger.info("Sportradar discover %s: %s", name, e)
+        return sorted(found)
+
+    def sync_fixtures(self, *, competition: str, round_number: int, org: Organisation) -> int:
+        self._check(competition)
+        n = 0
+        for name in self.series_names:
+            series, rows = self._rows(name, round_number, org.season.year)
+            if not rows:
+                continue
+            round_obj, _ = Round.objects.get_or_create(
+                org=org, round_number=round_number, series=series,
+                defaults={"lockout_at": min(r["kickoff_at"] for r in rows),
+                          "status": "upcoming",
+                          "competition": Competition.for_series(series, org.season)},
+            )
+            earliest = min(r["kickoff_at"] for r in rows)
+            if round_obj.lockout_at != earliest:
+                round_obj.lockout_at = earliest
+                round_obj.save(update_fields=["lockout_at"])
+            _ensure_round_competition(round_obj, series, org)
+            for r in rows:
+                home = _resolve_sr_team(series, r["home_name"], r["home_external_id"])
+                away = _resolve_sr_team(series, r["away_name"], r["away_external_id"])
+                if not home or not away:
+                    logger.warning("Skip sportradar %s: unresolved %s/%s",
+                                   r["external_id"], r["home_name"], r["away_name"])
+                    continue
+                match = _resolve_match(round_obj, r["external_id"], home, away)
+                if match is None:
+                    Match.objects.create(
+                        round=round_obj, external_id=r["external_id"],
+                        home_team=home, away_team=away, kickoff_at=r["kickoff_at"],
+                        venue=r["venue"], venue_city=r["venue_city"])
+                else:
+                    match.external_id = r["external_id"]
+                    match.home_team, match.away_team = home, away
+                    match.kickoff_at = r["kickoff_at"]
+                    match.venue, match.venue_city = r["venue"], r["venue_city"]
+                    match.save(update_fields=["external_id", "home_team", "away_team",
+                                              "kickoff_at", "venue", "venue_city"])
+                n += 1
+        return n
+
+    def sync_live(self, *, competition: str, round_number: int, org: Organisation) -> int:
+        """In-play score only. Grading waits for sync_results, because a score
+        mid-game is provisional and points taken back are worse than points late."""
+        self._check(competition)
+        n = 0
+        for name in self.series_names:
+            series, rows = self._rows(name, round_number, org.season.year)
+            round_obj = Round.objects.filter(org=org, round_number=round_number, series=series).first() if series else None
+            if not rows or round_obj is None:
+                continue
+            for r in rows:
+                if r["status"] == "scheduled":
+                    continue
+                home = _resolve_sr_team(series, r["home_name"], r["home_external_id"])
+                away = _resolve_sr_team(series, r["away_name"], r["away_external_id"])
+                match = _resolve_match(round_obj, r["external_id"], home, away) if home and away else None
+                if match is None:
+                    continue
+                match.home_score, match.away_score = r["home_score"], r["away_score"]
+                match.status = r["status"]
+                match.period = r["period"][:32]
+                match.live_updated_at = timezone.now()
+                match.save(update_fields=["home_score", "away_score", "status",
+                                          "period", "live_updated_at"])
+                n += 1
+        return n
+
+    def sync_results(self, *, competition: str, round_number: int, org: Organisation) -> int:
+        self._check(competition)
+        n = 0
+        for name in self.series_names:
+            series, rows = self._rows(name, round_number, org.season.year)
+            round_obj = Round.objects.filter(org=org, round_number=round_number, series=series).first() if series else None
+            if not rows or round_obj is None:
+                continue
+            for r in rows:
+                if r["status"] != "complete" or r["home_score"] is None:
+                    continue
+                home = _resolve_sr_team(series, r["home_name"], r["home_external_id"])
+                away = _resolve_sr_team(series, r["away_name"], r["away_external_id"])
+                match = _resolve_match(round_obj, r["external_id"], home, away) if home and away else None
+                if match is None:
+                    continue
+                match.status = "complete"
+                match.period = r["period"][:32]
+                match.save(update_fields=["status", "period"])
+                record_match_result(match, int(r["home_score"]), int(r["away_score"]))
+                n += 1
+        return n
+
+    def sync_ladder(self, *, competition: str, org: Organisation, **kw) -> int:
+        """Standings are a separate Sportradar endpoint and are not in the
+        client's launch scope ("fixtures and final results"). Falls back to
+        the existing provider rather than pretending."""
+        self._check(competition)
+        if self.competition == "AFL":
+            return SquiggleSyncService().sync_ladder(competition=competition, org=org, **kw)
+        raise SyncError("NRL ladder is not in the Sportradar launch scope yet.")

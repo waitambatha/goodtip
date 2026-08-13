@@ -1,6 +1,6 @@
 {% extends "app_base.html" %}
 {% load team_extras %}
-{% block title %}My tips — {{ org.name }}{% endblock %}
+{% block title %}My tips, {{ org.name }}{% endblock %}
 {% block loader_task %}Fetching your tips{% endblock %}
 {% block nav_tips %}on{% endblock %}
 {% block body_class %}page-deep sheet-page{% endblock %}
@@ -60,6 +60,14 @@
       </div>
     </div>
 
+    {% comment %}
+    Competition filter above the round list, because it scopes WHICH rounds
+    exist here: an org on AFL and NRL has two round 3s, and the prev/next
+    arrows follow whichever code is selected.
+    {% endcomment %}
+    {% url 'tipping:my_tips' org.id as tips_url %}
+    {% include "partials/series_filter.html" with base=tips_url %}
+
     {% include "partials/my_tips_round.html" with round=selected_round rows=rows state=state phase_counts=phase_counts total_all=total_all %}
 
     <div class="gt-note">
@@ -74,18 +82,18 @@
       <div class="gt-rankrow">
         <div class="rk">
           <small>Rank</small>
-          <b>{% if rank %}{{ rank }}{% else %}&mdash;{% endif %}</b>
+          <b>{% if rank %}{{ rank }}{% else %}-{% endif %}</b>
           <i>of {{ total_tippers }}</i>
         </div>
         <span class="shield"><svg><use href="#ic-shield-star"/></svg></span>
         <div class="rk r">
           <small>Percentile</small>
-          <b>{% if percentile %}{{ percentile }}%{% else %}&mdash;{% endif %}</b>
+          <b>{% if percentile %}{{ percentile }}%{% else %}-{% endif %}</b>
           <i>of the field</i>
         </div>
       </div>
       {% if percentile %}
-      <p class="gsc-note">{% if percentile >= 75 %}Top of the table stuff — keep it going.{% elif percentile >= 40 %}Right in the mix. A good round moves you up.{% else %}Plenty of season left to climb.{% endif %}</p>
+      <p class="gsc-note">{% if percentile >= 75 %}Top of the table stuff, keep it going.{% elif percentile >= 40 %}Right in the mix. A good round moves you up.{% else %}Plenty of season left to climb.{% endif %}</p>
       <div class="pbar sm"><i style="width:{{ percentile }}%"></i></div>
       {% endif %}
     </section>

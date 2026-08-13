@@ -1,6 +1,6 @@
 {% extends "admin_base.html" %}
 {% load static %}
-{% block title %}Sync — Manage{% endblock %}
+{% block title %}Sync. Manage{% endblock %}
 {% block nav_sync %}on{% endblock %}
 {% block hero_title %}Manage{% endblock %}
 {% block hero_lead %}Keep your data in sync. Accurate tips. Better results.{% endblock %}
@@ -58,8 +58,12 @@
     <div class="gd-fld">
       <label for="sy_comp">Competition</label>
       <select name="competition" id="sy_comp">
-        <option value="AFL">AFL &middot; Squiggle</option>
-        <option value="NRL">NRL &middot; TheSports</option>
+        {% comment %}
+        Competitions, not series: each covers its own women's and rep
+        series, so AFL syncs AFLW too and NRL takes NRLW and Origin.
+        {% endcomment %}
+        <option value="AFL">AFL &middot; incl. AFLW</option>
+        <option value="NRL">NRL &middot; incl. NRLW &amp; Origin</option>
       </select>
     </div>
 
@@ -152,7 +156,7 @@
       {% endif %}
 
       <p class="card-lead" style="margin-top:14px;font-size:12px;">
-        Scheduled by <code>manage.py sync_matches</code> — live every 2 min,
+        Scheduled by <code>manage.py sync_matches</code>, live every 2 min,
         results every 15, fixtures nightly. See DEPLOYMENT.md.
       </p>
     </section>

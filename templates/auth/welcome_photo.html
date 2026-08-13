@@ -1,12 +1,12 @@
 {% extends "auth_base.html" %}
-{% block title %}Add your photo — GoodTip{% endblock %}
+{% block title %}Add your photo &middot; GoodTip{% endblock %}
 {% block loader_task %}Setting up your profile{% endblock %}
 {% block auth_mood %}mood-lime{% endblock %}
 {% block brand_head %}Put a face on <em>the ladder.</em>{% endblock %}
-{% block brand_sub %}Your photo shows up next to your tips, your sledges on the Wall, and your spot on the ladder. Groups with faces give more grief — and more to charity.{% endblock %}
+{% block brand_sub %}Your photo shows up next to your tips, your sledges on the Wall, and your spot on the ladder. Groups with faces give more grief, and more to charity.{% endblock %}
 {% block auth_form %}
 <h1>You're in. Add a photo?</h1>
-<p class="sub">Totally optional — skip it and your group sees your initials instead.</p>
+<p class="sub">Totally optional, skip it and your group sees your initials instead.</p>
 {% if error %}<div class="flash error" style="margin-bottom:16px;"><span>{{ error }}</span></div>{% endif %}
 
 <form method="post" enctype="multipart/form-data" class="wp-form">
@@ -47,7 +47,7 @@
        It is one of the two real choices on this page, so it now looks like a
        choice — full width, bordered, same hit area as the primary. {% endcomment %}
     <button type="submit" name="skip" value="1" class="abtn abtn-quiet abtn-block wp-skip" formnovalidate>
-      Skip for now — I'll add a photo later
+      Skip for now. I'll add a photo later
     </button>
     <p class="wp-skip-note">You can add or change your photo any time from your profile.</p>
   </div>

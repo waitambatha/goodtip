@@ -1,5 +1,5 @@
 {% extends "admin_base.html" %}
-{% block title %}Approvals — GoodTip admin{% endblock %}
+{% block title %}Approvals &middot; GoodTip admin{% endblock %}
 {% block nav_approvals %}on{% endblock %}
 {% block admin_content %}
 
@@ -28,7 +28,7 @@
           {% for a in row.admins %}{{ a.display_name }}{% if not forloop.last %}, {% endif %}
           {% empty %}
           {# No admin means nobody but staff can clear this one. #}
-          <b style="color:var(--forest);">None — only you can action this</b>
+          <b style="color:var(--forest);">None, only you can action this</b>
           {% endfor %}
         </td>
         <td style="text-align:right;white-space:nowrap;">

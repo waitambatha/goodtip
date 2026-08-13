@@ -1,6 +1,6 @@
 {% extends "app_base.html" %}
 {% load static %}
-{% block title %}Departments — {{ org.name }}{% endblock %}
+{% block title %}Departments, {{ org.name }}{% endblock %}
 {% block loader_task %}Finding the departments{% endblock %}
 {% block body_class %}page-deep sheet-page{% endblock %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
@@ -16,11 +16,38 @@ asked to be in it, or you can ask. Pending departments are shown only to the
 admins who must decide on them and to the member who raised the request, so
 nobody else sees a half-built thing in the list.
 {% endcomment %}
-<div class="gt-head">
-  <div>
+{% comment %}
+The page leads with what it is for rather than a plain heading: the title and
+its explanation on the left, the one action on the right, and an illustration
+that says "teams, competing" without a paragraph. The trophy is drawn rather
+than photographed so it stays crisp at any size and costs no request.
+{% endcomment %}
+<div class="dept-hero">
+  <div class="dh-copy">
     <div class="gh-eyebrow">{{ org.name }}</div>
     <h1>Departments</h1>
-    <p class="gh-lead">Find your team inside {{ org.name }}, or start it if it isn't here yet. Each one has its own ladder, its own wall and its own crowd.</p>
+    <p class="dh-lead">Find your team inside {{ org.name }}, or start it if it isn't here yet. Each one has its own ladder, its own wall and its own crowd.</p>
+  </div>
+  <div class="dh-side">
+    <button type="button" class="abtn abtn-primary abtn-lg dh-cta" data-dept-open>
+      <svg class="cic" aria-hidden="true" viewBox="0 0 24 24"><path d="M11 5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5Z"/></svg>
+      Create department
+    </button>
+    {% comment %}
+    The orbit: a trophy with the people around it. Members are real avatars
+    where the org has them, so the illustration is about this organisation
+    rather than being stock decoration.
+    {% endcomment %}
+    <div class="dh-orbit" aria-hidden="true">
+      <span class="dho-ring"></span>
+      <span class="dho-ring two"></span>
+      <span class="dho-trophy"><svg viewBox="0 0 24 24"><use href="#ic-f-trophy"/></svg></span>
+      {% for m in orbit_members %}
+      <span class="dho-face f{{ forloop.counter }}">
+        {% if m.user.avatar %}<img src="{{ m.user.avatar.url }}" alt="">{% else %}{{ m.user.display_name|slice:":2"|upper }}{% endif %}
+      </span>
+      {% endfor %}
+    </div>
   </div>
 </div>
 
@@ -30,13 +57,13 @@ nobody else sees a half-built thing in the list.
 </div>
 {% endif %}
 
-<div class="card pad-lg" style="margin-bottom:18px;">
+<div class="dept-searchbar">
   <form method="get" action="{% url 'orgs:departments' org.id %}" class="dept-search">
-    <div class="fld-ic" style="flex:1;min-width:220px;">
-      <span class="fi-mark" aria-hidden="true"><svg><use href="#ic-search"/></svg></span>
+    <div class="ds-field">
+      <span class="ds-ic" aria-hidden="true"><svg><use href="#ic-search"/></svg></span>
       <input type="search" name="q" value="{{ q }}" placeholder="Search departments, e.g. IT, Finance, Warehouse" autocomplete="off">
     </div>
-    <button type="submit" class="abtn abtn-ghost">Search</button>
+    <button type="submit" class="abtn abtn-dark ds-go">Search</button>
     {% if q %}<a href="{% url 'orgs:departments' org.id %}" class="abtn abtn-ghost">Clear</a>{% endif %}
   </form>
 </div>
@@ -44,29 +71,23 @@ nobody else sees a half-built thing in the list.
 <div class="dept-grid">
   {% for r in rows %}
   <article class="dept-card{% if r.awaiting_approval %} is-pending{% endif %}">
-    <div class="dc-top">
-      {% comment %}
-      The glyph is chosen from the department's type rather than being the same
-      org mark on every card. A wall of identical icons is decoration; a wall
-      of different ones is something you can scan, which is the entire job of
-      this page.
-      {% endcomment %}
-      <span class="gt-ic-tile" aria-hidden="true"><svg><use href="#{{ r.icon }}"/></svg></span>
-      <div class="dc-name">
-        <b>{{ r.org.name }}</b>
-        {% if r.org.department_kind %}<i>{{ r.org.department_kind }}</i>{% endif %}
+    <div class="dc-body">
+      <div class="dc-top">
+        <span class="gt-ic-tile filled tone-{{ r.tone }}" aria-hidden="true"><svg><use href="#{{ r.icon }}"/></svg></span>
+        <div class="dc-name">
+          <b>{{ r.org.name }}</b>
+          {% if r.org.department_kind %}<i>{{ r.org.department_kind }}</i>{% endif %}
+          <span class="dc-meta"><svg><use href="#ic-f-people"/></svg> {{ r.org.member_count }} member{{ r.org.member_count|pluralize }}</span>
+        </div>
+        <span class="dc-count">{{ r.org.member_count }} member{{ r.org.member_count|pluralize }}</span>
       </div>
-    </div>
-
-    <div class="dc-meta">
-      <span><svg><use href="#ic-users"/></svg> {{ r.org.member_count }} member{{ r.org.member_count|pluralize }}</span>
       {% if r.awaiting_approval %}<span class="dc-flag">Waiting for approval</span>{% endif %}
     </div>
 
-    <div class="dc-actions">
+    <div class="dc-foot">
       {% if r.awaiting_approval %}
         {% if is_admin %}
-          <form method="post" action="{% url 'orgs:departments' org.id %}" style="display:flex;gap:8px;flex-wrap:wrap;">
+          <form method="post" action="{% url 'orgs:departments' org.id %}" class="dc-decide">
             {% csrf_token %}<input type="hidden" name="dept_id" value="{{ r.org.id }}">
             <button type="submit" name="action" value="approve" class="abtn abtn-primary abtn-sm">Approve</button>
             <button type="submit" name="action" value="decline" class="abtn abtn-ghost abtn-sm"
@@ -76,93 +97,150 @@ nobody else sees a half-built thing in the list.
           <span class="dc-note">Sent to {{ org.name }}'s admins.</span>
         {% endif %}
       {% elif r.is_member %}
-        <a href="{% url 'orgs:wall' r.org.id %}" class="abtn abtn-primary abtn-sm">Open the wall &rarr;</a>
+        <a href="{% url 'orgs:wall' r.org.id %}" class="dc-link">Open the wall &rarr;</a>
       {% elif r.join_pending %}
         <span class="dc-note">Request sent. Waiting on their admin.</span>
       {% else %}
         <form method="post" action="{% url 'orgs:request_join' r.org.id %}">
           {% csrf_token %}
           <input type="hidden" name="next" value="{% url 'orgs:departments' org.id %}">
-          <button type="submit" class="abtn abtn-ghost abtn-sm">Ask to join</button>
+          <button type="submit" class="dc-link as-btn">Ask to join &rarr;</button>
         </form>
       {% endif %}
     </div>
   </article>
-  {% empty %}
-  {% comment %}
-  An empty directory is the first thing every new organisation sees here, so
-  it is worth more than a sentence in a box. The photograph carries it and the
-  message sits on top.
-  {% endcomment %}
-  <div class="gt-empty has-photo" style="grid-column:1/-1;">
-    <div class="ge-photo" style="background-image:url('{% static 'img/scenes/nrl-warmup.jpg' %}')" aria-hidden="true"></div>
-    <div class="ge-scrim" aria-hidden="true"></div>
-    <div>
-      {% if q %}
-        <h3>Nothing matching &ldquo;{{ q }}&rdquo;</h3>
-        <p>No department here goes by that. <a href="{% url 'orgs:departments' org.id %}">See all of them</a>, or start yours below.</p>
-      {% else %}
-        <h3>No departments yet</h3>
-        <p>{{ org.name }} is one big group right now. Start the first department below and give your team its own ladder.</p>
-      {% endif %}
-    </div>
-  </div>
   {% endfor %}
+
+  {% comment %}
+  The prompt sits IN the grid as its own card rather than under it. Someone
+  scanning for their department and not seeing it is already looking here, and
+  a call to action below the fold is one they have to go back for.
+  {% endcomment %}
+  <article class="dept-card is-prompt">
+    <div class="dc-body">
+      <span class="dc-prompt-ic" aria-hidden="true"><svg><use href="#ic-f-people"/></svg></span>
+      <b class="dc-prompt-h">{% if q %}Nothing matching &ldquo;{{ q }}&rdquo;{% else %}Can't find your department?{% endif %}</b>
+      <p class="dc-prompt-p">
+        {% if is_admin %}You're an admin of {{ org.name }}, so yours goes live straight away.
+        {% else %}Start it and {{ org.name }}'s admins will approve it.{% endif %}
+      </p>
+    </div>
+    <div class="dc-foot">
+      <button type="button" class="dc-link as-btn" data-dept-open>Create department <span class="dc-plus">+</span></button>
+    </div>
+  </article>
 </div>
 
 {% comment %}
-Anyone can start one. A member's goes to the org's admins first; an admin's is
-live immediately, because asking someone to approve their own request is
-theatre. The form says which of those will happen before it is submitted.
+Three facts about what a department actually gets you. They answer the question
+the page raises ("why would I want one?") at the point someone has just decided
+whether to join or start one.
 {% endcomment %}
-<div class="card pad-lg" style="margin-top:22px;" id="new-department">
-  <div class="card-h">Start a department</div>
-  <p class="card-lead" style="margin:4px 0 16px;">
-    {% if is_admin %}You're an admin of {{ org.name }}, so this goes live straight away.
-    {% else %}This gets sent to {{ org.name }}'s admins to approve. You'll be its admin once they say yes.{% endif %}
-  </p>
-  {% comment %}
-  Two columns, because the four inputs are two pairs: what it is called, and
-  what kind of thing it is. Stacked, the pairing was invisible and the form
-  read as four unrelated questions.
-  {% endcomment %}
-  <form method="post" action="{% url 'orgs:departments' org.id %}" class="dept-form">
-    {% csrf_token %}
-    <input type="hidden" name="action" value="create">
-    <div class="dept-form-grid">
-      <div class="fld">
-        <label for="id_dept_name">Department name</label>
-        <div class="fld-ic">
-          <span class="fi-mark" aria-hidden="true"><svg><use href="#ic-org"/></svg></span>
-          <input type="text" name="name" id="id_dept_name" required maxlength="200" placeholder="e.g. IT" autocomplete="off">
-        </div>
-        <div class="hint">What the people in it would call it.</div>
-      </div>
-      <div class="fld">
-        <label for="id_dept_type">Type <span class="fld-opt">optional</span></label>
-        <div class="fld-ic">
-          <span class="fi-mark" aria-hidden="true"><svg><use href="#ic-sliders"/></svg></span>
-          <select name="department_type" id="id_dept_type">
-            <option value="">— Pick one, or describe it yourself —</option>
-            {% for t in type_choices %}
-            <option value="{{ t.pk }}">{{ t.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="hint">Sets the icon on your card.</div>
-      </div>
-      <div class="fld">
-        <label for="id_dept_label">…or describe it yourself</label>
-        <div class="fld-ic">
-          <span class="fi-mark" aria-hidden="true"><svg><use href="#ic-doc"/></svg></span>
-          <input type="text" name="department_label" id="id_dept_label" maxlength="80" placeholder="e.g. Night Shift, Level 3, The Cave" autocomplete="off">
-        </div>
-        <div class="hint">Use this when the list doesn't have you. It shows beside the name.</div>
-      </div>
-    </div>
-    <button type="submit" class="abtn abtn-primary abtn-lg">
-      {% if is_admin %}Create department{% else %}Send for approval{% endif %} &rarr;
+<div class="dept-facts">
+  <div class="df-item">
+    <span class="df-ic"><svg><use href="#ic-f-chart"/></svg></span>
+    <div><b>Independent departments</b><p>Each department has its own ladder and wall.</p></div>
+  </div>
+  <div class="df-item">
+    <span class="df-ic"><svg><use href="#ic-f-people"/></svg></span>
+    <div><b>Built-in engagement</b><p>Walls, tips and ladders drive friendly competition.</p></div>
+  </div>
+  <div class="df-item">
+    <span class="df-ic round"><svg><use href="#ic-f-heart"/></svg></span>
+    <div><b>Raise for {{ org.charity_display }}</b><p>Every tip contributes to the cause your group picked.</p></div>
+  </div>
+</div>
+
+<div class="dept-modal" id="deptModal" hidden>
+  <div class="dm-scrim" data-dept-close></div>
+  <div class="dm-panel" role="dialog" aria-modal="true" aria-labelledby="dmTitle">
+    <button type="button" class="dm-x" aria-label="Close" data-dept-close>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
     </button>
-  </form>
+
+    <div class="dm-rail" aria-hidden="true">
+      <span class="dm-dot on" data-dot="1"></span>
+      <span class="dm-line"></span>
+      <span class="dm-dot" data-dot="2"></span>
+    </div>
+
+    <form method="post" action="{% url 'orgs:departments' org.id %}" class="dm-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create">
+      <input type="hidden" name="target_org" id="dmTargetOrg" value="{{ org.id }}">
+
+      {# ---------- step 1: which organisation ---------- #}
+      <section class="dm-step is-active" data-step="1">
+        <div class="dm-eyebrow">Step 1 of 2</div>
+        <h2 class="dm-title" id="dmTitle">Which organisation?</h2>
+        <p class="dm-lead">Your department will sit inside it and its totals roll up there.</p>
+
+        <label class="dm-org is-picked" data-org-option data-org-id="{{ org.id }}">
+          <span class="gt-ic-tile filled tone-green"><svg><use href="#ic-f-org"/></svg></span>
+          <span class="dm-org-txt"><b>{{ org.name }}</b><i>Where you are now</i></span>
+          <span class="dm-tick" aria-hidden="true"><svg><use href="#ic-f-vote"/></svg></span>
+        </label>
+
+        {% if my_orgs|length > 1 %}
+        <button type="button" class="dm-switch" data-dept-switch>Not this one? Pick another</button>
+        <div class="dm-orglist" hidden>
+          {% for o in my_orgs %}{% if o.id != org.id %}
+          <label class="dm-org" data-org-option data-org-id="{{ o.id }}">
+            <span class="gt-ic-tile filled tone-slate sm"><svg><use href="#ic-f-org"/></svg></span>
+            <span class="dm-org-txt"><b>{{ o.name }}</b><i>{{ o.sport_label }} &middot; {{ o.season }}</i></span>
+            <span class="dm-tick" aria-hidden="true"><svg><use href="#ic-f-vote"/></svg></span>
+          </label>
+          {% endif %}{% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="dm-actions">
+          <button type="button" class="abtn abtn-primary abtn-lg" data-dept-next>Continue &rarr;</button>
+        </div>
+      </section>
+
+      {# ---------- step 2: which department ---------- #}
+      <section class="dm-step" data-step="2">
+        <div class="dm-eyebrow">Step 2 of 2</div>
+        <h2 class="dm-title">Which department?</h2>
+        <p class="dm-lead">Pick one, or type your own if it isn't here.</p>
+
+        <div class="dm-types" role="radiogroup" aria-label="Department type">
+          {% for t in type_choices %}
+          <button type="button" class="dm-type" data-type-id="{{ t.pk }}" data-type-name="{{ t.name }}" role="radio" aria-checked="false">
+            {{ t.name }}
+          </button>
+          {% endfor %}
+        </div>
+        <input type="hidden" name="department_type" id="dmType" value="">
+
+        <div class="dm-own">
+          <label for="dmOwn">Not listed? Type it</label>
+          <div class="fld-ic">
+            <span class="fi-mark" aria-hidden="true"><svg><use href="#ic-f-doc"/></svg></span>
+            <input type="text" id="dmOwn" name="department_label" maxlength="80"
+                   placeholder="e.g. Night Shift, Level 3, The Cave" autocomplete="off">
+          </div>
+        </div>
+
+        <div class="dm-name">
+          <label for="dmName">What is it called?</label>
+          <div class="fld-ic">
+            <span class="fi-mark" aria-hidden="true"><svg><use href="#ic-f-org"/></svg></span>
+            <input type="text" id="dmName" name="name" required maxlength="200"
+                   placeholder="e.g. IT" autocomplete="off">
+          </div>
+          <div class="hint">What the people in it would call it.</div>
+        </div>
+
+        <div class="dm-actions">
+          <button type="button" class="abtn abtn-ghost abtn-lg" data-dept-back>&larr; Back</button>
+          <button type="submit" class="abtn abtn-primary abtn-lg">
+            {% if is_admin %}Create department{% else %}Send for approval{% endif %} &rarr;
+          </button>
+        </div>
+      </section>
+    </form>
+  </div>
 </div>
 {% endblock %}

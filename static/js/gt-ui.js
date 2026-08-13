@@ -134,3 +134,30 @@
     });
   });
 })();
+
+/* Recap conversation starters.
+ *
+ * A starter is a suggestion, not a message. Tapping one drops the line into
+ * that member's own reply box and puts the cursor at the end of it, so the
+ * thing that lands on the Wall is something they chose to send and could
+ * edit first. Nothing here posts, and nothing on the Wall is ever written in
+ * a member's voice.
+ *
+ * Delegated from the document so it survives an htmx swap of the feed.
+ */
+(function () {
+  'use strict';
+  document.addEventListener('click', function (e) {
+    var chip = e.target.closest('[data-recap-starter]');
+    if (!chip) return;
+    var card = document.getElementById('post-' + chip.dataset.post);
+    var box = card && card.querySelector('.gpt-replybox textarea');
+    if (!box) return;
+    box.value = chip.textContent.trim();
+    box.focus();
+    box.setSelectionRange(box.value.length, box.value.length);
+    /* the reply box grows with its content (data-grow) */
+    box.dispatchEvent(new Event('input', { bubbles: true }));
+    box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+})();

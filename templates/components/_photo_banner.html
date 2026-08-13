@@ -27,6 +27,17 @@ Two rules the photos forced:
 {% endcomment %}
 <div class="photo-banner{% if tall %} is-tall{% endif %}{% if align == 'center' %} is-centred{% endif %}">
   <div class="pb-img" style="background-image:url('{% static image %}')" aria-hidden="true"></div>
+  {% comment %}
+  Optional moving version of the same frame. `video` is a path under static/,
+  and `image` stays the poster: it is painted underneath, so the banner is
+  never empty and anyone on reduced motion or a data saver simply keeps the
+  photograph. data-src rather than src means nothing downloads until gt-video.js
+  decides it should.
+  {% endcomment %}
+  {% if video %}
+  <video class="pb-video" data-src="{% static video %}" poster="{% static image %}"
+         muted loop playsinline preload="none" aria-hidden="true" tabindex="-1"></video>
+  {% endif %}
   <div class="pb-scrim" aria-hidden="true"></div>
   <div class="pb-body">
     {% if eyebrow %}<div class="pb-eyebrow">{{ eyebrow }}</div>{% endif %}

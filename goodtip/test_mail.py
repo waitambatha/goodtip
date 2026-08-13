@@ -97,6 +97,22 @@ class PostmarkBackendTests(TestCase):
         # A 200 on the batch does not mean every message was accepted.
         self.assertEqual(count, 1)
 
+    def test_message_ids_are_kept_for_diagnosis(self):
+        """check_email looks these up to tell a real send from a dropped one."""
+        response = MagicMock(
+            status_code=200,
+            json=MagicMock(return_value=[{"ErrorCode": 0, "To": "a0@b.com", "MessageID": "abc-123"}]),
+            raise_for_status=MagicMock(return_value=None),
+        )
+        backend = PostmarkEmailBackend()
+        backend.token = "test-token"
+        with patch("goodtip.email_backends.requests.post", return_value=response):
+            backend.send_messages([self._msg()])
+            self.assertEqual([r["MessageID"] for r in backend.last_results], ["abc-123"])
+            # A second send reports on itself, not on everything since startup.
+            backend.send_messages([self._msg()])
+            self.assertEqual(len(backend.last_results), 1)
+
     @POSTMARK
     def test_email_configured_requires_token(self):
         self.assertTrue(email_configured())

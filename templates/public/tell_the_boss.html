@@ -1,7 +1,7 @@
 {% extends "public/base.html" %}
 {% load static %}
 
-{% block title %}Tell the Boss — GoodTip{% endblock %}
+{% block title %}Tell the Boss &middot; GoodTip{% endblock %}
 {% block loader_task %}Drafting the note{% endblock %}
 {% block meta_description %}A real note, ready to send. Copy it, paste it, and let the person who says yes actually see it.{% endblock %}
 {% block body_class %}page-boss{% endblock %}
@@ -44,7 +44,7 @@
     {# centred, because the two letters below it are a symmetric pair #}
     <p class="eyebrow reveal ttb-centre">Real note. Send it.</p>
     <h2 class="section-heading reveal ttb-centre">Stick it somewhere they'll actually see it.</h2>
-    <p class="ttb-lede reveal ttb-centre">Two ways to put it in front of them. Same words either way &mdash; pick whichever suits your office.</p>
+    <p class="ttb-lede reveal ttb-centre">Two ways to put it in front of them. Same words either way, pick whichever suits your office.</p>
     {% comment %}
     Both presentations of the same note, side by side as a hero split — the
     parchment scroll and the card on a desk. They share the letter body partial
@@ -66,7 +66,7 @@
       </div>
 
       <div class="bn-actions">
-        <span class="bn-hint">Real text. Fill in the names below — the letter follows.</span>
+        <span class="bn-hint">Real text. Fill in the names below, the letter follows.</span>
         <button type="button" class="btn-ghost" data-copy-note>Copy this note</button>
       </div>
       <textarea id="bossNote" aria-hidden="true" tabindex="-1" style="position:absolute;left:-9999px;top:0;"></textarea>
@@ -74,17 +74,17 @@
       {% if sent %}
       <div class="bn-send bn-sent" id="send">
         <h3>Sent. It's on their desk.</h3>
-        <p>The note is in the boss's inbox with your name on it. Follow it up over a coffee — that's usually all it takes.</p>
+        <p>The note is in the boss's inbox with your name on it. Follow it up over a coffee, that's usually all it takes.</p>
       </div>
       {% elif not user.is_authenticated %}
       <div class="bn-send bn-lock" id="send">
         <div class="bn-lock-badge"><svg class="cic"><use href="#ic-users"/></svg></div>
         {% if boss_error %}<p class="bn-error" role="alert">{{ boss_error }}</p>{% endif %}
         <h3>Want us to send it? Members only.</h3>
-        <p>Anyone can copy the note above. But when GoodTip delivers it, it goes out with a member's name on it — so sign up first (it's free), then come back and we'll put it on the boss's desk.</p>
+        <p>Anyone can copy the note above. But when GoodTip delivers it, it goes out with a member's name on it, so sign up first (it's free), then come back and we'll put it on the boss's desk.</p>
         <div class="bn-lock-ctas">
           <a href="{% url 'accounts:signup' %}?next={{ request.path|urlencode }}%23send" class="btn-primary">Become a member &rarr;</a>
-          <a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}%23send" class="btn-ghost">I'm already in — log in</a>
+          <a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}%23send" class="btn-ghost">I'm already in, log in</a>
         </div>
         <span class="bn-hint" style="display:block;margin-top:14px;">Two minutes. No payment. Then the note sends with your name on it.</span>
       </div>
@@ -176,7 +176,7 @@
 <section class="cta-pro">
   <div class="wrap reveal zoom">
     <h2>Send this to whoever can make the call.</h2>
-    <p>Copy the note, or copy the link to this page — either way, it lands on the desk that matters.</p>
+    <p>Copy the note, or copy the link to this page, either way, it lands on the desk that matters.</p>
     <button type="button" class="btn-dark" data-copy-note>Copy the note</button>
     <button type="button" class="btn-dark" data-copy-link>Copy the link</button>
   </div>

@@ -5,80 +5,65 @@ Australian but this is the message that arrives before anyone has decided to
 trust the product, and colloquial greetings in a security email read as a
 phishing tell rather than as warmth.
 
-Look: the code sits in a dark forest panel with lime type, which is the app's
-own palette rather than the grey-on-grey box every other service sends. It also
-solves a legibility problem — a six-digit code needs to survive being read off a
-phone at arm's length, and light-on-dark at 42px does that better than anything
-tuned for a white card.
+The code is drawn as six separate cells rather than one string. It is easier to
+read back off a phone at arm's length, it survives a client that decides to
+"helpfully" reflow letter-spacing, and it stops Apple Mail and Outlook turning
+a bare six-digit run into a tappable phone number.
 
-Everything is drawn with table cells and inline styles. No remote images: Gmail
-and Outlook block those by default, so an image-led design arrives as a stack of
-broken-image boxes for most recipients. No <script>, because every major client
-strips it — which is why there is no copy button here, and why the code is
-instead a large long-press target that also leads the preheader so it is
-readable from the inbox list without opening anything.
+Nothing here is an image. The whole point of a security email is that it works
+the instant it arrives, and a recipient whose client blocks remote content must
+still be able to read the code — so the photograph in the header is the only
+image in the message and it carries no information.
 {% endcomment %}
 {% block title %}Your GoodTip verification code{% endblock %}
-{% block eyebrow %}{% if purpose == "signup" %}Confirm your email address{% else %}Sign-in code{% endif %}{% endblock %}
+{% block eyebrow %}{% if purpose == "signup" %}Confirm your email{% else %}Sign-in code{% endif %}{% endblock %}
+{% block badge %}&#10003;{% endblock %}
 {% block preheader %}{{ code }} is your GoodTip verification code. It expires in {{ minutes }} minutes.{% endblock %}
 {% block content %}
 
-  <p style="margin:0 0 16px;font-size:17px;font-weight:bold;color:#0F2E22;">Hello {{ user.display_name }},</p>
-  <p style="margin:0 0 28px;font-size:16px;line-height:1.65;color:#40403a;">
+  <p style="margin:0 0 10px;font-size:19px;font-weight:bold;color:#0F2E22;text-align:center;line-height:1.3;">
+    Hello <span style="color:#7FA828;">{{ user.display_name }}</span>,
+  </p>
+  <p style="margin:0 0 18px;font-size:14.5px;line-height:1.6;color:#4a4a41;text-align:center;">
     {% if purpose == "signup" %}
-      Welcome to GoodTip. Enter the code below to confirm your email address and
-      finish setting up your account.
+      Welcome to GoodTip. Enter the code below to confirm your email address.
     {% else %}
-      We received a request to sign in to your GoodTip account. Enter the code
-      below to continue.
+      We received a request to sign in to your GoodTip account.
     {% endif %}
   </p>
 
-  {# ---- the code ---- #}
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+  {# the code panel is shared with work_email_code — see emails/_bits.html #}
+  {% if purpose == "signup" %}
+    {% include "emails/_bits.html" with bit="code" code=code minutes=minutes code_label="Your confirmation code" %}
+  {% else %}
+    {% include "emails/_bits.html" with bit="code" code=code minutes=minutes code_label="Your sign-in code" %}
+  {% endif %}
+
+  {% comment %}
+  One box, not two. "Did not request this?" and "we will never ask you for
+  this code" were separate blocks with their own padding, icons and rules,
+  and together they were taller than the code itself — on a security email
+  whose whole job is to be read in five seconds. Same two facts, one frame.
+  {% endcomment %}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0 0;">
     <tr>
-      <td style="background:#0F2E22;border-radius:16px;padding:30px 20px;text-align:center;">
-        <div style="font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:#C8F135;font-weight:bold;">
-          {% if purpose == "signup" %}Confirmation code{% else %}Sign-in code{% endif %}
-        </div>
-        {% comment %} Padding here is the tap target: a long-press anywhere in this block
-           selects the code cleanly on a phone. {% endcomment %}
-        <div style="margin:18px 0 0;">
-          <span style="font-family:'Courier New',Courier,monospace;font-size:42px;font-weight:bold;letter-spacing:10px;color:#ffffff;line-height:1.2;">{{ code }}</span>
-        </div>
-        <div style="margin-top:16px;">
-          <span style="display:inline-block;padding:6px 14px;border-radius:100px;background:rgba(200,241,53,0.14);color:#C8F135;font-size:12.5px;font-weight:bold;">
-            Expires in {{ minutes }} minutes
-          </span>
-        </div>
+      <td bgcolor="#F2F1E7" style="background-color:#F2F1E7;border-radius:10px;padding:14px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td width="4" style="width:4px;background-color:#C8F135;font-size:0;line-height:0;border-radius:2px;">&nbsp;</td>
+            <td style="padding-left:14px;">
+              <p style="margin:0 0 4px;font-size:14px;font-weight:bold;color:#0F2E22;">Did not request this?</p>
+              <p style="margin:0;font-size:13px;line-height:1.55;color:#4a4a41;">
+                Ignore this email. The code works only alongside your password,
+                so it cannot sign anyone in on its own.{% if purpose == "login" %} If these
+                keep arriving, change your password.{% endif %}
+                GoodTip will never ask you for it by phone, text or reply.
+              </p>
+            </td>
+          </tr>
+        </table>
       </td>
     </tr>
   </table>
-
-  <p style="margin:14px 0 0;font-size:13px;color:#8a8a7e;text-align:center;">
-    Press and hold the code to copy it.
-  </p>
-
-  {# ---- security note ---- #}
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0 0;">
-    <tr>
-      <td style="padding:18px 20px;background:#F7F6F0;border-left:4px solid #C8F135;border-radius:0 10px 10px 0;">
-        <p style="margin:0;font-size:14px;line-height:1.65;color:#4a4a41;">
-          <strong style="color:#0F2E22;">Did not request this?</strong>
-          You can safely ignore this email. The code works only alongside your
-          password, so it cannot be used to sign in on its own.
-          {% if purpose == "login" %}
-            If these codes continue to arrive unexpectedly, please change your
-            password.
-          {% endif %}
-        </p>
-      </td>
-    </tr>
-  </table>
-
-  <p style="margin:24px 0 0;padding-top:20px;border-top:1px solid #EAE8DE;font-size:13px;line-height:1.6;color:#8a8a7e;">
-    GoodTip will never ask you for this code by phone, text message, or in a
-    reply to this email.
-  </p>
 
 {% endblock %}

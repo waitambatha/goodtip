@@ -71,6 +71,20 @@ class Prediction:
     def is_even(self) -> bool:
         return self.tier == "Even Contest"
 
+    @property
+    def strength(self) -> int:
+        """The tier as 0–4, for drawing it rather than only naming it.
+
+        Says nothing the tier name doesn't already: it is the position of the
+        tier on the scale above, so a meter built from it is the same verdict
+        in a second form. Not derived from ``probability``, deliberately — a
+        bar whose length tracked P would be the forbidden number, drawn.
+        """
+        for i, (_, name) in enumerate(reversed(TIERS)):
+            if name == self.tier:
+                return i
+        return 0
+
 
 def tier_for(probability: float) -> str:
     """Tier for a probability, read on the leading side."""

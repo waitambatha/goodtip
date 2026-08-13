@@ -1,5 +1,5 @@
 {% extends "admin_base.html" %}
-{% block title %}Org members — Manage{% endblock %}
+{% block title %}Org members. Manage{% endblock %}
 {% block nav_orgs %}on{% endblock %}
 {% block admin_content %}
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;"><a href="{% url 'manage:orgs_list' %}" class="flink" style="color:var(--lime);">Orgs</a><span style="color:rgba(245,241,230,.5);">/</span><h1 class="admin-h1" style="margin:0;">{{ org.name }} &middot; Members</h1></div>
@@ -17,7 +17,7 @@
         {% if not m.is_league_owner %}
         <form method="post" action="{% url 'manage:org_members' org.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="action" value="promote"><input type="hidden" name="member_id" value="{{ m.id }}"><button class="abtn abtn-ghost abtn-sm" type="submit">{% if m.is_manager %}Make Participant{% else %}Make Manager{% endif %}</button></form>
         <form method="post" action="{% url 'manage:org_members' org.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="member_id" value="{{ m.id }}"><button class="abtn abtn-ghost abtn-sm" type="submit" style="color:#9a2b2b;">Remove</button></form>
-        {% else %}<span style="color:var(--muted);">&mdash;</span>{% endif %}
+        {% else %}<span style="color:var(--muted);">-</span>{% endif %}
       </td>
     </tr>
   {% empty %}

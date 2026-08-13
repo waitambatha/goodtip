@@ -1,6 +1,6 @@
 {% extends "admin_base.html" %}
 {% load static %}
-{% block title %}{{ enquiry.name }} — Enquiries{% endblock %}
+{% block title %}{{ enquiry.name }}. Enquiries{% endblock %}
 {% block nav_enquiries %}on{% endblock %}
 {% block hero_title %}{{ enquiry.name }}{% endblock %}
 {% block hero_lead %}{{ enquiry.email }}{% if enquiry.organisation %} &middot; {{ enquiry.organisation }}{% endif %}{% endblock %}

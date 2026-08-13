@@ -1,6 +1,7 @@
 {% extends "emails/_base.html" %}
 {% block title %}{{ post.title }}{% endblock %}
 {% block eyebrow %}{% if post.get_tag_display %}{{ post.get_tag_display }}{% else %}From GoodTip{% endif %}{% endblock %}
+{% block badge %}&#9733;{% endblock %}{# star — something worth reading #}
 {% block preheader %}{{ post.title }}{% endblock %}
 {% block content %}
   <h1 style="margin:0 0 6px;font-size:24px;line-height:1.25;color:#0F2E22;">{{ post.title }}</h1>

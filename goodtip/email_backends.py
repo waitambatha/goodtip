@@ -30,10 +30,16 @@ class PostmarkEmailBackend(BaseEmailBackend):
         self.token = getattr(settings, "POSTMARK_SERVER_TOKEN", "")
         self.stream = getattr(settings, "POSTMARK_MESSAGE_STREAM", "outbound")
         self.timeout = getattr(settings, "EMAIL_TIMEOUT", 10)
+        # Postmark's per-message verdicts from the last send_messages() call.
+        # Nothing in the app reads them — send_messages returns a count, as
+        # Django requires — but check_email uses the MessageIDs to confirm a
+        # message Postmark said "OK" to actually entered the sending queue.
+        self.last_results: list[dict] = []
 
     def send_messages(self, email_messages):
         if not email_messages:
             return 0
+        self.last_results = []
         if not self.token:
             # Mirrors how the SMTP path behaves pre-launch: log loudly, don't
             # raise, so an unconfigured environment can't break a signup.
@@ -111,6 +117,7 @@ class PostmarkEmailBackend(BaseEmailBackend):
         # so a 2xx does not mean every message was accepted.
         ok = 0
         for res in results if isinstance(results, list) else []:
+            self.last_results.append(res)
             if res.get("ErrorCode") == 0:
                 ok += 1
             else:

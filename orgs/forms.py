@@ -31,7 +31,7 @@ class OrgCreateForm(forms.ModelForm):
     group_type = forms.ModelChoiceField(
         queryset=GroupType.objects.all(),  # ordered by sort_order per the spec
         label="Organisation type",
-        empty_label="— Choose your organisation type —",
+        empty_label="Choose your organisation type",
     )
     sub_categories = forms.ModelMultipleChoiceField(
         queryset=SubCategory.objects.filter(is_active=True).select_related("group_type"),
@@ -49,7 +49,7 @@ class OrgCreateForm(forms.ModelForm):
         queryset=State.objects.all(),
         required=False,
         label="State or territory (optional)",
-        empty_label="— We operate nationally —",
+        empty_label="We operate nationally",
     )
     competitions = forms.ModelMultipleChoiceField(
         queryset=Competition.objects.select_related("sport", "season"),
@@ -66,7 +66,7 @@ class OrgCreateForm(forms.ModelForm):
         queryset=Charity.objects.filter(is_approved=True),
         required=False,
         label="Charity",
-        empty_label="— Choose an approved charity —",
+        empty_label="Choose an approved charity",
     )
     new_charity_name = forms.CharField(
         required=False,

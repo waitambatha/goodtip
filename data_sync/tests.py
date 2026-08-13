@@ -1,13 +1,18 @@
 from datetime import timedelta
 from unittest.mock import MagicMock
 
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
 from catalog.models import Competition, Season, Series, Sport
 from data_sync.models import SyncRun
 from data_sync.services import (
+    AflScrapeSyncService,
+    NrlScrapeSyncService,
     SquiggleSyncService,
+    competition_for_series,
+    slug_candidates,
+    get_sync_service,
     _normalise_team_name,
     _resolve_match,
     _split_period_clock,
@@ -240,3 +245,117 @@ class SyncRunTests(TestCase):
         with SyncRun.record(kind=SyncRun.KIND_LIVE, competition="AFL"):
             pass
         self.assertIsNotNone(SyncRun.last_success(kind=SyncRun.KIND_LIVE))
+
+
+class CompetitionForSeriesTests(SimpleTestCase):
+    """Series names are not competition names, and the sync dispatches on the
+    latter.
+
+    Every sync service takes a COMPETITION and loops the SERIES that
+    competition bundles. The two names happen to be identical for the men's
+    series and for nothing else, so code that upper-cased a Round's series and
+    handed it to get_sync_service worked on AFL and NRL while every AFLW,
+    NRLW and Origin round failed with "Unsupported competition: AFLW".
+    """
+
+    def test_womens_and_representative_series_resolve_to_their_competition(self):
+        self.assertEqual(competition_for_series("AFL"), "AFL")
+        self.assertEqual(competition_for_series("AFLW"), "AFL")
+        self.assertEqual(competition_for_series("NRL"), "NRL")
+        self.assertEqual(competition_for_series("NRLW"), "NRL")
+        self.assertEqual(competition_for_series("State of Origin"), "NRL")
+
+    def test_case_and_padding_do_not_matter(self):
+        self.assertEqual(competition_for_series("  aflw "), "AFL")
+        self.assertEqual(competition_for_series("STATE OF ORIGIN"), "NRL")
+
+    def test_a_series_with_no_feed_returns_none_rather_than_raising(self):
+        """Skippable, not an error. Super Netball is in the catalog with no
+        feed behind it, and one unfed series must not stop the codes that do
+        have one."""
+        self.assertIsNone(competition_for_series("Super Netball"))
+        self.assertIsNone(competition_for_series("Super League"))
+        self.assertIsNone(competition_for_series(""))
+        self.assertIsNone(competition_for_series(None))
+
+    def test_every_resolved_key_is_one_get_sync_service_accepts(self):
+        for series in ("AFL", "AFLW", "NRL", "NRLW", "State of Origin"):
+            key = competition_for_series(series)
+            # Constructing the service is what used to raise. Any exception
+            # here means the resolver is handing over a name no feed answers to.
+            self.assertIsNotNone(get_sync_service(key))
+
+    def test_the_resolver_tracks_the_services_own_series_lists(self):
+        """Derived, not a second hardcoded table — so adding a series to a
+        feed cannot leave this mapping behind."""
+        for name in AflScrapeSyncService.SERIES:
+            self.assertEqual(competition_for_series(name), "AFL")
+        for name in NrlScrapeSyncService.SERIES:
+            self.assertEqual(competition_for_series(name), "NRL")
+
+
+class SlugCandidateTests(SimpleTestCase):
+    """The order clubs are looked up in.
+
+    This is pure ordering logic and it is worth pinning, because getting it
+    wrong fails SILENTLY: a name resolves to the wrong club, or to none, and
+    the fixture is dropped from history with a log line nobody reads. It cost
+    178 AFLW games and every AFL fixture whose broadcast name carried a
+    nickname before anyone noticed.
+    """
+
+    def test_full_name_is_tried_before_any_shortening(self):
+        """A club stored under its whole name must match itself first.
+
+        Otherwise "West Coast Eagles" resolves on the prefix "west-coast" and
+        lands on a different row than the one that carries its results.
+        """
+        self.assertEqual(slug_candidates("West Coast Eagles")[0], "west-coast-eagles")
+        self.assertEqual(slug_candidates("Carlton Blues")[0], "carlton-blues")
+
+    def test_leading_words_are_offered(self):
+        """The AFLW bug: Sportradar sends "Carlton Blues", we store "Carlton"."""
+        for sent, stored in [
+            ("Carlton Blues", "carlton"),
+            ("Collingwood Magpies", "collingwood"),
+            ("Port Adelaide Power", "port-adelaide"),
+            ("North Melbourne Kangaroos", "north-melbourne"),
+            ("St Kilda Saints", "st-kilda"),
+        ]:
+            self.assertIn(stored, slug_candidates(sent), f"{sent!r} never offers {stored!r}")
+
+    def test_longer_prefix_comes_before_shorter(self):
+        """"North Melbourne Kangaroos" must reach north-melbourne, not north."""
+        got = slug_candidates("North Melbourne Kangaroos")
+        self.assertLess(got.index("north-melbourne"), got.index("north"))
+
+    def test_bare_nickname_is_the_last_resort(self):
+        """The loosest guess is tried only once everything specific failed."""
+        for name in ("Carlton Blues", "North Melbourne Kangaroos", "Sydney Swans"):
+            got = slug_candidates(name)
+            self.assertEqual(got[-1], got[-1].split("-")[-1])
+            self.assertEqual(got.index(got[-1]), len(got) - 1)
+
+    def test_no_duplicates(self):
+        """A two-word name generates the same slug twice; re-querying is waste."""
+        for name in ("Sydney Swans", "Brisbane Lions", "Dolphins"):
+            got = slug_candidates(name)
+            self.assertEqual(len(got), len(set(got)), got)
+
+    def test_empty_names(self):
+        self.assertEqual(slug_candidates(""), [])
+        self.assertEqual(slug_candidates(None), [])
+
+    def test_the_longest_real_club_name_still_reaches_its_slug(self):
+        """St George Illawarra is the worst case in either code: four words
+        before the nickname, and it is stored under three of them."""
+        self.assertIn(
+            "st-george-illawarra",
+            slug_candidates("St George Illawarra Dragons"),
+        )
+
+    def test_ampersand_becomes_and(self):
+        """Deliberate, and inherited from _normalise_team_name — a club
+        written "Sharks & Co" must not slug down to "sharks-co" and collide
+        with a differently-named row."""
+        self.assertEqual(slug_candidates("A & B")[0], "a-and-b")

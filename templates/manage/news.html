@@ -1,6 +1,6 @@
 {% extends "admin_base.html" %}
 {% load static %}
-{% block title %}News &amp; blog — Manage{% endblock %}
+{% block title %}News &amp; blog. Manage{% endblock %}
 {% block nav_news %}on{% endblock %}
 {% block hero_title %}News &amp; blog{% endblock %}
 {% block hero_lead %}Everything published here reaches every member's dashboard.{% endblock %}
@@ -51,7 +51,7 @@
             </td>
           </tr>
         {% empty %}
-          <tr><td colspan="4" class="gt-empty">Nothing posted yet — publish your first story with the form beside this list.</td></tr>
+          <tr><td colspan="4" class="gt-empty">Nothing posted yet, publish your first story with the form beside this list.</td></tr>
         {% endfor %}
         </tbody>
       </table>
@@ -87,7 +87,7 @@
   </div>
   <div class="gtr">
     <span class="gtr-ic"><svg><use href="#ic-shield"/></svg></span>
-    <div><b>Super admin only</b><p>Group admins can't post here — the platform voice stays yours.</p></div>
+    <div><b>Super admin only</b><p>Group admins can't post here, the platform voice stays yours.</p></div>
   </div>
 </div>
 {% endblock %}

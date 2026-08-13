@@ -3,7 +3,9 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db.models import ProtectedError
-from django.test import TestCase
+import re
+
+from django.test import SimpleTestCase, TestCase
 
 from catalog.models import Charity, Season, Sport
 
@@ -16,6 +18,7 @@ from .models import (
     Organisation,
     WallPost,
 )
+from .recaps import build_talking_points, compose_recap, fallback_line
 from .services import (
     approve_membership_request,
     cast_charity_ballot,
@@ -777,7 +780,12 @@ class ChildAdminManagementTests(TestCase):
 
 
 class RoundRecapTests(TestCase):
-    """AI Group Recap launch-minimum (docs/ai-group-recap-spec.md §§1–4, 7, 10)."""
+    """Group Recap end to end (docs/ai-group-recap-spec.md §§1-4, 7, 10).
+
+    The writer itself is covered branch by branch in RecapWriterTests; this
+    class is about the batch: readiness, idempotency, and what a corrected
+    result does to a card that has already gone up.
+    """
 
     def setUp(self):
         from datetime import timedelta
@@ -818,9 +826,7 @@ class RoundRecapTests(TestCase):
         from .recaps import generate_recaps
 
         record_match_result(self.match, 30, 10)
-        with self.settings(ANTHROPIC_API_KEY="test-key"):
-            results = generate_recaps(org=self.org)
-        self.assertEqual(results, [])
+        self.assertEqual(generate_recaps(org=self.org), [])
         self.assertFalse(WallPost.objects.filter(org=self.org).exists())
 
     def test_unresolved_round_is_not_ready(self):
@@ -830,39 +836,50 @@ class RoundRecapTests(TestCase):
 
         Tip.objects.create(user=self.user, match=self.match, org=self.org, selection="home")
         self.assertFalse(round_ready_for_recap(self.rnd))
-        with self.settings(ANTHROPIC_API_KEY="test-key"):
-            self.assertEqual(generate_recaps(org=self.org), [])
+        self.assertEqual(generate_recaps(org=self.org), [])
 
-    def test_recap_posts_once_and_pins(self):
-        from unittest.mock import patch
-
+    def test_recap_posts_once_and_carries_its_board(self):
         from .models import RoundRecap
-        from .recaps import generate_recaps
+        from .recaps import RECAP_ENGINE, generate_recaps
 
         self._tip_and_settle()
-        fake = "Dave backed the Pies and got the points. He tops the ladder on 1."
-        with self.settings(ANTHROPIC_API_KEY="test-key"), \
-             patch("orgs.recaps.generate_recap_text", return_value=fake):
-            first = generate_recaps(org=self.org)
-            second = generate_recaps(org=self.org)
+        first = generate_recaps(org=self.org)
+        second = generate_recaps(org=self.org)
         self.assertEqual(len(first), 1)
         self.assertEqual(second, [])  # idempotent — one per (org, round)
+
         post = WallPost.objects.get(org=self.org, kind=WallPost.KIND_RECAP)
-        self.assertEqual(post.body, fake)
         self.assertIsNone(post.author)
+        self.assertIn("Dave", post.body)
+
         recap = RoundRecap.objects.get(org=self.org, round=self.rnd)
         self.assertEqual(recap.post, post)
-        self.assertFalse(recap.fallback_used)
+        self.assertEqual(recap.model_used, RECAP_ENGINE)
+        self.assertEqual(recap.leaderboard[0]["name"], "Dave")
+        self.assertEqual(recap.leaderboard[0]["rank"], 1)
+        self.assertTrue(recap.talking_points)
 
-    def test_model_failure_uses_factual_fallback(self):
+    def test_generation_never_reaches_the_network(self):
+        """The writer is in house. If anything here opens a socket, that is a
+        regression worth failing on rather than a slow test."""
+        import socket
+        from unittest.mock import patch
+
+        from .recaps import generate_recaps
+
+        self._tip_and_settle()
+        with patch.object(socket.socket, "connect", side_effect=AssertionError("no outbound call")):
+            results = generate_recaps(org=self.org)
+        self.assertEqual(len(results), 1)
+
+    def test_a_round_with_nothing_to_say_uses_the_factual_line(self):
         from unittest.mock import patch
 
         from .models import RoundRecap
         from .recaps import generate_recaps
 
         self._tip_and_settle()
-        with self.settings(ANTHROPIC_API_KEY="test-key"), \
-             patch("orgs.recaps.generate_recap_text", side_effect=RuntimeError("api down")):
+        with patch("orgs.recaps.compose_recap", return_value=None):
             results = generate_recaps(org=self.org)
         self.assertEqual(len(results), 1)
         recap = RoundRecap.objects.get(org=self.org, round=self.rnd)
@@ -870,19 +887,17 @@ class RoundRecapTests(TestCase):
         self.assertIn("Dave", recap.post.body)
         self.assertIn("1 point", recap.post.body)
 
-    def test_no_api_key_skips_without_burning_the_slot(self):
+    def test_a_writer_crash_still_posts_something(self):
         from unittest.mock import patch
 
         from .models import RoundRecap
         from .recaps import generate_recaps
 
         self._tip_and_settle()
-        with self.settings(ANTHROPIC_API_KEY=""), \
-             patch("orgs.recaps.generate_recap_text") as gen:
+        with patch("orgs.recaps.compose_recap", side_effect=RuntimeError("boom")):
             results = generate_recaps(org=self.org)
-        gen.assert_not_called()
-        self.assertEqual(results, [])
-        self.assertFalse(RoundRecap.objects.filter(org=self.org).exists())
+        self.assertEqual(len(results), 1)
+        self.assertTrue(RoundRecap.objects.get(org=self.org, round=self.rnd).fallback_used)
 
     def test_facts_are_real_results_only(self):
         from .recaps import build_recap_facts
@@ -898,17 +913,13 @@ class RoundRecapTests(TestCase):
         self.assertFalse(facts["round"]["is_origin"])
 
     def test_result_correction_flags_recap_for_review(self):
-        from unittest.mock import patch
-
         from tipping.services import record_match_result
 
         from .models import RoundRecap
         from .recaps import generate_recaps
 
         self._tip_and_settle()
-        with self.settings(ANTHROPIC_API_KEY="test-key"), \
-             patch("orgs.recaps.generate_recap_text", return_value="Dave got the points."):
-            generate_recaps(org=self.org)
+        generate_recaps(org=self.org)
         recap = RoundRecap.objects.get(org=self.org, round=self.rnd)
         self.assertFalse(recap.needs_review)
         record_match_result(self.match, 10, 30)  # admin corrects the score
@@ -1491,3 +1502,262 @@ class CreateWizardTests(TestCase):
         draft = OrgDraft.objects.get(user=self.user)
         self.assertEqual(draft.step, 1)
         self.assertEqual(draft.data, {})
+
+    def test_verify_step_renders_before_any_code_is_requested(self):
+        """Step 2 with no WorkEmailVerification row is the FIRST thing every
+        business/education/charity creator sees, and it used to 500.
+
+        The role field prefilled with `|default:verification.role`, and a
+        filter argument is resolved eagerly: with no row, `verification` is
+        None and the lookup raised VariableDoesNotExist through the whole
+        page. The neighbouring `{% if verification.is_verified %}` swallowed
+        the same failure, so nothing else on the step gave it away.
+        """
+        from catalog.models import GroupType
+
+        from .models import OrgDraft, WorkEmailVerification
+
+        business = GroupType.objects.filter(slug="business").first()
+        if business is None:
+            self.skipTest("no business group type in this catalog")
+        sub = business.sub_categories.first()
+
+        payload = {
+            "step": 1, "action": "next", "name": "Verify Step Co",
+            "group_type": business.pk,
+        }
+        if sub is not None:
+            payload["sub_categories"] = [sub.pk]
+        self.client.post(self.URL, payload)
+
+        self.assertEqual(OrgDraft.objects.get(user=self.user).step, 2)
+        self.assertFalse(WorkEmailVerification.objects.filter(user=self.user).exists())
+
+        resp = self.client.get(self.URL)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'id="id_role"')
+        # Blank, not the string "None" rendered into the box.
+        self.assertNotContains(resp, 'value="None"')
+
+
+class RecapWriterTests(SimpleTestCase):
+    """The recap writer, driven directly.
+
+    compose_recap and build_talking_points are pure functions over the facts
+    dict, so every branch is reachable without a database. That is the point
+    of keeping the writer separate from the query that feeds it: the voice
+    rules in §8-9 of the spec are testable on their own.
+    """
+
+    def facts(self, **over):
+        base = {
+            "seed": "1:1",
+            "round": {
+                "number": 12, "competition": "NRL (2026)", "stage": "regular",
+                "is_origin": False, "code": "nrl",
+                "points_per_correct_pick": 1, "matches_in_round": 8,
+            },
+            "group": {
+                "name": "Depot Crew", "members_who_tipped": 4,
+                "first_round_for_group": False,
+            },
+            "members": [
+                {"name": "Sam", "correct": 7, "picks": 8, "round_points": 7,
+                 "season_points": 61, "rank_now": 1, "perfect_round": False,
+                 "rank_before_round": 3, "moved": 2},
+                {"name": "Alex", "correct": 6, "picks": 8, "round_points": 6,
+                 "season_points": 58, "rank_now": 2, "perfect_round": False,
+                 "rank_before_round": 1, "moved": -1},
+                {"name": "Jo", "correct": 4, "picks": 8, "round_points": 4,
+                 "season_points": 44, "rank_now": 3, "perfect_round": False,
+                 "rank_before_round": 2, "moved": -1},
+                {"name": "Pat", "correct": 3, "picks": 8, "round_points": 3,
+                 "season_points": 30, "rank_now": 4, "perfect_round": False,
+                 "rank_before_round": 4, "moved": 0},
+            ],
+            "standings": [
+                {"name": "Sam", "rank": 1, "season_points": 61, "round_points": 7,
+                 "tipped_this_round": True, "moved": 2},
+                {"name": "Alex", "rank": 2, "season_points": 58, "round_points": 6,
+                 "tipped_this_round": True, "moved": -1},
+                {"name": "Jo", "rank": 3, "season_points": 44, "round_points": 4,
+                 "tipped_this_round": True, "moved": -1},
+                {"name": "Pat", "rank": 4, "season_points": 30, "round_points": 3,
+                 "tipped_this_round": True, "moved": 0},
+            ],
+            "matches": {"upset": None, "consensus": None},
+            "totals": {"correct": 20, "picks": 32},
+        }
+        for key, value in over.items():
+            if isinstance(value, dict) and isinstance(base.get(key), dict):
+                base[key] = {**base[key], **value}
+            else:
+                base[key] = value
+        return base
+
+    # -- voice (§8) --------------------------------------------------------
+
+    def test_no_em_dashes_anywhere(self):
+        for code in ("afl", "nrl", "generic"):
+            text = compose_recap(self.facts(round={"code": code}))
+            self.assertNotIn("—", text)
+            self.assertNotIn("–", text)
+
+    def test_two_to_four_sentences_on_every_branch(self):
+        for text in self.every_recap():
+            n = len([s for s in re.split(r"(?<=\.)\s+", text) if s.strip()])
+            self.assertGreaterEqual(n, 2, text)
+            self.assertLessEqual(n, 4, text)
+
+    def test_no_banned_words_in_the_output(self):
+        """Swept across every branch and a spread of seeds.
+
+        Checked on finished text with the member names blanked first: the ban
+        is on the writer's vocabulary, and a member called May or Hope is not
+        a voice breach.
+        """
+        from orgs.recaps import BANNED_WORDS
+
+        for text in self.every_recap():
+            stripped = re.sub(r"\b(Sam|Alex|Jo|Pat|Depot|Crew|Titans|Storm)\b", "", text)
+            for word in BANNED_WORDS:
+                self.assertNotRegex(
+                    stripped.lower(), rf"\b{re.escape(word)}\b",
+                    f"banned word {word!r} in: {text}",
+                )
+
+    def every_recap(self):
+        """One recap per branch the writer can take, across several seeds."""
+        upset = {"home": "Storm", "away": "Titans", "winner": "Titans",
+                 "loser": "Storm", "correct": 1, "tips": 4, "share": 0.25}
+        consensus = {"home": "Storm", "away": "Titans", "winner": "Storm",
+                     "loser": "Titans", "correct": 4, "tips": 4, "share": 1.0}
+        shapes = []
+        for code in ("afl", "nrl", "generic"):
+            shapes.append(self.facts(round={"code": code}))
+        shapes.append(self.facts(group={"first_round_for_group": True}))
+        shapes.append(self.facts(round={"is_origin": True, "stage": "origin",
+                                        "points_per_correct_pick": 4,
+                                        "matches_in_round": 1}))
+        shapes.append(self.facts(matches={"upset": upset, "consensus": consensus}))
+        perfect = self.facts()
+        perfect["members"][0].update(correct=8, round_points=8, perfect_round=True)
+        shapes.append(perfect)
+        tied = self.facts()
+        tied["members"][1]["round_points"] = 7
+        shapes.append(tied)
+        solo = self.facts(group={"members_who_tipped": 1})
+        solo["members"] = solo["members"][:1]
+        solo["standings"] = solo["standings"][:1]
+        shapes.append(solo)
+
+        for shape in shapes:
+            for n in range(1, 8):
+                text = compose_recap({**shape, "seed": f"1:{n}"})
+                if text:
+                    yield text
+
+    def test_never_borrows_the_other_codes_words(self):
+        afl = compose_recap(self.facts(round={"code": "afl"}, seed="1:9"))
+        nrl = compose_recap(self.facts(round={"code": "nrl"}, seed="1:9"))
+        for banned in ("blinder", "ripper"):
+            self.assertNotIn(banned, afl)
+        for banned in ("chocolates", "kicked a bag", "home and hosed"):
+            self.assertNotIn(banned, nrl)
+
+    def test_phrasing_varies_between_rounds_but_not_between_runs(self):
+        a = compose_recap(self.facts(seed="1:1"))
+        again = compose_recap(self.facts(seed="1:1"))
+        self.assertEqual(a, again)
+        openers = {
+            compose_recap(self.facts(seed=f"1:{n}")).split(".")[0]
+            for n in range(1, 12)
+        }
+        self.assertGreater(len(openers), 1)
+
+    # -- what it chooses to lead on ---------------------------------------
+
+    def test_a_perfect_round_leads(self):
+        f = self.facts()
+        f["members"][0].update(correct=8, round_points=8, perfect_round=True)
+        text = compose_recap(f)
+        self.assertIn("Sam", text.split(".")[0])
+        self.assertIn("clean", text)
+
+    def test_a_tie_at_the_top_leads(self):
+        f = self.facts()
+        f["members"][1]["round_points"] = 7
+        text = compose_recap(f)
+        self.assertIn("Sam", text)
+        self.assertIn("Alex", text)
+
+    def test_origin_is_named_and_its_points_stated(self):
+        text = compose_recap(self.facts(round={
+            "is_origin": True, "stage": "origin",
+            "points_per_correct_pick": 4, "matches_in_round": 1,
+        }))
+        self.assertIn("State of Origin", text)
+        self.assertIn("4", text)
+
+    def test_first_round_carries_no_movement_language(self):
+        f = self.facts(group={"first_round_for_group": True})
+        for m in f["members"]:
+            m.pop("moved", None)
+            m.pop("rank_before_round", None)
+        text = compose_recap(f)
+        for word in ("climbed", "is up", "takes over", "leads the season"):
+            self.assertNotIn(word, text)
+
+    def test_the_upset_names_the_side_that_won(self):
+        text = compose_recap(self.facts(matches={"upset": {
+            "home": "Storm", "away": "Titans", "winner": "Titans",
+            "loser": "Storm", "correct": 1, "tips": 4, "share": 0.25,
+        }}))
+        self.assertIn("Titans", text)
+        self.assertIn("1 of 4", text)
+
+    def test_a_solo_tipper_is_not_told_their_own_score_twice(self):
+        f = self.facts(group={"members_who_tipped": 1}, totals={"correct": 7, "picks": 8})
+        f["members"] = f["members"][:1]
+        f["standings"] = f["standings"][:1]
+        text = compose_recap(f)
+        self.assertNotIn("between them", text)
+
+    def test_a_round_with_nothing_in_it_falls_back(self):
+        f = self.facts(group={"members_who_tipped": 1, "first_round_for_group": True},
+                       totals={"correct": 0, "picks": 1})
+        f["members"] = [{
+            "name": "Sam", "correct": 0, "picks": 1, "round_points": 0,
+            "season_points": 0, "rank_now": 1, "perfect_round": False,
+        }]
+        f["standings"] = f["standings"][:1]
+        self.assertIsNone(compose_recap(f))
+        self.assertIn("Sam", fallback_line(f))
+
+    # -- conversation starters --------------------------------------------
+
+    def test_starters_are_short_and_ask_something(self):
+        points = build_talking_points(self.facts(matches={"upset": {
+            "home": "Storm", "away": "Titans", "winner": "Titans",
+            "loser": "Storm", "correct": 1, "tips": 4, "share": 0.25,
+        }}))
+        self.assertTrue(1 <= len(points) <= 3)
+        for p in points:
+            self.assertLessEqual(len(p), 120)
+            self.assertIn("?", p)
+
+    def test_starters_only_name_people_in_the_group(self):
+        f = self.facts()
+        names = {m["name"] for m in f["members"]}
+        for p in build_talking_points(f):
+            for word in re.findall(r"\b[A-Z][a-z]+\b", p):
+                if word in ("Who", "Anyone", "Which", "Was", "Did", "Only", "Everyone"):
+                    continue
+                self.assertIn(word, names | {"Depot", "Crew"})
+
+    def test_a_quiet_round_still_gets_one_starter(self):
+        points = build_talking_points(self.facts(
+            members=[{"name": "Sam", "correct": 0, "picks": 8, "round_points": 0,
+                      "season_points": 0, "rank_now": 1, "perfect_round": False}],
+        ))
+        self.assertTrue(points)

@@ -1,6 +1,6 @@
 {% extends "app_base.html" %}
 {% load static %}
-{% block title %}Ladder — {{ org.name }}{% endblock %}
+{% block title %}Ladder, {{ org.name }}{% endblock %}
 {% block loader_task %}Loading the ladder{% endblock %}
 {% block nav_ladder %}on{% endblock %}
 {% block body_class %}page-deep sheet-page{% endblock %}
@@ -77,7 +77,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
 </div>
 
 <p class="lad-foot">
-  <span class="lad-key"><i class="k-finals"></i> Top 8 — finals places</span>
+  <span class="lad-key"><i class="k-finals"></i> Top 8, finals places</span>
   {% if updated_at %}<span class="lad-when">Updated {{ updated_at|timesince }} ago</span>{% endif %}
 </p>
 

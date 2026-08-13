@@ -1,6 +1,6 @@
 {% extends "admin_base.html" %}
 {% load team_extras %}
-{% block title %}Matches — Manage{% endblock %}
+{% block title %}Matches. Manage{% endblock %}
 {% block nav_orgs %}on{% endblock %}
 {% block admin_content %}
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;"><a href="{% url 'manage:org_rounds' org.id %}" class="flink" style="color:var(--forest);">Rounds</a><span style="color:var(--muted);">/</span><h1 class="admin-h1" style="margin:0;">Round {{ round.round_number }} &middot; Matches</h1></div>
@@ -22,7 +22,7 @@
         </form>
       </div>
       {% empty %}
-      <p class="app-sub" style="margin:0;">No matches yet — add one, or trigger a sync from the Sync tab.</p>
+      <p class="app-sub" style="margin:0;">No matches yet, add one, or trigger a sync from the Sync tab.</p>
       {% endfor %}
     </div>
   </div>

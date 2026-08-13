@@ -1,12 +1,12 @@
 {% extends "app_base.html" %}
-{% block title %}Set up the election — {{ org.name }}{% endblock %}
+{% block title %}Set up the election, {{ org.name }}{% endblock %}
 {% block loader_task %}Setting up the election{% endblock %}
 {% block app_content %}
 <div class="app-head">
   <div>
     <div class="app-eyebrow">{{ org.name }}</div>
     <h1 class="app-h1">Set up the charity election</h1>
-    <p class="app-sub">Members vote on where the season's money goes. Schedule it for later or open it right now — either way, everyone gets an email and an in-app heads-up the moment it opens.</p>
+    <p class="app-sub">Members vote on where the season's money goes. Schedule it for later or open it right now, either way, everyone gets an email and an in-app heads-up the moment it opens.</p>
   </div>
   {% if vote.status == "scheduled" %}<span class="badge-live" style="background:rgba(15,46,34,.08);color:var(--forest);">Scheduled</span>{% endif %}
 </div>
@@ -32,7 +32,7 @@
     {% csrf_token %}
     <div class="fld" style="margin-bottom:18px;">
       <label for="adminMessage">A note to your members <span style="font-weight:400;color:var(--muted);">(lands in the email and the popup)</span></label>
-      <textarea id="adminMessage" name="admin_message" rows="3" placeholder="e.g. Vote's open, team — pick where our season's money goes. Winner locked in Friday!">{{ vote.admin_message }}</textarea>
+      <textarea id="adminMessage" name="admin_message" rows="3" placeholder="e.g. Vote's open, team, pick where our season's money goes. Winner locked in Friday!">{{ vote.admin_message }}</textarea>
     </div>
 
     <div class="fld" style="margin-bottom:8px;">
@@ -47,7 +47,7 @@
     </div>
 
     <div class="fld" style="margin:18px 0 8px;">
-      <label for="closeAt">When should voting end? <span style="font-weight:400;color:var(--muted);">(optional — it closes and reveals results automatically; you can always end it manually)</span></label>
+      <label for="closeAt">When should voting end? <span style="font-weight:400;color:var(--muted);">(optional, it closes and reveals results automatically; you can always end it manually)</span></label>
       <input type="datetime-local" id="closeAt" name="scheduled_close_at" class="election-when"
              value="{% if vote.scheduled_close_at %}{{ vote.scheduled_close_at|date:'Y-m-d\TH:i' }}{% endif %}">
     </div>
@@ -57,7 +57,7 @@
       <button type="submit" name="action" value="now" class="abtn abtn-primary" data-confirm="Every member is emailed and notified straight away, and voting opens immediately."
               data-confirm-title="Open the election now?" data-confirm-ok="Open election">Start it now &rarr;</button>
     </div>
-    <p class="app-sub" style="margin-top:12px;">Voting is blind — tallies stay hidden until you close it from the vote page.</p>
+    <p class="app-sub" style="margin-top:12px;">Voting is blind, tallies stay hidden until you close it from the vote page.</p>
   </form>
 </div>
 {% endblock %}

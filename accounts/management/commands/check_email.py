@@ -8,19 +8,36 @@ sender looks exactly like a working one from the outside.
 This command is the opposite trade. It reports the resolved configuration, sends
 one message, and prints Postmark's own verdict on it — including the per-message
 rejection that the backend would normally only write to a log.
+
+"Postmark said OK" is not the same as "Postmark sent it". On the free plan the
+API keeps returning ErrorCode 0 with a MessageID after the monthly allowance is
+spent, and those messages never appear in Activity and never leave — which is
+indistinguishable from working, from inside the app. So the send is followed by
+a lookup of that MessageID, and the month's running total is printed either way.
 """
 from __future__ import annotations
 
+import datetime as dt
 import logging
+import time
 
+import requests
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.core.management.base import BaseCommand, CommandError
+
+API_BASE = "https://api.postmarkapp.com"
+# Emails per month included on Postmark's free plan. Sending stops dead at this
+# number until the billing cycle resets; there are no overages to buy.
+FREE_PLAN_MONTHLY = 100
 
 # Postmark's code for "the From address isn't a verified sender signature".
 # Far and away the most common failure, and the least self-explanatory, so it
 # gets spelled out rather than left as a bare number.
 ERR_UNVERIFIED_SENDER = 300
+# "This message was not found" — what a MessageID lookup returns for a message
+# that was accepted but never queued.
+ERR_MESSAGE_NOT_FOUND = 701
 
 
 class Command(BaseCommand):
@@ -47,7 +64,20 @@ class Command(BaseCommand):
             self._row("Token", f"…{token[-6:]}" if token else "(not set)")
             self._row("Stream", getattr(settings, "POSTMARK_MESSAGE_STREAM", "outbound"))
         self._row("Site base URL", getattr(settings, "SITE_BASE_URL", ""))
+
+        used = self._sent_this_month(token) if "Postmark" in backend and token else None
+        if used is not None:
+            self._row("Sent this month", f"{used} (free plan allows {FREE_PLAN_MONTHLY})")
         self.stdout.write("")
+
+        if used is not None and used >= FREE_PLAN_MONTHLY:
+            self.stdout.write(self.style.ERROR(
+                f"The month's {FREE_PLAN_MONTHLY}-email allowance is gone. Postmark "
+                "still answers OK, but nothing is being sent and nothing will reach "
+                "an inbox until the billing cycle resets or the account moves to a "
+                "paid plan (account.postmarkapp.com → Billing)."
+            ))
+            self.stdout.write("")
 
         if "console" in backend:
             self.stdout.write(self.style.WARNING(
@@ -72,16 +102,13 @@ class Command(BaseCommand):
         log = logging.getLogger("goodtip.email_backends")
         log.addHandler(handler)
         try:
-            sent = self._send(to)
+            sent, results = self._send(to)
         finally:
             log.removeHandler(handler)
 
         if sent:
-            self.stdout.write(self.style.SUCCESS(
-                f"Accepted for delivery to {to}.\n"
-                "If it doesn't arrive, check spam and then Postmark → Activity "
-                "for the bounce."
-            ))
+            self.stdout.write(self.style.SUCCESS(f"Postmark accepted the message for {to}."))
+            self._confirm_queued(token, results)
             return
 
         self.stdout.write(self.style.ERROR(f"Not delivered to {to}."))
@@ -95,7 +122,73 @@ class Command(BaseCommand):
                 "address that already is."
             ))
 
-    def _send(self, to: str) -> int:
+    def _sent_this_month(self, token: str) -> int | None:
+        """How many emails this server has sent since the 1st, or None if unknown.
+
+        The allowance is what runs out, so it's worth showing before the send
+        rather than after — a number one short of the cap is the only warning
+        there is that the next election notice fans out into nothing.
+        """
+        today = dt.date.today()
+        try:
+            r = requests.get(
+                f"{API_BASE}/stats/outbound/sends",
+                params={"fromdate": today.replace(day=1).isoformat(), "todate": today.isoformat()},
+                headers={"Accept": "application/json", "X-Postmark-Server-Token": token},
+                timeout=15,
+            )
+            r.raise_for_status()
+            return int(r.json().get("Sent", 0))
+        except (requests.RequestException, ValueError, TypeError):
+            # Diagnosis is the job here; a stats hiccup shouldn't stop the send.
+            return None
+
+    def _confirm_queued(self, token: str, results: list[dict]) -> None:
+        """Look the accepted MessageIDs back up in Postmark's Activity.
+
+        A message that was really queued resolves within a second or two. One
+        that doesn't exist at all was swallowed — the signature of a spent
+        allowance, and the whole reason this command can't stop at "accepted".
+        """
+        ids = [r.get("MessageID") for r in results if r.get("ErrorCode") == 0 and r.get("MessageID")]
+        if not token or not ids:
+            return
+
+        for message_id in ids:
+            status, detail = None, {}
+            for attempt in range(3):
+                if attempt:
+                    time.sleep(3)
+                try:
+                    r = requests.get(
+                        f"{API_BASE}/messages/outbound/{message_id}/details",
+                        headers={"Accept": "application/json", "X-Postmark-Server-Token": token},
+                        timeout=15,
+                    )
+                    detail = r.json() if r.content else {}
+                except (requests.RequestException, ValueError):
+                    return  # Can't reach the API to check; say nothing rather than cry wolf.
+                if r.status_code == 200:
+                    status = detail.get("Status", "Queued")
+                    break
+                if detail.get("ErrorCode") != ERR_MESSAGE_NOT_FOUND:
+                    return  # Some other API problem — not evidence of a drop.
+
+            if status:
+                self.stdout.write(
+                    f"  Postmark Activity says: {status}. "
+                    "If it isn't in the inbox, check spam."
+                )
+            else:
+                self.stdout.write(self.style.ERROR(
+                    f"  …but message {message_id} never reached Postmark's Activity, "
+                    "so it was accepted and dropped — it will not arrive.\n"
+                    "  That is what a spent monthly allowance looks like: check "
+                    "'Sent this month' above against the plan, and Billing at "
+                    "account.postmarkapp.com."
+                ))
+
+    def _send(self, to: str) -> tuple[int, list[dict]]:
         msg = EmailMultiAlternatives(
             subject="GoodTip — email delivery test",
             body=(
@@ -118,7 +211,8 @@ class Command(BaseCommand):
         # fail_silently=False so a network or auth failure surfaces here as a
         # traceback rather than a silent zero — this command exists to be told.
         connection = get_connection(fail_silently=False)
-        return connection.send_messages([msg]) or 0
+        sent = connection.send_messages([msg]) or 0
+        return sent, list(getattr(connection, "last_results", []))
 
     def _row(self, label: str, value) -> None:
         self.stdout.write(f"  {label:<14} {value}")

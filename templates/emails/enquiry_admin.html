@@ -1,6 +1,7 @@
 {% extends "emails/_base.html" %}
 {% block title %}New enquiry from {{ enquiry.name }}{% endblock %}
 {% block eyebrow %}Customer enquiry{% endblock %}
+{% block badge %}&#9993;{% endblock %}{# envelope — somebody got in touch #}
 {% block preheader %}{{ enquiry.name }}{% if enquiry.organisation %} at {{ enquiry.organisation }}{% endif %} just got in touch through the website.{% endblock %}
 {% block content %}
   <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">Hey boss,</p>
@@ -47,7 +48,7 @@
   <p style="margin:14px 0 0;font-size:14px;line-height:1.6;color:#6b6b5e;">
     That link goes straight to this enquiry. If you're not signed in it'll ask
     you first and then take you there. Replying on that page emails
-    {{ enquiry.name }} directly &mdash; no need to start a new message.
+    {{ enquiry.name }} directly, no need to start a new message.
   </p>
   <p style="margin:10px 0 0;font-size:14px;line-height:1.6;color:#6b6b5e;">
     You can also just hit reply to this email; it goes to {{ enquiry.email }}.

@@ -37,7 +37,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from data_sync.models import SyncRun
-from data_sync.services import SyncError, get_sync_service
+from data_sync.services import SyncError, competition_for_series, get_sync_service
 from orgs.models import Organisation
 from tipping.models import Match, Round
 
@@ -158,7 +158,11 @@ class Command(BaseCommand):
                 continue
             for comp in org.competitions.all():
                 for series in comp.series.all():
-                    name = series.name.upper()
+                    # Same Series-to-Competition resolve as _targets: the
+                    # ladder feeds answer to "AFL", never to "AFLW".
+                    name = competition_for_series(series.name)
+                    if name is None:
+                        continue
                     key = (name, org.season_id)
                     if key in seen:
                         continue
@@ -251,12 +255,15 @@ class Command(BaseCommand):
         for org in orgs:
             if org.season_id is None:
                 continue
-            # Series names are what get_sync_service dispatches on, so the set
-            # of feeds to ask falls straight out of what the org signed up for.
+            # The set of feeds to ask falls out of what the org signed up for,
+            # resolved from Series to Competition: an org on AFL + AFLW asks
+            # the AFL feed once, not once per series under a name it does not
+            # answer to.
             names = {
-                s.name.upper()
+                key
                 for comp in org.competitions.all()
                 for s in comp.series.all()
+                if (key := competition_for_series(s.name)) is not None
             }
             for comp_name in sorted(names):
                 if comp_name not in services:
@@ -290,8 +297,10 @@ class Command(BaseCommand):
     def _targets(self, opts) -> list[tuple[Organisation, int, str]]:
         """Work out which (org, round, competition) triples to hit.
 
-        Competition comes from the round's series name, which is what
-        get_sync_service dispatches on.
+        A Round knows its Series; the feeds are keyed by Competition. Those
+        two names coincide for AFL and NRL and differ for everything else, so
+        the series is resolved through competition_for_series rather than
+        being upper-cased and hoped for.
         """
         rounds = Round.objects.select_related("org", "series", "org__season")
 
@@ -316,7 +325,13 @@ class Command(BaseCommand):
         seen = set()
         targets = []
         for r in rounds.exclude(status="complete"):
-            comp = r.series.name.upper()
+            comp = competition_for_series(r.series.name)
+            if comp is None:
+                # No feed covers this series. Skipping is right: raising per
+                # round would bury the codes that do sync under noise.
+                continue
+            # The AFL and AFLW rounds of one org collapse to a single AFL
+            # target, because one call to the service syncs both series.
             key = (r.org_id, r.round_number, comp)
             if key in seen:
                 continue

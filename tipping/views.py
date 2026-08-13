@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseForbidden
@@ -9,8 +11,9 @@ from billing.donations import donation_summary
 from orgs.models import OrgMember, Organisation
 from .models import LadderEntry, Match, Round, Tip
 from .services import (
-    annotate_play_state, current_round, leaderboard_for_family,
-    leaderboard_for_org, submit_tip, user_org_stats, user_rank_in_org,
+    annotate_play_state, competition_filter, current_round,
+    leaderboard_for_family, leaderboard_for_org, submit_tip, tip_window,
+    user_org_stats, user_rank_in_org,
 )
 
 
@@ -58,9 +61,15 @@ def tip_save_partial(request, org_id: int, round_id: int, match_id: int):
     except ValueError as e:
         return HttpResponse(f"<span class='text-red-400 text-xs'>{e}</span>", status=400)
     if request.POST.get("view") == "mytips":
-        return render(request, "partials/tip_pick_cell.html", {
+        # The whole card comes back, not just the picker: the chosen club is
+        # now shown by the club's own row, so a swap that replaced only the
+        # buttons would leave the previous pick still looking selected.
+        from matchreader.services import read_match_verbose
+
+        return render(request, "partials/fixture_card.html", {
             "org": org, "match": match, "selection": selection,
-            "editable": True, "saved": True,
+            "editable": True, "saved": True, "mode": "htmx",
+            "reader": read_match_verbose(match),
         })
     return render(request, "partials/tip_saved.html", {"match": match, "selection": selection})
 
@@ -165,6 +174,32 @@ def tip_confirm_upcoming(request, org_id: int):
     return redirect(f"{reverse('dashboard')}?org={org.id}")
 
 
+logger = logging.getLogger(__name__)
+
+
+def _readers_for(matches) -> dict:
+    """MatchReader's take on a slate of fixtures, keyed by match id.
+
+    Only offered BEFORE a game is decided. Once a result is in, a prediction
+    is noise at best and an argument at worst, and the screen already shows
+    who actually won — so decided games are dropped before the model is asked
+    rather than after.
+
+    Batched: read one at a time this cost three queries per fixture, which is
+    a round's worth of latency for information that fits in one.
+    """
+    pending = [m for m in matches if m.phase != "complete"]
+    if not pending:
+        return {}
+    try:
+        from matchreader.services import read_matches_verbose
+
+        return read_matches_verbose(pending)
+    except Exception:  # noqa: BLE001 — an insight must never break the page
+        logger.exception("MatchReader failed for a slate of %d", len(pending))
+        return {}
+
+
 @login_required
 def my_tips_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
@@ -173,9 +208,19 @@ def my_tips_view(request, org_id: int):
     # Annotated so current_round can pick the round in play without a query per
     # round. Kept newest-first: the prev/next sidebar below indexes into this
     # list and depends on that order.
-    rounds = list(
-        annotate_play_state(Round.objects.filter(org=org)).order_by("-round_number")
-    )
+    # ---- competition filter.
+    # A Round belongs to exactly one Series, so filtering by competition here
+    # means narrowing the ROUND LIST: an org tipping AFL and NRL has two sets
+    # of rounds interleaved by number, and "round 3" is ambiguous until you
+    # say which code. The filter therefore also scopes prev/next, so paging
+    # through NRL rounds never lands on an AFL one.
+    org_series, active_series = competition_filter(org, request.GET.getlist("series"))
+    active_slugs = [s.slug for s in active_series if s in org_series]
+
+    round_qs = Round.objects.filter(org=org)
+    if active_series:
+        round_qs = round_qs.filter(series__in=active_series)
+    rounds = list(annotate_play_state(round_qs).order_by("-round_number"))
     selected_round_id = request.GET.get("round")
     if selected_round_id:
         try:
@@ -185,22 +230,43 @@ def my_tips_view(request, org_id: int):
     else:
         selected_round = current_round(rounds)
     all_rows = []
+    round_open, round_lock_note = True, ""
     if selected_round:
-        matches = selected_round.matches.select_related("home_team", "away_team").all()
+        matches = list(
+            selected_round.matches
+            .select_related("home_team", "away_team", "round__series")
+        )
         tips = {
             t.match_id: t
             for t in Tip.objects.filter(user=request.user, match__in=matches, org=org)
         }
+        # One batched read for the round rather than three queries per fixture.
+        readers = _readers_for(matches)
+        # This screen shows a single round, so the window verdict is the same
+        # for every fixture on it — resolved once and reported once, above the
+        # list, rather than repeated on every card.
+        state = tip_window(org).get(selected_round.id, {"open": True, "waits_for": None})
+        round_open = state["open"]
+        if not round_open and state["waits_for"] is not None:
+            round_lock_note = (
+                f"Locked. You can tip round {selected_round.round_number} once "
+                f"round {state['waits_for'].round_number} is over."
+            )
         for m in matches:
             all_rows.append({
                 "match": m,
                 "tip": tips.get(m.id),
-                # A pick can change until THIS match kicks off. The round's own
+                # A pick can change until THIS match kicks off, and only while
+                # its round is inside the tipping window. The round's own
                 # lockout is its first kickoff, so gating on it closed games
                 # that had not started yet.
-                "editable": not m.is_locked,
+                "editable": not m.is_locked and round_open,
                 # upcoming / live / complete — drives the state filter below
                 "phase": m.phase,
+                # MatchReader's read. None whenever there is no fitted model
+                # for this series or too little form behind either side, and
+                # the template simply shows nothing rather than a hedge.
+                "reader": readers.get(m.id),
             })
 
     # ---- state filter. Counts are always over the whole round, so the tab
@@ -217,6 +283,8 @@ def my_tips_view(request, org_id: int):
         return render(request, "partials/my_tips_round.html", {
             "org": org, "round": selected_round, "rows": tip_rows,
             "state": state, "phase_counts": phase_counts, "total_all": len(all_rows),
+            "org_series": org_series, "active_slugs": active_slugs,
+            "round_open": round_open, "round_lock_note": round_lock_note,
         })
 
     # ---- sidebar: where this member sits, and what's left to do this round.
@@ -241,6 +309,10 @@ def my_tips_view(request, org_id: int):
     return render(request, "my_tips.html", {
         "org": org, "rounds": rounds, "selected_round": selected_round,
         "rows": tip_rows, "points": stats["points"],
+        # Competition filter: the org's series, and which are selected.
+        "org_series": org_series, "active_slugs": active_slugs,
+        # Tipping window: whether this round is open, and why not.
+        "round_open": round_open, "round_lock_note": round_lock_note,
         "state": state, "phase_counts": phase_counts, "total_all": len(all_rows),
         "prev_round": prev_round, "next_round": next_round,
         "round_position": len(rounds) - rounds.index(selected_round) if selected_round else 0,

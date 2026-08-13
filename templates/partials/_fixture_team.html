@@ -1,0 +1,92 @@
+{% load team_extras %}
+{% comment %}
+One side of a fixture: crest, name, recent form, and the act of tipping it.
+
+Stacked vertically WITHIN its column so the two sides sit shoulder to shoulder
+either side of the versus. The club is named once on the whole card, because
+pressing the club is how you tip it.
+
+The form strip is a SIBLING of the pick control, not a child. Nesting a
+focusable element inside a <button> is invalid and makes the inner one
+unreachable by keyboard, and it would mean opening the history changed your
+tip on the way through.
+
+Two save styles. The dashboard and confirmation collect a whole round and
+submit once, so the control is a label over a hidden radio. My Tips saves each
+pick as it is made, so the control posts itself. They render identically.
+
+Expects: team, form (a reader row, optional), pick ("home"|"away"),
+         side (for the crest alignment), match, selection, editable, mode, org
+{% endcomment %}
+<div class="fxc-side fxc-side-{{ side }}">
+
+  {% comment %}
+  Crest left, club right, on one wide box — the shape in the mock. The name
+  wraps to a second line rather than shrinking, so "Canterbury-Bankstown
+  Bulldogs" reads as two words of a club rather than as truncated text.
+  {% endcomment %}
+  {% if editable and mode == "htmx" %}
+  <button type="button"
+          class="fxc-team{% if selection == pick %} sel{% endif %}"
+          hx-post="{% url 'tipping:tip_save' org.id match.round_id match.id %}"
+          hx-vals='{"selection":"{{ pick }}","view":"mytips"}'
+          hx-target="#fxc-{{ match.id }}" hx-swap="outerHTML"
+          aria-pressed="{% if selection == pick %}true{% else %}false{% endif %}">
+    <span class="fxc-crest">{% crest team %}</span>
+    <span class="fxc-name">{{ team.name }}</span>
+    <span class="fxc-tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7"/></svg></span>
+  </button>
+
+  {% elif editable %}
+  <label class="fxc-team{% if selection == pick %} sel{% endif %}">
+    <input type="radio" name="match_{{ match.id }}" value="{{ pick }}" hidden
+           {% if selection == pick %}checked{% endif %}>
+    <span class="fxc-crest">{% crest team %}</span>
+    <span class="fxc-name">{{ team.name }}</span>
+    <span class="fxc-tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7"/></svg></span>
+  </label>
+
+  {% else %}
+  {# Locked or graded: still a side, no longer a control. #}
+  <div class="fxc-team{% if selection == pick %} sel{% else %} is-dim{% endif %}">
+    <span class="fxc-crest">{% crest team %}</span>
+    <span class="fxc-name">{{ team.name }}</span>
+    <span class="fxc-tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7"/></svg></span>
+  </div>
+  {% endif %}
+
+  {% comment %}
+  form.of, not form. The reader dict is always truthy, so testing it alone
+  drew an empty dot strip reading "0 of 0" for a side with no history yet —
+  which is every side in round one of a newly backfilled series.
+  {% endcomment %}
+  {% if form.of %}
+  <button type="button" class="fxc-form" data-hist data-team="{{ team.name }}"
+          aria-label="{{ team.name }}: last {{ form.of }} games. Open the scores.">
+    <span class="fxc-dots" aria-hidden="true">
+      {% for g in form.games %}<i class="{{ g.outcome|lower }}"></i>{% endfor %}
+    </span>
+    <span class="fxc-rec">{{ form.wins }} of {{ form.of }}</span>
+    <span class="fxc-hint" aria-hidden="true">
+      <b>Last {{ form.of }} games</b>
+      Newest on the right. Green won, amber drew, red lost.
+      <i>Tap to see the scores</i>
+    </span>
+  </button>
+
+  {# Cloned into the dialog on click; never rendered in place. #}
+  <template data-hist-body>
+    <ol class="fxh-list">
+      {% for g in form.games reversed %}
+      <li class="fxh-row {{ g.outcome|lower }}">
+        <span class="fxh-badge">{{ g.outcome }}</span>
+        <span class="fxh-what"><b>{{ g.result_word }} {{ g.score_line }}</b> v {{ g.opponent }}</span>
+        <span class="fxh-where">{{ g.venue_word }} &middot; {{ g.kickoff_at|date:"j M Y" }}</span>
+      </li>
+      {% endfor %}
+    </ol>
+    <p class="fxh-sum">{{ form.wins }} won, {{ form.draws }} drawn, {{ form.losses }} lost.</p>
+  </template>
+  {% endif %}
+
+</div>

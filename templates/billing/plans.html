@@ -1,11 +1,11 @@
 {% extends "app_base.html" %}
-{% block title %}Plans — {{ org.name }}{% endblock %}
+{% block title %}Plans, {{ org.name }}{% endblock %}
 {% block loader_task %}Loading the plans{% endblock %}
 {% block app_content %}
 <div class="app-head"><div><div class="app-eyebrow">{{ org.name }} &middot; billing</div><h1 class="app-h1">Choose your plan</h1><p class="app-sub">Priced by group size. Every plan includes all four codes and the full platform. GoodTip gives a share of this fee to the charity your group picks.</p></div></div>
 
 {% if not stripe_configured %}
-<div class="flash info" style="margin-bottom:18px;"><svg class="cic" style="width:18px;height:18px;stroke:#245b66;fill:none;flex:none;"><use href="#ic-lock"/></svg><span>Payments aren't switched on yet — your choice is saved and we'll confirm before charging.</span></div>
+<div class="flash info" style="margin-bottom:18px;"><svg class="cic" style="width:18px;height:18px;stroke:#245b66;fill:none;flex:none;"><use href="#ic-lock"/></svg><span>Payments aren't switched on yet, your choice is saved and we'll confirm before charging.</span></div>
 {% endif %}
 
 <div class="tier-cards">

@@ -7,6 +7,15 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* The hidden attribute must always win.
+   The browser's own [hidden] { display: none } is a UA rule, so ANY author
+   rule that sets display on the same element silently beats it — and every
+   panel we toggle with el.hidden = true is display-typed (grid, flex).
+   That produced a dialog which opened and then could not be closed: setting
+   .hidden ran, and .fxh-modal { display: grid } kept it on screen. Declaring
+   it once here removes the whole class of bug rather than one instance. */
+[hidden] { display: none !important; }
+
 :root {
   /* ---- Brand palette (from client) ---- */
   --deep:    #0F2E22;   /* deep forest */
@@ -5979,15 +5988,21 @@ body.gtc-open { overflow: hidden; }
    question survives scrolling. */
 .fixtures .fx-roundhead {
   position: sticky; top: 0; z-index: 2;
-  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
-  margin: 16px 0 8px; padding: 8px 12px;
-  background: rgba(15,46,34,.92); border-radius: 9px;
-  backdrop-filter: blur(4px);
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin: 18px 0 0; padding: 12px 18px;
+  background: var(--deep);
+  /* Rounded top only: the round header and the fixtures beneath it are one
+     block, so a fully rounded bar floating above them would read as a
+     separate thing rather than as this round's heading. */
+  border-radius: 12px 12px 0 0;
 }
 .fixtures .fx-roundhead:first-child { margin-top: 0; }
-.fxr-n { font-family: var(--mark); font-size: 14px; font-weight: 800; color: var(--lime); letter-spacing: .02em; }
-.fxr-series { font-size: 12.5px; font-weight: 600; color: rgba(232,228,213,.75); }
-.fxr-locks { margin-left: auto; font-size: 11.5px; color: rgba(232,228,213,.5); white-space: nowrap; }
+.fxr-n { font-family: var(--mark); font-size: 16px; font-weight: 800; color: var(--lime); letter-spacing: .02em; }
+.fxr-series { font-size: 13.5px; font-weight: 600; color: rgba(232,228,213,.8); }
+.fxr-locks { margin-left: auto; font-size: 12.5px; color: rgba(232,228,213,.62); white-space: nowrap; }
+/* Cards in a round group sit flush under its header and square off the join. */
+.fixtures .fx-roundhead + .fxc { border-radius: 0; border-top: 0; }
+.fixtures .fxc { border-left-width: 3px; }
 @media (max-width: 520px) { .fxr-locks { margin-left: 0; width: 100%; } }
 
 /* ==========================================================================
@@ -8208,3 +8223,995 @@ a:hover > .gt-ic-tile,
 .gt-empty.has-photo h3 { color: #fff; }
 .gt-empty.has-photo p { color: rgba(255,255,255,.78); }
 .gt-empty.has-photo a { color: var(--lime); }
+
+/* ==========================================================================
+   ============ v44 — filled icons, with colour ============================
+   ========================================================================== */
+
+/* The stroke set is a line drawing. Correct at 16px in a nav row, and lifeless
+   as the subject of a card — which is the note: the icons should look like
+   icons, the way an app icon does, not like a wireframe.
+   The filled set (ic-f-*) is solid silhouettes with no stroke, knocked out in
+   white on a coloured tile. Colour is per department type, so the directory is
+   scannable before a word of it is read. */
+
+.gt-ic-tile.filled {
+  border: 0;
+  background: linear-gradient(150deg, var(--tone-a), var(--tone-b));
+  color: #fff;
+  box-shadow: 0 6px 14px -6px var(--tone-shadow, rgba(15,46,34,.5));
+}
+.gt-ic-tile.filled svg {
+  /* the whole point: painted, not outlined */
+  fill: currentColor;
+  stroke: none;
+  width: 22px; height: 22px;
+}
+.gt-ic-tile.filled.sm svg { width: 18px; height: 18px; }
+.gt-ic-tile.filled.lg svg { width: 27px; height: 27px; }
+
+/* Tones. Each is a two-stop gradient rather than a flat fill, because a flat
+   square of colour reads as a swatch and a gradient reads as an object. Kept
+   deep enough that white knocks out cleanly on every one. */
+.tone-green  { --tone-a:#2D7A3A; --tone-b:#1C5628; --tone-shadow:rgba(45,122,58,.45); }
+.tone-blue   { --tone-a:#2F6FB5; --tone-b:#1E4C81; --tone-shadow:rgba(47,111,181,.45); }
+.tone-teal   { --tone-a:#1F8A8A; --tone-b:#14625F; --tone-shadow:rgba(31,138,138,.45); }
+.tone-gold   { --tone-a:#C79A2B; --tone-b:#94701A; --tone-shadow:rgba(199,154,43,.45); }
+.tone-violet { --tone-a:#6B4EA8; --tone-b:#4A3579; --tone-shadow:rgba(107,78,168,.45); }
+.tone-pink   { --tone-a:#B84A72; --tone-b:#8A3252; --tone-shadow:rgba(184,74,114,.45); }
+.tone-slate  { --tone-a:#4A5A63; --tone-b:#313E45; --tone-shadow:rgba(74,90,99,.45); }
+
+/* The Manage menu rows get the same treatment: solid glyph on lime, which is
+   the one place the brand colour belongs at this size. */
+.an-menu-panel a .mi-ic {
+  background: linear-gradient(150deg, var(--lime), #A8CE22);
+  border: 0;
+  color: var(--deep);
+}
+.an-menu-panel a .mi-ic svg { fill: currentColor; stroke: none; width: 18px; height: 18px; }
+.an-menu-panel a:hover .mi-ic { background: linear-gradient(150deg, #D8FF4A, var(--lime)); }
+
+/* Empty-state mark, same idea. */
+.gt-empty .ge-ic { background: linear-gradient(150deg, var(--lime), #A8CE22); border: 0; color: var(--deep); }
+.gt-empty .ge-ic svg { fill: currentColor; stroke: none; }
+
+/* ==========================================================================
+   ============ v45 — video backgrounds ====================================
+   ========================================================================== */
+
+/* The client's clips are silent match footage, so they are backgrounds, not
+   things anyone presses play on. That decides everything here: muted, looping,
+   inline, no controls, and a poster frame that is what a visitor actually sees
+   until the file has buffered.
+
+   The poster is not a nicety. It is the whole of what gets shown to anyone on
+   reduced motion, on a data saver, or on a browser that refuses autoplay —
+   which is most mobile browsers unless the video is muted. So the poster is
+   set on the element AND painted as a CSS background behind it, and the video
+   simply fades in on top once it can play. Nothing ever renders empty. */
+
+.photo-banner .pb-video {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  object-position: center 32%;
+  opacity: 0;
+  transition: opacity .6s var(--ease);
+}
+.photo-banner .pb-video.ready { opacity: 1; }
+
+/* Reduced motion: the video never plays and never loads. The poster is the
+   design, not a fallback — a looping background is exactly the kind of
+   unrequested movement the setting exists to stop. */
+@media (prefers-reduced-motion: reduce) {
+  .photo-banner .pb-video { display: none !important; }
+}
+
+/* ==========================================================================
+   ============ v46 — nav glyphs, filled ===================================
+   ========================================================================== */
+
+/* Both bars move to the filled set. The earlier note was that a heavier
+   stroke at 15px closes up the counters — true, and the answer turned out not
+   to be a heavier stroke but no stroke at all. A solid silhouette holds its
+   shape at small sizes far better than an outline does, which is exactly why
+   every OS tab bar is drawn this way.
+   Colour stays where it was: the glyph carries the label's own colour and
+   lifts to lime on hover and on the current page. Nothing about the palette
+   moves; the shapes just stop looking like wireframes. */
+.nav-ic, .an-ic {
+  fill: currentColor;
+  stroke: none;
+  opacity: .72;
+}
+.nav-links a:hover .nav-ic,
+.nav-links a:focus-visible .nav-ic,
+.nav-links a[aria-current="page"] .nav-ic,
+.gt-v2 .an-links a:hover .an-ic,
+.gt-v2 .an-links a.on .an-ic,
+.an-menu-btn:hover .an-ic,
+.an-menu-btn.on .an-ic,
+.an-menu-btn[aria-expanded="true"] .an-ic { opacity: 1; color: var(--lime); }
+
+/* The lime sign-up pill: a filled glyph on lime needs the deep green, and at
+   full opacity or it muddies. */
+.nav-links .btn-nav .nav-ic { opacity: 1; }
+.nav-links .nav-login .nav-ic { opacity: .9; }
+
+/* ==========================================================================
+   ============ v47 — the create-department modal ==========================
+   ========================================================================== */
+
+/* Two steps in one panel. The steps do not fade in and out on top of each
+   other — they slide, so the panel reads as one surface moving rather than
+   two screens swapping. Height animates with it, because a panel that snaps
+   from tall to short is the thing that makes a modal feel cheap. */
+
+.dept-cta {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; flex-wrap: wrap;
+  margin-top: 22px; padding: 22px 24px;
+  background: var(--gt-card); border: 1px solid var(--gt-hair);
+  border-radius: 18px;
+}
+.dept-cta .abtn svg { width: 18px; height: 18px; fill: currentColor; stroke: none; }
+
+.dept-modal { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 20px; }
+.dept-modal[hidden] { display: none; }
+.dept-modal .dm-scrim {
+  position: absolute; inset: 0;
+  background: rgba(6,20,13,.72); backdrop-filter: blur(4px);
+  opacity: 0; transition: opacity .22s var(--ease);
+}
+.dept-modal.is-open .dm-scrim { opacity: 1; }
+
+.dept-modal .dm-panel {
+  position: relative; z-index: 1;
+  width: min(560px, 100%);
+  max-height: min(88vh, 760px);
+  overflow: hidden auto;
+  background: var(--gt-card);
+  border-radius: 22px;
+  border: 1px solid rgba(255,255,255,.1);
+  box-shadow: 0 50px 100px -34px rgba(0,0,0,.75);
+  padding: 30px 30px 26px;
+  transform: translateY(14px) scale(.985);
+  opacity: 0;
+  transition: transform .26s cubic-bezier(.2,.9,.3,1.05), opacity .2s var(--ease);
+}
+.dept-modal.is-open .dm-panel { transform: none; opacity: 1; }
+
+body.dept-modal-open { overflow: hidden; }
+
+.dm-x {
+  position: absolute; top: 16px; right: 16px;
+  width: 36px; height: 36px; display: grid; place-items: center;
+  border: 0; border-radius: 50%; background: rgba(15,46,34,.06);
+  color: var(--muted); cursor: pointer; transition: .15s var(--ease);
+}
+.dm-x:hover { background: rgba(15,46,34,.12); color: var(--ink); }
+.dm-x svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; }
+
+/* Progress: two dots and a line that fills. Deliberately not a bar with a
+   percentage — two steps is not a journey and a 50% bar overstates it. */
+.dm-rail { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+.dm-dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(15,46,34,.18); transition: background .25s var(--ease); }
+.dm-dot.on { background: var(--forest); }
+.dm-line { flex: 1; height: 2px; background: rgba(15,46,34,.12); border-radius: 2px; max-width: 46px; }
+
+/* The slide. Steps stack in the same grid cell so the panel keeps one height
+   context, and the inactive one is taken out of the tab order. */
+.dm-form { display: grid; }
+.dm-step {
+  grid-area: 1 / 1;
+  opacity: 0; transform: translateX(26px);
+  transition: opacity .24s var(--ease), transform .3s cubic-bezier(.2,.85,.3,1);
+  pointer-events: none; visibility: hidden;
+}
+.dm-step.is-active { opacity: 1; transform: none; pointer-events: auto; visibility: visible; }
+.dm-panel[data-step="1"] .dm-step[data-step="2"] { transform: translateX(26px); }
+.dm-panel[data-step="2"] .dm-step[data-step="1"] { transform: translateX(-26px); }
+
+.dm-eyebrow {
+  font-family: var(--mark); font-size: 11px; font-weight: 800;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--forest);
+}
+.dm-title { margin: 6px 0 4px; font-size: 24px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
+.dm-lead { margin: 0 0 20px; font-size: 14.5px; color: var(--muted); line-height: 1.55; }
+
+/* Organisation rows */
+.dm-org {
+  display: flex; align-items: center; gap: 13px;
+  padding: 13px 14px; margin-bottom: 8px;
+  border: 1.5px solid var(--gt-hair); border-radius: 14px;
+  cursor: pointer; background: #fff;
+  transition: border-color .15s var(--ease), background .15s var(--ease);
+}
+.dm-org:hover { border-color: rgba(45,122,58,.45); }
+.dm-org.is-picked { border-color: var(--forest); background: rgba(45,122,58,.06); }
+.dm-org-txt { flex: 1; min-width: 0; line-height: 1.25; }
+.dm-org-txt b { display: block; font-size: 15.5px; color: var(--ink); }
+.dm-org-txt i { display: block; font-style: normal; font-size: 12.5px; color: var(--muted); }
+.dm-tick { width: 22px; height: 22px; flex: none; display: grid; place-items: center; color: var(--forest); opacity: 0; transition: opacity .15s var(--ease); }
+.dm-org.is-picked .dm-tick { opacity: 1; }
+.dm-tick svg { width: 20px; height: 20px; fill: currentColor; stroke: none; }
+
+.dm-switch {
+  background: none; border: 0; padding: 6px 0; margin-bottom: 10px;
+  font-family: var(--body); font-size: 13.5px; font-weight: 700;
+  color: var(--forest); cursor: pointer; text-decoration: underline;
+}
+.dm-orglist[hidden] { display: none; }
+
+/* Type chips */
+.dm-types { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.dm-type {
+  padding: 9px 15px; border-radius: 100px;
+  border: 1.5px solid var(--gt-hair); background: #fff;
+  font-family: var(--body); font-size: 13.5px; font-weight: 600; color: var(--ink);
+  cursor: pointer; transition: .15s var(--ease);
+}
+.dm-type:hover { border-color: rgba(45,122,58,.5); }
+.dm-type.on { background: var(--forest); border-color: var(--forest); color: #fff; }
+
+.dm-own, .dm-name { margin-bottom: 16px; }
+.dm-own label, .dm-name label { display: block; font-size: 13.5px; font-weight: 700; color: var(--ink); margin-bottom: 7px; }
+.dm-own .fld-ic, .dm-name .fld-ic {
+  display: flex; align-items: stretch; background: #fff;
+  border: 1px solid rgba(15,46,34,.15); border-radius: 11px; overflow: hidden;
+}
+.dm-own .fld-ic > .fi-mark, .dm-name .fld-ic > .fi-mark {
+  position: static; transform: none; width: 44px; height: auto; flex: none;
+  display: grid; place-items: center; pointer-events: none;
+  border-right: 1px solid rgba(15,46,34,.1); background: rgba(15,46,34,.025); color: rgba(15,46,34,.5);
+}
+.dm-own .fld-ic > .fi-mark svg, .dm-name .fld-ic > .fi-mark svg { width: 18px; height: 18px; fill: currentColor; stroke: none; }
+.dm-own input, .dm-name input {
+  flex: 1 1 auto; min-width: 0; border: 0 !important; background: transparent !important;
+  padding: 13px 15px !important; box-shadow: none !important; outline: none; font-size: 15px;
+}
+.dm-own .fld-ic:focus-within, .dm-name .fld-ic:focus-within {
+  border-color: var(--forest); box-shadow: 0 0 0 3px rgba(45,122,58,.16);
+}
+
+.dm-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 22px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dept-modal .dm-panel, .dm-step { transition: opacity .15s linear !important; transform: none !important; }
+}
+@media (max-width: 560px) {
+  .dept-modal { padding: 0; align-items: flex-end; }
+  .dept-modal .dm-panel { width: 100%; max-height: 92vh; border-radius: 22px 22px 0 0; padding: 26px 20px 22px; }
+  .dm-actions .abtn { flex: 1; justify-content: center; }
+}
+
+/* ==========================================================================
+   ============ v48 — departments, redesigned ==============================
+   ========================================================================== */
+
+/* ---- hero ---- */
+.dept-hero {
+  display: grid; grid-template-columns: minmax(0,1fr) auto;
+  gap: 28px; align-items: center;
+  margin-bottom: 26px;
+}
+.dept-hero .dh-copy h1 {
+  margin: 6px 0 10px; color: #fff;
+  font-family: var(--display, var(--mark)); font-weight: 800;
+  font-size: clamp(30px, 4vw, 44px); line-height: 1.02; letter-spacing: -.02em;
+}
+.dept-hero .dh-lead {
+  margin: 0; max-width: 46ch;
+  font-size: 15.5px; line-height: 1.62; color: rgba(232,228,213,.76);
+}
+.dept-hero .dh-side {
+  display: flex; align-items: center; gap: 26px; flex: none;
+}
+.dept-hero .dh-cta svg { width: 17px; height: 17px; fill: currentColor; stroke: none; }
+
+/* The orbit. Two rings, a trophy, and real member faces sitting on the ring
+   at fixed points — no animation, because a spinning illustration next to a
+   search field is a distraction from the one thing this page is for. */
+.dh-orbit { position: relative; width: 190px; height: 170px; flex: none; }
+.dho-ring, .dho-ring.two {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  border-radius: 50%; border: 1px solid rgba(200,241,53,.16);
+}
+.dho-ring { width: 168px; height: 168px; }
+.dho-ring.two { width: 124px; height: 124px; border-color: rgba(200,241,53,.10); }
+.dho-trophy {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  width: 96px; height: 96px; display: grid; place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #2C6E42, #0E2A1C 72%);
+  box-shadow: 0 20px 44px -18px rgba(0,0,0,.75), inset 0 1px 0 rgba(200,241,53,.22);
+}
+.dho-trophy svg { width: 50px; height: 50px; fill: var(--lime); stroke: none; filter: drop-shadow(0 3px 10px rgba(200,241,53,.4)); }
+.dho-face {
+  position: absolute; width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center; overflow: hidden;
+  background: var(--gt-deep-3); color: var(--lime);
+  font-family: var(--mark); font-weight: 800; font-size: 12px;
+  border: 2px solid rgba(200,241,53,.5);
+  box-shadow: 0 8px 18px -8px rgba(0,0,0,.7);
+}
+.dho-face img { width: 100%; height: 100%; object-fit: cover; }
+.dho-face.f1 { top: 6px; right: 20px; }
+.dho-face.f2 { bottom: 14px; left: 6px; }
+.dho-face.f3 { bottom: 28px; right: 2px; }
+
+/* ---- search ---- */
+.dept-searchbar {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 18px; padding: 14px;
+  margin-bottom: 18px;
+}
+.dept-search { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
+.dept-search .ds-field {
+  flex: 1 1 260px; min-width: 0;
+  display: flex; align-items: center; gap: 10px;
+  background: #fff; border-radius: 12px; padding: 0 16px;
+  border: 1px solid transparent;
+}
+.dept-search .ds-field:focus-within { border-color: var(--forest); box-shadow: 0 0 0 3px rgba(45,122,58,.2); }
+.dept-search .ds-ic { flex: none; display: grid; place-items: center; color: var(--muted); }
+.dept-search .ds-ic svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+.dept-search input[type="search"] {
+  flex: 1; min-width: 0; border: 0 !important; background: transparent !important;
+  padding: 15px 0 !important; font-size: 15px; box-shadow: none !important; outline: none;
+}
+.dept-search .ds-go { flex: none; padding: 0 26px; border-radius: 12px; }
+
+/* ---- cards ---- */
+.dept-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+.dept-card {
+  padding: 0; overflow: hidden; gap: 0;
+  background: #fff; border-radius: 18px; border: 1px solid var(--gt-hair);
+  border-left: 1px solid var(--gt-hair);
+}
+.dept-card .dc-body { padding: 20px 20px 18px; flex: 1; }
+.dept-card .dc-top { align-items: flex-start; gap: 14px; }
+.dept-card .dc-name b { font-size: 17px; }
+.dept-card .dc-name .dc-meta {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
+  font-size: 12.5px; color: var(--muted);
+}
+.dept-card .dc-meta svg { width: 14px; height: 14px; fill: currentColor; stroke: none; }
+.dept-card .dc-count {
+  flex: none; margin-left: auto;
+  font-family: var(--mark); font-size: 10.5px; font-weight: 800;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+  background: rgba(15,46,34,.06); padding: 6px 11px; border-radius: 8px;
+}
+/* The action gets its own bar with a rule above it, so every card's button
+   lands on the same line no matter how long the name ran. */
+.dept-card .dc-foot {
+  border-top: 1px solid var(--gt-hair);
+  padding: 15px 20px; text-align: center; margin-top: auto;
+}
+.dept-card .dc-link {
+  display: inline-flex; align-items: center; gap: 8px; justify-content: center;
+  font-family: var(--body); font-size: 14.5px; font-weight: 700;
+  color: var(--ink); text-decoration: none; background: none; border: 0; cursor: pointer;
+}
+.dept-card .dc-link:hover { color: var(--forest); }
+.dept-card .dc-plus { font-size: 17px; line-height: 1; }
+.dept-card .dc-decide { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+/* The prompt card: same shape, cream, so it reads as part of the set rather
+   than an advert bolted to the end. */
+.dept-card.is-prompt { background: #F6F4EA; }
+.dept-card.is-prompt .dc-body { display: flex; flex-direction: column; align-items: flex-start; }
+.dc-prompt-ic {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center; margin-bottom: 14px;
+  background: rgba(15,46,34,.07); color: var(--forest);
+}
+.dc-prompt-ic svg { width: 21px; height: 21px; fill: currentColor; stroke: none; }
+.dc-prompt-h { font-size: 17px; color: var(--ink); }
+.dc-prompt-p { margin: 6px 0 0; font-size: 14px; line-height: 1.55; color: var(--muted); }
+
+/* ---- the three facts ---- */
+.dept-facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0; margin-top: 30px; padding-top: 26px;
+  border-top: 1px solid rgba(255,255,255,.1);
+}
+.df-item { display: flex; gap: 14px; align-items: flex-start; padding: 4px 26px; }
+.df-item + .df-item { border-left: 1px solid rgba(255,255,255,.09); }
+.df-item:first-child { padding-left: 0; }
+.df-ic { width: 34px; height: 34px; flex: none; display: grid; place-items: center; color: var(--lime); }
+.df-ic.round { border-radius: 50%; border: 1px solid rgba(200,241,53,.3); }
+.df-ic svg { width: 21px; height: 21px; fill: currentColor; stroke: none; }
+.df-item b { display: block; font-size: 14.5px; color: #fff; margin-bottom: 4px; }
+.df-item p { margin: 0; font-size: 13.5px; line-height: 1.5; color: rgba(232,228,213,.66); }
+
+@media (max-width: 900px) {
+  .dept-hero { grid-template-columns: 1fr; }
+  .dept-hero .dh-side { flex-direction: row-reverse; justify-content: space-between; }
+  .dh-orbit { width: 150px; height: 140px; }
+  .dho-ring { width: 132px; height: 132px; } .dho-ring.two { width: 96px; height: 96px; }
+  .dho-trophy { width: 76px; height: 76px; } .dho-trophy svg { width: 40px; height: 40px; }
+  .df-item { padding: 4px 0; } .df-item + .df-item { border-left: 0; padding-top: 18px; }
+}
+@media (max-width: 560px) {
+  .dept-hero .dh-side { flex-direction: column; align-items: stretch; gap: 18px; }
+  .dept-hero .dh-cta { justify-content: center; }
+  .dh-orbit { margin: 0 auto; }
+  .dept-search .ds-go { flex: 1; }
+}
+
+/* The eyebrow inherits .gh-eyebrow, which is tuned for a cream card and lands
+   dark-green-on-dark-green here — invisible. The hero is on the sheet, so it
+   takes the on-dark treatment the rest of the sheet headings already use. */
+.dept-hero .gh-eyebrow {
+  color: var(--lime);
+  font-family: var(--mark); font-size: 12px; font-weight: 800;
+  letter-spacing: .14em; text-transform: uppercase;
+}
+
+/* Cards in a row stretch to the tallest, which left the shorter one with a
+   pool of empty white between its last line and its footer. The body no
+   longer grows; the gap goes under it instead, so both cards keep their
+   footers aligned without either looking half-empty. */
+.dept-grid { align-items: stretch; }
+.dept-card .dc-body { flex: 0 0 auto; }
+.dept-card { justify-content: flex-start; }
+.dept-card .dc-foot { margin-top: auto; }
+
+/* ==========================================================================
+   ============ v49 — MatchReader on the tipping screen ====================
+   ========================================================================== */
+
+/* The read sits between the pick and the match-state row: after you have seen
+   who is playing and what you did about it, before the clock and the ground.
+   That is the order somebody actually asks the questions in.
+
+   It is quiet by design. A tipping screen belongs to the tipper's own opinion,
+   and an insight that shouted would start reading as instruction. */
+.gt-fix .gfx-reader {
+  grid-column: 1 / -1;
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  margin-top: 2px; padding: 11px 13px;
+  border-radius: 12px;
+  background: rgba(45,122,58,.06);
+  border: 1px solid rgba(45,122,58,.16);
+}
+.gt-fix .gr-badge {
+  display: inline-flex; align-items: center; gap: 7px; flex: none;
+  font-family: var(--mark); font-size: 11.5px; font-weight: 800;
+  letter-spacing: .06em; text-transform: uppercase;
+  color: var(--forest);
+}
+.gt-fix .gr-badge svg { width: 14px; height: 14px; fill: currentColor; stroke: none; }
+.gt-fix .gr-why { font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+
+/* Tier carries a weight, so a Dominant Position does not look identical to an
+   Even Contest. Colour is the same green throughout: this is confidence, not
+   a warning, and a red/amber scale would read as a tip to avoid the game. */
+.gt-fix .gfx-reader.tier-even-contest { background: rgba(15,46,34,.04); border-color: rgba(15,46,34,.1); }
+.gt-fix .gfx-reader.tier-even-contest .gr-badge { color: var(--muted); }
+.gt-fix .gfx-reader.tier-strong-position,
+.gt-fix .gfx-reader.tier-dominant-position {
+  background: rgba(45,122,58,.11); border-color: rgba(45,122,58,.3);
+}
+
+@media (max-width: 560px) {
+  .gt-fix .gfx-reader { flex-direction: column; gap: 6px; }
+}
+
+/* MatchReader on the dashboard fixture rows. Same content as the My Tips
+   version, tighter, because these rows are a list you scan rather than cards
+   you study. It sits above the picker: a hint read after the choice is made
+   is not a hint.
+
+   Two bands: the verdict, then the evidence. The verdict band is the only
+   part that has to survive being skimmed, so the tier and the team it favours
+   carry the weight and everything under them is deliberately quieter. */
+.fxp-reader {
+  margin: 8px 0 2px; padding: 9px 11px 9px;
+  border-radius: 10px;
+  background: rgba(45,122,58,.07);
+  border: 1px solid rgba(45,122,58,.15);
+}
+.fxr-head { display: flex; align-items: center; gap: 7px; }
+.fxr-spark { width: 13px; height: 13px; flex: none; fill: var(--forest); stroke: none; }
+.fxr-tier {
+  font-family: var(--mark); font-size: 11px; font-weight: 800;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--forest);
+  flex: none;
+}
+/* The team is the actionable half — a tier without a name is a mood. */
+.fxr-lead {
+  font-size: 12.5px; font-weight: 700; color: var(--ink);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fxr-lead::before { content: "·"; color: var(--muted); font-weight: 400; margin-right: 6px; opacity: .6; }
+
+/* Four steps, one per tier above Even Contest, so the difference between a
+   Slight Edge and a Dominant Position is visible without reading either. */
+.fxr-meter { margin-left: auto; flex: none; display: inline-flex; align-items: flex-end; gap: 3px; }
+.fxr-meter i { width: 4px; border-radius: 2px; background: rgba(15,46,34,.13); }
+.fxr-meter i:nth-child(1) { height: 6px; }
+.fxr-meter i:nth-child(2) { height: 8px; }
+.fxr-meter i:nth-child(3) { height: 10px; }
+.fxr-meter i:nth-child(4) { height: 12px; }
+.fxr-meter[data-lvl="1"] i:nth-child(-n+1),
+.fxr-meter[data-lvl="2"] i:nth-child(-n+2),
+.fxr-meter[data-lvl="3"] i:nth-child(-n+3),
+.fxr-meter[data-lvl="4"] i:nth-child(-n+4) { background: var(--forest); }
+
+/* The evidence: each side's last five, oldest to newest. */
+.fxr-form { display: grid; gap: 4px; margin-top: 8px; }
+.fxr-row { display: flex; align-items: center; gap: 9px; font-size: 11.5px; color: var(--muted); }
+.fxr-team { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fxr-row.is-lead .fxr-team { color: var(--ink); font-weight: 700; }
+.fxr-pips { flex: none; display: inline-flex; gap: 3px; }
+.fxr-pips i { width: 6px; height: 6px; border-radius: 50%; background: rgba(15,46,34,.15); }
+.fxr-pips i.w { background: var(--forest); }
+.fxr-row.is-lead .fxr-pips i.w { box-shadow: 0 0 0 2px rgba(45,122,58,.14); }
+.fxr-rec {
+  flex: none; min-width: 46px; text-align: right;
+  font-family: var(--score); font-weight: 700; font-size: 11.5px; color: var(--muted);
+}
+
+/* Tier carries a weight. Same green throughout — this is confidence, not a
+   warning, and a red/amber scale would read as "avoid this game". */
+.fxp-reader.tier-even-contest { background: rgba(15,46,34,.05); border-color: rgba(15,46,34,.1); }
+.fxp-reader.tier-even-contest .fxr-tier,
+.fxp-reader.tier-even-contest .fxr-spark { color: var(--muted); fill: var(--muted); }
+.fxp-reader.tier-strong-position,
+.fxp-reader.tier-dominant-position { background: rgba(45,122,58,.12); border-color: rgba(45,122,58,.28); }
+
+@media (max-width: 560px) {
+  .fxr-tier { font-size: 10.5px; }
+  .fxr-rec { min-width: 42px; }
+}
+
+/* ==========================================================================
+   ============ v50 — the round recap card: board + starters ================
+   ==========================================================================
+   Sits under the recap's written summary inside .gt-post.is-recap. Two jobs:
+   show the group where it stood at that round, and give somebody an easy way
+   into the thread.
+
+   The board is a three-column grid rather than a table so the name column can
+   take the pressure on a phone: rank, name, movement and a "sat out" note all
+   compete for one line, and the two number columns are fixed at their widest
+   plausible value so the rows line up down the card. Name gets whatever is
+   left and ellipses rather than wrapping into a second row, which would break
+   the vertical rhythm every reader is using to scan the ladder.
+   -------------------------------------------------------------------------- */
+
+.gpt-recap { margin: 14px 0 4px; display: grid; gap: 14px; }
+
+.grc-board {
+  border: 1px solid rgba(15,46,34,.10); border-radius: 14px;
+  background: rgba(255,255,255,.55); overflow: hidden;
+}
+.grc-bhead, .grc-brow {
+  display: grid; grid-template-columns: minmax(0,1fr) 58px 62px;
+  align-items: center; gap: 8px; padding: 9px 14px;
+}
+.grc-bhead {
+  font-family: var(--mark); font-weight: 700; font-size: 10.5px;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+  background: rgba(15,46,34,.04);
+}
+.grc-bhead span:not(:first-child), .grc-brow .grc-pts, .grc-brow .grc-tot { text-align: right; }
+.grc-brow + .grc-brow { border-top: 1px solid rgba(15,46,34,.07); }
+.grc-brow.lead { background: rgba(200,241,53,.16); }
+
+.grc-who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.grc-rank {
+  font-family: var(--mark); font-style: normal; font-weight: 700; font-size: 11px;
+  width: 20px; height: 20px; flex: none; border-radius: 6px;
+  display: grid; place-items: center;
+  background: rgba(15,46,34,.07); color: var(--forest);
+}
+.grc-brow.lead .grc-rank { background: var(--lime); color: var(--deep); }
+.grc-who b {
+  font-size: 14px; color: var(--ink); font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.grc-mv { font-size: 10.5px; font-weight: 700; flex: none; }
+.grc-mv.up { color: #2d7a3a; }
+.grc-mv.dn { color: #9a2b2b; }
+.grc-out {
+  font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); border: 1px solid rgba(15,46,34,.12);
+  border-radius: 100px; padding: 1px 7px; flex: none;
+}
+.grc-pts { font-size: 13px; color: var(--forest); font-weight: 600; }
+.grc-tot { font-family: var(--display); font-size: 15px; color: var(--ink); }
+
+/* Starters. Deliberately styled as suggestions rather than as send buttons:
+   tapping one only fills the reply box below, so they must not read as the
+   primary action of the card. */
+.grc-tlab {
+  display: block; font-family: var(--mark); font-weight: 700; font-size: 10.5px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+  margin-bottom: 8px;
+}
+.grc-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.grc-chip {
+  font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+  padding: 8px 14px; border-radius: 100px; color: var(--forest);
+  background: rgba(255,255,255,.7); border: 1px solid rgba(15,46,34,.14);
+  transition: background .14s var(--ease), border-color .14s var(--ease), transform .14s var(--ease);
+}
+.grc-chip:hover { background: var(--lime); border-color: var(--lime); color: var(--deep); }
+.grc-chip:active { transform: translateY(1px); }
+.grc-chip:focus-visible { outline: 2px solid var(--forest); outline-offset: 2px; }
+
+@media (max-width: 560px) {
+  /* The season total is the number people came for; the round column is the
+     one that goes when there is no room for both. */
+  .grc-bhead, .grc-brow { grid-template-columns: minmax(0,1fr) 52px; padding: 9px 12px; }
+  .grc-bhead span:nth-child(2), .grc-brow .grc-pts { display: none; }
+  .grc-chip { font-size: 12.5px; padding: 7px 12px; }
+}
+
+/* ==========================================================================
+   ============ v52 — the fixture card, side by side ========================
+   ==========================================================================
+   Replaces v51's stacked rows. A fixture is two sides FACING each other, and
+   the layout has to say that: stacked, they read as a list of two unrelated
+   clubs and the eye has to travel down and back to compare form. Three
+   columns keeps the comparison horizontal, which is the shape of the question
+   being asked, and puts the versus where it belongs.
+
+   The two side columns are 1fr each so they are exactly equal whatever the
+   club names are — an away side that got less room than the home side would
+   quietly imply something about the fixture.
+   -------------------------------------------------------------------------- */
+
+.fxc {
+  background: var(--gt-card); border: 1px solid var(--gt-hair);
+  border-left: 3px solid var(--gt-hair); border-radius: var(--gt-r-sm);
+  padding: 14px 16px 16px; display: grid; gap: 12px;
+  transition: border-color .16s var(--ease), box-shadow .16s var(--ease);
+}
+.fxc:hover { box-shadow: 0 14px 30px -24px rgba(15,46,34,.5); }
+.fxc.is-picked { border-left-color: var(--lime); }
+.fxc.phase-live { border-left-color: #c0392b; }
+
+.fxc-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.fxc-when { font-weight: 600; color: var(--forest); }
+.fxc-venue { display: inline-flex; align-items: center; gap: 4px; }
+.fxc-venue svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.fxc-state {
+  margin-left: auto; font-family: var(--mark); font-weight: 700; font-size: 10px;
+  letter-spacing: .08em; text-transform: uppercase; padding: 3px 9px; border-radius: 100px;
+}
+.fxc-state.is-open   { background: rgba(15,46,34,.07); color: var(--forest); }
+.fxc-state.is-tipped { background: var(--lime); color: var(--deep); }
+.fxc-state.is-missed { background: rgba(154,43,43,.10); color: #9a2b2b; }
+.fxc-state.is-shut   { background: rgba(15,46,34,.10); color: #5d6b60; }
+
+/* ---- the matchup ------------------------------------------------------- */
+.fxc-teams {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: start;
+  gap: 12px; padding: 2px 0;
+}
+.fxc-v {
+  align-self: start; margin-top: 30px; font-family: var(--mark); font-weight: 700;
+  font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); padding: 6px 4px; white-space: nowrap;
+  position: relative;
+}
+/* Faint rules either side so the versus reads as a divider between two
+   columns rather than as a third item in a row of three. */
+.fxc-v::before, .fxc-v::after {
+  content: ""; position: absolute; left: 50%; width: 1px; height: 12px;
+  background: rgba(15,46,34,.16);
+}
+.fxc-v::before { top: -14px; }
+.fxc-v::after  { bottom: -14px; }
+
+.fxc-side { display: grid; gap: 10px; justify-items: stretch; min-width: 0; }
+
+/* The club, and the act of picking it.
+   Crest left, name right, on one wide box — the shape in the mock. The name
+   is allowed to wrap to a second line rather than shrink, because
+   "Canterbury-Bankstown Bulldogs" ellipsed at this width says nothing. */
+.fxc-team {
+  display: grid; grid-template-columns: 44px minmax(0,1fr); align-items: center;
+  gap: 14px; position: relative; width: 100%; font: inherit; cursor: pointer;
+  text-align: left; padding: 14px 16px; border-radius: 14px; min-width: 0;
+  background: rgba(255,255,255,.75); border: 1.5px solid rgba(15,46,34,.13);
+  transition: background .14s var(--ease), border-color .14s var(--ease), transform .12s var(--ease);
+}
+.fxc-team:hover { border-color: rgba(15,46,34,.32); background: #fff; }
+.fxc-team:active { transform: translateY(1px); }
+.fxc-team:focus-visible { outline: 2px solid var(--forest); outline-offset: 2px; }
+.fxc-team.sel { background: var(--lime); border-color: var(--lime); }
+.fxc-team.is-dim { opacity: .55; cursor: default; }
+.fxc-team.is-dim:hover { background: rgba(255,255,255,.75); border-color: rgba(15,46,34,.13); }
+div.fxc-team { cursor: default; }
+
+.fxc-crest { display: block; }
+.fxc-crest .crest { width: 44px; height: 44px; font-size: 13px; }
+.fxc-name {
+  font-size: 15px; font-weight: 700; color: var(--ink); line-height: 1.28;
+  /* Two lines then ellipsis. A club name is two or three words and the box is
+     built to hold them; past that, truncating beats overflowing the card. */
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; word-break: break-word;
+}
+/* Over the corner rather than in the flow, so choosing a side cannot change
+   one column's height and knock the two out of line. */
+.fxc-tick {
+  position: absolute; top: 8px; right: 8px; width: 20px; height: 20px;
+  border-radius: 50%; background: var(--deep); display: grid; place-items: center;
+  opacity: 0; transform: scale(.6); transition: opacity .14s var(--ease), transform .14s var(--ease);
+}
+.fxc-team.sel .fxc-tick { opacity: 1; transform: none; }
+.fxc-tick svg { width: 12px; height: 12px; fill: none; stroke: var(--lime); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---- form strip: the traffic lights ------------------------------------ */
+.fxc-form {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  gap: 9px; font: inherit; cursor: pointer; padding: 7px 10px; border-radius: 100px;
+  background: none; border: 1px solid transparent; width: 100%;
+  transition: background .14s var(--ease), border-color .14s var(--ease);
+}
+.fxc-form:hover, .fxc-form:focus-visible { background: rgba(15,46,34,.05); border-color: rgba(15,46,34,.14); }
+.fxc-form:focus-visible { outline: 2px solid var(--forest); outline-offset: 1px; }
+.fxc-dots { display: inline-flex; gap: 5px; }
+/* Bigger than v51's 9px. These are the fastest read on the card — five shapes
+   you compare without reading — and at 9px the colour was doing all the work
+   on a phone. */
+.fxc-dots i { width: 13px; height: 13px; border-radius: 50%; display: block; box-shadow: inset 0 -1px 0 rgba(0,0,0,.14); }
+.fxc-dots i.w { background: #2d7a3a; }
+.fxc-dots i.d { background: #e0a51f; }
+.fxc-dots i.l { background: #c0392b; }
+.fxc-rec { font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+
+/* Hover hint. Larger and structured rather than one small grey line — it has
+   to explain three colours to somebody who has never seen them. */
+.fxc-hint {
+  position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translate(-50%, 4px);
+  z-index: 8; background: var(--deep); color: #fff; text-align: left;
+  font-size: 13px; line-height: 1.5; padding: 11px 14px; border-radius: 10px;
+  width: max-content; max-width: 240px; white-space: normal; pointer-events: none;
+  opacity: 0; visibility: hidden;
+  box-shadow: 0 18px 34px -18px rgba(9,26,19,.7);
+  transition: opacity .14s var(--ease), transform .14s var(--ease), visibility .14s;
+}
+.fxc-hint b { display: block; font-size: 13.5px; color: var(--lime); margin-bottom: 3px; }
+.fxc-hint i { display: block; font-style: normal; margin-top: 6px; font-size: 12.5px; color: var(--lime); }
+.fxc-hint::after {
+  content: ""; position: absolute; top: 100%; left: 50%; margin-left: -6px;
+  border: 6px solid transparent; border-top-color: var(--deep);
+}
+.fxc-form:hover .fxc-hint, .fxc-form:focus-visible .fxc-hint { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+
+/* ---- MatchReader ------------------------------------------------------- */
+.fxc-readwrap { border-top: 1px solid rgba(15,46,34,.10); padding-top: 12px; }
+.fxc-why {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  font: inherit; cursor: pointer; padding: 11px 14px; border-radius: 12px;
+  color: var(--ink); background: rgba(200,241,53,.16); border: 1px solid rgba(15,46,34,.10);
+  transition: background .14s var(--ease), border-color .14s var(--ease);
+}
+.fxc-why:hover { background: rgba(200,241,53,.3); border-color: rgba(15,46,34,.2); }
+.fxc-why:focus-visible { outline: 2px solid var(--forest); outline-offset: 2px; }
+.fxc-why-badge {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  font-family: var(--mark); font-weight: 700; font-size: 11px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--deep);
+  background: var(--lime); padding: 5px 10px; border-radius: 100px;
+}
+.fxc-why-badge svg { width: 13px; height: 13px; }
+.fxc-why-text { display: grid; min-width: 0; }
+.fxc-why-text b { font-size: 14.5px; font-weight: 700; line-height: 1.3; }
+.fxc-why-text small { font-size: 12px; color: var(--muted); }
+.fxc-why .fxc-chev {
+  width: 14px; height: 14px; margin-left: auto; flex: none;
+  transform: rotate(-90deg); transition: transform .16s var(--ease);
+  stroke: var(--forest); fill: none; stroke-width: 2.4;
+}
+.fxc-readwrap.is-open .fxc-chev { transform: rotate(90deg); }
+.fxc-why-shut { display: none; }
+.fxc-readwrap.is-open .fxc-why-open { display: none; }
+.fxc-readwrap.is-open .fxc-why-shut { display: block; }
+
+.fxc-read {
+  position: relative; margin-top: 10px; padding: 16px 38px 16px 16px;
+  border-radius: 12px; background: rgba(200,241,53,.12);
+  border: 1px solid rgba(15,46,34,.10);
+  animation: fxcRead .18s var(--ease) both;
+}
+@keyframes fxcRead { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.fxc-read p { font-size: 14.5px; line-height: 1.6; color: var(--ink); margin: 0 0 8px; }
+.fxc-read p:last-child { margin-bottom: 0; }
+.fxc-read-foot { font-size: 12px !important; color: var(--muted) !important; font-style: italic; }
+.fxc-read-tier { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.fxc-tier-name { font-family: var(--mark); font-weight: 700; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--deep); }
+.fxc-meter { display: inline-flex; gap: 3px; }
+.fxc-meter i { width: 18px; height: 5px; border-radius: 3px; background: rgba(15,46,34,.15); }
+.fxc-meter[data-lvl="1"] i:nth-child(-n+1),
+.fxc-meter[data-lvl="2"] i:nth-child(-n+2),
+.fxc-meter[data-lvl="3"] i:nth-child(-n+3),
+.fxc-meter[data-lvl="4"] i:nth-child(-n+4) { background: var(--forest); }
+.fxc-read-x {
+  position: absolute; top: 8px; right: 10px; background: none; border: 0; cursor: pointer;
+  font-size: 21px; line-height: 1; color: var(--muted); padding: 2px 7px; border-radius: 6px;
+}
+.fxc-read-x:hover { color: var(--deep); background: rgba(15,46,34,.08); }
+
+/* ---- locked round ------------------------------------------------------ */
+.fxc-shut {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px; border-radius: 10px;
+  background: rgba(15,46,34,.05); border: 1px dashed rgba(15,46,34,.16);
+  font-size: 12.5px; color: #5d6b60;
+}
+.fxc-shut svg { width: 14px; height: 14px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; }
+
+.gt-lockbar {
+  display: flex; align-items: center; gap: 12px; margin: 0 0 14px;
+  padding: 13px 16px; border-radius: 12px;
+  background: rgba(15,46,34,.05); border: 1px solid rgba(15,46,34,.12);
+}
+.gt-lockbar svg { width: 20px; height: 20px; flex: none; stroke: #5d6b60; fill: none; stroke-width: 1.8; }
+.gt-lockbar b { display: block; font-size: 14px; color: var(--ink); }
+.gt-lockbar span { font-size: 13px; color: var(--muted); }
+
+/* ---- My Tips keeps a graded outcome under the card --------------------- */
+.gt-fixwrap { display: grid; gap: 0; }
+.gt-fixwrap .gfx-state {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 16px; font-size: 12.5px;
+  border: 1px solid var(--gt-hair); border-top: 0;
+  border-radius: 0 0 var(--gt-r-sm) var(--gt-r-sm); background: rgba(15,46,34,.03);
+}
+.gt-fixwrap .fxc { border-radius: var(--gt-r-sm) var(--gt-r-sm) 0 0; }
+.gt-fixwrap.correct .fxc { border-left-color: #2d7a3a; }
+.gt-fixwrap.missed  .fxc { border-left-color: #c0392b; }
+
+/* ---- last five, with the scores ---------------------------------------- */
+body.fxh-open { overflow: hidden; }
+.fxh-modal { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 20px; }
+.fxh-back { position: absolute; inset: 0; background: rgba(9,26,19,.55); backdrop-filter: blur(2px); animation: fxhFade .16s var(--ease) both; }
+.fxh-panel {
+  position: relative; width: min(440px, 100%); max-height: 80vh; overflow: auto;
+  background: var(--gt-card); border-radius: 18px; padding: 18px 20px 20px;
+  box-shadow: 0 40px 80px -30px rgba(9,26,19,.6);
+  animation: fxhPop .2s var(--ease) both;
+}
+@keyframes fxhFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fxhPop { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+.fxh-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.fxh-head h3 { font-family: var(--display); font-size: 18px; color: var(--ink); margin: 0; }
+.fxh-x { margin-left: auto; background: none; border: 0; cursor: pointer; font-size: 26px; line-height: 1; color: var(--muted); padding: 2px 10px; border-radius: 8px; }
+.fxh-x:hover { color: var(--deep); background: rgba(15,46,34,.07); }
+.fxh-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.fxh-row { display: grid; grid-template-columns: 30px minmax(0,1fr); gap: 10px 12px; align-items: center; padding: 11px 13px; border-radius: 10px; background: rgba(15,46,34,.035); }
+.fxh-badge { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-family: var(--mark); font-weight: 700; font-size: 12px; color: #fff; }
+.fxh-row.w .fxh-badge { background: #2d7a3a; }
+.fxh-row.d .fxh-badge { background: #e0a51f; }
+.fxh-row.l .fxh-badge { background: #c0392b; }
+.fxh-what { font-size: 14px; color: var(--ink); }
+.fxh-where { grid-column: 2; font-size: 12px; color: var(--muted); }
+.fxh-sum { margin: 14px 0 0; font-size: 13px; color: var(--muted); text-align: center; }
+
+@media (max-width: 560px) {
+  /* Stays side by side. The whole point of the layout is the comparison, and
+     a phone is exactly where stacking would force the scroll-and-remember
+     that the columns exist to avoid. Everything shrinks instead. */
+  .fxc { padding: 12px 12px 14px; }
+  .fxc-teams { gap: 6px; }
+  .fxc-team { padding: 11px 6px 10px; border-radius: 12px; }
+  .fxc-crest .crest { width: 34px; height: 34px; font-size: 11px; }
+  .fxc-name { font-size: 12.5px; }
+  .fxc-v { font-size: 10.5px; padding: 6px 2px; }
+  .fxc-dots i { width: 11px; height: 11px; }
+  .fxc-rec { font-size: 11px; }
+  .fxc-form { gap: 6px; padding: 6px 4px; }
+  .fxc-hint { max-width: 200px; font-size: 12.5px; }
+  .fxc-why { gap: 8px; padding: 10px 11px; flex-wrap: wrap; }
+  .fxc-why-text b { font-size: 13.5px; }
+}
+
+
+/* ---- v53: competition filter, buttons only ------------------------------
+   Was a panel with a toggle and a checkbox list for picking a combination.
+   It went because a filter that needs opening, ticking and applying is three
+   actions to answer what one chip answers, and it sat above the fixtures as
+   a form to fill in before you were allowed to tip. */
+.sfilter {
+  background: var(--gt-card); border: 1px solid var(--gt-hair);
+  border-radius: var(--gt-r-sm); padding: 16px 20px 18px; margin: 0 0 16px;
+}
+.sfilter-lead {
+  margin: 0 0 12px; text-align: center;
+  font-family: var(--mark); font-weight: 700; font-size: 12px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+}
+.sfilter-chips { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.sfilter-chip {
+  font-family: var(--body); font-weight: 600; font-size: 14px;
+  padding: 10px 20px; border-radius: 100px; text-decoration: none;
+  color: var(--forest); background: rgba(255,255,255,.7);
+  border: 1.5px solid rgba(15,46,34,.14); white-space: nowrap;
+  transition: background .14s var(--ease), border-color .14s var(--ease), color .14s var(--ease);
+}
+.sfilter-chip:hover { border-color: var(--forest); background: #fff; }
+.sfilter-chip:focus-visible { outline: 2px solid var(--forest); outline-offset: 2px; }
+.sfilter-chip.on { background: var(--lime); border-color: var(--lime); color: var(--deep); font-weight: 700; }
+
+@media (max-width: 560px) {
+  .sfilter { padding: 13px 14px 15px; }
+  .sfilter-chip { font-size: 13px; padding: 9px 15px; }
+}
+
+/* A round beyond the tipping window still lists, so people can see what is
+   coming, but it must not look pressable. */
+.fx-roundhead.is-shut { opacity: .72; }
+.fx-roundhead .fxr-locks.shut { display: inline-flex; align-items: center; gap: 5px; font-style: italic; }
+.fx-roundhead .fxr-locks.shut svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+
+
+
+
+
+/* ---- My Tips keeps a graded outcome under the card --------------------- */
+.gt-fixwrap { display: grid; gap: 0; }
+.gt-fixwrap .gfx-state {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 16px; font-size: 12.5px;
+  border: 1px solid var(--gt-hair); border-top: 0;
+  border-radius: 0 0 var(--gt-r-sm) var(--gt-r-sm); background: rgba(15,46,34,.03);
+}
+.gt-fixwrap .fxc { border-radius: var(--gt-r-sm) var(--gt-r-sm) 0 0; }
+.gt-fixwrap.correct .fxc { border-left-color: #2d7a3a; }
+.gt-fixwrap.missed  .fxc { border-left-color: #c0392b; }
+
+/* ---- last five, with the scores ---------------------------------------- */
+body.fxh-open { overflow: hidden; }
+.fxh-modal { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 20px; }
+.fxh-back { position: absolute; inset: 0; background: rgba(9,26,19,.55); backdrop-filter: blur(2px); animation: fxhFade .16s var(--ease) both; }
+.fxh-panel {
+  position: relative; width: min(440px, 100%); max-height: 80vh; overflow: auto;
+  background: var(--gt-card); border-radius: 18px; padding: 18px 20px 20px;
+  box-shadow: 0 40px 80px -30px rgba(9,26,19,.6);
+  animation: fxhPop .2s var(--ease) both;
+}
+@keyframes fxhFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fxhPop { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+.fxh-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.fxh-head h3 { font-family: var(--display); font-size: 18px; color: var(--ink); margin: 0; }
+.fxh-x { margin-left: auto; background: none; border: 0; cursor: pointer; font-size: 26px; line-height: 1; color: var(--muted); padding: 2px 10px; border-radius: 8px; }
+.fxh-x:hover { color: var(--deep); background: rgba(15,46,34,.07); }
+.fxh-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.fxh-row { display: grid; grid-template-columns: 30px minmax(0,1fr); gap: 10px 12px; align-items: center; padding: 11px 13px; border-radius: 10px; background: rgba(15,46,34,.035); }
+.fxh-badge { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-family: var(--mark); font-weight: 700; font-size: 12px; color: #fff; }
+.fxh-row.w .fxh-badge { background: #2d7a3a; }
+.fxh-row.d .fxh-badge { background: #e0a51f; }
+.fxh-row.l .fxh-badge { background: #c0392b; }
+.fxh-what { font-size: 14px; color: var(--ink); }
+.fxh-where { grid-column: 2; font-size: 12px; color: var(--muted); }
+.fxh-sum { margin: 14px 0 0; font-size: 13px; color: var(--muted); text-align: center; }
+
+@media (max-width: 560px) {
+  /* Stays side by side. The whole point of the layout is the comparison, and
+     a phone is exactly where stacking would force the scroll-and-remember
+     that the columns exist to avoid. Everything shrinks instead. */
+  .fxc { padding: 12px 12px 14px; }
+  .fxc-teams { gap: 6px; }
+  .fxc-team { padding: 11px 6px 10px; border-radius: 12px; }
+  .fxc-crest .crest { width: 34px; height: 34px; font-size: 11px; }
+  .fxc-name { font-size: 12.5px; }
+  .fxc-v { font-size: 10.5px; padding: 6px 2px; }
+  .fxc-dots i { width: 11px; height: 11px; }
+  .fxc-rec { font-size: 11px; }
+  .fxc-form { gap: 6px; padding: 6px 4px; }
+  .fxc-hint { max-width: 200px; font-size: 12.5px; }
+  .fxc-why { gap: 8px; padding: 10px 11px; flex-wrap: wrap; }
+  .fxc-why-text b { font-size: 13.5px; }
+}
+
+

@@ -1,6 +1,7 @@
 {% extends "emails/_base.html" %}
 {% block title %}Welcome to GoodTip{% endblock %}
 {% block eyebrow %}You're in{% endblock %}
+{% block badge %}&#9733;{% endblock %}{# star — a new member #}
 {% block preheader %}Your account is live. Here's how footy tipping turns into money for a cause.{% endblock %}
 {% block content %}
   <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">Hello {{ user.display_name }},</p>
@@ -13,15 +14,15 @@
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
     <tr>
       <td width="34" valign="top" style="padding:0 0 14px;"><span style="display:inline-block;width:24px;height:24px;line-height:24px;text-align:center;background:#C8F135;color:#0F2E22;border-radius:50%;font-size:12px;font-weight:bold;">1</span></td>
-      <td valign="top" style="padding:0 0 14px;font-size:15px;line-height:1.55;color:#1A1A14;"><b>Join your group</b> — or start one. Your workplace, club or crew.</td>
+      <td valign="top" style="padding:0 0 14px;font-size:15px;line-height:1.55;color:#1A1A14;"><b>Join your group</b>, or start one. Your workplace, club or crew.</td>
     </tr>
     <tr>
       <td width="34" valign="top" style="padding:0 0 14px;"><span style="display:inline-block;width:24px;height:24px;line-height:24px;text-align:center;background:#C8F135;color:#0F2E22;border-radius:50%;font-size:12px;font-weight:bold;">2</span></td>
-      <td valign="top" style="padding:0 0 14px;font-size:15px;line-height:1.55;color:#1A1A14;"><b>Tip each round</b> — pick who wins. Takes a minute before lockout.</td>
+      <td valign="top" style="padding:0 0 14px;font-size:15px;line-height:1.55;color:#1A1A14;"><b>Tip each round</b>, pick who wins. Takes a minute before lockout.</td>
     </tr>
     <tr>
       <td width="34" valign="top" style="padding:0;"><span style="display:inline-block;width:24px;height:24px;line-height:24px;text-align:center;background:#C8F135;color:#0F2E22;border-radius:50%;font-size:12px;font-weight:bold;">3</span></td>
-      <td valign="top" style="padding:0;font-size:15px;line-height:1.55;color:#1A1A14;"><b>Vote on the charity</b> — your group decides where the money goes.</td>
+      <td valign="top" style="padding:0;font-size:15px;line-height:1.55;color:#1A1A14;"><b>Vote on the charity</b>, your group decides where the money goes.</td>
     </tr>
   </table>
 

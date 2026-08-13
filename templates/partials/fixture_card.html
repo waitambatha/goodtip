@@ -1,0 +1,118 @@
+{% load team_extras %}
+{% comment %}
+One fixture, one card. Used by the dashboard, My Tips and the confirmation
+screen so the three cannot drift apart.
+
+WHY THIS EXISTS
+Each club used to be named three or four times on the same card: once in the
+matchup line, once as the thing you press to tip it, once in the MatchReader
+verdict, and once again in each form row. Four "Fremantle"s is not emphasis,
+it is noise, and it made the card twice as tall as the information in it.
+
+Here a club appears ONCE. The club IS the control: press it to tip it, and the
+card shows which one you picked. Its form rides on the same row, so the
+comparison you are being asked to make is a single left-to-right read.
+
+PARAMETERS
+  match      the fixture
+  reader     read_match_verbose() output, or nothing
+  selection  "home" | "away" | empty — the current pick
+  editable   truthy while the pick can still be changed
+  mode       "form" for a hidden radio inside a bigger <form> (dashboard,
+             confirm), "htmx" for a button that saves on the spot (My Tips)
+  org        needed by mode="htmx" to build the save URL
+
+The dots are decorative and hidden from screen readers: the record beside them
+("4 of 5") says the same thing in words, and the detail button carries the
+rest.
+{% endcomment %}
+<article class="fxc phase-{{ match.phase }}{% if selection %} is-picked{% endif %}{% if not editable %} is-locked{% endif %}"
+         id="fxc-{{ match.id }}">
+
+  <div class="fxc-meta">
+    <span class="fxc-when">{{ match.kickoff_at|date:"D j M · g:i A" }}</span>
+    {% if match.venue %}<span class="fxc-venue"><svg><use href="#ic-pin"/></svg>{{ match.venue }}</span>{% endif %}
+    {% comment %}
+    Three ways a card can be un-tippable and they must not look alike.
+    "No tip" is a reproach — you had the chance and did not take it. A round
+    outside the tipping window is the opposite: nothing has been missed and
+    there is nothing to do yet. Saying "No tip" there would tell somebody they
+    had failed at something that was never open to them.
+    {% endcomment %}
+    {% if selection %}<span class="fxc-state is-tipped">Tipped</span>
+    {% elif round_locked or lock_note %}<span class="fxc-state is-shut">Locked</span>
+    {% elif not editable %}<span class="fxc-state is-missed">No tip</span>
+    {% else %}<span class="fxc-state is-open">Open</span>{% endif %}
+  </div>
+
+  {% comment %}
+  The reason rides on the card only where a list mixes open and locked rounds,
+  which is the dashboard. My Tips shows one round at a time, so it carries the
+  same sentence once above the list rather than nine times down it.
+  {% endcomment %}
+  {% if lock_note %}
+  <div class="fxc-shut">
+    <svg aria-hidden="true"><use href="#ic-lock"/></svg>
+    <span>{{ lock_note }}</span>
+  </div>
+  {% endif %}
+
+  {% comment %}
+  Side by side, with the versus between them. A fixture is two sides facing
+  each other and the layout has to say so: stacked rows read as a list of two
+  unrelated teams, and the eye has to travel down and back to compare them.
+  Three columns keeps the comparison horizontal, which is the shape of the
+  question being asked.
+  {% endcomment %}
+  <div class="fxc-teams">
+    {% include "partials/_fixture_team.html" with team=match.home_team form=reader.home pick="home" side="home" %}
+    <span class="fxc-v" aria-hidden="true">vs</span>
+    {% include "partials/_fixture_team.html" with team=match.away_team form=reader.away pick="away" side="away" %}
+  </div>
+
+  {% comment %}
+  The verdict is behind a press. Shown by default it is a wall of text on every
+  card in the round and people stop reading it; asked for, it is advice. The
+  panel is plain markup toggled with hidden, so it is in the page for search
+  and for anyone with JS off, who simply gets it open.
+  {% endcomment %}
+  {% comment %}
+  Keyed on the PREDICTION, not on the reader. The form strip above shows
+  wherever there is history, because results are facts; this panel is an
+  opinion and only appears where a fitted model has earned the right to give
+  one. A series without a model shows its dots and its scores and simply says
+  nothing about who will win.
+  {% endcomment %}
+  {% if reader.prediction %}
+  <div class="fxc-readwrap">
+    {% comment %}
+    Named, not hinted at. "What does the form say?" was a riddle: it neither
+    said who was speaking nor what pressing it would produce. This says the
+    product name, says it is a prediction, and shows the favoured side on the
+    button itself — so the button is useful even unopened, and opening it is
+    for the reasoning rather than for the verdict.
+    {% endcomment %}
+    <button type="button" class="fxc-why" data-reader-toggle
+            aria-expanded="false" aria-controls="read-{{ match.id }}">
+      <span class="fxc-why-badge"><svg aria-hidden="true"><use href="#ic-f-spark"/></svg> MatchReader</span>
+      <span class="fxc-why-text">
+        <b class="fxc-why-open">See the prediction{% if not reader.prediction.is_even %}: {{ reader.prediction.leader }}{% endif %}</b>
+        <b class="fxc-why-shut">Hide the prediction</b>
+        <small>Our tipping assistant, from recent form</small>
+      </span>
+      <svg class="fxc-chev" aria-hidden="true"><use href="#ic-chev-left"/></svg>
+    </button>
+    <div class="fxc-read tier-{{ reader.prediction.tier|slugify }}" id="read-{{ match.id }}" hidden>
+      <button type="button" class="fxc-read-x" data-reader-close aria-label="Hide the read">&times;</button>
+      <div class="fxc-read-tier">
+        <span class="fxc-tier-name">{{ reader.prediction.tier }}</span>
+        <span class="fxc-meter" data-lvl="{{ reader.prediction.strength }}" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </div>
+      {% for line in reader.explanation.sentences %}<p>{{ line }}</p>{% endfor %}
+      <p class="fxc-read-foot">Recent results only. It is a read, not a tip.</p>
+    </div>
+  </div>
+  {% endif %}
+
+  {% include "components/_match_state.html" with match=match %}
+</article>

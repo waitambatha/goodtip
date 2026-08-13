@@ -2,7 +2,7 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}{{ post.title }} — GoodTip{% endblock %}
+{% block title %}{{ post.title }} &middot; GoodTip{% endblock %}
 {% block loader_task %}Opening the story{% endblock %}
 {% block meta_description %}{{ post.excerpt|default:post.title|truncatechars:150 }}{% endblock %}
 {% block body_class %}page-news{% endblock %}

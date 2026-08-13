@@ -2,7 +2,7 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}The Wall — GoodTip{% endblock %}
+{% block title %}The Wall &middot; GoodTip{% endblock %}
 {% block loader_task %}Loading the Wall{% endblock %}
 {% block meta_description %}Where the group lives every round: tips, banter, the ladder shuffle, and the charity total ticking up in real time.{% endblock %}
 {% block body_class %}page-wall{% endblock %}
@@ -91,7 +91,7 @@ the right is never covered. Cards swap every 2s.
           {% if not post.can_reply_direct %}
           <div class="wf-guestfields">
             {% if user.is_authenticated %}
-              <p class="wf-note">Replying as <b>{{ user.display_name }}</b> &mdash; you're not in this group, so it goes up once we've checked it.</p>
+              <p class="wf-note">Replying as <b>{{ user.display_name }}</b>, you're not in this group, so it goes up once we've checked it.</p>
             {% else %}
               <input type="text" name="guest_name" placeholder="Your name" maxlength="80" autocomplete="name">
               <input type="email" name="guest_email" placeholder="you@work.com.au" maxlength="254" required autocomplete="email">
@@ -168,7 +168,7 @@ the right is never covered. Cards swap every 2s.
 {% endblock %}
 
 {% block extra_js %}
-/* Hero rotator — one post at a time, swapping on a timer. Pauses on hover
+/* Hero rotator, one post at a time, swapping on a timer. Pauses on hover
    and for anyone who asked for reduced motion. */
 (function(){
   var stack = document.querySelector('[data-rotor]');

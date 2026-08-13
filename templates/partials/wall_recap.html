@@ -1,0 +1,66 @@
+{% comment %}
+The round recap card's body: the written summary is printed by the feed as an
+ordinary post body, and this adds the two things that make it worth pinning.
+
+  * The leaderboard AS IT STOOD at that round. Snapshotted at generation
+    (RoundRecap.leaderboard), never recomputed on render. A ladder that
+    silently updates underneath a two-week-old recap ends up contradicting
+    the sentence sitting directly above it.
+
+  * Conversation starters. These are NOT posted by anyone and no message on
+    the Wall is ever written in a member's voice. They are buttons that drop
+    the line into that member's own reply box, where they can send it, edit
+    it, or ignore it. The recap is the thing a conversation hangs off, not
+    the conversation.
+
+Takes `recap` (a RoundRecap) and `post`.
+{% endcomment %}
+<div class="gpt-recap">
+
+  {% if recap.leaderboard %}
+  <div class="grc-board" role="table" aria-label="Standings after round {{ recap.round.round_number }}">
+    <div class="grc-bhead" role="row">
+      <span role="columnheader">After round {{ recap.round.round_number }}</span>
+      <span role="columnheader">Round</span>
+      <span role="columnheader">Season</span>
+    </div>
+    {% for row in recap.leaderboard %}
+    <div class="grc-brow{% if forloop.first %} lead{% endif %}" role="row">
+      <span class="grc-who" role="cell">
+        <i class="grc-rank">{{ row.rank }}</i>
+        <b>{{ row.name }}</b>
+        {% comment %}
+        Movement is only shown where there is a previous round to have moved
+        from. A member's first round has no arrow rather than a zero.
+        {% endcomment %}
+        {% if row.moved %}
+          {% if row.moved > 0 %}
+          <span class="grc-mv up" title="Up {{ row.moved }}">&#9650;{{ row.moved }}</span>
+          {% else %}
+          {# stringformat first: slice on a bare integer leaves the minus sign on #}
+          {% with down=row.moved|stringformat:"d"|slice:"1:" %}
+          <span class="grc-mv dn" title="Down {{ down }}">&#9660;{{ down }}</span>
+          {% endwith %}
+          {% endif %}
+        {% endif %}
+        {% if not row.tipped_this_round %}<span class="grc-out" title="No tips this round">sat out</span>{% endif %}
+      </span>
+      <span class="grc-pts" role="cell">{% if row.tipped_this_round %}+{{ row.round_points }}{% else %}&ndash;{% endif %}</span>
+      <span class="grc-tot" role="cell">{{ row.season_points }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if recap.talking_points %}
+  <div class="grc-talk">
+    <span class="grc-tlab">Start something</span>
+    <div class="grc-chips">
+      {% for line in recap.talking_points %}
+      {# fills the reply box below rather than posting: the member still sends it #}
+      <button type="button" class="grc-chip" data-recap-starter data-post="{{ post.id }}">{{ line }}</button>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>

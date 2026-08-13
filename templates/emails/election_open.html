@@ -1,11 +1,12 @@
 {% extends "emails/_base.html" %}
 {% block title %}Charity election open{% endblock %}
 {% block eyebrow %}Charity election open{% endblock %}
-{% block preheader %}{{ org.name }} is choosing where this season's money goes — your vote is one of them.{% endblock %}
+{% block badge %}&#9829;{% endblock %}{# heart — the charity vote #}
+{% block preheader %}{{ org.name }} is choosing where this season's money goes, your vote is one of them.{% endblock %}
 {% block content %}
   <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">Hello {{ user.display_name }},</p>
   <p style="margin:0 0 18px;font-size:16px;line-height:1.6;color:#1A1A14;">
-    <b>{{ org.name }}</b> is deciding where this season's money goes — and your vote is one of the ones that picks it.
+    <b>{{ org.name }}</b> is deciding where this season's money goes, and your vote is one of the ones that picks it.
   </p>
 
   {% if vote.admin_message %}
@@ -30,6 +31,6 @@
   {% include "emails/_bits.html" with bit="button" url=vote_url label="Cast your vote" %}
 
   <p style="margin:14px 0 0;font-size:13px;line-height:1.6;color:#6b6b5e;text-align:center;">
-    Blind vote — tallies stay hidden until it closes. You can change your pick any time before then.
+    Blind vote, tallies stay hidden until it closes. You can change your pick any time before then.
   </p>
 {% endblock %}

@@ -2,8 +2,13 @@ venv/
 __pycache__/
 *.pyc
 *.pyo
+# Every .env variant, not just the bare name. Two backups (.env.bak-*) were
+# committed and pushed because the old pattern matched only ".env" exactly,
+# putting SECRET_KEY, the Postmark token, Stripe keys and the database
+# password into public history.
 .env
-.env.local
+.env.*
+!.env.example
 db.sqlite3
 db.sqlite3-journal
 staticfiles/

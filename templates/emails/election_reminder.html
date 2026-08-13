@@ -5,20 +5,21 @@ the hour-out one rather than sending the same message twice.
 {% endcomment %}
 {% block title %}Voting closes soon{% endblock %}
 {% block eyebrow %}{% if urgency == "hour" %}Closes within the hour{% else %}Closes tomorrow{% endif %}{% endblock %}
+{% block badge %}&#9829;{% endblock %}{# heart — the charity vote #}
 {% block preheader %}{{ org.name }}'s charity vote closes {% if urgency == "hour" %}within the hour{% else %}tomorrow{% endif %} and you haven't voted yet.{% endblock %}
 {% block content %}
   <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">Hello {{ user.display_name }},</p>
 
   {% if urgency == "hour" %}
   <p style="margin:0 0 18px;font-size:16px;line-height:1.6;color:#1A1A14;">
-    Last call — <b>{{ org.name }}</b>'s charity vote closes at
+    Last call, <b>{{ org.name }}</b>'s charity vote closes at
     <b>{{ vote.scheduled_close_at|date:"g:i A" }}</b>, about an hour from now, and your
     vote isn't in yet. It takes one tap.
   </p>
   {% else %}
   <p style="margin:0 0 18px;font-size:16px;line-height:1.6;color:#1A1A14;">
     Quick reminder: <b>{{ org.name }}</b>'s charity vote closes
-    <b>{{ vote.scheduled_close_at|date:"l j F, g:i A" }}</b> — that's tomorrow — and you
+    <b>{{ vote.scheduled_close_at|date:"l j F, g:i A" }}</b>, that's tomorrow, and you
     haven't picked yet.
   </p>
   {% endif %}
@@ -35,6 +36,6 @@ the hour-out one rather than sending the same message twice.
   {% include "emails/_bits.html" with bit="button" url=vote_url label="Vote before it closes" %}
 
   <p style="margin:14px 0 0;font-size:13px;line-height:1.6;color:#6b6b5e;text-align:center;">
-    If you've already voted since this was queued, ignore this — nothing to do.
+    If you've already voted since this was queued, ignore this, nothing to do.
   </p>
 {% endblock %}

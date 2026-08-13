@@ -1,0 +1,36 @@
+{% comment %}
+Competition filter: buttons, nothing else.
+
+Only the leagues people tip week to week get a button. State of Origin is a
+representative series of three games a year that belongs to the NRL
+competition, so it is not a chip — it rides with NRL. See
+tipping.services.competition_filter.
+
+One press per code, and what is selected is readable without opening anything.
+There was a checkbox panel here for picking a combination; it went because a
+filter that needs opening, ticking and applying is three actions to answer a
+question the chips answer in one, and it put a form above the fixtures on
+every visit.
+
+`series` is still read as a repeatable parameter by the views, so
+?series=nrl&series=afl continues to work as a URL if anything ever needs to
+link to a combination. Nothing in the interface produces one now.
+
+Expects: org_series, active_slugs (selected slugs), base, keep (query string
+         to carry through, e.g. the org).
+{% endcomment %}
+{% if org_series|length > 1 %}
+<div class="sfilter">
+  <p class="sfilter-lead">Show these competitions</p>
+  <div class="sfilter-chips" role="group" aria-label="Filter by competition">
+    <a class="sfilter-chip{% if not active_slugs %} on{% endif %}"
+       href="{{ base }}{% if keep %}?{{ keep }}{% endif %}"
+       {% if not active_slugs %}aria-current="true"{% endif %}>All competitions</a>
+    {% for s in org_series %}
+    <a class="sfilter-chip{% if s.slug in active_slugs %} on{% endif %}"
+       href="{{ base }}?series={{ s.slug }}{% if keep %}&amp;{{ keep }}{% endif %}"
+       {% if s.slug in active_slugs %}aria-current="true"{% endif %}>{{ s.name }}</a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}

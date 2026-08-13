@@ -85,12 +85,109 @@ def _recalculate_tips_for_match(match: Match) -> int:
     return updated
 
 
+def competition_filter(org, wanted_slugs):
+    """(chips, series to filter by) for the competition filter.
+
+    Returns the series worth offering as a button, and the series a selection
+    actually resolves to. They are not the same list, because State of Origin
+    is not a competition anyone tips week to week — it is three representative
+    games that belong to the NRL competition. Offering it as its own button
+    put a code on screen that is empty for eleven months of the year and
+    invited the question "why is that there".
+
+    So representative series are never chips, and a code's chip carries them:
+    choosing NRL shows the NRL rounds AND the Origin rounds, because in a
+    tipping league Origin week IS the NRL round. That keeps Origin reachable
+    without giving it a button of its own, and means picking a code never
+    silently hides games that count toward the same ladder.
+
+    Unknown slugs are dropped rather than 404ing — a stale bookmark should
+    show everything, not an error.
+    """
+    from catalog.models import Series
+
+    have = Series.objects.filter(rounds__org=org).distinct().order_by("name")
+    chips = [s for s in have if s.category != Series.CATEGORY_REPRESENTATIVE]
+    reps = [s for s in have if s.category == Series.CATEGORY_REPRESENTATIVE]
+
+    by_slug = {s.slug: s for s in chips}
+    active = [by_slug[v] for v in (wanted_slugs or []) if v in by_slug]
+    if not active:
+        return chips, []
+
+    # Carry each chosen code's representative series along with it.
+    sports = {s.sport_id for s in active}
+    return chips, active + [s for s in reps if s.sport_id in sports]
+
+
+# How many rounds a member may have open at once. Two: the one being played
+# and the one after it.
+TIP_WINDOW_ROUNDS = 2
+
+
+def tip_window(org) -> dict[int, dict]:
+    """Which rounds are open to tip, and for the rest, what they are waiting on.
+
+    The earliest ``TIP_WINDOW_ROUNDS`` rounds that still have a match to play,
+    per series. Once the first of them is done, the window slides forward and
+    the next one opens.
+
+    Per series, not per org, because an org tipping AFL and NRL runs two
+    ladders side by side: capping the org at two rounds total would close the
+    NRL round purely because two AFL rounds happened to sit in front of it.
+
+    Returns ``{round_id: {"open": bool, "waits_for": Round | None}}``.
+
+    ``waits_for`` is the point of this over a bare set of ids. A closed round
+    must be able to say WHICH round has to finish before it opens — "locked"
+    on its own is indistinguishable from "you missed it", and the two need
+    opposite reactions from whoever is reading. With a window of two, the
+    round at position N is released by the round at position N-2 finishing,
+    so that is the one to name.
+
+    The rule is about what may be SAVED, so submit_tip enforces it; the
+    screens only reflect it.
+    """
+    from django.utils import timezone
+
+    now = timezone.now()
+    live = (
+        Round.objects.filter(org=org)
+        # A round is still live while any of its matches has yet to be played.
+        .filter(matches__kickoff_at__gt=now)
+        .distinct()
+        .order_by("series_id", "lockout_at", "round_number")
+    )
+    per_series: dict[int, list] = {}
+    for rnd in live:
+        per_series.setdefault(rnd.series_id, []).append(rnd)
+
+    window: dict[int, dict] = {}
+    for rounds in per_series.values():
+        for i, rnd in enumerate(rounds):
+            if i < TIP_WINDOW_ROUNDS:
+                window[rnd.id] = {"open": True, "waits_for": None}
+            else:
+                window[rnd.id] = {"open": False, "waits_for": rounds[i - TIP_WINDOW_ROUNDS]}
+    return window
+
+
+def tippable_round_ids(org) -> set[int]:
+    """Just the ids, for the enforcement check in submit_tip."""
+    return {rid for rid, state in tip_window(org).items() if state["open"]}
+
+
 @transaction.atomic
 def submit_tip(*, user, match: Match, org, selection: str) -> Tip:
     if match.is_locked:
         raise ValueError("Match is locked")
     if selection not in ("home", "away"):
         raise ValueError("Invalid selection")
+    if match.round_id not in tippable_round_ids(org):
+        raise ValueError(
+            f"That round isn't open yet. You can tip {TIP_WINDOW_ROUNDS} rounds "
+            "at a time, so this one opens once the current round is done."
+        )
     tip, _ = Tip.objects.update_or_create(
         user=user, match=match, org=org,
         defaults={"selection": selection},

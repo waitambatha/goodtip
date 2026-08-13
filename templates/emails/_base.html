@@ -2,64 +2,161 @@
 Shared layout for every GoodTip email.
 
 Table-based with inline styles on purpose — that is still what Outlook and the
-Gmail app reliably render. Extracted from the original election-open template so
-every message shares one header, footer and set of brand colours; if the brand
-moves, it moves here once.
+Gmail app reliably render.
+
+FULL-BLEED PHOTOGRAPH, AND A MESSAGE SHORT ENOUGH TO CARRY IT
+The picture runs the whole height with the card floating on it. That only
+works if the email FITS: background-size:cover stretched across a message two
+thousand pixels tall blows the crop up until the photo reads as a smear, and
+the reader is scrolling past it either way. So the thing that makes this
+design work is vertical restraint — every padding below is the smallest value
+that still breathes, so a sign-in code lands inside one laptop screen and the
+photograph stays a photograph.
+
+If a message ever needs more content than fits, it belongs behind a link.
+
+THE PHOTOGRAPH IS DECORATION, NEVER STRUCTURE
+Outlook desktop blocks remote images by default, so the photo is layered OVER
+a solid #0B1F17 that carries the same weight: images off, this is still the
+dark-green branded message, just without the crowd. Nothing meaningful lives
+in an image — no text, no code, no button.
+
+Three layers, because each client reads a different one:
+  * bgcolor + background-color   every client
+  * background="" attribute      Gmail, Apple Mail, most webmail
+  * VML rect                     Outlook 2007-2019 Windows, which ignores CSS
+                                 background-image entirely
 
 Blocks a message fills in:
   eyebrow    small caps line under the wordmark (what this email is)
+  badge      the emblem above the card
   preheader  the grey snippet shown next to the subject in an inbox list
-  content    the body, inside the white card
-  footnote   small print above the footer
+  content    the body, inside the card
+  footnote   the line beside the heart in the footer
 {% endcomment %}<!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
   <title>{% block title %}GoodTip{% endblock %}</title>
+  <!--[if mso]>
+  <xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
+  <![endif]-->
+  <style>
+    /* Only what genuinely needs a query. Everything else is inline, because
+       Gmail strips <style> from a forwarded message. */
+    @media only screen and (max-width:620px) {
+      .gt-pad { padding-left:18px !important; padding-right:18px !important; }
+      .gt-digit { width:40px !important; height:50px !important; }
+      .gt-digit span { font-size:25px !important; line-height:50px !important; }
+      .gt-foot-r { display:block !important; width:100% !important; text-align:center !important; padding-top:10px !important; }
+    }
+  </style>
 </head>
-<body style="margin:0;padding:0;background:#F2EFE6;font-family:Arial,Helvetica,sans-serif;">
+<body style="margin:0;padding:0;background-color:#0B1F17;font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;">
 
-  {% comment %}
-  Inbox preview text. Hidden in the body, but it's the second line a reader sees
-  after the subject, so it's worth setting per message.
-  {% endcomment %}
   <div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
     {% block preheader %}Footy tipping that does good.{% endblock %}
+    &#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;
   </div>
 
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2EFE6;padding:28px 12px;">
-    <tr><td align="center">
-      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+         bgcolor="#0B1F17" style="background-color:#0B1F17;">
+    <tr>
+      {% comment %}
+      scene_url comes from goodtip.mail.EMAIL_SCENES, picked per send so two of
+      the same message do not arrive identical. Empty when it could not be
+      resolved, which leaves the solid colour and costs nothing.
+      {% endcomment %}
+      <td align="center"
+          background="{{ scene_url }}"
+          bgcolor="#0B1F17"
+          style="background-color:#0B1F17;
+                 background-image:url('{{ scene_url }}');
+                 background-position:center center;background-size:cover;background-repeat:no-repeat;
+                 padding:18px 12px 20px;">
 
-        <!-- header -->
-        <tr><td style="background:#0F2E22;border-radius:14px 14px 0 0;padding:30px 32px 26px;text-align:center;">
-          <span style="font-size:28px;font-weight:900;letter-spacing:.5px;color:#ffffff;">GOOD<span style="color:#C8F135;">TIP</span><span style="color:#C8F135;">.</span></span>
-          <div style="color:#C8F135;font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-top:8px;">{% block eyebrow %}Footy tipping, for good{% endblock %}</div>
-        </td></tr>
+        <!--[if gte mso 9]>
+        <v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:600px;">
+        <v:fill type="frame" color="#0B1F17" src="{{ scene_url }}" />
+        <v:textbox inset="0,0,0,0"><![endif]-->
 
-        <!-- Lime rule. The header and the white card met as two flat blocks;
-             this gives the join an edge and carries the brand colour down the
-             message. A 3px table cell renders everywhere a border does not. -->
-        <tr><td style="background:#C8F135;font-size:0;line-height:0;height:3px;">&nbsp;</td></tr>
+        <table role="presentation" width="580" cellpadding="0" cellspacing="0" border="0" style="max-width:580px;width:100%;">
 
-        <!-- body -->
-        <tr><td style="background:#ffffff;padding:32px;">
-          {% block content %}{% endblock %}
-        </td></tr>
+          <!-- wordmark -->
+          <tr><td align="center" style="padding:6px 20px 0;">
+            <span style="font-size:29px;font-weight:900;letter-spacing:-0.5px;color:#ffffff;line-height:1;">GOOD<span style="color:#C8F135;">TIP</span><span style="color:#C8F135;">.</span></span>
+          </td></tr>
 
-        {% block after_card %}{% endblock %}
+          {% comment %}
+          Eyebrow with a rule either side. Three cells rather than a border or
+          a flex row: it is the part of the header that has to hold its shape
+          in Outlook, and a table does.
+          {% endcomment %}
+          <tr><td align="center" style="padding:9px 20px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
+              <tr>
+                <td style="width:26px;height:1px;background-color:#4d6b52;font-size:0;line-height:0;">&nbsp;</td>
+                <td style="padding:0 10px;color:#C8F135;font-size:10.5px;font-weight:bold;letter-spacing:2.5px;text-transform:uppercase;white-space:nowrap;">{% block eyebrow %}Footy tipping, for good{% endblock %}</td>
+                <td style="width:26px;height:1px;background-color:#4d6b52;font-size:0;line-height:0;">&nbsp;</td>
+              </tr>
+            </table>
+          </td></tr>
 
-        <!-- footer -->
-        <tr><td style="background:#0F2E22;border-radius:0 0 14px 14px;padding:18px 32px;text-align:center;">
-          <div style="color:#F2EFE6;font-size:12px;line-height:1.7;opacity:.85;">
-            {% block footnote %}Footy tipping, for good.{% endblock %} &middot; goodtip.com.au<br>
-            &copy; 2026 GoodTip Pty Ltd &middot; Not affiliated with the AFL or NRL.
-          </div>
-        </td></tr>
+          {% comment %}
+          The emblem. In the mock it straddles the card's top edge; email has
+          no reliable negative margin, so it sits just above instead — the same
+          shape without a hack that collapses in Outlook and leaves a circle
+          floating mid-text.
+          {% endcomment %}
+          <tr><td align="center" style="padding:14px 20px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr><td align="center" width="56" height="56"
+                      style="width:56px;height:56px;background-color:#143326;
+                             border-radius:28px;border:2px solid #C8F135;text-align:center;
+                             font-size:24px;line-height:56px;color:#C8F135;">{% block badge %}&#9679;{% endblock %}</td></tr>
+            </table>
+          </td></tr>
 
-      </table>
-    </td></tr>
+          <!-- lime edge, then the card -->
+          <tr><td style="padding:12px 0 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td style="background-color:#C8F135;height:4px;font-size:0;line-height:0;border-radius:12px 12px 0 0;">&nbsp;</td></tr>
+              <tr><td class="gt-pad" bgcolor="#FBFAF5" style="background-color:#FBFAF5;padding:22px 28px;">
+                {% block content %}{% endblock %}
+              </td></tr>
+            </table>
+          </td></tr>
+
+          {% block after_card %}{% endblock %}
+
+          <!-- footer -->
+          <tr><td bgcolor="#143326" style="background-color:#143326;border-radius:0 0 12px 12px;padding:14px 24px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="left" style="font-size:12.5px;line-height:1.6;color:#DDE7D9;">
+                  <span style="color:#C8F135;font-size:15px;">&#9829;</span>&nbsp;
+                  {% block footnote %}Thanks for being part of <span style="color:#C8F135;font-weight:bold;">GoodTip</span>.{% endblock %}
+                </td>
+                <td class="gt-foot-r" align="right" style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:15px;color:#C8F135;white-space:nowrap;">
+                  Play fair. Tip good.
+                </td>
+              </tr>
+            </table>
+          </td></tr>
+
+          <!-- legal, outside the card so it reads as small print -->
+          <tr><td align="center" style="padding:12px 20px 0;color:#8FA894;font-size:11px;line-height:1.6;">
+            goodtip.com.au &middot; &copy; 2026 GoodTip Pty Ltd &middot; Not affiliated with the AFL or NRL.
+          </td></tr>
+
+        </table>
+
+        <!--[if gte mso 9]></v:textbox></v:rect><![endif]-->
+      </td>
+    </tr>
   </table>
 </body>
 </html>

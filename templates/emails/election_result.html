@@ -1,6 +1,7 @@
 {% extends "emails/_base.html" %}
 {% block title %}The vote's in{% endblock %}
 {% block eyebrow %}The vote's in{% endblock %}
+{% block badge %}&#9829;{% endblock %}{# heart — the charity vote #}
 {% block preheader %}{{ org.name }} picked {{ winner.name }}. Here's how the vote landed.{% endblock %}
 {% block content %}
   <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">Hello {{ user.display_name }},</p>
@@ -9,7 +10,7 @@
   </p>
 
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
-    <tr><td style="background:#0F2E22;border-radius:12px;padding:22px;text-align:center;">
+    <tr><td style="background:#143326;border-radius:12px;padding:22px;text-align:center;">
       <div style="color:#C8F135;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Your group's cause</div>
       <div style="color:#ffffff;font-size:23px;font-weight:900;">{{ winner.name }}</div>
     </td></tr>

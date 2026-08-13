@@ -1,6 +1,6 @@
 {% extends "app_base.html" %}
 {% load static %}
-{% block title %}Your note to the boss — GoodTip{% endblock %}
+{% block title %}Your note to the boss &middot; GoodTip{% endblock %}
 {% block loader_task %}Checking on your note{% endblock %}
 {% block body_class %}page-deep sheet-page{% endblock %}
 {% block page_backdrop %}
@@ -58,11 +58,11 @@ anything happened at all.
 
     <p class="bp-note">
       {% if inv.status == 'sent' %}
-        Delivered. Nothing more for you to do — we'll add you to their comp the moment they create one.
+        Delivered. Nothing more for you to do, we'll add you to their comp the moment they create one.
       {% elif inv.status == 'joined' %}
         {{ inv.boss_name|default:"They" }} signed up. As soon as they set up an organisation you'll be added to it automatically.
       {% else %}
-        Done — you're a member of <b>{{ inv.org.name }}</b>.
+        Done, you're a member of <b>{{ inv.org.name }}</b>.
         <a href="{% url 'dashboard' %}?org={{ inv.org.id }}">Open it &rarr;</a>
       {% endif %}
     </p>

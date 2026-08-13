@@ -13,6 +13,7 @@ message a confused recipient is a likely case rather than an edge one.
 {% endcomment %}
 {% block title %}Your GoodTip verification code{% endblock %}
 {% block eyebrow %}Verify your work email{% endblock %}
+{% block badge %}&#9993;{% endblock %}
 {% block preheader %}{{ code }} is your GoodTip verification code. It expires in {{ minutes }} minutes.{% endblock %}
 {% block content %}
 
@@ -23,26 +24,8 @@ message a confused recipient is a likely case rather than an edge one.
     their work email. Enter the code below to confirm the address is yours.
   </p>
 
-  {# ---- the code ---- #}
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-    <tr>
-      <td style="background:#0F2E22;border-radius:16px;padding:30px 20px;text-align:center;">
-        <div style="font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:#C8F135;font-weight:bold;">
-          Verification code
-        </div>
-        {% comment %} Padding is the tap target: a long-press anywhere in this
-           block selects the code cleanly on a phone. {% endcomment %}
-        <div style="margin:18px 0 0;">
-          <span style="font-family:'Courier New',Courier,monospace;font-size:42px;font-weight:bold;letter-spacing:10px;color:#ffffff;line-height:1.2;">{{ code }}</span>
-        </div>
-        <div style="margin-top:16px;">
-          <span style="display:inline-block;padding:6px 14px;border-radius:100px;background:rgba(200,241,53,0.14);color:#C8F135;font-size:12.5px;font-weight:bold;">
-            Expires in {{ minutes }} minutes
-          </span>
-        </div>
-      </td>
-    </tr>
-  </table>
+  {# the code panel is shared with login_code — see emails/_bits.html #}
+  {% include "emails/_bits.html" with bit="code" code=code minutes=minutes code_label="Verification code" %}
 
   <p style="margin:14px 0 0;font-size:13px;color:#8a8a7e;text-align:center;">
     Press and hold the code to copy it.
@@ -51,7 +34,7 @@ message a confused recipient is a likely case rather than an edge one.
   {# ---- security note ---- #}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0 0;">
     <tr>
-      <td style="padding:18px 20px;background:#F7F6F0;border-left:4px solid #C8F135;border-radius:0 10px 10px 0;">
+      <td style="padding:18px 20px;background:#F2F1E7;border-left:4px solid #C8F135;border-radius:0 10px 10px 0;">
         <p style="margin:0;font-size:14px;line-height:1.65;color:#4a4a41;">
           <strong style="color:#0F2E22;">Were you not expecting this?</strong>
           You can safely ignore this email. Nothing is set up in your

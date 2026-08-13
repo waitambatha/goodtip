@@ -133,6 +133,11 @@ LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "landing"
 
+# --- Sportradar sports data -------------------------------------------------
+# Trial key, expires 11 Sep 2026 (client doc, 12 Aug 2026). Never in source.
+SPORTRADAR_API_KEY = os.environ.get("SPORTRADAR_API_KEY", "")
+SPORTRADAR_TRIAL_EXPIRES = os.environ.get("SPORTRADAR_TRIAL_EXPIRES", "")
+
 # Postmark is the transactional email provider. The token lives only in .env.
 POSTMARK_SERVER_TOKEN = os.environ.get("POSTMARK_SERVER_TOKEN", "")
 POSTMARK_MESSAGE_STREAM = os.environ.get("POSTMARK_MESSAGE_STREAM", "outbound")
@@ -187,10 +192,9 @@ GOODTIP_TEAM_EMAIL = os.environ.get("GOODTIP_TEAM_EMAIL", "team@goodtip.com.au")
 # Absolute base URL used in outbound email links.
 SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://goodtip.com.au")
 
-# AI Group Recap (docs/ai-group-recap-spec.md). Generation is skipped —
-# silently, with a log line — until the key is set, mirroring the SMTP setup.
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-RECAP_MODEL = os.environ.get("RECAP_MODEL", "claude-opus-4-8")
+# Group Recap (docs/ai-group-recap-spec.md) needs no configuration: the
+# writer lives in orgs/recaps.py and runs off the database. Nothing to key,
+# nothing to bill, nothing to be down.
 
 # NRL fixtures, scores and results come from API-SPORTS (v1.rugby.api-sports.io).
 # THESPORTS_API_KEY is the old name, kept as a fallback so an existing .env keeps

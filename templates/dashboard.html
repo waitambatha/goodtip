@@ -2,7 +2,7 @@
 {% load static %}
 {% load humanize %}
 {% load team_extras %}
-{% block title %}Dashboard — GoodTip{% endblock %}
+{% block title %}Dashboard &middot; GoodTip{% endblock %}
 {% block nav_dash %}on{% endblock %}
 {% block loader_task %}Opening your dashboard{% endblock %}
 {% block body_class %}page-deep sheet-page{% endblock %}
@@ -20,7 +20,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
   <div class="app-head head-center">
     <div class="app-eyebrow">Dashboard</div>
     <h1 class="app-h1">Welcome to GoodTip, {{ user.display_name }}</h1>
-    <p class="app-sub">Here's what's coming up. Tipping happens inside a group — join one or start your own and these games are yours.</p>
+    <p class="app-sub">Here's what's coming up. Tipping happens inside a group, join one or start your own and these games are yours.</p>
   </div>
 
   <div class="card pad-lg" style="text-align:center;">
@@ -82,8 +82,8 @@ stacking context, so a strip rendered inside it paints over the sheet.
       <header class="ts-head">
         <div>
           <div class="ng-emoji" aria-hidden="true">😔</div>
-          <h3 id="ngTitle">Ah — you'll need a group first</h3>
-          <p class="ts-sub">Tips are counted inside a group. That's where your ladder, your rivals and the money you're raising all live — so there's nowhere to put this pick just yet.</p>
+          <h3 id="ngTitle">Ah, you'll need a group first</h3>
+          <p class="ts-sub">Tips are counted inside a group. That's where your ladder, your rivals and the money you're raising all live, so there's nowhere to put this pick just yet.</p>
         </div>
         <button type="button" class="ts-x" data-sheet-close aria-label="Close">&times;</button>
       </header>
@@ -148,7 +148,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
       you is not a landmark anyone can navigate by.
       {% endcomment %}
       {% if prompts %}
-      <h1 class="sr-only">Dashboard — {{ c.org.name }}</h1>
+      <h1 class="sr-only">Dashboard, {{ c.org.name }}</h1>
       <div class="dash-prompt has-greet" data-prompts aria-live="polite">
         <div class="dp-line dp-greet on">
           <span class="dp-txt">Welcome back, {{ user.display_name }}</span>
@@ -182,7 +182,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
     <select name="org" id="dashOrg" aria-label="Choose an organisation" onchange="this.form.submit()">
       {% for oc in cards %}
       <option value="{{ oc.org.id }}" {% if oc.org.id == c.org.id %}selected{% endif %}>
-        {{ oc.org.name }}{% if oc.tips_total %} — {{ oc.tips_done }} of {{ oc.tips_total }} matches tipped{% endif %}
+        {{ oc.org.name }}{% if oc.tips_total %}, {{ oc.tips_done }} of {{ oc.tips_total }} matches tipped{% endif %}
       </option>
       {% endfor %}
     </select>
@@ -260,15 +260,15 @@ stacking context, so a strip rendered inside it paints over the sheet.
     {% endcomment %}
     <div class="grid-app g-3 dash-stats">
       <div class="stat-card accent"><div class="s-lab">Season points</div><div class="s-num">{{ c.points }}</div><div class="s-sub">across the season</div></div>
-      <div class="stat-card"><div class="s-lab">Your rank</div><div class="s-num">{{ c.rank|default:"—" }}</div><div class="s-sub">of all tippers</div></div>
+      <div class="stat-card"><div class="s-lab">Your rank</div><div class="s-num">{{ c.rank|default:"-" }}</div><div class="s-sub">of all tippers</div></div>
       <div class="stat-card"><div class="s-lab">Tips this round</div><div class="s-num">{{ c.tips_done }}<span style="font-size:18px;color:var(--muted);"> / {{ c.tips_total }}</span></div><div class="s-sub">{% if c.tips_total > c.tips_done %}still open{% else %}all in{% endif %}</div></div>
     </div>
 
     <!-- this round's games: pick your teams right here, then confirm -->
     {% comment %}
-Posts to the org, not to a round: the slate below spans whatever rounds still
-have unplayed games, so a round-scoped URL could not accept it.
-{% endcomment %}
+    Posts to the org, not to a round: the slate below spans whatever rounds still
+    have unplayed games, so a round-scoped URL could not accept it.
+    {% endcomment %}
 <form method="post" action="{% url 'tipping:tip_confirm_upcoming' c.org.id %}" id="tipSlip">
       {% csrf_token %}
 
@@ -292,6 +292,15 @@ have unplayed games, so a round-scoped URL could not accept it.
       <div class="pbar slim" style="margin-bottom:14px;"><i id="slipBar" style="width:{% widthratio c.tips_done c.tips_total|default:1 100 %}%"></i></div>
       {% endif %}
 
+      {% comment %}
+      Competition filter. A member in a two-code league gets both slates
+      interleaved by kickoff; this narrows the list to the one they came for.
+      Carries the org through, or switching code would bounce them to whatever
+      the default league is.
+      {% endcomment %}
+      {% url 'dashboard' as dash_url %}
+      {% include "partials/series_filter.html" with base=dash_url keep="org="|add:c.org.id keep_org=c.org.id %}
+
       {# the round's fixtures scroll in place, keeping Confirm reachable below #}
       <div class="fixtures gt-scroll">
         {% regroup games by round as round_groups %}
@@ -301,41 +310,30 @@ have unplayed games, so a round-scoped URL could not accept it.
         member cannot tell where one round ends and the next begins — which
         matters, because points and ladders are counted per round.
         {% endcomment %}
-        <div class="fx-roundhead">
+        {% comment %}
+        A round outside the tipping window is still listed — seeing what is
+        coming is the point of the list — but it says plainly that it is not
+        open yet, rather than offering controls that would be refused on
+        submit.
+        {% endcomment %}
+        <div class="fx-roundhead{% if not grp.list.0.round_open %} is-shut{% endif %}">
           <span class="fxr-n">Round {{ grp.grouper.round_number }}</span>
           <span class="fxr-series">{{ grp.grouper.series }}</span>
+          {% if grp.list.0.round_open %}
           <span class="fxr-locks">Locks {{ grp.grouper.lockout_at|date:"D j M, g:i A" }}</span>
+          {% else %}
+          {# names the round it waits on, so "locked" is an explanation #}
+          <span class="fxr-locks shut"><svg><use href="#ic-lock"/></svg> {{ grp.list.0.lock_note }}</span>
+          {% endif %}
         </div>
         {% for g in grp.list %}
-        <div class="fxp {% if g.tipped %}done{% endif %}">
-          <div class="fxp-meta">
-            <span class="fxp-date">{{ g.kickoff_at|date:"D j M · g:i A" }}</span>
-            {% if g.venue %}<span class="fxp-venue">{{ g.venue }}</span>{% endif %}
-            {% comment %}
-            This label describes YOUR tip, not whether tipping is available —
-            "Open" used to show on every untipped game including ones in a
-            locked round, which read as "you can still tip this" directly under
-            a banner saying the round was closed. Once the round locks, an
-            untipped game is a missed one and has to say so.
-            {% endcomment %}
-            {% if g.tipped %}
-              <span class="fxp-state is-tipped">Tipped</span>
-            {% elif g.is_locked %}
-              <span class="fxp-state is-missed">No tip</span>
-            {% else %}
-              <span class="fxp-state is-open">Open</span>
-            {% endif %}
-          </div>
-          <div class="pick pick-sm">
-            <label class="team {% if g.my_tip == 'home' %}sel{% endif %}">{% crest g.home_team %}<span>{{ g.home_team.name }}</span>
-              <input type="radio" name="match_{{ g.id }}" value="home" hidden {% if g.my_tip == 'home' %}checked{% endif %} {% if g.is_locked %}disabled{% endif %}>
-            </label>
-            <div class="vs">vs</div>
-            <label class="team away {% if g.my_tip == 'away' %}sel{% endif %}">{% crest g.away_team %}<span>{{ g.away_team.name }}</span>
-              <input type="radio" name="match_{{ g.id }}" value="away" hidden {% if g.my_tip == 'away' %}checked{% endif %} {% if g.is_locked %}disabled{% endif %}>
-            </label>
-          </div>
-        </div>
+        {% comment %}
+        The same card My Tips uses, in "form" mode: the picks ride hidden
+        radios and go up together when Confirm is pressed. Each club is named
+        once — pressing the club is the tip — and the MatchReader read sits
+        behind a button rather than filling the card on every fixture.
+        {% endcomment %}
+        {% include "partials/fixture_card.html" with match=g reader=g.reader selection=g.my_tip editable=g.can_tip lock_note=g.lock_note mode="form" %}
         {% endfor %}
         {% endfor %}
       </div>
@@ -374,21 +372,16 @@ have unplayed games, so a round-scoped URL could not accept it.
   </div>
   {% endif %}
 
-  {% if c.family %}
-  <!-- §7: local and national totals, side by side, never combined -->
-  <div class="grid-app g-2" style="margin-top:18px;">
-    <div class="card">
-      <div class="card-h">{{ c.org.name }} total</div>
-      <div class="s-num" style="font-size:26px;margin:10px 0 2px;color:var(--forest);">${{ c.family.local|floatformat:0|intcomma }}</div>
-      <div class="card-lead">Raised by your group for {{ c.org.charity_display }}</div>
-    </div>
-    <div class="card">
-      <div class="card-h">{{ c.family.root.name }} national total</div>
-      <div class="s-num" style="font-size:26px;margin:10px 0 2px;color:var(--forest);">${{ c.family.national|floatformat:0|intcomma }}</div>
-      <div class="card-lead">Across all {{ c.family.org_count }} {{ c.family.root.name }} groups</div>
-    </div>
-  </div>
-  {% endif %}
+  {% comment %}
+  The local and national donation totals (§7 of the brief: side by side, never
+  combined) lived here. Taken off the dashboard because both read $0 for every
+  group until money actually moves, and a pair of empty dollar figures at the
+  top of the page says nothing while taking the space that the fixtures want.
+
+  Nothing about the calculation has been removed — c.family still carries
+  local, national and org_count — so putting it back is re-adding the markup,
+  not rebuilding the feature.
+  {% endcomment %}
 
   {% if c.is_owner %}
   <div class="grid-app g-2" style="margin-top:18px;">
@@ -485,7 +478,7 @@ have unplayed games, so a round-scoped URL could not accept it.
 {% endblock %}
 
 {% block app_js %}
-/* Welcome banner ticker — the prompts cycle so the banner is a message
+/* Welcome banner ticker, the prompts cycle so the banner is a message
    channel, not a static greeting. Pauses on hover; dots let you step. */
 (function(){
   var wrap = document.querySelector('[data-prompts]');
@@ -510,8 +503,8 @@ have unplayed games, so a round-scoped URL could not accept it.
   }
   /* 3s on the greeting, then keep moving. This runs under reduced motion too:
      the banner is a message channel, and freezing it there hides information
-     rather than calming it. What reduced motion drops is the slide — the CSS
-     leaves a plain fade — and the dwell lengthens so it is a gentler read.
+     rather than calming it. What reduced motion drops is the slide, the CSS
+     leaves a plain fade, and the dwell lengthens so it is a gentler read.
      Hover pause and the dots remain the manual controls either way. */
   function start(){ if (!timer) timer = setInterval(function(){ show(i + 1); }, reduce ? 5200 : 3000); }
   function stop(){ if (timer) { clearInterval(timer); timer = null; } }
@@ -522,10 +515,14 @@ have unplayed games, so a round-scoped URL could not accept it.
   start();
 })();
 
-    /* dashboard tip slip: reflect picks visually + keep the count live */
+    /* dashboard tip slip.
+       Picking a team is handled by the delegated listener in gt-fixture.js —
+       binding it per row here depended on this script running after the
+       fixtures and covered nothing added afterwards. What stays is the
+       initial count, for picks already saved when the page loads. */
     var slip = document.getElementById('tipSlip');
     if (slip) {
-      var rows = slip.querySelectorAll('.fxp');
+      var rows = slip.querySelectorAll('.fxc');
       var count = document.getElementById('slipCount');
       var bar = document.getElementById('slipBar');
       function slipRefresh(){
@@ -534,26 +531,6 @@ have unplayed games, so a round-scoped URL could not accept it.
         if (count) count.textContent = n;
         if (bar && rows.length) bar.style.width = Math.round(n / rows.length * 100) + '%';
       }
-      rows.forEach(function(row){
-        row.querySelectorAll('.team').forEach(function(team){
-          var input = team.querySelector('input');
-          if (!input || input.disabled) return;
-          team.addEventListener('click', function(){
-            row.querySelectorAll('.team').forEach(function(t){ t.classList.remove('sel'); });
-            team.classList.add('sel');
-            input.checked = true;
-            row.classList.add('picked');
-            var st = row.querySelector('.fxp-state');
-            if (st) {
-              st.textContent = 'Picked — press confirm';
-              // Keep the class in step with the words, or a pick keeps the
-              // grey "Open" styling while claiming to be chosen.
-              st.className = 'fxp-state is-picked';
-            }
-            slipRefresh();
-          });
-        });
-      });
       slipRefresh();
 
       /* ---- review sheet ----
@@ -574,18 +551,20 @@ have unplayed games, so a round-scoped URL could not accept it.
           var picked = 0, missing = 0;
           rows.forEach(function(row){
             var chosen = row.querySelector('input:checked');
-            var teams = row.querySelectorAll('.team');
-            /* :not(.crest) matters — the crest tag emits its own <span> before
+            var teams = row.querySelectorAll('.fxc-team');
+            /* :not(.crest) matters, the crest tag emits its own <span> before
                the name, and plain querySelector('span') returns that one (which
                holds only an <img>), so the names came out blank. */
+            /* The card gives the name its own class now, so this no
+               longer has to guess which span is not the crest. */
             function nameOf(el){
-              var s = el && el.querySelector('span:not(.crest)');
+              var s = el && el.querySelector('.fxc-name');
               return s ? s.textContent.trim() : '';
             }
             var homeName = nameOf(teams[0]);
             var awayName = nameOf(teams[1]);
-            var meta = row.querySelector('.fxp-date');
-            var venue = row.querySelector('.fxp-venue');
+            var meta = row.querySelector('.fxc-when');
+            var venue = row.querySelector('.fxc-venue');
 
             var item = document.createElement('div');
             item.className = 'ts-item' + (chosen ? '' : ' none');

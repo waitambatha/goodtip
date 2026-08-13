@@ -34,15 +34,34 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR(f"No series named {name!r}."))
             return
 
-        if name in ("AFL", "AFLW"):
-            from data_sync.scrapers.afl import AflApiScraper
-            scraper, resolve, key = AflApiScraper(), _resolve_team, name
-        elif name in ("NRL", "NRLW"):
-            from data_sync.scrapers.nrl import NrlDrawScraper
-            scraper, resolve, key = NrlDrawScraper(), _resolve_nrl_team, name.upper()
-        else:
-            self.stderr.write(self.style.ERROR(f"No scraper for {name!r}."))
-            return
+        # Sportradar first: it returns a whole season in one request, where the
+        # scrapers cost one page per round. Backfilling six seasons of four
+        # codes is the difference between minutes and most of an hour, and it
+        # is the source the client commissioned.
+        from django.conf import settings
+        scraper = resolve = key = None
+        if getattr(settings, "SPORTRADAR_API_KEY", ""):
+            try:
+                from data_sync.providers_sportradar import SportradarClient, COMPETITIONS
+                from data_sync.services import _resolve_sr_team
+                if name.upper() in COMPETITIONS:
+                    scraper, resolve, key = SportradarClient(), _resolve_sr_team, name
+                    self.stdout.write("  source: Sportradar")
+            except Exception as e:                       # noqa: BLE001
+                self.stderr.write(f"  Sportradar unavailable ({e}); falling back to scraping")
+
+        if scraper is None:
+            if name in ("AFL", "AFLW"):
+                from data_sync.scrapers.afl import AflApiScraper
+                scraper, resolve, key = AflApiScraper(), _resolve_team, name
+                self.stdout.write("  source: afl.com.au")
+            elif name in ("NRL", "NRLW"):
+                from data_sync.scrapers.nrl import NrlDrawScraper
+                scraper, resolve, key = NrlDrawScraper(), _resolve_nrl_team, name.upper()
+                self.stdout.write("  source: nrl.com")
+            else:
+                self.stderr.write(self.style.ERROR(f"No source for {name!r}."))
+                return
 
         created = updated = skipped = 0
         for season in range(o["from_season"], o["to_season"] + 1):

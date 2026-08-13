@@ -1,5 +1,5 @@
 {% extends "app_base.html" %}
-{% block title %}Join request — {{ org.name }}{% endblock %}
+{% block title %}Join request, {{ org.name }}{% endblock %}
 {% block loader_task %}Opening the request{% endblock %}
 {% block app_content %}
 
@@ -24,14 +24,14 @@
 
     {% if join_req.is_pending %}
     <p class="card-lead" style="margin:18px 0 20px;">
-      Approving adds them to {{ org.name }} as a participant — they'll be able to tip
+      Approving adds them to {{ org.name }} as a participant, they'll be able to tip
       each round, appear on your ladder and vote when the group picks its charity.
       Declining leaves them out; they can ask again later.
     </p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <form method="post" style="display:inline;">
         {% csrf_token %}<input type="hidden" name="action" value="approve">
-        <button type="submit" class="abtn abtn-primary abtn-lg">Approve — add to {{ org.name }}</button>
+        <button type="submit" class="abtn abtn-primary abtn-lg">Approve, add to {{ org.name }}</button>
       </form>
       <form method="post" style="display:inline;">
         {% csrf_token %}<input type="hidden" name="action" value="decline">
@@ -43,7 +43,7 @@
     <div class="slip-bar locked" style="margin-top:18px;">
       <div class="slip-info">
         <b>Already {{ join_req.get_status_display|lower }}</b>
-        <span>{% if join_req.decided_by %}Handled by {{ join_req.decided_by.display_name }}{% endif %}{% if join_req.decided_at %} on {{ join_req.decided_at|date:"j M Y" }}{% endif %} — nothing to do here.</span>
+        <span>{% if join_req.decided_by %}Handled by {{ join_req.decided_by.display_name }}{% endif %}{% if join_req.decided_at %} on {{ join_req.decided_at|date:"j M Y" }}{% endif %}, nothing to do here.</span>
       </div>
     </div>
     {% endif %}
@@ -51,7 +51,7 @@
 
   <p class="app-sub" style="text-align:center;margin-top:18px;">
     <a href="{% url 'orgs:members' org.id %}" class="flink">
-      {% if other_pending %}{{ other_pending }} other request{{ other_pending|pluralize }} waiting — see all members{% else %}See all members{% endif %}
+      {% if other_pending %}{{ other_pending }} other request{{ other_pending|pluralize }} waiting, see all members{% else %}See all members{% endif %}
     </a>
   </p>
 </div>

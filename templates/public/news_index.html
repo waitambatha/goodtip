@@ -2,9 +2,9 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}News — GoodTip{% endblock %}
+{% block title %}News &middot; GoodTip{% endblock %}
 {% block loader_task %}Fetching the latest stories{% endblock %}
-{% block meta_description %}Stories, previews and updates from the GoodTip team — AFL, AFLW, NRL and NRLW.{% endblock %}
+{% block meta_description %}Stories, previews and updates from the GoodTip team. AFL, AFLW, NRL and NRLW.{% endblock %}
 {% block body_class %}page-news{% endblock %}
 
 {% block content %}
@@ -14,7 +14,7 @@
   <div class="hs-left">
     <span class="pill" style="align-self:flex-start;margin-bottom:24px;"><span class="dot"></span>Around the grounds</span>
     <h1>News that moves <em>the comp.</em></h1>
-    <p class="hero-sub">Stories, previews and updates from the GoodTip team — across all four codes.</p>
+    <p class="hero-sub">Stories, previews and updates from the GoodTip team, across all four codes.</p>
   </div>
   <div class="hs-right">
     <div class="hero-bg" aria-hidden="true">
@@ -58,7 +58,7 @@
     {% else %}
     <div class="news-empty reveal">
       <p class="ne-big">Nothing filed under {{ active_tag|default:"this" }} yet.</p>
-      <p class="section-sub" style="margin:0;">Stories land here as they're published — try <a href="{% url 'news_index' %}#stories">all codes</a> or check back soon.</p>
+      <p class="section-sub" style="margin:0;">Stories land here as they're published, try <a href="{% url 'news_index' %}#stories">all codes</a> or check back soon.</p>
     </div>
     {% endif %}
   </div>

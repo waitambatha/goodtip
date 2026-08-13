@@ -1,6 +1,6 @@
 {% extends "admin_base.html" %}
 {% load static %}
-{% block title %}Orgs — Manage{% endblock %}
+{% block title %}Orgs. Manage{% endblock %}
 {% block nav_orgs %}on{% endblock %}
 {% block hero_title %}Manage Organisations{% endblock %}
 {% block hero_lead %}Build. Organise. Grow your tipping community.{% endblock %}
@@ -48,7 +48,7 @@
                 </span>
               </span>
             </td>
-            <td><span class="gt-with-ic"><svg><use href="#ic-flag"/></svg>{{ o.sport_label|default:"—" }}</span></td>
+            <td><span class="gt-with-ic"><svg><use href="#ic-flag"/></svg>{{ o.sport_label|default:"-" }}</span></td>
             <td class="fit">
               <span class="gt-linkstack">
                 <a href="{% url 'manage:org_rounds' o.id %}">Rounds <svg><use href="#ic-arrow"/></svg></a>
@@ -57,7 +57,7 @@
             </td>
           </tr>
         {% empty %}
-          <tr><td colspan="3" class="gt-empty">{% if q or sport %}Nothing matches that search. <a href="{% url 'manage:orgs_list' %}" style="color:var(--forest);font-weight:700;">Clear filters</a>{% else %}No orgs yet — create your first one with the form beside this list.{% endif %}</td></tr>
+          <tr><td colspan="3" class="gt-empty">{% if q or sport %}Nothing matches that search. <a href="{% url 'manage:orgs_list' %}" style="color:var(--forest);font-weight:700;">Clear filters</a>{% else %}No orgs yet, create your first one with the form beside this list.{% endif %}</td></tr>
         {% endfor %}
         </tbody>
       </table>

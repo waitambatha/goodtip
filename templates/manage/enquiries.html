@@ -1,6 +1,6 @@
 {% extends "admin_base.html" %}
 {% load static %}
-{% block title %}Enquiries — Manage{% endblock %}
+{% block title %}Enquiries. Manage{% endblock %}
 {% block nav_enquiries %}on{% endblock %}
 {% block hero_title %}Customer enquiries{% endblock %}
 {% block hero_lead %}Messages from the contact form on the public site. Reply here and the answer is emailed straight back.{% endblock %}
@@ -14,7 +14,7 @@
       <div>
         <h2>Inbox</h2>
         <div class="gp-sub">
-          {% if open_count %}{{ open_count }} waiting on a reply{% else %}Nothing waiting — all caught up.{% endif %}
+          {% if open_count %}{{ open_count }} waiting on a reply{% else %}Nothing waiting, all caught up.{% endif %}
         </div>
       </div>
     </div>
@@ -42,7 +42,7 @@
               </span>
             </td>
             <td>
-              {% if e.interest %}<span class="gt-with-ic"><svg><use href="#ic-flag"/></svg>{{ e.interest }}</span>{% else %}<span class="gt-muted">&mdash;</span>{% endif %}
+              {% if e.interest %}<span class="gt-with-ic"><svg><use href="#ic-flag"/></svg>{{ e.interest }}</span>{% else %}<span class="gt-muted">-</span>{% endif %}
               <small class="enq-snip">{{ e.message|truncatechars:90 }}</small>
             </td>
             <td>{{ e.created_at|date:"j M Y, g:i a" }}</td>

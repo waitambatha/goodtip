@@ -1273,7 +1273,12 @@ def _wall_posts_context(request, org):
 
     posts = list(
         WallPost.objects.filter(org=org, is_hidden=False)
-        .select_related("author", "tip__match__home_team", "tip__match__away_team")
+        # "recap" is the reverse OneToOne carrying the round's leaderboard and
+        # conversation starters — one join beats a query per card.
+        .select_related(
+            "author", "recap", "recap__round",
+            "tip__match__home_team", "tip__match__away_team",
+        )
         [:WALL_PAGE_SIZE]
     )
     # The latest recap card is pinned to the top (recap spec §2).
@@ -1713,27 +1718,29 @@ def notification_open(request, note_id: int):
 # type "IT" get the same mark. Ordered: the first hit wins, so the specific
 # terms sit above the general ones.
 _DEPARTMENT_ICONS = [
-    # "product" sits above the IT rule: a Product team matched "dev" and got
-    # the same sliders glyph as IT, which defeats the point of per-type icons.
-    (("product", "design", "ux"), "ic-spark"),
-    (("it", "tech", "engineering", "developer", "dev", "data", "analytics"), "ic-sliders"),
-    (("finance", "account", "payroll", "procurement", "treasury"), "ic-coins"),
-    (("people", "hr", "culture", "recruit", "talent"), "ic-users"),
-    (("sales", "business development", "account management"), "ic-trend"),
-    (("marketing", "brand", "comms", "communications", "media"), "ic-spark"),
-    (("legal", "risk", "compliance", "governance"), "ic-shield"),
-    (("customer", "service", "support", "call centre", "helpdesk"), "ic-lifebuoy"),
-    (("warehouse", "logistics", "depot", "supply", "field"), "ic-org"),
-    (("retail", "store", "branch", "floor"), "ic-flag"),
-    (("exec", "executive", "leadership", "board", "committee"), "ic-shield-star"),
-    (("teach", "faculty", "student", "year level", "school"), "ic-cap"),
-    (("volunteer", "fundraising", "program", "partnership"), "ic-heart"),
-    (("admin", "operations", "ops"), "ic-target"),
-    (("night", "shift", "crew", "team"), "ic-clock"),
+    # Filled glyphs (ic-f-*), not the stroke set. On a card the icon IS the
+    # subject, and a 2px outline at 21px reads as a diagram; a solid silhouette
+    # reads as an icon. Each also carries a hue, so the directory is scannable
+    # by colour before anybody reads a word of it.
+    (("product", "design", "ux"), "ic-f-spark", "violet"),
+    (("it", "tech", "engineering", "developer", "dev", "data", "analytics"), "ic-f-sliders", "blue"),
+    (("finance", "account", "payroll", "procurement", "treasury"), "ic-f-coins", "gold"),
+    (("people", "hr", "culture", "recruit", "talent"), "ic-f-users", "teal"),
+    (("sales", "business development", "account management"), "ic-f-trend", "green"),
+    (("marketing", "brand", "comms", "communications", "media"), "ic-f-spark", "pink"),
+    (("legal", "risk", "compliance", "governance"), "ic-f-shield", "slate"),
+    (("customer", "service", "support", "call centre", "helpdesk"), "ic-f-lifebuoy", "teal"),
+    (("warehouse", "logistics", "depot", "supply", "field"), "ic-f-org", "slate"),
+    (("retail", "store", "branch", "floor"), "ic-f-flag", "pink"),
+    (("exec", "executive", "leadership", "board", "committee"), "ic-f-shield-star", "gold"),
+    (("teach", "faculty", "student", "year level", "school"), "ic-f-cap", "blue"),
+    (("volunteer", "fundraising", "program", "partnership"), "ic-f-heart", "pink"),
+    (("admin", "operations", "ops"), "ic-f-target", "green"),
+    (("night", "shift", "crew", "team"), "ic-f-clock", "violet"),
 ]
 
 
-def _department_icon(dept) -> str:
+def _department_icon(dept) -> tuple[str, str]:
     """A glyph for a department, from its type or its name.
 
     Falls back to the generic org mark rather than guessing: a wrong icon is
@@ -1744,10 +1751,10 @@ def _department_icon(dept) -> str:
         dept.department_label or "",
         dept.name or "",
     ])).lower()
-    for words, icon in _DEPARTMENT_ICONS:
+    for words, icon, tone in _DEPARTMENT_ICONS:
         if any(w in haystack for w in words):
-            return icon
-    return "ic-org"
+            return icon, tone
+    return "ic-f-org", "green"
 
 
 @login_required
@@ -1771,9 +1778,21 @@ def departments_view(request, org_id: int):
             raw_type = request.POST.get("department_type") or ""
             if raw_type.isdigit():
                 dept_type = DepartmentType.objects.filter(pk=raw_type, is_active=True).first()
+            # The modal's first step lets you switch organisation, so the
+            # parent is whatever it confirmed, not whichever page you opened.
+            # Re-checked here rather than trusted: it arrives from a form.
+            target = root
+            raw_org = request.POST.get("target_org") or ""
+            if raw_org.isdigit() and int(raw_org) != root.pk:
+                candidate = Organisation.objects.filter(pk=raw_org, parent__isnull=True).first()
+                if candidate and _is_member(request.user, candidate):
+                    target = candidate
+                else:
+                    messages.error(request, "You're not a member of that organisation.")
+                    return redirect("orgs:departments", org_id=root.pk)
             try:
                 dept = create_department(
-                    root,
+                    target,
                     name=request.POST.get("name", ""),
                     by_user=request.user,
                     department_type=dept_type,
@@ -1782,14 +1801,14 @@ def departments_view(request, org_id: int):
                 if dept.is_pending_approval:
                     messages.success(
                         request,
-                        f"{dept.name} has been sent to {root.name}'s admins to approve. "
+                        f"{dept.name} has been sent to {target.name}'s admins to approve. "
                         "You'll get a notification when they decide.",
                     )
                 else:
                     messages.success(request, f"{dept.name} is live. Invite your team.")
             except ValueError as e:
                 messages.error(request, str(e))
-            return redirect("orgs:departments", org_id=root.pk)
+            return redirect("orgs:departments", org_id=target.pk)
 
         # Everything below is an admin decision on a pending department.
         dept = get_object_or_404(Organisation, pk=request.POST.get("dept_id"), parent=root)
@@ -1835,7 +1854,8 @@ def departments_view(request, org_id: int):
             "is_member": d.pk in my_dept_ids,
             "join_pending": d.pk in pending_join_ids,
             "awaiting_approval": d.is_pending_approval,
-            "icon": _department_icon(d),
+            "icon": _department_icon(d)[0],
+            "tone": _department_icon(d)[1],
         })
 
     # The picker: types for this org's business type, plus the ones offered to
@@ -1844,8 +1864,26 @@ def departments_view(request, org_id: int):
         Q(group_type__isnull=True) | Q(group_type=root.group_type_id)
     ).order_by("group_type__id", "sort_order", "name")
 
+    # Orgs this person could create a department in. Someone can belong to
+    # several, and the modal opens on the one they are looking at but must let
+    # them say "actually, this one" without leaving the page.
+    my_orgs = list(
+        Organisation.objects.filter(
+            parent__isnull=True,
+            members__user=request.user,
+        ).distinct().order_by("name")
+    )
+
+    # A few real faces for the hero illustration. Real members rather than
+    # stock, so the artwork is about this organisation.
+    orbit_members = list(
+        OrgMember.objects.filter(org=root).select_related("user")[:3]
+    )
+
     return render(request, "orgs/departments.html", {
         "org": root,
+        "my_orgs": my_orgs,
+        "orbit_members": orbit_members,
         "rows": rows,
         "q": q,
         "type_choices": type_choices,
