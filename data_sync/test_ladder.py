@@ -245,3 +245,30 @@ class LadderSourceTests(_LadderBase):
         """
         netball = Series.objects.get(name="Super Netball")
         self.assertEqual(rebuild_ladder(series=netball, season=self.season), 0)
+
+
+class EmptySeasonTests(_LadderBase):
+    """A season with no results must show no table, not an empty one."""
+
+    def test_a_season_with_no_results_clears_stale_rows(self):
+        """AFL 2027 held eighteen all-zero rows from the removed Squiggle sync.
+
+        Ranked alphabetically, so a 2027 league opened the ladder to Adelaide
+        first and the top eight flagged as finals places, for a season that had
+        not started. An empty table is not a neutral thing to leave lying
+        around — it reads as a standing.
+        """
+        LadderEntry.objects.create(
+            series=self.series, season=self.season, team=self.teams[0],
+            rank=1, played=0, wins=0, losses=0, draws=0, points=0, percentage=0,
+        )
+        self.assertEqual(rebuild_ladder(series=self.series, season=self.season), 0)
+        self.assertFalse(LadderEntry.objects.filter(series=self.series, season=self.season).exists())
+
+    def test_a_real_table_is_not_cleared(self):
+        self.game(1, 0, 1, 100, 50)
+        rebuild_ladder(series=self.series, season=self.season)
+        self.assertEqual(len(self.table()), 2)
+        # Second pass over the same results leaves it intact.
+        rebuild_ladder(series=self.series, season=self.season)
+        self.assertEqual(len(self.table()), 2)

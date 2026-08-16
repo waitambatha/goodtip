@@ -195,7 +195,26 @@ def rebuild_ladder(*, series, season) -> int:
             away.draws += 1
 
     if not rows:
-        logger.info("No completed %s matches in %s; ladder left as it stands.", series.name, season)
+        # No results means no table — CLEAR it, do not leave it standing.
+        #
+        # Leaving it was the old behaviour, inherited from when ladders were
+        # fetched and an empty read might be a transient feed failure worth
+        # riding out. Nothing is transient now: this reads our own database,
+        # so "no completed matches" is a fact about the season, not a blip.
+        #
+        # What it left behind was worse than nothing. AFL 2027 kept eighteen
+        # all-zero rows from the decommissioned Squiggle sync, ranked
+        # alphabetically — so a 2027 league opened the ladder to find Adelaide
+        # first, Brisbane second, and the top eight marked as finals places,
+        # for a season that has not started. The empty state on the ladder page
+        # says "standings arrive with the results feed", which is true and is
+        # what should be shown.
+        deleted, _ = LadderEntry.objects.filter(series=series, season=season).delete()
+        if deleted:
+            logger.info(
+                "No completed %s matches in %s; cleared %s stale ladder row(s).",
+                series.name, season, deleted,
+            )
         return 0
 
     if rules.bye:
