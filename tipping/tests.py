@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import User
@@ -163,3 +166,64 @@ class FamilyLeaderboardTests(TestCase):
         self.client.force_login(solo)
         resp = self.client.get(f"/org/{loner.id}/leaderboard/")
         self.assertNotContains(resp, "scope=national")
+
+
+class MatchStatePollTests(TestCase):
+    """The in-play refresh endpoint the live badge polls.
+
+    Before this existed, scores changed in the database every two minutes and
+    never reached a page somebody already had open — the "live" badge pulsed
+    against a number that only moved on reload.
+    """
+
+    def setUp(self):
+        self.sport = Sport.objects.create(name="Poll Footy", slug="poll-footy")
+        self.series = Series.objects.create(sport=self.sport, name="Poll Series", slug="poll-series")
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(name="Poll League", season=self.season)
+        self.user = User.objects.create_user(email="p@b.com", password="x", display_name="Pat")
+        OrgMember.objects.create(user=self.user, org=self.org)
+        self.round = Round.objects.create(
+            org=self.org, round_number=1, series=self.series,
+            lockout_at=timezone.now() - timedelta(hours=1),
+        )
+        self.home = Team.objects.create(name="Reds", slug="reds", series=self.series)
+        self.away = Team.objects.create(name="Blues", slug="blues", series=self.series)
+
+    def _match(self, **kw):
+        return Match.objects.create(
+            round=self.round, home_team=self.home, away_team=self.away,
+            kickoff_at=timezone.now() - timedelta(hours=1), **kw,
+        )
+
+    def test_a_live_match_returns_its_score_and_keeps_polling(self):
+        match = self._match(
+            status=Match.STATUS_LIVE, period="Q3", clock="12:45",
+            home_score=54, away_score=41,
+        )
+        self.client.force_login(self.user)
+        r = self.client.get(reverse("tipping:match_state", args=[match.id]))
+        self.assertEqual(r.status_code, 200)
+        body = r.content.decode()
+        self.assertIn("54–41", body)
+        self.assertIn("Q3 12:45", body)
+        # Still in play, so the fragment must carry the trigger that fetches
+        # it again — otherwise the first poll is also the last.
+        self.assertIn("every 30s", body)
+
+    def test_a_finished_match_stops_polling(self):
+        """The trigger has to disappear, or a completed game keeps costing a
+        request every thirty seconds for the rest of the day."""
+        match = self._match(
+            status=Match.STATUS_COMPLETE, period="Full Time",
+            home_score=80, away_score=60, result="home",
+        )
+        self.client.force_login(self.user)
+        body = self.client.get(reverse("tipping:match_state", args=[match.id])).content.decode()
+        self.assertNotIn("every 30s", body)
+        self.assertIn("80–60", body)
+
+    def test_it_requires_a_login(self):
+        match = self._match(status=Match.STATUS_LIVE)
+        r = self.client.get(reverse("tipping:match_state", args=[match.id]))
+        self.assertEqual(r.status_code, 302)
