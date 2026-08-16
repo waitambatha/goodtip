@@ -88,7 +88,22 @@ class Command(BaseCommand):
         if opts["backfill"]:
             opts = {**opts, "fixtures": True, "results": True, "ladder": True,
                     "discover": True, "full_season": True}
+            # An umbrella run for the sweep as a whole. Its parts are recorded
+            # under their own kinds, so without this there is no row anywhere
+            # saying the sweep itself happened — and "last full-season sweep"
+            # would read "never" however often it ran.
+            from data_sync.autosync import stamp
 
+            with SyncRun.record(kind=SyncRun.KIND_BACKFILL, competition="ALL") as run:
+                run.matches_touched = self._sweep(opts)
+            # The sweep has its own systemd timer and so never goes through
+            # `claim`; without this its schedule row would read overdue forever.
+            stamp(SyncRun.KIND_BACKFILL)
+            return
+
+        self._sweep(opts)
+
+    def _sweep(self, opts) -> int:
         kinds = [k for k in ("live", "results", "fixtures", "ladder") if opts[k]]
         if not kinds:
             kinds = ["live", "results"]
@@ -107,8 +122,7 @@ class Command(BaseCommand):
         want_ladder = "ladder" in kinds
         kinds = [k for k in kinds if k != "ladder"]
         if want_ladder and not kinds:
-            self._sync_ladders(opts)
-            return
+            return self._sync_ladders(opts)
 
         # --fixtures implies discovery. Refreshing the draw is the one job whose
         # whole purpose is learning what changed upstream, and doing that from a
@@ -144,9 +158,7 @@ class Command(BaseCommand):
 
         if not plans:
             self.stdout.write("Nothing to sync — no rounds matched.")
-            if want_ladder:
-                self._sync_ladders(opts)
-            return
+            return self._sync_ladders(opts) if want_ladder else 0
 
         total = 0
         failures = 0
@@ -187,11 +199,11 @@ class Command(BaseCommand):
             self.stderr.write(self.style.WARNING(f"{msg} {failures} feed call(s) failed."))
         else:
             self.stdout.write(self.style.SUCCESS(msg))
+        return total
 
-
-
-    def _sync_ladders(self, opts) -> None:
+    def _sync_ladders(self, opts) -> int:
         seen = set()
+        written = 0
         orgs = Organisation.objects.select_related("season").prefetch_related("competitions__series")
         if opts["org"]:
             orgs = orgs.filter(pk=opts["org"])
@@ -221,10 +233,12 @@ class Command(BaseCommand):
                     try:
                         with SyncRun.record(kind="ladder", competition=name, org=org) as run:
                             run.matches_touched = svc.sync_ladder(competition=name, org=org)
+                        written += run.matches_touched
                         self.stdout.write(f"  ladder {name} {org.season.year}: {run.matches_touched} teams")
                     except SyncError as e:
                         logger.warning("ladder %s failed: %s", name, e)
                         self.stderr.write(f"  ladder {name}: {e}")
+        return written
 
     def _discovered_targets(self, opts) -> list[tuple[Organisation, int, str]]:
         """Ask each feed what it is publishing, and work from that.

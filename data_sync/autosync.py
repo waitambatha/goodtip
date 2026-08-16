@@ -89,6 +89,24 @@ def claim(kind: str) -> bool:
     return bool(claimed)
 
 
+def stamp(kind: str) -> None:
+    """Mark a kind as just-run, moving it to its next due time.
+
+    For work that runs from its OWN systemd timer rather than through the
+    run_due_syncs dispatcher — the full-season backfill — and so never goes
+    near ``claim``. Without this its SyncSchedule row would sit at a due time
+    that had long passed, and the admin panel's "next due" column would report
+    a sweep as permanently overdue while it was in fact running on schedule.
+    """
+    from .models import SyncSchedule
+
+    now = timezone.now()
+    SyncSchedule.objects.filter(kind=kind).update(
+        next_run_at=now + timedelta(seconds=ALL_INTERVALS[kind]),
+        last_started_at=now,
+    )
+
+
 def _run(kind: str) -> None:
     """Run one sync on a worker thread, then let go of the connection.
 
