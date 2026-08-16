@@ -490,3 +490,57 @@ class RegradeTests(_FixtureBase):
         self.round.save(update_fields=["stage"])
         regrade_round(self.round)
         self.assertEqual(Tip.objects.get().points_awarded, 4)
+
+
+class DiscoveryTargetingTests(_FixtureBase):
+    """Discovery has to drive RESULTS too, not just fixtures.
+
+    Targets are chosen before the sync loop runs. A backfill creates a season
+    of rounds in its fixtures pass, so choosing the results targets from the
+    database would evaluate before any of them existed — every fixture created
+    and not one of their results filled in. The bug is invisible in a steady
+    state and only bites on the run that matters most, the first one.
+    """
+
+    def test_a_discovery_run_syncs_results_for_the_rounds_it_discovers(self):
+        from unittest.mock import patch
+        from data_sync.management.commands.sync_matches import Command
+
+        cmd = Command()
+        opts = {
+            "live": False, "results": True, "fixtures": True, "ladder": False,
+            "backfill": False, "org": self.org.id, "round": None,
+            "all_rounds": False, "discover": True, "full_season": False,
+            "verbosity": 0,
+        }
+        discovered = [(self.org, 7, "AFL")]
+        with patch.object(Command, "_discovered_targets", return_value=discovered), \
+             patch.object(Command, "_targets", return_value=[]) as from_db, \
+             patch("data_sync.management.commands.sync_matches.get_sync_service") as svc:
+            svc.return_value.sync_fixtures.return_value = 0
+            svc.return_value.sync_results.return_value = 0
+            cmd.stdout = cmd.stderr = _Sink()
+            cmd.handle(**opts)
+
+        # Round 7 does not exist locally, so a database-driven lookup returns
+        # nothing — results must still have been asked for it.
+        svc.return_value.sync_results.assert_called_once()
+        self.assertEqual(svc.return_value.sync_results.call_args.kwargs["round_number"], 7)
+        from_db.assert_not_called()
+
+
+class _Sink:
+    """Swallows command output; the assertions are on the calls, not the text."""
+
+    def write(self, *a, **k):
+        pass
+
+    def flush(self):
+        pass
+
+    @property
+    def style(self):
+        return self
+
+    def __getattr__(self, _):
+        return lambda *a, **k: ""

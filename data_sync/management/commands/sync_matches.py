@@ -122,19 +122,23 @@ class Command(BaseCommand):
         else:
             discovered = []
 
-        # Targets are per KIND, not one list for the whole run. Sharing one
-        # list is what made the live poller useless: a round qualified only if
-        # a game kicked off within a few hours OR Round.status was open/locked,
-        # and since nothing ever maintained that status, across thirty-three
-        # leagues exactly one stale round matched — org 17's AFL Round 1, from
-        # March, refetched every two minutes.
+        # In DISCOVERY mode every kind works from the discovered rounds. That
+        # is the mode's whole meaning — "here are the rounds the feed
+        # publishes, sync them" — and it has to include results, because the
+        # rounds fixtures is about to create do not exist yet. Targeting
+        # results from the database instead would evaluate before a single one
+        # of them had been written, and a backfill would create a season of
+        # fixtures while filling in none of their results.
         #
-        # Each kind now asks the question it actually cares about, and both are
-        # self-healing rather than time-boxed: results keeps retrying while a
-        # played game is ungraded, however long the feed was down.
+        # Outside discovery, each kind asks the question it actually cares
+        # about. Sharing one list is what made the live poller useless: a round
+        # qualified only if a game kicked off within a few hours OR
+        # Round.status was open/locked, and since nothing ever maintained that
+        # status, across thirty-three leagues exactly one stale round matched —
+        # org 17's AFL Round 1, from March, refetched every two minutes.
         plans = []
         for kind in kinds:
-            targets = discovered if (discovering and kind == "fixtures") else self._targets(opts, kind)
+            targets = discovered if discovering else self._targets(opts, kind)
             if targets:
                 plans.append((kind, targets))
 
