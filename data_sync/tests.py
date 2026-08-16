@@ -544,3 +544,92 @@ class _Sink:
 
     def __getattr__(self, _):
         return lambda *a, **k: ""
+
+
+class NegativeCacheTests(SimpleTestCase):
+    """Missing rounds must be remembered; transient failures must not.
+
+    A full-season sweep asks each feed once per organisation. With 33 leagues
+    and a season whose draw runs to round 12, rounds 13-30 are eighteen
+    guaranteed 404s per series per org — each paying the scraper's deliberate
+    throttle. Remembering them is the difference between a sweep of minutes and
+    one of hours.
+
+    The opposite error is worse and is why these are two separate tests: a
+    cached RATE-LIMIT would make a real round look empty for the rest of the
+    run, silently losing fixtures rather than merely wasting time.
+    """
+
+    def _afl(self):
+        from unittest.mock import MagicMock
+        from data_sync.scrapers.afl import AflApiScraper
+        s = AflApiScraper()
+        s._session = MagicMock()
+        s._last_request = 0.0
+        return s
+
+    def _response(self, status):
+        from unittest.mock import MagicMock
+        r = MagicMock()
+        r.status_code = status
+        return r
+
+    def test_afl_404_is_fetched_once_then_remembered(self):
+        from data_sync.scrapers.afl import AflScrapeError
+        s = self._afl()
+        s._session.get.return_value = self._response(404)
+
+        with self.assertRaises(AflScrapeError):
+            s._get("matchItems/round/CD_R202626430")
+        # Second ask is served from cache: no fixtures, and no second request.
+        self.assertEqual(s.fixtures(series="AFLW", season=2026, round_number=30), [])
+        self.assertEqual(s._session.get.call_count, 1)
+
+    def test_afl_server_error_is_retried_not_remembered(self):
+        """A 503 is the feed having a moment, not the round being absent."""
+        from data_sync.scrapers.afl import AflScrapeError
+        s = self._afl()
+        s._session.get.return_value = self._response(503)
+
+        for _ in range(2):
+            with self.assertRaises(AflScrapeError):
+                s._get("matchItems/round/CD_R202601423")
+        self.assertEqual(s._session.get.call_count, 2)
+
+    def test_nrl_error_carries_its_status(self):
+        """The 404-vs-transient decision depends on this being populated."""
+        from unittest.mock import MagicMock, patch
+        import requests
+        from data_sync.scrapers.nrl import NrlDrawScraper, NrlScrapeError
+
+        s = NrlDrawScraper()
+        s._session = MagicMock()
+        s._last_request = 0.0
+        response = MagicMock(status_code=404)
+        s._session.get.side_effect = requests.HTTPError(response=response)
+
+        with self.assertRaises(NrlScrapeError) as caught:
+            s._fetch({"competition": 111, "season": 2027})
+        self.assertEqual(caught.exception.status, 404)
+
+    def test_nrl_404_is_remembered_but_a_rate_limit_is_not(self):
+        from unittest.mock import MagicMock
+        import requests
+        from data_sync.scrapers.nrl import NrlDrawScraper, NrlScrapeError
+
+        s = NrlDrawScraper()
+        s._session = MagicMock()
+        s._last_request = 0.0
+
+        s._session.get.side_effect = requests.HTTPError(response=MagicMock(status_code=404))
+        with self.assertRaises(NrlScrapeError):
+            s._page(competition_id=111, season=2027, round_number=None)
+        self.assertIn((111, 2027, None), s._cache)
+
+        s._session.get.side_effect = requests.HTTPError(response=MagicMock(status_code=429))
+        with self.assertRaises(NrlScrapeError):
+            s._page(competition_id=111, season=2026, round_number=9)
+        self.assertNotIn(
+            (111, 2026, 9), s._cache,
+            "a rate-limit must be retried, not remembered as an empty round",
+        )

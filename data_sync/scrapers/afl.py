@@ -120,6 +120,19 @@ class AflApiScraper:
             logger.info("afl.com.au token rejected; re-authenticating once")
             self._session = self._auth()
             return self._get(path, retry=False)
+        if r.status_code == 404:
+            # Cache the ABSENCE, not just the hit.
+            #
+            # A 404 here means "this round does not exist", which is a fact
+            # about the season and cannot change during a run. Without caching
+            # it, a full-season sweep re-asks for every non-existent round once
+            # per organisation: the AFLW draw runs to about round 12, so rounds
+            # 13-30 are eighteen guaranteed 404s, times thirty-three leagues,
+            # each paying the one-second throttle. That is nine minutes of
+            # deliberate waiting to re-learn the same nothing, per series, and
+            # it is most of why the first sweep took hours rather than minutes.
+            self._cache[path] = {}
+            raise AflScrapeError(f"afl.com.au {path} returned HTTP 404")
         if r.status_code != 200:
             raise AflScrapeError(f"afl.com.au {path} returned HTTP {r.status_code}")
         try:

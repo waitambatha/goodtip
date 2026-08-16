@@ -62,7 +62,19 @@ _MODE_TO_STATUS = {"pre": "scheduled", "live": "live", "post": "complete"}
 
 
 class NrlScrapeError(Exception):
-    pass
+    """A failed read of nrl.com.
+
+    Carries the HTTP status where there was one, because the caller needs to
+    tell "this round does not exist" (404, permanent, safe to remember) from
+    "we were paced out" (429/503, transient, must be retried). Treating the
+    two alike in either direction is a bug: remembering a rate-limit makes a
+    real round look empty for the rest of the run, and re-asking for a
+    permanent 404 wastes the throttle once per organisation.
+    """
+
+    def __init__(self, message, *, status: int | None = None):
+        super().__init__(message)
+        self.status = status
 
 
 class NrlDrawScraper:
@@ -135,7 +147,8 @@ class NrlDrawScraper:
             r = self._session.get(self.BASE, params=params, headers=self.HEADERS, timeout=self.TIMEOUT)
             r.raise_for_status()
         except requests.RequestException as e:
-            raise NrlScrapeError(f"nrl.com request failed: {e}") from e
+            status = getattr(getattr(e, "response", None), "status_code", None)
+            raise NrlScrapeError(f"nrl.com request failed: {e}", status=status) from e
 
         # Bounced to the login: the session went stale or we were paced out.
         # One re-warm and retry, then give up rather than hammering.
@@ -154,7 +167,25 @@ class NrlDrawScraper:
         params = {"competition": competition_id, "season": season}
         if round_number is not None:
             params["round"] = round_number
-        text = self._fetch(params)
+        try:
+            text = self._fetch(params)
+        except NrlScrapeError as e:
+            # Cache the absence, but ONLY for a 404.
+            #
+            # A 404 means this competition/season/round is not published, which
+            # cannot change mid-run — and a sweep asks once per organisation,
+            # so without remembering it the same missing page is re-fetched
+            # thirty-three times, each paying the six-second pacing nrl.com
+            # requires. That is over three minutes of waiting to re-learn one
+            # nothing, and the 2027 season is entirely nothings.
+            #
+            # Anything else (429, 503, a timeout) is transient and must NOT be
+            # remembered: caching a rate-limit would make a real round look
+            # empty for the rest of the run, which is the failure that quietly
+            # loses fixtures rather than the one that merely wastes time.
+            if e.status == 404:
+                self._cache[key] = {}
+            raise
 
         m = self._Q_DATA.search(text)
         if not m:
