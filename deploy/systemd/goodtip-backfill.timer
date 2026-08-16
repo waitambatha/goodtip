@@ -1,0 +1,19 @@
+[Unit]
+Description=GoodTip — sweep every round of every competition, four times a day
+
+[Timer]
+# Six-hourly. The fast syncs already keep today correct, so this only has to
+# catch what they structurally cannot: a round published outside their window,
+# a fixture added mid-season, a result revised weeks later. Six hours is short
+# enough that no gap survives a day and long enough that the feeds are not
+# being swept for the sake of it.
+OnBootSec=15min
+OnUnitActiveSec=6h
+RandomizedDelaySec=300
+AccuracySec=60
+# So a server that was off over the weekend sweeps once on the way back up
+# rather than waiting out a fresh six hours with the holes still in place.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -38,6 +38,11 @@ class Command(BaseCommand):
         # Fixtures first: live and results ask about rounds that a fixtures run
         # may be about to create, so the other order wastes a whole tick.
         # Ladder last: it reflects results, so grade first then read standings.
+        #
+        # The full-season backfill is NOT here. It runs from its own timer
+        # (goodtip-backfill) because these kinds run sequentially in one
+        # process, and a sweep of every round of every series would hold the
+        # two-minute live poller behind it for as long as it took.
         order = ["fixtures", "results", "live", "ladder"]
         ran = []
         for kind in order:

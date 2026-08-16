@@ -8,8 +8,24 @@ Three shapes, one per phase:
 
 Venue and city come from match.venue_label so the ground shows everywhere the
 fixture does.
+
+REFRESHING ITSELF
+The server pulls in-play scores every two minutes, and until now none of that
+reached a page somebody already had open: the score changed in the database and
+the reader watched a stale number until they thought to reload. A live badge
+that never moves is worse than no live badge.
+
+So a match in play re-fetches just this block. The poll is on the block rather
+than the page because this is the only part that changes mid-game, and it stops
+on its own — once the fixture is complete the response comes back without a
+trigger, so a finished game costs nothing for the rest of the day.
+
+Thirty seconds against a two-minute feed cadence: fast enough that a score is
+never more than one poll behind the sync, slow enough to stay cheap.
 {% endcomment %}
-<div class="ms ms-{{ match.phase }}">
+<div class="ms ms-{{ match.phase }}"
+     {% if match.phase == "live" %}hx-get="{% url 'tipping:match_state' match.id %}"
+     hx-trigger="every 30s" hx-swap="outerHTML"{% endif %}>
   {% if match.phase == "live" %}
     <span class="ms-badge live"><i class="ms-dot"></i>{% if match.live_label %}{{ match.live_label }}{% else %}Live{% endif %}</span>
     {% if match.score_line %}<span class="ms-score">{{ match.score_line }}</span>{% endif %}

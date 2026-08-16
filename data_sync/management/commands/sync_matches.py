@@ -58,6 +58,11 @@ class Command(BaseCommand):
         parser.add_argument("--results", action="store_true", help="Pull final scores and grade tips.")
         parser.add_argument("--fixtures", action="store_true", help="Refresh the draw (kickoffs, venues).")
         parser.add_argument("--ladder", action="store_true", help="Refresh competition ladders/standings.")
+        parser.add_argument(
+            "--backfill", action="store_true",
+            help="Full-season sweep: every round the feeds publish, fixtures then "
+                 "results then ladder. Fills gaps the rolling window can never reach.",
+        )
         parser.add_argument("--org", type=int, help="Limit to one organisation id.")
         parser.add_argument("--round", type=int, help="Limit to one round number.")
         parser.add_argument(
@@ -70,14 +75,19 @@ class Command(BaseCommand):
                  "Required to pick up rounds and games not yet in the database.",
         )
         parser.add_argument(
-            "--probe-nrl", action="store_true",
-            help="Print one raw NRL game from API-SPORTS and stop. Use this to "
-                 "confirm the field mapping once a key is configured.",
+            "--full-season", action="store_true",
+            help="With --discover/--fixtures, ask the feeds for EVERY round they "
+                 "publish rather than the rounds around today.",
         )
 
     def handle(self, *args, **opts):
-        if opts["probe_nrl"]:
-            return self._probe_nrl(opts)
+        # --backfill is the whole job in one flag, because the ordering matters
+        # and getting it wrong quietly does nothing: fixtures have to exist
+        # before results can grade them, and results have to be in before the
+        # ladder reads them.
+        if opts["backfill"]:
+            opts = {**opts, "fixtures": True, "results": True, "ladder": True,
+                    "discover": True, "full_season": True}
 
         kinds = [k for k in ("live", "results", "fixtures", "ladder") if opts[k]]
         if not kinds:
@@ -88,37 +98,62 @@ class Command(BaseCommand):
         # target — otherwise ten leagues on AFL 2026 would write the same 18
         # rows ten times.
         #
-        # It also has to run BEFORE the round targeting below. Standings do not
-        # depend on a round existing, but the "no rounds matched" guard returns
-        # early — so a lone --ladder run was exiting before it did anything.
-        if "ladder" in kinds:
-            kinds = [k for k in kinds if k != "ladder"]
+        # It is also taken out of `kinds` entirely and run at the END, after
+        # results. Standings are derived from results, so reading them first
+        # gives a table that is one sync behind the scores on the same page.
+        # A lone --ladder run must still work, which is why it cannot simply be
+        # left to the round-targeting below: that returns early on "no rounds
+        # matched", and standings do not need a round to exist.
+        want_ladder = "ladder" in kinds
+        kinds = [k for k in kinds if k != "ladder"]
+        if want_ladder and not kinds:
             self._sync_ladders(opts)
-            if not kinds:
-                return
+            return
 
         # --fixtures implies discovery. Refreshing the draw is the one job whose
         # whole purpose is learning what changed upstream, and doing that from a
         # list of rounds we already hold can only ever confirm what we knew.
-        if opts["discover"] or "fixtures" in kinds:
-            targets = self._discovered_targets(opts)
+        discovering = opts["discover"] or "fixtures" in kinds
+        if discovering:
+            discovered = self._discovered_targets(opts)
             # Fixtures must run first, or live/results are asked about rounds
             # that this same invocation is about to create.
             kinds = ["fixtures"] + [k for k in kinds if k != "fixtures"]
         else:
-            targets = self._targets(opts)
-        if not targets:
+            discovered = []
+
+        # Targets are per KIND, not one list for the whole run. Sharing one
+        # list is what made the live poller useless: a round qualified only if
+        # a game kicked off within a few hours OR Round.status was open/locked,
+        # and since nothing ever maintained that status, across thirty-three
+        # leagues exactly one stale round matched — org 17's AFL Round 1, from
+        # March, refetched every two minutes.
+        #
+        # Each kind now asks the question it actually cares about, and both are
+        # self-healing rather than time-boxed: results keeps retrying while a
+        # played game is ungraded, however long the feed was down.
+        plans = []
+        for kind in kinds:
+            targets = discovered if (discovering and kind == "fixtures") else self._targets(opts, kind)
+            if targets:
+                plans.append((kind, targets))
+
+        if not plans:
             self.stdout.write("Nothing to sync — no rounds matched.")
+            if want_ladder:
+                self._sync_ladders(opts)
             return
 
         total = 0
         failures = 0
+        pairs = set()
         # One service instance per competition for the whole run. Building a
         # fresh one per target threw away its response cache every time, which
         # is what made a full sync issue the same feed request once per league.
         services: dict = {}
-        for kind in kinds:
+        for kind, targets in plans:
             for org, round_number, competition in targets:
+                pairs.add((org.id, round_number, competition))
                 try:
                     with SyncRun.record(
                         kind=kind, competition=competition, org=org, round_number=round_number,
@@ -139,7 +174,11 @@ class Command(BaseCommand):
                                    kind, competition, round_number, org.id, e)
                     self.stderr.write(f"  {kind} {competition} R{round_number} {org.name}: {e}")
 
-        msg = f"Synced {total} match update(s) across {len(targets)} round/org pair(s)."
+        # Last, so the standings reflect the results this same run just graded.
+        if want_ladder:
+            self._sync_ladders(opts)
+
+        msg = f"Synced {total} match update(s) across {len(pairs)} round/org pair(s)."
         if failures:
             self.stderr.write(self.style.WARNING(f"{msg} {failures} feed call(s) failed."))
         else:
@@ -182,53 +221,6 @@ class Command(BaseCommand):
                     except SyncError as e:
                         logger.warning("ladder %s failed: %s", name, e)
                         self.stderr.write(f"  ladder {name}: {e}")
-
-    def _probe_nrl(self, opts):
-        """Dump one real game so the mapping can be checked against a payload.
-
-        The rest of the NRL client was written without a key, so the envelope is
-        verified but the per-game field names are from API-SPORTS' published
-        rugby schema rather than from something observed. This is how that gets
-        settled in one command rather than by a failing sync at 3am.
-        """
-        import json
-
-        from data_sync.services import ApiSportsRugbySyncService
-
-        org = None
-        if opts["org"]:
-            org = Organisation.objects.select_related("season").filter(pk=opts["org"]).first()
-        if org is None:
-            org = Organisation.objects.select_related("season").order_by("pk").first()
-        if org is None:
-            self.stderr.write("No organisation to probe with.")
-            return
-
-        svc = ApiSportsRugbySyncService()
-        try:
-            self.stdout.write(f"League id: {svc._nrl_league_id()}")
-            games = svc._games(org)
-        except SyncError as e:
-            self.stderr.write(self.style.ERROR(str(e)))
-            return
-
-        self.stdout.write(f"Season {org.season.year}: {len(games)} game(s) returned.")
-        if not games:
-            return
-        g = games[0]
-        self.stdout.write("\n--- raw game[0] ---")
-        self.stdout.write(json.dumps(g, indent=2, default=str)[:4000])
-        self.stdout.write("\n--- as this client reads it ---")
-        self.stdout.write(f"  round      -> {svc._round_number(g)}")
-        self.stdout.write(f"  scores     -> {svc._scores(g)}")
-        self.stdout.write(f"  status     -> {(g.get('status') or {})}")
-        _, home, away = svc._teams(g)
-        self.stdout.write(f"  home/away  -> {home} / {away}")
-        if not home or not away:
-            self.stdout.write(self.style.WARNING(
-                "  Teams did not resolve — add the feed's spellings to "
-                "TEAM_SLUG_ALIASES or seed the NRL teams."
-            ))
 
     def _discovered_targets(self, opts) -> list[tuple[Organisation, int, str]]:
         """Ask each feed what it is publishing, and work from that.
@@ -278,7 +270,10 @@ class Command(BaseCommand):
                 if discover is None:
                     continue
                 try:
-                    numbers = discover(competition=comp_name, org=org)
+                    numbers = discover(
+                        competition=comp_name, org=org,
+                        full_season=opts.get("full_season", False),
+                    )
                 except SyncError as e:
                     # A feed that is down or unimplemented must not stop the
                     # others; it is reported, not fatal.
@@ -294,13 +289,28 @@ class Command(BaseCommand):
                         targets.append((org, n, comp_name))
         return targets
 
-    def _targets(self, opts) -> list[tuple[Organisation, int, str]]:
-        """Work out which (org, round, competition) triples to hit.
+    def _targets(self, opts, kind: str) -> list[tuple[Organisation, int, str]]:
+        """Which (org, round, competition) triples this KIND needs to hit.
 
         A Round knows its Series; the feeds are keyed by Competition. Those
         two names coincide for AFL and NRL and differ for everything else, so
         the series is resolved through competition_for_series rather than
         being upper-cased and hoped for.
+
+        The selection depends on what is being synced, because the two jobs are
+        asking genuinely different questions:
+
+        live      Is anything in play? A narrow window around kickoff, plus any
+                  fixture already flagged live — a game that runs long is still
+                  live an hour after the window would have closed.
+
+        results   Is anything played but ungraded? No time window at all. The
+                  old rule only looked a few hours either side of kickoff, so a
+                  feed outage across that window meant those games were never
+                  graded — the sync would simply stop asking. Keyed on the
+                  outstanding work instead, it retries until the result lands,
+                  and costs nothing once everything is graded because the set
+                  is then empty.
         """
         rounds = Round.objects.select_related("org", "series", "org__season")
 
@@ -311,16 +321,23 @@ class Command(BaseCommand):
 
         if not opts["all_rounds"] and not opts["round"]:
             now = timezone.now()
-            # A round is interesting if any of its matches kicked off recently
-            # or is about to. Cheaper and more accurate than guessing from the
-            # round's lockout alone, which only marks the first game.
-            window = Match.objects.filter(
-                kickoff_at__gte=now - timedelta(hours=LIVE_WINDOW_HOURS_AFTER),
-                kickoff_at__lte=now + timedelta(hours=LIVE_WINDOW_HOURS_BEFORE),
-            ).values("round_id")
-            rounds = rounds.filter(
-                Q(id__in=window) | Q(status__in=("open", "locked")),
-            )
+            if kind == "results":
+                # Kicked off, not complete. That is the definition of "we owe
+                # this round a result", and it stays true until we deliver one.
+                outstanding = Match.objects.filter(
+                    kickoff_at__lte=now,
+                ).exclude(status=Match.STATUS_COMPLETE).values("round_id")
+                rounds = rounds.filter(id__in=outstanding)
+            else:
+                # A round is in play if any of its matches kicked off recently
+                # or is about to. More accurate than guessing from the round's
+                # lockout alone, which only marks the first game.
+                window = Match.objects.filter(
+                    kickoff_at__gte=now - timedelta(hours=LIVE_WINDOW_HOURS_AFTER),
+                    kickoff_at__lte=now + timedelta(hours=LIVE_WINDOW_HOURS_BEFORE),
+                ).values("round_id")
+                in_play = Match.objects.filter(status=Match.STATUS_LIVE).values("round_id")
+                rounds = rounds.filter(Q(id__in=window) | Q(id__in=in_play))
 
         seen = set()
         targets = []

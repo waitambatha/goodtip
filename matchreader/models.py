@@ -12,13 +12,24 @@ from django.db import models
 
 
 class HistoricalMatch(models.Model):
-    """One real-world game, stored once, used for fitting and validation."""
+    """One real-world game, stored once, used for fitting and validation.
+
+    Also the source the competition ladder is derived from — it is the only
+    table holding whole seasons independent of who tipped them.
+    """
+
+    STAGE_REGULAR = "regular"
+    STAGE_FINALS = "finals"
+    STAGE_CHOICES = [(STAGE_REGULAR, "Regular season"), (STAGE_FINALS, "Finals")]
 
     series = models.ForeignKey(
         "catalog.Series", on_delete=models.CASCADE, related_name="historical_matches"
     )
     season = models.PositiveIntegerField()
     round_number = models.PositiveIntegerField()
+    # Finals must stay off the ladder — a ladder is the regular-season table,
+    # and it is what decides who plays finals in the first place.
+    stage = models.CharField(max_length=10, choices=STAGE_CHOICES, default=STAGE_REGULAR)
     external_id = models.CharField(max_length=100)
     home_team = models.ForeignKey(
         "tipping.Team", on_delete=models.CASCADE, related_name="historical_home"
@@ -31,9 +42,21 @@ class HistoricalMatch(models.Model):
     away_score = models.IntegerField()
 
     class Meta:
-        # One row per real fixture. The scraper is re-run to top up recent
-        # seasons, so this is what keeps a backfill idempotent.
-        unique_together = [("series", "external_id")]
+        # TWO uniqueness rules, because one was not enough.
+        #
+        # (series, external_id) keeps a re-run of the same source idempotent.
+        # It does NOT survive a change of source: Sportradar ids
+        # ("sr:sport_event:45559680") and afl.com.au ids ("CD_M20240140101")
+        # describe the same game under different schemes, so backfilling AFL
+        # 2024 from both stored every fixture twice — 422 rows for a 207-game
+        # season — and MatchReader was fitted on the doubled history.
+        #
+        # The natural key is what actually identifies a game: these two clubs,
+        # that round, that season. It holds across any source.
+        unique_together = [
+            ("series", "external_id"),
+            ("series", "season", "round_number", "home_team", "away_team"),
+        ]
         indexes = [
             models.Index(fields=["series", "season", "round_number"]),
             models.Index(fields=["kickoff_at"]),

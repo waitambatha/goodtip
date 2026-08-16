@@ -29,12 +29,36 @@ from django.utils import timezone
 logger = logging.getLogger("data_sync")
 
 # How often each kind should run, in seconds. Mirrors the cron cadences.
+#
+# These are the FAST kinds: they work from a window around today, finish in
+# seconds to a couple of minutes, and share the two-minute scheduler tick.
 INTERVALS = {
     "live": 120,       # in-play score and clock
     "results": 900,    # final scores; this is what grades tips
-    "fixtures": 3600,  # discovery: new rounds and games
+    "fixtures": 3600,  # discovery: new rounds and games, around today
     "ladder": 1800,    # standings only move when a game finishes
 }
+
+# The full-season sweep, on its own cadence and its own systemd unit.
+#
+# Every kind above works from a window around today, which keeps this week
+# correct and can never repair a round that fell outside the window when it
+# mattered — the live database held AFL 2026 rounds 1-5 and 21-25 with a
+# permanent hole in between for exactly that reason. This one asks each feed
+# for every round it publishes, so a hole closes itself within six hours
+# instead of never.
+#
+# It is kept OUT of INTERVALS deliberately. run_due_syncs runs its kinds
+# sequentially in one oneshot process, so a slow sweep sharing that unit would
+# hold up the two-minute live poller behind it for as long as it ran. Separate
+# unit, separate timeout, separate failure in the journal.
+SLOW_INTERVALS = {
+    "backfill": 21600,
+}
+
+# Everything claimable, fast and slow. claim() reads this; the schedulers read
+# the two halves separately.
+ALL_INTERVALS = {**INTERVALS, **SLOW_INTERVALS}
 
 # Process-local throttle: the cheapest check is the one that never reaches the
 # database. Nothing can be due sooner than the shortest interval, so there is no
@@ -55,7 +79,7 @@ def claim(kind: str) -> bool:
     from .models import SyncSchedule
 
     now = timezone.now()
-    interval = INTERVALS[kind]
+    interval = ALL_INTERVALS[kind]
     with transaction.atomic():
         claimed = (
             SyncSchedule.objects.filter(kind=kind, next_run_at__lte=now)

@@ -85,6 +85,27 @@ def _recalculate_tips_for_match(match: Match) -> int:
     return updated
 
 
+@transaction.atomic
+def regrade_round(round_obj: Round) -> int:
+    """Re-award points for every graded match in a round. Returns tips changed.
+
+    Needed because what a correct tip is WORTH is a property of the round —
+    1 regular, 2 finals, 4 for State of Origin — while ``points_awarded`` is
+    frozen onto the Tip at the moment it was graded. Correcting a round's stage
+    after its games have been played therefore changes nothing on its own, and
+    the leaderboard keeps paying the old rate for the rest of the season.
+
+    That is not a hypothetical: every State of Origin round in the live
+    database was created on the "regular" default, so the prestige series that
+    is meant to be worth quadruple was paying single, and simply setting the
+    stage correctly would not have moved a single member's score.
+    """
+    updated = 0
+    for match in round_obj.matches.filter(result__isnull=False):
+        updated += _recalculate_tips_for_match(match)
+    return updated
+
+
 def competition_filter(org, wanted_slugs):
     """(chips, series to filter by) for the competition filter.
 

@@ -1,0 +1,29 @@
+[Unit]
+# The full-season sweep: every round every feed publishes, fixtures then
+# results then ladder.
+#
+# Separate from goodtip-matchsync because that unit runs its kinds one after
+# another in a single oneshot process on a two-minute tick. A sweep of every
+# round of every series takes far longer than two minutes on its first pass, so
+# sharing the unit would park the live score poller behind it.
+#
+# What it is FOR: goodtip-matchsync works from a window around today, which
+# keeps this week right and can never repair a round that fell outside the
+# window when it ran. That is how the database ended up holding AFL 2026 rounds
+# 1-5 and 21-25 with a permanent hole in between. This closes any such hole
+# within six hours.
+Description=GoodTip — full-season fixture and result backfill
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=mbatha-goodtip
+WorkingDirectory=/home/mbatha-goodtip/projects/goodtip
+ExecStart=/home/mbatha-goodtip/projects/goodtip/venv/bin/python manage.py sync_matches --backfill
+# Generous, because the first run has a whole season of every series to create
+# and the database is remote. Later runs are far quicker: the syncs write only
+# what actually changed, so a sweep with nothing to fix is mostly reads.
+TimeoutStartSec=7200
+StandardOutput=journal
+StandardError=journal

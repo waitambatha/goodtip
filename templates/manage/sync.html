@@ -22,23 +22,17 @@
   <div class="gt-prov ok">
     <span class="gpv-ic"><svg><use href="#ic-spark"/></svg></span>
     <div>
-      <div class="gpv-top"><h3>Squiggle</h3><span class="gt-chip ready">Ready</span></div>
-      <p>AFL &amp; AFLW &middot; free public API, no key required.</p>
+      <div class="gpv-top"><h3>afl.com.au</h3><span class="gt-chip ready">Ready</span></div>
+      <p>AFL &amp; AFLW &middot; read from the AFL's own site, no key required.</p>
       <span class="gpv-state"><svg><use href="#ic-check"/></svg> Connected</span>
     </div>
   </div>
-  <div class="gt-prov {% if thesports_ready %}ok{% else %}wait{% endif %}">
-    <span class="gpv-ic"><svg><use href="#ic-lock"/></svg></span>
+  <div class="gt-prov ok">
+    <span class="gpv-ic"><svg><use href="#ic-spark"/></svg></span>
     <div>
-      <div class="gpv-top"><h3>TheSports API</h3>
-        {% if thesports_ready %}<span class="gt-chip ready">Ready</span>{% else %}<span class="gt-chip needs">Key needed</span>{% endif %}
-      </div>
-      <p>NRL &amp; NRLW &middot; add <code>THESPORTS_API_KEY</code> to <code>.env</code>.</p>
-      {% if thesports_ready %}
-        <span class="gpv-state"><svg><use href="#ic-check"/></svg> Connected</span>
-      {% else %}
-        <span class="gpv-state"><svg><use href="#ic-flag"/></svg> Not connected</span>
-      {% endif %}
+      <div class="gpv-top"><h3>nrl.com</h3><span class="gt-chip ready">Ready</span></div>
+      <p>NRL, NRLW &amp; State of Origin &middot; read from the NRL's own draw, no key required.</p>
+      <span class="gpv-state"><svg><use href="#ic-check"/></svg> Connected</span>
     </div>
   </div>
 </div>
@@ -140,25 +134,76 @@
         <b>{% if last_results %}{{ last_results.started_at|timesince }} ago{% else %}never{% endif %}</b></div>
       <div class="gsc-row"><span>Fixtures</span>
         <b>{% if last_fixtures %}{{ last_fixtures.started_at|timesince }} ago{% else %}never{% endif %}</b></div>
+      <div class="gsc-row"><span>Ladder</span>
+        <b>{% if last_ladder %}{{ last_ladder.started_at|timesince }} ago{% else %}never{% endif %}</b></div>
+      <div class="gsc-row"><span>Full-season sweep</span>
+        <b>{% if last_backfill %}{{ last_backfill.started_at|timesince }} ago{% else %}never{% endif %}</b></div>
 
       {% if recent_runs %}
       <hr style="border:0;border-top:1px solid var(--gt-hair);margin:18px 0 12px;">
       <div class="gt-listwrap">
         <div class="gt-scroll" style="max-height:230px;">
           {% for run in recent_runs %}
+          {% comment %}
+          Three states, not two. `ok` is False until a run closes, so reading it
+          alone painted every healthy in-flight sync red — the panel cried wolf
+          on the normal case, which is how you stop believing it on a real one.
+          {% endcomment %}
           <div class="gsc-row" style="font-size:12px;">
             <span>{{ run.started_at|date:"j M H:i" }} &middot; {{ run.get_kind_display }} {{ run.competition }}{% if run.round_number %} R{{ run.round_number }}{% endif %}</span>
-            <b style="color:{% if run.ok %}var(--forest){% else %}#C0392B{% endif %};">{% if run.ok %}{{ run.matches_touched }}{% else %}failed{% endif %}</b>
+            {% if run.state == "ok" %}
+              <b style="color:var(--forest);">{{ run.matches_touched }}</b>
+            {% elif run.is_stuck %}
+              <b style="color:#C0392B;">stalled</b>
+            {% elif run.state == "running" %}
+              <b style="color:var(--ink);opacity:.6;">running</b>
+            {% else %}
+              <b style="color:#C0392B;" title="{{ run.message }}">failed</b>
+            {% endif %}
           </div>
           {% endfor %}
         </div>
       </div>
       {% endif %}
 
+      {% if schedules %}
+      <hr style="border:0;border-top:1px solid var(--gt-hair);margin:18px 0 12px;">
+      <h3 style="font-family:var(--mark);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:11.5px;color:var(--ink);margin-bottom:12px;">Next due</h3>
+      {% for s in schedules %}
+      <div class="gsc-row" style="font-size:12px;"><span>{{ s.get_kind_display }}</span>
+        <b>{{ s.next_run_at|timeuntil }}</b></div>
+      {% endfor %}
+      {% endif %}
+
       <p class="card-lead" style="margin-top:14px;font-size:12px;">
-        Scheduled by <code>manage.py sync_matches</code>, live every 2 min,
-        results every 15, fixtures nightly. See DEPLOYMENT.md.
+        Scheduled on the server's own clock, not on visitor traffic: live every
+        2 min, results every 15, fixtures hourly, ladder every 30 min, and a
+        full-season sweep every 6 hours. See DEPLOYMENT.md.
       </p>
+    </section>
+
+    {% comment %}
+    Coverage, which is the question the freshness stamps above cannot answer.
+    A sync can run every two minutes, report success every time, and still be
+    leaving half a season unfetched — that is precisely what was happening, and
+    nothing on this page would have shown it.
+    {% endcomment %}
+    <section class="gt-panel" style="margin-top:18px;">
+      <h2 style="font-family:var(--mark);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:12.5px;color:var(--ink);margin-bottom:18px;">Coverage this season</h2>
+      {% for c in coverage %}
+      <div class="gsc-row" style="font-size:12.5px;align-items:flex-start;">
+        <span>
+          <b>{{ c.series.name }}</b>
+          {% if not c.feed %}<br><small style="color:#C0392B;">No feed &mdash; fixtures cannot be fetched</small>
+          {% elif c.missing %}<br><small style="color:#C0392B;">Missing rounds {{ c.missing|join:", " }}</small>
+          {% endif %}
+        </span>
+        <b style="text-align:right;white-space:nowrap;">
+          {{ c.rounds }} rnd<br>
+          <small style="font-weight:400;opacity:.7;">{{ c.results }} results &middot; {{ c.ladder }} on ladder</small>
+        </b>
+      </div>
+      {% endfor %}
     </section>
   </aside>
 </div>

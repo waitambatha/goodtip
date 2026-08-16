@@ -8,7 +8,7 @@ from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 
 from catalog.models import Charity, Competition, Season, Series, Sport
-from data_sync.models import SyncRun
+from data_sync.models import SyncRun, SyncSchedule
 from data_sync.services import get_sync_service, SyncError
 from orgs.forms import _unique_charity_slug
 from orgs.models import MembershipRequest, OrgMember, Organisation
@@ -256,15 +256,69 @@ def sync_panel(request):
     orgs = Organisation.objects.select_related("season").all()
     return render(request, "manage/sync.html", {
         "orgs": orgs,
-        # Squiggle needs no key; TheSports does, so the panel shows its real state.
-        "thesports_ready": bool(settings.THESPORTS_API_KEY),
+        # No feed needs a key any more — both sources are scraped. Kept true so
+        # the template's "feed configured" branch stays correct without needing
+        # a change in two places; what actually matters now is the freshness
+        # below, which reports whether the scrapers are still working.
+        "thesports_ready": True,
         # Freshness per feed kind, so "are the games up to date?" is answerable
         # from the panel rather than from the server logs.
         "last_live": SyncRun.last_success(kind=SyncRun.KIND_LIVE),
         "last_results": SyncRun.last_success(kind=SyncRun.KIND_RESULTS),
         "last_fixtures": SyncRun.last_success(kind=SyncRun.KIND_FIXTURES),
+        "last_ladder": SyncRun.last_success(kind=SyncRun.KIND_LADDER),
+        "last_backfill": SyncRun.last_success(kind=SyncRun.KIND_BACKFILL),
         "recent_runs": SyncRun.objects.select_related("org")[:12],
+        # What the scheduler thinks it should be doing, and what each feed
+        # actually holds. Freshness stamps alone answer "did it run", never
+        # "is the data complete" — and the season-long holes that made every
+        # ladder wrong were invisible precisely because every run said ok.
+        "schedules": SyncSchedule.objects.all(),
+        "coverage": _feed_coverage(),
     })
+
+
+def _feed_coverage():
+    """Per-series: rounds held, results in, and whether a feed exists at all.
+
+    Built for the question the freshness stamps cannot answer — "is anything
+    missing?" A sync that runs every two minutes and reports success can still
+    be leaving half a season unfetched, which is exactly what was happening.
+
+    Series with no feed are listed rather than hidden. Six leagues are signed
+    up to Super League and Super Netball, which have no scraper and no teams,
+    so their fixtures are never coming; saying so here is the difference
+    between a known limitation and a bug somebody rediscovers every month.
+    """
+    from catalog.models import Series
+    from data_sync.services import competition_for_series
+    from matchreader.models import HistoricalMatch
+    from tipping.models import LadderEntry, Round
+
+    season = Season.objects.order_by("-year").first()
+    rows = []
+    for series in Series.objects.select_related("sport").order_by("name"):
+        feed = competition_for_series(series.name)
+        numbers = sorted(set(
+            Round.objects.filter(series=series, org__season=season)
+            .values_list("round_number", flat=True)
+        ))
+        held = len(numbers)
+        # A hole is a round number the feed skipped over — present on either
+        # side, absent in the middle. That is the shape the rolling-window
+        # discovery used to leave behind, so it is worth naming precisely.
+        missing = [n for n in range(1, max(numbers) + 1) if n not in numbers] if numbers else []
+        rows.append({
+            "series": series,
+            "feed": feed,
+            "rounds": held,
+            "missing": missing,
+            "results": HistoricalMatch.objects.filter(
+                series=series, season=season.year if season else 0
+            ).count(),
+            "ladder": LadderEntry.objects.filter(series=series, season=season).count(),
+        })
+    return rows
 
 
 # ---------------------------------------------------------------------------

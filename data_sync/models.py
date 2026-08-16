@@ -15,11 +15,13 @@ class SyncRun(models.Model):
     KIND_RESULTS = "results"
     KIND_LIVE = "live"
     KIND_LADDER = "ladder"
+    KIND_BACKFILL = "backfill"
     KIND_CHOICES = [
         (KIND_FIXTURES, "Fixtures"),
         (KIND_RESULTS, "Results"),
         (KIND_LIVE, "Live scores"),
         (KIND_LADDER, "Ladder"),
+        (KIND_BACKFILL, "Full-season backfill"),
     ]
 
     kind = models.CharField(max_length=10, choices=KIND_CHOICES)
@@ -54,6 +56,36 @@ class SyncRun(models.Model):
         if not self.finished_at:
             return None
         return int((self.finished_at - self.started_at).total_seconds() * 1000)
+
+    @property
+    def state(self) -> str:
+        """"running", "ok" or "failed" — THREE outcomes, not two.
+
+        ``ok`` starts False and only becomes True when the run closes, so a run
+        still in progress is indistinguishable from a failed one if you read
+        that field alone. The sync panel did exactly that and reported healthy
+        in-flight syncs as failures, which is the worst kind of monitoring: it
+        cries wolf on the normal case and you stop believing it on the real one.
+
+        ``finished_at`` is what separates them, because the recorder sets it in
+        a finally-style exit whether or not the sync raised.
+        """
+        if self.finished_at is None:
+            return "running"
+        return "ok" if self.ok else "failed"
+
+    @property
+    def is_stuck(self) -> bool:
+        """Open far longer than any sync legitimately takes.
+
+        A process killed mid-run — a deploy, an OOM, a systemd timeout — leaves
+        its row open forever, and "running" would then be a lie that never
+        resolves. Anything past an hour is wreckage, not work: the slowest kind
+        is the full-season backfill and it has its own two-hour ceiling.
+        """
+        if self.finished_at is not None:
+            return False
+        return (timezone.now() - self.started_at).total_seconds() > 3600
 
     @classmethod
     def last_success(cls, kind: str | None = None, competition: str | None = None):

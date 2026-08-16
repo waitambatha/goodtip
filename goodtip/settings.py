@@ -133,10 +133,12 @@ LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "landing"
 
-# --- Sportradar sports data -------------------------------------------------
-# Trial key, expires 11 Sep 2026 (client doc, 12 Aug 2026). Never in source.
-SPORTRADAR_API_KEY = os.environ.get("SPORTRADAR_API_KEY", "")
-SPORTRADAR_TRIAL_EXPIRES = os.environ.get("SPORTRADAR_TRIAL_EXPIRES", "")
+# --- Sports data -------------------------------------------------------------
+# There are no keys here on purpose. Fixtures, live scores and results come
+# from nrl.com and afl.com.au directly (data_sync/scrapers/), and the ladder is
+# derived from those results rather than fetched. Sportradar's trial key,
+# Squiggle and API-SPORTS were all removed on 14 Aug 2026 — see
+# data_sync/services.get_sync_service for why each one went.
 
 # Postmark is the transactional email provider. The token lives only in .env.
 POSTMARK_SERVER_TOKEN = os.environ.get("POSTMARK_SERVER_TOKEN", "")
@@ -196,16 +198,11 @@ SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://goodtip.com.au")
 # writer lives in orgs/recaps.py and runs off the database. Nothing to key,
 # nothing to bill, nothing to be down.
 
-# NRL fixtures, scores and results come from API-SPORTS (v1.rugby.api-sports.io).
-# THESPORTS_API_KEY is the old name, kept as a fallback so an existing .env keeps
-# working — the host it was written for (api.thesportsapi.com) has no DNS record
-# and never did, so nothing can be depending on the old client.
-APISPORTS_KEY = os.environ.get("APISPORTS_KEY") or os.environ.get("THESPORTS_API_KEY", "")
-THESPORTS_API_KEY = APISPORTS_KEY  # legacy alias
-# The NRL's league id within API-SPORTS' rugby catalogue. Discovered from
-# /leagues on first use when left unset, then worth pinning here to save a
-# request per sync.
-APISPORTS_NRL_LEAGUE_ID = os.environ.get("APISPORTS_NRL_LEAGUE_ID", "")
+# NRL fixtures, scores and results come from nrl.com's own draw page — see
+# data_sync/scrapers/nrl.py. There is no key and no API-SPORTS settings block
+# any more: that client needed a paid key that was never issued, so it never
+# ran once, and it was removed on 14 Aug 2026 along with Sportradar and
+# Squiggle.
 
 # Stripe (Phase 1: single-destination platform-fee charges via Checkout).
 # Left blank until test/live keys are supplied — billing stays dormant if unset.

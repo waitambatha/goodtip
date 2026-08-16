@@ -250,10 +250,19 @@ class LadderEntry(models.Model):
     That also means the sync fetches it once per competition per season instead
     of once per league.
 
-    Refreshed wholesale from the feed: the provider computes rank, percentage
-    and premiership points under rules that differ per competition (percentage
-    in the AFL, for-and-against in the NRL), and recomputing them locally would
-    be a second implementation to keep in step for no gain.
+    DERIVED, not fetched. Rank, points and percentage are computed from our own
+    completed Match rows by ``data_sync.ladder``, under per-code rules (4 points
+    a win and percentage in the AFL; 2 points a win, 2 for a bye and
+    for-and-against in the NRL).
+
+    It used to be fetched, and the comment here used to argue that recomputing
+    locally would be a second implementation for no gain. That was wrong twice
+    over: it made standings the only thing in the app that needed a third-party
+    API, and the NRL had no ladder at all because nobody served one we could
+    read. The arithmetic is a dozen lines and the results are already ours.
+
+    Rebuilt wholesale, so a corrected score fixes the table on the next pass
+    with no incremental-update state to drift.
     """
 
     series = models.ForeignKey("catalog.Series", on_delete=models.CASCADE, related_name="ladder_entries")
@@ -265,6 +274,11 @@ class LadderEntry(models.Model):
     wins = models.PositiveIntegerField(default=0)
     losses = models.PositiveIntegerField(default=0)
     draws = models.PositiveIntegerField(default=0)
+    # Byes are inferred from absence (a settled round with no fixture for this
+    # team), and are worth 2 competition points in the NRL and none in the AFL.
+    # Stored rather than folded into `points` so the inference is visible: if a
+    # table looks wrong, this is the first column to check.
+    byes = models.PositiveIntegerField(default=0)
     points = models.IntegerField(default=0)
     # AFL percentage is points-for/against x100 and runs well over 100, so this
     # is not a 0-100 value.
@@ -283,5 +297,33 @@ class LadderEntry(models.Model):
 
     @property
     def played_check(self) -> int:
-        """Wins+losses+draws. Differs from `played` only if the feed is mid-update."""
+        """Wins+losses+draws. Should equal `played` on a derived table."""
         return self.wins + self.losses + self.draws
+
+
+class LadderAdjustment(models.Model):
+    """A points adjustment the results cannot account for.
+
+    Salary-cap penalties, forfeits and administrative deductions are decisions
+    by the governing body. They change the ladder without changing any score,
+    so a table derived purely from results will read high for a penalised club
+    until one of these is entered.
+
+    Rare — a handful of times a decade — which is exactly why it is a manual
+    row rather than something to scrape. Entering it takes a minute; building a
+    collector for a tribunal ruling does not end.
+    """
+
+    series = models.ForeignKey("catalog.Series", on_delete=models.CASCADE, related_name="ladder_adjustments")
+    season = models.ForeignKey("catalog.Season", on_delete=models.CASCADE, related_name="ladder_adjustments")
+    team = models.ForeignKey("tipping.Team", on_delete=models.CASCADE, related_name="ladder_adjustments")
+    # Negative for a deduction, which is what these almost always are.
+    points = models.IntegerField(help_text="Negative to deduct, e.g. -12 for a salary-cap penalty.")
+    reason = models.CharField(max_length=200)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["series", "team"]
+
+    def __str__(self):
+        return f"{self.team.name} {self.points:+d} ({self.reason})"

@@ -12,6 +12,9 @@ urlpatterns = [
     # Cross-round confirm for the dashboard's "everything still to play" slate.
     path("<int:org_id>/tip/confirm/", views.tip_confirm_upcoming, name="tip_confirm_upcoming"),
     path("<int:org_id>/tips/", views.my_tips_view, name="my_tips"),
+    # In-play score/clock for one fixture. Not org-scoped: the fragment is
+    # identical whoever is looking, and it carries no tip.
+    path("match/<int:match_id>/state/", views.match_state_partial, name="match_state"),
     path("<int:org_id>/leaderboard/", views.leaderboard_view, name="leaderboard"),
     # The competition ladder (where the teams sit) — distinct from the
     # leaderboard above, which ranks tippers.

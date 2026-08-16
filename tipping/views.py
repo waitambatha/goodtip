@@ -22,6 +22,29 @@ def _require_member(user, org):
 
 
 @login_required
+def match_state_partial(request, match_id: int):
+    """Just the score/clock block for one fixture, for the in-play poll.
+
+    The live sync refreshes scores every two minutes and, before this, none of
+    that reached a page already open — the number changed in the database while
+    the reader watched a stale one. Re-rendering the whole fixture card would
+    have worked too, but the card carries the tip controls, and swapping those
+    out from under someone mid-tap is how you lose a selection they thought
+    they had made.
+
+    Membership is deliberately not checked. A fixture is not private — the same
+    score is on the AFL's own website — and the tip, which IS private, is not
+    in this fragment. Requiring a specific org membership would also mean
+    resolving which org the reader is viewing as, for a fragment identical
+    across all of them.
+    """
+    match = get_object_or_404(
+        Match.objects.select_related("home_team", "away_team"), pk=match_id,
+    )
+    return render(request, "components/_match_state.html", {"match": match})
+
+
+@login_required
 def tip_round_view(request, org_id: int, round_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _require_member(request.user, org):
