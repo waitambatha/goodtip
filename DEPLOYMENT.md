@@ -178,10 +178,49 @@ venv/bin/python manage.py run_due_syncs
 ```
 
 `run_due_syncs` reads the `SyncSchedule` table to decide what is actually due —
-live every 2 min, results every 15 min, fixtures hourly — so a 2-minute tick
-does not mean three feed calls every two minutes. Claiming a slot is a single
-conditional UPDATE, so a slow run still going when the next tick fires cannot
-double-hit a feed.
+live every 2 min, results every 15 min, fixtures hourly, ladder every 30 min —
+so a 2-minute tick does not mean four feed calls every two minutes. Claiming a
+slot is a single conditional UPDATE, so a slow run still going when the next
+tick fires cannot double-hit a feed.
+
+### The full-season sweep — `goodtip-backfill.timer`
+
+A **second** timer, every 6 hours:
+
+```bash
+venv/bin/python manage.py sync_matches --backfill
+```
+
+It exists because everything above works from a window around today — one round
+back, three forward. That keeps this week correct and is structurally incapable
+of repairing a round that fell outside the window when the sync ran. The live
+database held AFL 2026 rounds 1-5 and 21-25 with a permanent hole in between
+for exactly that reason: nothing was ever going to ask about round 12 again.
+
+The sweep asks each feed for **every** round it publishes, then runs fixtures,
+results and ladder over the lot, so any hole closes itself within six hours.
+
+It is a separate unit on purpose. `run_due_syncs` runs its kinds sequentially in
+one oneshot process, so a sweep sharing that unit would park the two-minute live
+poller behind it for as long as it ran. Its `TimeoutStartSec` is 2 hours, since
+a first pass on an empty season has a lot to create; later passes are far
+cheaper because the syncs write only what actually changed.
+
+```bash
+systemctl list-timers goodtip-backfill.timer
+journalctl -u goodtip-backfill.service -n 50
+manage.py sync_matches --backfill      # run the sweep now
+manage.py rebuild_ladders --season 2026  # ladders only, no network at all
+```
+
+### Is the data actually complete?
+
+Freshness stamps answer "did it run", never "is anything missing" — every sync
+can report success while half a season is unfetched. The **Coverage** panel at
+`/manage/sync/` is the one to read: rounds held per series, any missing round
+numbers, results stored, and ladder rows. Note that Super League and Super
+Netball appear there with no feed at all; they are 2027 roadmap entries with no
+scraper and no teams, so leagues signed up to them will not receive fixtures.
 
 **This is deliberately independent of site traffic.** Data has to be current
 when a visitor arrives, not fetched because one did — someone opening the
