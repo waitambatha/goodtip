@@ -38,6 +38,12 @@
   function wire(form) {
     var label = form.getAttribute('data-busy') || 'Working';
     if (!form.querySelector('[type="submit"]')) return;
+    /* Wire once. Forms are re-scanned after every htmx swap, and a second
+       listener on the same form would run the whole busy routine twice —
+       stashing the already-replaced label as idleLabel, so restoring it on
+       back/forward would put "Working" on the button permanently. */
+    if (form.dataset.busyWired) return;
+    form.dataset.busyWired = '1';
 
     form.addEventListener('submit', function (e) {
       /* Use the button actually pressed, not the first one in the form. The
@@ -130,8 +136,47 @@
     });
   });
 
+  /* EVERY POST FORM, not only the ones somebody remembered to mark.
+   *
+   * data-busy started as opt-in and reached about a dozen forms out of forty.
+   * The rest — approving a member, saving a profile, editing a post, inviting
+   * someone, voting for a charity, entering a round's results — did real work
+   * on a remote database and gave no sign at all that the click had landed.
+   * Every one of those is a duplicate submission waiting to happen, and the
+   * ones that were marked got marked because somebody hit the problem there
+   * first, not because they were the only ones that mattered.
+   *
+   * Opting in one template at a time cannot converge: the next form anybody
+   * adds starts silent again. So the default is inverted — a POST form gets
+   * feedback unless it says otherwise:
+   *
+   *   data-busy="Saving"   custom label (unchanged)
+   *   data-busy-none       genuinely instant, no feedback wanted
+   *
+   * Skipped automatically:
+   *   - htmx-driven forms, which gt-veil.js already covers. Two indicators for
+   *     one action reads as two things happening.
+   *   - GET forms. Filters and searches are navigations, and the veil path
+   *     handles the ones that need it.
+   */
+  function autoWire() {
+    document.querySelectorAll('form').forEach(function (form) {
+      var method = (form.getAttribute('method') || 'get').toLowerCase();
+      if (method !== 'post') return;
+      if (form.hasAttribute('data-busy')) return;          // already wired
+      if (form.hasAttribute('data-busy-none')) return;
+      if (form.hasAttribute('hx-post') || form.hasAttribute('data-hx-post')) return;
+      // A generic label, because a generic form cannot say what it is doing.
+      // Specific wording stays available through data-busy where it is worth
+      // the words.
+      form.setAttribute('data-busy', 'Working');
+      wire(form);
+    });
+  }
+
   function init() {
     document.querySelectorAll('form[data-busy]').forEach(wire);
+    autoWire();
   }
 
   if (document.readyState === 'loading') {
@@ -139,4 +184,13 @@
   } else {
     init();
   }
+
+  /* Forms that arrive in an htmx swap need wiring too — the dashboard's slate
+     brings its own, and they would otherwise be the only silent ones left. */
+  document.body && document.body.addEventListener('htmx:afterSettle', function () {
+    document.querySelectorAll('form[data-busy]').forEach(function (f) {
+      if (!f.dataset.busyWired) wire(f);
+    });
+    autoWire();
+  });
 })();

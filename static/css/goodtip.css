@@ -9555,3 +9555,44 @@ body.fxh-open { overflow: hidden; }
   .np-thumb { width: 54px; height: 54px; }
   .np-del { margin-left: 0; }
 }
+
+/* ==========================================================================
+   ============ v36 — leaderboard column tint ==============================
+   ========================================================================== */
+
+/* Same treatment as the ladder, for the same reason: the table is read across
+   — one person's row against their record and their points — and an unbroken
+   field gives the eye nothing to follow. Only the two numeric columns are
+   tinted; Rank and Tipper are the anchors and stay clear.
+   
+   Applied by position rather than by a class, because this table's cells are
+   named per column (.gb-correct, .gb-pts) rather than sharing one. */
+.gt-board .gb-head > span:nth-child(3),
+.gt-board .gb-head > span:nth-child(4),
+.gt-board .gb-row > .gb-correct,
+.gt-board .gb-row > .gb-pts { position: relative; }
+
+.gt-board .gb-row > .gb-correct::before,
+.gt-board .gb-row > .gb-pts::before,
+.gt-board .gb-head > span:nth-child(3)::before,
+.gt-board .gb-head > span:nth-child(4)::before {
+  content: ""; position: absolute; inset: -13px -7px; z-index: 0;
+  pointer-events: none;
+}
+.gt-board .gb-row > .gb-correct::before,
+.gt-board .gb-head > span:nth-child(3)::before { background: rgba(15,46,34,.04); }
+/* Points is what the board ranks on, so it carries the stronger tint — the
+   same weighting the ladder gives its own Pts column. */
+.gt-board .gb-row > .gb-pts::before,
+.gt-board .gb-head > span:nth-child(4)::before { background: rgba(45,122,58,.09); }
+.gt-board .gb-head > span:nth-child(3)::before,
+.gt-board .gb-head > span:nth-child(4)::before { inset: -6px -7px -10px; }
+
+/* Figures above their own tint. */
+.gt-board .gb-correct, .gt-board .gb-pts,
+.gt-board .gb-head > span { z-index: 1; }
+
+/* The ladder defines its own striping on .lad-col; this must not double up on
+   it, or the Pts column gets two overlapping tints. */
+.gt-board.ladder .gb-head > span:nth-child(3)::before,
+.gt-board.ladder .gb-head > span:nth-child(4)::before { display: none; }
