@@ -414,3 +414,85 @@ class TiebreakerTests(TestCase):
         # by his NRLW score a second time on top of it.
         self.assertEqual([u.display_name for u in board], ["Bob", "Ann"])
         self.assertEqual([u.points for u in board], [103, 9])
+
+
+class MyTipsScopeTests(TestCase):
+    """What My Tips shows, and the one untipped case it keeps."""
+
+    def setUp(self):
+        from catalog.models import Season, Series, Sport
+        from orgs.models import OrgMember, Organisation
+        sport = Sport.objects.create(name="Scope Footy", slug="scope-footy")
+        self.series = Series.objects.create(sport=sport, name="Scope Series", slug="scope-series")
+        season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(name="Scope League", season=season)
+        self.user = User.objects.create_user(
+            email="scope@x.com", password="Str0ng!pass", display_name="Scoper",
+        )
+        OrgMember.objects.create(user=self.user, org=self.org)
+        self.rnd = Round.objects.create(
+            org=self.org, round_number=1, series=self.series,
+            lockout_at=timezone.now() - timedelta(hours=3),
+        )
+        self.client.force_login(self.user)
+
+    def _match(self, slug, *, hours, status=Match.STATUS_SCHEDULED, result=None):
+        h = Team.objects.create(name=f"H{slug}", slug=f"sh-{slug}", series=self.series)
+        a = Team.objects.create(name=f"A{slug}", slug=f"sa-{slug}", series=self.series)
+        return Match.objects.create(
+            round=self.rnd, home_team=h, away_team=a,
+            kickoff_at=timezone.now() + timedelta(hours=hours),
+            status=status, result=result,
+        )
+
+    def _rows(self):
+        r = self.client.get(f"/org/{self.org.id}/tips/?round={self.rnd.id}")
+        return r.context["rows"]
+
+    def test_an_untipped_upcoming_match_is_hidden(self):
+        self._match("up", hours=48)
+        self.assertEqual(self._rows(), [])
+
+    def test_an_untipped_finished_match_is_hidden(self):
+        """Nothing to do and nothing to report — it was never yours."""
+        m = self._match("done", hours=-30, status=Match.STATUS_COMPLETE, result="home")
+        m.home_score, m.away_score = 30, 10
+        m.save()
+        self.assertEqual(self._rows(), [])
+
+    def test_a_tipped_match_is_shown(self):
+        m = self._match("mine", hours=48)
+        Tip.objects.create(user=self.user, match=m, org=self.org, selection="home")
+        rows = self._rows()
+        self.assertEqual([r["match"].id for r in rows], [m.id])
+        self.assertFalse(rows[0]["missed_live"])
+
+    def test_an_untipped_LIVE_match_is_kept_and_flagged(self):
+        """The one exception: a game on right now that you are not in.
+
+        Hiding it would mean somebody watching the round sees only the games
+        they picked, with no sign the others are being played.
+        """
+        m = self._match("live", hours=-1, status=Match.STATUS_LIVE)
+        rows = self._rows()
+        self.assertEqual([r["match"].id for r in rows], [m.id])
+        self.assertTrue(rows[0]["missed_live"])
+        self.assertIsNone(rows[0]["tip"])
+
+    def test_untipped_live_games_lead_the_in_play_block(self):
+        """They are the only rows carrying anything to notice, so they go first."""
+        mine = self._match("livemine", hours=-2, status=Match.STATUS_LIVE)
+        Tip.objects.create(user=self.user, match=mine, org=self.org, selection="home")
+        theirs = self._match("livemissed", hours=-1, status=Match.STATUS_LIVE)
+        rows = self._rows()
+        self.assertEqual([r["match"].id for r in rows], [theirs.id, mine.id])
+
+    def test_the_sidebar_still_counts_the_whole_round(self):
+        """"1 of 4 tipped", not "1 of 1" — the round's real size is kept."""
+        m = self._match("a", hours=48)
+        Tip.objects.create(user=self.user, match=m, org=self.org, selection="home")
+        for s in ("b", "c", "d"):
+            self._match(s, hours=48)
+        r = self.client.get(f"/org/{self.org.id}/tips/?round={self.rnd.id}")
+        self.assertEqual(r.context["total_matches"], 4)
+        self.assertEqual(r.context["tips_this_round"], 1)

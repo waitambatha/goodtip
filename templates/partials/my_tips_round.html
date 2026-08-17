@@ -69,10 +69,17 @@ reason is stated once here rather than repeated on every fixture below.
   read; the graded outcome is appended below it because that is the only part
   My Tips shows and the dashboard does not.
   {% endcomment %}
-  <div class="gt-fixwrap {% if t.is_correct is True %}correct{% elif t.is_correct is False %}missed{% elif t %}tipped{% endif %}">
+  {% comment %}
+  `no-tip` marks a game being played that you are not in. It is the one kind of
+  untipped fixture this page keeps — see the view — and it has to look unlike
+  the rows around it, or a member scanning the round reads it as one of their
+  own picks and wonders why it has no result coming.
+  {% endcomment %}
+  <div class="gt-fixwrap {% if r.missed_live %}no-tip{% elif t.is_correct is True %}correct{% elif t.is_correct is False %}missed{% elif t %}tipped{% endif %}">
     {% include "partials/fixture_card.html" with match=m reader=r.reader selection=t.selection editable=r.editable round_locked=round_lock_note mode="htmx" org=org %}
     <div class="gfx-state">
-      {% if t.is_correct is True %}<span class="res correct">Correct &middot; +{{ t.points_awarded }}</span>
+      {% if r.missed_live %}<span class="res none">In play &middot; you didn't tip this one</span>
+      {% elif t.is_correct is True %}<span class="res correct">Correct &middot; +{{ t.points_awarded }}</span>
       {% elif t.is_correct is False %}<span class="res incorrect">Missed</span>
       {% elif r.phase == 'live' %}<span class="res live">In play</span>
       {% elif t %}<span class="res pending">Pending</span>

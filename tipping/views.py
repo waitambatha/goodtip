@@ -304,11 +304,28 @@ def my_tips_view(request, org_id: int):
     # A row survives if there is a Tip on it, whoever made it: an auto-assigned
     # pick still scores, so hiding it would hide points from the very screen
     # that accounts for them. The card marks which ones were not yours.
+    #
+    # ONE EXCEPTION: a match being played right now stays, tipped or not.
+    #
+    # Everywhere else an untipped fixture is noise — nothing to do about an
+    # upcoming game you have not picked except go to the dashboard, and nothing
+    # at all about a finished one. In play is different: it is the only state
+    # where an untipped match still tells you something you want to know, which
+    # is that it is happening and you have no stake in it. Hiding those would
+    # mean a member watching the round sees three of the six games on and no
+    # sign the others exist.
+    #
     # Captured BEFORE the filter: the sidebar reports progress as "3 of 9
     # tipped", which needs the round's real size. Measuring it after would make
     # it read "3 of 3" — permanently complete, however much was missed.
     round_match_count = len(all_rows)
-    all_rows = [r for r in all_rows if r["tip"] is not None]
+    all_rows = [
+        r for r in all_rows
+        if r["tip"] is not None or r["phase"] == "live"
+    ]
+    for r in all_rows:
+        # Drives the "you didn't tip this one" treatment on the card.
+        r["missed_live"] = r["tip"] is None and r["phase"] == "live"
 
     # ---- state filter. Counts are always over the whole round, so the tab
     # labels don't change as you move between them.
@@ -324,9 +341,18 @@ def my_tips_view(request, org_id: int):
     tip_rows = all_rows if state == "all" else [r for r in all_rows if r["phase"] == state]
     if state == "all":
         order = {s: i for i, s in enumerate(STATES)}
+        # Inside the in-play block, the ones you have NOT tipped come first.
+        # They are the only rows on this page carrying anything to act on —
+        # the round is running and you are not in these — so they lead, and
+        # the games you did pick follow underneath.
         tip_rows = sorted(
             tip_rows,
-            key=lambda r: (order.get(r["phase"], 99), r["match"].kickoff_at, r["match"].id),
+            key=lambda r: (
+                order.get(r["phase"], 99),
+                0 if r.get("missed_live") else 1,
+                r["match"].kickoff_at,
+                r["match"].id,
+            ),
         )
 
     stats = user_org_stats(request.user, org)

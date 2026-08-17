@@ -9767,3 +9767,28 @@ body.fxh-open { overflow: hidden; }
   padding: 2px 10px;
   font-weight: 600;
 }
+
+/* ==========================================================================
+   ============ v39 — the in-play game you didn't tip =======================
+   ========================================================================== */
+
+/* My Tips shows your picks, with one exception: a match being played right now
+   stays whether you tipped it or not, because "this is on and you are not in
+   it" is worth knowing while the round is live. See tipping.views.my_tips_view.
+
+   It must not look like one of your own rows. Dashed rather than solid, and
+   muted rather than coloured — present, clearly not yours, and not shouting
+   about a thing you can no longer do anything about. */
+.gt-fixwrap.no-tip .fxc {
+  border-left-color: rgba(15, 46, 34, .22);
+  border-left-style: dashed;
+  background: rgba(15, 46, 34, .015);
+}
+.gt-fixwrap.no-tip .gfx-state { background: rgba(15, 46, 34, .04); }
+.gt-fixwrap.no-tip .res.none {
+  color: #6b6b6b;
+  font-weight: 600;
+}
+/* The clubs are not your pick, so they do not carry the picked-team emphasis
+   the rest of the page uses — that colouring means "this is the side I chose". */
+.gt-fixwrap.no-tip .fxc-team { opacity: .82; }
