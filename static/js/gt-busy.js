@@ -64,8 +64,27 @@
       form.classList.add('is-busy');
       btn.disabled = true;
       btn.setAttribute('aria-busy', 'true');
-      btn.dataset.idleLabel = btn.innerHTML;
-      btn.innerHTML = '<span class="busy-dot busy-run" aria-hidden="true"></span>' + label;
+
+      /* TWO TREATMENTS, chosen by whether the label was authored.
+       *
+       * Replacing a button's contents with a word only works when the button
+       * was built to hold words. Applied blindly it is destructive: the Wall's
+       * delete control is a single "×", and swapping that for "Working" turns
+       * a 28px round button into a wide rectangle that shoves the post header
+       * out of shape. Icon buttons lose their icon; short buttons jump width
+       * mid-click.
+       *
+       * So the label swap is now reserved for forms that asked for one by
+       * name — data-busy="Creating your account" — where an author has looked
+       * at the button and decided the words fit. Everything picked up by the
+       * blanket pass keeps its own content and gets a spinner laid over it,
+       * which cannot change the size of anything. */
+      if (form.dataset.busyAuto) {
+        btn.classList.add('is-btn-busy');
+      } else {
+        btn.dataset.idleLabel = btn.innerHTML;
+        btn.innerHTML = '<span class="busy-dot busy-run" aria-hidden="true"></span>' + label;
+      }
 
       var scope = form.closest('[data-busy-scope]');
       if (scope) {
@@ -120,10 +139,11 @@
     document.querySelectorAll('form.is-busy').forEach(function (form) {
       var btn = form.querySelector('[type="submit"]');
       form.classList.remove('is-busy');
-      if (btn && btn.dataset.idleLabel) {
+      if (btn) {
         btn.disabled = false;
         btn.removeAttribute('aria-busy');
-        btn.innerHTML = btn.dataset.idleLabel;
+        btn.classList.remove('is-btn-busy');
+        if (btn.dataset.idleLabel) btn.innerHTML = btn.dataset.idleLabel;
       }
       var strip = form.querySelector('.busy-strip');
       if (strip) strip.remove();
@@ -166,9 +186,11 @@
       if (form.hasAttribute('data-busy')) return;          // already wired
       if (form.hasAttribute('data-busy-none')) return;
       if (form.hasAttribute('hx-post') || form.hasAttribute('data-hx-post')) return;
-      // A generic label, because a generic form cannot say what it is doing.
-      // Specific wording stays available through data-busy where it is worth
-      // the words.
+      // Marked as auto so wire() knows not to rewrite the button's contents —
+      // a blanket pass has no idea whether the button it found is a wide
+      // "Save changes" or a 28px "×", and only one of those survives having
+      // its label replaced.
+      form.dataset.busyAuto = '1';
       form.setAttribute('data-busy', 'Working');
       wire(form);
     });

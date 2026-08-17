@@ -88,27 +88,39 @@ Expects: c (the selected org card), games, open_games, org_series,
         <span class="rnav-arrow is-off" aria-hidden="true"><svg><use href="#ic-arrow-left"/></svg></span>
         {% endif %}
 
-        <form method="get" action="{{ dash_url }}" class="rnav-pick"
-              hx-get="{{ dash_url }}" hx-target="#slipPanel" hx-swap="outerHTML"
-              hx-trigger="change" hx-push-url="true" hx-include="this">
-          <input type="hidden" name="org" value="{{ c.org.id }}">
-          {% for s in active_slugs %}<input type="hidden" name="series" value="{{ s }}">{% endfor %}
-          {% comment %}
-          slate=1 rides in the query string so the htmx request and the
-          no-JavaScript submit differ by exactly this one parameter — the view
-          keys its partial response off it together with the HX-Request header.
-          {% endcomment %}
-          <input type="hidden" name="slate" value="1">
-          <label class="rnav-lab" for="rnavSel">Round</label>
-          <select name="round" id="rnavSel" aria-label="Choose a round">
+        {% comment %}
+        NOT A <form>. This whole panel renders inside the tip-confirm form, and
+        HTML forbids nesting one form in another — the parser does not error,
+        it silently DELETES the inner <form> tag and hoists its children into
+        the outer one. Which is exactly what happened: the round dropdown's
+        hx-get went with the discarded element, so changing it did nothing at
+        all, and its hidden org/series/slate inputs quietly became part of the
+        tip submission.
+
+        So the select carries its own htmx attributes. htmx sends a named
+        control's value with the request, so `round` rides along without any
+        wrapper; everything else is already in the URL.
+
+        Without JavaScript the arrows either side are the way through — they
+        are real links and always were. A lone <select> cannot submit itself,
+        and the alternative was a form that browsers refuse to build here.
+
+        No visible "Round" label: every option already begins with the word, so
+        a caption beside it said the same thing twice and cost the width that
+        left the bar looking half-empty. aria-label carries the accessible name.
+        {% endcomment %}
+        <span class="rnav-pick">
+          <select name="round" id="rnavSel" aria-label="Choose a round"
+                  hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+                  hx-target="#slipPanel" hx-swap="outerHTML"
+                  hx-trigger="change" hx-push-url="true">
             {% for n in round_nav.numbers %}
             <option value="{{ n }}" {% if n == round_nav.current %}selected{% endif %}>
               Round {{ n }}{% if n == round_nav.in_play %} &middot; this week{% endif %}
             </option>
             {% endfor %}
           </select>
-          <noscript><button type="submit" class="abtn abtn-dark abtn-sm">Go</button></noscript>
-        </form>
+        </span>
 
         {% if round_nav.next %}
         <a class="rnav-arrow"

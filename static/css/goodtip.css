@@ -9345,69 +9345,84 @@ body.fxh-open { overflow: hidden; }
    ========================================================================== */
 
 /* Move between rounds without leaving the dashboard. See the comment in
-   dashboard.html for why the flat cross-round list had to go. */
+   dashboard_slate.html for why the flat cross-round list had to go.
+
+   HUGS ITS CONTENT. The first cut stretched the pill to the full width of the
+   panel, which put the three controls in the left third and left the other
+   two thirds as an empty bordered box — the bar read as something that had
+   failed to load rather than as a control. A navigator is a control cluster,
+   so it is sized like one. */
 .rnav {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;
   background: var(--gt-card); border: 1px solid var(--gt-hair);
-  border-radius: 100px; padding: 7px 10px; margin: 0 0 14px;
-  position: relative;
+  border-radius: 100px; padding: 5px 6px; margin: 0 0 14px;
+  max-width: 100%; position: relative;
 }
 
 .rnav-arrow {
-  width: 36px; height: 36px; flex: none; border-radius: 50%;
+  width: 34px; height: 34px; flex: none; border-radius: 50%;
   display: grid; place-items: center; text-decoration: none;
   background: rgba(15,46,34,.06); color: var(--deep);
-  transition: background .15s var(--ease), transform .15s var(--ease);
+  transition: background .15s var(--ease), color .15s var(--ease);
 }
-.rnav-arrow svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 2.1; }
-.rnav-arrow:hover { background: var(--lime); transform: translateY(-1px); }
+.rnav-arrow svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+.rnav-arrow:hover { background: var(--deep); color: var(--lime); }
 /* The end of the season is a real edge, so the control stays in place and goes
    quiet rather than vanishing — a disappearing arrow makes the row jump and
    leaves you wondering whether you mis-clicked. */
-.rnav-arrow.is-off { opacity: .25; pointer-events: none; }
+.rnav-arrow.is-off { opacity: .22; pointer-events: none; }
 
-.rnav-pick { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; }
-.rnav-lab {
-  font-family: var(--mark); font-size: 10.5px; font-weight: 700;
-  letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
-}
+.rnav-pick { display: flex; align-items: center; min-width: 0; }
+/* Borderless: the pill around it is already the border, and a second one
+   inside it read as a box within a box. */
 .rnav-pick select {
-  flex: 1 1 auto; min-width: 0; max-width: 260px;
-  border: 1px solid var(--gt-hair); border-radius: 100px;
-  background: var(--gt-bg); color: var(--ink);
-  padding: 8px 13px; font-size: 14px; font-weight: 600;
+  border: 0; background: transparent; color: var(--ink);
+  padding: 7px 10px; font-size: 15px; font-weight: 700;
+  font-family: var(--body); cursor: pointer;
+  min-width: 0; max-width: 230px;
 }
+.rnav-pick select:focus-visible { outline: 2px solid var(--forest); outline-offset: 2px; border-radius: 8px; }
 
-/* How the round went. Sits at the end of the bar so the numbers land where the
-   eye finishes reading the control, not before it. */
-.rnav-score { display: flex; align-items: baseline; gap: 7px; margin-left: auto; padding-right: 6px; }
+/* How the round went, divided off rather than floated to a far edge — with the
+   bar hugging its content there is no far edge to float to, and the numbers
+   belong to the round named beside them. */
+.rnav-score {
+  display: flex; align-items: baseline; gap: 6px;
+  padding-left: 12px; margin-left: 4px;
+  border-left: 1px solid var(--gt-hair);
+}
 .rns-hit {
-  font-family: var(--score); font-weight: 900; font-size: 19px; color: var(--deep);
+  font-family: var(--score); font-weight: 900; font-size: 18px; color: var(--deep);
   font-variant-numeric: tabular-nums;
 }
-.rns-hit span { font-size: 13px; font-weight: 700; color: var(--muted); }
+.rns-hit span { font-size: 12.5px; font-weight: 700; color: var(--muted); }
 .rns-lab {
-  font-family: var(--mark); font-size: 10.5px; font-weight: 700;
+  font-family: var(--mark); font-size: 10px; font-weight: 700;
   letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
 }
 .rns-pts {
-  font-family: var(--score); font-weight: 900; font-size: 19px; color: var(--forest);
-  font-variant-numeric: tabular-nums; margin-left: 4px;
+  font-family: var(--score); font-weight: 900; font-size: 18px; color: var(--forest);
+  font-variant-numeric: tabular-nums; margin-left: 3px;
 }
-.rns-pts span { font-size: 11px; margin-left: 2px; }
+.rns-pts span { font-size: 10.5px; margin-left: 2px; }
 
 .rnav-now {
-  margin-left: auto; text-decoration: none;
-  font-family: var(--mark); font-size: 11px; font-weight: 800;
+  text-decoration: none; margin-left: 4px;
+  font-family: var(--mark); font-size: 10.5px; font-weight: 800;
   letter-spacing: .07em; text-transform: uppercase;
   background: var(--lime); color: var(--deep);
-  padding: 8px 15px; border-radius: 100px; white-space: nowrap;
+  padding: 8px 14px; border-radius: 100px; white-space: nowrap;
 }
 .rnav-now:hover { filter: brightness(1.06); }
+.rnav-now.is-quiet { background: rgba(15,46,34,.06); color: var(--deep); }
+.rnav-now.is-quiet:hover { background: rgba(15,46,34,.12); filter: none; }
 
 @media (max-width: 560px) {
-  .rnav { border-radius: 18px; }
-  .rnav-score, .rnav-now { margin-left: 0; width: 100%; justify-content: center; text-align: center; }
+  .rnav { display: flex; width: 100%; border-radius: 18px; padding: 8px; }
+  .rnav-pick { flex: 1 1 auto; }
+  .rnav-pick select { max-width: none; width: 100%; }
+  .rnav-score { width: 100%; border-left: 0; padding-left: 0; margin-left: 0; justify-content: center; }
+  .rnav-now { width: 100%; text-align: center; margin-left: 0; }
 }
 
 /* Graded outcomes on a fixture card. Correct is the lime the app already uses
@@ -9596,3 +9611,62 @@ body.fxh-open { overflow: hidden; }
    it, or the Pts column gets two overlapping tints. */
 .gt-board.ladder .gb-head > span:nth-child(3)::before,
 .gt-board.ladder .gb-head > span:nth-child(4)::before { display: none; }
+
+/* ==========================================================================
+   ============ v37 — non-destructive busy button ==========================
+   ========================================================================== */
+
+/* For buttons picked up by the blanket pass, where the label was NOT authored.
+   See gt-busy.js: swapping contents for the word "Working" wrecks any button
+   not built to hold words — the Wall's "×" delete becomes a wide rectangle,
+   icon buttons lose their icon, short buttons jump width mid-click.
+   
+   This changes nothing about the box. The button keeps its own size, its own
+   content and its own colours; the label dims and a spinner sits on top. */
+.is-btn-busy {
+  position: relative;
+  cursor: progress;
+  pointer-events: none;
+}
+/* Dim the content in place rather than removing it, so the width is held by
+   the same text that was always there. */
+.is-btn-busy > * { opacity: .18; }
+.is-btn-busy {
+  color: transparent !important;
+  text-shadow: none !important;
+}
+
+.is-btn-busy::after {
+  content: "";
+  position: absolute; top: 50%; left: 50%;
+  width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  /* currentColor is transparent above, so the ring needs its own colour. Two
+     variants because these buttons sit on both light and dark grounds. */
+  border-color: rgba(15,46,34,.28);
+  border-top-color: var(--forest);
+  animation: busySpin .75s linear infinite;
+}
+/* The ring has to contrast with the button it sits on, and the buttons split
+   two ways rather than one.
+
+   DARK grounds — a white ring. */
+.abtn-dark.is-btn-busy::after,
+.tier-cta.is-btn-busy::after {
+  border-color: rgba(255,255,255,.3);
+  border-top-color: #fff;
+}
+/* LIME grounds — a dark ring. White on lime is nearly invisible, which is what
+   the first pass shipped: the button dimmed its label and appeared to show
+   nothing at all in its place. */
+.abtn-primary.is-btn-busy::after,
+.gt-go-btn.is-btn-busy::after {
+  border-color: rgba(15,46,34,.28);
+  border-top-color: var(--deep);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-btn-busy::after { animation-duration: 1.8s; }
+}
