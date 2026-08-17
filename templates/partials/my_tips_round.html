@@ -77,7 +77,14 @@ reason is stated once here rather than repeated on every fixture below.
       {% elif r.phase == 'live' %}<span class="res live">In play</span>
       {% elif t %}<span class="res pending">Pending</span>
       {% else %}<span class="gfx-picked none">No tip made</span>{% endif %}
-      {% if t %}<span class="gfx-stamp">Tipped {{ t.submitted_at|date:"j M, g:i A" }}</span>{% endif %}
+      {% comment %}
+      An auto-assigned pick says so. It counts towards your score, so it has to
+      appear on the page that accounts for your score — but presenting it as
+      "Tipped 14 Aug, 7:02 PM" would claim you made a choice you did not, and
+      that is the sort of thing somebody disputes when it costs them a round.
+      {% endcomment %}
+      {% if t.is_auto %}<span class="gfx-stamp is-auto">Auto pick &middot; no tip was made in time</span>
+      {% elif t %}<span class="gfx-stamp">Tipped {{ t.submitted_at|date:"j M, g:i A" }}</span>{% endif %}
     </div>
   </div>
   {% endwith %}
@@ -85,13 +92,22 @@ reason is stated once here rather than repeated on every fixture below.
   <div class="gt-empty">
     <span class="ge-ic"><svg><use href="#ic-calendar"/></svg></span>
     <div>
+      {% comment %}
+      The page lists only what you tipped, so "nothing here" now means you did
+      not tip this round — not that the round is empty. Saying "no fixtures
+      loaded" here would blame the sync for a round that is sitting there fully
+      populated, and send somebody to their admin over nothing.
+      {% endcomment %}
       {% if state != 'all' %}
         <h3>Nothing here right now</h3>
-        <p>No {% if state == 'complete' %}completed{% elif state == 'live' %}in-play{% else %}upcoming{% endif %}
-           matches in round {{ round.round_number }}. Try <a href="{% url 'tipping:my_tips' org.id %}?round={{ round.id }}">all matches</a>.</p>
+        <p>None of your tips in round {{ round.round_number }} are
+           {% if state == 'complete' %}finished{% elif state == 'live' %}in play{% else %}still to come{% endif %}.
+           Try <a href="{% url 'tipping:my_tips' org.id %}?round={{ round.id }}">all of them</a>.</p>
       {% else %}
-        <h3>No matches yet</h3>
-        <p>Round {{ round.round_number }} has no fixtures loaded. They'll appear here as soon as your admin syncs them.</p>
+        <h3>You haven't tipped this round</h3>
+        <p>This page shows the games you picked. Head to the
+           <a href="{% url 'dashboard' %}?org={{ org.id }}">dashboard</a> to make your tips for
+           round {{ round.round_number }}, and they'll show up here.</p>
       {% endif %}
     </div>
   </div>

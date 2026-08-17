@@ -49,13 +49,18 @@
   var SHOW_AFTER = 180;      // ms before a veil is worth showing at all
   var pending = new WeakMap();
 
-  /* Sport-themed marker rather than a bare ring. The splash uses a ball; this
-     is the same idea at panel scale, so the app has one visual language for
-     "working" instead of a footy on one screen and a spinner on the next. */
+  /* A ball with a progress ring sweeping around it. The splash uses a ball, so
+     the app keeps one visual language for "working" rather than a footy on one
+     screen and a plain spinner on the next — but the ball alone only bounced
+     in place, with nothing to read as progress. The ring is that part.
+
+     The <i> is the ball; the ring is drawn by the wrapper's pseudo-elements,
+     which is why the child is needed at all. */
   function spinner() {
     var wrap = document.createElement('span');
     wrap.className = 'bv-ball busy-run';
     wrap.setAttribute('aria-hidden', 'true');
+    wrap.appendChild(document.createElement('i'));
     return wrap;
   }
 

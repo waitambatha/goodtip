@@ -292,14 +292,42 @@ def my_tips_view(request, org_id: int):
                 "reader": readers.get(m.id),
             })
 
+    # MY TIPS MEANS MY TIPS.
+    #
+    # This screen listed every fixture in the round and left the ones you had
+    # not picked sitting there blank. On a nine-game round where somebody
+    # tipped three, six of the nine rows were empty — so the page answering
+    # "how am I going" was two-thirds filled with matches that had nothing to
+    # do with them. The dashboard is where you tip; this is where you review
+    # what you tipped.
+    #
+    # A row survives if there is a Tip on it, whoever made it: an auto-assigned
+    # pick still scores, so hiding it would hide points from the very screen
+    # that accounts for them. The card marks which ones were not yours.
+    # Captured BEFORE the filter: the sidebar reports progress as "3 of 9
+    # tipped", which needs the round's real size. Measuring it after would make
+    # it read "3 of 3" — permanently complete, however much was missed.
+    round_match_count = len(all_rows)
+    all_rows = [r for r in all_rows if r["tip"] is not None]
+
     # ---- state filter. Counts are always over the whole round, so the tab
     # labels don't change as you move between them.
+    #
+    # Ordered upcoming → live → complete: still to play is what you can still
+    # act on, in progress is what you are watching, and finished is the record.
+    # That is the order of decreasing urgency, and the order people read in.
     STATES = ("upcoming", "live", "complete")
     phase_counts = {s: sum(1 for r in all_rows if r["phase"] == s) for s in STATES}
     state = request.GET.get("state", "all")
     if state not in STATES:
         state = "all"
     tip_rows = all_rows if state == "all" else [r for r in all_rows if r["phase"] == state]
+    if state == "all":
+        order = {s: i for i, s in enumerate(STATES)}
+        tip_rows = sorted(
+            tip_rows,
+            key=lambda r: (order.get(r["phase"], 99), r["match"].kickoff_at, r["match"].id),
+        )
 
     stats = user_org_stats(request.user, org)
     if request.headers.get("HX-Request"):
@@ -319,8 +347,8 @@ def my_tips_view(request, org_id: int):
         next_round = rounds[idx - 1] if idx > 0 else None
 
     # Round-level stats describe the whole round, not the filtered view.
-    total_matches = len(all_rows)
-    tips_this_round = sum(1 for r in all_rows if r["tip"])
+    total_matches = round_match_count
+    tips_this_round = len(all_rows)
     total_tippers = len(leaderboard_for_org(org))
     rank = user_rank_in_org(request.user, org)
     # Percentile = share of the field this member is ahead of or level with.

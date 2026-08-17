@@ -40,7 +40,7 @@ new slate is fetched — see gt-veil.js.
        href="{{ base }}{% if keep %}?{{ keep }}{% endif %}"
        {% if swap_target %}
        hx-get="{{ base }}?slate=1{% if keep %}&amp;{{ keep }}{% endif %}"
-       hx-target="{{ swap_target }}" hx-swap="outerHTML" data-veil-for="#roundFixtures"
+       hx-target="{{ swap_target }}" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
        hx-push-url="{{ base }}{% if keep %}?{{ keep }}{% endif %}"
        {% endif %}
        {% if not active_slugs %}aria-current="true"{% endif %}>All competitions</a>
@@ -49,7 +49,7 @@ new slate is fetched — see gt-veil.js.
        href="{{ base }}?series={{ s.slug }}{% if keep %}&amp;{{ keep }}{% endif %}"
        {% if swap_target %}
        hx-get="{{ base }}?slate=1&amp;series={{ s.slug }}{% if keep %}&amp;{{ keep }}{% endif %}"
-       hx-target="{{ swap_target }}" hx-swap="outerHTML" data-veil-for="#roundFixtures"
+       hx-target="{{ swap_target }}" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
        hx-push-url="{{ base }}?series={{ s.slug }}{% if keep %}&amp;{{ keep }}{% endif %}"
        {% endif %}
        {% if s.slug in active_slugs %}aria-current="true"{% endif %}>{{ s.name }}</a>

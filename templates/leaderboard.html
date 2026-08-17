@@ -19,7 +19,8 @@
     <span class="lbl">Round</span>
     <select name="round" class="gt-select"
             hx-get="{% url 'tipping:leaderboard' org.id %}?scope={{ scope }}"
-            hx-target="#lbtable" hx-swap="outerHTML" hx-trigger="change">
+            {# show:none stops htmx scrolling the swapped table into view #}
+            hx-target="#lbtable" hx-swap="outerHTML show:none" hx-trigger="change">
       <option value="all" {% if selected_round_id == 'all' %}selected{% endif %}>All rounds</option>
       {% for r in rounds %}<option value="{{ r.id }}" {% if selected_round_id == r.id|stringformat:'s' %}selected{% endif %}>Round {{ r.round_number }}</option>{% endfor %}
     </select>

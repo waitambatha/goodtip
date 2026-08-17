@@ -79,7 +79,7 @@ Expects: c (the selected org card), games, open_games, org_series,
         <a class="rnav-arrow"
            href="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.prev }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
            hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}&amp;round={{ round_nav.prev }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-           hx-target="#slipPanel" hx-swap="outerHTML" data-veil-for="#roundFixtures"
+           hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
            hx-push-url="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.prev }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
            aria-label="Round {{ round_nav.prev }}" title="Round {{ round_nav.prev }}">
           <svg><use href="#ic-arrow-left"/></svg>
@@ -112,7 +112,7 @@ Expects: c (the selected org card), games, open_games, org_series,
         <span class="rnav-pick">
           <select name="round" id="rnavSel" aria-label="Choose a round"
                   hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-                  hx-target="#slipPanel" hx-swap="outerHTML" data-veil-for="#roundFixtures"
+                  hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
                   hx-trigger="change" hx-push-url="true">
             {% for n in round_nav.numbers %}
             <option value="{{ n }}" {% if n == round_nav.current %}selected{% endif %}>
@@ -126,7 +126,7 @@ Expects: c (the selected org card), games, open_games, org_series,
         <a class="rnav-arrow"
            href="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.next }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
            hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}&amp;round={{ round_nav.next }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-           hx-target="#slipPanel" hx-swap="outerHTML" data-veil-for="#roundFixtures"
+           hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
            hx-push-url="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.next }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
            aria-label="Round {{ round_nav.next }}" title="Round {{ round_nav.next }}">
           <svg><use href="#ic-arrow-right"/></svg>
@@ -157,7 +157,7 @@ Expects: c (the selected org card), games, open_games, org_series,
         <a class="rnav-now{% if round_nav.played %} is-quiet{% endif %}"
            href="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.in_play }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
            hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}&amp;round={{ round_nav.in_play }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-           hx-target="#slipPanel" hx-swap="outerHTML" data-veil-for="#roundFixtures"
+           hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
            hx-push-url="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.in_play }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}">
           This week
         </a>

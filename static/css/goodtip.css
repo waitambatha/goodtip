@@ -9231,29 +9231,57 @@ body.fxh-open { overflow: hidden; }
    here is the sport marker and the cases a form never hit — veiling a table,
    a filter bar, or a card grid. */
 
-/* A bouncing ball rather than a ring. The splash already established the
-   language; a spinner here would be a different app's idea of waiting. */
+/* A ball with a track running round it. The ball alone said "sport" but not
+   "working" — it bounced in place with nothing to measure it against. The ring
+   sweeping around it is the part that reads as progress, and the two together
+   are unmistakably this app rather than a generic spinner.
+
+   Built as a rotating conic gradient masked to a ring, so it is one element
+   with no SVG and no extra markup: the ball sits inside it, and the whole
+   thing scales by changing one width. */
 .bv-ball {
-  width: 26px; height: 34px; position: relative;
+  width: 54px; height: 54px; position: relative;
+  display: grid; place-items: center;
+  animation: none;                    /* the ring spins; the ball bounces */
+}
+/* The track: a full circle at low opacity, so the sweep has something to run
+   against and the control never looks half-drawn. */
+.bv-ball::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  border: 3px solid rgba(15, 46, 34, .13);
+}
+/* The sweep. */
+.bv-ball::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  border: 3px solid transparent;
+  border-top-color: var(--forest);
+  border-right-color: var(--forest);
+  animation: bvSpin .9s linear infinite;
+}
+@keyframes bvSpin { to { transform: rotate(360deg); } }
+
+/* The ball itself, now a child element so the ring can own the box. */
+.bv-ball i {
+  width: 20px; height: 27px; display: block; position: relative;
   background: radial-gradient(120% 120% at 35% 30%, #F2EFE6, #cfcab6);
   border-radius: 50% / 42%;
-  border: 1.5px solid rgba(15,46,34,.28);
+  border: 1.4px solid rgba(15,46,34,.30);
   animation: bvBounce 1.05s cubic-bezier(.3,.5,.4,1) infinite;
-  filter: drop-shadow(0 5px 6px rgba(15,46,34,.28));
+  filter: drop-shadow(0 3px 4px rgba(15,46,34,.28));
 }
 /* The lacing, so it reads as an oval ball and not a lozenge. */
-.bv-ball::before {
-  content: ""; position: absolute; left: 50%; top: 15%; bottom: 15%;
-  width: 2px; margin-left: -1px; background: var(--forest);
+.bv-ball i::before {
+  content: ""; position: absolute; left: 50%; top: 16%; bottom: 16%;
+  width: 1.6px; margin-left: -.8px; background: var(--forest);
 }
-.bv-ball::after {
-  content: ""; position: absolute; left: 50%; top: 27%;
-  width: 9px; height: 1.5px; margin-left: -4.5px;
-  box-shadow: 0 4px var(--forest), 0 8px var(--forest), 0 12px var(--forest);
+.bv-ball i::after {
+  content: ""; position: absolute; left: 50%; top: 28%;
+  width: 7px; height: 1.2px; margin-left: -3.5px;
+  box-shadow: 0 3px var(--forest), 0 6px var(--forest), 0 9px var(--forest);
 }
 @keyframes bvBounce {
-  0%, 100% { transform: translateY(-7px) rotate(-12deg); }
-  50%      { transform: translateY(7px) rotate(12deg); }
+  0%, 100% { transform: translateY(-3px) rotate(-11deg); }
+  50%      { transform: translateY(3px) rotate(11deg); }
 }
 
 /* Scoped veils sit on panels that are often shorter than the auth panels the
@@ -9267,7 +9295,8 @@ body.fxh-open { overflow: hidden; }
    height it goes side-by-side and drops the ball to match the text. */
 @media (min-height: 0px) {
   .bv-scoped[data-veil-compact] .bv-inner { flex-direction: row; gap: 10px; }
-  .bv-scoped[data-veil-compact] .bv-ball { width: 17px; height: 22px; }
+  .bv-scoped[data-veil-compact] .bv-ball { width: 32px; height: 32px; }
+  .bv-scoped[data-veil-compact] .bv-ball i { width: 12px; height: 16px; }
 }
 
 /* On the deep-green sheet pages the cream veil is right, but on the dark board
@@ -9279,7 +9308,8 @@ body.fxh-open { overflow: hidden; }
 .gt-dark .bv-scoped .bv-label { color: var(--cream); }
 
 @media (prefers-reduced-motion: reduce) {
-  .bv-ball { animation-duration: 2.1s; }
+  .bv-ball::after { animation-duration: 2.4s; }
+  .bv-ball i { animation-duration: 2.1s; }
 }
 
 /* ==========================================================================
@@ -9725,4 +9755,15 @@ body.fxh-open { overflow: hidden; }
    viewport instead of stranded over the artwork. */
 .app-nav {
   box-shadow: 0 10px 28px -18px rgba(0, 0, 0, .75);
+}
+
+/* An auto-assigned pick, on My Tips. Amber rather than the neutral grey of a
+   real timestamp: it is not an error, but it IS the one line on the card that
+   somebody might want to argue with, so it should not read as ordinary chrome. */
+.gfx-stamp.is-auto {
+  color: #8a6d1f;
+  background: rgba(240, 190, 60, .14);
+  border-radius: 100px;
+  padding: 2px 10px;
+  font-weight: 600;
 }
