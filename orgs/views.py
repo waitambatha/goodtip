@@ -370,12 +370,25 @@ def create_org_view(request):
                 if _verification_required(draft) and not (row and row.is_verified):
                     messages.error(
                         request,
-                        "Verify a work email at your organisation's domain before you go on.",
+                        "Send yourself a code and enter it before you go on — that "
+                        "is what proves the domain is yours.",
                     )
                     return redirect("orgs:create")
                 draft.step = step + 1
                 draft.save()
                 return redirect("orgs:create")
+
+            # No recognised action on the verify step means the submitter's
+            # name never arrived. Falling through from here would reach the
+            # generic form path below, and step 2 owns no form fields — so it
+            # would find nothing to complain about and ADVANCE, carrying an
+            # unverified draft past the one gate that exists to stop it.
+            #
+            # That is not hypothetical: a submit handler that disabled the
+            # pressed button stripped `action` from every POST this wizard
+            # made. Fixed at source in gt-busy.js, but the step must not be
+            # one dropped field away from skipping its own check.
+            return redirect("orgs:create")
 
         form = _draft_form(draft, parent_org, bound=True)
         errors = _step_errors(form, step)

@@ -524,7 +524,32 @@ def dashboard_view(request):
         # they say "go back to 16".
         numbers = sorted(set(org_rounds.values_list("round_number", flat=True)))
         if numbers:
-            in_play = selected["round"].round_number if selected["round"] else numbers[-1]
+            # "This week" must be a round you can actually DO something with.
+            #
+            # It used to come from current_round(), which is the earliest round
+            # holding an unplayed game anywhere in the org. Round numbers are
+            # not aligned across codes — one live league sits at NRL round 25
+            # and AFLW round 2 — so that returned 2, and the navigator then
+            # showed NRL round 2 alongside it: eight games played back in
+            # March, every team unclickable, under a label reading "this week".
+            # The screen looked broken when it was merely pointing at the wrong
+            # round.
+            #
+            # The tipping window is the honest source: it names the rounds that
+            # are open to tip right now, per series. The earliest of those is
+            # where somebody wants to land.
+            from tipping.services import tip_window as _tw
+
+            open_ids = [rid for rid, st in _tw(selected["org"]).items() if st["open"]]
+            open_numbers = sorted(
+                org_rounds.filter(id__in=open_ids).values_list("round_number", flat=True)
+            )
+            if open_numbers:
+                in_play = open_numbers[0]
+            elif selected["round"]:
+                in_play = selected["round"].round_number
+            else:
+                in_play = numbers[-1]
             try:
                 wanted = int(request.GET.get("round", ""))
             except (TypeError, ValueError):
@@ -628,6 +653,29 @@ def dashboard_view(request):
             if g.can_tip:
                 open_games += 1
             games.append(g)
+
+        # PLAYABLE SERIES FIRST.
+        #
+        # One round number is not one round. Codes run their own seasons and
+        # are nowhere near each other: for a league on AFL+NRL, "round 2" is
+        # NRL round 2 (played in March), AFL round 2 (March), Origin game 2
+        # (June), NRLW round 2 (July) — and AFLW round 2, which is the only one
+        # still to come. Ordered by kickoff, the four dead groups sat on top and
+        # the one live group was below the fold, so the first team anybody
+        # clicked belonged to a match finished five months ago and nothing
+        # happened. It was not broken; it was buried.
+        #
+        # Sorting by (round finished, kickoff) floats whatever can still be
+        # tipped to the top and leaves the rest below in the order they were
+        # played. Chronology is preserved inside each group, which is what
+        # matters once you are reading one.
+        played_round = {}
+        for g in games:
+            if g.round_id not in played_round:
+                played_round[g.round_id] = True
+            if not g.is_locked:
+                played_round[g.round_id] = False
+        games.sort(key=lambda g: (played_round.get(g.round_id, False), g.kickoff_at, g.id))
 
         if round_nav is not None:
             round_nav["graded"] = round_graded

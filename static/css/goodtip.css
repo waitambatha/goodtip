@@ -5220,7 +5220,10 @@ body.sheet-open { overflow: hidden; }
 
 /* Submit feedback — see gt-busy.js. The button stops being a button and starts
    being a status line, so a slow signup reads as working rather than ignored. */
-form.is-busy [type="submit"] { opacity: .82; cursor: progress; }
+/* pointer-events blocks the second click during the window where the button
+   is deliberately NOT yet `disabled` — see gt-busy.js, where disabling it
+   synchronously would strip the submitter's name and value from the POST. */
+form.is-busy [type="submit"] { opacity: .82; cursor: progress; pointer-events: none; }
 form.is-busy [type="submit"]:hover { transform: none; }
 .busy-dot {
   display: inline-block; width: 14px; height: 14px; margin-right: 9px;
@@ -9353,11 +9356,22 @@ body.fxh-open { overflow: hidden; }
    failed to load rather than as a control. A navigator is a control cluster,
    so it is sized like one. */
 .rnav {
-  display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  /* END TO END, directly under the competition chips.
+     The chips and the navigator are one control group in use — pick a code,
+     then move through its rounds — so they read as a pair when they share a
+     width and sit together. The earlier inline-flex version hugged its content
+     and floated at the left edge of a full-width filter above it, which made
+     two related controls look unrelated. */
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   background: var(--gt-card); border: 1px solid var(--gt-hair);
-  border-radius: 100px; padding: 5px 6px; margin: 0 0 14px;
-  max-width: 100%; position: relative;
+  border-radius: 100px; padding: 5px 8px; margin: -4px 0 14px;
+  width: 100%; position: relative;
 }
+/* The select takes the slack so the arrows stay pinned to the ends, which is
+   what makes a full-width bar read as a navigator rather than as a stretched
+   pill with controls rattling around inside it. */
+.rnav .rnav-pick { flex: 1 1 auto; }
+.rnav .rnav-pick select { width: 100%; max-width: none; text-align: left; }
 
 .rnav-arrow {
   width: 34px; height: 34px; flex: none; border-radius: 50%;
@@ -9670,3 +9684,7 @@ body.fxh-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .is-btn-busy::after { animation-duration: 1.8s; }
 }
+
+/* A finished round's head reports what happened, not a lock time that passed
+   months ago. Muted, because it is context for games you can no longer act on. */
+.fxr-locks.done { color: rgba(15,46,34,.5); font-weight: 600; }

@@ -62,7 +62,25 @@
       if (form.classList.contains('is-busy')) { e.preventDefault(); return; }
 
       form.classList.add('is-busy');
-      btn.disabled = true;
+      /* DO NOT disable the button here.
+       *
+       * The browser builds the form's entry list AFTER the submit event
+       * returns, and a disabled control is excluded from it. Disabling the
+       * submitter synchronously therefore STRIPS its own name and value from
+       * the POST — silently, with no error anywhere.
+       *
+       * That broke the create-an-organisation wizard completely. It tells its
+       * twelve actions apart by the submitter's value (send_code, verify_code,
+       * next, save…), so every one of them arrived as no action at all:
+       * pressing "Send me a code" sent nothing, issued no code, and let the
+       * step advance as though the address had been verified.
+       *
+       * Deferred by a macrotask instead, which runs after the payload is
+       * built. The class goes on immediately, so CSS blocks pointer events in
+       * the meantime and the is-busy guard above catches a second submit —
+       * the button is unusable straight away, it just is not yet `disabled`.
+       */
+      setTimeout(function () { btn.disabled = true; }, 0);
       btn.setAttribute('aria-busy', 'true');
 
       /* TWO TREATMENTS, chosen by whether the label was authored.

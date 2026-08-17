@@ -68,6 +68,20 @@
     var el = evt.detail && evt.detail.elt;
     if (!el || !el.closest) return null;
 
+    /* data-veil-for wins over everything, including the htmx target.
+     *
+     * The round arrows and competition chips REPLACE the whole slate panel —
+     * status bar, filter, navigator and fixtures — because that is what has to
+     * stay consistent. But the thing a reader is watching is the fixture list,
+     * and veiling the panel greys out the very controls they just pressed,
+     * including the round they are trying to read. Pointing the veil at the
+     * fixtures alone keeps the navigator legible while its results load. */
+    var named = el.getAttribute && el.getAttribute('data-veil-for');
+    if (named) {
+      var target = document.querySelector(named);
+      if (target) return target;
+    }
+
     var explicit = el.closest('[data-veil]');
     if (explicit) return explicit;
 

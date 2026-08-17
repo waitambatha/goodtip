@@ -33,14 +33,14 @@ data-veil: pressing a code used to be followed by a silent round trip with
 nothing on screen to say it had registered. The filter veils itself while the
 new slate is fetched — see gt-veil.js.
 {% endcomment %}
-<div class="sfilter" data-veil data-veil-compact data-veil-label="Loading fixtures">
+<div class="sfilter">
   <p class="sfilter-lead">Show these competitions</p>
   <div class="sfilter-chips" role="group" aria-label="Filter by competition">
     <a class="sfilter-chip{% if not active_slugs %} on{% endif %}"
        href="{{ base }}{% if keep %}?{{ keep }}{% endif %}"
        {% if swap_target %}
        hx-get="{{ base }}?slate=1{% if keep %}&amp;{{ keep }}{% endif %}"
-       hx-target="{{ swap_target }}" hx-swap="outerHTML"
+       hx-target="{{ swap_target }}" hx-swap="outerHTML" data-veil-for="#roundFixtures"
        hx-push-url="{{ base }}{% if keep %}?{{ keep }}{% endif %}"
        {% endif %}
        {% if not active_slugs %}aria-current="true"{% endif %}>All competitions</a>
@@ -49,7 +49,7 @@ new slate is fetched — see gt-veil.js.
        href="{{ base }}?series={{ s.slug }}{% if keep %}&amp;{{ keep }}{% endif %}"
        {% if swap_target %}
        hx-get="{{ base }}?slate=1&amp;series={{ s.slug }}{% if keep %}&amp;{{ keep }}{% endif %}"
-       hx-target="{{ swap_target }}" hx-swap="outerHTML"
+       hx-target="{{ swap_target }}" hx-swap="outerHTML" data-veil-for="#roundFixtures"
        hx-push-url="{{ base }}?series={{ s.slug }}{% if keep %}&amp;{{ keep }}{% endif %}"
        {% endif %}
        {% if s.slug in active_slugs %}aria-current="true"{% endif %}>{{ s.name }}</a>
