@@ -184,9 +184,24 @@
     return el.closest('[data-veil]');
   }
 
+  /* An htmx-driven control must NOT also go through this path.
+   *
+   * The round arrows carry both an href (so they work without JavaScript, and
+   * can be opened in a new tab) and an hx-get. Running both handlers is not
+   * merely redundant, it leaks: the htmx path tracks its veil in `pending` and
+   * clears it on afterRequest, while this path fires a bare timeout. A
+   * response that lands inside SHOW_AFTER clears nothing — because nothing is
+   * showing yet — and the timeout then paints a veil that no event will ever
+   * take down, freezing the panel it covers.
+   */
+  function htmxDriven(el) {
+    return el.hasAttribute('hx-get') || el.hasAttribute('hx-post') ||
+           el.hasAttribute('data-hx-get') || el.hasAttribute('data-hx-post');
+  }
+
   document.addEventListener('click', function (e) {
     var link = e.target.closest && e.target.closest('a[href]');
-    if (!link) return;
+    if (!link || htmxDriven(link)) return;
     // Modified clicks open elsewhere — this document is not going anywhere, so
     // veiling it would leave a panel greyed out with nothing coming.
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || link.target === '_blank') return;
@@ -199,7 +214,8 @@
 
   document.addEventListener('submit', function (e) {
     var form = e.target;
-    if (!form || form.method && form.method.toLowerCase() !== 'get') return;
+    if (!form || htmxDriven(form)) return;
+    if (form.method && form.method.toLowerCase() !== 'get') return;
     var scope = navScope(form);
     if (!scope) return;
     setTimeout(function () { show(scope, label(scope)); }, SHOW_AFTER);

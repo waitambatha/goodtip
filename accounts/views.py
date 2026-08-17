@@ -637,6 +637,32 @@ def dashboard_view(request):
             # what switches the panel from tipping to reporting.
             round_nav["played"] = round_graded > 0
 
+    # ---- htmx: just the slate ------------------------------------------
+    #
+    # The competition filter and the round navigator change this one region and
+    # nothing else on the page, so they swap it in place rather than reloading
+    # the document. Returning early here — from the SAME view, on the same
+    # context — is what stops the swapped markup drifting from the first paint;
+    # a second view rendering "the fixtures, roughly" is a copy that goes stale
+    # the first time either one is edited.
+    #
+    # Everything below this point (the preview round for people with no group,
+    # the news column, the prompt rotator) is not in the partial, so returning
+    # before it is also the cheaper path.
+    #
+    # `c` is supplied because the full page binds it with {% with c=selected %}
+    # around the include, and the partial cannot see that when rendered alone.
+    if selected and request.headers.get("HX-Request") and request.GET.get("slate"):
+        return render(request, "partials/dashboard_slate.html", {
+            "c": selected,
+            "selected": selected,
+            "games": games,
+            "open_games": open_games,
+            "org_series": org_series,
+            "active_slugs": active_slugs,
+            "round_nav": round_nav,
+        })
+
     # Someone who hasn't joined a group yet used to land on an empty page, which
     # reads as "nothing on" rather than "you're one step away". Rounds hang off
     # an org, so there is no such thing as a global fixture list — we borrow the

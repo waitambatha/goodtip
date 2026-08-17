@@ -280,146 +280,7 @@ impossible. See gt-busy.js.
       data-busy="Saving your tips">
       {% csrf_token %}
 
-      {% comment %}
-      Read-only only when every game has started. The old test was the round's
-      lockout — its FIRST kickoff — so this banner appeared while most of the
-      round was still days away and perfectly tippable.
-      {% endcomment %}
-      {% if not open_games %}
-      <div class="slip-bar locked">
-        <div class="slip-info"><b>Every game in this round has started</b><span>Tips are final and shown read-only below.</span></div>
-        <a href="{% url 'tipping:my_tips' c.org.id %}" class="abtn abtn-dark">Review in My Tips &rarr;</a>
-      </div>
-      {% else %}
-      <div class="slip-bar">
-        <div class="slip-info"><b>Make your tips right here</b><span>Tap the team you think wins each match, then confirm. You can change any pick until the round locks.</span></div>
-        <div class="slip-meter"><b id="slipCount">{{ c.tips_done }}</b> of {{ c.tips_total }} picked</div>
-        {# opens the review sheet; the sheet's own button does the real submit #}
-        <button type="button" class="abtn abtn-primary abtn-lg" id="slipReview">Confirm my tips</button>
-      </div>
-      <div class="pbar slim" style="margin-bottom:14px;"><i id="slipBar" style="width:{% widthratio c.tips_done c.tips_total|default:1 100 %}%"></i></div>
-      {% endif %}
-
-      {% comment %}
-      Competition filter. A member in a two-code league gets both slates
-      interleaved by kickoff; this narrows the list to the one they came for.
-      Carries the org through, or switching code would bounce them to whatever
-      the default league is.
-      {% endcomment %}
-      {% url 'dashboard' as dash_url %}
-      {% include "partials/series_filter.html" with base=dash_url keep="org="|add:c.org.id keep_org=c.org.id %}
-
-      {% comment %}
-      ROUND NAVIGATOR.
-      The fixtures list used to run across every round still to play, ordered
-      by kickoff. For a league tipping two codes that interleaves two round
-      numberings, so you scrolled past "Round 2, Round 24, Round 26, Round 25"
-      with games one after another and no way to orient yourself — and a round
-      already played was not in the list at all, so "how did I go last week"
-      meant leaving for My Tips.
-
-      Arrows for the neighbours, a dropdown for the jump. The dropdown is a
-      real <select> submitting a GET, so it works without JavaScript and is
-      keyboard-navigable for free; the arrows are plain links for the same
-      reason.
-      {% endcomment %}
-      {% if round_nav %}
-      <div class="rnav" data-veil data-veil-compact data-veil-label="Loading round">
-        {% if round_nav.prev %}
-        <a class="rnav-arrow" href="?org={{ c.org.id }}&amp;round={{ round_nav.prev }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-           aria-label="Round {{ round_nav.prev }}" title="Round {{ round_nav.prev }}">
-          <svg><use href="#ic-arrow-left"/></svg>
-        </a>
-        {% else %}
-        <span class="rnav-arrow is-off" aria-hidden="true"><svg><use href="#ic-arrow-left"/></svg></span>
-        {% endif %}
-
-        <form method="get" action="" class="rnav-pick">
-          <input type="hidden" name="org" value="{{ c.org.id }}">
-          {% for s in active_slugs %}<input type="hidden" name="series" value="{{ s }}">{% endfor %}
-          <label class="rnav-lab" for="rnavSel">Round</label>
-          <select name="round" id="rnavSel" onchange="this.form.submit()" aria-label="Choose a round">
-            {% for n in round_nav.numbers %}
-            <option value="{{ n }}" {% if n == round_nav.current %}selected{% endif %}>
-              Round {{ n }}{% if n == round_nav.in_play %} &middot; this week{% endif %}
-            </option>
-            {% endfor %}
-          </select>
-          <noscript><button type="submit" class="abtn abtn-dark abtn-sm">Go</button></noscript>
-        </form>
-
-        {% if round_nav.next %}
-        <a class="rnav-arrow" href="?org={{ c.org.id }}&amp;round={{ round_nav.next }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-           aria-label="Round {{ round_nav.next }}" title="Round {{ round_nav.next }}">
-          <svg><use href="#ic-arrow-right"/></svg>
-        </a>
-        {% else %}
-        <span class="rnav-arrow is-off" aria-hidden="true"><svg><use href="#ic-arrow-right"/></svg></span>
-        {% endif %}
-
-        {% comment %}
-        The result strip. Only for a round with graded tips — showing "0 points"
-        against a round that has not been played would read as a bad week
-        rather than as one that has not happened.
-        {% endcomment %}
-        {% if round_nav.played %}
-        <div class="rnav-score">
-          <span class="rns-hit">{{ round_nav.correct }}<span>/{{ round_nav.graded }}</span></span>
-          <span class="rns-lab">correct</span>
-          <span class="rns-pts">{{ round_nav.points }}<span>pts</span></span>
-        </div>
-        {% endif %}
-        {% comment %}
-        The way home, shown whenever you have navigated away — including on a
-        played round, which is the most likely place to be. Stepping back
-        through six rounds and then having to step forward six times to return
-        is the kind of thing that makes a navigator feel like a trap.
-        {% endcomment %}
-        {% if not round_nav.is_in_play %}
-        <a class="rnav-now{% if round_nav.played %} is-quiet{% endif %}"
-           href="?org={{ c.org.id }}&amp;round={{ round_nav.in_play }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}">
-          This week
-        </a>
-        {% endif %}
-      </div>
-      {% endif %}
-
-      {# the round's fixtures scroll in place, keeping Confirm reachable below #}
-      <div class="fixtures gt-scroll">
-        {% regroup games by round as round_groups %}
-        {% for grp in round_groups %}
-        {% comment %}
-        The list runs in kickoff order across rounds, so without a heading a
-        member cannot tell where one round ends and the next begins — which
-        matters, because points and ladders are counted per round.
-        {% endcomment %}
-        {% comment %}
-        A round outside the tipping window is still listed — seeing what is
-        coming is the point of the list — but it says plainly that it is not
-        open yet, rather than offering controls that would be refused on
-        submit.
-        {% endcomment %}
-        <div class="fx-roundhead{% if not grp.list.0.round_open %} is-shut{% endif %}">
-          <span class="fxr-n">Round {{ grp.grouper.round_number }}</span>
-          <span class="fxr-series">{{ grp.grouper.series }}</span>
-          {% if grp.list.0.round_open %}
-          <span class="fxr-locks">Locks {{ grp.grouper.lockout_at|date:"D j M, g:i A" }}</span>
-          {% else %}
-          {# names the round it waits on, so "locked" is an explanation #}
-          <span class="fxr-locks shut"><svg><use href="#ic-lock"/></svg> {{ grp.list.0.lock_note }}</span>
-          {% endif %}
-        </div>
-        {% for g in grp.list %}
-        {% comment %}
-        The same card My Tips uses, in "form" mode: the picks ride hidden
-        radios and go up together when Confirm is pressed. Each club is named
-        once — pressing the club is the tip — and the MatchReader read sits
-        behind a button rather than filling the card on every fixture.
-        {% endcomment %}
-        {% include "partials/fixture_card.html" with match=g reader=g.reader selection=g.my_tip editable=g.can_tip lock_note=g.lock_note mode="form" %}
-        {% endfor %}
-        {% endfor %}
-      </div>
+      {% include "partials/dashboard_slate.html" %}
 
       {% comment %}
       Review sheet. Lives inside the form so its confirm button is a plain
@@ -608,26 +469,41 @@ impossible. See gt-busy.js.
        Picking a team is handled by the delegated listener in gt-fixture.js —
        binding it per row here depended on this script running after the
        fixtures and covered nothing added afterwards. What stays is the
-       initial count, for picks already saved when the page loads. */
+       initial count, for picks already saved when the page loads.
+
+       NOTHING INSIDE #slipPanel IS CACHED. The competition filter and the
+       round navigator swap that panel out from under this script, so a
+       NodeList of rows captured at load — or a button found once by id —
+       would point at detached nodes the moment either was used: the counter
+       would freeze on the old round's total and Confirm would review a slate
+       that is no longer on screen. Every lookup below is therefore made at the
+       moment it is needed, and the two controls are delegated from the form,
+       which is outside the swapped region and survives.
+
+       The review sheet is likewise kept OUTSIDE #slipPanel in the markup for
+       exactly this reason — it is built from live DOM each time it opens, so
+       it always describes the round currently shown. */
     var slip = document.getElementById('tipSlip');
     if (slip) {
-      var rows = slip.querySelectorAll('.fxc');
-      var count = document.getElementById('slipCount');
-      var bar = document.getElementById('slipBar');
+      function rows(){ return slip.querySelectorAll('.fxc'); }
       function slipRefresh(){
-        var n = 0;
-        rows.forEach(function(r){ if (r.querySelector('input:checked')) n++; });
+        var r = rows(), n = 0;
+        var count = document.getElementById('slipCount');
+        var bar = document.getElementById('slipBar');
+        r.forEach(function(row){ if (row.querySelector('input:checked')) n++; });
         if (count) count.textContent = n;
-        if (bar && rows.length) bar.style.width = Math.round(n / rows.length * 100) + '%';
+        if (bar && r.length) bar.style.width = Math.round(n / r.length * 100) + '%';
       }
       slipRefresh();
+      /* Recount after a swap: the new round arrives with its own saved picks,
+         and the bar would otherwise still be showing the previous round's. */
+      document.body.addEventListener('htmx:afterSettle', slipRefresh);
 
       /* ---- review sheet ----
          Built from the form's own radios each time it opens, so the list shown
          is exactly what the submit will post. */
       var sheet = document.getElementById('tipSheet');
-      var reviewBtn = document.getElementById('slipReview');
-      if (sheet && reviewBtn) {
+      if (sheet) {
         var tsList = document.getElementById('tsList');
         var tsCount = document.getElementById('tsCount');
         var tsMiss = document.getElementById('tsMiss');
@@ -635,10 +511,13 @@ impossible. See gt-busy.js.
         var tsMissP = document.getElementById('tsMissP');
         var lastFocus = null;
 
+        /* The sheet's own elements are safe to hold: #tipSheet sits outside
+           #slipPanel precisely so a swap cannot detach them. Only the FIXTURE
+           rows are re-read, because those are what changes. */
         function buildSheet(){
           tsList.innerHTML = '';
           var picked = 0, missing = 0;
-          rows.forEach(function(row){
+          rows().forEach(function(row){
             var chosen = row.querySelector('input:checked');
             var teams = row.querySelectorAll('.fxc-team');
             /* :not(.crest) matters, the crest tag emits its own <span> before
@@ -705,7 +584,13 @@ impossible. See gt-busy.js.
           if (lastFocus) lastFocus.focus();
         }
 
-        reviewBtn.addEventListener('click', openSheet);
+        /* Delegated from the form, which outlives the swap. #slipReview lives
+           inside #slipPanel, so a direct binding would be lost the first time
+           the round or the competition filter changed — leaving a Confirm
+           button that silently did nothing. */
+        slip.addEventListener('click', function(e){
+          if (e.target.closest && e.target.closest('#slipReview')) openSheet();
+        });
         sheet.querySelectorAll('[data-sheet-close]').forEach(function(el){
           el.addEventListener('click', closeSheet);
         });

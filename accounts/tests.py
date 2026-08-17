@@ -215,3 +215,109 @@ class PasswordResetUnknownEmailTests(TestCase):
         resp = self.client.post(reverse("password_reset"), {"email": "known@example.com"})
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(len(mail.outbox), 1)
+
+
+class DashboardRoundNavTests(TestCase):
+    """The round navigator and its htmx swap.
+
+    Both halves matter and both are easy to break silently: the navigator is
+    what replaced a flat cross-round list nobody could orient in, and the swap
+    is what stops changing round reloading the whole page.
+    """
+
+    def setUp(self):
+        from catalog.models import Competition, Season, Series, Sport
+        from orgs.models import OrgMember, Organisation
+        from tipping.models import Match, Round, Team
+
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            email="nav@example.com", password="x", display_name="Nav"
+        )
+        sport = Sport.objects.create(name="Nav Footy", slug="nav-footy")
+        self.series = Series.objects.create(sport=sport, name="Nav Series", slug="nav-series")
+        season = Season.objects.create(year=2099, label="2099")
+        self.comp = Competition.objects.create(
+            sport=sport, season=season, name="Nav Comp", slug="nav-comp",
+        )
+        self.comp.series.add(self.series)
+        self.org = Organisation.objects.create(name="Nav League", season=season)
+        self.org.competitions.add(self.comp)
+        OrgMember.objects.create(user=self.user, org=self.org)
+
+        home = Team.objects.create(name="Reds", slug="nav-reds", series=self.series)
+        away = Team.objects.create(name="Blues", slug="nav-blues", series=self.series)
+        now = timezone.now()
+        # One played round, then THREE still to come. Three matters: the
+        # tipping window is two rounds per series, so a fourth is needed for
+        # anything to be legitimately shut — with only two ahead, everything is
+        # open and the window test would pass for the wrong reason.
+        for n, offset in ((1, -14), (2, 3), (3, 10), (4, 17)):
+            rnd = Round.objects.create(
+                org=self.org, round_number=n, series=self.series, competition=self.comp,
+                lockout_at=now + timedelta(days=offset),
+            )
+            Match.objects.create(
+                round=rnd, home_team=home, away_team=away,
+                kickoff_at=now + timedelta(days=offset),
+                status="complete" if offset < 0 else "scheduled",
+            )
+        self.client.force_login(self.user)
+
+    def test_the_navigator_lists_every_round(self):
+        body = self.client.get(f"/dashboard/?org={self.org.id}").content.decode()
+        self.assertIn('id="rnavSel"', body)
+        for n in (1, 2, 3, 4):
+            self.assertIn(f'value="{n}"', body)
+
+    def test_an_htmx_request_returns_only_the_slate(self):
+        """The swap must not carry the nav, the news column or a <head>.
+
+        Sending the whole document to replace one panel would work by accident
+        and cost several times the bytes, so this pins the contract.
+        """
+        r = self.client.get(
+            f"/dashboard/?slate=1&org={self.org.id}&round=1", HTTP_HX_REQUEST="true",
+        )
+        body = r.content.decode()
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("<!DOCTYPE", body)
+        self.assertNotIn("<nav", body)
+        self.assertTrue(body.lstrip().startswith('<div id="slipPanel">'))
+
+    def test_the_same_url_without_htmx_returns_the_whole_page(self):
+        """A shared or bookmarked round URL has to be a real page.
+
+        hx-push-url puts these in the address bar, so they get copied and
+        pasted — landing on a bare fragment would be a broken link.
+        """
+        body = self.client.get(
+            f"/dashboard/?slate=1&org={self.org.id}&round=1"
+        ).content.decode()
+        self.assertIn("<!DOCTYPE", body)
+
+    def test_the_slate_carries_the_requested_round(self):
+        r = self.client.get(
+            f"/dashboard/?slate=1&org={self.org.id}&round=3", HTTP_HX_REQUEST="true",
+        )
+        self.assertIn('value="3" selected', r.content.decode())
+
+    def test_a_round_outside_the_window_is_shown_but_shut(self):
+        """The two-round rule, visible rather than merely enforced on submit.
+
+        Rounds 2 and 3 are the window, so round 4 is the first that must render
+        shut — present, so you can see what is coming, but not offering
+        controls that submit_tip would refuse.
+        """
+        r = self.client.get(
+            f"/dashboard/?slate=1&org={self.org.id}&round=4", HTTP_HX_REQUEST="true",
+        )
+        body = r.content.decode()
+        self.assertIn("fxc-state is-shut", body)
+        self.assertNotIn("fxc-state is-open", body)
+
+    def test_an_unknown_round_falls_back_rather_than_erroring(self):
+        """A stale bookmark should land somewhere useful, not on a 404."""
+        r = self.client.get(f"/dashboard/?org={self.org.id}&round=99")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('id="rnavSel"', r.content.decode())

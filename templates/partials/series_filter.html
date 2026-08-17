@@ -18,22 +18,40 @@ link to a combination. Nothing in the interface produces one now.
 
 Expects: org_series, active_slugs (selected slugs), base, keep (query string
          to carry through, e.g. the org).
+
+Optional: swap_target — a CSS selector. When given, the chips become htmx
+         requests that replace that element instead of reloading the page, and
+         push the same URL they would have navigated to. Opt-in because this
+         partial is shared: the dashboard has a slate panel to swap, My Tips
+         renders its list differently and is better off with the plain
+         navigation. The href is identical either way, so nothing is lost when
+         JavaScript is off or the attribute is absent.
 {% endcomment %}
 {% if org_series|length > 1 %}
 {% comment %}
-data-veil: pressing a code is a full page navigation, so the click was followed
-by a silent round trip with nothing on screen to say it had registered. The
-filter now veils itself while the new slate is fetched — see gt-veil.js.
+data-veil: pressing a code used to be followed by a silent round trip with
+nothing on screen to say it had registered. The filter veils itself while the
+new slate is fetched — see gt-veil.js.
 {% endcomment %}
 <div class="sfilter" data-veil data-veil-compact data-veil-label="Loading fixtures">
   <p class="sfilter-lead">Show these competitions</p>
   <div class="sfilter-chips" role="group" aria-label="Filter by competition">
     <a class="sfilter-chip{% if not active_slugs %} on{% endif %}"
        href="{{ base }}{% if keep %}?{{ keep }}{% endif %}"
+       {% if swap_target %}
+       hx-get="{{ base }}?slate=1{% if keep %}&amp;{{ keep }}{% endif %}"
+       hx-target="{{ swap_target }}" hx-swap="outerHTML"
+       hx-push-url="{{ base }}{% if keep %}?{{ keep }}{% endif %}"
+       {% endif %}
        {% if not active_slugs %}aria-current="true"{% endif %}>All competitions</a>
     {% for s in org_series %}
     <a class="sfilter-chip{% if s.slug in active_slugs %} on{% endif %}"
        href="{{ base }}?series={{ s.slug }}{% if keep %}&amp;{{ keep }}{% endif %}"
+       {% if swap_target %}
+       hx-get="{{ base }}?slate=1&amp;series={{ s.slug }}{% if keep %}&amp;{{ keep }}{% endif %}"
+       hx-target="{{ swap_target }}" hx-swap="outerHTML"
+       hx-push-url="{{ base }}?series={{ s.slug }}{% if keep %}&amp;{{ keep }}{% endif %}"
+       {% endif %}
        {% if s.slug in active_slugs %}aria-current="true"{% endif %}>{{ s.name }}</a>
     {% endfor %}
   </div>
