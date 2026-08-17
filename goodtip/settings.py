@@ -87,6 +87,14 @@ DATABASES = {
     "default": dj_database_url.parse(
         os.environ["DATABASE_URL"],
         conn_max_age=600,
+        # Validate a reused connection before handing it out, and reconnect if
+        # it has died. Without this, a persistent connection killed at the far
+        # end — a database restart, an idle timeout, a firewall reaping a quiet
+        # TCP session — is handed to the next request anyway and fails with
+        # "the connection is closed". conn_max_age=600 makes that MORE likely,
+        # not less: the longer a connection is kept, the more chance it is
+        # dead by the time it is next used.
+        conn_health_checks=True,
     )
 }
 

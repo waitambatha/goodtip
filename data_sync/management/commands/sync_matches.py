@@ -33,6 +33,7 @@ import logging
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
+from django.db import close_old_connections, connection
 from django.db.models import Q
 from django.utils import timezone
 
@@ -170,6 +171,30 @@ class Command(BaseCommand):
         for kind, targets in plans:
             for org, round_number, competition in targets:
                 pairs.add((org.id, round_number, competition))
+                # Drop any connection that has outlived CONN_MAX_AGE before
+                # starting the next target.
+                #
+                # A full-season sweep runs for many minutes and spends most of
+                # them ASLEEP in the scrapers' throttle — six seconds between
+                # nrl.com requests, by design. A connection idle that long is
+                # exactly what a database idle-timeout or a firewall reaps, and
+                # the next query then dies with "the connection is closed",
+                # taking the whole sweep with it however much was left to do.
+                # That is not hypothetical: it is how the first full sweep
+                # ended.
+                #
+                # conn_health_checks in settings covers the web workers, which
+                # get a fresh request cycle to validate on. A management
+                # command has no request cycle, so it has to do its own hygiene.
+                #
+                # Never inside a transaction. TestCase wraps every test in one,
+                # and close_old_connections sees autocommit disabled, concludes
+                # the connection is unusable and closes it — taking the test's
+                # transaction with it. Production sync runs are not in an
+                # atomic block here, so the guard costs nothing where it
+                # matters and keeps the suite honest.
+                if not connection.in_atomic_block:
+                    close_old_connections()
                 try:
                     with SyncRun.record(
                         kind=kind, competition=competition, org=org, round_number=round_number,
