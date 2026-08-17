@@ -70,7 +70,7 @@ class WeightedScoringTests(TestCase):
 
     def test_leaderboard_sums_weighted_points(self):
         self._correct_tip(self._round(2, Round.STAGE_FINALS))
-        row = leaderboard_for_org(self.org).get(id=self.user.id)
+        row = next(r for r in leaderboard_for_org(self.org) if r.id == self.user.id)
         self.assertEqual(row.points, 2)
         self.assertEqual(row.tips_correct, 1)
 
@@ -227,3 +227,190 @@ class MatchStatePollTests(TestCase):
         match = self._match(status=Match.STATUS_LIVE)
         r = self.client.get(reverse("tipping:match_state", args=[match.id]))
         self.assertEqual(r.status_code, 302)
+
+
+class AddendumScoringTests(TestCase):
+    """Scoring & Tiebreaker Addendum rev 3, §1 and §2."""
+
+    def setUp(self):
+        from catalog.models import Season, Series, Sport
+        from orgs.models import OrgMember, Organisation
+        sport = Sport.objects.create(name="Add Footy", slug="add-footy")
+        self.series = Series.objects.create(sport=sport, name="Add Series", slug="add-series")
+        season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(name="Add League", season=season)
+        self.user = User.objects.create_user(email="a1@x.com", password="x", display_name="A1")
+        self.other = User.objects.create_user(email="a2@x.com", password="x", display_name="A2")
+        OrgMember.objects.create(user=self.user, org=self.org)
+        OrgMember.objects.create(user=self.other, org=self.org)
+        self.home = Team.objects.create(name="H", slug="add-h", series=self.series)
+        self.away = Team.objects.create(name="A", slug="add-a", series=self.series)
+
+    def _match(self, stage):
+        rnd = Round.objects.create(
+            org=self.org, round_number=1, series=self.series,
+            stage=stage, lockout_at=timezone.now(),
+        )
+        return Match.objects.create(
+            round=rnd, home_team=self.home, away_team=self.away, kickoff_at=timezone.now(),
+        )
+
+    # ---- §1 draws ------------------------------------------------------
+
+    def test_a_drawn_regular_round_pays_nothing(self):
+        m = self._match(Round.STAGE_REGULAR)
+        Tip.objects.create(user=self.user, match=m, org=self.org, selection="home")
+        record_match_result(m, 20, 20)
+        t = Tip.objects.get(user=self.user, match=m)
+        self.assertEqual(t.points_awarded, 0)
+        self.assertFalse(t.is_correct)
+
+    def test_a_drawn_origin_game_pays_two(self):
+        """Origin scores "4 pts / 2 pts draw" — three games a series is too few
+        for one of them to count for nothing."""
+        m = self._match(Round.STAGE_ORIGIN)
+        Tip.objects.create(user=self.user, match=m, org=self.org, selection="home")
+        Tip.objects.create(user=self.other, match=m, org=self.org, selection="away")
+        record_match_result(m, 12, 12)
+        # Both sides, because nobody picked a winner that existed.
+        for u in (self.user, self.other):
+            self.assertEqual(Tip.objects.get(user=u, match=m).points_awarded, 2)
+
+    def test_a_correct_origin_tip_still_pays_four(self):
+        m = self._match(Round.STAGE_ORIGIN)
+        Tip.objects.create(user=self.user, match=m, org=self.org, selection="home")
+        record_match_result(m, 20, 10)
+        self.assertEqual(Tip.objects.get(user=self.user, match=m).points_awarded, 4)
+
+    def test_a_postponed_match_is_not_scored_either_way(self):
+        m = self._match(Round.STAGE_REGULAR)
+        Tip.objects.create(user=self.user, match=m, org=self.org, selection="home")
+        m.status = Match.STATUS_POSTPONED
+        m.save(update_fields=["status"])
+        record_match_result(m, 30, 10)
+        t = Tip.objects.get(user=self.user, match=m)
+        self.assertIsNone(t.is_correct)
+        self.assertEqual(t.points_awarded, 0)
+
+    # ---- §2 missed-tip default -----------------------------------------
+
+    def test_a_missed_tip_defaults_to_the_away_side(self):
+        m = self._match(Round.STAGE_REGULAR)
+        record_match_result(m, 10, 30)          # away won
+        t = Tip.objects.get(user=self.user, match=m)
+        self.assertEqual(t.selection, "away")
+        self.assertTrue(t.is_auto)
+        self.assertTrue(t.is_correct)
+        self.assertEqual(t.points_awarded, 1)
+
+    def test_an_auto_tip_can_be_wrong_like_any_other(self):
+        m = self._match(Round.STAGE_REGULAR)
+        record_match_result(m, 30, 10)          # home won
+        t = Tip.objects.get(user=self.user, match=m)
+        self.assertEqual(t.points_awarded, 0)
+        self.assertFalse(t.is_correct)
+
+    def test_a_real_tip_is_never_overwritten(self):
+        m = self._match(Round.STAGE_REGULAR)
+        Tip.objects.create(user=self.user, match=m, org=self.org, selection="home")
+        record_match_result(m, 30, 10)
+        t = Tip.objects.get(user=self.user, match=m)
+        self.assertEqual(t.selection, "home")
+        self.assertFalse(t.is_auto)
+
+    def test_filling_twice_does_not_duplicate(self):
+        """Results run every fifteen minutes; a re-grade must not stack tips."""
+        m = self._match(Round.STAGE_REGULAR)
+        record_match_result(m, 10, 30)
+        record_match_result(m, 10, 30)
+        self.assertEqual(Tip.objects.filter(match=m).count(), 2)   # one per member
+
+
+class TiebreakerTests(TestCase):
+    """Addendum §3: cross-code, then countback, then co-champions."""
+
+    def setUp(self):
+        from catalog.models import Season, Series, Sport
+        from orgs.models import OrgMember, Organisation
+        # The seeded NRL/NRLW, not new rows: Series.name is unique, and the
+        # pairing map is keyed on those exact names, so inventing a couple
+        # would either collide or never pair.
+        self.mens = Series.objects.get(name="NRL")
+        self.womens = Series.objects.get(name="NRLW")
+        season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(name="Tie League", season=season)
+        self.a = User.objects.create_user(email="t1@x.com", password="x", display_name="Ann")
+        self.b = User.objects.create_user(email="t2@x.com", password="x", display_name="Bob")
+        for u in (self.a, self.b):
+            OrgMember.objects.create(user=u, org=self.org)
+        self.h = Team.objects.create(name="Tie Home", slug="tie-h", series=self.mens)
+        self.aw = Team.objects.create(name="Tie Away", slug="tie-a", series=self.mens)
+
+    def _award(self, user, series, points, when):
+        rnd, _ = Round.objects.get_or_create(
+            org=self.org, round_number=1, series=series,
+            defaults={"lockout_at": when},
+        )
+        m = Match.objects.create(
+            round=rnd, home_team=self.h, away_team=self.aw, kickoff_at=when,
+        )
+        Tip.objects.create(
+            user=user, match=m, org=self.org, selection="home",
+            is_correct=True, points_awarded=points,
+        )
+
+    def test_a_tie_in_the_mens_comp_breaks_on_the_womens(self):
+        """Scoped to the NRL round, so the tie is a tie IN THAT COMP.
+
+        The step only applies to a single-comp board. On an all-comps board the
+        women's points are already inside the total, and using them again would
+        rank on the same number twice.
+        """
+        now = timezone.now()
+        self._award(self.a, self.mens, 5, now)
+        self._award(self.b, self.mens, 5, now)
+        self._award(self.b, self.womens, 3, now)   # Bob is better in NRLW
+        nrl_round = Round.objects.get(org=self.org, series=self.mens)
+        board = leaderboard_for_org(self.org, round_id=nrl_round.id)
+        self.assertEqual([u.display_name for u in board], ["Bob", "Ann"])
+        self.assertEqual([u.rank for u in board], [1, 2])
+        self.assertFalse(board[0].is_tied)
+
+    def test_level_on_both_falls_to_countback(self):
+        """Same score in both comps — whoever got there first ranks higher."""
+        early = timezone.now() - timedelta(days=7)
+        late = timezone.now() - timedelta(days=1)
+        self._award(self.a, self.mens, 4, early)
+        self._award(self.b, self.mens, 4, late)
+        board = leaderboard_for_org(self.org)
+        self.assertEqual([u.display_name for u in board], ["Ann", "Bob"])
+
+    def test_still_level_means_co_champions(self):
+        same = timezone.now() - timedelta(days=3)
+        self._award(self.a, self.mens, 4, same)
+        self._award(self.b, self.mens, 4, same)
+        board = leaderboard_for_org(self.org)
+        self.assertEqual([u.rank for u in board], [1, 1])
+        self.assertTrue(all(u.is_tied for u in board))
+
+    def test_points_still_outrank_everything(self):
+        """Within the comp being ranked, a lower score cannot be rescued."""
+        now = timezone.now()
+        self._award(self.a, self.mens, 9, now)
+        self._award(self.b, self.mens, 4, now)
+        self._award(self.b, self.womens, 99, now)
+        nrl_round = Round.objects.get(org=self.org, series=self.mens)
+        board = leaderboard_for_org(self.org, round_id=nrl_round.id)
+        self.assertEqual([u.display_name for u in board], ["Ann", "Bob"])
+
+    def test_an_all_comps_board_does_not_reuse_the_paired_score(self):
+        """Everything is already in the total there, so it must not count twice."""
+        now = timezone.now()
+        self._award(self.a, self.mens, 9, now)
+        self._award(self.b, self.mens, 4, now)
+        self._award(self.b, self.womens, 99, now)
+        board = leaderboard_for_org(self.org)          # unscoped
+        # Bob genuinely leads on 103 to 9. The point is that he is not ranked
+        # by his NRLW score a second time on top of it.
+        self.assertEqual([u.display_name for u in board], ["Bob", "Ann"])
+        self.assertEqual([u.points for u in board], [103, 9])

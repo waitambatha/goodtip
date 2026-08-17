@@ -321,8 +321,7 @@ def my_tips_view(request, org_id: int):
     # Round-level stats describe the whole round, not the filtered view.
     total_matches = len(all_rows)
     tips_this_round = sum(1 for r in all_rows if r["tip"])
-    board = list(leaderboard_for_org(org).values("id", "points"))
-    total_tippers = len(board)
+    total_tippers = len(leaderboard_for_org(org))
     rank = user_rank_in_org(request.user, org)
     # Percentile = share of the field this member is ahead of or level with.
     percentile = None
@@ -426,17 +425,16 @@ def leaderboard_view(request, org_id: int):
     else:
         scope = "local"
         board = leaderboard_for_org(org, round_id=round_filter)
-    ranked = []
-    last_points = None
-    rank = 0
-    real_rank = 0
-    for u in board:
-        real_rank += 1
-        if u.points != last_points:
-            rank = real_rank
-            last_points = u.points
-        ranked.append({"rank": rank, "user": u, "points": u.points,
-                       "tips_correct": u.tips_correct, "tips_total": u.tips_total})
+    # Ranks come from the board, which resolved them under the addendum's
+    # tiebreakers. Recomputing "equal points means equal rank" here would
+    # undo that: two tippers separated on the paired comp would be reported
+    # level again, and the leaderboard would disagree with the dashboard.
+    ranked = [
+        {"rank": u.rank, "user": u, "points": u.points,
+         "tips_correct": u.tips_correct, "tips_total": u.tips_total,
+         "is_tied": u.is_tied}
+        for u in board
+    ]
     if request.headers.get("HX-Request"):
         return render(request, "partials/leaderboard_table.html", {
             "ranked": ranked, "me": request.user,

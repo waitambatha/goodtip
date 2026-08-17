@@ -185,14 +185,20 @@ def send_round_results(round_obj) -> int:
     for tip in Tip.objects.filter(match__in=matches, org=org).select_related("match"):
         tips_by_user.setdefault(tip.user_id, {})[tip.match_id] = tip
 
-    total_tippers = leaderboard_for_org(org).count()
+    total_tippers = len(leaderboard_for_org(org))
 
     messages = []
     for m in org.members.select_related("user"):
         user = m.user
         user_tips = tips_by_user.get(user.id, {})
         # No tips in this round means nothing to report on.
-        if not user.email or not user_tips:
+        #
+        # Auto-assigned tips do not count. The missed-tip default gives every
+        # member the away side at grading time, so without this check a
+        # scorecard would go to somebody who never opened the round — a mail
+        # reporting "your picks" over picks the system made on their behalf.
+        # Someone who sat a round out gets silence, exactly as before.
+        if not user.email or not any(not t.is_auto for t in user_tips.values()):
             continue
 
         rows, correct, graded, points = [], 0, 0, 0

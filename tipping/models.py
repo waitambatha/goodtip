@@ -47,6 +47,21 @@ class Round(models.Model):
         STAGE_FINALS: 2,
         STAGE_ORIGIN: 4,
     }
+    # What a DRAWN match pays, per stage (Scoring & Tiebreaker Addendum rev 3,
+    # §1). A draw is worth nothing in a regular round or a final; State of
+    # Origin alone pays half, because the addendum scores it "4 pts / 2 pts
+    # draw".
+    #
+    # Finals draws are listed in the addendum as unspecified — both codes
+    # resolve finals with extra time or golden point rather than ending level,
+    # so the case is expected never to arise. Nothing is paid until somebody
+    # confirms otherwise, which is the correction-safe direction: awarding
+    # points that a ruling later removes is far worse than awarding them late.
+    DRAW_POINTS_PER_STAGE = {
+        STAGE_REGULAR: 0,
+        STAGE_FINALS: 0,
+        STAGE_ORIGIN: 2,
+    }
 
     org = models.ForeignKey("orgs.Organisation", on_delete=models.CASCADE, related_name="rounds")
     round_number = models.IntegerField()
@@ -74,6 +89,17 @@ class Round(models.Model):
     def points_per_correct(self) -> int:
         """Points awarded for each correct tip in this round (1 / 2 / 4)."""
         return self.POINTS_PER_STAGE.get(self.stage, 1)
+
+    @property
+    def points_per_draw(self) -> int:
+        """Points every tipper gets when a match in this round is drawn.
+
+        Nobody picked correctly — there is no winner to have picked — so this
+        is not a reward for being right. It is the addendum's rule that an
+        Origin draw still pays half, on the reasoning that three games a series
+        are too scarce to have one of them count for nothing.
+        """
+        return self.DRAW_POINTS_PER_STAGE.get(self.stage, 0)
 
     @property
     def is_locked(self) -> bool:
@@ -229,6 +255,12 @@ class Tip(models.Model):
     org = models.ForeignKey("orgs.Organisation", on_delete=models.CASCADE, related_name="tips")
     selection = models.CharField(max_length=10, choices=SELECTION_CHOICES)
     submitted_at = models.DateTimeField(auto_now=True)
+    # Filled in by the system because the member did not tip before lock —
+    # the away side, per the addendum's missed-tip default (§2). Flagged
+    # rather than written silently: a score you did not choose has to be
+    # distinguishable from one you did, both on screen and in any dispute
+    # about how somebody's total was arrived at.
+    is_auto = models.BooleanField(default=False)
     is_correct = models.BooleanField(null=True, blank=True)
     # Weighted score this tip earned once graded: round.points_per_correct if
     # correct, else 0. Stored so the leaderboard can Sum() instead of Count().

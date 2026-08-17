@@ -184,6 +184,14 @@ def build_recap_facts(org, rnd):
 
     Returns None when nobody in the group tipped this round — silence, not an
     apologetic card (§10).
+
+    AUTO-ASSIGNED TIPS DO NOT COUNT AS TIPPING. The missed-tip default gives
+    every member the away side at grading time, so from the database's point of
+    view a group that ignored the round entirely now holds a full set of tips.
+    Reading those as participation would post a chatty recap — "here is how
+    everyone went" — to a league where not one person opened the app. The rule
+    §10 encodes is about whether anybody engaged, so it has to be asked of the
+    picks people actually made.
     """
     from tipping.models import Tip
 
@@ -191,7 +199,7 @@ def build_recap_facts(org, rnd):
         Tip.objects.filter(org=org, match__round=rnd)
         .select_related("user")
     )
-    if not round_tips:
+    if not any(not t.is_auto for t in round_tips):
         return None
 
     per_member = {}

@@ -56,6 +56,12 @@ def derive_result(home_score: int | None, away_score: int | None) -> str | None:
 
 @transaction.atomic
 def record_match_result(match: Match, home_score: int, away_score: int) -> int:
+    # A match that was called off is not scored either way (addendum §1). It
+    # has no result to grade, and any tips already on it are wound back to
+    # ungraded rather than left holding points from a game nobody played.
+    if match.status == Match.STATUS_POSTPONED:
+        return match.tips.update(is_correct=None, points_awarded=0)
+
     had_result = match.result is not None
     match.home_score = home_score
     match.away_score = away_score
@@ -67,17 +73,63 @@ def record_match_result(match: Match, home_score: int, away_score: int) -> int:
         from orgs.models import RoundRecap
 
         RoundRecap.objects.filter(round=match.round).update(needs_review=True)
+    _fill_missed_tips(match)
     return _recalculate_tips_for_match(match)
+
+
+def _fill_missed_tips(match: Match) -> int:
+    """Give every member without a tip on this match the away side.
+
+    The addendum's missed-tip default (§2), applied per match rather than per
+    round: one forgotten week should not zero a whole round, which is what
+    happens when an absent tip is simply worth nothing.
+
+    Done at grading time rather than on a lock-time timer. The result is the
+    moment the answer stops being able to change, so filling here cannot race
+    a late tip and cannot be forgotten by a scheduler that did not run — and
+    it is idempotent, because a member who has a tip is skipped.
+
+    The away side specifically, because it has to be a rule nobody can work an
+    advantage from. Home teams win more often than not, so defaulting to home
+    would hand a bonus to whoever skipped the round.
+    """
+    from orgs.models import OrgMember
+
+    have = set(match.tips.values_list("user_id", flat=True))
+    missing = [
+        uid for uid in OrgMember.objects.filter(org_id=match.round.org_id)
+        .values_list("user_id", flat=True)
+        if uid not in have
+    ]
+    if not missing:
+        return 0
+    Tip.objects.bulk_create(
+        [
+            Tip(user_id=uid, match=match, org_id=match.round.org_id,
+                selection="away", is_auto=True)
+            for uid in missing
+        ],
+        # Two graders racing the same match must not collide on the unique
+        # (user, match, org) key and lose the whole batch.
+        ignore_conflicts=True,
+    )
+    return len(missing)
 
 
 def _recalculate_tips_for_match(match: Match) -> int:
     if match.result is None:
         return 0
-    # The round's stage decides what a correct tip is worth (1 / 2 / 4).
+    # The round's stage decides what a correct tip is worth (1 / 2 / 4) and
+    # what a draw pays (0, except State of Origin's 2).
     points = match.round.points_per_correct
     updated = 0
     if match.result == "draw":
-        updated += match.tips.update(is_correct=False, points_awarded=0)
+        # is_correct stays False: nobody picked the winner, because there was
+        # not one. The points are a property of the fixture, not of the pick,
+        # which is why they are awarded to every tip alike.
+        updated += match.tips.update(
+            is_correct=False, points_awarded=match.round.points_per_draw,
+        )
     else:
         winning = match.result
         updated += match.tips.filter(selection=winning).update(is_correct=True, points_awarded=points)
@@ -231,7 +283,152 @@ def leaderboard_for_org(org, round_id: int | None = None):
     tip_filter = Q(tips__org=org)
     if round_id is not None:
         tip_filter &= Q(tips__match__round_id=round_id)
-    return _leaderboard([org.id], tip_filter)
+    return apply_tiebreakers(
+        _leaderboard([org.id], tip_filter), [org.id], round_id=round_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tiebreakers (Scoring & Tiebreaker Addendum rev 3, §3)
+#
+# Scope is deliberately narrow: within-org leaderboards only. The industry and
+# public boards rank by charity given rather than by tipping score and are
+# untouched by any of this.
+#
+# There is no prize pool at any tier, so a tie decides ladder position and
+# bragging rights and nothing else. That is why the order below resolves on
+# performance and then stops, rather than reaching for a number that would
+# always separate two people.
+# ---------------------------------------------------------------------------
+
+#: Which series breaks a tie in which. Every org package bundles both codes of
+#: its sport — AFL+AFLW, NRL+NRLW, with no code-only opt-out — so a tied tipper
+#: always has a same-period score in the paired comp to be judged on.
+PAIRED_SERIES = {
+    "AFL": "AFLW", "AFLW": "AFL",
+    "NRL": "NRLW", "NRLW": "NRL",
+}
+
+
+def _paired_scores(org_ids, series_name: str, user_ids, round_id=None) -> dict:
+    """Each user's points in the comp paired with ``series_name``."""
+    from accounts.models import User
+
+    partner = PAIRED_SERIES.get((series_name or "").upper())
+    if not partner or not user_ids:
+        return {}
+
+    tip_filter = Q(tips__org_id__in=org_ids, tips__match__round__series__name__iexact=partner)
+    if round_id is not None:
+        rnd = Round.objects.filter(pk=round_id).only("round_number").first()
+        if rnd is not None:
+            # Same period, not the same Round row: the paired comp has its own
+            # round of that number, which is the like-for-like comparison.
+            tip_filter &= Q(tips__match__round__round_number=rnd.round_number)
+
+    rows = (
+        User.objects.filter(id__in=user_ids)
+        .annotate(paired=Coalesce(Sum("tips__points_awarded", filter=tip_filter), Value(0)))
+        .values_list("id", "paired")
+    )
+    return dict(rows)
+
+
+def _reached_score_at(org_ids, user_ids, points_by_user, round_id=None) -> dict:
+    """When each user first reached their final total — the countback.
+
+    "Whoever reached the tied score first ranks higher." Walking each tipper's
+    graded tips in time order and stopping at the moment their running total
+    hits the tied figure is what that sentence means: the earlier that moment,
+    the longer they have held the score.
+    """
+    from collections import defaultdict
+
+    tips = (
+        Tip.objects.filter(
+            org_id__in=org_ids, user_id__in=user_ids, is_correct__isnull=False,
+        )
+        .values_list("user_id", "points_awarded", "match__kickoff_at")
+        .order_by("match__kickoff_at", "id")
+    )
+    running = defaultdict(int)
+    reached = {}
+    for uid, pts, when in tips:
+        if uid in reached:
+            continue
+        running[uid] += pts or 0
+        if running[uid] >= points_by_user.get(uid, 0):
+            reached[uid] = when
+    return reached
+
+
+def apply_tiebreakers(board, org_ids, round_id=None):
+    """Order a leaderboard, resolving ties on performance rather than on a name.
+
+    Returns a list, not a queryset — the second and third steps need data the
+    database cannot sort on in one pass, and pretending otherwise would mean a
+    queryset whose order changed depending on whether it had been evaluated.
+
+    Order: points, then the paired women's/men's comp, then countback, then
+    equal. Co-champions is a real outcome here and not a failure to decide:
+    with no cheque to write there is no reason to force one name above another.
+
+    Ranks are attached as ``rank`` and ``is_tied`` so a template can show
+    joint positions without recomputing any of this.
+    """
+    rows = list(board)
+    if not rows:
+        return rows
+
+    user_ids = [u.id for u in rows]
+    points_by_user = {u.id: u.points for u in rows}
+
+    # THE CROSS-CODE STEP ONLY APPLIES TO A BOARD SCOPED TO ONE COMP.
+    #
+    # The addendum phrases it as "a tie in the men's comp is broken by that
+    # tipper's score in the paired women's comp", which presumes the ranking
+    # being broken covers one code. An unfiltered org board does not: it sums
+    # every comp the league tips, so the paired score is ALREADY inside the
+    # total. Adding it again would rank on the women's comp twice — a tipper
+    # level overall would be separated by a number both of them had already
+    # been credited for, which is not a tiebreak, it is double-counting.
+    #
+    # A tie on an all-comps board is a tie on everything, so it goes straight
+    # to the countback.
+    series_name = ""
+    if round_id is not None:
+        rnd = Round.objects.filter(pk=round_id).select_related("series").first()
+        if rnd:
+            series_name = rnd.series.name
+
+    paired = _paired_scores(org_ids, series_name, user_ids, round_id=round_id)
+    reached = _reached_score_at(org_ids, user_ids, points_by_user, round_id=round_id)
+
+    from datetime import datetime, timezone as _tz
+    far_future = datetime.max.replace(tzinfo=_tz.utc)
+
+    for u in rows:
+        u.paired_points = paired.get(u.id, 0)
+        u.reached_at = reached.get(u.id, far_future)
+
+    rows.sort(key=lambda u: (-u.points, -u.paired_points, u.reached_at, u.display_name or ""))
+
+    # Joint ranks. Two people are genuinely tied only when every step above
+    # failed to separate them, which is exactly when they share a position.
+    rank = 0
+    previous = None
+    for i, u in enumerate(rows, start=1):
+        key = (u.points, u.paired_points, u.reached_at)
+        if key != previous:
+            rank = i
+            previous = key
+        u.rank = rank
+    counts = {}
+    for u in rows:
+        counts[u.rank] = counts.get(u.rank, 0) + 1
+    for u in rows:
+        u.is_tied = counts[u.rank] > 1
+    return rows
 
 
 def leaderboard_for_family(org, round_id: int | None = None):
@@ -251,7 +448,9 @@ def leaderboard_for_family(org, round_id: int | None = None):
                 tips__match__round__round_number=rnd.round_number,
                 tips__match__round__series_id=rnd.series_id,
             )
-    return _leaderboard(family_ids, tip_filter)
+    return apply_tiebreakers(
+        _leaderboard(family_ids, tip_filter), family_ids, round_id=round_id,
+    )
 
 
 def user_org_stats(user, org):
@@ -263,17 +462,15 @@ def user_org_stats(user, org):
 
 
 def user_rank_in_org(user, org) -> int | None:
-    board = list(leaderboard_for_org(org).values("id", "points"))
-    if not board:
-        return None
-    last_points = None
-    rank = 0
-    real_rank = 0
-    for row in board:
-        real_rank += 1
-        if row["points"] != last_points:
-            rank = real_rank
-            last_points = row["points"]
-        if row["id"] == user.id:
-            return rank
+    """This member's position, with the addendum's tiebreakers applied.
+
+    Reads the rank the board itself worked out rather than recounting by
+    points here. The two used to disagree the moment a tie was broken by
+    anything other than the score: the board would separate two people on the
+    paired comp while this still called them equal, so a member saw one
+    position on the leaderboard and a different one on their dashboard.
+    """
+    for row in leaderboard_for_org(org):
+        if row.id == user.id:
+            return row.rank
     return None
