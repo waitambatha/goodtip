@@ -15,9 +15,10 @@
   <script src="{% static 'js/gt-lists.js' %}" defer></script>
   <script src="{% static 'js/gt-loader.js' %}" defer></script>
   <script src="{% static 'js/gt-busy.js' %}" defer></script>
-  {# Scoped loading veils for htmx. Filtering, round changes and tip confirms
-     change one region, so one region is what goes translucent — see
-     gt-veil.js. #}
+  {% comment %}
+  Scoped loading veils for htmx. Filtering, round changes and tip confirms
+  change one region, so one region is what goes translucent — see gt-veil.js.
+  {% endcomment %}
   <script src="{% static 'js/gt-veil.js' %}" defer></script>
   <script src="{% static 'js/gt-confirm.js' %}" defer></script>
   <script src="{% static 'js/gt-video.js' %}" defer></script>

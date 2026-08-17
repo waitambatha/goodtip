@@ -92,15 +92,33 @@ def _fill_missed_tips(match: Match) -> int:
     The away side specifically, because it has to be a rule nobody can work an
     advantage from. Home teams win more often than not, so defaulting to home
     would hand a bonus to whoever skipped the round.
+
+    WHO IT APPLIES TO is narrower than "everyone in the league", on two counts,
+    and both matter:
+
+      * Only members who were in the league BEFORE the match kicked off. A
+        default is for a tip somebody could have made and did not. Someone who
+        joined on Sunday never had the chance to tip Thursday's game, and
+        handing them a pick — which might land and score — would credit them
+        for a round they were not part of. It also makes a new member's total
+        depend on when the sync happened to grade, which is not a thing anyone
+        should be able to notice.
+
+      * Only members who actually tip. The roles split manager, captain,
+        participant and both; a Team Manager who runs the league and never
+        makes a pick would otherwise be auto-entered into every match and
+        appear up the leaderboard on tips the system made for them.
     """
     from orgs.models import OrgMember
 
     have = set(match.tips.values_list("user_id", flat=True))
-    missing = [
-        uid for uid in OrgMember.objects.filter(org_id=match.round.org_id)
+    eligible = (
+        OrgMember.objects.filter(org_id=match.round.org_id)
+        .exclude(role=OrgMember.ROLE_MANAGER)
+        .filter(joined_at__lt=match.kickoff_at)
         .values_list("user_id", flat=True)
-        if uid not in have
-    ]
+    )
+    missing = [uid for uid in eligible if uid not in have]
     if not missing:
         return 0
     Tip.objects.bulk_create(
