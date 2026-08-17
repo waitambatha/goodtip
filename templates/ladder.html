@@ -26,7 +26,13 @@ stacking context, so a strip rendered inside it paints over the sheet.
 
   {% if series_options|length > 1 %}
   <div class="gh-actions">
-    <form method="get" class="dc-pick">
+    {% comment %}
+    data-veil-for points at the table rather than at this picker: the control
+    lives in the page header and the thing it rebuilds is further down, so
+    without it the veil would land on a dropdown while the stale table below
+    carried on looking current.
+    {% endcomment %}
+    <form method="get" class="dc-pick" data-veil-for="#ladderTable" data-veil-label="Loading the ladder">
       <span class="dc-lab">Competition</span>
       <select name="series" onchange="this.form.submit()">
         {% for s in series_options %}
@@ -45,7 +51,7 @@ competition change loads — see gt-veil.js. The filter swaps the rows, but what
 a reader watches is the table, so veiling only the rows would leave the header
 sitting bright above a blank space.
 {% endcomment %}
-<div class="gt-listwrap" data-veil data-veil-label="Loading the ladder">
+<div class="gt-listwrap" id="ladderTable" data-veil data-veil-label="Loading the ladder">
   <div class="gt-board ladder">
     {% comment %}
     Column heads carry .lad-col so they stripe with the cells beneath them —

@@ -170,10 +170,18 @@
    * The veil is not removed on a timer. The navigation replaces the document,
    * which disposes of it; leaving it up until then is the point.
    */
+  /* Which region a same-page navigation should veil.
+   *
+   * data-veil-for is for the common case where the CONTROL is not inside the
+   * thing it reloads: the ladder's competition picker sits in the page header
+   * while the table it rebuilds is further down. Without it the only reachable
+   * scope is the picker itself, so a two-second table rebuild would veil a
+   * dropdown and leave the stale table looking perfectly current.
+   */
   function navScope(el) {
-    var explicit = el.closest('[data-veil]');
-    if (explicit) return explicit;
-    return null;
+    var sel = el.getAttribute('data-veil-for');
+    if (sel) return document.querySelector(sel);
+    return el.closest('[data-veil]');
   }
 
   document.addEventListener('click', function (e) {
