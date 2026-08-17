@@ -60,7 +60,15 @@ answer, so going back to change one costs nothing.
 {% comment %} Not .form-lime: that paints the step card in the lime gradient, which the
    design replaces with cream. The lime is spent on the one thing you are meant
    to press instead of on the whole panel. {% endcomment %}
-<form method="post" action="{% url 'orgs:create' %}" class="wiz-form" enctype="multipart/form-data" data-busy="Saving">
+{% comment %}
+data-busy-scope veils THIS form while a step saves, rather than throwing the
+whole-page splash over a wizard you are still standing in. Creating a group
+writes an org, a membership and a competition link, which is real work on a
+remote database — and with only the button changing, a slow step looked like a
+missed click and got submitted twice.
+{% endcomment %}
+<form method="post" action="{% url 'orgs:create' %}" class="wiz-form" enctype="multipart/form-data"
+      data-busy="Saving" data-busy-scope>
   {% csrf_token %}
   <input type="hidden" name="step" value="{{ step }}">
   {% if parent_org %}

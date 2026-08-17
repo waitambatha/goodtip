@@ -1,5 +1,5 @@
 {% extends "app_base.html" %}
-{% load static %}
+{% load static team_extras %}
 {% block title %}Ladder, {{ org.name }}{% endblock %}
 {% block loader_task %}Loading the ladder{% endblock %}
 {% block nav_ladder %}on{% endblock %}
@@ -39,17 +39,29 @@ stacking context, so a strip rendered inside it paints over the sheet.
 </div>
 
 {% if entries %}
-<div class="gt-listwrap">
+{% comment %}
+data-veil marks the whole table as the thing that goes translucent while a
+competition change loads — see gt-veil.js. The filter swaps the rows, but what
+a reader watches is the table, so veiling only the rows would leave the header
+sitting bright above a blank space.
+{% endcomment %}
+<div class="gt-listwrap" data-veil data-veil-label="Loading the ladder">
   <div class="gt-board ladder">
+    {% comment %}
+    Column heads carry .lad-col so they stripe with the cells beneath them —
+    the numeric columns share a tint that runs the height of the table, which
+    is what lets you track one club's row across eight columns without losing
+    your place.
+    {% endcomment %}
     <div class="gb-head lad-head">
       <span>#</span>
       <span>Club</span>
-      <span class="lad-num">P</span>
-      <span class="lad-num">W</span>
-      <span class="lad-num">L</span>
-      <span class="lad-num lad-d">D</span>
-      <span class="lad-num lad-pct">%</span>
-      <span class="lad-num">Pts</span>
+      <span class="lad-num lad-col">P</span>
+      <span class="lad-num lad-col">W</span>
+      <span class="lad-num lad-col">L</span>
+      <span class="lad-num lad-col lad-d">D</span>
+      <span class="lad-num lad-col lad-pct">%</span>
+      <span class="lad-num lad-col lad-pts">Pts</span>
     </div>
 
     <div class="gt-scroll gb-rows">
@@ -61,15 +73,23 @@ stacking context, so a strip rendered inside it paints over the sheet.
       <div class="gb-row lad-row{% if e.rank <= 8 %} in-finals{% endif %}{% if e.rank == 1 %} is-top{% endif %}">
         <span class="gb-rank">{{ e.rank }}</span>
         <span class="gb-who">
-          <span class="lad-crest">{% if e.team.logo %}<img src="{{ e.team.logo.url }}" alt="" loading="lazy">{% else %}{{ e.team.name|slice:":2"|upper }}{% endif %}</span>
+          {% comment %}
+          The shared crest tag, not a bare two-letter slice. No club has
+          uploaded a logo, so the old markup rendered every badge as identical
+          grey initials — while team_colors has carried real club colours the
+          whole time. crest uses the logo when there is one and the club's own
+          colours when there is not, so the ladder now looks like the rest of
+          the app instead of a spreadsheet.
+          {% endcomment %}
+          {% crest e.team %}
           <span class="gb-name">{{ e.team.name }}</span>
         </span>
-        <span class="lad-num">{{ e.played }}</span>
-        <span class="lad-num lad-w">{{ e.wins }}</span>
-        <span class="lad-num">{{ e.losses }}</span>
-        <span class="lad-num lad-d">{{ e.draws }}</span>
-        <span class="lad-num lad-pct">{{ e.percentage|floatformat:1 }}</span>
-        <span class="lad-num lad-pts">{{ e.points }}</span>
+        <span class="lad-num lad-col">{{ e.played }}</span>
+        <span class="lad-num lad-col lad-w">{{ e.wins }}</span>
+        <span class="lad-num lad-col">{{ e.losses }}</span>
+        <span class="lad-num lad-col lad-d">{{ e.draws }}</span>
+        <span class="lad-num lad-col lad-pct">{{ e.percentage|floatformat:1 }}</span>
+        <span class="lad-num lad-col lad-pts">{{ e.points }}</span>
       </div>
       {% endfor %}
     </div>

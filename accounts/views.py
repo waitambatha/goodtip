@@ -479,20 +479,31 @@ def dashboard_view(request):
             # the member sees results rather than an empty screen.
             selected = cards[0]
 
-    # Everything still to play, across rounds — not one round at a time.
-    # Anchoring on a single round meant the panel emptied out as that round was
-    # played, while the next fortnight of fixtures sat invisible: a member with
-    # nothing left in this round was shown a read-only screen rather than the
-    # games they could actually tip. Fixtures are listed by kickoff and grouped
-    # by round in the template, so "what can I tip right now" is the whole list.
+    # ONE ROUND AT A TIME, with a navigator to move between them.
+    #
+    # This used to be a flat list of everything still to play, ordered by
+    # kickoff and grouped by round in the template. The intent was "what can I
+    # tip right now", and for a single-code league in mid-season it read fine.
+    # In practice it did not: an org tipping AFL and NRL interleaves two round
+    # numberings, so scrolling produced "Round 2, Round 24, Round 26, Round 25"
+    # with fixtures running one after another and no way to get your bearings.
+    # It also could not answer the question people actually ask on a Monday —
+    # how did I go last week — because a past round was never in the list at
+    # all. That meant leaving the dashboard for My Tips to see a result.
+    #
+    # So the panel is scoped to a round and given a way to move: arrows for the
+    # neighbours, a dropdown for the jump. Past rounds come with what happened
+    # (your pick, the result, the points) and future rounds beyond the tipping
+    # window are shown but shut, which is the honest picture of a season rather
+    # than a scroll of everything at once.
     games = []
     open_games = 0
     org_series, active_slugs = [], []
+    round_nav = None
     if selected:
         # ---- competition filter. An org tipping two codes gets both slates
         # interleaved by kickoff, which is right for "what is on this week" and
-        # wrong for "just show me the NRL". Filtering here rather than in the
-        # template so the UPCOMING_LIMIT applies to the code being looked at.
+        # wrong for "just show me the NRL".
         from tipping.services import competition_filter
 
         org_series, active_series = competition_filter(
@@ -500,24 +511,67 @@ def dashboard_view(request):
         )
         active_slugs = [s.slug for s in active_series if s in org_series]
 
+        org_rounds = Round.objects.filter(
+            org=selected["org"], competition__in=selected["org"].competitions.all()
+        )
+        if active_series:
+            org_rounds = org_rounds.filter(series__in=active_series)
+
+        # Navigation is by ROUND NUMBER, not by Round row. A round row is per
+        # (org, series), so an org on AFL and NRL holds two rows called "round
+        # 22" — stepping through rows would visit the same number twice and
+        # make the arrows feel broken. The number is what a member means when
+        # they say "go back to 16".
+        numbers = sorted(set(org_rounds.values_list("round_number", flat=True)))
+        if numbers:
+            in_play = selected["round"].round_number if selected["round"] else numbers[-1]
+            try:
+                wanted = int(request.GET.get("round", ""))
+            except (TypeError, ValueError):
+                wanted = None
+            # An out-of-range or hand-edited round falls back to the one being
+            # played rather than 404ing — a stale bookmark should land you
+            # somewhere useful.
+            current_no = wanted if wanted in numbers else (
+                in_play if in_play in numbers else numbers[-1]
+            )
+            i = numbers.index(current_no)
+            round_nav = {
+                "numbers": numbers,
+                "current": current_no,
+                "prev": numbers[i - 1] if i > 0 else None,
+                "next": numbers[i + 1] if i < len(numbers) - 1 else None,
+                "in_play": in_play,
+                "is_in_play": current_no == in_play,
+            }
+
         upcoming = Match.objects.filter(
             round__org=selected["org"],
             round__competition__in=selected["org"].competitions.all(),
-            kickoff_at__gt=now,
         )
         if active_series:
             upcoming = upcoming.filter(round__series__in=active_series)
+        if round_nav:
+            upcoming = upcoming.filter(round__round_number=round_nav["current"])
+        else:
+            upcoming = upcoming.filter(kickoff_at__gt=now)
         upcoming = (
             upcoming
             .select_related("home_team", "away_team", "round", "round__series")
             .order_by("kickoff_at", "id")[:UPCOMING_LIMIT]
         )
         upcoming = list(upcoming)
-        my_picks = dict(
-            Tip.objects.filter(
+        # The tip itself, plus how it went. Grading writes is_correct and
+        # points_awarded onto the Tip, so a past round can report your result
+        # without recomputing anything — which is what lets the dashboard
+        # answer "how did I go last week" instead of sending you to My Tips.
+        my_tips = {
+            t.match_id: t
+            for t in Tip.objects.filter(
                 user=request.user, match__in=upcoming, org=selected["org"]
-            ).values_list("match_id", "selection")
-        )
+            )
+        }
+        my_picks = {mid: t.selection for mid, t in my_tips.items()}
         # MatchReader's read on each upcoming game. Attached here rather than
         # queried from the template so the work is visible and bounded: these
         # are the next few fixtures, not a whole season.
@@ -541,7 +595,11 @@ def dashboard_view(request):
         from tipping.services import tip_window
 
         window = tip_window(selected["org"])
+        round_points = 0
+        round_correct = 0
+        round_graded = 0
         for g in upcoming:
+            tip = my_tips.get(g.id)
             g.my_tip = my_picks.get(g.id)
             g.tipped = g.my_tip is not None
             g.reader = readers.get(g.id)
@@ -554,8 +612,30 @@ def dashboard_view(request):
                     f"Locked. You can tip this once round "
                     f"{state['waits_for'].round_number} is over."
                 )
-            open_games += 1
+            # How this pick went, for a round already played. None means not
+            # graded yet, which is different from wrong and has to look
+            # different — a game still in play must not be shown as a loss.
+            g.tip_correct = tip.is_correct if tip else None
+            g.tip_points = tip.points_awarded if tip else 0
+            if tip is not None and tip.is_correct is not None:
+                round_graded += 1
+                round_points += tip.points_awarded
+                round_correct += 1 if tip.is_correct else 0
+            # "Open" counts only what can still be acted on, which is what the
+            # Confirm button and its empty state key off. A past round is
+            # rendered read-only, so counting it here would offer a confirm for
+            # games that finished a month ago.
+            if g.can_tip:
+                open_games += 1
             games.append(g)
+
+        if round_nav is not None:
+            round_nav["graded"] = round_graded
+            round_nav["correct"] = round_correct
+            round_nav["points"] = round_points
+            # A round is "done" once every tip on it has been graded, which is
+            # what switches the panel from tipping to reporting.
+            round_nav["played"] = round_graded > 0
 
     # Someone who hasn't joined a group yet used to land on an empty page, which
     # reads as "nothing on" rather than "you're one step away". Rounds hang off
@@ -605,6 +685,10 @@ def dashboard_view(request):
         # which are selected.
         "org_series": org_series,
         "active_slugs": active_slugs,
+        # Round navigator: which round is shown, its neighbours for the arrows,
+        # the full list for the dropdown, and — for a round already played —
+        # how the member went.
+        "round_nav": round_nav,
         "preview_round": preview_round,
         "locking_soon": locking_soon,
         "create_url": reverse("orgs:create"),

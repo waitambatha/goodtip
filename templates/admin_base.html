@@ -8,6 +8,10 @@
   {% include "partials/_fonts.html" %}
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
   <script src="{% static 'js/gt-ui.js' %}" defer></script>
+  {# Manage runs real work — syncing a round, emailing every member, deleting a
+     post — and had no submit feedback at all, so a slow POST looked like a
+     missed click. Same busy/veil behaviour as the member app. #}
+  <script src="{% static 'js/gt-busy.js' %}" defer></script>
   <script src="{% static 'js/gt-confirm.js' %}" defer></script>
   <script src="{% static 'js/gt-scenes.js' %}" defer></script>
   <script src="{% static 'js/gt-lists.js' %}" defer></script>

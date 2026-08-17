@@ -39,7 +39,20 @@ rest.
     there is nothing to do yet. Saying "No tip" there would tell somebody they
     had failed at something that was never open to them.
     {% endcomment %}
-    {% if selection %}<span class="fxc-state is-tipped">Tipped</span>
+    {% comment %}
+    A graded tip outranks "Tipped". Once a game is over, whether you picked it
+    is old news and whether you got it RIGHT is the whole question — the
+    dashboard's round navigator exists so a past round can answer that here
+    rather than sending you to My Tips. `is None` matters: a game in play is
+    ungraded, and showing that as a loss would be wrong twice over.
+    {% endcomment %}
+    {% if match.tip_correct is not None %}
+      {% if match.tip_correct %}
+      <span class="fxc-state is-hit">Correct{% if match.tip_points %} &middot; +{{ match.tip_points }}{% endif %}</span>
+      {% else %}
+      <span class="fxc-state is-miss">Missed</span>
+      {% endif %}
+    {% elif selection %}<span class="fxc-state is-tipped">Tipped</span>
     {% elif round_locked or lock_note %}<span class="fxc-state is-shut">Locked</span>
     {% elif not editable %}<span class="fxc-state is-missed">No tip</span>
     {% else %}<span class="fxc-state is-open">Open</span>{% endif %}

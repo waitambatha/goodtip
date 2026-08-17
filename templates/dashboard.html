@@ -269,7 +269,15 @@ stacking context, so a strip rendered inside it paints over the sheet.
     Posts to the org, not to a round: the slate below spans whatever rounds still
     have unplayed games, so a round-scoped URL could not accept it.
     {% endcomment %}
-<form method="post" action="{% url 'tipping:tip_confirm_upcoming' c.org.id %}" id="tipSlip">
+{% comment %}
+data-busy veils the review sheet while the slate is saved. Confirming writes a
+tip per fixture — up to nine rows — so it is real work, and the sheet used to
+sit perfectly still through it. A second press on a confirm button is a second
+submission of the slate already in flight, which is exactly what the veil makes
+impossible. See gt-busy.js.
+{% endcomment %}
+<form method="post" action="{% url 'tipping:tip_confirm_upcoming' c.org.id %}" id="tipSlip"
+      data-busy="Saving your tips">
       {% csrf_token %}
 
       {% comment %}
@@ -300,6 +308,81 @@ stacking context, so a strip rendered inside it paints over the sheet.
       {% endcomment %}
       {% url 'dashboard' as dash_url %}
       {% include "partials/series_filter.html" with base=dash_url keep="org="|add:c.org.id keep_org=c.org.id %}
+
+      {% comment %}
+      ROUND NAVIGATOR.
+      The fixtures list used to run across every round still to play, ordered
+      by kickoff. For a league tipping two codes that interleaves two round
+      numberings, so you scrolled past "Round 2, Round 24, Round 26, Round 25"
+      with games one after another and no way to orient yourself — and a round
+      already played was not in the list at all, so "how did I go last week"
+      meant leaving for My Tips.
+
+      Arrows for the neighbours, a dropdown for the jump. The dropdown is a
+      real <select> submitting a GET, so it works without JavaScript and is
+      keyboard-navigable for free; the arrows are plain links for the same
+      reason.
+      {% endcomment %}
+      {% if round_nav %}
+      <div class="rnav" data-veil data-veil-compact data-veil-label="Loading round">
+        {% if round_nav.prev %}
+        <a class="rnav-arrow" href="?org={{ c.org.id }}&amp;round={{ round_nav.prev }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+           aria-label="Round {{ round_nav.prev }}" title="Round {{ round_nav.prev }}">
+          <svg><use href="#ic-arrow-left"/></svg>
+        </a>
+        {% else %}
+        <span class="rnav-arrow is-off" aria-hidden="true"><svg><use href="#ic-arrow-left"/></svg></span>
+        {% endif %}
+
+        <form method="get" action="" class="rnav-pick">
+          <input type="hidden" name="org" value="{{ c.org.id }}">
+          {% for s in active_slugs %}<input type="hidden" name="series" value="{{ s }}">{% endfor %}
+          <label class="rnav-lab" for="rnavSel">Round</label>
+          <select name="round" id="rnavSel" onchange="this.form.submit()" aria-label="Choose a round">
+            {% for n in round_nav.numbers %}
+            <option value="{{ n }}" {% if n == round_nav.current %}selected{% endif %}>
+              Round {{ n }}{% if n == round_nav.in_play %} &middot; this week{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <noscript><button type="submit" class="abtn abtn-dark abtn-sm">Go</button></noscript>
+        </form>
+
+        {% if round_nav.next %}
+        <a class="rnav-arrow" href="?org={{ c.org.id }}&amp;round={{ round_nav.next }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+           aria-label="Round {{ round_nav.next }}" title="Round {{ round_nav.next }}">
+          <svg><use href="#ic-arrow-right"/></svg>
+        </a>
+        {% else %}
+        <span class="rnav-arrow is-off" aria-hidden="true"><svg><use href="#ic-arrow-right"/></svg></span>
+        {% endif %}
+
+        {% comment %}
+        The result strip. Only for a round with graded tips — showing "0 points"
+        against a round that has not been played would read as a bad week
+        rather than as one that has not happened.
+        {% endcomment %}
+        {% if round_nav.played %}
+        <div class="rnav-score">
+          <span class="rns-hit">{{ round_nav.correct }}<span>/{{ round_nav.graded }}</span></span>
+          <span class="rns-lab">correct</span>
+          <span class="rns-pts">{{ round_nav.points }}<span>pts</span></span>
+        </div>
+        {% endif %}
+        {% comment %}
+        The way home, shown whenever you have navigated away — including on a
+        played round, which is the most likely place to be. Stepping back
+        through six rounds and then having to step forward six times to return
+        is the kind of thing that makes a navigator feel like a trap.
+        {% endcomment %}
+        {% if not round_nav.is_in_play %}
+        <a class="rnav-now{% if round_nav.played %} is-quiet{% endif %}"
+           href="?org={{ c.org.id }}&amp;round={{ round_nav.in_play }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}">
+          This week
+        </a>
+        {% endif %}
+      </div>
+      {% endif %}
 
       {# the round's fixtures scroll in place, keeping Confirm reachable below #}
       <div class="fixtures gt-scroll">
@@ -346,7 +429,13 @@ stacking context, so a strip rendered inside it paints over the sheet.
       {% endcomment %}
       <div class="tipsheet" id="tipSheet" hidden aria-hidden="true">
         <div class="ts-veil" data-sheet-close></div>
-        <div class="ts-panel" role="dialog" aria-modal="true" aria-labelledby="tsTitle">
+        {% comment %}
+        data-busy-scope so the veil lands on THIS panel rather than the page.
+        The sheet is what you are looking at when you confirm, so it is what
+        should show the work — and covering its buttons is what stops a second
+        submission of a slate already being written.
+        {% endcomment %}
+        <div class="ts-panel" role="dialog" aria-modal="true" aria-labelledby="tsTitle" data-busy-scope>
           <header class="ts-head">
             <div>
               <h3 id="tsTitle">Check your tips</h3>

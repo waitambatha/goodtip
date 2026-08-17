@@ -10,37 +10,101 @@
 {% endblock %}
 {% block admin_content %}
 
-<div class="gt-panel-head" style="margin-bottom:24px;">
+<div class="gt-panel-head" style="margin-bottom:20px;">
   <span class="gp-ic" style="background:var(--lime);color:var(--gt-deep);"><svg><use href="#ic-sync"/></svg></span>
   <div>
-    <h2 style="font-size:29px;">Sync fixtures &amp; results</h2>
-    <div class="gp-sub">Pull fixtures or results from your data provider into your org's rounds.</div>
+    <h2 style="font-size:29px;">Fixtures, results &amp; live scores</h2>
+    <div class="gp-sub">Everything below runs by itself. The manual controls are a fallback, not the way this works.</div>
   </div>
 </div>
 
+{% comment %}
+The headline this page was missing. Everything here is automatic and has been
+for some time, but the page led with a manual sync form — so the honest reading
+of it was "this is a thing you have to do", and nothing said otherwise. State
+what runs, how often, and on what, before offering the button.
+{% endcomment %}
+<div class="gt-auto">
+  <div class="gta-head">
+    <span class="gta-dot" aria-hidden="true"></span>
+    <div>
+      <h3>Running automatically</h3>
+      <p>On the server's own clock, whether or not anybody is on the site. A visitor
+         arriving at 3am finds last night's results already in.</p>
+    </div>
+  </div>
+  <div class="gta-grid">
+    <div class="gta-item">
+      <b>Fixtures</b><span>every hour</span>
+      <small>New games and changed kickoffs, for every competition below.</small>
+    </div>
+    <div class="gta-item">
+      <b>Live scores</b><span>every 2 minutes</span>
+      <small>Score, period and clock while a game is being played.</small>
+    </div>
+    <div class="gta-item">
+      <b>Results</b><span>every 15 minutes</span>
+      <small>Final scores. This is what grades tips and awards points.</small>
+    </div>
+    <div class="gta-item">
+      <b>Ladders</b><span>every 30 minutes</span>
+      <small>Computed from our own results — no outside source to fail.</small>
+    </div>
+    <div class="gta-item wide">
+      <b>Full-season sweep</b><span>every 6 hours</span>
+      <small>Re-reads every round of every competition, so a game added mid-season
+             or a round missed while a feed was down is picked up without anyone asking.</small>
+    </div>
+  </div>
+</div>
+
+{% comment %}
+Sources, one card per feed, listing every series it covers. Series with no feed
+are named here too rather than left to be discovered: leagues can sign up to
+them, and "why has nothing appeared" should have an answer on this page.
+{% endcomment %}
+<h3 class="gt-subhead">Where the data comes from</h3>
 <div class="gt-provs">
   <div class="gt-prov ok">
     <span class="gpv-ic"><svg><use href="#ic-spark"/></svg></span>
     <div>
-      <div class="gpv-top"><h3>afl.com.au</h3><span class="gt-chip ready">Ready</span></div>
-      <p>AFL &amp; AFLW &middot; read from the AFL's own site, no key required.</p>
-      <span class="gpv-state"><svg><use href="#ic-check"/></svg> Connected</span>
+      <div class="gpv-top"><h3>afl.com.au</h3><span class="gt-chip ready">Automatic</span></div>
+      <p><b>AFL</b> &amp; <b>AFLW</b> &middot; read from the AFL's own site. No key, nothing to expire.</p>
+      <span class="gpv-state"><svg><use href="#ic-check"/></svg> Fixtures, live scores, results</span>
     </div>
   </div>
   <div class="gt-prov ok">
     <span class="gpv-ic"><svg><use href="#ic-spark"/></svg></span>
     <div>
-      <div class="gpv-top"><h3>nrl.com</h3><span class="gt-chip ready">Ready</span></div>
-      <p>NRL, NRLW &amp; State of Origin &middot; read from the NRL's own draw, no key required.</p>
-      <span class="gpv-state"><svg><use href="#ic-check"/></svg> Connected</span>
+      <div class="gpv-top"><h3>nrl.com</h3><span class="gt-chip ready">Automatic</span></div>
+      <p><b>NRL</b>, <b>NRLW</b> &amp; <b>State of Origin</b> &middot; read from the NRL's own draw. No key.</p>
+      <span class="gpv-state"><svg><use href="#ic-check"/></svg> Fixtures, live scores, results</span>
+    </div>
+  </div>
+  <div class="gt-prov ok">
+    <span class="gpv-ic"><svg><use href="#ic-trophy"/></svg></span>
+    <div>
+      <div class="gpv-top"><h3>Ladders</h3><span class="gt-chip ready">Derived</span></div>
+      <p>Every competition above &middot; computed from the results already stored here.</p>
+      <span class="gpv-state"><svg><use href="#ic-check"/></svg> No third-party call at all</span>
     </div>
   </div>
 </div>
 
 <div class="gt-shell gt-shell-wide">
-  <form method="post" action="{% url 'manage:sync' %}" class="gt-dark">
+  <form method="post" action="{% url 'manage:sync' %}" class="gt-dark"
+        data-busy="Syncing" data-busy-scope>
     {% csrf_token %}
-    <div class="gd-head"><svg><use href="#ic-sliders"/></svg><span>Sync configuration</span></div>
+    <div class="gd-head"><svg><use href="#ic-sliders"/></svg><span>Manual sync &middot; not normally needed</span></div>
+    {% comment %}
+    Said plainly at the top of the control rather than left to be inferred.
+    Someone landing on a form headed "Sync configuration" reasonably concludes
+    the data does not arrive without them.
+    {% endcomment %}
+    <p class="gd-note">
+      Everything above already runs on a schedule. Use this to pull one round
+      immediately — after a fixture change, or to check a feed is answering.
+    </p>
 
     <div class="gd-fld">
       <label for="sy_org">Organisation</label>

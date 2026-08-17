@@ -17,44 +17,89 @@
       </div>
     </div>
 
-    <div class="gt-tablewrap">
-      <table class="gt-table gt-t-news">
-        <thead><tr><th>Post</th><th>Tag</th><th>Status</th><th class="fit">Actions</th></tr></thead>
-        <tbody>
-        {% for p in posts %}
-          <tr>
-            <td>
-              <span class="gt-namecell">
-                {% if p.image %}<img class="gt-newsthumb" src="{{ p.image.url }}" alt="">
-                {% else %}<span class="gt-newsthumb ph"><svg><use href="#ic-image"/></svg></span>{% endif %}
-                <span>
-                  <b>{{ p.title }}</b>
-                  <small>{{ p.published_at|date:"j M Y, g:i a" }}{% if p.created_by %} &middot; {{ p.created_by.display_name }}{% endif %}</small>
-                </span>
-              </span>
-            </td>
-            <td><span class="gt-with-ic"><svg><use href="#ic-flag"/></svg>{{ p.get_tag_display }}</span></td>
-            <td>{% if p.is_published %}<span class="gt-chip live">Live</span>{% else %}<span class="gt-chip draft">Draft</span>{% endif %}</td>
-            <td class="fit">
-              <span class="gt-actions">
-                <a href="{% url 'manage:news_edit' p.id %}">Edit</a>
-                <form method="post" action="{% url 'manage:news_toggle' p.id %}">{% csrf_token %}<button type="submit">{% if p.is_published %}Unpublish{% else %}Publish{% endif %}</button></form>
-                {% if p.is_published %}
-                  {% if p.announced_at %}
-                    <span title="Emailed {{ p.announced_at|date:'j M Y, g:i A' }}" style="font-size:12px;color:var(--muted);align-self:center;">Emailed &#10003;</span>
-                  {% else %}
-                    <form method="post" action="{% url 'manage:news_announce' p.id %}" data-confirm="Every member with email notifications on will receive this post. This cannot be recalled." data-confirm-title="Email this to all members?" data-confirm-ok="Send email">{% csrf_token %}<button type="submit">Email members</button></form>
-                  {% endif %}
-                {% endif %}
-                <form method="post" action="{% url 'manage:news_delete' p.id %}" data-confirm="The post will be removed from the site permanently." data-confirm-title="Delete this post?" data-confirm-ok="Delete" data-confirm-danger>{% csrf_token %}<button type="submit" class="danger">Delete</button></form>
-              </span>
-            </td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="4" class="gt-empty">Nothing posted yet, publish your first story with the form beside this list.</td></tr>
-        {% endfor %}
-        </tbody>
-      </table>
+    {% comment %}
+    A LIST OF CARDS, NOT A TABLE.
+
+    The table put four columns on a 640px minimum width inside a panel that is
+    roughly half the page, so it scrolled sideways at every realistic width —
+    and the actions were the column pushed off the edge. What arrived visually
+    was the title, the date and author run together, then a chip, then a row of
+    undifferentiated links: Edit Unpublish Email members Delete. Nothing said
+    which of those was destructive, and the post's own headline competed with
+    its metadata for the same weight.
+
+    A post is not tabular data. It has one important field — the headline —
+    and everything else is context for it. So: the headline leads at a size you
+    can actually read, the metadata sits under it as one quiet line, the status
+    is a chip on the right where the eye ends, and the actions are grouped with
+    delete separated and coloured as the exception it is.
+    {% endcomment %}
+    <div class="np-list">
+      {% for p in posts %}
+      <article class="np-row{% if not p.is_published %} is-draft{% endif %}">
+        <span class="np-thumb">
+          {% if p.image %}<img src="{{ p.image.url }}" alt="" loading="lazy">
+          {% else %}<svg aria-hidden="true"><use href="#ic-image"/></svg>{% endif %}
+        </span>
+
+        <div class="np-body">
+          <div class="np-top">
+            <h3 class="np-title">{{ p.title }}</h3>
+            {% if p.is_published %}<span class="gt-chip live">Live</span>
+            {% else %}<span class="gt-chip draft">Draft</span>{% endif %}
+          </div>
+          <p class="np-meta">
+            <span class="np-tag"><svg aria-hidden="true"><use href="#ic-flag"/></svg>{{ p.get_tag_display }}</span>
+            <span class="np-sep" aria-hidden="true">&middot;</span>
+            <span>{{ p.published_at|date:"j M Y, g:i a" }}</span>
+            {% if p.created_by %}
+            <span class="np-sep" aria-hidden="true">&middot;</span>
+            <span>{{ p.created_by.display_name }}</span>
+            {% endif %}
+            {% if p.announced_at %}
+            <span class="np-sep" aria-hidden="true">&middot;</span>
+            <span class="np-sent" title="Emailed {{ p.announced_at|date:'j M Y, g:i A' }}">
+              <svg aria-hidden="true"><use href="#ic-check"/></svg> Emailed
+            </span>
+            {% endif %}
+          </p>
+
+          <div class="np-acts">
+            <a class="np-btn" href="{% url 'manage:news_edit' p.id %}">Edit</a>
+
+            <form method="post" action="{% url 'manage:news_toggle' p.id %}" data-busy="Saving">
+              {% csrf_token %}
+              <button type="submit" class="np-btn">{% if p.is_published %}Unpublish{% else %}Publish{% endif %}</button>
+            </form>
+
+            {% comment %}
+            Emailing is offered once. After that the row says so above rather
+            than showing a button that would send a duplicate to every member.
+            {% endcomment %}
+            {% if p.is_published and not p.announced_at %}
+            <form method="post" action="{% url 'manage:news_announce' p.id %}" data-busy="Sending"
+                  data-confirm="Every member with email notifications on will receive this post. This cannot be recalled."
+                  data-confirm-title="Email this to all members?" data-confirm-ok="Send email">
+              {% csrf_token %}
+              <button type="submit" class="np-btn np-btn-go">Email members</button>
+            </form>
+            {% endif %}
+
+            {# Destructive, so it sits apart and is coloured as the exception. #}
+            <form method="post" action="{% url 'manage:news_delete' p.id %}" class="np-del" data-busy="Deleting"
+                  data-confirm="The post will be removed from the site permanently."
+                  data-confirm-title="Delete this post?" data-confirm-ok="Delete" data-confirm-danger>
+              {% csrf_token %}
+              <button type="submit" class="np-btn np-btn-danger">Delete</button>
+            </form>
+          </div>
+        </div>
+      </article>
+      {% empty %}
+      <div class="gt-empty" style="padding:34px 20px;text-align:center;">
+        Nothing posted yet, publish your first story with the form beside this list.
+      </div>
+      {% endfor %}
     </div>
   </section>
 

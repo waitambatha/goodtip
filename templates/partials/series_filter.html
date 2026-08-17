@@ -20,7 +20,12 @@ Expects: org_series, active_slugs (selected slugs), base, keep (query string
          to carry through, e.g. the org).
 {% endcomment %}
 {% if org_series|length > 1 %}
-<div class="sfilter">
+{% comment %}
+data-veil: pressing a code is a full page navigation, so the click was followed
+by a silent round trip with nothing on screen to say it had registered. The
+filter now veils itself while the new slate is fetched — see gt-veil.js.
+{% endcomment %}
+<div class="sfilter" data-veil data-veil-compact data-veil-label="Loading fixtures">
   <p class="sfilter-lead">Show these competitions</p>
   <div class="sfilter-chips" role="group" aria-label="Filter by competition">
     <a class="sfilter-chip{% if not active_slugs %} on{% endif %}"

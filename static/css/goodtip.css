@@ -9215,3 +9215,343 @@ body.fxh-open { overflow: hidden; }
 }
 
 
+
+/* ==========================================================================
+   ============ v31 — scoped loading veils ==================================
+   ========================================================================== */
+
+/* The panel-level counterpart to the splash. See gt-veil.js for which region
+   gets veiled and why polling is exempt.
+   
+   Deliberately reuses .busy-veil from the form path rather than introducing a
+   second look: an app with one loading state reads as one app. What is added
+   here is the sport marker and the cases a form never hit — veiling a table,
+   a filter bar, or a card grid. */
+
+/* A bouncing ball rather than a ring. The splash already established the
+   language; a spinner here would be a different app's idea of waiting. */
+.bv-ball {
+  width: 26px; height: 34px; position: relative;
+  background: radial-gradient(120% 120% at 35% 30%, #F2EFE6, #cfcab6);
+  border-radius: 50% / 42%;
+  border: 1.5px solid rgba(15,46,34,.28);
+  animation: bvBounce 1.05s cubic-bezier(.3,.5,.4,1) infinite;
+  filter: drop-shadow(0 5px 6px rgba(15,46,34,.28));
+}
+/* The lacing, so it reads as an oval ball and not a lozenge. */
+.bv-ball::before {
+  content: ""; position: absolute; left: 50%; top: 15%; bottom: 15%;
+  width: 2px; margin-left: -1px; background: var(--forest);
+}
+.bv-ball::after {
+  content: ""; position: absolute; left: 50%; top: 27%;
+  width: 9px; height: 1.5px; margin-left: -4.5px;
+  box-shadow: 0 4px var(--forest), 0 8px var(--forest), 0 12px var(--forest);
+}
+@keyframes bvBounce {
+  0%, 100% { transform: translateY(-7px) rotate(-12deg); }
+  50%      { transform: translateY(7px) rotate(12deg); }
+}
+
+/* Scoped veils sit on panels that are often shorter than the auth panels the
+   original was built for, so the padding is trimmed and the label sits closer. */
+.bv-scoped { border-radius: inherit; }
+.bv-scoped .bv-inner { gap: 11px; padding: 4px 14px; }
+.bv-scoped .bv-label { font-size: 11.5px; letter-spacing: .14em; }
+
+/* Short regions — a filter bar, a single row — cannot fit a stacked ball and
+   caption without the veil growing taller than what it covers. Below that
+   height it goes side-by-side and drops the ball to match the text. */
+@media (min-height: 0px) {
+  .bv-scoped[data-veil-compact] .bv-inner { flex-direction: row; gap: 10px; }
+  .bv-scoped[data-veil-compact] .bv-ball { width: 17px; height: 22px; }
+}
+
+/* On the deep-green sheet pages the cream veil is right, but on the dark board
+   headers and the deep panels it would glare. Inverted there. */
+.gt-dark .bv-scoped,
+.page-deep .gt-prov .bv-scoped {
+  background: rgba(11,35,25,.78);
+}
+.gt-dark .bv-scoped .bv-label { color: var(--cream); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bv-ball { animation-duration: 2.1s; }
+}
+
+/* ==========================================================================
+   ============ v32 — ladder legibility ====================================
+   ========================================================================== */
+
+/* THE HEADER WAS INVISIBLE.
+   
+   .gt-board .gb-head paints dark-green text on the deep-green bar, which is
+   correct on its own. Then the sheet-page rule recoloured the TEXT to
+   rgba(15,46,34,.55) — near-black — for a cream bed, without also removing the
+   dark background it was sitting on. Dark on dark: "Club P W L D % Pts" simply
+   did not render for anyone using the ladder or leaderboard.
+   
+   Fixed by finishing what that rule started: on a sheet page the head is a
+   plain caption row on the cream bed, so the dark plate goes too. */
+.sheet-page .gt-board .gb-head {
+  background: transparent;
+  padding: 6px 20px 10px;
+  border-bottom: 1px solid rgba(15,46,34,.13);
+  border-radius: 0;
+  color: rgba(15,46,34,.72);
+}
+
+/* Column striping. A ladder is read ACROSS — one club's row against eight
+   columns — and an unbroken cream field gives the eye nothing to track along.
+   A tint on alternating numeric columns, running the full height of the table,
+   does that without the heavy banding of full row stripes.
+   
+   Deliberately on the columns rather than the rows: rows already carry meaning
+   here (the finals cut, the leader), and striping them too would put three
+   competing signals on the same surface. */
+.gt-board.ladder .lad-col { position: relative; }
+.gt-board.ladder .lad-head .lad-col::before,
+.gt-board.ladder .lad-row .lad-col::before {
+  content: ""; position: absolute; inset: -13px -3px; z-index: 0;
+  background: rgba(15, 46, 34, .045);
+  pointer-events: none;
+}
+/* Alternate, so adjacent columns are distinguishable rather than one solid
+   block. nth-of-type counts the spans in the row: 3=P 4=W 5=L 6=D 7=% 8=Pts. */
+.gt-board.ladder .lad-col:nth-of-type(even)::before { background: transparent; }
+.gt-board.ladder .lad-head .lad-col::before { inset: -6px -3px -10px; }
+/* The figure has to sit above its own tint. */
+.gt-board.ladder .lad-num { position: relative; z-index: 1; }
+
+/* Points is the column the table exists to report, so it gets the strongest
+   treatment rather than sharing the alternating tint. */
+.gt-board.ladder .lad-pts::before {
+  background: rgba(45, 122, 58, .10) !important;
+}
+.gt-board.ladder .lad-row .lad-pts { color: var(--deep); font-weight: 800; }
+
+/* Club crests in the ladder. The shared .crest sizing is tuned for match
+   cards, which are roomier than a table row. */
+.gt-board.ladder .gb-who .crest {
+  width: 28px; height: 28px; flex: none; font-size: 10px;
+}
+
+/* The first column of figures needs a little air from the club name, or the
+   longest names run straight into the P column. */
+.gt-board.ladder .gb-who { padding-right: 10px; }
+
+/* ==========================================================================
+   ============ v33 — dashboard round navigator ============================
+   ========================================================================== */
+
+/* Move between rounds without leaving the dashboard. See the comment in
+   dashboard.html for why the flat cross-round list had to go. */
+.rnav {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--gt-card); border: 1px solid var(--gt-hair);
+  border-radius: 100px; padding: 7px 10px; margin: 0 0 14px;
+  position: relative;
+}
+
+.rnav-arrow {
+  width: 36px; height: 36px; flex: none; border-radius: 50%;
+  display: grid; place-items: center; text-decoration: none;
+  background: rgba(15,46,34,.06); color: var(--deep);
+  transition: background .15s var(--ease), transform .15s var(--ease);
+}
+.rnav-arrow svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 2.1; }
+.rnav-arrow:hover { background: var(--lime); transform: translateY(-1px); }
+/* The end of the season is a real edge, so the control stays in place and goes
+   quiet rather than vanishing — a disappearing arrow makes the row jump and
+   leaves you wondering whether you mis-clicked. */
+.rnav-arrow.is-off { opacity: .25; pointer-events: none; }
+
+.rnav-pick { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; }
+.rnav-lab {
+  font-family: var(--mark); font-size: 10.5px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+}
+.rnav-pick select {
+  flex: 1 1 auto; min-width: 0; max-width: 260px;
+  border: 1px solid var(--gt-hair); border-radius: 100px;
+  background: var(--gt-bg); color: var(--ink);
+  padding: 8px 13px; font-size: 14px; font-weight: 600;
+}
+
+/* How the round went. Sits at the end of the bar so the numbers land where the
+   eye finishes reading the control, not before it. */
+.rnav-score { display: flex; align-items: baseline; gap: 7px; margin-left: auto; padding-right: 6px; }
+.rns-hit {
+  font-family: var(--score); font-weight: 900; font-size: 19px; color: var(--deep);
+  font-variant-numeric: tabular-nums;
+}
+.rns-hit span { font-size: 13px; font-weight: 700; color: var(--muted); }
+.rns-lab {
+  font-family: var(--mark); font-size: 10.5px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+}
+.rns-pts {
+  font-family: var(--score); font-weight: 900; font-size: 19px; color: var(--forest);
+  font-variant-numeric: tabular-nums; margin-left: 4px;
+}
+.rns-pts span { font-size: 11px; margin-left: 2px; }
+
+.rnav-now {
+  margin-left: auto; text-decoration: none;
+  font-family: var(--mark); font-size: 11px; font-weight: 800;
+  letter-spacing: .07em; text-transform: uppercase;
+  background: var(--lime); color: var(--deep);
+  padding: 8px 15px; border-radius: 100px; white-space: nowrap;
+}
+.rnav-now:hover { filter: brightness(1.06); }
+
+@media (max-width: 560px) {
+  .rnav { border-radius: 18px; }
+  .rnav-score, .rnav-now { margin-left: 0; width: 100%; justify-content: center; text-align: center; }
+}
+
+/* Graded outcomes on a fixture card. Correct is the lime the app already uses
+   for a live pick; missed is muted rather than alarming — you lost a tip, the
+   card should not shout at you about it a week later. */
+.fxc-state.is-hit  { background: var(--lime); color: var(--deep); font-weight: 800; }
+.fxc-state.is-miss { background: rgba(15,46,34,.09); color: #7a6a6a; }
+
+/* When the score strip is already carrying the emphasis, the way-home link
+   steps down to a quiet secondary so the round's result stays the loudest
+   thing in the bar. */
+.rnav-now.is-quiet {
+  background: rgba(15,46,34,.06); color: var(--deep);
+  margin-left: 10px;
+}
+.rnav-now.is-quiet:hover { background: rgba(15,46,34,.11); filter: none; }
+/* With a score strip present the auto margin belongs to the score, not to the
+   link that follows it. */
+.rnav-score + .rnav-now { margin-left: 10px; }
+
+/* ==========================================================================
+   ============ v34 — sync panel: automatic first ===========================
+   ========================================================================== */
+
+/* The page led with a manual form, so the reasonable reading was "syncing is
+   something you do". It is not, and has not been for a while. This block says
+   what runs and how often, above the fallback control. */
+.gt-auto {
+  background: var(--gt-deep); color: var(--cream);
+  border-radius: 18px; padding: 22px 24px; margin-bottom: 22px;
+}
+.gta-head { display: flex; align-items: flex-start; gap: 13px; margin-bottom: 18px; }
+.gta-head h3 {
+  font-family: var(--mark); font-size: 13px; font-weight: 800;
+  letter-spacing: .13em; text-transform: uppercase; color: var(--lime); margin: 0 0 5px;
+}
+.gta-head p { font-size: 13.5px; color: rgba(232,228,213,.75); margin: 0; max-width: 62ch; }
+
+/* A live pulse, because "running" is the whole claim of this panel. */
+.gta-dot {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--lime);
+  flex: none; margin-top: 4px; position: relative;
+  box-shadow: 0 0 0 0 rgba(200,241,53,.6);
+  animation: gtaPulse 2.2s ease-out infinite;
+}
+@keyframes gtaPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(200,241,53,.55); }
+  70%  { box-shadow: 0 0 0 11px rgba(200,241,53,0); }
+  100% { box-shadow: 0 0 0 0 rgba(200,241,53,0); }
+}
+
+.gta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.gta-item {
+  background: rgba(255,255,255,.055); border: 1px solid rgba(232,228,213,.13);
+  border-radius: 13px; padding: 13px 15px;
+}
+.gta-item.wide { grid-column: 1 / -1; }
+.gta-item b {
+  display: block; font-size: 14.5px; color: var(--white); font-weight: 700; margin-bottom: 2px;
+}
+.gta-item > span {
+  display: inline-block; font-family: var(--mark); font-size: 10.5px; font-weight: 800;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--lime); margin-bottom: 6px;
+}
+.gta-item small { display: block; font-size: 12.5px; color: rgba(232,228,213,.7); line-height: 1.5; }
+
+.gt-subhead {
+  font-family: var(--mark); font-size: 12px; font-weight: 800;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+  margin: 0 0 12px;
+}
+
+.gd-note {
+  font-size: 12.5px; color: rgba(232,228,213,.72);
+  margin: -2px 0 16px; line-height: 1.55;
+}
+
+@media (prefers-reduced-motion: reduce) { .gta-dot { animation: none; } }
+
+/* ==========================================================================
+   ============ v35 — admin news list =======================================
+   ========================================================================== */
+
+/* Cards, not a table. See the comment in manage/news.html: four columns on a
+   640px minimum inside a half-width panel scrolled sideways at every real
+   width, and the column that got pushed off was the actions. */
+.np-list { display: grid; gap: 12px; }
+
+.np-row {
+  display: grid; grid-template-columns: 76px minmax(0,1fr); gap: 15px;
+  background: var(--gt-card); border: 1px solid var(--gt-hair);
+  border-radius: 15px; padding: 14px;
+  transition: border-color .15s var(--ease), box-shadow .15s var(--ease);
+}
+.np-row:hover { border-color: rgba(45,122,58,.32); box-shadow: 0 14px 30px -26px rgba(15,46,34,.5); }
+/* A draft is not live to anyone, so it reads back a step without being greyed
+   into illegibility — you still have to be able to work on it. */
+.np-row.is-draft { background: repeating-linear-gradient(135deg, var(--gt-card) 0 12px, rgba(15,46,34,.022) 12px 24px); }
+
+.np-thumb {
+  width: 76px; height: 76px; border-radius: 11px; overflow: hidden;
+  background: rgba(15,46,34,.06); display: grid; place-items: center; color: var(--muted);
+}
+.np-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.np-thumb svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+
+.np-body { min-width: 0; }
+.np-top { display: flex; align-items: flex-start; gap: 12px; }
+/* The headline is the field that matters and now looks like it. */
+.np-title {
+  font-family: var(--display); font-size: 16.5px; line-height: 1.35;
+  color: var(--ink); margin: 0; flex: 1 1 auto; min-width: 0;
+}
+.np-top .gt-chip { flex: none; margin-top: 1px; }
+
+.np-meta {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  font-size: 12.5px; color: var(--muted); margin: 5px 0 11px;
+}
+.np-tag { display: inline-flex; align-items: center; gap: 5px; }
+.np-tag svg, .np-sent svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.9; }
+.np-sep { opacity: .45; }
+.np-sent { display: inline-flex; align-items: center; gap: 4px; color: var(--forest); font-weight: 600; }
+
+.np-acts { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.np-acts form { margin: 0; }
+.np-btn {
+  display: inline-block; border: 1px solid var(--gt-hair); background: var(--gt-bg);
+  color: var(--ink); border-radius: 100px; padding: 6px 14px;
+  font-size: 12.5px; font-weight: 600; text-decoration: none; cursor: pointer;
+  transition: background .14s var(--ease), border-color .14s var(--ease), color .14s var(--ease);
+}
+.np-btn:hover { background: rgba(15,46,34,.06); border-color: rgba(15,46,34,.22); }
+.np-btn-go { background: var(--lime); border-color: transparent; color: var(--deep); font-weight: 700; }
+.np-btn-go:hover { filter: brightness(1.05); background: var(--lime); }
+
+/* Delete is pushed to the far end AND coloured, because in the old row it was
+   the fourth of four identical links — one slip from Email members. */
+.np-del { margin-left: auto; }
+.np-btn-danger { color: #9a2b2b; border-color: rgba(154,43,43,.28); background: rgba(154,43,43,.05); }
+.np-btn-danger:hover { background: #9a2b2b; border-color: #9a2b2b; color: #fff; }
+
+@media (max-width: 560px) {
+  .np-row { grid-template-columns: 54px minmax(0,1fr); }
+  .np-thumb { width: 54px; height: 54px; }
+  .np-del { margin-left: 0; }
+}
