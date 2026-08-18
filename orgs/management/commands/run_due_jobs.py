@@ -25,6 +25,13 @@ JOBS = [
     ("send_election_reminders", "vote reminders (a day out, an hour out)"),
     ("send_result_emails", "round scorecards and election outcomes"),
     ("generate_recaps", "AI round recaps"),
+    # Housekeeping. Both are self-throttling no-ops on almost every tick, which
+    # is why they can sit in a ten-minute loop rather than needing timers of
+    # their own — a new unit is a thing that has to be installed with sudo, and
+    # the one job that DID need its own timer is still not installed weeks
+    # later. Adding work to a loop that already runs is the cheaper promise.
+    ("retrain_matchreader", "refit MatchReader where the model is missing or stale"),
+    ("prune_sync_runs", "trim the sync history"),
 ]
 
 
