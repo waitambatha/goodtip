@@ -13,6 +13,6 @@
   <div class="receipt-row"><span class="k">Seats</span><span>{{ sub.seat_limit_label }}</span></div>
   <div class="receipt-row"><span class="k">Season</span><span>{{ sub.season }}</span></div>
   <div class="receipt-total"><span>Total paid</span><span class="num">${{ sub.price_aud|floatformat:2 }} AUD</span></div>
-  <p class="receipt-note">This is a receipt for the GoodTip platform service fee only. Charitable donations (base pledge, top-ups and matching) are handled separately and are not included in this amount. Not a tax-deductible donation receipt, those issue once the GoodTip Foundation has DGR status.</p>
+  <p class="receipt-note">This is a receipt for the GoodTip platform service fee. GoodTip gives a share of that fee to the charity your group picked; the donation is not itemised here and this is not a tax-deductible donation receipt, those issue once the GoodTip Foundation has DGR status.</p>
 </div>
 {% endblock %}

@@ -26,12 +26,17 @@
     <div class="card-h">Raised for {{ summary.charity.name|default:org.charity_display }}</div>
     <div class="s-num num" style="font-size:34px;color:var(--forest);margin:10px 0 4px;">${{ summary.raised|floatformat:0 }}</div>
     <div class="pbar" style="margin:6px 0 12px;"><i style="width:{{ summary.pct }}%"></i></div>
+    {% comment %}
+    One line, not a three-way split. The breakdown named a base pledge,
+    participant top-ups and an organisation match — none of which exist now
+    that GoodTip funds the donation from its own revenue. On a real season it
+    would have printed two rows of $0 under a total that came from somewhere
+    else entirely, which is worse than no breakdown at all.
+    {% endcomment %}
     <div class="dbreak">
-      <div class="row"><span>Base pledge</span><b>${{ summary.base|floatformat:0 }}</b></div>
-      <div class="row"><span>Participant top-ups</span><b>${{ summary.topups|floatformat:0 }}</b></div>
-      {% if summary.matching_enabled %}<div class="row"><span>Matched by {{ org.name }}</span><b>${{ summary.matched|floatformat:0 }}</b></div>{% endif %}
-      <div class="row total"><span>Total to charity</span><b>${{ summary.raised|floatformat:0 }}</b></div>
+      <div class="row total"><span>Given to charity</span><b>${{ summary.raised|floatformat:0 }}</b></div>
     </div>
+    <p class="card-lead" style="margin:10px 0 0;">Funded by GoodTip from its own revenue, from the flat fee {{ org.name }} pays.</p>
   </div>
   <div class="card pad-lg">
     <div class="card-h">Platform &amp; reporting</div>
