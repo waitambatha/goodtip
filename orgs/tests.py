@@ -1766,3 +1766,92 @@ class RecapWriterTests(SimpleTestCase):
                       "season_points": 0, "rank_now": 1, "perfect_round": False}],
         ))
         self.assertTrue(points)
+
+
+class WizardEndToEndTests(TestCase):
+    """Walk the whole create-a-group wizard and check a group comes out.
+
+    The existing CreateWizardTests assert on markup from an older shape — they
+    look for the season field on step 1, which moved to step 3 when the verify
+    step was inserted. Stale assertions hide a real question: does the flow
+    still WORK? This answers it by using the wizard the way a person does,
+    which is the thing that has to be true before anyone is invited to test.
+    """
+
+    def setUp(self):
+        from catalog.models import Competition, GroupType
+
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            email="wiz@example.com", password="Str0ng!pass", display_name="Wiz",
+        )
+        self.client.force_login(self.user)
+        # A type that does NOT require work-email verification, so the walk
+        # exercises the wizard rather than the emailed-code path.
+        self.gtype = GroupType.objects.exclude(
+            slug__in=["business", "education", "charities"]
+        ).first()
+        # Community and Business must name a sub-category — step 1 will not
+        # save without one, which is exactly the kind of thing a walk-through
+        # exists to catch.
+        from catalog.models import SubCategory
+        self.subcat = SubCategory.objects.filter(group_type=self.gtype).first()
+        self.comp = Competition.objects.filter(
+            slug="afl", season__year=2026
+        ).select_related("season").first()
+        self.charity = Charity.objects.filter(is_approved=True).first()
+        from django.urls import reverse
+        self.url = reverse("orgs:create")
+
+    def _post(self, step, **fields):
+        return self.client.post(self.url, {"step": str(step), "action": "next", **fields})
+
+    def test_a_group_can_be_created_from_start_to_finish(self):
+        from orgs.models import OrgMember, Organisation
+
+        self.assertIsNotNone(self.gtype, "no non-verifying group type seeded")
+        self.assertIsNotNone(self.comp, "no AFL 2026 competition seeded")
+
+        # 1 — who you are
+        self._post(1, name="Wizard Walk FC", group_type=self.gtype.id,
+                   sub_categories=self.subcat.id if self.subcat else "")
+        # 2 — verification, not required for this type
+        self._post(2)
+        # 3 — what you tip
+        self._post(
+            3, competitions=self.comp.id, season=self.comp.season_id,
+            team_size="10",
+        )
+        # 4 — the cause
+        self._post(4, charity_method="pick", charity=self.charity.id)
+        # 5 — create
+        self._post(5)
+
+        org = Organisation.objects.filter(name="Wizard Walk FC").first()
+        self.assertIsNotNone(org, "the wizard finished without creating a group")
+        self.assertEqual(org.season_id, self.comp.season_id)
+        self.assertIn(self.comp, org.competitions.all())
+        # The creator is the admin of what they just made, or nobody can run it.
+        member = OrgMember.objects.filter(org=org, user=self.user).first()
+        self.assertIsNotNone(member)
+        self.assertTrue(member.is_league_owner)
+
+    def test_the_created_group_lands_on_a_season_with_fixtures(self):
+        """The whole point of the season default. A group created into a season
+        the feeds have no draw for syncs nothing and looks broken."""
+        from orgs.models import Organisation
+
+        self._post(1, name="Season Check FC", group_type=self.gtype.id,
+                   sub_categories=self.subcat.id if self.subcat else "")
+        self._post(2)
+        # Season deliberately NOT posted — take whatever the form defaults to.
+        self._post(3, competitions=self.comp.id, team_size="10")
+        self._post(4, charity_method="pick", charity=self.charity.id)
+        self._post(5)
+
+        org = Organisation.objects.filter(name="Season Check FC").first()
+        if org is not None:
+            self.assertEqual(
+                org.season.year, 2026,
+                "a new group must land in the season being played, not a future one",
+            )

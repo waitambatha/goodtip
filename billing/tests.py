@@ -177,35 +177,15 @@ class DonationViewTests(TestCase):
         self.player = User.objects.create_user(email="p@example.com", password="x", display_name="Player")
         OrgMember.objects.create(user=self.player, org=self.org, role=OrgMember.ROLE_PARTICIPANT)
 
-    def test_owner_sets_pledge_via_view(self):
-        self.client.force_login(self.owner)
-        url = reverse("billing:pledge", args=[self.org.id])
-        self.assertEqual(self.client.get(url).status_code, 200)
-        resp = self.client.post(url, {
-            "pledged_amount": "500",
-            "payment_schedule": "season_close",
-            "matching_enabled": "on",
-            "matching_cap": "200",
-        })
-        self.assertEqual(resp.status_code, 302)
-        pledge = donations.get_pledge(self.org)
-        self.assertEqual(pledge.pledged_amount_aud, Decimal("500.00"))
-        self.assertTrue(pledge.matching_enabled)
-        self.assertEqual(pledge.matching_cap_aud, Decimal("200.00"))
-
-    def test_participant_cannot_set_pledge(self):
-        self.client.force_login(self.player)
-        url = reverse("billing:pledge", args=[self.org.id])
-        self.assertEqual(self.client.get(url).status_code, 403)
-
-    def test_participant_topup_recorded_without_gateway(self):
-        donations.set_pledge(self.org, pledged_amount=Decimal("200"))
-        self.client.force_login(self.player)
-        url = reverse("billing:topup", args=[self.org.id])
-        self.assertEqual(self.client.get(url).status_code, 200)
-        resp = self.client.post(url, {"amount": "25"})
-        self.assertEqual(resp.status_code, 302)
-        self.assertEqual(donations.donation_summary(self.org)["topups"], Decimal("25.00"))
+    # test_owner_sets_pledge_via_view, test_participant_cannot_set_pledge and
+    # test_participant_topup_recorded_without_gateway were removed on
+    # 18 Aug 2026 with the screens they exercised. GoodTip funds the donation
+    # from its own revenue, so an organisation has no pledge to set and a
+    # participant has nothing to top up — there is no view left to test.
+    #
+    # donations.set_pledge and the summary maths are NOT removed and stay
+    # covered below: the dashboard and the ESG report still read them to report
+    # what has been given, they are simply no longer written from a form.
 
     def test_manager_closes_season(self):
         donations.set_pledge(self.org, pledged_amount=Decimal("300"))

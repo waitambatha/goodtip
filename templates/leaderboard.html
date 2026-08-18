@@ -15,7 +15,6 @@
     <p class="gh-lead">Compete. Climb. Make an impact.</p>
   </div>
   <div class="gh-actions">
-    <a href="{% url 'billing:topup' org.id %}" class="gt-pill"><svg><use href="#ic-heart"/></svg> Add to the cause</a>
     <span class="lbl">Round</span>
     <select name="round" class="gt-select"
             hx-get="{% url 'tipping:leaderboard' org.id %}?scope={{ scope }}"
@@ -104,7 +103,6 @@
           <small>{% if donation.raised %}${{ donation.raised|floatformat:0 }} raised so far{% else %}Every tip makes a difference.{% endif %}</small>
         </div>
       </div>
-      <a href="{% url 'billing:topup' org.id %}" class="gt-pill" style="width:100%;justify-content:center;margin-top:16px;">Add to the cause <svg><use href="#ic-arrow-right"/></svg></a>
     </section>
 
     <section class="gt-quote">

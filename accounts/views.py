@@ -54,9 +54,14 @@ def _consume_pending_join(request):
 
 
 def post_join_redirect(org):
-    """After joining, show the one-time optional top-up prompt if a pledge exists."""
-    if org is not None and org.pledges.filter(season=org.season).exists():
-        return redirect("billing:topup", org_id=org.id)
+    """Where a new member lands after joining a group.
+
+    This used to divert to a one-time top-up prompt when the org had a pledge.
+    Both are gone: GoodTip funds the donation from its own revenue, so there is
+    nothing for a participant to contribute and asking would contradict the
+    promise the site now makes. Straight to the dashboard, which is where
+    somebody who just joined wants to be anyway.
+    """
     return redirect("dashboard")
 
 
@@ -356,11 +361,15 @@ def _dashboard_prompts(user, card, games):
 
     # 5. What it's all for.
     if card["donation"] and card["donation"].get("raised"):
+        # Reports the total; no longer invites a contribution. Participants are
+        # never asked for money, so "Add to it" pointed at a flow that has been
+        # removed and a proposition the site no longer makes.
         prompts.append({
             "icon": "ic-heart",
-            "text": f"{org.name} has raised ${card['donation']['raised']:,.0f} for {org.charity_display} so far.",
-            "cta": "Add to it",
-            "url": reverse("billing:topup", args=[org.id]),
+            "text": (
+                f"{org.name} has raised ${card['donation']['raised']:,.0f} "
+                f"for {org.charity_display} so far."
+            ),
         })
 
     # 6. The Wall, always last — the nudge that keeps the room warm.

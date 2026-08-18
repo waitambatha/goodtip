@@ -74,7 +74,7 @@
     <div class="tally">
       <p class="eyebrow">Raised so far &middot; this group</p>
       <div class="tally-num" data-countto="8420" data-prefix="$">$0</div>
-      <p class="tally-cap">Base pledge + voluntary top-ups + the company match. Every dollar here lands with the charity your group voted for, nothing skimmed.</p>
+      <p class="tally-cap">GoodTip funds this from its own revenue. Every dollar lands with the charity your group picked.</p>
       <div class="tally-bar"><i data-pct="68"></i></div>
       <div class="tally-meta"><span>68% to season goal</span><span>Goal $12,500</span></div>
     </div>
@@ -252,7 +252,7 @@
   <div class="wrap">
     <p class="eyebrow reveal">Pricing</p>
     <h2 class="section-heading reveal">One flat fee. All year. All four codes.</h2>
-    <p class="section-sub reveal">Priced by team size, nothing else. Entry to the comp is free for your people; they can donate and you can match it. The donation is the prize.</p>
+    <p class="section-sub reveal">Priced by team size, nothing else. Tipping is free for your people, and GoodTip funds a donation to the charity your group picked.</p>
     <div class="pricing-grid reveal" data-cards>
       <div class="price-card"><div class="price-ic"><svg><use href="#ic-spark"/></svg></div><div class="price-tier">Starter</div><div class="price-size">Up to 20 people</div><div class="price-num">$99</div><div class="price-period">/year</div><div class="price-per">~$5 per person</div><p class="price-desc">The full platform. AFL, AFLW, NRL, NRLW. Charity Vote, live ladder, the Wall, email reminders.</p></div>
       <div class="price-card featured"><div class="price-badge">Most popular</div><div class="price-ic"><svg><use href="#ic-users"/></svg></div><div class="price-tier">Team</div><div class="price-size">Up to 50 people</div><div class="price-num">$299</div><div class="price-period">/year</div><div class="price-per">~$6 per person</div><p class="price-desc">Everything in Starter, plus your group's name and logo and a round-by-round participation dashboard.</p></div>
@@ -263,30 +263,19 @@
   </div>
 </section>
 
-<!-- HOW THE DONATION WORKS — animated flow -->
+<!-- HOW THE DONATION WORKS -->
+{% comment %}
+One line, not three steps. The old section walked through base pledge →
+participant top-ups → organisation match, which described a funding model the
+product no longer uses: participants are never asked for money and there is
+nothing to match. Explaining a mechanism that does not exist is worse than
+saying nothing, because every question it raises has no answer on the site.
+{% endcomment %}
 <section class="section on-dark">
   <div class="wrap">
     <p class="eyebrow reveal">How the donation works</p>
-    <h2 class="section-heading reveal">Three ways the money grows. <em>Watch it flow.</em></h2>
-    <p class="section-sub reveal">It builds left to right across the season, tap any step to hold it and read.</p>
-    <div class="flow-seq reveal" data-flow>
-      <div class="flow-step c1">
-        <div class="fs-illus"><svg><use href="#ic-coins"/></svg></div>
-        <div class="fs-body"><span class="fs-num">1</span><h4>Base pledge</h4><p class="fs-lead">Your organisation sets a donation amount at the start of the season.</p><div class="fs-detail"><p>Paid however suits you, upfront, monthly, or at season close. This is the floor: the number the group can already see climbing on day one.</p></div></div>
-      </div>
-      <div class="flow-arrow"><svg class="cic" width="26" height="26"><use href="#ic-arrow"/></svg></div>
-      <div class="flow-step c2">
-        <div class="fs-illus"><svg><use href="#ic-vote"/></svg></div>
-        <div class="fs-body"><span class="fs-num">2</span><h4>Participant top-ups</h4><p class="fs-lead">Anyone in the group can add a voluntary top-up on top of their entry.</p><div class="fs-detail"><p>Entirely optional. Nobody's chased for it. But when the running total is visible all season on the ladder and the Wall, people give, and the average creeps up.</p></div></div>
-      </div>
-      <div class="flow-arrow"><svg class="cic" width="26" height="26"><use href="#ic-arrow"/></svg></div>
-      <div class="flow-step c3">
-        <div class="fs-illus"><svg><use href="#ic-match"/></svg></div>
-        <div class="fs-body"><span class="fs-num">3</span><h4>Organisation match</h4><p class="fs-lead">Your organisation matches top-ups dollar for dollar, up to a cap.</p><div class="fs-detail"><p>The group watches it happen in real time. That's the moment a tipping comp becomes a movement, and the total on the ladder is exactly what the charity receives.</p></div></div>
-      </div>
-    </div>
-    <div class="flow-progress"><i class="on"></i><i></i><i></i></div>
-    <p class="flow-hint">Three separate flows. The subscription runs the platform, every donated dollar reaches the charity. Nothing skimmed.</p>
+    <h2 class="section-heading reveal">One fee. <em>That's the whole story.</em></h2>
+    <p class="section-sub reveal">Your organisation pays one flat fee. GoodTip funds a donation from its own revenue and sends it to the charity your group picked.</p>
   </div>
 </section>
 
@@ -321,11 +310,11 @@
       <p class="section-sub" style="margin-bottom:0;">The honest answers, up front. Anything else, just ask.</p>
     </div>
     <div class="reveal">
-      <div class="faq-item" data-open="true"><button class="faq-q"><span><span class="qn">01</span> Is this gambling?</span><span class="qx"></span></button><div class="faq-a">No. Participants never pay anything and never receive anything. There is no entry fee, no prize pool and no money of yours in play at any point. GoodTip is not a gambling service.</div></div>
+      <div class="faq-item" data-open="true"><button class="faq-q"><span><span class="qn">01</span> How is this different from a normal tipping comp?</span><span class="qx"></span></button><div class="faq-a">Your group tips for free, every round. Your organisation pays one platform fee, and GoodTip gives a share of it to the charity your group picked.</div></div>
       <div class="faq-item"><button class="faq-q"><span><span class="qn">02</span> How does GoodTip make money?</span><span class="qx"></span></button><div class="faq-a">Your organisation pays one platform fee. GoodTip gives a share of that fee to the charity your group picks, from its own revenue. Tipping is free for every participant. It always will be.</div></div>
       <div class="faq-item"><button class="faq-q"><span><span class="qn">03</span> Who picks the charity?</span><span class="qx"></span></button><div class="faq-a">Your group does. Everyone nominates. Everyone votes. Majority wins. That's where the money goes.</div></div>
       <div class="faq-item"><button class="faq-q"><span><span class="qn">04</span> Which sports are included?</span><span class="qx"></span></button><div class="faq-a">AFL, AFLW, NRL, and NRLW at launch. Four codes, all season. Women's competitions come with the men's, same price either way. More in 2027.</div></div>
-      <div class="faq-item"><button class="faq-q"><span><span class="qn">05</span> How does donation matching work?</span><span class="qx"></span></button><div class="faq-a">Your organisation sets a base pledge and a matching cap at the start of the season. Participants can add voluntary top-ups. Your organisation matches those dollar for dollar, up to the cap. The running total is visible all season; at the end, the full amount goes to the chosen charity.</div></div>
+      <div class="faq-item"><button class="faq-q"><span><span class="qn">05</span> Where does the donation come from?</span><span class="qx"></span></button><div class="faq-a">GoodTip funds it from its own revenue. Your organisation pays one flat fee to run the comp; a share of that goes to the charity your group picked. Participants are never asked for money.</div></div>
       <div class="faq-item"><button class="faq-q"><span><span class="qn">06</span> When can we start?</span><span class="qx"></span></button><div class="faq-a">Set up your group now, free. Pay when you launch. Finals start August 28.</div></div>
     </div>
   </div>

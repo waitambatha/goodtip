@@ -2,7 +2,7 @@
 {% load static humanize %}
 
 {% block title %}The Good List &middot; GoodTip{% endblock %}
-{% block meta_description %}Your tips raise money for charity. The Good List ranks every group by what they've raised, filter by organisation type, sub-category, and state.{% endblock %}
+{% block meta_description %}Your group tips, every round. GoodTip funds the donation. The Good List ranks every group by what GoodTip's given because of them, filter by organisation type, sub-category, and state.{% endblock %}
 {% block body_class %}page-leaderboard{% endblock %}
 {% block loader_task %}Loading The Good List{% endblock %}
 
@@ -12,8 +12,8 @@
 <section class="hero-split">
   <div class="hs-left">
     <span class="pill" style="align-self:flex-start;margin-bottom:22px;"><span class="dot"></span>The Good List</span>
-    <h1>Your tips raise money <em>for charity.</em></h1>
-    <p class="hero-sub">Groups pick winners every round, free. GoodTip gives to the charity each group picked. No entry fees, no prize pool, no money from anyone playing.</p>
+    <h1>Your group tips, every round. <em>GoodTip funds the donation.</em></h1>
+    <p class="hero-sub">You choose where it lands. Groups pick winners every round, free, and GoodTip gives to the charity each group picked. Nobody playing is ever asked for money.</p>
     <div class="lb-herostat">
       {% if national_total > 0 %}
       <div class="big" data-countto="{{ national_total|floatformat:0 }}" data-prefix="$">$0</div>
@@ -51,7 +51,7 @@
     <div class="wrap">
       <div class="lb-head reveal">
         <h2>The Good List</h2>
-        <div class="note">Every named group, ranked by total raised. Groups appear here only after they opt in to public listing.</div>
+        <div class="note">Every named group, ranked by what GoodTip’s given because of them. Groups appear here only after they opt in to public listing.</div>
       </div>
 
       <form method="get" action="{% url 'good_list' %}" id="glFilters" class="gl-filterbar reveal">
@@ -174,7 +174,7 @@
 <section class="cta-pro">
   <div class="wrap reveal zoom">
     <h2>Get your group on The Good List.</h2>
-    <p>Set up free, run the Charity Vote, and your total starts climbing the moment Round 1 locks in. Finals start August 28.</p>
+    <p>Set up free, run the Charity Vote, and your total starts climbing the moment your organisation signs on.</p>
     <a href="/#start" class="btn-dark">Set up your group &rarr;</a>
   </div>
 </section>

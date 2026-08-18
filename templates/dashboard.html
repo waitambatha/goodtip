@@ -350,25 +350,16 @@ impossible. See gt-busy.js.
     </a>
     {% endif %}
 
-    {% if c.donation %}
-    <div class="card">
-      <div class="card-h">Donation pledge</div>
-      <div class="s-num" style="font-size:26px;margin:10px 0 2px;color:var(--forest);">${{ c.donation.raised|floatformat:0 }} <span style="font-size:14px;color:var(--muted);font-family:var(--body);font-weight:400;">for {{ c.donation.charity.name|default:c.org.charity_display }}</span></div>
-      <div class="dbreak">
-        <div class="row"><span>Base pledge</span><b>${{ c.donation.base|floatformat:0 }}</b></div>
-        <div class="row"><span>Top-ups</span><b>${{ c.donation.topups|floatformat:0 }}</b></div>
-        {% if c.donation.matching_enabled %}<div class="row"><span>Matched</span><b>${{ c.donation.matched|floatformat:0 }}</b></div>{% endif %}
-      </div>
-      <div class="pbar sm"><i style="width:{{ c.donation.pct }}%"></i></div>
-      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:6px;"><span>{{ c.donation.pct }}% of ${{ c.donation.goal|floatformat:0 }} goal</span><a href="{% url 'billing:pledge' c.org.id %}" class="flink" style="color:var(--forest);font-weight:700;">Edit</a></div>
-    </div>
-    {% else %}
-    <a href="{% url 'billing:pledge' c.org.id %}" class="card" style="text-decoration:none;border-color:var(--lime);">
-      <div style="display:flex;justify-content:space-between;align-items:center;"><div class="card-h">Donation pledge</div><span class="pill-role owner">Action needed</span></div>
-      <div class="s-num" style="font-size:22px;margin:10px 0 2px;">Set your pledge</div>
-      <div class="card-lead">What {{ c.org.name }} commits to the charity &rarr;</div>
-    </a>
-    {% endif %}
+    {% comment %}
+The donation-pledge card is gone with the pledge page itself. It broke the
+season down as base pledge + top-ups + match, and none of those are things any
+more: the organisation pays one flat fee and GoodTip funds the donation from
+its own revenue. A card inviting an admin to "set your pledge" pointed at a
+screen that no longer decides anything.
+
+What the group is raising for still shows — see the charity card — because that
+is the part members care about and the part that is still true.
+{% endcomment %}
   </div>
   {% endif %}
 </div>

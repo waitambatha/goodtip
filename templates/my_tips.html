@@ -107,7 +107,6 @@
           <small>{% if donation.raised %}${{ donation.raised|floatformat:0 }} raised so far{% else %}Make every tip count.{% endif %}</small>
         </div>
       </div>
-      <a href="{% url 'billing:topup' org.id %}" class="gt-pill" style="width:100%;justify-content:center;margin-top:16px;">Add to the cause <svg><use href="#ic-arrow-right"/></svg></a>
     </section>
 
     {% if selected_round %}

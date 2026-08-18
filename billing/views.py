@@ -12,7 +12,6 @@ from catalog.models import GoodListConfig, GroupType, State
 from orgs.models import OrgMember, Organisation
 
 from . import donations, goodlist, services
-from .forms import DonationPledgeForm, TopUpForm
 from .models import DonationPledge, PlanSubscription
 from .pricing import TIERS, seat_limit_label
 
@@ -137,86 +136,11 @@ def checkout_view(request, org_id: int):
     return redirect(session.url)
 
 
-@login_required
-def pledge_view(request, org_id: int):
-    org = get_object_or_404(Organisation, pk=org_id)
-    if not _require_owner(request.user, org):
-        return HttpResponseForbidden()
-
-    pledge = donations.get_pledge(org)
-    if request.method == "POST":
-        form = DonationPledgeForm(request.POST)
-        if form.is_valid():
-            donations.set_pledge(
-                org,
-                pledged_amount=form.cleaned_data["pledged_amount"],
-                payment_schedule=form.cleaned_data["payment_schedule"],
-                matching_enabled=form.cleaned_data["matching_enabled"],
-                matching_cap=form.cleaned_data["matching_cap"],
-            )
-            messages.success(request, "Donation pledge saved — participants can see it now.")
-            return redirect("dashboard")
-    else:
-        initial = {}
-        if pledge:
-            initial = {
-                "pledged_amount": pledge.pledged_amount_aud,
-                "payment_schedule": pledge.payment_schedule,
-                "matching_enabled": pledge.matching_enabled,
-                "matching_cap": pledge.matching_cap_aud,
-            }
-        form = DonationPledgeForm(initial=initial)
-
-    return render(request, "billing/pledge.html", {
-        "org": org,
-        "form": form,
-        "pledge": pledge,
-        "suggested_minimum": donations.suggested_minimum(org),
-    })
-
-
-@login_required
-def topup_view(request, org_id: int):
-    """The 'Add to the cause' flow — optional participant donation (deck slide 6)."""
-    org = get_object_or_404(Organisation, pk=org_id)
-    if not OrgMember.objects.filter(user=request.user, org=org).exists():
-        return HttpResponseForbidden()
-
-    summary = donations.donation_summary(org)
-    if summary is None:
-        messages.info(request, "This league hasn't set a donation pledge yet.")
-        return redirect("dashboard")
-
-    pledge = summary["pledge"]
-    if request.method == "POST":
-        form = TopUpForm(request.POST)
-        if form.is_valid():
-            amount = form.cleaned_data["amount"]
-            if not services.is_configured():
-                # Phase 1 without a gateway: record and hold (deck: held in Pty Ltd).
-                result = donations.record_topup(pledge, participant=request.user, amount=amount)
-                _flash_topup(request, result)
-                return redirect("tipping:leaderboard", org_id=org.id)
-            success_url = request.build_absolute_uri(
-                reverse("tipping:leaderboard", args=[org.id])
-            )
-            cancel_url = request.build_absolute_uri(reverse("billing:topup", args=[org.id]))
-            try:
-                session = services.create_donation_checkout_session(
-                    pledge, request.user, amount,
-                    success_url=success_url, cancel_url=cancel_url,
-                )
-            except Exception:  # noqa: BLE001 — surface any Stripe error gracefully
-                logger.exception("Stripe donation session creation failed")
-                messages.error(request, "Couldn't start checkout. Please try again.")
-                return redirect("billing:topup", org_id=org.id)
-            return redirect(session.url)
-    else:
-        form = TopUpForm()
-
-    return render(request, "billing/topup.html", {
-        "org": org, "form": form, "summary": summary,
-    })
+# pledge_view and topup_view were removed on 18 Aug 2026 with the wording
+# change: GoodTip funds the donation from its own revenue, so an organisation
+# has no pledge to set and a participant has nothing to top up. donations.py
+# keeps the read-side helpers, which the dashboard and ESG report still use to
+# report what has been given.
 
 
 def _flash_topup(request, result):
