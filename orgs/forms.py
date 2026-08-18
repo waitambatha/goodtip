@@ -6,6 +6,31 @@ from catalog.models import Charity, Competition, GroupType, Season, State, SubCa
 from .models import Organisation
 from .services import unique_charity_slug as _unique_charity_slug
 
+
+def fed_competitions():
+    """Competitions a feed can actually deliver fixtures for.
+
+    Super League and Super Netball are seeded by a migration as 2027 roadmap
+    entries. They have no scraper, no teams and no fixtures, and nothing is
+    scheduled to give them any — so a league that picks one gets an empty
+    dashboard for its whole season with nothing on screen suggesting why. Six
+    leagues had already done exactly that, and one of them tips nothing else.
+
+    Offering a competition is a promise to deliver its games; this keeps the
+    signup form to the promises the system can actually keep. The moment either
+    gains a scraper it reappears here on its own, because the test is what
+    data_sync can resolve rather than a second hardcoded list that would have
+    to be remembered.
+    """
+    from data_sync.services import competition_for_series
+
+    ok = [
+        c.pk for c in Competition.objects.prefetch_related("series")
+        if any(competition_for_series(s.name) for s in c.series.all())
+    ]
+    return Competition.objects.filter(pk__in=ok).select_related("sport", "season")
+
+
 # The only allowed sub-category pairing (categories doc build note): a school
 # running both levels selects Primary + Secondary and surfaces under both
 # Good List filters. Every other type picks exactly one sub-category.
@@ -51,8 +76,9 @@ class OrgCreateForm(forms.ModelForm):
         label="State or territory (optional)",
         empty_label="We operate nationally",
     )
+    # Only competitions a feed can actually deliver. See fed_competitions().
     competitions = forms.ModelMultipleChoiceField(
-        queryset=Competition.objects.select_related("sport", "season"),
+        queryset=Competition.objects.none(),
         widget=forms.CheckboxSelectMultiple,
         label="Competition(s)",
     )
@@ -103,6 +129,7 @@ class OrgCreateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["competitions"].queryset = fed_competitions()
         self.fields["season"].queryset = Season.objects.all()
         self.fields["season"].empty_label = None
         # Season.Meta orders by -year, so the first choice was always the

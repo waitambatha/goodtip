@@ -7,7 +7,7 @@ import re
 
 from django.test import SimpleTestCase, TestCase
 
-from catalog.models import Charity, Season, Sport
+from catalog.models import Charity, Season, Series, Sport
 
 from .models import (
     CharityVote,
@@ -112,6 +112,11 @@ class OrgCategoryFormTests(TestCase):
         self.comp, _ = Competition.objects.get_or_create(
             sport=self.sport, season=self.season, slug="afl", defaults={"name": "AFL"},
         )
+        # A Competition with no Series cannot deliver a fixture, and the signup
+        # form now offers only competitions a feed can actually serve — so a
+        # bare competition is correctly unselectable. Attach the real AFL
+        # series, which is what production rows look like.
+        self.comp.series.set([Series.objects.get(name="AFL")])
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
         )

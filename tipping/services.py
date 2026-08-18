@@ -287,13 +287,26 @@ def submit_tip(*, user, match: Match, org, selection: str) -> Tip:
 
 
 def _leaderboard(org_ids, tip_filter):
+    """Points, and the accuracy record — which count DIFFERENT things.
+
+    POINTS include auto-assigned tips. The missed-tip default exists precisely
+    so a skipped round still scores, and a leaderboard that left those out
+    would disagree with the rule that produced them.
+
+    ACCURACY does not. "8 of 9 correct" is a claim about judgement, and a tip
+    the system wrote is not judgement — without this filter, somebody who never
+    opened the app could finish a round on a perfect record, and the member who
+    actually studied the form and got seven would rank below them on it. Points
+    are what the default is for; a strike rate is not.
+    """
     from accounts.models import User
+    real = Q(tips__is_auto=False)
     qs = User.objects.filter(memberships__org_id__in=org_ids).distinct()
     return qs.annotate(
         # Weighted score: sum of points_awarded (finals and Origin count for more).
         points=Coalesce(Sum("tips__points_awarded", filter=tip_filter), Value(0)),
-        tips_total=Count("tips", filter=tip_filter & Q(tips__is_correct__isnull=False)),
-        tips_correct=Count("tips", filter=tip_filter & Q(tips__is_correct=True)),
+        tips_total=Count("tips", filter=tip_filter & real & Q(tips__is_correct__isnull=False)),
+        tips_correct=Count("tips", filter=tip_filter & real & Q(tips__is_correct=True)),
     ).order_by("-points", "display_name")
 
 
@@ -472,11 +485,22 @@ def leaderboard_for_family(org, round_id: int | None = None):
 
 
 def user_org_stats(user, org):
+    """Points over every tip; the record over the ones this member actually made.
+
+    Same split as the leaderboard and for the same reason — see _leaderboard.
+    tips_submitted likewise counts real picks, because it is the number shown
+    as "tips made" and the system making one on your behalf is not you making
+    a tip.
+    """
     tips = Tip.objects.filter(user=user, org=org)
+    mine = tips.filter(is_auto=False)
     points = tips.aggregate(p=Coalesce(Sum("points_awarded"), Value(0)))["p"]
-    correct = tips.filter(is_correct=True).count()
-    graded = tips.filter(is_correct__isnull=False).count()
-    return {"points": points, "tips_correct": correct, "tips_graded": graded, "tips_submitted": tips.count()}
+    return {
+        "points": points,
+        "tips_correct": mine.filter(is_correct=True).count(),
+        "tips_graded": mine.filter(is_correct__isnull=False).count(),
+        "tips_submitted": mine.count(),
+    }
 
 
 def user_rank_in_org(user, org) -> int | None:
