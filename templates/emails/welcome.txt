@@ -1,7 +1,8 @@
 Hello {{ user.display_name }},
 
 Your GoodTip account is live. Same footy tipping you already do on a Monday —
-except the entry fees end up somewhere that matters.
+except this time, GoodTip turns it into a donation for a charity your group
+picks.
 
 HOW IT WORKS
 1. Join your group — or start one. Your workplace, club or crew.

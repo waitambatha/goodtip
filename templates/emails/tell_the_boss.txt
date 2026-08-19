@@ -5,8 +5,8 @@ Dear {{ boss_name|default:"Boss" }},
 
 What if our footy tips actually did some good?
 
-We're already picking teams and checking the ladder every Monday. GoodTip just
-sends our entry fees to a charity we choose. Together.
+We're already picking teams and checking the ladder every Monday. With GoodTip
+it stays free for all of us, and GoodTip gives to a charity we choose. Together.
 
 Five minutes to set up. Nothing to lose but bragging rights.
 
@@ -16,9 +16,9 @@ Can we do this?
 ----
 
 WHAT GOODTIP ACTUALLY IS
-A footy tipping comp for your workplace or club where the entry fees go to a
-charity your group votes on, instead of a prize pool. Free to play, about five
-minutes to set up.
+A footy tipping comp for your workplace or club. Your organisation pays one
+platform fee and GoodTip gives a share of it to a charity your group votes on.
+Free to play for everyone in it, about five minutes to set up.
 
 See how it works: {{ how_url }}
 

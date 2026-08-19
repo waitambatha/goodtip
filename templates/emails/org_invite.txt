@@ -1,8 +1,8 @@
 Hello,
 
 {{ inviter_name }} has invited you to join {{ org.name }} on GoodTip — the footy
-tipping comp where the entry fees go to a charity your group votes on, not a
-prize pool.
+tipping comp where you tip and GoodTip gives to a charity your group votes on.
+It costs you nothing.
 {% if message %}
   "{{ message }}"
   — {{ inviter_name }}
