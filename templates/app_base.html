@@ -198,8 +198,6 @@
         {% if primary_donation.goal %}<span class="cs-amt" style="opacity:.6;font-weight:400;">Goal ${{ primary_donation.goal|floatformat:0 }}</span>{% endif %}
       {% else %}
         <span class="cs-label"><svg><use href="#ic-heart"/></svg> Raising for {{ primary_org.charity_display }}</span>
-        <span class="cs-amt" style="opacity:.6;font-weight:400;">No pledge set yet</span>
-        <span class="cs-bar"><i style="width:0%"></i></span>
       {% endif %}
       <span class="cs-right">{{ primary_org.season }} &middot; {{ primary_org.sport_label }}</span>
     </div>

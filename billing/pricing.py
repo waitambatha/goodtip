@@ -26,7 +26,7 @@ TIERS = {
         "price": 199,
         "seat_limit": 50,
         "audience": "Mid-market, community clubs",
-        "features": ["Everything in Starter", "Up to 3 leagues", "Captain tools", "Participation tracking", "Donation progress bar"],
+        "features": ["Everything in Starter", "Up to 3 leagues", "Captain tools", "Participation tracking"],
         "popular": True,
     },
     PRO: {
@@ -34,7 +34,7 @@ TIERS = {
         "price": 499,
         "seat_limit": 200,
         "audience": "Corporate, larger organisations",
-        "features": ["Everything in Growth", "Unlimited leagues", "Org dashboard", "ESG report export", "Matching tools", "Multiple sports"],
+        "features": ["Everything in Growth", "Unlimited leagues", "Org dashboard", "ESG report export", "Multiple sports"],
         "popular": False,
     },
     ENTERPRISE: {
