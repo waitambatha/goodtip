@@ -246,7 +246,7 @@ def send_round_results(round_obj) -> int:
 # News
 def send_news_published(post, recipients) -> int:
     """Announce a published post. ``recipients`` is an iterable of users."""
-    post_url = site_url(f"/news/{post.pk}/")
+    post_url = site_url(f"/news/{post.slug}/")
     image_url = ""
     if getattr(post, "image", None):
         try:

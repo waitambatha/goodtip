@@ -8,7 +8,7 @@
 {% if posts %}
 <div class="grid-app g-3">
   {% for p in posts %}
-  <a class="news-lead news-link" href="{% url 'news_detail' p.id %}">
+  <a class="news-lead news-link" href="{% url 'news_detail' p.slug %}">
     {% if p.image %}<div class="thumb" style="background-image:url('{{ p.image.url }}')"><span class="sport-tag">{{ p.get_tag_display }}</span></div>
     {% else %}<div class="thumb noimg"><span class="sport-tag">{{ p.get_tag_display }}</span><span class="noimg-mark">GOOD<span>TIP</span></span></div>{% endif %}
     <div class="body">

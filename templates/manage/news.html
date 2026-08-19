@@ -7,13 +7,16 @@
 {% block hero_shot %}{% static 'img/scenes/aussie-crowd-flag.jpg' %}{% endblock %}
 {% block admin_content %}
 
-<div class="gt-shell gt-shell-wide">
+<div class="gt-shell gt-shell-single">
   <section class="gt-panel">
     <div class="gt-panel-head">
       <span class="gp-ic"><svg><use href="#ic-doc"/></svg></span>
       <div>
         <h2>All posts</h2>
         <div class="gp-sub">{{ posts|length }} post{{ posts|length|pluralize }} &middot; only the super admin can publish.</div>
+      </div>
+      <div class="gp-right">
+        <a href="{% url 'manage:news_new' %}" class="gt-go-btn" style="width:auto;">Create post <svg><use href="#ic-arrow-right"/></svg></a>
       </div>
     </div>
 
@@ -97,28 +100,11 @@
       </article>
       {% empty %}
       <div class="gt-empty" style="padding:34px 20px;text-align:center;">
-        Nothing posted yet, publish your first story with the form beside this list.
+        Nothing posted yet, <a href="{% url 'manage:news_new' %}" style="color:var(--forest);font-weight:700;">write your first story</a>.
       </div>
       {% endfor %}
     </div>
   </section>
-
-  <aside>
-    <section class="gt-panel gt-form">
-      <div class="gt-panel-head">
-        <span class="gp-ic"><svg><use href="#ic-send"/></svg></span>
-        <div>
-          <h2>New post</h2>
-          <div class="gp-sub">Publish now, or save it as a draft.</div>
-        </div>
-      </div>
-      <form method="post" action="{% url 'manage:news' %}" enctype="multipart/form-data">
-        {% csrf_token %}
-        {% include "manage/_news_form_fields.html" %}
-        <button type="submit" class="gt-go-btn" style="margin-top:6px;">Save post <svg><use href="#ic-arrow-right"/></svg></button>
-      </form>
-    </section>
-  </aside>
 </div>
 
 <div class="gt-trust">

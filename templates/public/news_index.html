@@ -43,7 +43,7 @@
     {% if posts %}
     <div class="pnews-grid reveal">
       {% for p in posts %}
-      <a class="pnews-card {% if forloop.first and not active_tag %}lead{% endif %}" href="{% url 'news_detail' p.id %}">
+      <a class="pnews-card {% if forloop.first and not active_tag %}lead{% endif %}" href="{% url 'news_detail' p.slug %}">
         {% if p.image %}<div class="pn-thumb" style="background-image:url('{{ p.image.url }}')"><span class="pn-tag">{{ p.get_tag_display }}</span></div>
         {% else %}<div class="pn-thumb noimg"><span class="pn-tag">{{ p.get_tag_display }}</span></div>{% endif %}
         <div class="pn-body">

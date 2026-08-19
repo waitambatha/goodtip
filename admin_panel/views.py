@@ -1,11 +1,13 @@
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.files.storage import default_storage
 from django.db.models import Q
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
+from django.utils.html import linebreaks, strip_tags
 
 from catalog.models import Charity, Competition, Season, Series, Sport
 from data_sync.models import SyncRun, SyncSchedule
@@ -328,35 +330,89 @@ def _feed_coverage():
 from django.contrib.auth.decorators import user_passes_test  # noqa: E402
 
 from .models import NewsPost  # noqa: E402
+from .sanitize import sanitize_editor_html  # noqa: E402
 
 superuser_required = user_passes_test(
     lambda u: u.is_active and u.is_superuser, login_url="/admin/login/"
 )
 
 
-def _apply_news_form(request, post: NewsPost) -> NewsPost:
-    post.title = request.POST["title"].strip()
+def _headline_text(request) -> str:
+    """Plain-text version of the rich headline, for the empty-headline guard."""
+    return strip_tags(request.POST.get("title_html", "")).strip()
+
+
+def _parse_sources(post_data) -> list:
+    labels = post_data.getlist("source_label")
+    urls = post_data.getlist("source_url")
+    sources = []
+    for label, url in zip(labels, urls):
+        url = url.strip()
+        if not url:
+            continue
+        sources.append({"label": label.strip() or url, "url": url})
+    return sources
+
+
+def _fill_news_post(request, post: NewsPost) -> NewsPost:
+    """Populate `post` from POST data. Caller decides whether to save it."""
+    title_html = sanitize_editor_html(request.POST.get("title_html", "").strip())
+    post.title_html = title_html
+    post.title = strip_tags(title_html).strip()
     post.tag = request.POST.get("tag", "NEWS")
     post.excerpt = request.POST.get("excerpt", "").strip()
-    post.body = request.POST.get("body", "").strip()
+    post.body = sanitize_editor_html(request.POST.get("body", "").strip())
     post.link_url = request.POST.get("link_url", "").strip()
+    post.sources = _parse_sources(request.POST)
     post.is_published = bool(request.POST.get("is_published"))
     if request.FILES.get("image"):
         post.image = request.FILES["image"]
+    return post
+
+
+def _apply_news_form(request, post: NewsPost) -> NewsPost:
+    _fill_news_post(request, post)
     post.save()
     return post
 
 
+def _editor_body_html(body: str) -> str:
+    """The story editor is a contenteditable surface, so it needs real HTML.
+
+    Posts written before the rich editor existed have a plain-text body — one
+    wrapping <p> per line reproduces how it already renders on the article
+    page (see the news_detail templates' linebreaks fallback) instead of
+    dumping it into the editor as one unbroken run of text.
+    """
+    if not body:
+        return ""
+    if "<" in body:
+        return body
+    return linebreaks(body)
+
+
 @superuser_required
 def news_list(request):
+    posts = NewsPost.objects.all()
+    return render(request, "manage/news.html", {"posts": posts})
+
+
+@superuser_required
+def news_new(request):
     if request.method == "POST":
+        if not _headline_text(request):
+            messages.error(request, "Give the story a headline before saving.")
+            draft = _fill_news_post(request, NewsPost())
+            return render(request, "manage/news_editor.html", {
+                "post": draft, "tag_choices": NewsPost.TAG_CHOICES, "is_new": True,
+                "initial_body": draft.body,
+            })
         post = NewsPost(created_by=request.user, published_at=timezone.now())
         _apply_news_form(request, post)
         messages.success(request, "Post published." if post.is_published else "Post saved as a draft.")
         return redirect("manage:news")
-    posts = NewsPost.objects.all()
-    return render(request, "manage/news.html", {
-        "posts": posts, "tag_choices": NewsPost.TAG_CHOICES,
+    return render(request, "manage/news_editor.html", {
+        "tag_choices": NewsPost.TAG_CHOICES, "is_new": True,
     })
 
 
@@ -364,12 +420,32 @@ def news_list(request):
 def news_edit(request, post_id: int):
     post = get_object_or_404(NewsPost, pk=post_id)
     if request.method == "POST":
+        if not _headline_text(request):
+            messages.error(request, "Give the story a headline before saving.")
+            draft = _fill_news_post(request, post)
+            return render(request, "manage/news_editor.html", {
+                "post": draft, "tag_choices": NewsPost.TAG_CHOICES, "is_new": False,
+                "initial_body": draft.body,
+            })
         _apply_news_form(request, post)
         messages.success(request, "Post updated.")
         return redirect("manage:news")
-    return render(request, "manage/news_edit.html", {
-        "post": post, "tag_choices": NewsPost.TAG_CHOICES,
+    return render(request, "manage/news_editor.html", {
+        "post": post, "tag_choices": NewsPost.TAG_CHOICES, "is_new": False,
+        "initial_body": _editor_body_html(post.body),
     })
+
+
+@superuser_required
+def news_upload_image(request):
+    """Inline image upload for the story editor — returns the URL to insert."""
+    f = request.FILES.get("file")
+    if request.method != "POST" or not f:
+        return JsonResponse({"error": "No file given."}, status=400)
+    if not (f.content_type or "").startswith("image/"):
+        return JsonResponse({"error": "That's not an image."}, status=400)
+    path = default_storage.save(f"news/body/{f.name}", f)
+    return JsonResponse({"url": default_storage.url(path)})
 
 
 @superuser_required
@@ -452,12 +528,22 @@ def news_index(request):
     })
 
 
-def news_detail(request, post_id: int):
-    """Full story page. Public, same split as the index."""
-    post = get_object_or_404(NewsPost, pk=post_id, is_published=True)
+def news_detail(request, slug: str):
+    """Full story page. Public, same split as the index.
+
+    Also the page link-preview crawlers (Facebook, LinkedIn, Slack…) hit when
+    a story is shared, since those requests are always anonymous — so the
+    absolute image/URL built here for the Open Graph tags need to be right on
+    the public template every time, not just for logged-in members.
+    """
+    post = get_object_or_404(NewsPost, slug=slug, is_published=True)
     more = NewsPost.objects.filter(is_published=True).exclude(pk=post.pk)[:5]
     tpl = "news_detail.html" if request.user.is_authenticated else "public/news_detail.html"
-    return render(request, tpl, {"post": post, "more": more, "active": "news"})
+    return render(request, tpl, {
+        "post": post, "more": more, "active": "news",
+        "share_url": request.build_absolute_uri(),
+        "share_image_url": request.build_absolute_uri(post.image.url) if post.image else "",
+    })
 
 
 # ---------------------------------------------------------------------------

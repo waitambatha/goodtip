@@ -1,0 +1,28 @@
+{# Share bar + optional sources for a published story.
+   Pass `prefix` = "art" (member app layout) or "pn" (public marketing layout)
+   to pick up that page's existing class names. #}
+<div class="{{ prefix }}-share">
+  <span class="as-label">Share this story</span>
+  <a class="as-btn as-facebook" target="_blank" rel="noopener"
+     href="https://www.facebook.com/sharer/sharer.php?u={{ share_url|urlencode }}" title="Share on Facebook">
+    <svg><use href="#s-facebook"/></svg>
+  </a>
+  <a class="as-btn as-linkedin" target="_blank" rel="noopener"
+     href="https://www.linkedin.com/sharing/share-offsite/?url={{ share_url|urlencode }}" title="Share on LinkedIn">
+    <svg><use href="#s-linkedin"/></svg>
+  </a>
+  <button type="button" class="as-btn as-copy" data-copy-link="{{ share_url }}" data-label="Copy link" title="Copy link">
+    <svg><use href="#ic-link"/></svg> Copy link
+  </button>
+</div>
+
+{% if post.sources %}
+<div class="{{ prefix }}-sources">
+  <h4>Sources</h4>
+  <ol>
+    {% for s in post.sources %}
+    <li><a href="{{ s.url }}" target="_blank" rel="noopener nofollow">{{ s.label|default:s.url }}</a></li>
+    {% endfor %}
+  </ol>
+</div>
+{% endif %}

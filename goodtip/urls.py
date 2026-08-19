@@ -44,7 +44,7 @@ urlpatterns = [
     path("dashboard/", dashboard_view, name="dashboard"),
     # News & blog (members) — full-story pages behind the dashboard cards
     path("news/", news_index, name="news_index"),
-    path("news/<int:post_id>/", news_detail, name="news_detail"),
+    path("news/<slug:slug>/", news_detail, name="news_detail"),
     path("", include("accounts.urls", namespace="accounts")),
     path("password-reset/", auth_views.PasswordResetView.as_view(
         template_name="auth/password_reset.html",

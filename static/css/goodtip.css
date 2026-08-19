@@ -3823,6 +3823,9 @@ a.gt-stat:hover .gs-go { opacity: 1; color: var(--lime); }
 /* ---- admin: list + create-form split ----------------------------------- */
 .gt-shell.gt-shell-wide { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); }
 @media (max-width: 1080px) { .gt-shell.gt-shell-wide { grid-template-columns: 1fr; } }
+/* News & blog dropped its sidebar create-form for a full standalone editor
+   page, so the list panel now runs the shell's full width on its own. */
+.gt-shell.gt-shell-single { grid-template-columns: 1fr; }
 /* the org row's name line: title and status chip share a line, meta below */
 .gt-table .gt-nameline { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
 .gt-table .gt-nameline b { white-space: nowrap; }
@@ -4930,6 +4933,10 @@ html.no-js [data-shots] .shot:first-child { opacity: 1; }
 .page-deep .gt-scroll, .gt-scroll.on-dark { scrollbar-color: rgba(200,241,53,.34) transparent; }
 .page-deep .gt-scroll::-webkit-scrollbar-thumb,
 .gt-scroll.on-dark::-webkit-scrollbar-thumb { background-color: rgba(200,241,53,.30); }
+/* Match cards (.fxc) run ~210px tall with the MatchReader row, so the generic
+   floor above only ever fit about two before scrolling. Raised so roughly
+   four sit in view first — same self-scrolling behaviour, just a bigger window. */
+.fixtures.gt-scroll { max-height: max(880px, 74vh); }
 
 /* A hint that there's more below, which fades out once you reach the end. */
 .gt-listwrap { position: relative; }
@@ -9638,6 +9645,169 @@ body.fxh-open { overflow: hidden; }
   .np-thumb { width: 54px; height: 54px; }
   .np-del { margin-left: 0; }
 }
+
+/* ---- Story editor: full-page create/edit, replacing the sidebar form ----
+   The client's exact complaint was that the box to write a story in was too
+   small. This is a wide, standalone page: a styled headline, a full-height
+   body canvas with its own formatting toolbar, and everything else (tag,
+   teaser, featured image, sources, publish) as calm supporting fields around
+   it rather than crowding the writing surface. */
+.ned-shell { max-width: 900px; margin: 0 auto; }
+.ned-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap; margin-bottom: 20px;
+}
+.ned-topbar .ned-back { font-size: 13px; font-weight: 700; color: var(--forest); text-decoration: none; }
+.ned-topbar .ned-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.ned-meta-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+.ned-meta-row .fld { margin-bottom: 0; }
+.ned-meta-row select { width: auto; min-width: 140px; }
+.ned-slug { font-size: 12.5px; color: var(--muted); font-family: var(--mark); }
+.ned-slug b { color: var(--ink); font-weight: 600; }
+
+.ned-field-label { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 8px; display: block; }
+
+.ned-editor { margin-bottom: 26px; }
+.ned-toolbar {
+  display: flex; align-items: center; gap: 3px; flex-wrap: wrap;
+  background: var(--gt-card); border: 1px solid var(--gt-hair); border-radius: 12px 12px 0 0;
+  padding: 7px;
+}
+.ned-toolbar button, .ned-toolbar select {
+  border: 1px solid transparent; background: transparent; color: var(--ink);
+  border-radius: 8px; padding: 6px 9px; font-size: 13px; font-weight: 700; cursor: pointer;
+  font-family: var(--body); line-height: 1;
+}
+.ned-toolbar button:hover, .ned-toolbar select:hover { background: rgba(15,46,34,.07); }
+.ned-toolbar select { padding: 6px; max-width: 118px; font-weight: 600; }
+.ned-toolbar input[type="color"] {
+  width: 30px; height: 30px; padding: 2px; border: 1px solid var(--gt-hair);
+  border-radius: 8px; background: none; cursor: pointer;
+}
+.ned-toolbar .ned-sep { width: 1px; align-self: stretch; background: var(--gt-hair); margin: 3px 5px; }
+.ned-tool-wrap { position: relative; }
+
+.ned-pop {
+  display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 5;
+  background: #fff; border: 1px solid var(--gt-hair); border-radius: 10px; padding: 10px;
+  box-shadow: 0 18px 40px -20px rgba(15,46,34,.5); gap: 8px; align-items: center; min-width: 260px;
+}
+.ned-pop.open { display: flex; }
+.ned-pop input { flex: 1; padding: 8px 10px; border: 1px solid var(--app-line); border-radius: 8px; font-size: 13px; }
+.ned-pop button {
+  flex: none; background: var(--lime); border: none; color: var(--deep);
+  border-radius: 8px; padding: 8px 12px; font-weight: 700; font-size: 13px; cursor: pointer;
+}
+
+.ned-surface {
+  border: 1px solid var(--gt-hair); border-top: none; border-radius: 0 0 12px 12px;
+  background: #fff; padding: 20px 22px; outline: none; color: var(--ink);
+}
+.ned-surface:empty:before { content: attr(data-placeholder); color: var(--muted); }
+.ned-surface p { margin: 0 0 14px; }
+.ned-surface h2 { font-family: var(--display); font-size: 22px; margin: 22px 0 10px; color: var(--ink); }
+.ned-surface h3 { font-family: var(--display); font-size: 18px; margin: 18px 0 8px; color: var(--ink); }
+.ned-surface blockquote {
+  border-left: 3px solid var(--lime); margin: 14px 0; padding: 4px 0 4px 16px;
+  color: var(--muted); font-style: italic;
+}
+.ned-surface img { max-width: 100%; border-radius: 10px; margin: 10px 0; display: block; }
+.ned-surface ul, .ned-surface ol { margin: 0 0 14px 22px; }
+.ned-surface a { color: var(--forest); }
+
+.ned-editor.is-headline .ned-surface {
+  font-family: var(--display); font-size: clamp(24px, 3.6vw, 34px); line-height: 1.2;
+  padding: 18px 22px; min-height: 1.3em;
+}
+.ned-editor.is-body .ned-surface { min-height: 46vh; font-size: 16px; line-height: 1.75; }
+
+.ned-drop {
+  border: 1.5px dashed var(--gt-hair); border-radius: 14px; padding: 20px;
+  display: flex; align-items: center; gap: 16px; background: var(--gt-card);
+}
+.ned-drop .ned-drop-prev {
+  width: 92px; height: 92px; border-radius: 10px; overflow: hidden; flex: none;
+  background: rgba(15,46,34,.06); display: grid; place-items: center; color: var(--muted);
+}
+.ned-drop .ned-drop-prev img { width: 100%; height: 100%; object-fit: cover; }
+.ned-drop .ned-drop-txt { flex: 1; min-width: 0; }
+.ned-drop .ned-drop-txt b { display: block; font-size: 14.5px; color: var(--ink); margin-bottom: 3px; }
+.ned-drop .ned-drop-txt span { font-size: 12.5px; color: var(--muted); }
+
+.ned-source-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+.ned-source-row input { flex: 1; padding: 10px 12px; border: 1px solid var(--app-line); border-radius: 9px; font-size: 14px; }
+.ned-source-row input.ned-src-url { flex: 1.3; }
+.ned-source-remove {
+  flex: none; width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--gt-hair);
+  background: var(--gt-bg); color: #9a2b2b; cursor: pointer; display: grid; place-items: center;
+}
+.ned-source-remove:hover { background: #9a2b2b; color: #fff; border-color: #9a2b2b; }
+.ned-source-remove svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+.ned-source-add {
+  display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px dashed var(--gt-hair);
+  color: var(--forest); border-radius: 9px; padding: 9px 14px; font-weight: 700; font-size: 13px; cursor: pointer;
+}
+.ned-source-add:hover { border-color: var(--forest); background: rgba(45,122,58,.06); }
+.ned-source-add svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+
+.ned-publish-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  background: var(--gt-card); border: 1px solid var(--gt-hair); border-radius: 14px; padding: 16px 18px;
+  margin-top: 6px;
+}
+.ned-publish-row label { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 14px; font-weight: 600; color: var(--ink); }
+.ned-publish-row input[type="checkbox"] { width: 18px; height: 18px; }
+
+@media (max-width: 640px) {
+  .ned-toolbar { position: static; }
+  .ned-editor.is-body .ned-surface { min-height: 34vh; }
+}
+
+/* ---- Article share bar + optional sources, on the published story page ---- */
+.art-share, .pn-share {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--app-line);
+}
+.art-share .as-label, .pn-share .as-label {
+  font-size: 12.5px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .06em; margin-right: 2px;
+}
+.as-btn {
+  width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid var(--app-line); color: var(--ink); text-decoration: none;
+  transition: transform .15s var(--ease), background .15s var(--ease), color .15s var(--ease), border-color .15s var(--ease);
+  background: #fff; cursor: pointer;
+}
+.as-btn svg { width: 17px; height: 17px; }
+.as-btn.as-facebook svg, .as-btn.as-linkedin svg { fill: currentColor; }
+.as-btn.as-copy svg { fill: none; stroke: currentColor; stroke-width: 2; }
+.as-btn:hover { transform: translateY(-2px); }
+.as-btn.as-facebook:hover { background: #1877F2; border-color: #1877F2; color: #fff; }
+.as-btn.as-linkedin:hover { background: #0A66C2; border-color: #0A66C2; color: #fff; }
+.as-btn.as-copy {
+  width: auto; border-radius: 100px; padding: 0 16px; gap: 7px; font-size: 12.5px; font-weight: 700;
+}
+.as-btn.as-copy.copied { background: var(--lime); border-color: var(--lime); color: var(--deep); }
+
+.art-sources, .pn-sources {
+  margin-top: 22px; padding: 16px 18px; background: var(--gt-card);
+  border: 1px solid var(--app-line); border-radius: 12px;
+}
+.art-sources h4, .pn-sources h4 { font-size: 12.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+.art-sources ol, .pn-sources ol { margin: 0; padding-left: 18px; }
+.art-sources li, .pn-sources li { font-size: 13.5px; margin-bottom: 5px; }
+.art-sources a, .pn-sources a { color: var(--forest); word-break: break-word; }
+
+/* ---- Footer / contact-block social icons ---- */
+.footer-socials { display: flex; gap: 10px; }
+.footer-social-btn {
+  width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line-d);
+  display: grid; place-items: center; color: var(--cream);
+  transition: transform .15s var(--ease), background .15s var(--ease), color .15s var(--ease), border-color .15s var(--ease);
+}
+.footer-social-btn svg { width: 16px; height: 16px; fill: currentColor; }
+.footer-social-btn:hover { background: var(--lime); border-color: var(--lime); color: var(--deep); transform: translateY(-2px); }
 
 /* ==========================================================================
    ============ v36 — leaderboard column tint ==============================

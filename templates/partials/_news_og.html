@@ -1,0 +1,15 @@
+{# Open Graph / Twitter card tags for a shared story link.
+   Shared into both news_detail templates (member + public) so a link pasted
+   into Facebook, LinkedIn, Slack, iMessage etc always resolves an image and
+   a headline instead of coming through as a bare URL — that's what makes a
+   shared blog link read as trustworthy rather than as spam. #}
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="GoodTip">
+<meta property="og:title" content="{{ post.title }}">
+<meta property="og:description" content="{{ post.excerpt|default:post.title|truncatechars:200 }}">
+<meta property="og:url" content="{{ share_url }}">
+{% if share_image_url %}<meta property="og:image" content="{{ share_image_url }}">{% endif %}
+<meta name="twitter:card" content="{% if share_image_url %}summary_large_image{% else %}summary{% endif %}">
+<meta name="twitter:title" content="{{ post.title }}">
+<meta name="twitter:description" content="{{ post.excerpt|default:post.title|truncatechars:200 }}">
+{% if share_image_url %}<meta name="twitter:image" content="{{ share_image_url }}">{% endif %}

@@ -385,7 +385,7 @@ is the part members care about and the part that is still true.
 <div class="hub-h" style="margin-bottom:14px;"><span class="k">News &amp; blog</span><a href="{% url 'news_index' %}">All news &amp; blog &rarr;</a></div>
 <div class="grid-app g-3" style="margin-bottom:16px;">
   {% for p in news_leads %}
-  <a class="news-lead news-link" href="{% url 'news_detail' p.id %}">
+  <a class="news-lead news-link" href="{% url 'news_detail' p.slug %}">
     {% if p.image %}
     <div class="thumb" style="background-image:url('{{ p.image.url }}')"><span class="sport-tag">{{ p.get_tag_display }}</span></div>
     {% else %}
@@ -402,7 +402,7 @@ is the part members care about and the part that is still true.
 {% if news_more %}
 <div class="news-list" style="margin-bottom:22px;">
   {% for p in news_more %}
-  <a class="news-item news-link" href="{% url 'news_detail' p.id %}">
+  <a class="news-item news-link" href="{% url 'news_detail' p.slug %}">
     <span class="ntag {{ p.tag|lower }}">{{ p.get_tag_display }}</span>
     <div>
       <div class="nt">{{ p.title }}</div>

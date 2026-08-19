@@ -1,0 +1,186 @@
+{% extends "admin_base.html" %}
+{% load static %}
+{% block title %}{% if is_new %}New post{% else %}Edit post{% endif %} &middot; Manage{% endblock %}
+{% block nav_news %}on{% endblock %}
+{% block hero_title %}{% if is_new %}Write a new story{% else %}Edit story{% endif %}{% endblock %}
+{% block hero_lead %}{% if is_new %}A full page to write in — headline, body, images, formatting, all of it.{% else %}{{ post.title }}{% endif %}{% endblock %}
+{% block hero_shot %}{% static 'img/scenes/aussie-crowd-flag.jpg' %}{% endblock %}
+{% block extra_head %}<script src="{% static 'js/gt-news-editor.js' %}" defer></script>{% endblock %}
+{% block admin_content %}
+
+<div class="ned-shell">
+  <div class="ned-topbar">
+    <a href="{% url 'manage:news' %}" class="ned-back">&larr; All posts</a>
+    <div class="ned-slug">Publishes at <b data-slug-preview="/news/" {% if not is_new %}data-slug-fixed="{{ post.slug }}"{% endif %}>/news/&hellip;</b></div>
+  </div>
+
+  <form method="post"
+        action="{% if is_new %}{% url 'manage:news_new' %}{% else %}{% url 'manage:news_edit' post.id %}{% endif %}"
+        enctype="multipart/form-data" data-busy="Saving">
+    {% csrf_token %}
+
+    <div class="ned-meta-row">
+      <div class="fld" style="margin-bottom:0;">
+        <label for="np_tag">Tag</label>
+        <select name="tag" id="np_tag">
+          {% for val, label in tag_choices %}
+          <option value="{{ val }}" {% if post.tag == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <label class="ned-field-label">Headline</label>
+    <div class="ned-editor is-headline" data-editor="headline">
+      <div class="ned-toolbar">
+        <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
+        <button type="button" data-cmd="underline" title="Underline"><u>U</u></button>
+        <span class="ned-sep"></span>
+        <select data-cmd="fontName" title="Font">
+          <option value="">Font</option>
+          <option value="'Archivo Black', sans-serif">Display</option>
+          <option value="'Archivo', sans-serif">Sans</option>
+          <option value="'Barlow Condensed', sans-serif">Condensed</option>
+          <option value="Georgia, serif">Serif</option>
+        </select>
+        <select data-cmd="fontSizeCustom" title="Size">
+          <option value="">Size</option>
+          <option value="22">Small</option>
+          <option value="28">Medium</option>
+          <option value="34">Default</option>
+          <option value="44">Large</option>
+          <option value="56">XL</option>
+        </select>
+        <input type="color" data-cmd="foreColor" title="Colour" value="#0F2E22">
+      </div>
+      <div class="ned-surface" contenteditable="true" data-hidden-input="np_title_html"
+           data-placeholder="Finals race tightens as the top eight pulls away"
+           >{% if post.title_html %}{{ post.title_html|safe }}{% elif post.title %}{{ post.title }}{% endif %}</div>
+    </div>
+    <input type="hidden" name="title_html" id="np_title_html">
+
+    <div class="fld">
+      <label for="np_excerpt">Teaser <span style="color:var(--muted);font-weight:400;">(one or two sentences shown on the dashboard)</span></label>
+      <textarea name="excerpt" id="np_excerpt" rows="2" placeholder="Two games separate fourth from ninth with three rounds to play.">{{ post.excerpt|default:'' }}</textarea>
+    </div>
+
+    <div class="fld">
+      <label class="ned-field-label">Featured image {% if post.image %}<span style="color:var(--muted);font-weight:400;">(uploading replaces the current one)</span>{% endif %}</label>
+      <div class="ned-drop">
+        <div class="ned-drop-prev">
+          {% if post.image %}<img src="{{ post.image.url }}" alt="">
+          {% else %}<svg style="width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.6;"><use href="#ic-image"/></svg>{% endif %}
+        </div>
+        <div class="ned-drop-txt">
+          <b>The card and hero image for this story</b>
+          <span>Shown on the dashboard, the news list and the top of the article.</span>
+        </div>
+        <input type="file" name="image" accept="image/*" style="flex:none;">
+      </div>
+    </div>
+
+    <label class="ned-field-label">Full story</label>
+    <div class="ned-editor is-body" data-editor="body" data-upload-url="{% url 'manage:news_upload_image' %}">
+      <div class="ned-toolbar">
+        <select data-cmd="formatBlock" title="Style">
+          <option value="">Style</option>
+          <option value="P">Paragraph</option>
+          <option value="H2">Subtitle</option>
+          <option value="H3">Small subtitle</option>
+          <option value="BLOCKQUOTE">Quote</option>
+        </select>
+        <span class="ned-sep"></span>
+        <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
+        <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
+        <button type="button" data-cmd="underline" title="Underline"><u>U</u></button>
+        <span class="ned-sep"></span>
+        <select data-cmd="fontName" title="Font">
+          <option value="">Font</option>
+          <option value="'Archivo', sans-serif">Sans</option>
+          <option value="Georgia, serif">Serif</option>
+          <option value="'Barlow Condensed', sans-serif">Condensed</option>
+        </select>
+        <select data-cmd="fontSizeCustom" title="Size">
+          <option value="">Size</option>
+          <option value="14">Small</option>
+          <option value="16">Default</option>
+          <option value="19">Large</option>
+          <option value="24">XL</option>
+        </select>
+        <input type="color" data-cmd="foreColor" title="Colour" value="#0F2E22">
+        <span class="ned-sep"></span>
+        <button type="button" data-cmd="justifyLeft" title="Align left">
+          <svg viewBox="0 0 20 14" style="width:16px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;"><line x1="1" y1="2" x2="19" y2="2"/><line x1="1" y1="7" x2="13" y2="7"/><line x1="1" y1="12" x2="16" y2="12"/></svg>
+        </button>
+        <button type="button" data-cmd="justifyCenter" title="Align centre">
+          <svg viewBox="0 0 20 14" style="width:16px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;"><line x1="1" y1="2" x2="19" y2="2"/><line x1="4" y1="7" x2="16" y2="7"/><line x1="2" y1="12" x2="18" y2="12"/></svg>
+        </button>
+        <button type="button" data-cmd="justifyRight" title="Align right">
+          <svg viewBox="0 0 20 14" style="width:16px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;"><line x1="1" y1="2" x2="19" y2="2"/><line x1="7" y1="7" x2="19" y2="7"/><line x1="4" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <button type="button" data-cmd="justifyFull" title="Justify">
+          <svg viewBox="0 0 20 14" style="width:16px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;"><line x1="1" y1="2" x2="19" y2="2"/><line x1="1" y1="7" x2="19" y2="7"/><line x1="1" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <span class="ned-sep"></span>
+        <button type="button" data-cmd="insertUnorderedList" title="Bullet list">&bull;&nbsp;list</button>
+        <button type="button" data-cmd="insertOrderedList" title="Numbered list">1.&nbsp;list</button>
+        <span class="ned-sep"></span>
+        <div class="ned-tool-wrap">
+          <button type="button" data-action="link" title="Insert link">
+            <svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;"><use href="#ic-link"/></svg>
+          </button>
+          <div class="ned-pop" data-pop="link">
+            <input type="url" placeholder="https://example.com/story">
+            <button type="button" data-pop-apply>Add</button>
+          </div>
+        </div>
+        <button type="button" data-action="image" title="Insert image">
+          <svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.7;"><use href="#ic-image"/></svg>
+        </button>
+        <input type="file" accept="image/*" style="display:none;">
+      </div>
+      <div class="ned-surface" contenteditable="true" data-hidden-input="np_body"
+           data-placeholder="Tell the story…">{{ initial_body|default:""|safe }}</div>
+    </div>
+    <input type="hidden" name="body" id="np_body">
+
+    <div class="fld">
+      <label for="np_link">Link to full story <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <input type="url" name="link_url" id="np_link" value="{{ post.link_url|default:'' }}" placeholder="https://">
+    </div>
+
+    <label class="ned-field-label">Sources <span style="color:var(--muted);font-weight:400;">(optional — where this story's info came from, not required to publish)</span></label>
+    <div data-source-list>
+      {% for s in post.sources %}
+      <div class="ned-source-row">
+        <input type="text" name="source_label" placeholder="Source name" value="{{ s.label }}">
+        <input type="url" name="source_url" class="ned-src-url" placeholder="https://" value="{{ s.url }}">
+        <button type="button" class="ned-source-remove" data-source-remove title="Remove source">
+          <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;"><use href="#ic-cross"/></svg>
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="button" class="ned-source-add" data-source-add>+ Add a source</button>
+    <template data-source-template>
+      <div class="ned-source-row">
+        <input type="text" name="source_label" placeholder="Source name">
+        <input type="url" name="source_url" class="ned-src-url" placeholder="https://">
+        <button type="button" class="ned-source-remove" data-source-remove title="Remove source">
+          <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;"><use href="#ic-cross"/></svg>
+        </button>
+      </div>
+    </template>
+
+    <div class="ned-publish-row" style="margin-top:28px;">
+      <label for="np_pub">
+        <input type="checkbox" name="is_published" id="np_pub" {% if post %}{% if post.is_published %}checked{% endif %}{% else %}checked{% endif %}>
+        Published (visible on every member's dashboard)
+      </label>
+      <div class="ned-actions">
+        <button type="submit" class="gt-go-btn" style="width:auto;">{% if is_new %}Save post{% else %}Save changes{% endif %} <svg><use href="#ic-check"/></svg></button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

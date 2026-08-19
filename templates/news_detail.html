@@ -1,7 +1,12 @@
 {% extends "app_base.html" %}
+{% load static %}
 {% load humanize %}
 {% block title %}{{ post.title }} &middot; GoodTip{% endblock %}
 {% block loader_task %}Opening the story{% endblock %}
+{% block extra_head %}
+{% include "partials/_news_og.html" %}
+<script src="{% static 'js/gt-share.js' %}" defer></script>
+{% endblock %}
 {% block app_content %}
 
 <div class="article">
@@ -10,12 +15,14 @@
   {% if post.image %}<div class="art-hero" style="background-image:url('{{ post.image.url }}')"><span class="sport-tag">{{ post.get_tag_display }}</span></div>
   {% else %}<div class="art-hero noimg"><span class="sport-tag">{{ post.get_tag_display }}</span><span class="noimg-mark">GOOD<span>TIP</span></span></div>{% endif %}
 
-  <h1 class="art-title">{{ post.title }}</h1>
+  <h1 class="art-title">{% if post.title_html %}{{ post.title_html|safe }}{% else %}{{ post.title }}{% endif %}</h1>
   <div class="art-meta">{{ post.published_at|date:"l j F Y, g:i a" }} &middot; {{ post.published_at|naturaltime }}{% if post.created_by %} &middot; by {{ post.created_by.display_name }}{% endif %}</div>
 
   {% if post.excerpt %}<p class="art-lead">{{ post.excerpt }}</p>{% endif %}
-  {% if post.body %}<div class="art-body">{{ post.body|linebreaks }}</div>{% endif %}
+  {% if post.body %}<div class="art-body">{% if "<" in post.body %}{{ post.body|safe }}{% else %}{{ post.body|linebreaks }}{% endif %}</div>{% endif %}
   {% if post.link_url %}<a href="{{ post.link_url }}" target="_blank" rel="noopener" class="abtn abtn-dark" style="margin-top:18px;">Read the original story &rarr;</a>{% endif %}
+
+  {% include "partials/_news_share.html" with prefix="art" %}
 </div>
 
 {% if more %}
@@ -23,7 +30,7 @@
   <div class="hub-h" style="margin-bottom:12px;"><span class="k">More news &amp; blog</span><a href="{% url 'news_index' %}">See everything &rarr;</a></div>
   <div class="news-list">
     {% for p in more %}
-    <a class="news-item news-link" href="{% url 'news_detail' p.id %}">
+    <a class="news-item news-link" href="{% url 'news_detail' p.slug %}">
       <span class="ntag {{ p.tag|lower }}">{{ p.get_tag_display }}</span>
       <div><div class="nt">{{ p.title }}</div><div class="nd">{{ p.published_at|naturaltime }}</div></div>
     </a>
