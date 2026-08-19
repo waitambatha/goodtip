@@ -1679,6 +1679,9 @@ img, svg, video { max-width: 100%; }
 .stat-card .s-sub { font-size: 13px; color: var(--muted); margin-top: 6px; }
 .stat-card.accent { background: var(--deep); border-color: var(--deep); }
 .stat-card.accent .s-lab { color: var(--cream); opacity: .7; } .stat-card.accent .s-num { color: var(--lime); } .stat-card.accent .s-sub { color: var(--cream); opacity: .7; }
+/* watermark icon, positioned behind the number so the stat still reads first */
+.stat-card .s-ic { position: absolute; top: 16px; right: 14px; width: 40px; height: 40px; stroke: var(--ink); fill: none; stroke-width: 1.6; opacity: .1; }
+.stat-card.accent .s-ic { stroke: var(--cream); opacity: .16; }
 
 /* app buttons (compact) */
 .abtn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--body); font-weight: 700; font-size: 14px; padding: 11px 18px; border-radius: 10px; border: 1px solid transparent; cursor: pointer; text-decoration: none; transition: transform .1s var(--ease), filter .15s var(--ease), background .15s var(--ease), border-color .15s; white-space: nowrap; }

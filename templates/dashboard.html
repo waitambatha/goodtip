@@ -259,9 +259,9 @@ stacking context, so a strip rendered inside it paints over the sheet.
     that the round is 22 and it locks in a day.
     {% endcomment %}
     <div class="grid-app g-3 dash-stats">
-      <div class="stat-card accent"><div class="s-lab">Season points</div><div class="s-num">{{ c.points }}</div><div class="s-sub">across the season</div></div>
-      <div class="stat-card"><div class="s-lab">Your rank</div><div class="s-num">{{ c.rank|default:"-" }}</div><div class="s-sub">of all tippers</div></div>
-      <div class="stat-card"><div class="s-lab">Tips this round</div><div class="s-num">{{ c.tips_done }}<span style="font-size:18px;color:var(--muted);"> / {{ c.tips_total }}</span></div><div class="s-sub">{% if c.tips_total > c.tips_done %}still open{% else %}all in{% endif %}</div></div>
+      <div class="stat-card accent"><svg class="s-ic" aria-hidden="true"><use href="#ic-trophy"/></svg><div class="s-lab">Season points</div><div class="s-num">{{ c.points }}</div><div class="s-sub">across the season</div></div>
+      <div class="stat-card"><svg class="s-ic" aria-hidden="true"><use href="#ic-ribbon"/></svg><div class="s-lab">Your rank</div><div class="s-num">{{ c.rank|default:"-" }}</div><div class="s-sub">of all tippers</div></div>
+      <div class="stat-card"><svg class="s-ic" aria-hidden="true"><use href="#ic-target"/></svg><div class="s-lab">Tips this round</div><div class="s-num">{{ c.tips_done }}<span style="font-size:18px;color:var(--muted);"> / {{ c.tips_total }}</span></div><div class="s-sub">{% if c.tips_total > c.tips_done %}still open{% else %}all in{% endif %}</div></div>
     </div>
 
     <!-- this round's games: pick your teams right here, then confirm -->
