@@ -27,27 +27,38 @@ the ladder. Expects rows of {match, tip, correct, points}.
   </table>
 
   {% include "emails/_bits.html" with bit="eyebrow" label="Your tips" %}
+  {% comment %}
+  Two cards per row, not one row per match. A full round is 8-9 matches, and a
+  single tall column of them was the biggest thing pushing this email off a
+  laptop screen — and the taller the message, the more the header photo above
+  gets stretched to cover it (see _base.html's note on vertical restraint).
+  Venue is dropped here too: score and tip result are what the round recap is
+  for, and the ladder link covers the rest.
+
+  Built as a two-cell-per-<tr> grid rather than CSS columns, which Outlook and
+  the Gmail app don't reflow. `forloop.counter0|divisibleby:2` opens a row on
+  every even item and closes it on every odd one; the trailing block below
+  pads an unpaired final match with an empty cell so the row still closes.
+  {% endcomment %}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
     {% for row in rows %}
-    <tr>
-      <td style="padding:11px 14px;border:1px solid #E4E1D2;{% if not forloop.first %}border-top:0;{% endif %}font-size:14px;color:#1A1A14;">
+    {% if forloop.counter0|divisibleby:2 %}<tr>{% endif %}
+      <td width="255" valign="top" style="padding:10px 12px;border:1px solid #E4E1D2;border-radius:8px;font-size:13px;color:#1A1A14;">
         <b style="color:#0F2E22;">{{ row.match.home_team.name }} v {{ row.match.away_team.name }}</b><br>
-        <span style="font-size:12px;color:#6b6b5e;">
+        <span style="font-size:11px;color:#6b6b5e;">
           {% if row.match.score_line %}{{ row.match.score_line }} &middot; {% endif %}
           {% if row.tip %}you tipped {{ row.picked_name }}{% else %}no tip{% endif %}
-          {% if row.match.venue %} &middot; {{ row.match.venue }}{% endif %}
-        </span>
-      </td>
-      <td align="right" valign="middle" style="padding:11px 14px;border:1px solid #E4E1D2;border-left:0;{% if not forloop.first %}border-top:0;{% endif %}white-space:nowrap;">
+        </span><br>
         {% if row.correct %}
-          <span style="display:inline-block;background:#C8F135;color:#0F2E22;font-size:11px;font-weight:bold;letter-spacing:.5px;padding:5px 10px;border-radius:100px;">+{{ row.points }}</span>
+          <span style="display:inline-block;margin-top:6px;background:#C8F135;color:#0F2E22;font-size:11px;font-weight:bold;letter-spacing:.5px;padding:4px 9px;border-radius:100px;">+{{ row.points }}</span>
         {% elif row.tip %}
-          <span style="display:inline-block;background:#F3E3E1;color:#A3342A;font-size:11px;font-weight:bold;letter-spacing:.5px;padding:5px 10px;border-radius:100px;">MISSED</span>
+          <span style="display:inline-block;margin-top:6px;background:#F3E3E1;color:#A3342A;font-size:11px;font-weight:bold;letter-spacing:.5px;padding:4px 9px;border-radius:100px;">MISSED</span>
         {% else %}
-          <span style="display:inline-block;background:#EFEDE3;color:#6b6b5e;font-size:11px;font-weight:bold;letter-spacing:.5px;padding:5px 10px;border-radius:100px;">-</span>
+          <span style="display:inline-block;margin-top:6px;background:#EFEDE3;color:#6b6b5e;font-size:11px;font-weight:bold;letter-spacing:.5px;padding:4px 9px;border-radius:100px;">&ndash;</span>
         {% endif %}
       </td>
-    </tr>
+    {% if not forloop.counter0|divisibleby:2 %}</tr>{% else %}<td width="14">&nbsp;</td>{% endif %}
+    {% if forloop.last and forloop.counter0|divisibleby:2 %}<td width="255">&nbsp;</td></tr>{% endif %}
     {% endfor %}
   </table>
 
