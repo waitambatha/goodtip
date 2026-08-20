@@ -99,6 +99,52 @@ class NewsEditorTests(TestCase):
         html = self.client.get(post.get_absolute_url()).content.decode()
         self.assertIn("<b>Two</b> games separate fourth from ninth.", html)
 
+    # ---- posts written before the teaser had formatting ---------------------
+
+    def test_a_teaser_written_before_this_change_still_shows(self):
+        """No backfill migration needed — both templates fall back to `excerpt`.
+
+        Old posts have `excerpt` set and `excerpt_html` empty. There is no
+        formatting to recover for them, so a data migration would only be
+        rewriting plain text as plain text.
+        """
+        post = NewsPost.objects.create(
+            title="Old story", excerpt="A teaser from before the editor existed.",
+            is_published=True,
+        )
+        self.assertEqual(post.excerpt_html, "")
+        html = self.client.get(post.get_absolute_url()).content.decode()
+        self.assertIn("A teaser from before the editor existed.", html)
+
+    def test_the_editor_loads_an_old_teaser_into_the_surface(self):
+        post = NewsPost.objects.create(
+            title="Old story", excerpt="A teaser from before the editor existed.",
+            is_published=True,
+        )
+        html = self.client.get(reverse("manage:news_edit", args=[post.id])).content.decode()
+        surface = html.split('data-hidden-input="np_excerpt_html"')[1]
+        self.assertIn("A teaser from before the editor existed.", surface.split("</div>")[0])
+
+    def test_an_old_teaser_is_escaped_not_trusted_as_markup(self):
+        """`excerpt` is plain text, so it must go through autoescape."""
+        post = NewsPost.objects.create(
+            title="Old story", excerpt="Fourth <b>&</b> ninth", is_published=True,
+        )
+        html = self.client.get(post.get_absolute_url()).content.decode()
+        self.assertIn("Fourth &lt;b&gt;&amp;&lt;/b&gt; ninth", html)
+
+    def test_saving_an_old_post_moves_its_teaser_forward(self):
+        post = NewsPost.objects.create(
+            title="Old story", excerpt="A teaser from before.", is_published=True,
+        )
+        self.client.post(
+            reverse("manage:news_edit", args=[post.id]),
+            self._post(excerpt_html="A teaser from before."),
+        )
+        post.refresh_from_db()
+        self.assertEqual(post.excerpt_html, "A teaser from before.")
+        self.assertEqual(post.excerpt, "A teaser from before.")
+
     # ---- the URL is generated, unique and stable ----------------------------
 
     def test_slug_is_generated_from_the_headline(self):
