@@ -13,6 +13,7 @@ a plain-English reading of why the model favours who it favours.
 from __future__ import annotations
 
 import logging
+import random
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -26,6 +27,14 @@ logger = logging.getLogger(__name__)
 # Below this, a form figure is noise. Two games is a coin toss dressed as a
 # trend, and the tipper is better served by no tier than a confident one.
 MIN_GAMES_FOR_FORM = 3
+
+# Below this many completed regular-season games for a competition THIS
+# season, its home-win rate is a real number built on too small a sample to
+# show with the same visual confidence as AFL's, which rests on a full season
+# and decades of history (MatchReader_Copy_Update_Erick.docx §4). Below the
+# threshold a raw count is shown instead of a percentage — a count reads as
+# obviously provisional in a way a percentage does not, which is the point.
+MIN_GAMES_FOR_SEASON_RATE = 20
 
 WON, DREW, LOST = "W", "D", "L"
 
@@ -106,6 +115,49 @@ def _form(team_id: int, series_id: int, before) -> tuple[float, list[FormGame]]:
     return recent_form([g.won for g in games]), games
 
 
+def _season_year(match) -> int | None:
+    """The season this fixture's competition is playing, for scoping the
+    small-sample check to THIS season rather than the competition's whole
+    history. None when the round has no competition set, which the small-
+    sample check treats the same as "no games yet" (§4)."""
+    competition = match.round.competition
+    return competition.season.year if competition and competition.season_id else None
+
+
+def _season_records(series_season_pairs, before) -> dict:
+    """(home wins, games played) so far this season, per (series_id,
+    season_year) — fetched once for a whole batch rather than once per
+    fixture, same reasoning as the batched form query below.
+
+    Deliberately live off the shared history table rather than off the
+    trained model's ``baseline_accuracy``: that figure is fixed at whatever
+    it measured on the last retrain, while this is the actual count as of
+    right now, which is what "early in the season" needs to be honest about.
+    """
+    pairs = {p for p in series_season_pairs if p[1] is not None}
+    if not pairs:
+        return {}
+    q = Q()
+    for series_id, season_year in pairs:
+        q |= Q(series_id=series_id, season=season_year)
+    rows = HistoricalMatch.objects.filter(
+        q, stage=HistoricalMatch.STAGE_REGULAR, kickoff_at__lt=before,
+    ).values_list("series_id", "season", "home_score", "away_score")
+    out = {p: [0, 0] for p in pairs}
+    for series_id, season_year, home_score, away_score in rows:
+        rec = out[(series_id, season_year)]
+        rec[1] += 1
+        if home_score > away_score:
+            rec[0] += 1
+    return {k: tuple(v) for k, v in out.items()}
+
+
+def _season_home_record(series_id, season_year, before) -> tuple[int, int]:
+    return _season_records({(series_id, season_year)}, before).get(
+        (series_id, season_year), (0, 0),
+    )
+
+
 def read_match(match) -> Prediction | None:
     """MatchReader's call on one fixture, or None if it should not make one."""
     series_id = match.round.series_id
@@ -131,7 +183,7 @@ def read_match(match) -> Prediction | None:
     )
 
 
-def _assemble(match, version, home_games, away_games, home_form, away_form) -> dict | None:
+def _assemble(match, version, home_games, away_games, home_form, away_form, season_record) -> dict | None:
     """One fixture's card data: the form always, the prediction when earned.
 
     THE SPLIT. Recent results are FACTS — five outcomes and their scores, read
@@ -170,7 +222,7 @@ def _assemble(match, version, home_games, away_games, home_form, away_form) -> d
     home_row = _form_row(match.home_team, home_games, prediction, is_home=True)
     away_row = _form_row(match.away_team, away_games, prediction, is_home=False)
     if prediction is not None:
-        explanation = explain(prediction, home_row, away_row, version)
+        explanation = explain(prediction, home_row, away_row, version, match, season_record)
     return {
         "prediction": prediction,
         "explanation": explanation,
@@ -199,7 +251,8 @@ def read_match_verbose(match) -> dict | None:
     version = ModelVersion.objects.filter(series_id=series_id, is_active=True).first()
     home_form, home_games = _form(match.home_team_id, series_id, match.kickoff_at)
     away_form, away_games = _form(match.away_team_id, series_id, match.kickoff_at)
-    return _assemble(match, version, home_games, away_games, home_form, away_form)
+    season_record = _season_home_record(series_id, _season_year(match), match.kickoff_at)
+    return _assemble(match, version, home_games, away_games, home_form, away_form, season_record)
 
 
 def read_matches_verbose(matches) -> dict:
@@ -270,13 +323,24 @@ def read_matches_verbose(matches) -> dict:
         window.reverse()
         return recent_form([g.won for g in window]), window
 
+    # A SEPARATE query from `rows` above: that one is scoped to the teams
+    # playing in this batch, which is right for form but wrong for a
+    # competition-wide home-win count — a small competition's fixture list
+    # would then be judging itself on only the games its own batch happened
+    # to touch. Fetched once per distinct (series, season) in the batch, not
+    # once per fixture.
+    season_records = _season_records(
+        {(m.round.series_id, _season_year(m)) for m in matches}, latest,
+    )
+
     out = {}
     for m in matches:
         sid = m.round.series_id
         home_form, home_games = form_before(sid, m.home_team_id, m.kickoff_at)
         away_form, away_games = form_before(sid, m.away_team_id, m.kickoff_at)
+        season_record = season_records.get((sid, _season_year(m)), (0, 0))
         out[m.id] = _assemble(
-            m, versions.get(sid), home_games, away_games, home_form, away_form
+            m, versions.get(sid), home_games, away_games, home_form, away_form, season_record,
         )
     return out
 
@@ -325,7 +389,54 @@ def _record_phrase(row: dict) -> str:
     return base
 
 
-def explain(prediction: Prediction, home: dict, away: dict, version) -> dict:
+# MatchReader_Copy_Update_Erick.docx §2: "form" and "prediction" sit too close
+# to betting/tipster language once they sit next to "edge" and "pick"
+# elsewhere on the card. Neither word gets a single substitute — swapping one
+# word for another just moves the repetition problem — so headlines rotate
+# across a small approved set instead. Three lines per tier, picked by a seed
+# fixed on the fixture: the same card reads the same way on a second look,
+# but three same-tier cards on one screen do not read as one sentence with
+# the names swapped (§5).
+HEADLINE_VARIANTS = {
+    "Even Contest": [
+        "Nothing between {home} and {away} on recent results.",
+        "{home} and {away} are hard to split right now.",
+        "The last five give no real edge either way.",
+    ],
+    "Slight Edge": [
+        "{lead} are the pick, but it is close.",
+        "{lead} get a slight nod from the last five.",
+        "Lean {lead}. Not by much.",
+    ],
+    "Clear Edge": [
+        "{lead} hold a clear edge here.",
+        "Recent results clearly favour {lead}.",
+        "{lead} are the clear pick from recent games.",
+    ],
+    "Strong Position": [
+        "{lead} are strongly favoured on the last five.",
+        "Recent record points firmly to {lead}.",
+        "{lead} look well ahead here.",
+    ],
+    "Dominant Position": [
+        "{lead} are the clear standout in recent games.",
+        "Recent record heavily favours {lead}.",
+        "{lead} dominate the recent picture.",
+    ],
+}
+
+# §5: rotated only for "the favourite is at home", which is the one case the
+# brief supplied variants for. The even-contest and favourite-plays-away
+# branches below keep one line each until there is client-approved wording to
+# rotate them too.
+GROUND_HOME_VARIANTS = [
+    "They are at home too, and home sides win about {rate}% in this competition.",
+    "Home matters here. Home sides win about {rate}% of the time in this competition.",
+    "Home sides win about {rate}% at home in this competition.",
+]
+
+
+def explain(prediction: Prediction, home: dict, away: dict, version, match, season_record) -> dict:
     """Why the model favours who it favours, for somebody who does not follow
     the game.
 
@@ -336,52 +447,77 @@ def explain(prediction: Prediction, home: dict, away: dict, version) -> dict:
          not.
       2. The form behind it, because that is literally the model's only input
          and the tipper can check it.
-      3. Home ground, with the competition's OWN historical home-win rate.
-         That figure is a fact about the past, not a forecast, which is why it
-         can be shown where the model's probability cannot. It also answers
-         the question people actually ask: teams win at home, so how much is
-         that worth here?
+      3. Home ground. Above MIN_GAMES_FOR_SEASON_RATE completed games this
+         season, that is the competition's own historical home-win rate — a
+         fact about the past, not a forecast, which is why it can be shown
+         where the model's probability cannot. Below the threshold, a raw
+         count stands in for it instead (§4): the same fact, phrased so it
+         cannot be mistaken for a stable, seasons-deep number.
 
     The favoured side's home status is what makes point 3 worth saying at all,
     so it is phrased as support or as a caveat depending on which way it cuts.
     """
     leader_is_home = home["is_leader"]
     lead, other = (home, away) if leader_is_home else (away, home)
+    # Seeded on the fixture, not on the round or the screen: the same match
+    # reads the same way if the page is reloaded, but the fixture next to it
+    # in the list draws its own seed and so, almost always, its own words.
+    rng = random.Random(f"matchreader:{match.id}:{prediction.tier}")
 
     if prediction.is_even:
-        headline = f"Nothing between {home['name']} and {away['name']} on recent form."
-    elif prediction.tier == "Slight Edge":
-        headline = f"{lead['name']} are the pick, but there is not much in it."
-    elif prediction.tier == "Clear Edge":
-        headline = f"{lead['name']} are the pick here."
+        headline = rng.choice(HEADLINE_VARIANTS["Even Contest"]).format(
+            home=home["name"], away=away["name"],
+        )
     else:
-        headline = f"{lead['name']} are strongly favoured."
+        headline = rng.choice(HEADLINE_VARIANTS[prediction.tier]).format(lead=lead["name"])
 
+    # §5: the joined "X... while Y..." sentence becomes two short ones. Both
+    # keep the FULL record phrase (including a drawn game, or a clean sweep)
+    # rather than dropping the qualifier on the second team — a shortened
+    # second sentence must not read as a plainer record than the one that
+    # actually happened.
     first, second = (home, away) if prediction.is_even else (lead, other)
     form = (
-        f"{first['name']} have {_record_phrase(first)}, "
-        f"while {second['name']} have {_record_phrase(second)}."
+        f"{first['name']} have {_record_phrase(first)}. "
+        f"{second['name']} have {_record_phrase(second)}."
     )
 
-    # baseline_accuracy IS the home-win rate: it is the accuracy of always
-    # picking the home side, measured on real seasons of this competition.
-    home_rate = round((version.baseline_accuracy or 0) * 100)
+    home_wins, games_played = season_record
     ground = ""
-    if home_rate:
+    if games_played >= MIN_GAMES_FOR_SEASON_RATE:
+        # baseline_accuracy IS the home-win rate: it is the accuracy of always
+        # picking the home side, measured on real seasons of this competition.
+        # Left exactly as built (client feedback §1) — only the framing around
+        # a THIN sample changes below, never how this number is calculated.
+        home_rate = round((version.baseline_accuracy or 0) * 100)
+        if home_rate:
+            if prediction.is_even:
+                ground = (
+                    f"{home['name']} are at home, and home sides have won about "
+                    f"{home_rate}% of games in this competition."
+                )
+            elif leader_is_home:
+                ground = rng.choice(GROUND_HOME_VARIANTS).format(rate=home_rate)
+            else:
+                ground = (
+                    f"{other['name']} are at home though, and that is worth "
+                    f"something: home sides win about {home_rate}% of these games."
+                )
+    elif games_played:
         if prediction.is_even:
             ground = (
-                f"{home['name']} are at home, and home sides have won about "
-                f"{home_rate}% of games in this competition."
+                f"Early in the season, but home sides have won {home_wins} of "
+                f"{games_played} games so far in this competition."
             )
         elif leader_is_home:
             ground = (
-                f"They are at home too, where sides in this competition win "
-                f"about {home_rate}% of the time."
+                f"Early in the season, but home sides have won {home_wins} of "
+                f"{games_played} games so far."
             )
         else:
             ground = (
-                f"{other['name']} are at home though, and that is worth "
-                f"something: home sides win about {home_rate}% of these games."
+                f"Early in the season, but home sides have won {home_wins} of "
+                f"{games_played} games so far — {other['name']} are at home though."
             )
 
     return {
