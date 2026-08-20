@@ -862,6 +862,13 @@ class RoundRecap(models.Model):
     """
 
     org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name="round_recaps")
+    # Whose round this is a recap of. NULL is the organisation's own, matching
+    # Tip and WallPost — a group's recap reads a group's tips and lands on a
+    # group's wall.
+    group = models.ForeignKey(
+        "Group", on_delete=models.CASCADE,
+        related_name="round_recaps", null=True, blank=True,
+    )
     round = models.ForeignKey("tipping.Round", on_delete=models.CASCADE, related_name="recaps")
     post = models.OneToOneField(
         WallPost, on_delete=models.SET_NULL, null=True, blank=True, related_name="recap",
@@ -883,10 +890,28 @@ class RoundRecap(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("org", "round")
+        # Two constraints, not one unique_together, for the same reason as Tip:
+        # `group` is nullable and Postgres treats every NULL as distinct, so a
+        # single unique_together over (org, round, group) would enforce nothing
+        # for the organisation's own recap — the exact case that was covered
+        # before — and a second generate_recaps run would post a duplicate card
+        # to the Wall rather than being turned away.
+        constraints = [
+            models.UniqueConstraint(
+                fields=["org", "round", "group"],
+                condition=models.Q(group__isnull=False),
+                name="uniq_recap_per_group_round",
+            ),
+            models.UniqueConstraint(
+                fields=["org", "round"],
+                condition=models.Q(group__isnull=True),
+                name="uniq_recap_per_org_round",
+            ),
+        ]
 
     def __str__(self):
-        return f"Recap R{self.round.round_number} — {self.org.name}"
+        where = self.group.name if self.group_id else self.org.name
+        return f"Recap R{self.round.round_number} — {where}"
 
 
 class WallReply(models.Model):

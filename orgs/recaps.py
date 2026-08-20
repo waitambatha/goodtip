@@ -109,14 +109,21 @@ def round_ready_for_recap(rnd) -> bool:
     return timezone.now() >= max(m.kickoff_at for m in matches)
 
 
-def _season_ranks(org, cutoff):
-    """Standings from all of the org's tips in rounds locked out at or before
+def _season_ranks(org, cutoff, group=None):
+    """Standings from all of the room's tips in rounds locked out at or before
     ``cutoff`` — same Sum(points_awarded) the leaderboard uses. Competition
-    ranking with ties sharing a rank, matching user_rank_in_org."""
+    ranking with ties sharing a rank, matching user_rank_in_org.
+
+    Scoped to the same context the recap is for: a group's standings are built
+    from the tips made in that group, not from the organisation's ladder with
+    the group's members picked out of it. Those are different numbers, and the
+    card would otherwise congratulate someone on a position they do not hold
+    on the ladder the card is sitting next to.
+    """
     from tipping.models import Tip
 
     rows = list(
-        Tip.objects.filter(org=org, match__round__lockout_at__lte=cutoff)
+        Tip.objects.filter(org=org, group=group, match__round__lockout_at__lte=cutoff)
         .values("user_id")
         .annotate(points=Sum("points_awarded"))
         .order_by("-points")
@@ -179,7 +186,7 @@ def _match_stories(rnd, round_tips):
     }
 
 
-def build_recap_facts(org, rnd):
+def build_recap_facts(org, rnd, group=None):
     """Everything the writer is allowed to know (§4). Real results only.
 
     Returns None when nobody in the group tipped this round — silence, not an
@@ -196,7 +203,7 @@ def build_recap_facts(org, rnd):
     from tipping.models import Tip
 
     round_tips = list(
-        Tip.objects.filter(org=org, match__round=rnd)
+        Tip.objects.filter(org=org, group=group, match__round=rnd)
         .select_related("user")
     )
     if not any(not t.is_auto for t in round_tips):
@@ -213,8 +220,10 @@ def build_recap_facts(org, rnd):
             m["correct"] += 1
             m["round_points"] += t.points_awarded
 
-    ranks_now, season_points = _season_ranks(org, rnd.lockout_at)
-    ranks_prev, season_prev = _season_ranks(org, rnd.lockout_at - timezone.timedelta(seconds=1))
+    ranks_now, season_points = _season_ranks(org, rnd.lockout_at, group)
+    ranks_prev, season_prev = _season_ranks(
+        org, rnd.lockout_at - timezone.timedelta(seconds=1), group,
+    )
     prev_rounds_exist = bool(ranks_prev)
 
     match_count = rnd.matches.count()
@@ -258,7 +267,7 @@ def build_recap_facts(org, rnd):
     return {
         # Fixes the phrasing to this group and this round, so a re-run reads
         # the same and next week reads differently.
-        "seed": f"{org.id}:{rnd.id}",
+        "seed": f"{org.id}:{group.id if group is not None else 0}:{rnd.id}",
         "round": {
             "number": rnd.round_number,
             "competition": rnd.competition.name if rnd.competition else rnd.series.name,
@@ -269,7 +278,11 @@ def build_recap_facts(org, rnd):
             "matches_in_round": match_count,
         },
         "group": {
-            "name": org.name,
+            # The room the card is about, which is what the writer puts in the
+            # prose — "Nobody in Marketing had the Cats". Naming the
+            # organisation on a group's card would have the recap talk to
+            # Marketing about a room it is not in.
+            "name": group.name if group is not None else org.name,
             "members_who_tipped": len(members),
             "first_round_for_group": not prev_rounds_exist,
         },
@@ -608,47 +621,68 @@ def generate_recaps(org=None, dry_run=False):
 
     from .models import Organisation, RoundRecap, WallPost
 
+    from .models import Group
+
     orgs = [org] if org is not None else list(Organisation.objects.all())
     results = []
     for o in orgs:
-        done = set(RoundRecap.objects.filter(org=o).values_list("round_id", flat=True))
-        candidate_rounds = (
+        # One room at a time: the organisation itself, then every approved
+        # group inside it. A group's recap reads that group's tips and lands on
+        # that group's wall, so Marketing gets told about Marketing rather than
+        # about twenty thousand people it has never met.
+        rooms = [None]
+        if o.groups_enabled:
+            rooms += list(
+                Group.objects.filter(org=o, approval_status=Group.APPROVAL_APPROVED)
+            )
+
+        all_rounds = (
             Round.objects.filter(org=o, lockout_at__lte=timezone.now())
-            .exclude(id__in=done)
             .prefetch_related("matches")
             .select_related("competition", "series", "series__sport")
         )
-        for rnd in candidate_rounds:
-            if not round_ready_for_recap(rnd):
-                continue
-            facts = build_recap_facts(o, rnd)
-            if facts is None:
-                continue  # nobody tipped — silence (§10)
+        ready = [r for r in all_rounds if round_ready_for_recap(r)]
+        if not ready:
+            continue
 
-            fallback = False
-            try:
-                text = compose_recap(facts)
-            except Exception:
-                logger.exception("Recap composition failed for %s R%s", o, rnd.round_number)
-                text = None
-            if not text:
-                text = fallback_line(facts)
-                fallback = True
+        for room in rooms:
+            done = set(
+                RoundRecap.objects.filter(org=o, group=room)
+                .values_list("round_id", flat=True)
+            )
+            for rnd in ready:
+                if rnd.id in done:
+                    continue
+                facts = build_recap_facts(o, rnd, room)
+                if facts is None:
+                    continue  # nobody in this room tipped — silence (§10)
 
-            if dry_run:
-                results.append((facts, text))
-                continue
+                fallback = False
+                try:
+                    text = compose_recap(facts)
+                except Exception:
+                    logger.exception(
+                        "Recap composition failed for %s R%s", o, rnd.round_number,
+                    )
+                    text = None
+                if not text:
+                    text = fallback_line(facts)
+                    fallback = True
 
-            with transaction.atomic():
-                post = WallPost.objects.create(
-                    org=o, kind=WallPost.KIND_RECAP, body=text,
-                )
-                recap = RoundRecap.objects.create(
-                    org=o, round=rnd, post=post,
-                    fallback_used=fallback,
-                    model_used=RECAP_ENGINE,
-                    talking_points=build_talking_points(facts),
-                    leaderboard=leaderboard_snapshot(facts),
-                )
-            results.append((recap, text))
+                if dry_run:
+                    results.append((facts, text))
+                    continue
+
+                with transaction.atomic():
+                    post = WallPost.objects.create(
+                        org=o, group=room, kind=WallPost.KIND_RECAP, body=text,
+                    )
+                    recap = RoundRecap.objects.create(
+                        org=o, group=room, round=rnd, post=post,
+                        fallback_used=fallback,
+                        model_used=RECAP_ENGINE,
+                        talking_points=build_talking_points(facts),
+                        leaderboard=leaderboard_snapshot(facts),
+                    )
+                results.append((recap, text))
     return results

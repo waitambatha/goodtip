@@ -3099,3 +3099,180 @@ class GroupWallTests(TestCase):
         )
         self.assertEqual(told, {self.admin.id})
         self.assertNotIn(self.outsider.id, told)
+
+
+class GroupRecapTests(TestCase):
+    """A group gets its own round recap, about its own room.
+
+    The organisation's card is built from the organisation's tips and lands on
+    the organisation's wall; Marketing's is built from Marketing's tips and
+    lands on Marketing's.
+    """
+
+    def setUp(self):
+        from django.utils import timezone
+        from tipping.models import Match, Round, Team
+
+        self.sport = Sport.objects.create(name="Recap Code", slug="recap-code")
+        self.series = Series.objects.create(
+            sport=self.sport, name="Recap Comp", slug="recap-comp",
+        )
+        self.season = Season.objects.create(year=2091, label="2091")
+        self.org = Organisation.objects.create(
+            name="Acme", season=self.season, groups_enabled=True,
+        )
+        self.insider = User.objects.create_user(
+            email="in@r.com", password="x", display_name="Insider",
+        )
+        self.outsider = User.objects.create_user(
+            email="out@r.com", password="x", display_name="Outsider",
+        )
+        for u in (self.insider, self.outsider):
+            OrgMember.objects.create(user=u, org=self.org)
+        self.marketing = Group.objects.create(org=self.org, name="Marketing")
+        GroupMember.objects.create(group=self.marketing, user=self.insider)
+
+        self.home = Team.objects.create(name="Pies", slug="pies-g", series=self.series)
+        self.away = Team.objects.create(name="Roos", slug="roos-g", series=self.series)
+        self.rnd = Round.objects.create(
+            org=self.org, round_number=1, series=self.series,
+            stage=Round.STAGE_REGULAR,
+            lockout_at=timezone.now() - timedelta(days=2),
+        )
+        self.match = Match.objects.create(
+            round=self.rnd, home_team=self.home, away_team=self.away,
+            kickoff_at=timezone.now() - timedelta(days=1),
+        )
+
+    def _settle(self):
+        from tipping.services import record_match_result
+
+        record_match_result(self.match, 30, 10)
+
+    def _tip(self, user, group=None, selection="home"):
+        from tipping.models import Tip
+
+        return Tip.objects.create(
+            user=user, match=self.match, org=self.org, group=group,
+            selection=selection,
+        )
+
+    # ---- one card per room -------------------------------------------------
+
+    def test_a_group_that_tipped_gets_its_own_card(self):
+        from .models import RoundRecap
+        from .recaps import generate_recaps
+
+        self._tip(self.insider, group=self.marketing)
+        self._settle()
+        generate_recaps(org=self.org)
+
+        recap = RoundRecap.objects.get(group=self.marketing)
+        self.assertEqual(recap.post.group, self.marketing)
+        self.assertEqual(recap.post.kind, WallPost.KIND_RECAP)
+
+    def test_the_organisation_and_a_group_each_get_one(self):
+        from .models import RoundRecap
+        from .recaps import generate_recaps
+
+        self._tip(self.outsider, group=None)
+        self._tip(self.insider, group=self.marketing)
+        self._settle()
+        generate_recaps(org=self.org)
+
+        self.assertEqual(RoundRecap.objects.filter(group__isnull=True).count(), 1)
+        self.assertEqual(RoundRecap.objects.filter(group=self.marketing).count(), 1)
+
+    def test_a_group_nobody_tipped_in_stays_silent(self):
+        """§10: silence, not an apologetic card."""
+        from .models import RoundRecap
+        from .recaps import generate_recaps
+
+        self._tip(self.outsider, group=None)
+        self._settle()
+        generate_recaps(org=self.org)
+
+        self.assertFalse(RoundRecap.objects.filter(group=self.marketing).exists())
+        self.assertTrue(RoundRecap.objects.filter(group__isnull=True).exists())
+
+    def test_groups_switched_off_means_no_group_cards(self):
+        from .models import RoundRecap
+        from .recaps import generate_recaps
+
+        self.org.groups_enabled = False
+        self.org.save(update_fields=["groups_enabled"])
+        self._tip(self.insider, group=self.marketing)
+        self._tip(self.outsider, group=None)
+        self._settle()
+        generate_recaps(org=self.org)
+        self.assertFalse(RoundRecap.objects.filter(group=self.marketing).exists())
+
+    def test_a_pending_group_gets_no_card(self):
+        from .models import RoundRecap
+        from .recaps import generate_recaps
+
+        pending = Group.objects.create(
+            org=self.org, name="Skunkworks",
+            approval_status=Group.APPROVAL_PENDING,
+        )
+        GroupMember.objects.create(group=pending, user=self.insider)
+        self._tip(self.insider, group=pending)
+        self._settle()
+        generate_recaps(org=self.org)
+        self.assertFalse(RoundRecap.objects.filter(group=pending).exists())
+
+    def test_running_twice_posts_nothing_new(self):
+        """The NULL trap: `group` is nullable, so a plain unique_together over
+        (org, round, group) would enforce nothing for the organisation's own
+        card and the second run would post a duplicate to the Wall."""
+        from .recaps import generate_recaps
+
+        self._tip(self.outsider, group=None)
+        self._tip(self.insider, group=self.marketing)
+        self._settle()
+        first = generate_recaps(org=self.org)
+        second = generate_recaps(org=self.org)
+        self.assertEqual(len(first), 2)
+        self.assertEqual(second, [])
+        self.assertEqual(WallPost.objects.filter(kind=WallPost.KIND_RECAP).count(), 2)
+
+    # ---- the card is about the room it is in -------------------------------
+
+    def test_the_card_names_the_group_not_the_organisation(self):
+        from .recaps import build_recap_facts
+
+        self._tip(self.insider, group=self.marketing)
+        self._settle()
+        facts = build_recap_facts(self.org, self.rnd, self.marketing)
+        self.assertEqual(facts["group"]["name"], "Marketing")
+
+    def test_the_organisation_card_still_names_the_organisation(self):
+        from .recaps import build_recap_facts
+
+        self._tip(self.outsider, group=None)
+        self._settle()
+        facts = build_recap_facts(self.org, self.rnd, None)
+        self.assertEqual(facts["group"]["name"], "Acme")
+
+    def test_a_group_card_counts_only_its_own_tippers(self):
+        from .recaps import build_recap_facts
+
+        self._tip(self.outsider, group=None)
+        self._tip(self.insider, group=self.marketing)
+        self._settle()
+        facts = build_recap_facts(self.org, self.rnd, self.marketing)
+        self.assertEqual(facts["group"]["members_who_tipped"], 1)
+        self.assertEqual({m["name"] for m in facts["members"]}, {"Insider"})
+
+    def test_two_rooms_do_not_get_word_for_word_identical_cards(self):
+        """The seed picks the wording variant, and it used to be (org, round) —
+        so every group in an organisation would post the same sentence on the
+        same afternoon."""
+        from .recaps import build_recap_facts
+
+        self._tip(self.outsider, group=None)
+        self._tip(self.insider, group=self.marketing)
+        self._settle()
+        org_facts = build_recap_facts(self.org, self.rnd, None)
+        grp_facts = build_recap_facts(self.org, self.rnd, self.marketing)
+        self.assertNotEqual(org_facts["seed"], grp_facts["seed"])
