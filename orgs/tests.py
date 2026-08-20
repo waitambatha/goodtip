@@ -2122,3 +2122,205 @@ class GroupModelTests(TestCase):
         GroupMember.objects.create(group=self.marketing, user=self.user)
         with self.assertRaises(IntegrityError):
             GroupMember.objects.create(group=self.marketing, user=self.user)
+
+
+class CurrentContextTests(TestCase):
+    """Where the user is — see orgs/context.py.
+
+    Before this the nav took whichever membership the query returned first,
+    which was not a choice anyone made and could not express "I am looking at
+    Marketing" at all.
+    """
+
+    def setUp(self):
+        from django.urls import reverse
+        from django.utils import timezone
+
+        self.reverse = reverse
+        self.season, _ = Season.objects.get_or_create(year=2097, defaults={"label": "2097"})
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
+        )
+        self.now = timezone.now()
+        self.acme = Organisation.objects.create(
+            name="Acme", season=self.season, charity=self.charity, groups_enabled=True,
+        )
+        self.beta = Organisation.objects.create(
+            name="Beta", season=self.season, charity=self.charity, groups_enabled=True,
+        )
+        self.user = User.objects.create_user(
+            email="member@example.com", password="x", display_name="Member",
+        )
+        OrgMember.objects.create(user=self.user, org=self.acme)
+        OrgMember.objects.create(user=self.user, org=self.beta)
+        self.marketing = Group.objects.create(org=self.acme, name="Marketing")
+        GroupMember.objects.create(group=self.marketing, user=self.user)
+        self.client.force_login(self.user)
+
+    def _request(self):
+        """A request carrying this client's session, for calling context.py."""
+        from django.test import RequestFactory
+
+        r = RequestFactory().get("/")
+        r.user = self.user
+        r.session = self.client.session
+        return r
+
+    # ---- organisation -----------------------------------------------------
+
+    def test_with_no_choice_made_it_settles_on_a_stable_one(self):
+        from .context import current_org
+
+        # Ordered by name, so the fallback does not move when an unrelated
+        # membership row is written.
+        self.assertEqual(current_org(self._request()), self.acme)
+
+    def test_switching_organisation_sticks(self):
+        self.client.post(self.reverse("orgs:switch_org", args=[self.beta.id]))
+        from .context import current_org
+
+        self.assertEqual(current_org(self._request()), self.beta)
+
+    def test_you_cannot_switch_into_an_organisation_you_are_not_in(self):
+        outsider_org = Organisation.objects.create(
+            name="Zeta", season=self.season, charity=self.charity,
+        )
+        self.client.post(self.reverse("orgs:switch_org", args=[outsider_org.id]))
+        from .context import current_org
+
+        self.assertEqual(current_org(self._request()), self.acme)
+
+    def test_losing_membership_drops_the_context(self):
+        """A session outlives permission.
+
+        Someone removed from an organisation still has its id in their cookie,
+        and that must not be enough to keep showing it to them.
+        """
+        self.client.post(self.reverse("orgs:switch_org", args=[self.beta.id]))
+        OrgMember.objects.filter(user=self.user, org=self.beta).delete()
+        from .context import current_org
+
+        self.assertEqual(current_org(self._request()), self.acme)
+
+    def test_a_member_of_nothing_has_no_context(self):
+        OrgMember.objects.filter(user=self.user).delete()
+        from .context import current_org
+
+        self.assertIsNone(current_org(self._request()))
+
+    # ---- group ------------------------------------------------------------
+
+    def test_the_organisation_itself_is_a_real_context_not_a_missing_one(self):
+        from .context import current_group
+
+        self.assertIsNone(current_group(self._request()))
+
+    def test_stepping_into_a_group(self):
+        self.client.post(
+            self.reverse("orgs:switch_group", args=[self.acme.id, self.marketing.id])
+        )
+        from .context import current_group
+
+        self.assertEqual(current_group(self._request()), self.marketing)
+
+    def test_stepping_back_out_leaves_you_in_the_organisation(self):
+        self.client.post(
+            self.reverse("orgs:switch_group", args=[self.acme.id, self.marketing.id])
+        )
+        self.client.post(self.reverse("orgs:leave_group_context"))
+        from .context import current_group, current_org
+
+        self.assertIsNone(current_group(self._request()))
+        self.assertEqual(current_org(self._request()), self.acme)
+
+    def test_switching_organisation_drops_the_group(self):
+        """Marketing cannot survive a move to a different company."""
+        self.client.post(
+            self.reverse("orgs:switch_group", args=[self.acme.id, self.marketing.id])
+        )
+        self.client.post(self.reverse("orgs:switch_org", args=[self.beta.id]))
+        from .context import current_group
+
+        self.assertIsNone(current_group(self._request()))
+
+    def test_you_cannot_step_into_a_group_you_have_not_joined(self):
+        sales = Group.objects.create(org=self.acme, name="Sales")
+        self.client.post(self.reverse("orgs:switch_group", args=[self.acme.id, sales.id]))
+        from .context import current_group
+
+        self.assertIsNone(current_group(self._request()))
+
+    def test_you_cannot_step_into_a_group_still_awaiting_approval(self):
+        pending = Group.objects.create(
+            org=self.acme, name="Skunkworks",
+            approval_status=Group.APPROVAL_PENDING,
+        )
+        GroupMember.objects.create(group=pending, user=self.user)
+        self.client.post(self.reverse("orgs:switch_group", args=[self.acme.id, pending.id]))
+        from .context import current_group
+
+        self.assertIsNone(current_group(self._request()))
+
+    def test_leaving_a_group_drops_you_out_of_it(self):
+        self.client.post(
+            self.reverse("orgs:switch_group", args=[self.acme.id, self.marketing.id])
+        )
+        GroupMember.objects.filter(group=self.marketing, user=self.user).delete()
+        from .context import current_group
+
+        self.assertIsNone(current_group(self._request()))
+
+    def test_turning_groups_off_drops_anyone_standing_in_one(self):
+        self.client.post(
+            self.reverse("orgs:switch_group", args=[self.acme.id, self.marketing.id])
+        )
+        self.acme.groups_enabled = False
+        self.acme.save(update_fields=["groups_enabled"])
+        from .context import current_group
+
+        self.assertIsNone(current_group(self._request()))
+
+    # ---- the scope every tip query should use -----------------------------
+
+    def test_tip_scope_says_organisation_when_not_in_a_group(self):
+        from .context import tip_scope
+
+        self.assertEqual(tip_scope(self._request()), {"org": self.acme, "group": None})
+
+    def test_tip_scope_says_group_when_in_one(self):
+        self.client.post(
+            self.reverse("orgs:switch_group", args=[self.acme.id, self.marketing.id])
+        )
+        from .context import tip_scope
+
+        self.assertEqual(
+            tip_scope(self._request()), {"org": self.acme, "group": self.marketing}
+        )
+
+    # ---- the switch endpoints themselves ----------------------------------
+
+    def test_switching_is_not_a_get(self):
+        """A GET switcher gets followed by every prefetcher that sees the nav."""
+        resp = self.client.get(self.reverse("orgs:switch_org", args=[self.beta.id]))
+        self.assertEqual(resp.status_code, 405)
+
+    def test_next_only_honours_paths_on_this_site(self):
+        resp = self.client.post(
+            self.reverse("orgs:switch_org", args=[self.beta.id]),
+            {"next": "https://evil.example.com/"},
+        )
+        self.assertEqual(resp["Location"], self.reverse("dashboard"))
+
+    def test_next_honours_a_local_path(self):
+        resp = self.client.post(
+            self.reverse("orgs:switch_org", args=[self.beta.id]),
+            {"next": "/leagues/search/"},
+        )
+        self.assertEqual(resp["Location"], "/leagues/search/")
+
+    def test_a_protocol_relative_next_is_refused(self):
+        resp = self.client.post(
+            self.reverse("orgs:switch_org", args=[self.beta.id]),
+            {"next": "//evil.example.com/"},
+        )
+        self.assertEqual(resp["Location"], self.reverse("dashboard"))

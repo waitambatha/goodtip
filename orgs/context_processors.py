@@ -1,6 +1,8 @@
 def user_orgs(request):
     if not request.user.is_authenticated:
         return {"nav_orgs": []}
+    from .context import current_group, current_org, groups_for
+
     memberships = list(request.user.memberships.select_related("org").all())
     orgs = [m.org for m in memberships]
 
@@ -35,7 +37,11 @@ def user_orgs(request):
 
         open_enquiry_count = Enquiry.objects.filter(status=Enquiry.STATUS_NEW).count()
 
-    primary = orgs[0] if orgs else None
+    # Where the user actually is, rather than whichever membership the query
+    # happened to return first. `primary_org` is kept as the name the nav
+    # templates already use; it now means "current" instead of "arbitrary".
+    primary = current_org(request)
+    group = current_group(request, primary)
     donation = None
     primary_sport = ""
     # Drives the admin-only nav items. Computed here rather than per template so
@@ -57,6 +63,11 @@ def user_orgs(request):
     return {
         "nav_orgs": orgs,
         "primary_org": primary,
+        "current_org": primary,
+        "current_group": group,
+        # The groups this member can step into, for the switcher. Empty when
+        # the organisation has not switched groups on, which is the default.
+        "current_org_groups": list(groups_for(request.user, primary)) if primary else [],
         "primary_org_is_admin": primary_org_is_admin,
         "primary_donation": donation,
         # e.g. "Australian Rules" / "Rugby League" — drives the loader's

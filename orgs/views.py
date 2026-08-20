@@ -7,6 +7,7 @@ from django.db import models
 from django.db.models import Count, Q
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.core.files.storage import default_storage
 from django.utils import timezone
@@ -21,6 +22,7 @@ from .notifications import send_org_invites
 from .models import (
     CharityVote,
     CharityVoteOption,
+    Group,
     MembershipRequest,
     Notification,
     OrgCharitySelection,
@@ -58,6 +60,7 @@ from .services import (
     set_election_close_time,
     set_member_role,
 )
+from . import context as ctx
 from .signing import make_join_token, parse_join_token
 
 
@@ -1743,6 +1746,77 @@ def notification_open(request, note_id: int):
     from django.http import HttpResponse
 
     return HttpResponse("")
+
+
+# ---------------------------------------------------------------------------
+# Where the user is: switching organisation, and stepping in and out of a group
+# ---------------------------------------------------------------------------
+
+
+def _safe_next(request, fallback="dashboard"):
+    """Where to land after switching.
+
+    `next` arrives from the client, so it is only honoured when it is a path on
+    this site. An open redirect here would be handed out on every switch link
+    in the nav.
+    """
+    target = request.POST.get("next") or request.GET.get("next") or ""
+    if target.startswith("/") and not target.startswith("//"):
+        return target
+    return reverse(fallback)
+
+
+@login_required
+@require_POST
+def switch_org(request, org_id: int):
+    """Move to another organisation.
+
+    POST because it changes state that outlives the request. Membership is
+    checked here as well as in context.current_org — this is the write, and a
+    write that trusts the id it was given is how someone ends up looking at an
+    organisation they were never in.
+    """
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _is_member(request.user, org):
+        messages.error(request, "You're not a member of that organisation.")
+        return redirect(_safe_next(request))
+
+    ctx.set_current_org(request, org)
+    messages.success(request, f"You're now in {org.name}.")
+    return redirect(_safe_next(request))
+
+
+@login_required
+@require_POST
+def switch_group(request, org_id: int, group_id: int):
+    """Step into a group. Everything from here on belongs to the group."""
+    group = get_object_or_404(
+        Group, pk=group_id, org_id=org_id,
+        approval_status=Group.APPROVAL_APPROVED,
+    )
+    if not ctx.is_group_member(request.user, group):
+        messages.error(request, "You're not in that group.")
+        return redirect(_safe_next(request))
+    if not group.org.groups_enabled:
+        messages.error(request, "Groups aren't switched on for this organisation.")
+        return redirect(_safe_next(request))
+
+    ctx.set_current_group(request, group)
+    messages.success(request, f"You're now tipping in {group.name}.")
+    return redirect(_safe_next(request))
+
+
+@login_required
+@require_POST
+def leave_group_view(request):
+    """Step back out to the organisation itself, without leaving the group."""
+    ctx.leave_group_context(request)
+    org = ctx.current_org(request)
+    messages.success(
+        request,
+        f"Back to {org.name}." if org else "Back to your organisation.",
+    )
+    return redirect(_safe_next(request))
 
 
 # ---------------------------------------------------------------------------
