@@ -1,0 +1,232 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}Groups, {{ org.name }}{% endblock %}
+{% block loader_task %}Finding the groups{% endblock %}
+{% block body_class %}page-deep sheet-page{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+
+{% block app_content %}
+{% comment %}
+The directory. Every member lands here, not just admins: in an organisation big
+enough to need groups, the only person who knows which one you belong to is you.
+
+Three states per row and they are mutually exclusive — you are in it, it is
+waiting on an admin, or you can join it. Pending groups are shown only to the
+admins who must decide on them and to the member who asked, so nobody else sees
+a half-built thing in the list.
+{% endcomment %}
+
+<div class="dept-hero">
+  <div class="dh-copy">
+    <div class="gh-eyebrow">{{ org.name }}</div>
+    <h1>Groups</h1>
+    {% if org.groups_enabled %}
+    <p class="dh-lead">Find your team inside {{ org.name }}, or start it if it isn't here yet. A group has its own ladder and its own wall — everyone still tips the same fixtures.</p>
+    {% else %}
+    <p class="dh-lead">Split {{ org.name }} into teams — Marketing, IT, Sales — each with its own ladder.</p>
+    {% endif %}
+  </div>
+  {% if org.groups_enabled %}
+  <div class="dh-side">
+    {% comment %}
+    An anchor to the form further down, not a modal. The old two-step
+    department modal needed its own script to hold state the DOM already
+    knew; the form is short enough that the page can just hold it.
+    {% endcomment %}
+    <a href="#new-group" class="abtn abtn-primary abtn-lg dh-cta">
+      <svg class="cic" aria-hidden="true" viewBox="0 0 24 24"><path d="M11 5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5Z"/></svg>
+      Create group
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+{% if not org.groups_enabled %}
+{% comment %}
+THE OFF STATE, WHICH IS THE DEFAULT AND USUALLY THE RIGHT ANSWER.
+
+Groups are not a feature every organisation should have. Ten people in an
+office split into three groups of three is worse than not splitting at all —
+three ladders nobody can lose. So this explains what they are for and who they
+are for, and says plainly that most organisations do not need them, rather than
+selling a switch for the sake of it.
+{% endcomment %}
+<div class="card pad-lg" style="max-width:760px;">
+  <div class="card-h" style="font-size:20px;">Does {{ org.name }} need groups?</div>
+  <p class="card-lead" style="margin-top:10px;">
+    A group is a team inside your organisation — Marketing, IT, Sales, the
+    Melbourne office. Everyone still tips the same fixtures under the same
+    rules for the same charity. What a group adds is its own ladder and its own
+    wall, so Marketing can beat IT without either of them leaving the comp.
+  </p>
+  <div class="grid-app g-2" style="margin-top:18px;">
+    <div>
+      <div class="app-eyebrow">Worth it when</div>
+      <p class="card-lead" style="margin-top:6px;">There are enough people that one ladder stops being personal — a few hundred, spread across teams who already talk about each other.</p>
+    </div>
+    <div>
+      <div class="app-eyebrow">Not worth it when</div>
+      <p class="card-lead" style="margin-top:6px;">There are five or ten of you. One ladder is the whole point, and splitting it just gives everyone a smaller thing to win.</p>
+    </div>
+  </div>
+  <p class="card-lead" style="margin-top:16px;color:var(--muted);">
+    You can switch this on later — in a year, or in three — and nothing is lost
+    by waiting. Switching it off again keeps every group and every tip exactly
+    where it is.
+  </p>
+  {% if is_admin %}
+  <form method="post" action="{% url 'orgs:groups_toggle' org.id %}" style="margin-top:18px;" data-busy="Switching on">
+    {% csrf_token %}
+    <button type="submit" class="abtn abtn-primary abtn-lg">Switch groups on</button>
+  </form>
+  {% else %}
+  <p class="card-lead" style="margin-top:18px;">Only an admin of {{ org.name }} can switch these on.</p>
+  {% endif %}
+</div>
+
+{% else %}
+
+{% if is_admin and pending_count %}
+<div class="flash info" style="margin-bottom:18px;">
+  <span>{{ pending_count }} group{{ pending_count|pluralize }} waiting on you. They're marked below.</span>
+</div>
+{% endif %}
+
+{% if current_group %}
+<div class="flash success" style="margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
+  <span>You're tipping in <b>{{ current_group.name }}</b>. Your picks score on its ladder.</span>
+  <form method="post" action="{% url 'orgs:leave_group_context' %}" data-busy="Switching">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{% url 'orgs:groups' org.id %}">
+    <button type="submit" class="abtn abtn-ghost abtn-sm">Tip for {{ org.name }} instead</button>
+  </form>
+</div>
+{% endif %}
+
+<div class="dept-searchbar">
+  <form method="get" action="{% url 'orgs:groups' org.id %}" class="dept-search">
+    <input type="search" name="q" value="{{ q }}" placeholder="Search groups in {{ org.name }}" aria-label="Search groups">
+    <button type="submit" class="abtn abtn-ghost">Search</button>
+    {% if q %}<a href="{% url 'orgs:groups' org.id %}" class="abtn abtn-ghost">Clear</a>{% endif %}
+  </form>
+</div>
+
+<div class="grid-app g-3" style="margin-top:18px;">
+  {% for row in rows %}
+  <div class="card pad-lg dept-card{% if row.awaiting_approval %} is-pending{% endif %}">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span class="dc-ic tone-{{ row.tone }}"><svg><use href="#{{ row.icon }}"/></svg></span>
+      <div style="min-width:0;">
+        <div class="card-h" style="font-size:17px;">{{ row.group.name }}</div>
+        <div class="app-sub" style="font-size:12.5px;">
+          {% if row.group.kind_label %}{{ row.group.kind_label }} &middot; {% endif %}
+          {{ row.members }} member{{ row.members|pluralize }}
+        </div>
+      </div>
+    </div>
+
+    {% if row.awaiting_approval %}
+    <p class="card-lead" style="margin:12px 0 0;font-size:13px;">
+      Waiting for an admin{% if row.group.created_by %}, asked for by {{ row.group.created_by.display_name }}{% endif %}.
+    </p>
+      {% if is_admin %}
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <form method="post" action="{% url 'orgs:groups' org.id %}" data-busy="Approving">
+          {% csrf_token %}
+          <input type="hidden" name="group_id" value="{{ row.group.id }}">
+          <button type="submit" name="action" value="approve" class="abtn abtn-primary abtn-sm">Approve</button>
+        </form>
+        <form method="post" action="{% url 'orgs:groups' org.id %}" data-busy="Declining"
+              data-confirm="The group and its request will be removed. Nobody has tipped in it yet."
+              data-confirm-title="Decline this group?" data-confirm-ok="Decline" data-confirm-danger>
+          {% csrf_token %}
+          <input type="hidden" name="group_id" value="{{ row.group.id }}">
+          <button type="submit" name="action" value="decline" class="abtn abtn-ghost abtn-sm">Decline</button>
+        </form>
+      </div>
+      {% endif %}
+
+    {% elif row.is_mine %}
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+      {% if current_group.id != row.group.id %}
+      <form method="post" action="{% url 'orgs:switch_group' org.id row.group.id %}" data-busy="Switching">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{% url 'orgs:groups' org.id %}">
+        <button type="submit" class="abtn abtn-primary abtn-sm">Tip in {{ row.group.name }}</button>
+      </form>
+      {% else %}
+      <span class="pill-role owner">You're tipping here</span>
+      {% endif %}
+      <form method="post" action="{% url 'orgs:groups' org.id %}" data-busy="Leaving"
+            data-confirm="Your tips in this group stay on its ladder — leaving only takes you out of it."
+            data-confirm-title="Leave {{ row.group.name }}?" data-confirm-ok="Leave">
+        {% csrf_token %}
+        <input type="hidden" name="group_id" value="{{ row.group.id }}">
+        <button type="submit" name="action" value="leave" class="abtn abtn-ghost abtn-sm">Leave</button>
+      </form>
+    </div>
+
+    {% else %}
+    <form method="post" action="{% url 'orgs:groups' org.id %}" style="margin-top:14px;" data-busy="Joining">
+      {% csrf_token %}
+      <input type="hidden" name="group_id" value="{{ row.group.id }}">
+      <button type="submit" name="action" value="join" class="abtn abtn-ghost abtn-sm">Join {{ row.group.name }}</button>
+    </form>
+    {% endif %}
+  </div>
+  {% empty %}
+  <div class="card pad-lg" style="grid-column:1/-1;text-align:center;">
+    <div class="card-h">{% if q %}No groups match "{{ q }}".{% else %}No groups yet.{% endif %}</div>
+    <p class="card-lead" style="margin-top:8px;">
+      {% if q %}Try a different word, or start it yourself.
+      {% else %}Start the first one — Marketing, IT, whatever {{ org.name }} actually calls its teams.{% endif %}
+    </p>
+  </div>
+  {% endfor %}
+</div>
+
+{% comment %}
+The create form. Anyone in the organisation can fill it in; whether it goes
+live or goes to an admin is decided in create_group() by who is asking, not
+here, so the form does not have to know and cannot get it wrong.
+{% endcomment %}
+<div class="card pad-lg" id="new-group" style="margin-top:26px;max-width:640px;scroll-margin-top:90px;">
+  <div class="card-h" style="font-size:18px;">Start a group</div>
+  <p class="card-lead" style="margin:6px 0 16px;">
+    {% if is_admin %}It goes live straight away.
+    {% else %}An admin of {{ org.name }} approves it before it appears for everyone.{% endif %}
+  </p>
+  <form method="post" action="{% url 'orgs:groups' org.id %}" data-busy="Creating">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="create">
+    <div class="fld">
+      <label for="g_name">Name</label>
+      <input type="text" name="name" id="g_name" required maxlength="80" placeholder="e.g. Marketing">
+    </div>
+    <div class="fld">
+      <label for="g_kind">Kind <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <select name="kind" id="g_kind">
+        <option value="">Pick one, or leave it</option>
+        {% for k in kind_choices %}<option value="{{ k.pk }}">{{ k.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="fld">
+      <label for="g_label">Or describe it yourself <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <input type="text" name="label" id="g_label" maxlength="80" placeholder="e.g. The Cave">
+      <div class="hint">The list above is a shortcut, not a rule.</div>
+    </div>
+    <button type="submit" class="abtn abtn-primary">Create group</button>
+  </form>
+</div>
+
+{% if is_admin %}
+<form method="post" action="{% url 'orgs:groups_toggle' org.id %}" style="margin-top:22px;" data-busy="Switching off"
+      data-confirm="Every group and every tip in them stays exactly where it is. This only takes groups out of the nav."
+      data-confirm-title="Switch groups off?" data-confirm-ok="Switch off">
+  {% csrf_token %}
+  <button type="submit" class="abtn abtn-ghost abtn-sm">Switch groups off for {{ org.name }}</button>
+</form>
+{% endif %}
+
+{% endif %}
+{% endblock %}

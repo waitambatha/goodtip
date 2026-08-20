@@ -23,6 +23,7 @@ from .models import (
     CharityVote,
     CharityVoteOption,
     Group,
+    GroupMember,
     MembershipRequest,
     Notification,
     OrgCharitySelection,
@@ -40,13 +41,15 @@ from .services import (
     can_lock_fundraising,
     cast_charity_ballot,
     close_charity_vote,
-    approve_department,
+    approve_group,
     close_due_elections,
     create_charity_election,
-    create_department,
-    decline_department,
+    create_group,
+    decline_group,
     decline_membership_request,
-    departments_for,
+    groups_for,
+    join_group,
+    leave_group,
     demote_child_org_admin,
     lock_fundraising_to_self,
     open_due_elections,
@@ -1868,136 +1871,179 @@ def _department_icon(dept) -> tuple[str, str]:
     return "ic-f-org", "green"
 
 
-@login_required
-def departments_view(request, org_id: int):
-    """The department directory: find yours, join it, or start it.
+# ---------------------------------------------------------------------------
+# Groups — the directory, and the switch that turns the feature on
+# ---------------------------------------------------------------------------
 
-    Open to every member of the organisation, not just admins. That is the
-    whole point — in an organisation big enough to need departments, the
-    person who knows which one you belong to is you.
+
+def _group_icon(group) -> tuple[str, str]:
+    """A glyph for a group, from its kind or its name.
+
+    Matched on the words people actually use, so a group called "IT Support"
+    and one called "Technology" land on the same mark.
     """
-    org = get_object_or_404(Organisation, pk=org_id)
-    root = org.root
-    if not _is_member(request.user, root) and not _is_member(request.user, org):
+    hay = " ".join([
+        group.name or "",
+        (group.kind.name if group.kind_id else ""),
+        group.label or "",
+    ]).lower()
+    for words, icon, tone in GROUP_GLYPHS:
+        if any(w in hay for w in words):
+            return icon, tone
+    return "ic-people", "slate"
+
+
+GROUP_GLYPHS = [
+    (("it", "tech", "engineer", "developer", "software"), "ic-bolt", "violet"),
+    (("finance", "account", "payroll"), "ic-coin", "gold"),
+    (("marketing", "brand", "comms", "creative"), "ic-star", "pink"),
+    (("sales", "revenue", "business development"), "ic-trophy", "amber"),
+    (("people", "hr", "culture", "talent"), "ic-people", "teal"),
+    (("ops", "operation", "logistics", "warehouse"), "ic-shield", "slate"),
+    (("legal", "risk", "compliance"), "ic-doc", "navy"),
+    (("support", "service", "customer"), "ic-chat", "sky"),
+]
+
+
+@login_required
+@require_POST
+def groups_toggle(request, org_id: int):
+    """Switch groups on or off for an organisation.
+
+    Off is the default and stays right for most: five people in an office do
+    not need departments. Switching off leaves every group and every tip
+    exactly where it is — it only takes the feature out of the nav, so an
+    organisation that tries it and changes its mind loses nothing.
+    """
+    org = get_object_or_404(Organisation, pk=org_id, parent__isnull=True)
+    if not _can_manage(request.user, org):
         return HttpResponseForbidden()
 
+    org.groups_enabled = not org.groups_enabled
+    org.save(update_fields=["groups_enabled"])
+    if org.groups_enabled:
+        messages.success(request, "Groups are on. Start one, or let your members ask.")
+    else:
+        ctx.leave_group_context(request)
+        messages.info(
+            request,
+            "Groups are off. Nothing was deleted — switch them back on and "
+            "they're all still there.",
+        )
+    return redirect("orgs:groups", org_id=org.pk)
+
+
+@login_required
+def groups_view(request, org_id: int):
+    """The group directory: find yours, join it, or start one."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    root = org.root
+    if not _is_member(request.user, root):
+        return HttpResponseForbidden()
+    is_admin = _can_manage(request.user, root)
+
     if request.method == "POST":
-        action = request.POST.get("action")
+        action = request.POST.get("action", "")
 
         if action == "create":
-            dept_type = None
-            raw_type = request.POST.get("group_type") or ""
-            if raw_type.isdigit():
-                dept_type = GroupType.objects.filter(pk=raw_type, is_active=True).first()
-            # The modal's first step lets you switch organisation, so the
-            # parent is whatever it confirmed, not whichever page you opened.
-            # Re-checked here rather than trusted: it arrives from a form.
-            target = root
-            raw_org = request.POST.get("target_org") or ""
-            if raw_org.isdigit() and int(raw_org) != root.pk:
-                candidate = Organisation.objects.filter(pk=raw_org, parent__isnull=True).first()
-                if candidate and _is_member(request.user, candidate):
-                    target = candidate
-                else:
-                    messages.error(request, "You're not a member of that organisation.")
-                    return redirect("orgs:departments", org_id=root.pk)
+            raw_kind = request.POST.get("kind") or ""
+            kind = (
+                GroupType.objects.filter(pk=raw_kind, is_active=True).first()
+                if raw_kind.isdigit() else None
+            )
             try:
-                dept = create_department(
-                    target,
+                group = create_group(
+                    root,
                     name=request.POST.get("name", ""),
                     by_user=request.user,
-                    group_type=dept_type,
-                    department_label=request.POST.get("department_label", ""),
+                    kind=kind,
+                    label=request.POST.get("label", ""),
                 )
-                if dept.is_pending_approval:
+                if group.is_pending_approval:
                     messages.success(
                         request,
-                        f"{dept.name} has been sent to {target.name}'s admins to approve. "
-                        "You'll get a notification when they decide.",
+                        f"{group.name} has been sent to {root.name}'s admins to "
+                        "approve. You'll get a notification when they decide.",
                     )
                 else:
-                    messages.success(request, f"{dept.name} is live. Invite your team.")
+                    messages.success(request, f"{group.name} is live. Bring your team in.")
             except ValueError as e:
                 messages.error(request, str(e))
-            return redirect("orgs:departments", org_id=target.pk)
+            return redirect("orgs:groups", org_id=root.pk)
 
-        # Everything below is an admin decision on a pending department.
-        dept = get_object_or_404(Organisation, pk=request.POST.get("dept_id"), parent=root)
-        if not _can_manage(request.user, root):
+        group = get_object_or_404(Group, pk=request.POST.get("group_id"), org=root)
+
+        if action == "join":
+            try:
+                join_group(group, user=request.user)
+                ctx.set_current_group(request, group)
+                messages.success(request, f"You're in {group.name}.")
+            except ValueError as e:
+                messages.error(request, str(e))
+            return redirect("orgs:groups", org_id=root.pk)
+
+        if action == "leave":
+            leave_group(group, user=request.user)
+            messages.info(
+                request,
+                f"You've left {group.name}. The tips you made there stay on its ladder.",
+            )
+            return redirect("orgs:groups", org_id=root.pk)
+
+        # Everything below is an admin decision on a pending group.
+        if not is_admin:
             return HttpResponseForbidden()
         if action == "approve":
-            approve_department(dept, by_user=request.user)
-            messages.success(request, f"{dept.name} is live.")
+            approve_group(group, by_user=request.user)
+            messages.success(request, f"{group.name} is live.")
         elif action == "decline":
-            name = dept.name
+            name = group.name
             try:
-                decline_department(dept, by_user=request.user)
+                decline_group(group, by_user=request.user)
                 messages.info(request, f"{name} was declined.")
             except ValueError as e:
                 messages.error(request, str(e))
-        return redirect("orgs:departments", org_id=root.pk)
+        return redirect("orgs:groups", org_id=root.pk)
 
+    groups = groups_for(root, include_pending_for=request.user)
     q = (request.GET.get("q") or "").strip()
-    depts = departments_for(root, include_pending_for=request.user)
     if q:
-        depts = depts.filter(
-            Q(name__icontains=q)
-            | Q(department_label__icontains=q)
-            | Q(group_type__name__icontains=q)
+        groups = groups.filter(
+            Q(name__icontains=q) | Q(label__icontains=q) | Q(kind__name__icontains=q)
         )
 
-    # One query for "which of these am I already in", rather than one per row.
-    my_dept_ids = set(
-        OrgMember.objects.filter(user=request.user, org__parent=root)
-        .values_list("org_id", flat=True)
+    mine = set(
+        GroupMember.objects.filter(user=request.user, group__org=root)
+        .values_list("group_id", flat=True)
     )
-    pending_join_ids = set(
-        MembershipRequest.objects.filter(
-            user=request.user, org__parent=root,
-            status=MembershipRequest.STATUS_PENDING,
-        ).values_list("org_id", flat=True)
-    )
+    member_counts = {
+        row["group"]: row["n"]
+        for row in GroupMember.objects.filter(group__org=root)
+        .values("group").annotate(n=Count("id"))
+    }
 
     rows = []
-    for d in depts.annotate(member_count=Count("members", distinct=True)).order_by("name"):
+    for g in groups:
+        icon, tone = _group_icon(g)
         rows.append({
-            "org": d,
-            "is_member": d.pk in my_dept_ids,
-            "join_pending": d.pk in pending_join_ids,
-            "awaiting_approval": d.is_pending_approval,
-            "icon": _department_icon(d)[0],
-            "tone": _department_icon(d)[1],
+            "group": g,
+            "icon": icon,
+            "tone": tone,
+            "members": member_counts.get(g.pk, 0),
+            "is_mine": g.pk in mine,
+            "awaiting_approval": g.is_pending_approval,
         })
 
-    # The picker: types for this org's business type, plus the ones offered to
-    # everyone. Ordered so the general ones do not bury the specific ones.
-    type_choices = GroupType.objects.filter(is_active=True).filter(
+    kind_choices = GroupType.objects.filter(is_active=True).filter(
         Q(organisation_type__isnull=True) | Q(organisation_type=root.organisation_type_id)
     ).order_by("organisation_type__id", "sort_order", "name")
 
-    # Orgs this person could create a department in. Someone can belong to
-    # several, and the modal opens on the one they are looking at but must let
-    # them say "actually, this one" without leaving the page.
-    my_orgs = list(
-        Organisation.objects.filter(
-            parent__isnull=True,
-            members__user=request.user,
-        ).distinct().order_by("name")
-    )
-
-    # A few real faces for the hero illustration. Real members rather than
-    # stock, so the artwork is about this organisation.
-    orbit_members = list(
-        OrgMember.objects.filter(org=root).select_related("user")[:3]
-    )
-
-    return render(request, "orgs/departments.html", {
+    return render(request, "orgs/groups.html", {
         "org": root,
-        "my_orgs": my_orgs,
-        "orbit_members": orbit_members,
         "rows": rows,
         "q": q,
-        "type_choices": type_choices,
-        "is_admin": _can_manage(request.user, root),
+        "kind_choices": kind_choices,
+        "is_admin": is_admin,
+        "current_group": ctx.current_group(request, root),
         "pending_count": sum(1 for r in rows if r["awaiting_approval"]),
     })

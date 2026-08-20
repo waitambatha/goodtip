@@ -22,7 +22,6 @@
   <script src="{% static 'js/gt-veil.js' %}" defer></script>
   <script src="{% static 'js/gt-confirm.js' %}" defer></script>
   <script src="{% static 'js/gt-video.js' %}" defer></script>
-  <script src="{% static 'js/gt-dept.js' %}" defer></script>
   <script src="{% static 'js/gt-fixture.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
   {% include "partials/_analytics.html" %}
@@ -104,11 +103,11 @@
                 <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-users"/></svg></span>
                 <span class="mi-txt"><b>Members</b><i>Invites, join requests and roles</i></span>
               </a>
-              {# departments live under a top-level org only — two levels, no nesting #}
+              {# groups live inside a top-level organisation only #}
               {% if not primary_org.parent_id %}
-              <a href="{% url 'orgs:departments' primary_org.id %}">
+              <a href="{% url 'orgs:groups' primary_org.id %}">
                 <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-org"/></svg></span>
-                <span class="mi-txt"><b>Departments</b><i>Sites, branches and teams under you</i></span>
+                <span class="mi-txt"><b>Groups</b><i>The teams inside your organisation</i></span>
               </a>
               {% endif %}
               <a href="{% url 'billing:season_summary' primary_org.id %}">

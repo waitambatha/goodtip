@@ -21,6 +21,18 @@ def _require_member(user, org):
     return OrgMember.objects.filter(user=user, org=org).exists()
 
 
+def _group(request, org):
+    """The group this request is tipping in, or None for the organisation.
+
+    One helper rather than a call to orgs.context in each view, so a view that
+    forgets it fails to import rather than quietly writing a group's tips into
+    the organisation's ladder.
+    """
+    from orgs.context import current_group
+
+    return current_group(request, org)
+
+
 @login_required
 def match_state_partial(request, match_id: int):
     """Just the score/clock block for one fixture, for the in-play poll.
@@ -53,7 +65,7 @@ def tip_round_view(request, org_id: int, round_id: int):
     matches = list(round_obj.matches.select_related("home_team", "away_team").order_by("kickoff_at"))
     existing_tips = {
         t.match_id: t.selection
-        for t in Tip.objects.filter(user=request.user, match__in=matches, org=org)
+        for t in Tip.objects.filter(user=request.user, match__in=matches, org=org, group=_group(request, org))
     }
     rows = []
     for m in matches:
@@ -80,7 +92,8 @@ def tip_save_partial(request, org_id: int, round_id: int, match_id: int):
     match = get_object_or_404(Match, pk=match_id, round_id=round_id, round__org=org)
     selection = request.POST.get("selection")
     try:
-        submit_tip(user=request.user, match=match, org=org, selection=selection)
+        submit_tip(user=request.user, match=match, org=org, selection=selection,
+                       group=_group(request, org))
     except ValueError as e:
         return HttpResponse(f"<span class='text-red-400 text-xs'>{e}</span>", status=400)
     if request.POST.get("view") == "mytips":
@@ -122,7 +135,8 @@ def tip_round_confirm(request, org_id: int, round_id: int):
         if selection not in ("home", "away"):
             continue
         try:
-            submit_tip(user=request.user, match=match, org=org, selection=selection)
+            submit_tip(user=request.user, match=match, org=org, selection=selection,
+                       group=_group(request, org))
             saved += 1
         except ValueError:
             skipped += 1
@@ -177,7 +191,7 @@ def tip_confirm_upcoming(request, org_id: int):
         if match is None:
             continue  # not this org's match — ignore rather than error
         try:
-            submit_tip(user=request.user, match=match, org=org,
+            submit_tip(user=request.user, match=match, org=org, group=_group(request, org),
                        selection=request.POST[f"match_{mid}"])
             saved += 1
         except ValueError:
@@ -261,7 +275,7 @@ def my_tips_view(request, org_id: int):
         )
         tips = {
             t.match_id: t
-            for t in Tip.objects.filter(user=request.user, match__in=matches, org=org)
+            for t in Tip.objects.filter(user=request.user, match__in=matches, org=org, group=_group(request, org))
         }
         # One batched read for the round rather than three queries per fixture.
         readers = _readers_for(matches)
@@ -375,7 +389,7 @@ def my_tips_view(request, org_id: int):
     # Round-level stats describe the whole round, not the filtered view.
     total_matches = round_match_count
     tips_this_round = len(all_rows)
-    total_tippers = len(leaderboard_for_org(org))
+    total_tippers = len(leaderboard_for_org(org, group=_group(request, org)))
     rank = user_rank_in_org(request.user, org)
     # Percentile = share of the field this member is ahead of or level with.
     percentile = None
@@ -442,7 +456,7 @@ def ladder_view(request, org_id: int):
     # Which teams this member has tipped most, so the ladder connects to their
     # own season rather than being a bare table.
     my_team_ids = set(
-        Tip.objects.filter(user=request.user, org=org, is_correct=True)
+        Tip.objects.filter(user=request.user, org=org, group=_group(request, org), is_correct=True)
         .values_list("match__home_team_id", flat=True)
     )
 
@@ -474,11 +488,15 @@ def leaderboard_view(request, org_id: int):
     # filters to this org only. Standalone orgs only ever see local.
     is_family = org.is_child or org.children.exists()
     scope = request.GET.get("scope", "local")
-    if scope == "national" and is_family:
+    # The ladder you are standing on. Inside a group it is that group's, made
+    # of that group's members and the tips they made there; outside one it is
+    # the organisation's, and excludes every tip made inside a group.
+    group = _group(request, org)
+    if scope == "national" and is_family and group is None:
         board = leaderboard_for_family(org, round_id=round_filter)
     else:
         scope = "local"
-        board = leaderboard_for_org(org, round_id=round_filter)
+        board = leaderboard_for_org(org, round_id=round_filter, group=group)
     # Ranks come from the board, which resolved them under the addendum's
     # tiebreakers. Recomputing "equal points means equal rank" here would
     # undo that: two tippers separated on the paired comp would be reported

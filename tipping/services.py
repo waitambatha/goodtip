@@ -108,30 +108,57 @@ def _fill_missed_tips(match: Match) -> int:
         participant and both; a Team Manager who runs the league and never
         makes a pick would otherwise be auto-entered into every match and
         appear up the leaderboard on tips the system made for them.
-    """
-    from orgs.models import OrgMember
 
-    have = set(match.tips.values_list("user_id", flat=True))
-    eligible = (
-        OrgMember.objects.filter(org_id=match.round.org_id)
+    ONE DEFAULT PER CONTEXT. A tip belongs to where it was made, so a member
+    of Marketing who tipped there and not for the organisation has still missed
+    the organisation's round and still gets the default there — and the other
+    way round. Counting "has this person tipped this match at all" would have
+    let one pick in a group silently cover both ladders.
+    """
+    from orgs.models import Group, GroupMember, OrgMember
+
+    org_id = match.round.org_id
+    eligible = set(
+        OrgMember.objects.filter(org_id=org_id)
         .exclude(role=OrgMember.ROLE_MANAGER)
         .filter(joined_at__lt=match.kickoff_at)
         .values_list("user_id", flat=True)
     )
-    missing = [uid for uid in eligible if uid not in have]
-    if not missing:
+    if not eligible:
+        return 0
+
+    # Who already has a tip, per context. None is the organisation itself.
+    have = {}
+    for uid, gid in match.tips.values_list("user_id", "group_id"):
+        have.setdefault(gid, set()).add(uid)
+
+    contexts = [(None, eligible)]
+    for group in Group.objects.filter(
+        org_id=org_id, approval_status=Group.APPROVAL_APPROVED,
+    ):
+        members = set(
+            GroupMember.objects.filter(group=group)
+            .filter(joined_at__lt=match.kickoff_at)
+            .values_list("user_id", flat=True)
+        )
+        contexts.append((group.pk, members & eligible))
+
+    rows = []
+    for group_id, users in contexts:
+        for uid in users - have.get(group_id, set()):
+            rows.append(Tip(
+                user_id=uid, match=match, org_id=org_id, group_id=group_id,
+                selection="away", is_auto=True,
+            ))
+    if not rows:
         return 0
     Tip.objects.bulk_create(
-        [
-            Tip(user_id=uid, match=match, org_id=match.round.org_id,
-                selection="away", is_auto=True)
-            for uid in missing
-        ],
+        rows,
         # Two graders racing the same match must not collide on the unique
-        # (user, match, org) key and lose the whole batch.
+        # (user, match, org, group) key and lose the whole batch.
         ignore_conflicts=True,
     )
-    return len(missing)
+    return len(rows)
 
 
 def _recalculate_tips_for_match(match: Match) -> int:
@@ -269,7 +296,13 @@ def tippable_round_ids(org) -> set[int]:
 
 
 @transaction.atomic
-def submit_tip(*, user, match: Match, org, selection: str) -> Tip:
+def submit_tip(*, user, match: Match, org, selection: str, group=None) -> Tip:
+    """Record a tip in the context it was made in.
+
+    `group=None` means the organisation itself, and it is a real context rather
+    than a missing one: the same fixture can carry one tip from this person for
+    Marketing and another for the organisation, scored on separate ladders.
+    """
     if match.is_locked:
         raise ValueError("Match is locked")
     if selection not in ("home", "away"):
@@ -279,8 +312,10 @@ def submit_tip(*, user, match: Match, org, selection: str) -> Tip:
             f"That round isn't open yet. You can tip {TIP_WINDOW_ROUNDS} rounds "
             "at a time, so this one opens once the current round is done."
         )
+    if group is not None and group.org_id != org.id:
+        raise ValueError("That group belongs to a different organisation.")
     tip, _ = Tip.objects.update_or_create(
-        user=user, match=match, org=org,
+        user=user, match=match, org=org, group=group,
         defaults={"selection": selection},
     )
     return tip
@@ -310,13 +345,26 @@ def _leaderboard(org_ids, tip_filter):
     ).order_by("-points", "display_name")
 
 
-def leaderboard_for_org(org, round_id: int | None = None):
+def leaderboard_for_org(org, round_id: int | None = None, group=None):
+    """The ladder for one context.
+
+    `group=None` is the organisation's own ladder and must exclude every tip
+    made inside a group — otherwise a group's tips would be pooled in with the
+    organisation's and everyone who tips in both would be counted twice. The
+    isnull filter is the whole reason `group` is a column rather than a
+    separate table.
+    """
     tip_filter = Q(tips__org=org)
+    tip_filter &= Q(tips__group=group) if group is not None else Q(tips__group__isnull=True)
     if round_id is not None:
         tip_filter &= Q(tips__match__round_id=round_id)
-    return apply_tiebreakers(
-        _leaderboard([org.id], tip_filter), [org.id], round_id=round_id,
-    )
+
+    board = _leaderboard([org.id], tip_filter)
+    if group is not None:
+        # A group's ladder is its own members, not the whole organisation with
+        # most of them on nothing.
+        board = board.filter(group_memberships__group=group)
+    return apply_tiebreakers(board, [org.id], round_id=round_id)
 
 
 # ---------------------------------------------------------------------------

@@ -647,199 +647,184 @@ def close_due_elections(orgs=None) -> int:
 # the four-step wizard a top-level org goes through.
 
 
-def create_department(parent, *, name, by_user, group_type=None, department_label=""):
-    """Create a department under ``parent``.
+def create_group(org, *, name, by_user, kind=None, label=""):
+    """Create a group inside ``org``.
 
-    Who is asking decides whether it is live or a request. An admin of the
-    parent creates it outright; anyone else raises it for approval, because
-    the alternative is any of 20,000 staff being able to mint official-looking
-    sub-groups of the organisation unchecked.
+    Who is asking decides whether it is live or a request. An admin creates it
+    outright; anyone else raises it for approval, because the alternative is
+    any of 20,000 staff being able to mint official-looking sub-groups of the
+    organisation unchecked.
 
-    Either way the creator becomes the department's admin. They are the person
-    who wanted it to exist and who knows who belongs in it, and a department
-    nobody can administer is worse than no department.
+    Either way the creator becomes the group's admin. They are the person who
+    wanted it to exist and who knows who belongs in it, and a group nobody can
+    administer is worse than no group.
     """
-    from .models import Organisation, OrgMember
+    from .models import Group, GroupMember, OrgMember
 
     name = (name or "").strip()
     if not name:
-        raise ValueError("Give the department a name.")
-    if parent.parent_id:
-        # Two levels only. Guarded here as well as in Organisation.clean()
-        # because this path builds the org in code and never runs full_clean.
-        raise ValueError("Departments sit under a top-level organisation, not under another department.")
+        raise ValueError("Give the group a name.")
+    if org.parent_id:
+        raise ValueError("Groups sit inside a top-level organisation.")
+    if not org.groups_enabled:
+        raise ValueError(f"{org.name} hasn't switched groups on.")
+    if Group.objects.filter(org=org, name__iexact=name).exists():
+        raise ValueError(f"{org.name} already has a group called {name}.")
+    if not OrgMember.objects.filter(user=by_user, org=org).exists():
+        raise ValueError("You have to be in the organisation to start a group in it.")
 
     is_admin = OrgMember.objects.filter(
-        user=by_user, org=parent, role__in=[OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH],
+        user=by_user, org=org,
+    ).filter(
+        Q(role__in=[OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH])
+        | Q(is_league_owner=True)
     ).exists()
 
-    if Organisation.objects.filter(parent=parent, name__iexact=name).exists():
-        raise ValueError(f"{parent.name} already has a department called {name}.")
-
     with transaction.atomic():
-        dept = Organisation.objects.create(
-            parent=parent,
+        group = Group.objects.create(
+            org=org,
             name=name,
-            group_type=group_type,
-            department_label=(department_label or "").strip(),
+            kind=kind,
+            label=(label or "").strip(),
             created_by=by_user,
             approval_status=(
-                Organisation.APPROVAL_APPROVED if is_admin else Organisation.APPROVAL_PENDING
+                Group.APPROVAL_APPROVED if is_admin else Group.APPROVAL_PENDING
             ),
             approved_at=timezone.now() if is_admin else None,
             approved_by=by_user if is_admin else None,
-            # Inherited, never re-asked.
-            organisation_type=parent.organisation_type,
-            state=parent.state,
-            season=parent.season,
-            charity=parent.charity,
-            finals_only=parent.finals_only,
         )
-        dept.competitions.set(parent.competitions.all())
-        add_member(by_user, dept, role=OrgMember.ROLE_BOTH)
+        GroupMember.objects.create(group=group, user=by_user, is_admin=True)
 
-    if dept.is_pending_approval:
-        _notify_department_request(dept)
-    return dept
-
-
-def _notify_department_request(dept) -> None:
-    """Tell the parent's admins there is a department waiting on them."""
-    admins = org_admin_users(dept.parent)
-    if not admins:
-        return
-    who = getattr(dept.created_by, "display_name", "A member")
-    notify(
-        admins,
-        kind="department_request",
-        title=f"New department: {dept.name}",
-        message=f"{who} wants to start {dept.name} inside {dept.parent.name}. Approve it to make it visible to everyone.",
-        link_url=f"/leagues/{dept.parent_id}/departments/",
-        org=dept.parent,
-    )
+    if not is_admin:
+        admins = [
+            m.user for m in OrgMember.objects.filter(org=org).select_related("user")
+            if m.can_manage
+        ]
+        if admins:
+            notify(
+                admins,
+                kind="group_requested",
+                title=f"{by_user.display_name} wants to start {group.name}",
+                message=f"A new group inside {org.name} is waiting for your approval.",
+                link_url=f"/leagues/{org.pk}/groups/",
+                org=org,
+            )
+    return group
 
 
-def approve_department(dept, *, by_user):
-    """Approve a pending department and tell the person who asked for it."""
-    if not dept.approve(by_user=by_user):
-        return dept          # already approved; someone got there first
-    if dept.created_by_id:
+def approve_group(group, *, by_user):
+    """Approve a pending group and tell the person who asked for it."""
+    from .models import Group
+
+    if group.approval_status != Group.APPROVAL_PENDING:
+        return group                      # someone got there first
+    group.approval_status = Group.APPROVAL_APPROVED
+    group.approved_at = timezone.now()
+    group.approved_by = by_user
+    group.save(update_fields=["approval_status", "approved_at", "approved_by"])
+
+    if group.created_by_id:
         notify(
-            [dept.created_by],
-            kind="department_approved",
-            title=f"{dept.name} is live",
-            message=f"Your department inside {dept.parent.name} was approved. Invite your team and start tipping.",
-            link_url=f"/leagues/{dept.pk}/wall/",
-            org=dept,
+            [group.created_by],
+            kind="group_approved",
+            title=f"{group.name} is live",
+            message=(
+                f"Your group inside {group.org.name} was approved. "
+                "Bring your team in and start tipping."
+            ),
+            link_url=f"/leagues/{group.org_id}/groups/",
+            org=group.org,
         )
-    return dept
+    return group
 
 
-def decline_department(dept, *, by_user):
-    """Decline a pending department.
+def decline_group(group, *, by_user):
+    """Decline a pending group.
 
-    The row is deleted rather than kept in a declined state. A department that
-    was never approved has no members but its creator, no tips and no history,
-    so there is nothing to preserve, and leaving rejected rows behind would put
-    ghost departments in the very directory this feature exists to keep clean.
-    Declining is only ever offered while the department is still pending.
+    The row is deleted rather than kept in a declined state. A group that was
+    never approved has no members but its creator, no tips and no history, so
+    there is nothing to preserve, and leaving rejected rows behind would put
+    ghost groups in the very directory this feature exists to keep readable.
+    Declining is only ever offered while the group is still pending.
     """
-    from .models import Organisation, OrgMember
+    from .models import Group
 
-    if dept.approval_status != Organisation.APPROVAL_PENDING:
-        raise ValueError("That department has already been approved.")
+    if group.approval_status != Group.APPROVAL_PENDING:
+        raise ValueError("That group has already been approved.")
 
-    parent_name, dept_name, creator = dept.parent.name, dept.name, dept.created_by
-    with transaction.atomic():
-        OrgMember.objects.filter(org=dept).delete()
-        dept.competitions.clear()
-        dept.sub_categories.clear()
-        dept.delete()
+    org, name, creator = group.org, group.name, group.created_by
+    group.delete()
 
     if creator:
         notify(
             [creator],
-            kind="department_declined",
-            title=f"{dept_name} wasn't approved",
-            message=f"An admin of {parent_name} declined the request. Have a word with them if you think it should exist.",
-            org=None,
+            kind="group_declined",
+            title=f"{name} wasn't approved",
+            message=(
+                f"An admin of {org.name} declined the group you asked for. "
+                "Have a word with them if you think it should exist."
+            ),
+            link_url=f"/leagues/{org.pk}/groups/",
+            org=org,
         )
-    return True
+    return None
 
 
-def departments_for(org, *, include_pending_for=None):
-    """The departments of an org, for showing in the directory.
+def join_group(group, *, user):
+    """Put someone in a group they can see.
+
+    Joining is open to any member of the organisation: a group is a place to
+    tip from, not a permission, and making people ask twice to sit with their
+    own department is friction for its own sake.
+    """
+    from .models import Group, GroupMember, OrgMember
+
+    if group.approval_status != Group.APPROVAL_APPROVED:
+        raise ValueError("That group is still waiting to be approved.")
+    if not OrgMember.objects.filter(user=user, org=group.org).exists():
+        raise ValueError("You have to be in the organisation first.")
+    member, _ = GroupMember.objects.get_or_create(group=group, user=user)
+    return member
+
+
+def leave_group(group, *, user):
+    """Take someone out of a group.
+
+    Their tips stay. They were made in that group and scored on its ladder, and
+    deleting them would silently rewrite a season everyone else remembers.
+    """
+    from .models import GroupMember
+
+    GroupMember.objects.filter(group=group, user=user).delete()
+
+
+def groups_for(org, *, include_pending_for=None):
+    """The groups of an organisation, for showing in the directory.
 
     Pending ones are hidden from the membership at large. Two people see them:
-    an admin of the parent, who has to decide on them, and the member who
-    raised the request, so their own department does not silently vanish while
-    it waits.
+    an admin, who has to decide on them, and the member who raised the request,
+    so their own group does not silently vanish while it waits.
     """
-    from .models import Organisation, OrgMember
+    from .models import Group, OrgMember
 
     root = org.root
-    qs = Organisation.objects.filter(parent=root).select_related("group_type", "created_by")
+    qs = Group.objects.filter(org=root).select_related("kind", "created_by")
 
     if include_pending_for is None:
-        return qs.filter(approval_status=Organisation.APPROVAL_APPROVED)
+        return qs.filter(approval_status=Group.APPROVAL_APPROVED)
 
+    user = include_pending_for
     is_admin = OrgMember.objects.filter(
-        user=include_pending_for, org=root,
-        role__in=[OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH],
+        user=user, org=root,
+    ).filter(
+        Q(role__in=[OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH])
+        | Q(is_league_owner=True)
     ).exists()
     if is_admin:
         return qs
     return qs.filter(
-        Q(approval_status=Organisation.APPROVAL_APPROVED)
-        | Q(created_by=include_pending_for)
+        Q(approval_status=Group.APPROVAL_APPROVED) | Q(created_by=user)
     )
-
-
-# ---------------------------------------------------------------------------
-# Work-email / domain verification
-# ---------------------------------------------------------------------------
-#
-# The claim being checked is "this organisation is mine to create". The
-# evidence is a code delivered to a mailbox at the organisation's own domain.
-# That is not proof of employment and it is not meant to be. It is proof that
-# whoever is asking can read mail inside the organisation, which is the
-# strongest thing obtainable without a human in the loop, and it is enough to
-# stop a stranger registering a bank.
-
-
-# Domains anyone can get an address at in thirty seconds. An address here
-# proves you hold a mailbox and nothing whatsoever about where you work, so
-# the whole check would be theatre. Deliberately a denylist and not an
-# allowlist: we cannot enumerate every legitimate company domain on earth, but
-# we can name the handful that carry no signal.
-PUBLIC_EMAIL_DOMAINS = {
-    "gmail.com", "googlemail.com", "yahoo.com", "yahoo.com.au", "ymail.com",
-    "hotmail.com", "hotmail.co.uk", "hotmail.com.au", "outlook.com",
-    "outlook.com.au", "live.com", "live.com.au", "msn.com", "icloud.com",
-    "me.com", "mac.com", "aol.com", "proton.me", "protonmail.com",
-    "gmx.com", "mail.com", "zoho.com", "yandex.com", "fastmail.com",
-    "bigpond.com", "bigpond.net.au", "optusnet.com.au", "iinet.net.au",
-    "tpg.com.au", "internode.on.net", "westnet.com.au",
-    # Throwaway services. Not exhaustive, and not trying to be: this is a
-    # speed bump for the lazy, not a defence against the determined.
-    "mailinator.com", "guerrillamail.com", "10minutemail.com",
-    "tempmail.com", "trashmail.com", "yopmail.com", "sharklasers.com",
-}
-
-
-class VerificationError(ValueError):
-    """A verification problem that knows which field caused it.
-
-    Every one of these used to surface as the same anonymous flash at the top
-    of the page: three inputs on screen, one red banner, and no indication of
-    which box to fix. ``field`` is what lets the form mark the offending input
-    and put the sentence underneath it, which is where someone is already
-    looking when they get it wrong.
-    """
-
-    def __init__(self, message, field=None):
-        super().__init__(message)
-        self.field = field
 
 
 def normalise_domain(raw: str) -> str:

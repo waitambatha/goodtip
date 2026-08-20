@@ -189,15 +189,15 @@ stacking context, so a strip rendered inside it paints over the sheet.
     <noscript><button type="submit" class="abtn abtn-dark abtn-sm">Go</button></noscript>
   </form>
   {% comment %}
-  Departments, for everyone. This is the control an ordinary member needs most
+  Groups, for everyone. This is the control an ordinary member needs most
   and the one they had no route to: the organisation they joined might have
   twenty thousand people in it, and the twelve they actually want to tip
-  against are in their own department. Sits beside the org picker because it
+  against are in their own group. Sits beside the org picker because it
   belongs to the org you have selected, not to the platform.
   {% endcomment %}
-  <a href="{% url 'orgs:departments' c.org.root.id %}" class="abtn abtn-ghost abtn-xl">
+  <a href="{% url 'orgs:groups' c.org.root.id %}" class="abtn abtn-ghost abtn-xl">
     <svg style="width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.9;" aria-hidden="true"><use href="#ic-org"/></svg>
-    Departments
+    Groups
   </a>
   <a href="{% url 'orgs:search' %}" class="abtn abtn-ghost abtn-xl">Find an organisation</a>
   <a href="{% url 'orgs:create' %}" class="abtn abtn-primary abtn-xl">+ Create an organisation</a>

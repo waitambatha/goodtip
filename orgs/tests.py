@@ -2324,3 +2324,354 @@ class CurrentContextTests(TestCase):
             {"next": "//evil.example.com/"},
         )
         self.assertEqual(resp["Location"], self.reverse("dashboard"))
+
+
+class GroupTippingTests(TestCase):
+    """The two tip sets, end to end: tipping in a group and tipping in the
+    organisation are separate acts on separate ladders."""
+
+    def setUp(self):
+        from django.urls import reverse
+        from django.utils import timezone
+        from tipping.models import Match, Round, Team
+
+        self.reverse = reverse
+        self.now = timezone.now()
+        self.season, _ = Season.objects.get_or_create(year=2096, defaults={"label": "2096"})
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
+        )
+        self.org = Organisation.objects.create(
+            name="Acme", season=self.season, charity=self.charity, groups_enabled=True,
+        )
+        sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
+        self.series, _ = Series.objects.get_or_create(
+            name="AFL", defaults={"sport": sport, "slug": "afl"},
+        )
+        self.round = Round.objects.create(
+            org=self.org, round_number=1, series=self.series,
+            lockout_at=self.now + timedelta(days=2),
+        )
+        self.home = Team.objects.create(name="Home", slug="home", series=self.series)
+        self.away = Team.objects.create(name="Away", slug="away", series=self.series)
+        self.match = Match.objects.create(
+            round=self.round, home_team=self.home, away_team=self.away,
+            kickoff_at=self.now + timedelta(days=3),
+        )
+        self.user = User.objects.create_user(
+            email="tipper@example.com", password="x", display_name="Tipper",
+        )
+        OrgMember.objects.create(user=self.user, org=self.org)
+        self.marketing = Group.objects.create(org=self.org, name="Marketing")
+        GroupMember.objects.create(group=self.marketing, user=self.user)
+        self.client.force_login(self.user)
+
+    def _enter_group(self):
+        self.client.post(
+            self.reverse("orgs:switch_group", args=[self.org.id, self.marketing.id])
+        )
+
+    def test_tipping_in_a_group_scores_on_the_group(self):
+        from tipping.models import Tip
+        from tipping.services import submit_tip
+
+        submit_tip(user=self.user, match=self.match, org=self.org,
+                   selection="home", group=self.marketing)
+        tip = Tip.objects.get()
+        self.assertEqual(tip.group, self.marketing)
+
+    def test_the_same_round_can_be_tipped_both_ways(self):
+        """Five in the group and four in the organisation is nine tips."""
+        from tipping.models import Tip
+        from tipping.services import submit_tip
+
+        submit_tip(user=self.user, match=self.match, org=self.org,
+                   selection="home", group=self.marketing)
+        submit_tip(user=self.user, match=self.match, org=self.org,
+                   selection="away", group=None)
+        self.assertEqual(Tip.objects.count(), 2)
+        self.assertEqual(
+            Tip.objects.get(group=self.marketing).selection, "home",
+        )
+        self.assertEqual(Tip.objects.get(group__isnull=True).selection, "away")
+
+    def test_a_group_from_another_organisation_is_refused(self):
+        from tipping.services import submit_tip
+
+        other = Organisation.objects.create(
+            name="Beta", season=self.season, charity=self.charity, groups_enabled=True,
+        )
+        theirs = Group.objects.create(org=other, name="Marketing")
+        with self.assertRaises(ValueError):
+            submit_tip(user=self.user, match=self.match, org=self.org,
+                       selection="home", group=theirs)
+
+    # ---- the ladders stay apart -------------------------------------------
+
+    def test_the_organisation_ladder_excludes_tips_made_in_a_group(self):
+        """Otherwise a group's tips pool in with the organisation's and anyone
+        tipping in both is counted twice."""
+        from tipping.models import Tip
+        from tipping.services import leaderboard_for_org, submit_tip
+
+        submit_tip(user=self.user, match=self.match, org=self.org,
+                   selection="home", group=self.marketing)
+        Tip.objects.filter(group=self.marketing).update(
+            is_correct=True, points_awarded=1,
+        )
+        board = {u.id: u.points for u in leaderboard_for_org(self.org)}
+        self.assertEqual(board.get(self.user.id), 0)
+
+    def test_the_group_ladder_counts_only_its_own_tips(self):
+        from tipping.models import Tip
+        from tipping.services import leaderboard_for_org, submit_tip
+
+        submit_tip(user=self.user, match=self.match, org=self.org,
+                   selection="home", group=self.marketing)
+        Tip.objects.filter(group=self.marketing).update(
+            is_correct=True, points_awarded=1,
+        )
+        board = {u.id: u.points for u in leaderboard_for_org(self.org, group=self.marketing)}
+        self.assertEqual(board.get(self.user.id), 1)
+
+    def test_a_group_ladder_lists_only_group_members(self):
+        from tipping.services import leaderboard_for_org
+
+        outsider = User.objects.create_user(
+            email="outsider@example.com", password="x", display_name="Outsider",
+        )
+        OrgMember.objects.create(user=outsider, org=self.org)
+        ids = {u.id for u in leaderboard_for_org(self.org, group=self.marketing)}
+        self.assertIn(self.user.id, ids)
+        self.assertNotIn(outsider.id, ids)
+
+    # ---- the missed-tip default, per context ------------------------------
+
+    def test_a_missed_round_defaults_in_every_context_separately(self):
+        """Tipping in the group must not silently cover the organisation.
+
+        Counting "has this person tipped this match at all" would have let one
+        pick in Marketing stand in for the organisation's round too.
+        """
+        from tipping.models import Tip
+        from tipping.services import submit_tip
+
+        # Joined before kickoff, so eligible for the default.
+        OrgMember.objects.filter(user=self.user, org=self.org).update(
+            joined_at=self.now - timedelta(days=5),
+        )
+        GroupMember.objects.filter(group=self.marketing, user=self.user).update(
+            joined_at=self.now - timedelta(days=5),
+        )
+        submit_tip(user=self.user, match=self.match, org=self.org,
+                   selection="home", group=self.marketing)
+
+        from tipping.services import _fill_missed_tips as fill
+        fill(self.match)
+
+        self.assertEqual(Tip.objects.filter(group=self.marketing).count(), 1)
+        org_tip = Tip.objects.get(group__isnull=True)
+        self.assertTrue(org_tip.is_auto)
+        self.assertEqual(org_tip.selection, "away")
+
+
+class GroupsPageTests(TestCase):
+    """Creating, joining and approving groups from the directory."""
+
+    def setUp(self):
+        from django.urls import reverse
+
+        self.reverse = reverse
+        self.season, _ = Season.objects.get_or_create(year=2095, defaults={"label": "2095"})
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
+        )
+        self.org = Organisation.objects.create(
+            name="Acme", season=self.season, charity=self.charity,
+        )
+        self.admin = User.objects.create_user(
+            email="admin@example.com", password="x", display_name="Admin",
+        )
+        self.member = User.objects.create_user(
+            email="member@example.com", password="x", display_name="Member",
+        )
+        OrgMember.objects.create(
+            user=self.admin, org=self.org,
+            role=OrgMember.ROLE_BOTH, is_league_owner=True,
+        )
+        OrgMember.objects.create(user=self.member, org=self.org)
+        self.url = reverse("orgs:groups", args=[self.org.id])
+
+    def _enable(self):
+        self.org.groups_enabled = True
+        self.org.save(update_fields=["groups_enabled"])
+
+    # ---- off by default ---------------------------------------------------
+
+    def test_groups_are_off_and_the_page_explains_why_you_might_not_want_them(self):
+        self.client.force_login(self.admin)
+        html = self.client.get(self.url).content.decode()
+        self.assertIn("Does Acme need groups?", html)
+        self.assertIn("There are five or ten of you", html)
+        self.assertIn("Switch groups on", html)
+
+    def test_only_an_admin_can_switch_them_on(self):
+        self.client.force_login(self.member)
+        resp = self.client.post(self.reverse("orgs:groups_toggle", args=[self.org.id]))
+        self.assertEqual(resp.status_code, 403)
+        self.org.refresh_from_db()
+        self.assertFalse(self.org.groups_enabled)
+
+    def test_switching_on_and_off_keeps_everything(self):
+        """Switching off is not a delete — it takes groups out of the nav."""
+        self.client.force_login(self.admin)
+        self._enable()
+        Group.objects.create(org=self.org, name="Marketing")
+        self.client.post(self.reverse("orgs:groups_toggle", args=[self.org.id]))
+        self.org.refresh_from_db()
+        self.assertFalse(self.org.groups_enabled)
+        self.assertEqual(Group.objects.filter(org=self.org).count(), 1)
+
+    def test_a_group_cannot_be_created_while_groups_are_off(self):
+        self.client.force_login(self.admin)
+        self.client.post(self.url, {"action": "create", "name": "Marketing"})
+        self.assertFalse(Group.objects.exists())
+
+    # ---- who has to ask ---------------------------------------------------
+
+    def test_an_admin_creating_a_group_goes_live(self):
+        self.client.force_login(self.admin)
+        self._enable()
+        self.client.post(self.url, {"action": "create", "name": "Marketing"})
+        group = Group.objects.get()
+        self.assertEqual(group.approval_status, Group.APPROVAL_APPROVED)
+        self.assertTrue(
+            GroupMember.objects.filter(group=group, user=self.admin, is_admin=True).exists()
+        )
+
+    def test_a_member_creating_a_group_has_to_be_approved(self):
+        self.client.force_login(self.member)
+        self._enable()
+        self.client.post(self.url, {"action": "create", "name": "Skunkworks"})
+        group = Group.objects.get()
+        self.assertEqual(group.approval_status, Group.APPROVAL_PENDING)
+
+    def test_a_pending_group_is_hidden_from_everyone_else(self):
+        self._enable()
+        self.client.force_login(self.member)
+        self.client.post(self.url, {"action": "create", "name": "Skunkworks"})
+
+        other = User.objects.create_user(
+            email="other@example.com", password="x", display_name="Other",
+        )
+        OrgMember.objects.create(user=other, org=self.org)
+        # A separate client on purpose. force_login starts a new session but
+        # does not clear the cookie message store, so the "sent to the admins"
+        # message queued for `member` above would render on this page and the
+        # assertion would fail on a message rather than on the listing.
+        from django.test import Client
+
+        theirs = Client()
+        theirs.force_login(other)
+        self.assertNotIn("Skunkworks", theirs.get(self.url).content.decode())
+
+        # But its author still sees it, so it does not silently vanish.
+        mine = Client()
+        mine.force_login(self.member)
+        self.assertIn("Skunkworks", mine.get(self.url).content.decode())
+
+    def test_an_admin_approving_makes_it_live(self):
+        self._enable()
+        self.client.force_login(self.member)
+        self.client.post(self.url, {"action": "create", "name": "Skunkworks"})
+        group = Group.objects.get()
+
+        self.client.force_login(self.admin)
+        self.client.post(self.url, {"action": "approve", "group_id": group.id})
+        group.refresh_from_db()
+        self.assertEqual(group.approval_status, Group.APPROVAL_APPROVED)
+        self.assertEqual(group.approved_by, self.admin)
+
+    def test_declining_removes_it_rather_than_leaving_a_ghost(self):
+        self._enable()
+        self.client.force_login(self.member)
+        self.client.post(self.url, {"action": "create", "name": "Skunkworks"})
+        group = Group.objects.get()
+
+        self.client.force_login(self.admin)
+        self.client.post(self.url, {"action": "decline", "group_id": group.id})
+        self.assertFalse(Group.objects.filter(pk=group.pk).exists())
+
+    def test_a_member_cannot_approve_their_own_group(self):
+        self._enable()
+        self.client.force_login(self.member)
+        self.client.post(self.url, {"action": "create", "name": "Skunkworks"})
+        group = Group.objects.get()
+        resp = self.client.post(self.url, {"action": "approve", "group_id": group.id})
+        self.assertEqual(resp.status_code, 403)
+        group.refresh_from_db()
+        self.assertEqual(group.approval_status, Group.APPROVAL_PENDING)
+
+    # ---- joining and leaving ----------------------------------------------
+
+    def test_joining_a_group_puts_you_in_it_and_steps_you_into_it(self):
+        self._enable()
+        marketing = Group.objects.create(org=self.org, name="Marketing")
+        self.client.force_login(self.member)
+        self.client.post(self.url, {"action": "join", "group_id": marketing.id})
+        self.assertTrue(
+            GroupMember.objects.filter(group=marketing, user=self.member).exists()
+        )
+        self.assertEqual(
+            self.client.session.get("current_group_id"), marketing.pk,
+        )
+
+    def test_leaving_a_group_keeps_the_tips_you_made_in_it(self):
+        """They were made there and scored on its ladder — deleting them would
+        rewrite a season everyone else remembers."""
+        from tipping.models import Match, Round, Team, Tip
+        from django.utils import timezone
+
+        self._enable()
+        marketing = Group.objects.create(org=self.org, name="Marketing")
+        GroupMember.objects.create(group=marketing, user=self.member)
+        sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
+        series, _ = Series.objects.get_or_create(
+            name="AFL", defaults={"sport": sport, "slug": "afl"},
+        )
+        now = timezone.now()
+        rnd = Round.objects.create(
+            org=self.org, round_number=1, series=series,
+            lockout_at=now + timedelta(days=1),
+        )
+        match = Match.objects.create(
+            round=rnd,
+            home_team=Team.objects.create(name="H", slug="h", series=series),
+            away_team=Team.objects.create(name="A", slug="a", series=series),
+            kickoff_at=now + timedelta(days=2),
+        )
+        Tip.objects.create(
+            user=self.member, match=match, org=self.org,
+            group=marketing, selection="home",
+        )
+
+        self.client.force_login(self.member)
+        self.client.post(self.url, {"action": "leave", "group_id": marketing.id})
+        self.assertFalse(
+            GroupMember.objects.filter(group=marketing, user=self.member).exists()
+        )
+        self.assertEqual(Tip.objects.filter(group=marketing).count(), 1)
+
+    def test_an_outsider_cannot_see_the_directory(self):
+        outsider = User.objects.create_user(
+            email="nope@example.com", password="x", display_name="Nope",
+        )
+        self.client.force_login(outsider)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+
+    def test_two_groups_in_one_organisation_cannot_share_a_name(self):
+        self._enable()
+        Group.objects.create(org=self.org, name="Marketing")
+        self.client.force_login(self.admin)
+        self.client.post(self.url, {"action": "create", "name": "marketing"})
+        self.assertEqual(Group.objects.filter(org=self.org).count(), 1)

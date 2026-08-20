@@ -401,6 +401,8 @@ UPCOMING_LIMIT = 40
 
 @login_required
 def dashboard_view(request):
+    from orgs.context import current_group
+
     memberships = (
         OrgMember.objects.filter(user=request.user)
         .select_related("org")
@@ -429,7 +431,10 @@ def dashboard_view(request):
         tips_total = 0
         if round_in_play:
             tips_total = round_in_play.matches.count()
-            tips_done = Tip.objects.filter(user=request.user, match__round=round_in_play, org=org).count()
+            tips_done = Tip.objects.filter(
+                user=request.user, match__round=round_in_play, org=org,
+                group=current_group(request, org),
+            ).count()
         charity_vote = org.active_charity_vote
         has_voted = bool(
             charity_vote
@@ -602,7 +607,8 @@ def dashboard_view(request):
         my_tips = {
             t.match_id: t
             for t in Tip.objects.filter(
-                user=request.user, match__in=upcoming, org=selected["org"]
+                user=request.user, match__in=upcoming, org=selected["org"],
+                group=current_group(request, selected["org"]),
             )
         }
         my_picks = {mid: t.selection for mid, t in my_tips.items()}
