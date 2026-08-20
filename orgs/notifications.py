@@ -170,7 +170,19 @@ def send_election_result(vote) -> int:
 # ---------------------------------------------------------------------------
 # Round results
 def send_round_results(round_obj) -> int:
-    """Send each member their own scorecard for a graded round."""
+    """Send each member their own scorecard for a graded round.
+
+    ONE SCORECARD PER ROOM. A tip belongs to the context it was made in, so
+    someone who tips in Marketing and in the organisation has two results and
+    two positions, and one mail cannot honestly report both. Before this the
+    mail was organisation-only: a member who only ever tipped inside a group
+    was written to about a ladder they are not on, with a rank they do not
+    have, over picks they did not make there.
+
+    Nobody is written to twice about the same room, and nobody is written to at
+    all about a room they made no real picks in.
+    """
+    from .models import Group
     from tipping.models import Tip
     from tipping.services import leaderboard_for_org, user_rank_in_org
 
@@ -181,15 +193,47 @@ def send_round_results(round_obj) -> int:
     if not matches:
         return 0
 
-    tips_by_user: dict[int, dict[int, Tip]] = {}
-    for tip in Tip.objects.filter(match__in=matches, org=org).select_related("match"):
-        tips_by_user.setdefault(tip.user_id, {})[tip.match_id] = tip
-
-    total_tippers = len(leaderboard_for_org(org))
+    rooms = [None]
+    if org.groups_enabled:
+        rooms += list(
+            Group.objects.filter(org=org, approval_status=Group.APPROVAL_APPROVED)
+        )
 
     messages = []
-    for m in org.members.select_related("user"):
-        user = m.user
+    for room in rooms:
+        messages += _round_result_messages(round_obj, org, room, matches)
+
+    sent = send_bulk(messages)
+    round_obj.results_email_sent_at = timezone.now()
+    round_obj.save(update_fields=["results_email_sent_at"])
+    return sent
+
+
+def _round_result_messages(round_obj, org, room, matches) -> list:
+    """Every scorecard for one room. `room=None` is the organisation itself."""
+    from .models import GroupMember
+    from tipping.models import Tip
+    from tipping.services import leaderboard_for_org, user_rank_in_org
+
+    tips_by_user: dict[int, dict[int, Tip]] = {}
+    for tip in (
+        Tip.objects.filter(match__in=matches, org=org, group=room)
+        .select_related("match")
+    ):
+        tips_by_user.setdefault(tip.user_id, {})[tip.match_id] = tip
+
+    total_tippers = len(leaderboard_for_org(org, group=room))
+
+    if room is None:
+        recipients = [m.user for m in org.members.select_related("user")]
+    else:
+        recipients = [
+            gm.user for gm in
+            GroupMember.objects.filter(group=room).select_related("user")
+        ]
+
+    messages = []
+    for user in recipients:
         user_tips = tips_by_user.get(user.id, {})
         # No tips in this round means nothing to report on.
         #
@@ -223,23 +267,26 @@ def send_round_results(round_obj) -> int:
         if not graded:
             continue
 
+        # The room is named in the subject when there is one, because the
+        # alternative is two mails an hour apart with identical subjects and
+        # different numbers inside them.
+        where = f" in {room.name}" if room is not None else ""
         messages.append(build(
             "tip_results",
-            subject=f"Round {round_obj.round_number}: you got {correct} of {graded}",
+            subject=(
+                f"Round {round_obj.round_number}{where}: you got {correct} of {graded}"
+            ),
             to=user.email,
             context={
-                "user": user, "org": org, "round": round_obj, "rows": rows,
+                "user": user, "org": org, "group": room,
+                "round": round_obj, "rows": rows,
                 "correct": correct, "graded": graded, "round_points": points,
-                "rank": user_rank_in_org(user, org),
+                "rank": user_rank_in_org(user, org, group=room),
                 "total_tippers": total_tippers,
                 "leaderboard_url": _leaderboard_url(org.id),
             },
         ))
-
-    sent = send_bulk(messages)
-    round_obj.results_email_sent_at = timezone.now()
-    round_obj.save(update_fields=["results_email_sent_at"])
-    return sent
+    return messages
 
 
 # ---------------------------------------------------------------------------

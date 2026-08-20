@@ -551,7 +551,7 @@ def user_org_stats(user, org):
     }
 
 
-def user_rank_in_org(user, org) -> int | None:
+def user_rank_in_org(user, org, group=None) -> int | None:
     """This member's position, with the addendum's tiebreakers applied.
 
     Reads the rank the board itself worked out rather than recounting by
@@ -560,7 +560,7 @@ def user_rank_in_org(user, org) -> int | None:
     paired comp while this still called them equal, so a member saw one
     position on the leaderboard and a different one on their dashboard.
     """
-    for row in leaderboard_for_org(org):
+    for row in leaderboard_for_org(org, group=group):
         if row.id == user.id:
             return row.rank
     return None

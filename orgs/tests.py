@@ -3276,3 +3276,147 @@ class GroupRecapTests(TestCase):
         org_facts = build_recap_facts(self.org, self.rnd, None)
         grp_facts = build_recap_facts(self.org, self.rnd, self.marketing)
         self.assertNotEqual(org_facts["seed"], grp_facts["seed"])
+
+
+class GroupResultsEmailTests(TestCase):
+    """One scorecard per room.
+
+    The mail used to be organisation-only, so a member who only ever tipped
+    inside a group was written to about a ladder they are not on, with a rank
+    they do not have, over picks they did not make there.
+    """
+
+    def setUp(self):
+        from django.core import mail
+        from django.utils import timezone
+        from tipping.models import Match, Round, Team
+
+        mail.outbox = []
+        self.sport = Sport.objects.create(name="Mail Code", slug="mail-code")
+        self.series = Series.objects.create(
+            sport=self.sport, name="Mail Comp", slug="mail-comp",
+        )
+        self.season = Season.objects.create(year=2090, label="2090")
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
+        )
+        self.org = Organisation.objects.create(
+            name="Acme", season=self.season, charity=self.charity, groups_enabled=True,
+        )
+        self.grouper = User.objects.create_user(
+            email="grouper@x.com", password="x", display_name="Grouper",
+        )
+        self.orgonly = User.objects.create_user(
+            email="orgonly@x.com", password="x", display_name="OrgOnly",
+        )
+        for u in (self.grouper, self.orgonly):
+            OrgMember.objects.create(user=u, org=self.org)
+        self.marketing = Group.objects.create(org=self.org, name="Marketing")
+        GroupMember.objects.create(group=self.marketing, user=self.grouper)
+
+        self.rnd = Round.objects.create(
+            org=self.org, round_number=7, series=self.series,
+            stage=Round.STAGE_REGULAR,
+            lockout_at=timezone.now() - timedelta(days=2),
+        )
+        self.match = Match.objects.create(
+            round=self.rnd,
+            home_team=Team.objects.create(name="Pies", slug="pies-m", series=self.series),
+            away_team=Team.objects.create(name="Roos", slug="roos-m", series=self.series),
+            kickoff_at=timezone.now() - timedelta(days=1),
+        )
+
+    def _tip(self, user, group=None, selection="home"):
+        from tipping.models import Tip
+
+        return Tip.objects.create(
+            user=user, match=self.match, org=self.org, group=group, selection=selection,
+        )
+
+    def _settle_and_send(self):
+        from django.core import mail
+        from tipping.services import record_match_result
+        from .notifications import send_round_results
+
+        record_match_result(self.match, 30, 10)
+        send_round_results(self.rnd)
+        return mail.outbox
+
+    def _to(self, outbox):
+        return {(m.to[0], m.subject) for m in outbox}
+
+    # ---- the mismatch this fixes -------------------------------------------
+
+    def test_someone_who_only_tipped_in_a_group_hears_about_the_group(self):
+        self._tip(self.grouper, group=self.marketing)
+        outbox = self._settle_and_send()
+        self.assertEqual(len(outbox), 1)
+        msg = outbox[0]
+        self.assertEqual(msg.to, ["grouper@x.com"])
+        self.assertIn("in Marketing", msg.subject)
+
+    def test_they_are_not_written_to_about_the_organisation_ladder(self):
+        """The bug: a rank they do not have, over picks they did not make."""
+        self._tip(self.grouper, group=self.marketing)
+        outbox = self._settle_and_send()
+        self.assertEqual(len(outbox), 1)
+        self.assertNotIn("Round 7: you got", outbox[0].subject)  # the org subject
+
+    def test_tipping_in_both_gets_two_scorecards_that_say_which_is_which(self):
+        self._tip(self.grouper, group=None, selection="away")
+        self._tip(self.grouper, group=self.marketing, selection="home")
+        outbox = self._settle_and_send()
+        subjects = [m.subject for m in outbox if m.to == ["grouper@x.com"]]
+        self.assertEqual(len(subjects), 2)
+        group_line = next(x for x in subjects if "in Marketing" in x)
+        org_line = next(x for x in subjects if "in Marketing" not in x)
+        # Different picks in the two rooms, so different results — which is the
+        # whole reason one mail could not honestly report both.
+        self.assertIn("1 of 1", group_line)   # picked home, home won
+        self.assertIn("0 of 1", org_line)     # picked away for the organisation
+
+    def test_nobody_is_written_to_about_a_room_they_did_not_tip_in(self):
+        self._tip(self.orgonly, group=None)
+        outbox = self._settle_and_send()
+        self.assertEqual(self._to(outbox), {
+            ("orgonly@x.com", "Round 7: you got 1 of 1"),
+        })
+
+    def test_a_group_member_is_not_told_about_a_group_they_left(self):
+        self._tip(self.grouper, group=self.marketing)
+        GroupMember.objects.filter(group=self.marketing, user=self.grouper).delete()
+        outbox = self._settle_and_send()
+        self.assertEqual(outbox, [])
+
+    def test_groups_switched_off_sends_only_the_organisation_mail(self):
+        self._tip(self.grouper, group=self.marketing)
+        self._tip(self.orgonly, group=None)
+        self.org.groups_enabled = False
+        self.org.save(update_fields=["groups_enabled"])
+        outbox = self._settle_and_send()
+        self.assertEqual(len(outbox), 1)
+        self.assertEqual(outbox[0].to, ["orgonly@x.com"])
+
+    def test_an_auto_tip_alone_still_earns_no_mail(self):
+        """The missed-tip default must not become a scorecard, in any room."""
+        from tipping.models import Tip
+
+        Tip.objects.create(
+            user=self.grouper, match=self.match, org=self.org,
+            group=self.marketing, selection="away", is_auto=True,
+        )
+        self.assertEqual(self._settle_and_send(), [])
+
+    def test_the_body_says_which_ladder_it_is_about(self):
+        self._tip(self.grouper, group=self.marketing)
+        outbox = self._settle_and_send()
+        body = outbox[0].alternatives[0][0] if outbox[0].alternatives else outbox[0].body
+        self.assertIn("Marketing", body)
+        self.assertIn("counted separately", body)
+
+    def test_the_round_is_stamped_once_for_the_whole_send(self):
+        self._tip(self.grouper, group=self.marketing)
+        self._tip(self.orgonly, group=None)
+        self._settle_and_send()
+        self.rnd.refresh_from_db()
+        self.assertIsNotNone(self.rnd.results_email_sent_at)
