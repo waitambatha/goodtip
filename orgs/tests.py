@@ -13,6 +13,8 @@ from .models import (
     CharityVote,
     CharityVoteOption,
     MembershipRequest,
+    Group,
+    GroupMember,
     OrgCharitySelection,
     OrgDraft,
     OrgMember,
@@ -1981,3 +1983,142 @@ class WizardEndToEndTests(TestCase):
                 org.season.year, 2026,
                 "a new group must land in the season being played, not a future one",
             )
+
+
+class GroupModelTests(TestCase):
+    """Groups sit inside one organisation and own nothing but their members
+    and their ladder — see orgs.models.Group for why they are not child orgs."""
+
+    def setUp(self):
+        from django.utils import timezone
+        from tipping.models import Match, Round, Team
+
+        self.now = timezone.now()
+        self.season, _ = Season.objects.get_or_create(year=2098, defaults={"label": "2098"})
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
+        )
+        self.org = Organisation.objects.create(
+            name="Acme", season=self.season, charity=self.charity,
+        )
+        self.user = User.objects.create_user(
+            email="tipper@example.com", password="x", display_name="Tipper",
+        )
+        sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
+        series, _ = Series.objects.get_or_create(
+            name="AFL", defaults={"sport": sport, "slug": "afl"},
+        )
+        rnd = Round.objects.create(
+            org=self.org, round_number=1, series=series,
+            lockout_at=self.now + timedelta(days=1),
+        )
+        home = Team.objects.create(name="Home", slug="home", series=series)
+        away = Team.objects.create(name="Away", slug="away", series=series)
+        self.match = Match.objects.create(
+            round=rnd, home_team=home, away_team=away, kickoff_at=self.now,
+        )
+        self.marketing = Group.objects.create(org=self.org, name="Marketing")
+        self.it = Group.objects.create(org=self.org, name="IT")
+
+    def _tip(self, group=None, selection="home"):
+        from tipping.models import Tip
+
+        return Tip.objects.create(
+            user=self.user, match=self.match, org=self.org,
+            group=group, selection=selection,
+        )
+
+    # ---- the two tip sets -------------------------------------------------
+
+    def test_the_same_fixture_can_be_tipped_in_a_group_and_in_the_org(self):
+        """The whole point: tipping in Marketing is a different act from
+        tipping in Acme, and the two must not collide."""
+        self._tip(group=None, selection="home")
+        self._tip(group=self.marketing, selection="away")
+        from tipping.models import Tip
+
+        self.assertEqual(Tip.objects.filter(user=self.user, match=self.match).count(), 2)
+
+    def test_one_tip_per_group(self):
+        from django.db import IntegrityError
+
+        self._tip(group=self.marketing)
+        with self.assertRaises(IntegrityError):
+            self._tip(group=self.marketing, selection="away")
+
+    def test_one_tip_at_organisation_level(self):
+        """The NULL trap.
+
+        `group` is nullable, and Postgres treats every NULL as distinct from
+        every other, so a single unique_together over (user, match, org, group)
+        would enforce nothing here — this exact case, which used to be covered,
+        would silently accept unlimited duplicates. Hence two partial
+        constraints instead.
+        """
+        from django.db import IntegrityError
+
+        self._tip(group=None)
+        with self.assertRaises(IntegrityError):
+            self._tip(group=None, selection="away")
+
+    def test_two_groups_are_two_separate_ladders(self):
+        from tipping.models import Tip
+
+        self._tip(group=self.marketing, selection="home")
+        self._tip(group=self.it, selection="away")
+        self.assertEqual(Tip.objects.filter(group=self.marketing).count(), 1)
+        self.assertEqual(Tip.objects.filter(group=self.it).count(), 1)
+
+    def test_a_group_reuses_the_organisations_fixtures(self):
+        """A group adds no rounds and no matches of its own.
+
+        A department did: it was an organisation, and rounds and matches are
+        stored per organisation, so each one duplicated the whole fixture list.
+        """
+        from tipping.models import Match, Round
+
+        rounds_before = Round.objects.count()
+        matches_before = Match.objects.count()
+        Group.objects.create(org=self.org, name="Sales")
+        self.assertEqual(Round.objects.count(), rounds_before)
+        self.assertEqual(Match.objects.count(), matches_before)
+
+    # ---- shape ------------------------------------------------------------
+
+    def test_two_groups_in_one_org_cannot_share_a_name(self):
+        from django.db import IntegrityError
+
+        with self.assertRaises(IntegrityError):
+            Group.objects.create(org=self.org, name="Marketing")
+
+    def test_two_organisations_can_each_have_a_marketing(self):
+        other = Organisation.objects.create(
+            name="Beta", season=self.season, charity=self.charity,
+        )
+        Group.objects.create(org=other, name="Marketing")
+        self.assertEqual(Group.objects.filter(name="Marketing").count(), 2)
+
+    def test_a_group_cannot_hang_off_a_child_organisation(self):
+        from django.core.exceptions import ValidationError
+
+        child = Organisation.objects.create(
+            name="Acme Mitcham", season=self.season,
+            charity=self.charity, parent=self.org,
+        )
+        with self.assertRaises(ValidationError):
+            Group(org=child, name="Marketing").full_clean()
+
+    def test_groups_are_off_until_an_organisation_asks_for_them(self):
+        self.assertFalse(self.org.groups_enabled)
+
+    def test_a_member_can_be_in_more_than_one_group(self):
+        GroupMember.objects.create(group=self.marketing, user=self.user)
+        GroupMember.objects.create(group=self.it, user=self.user)
+        self.assertEqual(self.user.group_memberships.count(), 2)
+
+    def test_a_member_joins_a_group_once(self):
+        from django.db import IntegrityError
+
+        GroupMember.objects.create(group=self.marketing, user=self.user)
+        with self.assertRaises(IntegrityError):
+            GroupMember.objects.create(group=self.marketing, user=self.user)

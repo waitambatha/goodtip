@@ -253,6 +253,19 @@ class Tip(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tips")
     match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name="tips")
     org = models.ForeignKey("orgs.Organisation", on_delete=models.CASCADE, related_name="tips")
+    # Which context this tip was made in. NULL means the organisation itself.
+    #
+    # A tip belongs to where it was made: tip from inside Marketing and it
+    # scores on Marketing's ladder, tip from the organisation and it scores on
+    # the organisation's. The same fixture can therefore carry two tips from
+    # one person, and each screen shows only its own — going back to the
+    # organisation shows what you tipped there, not what you tipped in the
+    # group. The fixtures themselves are shared: a group reuses its
+    # organisation's rounds and matches rather than duplicating them.
+    group = models.ForeignKey(
+        "orgs.Group", on_delete=models.CASCADE,
+        related_name="tips", null=True, blank=True,
+    )
     selection = models.CharField(max_length=10, choices=SELECTION_CHOICES)
     submitted_at = models.DateTimeField(auto_now=True)
     # Filled in by the system because the member did not tip before lock —
@@ -267,7 +280,23 @@ class Tip(models.Model):
     points_awarded = models.PositiveIntegerField(default=0)
 
     class Meta:
-        unique_together = ("user", "match", "org")
+        # Two constraints rather than one unique_together, because `group` is
+        # nullable and Postgres treats every NULL as distinct from every other.
+        # A single unique_together over (user, match, org, group) would enforce
+        # nothing at all for organisation-level tips — the exact case that used
+        # to be covered — and would do it silently.
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "match", "org", "group"],
+                condition=models.Q(group__isnull=False),
+                name="uniq_tip_per_group",
+            ),
+            models.UniqueConstraint(
+                fields=["user", "match", "org"],
+                condition=models.Q(group__isnull=True),
+                name="uniq_tip_per_org",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.user} → {self.selection} for {self.match}"

@@ -83,6 +83,13 @@ class Organisation(models.Model):
     finals_only = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # Groups are off until an organisation asks for them. Five people in an
+    # office do not need departments, and a nav item for a feature you have no
+    # use for is clutter that has to be explained. Switched on from the org's
+    # own page whenever it stops being true — which for most groups is never,
+    # and for some is three years in.
+    groups_enabled = models.BooleanField(default=False)
+
     # --- Departments (children of a top-level org) ---
     # What kind of department this is. Two fields rather than one because the
     # picker is a convenience, not a taxonomy: department_type holds the row
@@ -352,6 +359,138 @@ class OrgMember(models.Model):
         if not labels:
             labels.append("Participant")
         return labels
+
+
+class Group(models.Model):
+    """A sub-unit inside one organisation — Marketing, IT, Sales.
+
+    WHY THIS IS NOT A CHILD ORGANISATION
+    ------------------------------------
+    It used to be. A "department" was an Organisation row with `parent` set,
+    which meant it carried a season, its own competitions, its own charity, its
+    own domain verification and its own copy of every round and fixture. Those
+    copies are not free: rounds and matches are stored per organisation, so each
+    department duplicated roughly 44 rounds and 360 matches, and the six that
+    existed had accumulated 22,873 sync-run records between them. Creating
+    "Marketing" also meant walking a five-step wizard that asked a department of
+    a company to pick a charity and prove it owned a domain.
+
+    A group owns none of that. Competitions, rules, season and charity belong to
+    the organisation and are inherited, which is not a convention here but a
+    fact of the schema: there is nowhere on this model to put them. What a group
+    has is a name, its members, and its own ladder.
+
+    Groups are optional and off by default (`Organisation.groups_enabled`) —
+    five people in an office do not need to be sorted into departments, and the
+    feature only starts paying for itself somewhere in the hundreds.
+    """
+
+    APPROVAL_APPROVED = "approved"
+    APPROVAL_PENDING = "pending"
+    APPROVAL_CHOICES = [
+        (APPROVAL_APPROVED, "Approved"),
+        (APPROVAL_PENDING, "Pending approval"),
+    ]
+
+    org = models.ForeignKey(
+        Organisation, on_delete=models.CASCADE, related_name="groups",
+    )
+    name = models.CharField(max_length=80)
+    # The picked kind, when they chose from the list, so groups stay comparable
+    # across organisations. `label` holds whatever they typed when they didn't:
+    # a dropdown that refuses "The Cave" just produces a group called "Other".
+    #
+    # Points at DepartmentType because that table already holds exactly this
+    # list. It wants renaming, but `catalog.GroupType` is taken — by the
+    # ORGANISATION type (Business, Community, Education…), which is itself
+    # misnamed under the new vocabulary. Both renames belong with the copy
+    # sweep, in one pass, rather than half-done here.
+    kind = models.ForeignKey(
+        "catalog.DepartmentType", on_delete=models.SET_NULL,
+        related_name="groups", null=True, blank=True,
+    )
+    label = models.CharField(max_length=80, blank=True)
+
+    # A group raised by an ordinary member is a request until an admin says yes.
+    # An admin creating one skips the queue, because asking someone to approve
+    # their own request is theatre.
+    approval_status = models.CharField(
+        max_length=10, choices=APPROVAL_CHOICES, default=APPROVAL_APPROVED,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name="groups_created", null=True, blank=True,
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name="groups_approved", null=True, blank=True,
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["name"]
+        # Two teams called Marketing in one company is a mistake, not a choice.
+        constraints = [
+            models.UniqueConstraint(
+                fields=["org", "name"], name="uniq_group_name_per_org",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.org.name})"
+
+    def clean(self):
+        super().clean()
+        # Groups hang off a real organisation, never off another organisation's
+        # child. Two levels was already the rule for orgs; this keeps it true.
+        if self.org_id and self.org.parent_id:
+            raise ValidationError({
+                "org": "Groups belong to a top-level organisation."
+            })
+
+    @property
+    def is_pending_approval(self) -> bool:
+        return self.approval_status == self.APPROVAL_PENDING
+
+    @property
+    def kind_label(self) -> str:
+        """What to show beside the name: the picked kind, or what they typed."""
+        if self.kind_id:
+            return self.kind.name
+        return self.label
+
+
+class GroupMember(models.Model):
+    """Someone's place in a group.
+
+    Separate from OrgMember rather than a column on it, because being in a
+    group is not a property of being in the organisation: a member can be in
+    several groups, or none, and joining one must not disturb their standing in
+    the organisation itself.
+    """
+
+    group = models.ForeignKey(
+        Group, on_delete=models.CASCADE, related_name="memberships",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name="group_memberships",
+    )
+    # Whoever creates a group runs it once it is approved.
+    is_admin = models.BooleanField(default=False)
+    joined_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["joined_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["group", "user"], name="uniq_group_member",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user} in {self.group}"
 
 
 class OrgDraft(models.Model):
