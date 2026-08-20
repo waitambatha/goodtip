@@ -2908,3 +2908,194 @@ class ContextChipTests(TestCase):
             {"next": self.reverse("dashboard")},
         )
         self.assertEqual(resp["Location"], self.reverse("dashboard"))
+
+
+class GroupWallTests(TestCase):
+    """A group's wall is private to that group.
+
+    Its posts never surface on the organisation's feed and can never be shared
+    publicly — the public wall is the organisation speaking, not one of its
+    teams.
+    """
+
+    def setUp(self):
+        from django.urls import reverse
+
+        self.reverse = reverse
+        self.season, _ = Season.objects.get_or_create(year=2092, defaults={"label": "2092"})
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
+        )
+        self.org = Organisation.objects.create(
+            name="Acme", season=self.season, charity=self.charity,
+            groups_enabled=True, is_public_listed=True,
+        )
+        self.insider = User.objects.create_user(
+            email="in@example.com", password="x", display_name="Insider",
+        )
+        self.outsider = User.objects.create_user(
+            email="out@example.com", password="x", display_name="Outsider",
+        )
+        self.admin = User.objects.create_user(
+            email="boss@example.com", password="x", display_name="Boss",
+        )
+        for u in (self.insider, self.outsider, self.admin):
+            OrgMember.objects.create(user=u, org=self.org)
+        OrgMember.objects.filter(user=self.admin, org=self.org).update(
+            role=OrgMember.ROLE_BOTH, is_league_owner=True,
+        )
+        self.marketing = Group.objects.create(org=self.org, name="Marketing")
+        GroupMember.objects.create(group=self.marketing, user=self.insider)
+
+        self.wall = reverse("orgs:wall", args=[self.org.id])
+        self.post_url = reverse("orgs:wall_post", args=[self.org.id])
+
+    def _client_for(self, user, group=None):
+        from django.test import Client
+
+        c = Client()
+        c.force_login(user)
+        if group is not None:
+            c.post(self.reverse("orgs:switch_group", args=[self.org.id, group.id]))
+        return c
+
+    # ---- the two walls stay apart -----------------------------------------
+
+    def test_a_post_made_in_a_group_lands_on_that_groups_wall(self):
+        c = self._client_for(self.insider, self.marketing)
+        c.post(self.post_url, {"body": "Marketing is winning"})
+        post = WallPost.objects.get()
+        self.assertEqual(post.group, self.marketing)
+
+    def test_a_group_post_never_shows_on_the_organisation_wall(self):
+        c = self._client_for(self.insider, self.marketing)
+        c.post(self.post_url, {"body": "Marketing is winning"})
+
+        # Same person, stepped back out to the organisation.
+        c.post(self.reverse("orgs:leave_group_context"))
+        self.assertNotIn("Marketing is winning", c.get(self.wall).content.decode())
+
+    def test_an_organisation_post_never_shows_on_a_groups_wall(self):
+        c = self._client_for(self.insider)
+        c.post(self.post_url, {"body": "Everyone welcome"})
+        c.post(self.reverse("orgs:switch_group", args=[self.org.id, self.marketing.id]))
+        self.assertNotIn("Everyone welcome", c.get(self.wall).content.decode())
+
+    def test_someone_not_in_the_group_cannot_read_it(self):
+        self._client_for(self.insider, self.marketing).post(
+            self.post_url, {"body": "Marketing is winning"}
+        )
+        theirs = self._client_for(self.outsider)
+        self.assertNotIn("Marketing is winning", theirs.get(self.wall).content.decode())
+
+    # ---- the id is not a key ----------------------------------------------
+
+    def test_an_outsider_cannot_reply_by_guessing_the_post_id(self):
+        """Membership of the organisation is not enough once groups exist.
+
+        Reply, react and remove all fetched a post by (id, org), and the id is
+        right there in the anchor of any link someone in the group pasted.
+        """
+        self._client_for(self.insider, self.marketing).post(
+            self.post_url, {"body": "Marketing is winning"}
+        )
+        post = WallPost.objects.get()
+        theirs = self._client_for(self.outsider)
+        resp = theirs.post(
+            self.reverse("orgs:wall_reply", args=[self.org.id, post.id]),
+            {"body": "let me in"},
+        )
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(post.replies.count(), 0)
+
+    def test_an_outsider_cannot_react_by_guessing_the_post_id(self):
+        from .models import WallReaction
+
+        self._client_for(self.insider, self.marketing).post(
+            self.post_url, {"body": "Marketing is winning"}
+        )
+        post = WallPost.objects.get()
+        theirs = self._client_for(self.outsider)
+        # "fire", not the emoji character. Posting 🔥 is rejected as an invalid
+        # choice before the access check is ever reached, so the test passed
+        # with the gate removed — proving nothing.
+        resp = theirs.post(
+            self.reverse("orgs:wall_react", args=[self.org.id, post.id]),
+            {"emoji": "fire"},
+        )
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(WallReaction.objects.count(), 0)
+
+    def test_a_member_of_the_group_can_react(self):
+        """The other half: proves the 403 above is the gate, not the emoji."""
+        from .models import WallReaction
+
+        c = self._client_for(self.insider, self.marketing)
+        c.post(self.post_url, {"body": "Marketing is winning"})
+        post = WallPost.objects.get()
+        c.post(
+            self.reverse("orgs:wall_react", args=[self.org.id, post.id]),
+            {"emoji": "fire"},
+        )
+        self.assertEqual(WallReaction.objects.filter(post=post).count(), 1)
+
+    def test_a_member_of_the_group_can_reply(self):
+        c = self._client_for(self.insider, self.marketing)
+        c.post(self.post_url, {"body": "Marketing is winning"})
+        post = WallPost.objects.get()
+        c.post(
+            self.reverse("orgs:wall_reply", args=[self.org.id, post.id]),
+            {"body": "too right"},
+        )
+        self.assertEqual(post.replies.count(), 1)
+
+    def test_an_admin_can_moderate_a_group_they_are_not_in(self):
+        """Someone has to be able to take down what is posted in their
+        organisation's name, and a room nobody can moderate is worse."""
+        self._client_for(self.insider, self.marketing).post(
+            self.post_url, {"body": "Marketing is winning"}
+        )
+        post = WallPost.objects.get()
+        boss = self._client_for(self.admin)
+        boss.post(self.reverse("orgs:wall_remove", args=[self.org.id, post.id]))
+        post.refresh_from_db()
+        self.assertTrue(post.is_hidden)
+
+    # ---- a group's wall is never public -----------------------------------
+
+    def test_a_group_post_cannot_be_shared_publicly(self):
+        c = self._client_for(self.insider, self.marketing)
+        c.post(self.post_url, {"body": "Marketing is winning", "share_public": "1"})
+        self.assertFalse(WallPost.objects.get().is_public)
+
+    def test_the_composer_does_not_offer_it_on_a_group_wall(self):
+        c = self._client_for(self.insider, self.marketing)
+        self.assertNotIn("share_public", c.get(self.wall).content.decode())
+
+    def test_an_organisation_post_can_still_be_shared(self):
+        c = self._client_for(self.insider)
+        c.post(self.post_url, {"body": "Everyone welcome", "share_public": "1"})
+        self.assertTrue(WallPost.objects.get().is_public)
+
+    # ---- who hears about it ------------------------------------------------
+
+    def test_a_group_post_only_notifies_the_group(self):
+        """Not twenty thousand people who cannot open it."""
+        from .models import Notification
+
+        c = self._client_for(self.insider, self.marketing)
+        c.post(self.post_url, {"body": "Marketing is winning"})
+        told = set(
+            Notification.objects.filter(kind=Notification.KIND_WALL_POST)
+            .values_list("user_id", flat=True)
+        )
+        self.assertEqual(told, set())          # insider is the only member
+
+        GroupMember.objects.create(group=self.marketing, user=self.admin)
+        c.post(self.post_url, {"body": "again"})
+        told = set(
+            Notification.objects.filter(kind=Notification.KIND_WALL_POST)
+            .values_list("user_id", flat=True)
+        )
+        self.assertEqual(told, {self.admin.id})
+        self.assertNotIn(self.outsider.id, told)

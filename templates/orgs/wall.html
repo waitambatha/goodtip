@@ -12,7 +12,12 @@
 {% comment %}
 Hero split: what the wider GoodTip room is saying on one side, the imagery on
 the other. No composer here — posting is a button in the organisation header.
+
+Skipped entirely on a group's wall. Marketing's room is inside one building;
+putting a window onto the street in it would say the wrong thing about who can
+read what.
 {% endcomment %}
+{% if not group %}
 <section class="gwall-hero">
   <div class="gwh-feed">
     <div class="gwh-top">
@@ -41,16 +46,37 @@ the other. No composer here — posting is a button in the organisation header.
     <div class="gwh-veil"></div>
   </div>
 </section>
+{% endif %}
 
-{# ---- your organisation's room: the messages from your own members ---- #}
+{# ---- the room you are standing in ---- #}
 <div class="gt-head gwall-head">
   <div>
+    {% if group %}
+    <div class="gh-eyebrow">{{ org.name }} &middot; {{ group.kind_label|default:"Group" }}</div>
+    <h1>{{ group.name }}</h1>
+    <p class="gh-lead">What {{ group.name }} is saying this round. Only members of {{ group.name }} see this, and it never goes to the public Wall.</p>
+    {% else %}
     <div class="gh-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div>
     <h1>Your organisation</h1>
     <p class="gh-lead">What your members are saying this round. Only {{ org.name }} sees this.</p>
+    {% endif %}
   </div>
   <div class="gh-actions">
-    <span class="gt-pill" title="Only members of {{ org.name }} can see this feed"><svg><use href="#ic-users"/></svg> Group only</span>
+    {% if group %}
+    <span class="gt-pill" title="Only members of {{ group.name }} can see this feed"><svg><use href="#ic-users"/></svg> {{ group.name }} only</span>
+    {% comment %}
+    A way back out of the room, on the wall itself. The nav chip does this too,
+    but someone reading a group's feed and wanting the organisation's should not
+    have to go looking for the control in a different part of the page.
+    {% endcomment %}
+    <form method="post" action="{% url 'orgs:leave_group_context' %}" data-busy="Switching">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{% url 'orgs:wall' org.id %}">
+      <button type="submit" class="gt-pill">{{ org.name }}'s wall &rarr;</button>
+    </form>
+    {% else %}
+    <span class="gt-pill" title="Only members of {{ org.name }} can see this feed"><svg><use href="#ic-users"/></svg> Organisation only</span>
+    {% endif %}
     <button type="button" class="gt-pill gt-pill-go" data-composer-open>
       <svg><use href="#ic-send"/></svg> Write a post
     </button>
@@ -74,7 +100,7 @@ the other. No composer here — posting is a button in the organisation header.
         {% if p.kind == 'recap' %}<span class="gpt-tag">Round recap</span>{% else %}<span class="gpt-tag">Update</span>{% endif %}
       {% endif %}
       {% if p.can_remove %}{# admins can also hide a recap/system card — recap spec §11 #}
-      <form method="post" action="{% url 'orgs:wall_remove' org.id p.id %}" class="gpt-x" data-confirm="This removes the post and its replies for everyone in the organisation. It cannot be undone." data-confirm-title="Remove this post?" data-confirm-ok="Remove post" data-confirm-danger>
+      <form method="post" action="{% url 'orgs:wall_remove' org.id p.id %}" class="gpt-x" data-confirm="This removes the post and its replies for everyone in {% if group %}{{ group.name }}{% else %}the organisation{% endif %}. It cannot be undone." data-confirm-title="Remove this post?" data-confirm-ok="Remove post" data-confirm-danger>
         {% csrf_token %}<button type="submit" title="{% if p.author_id == user.id %}Delete post{% else %}Hide post (admin){% endif %}">&times;</button>
       </form>
       {% endif %}

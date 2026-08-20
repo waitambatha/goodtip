@@ -775,6 +775,19 @@ class WallPost(models.Model):
     ]
 
     org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name="wall_posts")
+    # Which wall this is on. NULL is the organisation's own, the same way it
+    # means the organisation on Tip — one rule for "where was this made", not
+    # two.
+    #
+    # A group's wall is private to that group. Its posts never reach the
+    # organisation's feed and can never be shared publicly: the public wall is
+    # a shop window for the organisation, and a sub-team's chatter is not the
+    # organisation speaking. That is enforced in the view rather than left to
+    # the composer to remember.
+    group = models.ForeignKey(
+        "Group", on_delete=models.CASCADE,
+        related_name="wall_posts", null=True, blank=True,
+    )
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
         null=True, blank=True, related_name="wall_posts",
@@ -798,6 +811,7 @@ class WallPost(models.Model):
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["org", "-created_at"]),
+            models.Index(fields=["group", "-created_at"]),
             models.Index(fields=["is_public", "-created_at"]),
         ]
 

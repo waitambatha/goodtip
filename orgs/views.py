@@ -1328,12 +1328,17 @@ def _global_wall_posts(limit=GLOBAL_WALL_SIZE):
     return list(WallPost.public_feed()[:limit])
 
 
-def _wall_posts_context(request, org):
-    """The feed, with per-post reaction state for the current user."""
+def _wall_posts_context(request, org, group=None):
+    """The feed, with per-post reaction state for the current user.
+
+    `group=None` is the organisation's own wall and excludes every group post —
+    otherwise a sub-team's chatter would surface in front of the whole
+    organisation, which is the opposite of what a group is for.
+    """
     from .models import WallPost, WallReaction
 
     posts = list(
-        WallPost.objects.filter(org=org, is_hidden=False)
+        WallPost.objects.filter(org=org, group=group, is_hidden=False)
         # "recap" is the reverse OneToOne carrying the round's leaderboard and
         # conversation starters — one join beats a query per card.
         .select_related(
@@ -1376,9 +1381,30 @@ def _wall_posts_context(request, org):
     return _attach_threads(posts, viewer=request.user)
 
 
-def _current_round_tips(user, org):
+def _can_see_wall_post(user, post) -> bool:
+    """Is this post on a wall this person can stand on?
+
+    Membership of the organisation is not enough once groups exist. Replying,
+    reacting and removing all fetched a post by (id, org), so any member of a
+    twenty-thousand-person organisation could act on a post in a group they
+    were never in by knowing its id — the id being right there in the anchor
+    of any link someone in that group pasted.
+    """
+    from .models import GroupMember
+
+    if post.group_id is None:
+        return True
+    return GroupMember.objects.filter(group_id=post.group_id, user=user).exists()
+
+
+def _current_round_tips(user, org, group=None):
     """The user's picks for the round currently on the board — offered in the
-    composer so a post can carry the pick it's talking up."""
+    composer so a post can carry the pick it's talking up.
+
+    Scoped to the wall you are standing on: on Marketing's wall the composer
+    offers the picks you made in Marketing, because those are the ones that
+    scored on the ladder everyone reading it is on.
+    """
     from django.utils import timezone as tz
 
     from tipping.models import Round, Tip
@@ -1393,7 +1419,7 @@ def _current_round_tips(user, org):
     if rnd is None:
         return []
     return list(
-        Tip.objects.filter(user=user, org=org, match__round=rnd)
+        Tip.objects.filter(user=user, org=org, group=group, match__round=rnd)
         .select_related("match__home_team", "match__away_team")
         .order_by("match__kickoff_at")
     )
@@ -1404,17 +1430,23 @@ def wall_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _is_member(request.user, org):
         return HttpResponseForbidden()
+    group = ctx.current_group(request, org)
     # No donation figures on the Wall — participants are out of the money
     # flow entirely (donation-model reference, 23 Jul 2026).
     return render(request, "orgs/wall.html", {
         "org": org,
-        "posts": _wall_posts_context(request, org),
-        "global_posts": _global_wall_posts(),
-        "my_tips": _current_round_tips(request.user, org),
+        "group": group,
+        "posts": _wall_posts_context(request, org, group),
+        # The cross-organisation feed is about organisations, so it stays off
+        # a group's wall — a group is a room inside one building, not a window
+        # onto the street.
+        "global_posts": _global_wall_posts() if group is None else [],
+        "my_tips": _current_round_tips(request.user, org, group),
         "is_admin": _can_manage(request.user, org),
-        # Only offer the public toggle where it can actually do something —
-        # in a group that isn't publicly listed, sharing wide is not on offer.
-        "can_share_public": org.is_public_listed,
+        # Only offer the public toggle where it can actually do something — in
+        # an organisation that isn't publicly listed, sharing wide is not on
+        # offer, and a group's wall is never public at all.
+        "can_share_public": org.is_public_listed and group is None,
     })
 
 
@@ -1426,20 +1458,31 @@ def wall_post_create(request, org_id: int):
         return HttpResponseForbidden()
     from .models import WallPost
 
+    group = ctx.current_group(request, org)
     body = (request.POST.get("body") or "").strip()[:500]
     tip = None
     tip_id = request.POST.get("tip")
     if tip_id:
         from tipping.models import Tip
 
-        # Only the author's own pick, in this org — anything else is ignored.
-        tip = Tip.objects.filter(pk=tip_id, user=request.user, org=org).first()
+        # Only the author's own pick, made in this same context — a pick from
+        # the organisation's ladder has no business being talked up on a
+        # group's wall as though it scored there.
+        tip = Tip.objects.filter(
+            pk=tip_id, user=request.user, org=org, group=group,
+        ).first()
     if body or tip:
         post = WallPost.objects.create(
-            org=org, author=request.user, body=body, tip=tip,
+            org=org, group=group, author=request.user, body=body, tip=tip,
             kind=WallPost.KIND_MEMBER,
-            # Opt-in, and only honoured while the group is publicly listed.
-            is_public=bool(request.POST.get("share_public")) and org.is_public_listed,
+            # Opt-in, only honoured while the organisation is publicly listed,
+            # and never for a group post: the public wall is the organisation
+            # speaking, not one of its teams.
+            is_public=(
+                bool(request.POST.get("share_public"))
+                and org.is_public_listed
+                and group is None
+            ),
         )
         _notify_wall_post(post)
     else:
@@ -1448,11 +1491,24 @@ def wall_post_create(request, org_id: int):
 
 
 def _notify_wall_post(post):
-    """Tell the rest of the group there's something new on the Wall."""
-    others = (
-        post.org.members.select_related("user")
-        .exclude(user_id=post.author_id)
-    )
+    """Tell the rest of the room there's something new on the Wall.
+
+    The room, not the organisation: a post on Marketing's wall must not put a
+    notification in front of twenty thousand people who cannot open it.
+    """
+    from .models import GroupMember
+
+    if post.group_id:
+        others = (
+            GroupMember.objects.filter(group_id=post.group_id)
+            .select_related("user")
+            .exclude(user_id=post.author_id)
+        )
+    else:
+        others = (
+            post.org.members.select_related("user")
+            .exclude(user_id=post.author_id)
+        )
     link = reverse("orgs:wall", args=[post.org_id]) + f"#post-{post.id}"
     Notification.objects.bulk_create([
         Notification(
@@ -1479,6 +1535,8 @@ def wall_reply_create(request, org_id: int, post_id: int):
     from .models import WallPost, WallReply
 
     post = get_object_or_404(WallPost, pk=post_id, org=org, is_hidden=False)
+    if not _can_see_wall_post(request.user, post):
+        return HttpResponseForbidden()
     body = (request.POST.get("body") or "").strip()[:500]
     if not body:
         messages.error(request, "Write something first.")
@@ -1557,6 +1615,8 @@ def wall_react(request, org_id: int, post_id: int):
     from .models import WallPost, WallReaction
 
     post = get_object_or_404(WallPost, pk=post_id, org=org, is_hidden=False)
+    if not _can_see_wall_post(request.user, post):
+        return HttpResponseForbidden()
     emoji = request.POST.get("emoji")
     if emoji not in dict(WallReaction.EMOJI_CHOICES):
         return HttpResponseForbidden()
@@ -1596,9 +1656,12 @@ def wall_post_remove(request, org_id: int, post_id: int):
     from .models import WallPost
 
     post = get_object_or_404(WallPost, pk=post_id, org=org)
-    if post.author_id == request.user.id:
+    if post.author_id == request.user.id and _can_see_wall_post(request.user, post):
         post.delete()
     elif _can_manage(request.user, org):
+        # Admins can moderate a group they are not in. Someone has to be able
+        # to take down what is posted in their organisation's name, and a room
+        # nobody can moderate is worse than one that is read by an admin.
         post.is_hidden = True
         post.save(update_fields=["is_hidden"])
     else:
