@@ -533,6 +533,8 @@ a { color: inherit; }
 .footer { background: var(--deep-2); color: var(--cream); padding: clamp(48px,6vw,72px) var(--gutter) 32px; }
 .footer-top { max-width: var(--maxw); margin: 0 auto; display: grid; grid-template-columns: 1.2fr 2fr; gap: 40px; }
 @media (max-width: 760px){ .footer-top { grid-template-columns: 1fr; } }
+.footer-logo { display: inline-block; line-height: 0; border-radius: 6px; overflow: hidden; }
+.footer-logo img { display: block; height: 36px; width: auto; }
 .footer-brand p { font-size: 14px; color: var(--cream); opacity: .7; margin-top: 12px; }
 .footer-links { display: grid; grid-template-columns: repeat(3,1fr); gap: 24px; }
 @media (max-width: 520px){ .footer-links { grid-template-columns: 1fr 1fr; } }

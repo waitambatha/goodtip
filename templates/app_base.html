@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}GoodTip{% endblock %}</title>
   <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
+  {% include "partials/_favicon.html" %}
   {% include "partials/_fonts.html" %}
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
   {# vendored: unpkg was a blocking third-party round-trip on every page load #}
