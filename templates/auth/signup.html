@@ -4,7 +4,7 @@
 {% block loader_task %}Setting up your signup{% endblock %}
 {% block auth_mood %}mood-lime{% endblock %}
 {% block brand_head %}Join the comp. <em>Do some good.</em>{% endblock %}
-{% block brand_sub %}Tipping is free. It always will be. Five minutes to set up, and GoodTip gives to a charity your group picks.{% endblock %}
+{% block brand_sub %}Tipping is free. It always will be. Five minutes to set up, and GoodTip gives to a charity your organisation picks.{% endblock %}
 {% block aside_shots %}
   <div class="shot on" style="background-image:url('{% static 'img/scenes/afl-player-training.jpg' %}')"></div>
   <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
@@ -20,7 +20,7 @@
   {% csrf_token %}
   <div class="fld">
     <div class="fld-labelrow"><label for="id_display_name">Display name</label><button type="button" class="gen-btn" id="genName"><svg class="cic" style="width:12px;height:12px;stroke:currentColor;fill:none;"><use href="#ic-spark"/></svg> Suggest one</button></div>
-    <input type="text" name="display_name" id="id_display_name" value="{{ form.display_name.value|default:'' }}" placeholder="How your group sees you" autocomplete="name" autofocus>
+    <input type="text" name="display_name" id="id_display_name" value="{{ form.display_name.value|default:'' }}" placeholder="How other members see you" autocomplete="name" autofocus>
     {% if form.display_name.errors %}<div class="fld-err">{{ form.display_name.errors|join:" " }}</div>{% endif %}
   </div>
   <div class="fld">

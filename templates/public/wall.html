@@ -4,7 +4,7 @@
 
 {% block title %}The Wall &middot; GoodTip{% endblock %}
 {% block loader_task %}Loading the Wall{% endblock %}
-{% block meta_description %}Where the group lives every round: tips, banter, the ladder shuffle, and the charity total ticking up in real time.{% endblock %}
+{% block meta_description %}Where the organisation lives every round: tips, banter, the ladder shuffle, and the charity total ticking up in real time.{% endblock %}
 {% block body_class %}page-wall{% endblock %}
 
 {% block content %}
@@ -16,7 +16,7 @@ the right is never covered. Cards swap every 2s.
 <section class="hero-split wall-hero">
   <div class="hs-left">
     <span class="pill" style="align-self:flex-start;margin-bottom:14px;"><span class="dot"></span>New for 2026</span>
-    <h1>The Wall. <em>Where the group lives.</em></h1>
+    <h1>The Wall. <em>Where the organisation lives.</em></h1>
 
     <div class="wall-rotor">
       <div class="wr-stack" data-rotor data-interval="2000" aria-live="polite">
@@ -91,7 +91,7 @@ the right is never covered. Cards swap every 2s.
           {% if not post.can_reply_direct %}
           <div class="wf-guestfields">
             {% if user.is_authenticated %}
-              <p class="wf-note">Replying as <b>{{ user.display_name }}</b>, you're not in this group, so it goes up once we've checked it.</p>
+              <p class="wf-note">Replying as <b>{{ user.display_name }}</b>, you're not in this organisation, so it goes up once we've checked it.</p>
             {% else %}
               <input type="text" name="guest_name" placeholder="Your name" maxlength="80" autocomplete="name">
               <input type="email" name="guest_email" placeholder="you@work.com.au" maxlength="254" required autocomplete="email">
@@ -101,11 +101,11 @@ the right is never covered. Cards swap every 2s.
           <div class="wf-hp" aria-hidden="true"><label>Website<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
           {% endif %}
           <div class="wf-replyrow">
-            <textarea name="body" rows="1" maxlength="500" placeholder="{% if post.can_reply_direct %}Reply in your group's thread&hellip;{% else %}Say something back&hellip;{% endif %}" aria-label="Reply to {{ post.author.display_name }}" required></textarea>
+            <textarea name="body" rows="1" maxlength="500" placeholder="{% if post.can_reply_direct %}Reply in your organisation's thread&hellip;{% else %}Say something back&hellip;{% endif %}" aria-label="Reply to {{ post.author.display_name }}" required></textarea>
             <button type="submit" class="btn-primary">Reply</button>
           </div>
           {% if not post.can_reply_direct %}
-          <p class="wf-fine">Replies from outside the group go up after a quick check. We only use your email to contact you about the reply.</p>
+          <p class="wf-fine">Replies from outside the organisation go up after a quick check. We only use your email to contact you about the reply.</p>
           {% endif %}
         </form>
       </div>
@@ -114,7 +114,7 @@ the right is never covered. Cards swap every 2s.
     {% else %}
     <div class="wall-preview-note">
       <b>Nobody's shared a post publicly yet.</b>
-      <span>Members choose, post by post, whether their banter goes beyond the group. Here's what it looks like when they do.</span>
+      <span>Members choose, post by post, whether their banter goes beyond the organisation. Here's what it looks like when they do.</span>
     </div>
     <div class="wallfeed is-preview">
       {% include "public/partials/_wall_samples.html" %}
@@ -137,7 +137,7 @@ the right is never covered. Cards swap every 2s.
       <div class="for-card">
         <span class="for-tag">Private by default</span>
         <h3>Your room stays your room.</h3>
-        <p>A post is group-only unless the person who wrote it shares it, and their group has to be listed publicly too. Two switches, both theirs, both reversible.</p>
+        <p>A post is organisation-only unless the person who wrote it shares it, and their organisation has to be listed publicly too. Two switches, both theirs, both reversible.</p>
       </div>
       <div class="for-card">
         <span class="for-tag">Culture</span>
@@ -154,12 +154,12 @@ the right is never covered. Cards swap every 2s.
 <div class="founding">
   <div class="founding-inner reveal">
     <div>
-      <p class="eyebrow">Get your group on the Wall</p>
+      <p class="eyebrow">Get your organisation on the Wall</p>
       <h2>Set it up now. Tip when the season starts.</h2>
-      <p>The Wall comes with every plan, from Starter up. Set up your group for free, run the Charity Vote, and the feed is live the moment the first tips lock.</p>
+      <p>The Wall comes with every plan, from Starter up. Set up your organisation for free, run the Charity Vote, and the feed is live the moment the first tips lock.</p>
     </div>
     <div class="founding-cta">
-      <a href="/#start" class="btn-dark">Set up your group &rarr;</a>
+      <a href="/#start" class="btn-dark">Set up your organisation &rarr;</a>
       <span class="founding-deadline">Pay when you launch. That's the whole deal.</span>
     </div>
   </div>

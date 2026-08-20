@@ -7,7 +7,7 @@
   <div>
     <div class="app-eyebrow">Admin</div>
     <h1 class="app-h1">Approvals</h1>
-    <p class="app-sub">Everyone waiting to join a group, across all of GoodTip.</p>
+    <p class="app-sub">Everyone waiting to join an organisation, across all of GoodTip.</p>
   </div>
   {% if pending_count %}<span class="pill-role manager">{{ pending_count }} waiting</span>{% endif %}
 </div>
@@ -16,7 +16,7 @@
 <div class="card pad-lg">
   <table class="atable">
     <thead>
-      <tr><th>Who</th><th>Group</th><th>Asked</th><th>Group's own admins</th><th style="text-align:right;">Decision</th></tr>
+      <tr><th>Who</th><th>Group</th><th>Asked</th><th>Organisation's own admins</th><th style="text-align:right;">Decision</th></tr>
     </thead>
     <tbody>
     {% for row in rows %}

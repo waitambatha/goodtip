@@ -3,7 +3,7 @@
 {% block title %}Log in &middot; GoodTip{% endblock %}
 {% block loader_task %}Warming up your login{% endblock %}
 {% block brand_head %}Welcome back. <em>The room's waiting.</em>{% endblock %}
-{% block brand_sub %}Your group's ladder hasn't moved since you left. Let's fix that.{% endblock %}
+{% block brand_sub %}Your organisation's ladder hasn't moved since you left. Let's fix that.{% endblock %}
 {% block aside_shots %}
   <div class="shot on" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
   <div class="shot" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')"></div>
@@ -14,12 +14,12 @@
 <ol class="aa-steps">
   <li><span class="n">&rarr;</span><span class="t"><b>Get your tips in</b> before the round locks.</span></li>
   <li><span class="n">&rarr;</span><span class="t"><b>Check the ladder</b>, and who's talking on the Wall.</span></li>
-  <li><span class="n">&rarr;</span><span class="t"><b>Vote on the charity</b> your group is funding.</span></li>
+  <li><span class="n">&rarr;</span><span class="t"><b>Vote on the charity</b> your organisation is funding.</span></li>
 </ol>
 {% endblock %}
 {% block auth_form %}
 <h1>Log in</h1>
-<p class="sub">Pick up where your group left off.</p>
+<p class="sub">Pick up where your organisation left off.</p>
 <form method="post" action="{% url 'accounts:login' %}{% if request.GET.next %}?next={{ request.GET.next|urlencode }}{% endif %}" novalidate
       data-busy="Signing you in">
   {% csrf_token %}

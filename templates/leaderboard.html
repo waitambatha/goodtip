@@ -32,7 +32,7 @@
   <a href="?scope=local" class="gt-pill {% if scope == 'local' %}solid{% endif %}">{{ org.name }}</a>
   <a href="?scope=national" class="gt-pill {% if scope == 'national' %}solid{% endif %}">National &middot; {{ org.root.name }}</a>
 </div>
-{% if scope == 'national' %}<p class="gh-lead" style="margin:-10px 0 20px;">Every tipper across {{ org.root.name }} and all its groups, ranked together.</p>{% endif %}
+{% if scope == 'national' %}<p class="gh-lead" style="margin:-10px 0 20px;">Every tipper across {{ org.root.name }} and all its child organisations, ranked together.</p>{% endif %}
 {% endif %}
 
 {% if ranked %}

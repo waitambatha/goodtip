@@ -531,7 +531,7 @@ class OrgSearchTests(TestCase):
 
     def test_search_page_offers_create_when_no_match(self):
         resp = self.client.get("/leagues/search/", {"q": "zzz nothing"})
-        self.assertContains(resp, "No groups match")
+        self.assertContains(resp, "No organisations match")
 
     def test_search_requires_login(self):
         self.client.logout()

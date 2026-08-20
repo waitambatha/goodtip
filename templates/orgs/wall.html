@@ -11,7 +11,7 @@
 
 {% comment %}
 Hero split: what the wider GoodTip room is saying on one side, the imagery on
-the other. No composer here — posting is a button in the group header.
+the other. No composer here — posting is a button in the organisation header.
 {% endcomment %}
 <section class="gwall-hero">
   <div class="gwh-feed">
@@ -42,11 +42,11 @@ the other. No composer here — posting is a button in the group header.
   </div>
 </section>
 
-{# ---- your group's room: the messages from your own members ---- #}
+{# ---- your organisation's room: the messages from your own members ---- #}
 <div class="gt-head gwall-head">
   <div>
     <div class="gh-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div>
-    <h1>Your group</h1>
+    <h1>Your organisation</h1>
     <p class="gh-lead">What your members are saying this round. Only {{ org.name }} sees this.</p>
   </div>
   <div class="gh-actions">
@@ -74,7 +74,7 @@ the other. No composer here — posting is a button in the group header.
         {% if p.kind == 'recap' %}<span class="gpt-tag">Round recap</span>{% else %}<span class="gpt-tag">Update</span>{% endif %}
       {% endif %}
       {% if p.can_remove %}{# admins can also hide a recap/system card — recap spec §11 #}
-      <form method="post" action="{% url 'orgs:wall_remove' org.id p.id %}" class="gpt-x" data-confirm="This removes the post and its replies for everyone in the group. It cannot be undone." data-confirm-title="Remove this post?" data-confirm-ok="Remove post" data-confirm-danger>
+      <form method="post" action="{% url 'orgs:wall_remove' org.id p.id %}" class="gpt-x" data-confirm="This removes the post and its replies for everyone in the organisation. It cannot be undone." data-confirm-title="Remove this post?" data-confirm-ok="Remove post" data-confirm-danger>
         {% csrf_token %}<button type="submit" title="{% if p.author_id == user.id %}Delete post{% else %}Hide post (admin){% endif %}">&times;</button>
       </form>
       {% endif %}
@@ -159,10 +159,10 @@ the other. No composer here — posting is a button in the group header.
           <label class="gcm-switch">
             <input type="checkbox" name="share_public" value="1">
             <span class="gcm-track"><i></i></span>
-            <span class="gcm-slabel"><b>Also show this on the public Wall</b><small>Your name, your group's name and this post go on goodtip.com.au/wall. Off by default; you can delete it any time.</small></span>
+            <span class="gcm-slabel"><b>Also show this on the public Wall</b><small>Your name, your organisation's name and this post go on goodtip.com.au/wall. Off by default; you can delete it any time.</small></span>
           </label>
           {% else %}
-          <p class="gcm-locked"><svg><use href="#ic-lock"/></svg> This post stays inside {{ org.name }}. Sharing to the public Wall opens up once your manager lists the group publicly.</p>
+          <p class="gcm-locked"><svg><use href="#ic-lock"/></svg> This post stays inside {{ org.name }}. Sharing to the public Wall opens up once your manager lists the organisation publicly.</p>
           {% endif %}
         </div>
       </div>
@@ -179,7 +179,7 @@ the other. No composer here — posting is a button in the group header.
       </div>
       <div class="gcm-rule">
         <svg><use href="#ic-lock"/></svg>
-        <div><b>Your group only</b><p>Unless you tick the box, what's said here stays here.</p></div>
+        <div><b>Your organisation only</b><p>Unless you tick the box, what's said here stays here.</p></div>
       </div>
       <div class="gcm-post">
         <button type="submit">Post <svg><use href="#ic-send"/></svg></button>
@@ -215,7 +215,7 @@ if (ta && out) { ta.addEventListener('input', function(){ out.textContent = ta.v
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !modal.hidden) close(); });
 })();
 
-/* hero rotator, the cross-group posts, one card at a time */
+/* hero rotator, the cross-organisation posts, one card at a time */
 (function(){
   var stack = document.querySelector('[data-rotor]');
   if (!stack) return;

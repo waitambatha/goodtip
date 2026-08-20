@@ -20,19 +20,19 @@ stacking context, so a strip rendered inside it paints over the sheet.
   <div class="app-head head-center">
     <div class="app-eyebrow">Dashboard</div>
     <h1 class="app-h1">Welcome to GoodTip, {{ user.display_name }}</h1>
-    <p class="app-sub">Here's what's coming up. Tipping happens inside a group, join one or start your own and these games are yours.</p>
+    <p class="app-sub">Here's what's coming up. Tipping happens inside an organisation, join one or start your own and these games are yours.</p>
   </div>
 
   <div class="card pad-lg" style="text-align:center;">
-    <div class="card-h" style="font-size:20px;">You're not in a group yet</div>
-    <p class="card-lead" style="margin:6px 0 18px;">Start your own, find your group, or ask a group manager for a join link.</p>
-    <a href="{% url 'orgs:create' %}" class="abtn abtn-primary abtn-lg">Create a group</a>
-    <a href="{% url 'orgs:search' %}" class="abtn abtn-ghost abtn-lg">Find your group</a>
+    <div class="card-h" style="font-size:20px;">You're not in an organisation yet</div>
+    <p class="card-lead" style="margin:6px 0 18px;">Start your own, find your organisation, or ask an organisation manager for a join link.</p>
+    <a href="{% url 'orgs:create' %}" class="abtn abtn-primary abtn-lg">Create an organisation</a>
+    <a href="{% url 'orgs:search' %}" class="abtn abtn-ghost abtn-lg">Find your organisation</a>
   </div>
 
   {% if preview_round %}
   {% comment %}
-  Real fixtures, no group required. Deliberately NOT wrapped in a form: there is
+  Real fixtures, no organisation required. Deliberately NOT wrapped in a form: there is
   nothing to post to, so the teams are buttons that open the join dialog rather
   than radios that could look tippable.
   {% endcomment %}
@@ -46,7 +46,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
     </div>
 
     <div class="slip-bar">
-      <div class="slip-info"><b>Want to tip these?</b><span>Join a group to lock in your picks, climb the ladder and raise for your charity.</span></div>
+      <div class="slip-info"><b>Want to tip these?</b><span>Join an organisation to lock in your picks, climb the ladder and raise for your charity.</span></div>
       <button type="button" class="abtn abtn-primary abtn-lg" data-needs-group>Start tipping</button>
     </div>
 
@@ -58,7 +58,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
             <span class="fxp-date">{{ g.kickoff_at|date:"D j M · g:i A" }}</span>
             {% if g.venue %}<span class="fxp-venue">{{ g.venue }}</span>{% endif %}
             {% comment %}
-            Preview for visitors with no group: honest about the round's own
+            Preview for visitors with no organisation: honest about the round's own
             state rather than always claiming Open.
             {% endcomment %}
             <span class="fxp-state {% if g.is_locked %}is-missed{% else %}is-open{% endif %}">{% if g.is_locked %}Closed{% else %}Open{% endif %}</span>
@@ -82,14 +82,14 @@ stacking context, so a strip rendered inside it paints over the sheet.
       <header class="ts-head">
         <div>
           <div class="ng-emoji" aria-hidden="true">😔</div>
-          <h3 id="ngTitle">Ah, you'll need a group first</h3>
-          <p class="ts-sub">Tips are counted inside a group. That's where your ladder, your rivals and the money you're raising all live, so there's nowhere to put this pick just yet.</p>
+          <h3 id="ngTitle">Ah, you'll need an organisation first</h3>
+          <p class="ts-sub">Tips are counted inside an organisation. That's where your ladder, your rivals and the money you're raising all live, so there's nowhere to put this pick just yet.</p>
         </div>
         <button type="button" class="ts-x" data-sheet-close aria-label="Close">&times;</button>
       </header>
       <footer class="ts-foot">
-        <a href="{% url 'orgs:search' %}" class="abtn abtn-primary">Find your group &rarr;</a>
-        <a href="{% url 'orgs:create' %}" class="abtn abtn-dark">Create a group</a>
+        <a href="{% url 'orgs:search' %}" class="abtn abtn-primary">Find your organisation &rarr;</a>
+        <a href="{% url 'orgs:create' %}" class="abtn abtn-dark">Create an organisation</a>
       </footer>
     </div>
   </div>
@@ -199,7 +199,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
     <svg style="width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.9;" aria-hidden="true"><use href="#ic-org"/></svg>
     Departments
   </a>
-  <a href="{% url 'orgs:search' %}" class="abtn abtn-ghost abtn-xl">Find a group</a>
+  <a href="{% url 'orgs:search' %}" class="abtn abtn-ghost abtn-xl">Find an organisation</a>
   <a href="{% url 'orgs:create' %}" class="abtn abtn-primary abtn-xl">+ Create an organisation</a>
 </div>
 
@@ -212,7 +212,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
 
   {% if c.charity_vote %}
   <div class="flash info" style="justify-content:space-between;">
-    <span><svg class="cic" style="width:18px;height:18px;stroke:#245b66;"><use href="#ic-vote"/></svg> A charity vote is open for your group.</span>
+    <span><svg class="cic" style="width:18px;height:18px;stroke:#245b66;"><use href="#ic-vote"/></svg> A charity vote is open for your organisation.</span>
     <a href="{% url 'orgs:charity_vote' c.org.id %}" class="abtn abtn-dark abtn-sm">{% if c.has_voted %}Review{% else %}Vote now{% endif %}</a>
   </div>
   {% endif %}
@@ -325,7 +325,7 @@ impossible. See gt-busy.js.
   {% comment %}
   The local and national donation totals (§7 of the brief: side by side, never
   combined) lived here. Taken off the dashboard because both read $0 for every
-  group until money actually moves, and a pair of empty dollar figures at the
+  organisation until money actually moves, and a pair of empty dollar figures at the
   top of the page says nothing while taking the space that the fixtures want.
 
   Nothing about the calculation has been removed — c.family still carries
@@ -357,7 +357,7 @@ more: the organisation pays one flat fee and GoodTip funds the donation from
 its own revenue. A card inviting an admin to "set your pledge" pointed at a
 screen that no longer decides anything.
 
-What the group is raising for still shows — see the charity card — because that
+What the organisation is raising for still shows — see the charity card — because that
 is the part members care about and the part that is still true.
 {% endcomment %}
   </div>
