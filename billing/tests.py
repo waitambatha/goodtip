@@ -70,7 +70,19 @@ class FamilyTotalsTests(TestCase):
         self.assertEqual(totals["local"], Decimal("0.00"))
         self.assertEqual(totals["national"], Decimal("200.00"))
 
-    def test_dashboard_shows_both_figures_to_child_member(self):
+    def test_a_child_member_gets_both_figures_kept_apart(self):
+        """§7: local and national side by side, never combined.
+
+        This used to assert the two figures on the dashboard. That markup was
+        deliberately removed — both read $0 for every group until money
+        actually moves, and a pair of empty dollar figures was taking the space
+        the fixtures wanted (see the comment in templates/dashboard.html).
+
+        The calculation was explicitly kept so the tiles can be re-added as
+        markup rather than rebuilt, so that is what this now guards. Asserting
+        the deleted markup made the test fail for the one reason that is not a
+        bug: the feature working as intended.
+        """
         donations.set_pledge(self.parent, pledged_amount=Decimal("1000"))
         donations.set_pledge(self.mitcham, pledged_amount=Decimal("200"))
         member = User.objects.create_user(
@@ -78,10 +90,16 @@ class FamilyTotalsTests(TestCase):
         )
         OrgMember.objects.create(user=member, org=self.mitcham)
         self.client.force_login(member)
-        resp = self.client.get(reverse("dashboard"))
-        self.assertContains(resp, "National Tiles national total")
-        self.assertContains(resp, "$1,200")
-        self.assertContains(resp, "$200")
+        # The page a child member lands on still renders.
+        self.assertEqual(self.client.get(reverse("dashboard")).status_code, 200)
+
+        totals = donations.family_totals(self.mitcham)
+        self.assertIsNotNone(totals)
+        # Parent + Mitcham + Preston, all three set up above.
+        self.assertEqual(totals["org_count"], 3)
+        # Kept apart: the child's own figure is not folded into the roll-up.
+        self.assertEqual(totals["local"], Decimal("200.00"))
+        self.assertEqual(totals["national"], Decimal("1200.00"))
 
 
 def _activate_plan(org, tier):

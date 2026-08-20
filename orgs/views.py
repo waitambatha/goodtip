@@ -239,8 +239,22 @@ def create_org_view(request):
     raw_parent = request.POST.get("parent") or request.GET.get("parent")
     if raw_parent:
         draft.data["parent"] = raw_parent
-    # Resolved only for display — the banner and hidden field have to survive
-    # the redirect between steps, which carries no query string.
+    elif request.method == "GET":
+        # Arriving here with no parent named means "create an organisation",
+        # and it has to actually mean that.
+        #
+        # There is one draft per user and it was shared by both flows, but the
+        # parent was only ever written and never cleared. So opening the
+        # department form even once pinned that draft to a parent for good:
+        # every later visit to /orgs/create/ re-resolved it and rendered a page
+        # headed "New department under <that org>", with a Department name
+        # field, while the person had asked to create an organisation. The only
+        # escape was Start again, which is not something anyone would guess.
+        #
+        # An in-flight department keeps its parent regardless: every POST
+        # carries the hidden field, and the redirect between steps now carries
+        # ?parent= (see _create_redirect).
+        draft.data.pop("parent", None)
     parent_org = _requested_parent(request) or _parent_from_draft(draft)
 
     step = draft.step or 1
@@ -254,7 +268,7 @@ def create_org_view(request):
             draft.data, draft.step = {}, 1
             draft.save()
             messages.info(request, "Started again — nothing was created.")
-            return redirect("orgs:create")
+            return _create_redirect(parent_org)
 
         # Absorb first, so going back never loses what was just typed.
         if step != LAST_STEP:
@@ -263,14 +277,14 @@ def create_org_view(request):
         if action == "back":
             draft.step = max(1, step - 1)
             draft.save()
-            return redirect("orgs:create")
+            return _create_redirect(parent_org)
 
         if action == "logo_clear":
             _absorb_step(draft, request.POST, step, None)
             draft.data.pop("logo", None)
             draft.data.pop("logo_error", None)
             draft.save()
-            return redirect("orgs:create")
+            return _create_redirect(parent_org)
 
         if action == "save":
             # Save without advancing. Until this existed, "save" and "next" were
@@ -284,7 +298,7 @@ def create_org_view(request):
                 messages.success(
                     request, "Draft saved — pick it up here whenever you like."
                 )
-                return redirect("orgs:create")
+                return _create_redirect(parent_org)
             # Fall through to the render below so the offending fields are named
             # and marked, rather than reporting a bare "could not save".
             messages.error(request, "Fill these in first, then we can save your draft.")
@@ -309,7 +323,7 @@ def create_org_view(request):
                         email=request.POST.get("work_email", ""),
                     )
                     messages.success(request, f"Code sent to {row.email}. It expires in 15 minutes.")
-                    return redirect("orgs:create")
+                    return _create_redirect(parent_org)
                 except ValueError as e:
                     # Render rather than redirect, so the message can sit under
                     # the field that caused it AND the other two keep what was
@@ -333,14 +347,14 @@ def create_org_view(request):
                     messages.success(request, "Another code is on its way.")
                 except ValueError as e:
                     messages.error(request, str(e))
-                return redirect("orgs:create")
+                return _create_redirect(parent_org)
 
             if action == "change_email":
                 # Abandon the current check so the form comes back blank. The
                 # row is unverified by definition here, so nothing is lost.
                 if row and not row.is_verified:
                     row.delete()
-                return redirect("orgs:create")
+                return _create_redirect(parent_org)
 
             if action == "verify_code":
                 if row is None:
@@ -351,7 +365,7 @@ def create_org_view(request):
                     messages.success(request, f"{row.domain} verified. Nice one.")
                     draft.step = step + 1
                     draft.save()
-                    return redirect("orgs:create")
+                    return _create_redirect(parent_org)
                 elif row.attempts >= row.MAX_ATTEMPTS:
                     messages.error(
                         request,
@@ -364,7 +378,7 @@ def create_org_view(request):
                         f"That code isn't right. {left} attempt{'s' if left != 1 else ''} left, "
                         "or send yourself a new one.",
                     )
-                return redirect("orgs:create")
+                return _create_redirect(parent_org)
 
             if action == "next":
                 if _verification_required(draft) and not (row and row.is_verified):
@@ -373,10 +387,10 @@ def create_org_view(request):
                         "Send yourself a code and enter it before you go on — that "
                         "is what proves the domain is yours.",
                     )
-                    return redirect("orgs:create")
+                    return _create_redirect(parent_org)
                 draft.step = step + 1
                 draft.save()
-                return redirect("orgs:create")
+                return _create_redirect(parent_org)
 
             # No recognised action on the verify step means the submitter's
             # name never arrived. Falling through from here would reach the
@@ -388,14 +402,14 @@ def create_org_view(request):
             # pressed button stripped `action` from every POST this wizard
             # made. Fixed at source in gt-busy.js, but the step must not be
             # one dropped field away from skipping its own check.
-            return redirect("orgs:create")
+            return _create_redirect(parent_org)
 
         form = _draft_form(draft, parent_org, bound=True)
         errors = _step_errors(form, step)
         if not errors and step < LAST_STEP:
             draft.step = step + 1
             draft.save()
-            return redirect("orgs:create")
+            return _create_redirect(parent_org)
 
         # The review step owns no fields, so nothing would surface a problem
         # carried over from an earlier one. Show the lot rather than a button
@@ -472,6 +486,16 @@ def create_org_view(request):
     return _render_wizard(
         request, draft, form, step, parent_org, errors=errors, duplicates=duplicates,
     )
+
+
+def _create_redirect(parent_org):
+    """Back to the wizard, keeping a department flow on its parent.
+
+    A plain redirect drops the query string, which is why the parent used to be
+    fished back out of the draft — and why it could never be cleared.
+    """
+    url = reverse("orgs:create")
+    return redirect(f"{url}?parent={parent_org.id}" if parent_org else url)
 
 
 def _parent_from_draft(draft):

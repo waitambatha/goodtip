@@ -14,6 +14,7 @@ from .models import (
     CharityVoteOption,
     MembershipRequest,
     OrgCharitySelection,
+    OrgDraft,
     OrgMember,
     Organisation,
     WallPost,
@@ -545,19 +546,25 @@ def _walk_create_wizard(client, case, name, **extra):
     """
     url = "/leagues/new/"
     parent = extra.get("parent", "")
+    # Informal, deliberately. These callers are about duplicate names and
+    # parent/child rules, and an Informal group has no employer domain to
+    # prove — so step 2 waves it through instead of demanding an email code
+    # that has nothing to do with what is being tested. Verification has its
+    # own tests.
     client.post(url, {
         "step": 1, "action": "next", "name": name,
-        "group_type": case.charities_type.pk, "parent": parent,
+        "group_type": case.gtype.pk, "informal_label": "Book Club", "parent": parent,
     })
+    client.post(url, {"step": 2, "action": "next", "parent": parent})
     client.post(url, {
-        "step": 2, "action": "next",
+        "step": 3, "action": "next",
         "competitions": [case.comp.pk], "season": case.season.pk, "parent": parent,
     })
     client.post(url, {
-        "step": 3, "action": "next",
+        "step": 4, "action": "next",
         "charity_method": "pick", "charity": case.charity.pk, "parent": parent,
     })
-    final = {"step": 4, "action": "next", "parent": parent}
+    final = {"step": 5, "action": "next", "parent": parent}
     if extra.get("duplicate_confirmed"):
         final["duplicate_confirmed"] = extra["duplicate_confirmed"]
     return client.post(url, final)
@@ -568,17 +575,24 @@ class DuplicateDetectionTests(TestCase):
     exists needs one explicit confirmation — friction, not prevention."""
 
     def setUp(self):
-        from catalog.models import Competition, GroupType
+        from catalog.models import Competition, GroupType, Series
 
         self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
         sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
         self.comp, _ = Competition.objects.get_or_create(
             sport=sport, season=self.season, slug="afl", defaults={"name": "AFL"},
         )
+        # See CreateWizardTests.setUp: fed_competitions() hides a competition
+        # whose series resolve to no scraper, and a competition with no series
+        # at all resolves to nothing.
+        series, _ = Series.objects.get_or_create(
+            name="AFL", defaults={"sport": sport, "slug": "afl"},
+        )
+        self.comp.series.add(series)
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
         )
-        self.charities_type = GroupType.objects.get(slug="charities")
+        self.gtype = GroupType.objects.get(slug="informal")
         self.existing = Organisation.objects.create(
             name="National Tiles Mitcham", season=self.season, charity=self.charity,
         )
@@ -622,22 +636,39 @@ class ChildOrgCreationTests(TestCase):
     """
 
     def setUp(self):
-        from catalog.models import Competition, GroupType
+        from catalog.models import Competition, GroupType, Series
 
         self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
         sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
         self.comp, _ = Competition.objects.get_or_create(
             sport=sport, season=self.season, slug="afl", defaults={"name": "AFL"},
         )
+        # See CreateWizardTests.setUp: fed_competitions() hides a competition
+        # whose series resolve to no scraper, and a competition with no series
+        # at all resolves to nothing.
+        series, _ = Series.objects.get_or_create(
+            name="AFL", defaults={"sport": sport, "slug": "afl"},
+        )
+        self.comp.series.add(series)
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
         )
-        self.charities_type = GroupType.objects.get(slug="charities")
+        self.gtype = GroupType.objects.get(slug="informal")
         self.parent = Organisation.objects.create(
             name="National Tiles", season=self.season, charity=self.charity,
         )
         self.user = User.objects.create_user(
             email="franchisee@example.com", password="x", display_name="Franchisee",
+        )
+        # Creating a child requires managing the parent — see _parent_for() in
+        # orgs/views.py. Before that check existed, `?parent=` was read off the
+        # query string and trusted, so anyone could plant a department inside
+        # any organisation on the platform. These tests were written under the
+        # old rules and drove the wizard as a stranger to the parent; that path
+        # is closed on purpose now, so the creator is a parent admin here.
+        OrgMember.objects.create(
+            user=self.user, org=self.parent,
+            role=OrgMember.ROLE_BOTH, is_league_owner=True,
         )
         self.client.force_login(self.user)
 
@@ -649,17 +680,20 @@ class ChildOrgCreationTests(TestCase):
         self.assertContains(resp, f"Part of {self.parent.name}")
         self.assertContains(resp, f'name="parent" value="{self.parent.id}"')
 
-    def test_creator_becomes_child_admin_not_parent_member(self):
+    def test_creator_becomes_admin_of_the_child_they_created(self):
         resp = self.create_post("National Tiles Mitcham", parent=self.parent.pk)
         self.assertEqual(resp.status_code, 302)
         child = Organisation.objects.get(name="National Tiles Mitcham")
         self.assertEqual(child.parent, self.parent)
-        # §0: admin of the child they created…
+        # §0: admin of the child they created.
         self.assertTrue(
             OrgMember.objects.filter(user=self.user, org=child, is_league_owner=True).exists()
         )
-        # …and NOT a member (let alone admin) of the parent.
-        self.assertFalse(OrgMember.objects.filter(user=self.user, org=self.parent).exists())
+        # This used to assert they were NOT a member of the parent. That can no
+        # longer be true of anyone who is allowed to do this — only a parent
+        # admin can create a child now. What still has to hold is that creating
+        # the child does not quietly change their standing in the parent.
+        self.assertEqual(OrgMember.objects.filter(user=self.user, org=self.parent).count(), 1)
 
     def test_child_org_cannot_be_a_parent_option(self):
         child = Organisation.objects.create(
@@ -719,17 +753,25 @@ class ChildAdminManagementTests(TestCase):
             role=OrgMember.ROLE_BOTH, is_league_owner=True,
         )
 
-    def test_parent_admin_sees_child_groups_panel(self):
+    # These two assert on the panel's anchor rather than its heading. The
+    # heading has already been renamed once — "Child groups" became
+    # "Departments", and the test kept passing on the negative case while
+    # silently failing on the positive one — and it is about to be renamed
+    # again. What the tests are actually about is who sees the panel at all.
+    PANEL = 'id="departments"'
+
+    def test_parent_admin_sees_the_sub_org_panel(self):
         self.client.force_login(self.parent_admin)
         resp = self.client.get(f"/leagues/{self.parent.id}/members/")
-        self.assertContains(resp, "Child groups")
+        self.assertContains(resp, self.PANEL)
         self.assertContains(resp, "National Tiles Mitcham")
         self.assertContains(resp, "Mitcham Boss")
 
-    def test_child_admin_page_has_no_child_groups_panel(self):
+    def test_child_admin_page_has_no_sub_org_panel(self):
+        """Two levels only: a child cannot have children, so it gets no panel."""
         self.client.force_login(self.child_admin)
         resp = self.client.get(f"/leagues/{self.child.id}/members/")
-        self.assertNotContains(resp, "Child groups")
+        self.assertNotContains(resp, self.PANEL)
 
     def test_parent_admin_can_demote_child_admin(self):
         self.client.force_login(self.parent_admin)
@@ -1406,13 +1448,23 @@ class CreateWizardTests(TestCase):
     URL = "/leagues/new/"
 
     def setUp(self):
-        from catalog.models import Competition, GroupType
+        from catalog.models import Competition, GroupType, Series
 
         self.season, _ = Season.objects.get_or_create(year=2093, defaults={"label": "2093"})
         self.sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
         self.comp, _ = Competition.objects.get_or_create(
             sport=self.sport, season=self.season, slug="afl", defaults={"name": "AFL"},
         )
+        # The signup form only offers competitions a feed can actually deliver
+        # (orgs.forms.fed_competitions), and that test is "does any of its
+        # series resolve to a scraper". A Competition with no series attached
+        # resolves to nothing, so it was silently absent from the form and the
+        # tipping step rejected it with "7 is not one of the available
+        # choices" — which read as a wizard bug rather than a fixture gap.
+        self.series, _ = Series.objects.get_or_create(
+            name="AFL", defaults={"sport": self.sport, "slug": "afl"},
+        )
+        self.comp.series.add(self.series)
         self.gtype = GroupType.objects.get(slug="informal")
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
@@ -1426,23 +1478,47 @@ class CreateWizardTests(TestCase):
             "group_type": self.gtype.pk, "informal_label": "Book Club",
         })
 
-    def _step2(self):
+    # The wizard gained a step: Verify sits at 2 now, between the basics and
+    # the tipping rules. These helpers are named rather than numbered so the
+    # next insertion does not silently repoint every test at the wrong screen —
+    # which is exactly what happened to the numbered ones.
+
+    def _verify_step(self):
+        """Step 2, the work-domain check.
+
+        An Informal group has no employer domain to prove and never will, so it
+        passes straight through — but it is still a step, and skipping it in a
+        test means everything after lands one screen early.
+        """
+        return self.client.post(self.URL, {"step": 2, "action": "next"})
+
+    def _tipping_step(self):
         return self.client.post(self.URL, {
-            "step": 2, "action": "next",
+            "step": 3, "action": "next",
             "competitions": [self.comp.pk], "season": self.season.pk,
         })
 
-    def _step3(self):
+    def _charity_step(self):
         return self.client.post(self.URL, {
-            "step": 3, "action": "next",
+            "step": 4, "action": "next",
             "charity_method": "pick", "charity": self.charity.pk,
         })
+
+    def _review_step(self):
+        return self.client.post(self.URL, {"step": 5, "action": "next"})
+
+    def _through_to_review(self, name="Wizard Group"):
+        self._step1(name)
+        self._verify_step()
+        self._tipping_step()
+        self._charity_step()
 
     def test_one_step_shows_at_a_time(self):
         body = self.client.get(self.URL).content
         self.assertIn(b'id="id_name"', body)
         self.assertNotIn(b'id="id_season"', body)
         self._step1()
+        self._verify_step()
         body = self.client.get(self.URL).content
         self.assertIn(b'id="id_season"', body)
         self.assertNotIn(b'id="id_name"', body)
@@ -1462,26 +1538,26 @@ class CreateWizardTests(TestCase):
 
     def test_progress_survives_a_brand_new_session(self):
         self._step1()
-        self._step2()
+        self._verify_step()
+        self._tipping_step()
         self.client.logout()
         self.client.force_login(self.user)
         body = self.client.get(self.URL).content
-        # Straight back to step 3, with the earlier answers intact.
+        # Straight back to the charity step, with the earlier answers intact.
         self.assertIn(b"charity_method", body)
         self.assertNotIn(b'id="id_name"', body)
 
     def test_going_back_keeps_what_was_typed(self):
         self._step1()
-        self._step2()
-        self.client.post(self.URL, {"step": 3, "action": "back"})
+        self._verify_step()
+        self._tipping_step()
+        self.client.post(self.URL, {"step": 4, "action": "back"})
         body = self.client.get(self.URL).content
         self.assertIn(b'id="id_season"', body)
         self.assertIn(str(self.comp.pk).encode(), body)
 
     def test_the_review_step_reads_the_answers_back(self):
-        self._step1()
-        self._step2()
-        self._step3()
+        self._through_to_review()
         body = self.client.get(self.URL).content
         self.assertIn(b"Wizard Group", body)
         self.assertIn(b"Lifeline", body)
@@ -1489,15 +1565,65 @@ class CreateWizardTests(TestCase):
     def test_finishing_creates_the_group_and_clears_the_draft(self):
         from .models import OrgDraft
 
-        self._step1()
-        self._step2()
-        self._step3()
-        self.client.post(self.URL, {"step": 4, "action": "next"})
+        self._through_to_review()
+        self._review_step()
         org = Organisation.objects.get(name="Wizard Group")
         self.assertTrue(
             OrgMember.objects.filter(org=org, user=self.user, is_league_owner=True).exists()
         )
         self.assertFalse(OrgDraft.objects.filter(user=self.user).exists())
+
+    def test_opening_a_department_does_not_pin_the_wizard_to_it(self):
+        """The bug: create-an-organisation kept showing "New department under X".
+
+        There is one draft per user and both flows shared it, but the parent
+        was only ever written into it, never cleared. So opening the department
+        form once pinned that draft to a parent permanently — every later visit
+        re-resolved it and rendered a Department name field to someone who had
+        asked to create an organisation, with Start again as the only escape.
+        """
+        parent = Organisation.objects.create(
+            name="Masterclass", season=self.season, charity=self.charity,
+        )
+        OrgMember.objects.create(
+            user=self.user, org=parent,
+            role=OrgMember.ROLE_BOTH, is_league_owner=True,
+        )
+        # Open the department form, then walk away from it.
+        resp = self.client.get(f"{self.URL}?parent={parent.id}")
+        self.assertContains(resp, "Part of Masterclass")
+
+        # Come back to create an ORGANISATION. It must be one.
+        resp = self.client.get(self.URL)
+        self.assertNotContains(resp, "Part of Masterclass")
+        self.assertNotContains(resp, "Department name")
+        self.assertContains(resp, "Organisation name")
+        self.assertIsNone(OrgDraft.objects.get(user=self.user).data.get("parent"))
+
+    def test_a_department_in_progress_keeps_its_parent_between_steps(self):
+        """The other half: clearing the parent must not break a real flow.
+
+        The steps redirect, and a redirect drops the query string — which is
+        why the parent used to be fished back out of the draft in the first
+        place. It rides on the redirect now instead.
+        """
+        parent = Organisation.objects.create(
+            name="Masterclass", season=self.season, charity=self.charity,
+        )
+        OrgMember.objects.create(
+            user=self.user, org=parent,
+            role=OrgMember.ROLE_BOTH, is_league_owner=True,
+        )
+        self.client.get(f"{self.URL}?parent={parent.id}")
+        resp = self.client.post(self.URL, {
+            "step": 1, "action": "next", "name": "Finance",
+            "group_type": self.gtype.pk, "informal_label": "Book Club",
+            "parent": parent.id,
+        })
+        # The redirect carries the parent, so the next screen is still a
+        # department rather than silently becoming a new organisation.
+        self.assertIn(f"parent={parent.id}", resp["Location"])
+        self.assertContains(self.client.get(resp["Location"]), "Part of Masterclass")
 
     def test_start_again_empties_the_draft(self):
         from .models import OrgDraft
