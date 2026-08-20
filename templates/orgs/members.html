@@ -75,26 +75,26 @@ anyone would look for it.
 </div>
 
 {% comment %}
-Departments only exist under a top-level org — two levels, so a department
-cannot have departments of its own, and showing it an empty Departments card
+Child organisations only exist under a top-level org — two levels, so a child
+cannot have children of its own, and showing it an empty card
 would offer something the model forbids.
 
-The card renders even with no departments yet. Creating one was previously
+The card renders even with no child organisations yet. Creating one was previously
 reachable only by hand-editing ?parent= onto the create URL, which meant the
 feature existed in the model and nowhere in the product.
 {% endcomment %}
 {% if not org.parent_id %}
-<div class="card pad-lg" id="departments" style="margin-top:22px;scroll-margin-top:90px;">
+<div class="card pad-lg" id="child-orgs" style="margin-top:22px;scroll-margin-top:90px;">
   <div class="row-between" style="align-items:flex-start;gap:16px;flex-wrap:wrap;">
     <div>
-      <div class="card-h">Departments</div>
-      <p class="card-lead" style="margin:4px 0 0;">Departments under {{ org.name }} run themselves day to day, with their own members, their own charity and their own ladder. Their totals roll up into {{ org.name }}'s national figure.</p>
+      <div class="card-h">Organisations under {{ org.name }}</div>
+      <p class="card-lead" style="margin:4px 0 0;">A site, branch or franchise with its own members, its own charity and its own ladder. They run themselves day to day, and their totals roll up into {{ org.name }}'s national figure. For teams inside one organisation — Marketing, IT — use groups instead.</p>
     </div>
-    <a href="{% url 'orgs:create' %}?parent={{ org.id }}" class="abtn abtn-primary abtn-sm" style="flex:none;">+ New department</a>
+    <a href="{% url 'orgs:create' %}?parent={{ org.id }}" class="abtn abtn-primary abtn-sm" style="flex:none;">+ Add one</a>
   </div>
 
   {% if child_groups %}
-  <p class="card-lead" style="margin:14px 0;">You can remove or reassign a department's admin, for example if a location closes down.</p>
+  <p class="card-lead" style="margin:14px 0;">You can remove or reassign their admin, for example if a location closes down.</p>
   <table class="atable">
     <tbody>
     {% for g in child_groups %}
@@ -125,7 +125,7 @@ feature existed in the model and nowhere in the product.
     </tbody>
   </table>
   {% else %}
-  <p class="card-lead" style="margin:16px 0 0;color:var(--muted);">No departments yet. Create one for a site, branch or team that wants its own ladder and its own cause.</p>
+  <p class="card-lead" style="margin:16px 0 0;color:var(--muted);">None yet. Add one for a site, branch or franchise that wants its own ladder and its own cause.</p>
   {% endif %}
 </div>
 {% endif %}

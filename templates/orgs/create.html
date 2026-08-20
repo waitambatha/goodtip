@@ -16,8 +16,8 @@ stacking context, so a strip rendered inside it paints over the sheet.
    at the foot of the form. {% endcomment %}
 <div class="wiz-top">
   <div>
-    <div class="app-eyebrow">{% if parent_org %}New department under {{ parent_org.name }}{% else %}New organisation{% endif %}</div>
-    <h1 class="app-h1">{% if parent_org %}Create a department{% else %}Create an organisation{% endif %}</h1>
+    <div class="app-eyebrow">{% if parent_org %}New organisation under {{ parent_org.name }}{% else %}New organisation{% endif %}</div>
+    <h1 class="app-h1">{% if parent_org %}Create an organisation{% else %}Create an organisation{% endif %}</h1>
     <p class="app-sub">Four short steps. We save as you go, so you can finish it later.</p>
   </div>
   {% comment %} Always present, but it does not claim a save that has not happened: an
@@ -76,9 +76,9 @@ missed click and got submitted twice.
   <div class="card pad-lg" style="margin-bottom:16px;background:rgba(45,122,58,.06);border-color:rgba(45,122,58,.35);">
     <div class="card-h">Part of {{ parent_org.name }}</div>
     <p class="card-lead" style="margin:4px 0 0;">
-      This department will sit under <b>{{ parent_org.name }}</b>. It runs its own comp,
+      This organisation will sit under <b>{{ parent_org.name }}</b>. It runs its own comp,
       has its own members and picks its own charity, and its totals roll up into
-      {{ parent_org.name }}'s national figure. You'll be this department's admin.
+      {{ parent_org.name }}'s national figure. You'll be its admin.
       <a href="{% url 'orgs:create' %}">Not part of {{ parent_org.name }}?</a>
     </p>
   </div>
@@ -92,9 +92,9 @@ missed click and got submitted twice.
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
         </svg>
       </span>
-      <div><h2>{% if parent_org %}Let's start with your department{% else %}Let's start with your organisation{% endif %}</h2><p>Tell us a few basics about {% if parent_org %}this department{% else %}your organisation{% endif %}.</p></div>
+      <div><h2>{% if parent_org %}Let's start with your organisation{% else %}Let's start with your organisation{% endif %}</h2><p>Tell us a few basics about {% if parent_org %}this one{% else %}your organisation{% endif %}.</p></div>
     </div>
-    <div class="fld"><label for="id_name">{% if parent_org %}Department name{% else %}Organisation name{% endif %}</label>
+    <div class="fld"><label for="id_name">Organisation name</label>
       <div class="fld-ic">
         <span class="fi-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -127,7 +127,7 @@ missed click and got submitted twice.
           {% endif %}
         </div>
         <div class="ol-body">
-          <div class="ol-title">{% if parent_org %}Department logo{% else %}Organisation logo{% endif %} <span>optional</span></div>
+          <div class="ol-title">Organisation logo <span>optional</span></div>
           <p class="ol-hint">Helps members recognise you when they search. JPG, PNG, WEBP or SVG, under 5&nbsp;MB.</p>
           <div class="ol-actions">
             <label class="ol-pick" for="orgLogoFile">
@@ -485,7 +485,7 @@ missed click and got submitted twice.
       that will bounce you back with an error.
       {% endcomment %}
       {% if step == last_step %}
-      <button type="submit" name="action" value="next" class="abtn abtn-primary abtn-lg">{% if duplicates %}Yes, create a separate one &rarr;{% elif parent_org %}Create department &rarr;{% else %}Create organisation &rarr;{% endif %}</button>
+      <button type="submit" name="action" value="next" class="abtn abtn-primary abtn-lg">{% if duplicates %}Yes, create a separate one &rarr;{% elif parent_org %}Create organisation &rarr;{% else %}Create organisation &rarr;{% endif %}</button>
       {% elif step == verify_step %}
         {% if verification.is_verified %}
         <button type="submit" name="action" value="next" class="abtn abtn-primary abtn-lg">Continue &rarr;</button>

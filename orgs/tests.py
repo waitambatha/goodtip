@@ -760,7 +760,7 @@ class ChildAdminManagementTests(TestCase):
     # "Departments", and the test kept passing on the negative case while
     # silently failing on the positive one — and it is about to be renamed
     # again. What the tests are actually about is who sees the panel at all.
-    PANEL = 'id="departments"'
+    PANEL = 'id="child-orgs"'
 
     def test_parent_admin_sees_the_sub_org_panel(self):
         self.client.force_login(self.parent_admin)
