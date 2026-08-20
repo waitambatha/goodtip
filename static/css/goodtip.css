@@ -1633,6 +1633,36 @@ img, svg, video { max-width: 100%; }
 .app-nav .an-inner { max-width: 1160px; margin: 0 auto; height: 60px; display: flex; align-items: center; gap: 16px; padding: 0 20px; }
 .an-brand { font-family: var(--mark); font-weight: 900; font-size: 20px; color: #fff; text-transform: uppercase; letter-spacing: .02em; text-decoration: none; }
 .an-brand span { color: var(--lime); }
+/* ---- Where you are: the context chip in the nav ---- */
+.an-ctx { margin-left: 10px; }
+.an-ctx-btn {
+  display: inline-flex; align-items: center; gap: 7px; max-width: 320px;
+  font-size: 13px; color: var(--cream);
+}
+.an-ctx-org { opacity: .72; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The group is the half that changes which ladder a tip lands on, so it is the
+   half that is legible. */
+.an-ctx-group { font-weight: 700; color: var(--lime); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.an-ctx-sep { opacity: .45; flex: none; }
+.an-ctx-head {
+  font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--muted); padding: 10px 14px 4px; font-weight: 700;
+}
+.an-ctx-row {
+  display: flex; width: 100%; text-align: left; align-items: center; gap: 10px;
+  background: none; border: 0; cursor: pointer; padding: 9px 14px;
+  font-family: var(--body); color: var(--ink);
+}
+.an-ctx-row:hover { background: rgba(45,122,58,.10); }
+.an-ctx-row.on { background: linear-gradient(90deg, rgba(200,241,53,.35), rgba(200,241,53,.10)); }
+.an-ctx-row.on::after { content: "✓"; margin-left: auto; font-weight: 900; color: var(--forest); }
+.an-ctx-more {
+  display: block; padding: 10px 14px; font-size: 12.5px; font-weight: 700;
+  color: var(--forest); text-decoration: none;
+}
+.an-ctx-more:hover { text-decoration: underline; }
+@media (max-width: 900px) { .an-ctx { display: none; } }
+
 .an-org { font-size: 13px; color: var(--cream); opacity: .7; padding-left: 14px; border-left: 1px solid rgba(255,255,255,.15); white-space: nowrap; }
 .an-links { display: flex; gap: 2px; margin-left: 10px; }
 .an-links a { font-size: 14px; font-weight: 600; color: var(--cream); opacity: .72; padding: 8px 14px; border-radius: 8px; text-decoration: none; transition: opacity .15s var(--ease), background .15s var(--ease); }

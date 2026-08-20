@@ -2675,3 +2675,236 @@ class GroupsPageTests(TestCase):
         self.client.force_login(self.admin)
         self.client.post(self.url, {"action": "create", "name": "marketing"})
         self.assertEqual(Group.objects.filter(org=self.org).count(), 1)
+
+
+class OrgSettingsTests(TestCase):
+    """Changing what an organisation tips on, after it was created.
+
+    Competitions were settable in exactly one template and frozen after that,
+    so an organisation that started on NRL and wanted AFL the next year had no
+    route to it at all.
+    """
+
+    def setUp(self):
+        from catalog.models import Competition
+        from django.urls import reverse
+
+        self.reverse = reverse
+        self.season, _ = Season.objects.get_or_create(year=2094, defaults={"label": "2094"})
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
+        )
+        afl, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
+        nrl, _ = Sport.objects.get_or_create(name="NRL", defaults={"slug": "nrl"})
+        self.afl = self._comp(Competition, afl, "AFL", "afl", ["AFL", "AFLW"])
+        self.nrl = self._comp(Competition, nrl, "NRL", "nrl", ["NRL", "NRLW"])
+
+        self.org = Organisation.objects.create(
+            name="Acme", season=self.season, charity=self.charity,
+        )
+        self.org.competitions.add(self.nrl)
+        self.admin = User.objects.create_user(
+            email="admin@example.com", password="x", display_name="Admin",
+        )
+        self.member = User.objects.create_user(
+            email="member@example.com", password="x", display_name="Member",
+        )
+        OrgMember.objects.create(
+            user=self.admin, org=self.org,
+            role=OrgMember.ROLE_BOTH, is_league_owner=True,
+        )
+        OrgMember.objects.create(user=self.member, org=self.org)
+        self.url = reverse("orgs:settings", args=[self.org.id])
+
+    def _comp(self, Competition, sport, name, slug, series_names):
+        comp, _ = Competition.objects.get_or_create(
+            sport=sport, season=self.season, slug=slug, defaults={"name": name},
+        )
+        for sn in series_names:
+            series, _ = Series.objects.get_or_create(
+                name=sn, defaults={"sport": sport, "slug": sn.lower()},
+            )
+            comp.series.add(series)
+        return comp
+
+    def test_an_admin_can_add_a_competition_after_creation(self):
+        self.client.force_login(self.admin)
+        self.client.post(self.url, {"competitions": [self.nrl.pk, self.afl.pk]})
+        self.assertEqual(
+            set(self.org.competitions.values_list("pk", flat=True)),
+            {self.nrl.pk, self.afl.pk},
+        )
+
+    def test_adding_a_code_brings_its_womens_competition_with_it(self):
+        """Never one without the other — it is a property of Competition."""
+        self.client.force_login(self.admin)
+        self.client.post(self.url, {"competitions": [self.afl.pk]})
+        names = {s.name for c in self.org.competitions.all() for s in c.series.all()}
+        self.assertEqual(names, {"AFL", "AFLW"})
+
+    def test_an_ordinary_member_cannot_change_them(self):
+        self.client.force_login(self.member)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.post(self.url, {"competitions": [self.afl.pk]})
+        self.assertEqual(
+            set(self.org.competitions.values_list("pk", flat=True)), {self.nrl.pk},
+        )
+
+    def test_it_refuses_to_leave_an_organisation_with_nothing_to_tip(self):
+        self.client.force_login(self.admin)
+        self.client.post(self.url, {"competitions": []})
+        self.assertEqual(self.org.competitions.count(), 1)
+
+    def test_removing_a_competition_keeps_its_rounds_and_tips(self):
+        """A season half-played is still a season people remember."""
+        from django.utils import timezone
+        from tipping.models import Match, Round, Team, Tip
+
+        series = self.nrl.series.first()
+        rnd = Round.objects.create(
+            org=self.org, round_number=1, series=series, competition=self.nrl,
+            lockout_at=timezone.now() + timedelta(days=1),
+        )
+        match = Match.objects.create(
+            round=rnd,
+            home_team=Team.objects.create(name="H", slug="h2", series=series),
+            away_team=Team.objects.create(name="A", slug="a2", series=series),
+            kickoff_at=timezone.now() + timedelta(days=2),
+        )
+        Tip.objects.create(user=self.member, match=match, org=self.org, selection="home")
+
+        self.client.force_login(self.admin)
+        self.client.post(self.url, {"competitions": [self.afl.pk]})
+        self.assertEqual(Round.objects.filter(org=self.org).count(), 1)
+        self.assertEqual(Tip.objects.filter(org=self.org).count(), 1)
+
+
+class CharityVoteAtCreationTests(CreateWizardTests):
+    """Scheduling the charity vote while creating, rather than "later".
+
+    The wizard used to finish with "set up the charity election when you're
+    ready" and drop you on the dashboard, so an admin who never came back left
+    their members with a vote that silently never opened.
+    """
+
+    def _charity_step(self, **extra):
+        data = {
+            "step": 4, "action": "next", "charity_method": "vote",
+            "vote_charities": [self.charity.pk, self.second_charity.pk],
+        }
+        data.update(extra)
+        return self.client.post(self.URL, data)
+
+    def setUp(self):
+        super().setUp()
+        self.second_charity, _ = Charity.objects.get_or_create(
+            slug="beyond-blue", defaults={"name": "Beyond Blue", "is_approved": True},
+        )
+
+    def _walk(self, **charity_extra):
+        self._step1()
+        self._verify_step()
+        self._tipping_step()
+        self._charity_step(**charity_extra)
+        return self._review_step()
+
+    def test_a_date_schedules_the_vote(self):
+        from django.utils import timezone
+
+        when = timezone.now() + timedelta(days=3)
+        self._walk(vote_opens_at=when.strftime("%Y-%m-%dT%H:%M"))
+        vote = CharityVote.objects.get()
+        self.assertEqual(vote.status, CharityVote.STATUS_SCHEDULED)
+        self.assertIsNotNone(vote.scheduled_open_at)
+
+    def test_a_date_already_past_opens_it_now(self):
+        from django.utils import timezone
+
+        when = timezone.now() - timedelta(minutes=5)
+        self._walk(vote_opens_at=when.strftime("%Y-%m-%dT%H:%M"))
+        self.assertEqual(CharityVote.objects.get().status, CharityVote.STATUS_OPEN)
+
+    def test_no_date_still_leaves_it_in_draft(self):
+        """Blank is a real answer, not a missing one."""
+        self._walk()
+        self.assertEqual(CharityVote.objects.get().status, CharityVote.STATUS_DRAFT)
+
+    def test_a_closing_time_without_an_opening_time_is_refused(self):
+        from django.utils import timezone
+
+        closes = timezone.now() + timedelta(days=4)
+        self._step1()
+        self._verify_step()
+        self._tipping_step()
+        resp = self._charity_step(vote_closes_at=closes.strftime("%Y-%m-%dT%H:%M"))
+        self.assertContains(resp, "when it opens")
+        self.assertFalse(Organisation.objects.filter(name="Wizard Group").exists())
+
+    def test_closing_before_opening_is_refused(self):
+        from django.utils import timezone
+
+        opens = timezone.now() + timedelta(days=4)
+        closes = opens - timedelta(days=1)
+        self._step1()
+        self._verify_step()
+        self._tipping_step()
+        resp = self._charity_step(
+            vote_opens_at=opens.strftime("%Y-%m-%dT%H:%M"),
+            vote_closes_at=closes.strftime("%Y-%m-%dT%H:%M"),
+        )
+        self.assertContains(resp, "close after it opens")
+
+
+class ContextChipTests(TestCase):
+    """The nav has to say which ladder a tip is about to land on."""
+
+    def setUp(self):
+        from django.urls import reverse
+
+        self.reverse = reverse
+        self.season, _ = Season.objects.get_or_create(year=2093, defaults={"label": "2093"})
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
+        )
+        self.org = Organisation.objects.create(
+            name="Acme", season=self.season, charity=self.charity, groups_enabled=True,
+        )
+        self.user = User.objects.create_user(
+            email="m@example.com", password="x", display_name="M",
+        )
+        OrgMember.objects.create(user=self.user, org=self.org)
+        self.marketing = Group.objects.create(org=self.org, name="Marketing")
+        GroupMember.objects.create(group=self.marketing, user=self.user)
+        self.client.force_login(self.user)
+
+    def test_the_chip_names_the_organisation(self):
+        html = self.client.get(self.reverse("dashboard")).content.decode()
+        self.assertIn("an-ctx-org", html)
+        self.assertIn("Acme", html)
+
+    def test_the_chip_names_the_group_once_you_are_in_one(self):
+        self.client.post(
+            self.reverse("orgs:switch_group", args=[self.org.id, self.marketing.id])
+        )
+        html = self.client.get(self.reverse("dashboard")).content.decode()
+        self.assertIn("an-ctx-group", html)
+        self.assertIn("Marketing", html)
+
+    def test_the_chip_offers_a_way_back_to_the_organisation(self):
+        self.client.post(
+            self.reverse("orgs:switch_group", args=[self.org.id, self.marketing.id])
+        )
+        html = self.client.get(self.reverse("dashboard")).content.decode()
+        self.assertIn(self.reverse("orgs:leave_group_context"), html)
+
+    def test_a_group_you_have_not_joined_is_not_offered(self):
+        Group.objects.create(org=self.org, name="Sales")
+        html = self.client.get(self.reverse("dashboard")).content.decode()
+        self.assertNotIn("Sales", html)
+
+    def test_switching_from_the_chip_returns_you_to_the_page_you_were_on(self):
+        resp = self.client.post(
+            self.reverse("orgs:switch_group", args=[self.org.id, self.marketing.id]),
+            {"next": self.reverse("dashboard")},
+        )
+        self.assertEqual(resp["Location"], self.reverse("dashboard"))

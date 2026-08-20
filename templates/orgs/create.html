@@ -377,6 +377,31 @@ missed click and got submitted twice.
         {% endfor %}
       </div>
       {% if form.vote_charities.errors %}<div class="fld-err">{{ form.vote_charities.errors|join:" " }}</div>{% endif %}
+
+      {% comment %}
+      When it runs. Both optional, and blank is a real answer — it leaves the
+      election in draft to be scheduled from the dashboard later.
+
+      The reason it is asked here at all: the wizard used to finish with "set
+      up the charity election when you're ready" and drop you on the dashboard,
+      so an admin who did not come back left their members with a vote that
+      never opened and a charity nobody had chosen. A date now, while the
+      charities are in front of them, is a decision they only have to make once.
+      {% endcomment %}
+      <div class="fld-row" style="margin-top:18px;">
+        <div class="fld">
+          <label for="id_vote_opens_at">Open the vote <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+          <input type="datetime-local" name="vote_opens_at" id="id_vote_opens_at" value="{{ form.vote_opens_at.value|default:'' }}">
+          <div class="hint">Leave blank and you can start it whenever you like.</div>
+          {% if form.vote_opens_at.errors %}<div class="fld-err">{{ form.vote_opens_at.errors|join:" " }}</div>{% endif %}
+        </div>
+        <div class="fld">
+          <label for="id_vote_closes_at">Close it <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+          <input type="datetime-local" name="vote_closes_at" id="id_vote_closes_at" value="{{ form.vote_closes_at.value|default:'' }}">
+          <div class="hint">It closes itself, or you can close it early.</div>
+          {% if form.vote_closes_at.errors %}<div class="fld-err">{{ form.vote_closes_at.errors|join:" " }}</div>{% endif %}
+        </div>
+      </div>
     </div>
   </div>
   {% endif %}

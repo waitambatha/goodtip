@@ -104,6 +104,21 @@ class OrgCreateForm(forms.ModelForm):
         label="New charity website (optional)",
         widget=forms.URLInput(attrs={"placeholder": "https://"}),
     )
+    # When the vote runs. Both optional: leaving them blank creates the
+    # election in draft, which is what happened to every vote before these
+    # fields existed — the wizard finished with "set up the charity election
+    # when you're ready" and dropped you, so an admin who did not come back
+    # left their members with a vote that never opened.
+    vote_opens_at = forms.DateTimeField(
+        required=False,
+        label="Open the vote",
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+    )
+    vote_closes_at = forms.DateTimeField(
+        required=False,
+        label="Close it",
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+    )
     vote_charities = forms.ModelMultipleChoiceField(
         queryset=Charity.objects.filter(is_approved=True),
         required=False,
@@ -183,6 +198,12 @@ class OrgCreateForm(forms.ModelForm):
         self._clean_categories(cleaned)
         method = cleaned.get("charity_method")
         if method == "vote":
+            opens = cleaned.get("vote_opens_at")
+            closes = cleaned.get("vote_closes_at")
+            if closes and not opens:
+                self.add_error("vote_opens_at", "Say when it opens as well as when it closes.")
+            if opens and closes and closes <= opens:
+                self.add_error("vote_closes_at", "The vote has to close after it opens.")
             candidates = cleaned.get("vote_charities")
             if not candidates or candidates.count() < 2:
                 self.add_error(

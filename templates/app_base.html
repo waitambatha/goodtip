@@ -65,8 +65,68 @@
   <nav class="app-nav">
     <div class="an-inner">
       <a href="{% url 'dashboard' %}" class="an-brand">GOOD<span>TIP</span></a>
-      {# truncates with an ellipsis when the row is tight — the title carries the rest #}
-      {% if primary_org %}<span class="an-org" title="{{ primary_org.name }}">{{ primary_org.name }}</span>{% endif %}
+      {% comment %}
+      WHERE YOU ARE, on every page.
+
+      This was a label. It has to be a control, because tips now belong to the
+      context they were made in: the same fixture takes one tip for Marketing
+      and another for the organisation, on separate ladders. Someone who cannot
+      see which one they are standing in will tip into the wrong one and have
+      no way to notice — the fixtures look identical either way.
+
+      So the group is named in the chip whenever there is one, and switching
+      out of it is one click from anywhere rather than a trip to the groups
+      page. Truncates with an ellipsis when the row is tight; the title
+      attribute carries the rest.
+      {% endcomment %}
+      {% if current_org %}
+      <div class="an-menu an-ctx" data-anmenu>
+        <button type="button" class="an-menu-btn an-ctx-btn" aria-expanded="false" aria-haspopup="true"
+                title="{{ current_org.name }}{% if current_group %} &rsaquo; {{ current_group.name }}{% endif %}">
+          <span class="an-ctx-org">{{ current_org.name }}</span>
+          {% if current_group %}<span class="an-ctx-sep" aria-hidden="true">&rsaquo;</span><span class="an-ctx-group">{{ current_group.name }}</span>{% endif %}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="an-menu-panel" hidden>
+          {% if current_org.groups_enabled %}
+          <div class="an-ctx-head">Tipping in</div>
+          <form method="post" action="{% url 'orgs:leave_group_context' %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="an-ctx-row{% if not current_group %} on{% endif %}">
+              <span class="mi-txt"><b>{{ current_org.name }}</b><i>The whole organisation</i></span>
+            </button>
+          </form>
+          {% for g in current_org_groups %}
+          <form method="post" action="{% url 'orgs:switch_group' current_org.id g.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="an-ctx-row{% if current_group.id == g.id %} on{% endif %}">
+              <span class="mi-txt"><b>{{ g.name }}</b><i>{% if g.kind_label %}{{ g.kind_label }}{% else %}Your group{% endif %}</i></span>
+            </button>
+          </form>
+          {% endfor %}
+          <a href="{% url 'orgs:groups' current_org.id %}" class="an-ctx-more">All groups &rarr;</a>
+          {% endif %}
+
+          {% if nav_orgs|length > 1 %}
+          <div class="an-ctx-head">Switch organisation</div>
+          {% for o in nav_orgs %}{% if o.id != current_org.id %}
+          <form method="post" action="{% url 'orgs:switch_org' o.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="an-ctx-row"><span class="mi-txt"><b>{{ o.name }}</b></span></button>
+          </form>
+          {% endif %}{% endfor %}
+          {% endif %}
+
+          {% if not current_org.groups_enabled and nav_orgs|length <= 1 %}
+          <div class="an-ctx-head">{{ current_org.name }}</div>
+          <a href="{% url 'orgs:groups' current_org.id %}" class="an-ctx-more">Split it into groups &rarr;</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
       <div class="an-links">
         <a href="{% url 'dashboard' %}" class="{% block nav_dash %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-home"/></svg><span>Dashboard</span></a>
         {% if primary_org %}
@@ -102,6 +162,10 @@
               <a href="{% url 'orgs:members' primary_org.id %}">
                 <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-users"/></svg></span>
                 <span class="mi-txt"><b>Members</b><i>Invites, join requests and roles</i></span>
+              </a>
+              <a href="{% url 'orgs:settings' primary_org.id %}">
+                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-sliders"/></svg></span>
+                <span class="mi-txt"><b>Settings</b><i>What you tip on</i></span>
               </a>
               {# groups live inside a top-level organisation only #}
               {% if not primary_org.parent_id %}

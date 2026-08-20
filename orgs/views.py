@@ -17,7 +17,7 @@ from django.views.decorators.http import require_POST
 
 from accounts.views import JOIN_INVITER_SESSION_KEY, JOIN_SESSION_KEY
 from catalog.models import GroupType
-from .forms import InviteByEmailForm, OrgCreateForm
+from .forms import InviteByEmailForm, OrgCreateForm, fed_competitions
 from .notifications import send_org_invites
 from .models import (
     CharityVote,
@@ -148,7 +148,7 @@ WIZARD_STEPS = [
      ["competitions", "season", "team_size", "finals_only"]),
     (4, "The charity", "Choose a cause",
      ["charity_method", "charity", "new_charity_name",
-      "new_charity_url", "vote_charities"]),
+      "new_charity_url", "vote_charities", "vote_opens_at", "vote_closes_at"]),
     (5, "Review", "Check & create", []),
 ]
 VERIFY_STEP = 2
@@ -466,11 +466,29 @@ def create_org_view(request):
                 # The election is created in draft — the admin schedules it
                 # (or starts it now) from the dashboard, and members are
                 # notified by email + in-app when it actually opens.
-                create_charity_election(org, form.cleaned_data["vote_charities"])
-                messages.success(
-                    request,
-                    f"{org.name} created — set up the charity election when you're ready.",
-                )
+                vote = create_charity_election(org, form.cleaned_data["vote_charities"])
+                opens = form.cleaned_data.get("vote_opens_at")
+                if opens:
+                    # Scheduling here rather than leaving it in draft: the
+                    # wizard used to end with "set up the election when you're
+                    # ready", and an admin who never came back left their
+                    # members with a vote that silently never opened.
+                    schedule_charity_election(
+                        vote, when=opens, close_at=form.cleaned_data.get("vote_closes_at"),
+                    )
+                    if vote.is_open:
+                        messages.success(request, f"{org.name} created, and the charity vote is open.")
+                    else:
+                        stamp = timezone.localtime(opens)
+                        messages.success(
+                            request,
+                            f"{org.name} created. The charity vote opens {stamp:%-d %b at %-I:%M %p}.",
+                        )
+                else:
+                    messages.success(
+                        request,
+                        f"{org.name} created — set up the charity election when you're ready.",
+                    )
             else:
                 # Charity was picked at creation — start the timeline.
                 record_charity_selection(org, org.charity, source=OrgCharitySelection.SOURCE_INITIAL)
@@ -1869,6 +1887,71 @@ def _department_icon(dept) -> tuple[str, str]:
         if any(w in haystack for w in words):
             return icon, tone
     return "ic-f-org", "green"
+
+
+# ---------------------------------------------------------------------------
+# Organisation settings — the things that were only settable at creation
+# ---------------------------------------------------------------------------
+
+
+@login_required
+def org_settings_view(request, org_id: int):
+    """Change what an organisation picked when it was created.
+
+    Competitions were chosen at step 3 of the wizard and then frozen: the field
+    appeared in exactly one template and there was no edit path anywhere, so an
+    organisation that started on NRL and wanted AFL the following year had no
+    way to say so short of asking support. That is the whole reason this page
+    exists.
+
+    Adding a competition brings its whole series with it — pick NRL and the
+    members get NRL and NRLW, never one without the other. That is a property
+    of Competition rather than a rule enforced here: a Competition bundles its
+    men's, women's and representative series, and the form offers Competitions.
+    """
+    org = get_object_or_404(Organisation, pk=org_id, parent__isnull=True)
+    if not _can_manage(request.user, org):
+        return HttpResponseForbidden()
+
+    if request.method == "POST":
+        picked = set(request.POST.getlist("competitions"))
+        allowed = {str(c.pk): c for c in fed_competitions()}
+        chosen = [allowed[p] for p in picked if p in allowed]
+        if not chosen:
+            messages.error(request, "Keep at least one competition — members need something to tip.")
+            return redirect("orgs:settings", org_id=org.pk)
+
+        before = set(org.competitions.values_list("pk", flat=True))
+        org.competitions.set(chosen)
+        after = {c.pk for c in chosen}
+
+        added = [c.name for c in chosen if c.pk not in before]
+        # Removing is not a delete. The rounds, the tips and the ladder for a
+        # competition that has been dropped all stay exactly where they are —
+        # a season half-played is still a season people remember. It stops
+        # appearing on the tipping screens, and putting it back restores it.
+        removed_count = len(before - after)
+        if added:
+            messages.success(
+                request,
+                f"Added {', '.join(added)}. Members get the men's and women's "
+                "competitions together — there's no picking one without the other.",
+            )
+        if removed_count:
+            messages.info(
+                request,
+                f"{removed_count} competition{'s' if removed_count != 1 else ''} removed. "
+                "Nothing was deleted — the rounds and tips are still there if you add it back.",
+            )
+        if not added and not removed_count:
+            messages.info(request, "Nothing changed.")
+        return redirect("orgs:settings", org_id=org.pk)
+
+    return render(request, "orgs/settings.html", {
+        "org": org,
+        "competitions": fed_competitions(),
+        "chosen_ids": set(org.competitions.values_list("pk", flat=True)),
+    })
 
 
 # ---------------------------------------------------------------------------
