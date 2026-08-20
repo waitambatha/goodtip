@@ -7,14 +7,20 @@
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-copy-link]');
     if (!btn) return;
+    if (btn.classList.contains('copied')) return;  // mid-flash, ignore the re-click
     var url = btn.getAttribute('data-copy-link');
+    // Write into the label span when there is one. Setting textContent on the
+    // button itself would delete the icon sitting beside the words, and it
+    // never came back — restoring the old text cannot restore an <svg>.
+    var label = btn.querySelector('[data-copy-label]');
+    var target = label || btn;
     var done = function () {
-      var original = btn.getAttribute('data-label') || btn.textContent;
+      var original = label ? label.textContent : (btn.getAttribute('data-label') || btn.textContent);
       btn.classList.add('copied');
-      btn.textContent = 'Link copied';
+      target.textContent = 'Link copied';
       setTimeout(function () {
         btn.classList.remove('copied');
-        btn.textContent = original;
+        target.textContent = original;
       }, 1800);
     };
     if (navigator.clipboard && window.isSecureContext) {

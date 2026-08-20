@@ -28,9 +28,18 @@ class NewsPost(models.Model):
     slug = models.SlugField(max_length=220, unique=True, blank=True)
     tag = models.CharField(max_length=10, choices=TAG_CHOICES, default="NEWS")
     excerpt = models.TextField(blank=True, help_text="Short teaser shown under the headline.")
+    # Rich-formatted teaser, same split as title/title_html: `excerpt` keeps the
+    # plain-text version because the teaser is reused where markup cannot go —
+    # the OG/meta description, the announcement email, and the `truncatechars`
+    # cards on the dashboard and news list.
+    excerpt_html = models.TextField(blank=True)
     body = models.TextField(blank=True, help_text="Rich HTML from the story editor.")
     image = models.ImageField(upload_to="news/", blank=True, null=True)
-    link_url = models.URLField(blank=True, help_text="Optional: send readers to a full story elsewhere.")
+    # Deprecated. Every story now lives at its own auto-generated /news/<slug>/
+    # URL, so "read the original elsewhere" had nowhere sensible to point, and
+    # where a story came from is recorded in `sources` instead. The column stays
+    # so the URLs already saved against old posts are not destroyed.
+    link_url = models.URLField(blank=True, help_text="Deprecated, use `sources`.")
     # Optional citations shown under the story: [{"label": "...", "url": "..."}, ...].
     sources = models.JSONField(default=list, blank=True)
     is_published = models.BooleanField(default=True)
@@ -49,6 +58,11 @@ class NewsPost(models.Model):
 
     def __str__(self):
         return self.title
+
+    def get_absolute_url(self) -> str:
+        from django.urls import reverse
+
+        return reverse("news_detail", args=[self.slug])
 
     def save(self, *args, **kwargs):
         # Generated once at creation and kept stable after that — a slug that

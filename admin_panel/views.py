@@ -1,3 +1,5 @@
+import html
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
@@ -337,9 +339,23 @@ superuser_required = user_passes_test(
 )
 
 
+def _plain_text(html_value: str) -> str:
+    """The plain-text reading of an editor surface.
+
+    strip_tags alone is not enough: the surface stores entities, so a headline
+    typed as "Tips & tricks" comes back as "Tips &amp; tricks" and that literal
+    string then gets escaped a second time wherever it is printed — in the page
+    <title>, the slug, the email subject and the OG tags. Unescaping here means
+    the plain-text mirror holds the characters the author actually typed.
+    """
+    text = html.unescape(strip_tags(html_value or ""))
+    # A contenteditable emits &nbsp; freely; collapse it with the rest.
+    return " ".join(text.replace("\xa0", " ").split())
+
+
 def _headline_text(request) -> str:
     """Plain-text version of the rich headline, for the empty-headline guard."""
-    return strip_tags(request.POST.get("title_html", "")).strip()
+    return _plain_text(request.POST.get("title_html", ""))
 
 
 def _parse_sources(post_data) -> list:
@@ -358,15 +374,21 @@ def _fill_news_post(request, post: NewsPost) -> NewsPost:
     """Populate `post` from POST data. Caller decides whether to save it."""
     title_html = sanitize_editor_html(request.POST.get("title_html", "").strip())
     post.title_html = title_html
-    post.title = strip_tags(title_html).strip()
+    post.title = _plain_text(title_html)
     post.tag = request.POST.get("tag", "NEWS")
-    post.excerpt = request.POST.get("excerpt", "").strip()
+    excerpt_html = sanitize_editor_html(request.POST.get("excerpt_html", "").strip())
+    post.excerpt_html = excerpt_html
+    post.excerpt = _plain_text(excerpt_html)
     post.body = sanitize_editor_html(request.POST.get("body", "").strip())
-    post.link_url = request.POST.get("link_url", "").strip()
     post.sources = _parse_sources(request.POST)
     post.is_published = bool(request.POST.get("is_published"))
     if request.FILES.get("image"):
         post.image = request.FILES["image"]
+    elif request.POST.get("image_clear"):
+        # The drop zone's Remove button. Only the reference is dropped — the
+        # file itself stays on disk, since an image is easy to re-point at and
+        # impossible to get back.
+        post.image = None
     return post
 
 
@@ -393,7 +415,12 @@ def _editor_body_html(body: str) -> str:
 
 @superuser_required
 def news_list(request):
-    posts = NewsPost.objects.all()
+    # Each row carries the story's own public URL so it can be copied straight
+    # from the list — the point of the auto-generated slug is that the link is
+    # ready to share the moment the post is saved.
+    posts = list(NewsPost.objects.all())
+    for post in posts:
+        post.share_url = request.build_absolute_uri(post.get_absolute_url())
     return render(request, "manage/news.html", {"posts": posts})
 
 
@@ -433,6 +460,7 @@ def news_edit(request, post_id: int):
     return render(request, "manage/news_editor.html", {
         "post": post, "tag_choices": NewsPost.TAG_CHOICES, "is_new": False,
         "initial_body": _editor_body_html(post.body),
+        "share_url": request.build_absolute_uri(post.get_absolute_url()),
     })
 
 

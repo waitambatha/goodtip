@@ -3,9 +3,10 @@
  * The old form was a plain textarea inside a sidebar aside, and the client
  * flagged both problems at once: the box felt too small for writing an actual
  * article, and there was no way to format anything (headings, bold, colour,
- * alignment, images). This drives two contenteditable surfaces (headline,
- * body) plus their toolbars — no editor library, just execCommand, since the
- * only audience is the superuser story form.
+ * alignment, images). This drives three contenteditable surfaces (headline,
+ * teaser, body) plus their toolbars, the font-size stepper and the featured
+ * image drop zone — no editor library, just execCommand, since the only
+ * audience is the superuser story form.
  *
  * Each toolbar control keeps working after a click/selection change because
  * clicking a <select> or <input type=color> moves focus away from the
@@ -57,6 +58,9 @@
 
   function applyFontSize(surface, px) {
     restoreSelection(surface);
+    // execCommand only speaks in the seven legacy <font size> buckets, so ask
+    // for the top one and swap every tag it just made for a span carrying the
+    // exact pixel value the author typed.
     document.execCommand('fontSize', false, '7');
     surface.querySelectorAll('font[size="7"]').forEach(function (el) {
       var span = document.createElement('span');
@@ -65,6 +69,61 @@
       el.replaceWith(span);
     });
     syncHidden(surface);
+  }
+
+  /* Size of the text the caret is sitting in, so the number box reports where
+   * you already are rather than starting from a guess every time. */
+  function currentFontSize(surface) {
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !inSurface(surface, sel.anchorNode)) return null;
+    var node = sel.anchorNode;
+    var el = node.nodeType === 1 ? node : node.parentElement;
+    if (!el) return null;
+    var px = parseFloat(window.getComputedStyle(el).fontSize);
+    return px ? Math.round(px) : null;
+  }
+
+  /* The size stepper: −  [ 17 ]  +
+   *
+   * Returns the number input so the caller can keep it in step with the
+   * selection. Every control here cancels mousedown, because the surface loses
+   * its text selection the moment focus moves and there would be nothing left
+   * to resize. */
+  function wireSizeControl(editor, surface) {
+    var box = editor.querySelector('.ned-size');
+    if (!box) return null;
+    var num = box.querySelector('[data-cmd="fontSizePx"]');
+    if (!num) return null;
+
+    var fallback = parseInt(box.getAttribute('data-size-default'), 10) || 16;
+    var min = parseInt(num.getAttribute('min'), 10) || 8;
+    var max = parseInt(num.getAttribute('max'), 10) || 120;
+
+    function value() {
+      var v = parseInt(num.value, 10);
+      return isNaN(v) ? fallback : Math.min(max, Math.max(min, v));
+    }
+
+    function apply(px) {
+      num.value = px;
+      applyFontSize(surface, px);
+    }
+
+    num.addEventListener('change', function () { apply(value()); });
+    num.addEventListener('keydown', function (e) {
+      // Enter inside a number box would otherwise submit the whole story.
+      if (e.key === 'Enter') { e.preventDefault(); apply(value()); }
+    });
+
+    box.querySelectorAll('[data-size-step]').forEach(function (btn) {
+      btn.addEventListener('mousedown', function (e) {
+        e.preventDefault();
+        var step = parseInt(btn.getAttribute('data-size-step'), 10) || 0;
+        apply(Math.min(max, Math.max(min, value() + step)));
+      });
+    });
+
+    return num;
   }
 
   function insertLink(surface, url) {
@@ -125,7 +184,15 @@
     syncHidden(surface);
     surface.addEventListener('input', function () { syncHidden(surface); });
     surface.addEventListener('blur', function () { syncHidden(surface); });
-    document.addEventListener('selectionchange', function () { saveSelection(surface); });
+
+    var sizeBox = wireSizeControl(editor, surface);
+    document.addEventListener('selectionchange', function () {
+      saveSelection(surface);
+      // Don't fight the author while they are typing a number into the box.
+      if (!sizeBox || document.activeElement === sizeBox) return;
+      var px = currentFontSize(surface);
+      if (px) sizeBox.value = px;
+    });
 
     editor.querySelectorAll('[data-cmd]').forEach(function (ctrl) {
       var cmd = ctrl.getAttribute('data-cmd');
@@ -142,16 +209,16 @@
         return;
       }
 
+      // The size box is a number input, not a command select — wireSizeControl
+      // owns it, so it must not fall through to the generic handlers below.
+      if (cmd === 'fontSizePx') return;
+
       if (ctrl.tagName === 'SELECT') {
         ctrl.addEventListener('change', function () {
           if (!ctrl.value) return;
           restoreSelection(surface);
-          if (cmd === 'fontSizeCustom') {
-            applyFontSize(surface, ctrl.value);
-          } else {
-            document.execCommand(cmd, false, ctrl.value);
-            syncHidden(surface);
-          }
+          document.execCommand(cmd, false, ctrl.value);
+          syncHidden(surface);
           ctrl.selectedIndex = 0;
         });
         return;
@@ -198,7 +265,7 @@
       }
 
       if (action === 'image') {
-        var fileInput = editor.querySelector('input[type="file"]');
+        var fileInput = editor.querySelector('[data-inline-image]');
         ctrl.addEventListener('mousedown', function (e) {
           e.preventDefault();
           saveSelection(surface);
@@ -265,9 +332,120 @@
     });
   }
 
+  /* Featured image: a real drop zone rather than a bare file input.
+   *
+   * The browser's own control cannot be styled, gives no preview, shows a
+   * truncated filename, and offers no way to take an image back off a post.
+   * So the input is driven from a button beside it, the chosen file is shown
+   * immediately from a local object URL — no upload round trip — and Remove
+   * sets a flag the view reads to clear the field. */
+  function wireFeaturedImage() {
+    var drop = document.querySelector('[data-image-drop]');
+    if (!drop) return;
+
+    var input = drop.querySelector('[data-image-input]');
+    var preview = drop.querySelector('[data-image-preview]');
+    var nameEl = drop.querySelector('[data-image-name]');
+    var noteEl = drop.querySelector('[data-image-note]');
+    var pickLabel = drop.querySelector('[data-image-pick-label]');
+    var pickBtn = drop.querySelector('[data-image-pick]');
+    var clearBtn = drop.querySelector('[data-image-clear]');
+    var clearFlag = drop.querySelector('[data-image-clear-flag]');
+    if (!input || !preview) return;
+
+    var EMPTY_ICON = '<svg class="ned-drop-ph"><use href="#ic-image"/></svg>';
+    var EMPTY_NAME = 'The card and hero image for this story';
+    var EMPTY_NOTE = 'Shown on the dashboard, the news list and the top of the article. ' +
+                     'Drag a file in, or choose one.';
+    var objectUrl = null;
+
+    function releaseUrl() {
+      if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+    }
+
+    function readableSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function showFile(file) {
+      releaseUrl();
+      objectUrl = URL.createObjectURL(file);
+      preview.innerHTML = '<img alt="">';
+      preview.querySelector('img').src = objectUrl;
+      drop.classList.add('has-image');
+      if (nameEl) nameEl.textContent = file.name;
+      if (noteEl) noteEl.textContent = readableSize(file.size) + ' · saved when you save the post';
+      if (pickLabel) pickLabel.textContent = 'Replace image';
+      if (clearBtn) clearBtn.hidden = false;
+      if (clearFlag) clearFlag.value = '';
+    }
+
+    function showEmpty() {
+      releaseUrl();
+      preview.innerHTML = EMPTY_ICON;
+      drop.classList.remove('has-image');
+      if (nameEl) nameEl.textContent = EMPTY_NAME;
+      if (noteEl) noteEl.textContent = EMPTY_NOTE;
+      if (pickLabel) pickLabel.textContent = 'Choose image';
+      if (clearBtn) clearBtn.hidden = true;
+    }
+
+    function accept(file) {
+      if (!file) return;
+      if (!/^image\//.test(file.type)) {
+        if (noteEl) noteEl.textContent = "That file isn't an image — pick a JPG, PNG or WebP.";
+        return;
+      }
+      showFile(file);
+    }
+
+    if (pickBtn) pickBtn.addEventListener('click', function () { input.click(); });
+    input.addEventListener('change', function () {
+      if (input.files && input.files[0]) accept(input.files[0]);
+    });
+
+    if (clearBtn) clearBtn.addEventListener('click', function () {
+      input.value = '';
+      // Tells the view to drop the stored image too, not just the new pick.
+      if (clearFlag) clearFlag.value = '1';
+      showEmpty();
+    });
+
+    ['dragenter', 'dragover'].forEach(function (evt) {
+      drop.addEventListener(evt, function (e) {
+        e.preventDefault();
+        drop.classList.add('is-dragging');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (evt) {
+      drop.addEventListener(evt, function (e) {
+        if (evt === 'dragleave' && drop.contains(e.relatedTarget)) return;
+        drop.classList.remove('is-dragging');
+      });
+    });
+    drop.addEventListener('drop', function (e) {
+      e.preventDefault();
+      var files = e.dataTransfer && e.dataTransfer.files;
+      if (!files || !files.length) return;
+      // The file has to end up on the input itself — the form posts that, not
+      // whatever the preview happens to be showing.
+      try {
+        input.files = files;
+      } catch (err) {
+        var dt = new DataTransfer();
+        dt.items.add(files[0]);
+        input.files = dt.files;
+      }
+      accept(files[0]);
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('[data-editor]').forEach(wireEditor);
     wireSlugPreview();
     wireSourceRows();
+    wireFeaturedImage();
   });
 })();

@@ -19,9 +19,9 @@
       {% if post.image %}<div class="pn-hero" style="background-image:url('{{ post.image.url }}')"><span class="pn-tag">{{ post.get_tag_display }}</span></div>{% endif %}
       <h1>{% if post.title_html %}{{ post.title_html|safe }}{% else %}{{ post.title }}{% endif %}</h1>
       <div class="pn-meta">{{ post.published_at|date:"l j F Y" }} &middot; {{ post.published_at|naturaltime }}</div>
-      {% if post.excerpt %}<p class="pn-lead">{{ post.excerpt }}</p>{% endif %}
+      {% if post.excerpt_html %}<p class="pn-lead">{{ post.excerpt_html|safe }}</p>
+      {% elif post.excerpt %}<p class="pn-lead">{{ post.excerpt }}</p>{% endif %}
       {% if post.body %}<div class="pn-prose">{% if "<" in post.body %}{{ post.body|safe }}{% else %}{{ post.body|linebreaks }}{% endif %}</div>{% endif %}
-      {% if post.link_url %}<a href="{{ post.link_url }}" target="_blank" rel="noopener" class="btn-primary" style="margin-top:20px;display:inline-block;">Read the original story &rarr;</a>{% endif %}
 
       {% include "partials/_news_share.html" with prefix="pn" %}
     </div>

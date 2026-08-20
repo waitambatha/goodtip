@@ -1,0 +1,16 @@
+{% comment %}
+Font size control for a story-editor toolbar. Pass `default` — the size in px
+that this surface already renders at, so the box starts by telling the truth
+rather than saying "Size".
+
+This replaced a dropdown of Small / Medium / Large / XL. Those names were a
+guess dressed up as a choice: they gave no idea what size you were about to
+get, no idea what size you were already on, and no way to ask for anything in
+between. A number you can nudge up and down does all three.
+{% endcomment %}
+<span class="ned-size" data-size-default="{{ default }}">
+  <button type="button" class="ned-size-step" data-size-step="-1" title="Smaller" aria-label="Smaller text">&minus;</button>
+  <input type="number" class="ned-size-num" data-cmd="fontSizePx"
+         min="8" max="120" step="1" value="{{ default }}" aria-label="Font size in pixels">
+  <button type="button" class="ned-size-step" data-size-step="1" title="Bigger" aria-label="Bigger text">+</button>
+</span>

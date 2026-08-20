@@ -18,9 +18,9 @@
   <h1 class="art-title">{% if post.title_html %}{{ post.title_html|safe }}{% else %}{{ post.title }}{% endif %}</h1>
   <div class="art-meta">{{ post.published_at|date:"l j F Y, g:i a" }} &middot; {{ post.published_at|naturaltime }}{% if post.created_by %} &middot; by {{ post.created_by.display_name }}{% endif %}</div>
 
-  {% if post.excerpt %}<p class="art-lead">{{ post.excerpt }}</p>{% endif %}
+  {% if post.excerpt_html %}<p class="art-lead">{{ post.excerpt_html|safe }}</p>
+  {% elif post.excerpt %}<p class="art-lead">{{ post.excerpt }}</p>{% endif %}
   {% if post.body %}<div class="art-body">{% if "<" in post.body %}{{ post.body|safe }}{% else %}{{ post.body|linebreaks }}{% endif %}</div>{% endif %}
-  {% if post.link_url %}<a href="{{ post.link_url }}" target="_blank" rel="noopener" class="abtn abtn-dark" style="margin-top:18px;">Read the original story &rarr;</a>{% endif %}
 
   {% include "partials/_news_share.html" with prefix="art" %}
 </div>

@@ -5,6 +5,7 @@
 {% block hero_title %}News &amp; blog{% endblock %}
 {% block hero_lead %}Everything published here reaches every member's dashboard.{% endblock %}
 {% block hero_shot %}{% static 'img/scenes/aussie-crowd-flag.jpg' %}{% endblock %}
+{% block extra_head %}<script src="{% static 'js/gt-share.js' %}" defer></script>{% endblock %}
 {% block admin_content %}
 
 <div class="gt-shell gt-shell-single">
@@ -69,6 +70,17 @@
 
           <div class="np-acts">
             <a class="np-btn" href="{% url 'manage:news_edit' p.id %}">Edit</a>
+
+            {% comment %}
+            The story's own address, ready to paste. It only shows on published
+            posts because that URL 404s until the post is live — offering a
+            link that does not resolve yet is worse than not offering one.
+            {% endcomment %}
+            {% if p.is_published %}
+            <button type="button" class="np-btn" data-copy-link="{{ p.share_url }}" title="{{ p.share_url }}">
+              <span data-copy-label>Copy link</span>
+            </button>
+            {% endif %}
 
             <form method="post" action="{% url 'manage:news_toggle' p.id %}" data-busy="Saving">
               {% csrf_token %}

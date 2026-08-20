@@ -9663,8 +9663,21 @@ body.fxh-open { overflow: hidden; }
 .ned-meta-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
 .ned-meta-row .fld { margin-bottom: 0; }
 .ned-meta-row select { width: auto; min-width: 140px; }
-.ned-slug { font-size: 12.5px; color: var(--muted); font-family: var(--mark); }
-.ned-slug b { color: var(--ink); font-weight: 600; }
+.ned-url { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.ned-url-k { font-weight: 600; }
+.ned-url-v {
+  font-family: var(--mark); font-weight: 600; color: var(--ink);
+  background: var(--gt-card); border: 1px solid var(--gt-hair); border-radius: 8px;
+  padding: 5px 9px; max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ned-url-btn {
+  display: inline-flex; align-items: center; gap: 6px; text-decoration: none; cursor: pointer;
+  background: none; border: 1px solid var(--gt-hair); border-radius: 8px; padding: 6px 10px;
+  font-family: var(--body); font-size: 12.5px; font-weight: 700; color: var(--forest);
+}
+.ned-url-btn:hover { border-color: var(--forest); background: rgba(45,122,58,.07); }
+.ned-url-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; }
+.ned-url-btn.copied { background: var(--lime); border-color: var(--lime); color: var(--deep); }
 
 .ned-field-label { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 8px; display: block; }
 
@@ -9680,7 +9693,40 @@ body.fxh-open { overflow: hidden; }
   font-family: var(--body); line-height: 1;
 }
 .ned-toolbar button:hover, .ned-toolbar select:hover { background: rgba(15,46,34,.07); }
-.ned-toolbar select { padding: 6px; max-width: 118px; font-weight: 600; }
+/* A 118px cap used to cut the longer option labels — "Small subtitle",
+   "Condensed" — off mid-word, so the control showed a name you could not read
+   and gave no clue what it was set to. Each picker now sizes to its own widest
+   option and holds that width (flex-shrink off, or a tight toolbar would claw
+   the pixels straight back); when the page is narrow the toolbar wraps to a
+   second line instead, which costs a few pixels of height and nothing else. */
+.ned-toolbar select.ned-pick {
+  flex: 0 0 auto; width: auto; max-width: none;
+  padding: 6px 8px; font-weight: 600;
+  border-color: var(--gt-hair); background: #fff;
+}
+.ned-toolbar select.ned-pick:hover { border-color: var(--forest); background: #fff; }
+
+/* ---- Font size: a number you nudge, not a bucket you guess at ---- */
+.ned-size {
+  display: inline-flex; align-items: center; flex: 0 0 auto;
+  border: 1px solid var(--gt-hair); border-radius: 8px; background: #fff; overflow: hidden;
+}
+.ned-size-step {
+  width: 26px; height: 30px; padding: 0; border: 0; background: none;
+  color: var(--forest); font-size: 15px; font-weight: 800; line-height: 1; cursor: pointer;
+}
+.ned-size-step:hover { background: rgba(45,122,58,.12); }
+.ned-size-num {
+  width: 42px; padding: 6px 0; text-align: center; background: none; outline: none;
+  border: 0; border-left: 1px solid var(--gt-hair); border-right: 1px solid var(--gt-hair);
+  font-family: var(--body); font-size: 13px; font-weight: 700; color: var(--ink);
+  -moz-appearance: textfield;
+}
+.ned-size-num:focus { background: rgba(200,241,53,.25); }
+/* The native spinners are tiny, and the − / + buttons beside them are the
+   whole point of this control. */
+.ned-size-num::-webkit-outer-spin-button,
+.ned-size-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .ned-toolbar input[type="color"] {
   width: 30px; height: 30px; padding: 2px; border: 1px solid var(--gt-hair);
   border-radius: 8px; background: none; cursor: pointer;
@@ -9720,25 +9766,56 @@ body.fxh-open { overflow: hidden; }
   font-family: var(--display); font-size: clamp(24px, 3.6vw, 34px); line-height: 1.2;
   padding: 18px 22px; min-height: 1.3em;
 }
+.ned-editor.is-teaser .ned-surface {
+  min-height: 3.6em; font-size: 17px; line-height: 1.6; padding: 14px 18px; color: var(--ink);
+}
 .ned-editor.is-body .ned-surface { min-height: 46vh; font-size: 16px; line-height: 1.75; }
 
+.ned-hint { color: var(--muted); font-weight: 400; font-size: 12px; }
+
+/* The browser's own file input cannot be styled, shows a truncated filename,
+   previews nothing and gives no way to take an image back off a post. It is
+   kept off-screen and driven from the button, so this row is a real drop zone:
+   thumbnail, filename and weight, replace, remove. */
 .ned-drop {
+  position: relative;
   border: 1.5px dashed var(--gt-hair); border-radius: 14px; padding: 20px;
   display: flex; align-items: center; gap: 16px; background: var(--gt-card);
+  transition: border-color .15s var(--ease), background .15s var(--ease);
 }
+.ned-drop.has-image { border-style: solid; }
+.ned-drop.is-dragging { border-color: var(--forest); background: rgba(45,122,58,.07); }
 .ned-drop .ned-drop-prev {
   width: 92px; height: 92px; border-radius: 10px; overflow: hidden; flex: none;
   background: rgba(15,46,34,.06); display: grid; place-items: center; color: var(--muted);
 }
 .ned-drop .ned-drop-prev img { width: 100%; height: 100%; object-fit: cover; }
+.ned-drop .ned-drop-ph { width: 26px; height: 26px; stroke: currentColor; fill: none; stroke-width: 1.6; }
 .ned-drop .ned-drop-txt { flex: 1; min-width: 0; }
-.ned-drop .ned-drop-txt b { display: block; font-size: 14.5px; color: var(--ink); margin-bottom: 3px; }
-.ned-drop .ned-drop-txt span { font-size: 12.5px; color: var(--muted); }
-.ned-drop input[type="file"] {
-  width: auto; flex: none; max-width: 100%;
-  padding: 8px 10px; font-size: 12.5px; background: #fff;
-  border: 1px solid var(--gt-hair); border-radius: 8px;
+.ned-drop .ned-drop-txt b {
+  display: block; font-size: 14.5px; color: var(--ink); margin-bottom: 3px;
+  overflow-wrap: anywhere;
 }
+.ned-drop .ned-drop-txt span { font-size: 12.5px; color: var(--muted); }
+.ned-drop-acts { flex: none; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ned-drop-btn {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  background: var(--lime); border: 1px solid transparent; color: var(--deep);
+  border-radius: 10px; padding: 10px 16px;
+  font-family: var(--body); font-size: 13.5px; font-weight: 700; white-space: nowrap;
+}
+.ned-drop-btn:hover { filter: brightness(1.05); }
+.ned-drop-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+.ned-drop-clear {
+  cursor: pointer; background: none; border: 1px solid var(--gt-hair); color: #9a2b2b;
+  border-radius: 10px; padding: 10px 14px;
+  font-family: var(--body); font-size: 13px; font-weight: 700; white-space: nowrap;
+}
+.ned-drop-clear:hover { background: #9a2b2b; color: #fff; border-color: #9a2b2b; }
+.ned-drop-clear[hidden] { display: none; }
+/* Off-screen rather than display:none — a hidden input still has to be
+   focusable enough for .click() and for the form to post its file. */
+.ned-drop-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
 .ned-source-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
 .ned-source-row input { flex: 1; padding: 10px 12px; border: 1px solid var(--app-line); border-radius: 9px; font-size: 14px; }
@@ -9768,7 +9845,9 @@ body.fxh-open { overflow: hidden; }
   .ned-toolbar { position: static; }
   .ned-editor.is-body .ned-surface { min-height: 34vh; }
   .ned-drop { flex-wrap: wrap; }
-  .ned-drop input[type="file"] { width: 100%; }
+  .ned-drop-acts { width: 100%; }
+  .ned-drop-btn { flex: 1; justify-content: center; }
+  .ned-url-v { max-width: 100%; }
 }
 
 /* ---- Article share bar + optional sources, on the published story page ---- */
