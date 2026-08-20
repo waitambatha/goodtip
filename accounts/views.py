@@ -425,8 +425,11 @@ def dashboard_view(request):
                 ).order_by("-round_number")
             )
         )
-        stats = user_org_stats(request.user, org)
-        rank = user_rank_in_org(request.user, org)
+        # The card is about the room this member is standing in, so its total
+        # and its rank have to come from the same one.
+        card_group = current_group(request, org)
+        stats = user_org_stats(request.user, org, group=card_group)
+        rank = user_rank_in_org(request.user, org, group=card_group)
         tips_done = 0
         tips_total = 0
         if round_in_play:

@@ -3420,3 +3420,106 @@ class GroupResultsEmailTests(TestCase):
         self._settle_and_send()
         self.rnd.refresh_from_db()
         self.assertIsNotNone(self.rnd.results_email_sent_at)
+
+
+class GroupScopeLeakTests(TestCase):
+    """The places that count tips but were still counting all of them.
+
+    Each of these sits next to a number that IS scoped, so a leak here does not
+    look like a leak — it looks like two parts of one screen disagreeing.
+    """
+
+    def setUp(self):
+        from django.utils import timezone
+        from tipping.models import Match, Round, Team
+
+        self.now = timezone.now()
+        self.season = Season.objects.create(year=2089, label="2089")
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
+        )
+        self.sport = Sport.objects.create(name="Leak Code", slug="leak-code")
+        self.series = Series.objects.create(
+            sport=self.sport, name="Leak Comp", slug="leak-comp",
+        )
+        self.parent = Organisation.objects.create(
+            name="Parent", season=self.season, charity=self.charity, groups_enabled=True,
+        )
+        self.child = Organisation.objects.create(
+            name="Child", season=self.season, charity=self.charity, parent=self.parent,
+        )
+        self.user = User.objects.create_user(
+            email="u@leak.com", password="x", display_name="U",
+        )
+        OrgMember.objects.create(user=self.user, org=self.parent)
+        self.marketing = Group.objects.create(org=self.parent, name="Marketing")
+        GroupMember.objects.create(group=self.marketing, user=self.user)
+
+        self.rnd = Round.objects.create(
+            org=self.parent, round_number=1, series=self.series,
+            lockout_at=self.now + timedelta(days=1),
+        )
+        self.match = Match.objects.create(
+            round=self.rnd,
+            home_team=Team.objects.create(name="H", slug="h-leak", series=self.series),
+            away_team=Team.objects.create(name="A", slug="a-leak", series=self.series),
+            kickoff_at=self.now + timedelta(days=2),
+        )
+
+    def _scored(self, group, points):
+        from tipping.models import Tip
+
+        return Tip.objects.create(
+            user=self.user, match=self.match, org=self.parent, group=group,
+            selection="home", is_correct=True, points_awarded=points,
+        )
+
+    def test_the_national_board_leaves_group_tips_out(self):
+        """Otherwise anyone tipping in both is counted twice, one level up from
+        where leaderboard_for_org already guards against it."""
+        from tipping.services import leaderboard_for_family
+
+        self._scored(None, 3)
+        self._scored(self.marketing, 5)
+        board = {u.id: u.points for u in leaderboard_for_family(self.child)}
+        self.assertEqual(board.get(self.user.id), 3)
+
+    def test_dashboard_stats_count_one_room(self):
+        from tipping.services import user_org_stats
+
+        self._scored(None, 3)
+        self._scored(self.marketing, 5)
+        self.assertEqual(user_org_stats(self.user, self.parent)["points"], 3)
+        self.assertEqual(
+            user_org_stats(self.user, self.parent, group=self.marketing)["points"], 5,
+        )
+
+    def test_the_countback_walks_one_rooms_tips(self):
+        """A group ladder broken on the organisation's countback would order
+        its members by tips that never counted towards the tied score."""
+        from tipping.services import _reached_score_at
+
+        self._scored(None, 3)
+        self._scored(self.marketing, 5)
+        org_reached = _reached_score_at(
+            [self.parent.id], [self.user.id], {self.user.id: 3},
+        )
+        grp_reached = _reached_score_at(
+            [self.parent.id], [self.user.id], {self.user.id: 5}, group=self.marketing,
+        )
+        # Both resolve, and neither borrowed the other's tip to get there.
+        self.assertIn(self.user.id, org_reached)
+        self.assertIn(self.user.id, grp_reached)
+
+    def test_a_group_ladder_reports_the_groups_points(self):
+        from tipping.services import leaderboard_for_org
+
+        self._scored(None, 3)
+        self._scored(self.marketing, 5)
+        org_board = {u.id: u.points for u in leaderboard_for_org(self.parent)}
+        grp_board = {
+            u.id: u.points
+            for u in leaderboard_for_org(self.parent, group=self.marketing)
+        }
+        self.assertEqual(org_board.get(self.user.id), 3)
+        self.assertEqual(grp_board.get(self.user.id), 5)

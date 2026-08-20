@@ -369,7 +369,7 @@ def my_tips_view(request, org_id: int):
             ),
         )
 
-    stats = user_org_stats(request.user, org)
+    stats = user_org_stats(request.user, org, group=_group(request, org))
     if request.headers.get("HX-Request"):
         return render(request, "partials/my_tips_round.html", {
             "org": org, "round": selected_round, "rows": tip_rows,
@@ -390,7 +390,7 @@ def my_tips_view(request, org_id: int):
     total_matches = round_match_count
     tips_this_round = len(all_rows)
     total_tippers = len(leaderboard_for_org(org, group=_group(request, org)))
-    rank = user_rank_in_org(request.user, org)
+    rank = user_rank_in_org(request.user, org, group=_group(request, org))
     # Percentile = share of the field this member is ahead of or level with.
     percentile = None
     if rank and total_tippers:

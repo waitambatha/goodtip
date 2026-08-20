@@ -364,7 +364,7 @@ def leaderboard_for_org(org, round_id: int | None = None, group=None):
         # A group's ladder is its own members, not the whole organisation with
         # most of them on nothing.
         board = board.filter(group_memberships__group=group)
-    return apply_tiebreakers(board, [org.id], round_id=round_id)
+    return apply_tiebreakers(board, [org.id], round_id=round_id, group=group)
 
 
 # ---------------------------------------------------------------------------
@@ -389,7 +389,7 @@ PAIRED_SERIES = {
 }
 
 
-def _paired_scores(org_ids, series_name: str, user_ids, round_id=None) -> dict:
+def _paired_scores(org_ids, series_name: str, user_ids, round_id=None, group=None) -> dict:
     """Each user's points in the comp paired with ``series_name``."""
     from accounts.models import User
 
@@ -398,6 +398,7 @@ def _paired_scores(org_ids, series_name: str, user_ids, round_id=None) -> dict:
         return {}
 
     tip_filter = Q(tips__org_id__in=org_ids, tips__match__round__series__name__iexact=partner)
+    tip_filter &= Q(tips__group=group) if group is not None else Q(tips__group__isnull=True)
     if round_id is not None:
         rnd = Round.objects.filter(pk=round_id).only("round_number").first()
         if rnd is not None:
@@ -413,7 +414,7 @@ def _paired_scores(org_ids, series_name: str, user_ids, round_id=None) -> dict:
     return dict(rows)
 
 
-def _reached_score_at(org_ids, user_ids, points_by_user, round_id=None) -> dict:
+def _reached_score_at(org_ids, user_ids, points_by_user, round_id=None, group=None) -> dict:
     """When each user first reached their final total — the countback.
 
     "Whoever reached the tied score first ranks higher." Walking each tipper's
@@ -426,6 +427,7 @@ def _reached_score_at(org_ids, user_ids, points_by_user, round_id=None) -> dict:
     tips = (
         Tip.objects.filter(
             org_id__in=org_ids, user_id__in=user_ids, is_correct__isnull=False,
+            **({"group": group} if group is not None else {"group__isnull": True}),
         )
         .values_list("user_id", "points_awarded", "match__kickoff_at")
         .order_by("match__kickoff_at", "id")
@@ -441,7 +443,7 @@ def _reached_score_at(org_ids, user_ids, points_by_user, round_id=None) -> dict:
     return reached
 
 
-def apply_tiebreakers(board, org_ids, round_id=None):
+def apply_tiebreakers(board, org_ids, round_id=None, group=None):
     """Order a leaderboard, resolving ties on performance rather than on a name.
 
     Returns a list, not a queryset — the second and third steps need data the
@@ -480,8 +482,13 @@ def apply_tiebreakers(board, org_ids, round_id=None):
         if rnd:
             series_name = rnd.series.name
 
-    paired = _paired_scores(org_ids, series_name, user_ids, round_id=round_id)
-    reached = _reached_score_at(org_ids, user_ids, points_by_user, round_id=round_id)
+    # Both steps read tips, so both have to read the same room the board came
+    # from. A group ladder broken on the organisation's countback would order
+    # its members by tips that never counted towards the score being tied.
+    paired = _paired_scores(org_ids, series_name, user_ids, round_id=round_id, group=group)
+    reached = _reached_score_at(
+        org_ids, user_ids, points_by_user, round_id=round_id, group=group,
+    )
 
     from datetime import datetime, timezone as _tz
     far_future = datetime.max.replace(tzinfo=_tz.utc)
@@ -519,7 +526,11 @@ def leaderboard_for_family(org, round_id: int | None = None):
     by (round_number, series) rather than by the id of one org's round.
     """
     family_ids = org.family_ids()
-    tip_filter = Q(tips__org_id__in=family_ids)
+    # Organisation-level tips only. A group's tips belong to that group's
+    # ladder, and pooling them in here would count anyone who tips in both
+    # twice on the national board — the same double count leaderboard_for_org
+    # guards against, one level up.
+    tip_filter = Q(tips__org_id__in=family_ids, tips__group__isnull=True)
     if round_id is not None:
         rnd = Round.objects.filter(pk=round_id).only("round_number", "series_id").first()
         if rnd is not None:
@@ -532,15 +543,19 @@ def leaderboard_for_family(org, round_id: int | None = None):
     )
 
 
-def user_org_stats(user, org):
+def user_org_stats(user, org, group=None):
     """Points over every tip; the record over the ones this member actually made.
 
     Same split as the leaderboard and for the same reason — see _leaderboard.
     tips_submitted likewise counts real picks, because it is the number shown
     as "tips made" and the system making one on your behalf is not you making
     a tip.
+
+    Scoped to one room, like everything else that counts tips. These numbers
+    sit beside a rank, and a total built from both rooms next to a rank built
+    from one is two answers to the same question.
     """
-    tips = Tip.objects.filter(user=user, org=org)
+    tips = Tip.objects.filter(user=user, org=org, group=group)
     mine = tips.filter(is_auto=False)
     points = tips.aggregate(p=Coalesce(Sum("points_awarded"), Value(0)))["p"]
     return {
