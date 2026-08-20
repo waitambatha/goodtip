@@ -35,7 +35,7 @@ import random
 import re
 
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Count, Sum
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -138,6 +138,85 @@ def _season_ranks(org, cutoff, group=None):
     return ranks, points
 
 
+def _group_digest_facts(org, rnd):
+    """How the groups inside `org` compare to each other, as of this round.
+
+    This is what makes the organisation's own Wall card mean something once
+    groups are switched on: direct org-level tipping usually drops to near
+    zero the moment members are tipping inside their own group instead, so
+    the card that used to describe the organisation's own tippers now
+    describes the groups.
+
+    Ranked on season points PER MEMBER, not the raw total — a 20-person group
+    and a 200-person group are not the same competition, and ranking on the
+    total would just crown whichever group happens to be biggest. Needs at
+    least two groups with members in them: one group cannot be "leading"
+    anything, so with fewer than that this returns None, same silence rule
+    as everything else here.
+    """
+    from tipping.models import Tip
+
+    from .models import Group
+
+    groups = list(
+        Group.objects.filter(org=org, approval_status=Group.APPROVAL_APPROVED)
+        .annotate(_members=Count("memberships", distinct=True))
+    )
+    groups = [g for g in groups if g._members > 0]
+    if len(groups) < 2:
+        return None
+
+    def totals_at(cutoff):
+        rows = (
+            Tip.objects.filter(org=org, group__in=groups, match__round__lockout_at__lte=cutoff)
+            .values("group_id")
+            .annotate(points=Sum("points_awarded"))
+        )
+        return {r["group_id"]: r["points"] for r in rows}
+
+    def rank_by_avg(points_by_group):
+        ordered = sorted(
+            ((g, points_by_group.get(g.id, 0) / g._members) for g in groups),
+            key=lambda pair: -pair[1],
+        )
+        ranks, last, rank = {}, None, 0
+        for i, (g, avg) in enumerate(ordered, start=1):
+            if avg != last:
+                rank, last = i, avg
+            ranks[g.id] = rank
+        return ranks
+
+    now_points = totals_at(rnd.lockout_at)
+    prev_points = totals_at(rnd.lockout_at - timezone.timedelta(seconds=1))
+    ranks_now = rank_by_avg(now_points)
+    ranks_prev = rank_by_avg(prev_points) if prev_points else {}
+
+    # Participation this round, not season to date — "most active" is a
+    # statement about this week, and AUTO-ASSIGNED TIPS DO NOT COUNT, same
+    # rule as build_recap_facts and for the same reason: the missed-tip
+    # default must not read as someone having engaged.
+    tippers = {}
+    for gid, uid in (
+        Tip.objects.filter(org=org, group__in=groups, match__round=rnd, is_auto=False)
+        .values_list("group_id", "user_id").distinct()
+    ):
+        tippers.setdefault(gid, set()).add(uid)
+
+    entries = []
+    for g in groups:
+        entry = {
+            "name": g.name,
+            "avg_points": now_points.get(g.id, 0) / g._members,
+            "rank": ranks_now[g.id],
+            "participation": len(tippers.get(g.id, ())) / g._members,
+        }
+        if g.id in ranks_prev:
+            entry["moved"] = ranks_prev[g.id] - entry["rank"]
+        entries.append(entry)
+    entries.sort(key=lambda e: e["rank"])
+    return entries
+
+
 def _match_stories(rnd, round_tips):
     """How the group went game by game.
 
@@ -206,7 +285,15 @@ def build_recap_facts(org, rnd, group=None):
         Tip.objects.filter(org=org, group=group, match__round=rnd)
         .select_related("user")
     )
-    if not any(not t.is_auto for t in round_tips):
+    # The organisation's own card doubles as the cross-group standings once
+    # groups are on — built from every approved group's own numbers, so it
+    # still has something to say even when nobody tips at the organisation's
+    # own level at all, which is the ordinary case once groups have taken
+    # over the actual tipping.
+    group_digest = (
+        _group_digest_facts(org, rnd) if group is None and org.groups_enabled else None
+    )
+    if not any(not t.is_auto for t in round_tips) and not group_digest:
         return None
 
     per_member = {}
@@ -293,6 +380,7 @@ def build_recap_facts(org, rnd, group=None):
             "correct": sum(m["correct"] for m in members),
             "picks": sum(m["picks"] for m in members),
         },
+        "group_digest": group_digest,
     }
 
 
@@ -480,6 +568,34 @@ def _ordinal(n) -> str:
     return f"{n}{suffix}"
 
 
+def _compose_group_digest(facts, rng) -> str | None:
+    """The organisation's card when nobody tips at its own level — the
+    ordinary case once groups are switched on. One or two sentences: who
+    leads the groups, and whoever moved or was busiest, when either is worth
+    a line rather than restating the same group twice.
+    """
+    entries = facts["group_digest"]
+    label = _round_label(facts["round"])
+    leader = entries[0]
+
+    lines = [rng.choice([
+        f"{leader['name']} leads the groups after {label}, averaging {_pts(round(leader['avg_points']))} a head.",
+        f"{leader['name']} tops the group table after {label} on {_pts(round(leader['avg_points']))} a member.",
+    ])]
+
+    movers = [e for e in entries if e is not leader and e.get("moved", 0) >= 1]
+    if movers:
+        best = max(movers, key=lambda e: e["moved"])
+        lines.append(f"{best['name']} moved up to {_ordinal(best['rank'])} among the groups.")
+    else:
+        active = max(entries, key=lambda e: e["participation"])
+        if active is not leader and active["participation"] >= 0.5:
+            pct = round(active["participation"] * 100)
+            lines.append(f"{active['name']} was the busiest room in {label}, {pct}% of the group tipping.")
+
+    return _clean_output(" ".join(lines))
+
+
 def compose_recap(facts) -> str | None:
     """Two to four sentences on the group's round.
 
@@ -488,6 +604,12 @@ def compose_recap(facts) -> str | None:
     """
     rng = random.Random(facts.get("seed", facts["group"]["name"]))
     words = VERNACULAR.get(facts["round"]["code"], VERNACULAR["generic"])
+
+    if not facts["members"]:
+        # Nobody tipped at the organisation's own level; the groups did, and
+        # the card is the cross-group standings on their own rather than an
+        # empty leaderboard forced to say something.
+        return _compose_group_digest(facts, rng)
 
     opening = _opening(facts, rng, words)
     has_upset = bool(facts["matches"]["upset"])
@@ -549,6 +671,18 @@ def _clean_output(text: str) -> str:
 def build_talking_points(facts) -> list:
     """Two or three openers for the thread under the recap."""
     rng = random.Random(facts.get("seed", "") + "|talk")
+
+    if not facts["members"]:
+        entries = facts["group_digest"]
+        leader = entries[0]
+        points = [f"Who's catching {leader['name']}?"]
+        movers = [e for e in entries if e is not leader and e.get("moved", 0) >= 1]
+        if movers:
+            best = max(movers, key=lambda e: e["moved"])
+            points.append(f"{best['name']} is climbing the group table. Can they keep it up?")
+        rng.shuffle(points)
+        return points[:3]
+
     members, group = facts["members"], facts["group"]
     top = members[0]
     upset = facts["matches"]["upset"]
@@ -597,6 +731,13 @@ def leaderboard_snapshot(facts) -> list:
 
 def fallback_line(facts) -> str:
     """§10: one factual line for a round with nothing to say about it."""
+    if not facts["members"]:
+        leader = facts["group_digest"][0]
+        label = _round_label(facts["round"]).lower()
+        return (
+            f"{leader['name']} leads the groups after {label} on "
+            f"{_pts(round(leader['avg_points']))} a member."
+        )
     top = facts["members"][0]
     rnd = facts["round"]
     label = _round_label(rnd).lower()
