@@ -5,6 +5,10 @@ contenteditable surfaces post, what gets stored, and what the published
 article then shows. A broken template here is a runtime error, not an import
 error, so `manage.py check` never sees it.
 """
+import re
+from pathlib import Path
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -12,6 +16,38 @@ from django.urls import reverse
 from .models import NewsPost
 
 User = get_user_model()
+
+
+class TemplateCommentTests(TestCase):
+    """No `{# ... #}` comment may span a newline, anywhere in the project.
+
+    Django's tag regex is not compiled with DOTALL, so `{#` and `#}` only pair
+    up on one line. Spread a comment over two and it is never tokenised as a
+    comment at all — it is emitted as literal page text.
+
+    That is a nasty failure because it reads as correct in the editor. It has
+    shipped three times now: once pushing the nav off the top of the page, once
+    as visible prose mid-layout, and once inside a flex row where the leaked
+    text became an anonymous flex item and crushed the real label to one
+    character per line. A regex is cheaper than finding it in a screenshot.
+    """
+
+    # A {# with a newline before its matching #}.
+    MULTILINE_COMMENT = re.compile(r"\{#(?:(?!#\}).)*\n(?:(?!#\}).)*#\}", re.S)
+
+    def test_no_template_comment_spans_a_newline(self):
+        root = Path(settings.BASE_DIR) / "templates"
+        offenders = []
+        for path in sorted(root.rglob("*.html")):
+            body = path.read_text()
+            for match in self.MULTILINE_COMMENT.finditer(body):
+                line = body[: match.start()].count("\n") + 1
+                offenders.append(f"{path.relative_to(root)}:{line}")
+        self.assertEqual(
+            offenders, [],
+            "Multi-line {# #} renders as page text — use {% comment %} instead:\n  "
+            + "\n  ".join(offenders),
+        )
 
 
 class NewsEditorTests(TestCase):
@@ -153,6 +189,29 @@ class NewsEditorTests(TestCase):
         self.assertNotIn("<textarea", html)
 
     # ---- featured image -----------------------------------------------------
+
+    def test_no_comment_text_leaks_into_the_drop_zone(self):
+        """The drop zone is a flex row, so leaked text is not just ugly.
+
+        A stray text node between the flex children becomes an anonymous flex
+        item, which stole the width from the real label and wrapped it one
+        character per line.
+        """
+        html = self.client.get(reverse("manage:news_new")).content.decode()
+        self.assertNotIn("{#", html)
+        self.assertNotIn("bare file input cannot be styled", html)
+
+    def test_no_comment_text_leaks_onto_the_published_article(self):
+        self.client.post(reverse("manage:news_new"), self._post())
+        post = NewsPost.objects.get()
+        html = self.client.get(post.get_absolute_url()).content.decode()
+        self.assertNotIn("{#", html)
+        self.assertNotIn("Share bar + optional sources", html)
+        self.assertNotIn("Open Graph / Twitter card tags", html)
+        # …while the tags those comments describe are still emitted.
+        self.assertIn('property="og:title"', html)
+        self.assertIn("as-copy", html)
+
 
     def test_the_featured_image_can_be_taken_back_off_a_post(self):
         self.client.post(reverse("manage:news_new"), self._post())

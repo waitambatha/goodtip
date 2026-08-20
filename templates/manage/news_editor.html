@@ -122,8 +122,10 @@
         </button>
         <button type="button" class="ned-drop-clear" data-image-clear {% if not post.image %}hidden{% endif %}>Remove</button>
       </div>
-      {# Hidden and driven by the button above: a bare file input cannot be
-         styled, and at full width it used to swallow the whole drop-zone row. #}
+      {% comment %}
+      Hidden and driven by the button above: a bare file input cannot be
+      styled, and at full width it used to swallow the whole drop-zone row.
+      {% endcomment %}
       <input type="file" name="image" accept="image/*" data-image-input class="ned-drop-file">
       <input type="hidden" name="image_clear" value="" data-image-clear-flag>
     </div>

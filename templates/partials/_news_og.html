@@ -1,8 +1,10 @@
-{# Open Graph / Twitter card tags for a shared story link.
-   Shared into both news_detail templates (member + public) so a link pasted
-   into Facebook, LinkedIn, Slack, iMessage etc always resolves an image and
-   a headline instead of coming through as a bare URL — that's what makes a
-   shared blog link read as trustworthy rather than as spam. #}
+{% comment %}
+Open Graph / Twitter card tags for a shared story link.
+Shared into both news_detail templates (member + public) so a link pasted
+into Facebook, LinkedIn, Slack, iMessage etc always resolves an image and
+a headline instead of coming through as a bare URL — that's what makes a
+shared blog link read as trustworthy rather than as spam.
+{% endcomment %}
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="GoodTip">
 <meta property="og:title" content="{{ post.title }}">
