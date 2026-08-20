@@ -195,10 +195,12 @@ stacking context, so a strip rendered inside it paints over the sheet.
   against are in their own group. Sits beside the org picker because it
   belongs to the org you have selected, not to the platform.
   {% endcomment %}
+  {% if c.org.groups_enabled %}
   <a href="{% url 'orgs:groups' c.org.root.id %}" class="abtn abtn-ghost abtn-xl">
     <svg style="width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.9;" aria-hidden="true"><use href="#ic-org"/></svg>
     Groups
   </a>
+  {% endif %}
   <a href="{% url 'orgs:search' %}" class="abtn abtn-ghost abtn-xl">Find an organisation</a>
   <a href="{% url 'orgs:create' %}" class="abtn abtn-primary abtn-xl">+ Create an organisation</a>
 </div>

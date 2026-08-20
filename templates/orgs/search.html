@@ -77,7 +77,9 @@ stacking context, so a strip rendered inside it paints over the sheet.
         {% else %}
         <form method="post" action="{% url 'orgs:request_join' row.org.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}"><button type="submit" class="abtn abtn-primary abtn-sm">Ask to join</button></form>
         {% endif %}
+        {% if row.can_manage %}
         <a href="{% url 'orgs:create' %}?parent={{ row.org.id }}" class="abtn abtn-ghost abtn-sm">Start an organisation under this</a>
+        {% endif %}
       </div>
     </div>
     {% for kid in row.children %}
@@ -172,12 +174,14 @@ stacking context, so a strip rendered inside it paints over the sheet.
         '<input type="hidden" name="next" value="{{ request.path }}">' +
         '<button type="submit" class="abtn abtn-primary">Ask to join</button></form>';
     }
+    var startUnder = r.can_manage_root
+      ? '<a href="' + URL_CREATE + "?parent=" + r.root_id + '" class="abtn abtn-ghost">Start a new organisation under ' + esc(r.root_name) + "</a>"
+      : "";
     out.innerHTML =
       '<div class="card pad-lg">' +
       '<div class="card-h" style="font-size:20px;">' + esc(r.name) + "</div>" +
       '<p class="card-lead" style="margin:4px 0 16px;">' + meta(r) + "</p>" +
-      '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' + action +
-      '<a href="' + URL_CREATE + "?parent=" + r.root_id + '" class="abtn abtn-ghost">Start a new organisation under ' + esc(r.root_name) + "</a>" +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' + action + startUnder +
       "</div></div>";
   }
 

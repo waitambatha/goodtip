@@ -144,12 +144,18 @@ WIZARD_STEPS = [
     # here, straight after the name, so nobody fills in three more screens
     # before finding out they cannot prove the organisation is theirs.
     (2, "Verify", "Prove it's yours", []),
-    (3, "The tipping", "Scoring & rules",
+    # Asked straight after verification, and before anything about the season
+    # or the charity: whether this organisation needs sub-groups is a shape
+    # question, like step 1's type, not a setting to bury on a settings page
+    # someone has to go looking for after the fact.
+    (3, "Groups", "One ladder, or several",
+     ["groups_enabled"]),
+    (4, "The tipping", "Scoring & rules",
      ["competitions", "season", "team_size", "finals_only"]),
-    (4, "The charity", "Choose a cause",
+    (5, "The charity", "Choose a cause",
      ["charity_method", "charity", "new_charity_name",
       "new_charity_url", "vote_charities", "vote_opens_at", "vote_closes_at"]),
-    (5, "Review", "Check & create", []),
+    (6, "Review", "Check & create", []),
 ]
 VERIFY_STEP = 2
 
@@ -626,6 +632,11 @@ def _draft_summary(form, draft) -> list:
         ("Season", label_for("season", d.get("season"))),
         ("Expected size", d.get("team_size", "")),
         ("Finals only", "Yes" if d.get("finals_only") else ""),
+        (
+            "Groups",
+            "On — teams can start their own group" if d.get("groups_enabled") == "yes"
+            else "Off for now",
+        ),
         ("Charity", charity),
         ("On the ballot", labels_for("vote_charities", d.get("vote_charities"))),
     ]
@@ -923,9 +934,13 @@ def _search_payload(user, q: str) -> list[dict]:
             "is_member": org.id in member_ids,
             "pending": org.id in pending_ids,
             # §2's second path: create a new child org under this match's
-            # top-level parent (the match itself when it IS top-level).
+            # top-level parent (the match itself when it IS top-level). Only
+            # offered when the viewer actually runs that root — _parent_for()
+            # drops an unmanaged parent silently, so the button must not
+            # promise something it will not deliver.
             "root_id": org.root.id,
             "root_name": org.root.name,
+            "can_manage_root": _can_manage(user, org.root),
         }
         for org in _search_orgs(q)
     ]
@@ -980,6 +995,10 @@ def org_search_view(request):
             "is_member": org.id in member_ids,
             "pending": org.id in pending_ids,
             "icon": BROWSE_ICONS[org.id % len(BROWSE_ICONS)],
+            # Every row here is top-level (children are attached separately,
+            # below), so managing `org` IS managing the root — the same check
+            # _parent_for() runs before it lets a child actually get created.
+            "can_manage": _can_manage(request.user, org),
         }
 
     children = {}
@@ -1901,55 +1920,6 @@ def leave_group_view(request):
         f"Back to {org.name}." if org else "Back to your organisation.",
     )
     return redirect(_safe_next(request))
-
-
-# ---------------------------------------------------------------------------
-# Departments
-# ---------------------------------------------------------------------------
-
-
-# Department name or type -> a glyph that means something. Matched on the
-# words people actually use, so a department called "IT Support" and one of
-# type "IT" get the same mark. Ordered: the first hit wins, so the specific
-# terms sit above the general ones.
-_DEPARTMENT_ICONS = [
-    # Filled glyphs (ic-f-*), not the stroke set. On a card the icon IS the
-    # subject, and a 2px outline at 21px reads as a diagram; a solid silhouette
-    # reads as an icon. Each also carries a hue, so the directory is scannable
-    # by colour before anybody reads a word of it.
-    (("product", "design", "ux"), "ic-f-spark", "violet"),
-    (("it", "tech", "engineering", "developer", "dev", "data", "analytics"), "ic-f-sliders", "blue"),
-    (("finance", "account", "payroll", "procurement", "treasury"), "ic-f-coins", "gold"),
-    (("people", "hr", "culture", "recruit", "talent"), "ic-f-users", "teal"),
-    (("sales", "business development", "account management"), "ic-f-trend", "green"),
-    (("marketing", "brand", "comms", "communications", "media"), "ic-f-spark", "pink"),
-    (("legal", "risk", "compliance", "governance"), "ic-f-shield", "slate"),
-    (("customer", "service", "support", "call centre", "helpdesk"), "ic-f-lifebuoy", "teal"),
-    (("warehouse", "logistics", "depot", "supply", "field"), "ic-f-org", "slate"),
-    (("retail", "store", "branch", "floor"), "ic-f-flag", "pink"),
-    (("exec", "executive", "leadership", "board", "committee"), "ic-f-shield-star", "gold"),
-    (("teach", "faculty", "student", "year level", "school"), "ic-f-cap", "blue"),
-    (("volunteer", "fundraising", "program", "partnership"), "ic-f-heart", "pink"),
-    (("admin", "operations", "ops"), "ic-f-target", "green"),
-    (("night", "shift", "crew", "team"), "ic-f-clock", "violet"),
-]
-
-
-def _department_icon(dept) -> tuple[str, str]:
-    """A glyph for a department, from its type or its name.
-
-    Falls back to the generic org mark rather than guessing: a wrong icon is
-    worse than a neutral one, because it says something untrue about the team.
-    """
-    haystack = " ".join(filter(None, [
-        (dept.group_type.name if dept.group_type_id else ""),
-        dept.department_label or "",
-        dept.name or "",
-    ])).lower()
-    for words, icon, tone in _DEPARTMENT_ICONS:
-        if any(w in haystack for w in words):
-            return icon, tone
-    return "ic-f-org", "green"
 
 
 # ---------------------------------------------------------------------------

@@ -125,12 +125,24 @@ class OrgCreateForm(forms.ModelForm):
         widget=forms.CheckboxSelectMultiple,
         label="Charities to put to the vote (pick at least 2)",
     )
+    # Asked once, at creation, instead of being left to a settings toggle
+    # nobody stumbles across. "no" is the initial so a small team that never
+    # touches this step still gets the right default — most organisations
+    # never need groups — but it is a real radio a person looks at and picks,
+    # not a silent default they never saw.
+    groups_enabled = forms.TypedChoiceField(
+        choices=[("no", "Not for now"), ("yes", "Yes, switch them on")],
+        coerce=lambda v: v == "yes",
+        widget=forms.RadioSelect,
+        initial="no",
+        label="Split into groups?",
+    )
 
     class Meta:
         model = Organisation
         fields = [
             "name", "parent", "organisation_type", "sub_categories", "informal_label", "state",
-            "competitions", "season", "team_size", "finals_only",
+            "competitions", "season", "team_size", "finals_only", "groups_enabled",
         ]
         labels = {
             "name": "Organisation name",

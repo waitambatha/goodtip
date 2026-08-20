@@ -131,7 +131,7 @@ class OrgCategoryFormTests(TestCase):
 
         data = {
             "name": "Testers", "season": self.season.pk, "competitions": [self.comp.pk],
-            "charity_method": "pick", "charity": self.charity.pk,
+            "charity_method": "pick", "charity": self.charity.pk, "groups_enabled": "no",
         }
         data.update(extra)
         return OrgCreateForm(data)
@@ -558,15 +558,16 @@ def _walk_create_wizard(client, case, name, **extra):
         "organisation_type": case.gtype.pk, "informal_label": "Book Club", "parent": parent,
     })
     client.post(url, {"step": 2, "action": "next", "parent": parent})
+    client.post(url, {"step": 3, "action": "next", "groups_enabled": "no", "parent": parent})
     client.post(url, {
-        "step": 3, "action": "next",
+        "step": 4, "action": "next",
         "competitions": [case.comp.pk], "season": case.season.pk, "parent": parent,
     })
     client.post(url, {
-        "step": 4, "action": "next",
+        "step": 5, "action": "next",
         "charity_method": "pick", "charity": case.charity.pk, "parent": parent,
     })
-    final = {"step": 5, "action": "next", "parent": parent}
+    final = {"step": 6, "action": "next", "parent": parent}
     if extra.get("duplicate_confirmed"):
         final["duplicate_confirmed"] = extra["duplicate_confirmed"]
     return client.post(url, final)
@@ -1494,36 +1495,57 @@ class CreateWizardTests(TestCase):
         """
         return self.client.post(self.URL, {"step": 2, "action": "next"})
 
-    def _tipping_step(self):
+    def _groups_step(self, enabled=False):
+        """Step 3, whether the organisation wants sub-groups.
+
+        Defaults to "no" — an Informal book club has no use for departments,
+        and most of these tests are not about groups at all. Must still be
+        walked through on any path that finishes creation, because the field
+        is required on the form: skipping it is exactly the "step" numbers
+        drifting out from under a test that the named-helper pattern here
+        exists to prevent.
+        """
         return self.client.post(self.URL, {
             "step": 3, "action": "next",
+            "groups_enabled": "yes" if enabled else "no",
+        })
+
+    def _tipping_step(self):
+        return self.client.post(self.URL, {
+            "step": 4, "action": "next",
             "competitions": [self.comp.pk], "season": self.season.pk,
         })
 
     def _charity_step(self):
         return self.client.post(self.URL, {
-            "step": 4, "action": "next",
+            "step": 5, "action": "next",
             "charity_method": "pick", "charity": self.charity.pk,
         })
 
     def _review_step(self):
-        return self.client.post(self.URL, {"step": 5, "action": "next"})
+        return self.client.post(self.URL, {"step": 6, "action": "next"})
 
     def _through_to_review(self, name="Wizard Group"):
         self._step1(name)
         self._verify_step()
+        self._groups_step()
         self._tipping_step()
         self._charity_step()
 
     def test_one_step_shows_at_a_time(self):
         body = self.client.get(self.URL).content
         self.assertIn(b'id="id_name"', body)
-        self.assertNotIn(b'id="id_season"', body)
+        self.assertNotIn(b'name="groups_enabled"', body)
         self._step1()
         self._verify_step()
         body = self.client.get(self.URL).content
-        self.assertIn(b'id="id_season"', body)
+        self.assertIn(b'name="groups_enabled"', body)
         self.assertNotIn(b'id="id_name"', body)
+        self.assertNotIn(b'id="id_season"', body)
+        self._groups_step()
+        body = self.client.get(self.URL).content
+        self.assertIn(b'id="id_season"', body)
+        self.assertNotIn(b'name="groups_enabled"', body)
 
     def test_a_missing_answer_holds_you_on_that_step(self):
         from .models import OrgDraft
@@ -1552,8 +1574,9 @@ class CreateWizardTests(TestCase):
     def test_going_back_keeps_what_was_typed(self):
         self._step1()
         self._verify_step()
+        self._groups_step()
         self._tipping_step()
-        self.client.post(self.URL, {"step": 4, "action": "back"})
+        self.client.post(self.URL, {"step": 5, "action": "back"})
         body = self.client.get(self.URL).content
         self.assertIn(b'id="id_season"', body)
         self.assertIn(str(self.comp.pk).encode(), body)
@@ -1945,15 +1968,17 @@ class WizardEndToEndTests(TestCase):
                    sub_categories=self.subcat.id if self.subcat else "")
         # 2 — verification, not required for this type
         self._post(2)
-        # 3 — what you tip
+        # 3 — groups, not for this small a crew
+        self._post(3, groups_enabled="no")
+        # 4 — what you tip
         self._post(
-            3, competitions=self.comp.id, season=self.comp.season_id,
+            4, competitions=self.comp.id, season=self.comp.season_id,
             team_size="10",
         )
-        # 4 — the cause
-        self._post(4, charity_method="pick", charity=self.charity.id)
-        # 5 — create
-        self._post(5)
+        # 5 — the cause
+        self._post(5, charity_method="pick", charity=self.charity.id)
+        # 6 — create
+        self._post(6)
 
         org = Organisation.objects.filter(name="Wizard Walk FC").first()
         self.assertIsNotNone(org, "the wizard finished without creating a group")
@@ -1972,10 +1997,11 @@ class WizardEndToEndTests(TestCase):
         self._post(1, name="Season Check FC", organisation_type=self.gtype.id,
                    sub_categories=self.subcat.id if self.subcat else "")
         self._post(2)
+        self._post(3, groups_enabled="no")
         # Season deliberately NOT posted — take whatever the form defaults to.
-        self._post(3, competitions=self.comp.id, team_size="10")
-        self._post(4, charity_method="pick", charity=self.charity.id)
-        self._post(5)
+        self._post(4, competitions=self.comp.id, team_size="10")
+        self._post(5, charity_method="pick", charity=self.charity.id)
+        self._post(6)
 
         org = Organisation.objects.filter(name="Season Check FC").first()
         if org is not None:
@@ -2789,7 +2815,7 @@ class CharityVoteAtCreationTests(CreateWizardTests):
 
     def _charity_step(self, **extra):
         data = {
-            "step": 4, "action": "next", "charity_method": "vote",
+            "step": 5, "action": "next", "charity_method": "vote",
             "vote_charities": [self.charity.pk, self.second_charity.pk],
         }
         data.update(extra)
@@ -2804,6 +2830,7 @@ class CharityVoteAtCreationTests(CreateWizardTests):
     def _walk(self, **charity_extra):
         self._step1()
         self._verify_step()
+        self._groups_step()
         self._tipping_step()
         self._charity_step(**charity_extra)
         return self._review_step()
@@ -2835,6 +2862,7 @@ class CharityVoteAtCreationTests(CreateWizardTests):
         closes = timezone.now() + timedelta(days=4)
         self._step1()
         self._verify_step()
+        self._groups_step()
         self._tipping_step()
         resp = self._charity_step(vote_closes_at=closes.strftime("%Y-%m-%dT%H:%M"))
         self.assertContains(resp, "when it opens")
@@ -2847,6 +2875,7 @@ class CharityVoteAtCreationTests(CreateWizardTests):
         closes = opens - timedelta(days=1)
         self._step1()
         self._verify_step()
+        self._groups_step()
         self._tipping_step()
         resp = self._charity_step(
             vote_opens_at=opens.strftime("%Y-%m-%dT%H:%M"),

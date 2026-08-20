@@ -18,7 +18,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
   <div>
     <div class="app-eyebrow">{% if parent_org %}New organisation under {{ parent_org.name }}{% else %}New organisation{% endif %}</div>
     <h1 class="app-h1">{% if parent_org %}Create an organisation{% else %}Create an organisation{% endif %}</h1>
-    <p class="app-sub">Four short steps. We save as you go, so you can finish it later.</p>
+    <p class="app-sub">Five short steps. We save as you go, so you can finish it later.</p>
   </div>
   {% comment %} Always present, but it does not claim a save that has not happened: an
      untouched wizard has nothing saved, and a chip reading "Draft saved" over
@@ -326,7 +326,44 @@ missed click and got submitted twice.
   </div>
   {% endif %}
 
+  {% comment %}
+  Step 3, the groups question. Asked here — right after verification, before
+  the tipping and charity steps — for the same reason verify sits right after
+  the name: whether this organisation needs sub-groups changes nothing else on
+  screen, but it is a shape decision, not a setting to leave buried on a
+  settings page nobody visits until they already have the problem it solves.
+  {% endcomment %}
   {% if step == 3 %}
+  <div class="card pad-lg wiz-card" style="margin-bottom:16px;">
+    <div class="wc-head">
+      <span class="wc-ic" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </span>
+      <div>
+        <h2>Will {% if form.name.value %}{{ form.name.value }}{% else %}your organisation{% endif %} be split into groups?</h2>
+        <p>A group is a team inside your organisation — Marketing, IT, the Melbourne office — each with its own ladder and its own wall. Everyone still tips the same fixtures, under the same rules, for the same charity.</p>
+      </div>
+    </div>
+    <div class="opt-grid cols2" style="margin-top:8px;">
+      <label class="opt-card radio">
+        <input type="radio" name="groups_enabled" value="no" {% is_checked form.groups_enabled 'no' %}>
+        <span class="oc-box"></span>
+        <span><span class="oc-title">Not for now</span><span class="oc-sub">One ladder for everyone. Most organisations don't need this — five or ten people is a stronger comp together than split into smaller ones.</span></span>
+      </label>
+      <label class="opt-card radio">
+        <input type="radio" name="groups_enabled" value="yes" {% is_checked form.groups_enabled 'yes' %}>
+        <span class="oc-box"></span>
+        <span><span class="oc-title">Yes, switch them on</span><span class="oc-sub">Worth it once there are enough people that one ladder stops feeling personal. Members can start their own group, or ask, and you approve.</span></span>
+      </label>
+    </div>
+    {% if form.groups_enabled.errors %}<div class="fld-err">{{ form.groups_enabled.errors|join:" " }}</div>{% endif %}
+    <p class="app-sub" style="margin-top:14px;">This isn't final — an admin can switch groups on or off later from Settings, and nothing is ever lost by waiting.</p>
+  </div>
+  {% endif %}
+
+  {% if step == 4 %}
   <div class="card pad-lg" style="margin-bottom:16px;">
     <div class="fld">
       <label>Competitions</label>
@@ -349,7 +386,7 @@ missed click and got submitted twice.
   </div>
   {% endif %}
 
-  {% if step == 4 %}
+  {% if step == 5 %}
   <div class="card pad-lg" style="margin-bottom:16px;">
     <div class="card-h" style="margin-bottom:12px;">Who picks the charity?</div>
     <div class="opt-grid cols2" style="margin-bottom:8px;">
