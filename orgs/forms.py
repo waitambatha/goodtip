@@ -1,7 +1,7 @@
 from django import forms
 from django.utils import timezone
 
-from catalog.models import Charity, Competition, GroupType, Season, State, SubCategory
+from catalog.models import Charity, Competition, OrganisationType, Season, State, SubCategory
 
 from .models import Organisation
 from .services import unique_charity_slug as _unique_charity_slug
@@ -53,13 +53,13 @@ class OrgCreateForm(forms.ModelForm):
         widget=forms.HiddenInput,
     )
 
-    group_type = forms.ModelChoiceField(
-        queryset=GroupType.objects.all(),  # ordered by sort_order per the spec
+    organisation_type = forms.ModelChoiceField(
+        queryset=OrganisationType.objects.all(),  # ordered by sort_order per the spec
         label="Organisation type",
         empty_label="Choose your organisation type",
     )
     sub_categories = forms.ModelMultipleChoiceField(
-        queryset=SubCategory.objects.filter(is_active=True).select_related("group_type"),
+        queryset=SubCategory.objects.filter(is_active=True).select_related("organisation_type"),
         required=False,
         widget=forms.CheckboxSelectMultiple,
         label="Sub-category",
@@ -114,7 +114,7 @@ class OrgCreateForm(forms.ModelForm):
     class Meta:
         model = Organisation
         fields = [
-            "name", "parent", "group_type", "sub_categories", "informal_label", "state",
+            "name", "parent", "organisation_type", "sub_categories", "informal_label", "state",
             "competitions", "season", "team_size", "finals_only",
         ]
         labels = {
@@ -152,11 +152,11 @@ class OrgCreateForm(forms.ModelForm):
         sub-category, Education picks one or the Primary+Secondary pair,
         Charities has none, Informal self-describes instead.
         """
-        gt = cleaned.get("group_type")
+        gt = cleaned.get("organisation_type")
         if gt is None:
             return
         # Ignore stale checkboxes from a previously-selected type.
-        subs = [s for s in cleaned.get("sub_categories") or [] if s.group_type_id == gt.id]
+        subs = [s for s in cleaned.get("sub_categories") or [] if s.organisation_type_id == gt.id]
         cleaned["sub_categories"] = subs
 
         if gt.is_informal:

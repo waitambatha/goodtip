@@ -30,8 +30,8 @@ class Organisation(models.Model):
     # Self-selected at sign-up (categories doc, 7 Jul 2026): one of the five
     # organisation types — Community, Business, Education, Charities, Informal.
     # Drives the Good List's type filter. Lookup FKs keep the DB normalised.
-    group_type = models.ForeignKey(
-        "catalog.GroupType", on_delete=models.PROTECT,
+    organisation_type = models.ForeignKey(
+        "catalog.OrganisationType", on_delete=models.PROTECT,
         related_name="organisations", null=True, blank=True,
     )
     # Sub-categories within the type (Business → Finance, Community → Sports
@@ -90,18 +90,9 @@ class Organisation(models.Model):
     # and for some is three years in.
     groups_enabled = models.BooleanField(default=False)
 
-    # --- Departments (children of a top-level org) ---
-    # What kind of department this is. Two fields rather than one because the
-    # picker is a convenience, not a taxonomy: department_type holds the row
-    # when they chose from the list (so departments stay comparable across
-    # orgs), department_label holds whatever they typed when they didn't. A
-    # big organisation carves itself up the way it actually is, and a dropdown
-    # that refuses "The Cave" just gets a department called "Other".
-    department_type = models.ForeignKey(
-        "catalog.DepartmentType", on_delete=models.SET_NULL,
-        related_name="organisations", null=True, blank=True,
-    )
-    department_label = models.CharField(max_length=80, blank=True)
+    # The two department columns that used to sit here — what kind of
+    # department this was, and the free-text label for when the picker had no
+    # word for it — moved to Group, which is now the thing that has a kind.
 
     # A department raised by an ordinary member is a REQUEST until an admin of
     # the parent says yes. Admins of the parent skip the queue, because asking
@@ -188,23 +179,12 @@ class Organisation(models.Model):
     def family_ids(self) -> list[int]:
         return list(self.family().values_list("id", flat=True))
 
-    # --- Department helpers ---
-
-    @property
-    def is_department(self) -> bool:
-        """A department is just a child org, named for what it is to members."""
-        return self.parent_id is not None
+    # --- Approval ---
 
     @property
     def is_pending_approval(self) -> bool:
         return self.approval_status == self.APPROVAL_PENDING
 
-    @property
-    def department_kind(self) -> str:
-        """What to show beside the name: the picked type, or what they typed."""
-        if self.department_type_id:
-            return self.department_type.name
-        return self.department_label
 
     def approve(self, by_user=None):
         """Let a pending department into the org.
@@ -256,12 +236,12 @@ class Organisation(models.Model):
         self-description for Informal groups, otherwise its sub-categories
         ("Primary School + Secondary School"), otherwise the bare type name.
         """
-        if self.group_type_id and self.group_type.is_informal:
+        if self.organisation_type_id and self.organisation_type.is_informal:
             return self.informal_label
         subs = " + ".join(s.name for s in self.sub_categories.all())
         if subs:
             return subs
-        return self.group_type.name if self.group_type_id else ""
+        return self.organisation_type.name if self.organisation_type_id else ""
 
     @property
     def competition_label(self) -> str:
@@ -400,13 +380,13 @@ class Group(models.Model):
     # across organisations. `label` holds whatever they typed when they didn't:
     # a dropdown that refuses "The Cave" just produces a group called "Other".
     #
-    # Points at DepartmentType because that table already holds exactly this
-    # list. It wants renaming, but `catalog.GroupType` is taken — by the
+    # Points at GroupType because that table already holds exactly this
+    # list. It wants renaming, but `catalog.OrganisationType` is taken — by the
     # ORGANISATION type (Business, Community, Education…), which is itself
     # misnamed under the new vocabulary. Both renames belong with the copy
     # sweep, in one pass, rather than half-done here.
     kind = models.ForeignKey(
-        "catalog.DepartmentType", on_delete=models.SET_NULL,
+        "catalog.GroupType", on_delete=models.SET_NULL,
         related_name="groups", null=True, blank=True,
     )
     label = models.CharField(max_length=80, blank=True)
@@ -844,7 +824,7 @@ class WallPost(models.Model):
                 author__isnull=False,
             )
             .select_related(
-                "author", "org", "org__group_type", "org__season",
+                "author", "org", "org__organisation_type", "org__season",
                 "tip__match__home_team", "tip__match__away_team",
             )
             # The card prints the group's category and competitions, so pull

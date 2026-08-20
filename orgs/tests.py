@@ -108,7 +108,7 @@ class OrgCategoryFormTests(TestCase):
     """Per-type sign-up rules from the categories doc (7 Jul 2026)."""
 
     def setUp(self):
-        from catalog.models import Competition, GroupType, SubCategory
+        from catalog.models import Competition, OrganisationType, SubCategory
 
         self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
         self.sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
@@ -123,8 +123,8 @@ class OrgCategoryFormTests(TestCase):
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
         )
-        self.types = {g.slug: g for g in GroupType.objects.all()}
-        self.subcat = lambda t, s: SubCategory.objects.get(group_type__slug=t, slug=s)
+        self.types = {g.slug: g for g in OrganisationType.objects.all()}
+        self.subcat = lambda t, s: SubCategory.objects.get(organisation_type__slug=t, slug=s)
 
     def form(self, **extra):
         from .forms import OrgCreateForm
@@ -137,59 +137,59 @@ class OrgCategoryFormTests(TestCase):
         return OrgCreateForm(data)
 
     def test_five_types_in_spec_order(self):
-        from catalog.models import GroupType
+        from catalog.models import OrganisationType
 
         self.assertEqual(
-            list(GroupType.objects.values_list("slug", flat=True)),
+            list(OrganisationType.objects.values_list("slug", flat=True)),
             ["community", "business", "education", "charities", "informal"],
         )
 
     def test_type_is_required(self):
         f = self.form()
         self.assertFalse(f.is_valid())
-        self.assertIn("group_type", f.errors)
+        self.assertIn("organisation_type", f.errors)
 
     def test_business_requires_exactly_one_sub_category(self):
-        f = self.form(group_type=self.types["business"].pk)
+        f = self.form(organisation_type=self.types["business"].pk)
         self.assertFalse(f.is_valid())
         self.assertIn("sub_categories", f.errors)
-        f = self.form(group_type=self.types["business"].pk, sub_categories=[
+        f = self.form(organisation_type=self.types["business"].pk, sub_categories=[
             self.subcat("business", "finance").pk, self.subcat("business", "tech").pk,
         ])
         self.assertFalse(f.is_valid())
-        f = self.form(group_type=self.types["business"].pk,
+        f = self.form(organisation_type=self.types["business"].pk,
                       sub_categories=[self.subcat("business", "finance").pk])
         self.assertTrue(f.is_valid(), f.errors)
 
     def test_education_allows_primary_plus_secondary_only(self):
         pair = [self.subcat("education", "primary-school").pk,
                 self.subcat("education", "secondary-school").pk]
-        f = self.form(group_type=self.types["education"].pk, sub_categories=pair)
+        f = self.form(organisation_type=self.types["education"].pk, sub_categories=pair)
         self.assertTrue(f.is_valid(), f.errors)
         org = f.save()
         self.assertEqual(org.sub_categories.count(), 2)
         # Any other combination is rejected.
-        f = self.form(group_type=self.types["education"].pk, sub_categories=[
+        f = self.form(organisation_type=self.types["education"].pk, sub_categories=[
             self.subcat("education", "university").pk, self.subcat("education", "tafe").pk,
         ])
         self.assertFalse(f.is_valid())
         self.assertIn("sub_categories", f.errors)
 
     def test_informal_requires_self_description(self):
-        f = self.form(group_type=self.types["informal"].pk)
+        f = self.form(organisation_type=self.types["informal"].pk)
         self.assertFalse(f.is_valid())
         self.assertIn("informal_label", f.errors)
-        f = self.form(group_type=self.types["informal"].pk, informal_label="Book Club")
+        f = self.form(organisation_type=self.types["informal"].pk, informal_label="Book Club")
         self.assertTrue(f.is_valid(), f.errors)
         org = f.save()
         self.assertEqual(org.category_label, "Book Club")
 
     def test_charities_type_needs_no_sub_category(self):
-        f = self.form(group_type=self.types["charities"].pk)
+        f = self.form(organisation_type=self.types["charities"].pk)
         self.assertTrue(f.is_valid(), f.errors)
 
     def test_stale_sub_categories_from_other_type_are_dropped(self):
-        f = self.form(group_type=self.types["charities"].pk,
+        f = self.form(organisation_type=self.types["charities"].pk,
                       sub_categories=[self.subcat("business", "finance").pk])
         self.assertTrue(f.is_valid(), f.errors)
         org = f.save()
@@ -201,11 +201,11 @@ class CharityPartnerWorkflowTests(TestCase):
     admin-set partner flag; non-partners stay on the vote path."""
 
     def setUp(self):
-        from catalog.models import GroupType
+        from catalog.models import OrganisationType
 
         self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
-        self.charities_type = GroupType.objects.get(slug="charities")
-        self.community_type = GroupType.objects.get(slug="community")
+        self.charities_type = OrganisationType.objects.get(slug="charities")
+        self.community_type = OrganisationType.objects.get(slug="community")
         self.lifeline, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
         )
@@ -216,10 +216,10 @@ class CharityPartnerWorkflowTests(TestCase):
             email="boss@charity.org", password="x", display_name="Boss",
         )
 
-    def make_org(self, *, partner=False, group_type=None):
+    def make_org(self, *, partner=False, organisation_type=None):
         org = Organisation.objects.create(
             name="Helping Hands", season=self.season,
-            group_type=group_type or self.charities_type, is_charity_partner=partner,
+            organisation_type=organisation_type or self.charities_type, is_charity_partner=partner,
         )
         OrgMember.objects.create(
             user=self.user, org=org, role=OrgMember.ROLE_BOTH, is_league_owner=True,
@@ -236,7 +236,7 @@ class CharityPartnerWorkflowTests(TestCase):
     def test_non_charity_type_cannot_lock_even_if_flagged(self):
         from .services import lock_fundraising_to_self
 
-        org = self.make_org(partner=True, group_type=self.community_type)
+        org = self.make_org(partner=True, organisation_type=self.community_type)
         with self.assertRaises(ValueError):
             lock_fundraising_to_self(org)
 
@@ -555,7 +555,7 @@ def _walk_create_wizard(client, case, name, **extra):
     # own tests.
     client.post(url, {
         "step": 1, "action": "next", "name": name,
-        "group_type": case.gtype.pk, "informal_label": "Book Club", "parent": parent,
+        "organisation_type": case.gtype.pk, "informal_label": "Book Club", "parent": parent,
     })
     client.post(url, {"step": 2, "action": "next", "parent": parent})
     client.post(url, {
@@ -577,7 +577,7 @@ class DuplicateDetectionTests(TestCase):
     exists needs one explicit confirmation — friction, not prevention."""
 
     def setUp(self):
-        from catalog.models import Competition, GroupType, Series
+        from catalog.models import Competition, OrganisationType, Series
 
         self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
         sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
@@ -594,7 +594,7 @@ class DuplicateDetectionTests(TestCase):
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
         )
-        self.gtype = GroupType.objects.get(slug="informal")
+        self.gtype = OrganisationType.objects.get(slug="informal")
         self.existing = Organisation.objects.create(
             name="National Tiles Mitcham", season=self.season, charity=self.charity,
         )
@@ -638,7 +638,7 @@ class ChildOrgCreationTests(TestCase):
     """
 
     def setUp(self):
-        from catalog.models import Competition, GroupType, Series
+        from catalog.models import Competition, OrganisationType, Series
 
         self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
         sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
@@ -655,7 +655,7 @@ class ChildOrgCreationTests(TestCase):
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
         )
-        self.gtype = GroupType.objects.get(slug="informal")
+        self.gtype = OrganisationType.objects.get(slug="informal")
         self.parent = Organisation.objects.create(
             name="National Tiles", season=self.season, charity=self.charity,
         )
@@ -1450,7 +1450,7 @@ class CreateWizardTests(TestCase):
     URL = "/leagues/new/"
 
     def setUp(self):
-        from catalog.models import Competition, GroupType, Series
+        from catalog.models import Competition, OrganisationType, Series
 
         self.season, _ = Season.objects.get_or_create(year=2093, defaults={"label": "2093"})
         self.sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
@@ -1467,7 +1467,7 @@ class CreateWizardTests(TestCase):
             name="AFL", defaults={"sport": self.sport, "slug": "afl"},
         )
         self.comp.series.add(self.series)
-        self.gtype = GroupType.objects.get(slug="informal")
+        self.gtype = OrganisationType.objects.get(slug="informal")
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
         )
@@ -1477,7 +1477,7 @@ class CreateWizardTests(TestCase):
     def _step1(self, name="Wizard Group"):
         return self.client.post(self.URL, {
             "step": 1, "action": "next", "name": name,
-            "group_type": self.gtype.pk, "informal_label": "Book Club",
+            "organisation_type": self.gtype.pk, "informal_label": "Book Club",
         })
 
     # The wizard gained a step: Verify sits at 2 now, between the basics and
@@ -1619,7 +1619,7 @@ class CreateWizardTests(TestCase):
         self.client.get(f"{self.URL}?parent={parent.id}")
         resp = self.client.post(self.URL, {
             "step": 1, "action": "next", "name": "Finance",
-            "group_type": self.gtype.pk, "informal_label": "Book Club",
+            "organisation_type": self.gtype.pk, "informal_label": "Book Club",
             "parent": parent.id,
         })
         # The redirect carries the parent, so the next screen is still a
@@ -1646,18 +1646,18 @@ class CreateWizardTests(TestCase):
         page. The neighbouring `{% if verification.is_verified %}` swallowed
         the same failure, so nothing else on the step gave it away.
         """
-        from catalog.models import GroupType
+        from catalog.models import OrganisationType
 
         from .models import OrgDraft, WorkEmailVerification
 
-        business = GroupType.objects.filter(slug="business").first()
+        business = OrganisationType.objects.filter(slug="business").first()
         if business is None:
             self.skipTest("no business group type in this catalog")
         sub = business.sub_categories.first()
 
         payload = {
             "step": 1, "action": "next", "name": "Verify Step Co",
-            "group_type": business.pk,
+            "organisation_type": business.pk,
         }
         if sub is not None:
             payload["sub_categories"] = [sub.pk]
@@ -1907,7 +1907,7 @@ class WizardEndToEndTests(TestCase):
     """
 
     def setUp(self):
-        from catalog.models import Competition, GroupType
+        from catalog.models import Competition, OrganisationType
 
         User = get_user_model()
         self.user = User.objects.create_user(
@@ -1916,14 +1916,14 @@ class WizardEndToEndTests(TestCase):
         self.client.force_login(self.user)
         # A type that does NOT require work-email verification, so the walk
         # exercises the wizard rather than the emailed-code path.
-        self.gtype = GroupType.objects.exclude(
+        self.gtype = OrganisationType.objects.exclude(
             slug__in=["business", "education", "charities"]
         ).first()
         # Community and Business must name a sub-category — step 1 will not
         # save without one, which is exactly the kind of thing a walk-through
         # exists to catch.
         from catalog.models import SubCategory
-        self.subcat = SubCategory.objects.filter(group_type=self.gtype).first()
+        self.subcat = SubCategory.objects.filter(organisation_type=self.gtype).first()
         self.comp = Competition.objects.filter(
             slug="afl", season__year=2026
         ).select_related("season").first()
@@ -1941,7 +1941,7 @@ class WizardEndToEndTests(TestCase):
         self.assertIsNotNone(self.comp, "no AFL 2026 competition seeded")
 
         # 1 — who you are
-        self._post(1, name="Wizard Walk FC", group_type=self.gtype.id,
+        self._post(1, name="Wizard Walk FC", organisation_type=self.gtype.id,
                    sub_categories=self.subcat.id if self.subcat else "")
         # 2 — verification, not required for this type
         self._post(2)
@@ -1969,7 +1969,7 @@ class WizardEndToEndTests(TestCase):
         the feeds have no draw for syncs nothing and looks broken."""
         from orgs.models import Organisation
 
-        self._post(1, name="Season Check FC", group_type=self.gtype.id,
+        self._post(1, name="Season Check FC", organisation_type=self.gtype.id,
                    sub_categories=self.subcat.id if self.subcat else "")
         self._post(2)
         # Season deliberately NOT posted — take whatever the form defaults to.

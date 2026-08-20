@@ -57,11 +57,11 @@
       <form method="get" action="{% url 'good_list' %}" id="glFilters" class="gl-filterbar reveal">
         <select name="type" id="glType" aria-label="Organisation type">
           <option value="">All organisation types</option>
-          {% for gt in group_types %}<option value="{{ gt.slug }}" {% if sel_type == gt.slug %}selected{% endif %}>{{ gt.name }}</option>{% endfor %}
+          {% for gt in organisation_types %}<option value="{{ gt.slug }}" {% if sel_type == gt.slug %}selected{% endif %}>{{ gt.name }}</option>{% endfor %}
         </select>
         <select name="cat" id="glCat" aria-label="Sub-category">
           <option value="">All sub-categories</option>
-          {% for gt in group_types %}{% for sc in gt.sub_categories.all %}{% if sc.is_active %}<option value="{{ sc.slug }}" data-type="{{ gt.slug }}" {% if sel_type == gt.slug and sel_cat == sc.slug %}selected{% endif %}>{{ sc.name }}</option>{% endif %}{% endfor %}{% endfor %}
+          {% for gt in organisation_types %}{% for sc in gt.sub_categories.all %}{% if sc.is_active %}<option value="{{ sc.slug }}" data-type="{{ gt.slug }}" {% if sel_type == gt.slug and sel_cat == sc.slug %}selected{% endif %}>{{ sc.name }}</option>{% endif %}{% endfor %}{% endfor %}
         </select>
         <select name="state" id="glState" aria-label="State or territory">
           <option value="">All states &amp; territories</option>

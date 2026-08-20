@@ -16,7 +16,7 @@ from django.utils.timesince import timesince
 from django.views.decorators.http import require_POST
 
 from accounts.views import JOIN_INVITER_SESSION_KEY, JOIN_SESSION_KEY
-from catalog.models import DepartmentType
+from catalog.models import GroupType
 from .forms import InviteByEmailForm, OrgCreateForm
 from .notifications import send_org_invites
 from .models import (
@@ -134,7 +134,7 @@ def _requested_parent(request):
 # can see what is still ahead of them before committing to start.
 WIZARD_STEPS = [
     (1, "Your organisation", "Basic details",
-     ["name", "group_type", "sub_categories", "informal_label", "state"]),
+     ["name", "organisation_type", "sub_categories", "informal_label", "state"]),
     # Step 2 owns no form fields: it is the work-email check, and it is held in
     # its own table rather than in the draft's JSON because a hashed code with
     # an expiry, an attempt count and a send count is not a form value. It sits
@@ -175,12 +175,12 @@ def _verification_required(draft) -> bool:
     blocked by it, and the gate is re-evaluated on every submit, so choosing
     Business later still brings the requirement with it.
     """
-    from catalog.models import GroupType
+    from catalog.models import OrganisationType
 
-    gt_id = draft.data.get("group_type")
+    gt_id = draft.data.get("organisation_type")
     if not gt_id or not str(gt_id).isdigit():
         return False
-    slug = GroupType.objects.filter(pk=gt_id).values_list("slug", flat=True).first()
+    slug = OrganisationType.objects.filter(pk=gt_id).values_list("slug", flat=True).first()
     return slug in VERIFY_REQUIRED_SLUGS
 
 
@@ -597,7 +597,7 @@ def _draft_summary(form, draft) -> list:
     )
     rows = [
         ("Group name", d.get("name", "")),
-        ("Type", label_for("group_type", d.get("group_type"))),
+        ("Type", label_for("organisation_type", d.get("organisation_type"))),
         ("Sub-category", labels_for("sub_categories", d.get("sub_categories"))),
         ("Described as", d.get("informal_label", "")),
         ("State", label_for("state", d.get("state")) or "National"),
@@ -714,8 +714,8 @@ def charity_vote_view(request, org_id: int):
     partner_ctx = {
         "can_lock_fundraising": is_admin and can_lock_fundraising(org) and not already_self,
         "show_partner_cta": (
-            is_admin and org.group_type_id
-            and org.group_type.is_charity_type and not org.is_charity_partner
+            is_admin and org.organisation_type_id
+            and org.organisation_type.is_charity_type and not org.is_charity_partner
         ),
     }
     # A scheduled election whose time has come opens on first visit — and an
@@ -875,7 +875,7 @@ def _search_orgs(q: str, *, limit: int = 10):
     """Close-match org lookup for search and duplicate detection (§2, §4)."""
     return (
         Organisation.objects.filter(name__icontains=q)
-        .select_related("parent", "group_type", "state")
+        .select_related("parent", "organisation_type", "state")
         .prefetch_related("sub_categories")
         .annotate(_member_count=Count("members", distinct=True))
         .order_by("name")[:limit]
@@ -948,7 +948,7 @@ def org_search_view(request):
         ).values_list("org_id", flat=True)
     )
     all_orgs = list(
-        Organisation.objects.select_related("parent", "group_type", "state")
+        Organisation.objects.select_related("parent", "organisation_type", "state")
         .annotate(member_count=Count("members", distinct=True))
         .order_by("name")
     )
@@ -1858,7 +1858,7 @@ def _department_icon(dept) -> tuple[str, str]:
     worse than a neutral one, because it says something untrue about the team.
     """
     haystack = " ".join(filter(None, [
-        (dept.department_type.name if dept.department_type_id else ""),
+        (dept.group_type.name if dept.group_type_id else ""),
         dept.department_label or "",
         dept.name or "",
     ])).lower()
@@ -1886,9 +1886,9 @@ def departments_view(request, org_id: int):
 
         if action == "create":
             dept_type = None
-            raw_type = request.POST.get("department_type") or ""
+            raw_type = request.POST.get("group_type") or ""
             if raw_type.isdigit():
-                dept_type = DepartmentType.objects.filter(pk=raw_type, is_active=True).first()
+                dept_type = GroupType.objects.filter(pk=raw_type, is_active=True).first()
             # The modal's first step lets you switch organisation, so the
             # parent is whatever it confirmed, not whichever page you opened.
             # Re-checked here rather than trusted: it arrives from a form.
@@ -1906,7 +1906,7 @@ def departments_view(request, org_id: int):
                     target,
                     name=request.POST.get("name", ""),
                     by_user=request.user,
-                    department_type=dept_type,
+                    group_type=dept_type,
                     department_label=request.POST.get("department_label", ""),
                 )
                 if dept.is_pending_approval:
@@ -1943,7 +1943,7 @@ def departments_view(request, org_id: int):
         depts = depts.filter(
             Q(name__icontains=q)
             | Q(department_label__icontains=q)
-            | Q(department_type__name__icontains=q)
+            | Q(group_type__name__icontains=q)
         )
 
     # One query for "which of these am I already in", rather than one per row.
@@ -1971,9 +1971,9 @@ def departments_view(request, org_id: int):
 
     # The picker: types for this org's business type, plus the ones offered to
     # everyone. Ordered so the general ones do not bury the specific ones.
-    type_choices = DepartmentType.objects.filter(is_active=True).filter(
-        Q(group_type__isnull=True) | Q(group_type=root.group_type_id)
-    ).order_by("group_type__id", "sort_order", "name")
+    type_choices = GroupType.objects.filter(is_active=True).filter(
+        Q(organisation_type__isnull=True) | Q(organisation_type=root.organisation_type_id)
+    ).order_by("organisation_type__id", "sort_order", "name")
 
     # Orgs this person could create a department in. Someone can belong to
     # several, and the modal opens on the one they are looking at but must let

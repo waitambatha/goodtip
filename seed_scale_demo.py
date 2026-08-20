@@ -22,7 +22,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "goodtip.settings")
 django.setup()
 
 from django.contrib.auth import get_user_model
-from catalog.models import Charity, Competition, GroupType, Season, Series
+from catalog.models import Charity, Competition, OrganisationType, Season, Series
 from orgs.models import Organisation, OrgMember
 from tipping.models import Match, Round, Team, Tip
 
@@ -110,7 +110,7 @@ def main():
             defaults={"slug": "red-cross-australia", "is_approved": True},
         )[0]
     ]
-    group_types = list(GroupType.objects.all())
+    organisation_types = list(OrganisationType.objects.all())
     print(f"User {user.display_name}, {len(teams)} teams, {len(charities)} charities")
 
     # ---- Test League 1: full Round 1 fixture + three more rounds ----
@@ -154,7 +154,7 @@ def main():
             name=name, season=season,
             defaults={
                 "charity": charities[i % len(charities)],
-                "group_type": group_types[i % len(group_types)] if group_types else None,
+                "organisation_type": organisation_types[i % len(organisation_types)] if organisation_types else None,
             },
         )
         if created:

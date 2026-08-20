@@ -417,7 +417,7 @@ def can_lock_fundraising(org) -> bool:
     whose partner flag GoodTip staff have set in admin may lock fundraising
     to itself. The flag is never self-declared.
     """
-    return bool(org.group_type_id and org.group_type.is_charity_type and org.is_charity_partner)
+    return bool(org.organisation_type_id and org.organisation_type.is_charity_type and org.is_charity_partner)
 
 
 @transaction.atomic
@@ -647,7 +647,7 @@ def close_due_elections(orgs=None) -> int:
 # the four-step wizard a top-level org goes through.
 
 
-def create_department(parent, *, name, by_user, department_type=None, department_label=""):
+def create_department(parent, *, name, by_user, group_type=None, department_label=""):
     """Create a department under ``parent``.
 
     Who is asking decides whether it is live or a request. An admin of the
@@ -680,7 +680,7 @@ def create_department(parent, *, name, by_user, department_type=None, department
         dept = Organisation.objects.create(
             parent=parent,
             name=name,
-            department_type=department_type,
+            group_type=group_type,
             department_label=(department_label or "").strip(),
             created_by=by_user,
             approval_status=(
@@ -689,7 +689,7 @@ def create_department(parent, *, name, by_user, department_type=None, department
             approved_at=timezone.now() if is_admin else None,
             approved_by=by_user if is_admin else None,
             # Inherited, never re-asked.
-            group_type=parent.group_type,
+            organisation_type=parent.organisation_type,
             state=parent.state,
             season=parent.season,
             charity=parent.charity,
@@ -778,7 +778,7 @@ def departments_for(org, *, include_pending_for=None):
     from .models import Organisation, OrgMember
 
     root = org.root
-    qs = Organisation.objects.filter(parent=root).select_related("department_type", "created_by")
+    qs = Organisation.objects.filter(parent=root).select_related("group_type", "created_by")
 
     if include_pending_for is None:
         return qs.filter(approval_status=Organisation.APPROVAL_APPROVED)

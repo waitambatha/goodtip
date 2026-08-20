@@ -4,7 +4,7 @@ from .models import (
     Charity,
     Competition,
     GoodListConfig,
-    GroupType,
+    OrganisationType,
     Season,
     Series,
     State,
@@ -18,16 +18,16 @@ class StateAdmin(admin.ModelAdmin):
     list_display = ("name", "code", "sort_order")
 
 
-@admin.register(GroupType)
-class GroupTypeAdmin(admin.ModelAdmin):
+@admin.register(OrganisationType)
+class OrganisationTypeAdmin(admin.ModelAdmin):
     list_display = ("name", "slug", "sort_order")
     prepopulated_fields = {"slug": ("name",)}
 
 
 @admin.register(SubCategory)
 class SubCategoryAdmin(admin.ModelAdmin):
-    list_display = ("name", "group_type", "is_active", "sort_order", "slug")
-    list_filter = ("group_type", "is_active")
+    list_display = ("name", "organisation_type", "is_active", "sort_order", "slug")
+    list_filter = ("organisation_type", "is_active")
     list_editable = ("is_active", "sort_order")
     prepopulated_fields = {"slug": ("name",)}
 

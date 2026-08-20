@@ -125,7 +125,7 @@ class State(models.Model):
         return self.name
 
 
-class GroupType(models.Model):
+class OrganisationType(models.Model):
     """The organisation type an org self-selects at sign-up (categories doc,
     7 Jul 2026): Community, Business, Education, Charities, Informal — in that
     order, which drives both the sign-up dropdown and the Good List filters.
@@ -174,7 +174,7 @@ class SubCategory(models.Model):
     e.g. Business → Finance, Community → Sports Club, Education → University.
 
     Replaces the old flat ``Industry`` table: the same idea, but scoped to its
-    parent ``GroupType`` so the sign-up dropdown and the Good List filters show
+    parent ``OrganisationType`` so the sign-up dropdown and the Good List filters show
     only the sub-categories that belong to the selected type. Charities and
     Informal deliberately have none — Informal orgs self-describe instead.
 
@@ -182,7 +182,7 @@ class SubCategory(models.Model):
     redeploy.
     """
 
-    group_type = models.ForeignKey(GroupType, on_delete=models.CASCADE, related_name="sub_categories")
+    organisation_type = models.ForeignKey(OrganisationType, on_delete=models.CASCADE, related_name="sub_categories")
     name = models.CharField(max_length=80)
     slug = models.SlugField(max_length=80)
     sort_order = models.PositiveIntegerField(default=0)
@@ -190,15 +190,15 @@ class SubCategory(models.Model):
     is_active = models.BooleanField(default=True)
 
     class Meta:
-        ordering = ["group_type__sort_order", "sort_order", "name"]
+        ordering = ["organisation_type__sort_order", "sort_order", "name"]
         verbose_name_plural = "sub-categories"
         constraints = [
-            models.UniqueConstraint(fields=["group_type", "slug"], name="uniq_subcategory_slug_per_type"),
-            models.UniqueConstraint(fields=["group_type", "name"], name="uniq_subcategory_name_per_type"),
+            models.UniqueConstraint(fields=["organisation_type", "slug"], name="uniq_subcategory_slug_per_type"),
+            models.UniqueConstraint(fields=["organisation_type", "name"], name="uniq_subcategory_name_per_type"),
         ]
 
     def __str__(self):
-        return f"{self.name} ({self.group_type.name})"
+        return f"{self.name} ({self.organisation_type.name})"
 
 
 class GoodListConfig(models.Model):
@@ -251,13 +251,13 @@ class Charity(models.Model):
         return self.name
 
 
-class DepartmentType(models.Model):
+class GroupType(models.Model):
     """A ready-made department name, offered when someone creates a department
     inside an organisation (e.g. Business → IT, Finance, People & Culture).
 
-    Scoped to a ``GroupType`` the same way ``SubCategory`` is, so a bank is
+    Scoped to a ``OrganisationType`` the same way ``SubCategory`` is, so a bank is
     offered banking-shaped departments and a school is offered Year Levels
-    rather than a Warehouse. ``group_type`` NULL means "offer this to
+    rather than a Warehouse. ``organisation_type`` NULL means "offer this to
     everyone" — Finance and IT exist in almost every organisation, and
     duplicating them under all five types would be a list to maintain in five
     places.
@@ -270,8 +270,8 @@ class DepartmentType(models.Model):
     itself "The Cave" does not pollute the list everybody else sees.
     """
 
-    group_type = models.ForeignKey(
-        GroupType, on_delete=models.CASCADE, related_name="department_types",
+    organisation_type = models.ForeignKey(
+        OrganisationType, on_delete=models.CASCADE, related_name="group_types",
         null=True, blank=True,
     )
     name = models.CharField(max_length=80)
@@ -283,7 +283,7 @@ class DepartmentType(models.Model):
         ordering = ["sort_order", "name"]
         # Same name may exist under different types (Education "Admin" is not
         # Business "Admin"), so uniqueness is per type rather than global.
-        unique_together = [("group_type", "slug")]
+        unique_together = [("organisation_type", "slug")]
 
     def __str__(self):
-        return f"{self.group_type.name} → {self.name}" if self.group_type_id else self.name
+        return f"{self.organisation_type.name} → {self.name}" if self.organisation_type_id else self.name

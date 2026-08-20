@@ -150,26 +150,26 @@ missed click and got submitted twice.
         <ul id="dupeHintList" style="margin:6px 0 0;padding-left:18px;"></ul>
       </div></div>
 
-    <div class="fld"><label for="id_group_type">Organisation type</label>
+    <div class="fld"><label for="id_organisation_type">Organisation type</label>
       <div class="fld-ic">
         <span class="fi-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
           </svg>
         </span>
-      <select name="group_type" id="id_group_type">
+      <select name="organisation_type" id="id_organisation_type">
         <option value="">Choose your organisation type</option>
-        {% for gt in form.fields.group_type.queryset %}<option value="{{ gt.pk }}" data-slug="{{ gt.slug }}" {% if form.group_type.value|stringformat:'s' == gt.pk|stringformat:'s' %}selected{% endif %}>{{ gt.name }}</option>{% endfor %}
+        {% for gt in form.fields.organisation_type.queryset %}<option value="{{ gt.pk }}" data-slug="{{ gt.slug }}" {% if form.organisation_type.value|stringformat:'s' == gt.pk|stringformat:'s' %}selected{% endif %}>{{ gt.name }}</option>{% endfor %}
       </select>
       </div>
-      {% if form.group_type.errors %}<div class="fld-err">{{ form.group_type.errors|join:" " }}</div>{% endif %}
+      {% if form.organisation_type.errors %}<div class="fld-err">{{ form.organisation_type.errors|join:" " }}</div>{% endif %}
     </div>
 
     <div class="fld" data-cat="community business education" style="display:none;">
       <label>Sub-category <span id="subcatHint" style="color:var(--muted);font-weight:400;"></span></label>
       <div class="opt-grid cols2" style="margin-top:8px;" id="subcatGrid">
         {% for sc in form.fields.sub_categories.queryset %}
-        <label class="opt-card" data-type="{{ sc.group_type.slug }}"><input type="checkbox" name="sub_categories" value="{{ sc.pk }}" {% is_checked form.sub_categories sc.pk %}><span class="oc-box"><svg><use href="#ic-check"/></svg></span><span class="oc-title">{{ sc.name }}</span></label>
+        <label class="opt-card" data-type="{{ sc.organisation_type.slug }}"><input type="checkbox" name="sub_categories" value="{{ sc.pk }}" {% is_checked form.sub_categories sc.pk %}><span class="oc-box"><svg><use href="#ic-check"/></svg></span><span class="oc-title">{{ sc.name }}</span></label>
         {% endfor %}
       </div>
       {% if form.sub_categories.errors %}<div class="fld-err">{{ form.sub_categories.errors|join:" " }}</div>{% endif %}
@@ -535,7 +535,7 @@ missed click and got submitted twice.
 
     /* organisation type -> dependent sub-category / informal / charity blocks */
     (function(){
-      var typeSel = document.getElementById('id_group_type');
+      var typeSel = document.getElementById('id_organisation_type');
       if (!typeSel) return;
       var hint = document.getElementById('subcatHint');
       var cards = document.querySelectorAll('#subcatGrid .opt-card');

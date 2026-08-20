@@ -14,7 +14,7 @@ django.setup()
 
 from django.contrib.auth import get_user_model  # noqa: E402
 
-from catalog.models import Charity, Competition, GroupType, Season, State  # noqa: E402
+from catalog.models import Charity, Competition, OrganisationType, Season, State  # noqa: E402
 from orgs.models import OrgMember, Organisation  # noqa: E402
 
 User = get_user_model()
@@ -58,7 +58,7 @@ def main():
         name=ORG_NAME,
         season=season,
         defaults={
-            "group_type": GroupType.objects.get(name="Community"),
+            "organisation_type": OrganisationType.objects.get(name="Community"),
             "state": State.objects.get(code="VIC"),
             "charity": Charity.objects.get(name="Lifeline"),
             "is_public_listed": True,

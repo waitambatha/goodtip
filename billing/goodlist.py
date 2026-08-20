@@ -24,12 +24,12 @@ from decimal import Decimal
 
 from django.db.models import Count, Sum
 
-from catalog.models import GoodListConfig, GroupType
+from catalog.models import GoodListConfig, OrganisationType
 from orgs.models import Organisation
 
 from .models import DonationPayment
 
-COMMUNITY_SLUG = GroupType.SLUG_COMMUNITY
+COMMUNITY_SLUG = OrganisationType.SLUG_COMMUNITY
 
 
 def _q(value) -> Decimal:
@@ -90,11 +90,11 @@ def by_sub_category() -> list[dict]:
 
 def by_type() -> list[dict]:
     """Raised per organisation type (Community, Business, …)."""
-    return _aggregate_by("org__group_type__name")
+    return _aggregate_by("org__organisation_type__name")
 
 
 def _consenting_org_totals(
-    group_type_slug: str | None = None,
+    organisation_type_slug: str | None = None,
     sub_category_slug: str | None = None,
     state_code: str | None = None,
 ):
@@ -107,8 +107,8 @@ def _consenting_org_totals(
         is_public_listed=True,
         donation_payments__settled_at__isnull=False,
     )
-    if group_type_slug:
-        qs = qs.filter(group_type__slug=group_type_slug)
+    if organisation_type_slug:
+        qs = qs.filter(organisation_type__slug=organisation_type_slug)
     if sub_category_slug:
         # M2M: matches every org holding the sub-category, so a Primary +
         # Secondary school appears under both school filters (build note).
@@ -118,7 +118,7 @@ def _consenting_org_totals(
     return (
         qs.annotate(raised=Sum("donation_payments__amount_aud"))
         .filter(raised__gt=0)
-        .select_related("charity", "group_type", "state")
+        .select_related("charity", "organisation_type", "state")
         .prefetch_related("sub_categories")
         .order_by("-raised", "name")
         .distinct()
@@ -136,7 +136,7 @@ def board_is_live() -> bool:
 
 
 def by_group(
-    group_type_slug: str | None = None,
+    organisation_type_slug: str | None = None,
     sub_category_slug: str | None = None,
     state_code: str | None = None,
 ) -> list[dict]:
@@ -153,7 +153,7 @@ def by_group(
             "org": org,
             "name": org.name,
             "charity": org.charity,
-            "type": org.group_type.name if org.group_type_id else "",
+            "type": org.organisation_type.name if org.organisation_type_id else "",
             # Informal groups show their self-description; others their
             # sub-categories ("Primary School + Secondary School").
             "category": org.category_label,
@@ -161,7 +161,7 @@ def by_group(
             "raised": _q(org.raised),
         }
         for org in _consenting_org_totals(
-            group_type_slug=group_type_slug,
+            organisation_type_slug=organisation_type_slug,
             sub_category_slug=sub_category_slug,
             state_code=state_code,
         )
@@ -170,16 +170,16 @@ def by_group(
 
 # What an unnamed group is called on the private board, per type.
 _ANON_KINDS = {
-    GroupType.SLUG_COMMUNITY: "A community group",
-    GroupType.SLUG_BUSINESS: "A business",
-    GroupType.SLUG_EDUCATION: "An education group",
-    GroupType.SLUG_CHARITIES: "A charity",
-    GroupType.SLUG_INFORMAL: "An informal group",
+    OrganisationType.SLUG_COMMUNITY: "A community group",
+    OrganisationType.SLUG_BUSINESS: "A business",
+    OrganisationType.SLUG_EDUCATION: "An education group",
+    OrganisationType.SLUG_CHARITIES: "A charity",
+    OrganisationType.SLUG_INFORMAL: "An informal group",
 }
 
 
 def _anonymised_label(org) -> str:
-    kind = _ANON_KINDS.get(org.group_type.slug if org.group_type_id else "", "A group")
+    kind = _ANON_KINDS.get(org.organisation_type.slug if org.organisation_type_id else "", "A group")
     where = org.state.name if org.state_id else "Australia"
     return f"{kind} in {where}"
 
@@ -195,7 +195,7 @@ def private_board(viewer_org) -> list[dict]:
         Organisation.objects.filter(donation_payments__settled_at__isnull=False)
         .annotate(raised=Sum("donation_payments__amount_aud"))
         .filter(raised__gt=0)
-        .select_related("charity", "group_type", "state")
+        .select_related("charity", "organisation_type", "state")
         .order_by("-raised", "name")
         .distinct()
     )

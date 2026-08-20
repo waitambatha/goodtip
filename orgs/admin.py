@@ -22,14 +22,14 @@ class OrgMemberInline(admin.TabularInline):
 @admin.register(Organisation)
 class OrganisationAdmin(admin.ModelAdmin):
     list_display = (
-        "name", "parent", "child_count", "group_type", "category_label", "state",
+        "name", "parent", "child_count", "organisation_type", "category_label", "state",
         "is_charity_partner", "is_public_listed", "season", "charity", "created_at",
     )
     # is_charity_partner is set HERE and only here (categories doc: partner
     # status is never self-declared) — the org creation flow reads it to pick
     # the lock-to-self vs vote-plus-CTA workflow.
     list_filter = (
-        "group_type", "sub_categories", "state",
+        "organisation_type", "sub_categories", "state",
         "is_charity_partner", "is_public_listed", "season", "competitions",
     )
     list_editable = ("is_charity_partner", "is_public_listed")
