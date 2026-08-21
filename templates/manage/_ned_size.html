@@ -7,10 +7,19 @@ This replaced a dropdown of Small / Medium / Large / XL. Those names were a
 guess dressed up as a choice: they gave no idea what size you were about to
 get, no idea what size you were already on, and no way to ask for anything in
 between. A number you can nudge up and down does all three.
+
+Nudging alone turned out not to be enough. Going 16 → 48 is thirty-two clicks,
+and nothing tells you which sizes are worth choosing. So the number is a button
+too: click it and the usual sizes drop down in a list to scroll and pick from,
+while − and + stay for the one-point adjustments and the box stays typeable for
+anything not on the list. gt-news-editor.js fills the list in.
 {% endcomment %}
 <span class="ned-size" data-size-default="{{ default }}">
   <button type="button" class="ned-size-step" data-size-step="-1" title="Smaller" aria-label="Smaller text">&minus;</button>
   <input type="number" class="ned-size-num" data-cmd="fontSizePx"
-         min="8" max="120" step="1" value="{{ default }}" aria-label="Font size in pixels">
+         min="8" max="120" step="1" value="{{ default }}"
+         title="Font size — click for the list, or type one"
+         aria-label="Font size in pixels" aria-haspopup="listbox" aria-expanded="false">
   <button type="button" class="ned-size-step" data-size-step="1" title="Bigger" aria-label="Bigger text">+</button>
+  <div class="ned-menu is-sizes" data-size-menu role="listbox" aria-label="Font size"></div>
 </span>

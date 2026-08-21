@@ -9868,27 +9868,87 @@ body.fxh-open { overflow: hidden; }
 }
 .ned-toolbar select.ned-pick:hover { border-color: var(--forest); background: #fff; }
 
-/* ---- Font size: a number you nudge, not a bucket you guess at ---- */
-.ned-size {
-  display: inline-flex; align-items: center; flex: 0 0 auto;
-  border: 1px solid var(--gt-hair); border-radius: 8px; background: #fff; overflow: hidden;
+/* ---- Toolbar drop-downs: font and size ----
+   Both are a control with a list hanging under it rather than a <select>,
+   because a select truncates its own labels at a width the browser picks and
+   cannot draw an option in the font that option names. Note `overflow:
+   visible` on the shells below — the rounded corners are cut on the children
+   instead, since clipping the shell would clip the list right off. */
+.ned-menu {
+  display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
+  min-width: 100%; width: max-content; max-width: 320px;
+  max-height: 268px; overflow-y: auto; overscroll-behavior: contain;
+  padding: 6px; background: #fff;
+  border: 1px solid var(--app-line); border-radius: 11px;
+  box-shadow: 0 14px 34px rgba(15, 46, 34, .17);
 }
-.ned-size-step {
+.ned-menu.open { display: block; }
+.ned-menu-head {
+  margin: 0; padding: 7px 9px 4px; font-family: var(--body);
+  font-size: 10px; font-weight: 800; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--muted);
+}
+.ned-menu-head + .ned-menu-item { margin-top: 0; }
+/* Sits inside .ned-toolbar, so it has to out-specify the plain button rule
+   above — everything except font-family, which each item sets inline to show
+   itself off in its own typeface. */
+.ned-toolbar .ned-menu-item {
+  display: flex; align-items: baseline; gap: 9px; width: 100%;
+  padding: 7px 10px; border: 0; border-radius: 7px; background: none;
+  color: var(--ink); font-size: 15px; font-weight: 500; line-height: 1.3;
+  text-align: left; white-space: nowrap; cursor: pointer;
+}
+.ned-toolbar .ned-menu-item em {
+  font-family: var(--body); font-style: normal; font-size: 11px;
+  font-weight: 600; color: var(--muted);
+}
+.ned-toolbar .ned-menu-item:hover { background: rgba(45, 122, 58, .10); }
+/* Where you already are, so opening the list answers that before you pick. */
+.ned-toolbar .ned-menu-item.is-on { background: var(--lime); color: var(--deep); }
+.ned-toolbar .ned-menu-item.is-on em { color: var(--deep); opacity: .7; }
+
+.ned-font { position: relative; display: inline-flex; flex: 0 0 auto; }
+.ned-toolbar .ned-font-btn {
+  display: inline-flex; align-items: center; gap: 7px; height: 30px;
+  padding: 0 9px; border: 1px solid var(--gt-hair); border-radius: 8px;
+  background: #fff; font-weight: 600; font-size: 13px;
+  /* The name is never shortened — the toolbar wraps to a second line first.
+     A control that names a font you cannot read is the bug being fixed. */
+  white-space: nowrap; max-width: none;
+}
+.ned-toolbar .ned-font-btn:hover { border-color: var(--forest); background: #fff; }
+.ned-caret { width: 9px; height: 6px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; opacity: .7; }
+
+/* ---- Font size: a number you nudge, or pick off a list ---- */
+.ned-size {
+  position: relative;
+  display: inline-flex; align-items: center; flex: 0 0 auto;
+  border: 1px solid var(--gt-hair); border-radius: 8px; background: #fff;
+}
+.ned-toolbar .ned-size-step {
   width: 26px; height: 30px; padding: 0; border: 0; background: none;
   color: var(--forest); font-size: 15px; font-weight: 800; line-height: 1; cursor: pointer;
 }
-.ned-size-step:hover { background: rgba(45,122,58,.12); }
+.ned-size-step[data-size-step="-1"] { border-radius: 7px 0 0 7px; }
+.ned-size-step[data-size-step="1"] { border-radius: 0 7px 7px 0; }
+.ned-toolbar .ned-size-step:hover { background: rgba(45,122,58,.12); }
 .ned-size-num {
   width: 42px; padding: 6px 0; text-align: center; background: none; outline: none;
   border: 0; border-left: 1px solid var(--gt-hair); border-right: 1px solid var(--gt-hair);
   font-family: var(--body); font-size: 13px; font-weight: 700; color: var(--ink);
-  -moz-appearance: textfield;
+  cursor: pointer; -moz-appearance: textfield;
 }
 .ned-size-num:focus { background: rgba(200,241,53,.25); }
 /* The native spinners are tiny, and the − / + buttons beside them are the
    whole point of this control. */
 .ned-size-num::-webkit-outer-spin-button,
 .ned-size-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+/* Numbers read better in a narrow column, centred, than as a ragged list. */
+.ned-menu.is-sizes { min-width: 76px; padding: 5px; }
+.ned-toolbar .ned-menu.is-sizes .ned-menu-item {
+  justify-content: center; padding: 6px 8px;
+  font-family: var(--body); font-size: 13px; font-weight: 700;
+}
 .ned-toolbar input[type="color"] {
   width: 30px; height: 30px; padding: 2px; border: 1px solid var(--gt-hair);
   border-radius: 8px; background: none; cursor: pointer;
