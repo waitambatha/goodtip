@@ -1221,6 +1221,7 @@ body.loading { overflow: hidden; }
 .social-btn.s-linkedin:hover { background: #0A66C2; border-color: #0A66C2; color: #fff; }
 .social-btn.s-facebook:hover { background: #1877F2; border-color: #1877F2; color: #fff; }
 .social-btn.s-instagram:hover{ background: #E1306C; border-color: #E1306C; color: #fff; }
+.social-btn.s-youtube:hover  { background: #FF0000; border-color: #FF0000; color: #fff; }
 .social-btn.s-whatsapp:hover { background: #25D366; border-color: #25D366; color: #042; }
 .social-btn.s-tiktok:hover   { background: #fff; border-color: #fff; color: #111; }
 .social-note { font-size: 12px; color: var(--muted); margin-top: 12px; }
@@ -9935,29 +9936,11 @@ body.fxh-open { overflow: hidden; }
 .art-sources li, .pn-sources li { font-size: 13.5px; margin-bottom: 5px; }
 .art-sources a, .pn-sources a { color: var(--forest); word-break: break-word; }
 
-/* ---- Footer / contact-block social icons ----
-   White fill so each platform's own colour reads properly (a red YouTube
-   glyph on a dark footer disappears; on white it's instantly recognisable).
-   Same brand hexes as .social-btn's hover state on the contact block, just
-   applied as the resting colour here instead of a hover-only reveal. On
-   hover the circle fills with that brand colour and the glyph flips to
-   white — the two buttons' hover states meeting in the middle. */
-.footer-socials { display: flex; gap: 10px; }
-.footer-social-btn {
-  width: 36px; height: 36px; border-radius: 50%; border: 1px solid transparent;
-  background: var(--cream); display: grid; place-items: center;
-  transition: transform .15s var(--ease), background .15s var(--ease), color .15s var(--ease), box-shadow .15s var(--ease);
-}
-.footer-social-btn svg { width: 16px; height: 16px; fill: currentColor; }
-.footer-social-btn:hover { transform: translateY(-2px); color: #fff; box-shadow: 0 6px 14px -6px rgba(0,0,0,.35); }
-.footer-social-btn.s-facebook  { color: #1877F2; }
-.footer-social-btn.s-linkedin  { color: #0A66C2; }
-.footer-social-btn.s-instagram { color: #E1306C; }
-.footer-social-btn.s-youtube   { color: #FF0000; }
-.footer-social-btn.s-facebook:hover  { background: #1877F2; }
-.footer-social-btn.s-linkedin:hover  { background: #0A66C2; }
-.footer-social-btn.s-instagram:hover { background: #E1306C; }
-.footer-social-btn.s-youtube:hover   { background: #FF0000; }
+/* ---- Footer brand-column socials ----
+   The footer's "Follow us" list reuses .social-btn (see CONTACT v2 +
+   SOCIALS above) rather than its own icon-only treatment: one labelled
+   set of social links, styled one way, instead of two different-looking
+   social rows on the same page. */
 
 /* ==========================================================================
    ============ v36 — leaderboard column tint ==============================
