@@ -19,6 +19,21 @@
       <div class="shot active" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
       <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-posts-sunset.jpg' %}')"></div>
       <div class="shot" style="background-image:url('{% static 'img/scenes/afl-posts-mcg.jpg' %}')"></div>
+      {% comment %}
+      The right pane's fourth shot is video rather than a photo. It's marked
+      up exactly like its siblings — same .shot wrapper, background-image set
+      to the clip's poster frame — so the rotation engine (gt-scenes.js) can't
+      tell it apart from a still and crossfades to it the same way. The
+      <video> only paints once gt-video.js has decided it's allowed to load
+      (in view, no data-saver, motion not reduced) and can actually play; it
+      then fades in over the poster already sitting there. Anyone who never
+      gets that far — reduced motion, a metered connection — simply keeps
+      seeing the poster photo. Same shot, sometimes it moves.
+      {% endcomment %}
+      <div class="shot" style="background-image:url('{% static 'video/match-action-poster.jpg' %}')">
+        <video data-src="{% static 'video/match-action.mp4' %}" poster="{% static 'video/match-action-poster.jpg' %}"
+               muted loop playsinline preload="none" aria-hidden="true" tabindex="-1"></video>
+      </div>
     </div>
   </div>
   <div class="hero-veil" aria-hidden="true"></div>

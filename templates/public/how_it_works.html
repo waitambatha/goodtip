@@ -21,6 +21,11 @@
       <div class="shot active" style="background-image:url('{% static 'img/scenes/afl-goal-posts.jpg' %}')"></div>
       <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-ball-grass.jpg' %}')"></div>
       <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+      {% comment %} See home.html's hero for how a video shot works alongside its photo siblings. {% endcomment %}
+      <div class="shot" style="background-image:url('{% static 'video/warmup-poster.jpg' %}')">
+        <video data-src="{% static 'video/warmup.mp4' %}" poster="{% static 'video/warmup-poster.jpg' %}"
+               muted loop playsinline preload="none" aria-hidden="true" tabindex="-1"></video>
+      </div>
     </div>
     <div class="hs-veil" aria-hidden="true"></div>
     <div class="hs-tagstrip"><span class="live-dot">Allianz Stadium</span></div>
