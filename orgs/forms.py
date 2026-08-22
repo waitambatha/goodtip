@@ -156,23 +156,28 @@ class OrgCreateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["competitions"].queryset = fed_competitions()
+        # The season actually in play right now — the same fallback a betting
+        # site's "current round" resolves to without ever asking a punter to
+        # pick a year. Nobody signing up should have to know that a 2027
+        # competition row exists on file before its season has even started;
+        # they tip the season that is live, full stop.
+        current = (
+            Season.objects.filter(year=timezone.now().year).first()
+            or Season.objects.filter(year__lte=timezone.now().year).first()
+            or Season.objects.first()
+        )
+        self.fields["competitions"].queryset = (
+            fed_competitions().filter(season=current) if current else fed_competitions()
+        )
+        # No longer a question anyone answers: hidden, and always the current
+        # season, so "AFL (2027)" cannot even be selected before 2027 starts —
+        # it simply is not offered, rather than being offered and then having
+        # to be explained away with a second "which season" field beside it.
         self.fields["season"].queryset = Season.objects.all()
-        self.fields["season"].empty_label = None
-        # Season.Meta orders by -year, so the first choice was always the
-        # furthest-future season on file. With empty_label off that became the
-        # silent default, and every new league was created into a season nobody
-        # is playing — the upstream feeds have no draw for it, so the league
-        # syncs no fixtures and shows an empty dashboard with nothing obviously
-        # wrong. Default to the season actually in play.
-        if not self.is_bound and not self.initial.get("season"):
-            current = (
-                Season.objects.filter(year=timezone.now().year).first()
-                or Season.objects.filter(year__lte=timezone.now().year).first()
-                or Season.objects.first()
-            )
-            if current:
-                self.initial["season"] = current.pk
+        self.fields["season"].widget = forms.HiddenInput()
+        self.fields["season"].required = False
+        if not self.is_bound and not self.initial.get("season") and current:
+            self.initial["season"] = current.pk
 
     def _clean_categories(self, cleaned):
         """Per-type rules from the categories doc: Community/Business pick one

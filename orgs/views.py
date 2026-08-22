@@ -385,9 +385,16 @@ def create_org_view(request):
                 elif row.is_verified:
                     pass                                  # already through
                 elif row.verify(request.POST.get("code", "")):
+                    # Stays on step 2 rather than jumping straight to step 3.
+                    # It used to advance immediately, which meant a correct
+                    # code was never actually SEEN succeeding — the code-entry
+                    # veil just vanished into the next step's card with no
+                    # beat in between. Landing back here renders the
+                    # "Verified" tick (create.html's verify-done block, which
+                    # a script advances on its own after a moment — see
+                    # app_js), so the moment of getting it right is something
+                    # that happens on screen before the wizard moves on.
                     messages.success(request, f"{row.domain} verified. Nice one.")
-                    draft.step = step + 1
-                    draft.save()
                     return _create_redirect(parent_org)
                 elif row.attempts >= row.MAX_ATTEMPTS:
                     messages.error(
@@ -596,6 +603,14 @@ def _render_wizard(request, draft, form, step, parent_org, *, errors=None, dupli
         # and storage backends are free to serve from somewhere else entirely.
         "draft_logo_url": (
             default_storage.url(draft.data["logo"]) if draft.data.get("logo") else ""
+        ),
+        # The competitions queryset (see OrgCreateForm.__init__) is already
+        # filtered down to one season, so any row in it names the season the
+        # step-4 eyebrow should show — no separate lookup, no separate
+        # "which season is current" logic living in two places.
+        "current_season": (
+            getattr(form.fields["competitions"].queryset.first(), "season", None)
+            if step == 4 else None
         ),
     })
 

@@ -43,9 +43,16 @@ answer, so going back to change one costs nothing.
 {% endcomment %}
 <div class="wiz-rail" role="list">
   {% for s in steps %}
-  <div class="wiz-step {% if s.current %}current{% elif s.done %}done{% endif %}" role="listitem"
-       {% if s.current %}aria-current="step"{% endif %}>
+  <div class="wiz-step {% if s.current %}current{% elif s.done %}done{% endif %}" role="listitem" tabindex="0"
+       {% if s.current %}aria-current="step"{% endif %} aria-label="Step {{ s.n }}: {{ s.label }}, {{ s.sub }}">
     <span class="wz-num">{% if s.done %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 13 4 4L19 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>{% else %}{{ s.n }}{% endif %}</span>
+    {% comment %}
+    Numbers-only fits every step in the box (see "six steps..." note below);
+    a step that isn't the current one still names itself on hover/focus, as
+    a small floating tooltip rather than inline text — that way glancing at
+    step 1 can still answer "what happens at step 4" without the rail ever
+    trying to hold six full labels in a row again.
+    {% endcomment %}
     <span class="wz-text">
       <span class="wz-label">{{ s.label }}</span>
       <span class="wz-sub">{{ s.sub }}</span>
@@ -239,7 +246,14 @@ missed click and got submitted twice.
     </div>
 
     {% if verification.is_verified %}
-      <div class="verify-done">
+      {% comment %}
+      data-auto-continue only when a message is queued for THIS render — the
+      one-shot signal that a code was just verified, rather than this being a
+      revisit (e.g. pressing Back from step 3) to a step that was already
+      verified a while ago. Django's messages are consumed once they're
+      displayed, so it can't fire twice for the same success.
+      {% endcomment %}
+      <div class="verify-done" {% if messages %}data-auto-continue="1"{% endif %}>
         <span class="vd-tick" aria-hidden="true"><svg><use href="#ic-check"/></svg></span>
         <div>
           <b>{{ verification.domain }}</b>
@@ -253,12 +267,15 @@ missed click and got submitted twice.
         <p>We sent a six-digit code to <b>{{ verification.email }}</b>. It expires 15 minutes after it was sent.</p>
       </div>
       <div class="fld">
-        <label for="id_code">Enter the code</label>
-        <div class="fld-ic">
-          <span class="fi-mark" aria-hidden="true"><svg><use href="#ic-lock"/></svg></span>
-          <input type="text" name="code" id="id_code" inputmode="numeric" autocomplete="one-time-code"
-                 pattern="[0-9]*" maxlength="6" placeholder="123456" class="code-input" autofocus>
-        </div>
+        <label for="id_code" style="text-align:center;display:block;">Enter the code</label>
+        {% comment %}
+        No .fld-ic/lock-icon prefix here — that wrapper puts its icon at the
+        field's left edge, which only works with a full-width input. This one
+        is now a small centred slot (see .code-input), so a prefix icon would
+        sit far off to the side of it, pointing at nothing.
+        {% endcomment %}
+        <input type="text" name="code" id="id_code" inputmode="numeric" autocomplete="one-time-code"
+               pattern="[0-9]*" maxlength="6" placeholder="123456" class="code-input" autofocus>
       </div>
       <div class="verify-actions">
         <button type="submit" name="action" value="verify_code" class="abtn abtn-primary"
@@ -368,8 +385,21 @@ missed click and got submitted twice.
 
   {% if step == 4 %}
   <div class="card pad-lg" style="margin-bottom:16px;">
+    {% comment %}
+    No season picker here any more. A punter on a betting site is never asked
+    "which year" before finding fixtures — they get the round that's live,
+    full stop. This form works the same way now: the queryset behind
+    `competitions` is already filtered to the season actually being played
+    (see OrgCreateForm.__init__), so a competition whose season hasn't
+    started yet — 2027, right now — is never offered in the first place,
+    rather than being offered and then needing a second field to explain
+    which of the two years just picked actually applies. `form.season` still
+    exists on the model and still gets set, it just carries the current
+    season's id as a hidden field instead of a question.
+    {% endcomment %}
+    {{ form.season }}
     <div class="fld">
-      <label>Competitions</label>
+      <label>Competitions{% if current_season %} <span style="color:var(--muted);font-weight:400;">&middot; {{ current_season }} season</span>{% endif %}</label>
       <div class="opt-grid cols2">
         {% for comp in form.fields.competitions.queryset %}
         <label class="opt-card">
@@ -377,7 +407,6 @@ missed click and got submitted twice.
           <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
           <span>
             <span class="oc-title">{{ comp.name }}</span>
-            <span class="oc-sub">{{ comp.season }}</span>
             {% comment %}
             A Competition already bundles men's, women's and any representative
             series (NRL = NRL + NRLW + State of Origin) — picking one gets all
@@ -398,13 +427,9 @@ missed click and got submitted twice.
       </div>
       {% if form.competitions.errors %}<div class="fld-err">{{ form.competitions.errors|join:" " }}</div>{% endif %}
     </div>
-    <div class="fld-row">
-      <div class="fld"><label for="id_season">Season</label>
-        <select name="season" id="id_season">
-          {% for s in form.fields.season.queryset %}<option value="{{ s.pk }}" {% is_checked form.season s.pk %}>{{ s }}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="fld"><label for="id_team_size">Expected organisation size <span style="color:var(--muted);font-weight:400;">(optional)</span></label><input type="number" name="team_size" id="id_team_size" value="{{ form.team_size.value|default:'' }}" placeholder="e.g. 24"></div>
+    <div class="fld">
+      <label for="id_team_size">Expected organisation size <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <input type="number" name="team_size" id="id_team_size" value="{{ form.team_size.value|default:'' }}" placeholder="e.g. 24">
     </div>
     <label class="opt-card" style="margin-top:4px;"><input type="checkbox" name="finals_only" {% is_checked form.finals_only 'True' %}><span class="oc-box"><svg><use href="#ic-check"/></svg></span><span><span class="oc-title">Finals only</span><span class="oc-sub">Skip the regular season and tip finals only</span></span></label>
   </div>
@@ -549,7 +574,7 @@ missed click and got submitted twice.
       <button type="submit" name="action" value="next" class="abtn abtn-primary abtn-lg">{% if duplicates %}Yes, create a separate one &rarr;{% elif parent_org %}Create organisation &rarr;{% else %}Create organisation &rarr;{% endif %}</button>
       {% elif step == verify_step %}
         {% if verification.is_verified %}
-        <button type="submit" name="action" value="next" class="abtn abtn-primary abtn-lg">Continue &rarr;</button>
+        <button type="submit" name="action" value="next" class="abtn abtn-primary abtn-lg" id="verifyContinueBtn">Continue &rarr;</button>
         {% elif not verify_required %}
         <button type="submit" name="action" value="next" class="abtn abtn-ghost abtn-lg" formnovalidate>Skip for now &rarr;</button>
         {% endif %}
@@ -686,5 +711,24 @@ missed click and got submitted twice.
         clearTimeout(timer);
         timer = setTimeout(check, 400);
       });
+    })();
+
+    /* Verify step: once the "Verified" tick lands — and only on the render
+       right after it happened, per data-auto-continue — let it sit on screen
+       long enough to register, then carry on by itself. Nobody who has just
+       watched a code succeed wants to also go and click Continue; that turns
+       one small win into two steps. requestSubmit (not .click()) so the
+       button's own gt-busy wiring runs exactly as it would for a real click,
+       including the disabled/aria-busy handling. */
+    (function () {
+      var done = document.querySelector('.verify-done[data-auto-continue="1"]');
+      var btn = document.getElementById('verifyContinueBtn');
+      if (!done || !btn) return;
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      setTimeout(function () {
+        if (btn.disabled) return;      // already mid-submit some other way
+        if (btn.form && btn.form.requestSubmit) btn.form.requestSubmit(btn);
+        else btn.click();
+      }, reduce ? 700 : 1500);
     })();
 {% endblock %}

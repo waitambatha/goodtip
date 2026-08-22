@@ -38,6 +38,19 @@
   var L = document.getElementById('loader');
   if (!L) return;
 
+  /* The org-creation wizard is one page POSTing to itself on every step, so
+     this splash would replay full-screen after every Continue — right after
+     gt-busy.js's own small veil already said "checking your code" or
+     "saving" for that exact action. Two loaders for one click reads as the
+     app being unsure whether it is done, not as two things happening.
+     Skipped outright, before any timer starts, rather than dismissed early:
+     an early dismiss would still paint one visible frame of the full-screen
+     splash on every step. */
+  if (document.body.classList.contains('wiz-page')) {
+    L.style.display = 'none';
+    return;
+  }
+
   var MIN = parseInt(L.getAttribute('data-min') || '400', 10);
   var body = document.body;
   var STORE = 'gt-loader-sport';

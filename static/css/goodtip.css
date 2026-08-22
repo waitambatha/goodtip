@@ -5456,6 +5456,29 @@ form.is-busy [type="submit"]:hover { transform: none; }
    one that says where you are), is what actually fits, at every width. */
 .wiz-step .wz-text { display: none; }
 .wiz-step.current .wz-text { display: flex; }
+/* A step that isn't current still names itself — as a floating tooltip on
+   hover/focus rather than inline text, so previewing "what's step 4" from
+   step 1 costs nothing in layout width. Positioned off the circle, not the
+   whole .wiz-step (which also contains the invisible-but-present .wz-text
+   box for every non-current step, and centring on THAT would drift toward
+   whichever neighbour last had the wide current label). */
+.wiz-step:not(.current) { cursor: pointer; outline: none; }
+.wiz-step:not(.current):hover .wz-text,
+.wiz-step:not(.current):focus-visible .wz-text {
+  display: flex; position: absolute; z-index: 6;
+  bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+  width: max-content; max-width: 200px;
+  background: var(--deep); border: 1px solid rgba(255,255,255,.16);
+  border-radius: 10px; padding: 9px 13px;
+  box-shadow: 0 14px 30px -10px rgba(0,0,0,.55);
+  animation: wzTipIn .14s var(--ease) both;
+}
+.wiz-step:not(.current):hover .wz-text .wz-label,
+.wiz-step:not(.current):focus-visible .wz-text .wz-label { color: var(--white); }
+@keyframes wzTipIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(3px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
 @media (max-width: 560px) {
   .wiz-step .wz-num { width: 36px; height: 36px; font-size: 14px; }
   .wz-line { margin: 18px 6px 0; }
@@ -6794,13 +6817,23 @@ body.gtc-open { overflow: hidden; }
    in a slow, deliberate try — a lock being tested, not a generic spinner —
    while the keyhole dot pulses along with it. Same shape whether it's
    sending a code or checking one; the label text is what says which. */
-.bv-lock { width: 46px; height: 46px; color: var(--forest); }
-.bv-lock svg { width: 100%; height: 100%; }
+.bv-lock { width: 46px; height: 46px; color: var(--forest); position: relative; }
+.bv-lock svg { width: 100%; height: 100%; position: relative; z-index: 1; }
 .bv-lock .bvl-shackle {
   transform-origin: 8px 11px;
   animation: bvLockShackle 1.5s cubic-bezier(.5,0,.5,1) infinite;
 }
 .bv-lock .bvl-dot { animation: bvLockDot 1.5s ease-in-out infinite; }
+/* Two rings, offset half a cycle apart, expanding outward and fading — a
+   sonar ping under the lock rather than the lock sitting on an inert veil.
+   Reads as "actively working", the same job the ring spinner does elsewhere,
+   just in the vocabulary of this one screen. */
+.bv-lock::before, .bv-lock::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  border: 1.5px solid var(--forest);
+  animation: bvLockPing 1.8s cubic-bezier(0,.55,.45,1) infinite;
+}
+.bv-lock::after { animation-delay: .9s; }
 @keyframes bvLockShackle {
   0%, 15% { transform: rotate(0deg); }
   50% { transform: rotate(-16deg) translate(-1px, -1px); }
@@ -6811,8 +6844,12 @@ body.gtc-open { overflow: hidden; }
   55% { opacity: 1; transform: scale(1.35); }
   70%, 100% { opacity: .3; transform: scale(1); }
 }
+@keyframes bvLockPing {
+  0% { transform: scale(.85); opacity: .55; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .bv-lock .bvl-shackle, .bv-lock .bvl-dot { animation-duration: 2.6s; }
+  .bv-lock .bvl-shackle, .bv-lock .bvl-dot, .bv-lock::before, .bv-lock::after { animation-duration: 2.6s; }
 }
 
 .bv-label {
@@ -7922,15 +7959,27 @@ body.sheet-open {
 /* The code field. Six digits read back off a phone, so they get the treatment
    the email gives them: monospaced, spaced out, and large enough that a
    transposed pair is obvious before it is submitted. */
+/* Was inheriting .fld input's width: 100% — fine for a name or an email, not
+   for six digits, which just stretched the bold, widely-tracked type across
+   the whole card edge to edge. Capped and centred so it reads as one small,
+   deliberate slot the code drops into, not a field that happens to be
+   holding six characters in a lot of empty space. */
 .code-input {
   font-family: var(--score), 'Courier New', monospace;
-  font-size: 26px !important;
+  font-size: 28px !important;
   font-weight: 800;
-  letter-spacing: .34em;
+  letter-spacing: .38em;
   text-align: center;
   font-variant-numeric: tabular-nums;
+  max-width: 232px;
+  margin: 0 auto;
+  display: block;
+  padding: 15px 14px 15px 20px !important;   /* the extra left padding recentres the glyphs against their own trailing letter-spacing */
+  background: rgba(45,122,58,.04);
+  border-width: 1.5px !important;
 }
-.code-input::placeholder { letter-spacing: .34em; opacity: .3; font-weight: 700; }
+.code-input:focus { background: #fff; }
+.code-input::placeholder { letter-spacing: .38em; opacity: .3; font-weight: 700; }
 
 .verify-sent p { margin: 0 0 16px; font-size: 14.5px; line-height: 1.6; color: var(--muted); }
 .verify-sent b { color: var(--ink); }
