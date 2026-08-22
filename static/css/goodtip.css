@@ -1213,17 +1213,36 @@ body.loading { overflow: hidden; }
 .email-cta .ec-txt small { display: block; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--lime); opacity: .8; }
 .email-cta .ec-txt b { font-size: 18px; color: var(--white); font-family: var(--body); }
 .contact-meta { font-size: 14px; color: var(--cream); opacity: .8; line-height: 1.9; margin-bottom: 26px; }
-.socials { display: flex; flex-wrap: wrap; gap: 10px; }
-.social-btn { display: inline-flex; align-items: center; gap: 9px; background: rgba(255,255,255,.05); border: 1px solid var(--line-d); color: var(--cream); border-radius: 100px; padding: 10px 16px; text-decoration: none; font-size: 13px; font-weight: 600; transition: .2s var(--ease); }
-.social-btn svg { width: 17px; height: 17px; fill: currentColor; }
-.social-btn:hover { transform: translateY(-2px); color: var(--deep); }
-.social-btn.s-email:hover    { background: var(--lime); border-color: var(--lime); }
-.social-btn.s-linkedin:hover { background: #0A66C2; border-color: #0A66C2; color: #fff; }
-.social-btn.s-facebook:hover { background: #1877F2; border-color: #1877F2; color: #fff; }
-.social-btn.s-instagram:hover{ background: #E1306C; border-color: #E1306C; color: #fff; }
-.social-btn.s-youtube:hover  { background: #FF0000; border-color: #FF0000; color: #fff; }
-.social-btn.s-whatsapp:hover { background: #25D366; border-color: #25D366; color: #042; }
-.social-btn.s-tiktok:hover   { background: #fff; border-color: #fff; color: #111; }
+.socials { display: flex; flex-wrap: wrap; gap: 12px; }
+/* White fill, same reasoning as everywhere else socials appear on the site:
+   a brand-colour glyph reads instantly on white and disappears into one flat
+   tone on a dark or tinted pill. Default state carries the platform's own
+   colour on both icon and label; hover swaps it — the pill fills with that
+   colour and the glyph/label flip white — so the two states read as the
+   same button, colour and background trading places. */
+.social-btn {
+  display: inline-flex; align-items: center; gap: 11px;
+  background: #fff; border: 1px solid transparent; color: var(--deep);
+  border-radius: 100px; padding: 13px 22px; text-decoration: none;
+  font-size: 14.5px; font-weight: 600;
+  transition: transform .2s var(--ease), background .2s var(--ease), color .2s var(--ease), box-shadow .2s var(--ease);
+}
+.social-btn svg { width: 19px; height: 19px; fill: currentColor; }
+.social-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(0,0,0,.4); }
+.social-btn.s-email          { color: var(--forest); }
+.social-btn.s-linkedin       { color: #0A66C2; }
+.social-btn.s-facebook       { color: #1877F2; }
+.social-btn.s-instagram      { color: #E1306C; }
+.social-btn.s-youtube        { color: #FF0000; }
+.social-btn.s-whatsapp       { color: #25D366; }
+.social-btn.s-tiktok         { color: #111; }
+.social-btn.s-email:hover    { background: var(--lime); color: var(--deep); }
+.social-btn.s-linkedin:hover { background: #0A66C2; color: #fff; }
+.social-btn.s-facebook:hover { background: #1877F2; color: #fff; }
+.social-btn.s-instagram:hover{ background: #E1306C; color: #fff; }
+.social-btn.s-youtube:hover  { background: #FF0000; color: #fff; }
+.social-btn.s-whatsapp:hover { background: #25D366; color: #042; }
+.social-btn.s-tiktok:hover   { background: #111; color: #fff; }
 .social-note { font-size: 12px; color: var(--muted); margin-top: 12px; }
 
 /* elegant form: floating labels */
