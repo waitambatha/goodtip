@@ -287,6 +287,17 @@ def create_org_view(request):
             _absorb_step(draft, request.POST, step, request.FILES)
 
         if action == "back":
+            # The verify step has sub-states of its own — nothing started, a
+            # code in flight, verified — that "back" needs to unwind one at a
+            # time. Falling straight through to "step - 1" from the code-entry
+            # sub-state skipped past the role/domain/email form entirely and
+            # landed a step early, on step 1: the same one-press-too-far a
+            # "change_email" click already knew to avoid.
+            if step == VERIFY_STEP:
+                row = active_work_verification(request.user)
+                if row and not row.is_verified:
+                    row.delete()
+                    return _create_redirect(parent_org)
             draft.step = max(1, step - 1)
             draft.save()
             return _create_redirect(parent_org)

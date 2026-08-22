@@ -36,7 +36,6 @@
   'use strict';
 
   function wire(form) {
-    var label = form.getAttribute('data-busy') || 'Working';
     if (!form.querySelector('[type="submit"]')) return;
     /* Wire once. Forms are re-scanned after every htmx swap, and a second
        listener on the same form would run the whole busy routine twice —
@@ -56,6 +55,14 @@
       /* A button can opt out — Back and Start again are navigation, and
          labelling them "Saving" would describe the wrong thing. */
       if (btn.hasAttribute('data-busy-skip')) return;
+      /* The button pressed can name its own label and veil treatment —
+         "Sending your code" reads as what is actually happening where the
+         form's one blanket "Saving" does not, on a form whose dozen actions
+         (send_code, verify_code, next, back…) are nothing alike. Falls back
+         to the form's own label so every form that never opted a button in
+         keeps behaving exactly as before. */
+      var label = btn.getAttribute('data-busy') || form.getAttribute('data-busy') || 'Working';
+      var kind = btn.getAttribute('data-busy-kind') || form.getAttribute('data-busy-kind') || '';
       // A form that failed client-side validation never reaches the server, so
       // showing "creating your account" would be a lie that never resolves.
       if (form.hasAttribute('novalidate') ? false : !form.checkValidity()) return;
@@ -106,7 +113,7 @@
 
       var scope = form.closest('[data-busy-scope]');
       if (scope) {
-        veil(scope, label);
+        veil(scope, label, kind);
         // No strip as well. It would sit under the veil where nobody can see
         // it, and two indeterminate indicators for one action read as two
         // things happening.
@@ -123,7 +130,7 @@
     });
   }
 
-  function veil(scope, label) {
+  function veil(scope, label, kind) {
     if (scope.querySelector('.busy-veil')) return;
     var v = document.createElement('div');
     v.className = 'busy-veil';
@@ -136,13 +143,30 @@
 
     var inner = document.createElement('div');
     inner.className = 'bv-inner';
-    var ring = document.createElement('span');
-    ring.className = 'bv-ring busy-run';
-    ring.setAttribute('aria-hidden', 'true');
+    var icon = document.createElement('span');
+    icon.setAttribute('aria-hidden', 'true');
+    if (kind === 'lock') {
+      /* The work-email check is proving a lock, not just waiting on a
+         request — so instead of the generic ring, the shackle works itself
+         open and shut while the server is thinking. Every animated node
+         carries busy-run itself, not just the wrapper: the blanket
+         reduced-motion rule kills animation on anything without that class
+         on the ELEMENT, and a class on the <span> around an SVG does not
+         reach the <path> inside it. */
+      icon.className = 'bv-lock busy-run';
+      icon.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+        '<rect x="4.5" y="11" width="15" height="10" rx="2.4"/>' +
+        '<path class="bvl-shackle busy-run" d="M8 11V7.5a4 4 0 0 1 8 0V11"/>' +
+        '<circle class="bvl-dot busy-run" cx="12" cy="16" r="1.15" fill="currentColor" stroke="none"/>' +
+        '</svg>';
+    } else {
+      icon.className = 'bv-ring busy-run';
+    }
     var text = document.createElement('span');
     text.className = 'bv-label';
     text.textContent = label;          // textContent, so a label can never inject markup
-    inner.appendChild(ring);
+    inner.appendChild(icon);
     inner.appendChild(text);
     v.appendChild(inner);
 

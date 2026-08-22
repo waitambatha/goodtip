@@ -2197,6 +2197,14 @@ a.news-item.news-link:hover .nt { color: var(--forest); }
 .opt-card .oc-title { display: block; font-weight: 700; color: var(--ink); font-size: 15px; }
 .opt-card .oc-sub { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
 .opt-card .oc-right { margin-left: auto; text-align: right; }
+.opt-card .oc-series { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.opt-card .oc-series-chip {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .01em;
+  padding: 3px 9px; border-radius: 100px;
+  background: rgba(45,122,58,.09); color: var(--forest);
+  border: 1px solid rgba(45,122,58,.2);
+}
+.opt-card:has(input:checked) .oc-series-chip { background: rgba(200,241,53,.2); border-color: rgba(200,241,53,.45); color: var(--deep); }
 
 /* copy-link field */
 .copy-field { display: flex; gap: 8px; }
@@ -5434,18 +5442,20 @@ form.is-busy [type="submit"]:hover { transform: none; }
 .wiz-step.current .wz-sub { color: rgba(245,241,230,.62); }
 
 .wz-line {
-  flex: 1 1 auto; height: 1.5px; min-width: 18px; margin: 21px 14px 0;
+  flex: 1 1 auto; height: 1.5px; min-width: 18px; margin: 21px 8px 0;
   background: rgba(255,255,255,.14);
 }
 .wz-line.done { background: rgba(200,241,53,.4); }
 
-/* Below ~900px the four labels cannot share a row. Drop to numbers only and
-   keep the current step's text, which is the one that says where you are. */
-@media (max-width: 900px) {
-  .wiz-step .wz-text { display: none; }
-  .wiz-step.current .wz-text { display: flex; }
-  .wz-line { margin: 21px 8px 0; min-width: 10px; }
-}
+/* Six steps' worth of full labels need roughly 1450-1500px in a row; the
+   sheet that holds the rail is capped at 1160px (see .page-sheet), so that
+   width is never actually available, at any viewport — a fixed-width box
+   trying to hold something permanently wider than it overflows its own
+   edge every time, "filling" past the visible rail rather than stopping at
+   its last step. Numbers only, with the current step's own label kept (the
+   one that says where you are), is what actually fits, at every width. */
+.wiz-step .wz-text { display: none; }
+.wiz-step.current .wz-text { display: flex; }
 @media (max-width: 560px) {
   .wiz-step .wz-num { width: 36px; height: 36px; font-size: 14px; }
   .wz-line { margin: 18px 6px 0; }
@@ -6779,6 +6789,32 @@ body.gtc-open { overflow: hidden; }
   animation: busySpin .8s linear infinite;
 }
 
+/* The verify step's own veil treatment (data-busy-kind="lock" on its
+   send/resend/verify-code buttons): the shackle works itself open and shut
+   in a slow, deliberate try — a lock being tested, not a generic spinner —
+   while the keyhole dot pulses along with it. Same shape whether it's
+   sending a code or checking one; the label text is what says which. */
+.bv-lock { width: 46px; height: 46px; color: var(--forest); }
+.bv-lock svg { width: 100%; height: 100%; }
+.bv-lock .bvl-shackle {
+  transform-origin: 8px 11px;
+  animation: bvLockShackle 1.5s cubic-bezier(.5,0,.5,1) infinite;
+}
+.bv-lock .bvl-dot { animation: bvLockDot 1.5s ease-in-out infinite; }
+@keyframes bvLockShackle {
+  0%, 15% { transform: rotate(0deg); }
+  50% { transform: rotate(-16deg) translate(-1px, -1px); }
+  85%, 100% { transform: rotate(0deg); }
+}
+@keyframes bvLockDot {
+  0%, 40% { opacity: .3; transform: scale(1); }
+  55% { opacity: 1; transform: scale(1.35); }
+  70%, 100% { opacity: .3; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bv-lock .bvl-shackle, .bv-lock .bvl-dot { animation-duration: 2.6s; }
+}
+
 .bv-label {
   font-family: var(--mark); font-weight: 600;
   font-size: 13px; letter-spacing: .16em; text-transform: uppercase;
@@ -7909,13 +7945,26 @@ body.sheet-open {
   padding: 16px 18px; border-radius: var(--gt-r-sm);
   background: rgba(45,122,58,.09);
   border: 1px solid rgba(45,122,58,.28);
+  animation: vdArrive .5s var(--ease) both;
+}
+/* The payoff after the lock veil: a correct code lands here on the next
+   page. One entrance, not a loop — this is a moment, not a status. */
+@keyframes vdArrive {
+  from { opacity: 0; transform: translateY(7px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .verify-done .vd-tick {
   width: 38px; height: 38px; flex: none;
   display: grid; place-items: center; border-radius: 50%;
   background: var(--forest); color: #fff;
+  animation: vdTickRing .9s var(--ease) .2s both;
 }
 .verify-done .vd-tick svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2.6; }
+@keyframes vdTickRing {
+  0% { box-shadow: 0 0 0 0 rgba(45,122,58,.5); }
+  65% { box-shadow: 0 0 0 9px rgba(45,122,58,0); }
+  100% { box-shadow: 0 0 0 0 rgba(45,122,58,0); }
+}
 .verify-done b { display: block; font-size: 16px; color: var(--ink); }
 .verify-done i { display: block; font-style: normal; font-size: 13px; color: var(--muted); margin-top: 2px; }
 

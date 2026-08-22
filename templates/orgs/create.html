@@ -261,8 +261,10 @@ missed click and got submitted twice.
         </div>
       </div>
       <div class="verify-actions">
-        <button type="submit" name="action" value="verify_code" class="abtn abtn-primary">Verify &rarr;</button>
+        <button type="submit" name="action" value="verify_code" class="abtn abtn-primary"
+                data-busy="Checking your code&hellip;" data-busy-kind="lock">Verify &rarr;</button>
         <button type="submit" name="action" value="resend_code" class="abtn abtn-ghost"
+                data-busy="Sending a new code&hellip;" data-busy-kind="lock"
                 {% if not verification.can_resend %}disabled{% endif %}>
           {% if verification.sends >= 5 %}No codes left
           {% elif verification.resend_wait_seconds %}Resend in {{ verification.resend_wait_seconds }}s
@@ -321,7 +323,8 @@ missed click and got submitted twice.
       {% if verify_error and not verify_error.field %}
       <div class="flash error" style="margin-bottom:14px;"><span>{{ verify_error.message }}</span></div>
       {% endif %}
-      <button type="submit" name="action" value="send_code" class="abtn abtn-primary">Send me a code &rarr;</button>
+      <button type="submit" name="action" value="send_code" class="abtn abtn-primary"
+              data-busy="Sending your code&hellip;" data-busy-kind="lock">Send me a code &rarr;</button>
     {% endif %}
   </div>
   {% endif %}
@@ -369,7 +372,28 @@ missed click and got submitted twice.
       <label>Competitions</label>
       <div class="opt-grid cols2">
         {% for comp in form.fields.competitions.queryset %}
-        <label class="opt-card"><input type="checkbox" name="competitions" value="{{ comp.pk }}" {% is_checked form.competitions comp.pk %}><span class="oc-box"><svg><use href="#ic-check"/></svg></span><span><span class="oc-title">{{ comp.name }}</span><span class="oc-sub">{{ comp.season }}</span></span></label>
+        <label class="opt-card">
+          <input type="checkbox" name="competitions" value="{{ comp.pk }}" {% is_checked form.competitions comp.pk %}>
+          <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
+          <span>
+            <span class="oc-title">{{ comp.name }}</span>
+            <span class="oc-sub">{{ comp.season }}</span>
+            {% comment %}
+            A Competition already bundles men's, women's and any representative
+            series (NRL = NRL + NRLW + State of Origin) — picking one gets all
+            of them, no separate choice to make. That was previously invisible:
+            the card named only the men's series, so it read as an opt-out
+            women's game had never actually had. Naming every series it
+            includes is what makes "you get both" something people can see
+            rather than something they have to be told.
+            {% endcomment %}
+            {% if comp.series.all %}
+            <span class="oc-series">
+              {% for s in comp.series.all %}<span class="oc-series-chip">{{ s.name }}</span>{% endfor %}
+            </span>
+            {% endif %}
+          </span>
+        </label>
         {% endfor %}
       </div>
       {% if form.competitions.errors %}<div class="fld-err">{{ form.competitions.errors|join:" " }}</div>{% endif %}
