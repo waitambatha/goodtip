@@ -6,7 +6,7 @@ GoodTip is now deployed on this server with the following components:
 ### Services
 - **goodtipservice**: Django application running via Gunicorn on port 8000
 - **nginx**: Reverse proxy serving the application on port 80
-- **goodtip-sync.timer**: Auto-sync from GitHub every 5 minutes
+- **goodtip-sync.timer**: Auto-deploy from GitHub every 2 minutes (idle ticks are no-ops)
 
 ### Database
 - PostgreSQL database: `goodtip_db`
@@ -49,26 +49,68 @@ sudo journalctl -u goodtip-sync.service -f
 
 ## Auto-Sync from GitHub
 
-The system automatically syncs from GitHub every 5 minutes via the `goodtip-sync.timer`.
+**Pushing to `main` is the deploy.** `goodtip-sync.timer` checks origin every
+2 minutes, so a push is live within ~2 minutes with nothing to run by hand.
 
-### Manual Sync
-```bash
-cd ~/projects/goodtip
-./deploy.sh
-```
+It is pull-based rather than a GitHub webhook: no inbound port, no public
+endpoint and no shared secret to leak. The box asks GitHub; GitHub is never
+told about the box. The trade is latency, bounded by the timer interval.
 
-### What the sync does:
-1. Pulls latest changes from GitHub (main branch)
-2. Installs any new dependencies
+### What a tick does
+
+Almost always: one `git fetch`, notices origin has not moved, exits. This
+matters more than it sounds. `deploy.sh --auto` returns *before* touching the
+working tree, so an idle tick runs no migrations, no collectstatic and no
+reload. (Until Aug 2026 the timer ran `deploy.sh` with no arguments and did
+the full sequence every 5 minutes, recycling the gunicorn workers around the
+clock whether or not anything had been pushed.)
+
+When origin **has** moved:
+
+1. Stashes any stray local edit, pulls `--rebase`, restores it
+   (a conflict here aborts the deploy *before* migrate — see below)
+2. `pip install` — only when `requirements.txt` itself changed
 3. Runs database migrations
 4. Collects static files
-5. Restarts the application service
+5. Reinstalls the job units — only when `deploy/systemd/` changed
+6. SIGHUPs gunicorn: workers reload the new code, arbiter stays up,
+   no dropped requests and no sudo (gunicorn runs as `mbatha-goodtip`)
 
-### Sync Timer Status
+A `flock` keeps two deploys out of the one checkout, so a slow deploy simply
+makes the next tick a no-op instead of colliding with it.
+
+### Manual sync
+
 ```bash
-sudo systemctl status goodtip-sync.timer
-sudo systemctl list-timers goodtip-sync.timer
+cd ~/projects/goodtip
+./deploy.sh            # full sequence, skips none of the steps above
 ```
+
+### Is it working?
+
+```bash
+sudo systemctl list-timers goodtip-sync.timer   # next/last run
+journalctl -u goodtip-sync -n 50                # deploys only; idle ticks are silent
+```
+
+A healthy journal is *quiet* — entries appear when something was actually
+deployed. "Deployment completed successfully" prints the before/after commit.
+
+### When it stops
+
+The one case that halts a deploy is a local edit on the server that conflicts
+with what was pushed. `deploy.sh` stops before migrating, leaves the old code
+serving and keeps the work in `git stash list`. Resolve on the server and the
+next tick carries on:
+
+```bash
+cd ~/projects/goodtip && git status && git stash list
+```
+
+Note the deploy verifies nothing about the code itself — a push that passes
+CI-less straight to `main` is a push that reaches the public site in two
+minutes. The staging gate is what stands between a bad push and the public,
+not the deploy pipeline.
 
 ## Configuration
 

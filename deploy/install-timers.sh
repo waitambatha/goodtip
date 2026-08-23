@@ -16,7 +16,7 @@ changed=0
 for unit in goodtip-matchsync.service goodtip-matchsync.timer \
             goodtip-jobs.service goodtip-jobs.timer \
             goodtip-backfill.service goodtip-backfill.timer \
-            goodtip-autodeploy.service goodtip-autodeploy.timer; do
+            goodtip-sync.service goodtip-sync.timer; do
   if ! cmp -s "$UNIT_SRC/$unit" "$UNIT_DST/$unit"; then
     sudo cp "$UNIT_SRC/$unit" "$UNIT_DST/$unit"
     changed=1
@@ -33,9 +33,9 @@ fi
 sudo systemctl enable --now goodtip-matchsync.timer
 sudo systemctl enable --now goodtip-jobs.timer
 sudo systemctl enable --now goodtip-backfill.timer
-# Self-managing: from here on, edits to the autodeploy units deploy themselves.
-sudo systemctl enable --now goodtip-autodeploy.timer
+# Self-managing: from here on, edits to the deploy units deploy themselves.
+sudo systemctl enable --now goodtip-sync.timer
 
 echo "Timer status:"
-systemctl is-active goodtip-matchsync.timer goodtip-jobs.timer goodtip-backfill.timer goodtip-autodeploy.timer || true
-systemctl list-timers goodtip-matchsync.timer goodtip-jobs.timer goodtip-backfill.timer goodtip-autodeploy.timer --no-pager || true
+systemctl is-active goodtip-matchsync.timer goodtip-jobs.timer goodtip-backfill.timer goodtip-sync.timer || true
+systemctl list-timers goodtip-matchsync.timer goodtip-jobs.timer goodtip-backfill.timer goodtip-sync.timer --no-pager || true

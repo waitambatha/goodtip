@@ -1,0 +1,18 @@
+[Unit]
+Description=GoodTip Auto-Sync Timer
+Requires=goodtip-sync.service
+
+[Timer]
+# 2 minutes is the answer to "I pushed, why isn't it live yet?". A tick with
+# nothing new costs one `git fetch` and exits before touching the tree, so the
+# idle case is cheap enough that the interval is a UX choice, not a load one.
+OnBootSec=3min
+OnUnitActiveSec=2min
+RandomizedDelaySec=15
+AccuracySec=30
+# Catch up after downtime: if the box was off when something was pushed, deploy
+# it on the way back up rather than waiting for the next tick.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

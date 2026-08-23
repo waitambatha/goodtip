@@ -279,7 +279,7 @@ EMAIL_HOST_PASSWORD     # SMTP password
 
 ### Services
 - **goodtipservice** - Gunicorn app server (systemd)
-- **goodtip-sync.timer** - Auto-sync from GitHub (every 5 minutes)
+- **goodtip-sync.timer** - Auto-deploy from GitHub (every 2 minutes; idle ticks do nothing)
 - **nginx** - Web server (systemd)
 
 ### Directories
@@ -306,7 +306,7 @@ EMAIL_HOST_PASSWORD     # SMTP password
 6. Create templates in `templates/`
 7. Test locally
 8. Push to GitHub
-9. Auto-sync pulls changes (every 5 minutes)
+9. Auto-sync pulls changes (every 2 minutes)
 
 ### Create a Superuser
 ```bash
@@ -380,7 +380,7 @@ sudo tail -f /var/log/nginx/error.log
 1. **Add Features**: Modify models, views, templates
 2. **Test Locally**: Run `python manage.py runserver`
 3. **Push to GitHub**: Commit and push changes
-4. **Auto-Deploy**: Changes sync every 5 minutes
+4. **Auto-Deploy**: Pushing to main is the deploy — live within ~2 minutes
 5. **Monitor**: Check logs for errors
 
 ---

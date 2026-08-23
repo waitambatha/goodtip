@@ -3,7 +3,7 @@
 # Pull-based rather than a GitHub webhook because it needs no inbound port, no
 # shared secret and no public endpoint -- the box asks GitHub, GitHub is never
 # told about the box. The cost is latency, bounded by the timer interval.
-Description=GoodTip — deploy origin/main if it moved
+Description=GoodTip Auto-Sync from GitHub
 After=network-online.target
 Wants=network-online.target
 
@@ -11,12 +11,13 @@ Wants=network-online.target
 Type=oneshot
 User=mbatha-goodtip
 WorkingDirectory=/home/mbatha-goodtip/projects/goodtip
+# --auto is what makes this safe to run often: it returns before touching the
+# working tree when origin has not moved. Without it every tick migrated,
+# collectstatic'd and SIGHUP'd gunicorn, so the workers were recycled every
+# five minutes forever whether or not anything had been pushed.
 ExecStart=/bin/bash /home/mbatha-goodtip/projects/goodtip/deploy.sh --auto
 # Longer than the timer interval on purpose: a slow pip install must not be
 # killed halfway. Overlap is prevented by the flock in deploy.sh, not here.
 TimeoutStartSec=900
 StandardOutput=journal
 StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
