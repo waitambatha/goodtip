@@ -67,14 +67,50 @@ clock whether or not anything had been pushed.)
 
 When origin **has** moved:
 
-1. Stashes any stray local edit, pulls `--rebase`, restores it
-   (a conflict here aborts the deploy *before* migrate — see below)
+1. Stashes any stray local edit and pulls `--rebase`
 2. `pip install` — only when `requirements.txt` itself changed
-3. Runs database migrations
-4. Collects static files
-5. Reinstalls the job units — only when `deploy/systemd/` changed
-6. SIGHUPs gunicorn: workers reload the new code, arbiter stays up,
+3. **Verification gate** — see below. A commit that fails is rolled
+   straight back out of the tree and never reaches step 4
+4. Restores the stashed local edits (a conflict here aborts *before*
+   migrate)
+5. Runs database migrations
+6. Collects static files
+7. Reinstalls the job units — only when `deploy/systemd/` changed
+8. SIGHUPs gunicorn: workers reload the new code, arbiter stays up,
    no dropped requests and no sudo (gunicorn runs as `mbatha-goodtip`)
+
+### The verification gate
+
+Set by `Environment=DEPLOY_TEST_GATE=` in `goodtip-sync.service`:
+
+| Mode | What runs | Cost |
+|---|---|---|
+| `fast` | **default.** `manage.py check` + `makemigrations --check` | ~1.5s |
+| `block` | `fast`, then the full test suite; failure stops the deploy | ~6min |
+| `warn` | `fast` blocks; suite failures are reported but deploy anyway | ~6min |
+| `off` | nothing | — |
+
+The gate runs on the pulled code with local edits **still stashed**, so what
+gets judged is what is in git — a stray edit on the server can neither rescue
+a broken commit nor sink a good one.
+
+On rejection the tree is `git reset --hard` back to the commit that is actually
+serving, so disk and running code never disagree. The rejected SHA is recorded
+in `.git/deploy-blocked-sha` and skipped on later ticks: the answer will not
+change until someone pushes, and re-running a six-minute suite 720 times a day
+to relearn it helps nobody. Push anything new and it retries.
+
+**Why the default is `fast` and not `block`:** as of Aug 2026 the suite is red —
+461 tests, 11 failures, 6 errors, all in `orgs.tests` — so `block` would stop
+every deploy on arrival. Move to `block` once that is green; it is a one-line
+change to the unit.
+
+**Know what `fast` cannot do.** It imports the code, so it catches a module
+that will not load and models that drifted from their migrations. It does *not*
+catch a name that only explodes when a request reaches it. The `NameError`
+shipped on 2026-08-23 — a function raising an exception class nobody had
+defined — passes `manage.py check` cleanly. Only the suite catches that, which
+is the argument for getting `orgs.tests` green and switching to `block`.
 
 A `flock` keeps two deploys out of the one checkout, so a slow deploy simply
 makes the next tick a no-op instead of colliding with it.

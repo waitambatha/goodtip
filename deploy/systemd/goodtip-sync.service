@@ -16,6 +16,11 @@ WorkingDirectory=/home/mbatha-goodtip/projects/goodtip
 # collectstatic'd and SIGHUP'd gunicorn, so the workers were recycled every
 # five minutes forever whether or not anything had been pushed.
 ExecStart=/bin/bash /home/mbatha-goodtip/projects/goodtip/deploy.sh --auto
+# Verification gate. `fast` = django check + migration-drift check (~1.5s).
+# Change to `block` to require the full test suite once it is green -- as of
+# Aug 2026 it has 11 failures and 6 errors, so `block` today would stop every
+# deploy. `warn` runs the suite and reports without blocking; `off` disables.
+Environment=DEPLOY_TEST_GATE=fast
 # Longer than the timer interval on purpose: a slow pip install must not be
 # killed halfway. Overlap is prevented by the flock in deploy.sh, not here.
 TimeoutStartSec=900
