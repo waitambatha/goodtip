@@ -94,20 +94,12 @@ missed click and got submitted twice.
   {% if step == 1 %}
   <div class="card pad-lg wiz-card" style="margin-bottom:16px;">
     <div class="wc-head">
-      <span class="wc-ic" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
-        </svg>
-      </span>
+      <span class="wc-ic" aria-hidden="true"><svg style="stroke:currentColor;fill:none;stroke-width:1.7;"><use href="#ic-org"/></svg></span>
       <div><h2>{% if parent_org %}Let's start with your organisation{% else %}Let's start with your organisation{% endif %}</h2><p>Tell us a few basics about {% if parent_org %}this one{% else %}your organisation{% endif %}.</p></div>
     </div>
     <div class="fld"><label for="id_name">Organisation name</label>
       <div class="fld-ic">
-        <span class="fi-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M6 4h12v5a6 6 0 0 1-12 0zM8 21h8M12 15v6"/>
-          </svg>
-        </span>
+        <span class="fi-mark" aria-hidden="true"><svg style="stroke:currentColor;fill:none;stroke-width:1.8;"><use href="#ic-org"/></svg></span>
         <input type="text" name="name" id="id_name" value="{{ form.name.value|default:'' }}" placeholder="{% if parent_org %}e.g. Finance{% else %}e.g. Acme Corp{% endif %}" autocomplete="off">
       </div>
       <div class="hint">This is the name your members will see.</div>
@@ -384,7 +376,11 @@ missed click and got submitted twice.
   {% endif %}
 
   {% if step == 4 %}
-  <div class="card pad-lg" style="margin-bottom:16px;">
+  <div class="card pad-lg wiz-card" style="margin-bottom:16px;">
+    <div class="wc-head">
+      <span class="wc-ic" aria-hidden="true"><svg style="stroke:currentColor;fill:none;stroke-width:1.8;"><use href="#ic-trophy"/></svg></span>
+      <div><h2>The tipping</h2><p>Pick the competitions you'll tip, and any scoring rules on top.</p></div>
+    </div>
     {% comment %}
     No season picker here any more. A punter on a betting site is never asked
     "which year" before finding fixtures — they get the round that's live,
@@ -436,8 +432,11 @@ missed click and got submitted twice.
   {% endif %}
 
   {% if step == 5 %}
-  <div class="card pad-lg" style="margin-bottom:16px;">
-    <div class="card-h" style="margin-bottom:12px;">Who picks the charity?</div>
+  <div class="card pad-lg wiz-card" style="margin-bottom:16px;">
+    <div class="wc-head">
+      <span class="wc-ic" aria-hidden="true"><svg style="stroke:currentColor;fill:none;stroke-width:1.8;"><use href="#ic-heart"/></svg></span>
+      <div><h2>The charity</h2><p>Every fixture ties back to a cause. Choose how yours gets picked.</p></div>
+    </div>
     <div class="opt-grid cols2" style="margin-bottom:8px;">
       <label class="opt-card radio"><input type="radio" name="charity_method" value="pick" {% is_checked form.charity_method 'pick' %}><span class="oc-box"></span><span><span class="oc-title">I'll choose the charity</span><span class="oc-sub">Set it now for the whole organisation</span></span></label>
       <label class="opt-card radio"><input type="radio" name="charity_method" value="vote" {% is_checked form.charity_method 'vote' %}><span class="oc-box"></span><span><span class="oc-title">Let the organisation vote</span><span class="oc-sub">Everyone nominates &amp; votes</span></span></label>
@@ -493,9 +492,11 @@ missed click and got submitted twice.
   {% endif %}
 
   {% if step == last_step %}
-  <div class="card pad-lg" style="margin-bottom:16px;">
-    <div class="card-h" style="margin-bottom:4px;">Check it over</div>
-    <p class="card-lead" style="margin:0 0 14px;">Nothing's created until you press the button. Step back to change anything.</p>
+  <div class="card pad-lg wiz-card" style="margin-bottom:16px;">
+    <div class="wc-head">
+      <span class="wc-ic" aria-hidden="true"><svg style="stroke:currentColor;fill:none;stroke-width:1.8;"><use href="#ic-doc"/></svg></span>
+      <div><h2>Check it over</h2><p>Nothing's created until you press the button. Step back to change anything.</p></div>
+    </div>
     <table class="atable wiz-summary">
       <tbody>
       {% for row in summary %}
