@@ -497,13 +497,20 @@ missed click and got submitted twice.
       <span class="wc-ic" aria-hidden="true"><svg style="stroke:currentColor;fill:none;stroke-width:1.8;"><use href="#ic-doc"/></svg></span>
       <div><h2>Check it over</h2><p>Nothing's created until you press the button. Step back to change anything.</p></div>
     </div>
-    <table class="atable wiz-summary">
-      <tbody>
+    <div class="wsum-list">
       {% for row in summary %}
-        <tr><th style="text-align:left;white-space:nowrap;">{{ row.label }}</th><td>{{ row.value }}</td></tr>
+      <div class="wsum-row {{ row.band }}">
+        <span class="wsum-l">
+          <span class="wsum-ic" aria-hidden="true"><svg style="stroke:currentColor;fill:none;stroke-width:1.8;"><use href="#{{ row.icon }}"/></svg></span>
+          <span class="wsum-label">{{ row.label }}</span>
+        </span>
+        <span class="wsum-r">
+          <span class="wsum-val">{{ row.value }}</span>
+          <span class="wsum-check" aria-hidden="true"><svg><use href="#ic-check"/></svg></span>
+        </span>
+      </div>
       {% endfor %}
-      </tbody>
-    </table>
+    </div>
   </div>
 
   {% if step_errors %}

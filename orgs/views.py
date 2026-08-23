@@ -648,25 +648,34 @@ def _draft_summary(form, draft) -> list:
         if d.get("charity_method") == "vote"
         else (label_for("charity", d.get("charity")) or d.get("new_charity_name") or "")
     )
+    # (label, value, icon, colour band). The band is fixed per field rather than
+    # computed from the row's position in the final list, so which tint a row
+    # gets never shifts around depending on which OTHER rows happened to have
+    # an answer — "Charity" is always pink whether or not "Finals only" showed
+    # up above it.
     rows = [
-        ("Group name", d.get("name", "")),
-        ("Type", label_for("organisation_type", d.get("organisation_type"))),
-        ("Sub-category", labels_for("sub_categories", d.get("sub_categories"))),
-        ("Described as", d.get("informal_label", "")),
-        ("State", label_for("state", d.get("state")) or "National"),
-        ("Competitions", labels_for("competitions", d.get("competitions"))),
-        ("Season", label_for("season", d.get("season"))),
-        ("Expected size", d.get("team_size", "")),
-        ("Finals only", "Yes" if d.get("finals_only") else ""),
+        ("Group name", d.get("name", ""), "ic-people", "c1"),
+        ("Type", label_for("organisation_type", d.get("organisation_type")), "ic-org", "c1"),
+        ("Sub-category", labels_for("sub_categories", d.get("sub_categories")), "ic-sliders", "c1"),
+        ("Described as", d.get("informal_label", ""), "ic-doc", "c2"),
+        ("State", label_for("state", d.get("state")) or "National", "ic-pin", "c2"),
+        ("Competitions", labels_for("competitions", d.get("competitions")), "ic-trophy", "c3"),
+        ("Season", label_for("season", d.get("season")), "ic-calendar", "c3"),
+        ("Expected size", d.get("team_size", ""), "ic-users", "c4"),
+        ("Finals only", "Yes" if d.get("finals_only") else "", "ic-flag", "c4"),
         (
             "Groups",
             "On — teams can start their own group" if d.get("groups_enabled") == "yes"
             else "Off for now",
+            "ic-users", "c4",
         ),
-        ("Charity", charity),
-        ("On the ballot", labels_for("vote_charities", d.get("vote_charities"))),
+        ("Charity", charity, "ic-heart", "c5"),
+        ("On the ballot", labels_for("vote_charities", d.get("vote_charities")), "ic-vote", "c6"),
     ]
-    return [{"label": k, "value": v} for k, v in rows if v]
+    return [
+        {"label": k, "value": v, "icon": icon, "band": band}
+        for k, v, icon, band in rows if v
+    ]
 
 
 @login_required
