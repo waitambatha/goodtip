@@ -7,7 +7,9 @@ VENV="$PROJECT_DIR/venv"
 cd "$PROJECT_DIR"
 
 # Pull latest changes from GitHub
-git pull origin main
+git stash
+git pull --rebase origin main
+git stash pop || true
 
 # Activate venv and install any new dependencies
 source "$VENV/bin/activate"
