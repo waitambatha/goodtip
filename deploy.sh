@@ -21,7 +21,9 @@ AUTO=0
 # checkout is how you get a half-rebased tree. Non-blocking: if a deploy is
 # already running, this tick has nothing to add -- the running one is already
 # picking up whatever we would have fetched.
-exec 9>"$PROJECT_DIR/.deploy.lock"
+# Lock lives inside .git: same filesystem, never tracked, so it can never
+# collide with an incoming pull the way a dotfile in the tree root does.
+exec 9>"$PROJECT_DIR/.git/deploy.lock"
 if ! flock -n 9; then
   [ "$AUTO" = 1 ] || echo "Another deploy is in progress; nothing to do."
   exit 0

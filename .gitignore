@@ -31,3 +31,6 @@ htmlcov/
 # LibreOffice/OpenOffice lock files
 .~lock.*#
 .claude/
+
+# deploy lock (legacy location; the lock now lives in .git/)
+.deploy.lock
