@@ -22,9 +22,16 @@ fi
 git pull --rebase origin main
 
 if [ "$STASHED" = 1 ]; then
-  # A conflicting pop leaves the entry on the stack, so nothing is lost --
-  # but the tree now has markers in it and needs a human.
-  git stash pop || echo "WARNING: could not restore local changes -- see 'git stash list'." >&2
+  # A conflicting pop leaves markers in the tree and keeps the entry on the
+  # stack. Stop here rather than run migrate and collectstatic over a file
+  # with <<<<<<< in it: the old code is still serving, and the work is still
+  # in `git stash list`. This is the one failure in this script worth being
+  # fatal -- everything past this point writes to the database or the site.
+  git stash pop || {
+    echo "ERROR: conflict restoring local changes. Deploy stopped before migrate." >&2
+    echo "       Resolve the conflict, then re-run this script." >&2
+    exit 1
+  }
 fi
 
 # Activate venv and install any new dependencies
