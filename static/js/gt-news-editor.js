@@ -4,9 +4,9 @@
  * flagged both problems at once: the box felt too small for writing an actual
  * article, and there was no way to format anything (headings, bold, colour,
  * alignment, images). This drives three contenteditable surfaces (headline,
- * teaser, body) plus their toolbars, the font-size stepper and the featured
- * image drop zone — no editor library, just execCommand, since the only
- * audience is the superuser story form.
+ * teaser, body) plus their toolbars, the font and size pickers and the
+ * featured image drop zone — no editor library, just execCommand, since the
+ * only audience is the superuser story form.
  *
  * Each toolbar control keeps working after a click/selection change because
  * clicking a <select> or <input type=color> moves focus away from the
@@ -56,19 +56,99 @@
     return 'https://' + url.replace(/^\/+/, '');
   }
 
-  function applyFontSize(surface, px) {
+  // Held open inside an otherwise empty span so the browser cannot throw the
+  // span away before anything is typed into it. Stripped on the way out.
+  var ZWSP = '\u200B';
+
+  /* Put one inline style on whatever is selected — the whole of size and font.
+   *
+   * execCommand is the only thing that knows how to slice a selection running
+   * across half a bold run and two paragraphs, but it can only speak in the
+   * seven legacy <font size> buckets. So ask it for the top bucket purely to
+   * borrow that slicing, then swap every tag it just made for a span carrying
+   * the real value.
+   *
+   * That swap was the bug behind "the + button doesn't work": replacing the
+   * <font> tags threw away the very nodes the cached selection pointed at, so
+   * every click after the first restored a range into detached DOM and resized
+   * nothing at all. The new spans are re-selected here and the cache updated
+   * with them, so the control keeps working click after click.
+   */
+  function applyInlineStyle(surface, prop, value) {
     restoreSelection(surface);
-    // execCommand only speaks in the seven legacy <font size> buckets, so ask
-    // for the top one and swap every tag it just made for a span carrying the
-    // exact pixel value the author typed.
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+
+    if (sel.isCollapsed) {
+      // Nothing selected. Rather than do nothing — which is what it looked
+      // like was happening — start a fresh run at the caret, so the next thing
+      // typed comes out in the size or font just asked for.
+      var caretSpan = document.createElement('span');
+      caretSpan.style[prop] = value;
+      caretSpan.appendChild(document.createTextNode(ZWSP));
+      sel.getRangeAt(0).insertNode(caretSpan);
+      var inside = document.createRange();
+      inside.setStart(caretSpan.firstChild, 1);
+      inside.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(inside);
+      lastRange.set(surface, inside.cloneRange());
+      syncHidden(surface);
+      return;
+    }
+
+    // Chrome and Firefox default to <font> tags here, but a page that has
+    // turned CSS styling on gets spans marked xxx-large instead; catch both.
+    try { document.execCommand('styleWithCSS', false, false); } catch (e) {}
     document.execCommand('fontSize', false, '7');
-    surface.querySelectorAll('font[size="7"]').forEach(function (el) {
-      var span = document.createElement('span');
-      span.style.fontSize = px + 'px';
-      span.innerHTML = el.innerHTML;
-      el.replaceWith(span);
+
+    var legacy = prop === 'fontSize' ? 'size' : 'face';
+    var made = surface.querySelectorAll('font[size="7"], span[style*="xxx-large"]');
+    if (!made.length) { syncHidden(surface); return; }
+
+    var spans = [];
+    made.forEach(function (el) {
+      var span;
+      if (el.tagName === 'FONT') {
+        span = document.createElement('span');
+        // Move the nodes rather than copy their markup: innerHTML would build
+        // fresh ones and drop the selection on the floor.
+        while (el.firstChild) span.appendChild(el.firstChild);
+        el.replaceWith(span);
+      } else {
+        span = el;
+        span.style.fontSize = '';
+      }
+      span.style[prop] = value;
+      // A run nested inside this one with its own value would win over it.
+      span.querySelectorAll('[style]').forEach(function (n) { n.style[prop] = ''; });
+      span.querySelectorAll('font[' + legacy + ']').forEach(function (n) {
+        n.removeAttribute(legacy);
+      });
+      spans.push(span);
     });
+
+    var range = document.createRange();
+    range.setStartBefore(spans[0]);
+    range.setEndAfter(spans[spans.length - 1]);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    lastRange.set(surface, range.cloneRange());
     syncHidden(surface);
+  }
+
+  function applyFontSize(surface, px) {
+    applyInlineStyle(surface, 'fontSize', px + 'px');
+  }
+
+  function applyFontFamily(surface, stack) {
+    applyInlineStyle(surface, 'fontFamily', stack);
+  }
+
+  /* "Georgia, serif" and '"Georgia", serif' are the same font asked for two
+   * ways — compare the first name only, unquoted and lowercased. */
+  function firstFamily(stack) {
+    return (stack || '').split(',')[0].trim().replace(/^["']|["']$/g, '').toLowerCase();
   }
 
   /* Size of the text the caret is sitting in, so the number box reports where
@@ -83,12 +163,54 @@
     return px ? Math.round(px) : null;
   }
 
-  /* The size stepper: −  [ 17 ]  +
+  /* ---- Toolbar drop-downs ---------------------------------------------
+   *
+   * Hand-built rather than a <select>, for two reasons the client ran into:
+   * the browser decides how wide a select is and cuts the longer names off
+   * mid-word, and an <option> cannot be drawn in the font it names. A button
+   * and a list of buttons can do both — and the list can scroll, which is what
+   * turns twenty font sizes into something you pick from instead of click
+   * towards one step at a time.
+   */
+
+  // The sizes worth offering: every point through the body-text range, then
+  // widening gaps once the jumps stop mattering. Anything else can still be
+  // typed into the box.
+  var SIZE_PRESETS = [10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 28,
+                      32, 36, 40, 48, 56, 64, 72, 96];
+
+  function setMenuOpen(menu, open) {
+    menu.classList.toggle('open', open);
+    var owner = menu.parentElement.querySelector('[aria-haspopup]');
+    if (owner) owner.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  function closeMenus(editor, except) {
+    editor.querySelectorAll('.ned-menu.open').forEach(function (m) {
+      if (m !== except) setMenuOpen(m, false);
+    });
+  }
+
+  /* Open with the current value already highlighted and scrolled to, so a
+   * list of twenty sizes opens showing the one you are on. */
+  function openMenu(editor, menu, isCurrent) {
+    closeMenus(editor, menu);
+    var on = null;
+    menu.querySelectorAll('.ned-menu-item').forEach(function (item) {
+      var hit = isCurrent(item);
+      item.classList.toggle('is-on', hit);
+      if (hit) on = item;
+    });
+    setMenuOpen(menu, true);
+    if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+  }
+
+  /* The size control: −  [ 17 ▾ ]  +
    *
    * Returns the number input so the caller can keep it in step with the
-   * selection. Every control here cancels mousedown, because the surface loses
+   * selection. The − and + buttons cancel mousedown, because the surface loses
    * its text selection the moment focus moves and there would be nothing left
-   * to resize. */
+   * to resize; the number box does not, because it has to be typeable. */
   function wireSizeControl(editor, surface) {
     var box = editor.querySelector('.ned-size');
     if (!box) return null;
@@ -98,6 +220,7 @@
     var fallback = parseInt(box.getAttribute('data-size-default'), 10) || 16;
     var min = parseInt(num.getAttribute('min'), 10) || 8;
     var max = parseInt(num.getAttribute('max'), 10) || 120;
+    var menu = box.querySelector('[data-size-menu]');
 
     function value() {
       var v = parseInt(num.value, 10);
@@ -109,21 +232,110 @@
       applyFontSize(surface, px);
     }
 
+    if (menu) {
+      SIZE_PRESETS.forEach(function (px) {
+        var item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'ned-menu-item';
+        item.setAttribute('role', 'option');
+        item.setAttribute('data-size', px);
+        item.textContent = px;
+        menu.appendChild(item);
+      });
+      menu.addEventListener('mousedown', function (e) {
+        var item = e.target.closest('[data-size]');
+        if (!item) return;
+        e.preventDefault();
+        setMenuOpen(menu, false);
+        apply(parseInt(item.getAttribute('data-size'), 10));
+      });
+      // Click, not mousedown: the box still has to take focus and a caret so
+      // a size that isn't on the list can be typed straight in.
+      num.addEventListener('click', function () {
+        openMenu(editor, menu, function (item) {
+          return parseInt(item.getAttribute('data-size'), 10) === value();
+        });
+        num.select();
+      });
+    }
+
     num.addEventListener('change', function () { apply(value()); });
     num.addEventListener('keydown', function (e) {
       // Enter inside a number box would otherwise submit the whole story.
       if (e.key === 'Enter') { e.preventDefault(); apply(value()); }
+      if (e.key === 'Escape' && menu) setMenuOpen(menu, false);
+      // The arrows already step the number; make them style the text too,
+      // rather than leaving the box saying 18 over text still at 17.
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        apply(Math.min(max, Math.max(min, value() + (e.key === 'ArrowUp' ? 1 : -1))));
+      }
     });
 
     box.querySelectorAll('[data-size-step]').forEach(function (btn) {
       btn.addEventListener('mousedown', function (e) {
         e.preventDefault();
+        if (menu) setMenuOpen(menu, false);
         var step = parseInt(btn.getAttribute('data-size-step'), 10) || 0;
         apply(Math.min(max, Math.max(min, value() + step)));
       });
     });
 
     return num;
+  }
+
+  /* The font picker: [ Archivo ▾ ] over a list drawn in the fonts themselves.
+   *
+   * Returns a function that re-labels the button for wherever the caret is,
+   * so the toolbar says which font you are in rather than a fixed "Font". */
+  function wireFontControl(editor, surface) {
+    var box = editor.querySelector('.ned-font');
+    if (!box) return null;
+    var toggle = box.querySelector('[data-font-toggle]');
+    var label = box.querySelector('[data-font-label]');
+    var menu = box.querySelector('[data-font-menu]');
+    if (!toggle || !menu || !label) return null;
+
+    function stackOf(item) { return item.getAttribute('data-font'); }
+
+    function current() {
+      var sel = window.getSelection();
+      if (!sel || !sel.rangeCount || !inSurface(surface, sel.anchorNode)) return null;
+      var node = sel.anchorNode;
+      var el = node.nodeType === 1 ? node : node.parentElement;
+      if (!el) return null;
+      return firstFamily(window.getComputedStyle(el).fontFamily);
+    }
+
+    toggle.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      if (menu.classList.contains('open')) { setMenuOpen(menu, false); return; }
+      var now = current();
+      openMenu(editor, menu, function (item) {
+        return !!now && firstFamily(stackOf(item)) === now;
+      });
+    });
+
+    menu.addEventListener('mousedown', function (e) {
+      var item = e.target.closest('[data-font]');
+      if (!item) return;
+      e.preventDefault();
+      setMenuOpen(menu, false);
+      applyFontFamily(surface, stackOf(item));
+    });
+
+    return function syncLabel() {
+      var now = current();
+      var match = null;
+      if (now) {
+        menu.querySelectorAll('[data-font]').forEach(function (item) {
+          if (!match && firstFamily(stackOf(item)) === now) match = item;
+        });
+      }
+      label.textContent = match ? match.getAttribute('data-font-name') : 'Font';
+      // Show it in the font it names, the same as the list does.
+      label.style.fontFamily = match ? stackOf(match) : '';
+    };
   }
 
   function insertLink(surface, url) {
@@ -170,11 +382,14 @@
 
   function syncHidden(surface) {
     var input = document.getElementById(surface.getAttribute('data-hidden-input'));
-    if (input) input.value = surface.innerHTML;
+    // The zero-width space that holds a just-started run open is scaffolding
+    // for the editor, not part of the story — drop it on the way to the form.
+    if (input) input.value = surface.innerHTML.replace(/\u200B/g, '');
   }
 
   function closePopovers(editor) {
     editor.querySelectorAll('.ned-pop.open').forEach(function (p) { p.classList.remove('open'); });
+    closeMenus(editor);
   }
 
   function wireEditor(editor) {
@@ -186,8 +401,10 @@
     surface.addEventListener('blur', function () { syncHidden(surface); });
 
     var sizeBox = wireSizeControl(editor, surface);
+    var syncFontLabel = wireFontControl(editor, surface);
     document.addEventListener('selectionchange', function () {
       saveSelection(surface);
+      if (syncFontLabel) syncFontLabel();
       // Don't fight the author while they are typing a number into the box.
       if (!sizeBox || document.activeElement === sizeBox) return;
       var px = currentFontSize(surface);
@@ -283,7 +500,17 @@
     });
 
     document.addEventListener('mousedown', function (e) {
-      if (!editor.contains(e.target)) closePopovers(editor);
+      if (!editor.contains(e.target)) { closePopovers(editor); return; }
+      // Inside this editor too: clicking into the text, or onto another
+      // control, should put an open list away — only the list's own control
+      // gets to keep it open, or the toggle would close and reopen at once.
+      editor.querySelectorAll('.ned-menu.open').forEach(function (m) {
+        if (!m.parentElement.contains(e.target)) setMenuOpen(m, false);
+      });
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeMenus(editor);
     });
 
     var form = surface.closest('form');

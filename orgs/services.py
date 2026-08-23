@@ -827,6 +827,53 @@ def groups_for(org, *, include_pending_for=None):
     )
 
 
+# ---------------------------------------------------------------------------
+# Work-email / domain verification
+# ---------------------------------------------------------------------------
+#
+# The claim being checked is "this organisation is mine to create". The
+# evidence is a code delivered to a mailbox at the organisation's own domain.
+# That is not proof of employment and it is not meant to be. It is proof that
+# whoever is asking can read mail inside the organisation, which is the
+# strongest thing obtainable without a human in the loop, and it is enough to
+# stop a stranger registering a bank.
+
+
+# Domains anyone can get an address at in thirty seconds. An address here
+# proves you hold a mailbox and nothing whatsoever about where you work, so
+# the whole check would be theatre. Deliberately a denylist and not an
+# allowlist: we cannot enumerate every legitimate company domain on earth, but
+# we can name the handful that carry no signal.
+PUBLIC_EMAIL_DOMAINS = {
+    "gmail.com", "googlemail.com", "yahoo.com", "yahoo.com.au", "ymail.com",
+    "hotmail.com", "hotmail.co.uk", "hotmail.com.au", "outlook.com",
+    "outlook.com.au", "live.com", "live.com.au", "msn.com", "icloud.com",
+    "me.com", "mac.com", "aol.com", "proton.me", "protonmail.com",
+    "gmx.com", "mail.com", "zoho.com", "yandex.com", "fastmail.com",
+    "bigpond.com", "bigpond.net.au", "optusnet.com.au", "iinet.net.au",
+    "tpg.com.au", "internode.on.net", "westnet.com.au",
+    # Throwaway services. Not exhaustive, and not trying to be: this is a
+    # speed bump for the lazy, not a defence against the determined.
+    "mailinator.com", "guerrillamail.com", "10minutemail.com",
+    "tempmail.com", "trashmail.com", "yopmail.com", "sharklasers.com",
+}
+
+
+class VerificationError(ValueError):
+    """A verification problem that knows which field caused it.
+
+    Every one of these used to surface as the same anonymous flash at the top
+    of the page: three inputs on screen, one red banner, and no indication of
+    which box to fix. ``field`` is what lets the form mark the offending input
+    and put the sentence underneath it, which is where someone is already
+    looking when they get it wrong.
+    """
+
+    def __init__(self, message, field=None):
+        super().__init__(message)
+        self.field = field
+
+
 def normalise_domain(raw: str) -> str:
     """Reduce whatever someone typed to a bare hostname, or raise ValueError.
 

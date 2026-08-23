@@ -61,13 +61,7 @@
         <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
         <button type="button" data-cmd="underline" title="Underline"><u>U</u></button>
         <span class="ned-sep"></span>
-        <select class="ned-pick" data-cmd="fontName" title="Font">
-          <option value="">Font</option>
-          <option value="'Archivo Black', sans-serif">Display</option>
-          <option value="'Archivo', sans-serif">Sans</option>
-          <option value="'Barlow Condensed', sans-serif">Condensed</option>
-          <option value="Georgia, serif">Serif</option>
-        </select>
+        {% include "manage/_ned_font.html" %}
         {% include "manage/_ned_size.html" with default=34 %}
         <input type="color" data-cmd="foreColor" title="Colour" value="#0F2E22">
       </div>
@@ -90,12 +84,7 @@
         <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
         <button type="button" data-cmd="underline" title="Underline"><u>U</u></button>
         <span class="ned-sep"></span>
-        <select class="ned-pick" data-cmd="fontName" title="Font">
-          <option value="">Font</option>
-          <option value="'Archivo', sans-serif">Sans</option>
-          <option value="Georgia, serif">Serif</option>
-          <option value="'Barlow Condensed', sans-serif">Condensed</option>
-        </select>
+        {% include "manage/_ned_font.html" %}
         {% include "manage/_ned_size.html" with default=17 %}
         <input type="color" data-cmd="foreColor" title="Colour" value="#0F2E22">
       </div>
@@ -145,12 +134,7 @@
         <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
         <button type="button" data-cmd="underline" title="Underline"><u>U</u></button>
         <span class="ned-sep"></span>
-        <select class="ned-pick" data-cmd="fontName" title="Font">
-          <option value="">Font</option>
-          <option value="'Archivo', sans-serif">Sans</option>
-          <option value="Georgia, serif">Serif</option>
-          <option value="'Barlow Condensed', sans-serif">Condensed</option>
-        </select>
+        {% include "manage/_ned_font.html" %}
         {% include "manage/_ned_size.html" with default=16 %}
         <input type="color" data-cmd="foreColor" title="Colour" value="#0F2E22">
         <span class="ned-sep"></span>

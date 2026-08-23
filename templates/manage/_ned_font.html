@@ -1,0 +1,60 @@
+{% comment %}
+Font picker for a story-editor toolbar.
+
+This was a native <select> with four options, and it had two problems the
+client hit straight away. The browser decides how wide a select is, so the
+longer names came out cut off mid-word — a control naming a font you cannot
+read. And an <option> cannot be drawn in the font it names, so choosing a
+typeface meant reading a word and guessing what it would look like.
+
+A button over a list of buttons fixes both: every name is drawn in its own
+face at its natural width, nothing is ever truncated, and the list scrolls
+rather than growing the toolbar. The button also reports the font the caret is
+already sitting in, which the select never could.
+
+The first four are the faces the site itself loads (partials/_fonts.html), so
+they are the only ones certain to look the same for a reader as they do here.
+The rest ship with every desktop and phone — no extra download, and each stack
+names a lookalike behind it for anything missing one.
+{% endcomment %}
+<span class="ned-font">
+  <button type="button" class="ned-font-btn" data-font-toggle
+          title="Font" aria-haspopup="listbox" aria-expanded="false">
+    <span data-font-label>Font</span>
+    <svg class="ned-caret" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg>
+  </button>
+  <div class="ned-menu" data-font-menu role="listbox" aria-label="Font">
+    <p class="ned-menu-head">GoodTip's own</p>
+    <button type="button" class="ned-menu-item" role="option" data-font-name="Archivo Black"
+            data-font="'Archivo Black', sans-serif" style="font-family:'Archivo Black',sans-serif">Archivo Black <em>headlines</em></button>
+    <button type="button" class="ned-menu-item" role="option" data-font-name="Archivo"
+            data-font="'Archivo', sans-serif" style="font-family:'Archivo',sans-serif">Archivo <em>body text</em></button>
+    <button type="button" class="ned-menu-item" role="option" data-font-name="Barlow Condensed"
+            data-font="'Barlow Condensed', sans-serif" style="font-family:'Barlow Condensed',sans-serif">Barlow Condensed</button>
+    <button type="button" class="ned-menu-item" role="option" data-font-name="Barlow Semi Condensed"
+            data-font="'Barlow Semi Condensed', sans-serif" style="font-family:'Barlow Semi Condensed',sans-serif">Barlow Semi Condensed</button>
+    <p class="ned-menu-head">On every device</p>
+    <button type="button" class="ned-menu-item" role="option" data-font-name="Georgia"
+            data-font="Georgia, 'Times New Roman', serif" style="font-family:Georgia,serif">Georgia</button>
+    <button type="button" class="ned-menu-item" role="option" data-font-name="Times New Roman"
+            data-font="'Times New Roman', Times, serif" style="font-family:'Times New Roman',Times,serif">Times New Roman</button>
+    <button type="button" class="ned-menu-item" role="option" data-font-name="Palatino"
+            data-font="'Palatino Linotype', Palatino, 'Book Antiqua', serif" style="font-family:'Palatino Linotype',Palatino,'Book Antiqua',serif">Palatino</button>
+    <button type="button" class="ned-menu-item" role="option" data-font-name="Garamond"
+            data-font="Garamond, 'Hoefler Text', 'Times New Roman', serif" style="font-family:Garamond,'Hoefler Text',serif">Garamond</button>
+    <button type="button" class="ned-menu-item" role="option" data-font-name="Arial"
+            data-font="Arial, Helvetica, sans-serif" style="font-family:Arial,Helvetica,sans-serif">Arial</button>
+    <button type="button" class="ned-menu-item" role="option" data-font-name="Helvetica"
+            data-font="Helvetica, Arial, sans-serif" style="font-family:Helvetica,Arial,sans-serif">Helvetica</button>
+    <button type="button" class="ned-menu-item" role="option" data-font-name="Verdana"
+            data-font="Verdana, Geneva, sans-serif" style="font-family:Verdana,Geneva,sans-serif">Verdana</button>
+    <button type="button" class="ned-menu-item" role="option" data-font-name="Tahoma"
+            data-font="Tahoma, Verdana, sans-serif" style="font-family:Tahoma,Verdana,sans-serif">Tahoma</button>
+    <button type="button" class="ned-menu-item" role="option" data-font-name="Trebuchet MS"
+            data-font="'Trebuchet MS', Tahoma, sans-serif" style="font-family:'Trebuchet MS',Tahoma,sans-serif">Trebuchet MS</button>
+    <button type="button" class="ned-menu-item" role="option" data-font-name="Impact"
+            data-font="Impact, Haettenschweiler, sans-serif" style="font-family:Impact,Haettenschweiler,sans-serif">Impact</button>
+    <button type="button" class="ned-menu-item" role="option" data-font-name="Courier New"
+            data-font="'Courier New', Courier, monospace" style="font-family:'Courier New',Courier,monospace">Courier New</button>
+  </div>
+</span>
