@@ -6,10 +6,26 @@ VENV="$PROJECT_DIR/venv"
 
 cd "$PROJECT_DIR"
 
-# Pull latest changes from GitHub
-git stash
+# Pull latest changes from GitHub.
+#
+# The deploy target is a working checkout, so a stray edit would abort the
+# pull. Stash around it -- but only pop what THIS run stashed. `git stash`
+# saves nothing on a clean tree and still exits 0, so an unconditional pop
+# would restore whatever unrelated entry happened to be on top of the stack
+# and quietly deploy it. Test the tree first and remember the answer.
+STASHED=0
+if ! git diff --quiet HEAD; then
+  git stash push -m deploy-autostash
+  STASHED=1
+fi
+
 git pull --rebase origin main
-git stash pop || true
+
+if [ "$STASHED" = 1 ]; then
+  # A conflicting pop leaves the entry on the stack, so nothing is lost --
+  # but the tree now has markers in it and needs a human.
+  git stash pop || echo "WARNING: could not restore local changes -- see 'git stash list'." >&2
+fi
 
 # Activate venv and install any new dependencies
 source "$VENV/bin/activate"
