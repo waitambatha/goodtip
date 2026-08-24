@@ -15,7 +15,7 @@ from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
 
-from orgs.models import OrgMember, Organisation
+from orgs.models import Group, OrgMember, Organisation
 from orgs.notifications import send_welcome
 from tipping.models import Match, Round, Tip
 from tipping.services import (
@@ -460,6 +460,16 @@ def dashboard_view(request):
         # it for whenever the totals find a home.
         cards.append({
             "org": org,
+            # Which room this card is reporting on. It was already worked out
+            # above to scope the points and the rank, but never reached the
+            # template — so a member tipping inside a group saw a card headed
+            # only by the organisation, with group figures under it and nothing
+            # saying so. The card can now name the room it is talking about.
+            "group": card_group,
+            "groups": (
+                list(org.groups.filter(approval_status=Group.APPROVAL_APPROVED))
+                if org.groups_enabled else []
+            ),
             "round": round_in_play,
             "tips_done": tips_done,
             "tips_total": tips_total,

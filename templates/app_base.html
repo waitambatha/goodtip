@@ -333,7 +333,18 @@
       <div class="flash-stack">
         {% for m in messages %}
           <div class="flash {% if m.tags == 'success' %}success{% elif m.tags == 'error' %}error{% else %}info{% endif %}">
+            {% comment %} The icon carries the state as shape as well as colour, so the
+               three kinds stay distinguishable to anyone who can't separate the
+               accent hues. {% endcomment %}
+            <span class="flash-ic" aria-hidden="true">
+              {% if m.tags == 'success' %}<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>
+              {% elif m.tags == 'error' %}<svg viewBox="0 0 24 24" stroke-linecap="round"><path d="M12 8v5M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>
+              {% else %}<svg viewBox="0 0 24 24" stroke-linecap="round"><path d="M12 16v-5M12 8h.01"/><circle cx="12" cy="12" r="9"/></svg>{% endif %}
+            </span>
             <span>{{ m }}</span>
+            <button type="button" class="flash-close" data-flash-close aria-label="Dismiss">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
           </div>
         {% endfor %}
       </div>
@@ -349,6 +360,16 @@
 
     /* Sport loader is handled by gt-loader.js — shape and label stay as
        rendered server-side, since in the app they name the org's own code. */
+
+    /* flash messages: each one is a Django message rendered once on page
+       load, so dismissing it is purely client-side — there is nothing on
+       the server left to clear. */
+    document.querySelectorAll('[data-flash-close]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var el = btn.closest('.flash');
+        if (el) el.remove();
+      });
+    });
 
     /* notifications: bell panel + popup dismiss */
     (function(){

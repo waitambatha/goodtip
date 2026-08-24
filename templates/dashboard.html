@@ -178,12 +178,18 @@ stacking context, so a strip rendered inside it paints over the sheet.
 <!-- comp picker + create -->
 <div class="dash-ctl">
   <form method="get" action="" class="dc-pick">
+    {% comment %}
+    One option per organisation, and nothing else crammed into the label. It
+    used to read "masterclass › IT, 0 of 9 matches tipped" — three different
+    facts (which org, which room, how far through the round) welded into a
+    single line of a control whose only job is picking the first one. The room
+    is stated by the room bar on the card below, and the tip count by the
+    "Tips this round" tile, so both say it once, in the place that explains it.
+    {% endcomment %}
     <span class="dc-lab">Your organisation</span>
     <select name="org" id="dashOrg" aria-label="Choose an organisation" onchange="this.form.submit()">
       {% for oc in cards %}
-      <option value="{{ oc.org.id }}" {% if oc.org.id == c.org.id %}selected{% endif %}>
-        {{ oc.org.name }}{% if oc.tips_total %}, {{ oc.tips_done }} of {{ oc.tips_total }} matches tipped{% endif %}
-      </option>
+      <option value="{{ oc.org.id }}" {% if oc.org.id == c.org.id %}selected{% endif %}>{{ oc.org.name }}</option>
       {% endfor %}
     </select>
     <noscript><button type="submit" class="abtn abtn-dark abtn-sm">Go</button></noscript>
@@ -210,6 +216,22 @@ stacking context, so a strip rendered inside it paints over the sheet.
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
     <div><div class="card-h" style="font-size:20px;">{{ c.org.name }}</div><div class="card-lead">{{ c.org.sport_label }} &middot; {{ c.org.season }} &middot; raising for {{ c.org.charity_display }}</div></div>
   </div>
+
+  {% comment %}
+  Which room you are tipping in. This was only ever said in the nav's context
+  dropdown — closed by default — so a member standing in a group saw a card
+  headed by the organisation, with the group's points and the group's rank
+  underneath it, and nothing anywhere saying which of the two they were
+  looking at. The room is the frame for every number on this card, so it is
+  stated on the card, and switching is one press from here rather than a
+  hunt through the nav.
+  {% endcomment %}
+  {% comment %}
+  The room switcher, light skin — this card is cream while the page behind it
+  is the dark sheet. Same control as the one on My Tips, the Leaderboard and
+  the Ladder, so switching room looks and works identically wherever you do it.
+  {% endcomment %}
+  {% include "partials/room_switch.html" with noun="round" surface="light" %}
 
 
   {% if c.charity_vote %}
@@ -321,6 +343,30 @@ impossible. See gt-busy.js.
         </div>
       </div>
     </form>
+  </div>
+  {% else %}
+  {% comment %}
+  No round means this comp has no draw yet — a brand-new org whose fixtures
+  have not landed. Before this branch existed the whole card simply did not
+  render, so the dashboard of a comp created a minute ago showed a ladder, a
+  Wall and no games at all, with nothing to say why. Fixtures are cloned at
+  creation and the scheduled sync fills any gap, so this is a state that
+  clears itself — the copy says so rather than leaving someone wondering
+  whether they set the comp up wrong.
+  {% endcomment %}
+  <div class="card" style="background:var(--app-card-2);margin-top:16px;">
+    <div class="gt-empty">
+      <span class="ge-ic" aria-hidden="true"><svg style="stroke:currentColor;fill:none;stroke-width:1.7;"><use href="#ic-trophy"/></svg></span>
+      <div>
+        <div class="card-h">Fixtures are on their way</div>
+        <p class="card-lead" style="margin:6px 0 0;">
+          We're pulling the draw for
+          {% for comp in c.org.competitions.all %}{{ comp.name }}{% if not forloop.last %} and {% endif %}{% endfor %}
+          into {{ c.org.name }}. It usually lands within a couple of minutes —
+          refresh and the round you're up to will be here, ready to tip.
+        </p>
+      </div>
+    </div>
   </div>
   {% endif %}
 

@@ -1,9 +1,12 @@
+import logging
+import threading
 from pathlib import Path
 from uuid import uuid4
 
 from django.contrib import messages
+from django.core.management import call_command
 from django.contrib.auth.decorators import login_required
-from django.db import models
+from django.db import connection, models
 from django.db.models import Count, Q
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -65,6 +68,8 @@ from .services import (
 )
 from . import context as ctx
 from .signing import make_join_token, parse_join_token
+
+logger = logging.getLogger(__name__)
 
 
 def _membership(user, org):
@@ -158,6 +163,13 @@ WIZARD_STEPS = [
     (6, "Review", "Check & create", []),
 ]
 VERIFY_STEP = 2
+# The step that collects `competitions`, and so the earliest point at which the
+# feeds to fetch are known. Derived from WIZARD_STEPS rather than written as a
+# 4, so inserting a step ahead of it cannot silently start the prewarm against
+# the wrong screen.
+COMPETITION_STEP = next(
+    (n for n, _label, _sub, fields in WIZARD_STEPS if "competitions" in fields), 4
+)
 
 # Types that have a work domain to prove. A book club or a cycling crew has no
 # organisational domain and never will, so requiring one would block exactly the
@@ -233,6 +245,142 @@ def _step_errors(form, step: int) -> dict:
     without this filter step one would refuse to advance over a missing charity."""
     fields = set(_wizard_fields(step))
     return {name: errs for name, errs in form.errors.items() if name in fields}
+
+
+def _prewarm_fixtures_for(form) -> None:
+    """Start fetching the draw as soon as the competitions are known.
+
+    Step four is the first point at which anyone knows which feeds this comp
+    needs, and creation is still two steps away — a charity to choose and a
+    review to read, which is a real minute or two. Spending it on the network
+    means the fixtures are already cached when Create is pressed, and the org's
+    rounds are written with no scraping in that request at all.
+
+    Off the request thread and best-effort in every direction: this exists only
+    to make a later step fast, so a feed that is slow or down costs the wizard
+    nothing. Creation still works, the dashboard still explains itself, and the
+    scheduled sync still fills in whatever is missing.
+    """
+    if connection.settings_dict.get("NAME", "").startswith("test_"):
+        return
+
+    competitions = list(form.cleaned_data.get("competitions") or [])
+    season = form.cleaned_data.get("season")
+    year = getattr(season, "year", None)
+    if not competitions or not year:
+        return
+
+    def _warm():
+        try:
+            from data_sync.prewarm import prewarm_fixtures
+
+            prewarm_fixtures(competitions, year)
+        except Exception:  # noqa: BLE001 — warming is an optimisation only
+            logger.exception("fixture prewarm failed")
+        finally:
+            connection.close()
+
+    threading.Thread(target=_warm, daemon=True).start()
+
+
+def _seed_fixtures_for(org) -> None:
+    """Pull this org's draw from the real feeds, off the request thread.
+
+    Rounds carry an ``org`` FK and are unique on ``(org, round_number,
+    series)``, so a draw is not shared between organisations — each one holds
+    its own. Nothing built that at creation time: rounds only ever appeared
+    when the server's scheduled fixtures sync next ran, so a brand-new comp
+    had none, ``current_round()`` returned None, and the dashboard showed no
+    games at all for a comp that had just been set up.
+
+    The fixtures come from the same scrapers every other sync uses —
+    ``--discover`` because the org has no local rounds to read ahead from, so
+    the feeds have to be asked which rounds exist rather than being handed a
+    list. No fabricated or copied fixtures: what lands is the real draw, or
+    nothing until the feed can be reached.
+
+    Threaded because scraping a full season takes far longer than a request
+    should, and the wizard's final POST must not sit on it. The dashboard
+    renders an explicit "fixtures are on their way" card while this is in
+    flight (see dashboard.html), and the scheduled sync retries regardless,
+    so a feed that is down costs a delay rather than a broken comp.
+    """
+    # Never reach for the network under the test runner. Every test that
+    # creates an org lands here, and a thread hitting live scrapers mid-suite
+    # is slow, flaky, and would open a second connection to the test database
+    # from outside the test's own transaction.
+    if connection.settings_dict.get("NAME", "").startswith("test_"):
+        return
+
+    org_id = org.pk
+
+    def _sync():
+        try:
+            call_command(
+                "sync_matches", fixtures=True, discover=True, org=org_id, verbosity=0,
+            )
+        except Exception:  # noqa: BLE001 — the scheduled sync will retry
+            logger.exception("fixture sync failed for new org %s", org_id)
+        finally:
+            # A thread gets its own connection; leaving it open leaks one per
+            # organisation created.
+            connection.close()
+
+    threading.Thread(target=_sync, daemon=True).start()
+
+
+def _step_intro(step: int, parent_org=None) -> dict:
+    """The eyebrow and standfirst above the card, per step.
+
+    These used to read "New organisation" and "Five short steps…" on every
+    screen, which told you nothing about where you actually were — the rail
+    was carrying that on its own. Naming the task in progress means the top
+    of the page answers "what am I doing right now" without having to find
+    the highlighted step and read its label.
+    """
+    where = f" under {parent_org.name}" if parent_org else ""
+    intros = {
+        1: ("Naming your organisation",
+            "What it's called, what kind of outfit it is, and where it's based."),
+        2: ("Proving the domain is yours",
+            "A code to an address at your own domain — that's what shows you're on the inside."),
+        3: ("Deciding on groups",
+            "One ladder for everyone, or a separate ladder per team. Either can change later."),
+        4: ("Setting up the tipping",
+            "The competitions you'll tip, and any scoring rules on top of them."),
+        5: ("Choosing the cause",
+            "Pick the charity yourself, or put it to a vote and let the organisation decide."),
+        6: ("Checking it over",
+            "Nothing is created until you press the button. Step back to change anything."),
+    }
+    eyebrow, sub = intros.get(step, (f"New organisation{where}", "Five short steps."))
+    return {"eyebrow": f"{eyebrow}{where}", "sub": sub}
+
+
+def _step_saved_message(form, step: int) -> str:
+    """What Continue just saved, named specifically enough to be worth
+    reading — the generic "Draft saved" already covers the "nothing broke"
+    case, so this is the step's own answer to "what did that button do"."""
+    data = form.cleaned_data
+    if step == 1:
+        return f"“{data.get('name', '').strip()}” saved."
+    if step == 3:
+        return (
+            "Groups switched on — members can start their own."
+            if data.get("groups_enabled")
+            else "Groups: not for now — one ladder for everyone."
+        )
+    if step == 4:
+        n = len(data.get("competitions") or [])
+        return f"Tipping set up — {n} competition{'s' if n != 1 else ''} selected."
+    if step == 5:
+        if data.get("charity_method") == "vote":
+            n = len(data.get("vote_charities") or [])
+            return f"Charity vote set up — {n} option{'s' if n != 1 else ''} on the ballot."
+        charity = data.get("charity")
+        name = charity.name if charity else (data.get("new_charity_name") or "your charity")
+        return f"Charity set: {name}."
+    return "Saved."
 
 
 @login_required
@@ -437,6 +585,13 @@ def create_org_view(request):
         form = _draft_form(draft, parent_org, bound=True)
         errors = _step_errors(form, step)
         if not errors and step < LAST_STEP:
+            messages.success(request, _step_saved_message(form, step))
+            # The competitions have just been chosen, which is the first moment
+            # anyone knows which feeds this comp needs. Start fetching now, so
+            # the draw is already in hand by the time the charity and review
+            # steps are done and Create is pressed — see _prewarm_fixtures_for.
+            if step == COMPETITION_STEP:
+                _prewarm_fixtures_for(form)
             draft.step = step + 1
             draft.save()
             return _create_redirect(parent_org)
@@ -486,6 +641,12 @@ def create_org_view(request):
                 user=request.user, org=org,
                 defaults={"role": OrgMember.ROLE_BOTH, "is_league_owner": True},
             )
+            # Start pulling this comp's draw from the feeds straight away.
+            # Rounds are per-org, and until this ran a freshly created org had
+            # none at all — so the dashboard's fixture card, gated on
+            # current_round(), rendered nothing and the comp looked broken on
+            # the very first visit.
+            _seed_fixtures_for(org)
             if form.is_vote:
                 # The election is created in draft — the admin schedules it
                 # (or starts it now) from the dashboard, and members are
@@ -589,6 +750,7 @@ def _render_wizard(request, draft, form, step, parent_org, *, errors=None, dupli
         "duplicates": duplicates,
         "summary": _draft_summary(form, draft) if step == LAST_STEP else None,
         "draft_saved_label": _saved_label(draft),
+        "step_intro": _step_intro(step, parent_org),
         # Verify step state. Cheap enough to always provide: the template only
         # reads it on step 2, and computing it conditionally would mean the
         # "verified" tick could not show on the review step.
@@ -2044,15 +2206,21 @@ def _group_icon(group) -> tuple[str, str]:
     return "ic-people", "slate"
 
 
+# Every id here MUST exist as a <symbol> in the icon sprite. Four of these
+# once did not — ic-bolt, ic-coin, ic-star and ic-chat were never symbols, and
+# the sprite's actual names are ic-spark, ic-coins and ic-msg. A <use> pointing
+# at a missing symbol does not fail loudly: it renders nothing and measures
+# 0×0, so the group card showed an empty tile and nobody could tell whether the
+# icon was wrong or the group was.
 GROUP_GLYPHS = [
-    (("it", "tech", "engineer", "developer", "software"), "ic-bolt", "violet"),
-    (("finance", "account", "payroll"), "ic-coin", "gold"),
-    (("marketing", "brand", "comms", "creative"), "ic-star", "pink"),
+    (("it", "tech", "engineer", "developer", "software"), "ic-spark", "violet"),
+    (("finance", "account", "payroll"), "ic-coins", "gold"),
+    (("marketing", "brand", "comms", "creative"), "ic-flame", "pink"),
     (("sales", "revenue", "business development"), "ic-trophy", "amber"),
     (("people", "hr", "culture", "talent"), "ic-people", "teal"),
     (("ops", "operation", "logistics", "warehouse"), "ic-shield", "slate"),
     (("legal", "risk", "compliance"), "ic-doc", "navy"),
-    (("support", "service", "customer"), "ic-chat", "sky"),
+    (("support", "service", "customer"), "ic-msg", "sky"),
 ]
 
 

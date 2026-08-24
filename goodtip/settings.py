@@ -163,8 +163,23 @@ if DEBUG:
     # Postmark when EMAIL_SEND_FOR_REAL says so, console otherwise. Both paths
     # are kept: the console one is what to fall back to offline, or when you
     # don't want dev traffic counted against the Postmark quota.
-    if os.environ.get("EMAIL_SEND_FOR_REAL", "False").lower() == "true" and POSTMARK_SERVER_TOKEN:
-        EMAIL_BACKEND = "goodtip.email_backends.PostmarkEmailBackend"
+    #
+    # SMTP sits between them, and exists because Postmark's free plan is 100
+    # messages a calendar month with no overage — past that it still answers
+    # OK with a MessageID and silently drops the mail, which is impossible to
+    # tell from success inside the app. Dev had no way around that: the only
+    # two choices here were the exhausted account or a console backend that
+    # never reaches an inbox. Clear POSTMARK_SERVER_TOKEN and set EMAIL_HOST
+    # (any SMTP provider, or Gmail with an app password) to actually receive
+    # mail while the quota is gone. Mirrors what the non-DEBUG branch below
+    # has always done.
+    if os.environ.get("EMAIL_SEND_FOR_REAL", "False").lower() == "true":
+        if POSTMARK_SERVER_TOKEN:
+            EMAIL_BACKEND = "goodtip.email_backends.PostmarkEmailBackend"
+        elif os.environ.get("EMAIL_HOST", ""):
+            EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+        else:
+            EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
     else:
         EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
     # Browsers treat localhost and 127.0.0.1 as different sites with separate

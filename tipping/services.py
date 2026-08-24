@@ -579,3 +579,4 @@ def user_rank_in_org(user, org, group=None) -> int | None:
         if row.id == user.id:
             return row.rank
     return None
+

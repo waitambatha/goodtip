@@ -1668,31 +1668,58 @@ img, svg, video { max-width: 100%; }
 .an-brand { font-family: var(--mark); font-weight: 900; font-size: 20px; color: #fff; text-transform: uppercase; letter-spacing: .02em; text-decoration: none; }
 .an-brand span { color: var(--lime); }
 /* ---- Where you are: the context chip in the nav ---- */
-.an-ctx { margin-left: 10px; }
+/* flex:none, or the nav's flex layout shrinks this to whatever is left after
+   the link row has taken what it wants — which measured 149px against a
+   max-width of 460px, so the org and group names were ellipsised by a
+   constraint that had nothing to do with either of them. The names are the
+   whole point of the control; the links can give way instead. */
+.an-ctx { margin-left: 10px; flex: none; }
+/* Was max-width:320px at 13px, which an org name plus a group name plus the
+   chevron ran straight past — "masterclass › IT" arrived as "mastercl… › I…",
+   i.e. the two things the control exists to tell you were the two things
+   truncated. Roomier, and a size the name can actually be read at. */
 .an-ctx-btn {
-  display: inline-flex; align-items: center; gap: 7px; max-width: 320px;
-  font-size: 13px; color: var(--cream);
+  display: inline-flex; align-items: center; gap: 8px; max-width: 460px;
+  font-size: 14px; color: var(--cream); padding: 7px 12px;
+  border-radius: 11px; border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.04);
 }
-.an-ctx-org { opacity: .72; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.an-ctx-btn:hover { border-color: rgba(200,241,53,.4); background: rgba(200,241,53,.08); }
+/* The org gets a floor on how small it may be squeezed to; the group half is
+   allowed to give way first, since the org name is the stable landmark. */
+.an-ctx-org { opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 4.5em; }
 /* The group is the half that changes which ladder a tip lands on, so it is the
    half that is legible. */
 .an-ctx-group { font-weight: 700; color: var(--lime); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .an-ctx-sep { opacity: .45; flex: none; }
+/* This whole block is painted for the DARK dropdown panel it lives in
+   (.an-menu-panel, a deep-green gradient). It was written with the light-card
+   palette — --ink rows, --muted headings, --forest links and tick — which on
+   that panel is dark-on-dark: the group list was there the whole time and
+   simply could not be read. */
 .an-ctx-head {
   font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
-  color: var(--muted); padding: 10px 14px 4px; font-weight: 700;
+  color: rgba(232,228,213,.62); padding: 12px 14px 6px; font-weight: 800;
 }
 .an-ctx-row {
   display: flex; width: 100%; text-align: left; align-items: center; gap: 10px;
-  background: none; border: 0; cursor: pointer; padding: 9px 14px;
-  font-family: var(--body); color: var(--ink);
+  background: none; border: 0; cursor: pointer; padding: 11px 13px;
+  border-radius: 11px;
+  font-family: var(--body); color: var(--cream);
 }
-.an-ctx-row:hover { background: rgba(45,122,58,.10); }
-.an-ctx-row.on { background: linear-gradient(90deg, rgba(200,241,53,.35), rgba(200,241,53,.10)); }
-.an-ctx-row.on::after { content: "✓"; margin-left: auto; font-weight: 900; color: var(--forest); }
+/* The rows carry <b> name / <i> descriptor like the panel's anchors do, but
+   they are <button>s inside a <form> — so `.an-menu-panel a b` never reached
+   them and both lines fell back to the inherited colour. */
+.an-ctx-row .mi-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.an-ctx-row .mi-txt b { font-size: 14.5px; font-weight: 700; color: #fff; line-height: 1.25; }
+.an-ctx-row .mi-txt i { font-style: normal; font-size: 12px; color: rgba(232,228,213,.58); line-height: 1.3; }
+.an-ctx-row:hover { background: rgba(200,241,53,.14); }
+.an-ctx-row.on { background: linear-gradient(90deg, rgba(200,241,53,.26), rgba(200,241,53,.07)); }
+.an-ctx-row.on .mi-txt b { color: var(--lime); }
+.an-ctx-row.on::after { content: "✓"; margin-left: auto; font-weight: 900; color: var(--lime); }
 .an-ctx-more {
-  display: block; padding: 10px 14px; font-size: 12.5px; font-weight: 700;
-  color: var(--forest); text-decoration: none;
+  display: block; padding: 11px 14px; font-size: 12.5px; font-weight: 800;
+  color: var(--lime); text-decoration: none;
 }
 .an-ctx-more:hover { text-decoration: underline; }
 @media (max-width: 900px) { .an-ctx { display: none; } }
@@ -1726,6 +1753,67 @@ img, svg, video { max-width: 100%; }
 .flash.success { background: rgba(45,122,58,.12); border-color: rgba(45,122,58,.4); color: #1c5e30; }
 .flash.error { background: rgba(178,52,52,.10); border-color: rgba(178,52,52,.4); color: #9a2b2b; }
 .flash.info { background: rgba(46,110,122,.10); border-color: rgba(46,110,122,.4); color: #245b66; }
+.flash-close { flex: none; margin-left: auto; background: none; border: none; padding: 4px; display: grid; place-items: center; cursor: pointer; color: inherit; opacity: .55; border-radius: 6px; transition: opacity .15s var(--ease), background .15s var(--ease); }
+.flash-close:hover { opacity: 1; background: rgba(0,0,0,.06); }
+
+/* On a dark sheet these pastel, low-opacity flash colours pick up the green
+   backdrop showing through them, and their dark text nearly disappears
+   against it — "Started again" was there, just unreadable. Opaque and
+   light-on-dark here instead of fighting the ambient colour.
+
+   Each state also has to be told apart AT A GLANCE, which a green-tinted
+   panel on a green page never managed: "created" and "that didn't work"
+   both just read as green. So the state is carried by a bright accent rail
+   down the left edge and a matching icon chip, against one neutral near-black
+   panel — the panel stays out of the way and the colour does the talking.
+   Lime is the success colour because it is the brand's own "yes", and it is
+   the one hue on this page the background cannot mute. */
+.page-deep .flash {
+  position: relative;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 15px 16px 15px 20px;
+  background: linear-gradient(180deg, rgba(14,38,28,.97), rgba(9,27,20,.97));
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 13px;
+  color: var(--cream);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow: hidden;
+  box-shadow: 0 20px 44px -22px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.03);
+}
+/* The accent rail. ::before rather than a border-left so the radius stays
+   round and the colour reads as a solid bar, not a hairline. */
+.page-deep .flash::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  background: var(--flash-accent, rgba(255,255,255,.3));
+}
+.page-deep .flash .flash-ic {
+  flex: none; width: 26px; height: 26px; border-radius: 8px; margin-top: -1px;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--flash-accent) 18%, transparent);
+  color: var(--flash-accent);
+}
+.page-deep .flash .flash-ic svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2.4; }
+.page-deep .flash > span:not(.flash-ic) { padding-top: 3px; }
+
+.page-deep .flash.success { --flash-accent: #C8F135; }
+.page-deep .flash.error   { --flash-accent: #FF7A6B; }
+.page-deep .flash.info    { --flash-accent: #6FD2E8; }
+
+.page-deep .flash-close { margin-top: 1px; opacity: .5; }
+.page-deep .flash-close:hover { opacity: 1; background: rgba(255,255,255,.12); }
+
+/* Arrives rather than just being there — a message that appears on the same
+   frame as a full page render is easy to miss entirely. */
+@media (prefers-reduced-motion: no-preference) {
+  .page-deep .flash { animation: flash-in .34s var(--ease) both; }
+}
+@keyframes flash-in {
+  from { opacity: 0; transform: translateY(-7px); }
+  to   { opacity: 1; transform: none; }
+}
 
 /* cards */
 .card { background: var(--app-card); border: 1px solid var(--app-line); border-radius: 14px; padding: 22px; }
@@ -5607,6 +5695,7 @@ form.is-busy [type="submit"]:hover { transform: none; }
   line-height: 1.04; margin: 10px 0 0; letter-spacing: -.02em;
 }
 .wiz-page .app-sub { color: rgba(232,228,213,.72); font-size: 16px; margin-top: 12px; }
+.hl-lime { color: var(--lime); }
 
 /* ---------- the step card: cream, not lime ---------- */
 .wiz-form { max-width: 100%; margin: 0; }
@@ -7946,13 +8035,25 @@ body.sheet-open {
 }
 
 .dept-card .dc-top { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.dept-card .dc-mark {
-  width: 40px; height: 40px; flex: none;
+/* The group's mark. This rule was written for `.dc-mark`, which no template
+   has ever rendered — groups.html writes `.dc-ic`. So it matched nothing, the
+   bare <svg> inside had no width or height to inherit, and it grew to fill the
+   flex row: a 184px invisible block that squeezed the group's name and member
+   count into an 81px gutter. That, and not the styling, is why the card looked
+   broken. Named for the class that actually exists now.
+
+   flex:none and an explicit size on BOTH the tile and the svg, because an
+   unsized inline <svg> in a flex row is exactly how this happened. */
+.dept-card .dc-ic {
+  width: 44px; height: 44px; flex: none;
   display: grid; place-items: center;
-  border-radius: 11px;
-  background: rgba(45,122,58,.10); color: var(--forest);
+  border-radius: 12px;
+  /* Tinted from the group's own tone (see .tone-* above), falling back to the
+     house green for a group whose kind matched no glyph. */
+  background: color-mix(in srgb, var(--tone-a, #2D7A3A) 15%, transparent);
+  color: var(--tone-a, var(--forest));
 }
-.dept-card .dc-mark svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.dept-card .dc-ic svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.8; }
 .dept-card .dc-name { min-width: 0; line-height: 1.25; }
 .dept-card .dc-name b {
   display: block; font-size: 16px; font-weight: 700; color: var(--ink);
@@ -7965,7 +8066,10 @@ body.sheet-open {
 
 .dept-card .dc-meta {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  font-size: 12.5px; color: var(--muted);
+  /* A shade darker than --muted (#6B7A6E), which lands at 4.11:1 on this
+     card's cream and misses the 4.5:1 floor for text this size. Same sage
+     family, just enough of it to be read rather than guessed at. */
+  font-size: 12.5px; color: #566356;
 }
 .dept-card .dc-meta > span { display: inline-flex; align-items: center; gap: 6px; }
 .dept-card .dc-meta svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.9; }
@@ -7994,29 +8098,30 @@ body.sheet-open {
    ========================================================================== */
 
 /* The code field. Six digits read back off a phone, so they get the treatment
-   the email gives them: monospaced, spaced out, and large enough that a
-   transposed pair is obvious before it is submitted. */
-/* Was inheriting .fld input's width: 100% — fine for a name or an email, not
-   for six digits, which just stretched the bold, widely-tracked type across
-   the whole card edge to edge. Capped and centred so it reads as one small,
-   deliberate slot the code drops into, not a field that happens to be
-   holding six characters in a lot of empty space. */
-.code-input {
+   the email gives them: monospaced, large enough that a transposed pair is
+   obvious before it is submitted, and — six digits, six boxes — each one its
+   own slot rather than a single field holding all of them at once. */
+.otp-row { display: flex; gap: 10px; justify-content: center; }
+/* `.wiz-form .fld input[type="text"]` (0,3,1) sets width:100% on every text
+   input in the wizard, and a plain `.otp-box` class (0,2,0) loses that fight
+   — six boxes each computing to 100% width, which is the same trap the
+   icon-field comment above documents. `.wiz-form .fld .otp-row .otp-box`
+   (0,4,0) out-specifies it instead of trying to win on `!important`. */
+.wiz-form .fld .otp-row .otp-box {
+  flex: none;
+  width: 46px;
+  height: 56px;
   font-family: var(--score), 'Courier New', monospace;
-  font-size: 28px !important;
+  font-size: 24px !important;
   font-weight: 800;
-  letter-spacing: .38em;
   text-align: center;
   font-variant-numeric: tabular-nums;
-  max-width: 232px;
-  margin: 0 auto;
-  display: block;
-  padding: 15px 14px 15px 20px !important;   /* the extra left padding recentres the glyphs against their own trailing letter-spacing */
+  padding: 0 !important;
   background: rgba(45,122,58,.04);
   border-width: 1.5px !important;
+  border-radius: 10px;
 }
-.code-input:focus { background: #fff; }
-.code-input::placeholder { letter-spacing: .38em; opacity: .3; font-weight: 700; }
+.wiz-form .fld .otp-row .otp-box:focus { background: #fff; border-color: var(--lime); box-shadow: 0 0 0 3px rgba(200,241,53,.22); }
 
 .verify-sent p { margin: 0 0 16px; font-size: 14.5px; line-height: 1.6; color: var(--muted); }
 .verify-sent b { color: var(--ink); }
@@ -8304,7 +8409,7 @@ a:hover > .gt-ic-tile,
    glyph tiles as everything else, the rows become scannable and the panel
    stops looking like a context menu from another product. */
 .an-menu-panel {
-  min-width: 296px; padding: 8px;
+  min-width: 330px; padding: 8px;
   border-radius: 16px;
   background: linear-gradient(165deg, #14392655, var(--gt-deep-2));
   border: 1px solid rgba(200,241,53,.16);
@@ -8472,6 +8577,9 @@ a:hover > .gt-ic-tile,
 .tone-violet { --tone-a:#6B4EA8; --tone-b:#4A3579; --tone-shadow:rgba(107,78,168,.45); }
 .tone-pink   { --tone-a:#B84A72; --tone-b:#8A3252; --tone-shadow:rgba(184,74,114,.45); }
 .tone-slate  { --tone-a:#4A5A63; --tone-b:#313E45; --tone-shadow:rgba(74,90,99,.45); }
+.tone-amber  { --tone-a:#C2782B; --tone-b:#8F551A; --tone-shadow:rgba(194,120,43,.45); }
+.tone-navy   { --tone-a:#3B5480; --tone-b:#27385A; --tone-shadow:rgba(59,84,128,.45); }
+.tone-sky    { --tone-a:#2E7FA8; --tone-b:#1D5A7A; --tone-shadow:rgba(46,127,168,.45); }
 
 /* The Manage menu rows get the same treatment: solid glyph on lime, which is
    the one place the brand colour belongs at this size. */
@@ -10312,3 +10420,196 @@ body.fxh-open { overflow: hidden; }
 /* The clubs are not your pick, so they do not carry the picked-team emphasis
    the rest of the page uses — that colouring means "this is the side I chose". */
 .gt-fixwrap.no-tip .fxc-team { opacity: .82; }
+
+/* ==========================================================================
+   ============ the create-a-group sheet ===================================
+   ========================================================================== */
+
+/* Replaces the permanent form that used to sit under the group list. It asked
+   for a name, a "kind" and a free-text description as three separate
+   optional-looking fields, which is three decisions ahead of the only one that
+   matters. This asks that one: which team is this — pick the kind your
+   organisation actually uses, or name something the list has never heard of. */
+.gmodal { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 20px; }
+.gmodal[hidden] { display: none; }
+.gmodal .gm-backdrop { position: absolute; inset: 0; background: rgba(6,20,14,.7); backdrop-filter: blur(3px); }
+.gmodal .gm-panel {
+  position: relative; width: min(620px, 100%); max-height: min(86vh, 760px);
+  display: flex; flex-direction: column;
+  background: #F6F4EA; color: var(--ink);
+  border-radius: 20px; overflow: hidden;
+  box-shadow: 0 50px 100px -30px rgba(0,0,0,.75);
+}
+.gmodal .gm-panel > form { display: flex; flex-direction: column; min-height: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .gmodal .gm-panel { animation: gm-rise .26s var(--ease) both; }
+}
+@keyframes gm-rise { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+
+.gmodal .gm-head {
+  display: flex; align-items: flex-start; gap: 16px;
+  padding: 24px 26px 16px; border-bottom: 1px solid rgba(15,46,34,.09);
+}
+.gmodal .gm-head h2 { font-family: var(--display); font-size: 23px; color: var(--ink); margin: 0; letter-spacing: -.01em; }
+.gmodal .gm-head p { margin: 5px 0 0; font-size: 13.5px; color: #566356; }
+.gmodal .gm-x {
+  margin-left: auto; flex: none; width: 34px; height: 34px; border-radius: 10px;
+  display: grid; place-items: center; cursor: pointer;
+  background: rgba(15,46,34,.06); border: 0; color: var(--ink);
+}
+.gmodal .gm-x:hover { background: rgba(15,46,34,.12); }
+.gmodal .gm-x svg { width: 16px; height: 16px; }
+
+.gmodal .gm-body { padding: 20px 26px 4px; overflow-y: auto; min-height: 0; }
+.gmodal .gm-label {
+  font-size: 11px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase;
+  color: #566356; margin-bottom: 11px;
+}
+.gmodal .gm-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.gmodal .gm-chip {
+  padding: 9px 15px; border-radius: 100px; cursor: pointer;
+  background: #fff; border: 1.5px solid rgba(15,46,34,.14);
+  font-family: var(--body); font-size: 13.5px; font-weight: 600; color: var(--ink);
+  transition: border-color .14s var(--ease), background .14s var(--ease), color .14s var(--ease);
+}
+.gmodal .gm-chip:hover { border-color: var(--forest); color: var(--forest); }
+.gmodal .gm-chip.on {
+  background: var(--lime); border-color: var(--lime); color: var(--deep); font-weight: 800;
+}
+.gmodal .gm-or {
+  display: flex; align-items: center; gap: 12px; margin: 20px 0 16px;
+  font-size: 12px; color: #566356;
+}
+.gmodal .gm-or::before, .gmodal .gm-or::after {
+  content: ""; flex: 1; height: 1px; background: rgba(15,46,34,.12);
+}
+.gmodal .gm-body .fld input[type="text"] {
+  width: 100%; padding: 13px 15px; font-size: 15px; border-radius: 11px;
+  background: #fff; border: 1.5px solid rgba(15,46,34,.15); color: var(--ink);
+  font-family: var(--body);
+}
+.gmodal .gm-body .fld input[type="text"]:focus {
+  outline: none; border-color: var(--lime); box-shadow: 0 0 0 3px rgba(200,241,53,.25);
+}
+
+.gmodal .gm-foot {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 18px 26px 22px; margin-top: auto;
+  border-top: 1px solid rgba(15,46,34,.09); background: rgba(15,46,34,.02);
+}
+@media (max-width: 560px) {
+  .gmodal .gm-foot { flex-direction: column-reverse; }
+  .gmodal .gm-foot .abtn { width: 100%; justify-content: center; }
+}
+
+/* The sheet's panel is CREAM while the page it sits on is .page-deep, so the
+   page-level .abtn-ghost — cream text, pale border, meant for the dark sheet —
+   landed cream-on-cream at 1.16:1 and the Cancel button was invisible. Same
+   trap as .room-bar and the group card's meta line: the page being dark says
+   nothing about the surface a control is drawn on. */
+.gmodal .gm-foot .abtn-ghost,
+.sheet-page .gmodal .gm-foot .abtn-ghost {
+  background: #fff;
+  border-color: rgba(15,46,34,.18);
+  color: var(--ink);
+}
+.gmodal .gm-foot .abtn-ghost:hover,
+.sheet-page .gmodal .gm-foot .abtn-ghost:hover {
+  border-color: var(--forest); color: var(--forest); background: #fff;
+}
+
+/* ==========================================================================
+   ============ nav: brand to the edge, org name legible ===================
+   ========================================================================== */
+
+/* The nav row stays centred on the same max-width as the page content, so the
+   brand lines up with the content beneath it rather than sitting out on the
+   window edge. (A full-bleed version was tried and pulled: it put the brand
+   and the account controls in different optical columns to everything else on
+   the page.) Only the type sizing below is kept from that attempt. */
+
+/* The organisation is the thing this control exists to name — and at 14px,
+   sharing a row with eight nav links, it read as a caption rather than as
+   where you are. */
+.an-ctx-btn { font-size: 15px; }
+.an-ctx-org { font-weight: 700; font-size: 15.5px; opacity: .95; }
+.an-ctx-group { font-size: 15.5px; }
+.an-ctx-sep { font-size: 15px; }
+
+/* ==========================================================================
+   ============ room switcher — one control, both surfaces =================
+   ========================================================================== */
+
+/* Replaces .room-bar and .room-strip (and the nav dropdown's group list) with
+   a single segmented control. The old pattern hid the rooms behind a dropdown
+   or listed them as "IT →" buttons that never marked the one you were in;
+   a segmented control states position and options in the same glance.
+
+   Two skins, chosen by the caller, never inferred: .on-light for cream cards,
+   .on-dark for the sheet. */
+.room-switch { margin-bottom: 20px; }
+
+.room-switch .rw-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.room-switch .rw-eyebrow {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
+  flex: none;
+}
+.room-switch .rw-note { margin: 0; font-size: 13px; line-height: 1.45; }
+.room-switch .rw-note b { font-weight: 800; }
+
+/* The track. Scrolls rather than wraps: an org with a dozen groups should push
+   sideways, not grow a second row that shifts the page every time you switch. */
+.room-switch .rw-seg {
+  display: flex; align-items: stretch; gap: 4px;
+  padding: 5px; border-radius: 15px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.room-switch .rw-seg::-webkit-scrollbar { display: none; }
+.room-switch .rw-seg form { margin: 0; display: flex; }
+
+.room-switch .rw-opt {
+  display: flex; flex-direction: column; gap: 1px; align-items: flex-start;
+  padding: 9px 16px; border-radius: 11px; cursor: pointer;
+  border: 0; background: transparent; font-family: var(--body);
+  white-space: nowrap;
+  transition: background .16s var(--ease), color .16s var(--ease);
+}
+.room-switch .rw-opt b { font-size: 14px; font-weight: 700; line-height: 1.2; }
+.room-switch .rw-opt i {
+  font-style: normal; font-size: 10.5px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; opacity: .62;
+}
+
+.room-switch .rw-more {
+  display: inline-flex; align-items: center; gap: 5px; align-self: center;
+  margin-left: auto; padding: 0 14px; white-space: nowrap;
+  font-size: 12.5px; font-weight: 800; text-decoration: none;
+}
+.room-switch .rw-more svg { width: 13px; height: 13px; }
+.room-switch .rw-more:hover { text-decoration: underline; }
+
+/* ---------- on a cream card (dashboard) ---------- */
+.room-switch.on-light .rw-eyebrow { color: #566356; }
+.room-switch.on-light .rw-note { color: #566356; }
+.room-switch.on-light .rw-note b { color: var(--ink); }
+.room-switch.on-light .rw-seg { background: rgba(45,122,58,.08); border: 1px solid rgba(15,46,34,.1); }
+.room-switch.on-light .rw-opt { color: var(--ink); }
+.room-switch.on-light .rw-opt:hover { background: rgba(255,255,255,.7); }
+.room-switch.on-light .rw-opt.on { background: var(--lime); color: var(--deep); box-shadow: 0 4px 12px -4px rgba(140,180,30,.6); }
+.room-switch.on-light .rw-opt.on i { opacity: .72; }
+.room-switch.on-light .rw-more { color: var(--forest); }
+
+/* ---------- on the dark sheet (tips, leaderboard, ladder) ---------- */
+.room-switch.on-dark .rw-eyebrow { color: rgba(232,228,213,.55); }
+.room-switch.on-dark .rw-note { color: rgba(232,228,213,.72); }
+.room-switch.on-dark .rw-note b { color: #fff; }
+.room-switch.on-dark .rw-seg { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
+.room-switch.on-dark .rw-opt { color: var(--cream); }
+.room-switch.on-dark .rw-opt:hover { background: rgba(255,255,255,.09); }
+.room-switch.on-dark .rw-opt.on { background: var(--lime); color: var(--deep); box-shadow: 0 4px 14px -4px rgba(200,241,53,.5); }
+.room-switch.on-dark .rw-opt.on i { opacity: .72; }
+.room-switch.on-dark .rw-more { color: var(--lime); }
+
+@media (max-width: 640px) {
+  .room-switch .rw-more { margin-left: 0; }
+}

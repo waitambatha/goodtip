@@ -1,0 +1,68 @@
+{% comment %}
+The room switcher — one control, every page, both surfaces.
+
+A group has its own ladder, its own wall and its own tips, and they are
+genuinely different data: a tip made in IT scores on IT's ladder and never
+appears on the organisation's. Three separate controls used to gesture at
+that — a nav dropdown that hid the rooms behind a click, a row of "IT →"
+buttons that never said which room you were IN, and a sentence on the
+dashboard card. Three mechanisms for one idea, and none of them answered
+"where am I, and what else is there" in a single glance.
+
+A segmented control answers both at once: every room on screen, the current
+one filled. Nothing to open, nothing to read twice.
+
+Usage — noun names what the page shows, surface says what it is drawn on:
+    {% include "partials/room_switch.html" with noun="ladder" surface="dark" %}
+    {% include "partials/room_switch.html" with noun="round" surface="light" %}
+
+`surface` is explicit rather than inherited on purpose. Every invisible-text
+bug in this codebase came from one set of colours being asked to work on both
+a cream card and the dark sheet; making the caller state which one it is means
+the mistake has to be typed rather than merely forgotten.
+{% endcomment %}
+{% if current_org.groups_enabled %}
+<div class="room-switch {% if surface == 'light' %}on-light{% else %}on-dark{% endif %}{% if current_group %} in-group{% endif %}">
+
+  <div class="rw-top">
+    <span class="rw-eyebrow">Tipping in</span>
+    <p class="rw-note">
+      {% if current_group %}
+        This {{ noun }} is <b>{{ current_group.name }}</b>'s — its members, and only the tips made here.
+      {% else %}
+        This {{ noun }} is all of <b>{{ current_org.name }}</b>. Tips made inside a group stay on that group's.
+      {% endif %}
+    </p>
+  </div>
+
+  <div class="rw-seg" role="group" aria-label="Choose which room to tip in">
+    {% comment %} The organisation is always the first segment — it is the room you are
+       in until you choose otherwise, so it holds the leftmost position rather
+       than being an escape hatch tacked on the end. {% endcomment %}
+    <form method="post" action="{% url 'orgs:leave_group_context' %}" data-busy="Switching">
+      {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button type="submit" class="rw-opt{% if not current_group %} on{% endif %}"
+              {% if not current_group %}aria-current="true"{% endif %}>
+        <b>{{ current_org.name }}</b>
+        <i>Everyone</i>
+      </button>
+    </form>
+
+    {% for g in current_org_groups %}
+    <form method="post" action="{% url 'orgs:switch_group' current_org.id g.id %}" data-busy="Switching">
+      {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button type="submit" class="rw-opt{% if current_group.id == g.id %} on{% endif %}"
+              {% if current_group.id == g.id %}aria-current="true"{% endif %}>
+        <b>{{ g.name }}</b>
+        <i>{% if g.kind_label %}{{ g.kind_label }}{% else %}Group{% endif %}</i>
+      </button>
+    </form>
+    {% endfor %}
+
+    <a href="{% url 'orgs:groups' current_org.id %}" class="rw-more">
+      All groups
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+    </a>
+  </div>
+</div>
+{% endif %}

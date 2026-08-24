@@ -29,14 +29,17 @@ a half-built thing in the list.
   {% if org.groups_enabled %}
   <div class="dh-side">
     {% comment %}
-    An anchor to the form further down, not a modal. The old two-step
-    department modal needed its own script to hold state the DOM already
-    knew; the form is short enough that the page can just hold it.
+    Opens the picker rather than jumping to a form further down the page. The
+    form that used to live down there asked for a name, a kind and a
+    description as three separate optional-looking fields, which is three
+    decisions before you have made the one that matters — and it sat below the
+    list permanently, so the page ended on a form whether or not anyone wanted
+    one. The sheet asks the real question instead: which team is this?
     {% endcomment %}
-    <a href="#new-group" class="abtn abtn-primary abtn-lg dh-cta">
+    <button type="button" class="abtn abtn-primary abtn-lg dh-cta" data-group-open>
       <svg class="cic" aria-hidden="true" viewBox="0 0 24 24"><path d="M11 5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5Z"/></svg>
       Create group
-    </a>
+    </button>
   </div>
   {% endif %}
 </div>
@@ -118,7 +121,12 @@ selling a switch for the sake of it.
       <span class="dc-ic tone-{{ row.tone }}"><svg><use href="#{{ row.icon }}"/></svg></span>
       <div style="min-width:0;">
         <div class="card-h" style="font-size:17px;">{{ row.group.name }}</div>
-        <div class="app-sub" style="font-size:12.5px;">
+        {% comment %} .dc-meta, not .app-sub. This page is `page-deep sheet-page`, where
+           .app-sub is coloured cream for the dark sheet behind — but this line sits
+           INSIDE a cream card, so it was cream-on-cream at a contrast ratio of
+           1.16:1, i.e. invisible. .dc-meta is the card's own muted colour and
+           already existed for exactly this. {% endcomment %}
+        <div class="dc-meta">
           {% if row.group.kind_label %}{{ row.group.kind_label }} &middot; {% endif %}
           {{ row.members }} member{{ row.members|pluralize }}
         </div>
@@ -186,37 +194,54 @@ selling a switch for the sake of it.
 </div>
 
 {% comment %}
-The create form. Anyone in the organisation can fill it in; whether it goes
-live or goes to an admin is decided in create_group() by who is asking, not
-here, so the form does not have to know and cannot get it wrong.
+The create sheet. One question — which team is this — answered either by
+picking from the kinds this organisation's type actually uses, or by naming
+something the list has never heard of. Both paths post the same three fields
+the view already expects (name, kind, label), so nothing behind this changed.
 {% endcomment %}
-<div class="card pad-lg" id="new-group" style="margin-top:26px;max-width:640px;scroll-margin-top:90px;">
-  <div class="card-h" style="font-size:18px;">Start a group</div>
-  <p class="card-lead" style="margin:6px 0 16px;">
-    {% if is_admin %}It goes live straight away.
-    {% else %}An admin of {{ org.name }} approves it before it appears for everyone.{% endif %}
-  </p>
-  <form method="post" action="{% url 'orgs:groups' org.id %}" data-busy="Creating">
-    {% csrf_token %}
-    <input type="hidden" name="action" value="create">
-    <div class="fld">
-      <label for="g_name">Name</label>
-      <input type="text" name="name" id="g_name" required maxlength="80" placeholder="e.g. Marketing">
-    </div>
-    <div class="fld">
-      <label for="g_kind">Kind <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
-      <select name="kind" id="g_kind">
-        <option value="">Pick one, or leave it</option>
-        {% for k in kind_choices %}<option value="{{ k.pk }}">{{ k.name }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="fld">
-      <label for="g_label">Or describe it yourself <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
-      <input type="text" name="label" id="g_label" maxlength="80" placeholder="e.g. The Cave">
-      <div class="hint">The list above is a shortcut, not a rule.</div>
-    </div>
-    <button type="submit" class="abtn abtn-primary">Create group</button>
-  </form>
+<div class="gmodal" id="groupModal" hidden>
+  <div class="gm-backdrop" data-group-close></div>
+  <div class="gm-panel" role="dialog" aria-modal="true" aria-labelledby="gmTitle">
+    <form method="post" action="{% url 'orgs:groups' org.id %}" data-busy="Creating">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create">
+      <input type="hidden" name="kind" id="gmKind" value="">
+
+      <div class="gm-head">
+        <div>
+          <h2 id="gmTitle">Start a group</h2>
+          <p>{% if is_admin %}It goes live straight away.{% else %}An admin of {{ org.name }} approves it before it appears for everyone.{% endif %}</p>
+        </div>
+        <button type="button" class="gm-x" data-group-close aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="gm-body gt-scroll">
+        {% if kind_choices %}
+        <div class="gm-label">Pick a team</div>
+        <div class="gm-grid">
+          {% for k in kind_choices %}
+          <button type="button" class="gm-chip" data-kind="{{ k.pk }}" data-name="{{ k.name }}">{{ k.name }}</button>
+          {% endfor %}
+        </div>
+        <div class="gm-or"><span>or name your own</span></div>
+        {% endif %}
+
+        <div class="fld">
+          <label for="gmName">Group name</label>
+          <input type="text" name="name" id="gmName" required maxlength="80"
+                 placeholder="e.g. The Cave, Melbourne Office, Night Shift" autocomplete="off">
+          <div class="hint">Pick one above to fill this in, or type whatever {{ org.name }} actually calls the team.</div>
+        </div>
+      </div>
+
+      <div class="gm-foot">
+        <button type="button" class="abtn abtn-ghost" data-group-close>Cancel</button>
+        <button type="submit" class="abtn abtn-primary" id="gmSubmit">Create group &rarr;</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 {% if is_admin %}
@@ -229,4 +254,71 @@ here, so the form does not have to know and cannot get it wrong.
 {% endif %}
 
 {% endif %}
+{% endblock %}
+
+{% block app_js %}
+  /* The create-a-group sheet. Picking a kind fills the name and remembers the
+     kind id; typing your own name clears the kind, because a group called
+     "The Cave" is not a Marketing department and posting one as the other
+     would put a label on it nobody chose. Both paths post the same fields the
+     view already handled, so nothing server-side changed. */
+  (function () {
+    var modal = document.getElementById('groupModal');
+    if (!modal) return;
+    var kind = document.getElementById('gmKind');
+    var name = document.getElementById('gmName');
+    var chips = [].slice.call(modal.querySelectorAll('.gm-chip'));
+    var lastFocus = null;
+
+    function open() {
+      lastFocus = document.activeElement;
+      modal.hidden = false;
+      document.body.style.overflow = 'hidden';
+      (chips[0] || name).focus();
+    }
+    function close() {
+      modal.hidden = true;
+      document.body.style.overflow = '';
+      if (lastFocus) lastFocus.focus();
+    }
+    function clearChips() {
+      chips.forEach(function (c) { c.classList.remove('on'); });
+    }
+
+    document.querySelectorAll('[data-group-open]').forEach(function (b) {
+      b.addEventListener('click', open);
+    });
+    modal.querySelectorAll('[data-group-close]').forEach(function (b) {
+      b.addEventListener('click', close);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !modal.hidden) close();
+    });
+
+    chips.forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        var already = chip.classList.contains('on');
+        clearChips();
+        if (already) { kind.value = ''; return; }
+        chip.classList.add('on');
+        kind.value = chip.getAttribute('data-kind');
+        /* Only overwrite a name the person has not written themselves. */
+        if (!name.value.trim() || name.dataset.fromChip === '1') {
+          name.value = chip.getAttribute('data-name');
+          name.dataset.fromChip = '1';
+        }
+      });
+    });
+
+    name.addEventListener('input', function () {
+      if (name.dataset.fromChip === '1' && name.value !== '') {
+        /* They edited the filled-in name — it is theirs now, not the chip's. */
+        var match = chips.some(function (c) { return c.getAttribute('data-name') === name.value; });
+        if (!match) { name.dataset.fromChip = ''; clearChips(); kind.value = ''; }
+      } else if (name.value.trim()) {
+        clearChips();
+        kind.value = '';
+      }
+    });
+  })();
 {% endblock %}

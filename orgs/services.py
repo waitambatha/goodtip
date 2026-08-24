@@ -1,4 +1,5 @@
 import logging
+import sys
 
 from django.conf import settings
 from django.core.mail import send_mail
@@ -975,25 +976,71 @@ def resend_work_email_code(row):
     return row
 
 
-def _send_work_email_code(row, code: str) -> None:
-    from django.template.loader import render_to_string
+def _echo_work_code_to_console(row, code: str) -> None:
+    """Print a work-email code to the terminal running the dev server.
 
-    ctx = {"code": code, "domain": row.domain, "email": row.email,
-           "minutes": int(row.TTL.total_seconds() // 60)}
-    try:
-        send_mail(
-            subject=f"{code} is your GoodTip verification code",
-            message=render_to_string("emails/work_email_code.txt", ctx),
-            html_message=render_to_string("emails/work_email_code.html", ctx),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[row.email],
-            fail_silently=False,
-        )
-    except Exception:
-        # The row is already saved. Logging rather than raising means a
-        # provider hiccup does not destroy a code the user may yet receive,
-        # and Resend is one click away on the screen they are already on.
-        logger.exception("work email code send failed for %s", row.email)
+    The sign-in path has done this for as long as SHOW_OTP_IN_CONSOLE has
+    existed (accounts.notifications._echo_code_to_console), and this one
+    never did — so with real delivery unavailable, a sign-in code could
+    still be read off the terminal while a work-domain code simply went
+    nowhere and looked like the wizard was broken. The address here is the
+    organisation's, not the user's, which is exactly the case where nobody
+    developing locally can open the inbox to check.
+
+    Same two guards as the sign-in echo, both of which must hold: DEBUG, and
+    SHOW_OTP_IN_CONSOLE. A live server has neither, so a real code can never
+    reach a log.
+    """
+    if not settings.DEBUG or not getattr(settings, "SHOW_OTP_IN_CONSOLE", False):
+        return
+    minutes = int(row.TTL.total_seconds() // 60)
+    rule = "=" * 54
+    sys.stdout.write(
+        f"\n{rule}\n"
+        f"  WORK EMAIL CODE: {code}   ({row.domain}, {minutes} min)\n"
+        f"  for: {row.email}\n"
+        f"{rule}\n\n"
+    )
+    sys.stdout.flush()
+
+
+def _send_work_email_code(row, code: str) -> None:
+    """Send the work-domain code the same way the sign-in code is sent.
+
+    This used to call send_mail() with render_to_string() directly, which
+    looked equivalent and was not: emails/_base.html — the base BOTH of these
+    templates extend — paints its hero from {{ scene_url }}, and scene_url is
+    injected by goodtip.mail.build(), not by the template. Rendering around
+    build() left the variable undefined, so every work-email code went out
+    with background="", background-image:url('') and <v:fill src="">, while
+    the sign-in code (which does go through build()) rendered its artwork
+    properly. Three empty image references is a spam-filter signal, which is
+    a very good way for one of these to reach an inbox while the other is
+    quietly filed elsewhere.
+
+    Going through build()/send_bulk() also picks up the email_configured()
+    guard, so a missing backend is logged rather than raised mid-request.
+    """
+    from goodtip.mail import build, send_bulk
+
+    _echo_work_code_to_console(row, code)
+    msg = build(
+        "work_email_code",
+        subject=f"{code} is your GoodTip verification code",
+        to=row.email,
+        context={
+            "code": code,
+            "domain": row.domain,
+            "email": row.email,
+            "minutes": int(row.TTL.total_seconds() // 60),
+        },
+    )
+    # send_bulk swallows and logs its own failures. That is deliberate here:
+    # the row is already saved, so a provider hiccup must not destroy a code
+    # the user may yet receive, and Resend is one click away on the screen
+    # they are already on.
+    if not send_bulk([msg]):
+        logger.warning("work email code not sent for %s", row.email)
 
 
 def active_work_verification(user):

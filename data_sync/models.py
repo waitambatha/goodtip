@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db import models
 from django.utils import timezone
 
@@ -153,3 +155,50 @@ class SyncSchedule(models.Model):
 
     def __str__(self):
         return f"{self.kind} due {self.next_run_at:%Y-%m-%d %H:%M}"
+
+
+class FixtureCache(models.Model):
+    """One feed page of fixtures, kept just long enough to be handed to a
+    brand-new organisation without going back to the network.
+
+    Rounds carry an ``org`` FK, so every organisation holds its own copy of the
+    draw and a new one has none until a sync writes them. The scrape is the
+    slow half of that — the writes are milliseconds — and it is entirely
+    org-independent: the feeds are asked for a ``(series, season, round)``, and
+    ``org`` is only used to know which year to ask for and which rows to write
+    under. So the same page fetched once can serve every organisation that
+    wants it.
+
+    That is what this holds. The wizard warms it as soon as the competitions
+    are chosen at step four, while the person is still filling in the charity
+    and review steps; by the time they press Create, the fixtures are already
+    here and the org's rounds are written straight from this table with no
+    network in the request at all.
+
+    Deliberately NOT a general-purpose cache. Entries are a short-lived copy of
+    something the feed remains the truth for — kickoff times and venues do get
+    moved — so anything past ``FRESH_FOR`` is ignored and re-fetched, and the
+    scheduled sync keeps the real rounds true regardless of what is in here.
+    """
+
+    # Long enough to cover someone finishing the wizard at a human pace,
+    # short enough that a moved kickoff cannot be served stale for long.
+    FRESH_FOR = timedelta(minutes=30)
+
+    source = models.CharField(max_length=20)
+    series_key = models.CharField(max_length=60)
+    season_year = models.PositiveIntegerField()
+    round_number = models.PositiveIntegerField()
+    payload = models.JSONField()
+    fetched_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("source", "series_key", "season_year", "round_number")
+        indexes = [models.Index(fields=["fetched_at"])]
+
+    def __str__(self):
+        return f"{self.source} {self.series_key} {self.season_year} r{self.round_number}"
+
+    @property
+    def is_fresh(self) -> bool:
+        return timezone.now() - self.fetched_at < self.FRESH_FOR

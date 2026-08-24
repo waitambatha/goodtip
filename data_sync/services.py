@@ -11,6 +11,7 @@ from catalog.models import Competition, Series
 from orgs.models import Organisation
 from tipping.models import Match, Round, Team
 from tipping.services import record_match_result
+from .prewarm import fixture_cache_get, fixture_cache_put
 
 
 logger = logging.getLogger(__name__)
@@ -339,16 +340,29 @@ class _ScrapeSyncService:
         series = Series.objects.filter(name=series_name).first()
         if series is None:
             return None, []
+        key = self._scraper_key(series_name)
+
+        # This call is the org-independent half of a fixtures sync, and the
+        # only slow one — everything after it is local writes. A page already
+        # fetched for one organisation is the same page every other one wants,
+        # so it is served from FixtureCache when it is still fresh. That is
+        # what lets a brand-new org be given its draw with no network in the
+        # request: the wizard warms this as soon as the competitions are
+        # picked (see prewarm_fixtures).
+        cached = fixture_cache_get(self.SOURCE, key, year, round_number)
+        if cached is not None:
+            return series, cached
+
         try:
             rows = self._scraper.fixtures(
-                series=self._scraper_key(series_name), season=year,
-                round_number=round_number,
+                series=key, season=year, round_number=round_number,
             )
         except self._error as e:
             # One series failing — Origin has no round 24 — must not abort the
             # others, which are the ones anybody is tipping.
             logger.info("%s %s round %s: %s", self.SOURCE, series_name, round_number, e)
             return series, []
+        fixture_cache_put(self.SOURCE, key, year, round_number, rows)
         return series, rows
 
     def _round_for(self, org: Organisation, series: Series, round_number: int) -> Round | None:
@@ -379,6 +393,41 @@ class _ScrapeSyncService:
         if external_id and external_id in by_ext:
             return by_ext[external_id]
         return by_pair.get((home.id, away.id))
+
+    # ---- warming, ahead of any organisation -----------------------------
+
+    def discover_rounds_for_season(self, competition: str, year: int) -> list[int]:
+        """Every round this feed publishes for a season, with no org involved.
+
+        The org-taking ``discover_rounds`` below reads nothing from the
+        organisation except ``org.season.year``, so this is the same question
+        asked with the year passed in directly — which is what makes it usable
+        before the organisation exists (see data_sync.prewarm).
+        """
+        self._check(competition)
+        found: set[int] = set()
+        for name in self.SERIES:
+            try:
+                found.update(self._scraper.available_rounds(
+                    series=self._scraper_key(name), season=year,
+                ))
+            except self._error as e:
+                logger.info("%s available_rounds %s %s: %s", self.SOURCE, name, year, e)
+        return sorted(found)
+
+    def warm_round(self, competition: str, round_number: int, year: int) -> int:
+        """Pull one round's fixtures into the cache without writing any rounds.
+
+        Goes through ``_series_rows``, so it populates FixtureCache by the same
+        path a real sync reads it back from — there is no second fetching code
+        path that could drift from the one that matters.
+        """
+        self._check(competition)
+        seen = 0
+        for name in self.SERIES:
+            _series, rows = self._series_rows(name, round_number, year)
+            seen += len(rows)
+        return seen
 
     # ---- discovery ------------------------------------------------------
 

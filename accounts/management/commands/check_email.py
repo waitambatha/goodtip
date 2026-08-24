@@ -67,15 +67,26 @@ class Command(BaseCommand):
 
         used = self._sent_this_month(token) if "Postmark" in backend and token else None
         if used is not None:
-            self._row("Sent this month", f"{used} (free plan allows {FREE_PLAN_MONTHLY})")
+            self._row("Sent this month", str(used))
         self.stdout.write("")
 
+        # Being over the free-plan figure is a REASON TO CHECK, not a verdict.
+        # This used to assert outright that "nothing is being sent" past 100,
+        # which is only true on the free plan — an upgraded account sails past
+        # it. On 2026-08-24, with 192 sent, that wording sent a real
+        # investigation off after a billing problem that did not exist while
+        # the actual codes were being delivered normally (Postmark logged
+        # "Delivered … 250 OK" for them). The count alone cannot tell the two
+        # cases apart; only Activity can, which is what the post-send lookup
+        # below is for.
         if used is not None and used >= FREE_PLAN_MONTHLY:
-            self.stdout.write(self.style.ERROR(
-                f"The month's {FREE_PLAN_MONTHLY}-email allowance is gone. Postmark "
-                "still answers OK, but nothing is being sent and nothing will reach "
-                "an inbox until the billing cycle resets or the account moves to a "
-                "paid plan (account.postmarkapp.com → Billing)."
+            self.stdout.write(self.style.WARNING(
+                f"{used} sent this month, past the {FREE_PLAN_MONTHLY} included on "
+                "Postmark's FREE plan. If this account is still on that plan, sends "
+                "beyond the allowance are accepted with a MessageID and silently "
+                "dropped — check Billing at account.postmarkapp.com. If it is on a "
+                "paid plan this figure is fine and delivery is unaffected; the "
+                "delivery check below is what actually settles it."
             ))
             self.stdout.write("")
 

@@ -12,6 +12,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
 {% endblock %}
 
 {% block app_content %}
+{% include "partials/room_switch.html" with noun="ladder" surface="dark" %}
 <div class="gt-head">
   <div>
     <div class="gh-eyebrow">{{ org.name }} &middot; {{ org.season }}</div>

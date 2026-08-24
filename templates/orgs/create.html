@@ -16,9 +16,13 @@ stacking context, so a strip rendered inside it paints over the sheet.
    at the foot of the form. {% endcomment %}
 <div class="wiz-top">
   <div>
-    <div class="app-eyebrow">{% if parent_org %}New organisation under {{ parent_org.name }}{% else %}New organisation{% endif %}</div>
-    <h1 class="app-h1">{% if parent_org %}Create an organisation{% else %}Create an organisation{% endif %}</h1>
-    <p class="app-sub">Five short steps. We save as you go, so you can finish it later.</p>
+    {% comment %} Eyebrow and standfirst name the step actually in progress, so the top of
+       the page says what is happening now rather than repeating the page title.
+       Step {{ step }} of {{ last_step }} is here and not only in the rail because
+       the rail shows labels for the current step alone. {% endcomment %}
+    <div class="app-eyebrow">Step {{ step }} of {{ last_step }} &middot; {{ step_intro.eyebrow }}</div>
+    <h1 class="app-h1">Create an <span class="hl-lime">organisation</span></h1>
+    <p class="app-sub">{{ step_intro.sub }} We save as you go, so you can finish it later.</p>
   </div>
   {% comment %} Always present, but it does not claim a save that has not happened: an
      untouched wizard has nothing saved, and a chip reading "Draft saved" over
@@ -259,15 +263,25 @@ missed click and got submitted twice.
         <p>We sent a six-digit code to <b>{{ verification.email }}</b>. It expires 15 minutes after it was sent.</p>
       </div>
       <div class="fld">
-        <label for="id_code" style="text-align:center;display:block;">Enter the code</label>
+        <label for="otp-1" style="text-align:center;display:block;">Enter the code</label>
         {% comment %}
-        No .fld-ic/lock-icon prefix here — that wrapper puts its icon at the
-        field's left edge, which only works with a full-width input. This one
-        is now a small centred slot (see .code-input), so a prefix icon would
-        sit far off to the side of it, pointing at nothing.
+        Six single-digit boxes read back off a phone or another inbox better
+        than one six-character field: a transposed pair is obvious at a
+        glance, and each box's own focus ring shows exactly where the next
+        digit lands. They all feed one hidden `code` field, so the server
+        side of this (request.POST.get("code")) doesn't change at all —
+        see the otp-row script in app_js for how the boxes get joined,
+        and how a pasted or autofilled code gets spread across them.
         {% endcomment %}
-        <input type="text" name="code" id="id_code" inputmode="numeric" autocomplete="one-time-code"
-               pattern="[0-9]*" maxlength="6" placeholder="123456" class="code-input" autofocus>
+        <div class="otp-row" id="otpRow">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="otp-box" id="otp-1" autocomplete="one-time-code" autofocus>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="otp-box" id="otp-2">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="otp-box" id="otp-3">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="otp-box" id="otp-4">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="otp-box" id="otp-5">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="otp-box" id="otp-6">
+        </div>
+        <input type="hidden" name="code" id="id_code">
       </div>
       <div class="verify-actions">
         <button type="submit" name="action" value="verify_code" class="abtn abtn-primary"
@@ -638,6 +652,49 @@ missed click and got submitted twice.
         dt.items.add(f);
         input.files = dt.files;
         paint(f);
+      });
+    })();
+
+    /* Six OTP boxes acting as one field. Typing a digit advances focus;
+       backspace on an empty box steps back; a paste or an autofilled code
+       (Chrome/iOS drop the whole code into whichever box has focus) gets
+       split across the remaining boxes from that point on. The hidden
+       #id_code input is what actually posts, kept in sync on every change. */
+    (function(){
+      var row = document.getElementById('otpRow');
+      var hidden = document.getElementById('id_code');
+      if (!row || !hidden) return;
+      var boxes = Array.prototype.slice.call(row.querySelectorAll('.otp-box'));
+
+      function sync(){ hidden.value = boxes.map(function(b){ return b.value; }).join(''); }
+
+      function fill(fromIndex, digits){
+        for (var i = 0; i < digits.length && fromIndex + i < boxes.length; i++) {
+          boxes[fromIndex + i].value = digits[i];
+        }
+        var next = Math.min(fromIndex + digits.length, boxes.length - 1);
+        boxes[next].focus();
+        sync();
+      }
+
+      boxes.forEach(function(box, i){
+        box.addEventListener('input', function(){
+          var digits = box.value.replace(/\D/g, '');
+          if (digits.length > 1) { fill(i, digits); return; }
+          box.value = digits;
+          if (digits && i < boxes.length - 1) boxes[i + 1].focus();
+          sync();
+        });
+        box.addEventListener('keydown', function(e){
+          if (e.key === 'Backspace' && !box.value && i > 0) boxes[i - 1].focus();
+        });
+        box.addEventListener('paste', function(e){
+          var text = (e.clipboardData || window.clipboardData).getData('text');
+          var digits = text.replace(/\D/g, '');
+          if (!digits) return;
+          e.preventDefault();
+          fill(i, digits);
+        });
       });
     })();
 
