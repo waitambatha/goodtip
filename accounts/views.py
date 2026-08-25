@@ -401,13 +401,22 @@ UPCOMING_LIMIT = 40
 
 @login_required
 def dashboard_view(request):
-    from orgs.context import current_group
+    from orgs.context import current_group, current_org, set_current_org
 
     memberships = (
         OrgMember.objects.filter(user=request.user)
         .select_related("org")
         .order_by("org__name")
     )
+    # Two passes: an account can belong to several organisations (several
+    # businesses run through GoodTip, each with its own staff), and only ONE
+    # card — the selected one — is ever rendered in full. A single pass used
+    # to run a stats query, a rank query, a charity-vote lookup and (for every
+    # org this member owns) a subscription + donation-summary call for EVERY
+    # membership, on every dashboard load, only to throw away all but one set
+    # of numbers. This first pass builds just enough per org to pick which one
+    # is selected and to drive the org <select> and "locking soon" list — the
+    # full stats are computed once, below, for the selected org only.
     cards = []
     for m in memberships:
         org = m.org
@@ -428,16 +437,87 @@ def dashboard_view(request):
         # The card is about the room this member is standing in, so its total
         # and its rank have to come from the same one.
         card_group = current_group(request, org)
-        stats = user_org_stats(request.user, org, group=card_group)
-        rank = user_rank_in_org(request.user, org, group=card_group)
         tips_done = 0
         tips_total = 0
         if round_in_play:
             tips_total = round_in_play.matches.count()
             tips_done = Tip.objects.filter(
                 user=request.user, match__round=round_in_play, org=org,
-                group=current_group(request, org),
+                group=card_group,
             ).count()
+        cards.append({
+            "org": org,
+            # Which room this card is reporting on. It was already worked out
+            # above to scope the points and the rank, but never reached the
+            # template — so a member tipping inside a group saw a card headed
+            # only by the organisation, with group figures under it and nothing
+            # saying so. The card can now name the room it is talking about.
+            "group": card_group,
+            "groups": (
+                list(org.groups.filter(approval_status=Group.APPROVAL_APPROVED))
+                if org.groups_enabled else []
+            ),
+            "round": round_in_play,
+            "tips_done": tips_done,
+            "tips_total": tips_total,
+            "is_admin": m.can_manage,
+            "is_owner": m.is_league_owner,
+            "role_labels": m.role_labels,
+            # Kept only to compute the full stats below for whichever card is
+            # selected — never read by the template.
+            "_membership": m,
+        })
+    # The dashboard is built around ONE comp at a time: a dropdown picks it,
+    # its games come forth for tipping. Default to the next comp to lock that
+    # still needs tips — that's the one the user should act on.
+    now = timezone.now()
+    selected = None
+    org_param = request.GET.get("org")
+    if org_param:
+        selected = next((c for c in cards if str(c["org"].id) == org_param), None)
+        # The "Your organisation" picker changes which card is shown here, but
+        # used to leave the session's current-org untouched — so everything
+        # ELSE that reads it (the room switcher on this very card, the nav,
+        # My Tips, the Leaderboard) kept pointing at whichever org the nav
+        # dropdown last set, disagreeing with the card on screen in front of
+        # you. Picking an org here is the same action as picking one from the
+        # nav, so it carries the same effect.
+        if selected is not None and selected["org"].id != getattr(current_org(request), "id", None):
+            set_current_org(request, selected["org"])
+    if selected is None and cards:
+        # No explicit ?org= — default to wherever the nav already says you
+        # are. Without this, a plain visit to /dashboard/ ignored the session
+        # entirely and jumped to whichever org's tipping deadline was
+        # soonest, which could — and did — disagree with the room switcher
+        # and every other page, all of which read the session directly.
+        session_org = current_org(request)
+        if session_org is not None:
+            selected = next((c for c in cards if c["org"].id == session_org.id), None)
+    if selected is None and cards:
+        # First visit ever, or the session named an org this account no
+        # longer has a card for. Land on a round that still has something to
+        # tip. lockout_at is the round's FIRST kickoff, so selecting on it
+        # dropped a round the moment its opening game began — even with six
+        # fixtures still days away — and sent members to a read-only screen
+        # while their week was still live.
+        live = [c for c in cards if c["round"] and c["round"].has_open_matches]
+        needing = [c for c in live if c["tips_done"] < c["tips_total"]]
+        pool = needing or live
+        if pool:
+            selected = min(pool, key=lambda c: c["round"].lockout_at)
+        else:
+            # Nothing left to tip anywhere: fall back to the round in play so
+            # the member sees results rather than an empty screen.
+            selected = cards[0]
+
+    # Full stats — points, rank, charity vote, subscription, donation — computed
+    # once, for the selected card only. See the comment above the first pass.
+    if selected is not None:
+        org = selected["org"]
+        m = selected["_membership"]
+        card_group = selected["group"]
+        stats = user_org_stats(request.user, org, group=card_group)
+        rank = user_rank_in_org(request.user, org, group=card_group)
         charity_vote = org.active_charity_vote
         has_voted = bool(
             charity_vote
@@ -454,57 +534,20 @@ def dashboard_view(request):
             donation = donation_summary(org)
         # §7's local + national totals came off the dashboard — both read $0
         # for every group until money moves. family_totals is NOT called any
-        # more: it walks the whole family tree per org card, and this loop
-        # already runs once per league a member belongs to, so computing two
-        # figures nothing renders was pure cost. billing.donations still has
-        # it for whenever the totals find a home.
-        cards.append({
-            "org": org,
-            # Which room this card is reporting on. It was already worked out
-            # above to scope the points and the rank, but never reached the
-            # template — so a member tipping inside a group saw a card headed
-            # only by the organisation, with group figures under it and nothing
-            # saying so. The card can now name the room it is talking about.
-            "group": card_group,
-            "groups": (
-                list(org.groups.filter(approval_status=Group.APPROVAL_APPROVED))
-                if org.groups_enabled else []
-            ),
-            "round": round_in_play,
-            "tips_done": tips_done,
-            "tips_total": tips_total,
+        # more: it walks the whole family tree per org card, and this only
+        # ever runs once now, so computing two figures nothing renders would
+        # still be pure cost. billing.donations still has it for whenever the
+        # totals find a home.
+        selected.update({
             "points": stats["points"],
             "rank": rank,
-            "is_admin": m.can_manage,
-            "is_owner": m.is_league_owner,
-            "role_labels": m.role_labels,
             "charity_vote": charity_vote,
             "has_voted": has_voted,
             "subscription": subscription,
             "donation": donation,
         })
-    # The dashboard is built around ONE comp at a time: a dropdown picks it,
-    # its games come forth for tipping. Default to the next comp to lock that
-    # still needs tips — that's the one the user should act on.
-    now = timezone.now()
-    selected = None
-    org_param = request.GET.get("org")
-    if org_param:
-        selected = next((c for c in cards if str(c["org"].id) == org_param), None)
-    if selected is None and cards:
-        # Land on a round that still has something to tip. lockout_at is the
-        # round's FIRST kickoff, so selecting on it dropped a round the moment
-        # its opening game began — even with six fixtures still days away — and
-        # sent members to a read-only screen while their week was still live.
-        live = [c for c in cards if c["round"] and c["round"].has_open_matches]
-        needing = [c for c in live if c["tips_done"] < c["tips_total"]]
-        pool = needing or live
-        if pool:
-            selected = min(pool, key=lambda c: c["round"].lockout_at)
-        else:
-            # Nothing left to tip anywhere: fall back to the round in play so
-            # the member sees results rather than an empty screen.
-            selected = cards[0]
+    for c in cards:
+        c.pop("_membership", None)
 
     # ONE ROUND AT A TIME, with a navigator to move between them.
     #

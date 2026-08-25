@@ -13,6 +13,33 @@ def user_orgs(request):
     if orgs:
         open_due_elections(orgs=orgs)
 
+    # Every org's groups, in one query, so the nav's org switcher can preview
+    # any org's groups on hover without a request per row. Attached directly
+    # onto each Organisation instance (o.nav_groups) rather than a separate
+    # dict, so the template can just loop `o.nav_groups` — Django templates
+    # have no built-in "look this dict up by a variable key" syntax.
+    from .models import Group
+
+    nav_any_groups_enabled = any(o.groups_enabled for o in orgs)
+    for o in orgs:
+        o.nav_groups = []
+    if nav_any_groups_enabled:
+        groups_by_org = {}
+        enabled_ids = [o.id for o in orgs if o.groups_enabled]
+        for g in (
+            Group.objects.filter(
+                org_id__in=enabled_ids,
+                approval_status=Group.APPROVAL_APPROVED,
+                memberships__user=request.user,
+            )
+            .select_related("kind")
+            .distinct()
+            .order_by("org_id", "name")
+        ):
+            groups_by_org.setdefault(g.org_id, []).append(g)
+        for o in orgs:
+            o.nav_groups = groups_by_org.get(o.id, [])
+
     notes = list(
         request.user.notifications.select_related("org").order_by("-created_at")[:12]
     )
@@ -48,6 +75,10 @@ def user_orgs(request):
     # every page agrees on whether this member manages the org they are looking
     # at — a nav that appears on one screen and not the next reads as a bug.
     primary_org_is_admin = False
+    # Billing is narrower than "can manage": a Team Manager can run Members
+    # and Settings without ever seeing the bill, so the Plan link in the
+    # Manage menu is gated on ownership specifically, not on can_manage.
+    primary_org_is_owner = False
     if primary is not None:
         # Local import avoids an app-load-order import cycle.
         from billing.donations import donation_summary
@@ -56,12 +87,16 @@ def user_orgs(request):
         # Reuses the memberships already fetched above — the answer is in
         # hand, and this runs on every authenticated page view.
         mine = next((m for m in memberships if m.org_id == primary.id), None)
-        primary_org_is_admin = bool(mine and mine.can_manage)
+        from .services import is_creator_admin
+
+        primary_org_is_admin = is_creator_admin(request.user, primary, membership=mine)
+        primary_org_is_owner = bool(mine and mine.is_league_owner)
         comp = primary.competitions.select_related("sport").first()
         if comp:
             primary_sport = comp.sport.name
     return {
         "nav_orgs": orgs,
+        "nav_any_groups_enabled": nav_any_groups_enabled,
         "primary_org": primary,
         "current_org": primary,
         "current_group": group,
@@ -69,6 +104,7 @@ def user_orgs(request):
         # the organisation has not switched groups on, which is the default.
         "current_org_groups": list(groups_for(request.user, primary)) if primary else [],
         "primary_org_is_admin": primary_org_is_admin,
+        "primary_org_is_owner": primary_org_is_owner,
         "primary_donation": donation,
         # e.g. "Australian Rules" / "Rugby League" — drives the loader's
         # goal-post shape (client's Goal Posts Reference doc: AFL and NRL

@@ -122,15 +122,78 @@
     }
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
-      var open = panel.hidden;
-      panel.hidden = !open;
-      btn.setAttribute('aria-expanded', String(open));
+      var wasHidden = panel.hidden;
+      panel.hidden = !wasHidden;
+      btn.setAttribute('aria-expanded', String(wasHidden));
+      // Re-measure this panel's scroll lists now that they're actually
+      // visible — see the gt:rescan listener in gt-lists.js for why.
+      if (wasHidden) {
+        document.dispatchEvent(new CustomEvent('gt:rescan', { detail: panel }));
+      }
     });
     document.addEventListener('click', function (e) {
       if (!menu.contains(e.target)) close();
     });
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') close();
+    });
+  });
+})();
+
+/* Switch-organisation filter — only rendered once an account has more than a
+   handful of orgs (see .an-ctx-filter-wrap in app_base.html). Everything is
+   already in the DOM, so this is a plain text match, no fetch. */
+(function () {
+  'use strict';
+  document.querySelectorAll('[data-anctx-filter]').forEach(function (input) {
+    var list = input.closest('.an-ctx').querySelector('[data-anctx-list]');
+    if (!list) return;
+    var rows = Array.prototype.slice.call(list.querySelectorAll('[data-anctx-row-form]'));
+    input.addEventListener('input', function () {
+      var q = input.value.trim().toLowerCase();
+      rows.forEach(function (form) {
+        var name = form.querySelector('.mi-txt b').textContent.toLowerCase();
+        form.hidden = q.length > 0 && name.indexOf(q) === -1;
+      });
+    });
+    input.addEventListener('click', function (e) { e.stopPropagation(); });
+  });
+})();
+
+/* Hover (or focus, for keyboard use) an organisation row in the nav switcher
+   to preview ITS groups beside it, without first switching into it. Every
+   org's groups block is already in the DOM (app_base.html, data-org-groups)
+   — this only ever toggles which one is hidden, no fetch, so the preview is
+   instant. Each block's own forms already point at that org's switch_org /
+   switch_group, so clicking a group works whichever org's block is showing. */
+(function () {
+  'use strict';
+  document.querySelectorAll('.an-ctx').forEach(function (menu) {
+    var groupsCol = menu.querySelector('[data-anctx-groups-col]');
+    if (!groupsCol) return;
+    var blocks = groupsCol.querySelectorAll('[data-org-groups]');
+    var timer = null;
+
+    function show(orgId) {
+      var matched = null;
+      blocks.forEach(function (b) {
+        var on = b.getAttribute('data-org-groups') === orgId;
+        b.hidden = !on;
+        if (on) matched = b;
+      });
+      // The block just un-hidden was measured at 0 height while hidden (see
+      // the gt:rescan listener in gt-lists.js) — it needs a fresh look now.
+      if (matched) document.dispatchEvent(new CustomEvent('gt:rescan', { detail: matched }));
+    }
+
+    menu.querySelectorAll('[data-anctx-org-row]').forEach(function (row) {
+      var orgId = row.getAttribute('data-org-id');
+      function preview() {
+        clearTimeout(timer);
+        timer = setTimeout(function () { show(orgId); }, 80);
+      }
+      row.addEventListener('mouseenter', preview);
+      row.addEventListener('focus', preview);
     });
   });
 })();

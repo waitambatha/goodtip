@@ -1724,6 +1724,56 @@ img, svg, video { max-width: 100%; }
 .an-ctx-more:hover { text-decoration: underline; }
 @media (max-width: 900px) { .an-ctx { display: none; } }
 
+/* Switch-organisation list, capped once an account runs several businesses
+   through GoodTip — the same self-scrolling idea as .gt-scroll, but built
+   fresh rather than reused: .gt-scroll's fade-to-cream and scrollbar tokens
+   are tuned for the cream list beds it normally sits on, and this list lives
+   inside the dark, rounded .an-menu-panel gradient instead. */
+.an-ctx-listwrap { position: relative; }
+.an-ctx-scroll {
+  max-height: 280px; overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: thin; scrollbar-color: rgba(200,241,53,.30) transparent;
+  overscroll-behavior: contain;
+}
+.an-ctx-scroll::-webkit-scrollbar { width: 8px; }
+.an-ctx-scroll::-webkit-scrollbar-track { background: transparent; }
+.an-ctx-scroll::-webkit-scrollbar-thumb { background-color: rgba(200,241,53,.28); border-radius: 100px; }
+.an-ctx-listwrap::after {
+  content: ""; position: absolute; left: 0; right: 8px; bottom: 0; height: 22px;
+  background: linear-gradient(180deg, transparent, var(--deep-2));
+  pointer-events: none; opacity: 1; transition: opacity .2s var(--ease);
+}
+.an-ctx-listwrap.at-end::after { opacity: 0; }
+.an-ctx-filter-wrap { padding: 0 13px 6px; }
+.an-ctx-filter {
+  width: 100%; font-family: var(--body); font-size: 13px; color: var(--cream);
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 9px; padding: 8px 10px;
+}
+.an-ctx-filter::placeholder { color: rgba(232,228,213,.45); }
+.an-ctx-filter:focus { outline: none; border-color: rgba(200,241,53,.5); background: rgba(255,255,255,.09); }
+
+/* Which organisation, and which group inside it, as two columns rather than
+   one long stack — they are different questions, and reading down a single
+   list gave no visual cue where "switch org" stopped and "switch group"
+   began. The org column is unpadded-outer / padded-per-column so the divider
+   between columns can run the panel's full height. */
+.an-menu-panel.an-ctx-panel { display: flex; align-items: stretch; padding: 0; min-width: 480px; }
+.an-ctx-col { flex: 1 1 0; min-width: 220px; max-width: 280px; padding: 7px; }
+.an-ctx-col-groups { border-left: 1px solid rgba(255,255,255,.10); }
+.an-ctx-empty {
+  padding: 14px 13px 4px; font-size: 13px; line-height: 1.4;
+  color: rgba(232,228,213,.55);
+}
+/* The current organisation's own row in its column — shown, not a switch
+   target, so it neither submits a form nor takes the hover a real option gets. */
+.an-ctx-row-static { cursor: default; }
+.an-ctx-row-static:hover { background: linear-gradient(90deg, rgba(200,241,53,.26), rgba(200,241,53,.07)); }
+@media (max-width: 1100px) {
+  .an-ctx-panel { min-width: 0; }
+  .an-ctx-col { max-width: none; }
+}
+
 .an-org { font-size: 13px; color: var(--cream); opacity: .7; padding-left: 14px; border-left: 1px solid rgba(255,255,255,.15); white-space: nowrap; }
 .an-links { display: flex; gap: 2px; margin-left: 10px; }
 .an-links a { font-size: 14px; font-weight: 600; color: var(--cream); opacity: .72; padding: 8px 14px; border-radius: 8px; text-decoration: none; transition: opacity .15s var(--ease), background .15s var(--ease); }

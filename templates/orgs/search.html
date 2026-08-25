@@ -110,6 +110,10 @@ stacking context, so a strip rendered inside it paints over the sheet.
   var MIN = {{ min_chars }};
   var URL_JSON = "{% url 'orgs:search_json' %}";
   var URL_CREATE = "{% url 'orgs:create' %}";
+  // Reversed with a placeholder id, then patched per-row — keeps the URL in
+  // sync with orgs/urls.py instead of a hand-built "/leagues/" string that
+  // would silently drift if the prefix ever changed.
+  var URL_JOIN_TMPL = "{% url 'orgs:request_join' 0 %}";
   var input = document.getElementById("orgSearch");
   var panel = document.getElementById("acPanel");
   var ac = document.getElementById("orgAc");
@@ -169,7 +173,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
       action = '<span class="pill-role captain">Request pending — a organisation admin will approve it</span>';
     } else {
       action =
-        '<form method="post" action="/leagues/' + r.id + '/request-join/" style="display:inline;">' +
+        '<form method="post" action="' + URL_JOIN_TMPL.replace('/0/', '/' + r.id + '/') + '" style="display:inline;">' +
         '<input type="hidden" name="csrfmiddlewaretoken" value="' + csrf + '">' +
         '<input type="hidden" name="next" value="{{ request.path }}">' +
         '<button type="submit" class="abtn abtn-primary">Ask to join</button></form>';

@@ -15,8 +15,15 @@
 (function () {
   'use strict';
 
+  // .an-ctx-scroll/.an-ctx-listwrap (the nav's org/group switcher lists) are a
+  // separate class family — their fade and scrollbar are tuned for the dark
+  // dropdown panel rather than the cream list beds .gt-scroll normally sits
+  // on — but the same scroll-end fade behaviour applies, so both are scanned
+  // together here rather than duplicating this file for one extra selector.
+  var SCROLL_SELECTOR = '.gt-scroll, .an-ctx-scroll';
+
   function wrapOf(el) {
-    return el && el.closest ? el.closest('.gt-listwrap') : null;
+    return el && el.closest ? el.closest('.gt-listwrap, .an-ctx-listwrap') : null;
   }
 
   /* ---------------- scroll-end fade ---------------- */
@@ -43,7 +50,7 @@
   }
 
   function scan(root) {
-    (root || document).querySelectorAll('.gt-scroll').forEach(bind);
+    (root || document).querySelectorAll(SCROLL_SELECTOR).forEach(bind);
   }
 
   /* ---------------- scoped busy state ---------------- */
@@ -71,7 +78,20 @@
     scan(document);
   }
 
+  // A scroller measured while its ancestor carries [hidden] reads
+  // clientHeight/scrollHeight as 0 either way, so it always looks like it
+  // doesn't need to scroll — true of nothing until the panel actually opens.
+  // The nav's dropdowns dispatch this once they un-hide. scan()/bind() won't
+  // redo the measurement for a scroller it already bound at page load (while
+  // still hidden), so this calls syncFade directly rather than through bind.
+  document.addEventListener('gt:rescan', function (e) {
+    (e.detail || document).querySelectorAll(SCROLL_SELECTOR).forEach(function (el) {
+      bind(el);
+      syncFade(el);
+    });
+  });
+
   window.addEventListener('resize', function () {
-    document.querySelectorAll('.gt-scroll').forEach(syncFade);
+    document.querySelectorAll(SCROLL_SELECTOR).forEach(syncFade);
   });
 })();

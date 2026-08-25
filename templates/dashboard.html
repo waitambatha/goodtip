@@ -381,24 +381,7 @@ impossible. See gt-busy.js.
   not rebuilding the feature.
   {% endcomment %}
 
-  {% if c.is_owner %}
-  <div class="grid-app g-2" style="margin-top:18px;">
-    {% if c.subscription %}
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;"><div class="card-h">Plan</div><span class="pill-role owner">Active</span></div>
-      <div class="s-num" style="font-size:26px;margin:10px 0 2px;">{{ c.subscription.get_tier_display }}</div>
-      <div class="card-lead">{{ c.subscription.participant_count }} of {{ c.subscription.seat_limit_label|cut:"Up to " }} seats used</div>
-      <div style="display:flex;gap:8px;margin-top:16px;"><a href="{% url 'billing:receipt' c.org.id %}" class="abtn abtn-ghost abtn-sm">Receipt</a><a href="{% url 'billing:plans' c.org.id %}" class="abtn abtn-ghost abtn-sm">Manage plan</a></div>
-    </div>
-    {% else %}
-    <a href="{% url 'billing:plans' c.org.id %}" class="card" style="text-decoration:none;border-color:var(--lime);">
-      <div style="display:flex;justify-content:space-between;align-items:center;"><div class="card-h">Plan</div><span class="pill-role owner">Action needed</span></div>
-      <div class="s-num" style="font-size:22px;margin:10px 0 2px;">Choose a plan</div>
-      <div class="card-lead">Activate {{ c.org.name }} for the season &rarr;</div>
-    </a>
-    {% endif %}
-
-    {% comment %}
+  {% comment %}
 The donation-pledge card is gone with the pledge page itself. It broke the
 season down as base pledge + top-ups + match, and none of those are things any
 more: the organisation pays one flat fee and GoodTip funds the donation from
@@ -408,8 +391,14 @@ screen that no longer decides anything.
 What the organisation is raising for still shows — see the charity card — because that
 is the part members care about and the part that is still true.
 {% endcomment %}
-  </div>
-  {% endif %}
+
+  {% comment %}
+  The Plan card used to live here — a big "choose a plan" / seat-usage tile on
+  every owner's dashboard, permanently taking space below the fixtures for
+  something checked rarely. Billing belongs with the other admin-only actions,
+  so it moved into the Manage menu (see app_base.html) instead of sitting in
+  the page an owner opens every day to tip.
+  {% endcomment %}
 </div>
 
 <!-- what's locking across your other comps -->

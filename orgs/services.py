@@ -5,6 +5,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Count, Q
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -200,7 +201,7 @@ def _notify_join_request_in_app(req: MembershipRequest) -> None:
         ),
         # Straight to the one request, not the Members page: from a notification
         # the admin should land on the person, with the buttons already there.
-        link_url=f"/leagues/{req.org_id}/requests/{req.id}/",
+        link_url=reverse("orgs:review_request", args=[req.org_id, req.id]),
     )
 
 
@@ -254,7 +255,7 @@ def decline_membership_request(req: MembershipRequest, *, by_user) -> Membership
             "it's a mix-up, have a word with them and you're welcome to ask "
             "again — or find another group, or start your own."
         ),
-        link_url="/leagues/search/",
+        link_url=reverse("orgs:search"),
     )
     return req
 
@@ -408,7 +409,7 @@ def close_charity_vote(vote: CharityVote):
         [m.user for m in vote.org.members.select_related("user")], org=vote.org,
         kind=Notification.KIND_ELECTION_RESULT,
         title=title, message=body,
-        link_url=f"/leagues/{vote.org_id}/charity-vote/",
+        link_url=reverse("orgs:charity_vote", args=[vote.org_id]),
     )
     return winner
 
@@ -419,6 +420,27 @@ def can_lock_fundraising(org) -> bool:
     to itself. The flag is never self-declared.
     """
     return bool(org.organisation_type_id and org.organisation_type.is_charity_type and org.is_charity_partner)
+
+
+def is_creator_admin(user, org, *, membership=None) -> bool:
+    """Whether `user` may use org's owner-only Manage surfaces (Members,
+    Settings, Groups-admin, Season summary, Charity election).
+
+    Scoped to Organisation.created_by rather than OrgMember.can_manage's
+    per-membership role: a manager invited into someone else's org should
+    not gain control of *that org's* admin surfaces — only the org's own
+    creator should. Orgs recorded before `created_by` existed (created_by is
+    None) grandfather every existing can_manage member, so nobody running a
+    legacy org is locked out by a field that was never set on their row.
+    """
+    if org is None or not user.is_authenticated:
+        return False
+    m = membership if membership is not None else OrgMember.objects.filter(user=user, org=org).first()
+    if m is None or not m.can_manage:
+        return False
+    if org.created_by_id is None:
+        return True
+    return org.created_by_id == user.id
 
 
 @transaction.atomic
@@ -512,7 +534,7 @@ def schedule_charity_election(vote: CharityVote, *, when, close_at=None, message
             "know here the moment it opens."
             + (f"\n\nFrom your admin: {vote.admin_message}" if vote.admin_message else "")
         ),
-        link_url=f"/leagues/{vote.org_id}/charity-vote/",
+        link_url=reverse("orgs:charity_vote", args=[vote.org_id]),
     )
     return vote
 
@@ -546,7 +568,7 @@ def open_charity_election(vote: CharityVote) -> CharityVote:
     body = vote.admin_message or (
         "Your organisation is choosing where this season's money goes. Cast your vote!"
     )
-    link = f"/leagues/{vote.org_id}/charity-vote/"
+    link = reverse("orgs:charity_vote", args=[vote.org_id])
     Notification.objects.bulk_create([
         Notification(
             user=m.user, org=vote.org,
@@ -707,7 +729,7 @@ def create_group(org, *, name, by_user, kind=None, label=""):
                 kind="group_requested",
                 title=f"{by_user.display_name} wants to start {group.name}",
                 message=f"A new group inside {org.name} is waiting for your approval.",
-                link_url=f"/leagues/{org.pk}/groups/",
+                link_url=reverse("orgs:groups", args=[org.pk]),
                 org=org,
             )
     return group
@@ -733,7 +755,7 @@ def approve_group(group, *, by_user):
                 f"Your group inside {group.org.name} was approved. "
                 "Bring your team in and start tipping."
             ),
-            link_url=f"/leagues/{group.org_id}/groups/",
+            link_url=reverse("orgs:groups", args=[group.org_id]),
             org=group.org,
         )
     return group
@@ -765,7 +787,7 @@ def decline_group(group, *, by_user):
                 f"An admin of {org.name} declined the group you asked for. "
                 "Have a word with them if you think it should exist."
             ),
-            link_url=f"/leagues/{org.pk}/groups/",
+            link_url=reverse("orgs:groups", args=[org.pk]),
             org=org,
         )
     return None

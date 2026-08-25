@@ -10,6 +10,7 @@ from django.views.decorators.http import require_POST
 
 from catalog.models import GoodListConfig, OrganisationType, State
 from orgs.models import OrgMember, Organisation
+from orgs.services import is_creator_admin
 
 from . import donations, goodlist, services
 from .models import DonationPledge, PlanSubscription
@@ -159,7 +160,7 @@ def season_summary_view(request, org_id: int):
     """Season close: announce the winner and settle the donation pool (deck slide 4)."""
     org = get_object_or_404(Organisation, pk=org_id)
     member = OrgMember.objects.filter(user=request.user, org=org).first()
-    if member is None or not member.can_manage:
+    if member is None or not is_creator_admin(request.user, org, membership=member):
         return HttpResponseForbidden()
 
     if request.method == "POST":

@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "matchreader",
     "admin_panel",
     "billing",
+    "sysadmin",
 ]
 
 MIDDLEWARE = [

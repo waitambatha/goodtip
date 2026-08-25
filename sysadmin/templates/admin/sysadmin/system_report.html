@@ -1,0 +1,82 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div style="max-width: 980px;">
+  <p>Generated {{ generated_at }}.</p>
+
+  <h2>Overview</h2>
+  <table>
+    <tr><th style="text-align:left; padding-right: 24px;">Users</th><td>{{ counts.users }}</td></tr>
+    <tr><th style="text-align:left; padding-right: 24px;">Organisations</th><td>{{ counts.orgs }} ({{ counts.orgs_last_7d }} in the last 7 days, {{ counts.orgs_last_30d }} in the last 30)</td></tr>
+    <tr><th style="text-align:left; padding-right: 24px;">Groups</th><td>{{ counts.groups }}</td></tr>
+    <tr><th style="text-align:left; padding-right: 24px;">Org memberships</th><td>{{ counts.memberships }}</td></tr>
+    <tr><th style="text-align:left; padding-right: 24px;">Pending join requests</th><td>{{ counts.pending_join_requests }}</td></tr>
+    <tr><th style="text-align:left; padding-right: 24px;">Open enquiries</th><td>{{ counts.open_enquiries }}</td></tr>
+  </table>
+
+  <h2>Logins</h2>
+  <table>
+    <tr><th style="text-align:left; padding-right: 24px;">Successful, last 24h</th><td>{{ login_counts.last_24h }}</td></tr>
+    <tr><th style="text-align:left; padding-right: 24px;">Successful, last 7 days</th><td>{{ login_counts.last_7d }}</td></tr>
+    <tr><th style="text-align:left; padding-right: 24px;">Failed, last 24h</th><td>{{ login_counts.failed_last_24h }}</td></tr>
+    <tr><th style="text-align:left; padding-right: 24px;">Failed, last 7 days</th><td>{{ login_counts.failed_last_7d }}</td></tr>
+  </table>
+
+  <h3>Recent logins</h3>
+  {% if recent_logins %}
+  <table id="result_list">
+    <thead><tr><th>When</th><th>Email</th><th>User</th><th>Result</th><th>IP</th></tr></thead>
+    <tbody>
+      {% for ev in recent_logins %}
+      <tr>
+        <td>{{ ev.created_at }}</td>
+        <td>{{ ev.email }}</td>
+        <td>{% if ev.user %}<a href="{% url 'admin:accounts_user_change' ev.user_id %}">{{ ev.user }}</a>{% else %}—{% endif %}</td>
+        <td>{% if ev.success %}ok{% else %}failed{% endif %}</td>
+        <td>{{ ev.ip_address|default:"—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No logins recorded yet.</p>
+  {% endif %}
+  <p><a href="{% url 'admin:sysadmin_loginevent_changelist' %}">Full login history &rarr;</a></p>
+
+  <h2>Stress tests</h2>
+  {% if recent_stress_tests %}
+  <table id="result_list">
+    <thead><tr><th>Label</th><th>Started</th><th>Requests</th><th>Success</th><th>Failures</th><th>Avg (ms)</th><th>Req/s</th></tr></thead>
+    <tbody>
+      {% for run in recent_stress_tests %}
+      <tr>
+        <td><a href="{% url 'admin:sysadmin_stresstestrun_change' run.pk %}">{{ run.label }}</a></td>
+        <td>{{ run.started_at }}</td>
+        <td>{{ run.total_requests }}</td>
+        <td>{{ run.success_count }}</td>
+        <td>{{ run.failure_count }}</td>
+        <td>{{ run.avg_response_ms|default:"—" }}</td>
+        <td>{{ run.requests_per_sec|default:"—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No stress test runs recorded yet — add one via the "Add stress test run" button in the admin, or pipe results in with <code>manage.py record_stress_test_run</code>.</p>
+  {% endif %}
+  <p><a href="{% url 'admin:sysadmin_stresstestrun_add' %}">Add a stress test run &rarr;</a></p>
+
+  <h2>System</h2>
+  <table>
+    {% if system.disk_total_gb %}
+    <tr><th style="text-align:left; padding-right: 24px;">Disk</th><td>{{ system.disk_used_gb }} GB used of {{ system.disk_total_gb }} GB ({{ system.disk_used_pct }}%), {{ system.disk_free_gb }} GB free</td></tr>
+    {% endif %}
+    {% if system.load_avg %}
+    <tr><th style="text-align:left; padding-right: 24px;">Load average (1/5/15 min)</th><td>{{ system.load_avg.0 }} / {{ system.load_avg.1 }} / {{ system.load_avg.2 }}</td></tr>
+    {% endif %}
+    {% if not system.disk_total_gb and not system.load_avg %}
+    <tr><td colspan="2">Not available on this platform.</td></tr>
+    {% endif %}
+  </table>
+</div>
+{% endblock %}

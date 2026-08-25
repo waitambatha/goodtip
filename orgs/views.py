@@ -51,6 +51,7 @@ from .services import (
     decline_group,
     decline_membership_request,
     groups_for,
+    is_creator_admin,
     join_group,
     leave_group,
     demote_child_org_admin,
@@ -79,6 +80,10 @@ def _membership(user, org):
 def _can_manage(user, org) -> bool:
     m = _membership(user, org)
     return bool(m and m.can_manage)
+
+
+def _is_creator_admin(user, org, *, membership=None) -> bool:
+    return is_creator_admin(user, org, membership=membership)
 
 
 def _is_member(user, org) -> bool:
@@ -936,7 +941,7 @@ def charity_vote_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _is_member(request.user, org):
         return HttpResponseForbidden()
-    is_admin = _can_manage(request.user, org)
+    is_admin = _is_creator_admin(request.user, org)
     # Charity Partner Workflow (categories doc): partners can lock fundraising
     # to themselves; non-partner charity orgs see the become-a-partner CTA.
     already_self = bool(org.charity_id and org.charity.name.lower() == org.name.lower())
@@ -1035,7 +1040,7 @@ def cast_charity_vote(request, org_id: int):
 @require_POST
 def close_charity_vote_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
-    if not _can_manage(request.user, org):
+    if not _is_creator_admin(request.user, org):
         return HttpResponseForbidden()
     vote = org.charity_votes.first()
     if vote is not None and vote.is_open:
@@ -1052,7 +1057,7 @@ def close_charity_vote_view(request, org_id: int):
 def election_close_time_view(request, org_id: int):
     """Manager sets, moves, or clears the automatic end time of an open vote."""
     org = get_object_or_404(Organisation, pk=org_id)
-    if not _can_manage(request.user, org):
+    if not _is_creator_admin(request.user, org):
         return HttpResponseForbidden()
     vote = org.charity_votes.first()
     if vote is None or not vote.is_open:
@@ -1085,7 +1090,7 @@ def lock_fundraising_view(request, org_id: int):
     to itself — manager-only, and only once GoodTip staff set the partner flag.
     """
     org = get_object_or_404(Organisation, pk=org_id)
-    if not _can_manage(request.user, org):
+    if not _is_creator_admin(request.user, org):
         return HttpResponseForbidden()
     try:
         lock_fundraising_to_self(org)
@@ -1314,7 +1319,7 @@ def review_request_view(request, org_id: int, req_id: int):
 def members_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     me = _membership(request.user, org)
-    if me is None or not me.can_manage:
+    if me is None or not _is_creator_admin(request.user, org, membership=me):
         return HttpResponseForbidden()
 
     if request.method == "POST":
@@ -1416,7 +1421,7 @@ def members_view(request, org_id: int):
 def election_setup_view(request, org_id: int):
     """Admin schedules the charity election — pick a time or start it now."""
     org = get_object_or_404(Organisation, pk=org_id)
-    if not _can_manage(request.user, org):
+    if not _is_creator_admin(request.user, org):
         return HttpResponseForbidden()
     vote = org.charity_votes.first()
     if vote is None:
@@ -2140,7 +2145,7 @@ def org_settings_view(request, org_id: int):
     men's, women's and representative series, and the form offers Competitions.
     """
     org = get_object_or_404(Organisation, pk=org_id, parent__isnull=True)
-    if not _can_manage(request.user, org):
+    if not _is_creator_admin(request.user, org):
         return HttpResponseForbidden()
 
     if request.method == "POST":
@@ -2235,7 +2240,7 @@ def groups_toggle(request, org_id: int):
     organisation that tries it and changes its mind loses nothing.
     """
     org = get_object_or_404(Organisation, pk=org_id, parent__isnull=True)
-    if not _can_manage(request.user, org):
+    if not _is_creator_admin(request.user, org):
         return HttpResponseForbidden()
 
     org.groups_enabled = not org.groups_enabled
@@ -2259,7 +2264,7 @@ def groups_view(request, org_id: int):
     root = org.root
     if not _is_member(request.user, root):
         return HttpResponseForbidden()
-    is_admin = _can_manage(request.user, root)
+    is_admin = _is_creator_admin(request.user, root)
 
     if request.method == "POST":
         action = request.POST.get("action", "")

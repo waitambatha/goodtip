@@ -88,42 +88,89 @@
           {% if current_group %}<span class="an-ctx-sep" aria-hidden="true">&rsaquo;</span><span class="an-ctx-group">{{ current_group.name }}</span>{% endif %}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
         </button>
-        <div class="an-menu-panel" hidden>
-          {% if current_org.groups_enabled %}
-          <div class="an-ctx-head">Tipping in</div>
-          <form method="post" action="{% url 'orgs:leave_group_context' %}">
-            {% csrf_token %}
-            <input type="hidden" name="next" value="{{ request.path }}">
-            <button type="submit" class="an-ctx-row{% if not current_group %} on{% endif %}">
-              <span class="mi-txt"><b>{{ current_org.name }}</b><i>The whole organisation</i></span>
-            </button>
-          </form>
-          {% for g in current_org_groups %}
-          <form method="post" action="{% url 'orgs:switch_group' current_org.id g.id %}">
-            {% csrf_token %}
-            <input type="hidden" name="next" value="{{ request.path }}">
-            <button type="submit" class="an-ctx-row{% if current_group.id == g.id %} on{% endif %}">
-              <span class="mi-txt"><b>{{ g.name }}</b><i>{% if g.kind_label %}{{ g.kind_label }}{% else %}Your group{% endif %}</i></span>
-            </button>
-          </form>
-          {% endfor %}
-          <a href="{% url 'orgs:groups' current_org.id %}" class="an-ctx-more">All groups &rarr;</a>
-          {% endif %}
+        <div class="an-menu-panel an-ctx-panel" hidden>
+          {% comment %}
+          Two columns, side by side, not one long stack — which organisation
+          and which group inside it are two different questions, and stacking
+          "switch org" directly under "switch group" read as one long list
+          where it wasn't obvious which rows did which. The org column is
+          always first and always shown (even with one organisation, the same
+          way room_switch.html always names the whole-org option) so there is
+          one consistent place to look for "where am I", and the group column
+          only appears beside it when this organisation actually has groups.
+          {% endcomment %}
+          <div class="an-ctx-col an-ctx-col-orgs">
+            <div class="an-ctx-head">Your organisation</div>
+            {% if nav_orgs|length > 6 %}
+            <div class="an-ctx-filter-wrap">
+              <input type="text" class="an-ctx-filter" data-anctx-filter placeholder="Filter organisations…" aria-label="Filter organisations">
+            </div>
+            {% endif %}
+            <div class="an-ctx-listwrap">
+              <div class="an-ctx-scroll" data-anctx-list>
+                {% for o in nav_orgs %}
+                {% if o.id == current_org.id %}
+                <div class="an-ctx-row on an-ctx-row-static" data-anctx-org-row data-org-id="{{ o.id }}">
+                  <span class="mi-txt"><b>{{ o.name }}</b><i>Current</i></span>
+                </div>
+                {% else %}
+                <form method="post" action="{% url 'orgs:switch_org' o.id %}" data-anctx-row-form>
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.path }}">
+                  <button type="submit" class="an-ctx-row" data-anctx-org-row data-org-id="{{ o.id }}"><span class="mi-txt"><b>{{ o.name }}</b></span></button>
+                </form>
+                {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+            {% if not current_org.groups_enabled and nav_orgs|length <= 1 %}
+            <a href="{% url 'orgs:groups' current_org.id %}" class="an-ctx-more">Split it into groups &rarr;</a>
+            {% endif %}
+          </div>
 
-          {% if nav_orgs|length > 1 %}
-          <div class="an-ctx-head">Switch organisation</div>
-          {% for o in nav_orgs %}{% if o.id != current_org.id %}
-          <form method="post" action="{% url 'orgs:switch_org' o.id %}">
-            {% csrf_token %}
-            <input type="hidden" name="next" value="{{ request.path }}">
-            <button type="submit" class="an-ctx-row"><span class="mi-txt"><b>{{ o.name }}</b></span></button>
-          </form>
-          {% endif %}{% endfor %}
-          {% endif %}
-
-          {% if not current_org.groups_enabled and nav_orgs|length <= 1 %}
-          <div class="an-ctx-head">{{ current_org.name }}</div>
-          <a href="{% url 'orgs:groups' current_org.id %}" class="an-ctx-more">Split it into groups &rarr;</a>
+          {% if nav_any_groups_enabled %}
+          {% comment %}
+          One block per organisation, all rendered up front (a handful of orgs
+          with a handful of groups each is cheap, and it's one bulk query —
+          see context_processors.py), all hidden but the current one. Hovering
+          or focusing a row in the org column (data-anctx-org-row) swaps which
+          block shows, so you can see what "AquaFlow Water Co" is tipping in
+          without first switching into it. Every row still posts straight to
+          switch_org/switch_group with that row's own org id baked in by
+          Django, so nothing in JS ever has to guess which org a click means.
+          {% endcomment %}
+          <div class="an-ctx-col an-ctx-col-groups" data-anctx-groups-col>
+            {% for o in nav_orgs %}
+            <div class="an-ctx-groups-block{% if o.id == current_org.id %} on{% endif %}" data-org-groups="{{ o.id }}"{% if o.id != current_org.id %} hidden{% endif %}>
+              <div class="an-ctx-head">Groups in {{ o.name }}</div>
+              {% if o.groups_enabled %}
+              <div class="an-ctx-listwrap">
+                <div class="an-ctx-scroll">
+                  <form method="post" action="{% url 'orgs:switch_org' o.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.path }}">
+                    <button type="submit" class="an-ctx-row{% if o.id == current_org.id and not current_group %} on{% endif %}">
+                      <span class="mi-txt"><b>{{ o.name }}</b><i>The whole organisation</i></span>
+                    </button>
+                  </form>
+                  {% for g in o.nav_groups %}
+                  <form method="post" action="{% url 'orgs:switch_group' o.id g.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.path }}">
+                    <button type="submit" class="an-ctx-row{% if o.id == current_org.id and current_group.id == g.id %} on{% endif %}">
+                      <span class="mi-txt"><b>{{ g.name }}</b><i>{% if g.kind_label %}{{ g.kind_label }}{% else %}Your group{% endif %}</i></span>
+                    </button>
+                  </form>
+                  {% endfor %}
+                </div>
+              </div>
+              <a href="{% url 'orgs:groups' o.id %}" class="an-ctx-more">All groups &rarr;</a>
+              {% else %}
+              <p class="an-ctx-empty">{{ o.name }} doesn't use groups.</p>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
           {% endif %}
         </div>
       </div>
@@ -173,6 +220,21 @@
               <a href="{% url 'orgs:groups' primary_org.id %}">
                 <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-org"/></svg></span>
                 <span class="mi-txt"><b>Groups</b><i>The teams inside your organisation</i></span>
+              </a>
+              {% endif %}
+              {% comment %}
+              Billing is narrower than the rest of this menu — a Team Manager
+              runs Members and Settings without ever seeing the bill, so this
+              is gated on ownership (primary_org_is_owner) rather than the
+              can-manage check that opens the Manage menu itself. Moved here
+              from a permanent card on the dashboard (client feedback, Aug
+              2026): checked rarely, but took space below the fixtures on
+              every visit either way.
+              {% endcomment %}
+              {% if primary_org_is_owner %}
+              <a href="{% url 'billing:plans' primary_org.id %}">
+                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-coins"/></svg></span>
+                <span class="mi-txt"><b>Plan</b><i>Choose or manage your season plan</i></span>
               </a>
               {% endif %}
               <a href="{% url 'billing:season_summary' primary_org.id %}">
