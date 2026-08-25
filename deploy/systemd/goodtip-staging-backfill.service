@@ -1,0 +1,13 @@
+[Unit]
+Description=GoodTip staging — full-season fixture and result backfill
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=mbatha-goodtip
+WorkingDirectory=/home/mbatha-goodtip/projects/goodtip-staging
+ExecStart=/home/mbatha-goodtip/projects/goodtip-staging/venv/bin/python manage.py sync_matches --backfill
+TimeoutStartSec=7200
+StandardOutput=journal
+StandardError=journal

@@ -1,0 +1,12 @@
+[Unit]
+Description=GoodTip staging — tick the email/notification jobs every 10 minutes
+
+[Timer]
+OnBootSec=7min
+OnUnitActiveSec=10min
+RandomizedDelaySec=90
+AccuracySec=60
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,16 @@
+[Unit]
+# Staging's copy of goodtip-matchsync. Reads the same upstream feeds into the
+# staging database, so staging shows current fixtures and results instead of
+# whatever was true when its database was last rebuilt.
+Description=GoodTip staging — run due sports data syncs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=mbatha-goodtip
+WorkingDirectory=/home/mbatha-goodtip/projects/goodtip-staging
+ExecStart=/home/mbatha-goodtip/projects/goodtip-staging/venv/bin/python manage.py run_due_syncs
+TimeoutStartSec=600
+StandardOutput=journal
+StandardError=journal

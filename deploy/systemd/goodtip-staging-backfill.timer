@@ -1,0 +1,15 @@
+[Unit]
+Description=GoodTip staging — sweep every round of every competition
+
+[Timer]
+# Offset well clear of production's sweep: this one is long-running and reads
+# every round of every series, so overlapping the two is the worst case for
+# the upstream feeds.
+OnBootSec=45min
+OnUnitActiveSec=6h
+RandomizedDelaySec=600
+AccuracySec=60
+Persistent=true
+
+[Install]
+WantedBy=timers.target

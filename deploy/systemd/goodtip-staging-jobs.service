@@ -1,0 +1,15 @@
+[Unit]
+# Staging's copy of goodtip-jobs: election opens and closes, vote reminders,
+# round scorecards, recaps. Unlike the two sync units, this one SENDS EMAIL.
+Description=GoodTip staging — run due application jobs (email, elections, recaps)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=mbatha-goodtip
+WorkingDirectory=/home/mbatha-goodtip/projects/goodtip-staging
+ExecStart=/home/mbatha-goodtip/projects/goodtip-staging/venv/bin/python manage.py run_due_jobs
+TimeoutStartSec=900
+StandardOutput=journal
+StandardError=journal
