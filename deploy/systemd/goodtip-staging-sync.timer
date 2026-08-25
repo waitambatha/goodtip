@@ -1,0 +1,19 @@
+[Unit]
+Description=GoodTip Staging Auto-Sync Timer
+Requires=goodtip-staging-sync.service
+
+[Timer]
+# 2 minutes, matching production: the answer to "I pushed to staging, why isn't
+# it up yet?" should not be different depending on which site you pushed to.
+# An idle tick is one `git fetch` and an exit before the working tree is
+# touched, so the cost of the shorter interval is negligible.
+OnBootSec=4min
+OnUnitActiveSec=2min
+# Offset from production's 15s so the two deploys tend not to start together
+# and contend for pip, the database and the box's two cores.
+RandomizedDelaySec=45
+AccuracySec=30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

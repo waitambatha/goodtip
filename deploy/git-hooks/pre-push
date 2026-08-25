@@ -1,0 +1,73 @@
+#!/bin/bash
+# Refuse to push directly to main.
+#
+# Install (once per clone, on every machine you work from):
+#
+#   ln -sf ../../deploy/git-hooks/pre-push .git/hooks/pre-push
+#
+# Why a hook as well as a GitHub ruleset: the ruleset is the real enforcement,
+# but it rejects the push after it has travelled, and on a private repo it
+# depends on the account's plan. This stops it locally, instantly, and works
+# the same whether or not the ruleset exists. It also catches the actual
+# failure mode, which is not malice -- it is finishing a change on `main`
+# out of habit and pushing before remembering that main is the live site.
+#
+# Pushing to main IS deploying: goodtip-sync.timer picks it up within two
+# minutes. That is what this protects.
+#
+# To merge approved work, go through staging:
+#   git checkout main && git merge --ff-only staging && git push origin main
+# ...which this hook allows, because the check is on how you got there.
+#
+# Genuine emergency (a hotfix the live site cannot wait for):
+#   ALLOW_MAIN_PUSH=1 git push origin main
+
+PROTECTED="main"
+REMOTE_REF_PREFIX="refs/heads/$PROTECTED"
+
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  [ "$remote_ref" = "$REMOTE_REF_PREFIX" ] || continue
+
+  if [ "${ALLOW_MAIN_PUSH:-}" = "1" ]; then
+    echo "pre-push: ALLOW_MAIN_PUSH=1 -- pushing to $PROTECTED. This deploys to" >&2
+    echo "          goodtip.com.au within two minutes." >&2
+    continue
+  fi
+
+  # A merge from staging is the sanctioned route, and it is what the release
+  # step below does -- so allow the push when everything going up is already
+  # on origin/staging. Anything else is a commit that has never been on
+  # staging, which is exactly what this hook exists to stop.
+  if git rev-parse --verify --quiet origin/staging >/dev/null; then
+    unmerged=$(git rev-list --count "origin/staging..$_local_sha" 2>/dev/null || echo "?")
+    if [ "$unmerged" = "0" ]; then
+      echo "pre-push: main == origin/staging, allowing the release push." >&2
+      continue
+    fi
+  else
+    unmerged="?"
+  fi
+
+  cat >&2 <<MSG
+
+  Refusing to push directly to $PROTECTED.
+
+  Pushing to main deploys to goodtip.com.au within two minutes. Work goes to
+  staging first, gets approved on staging.goodtip.com.au, and reaches main
+  only as a merge of approved code.
+
+    git push origin HEAD:staging      # deploy this to staging instead
+
+  Then once the client has signed off:
+
+    git checkout main && git merge --ff-only staging && git push origin main
+
+  ($unmerged commit(s) here are not on origin/staging.)
+
+  Real emergency:  ALLOW_MAIN_PUSH=1 git push origin main
+
+MSG
+  exit 1
+done
+
+exit 0

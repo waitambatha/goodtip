@@ -1,0 +1,36 @@
+[Unit]
+# Continuous deploy for staging: whatever is on origin/staging is what
+# staging.goodtip.com.au serves. Same script, same mechanism and same
+# trade-offs as goodtip-sync.service -- read that one for why it is pull-based.
+# The only differences are the three Environment lines below.
+Description=GoodTip Staging Auto-Sync from GitHub
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=mbatha-goodtip
+WorkingDirectory=/home/mbatha-goodtip/projects/goodtip-staging
+ExecStart=/bin/bash /home/mbatha-goodtip/projects/goodtip-staging/deploy.sh --auto
+# The three variables that make one script serve two sites. GOODTIP_DIR is what
+# scopes the flock, the blocked-SHA file and the gunicorn reload to this
+# instance; without it a staging deploy would operate on production's checkout.
+Environment=GOODTIP_DIR=/home/mbatha-goodtip/projects/goodtip-staging
+Environment=GOODTIP_BRANCH=staging
+Environment=GOODTIP_VENV=/home/mbatha-goodtip/projects/goodtip-staging/venv
+# Deliberately stricter than production's `fast`.
+#
+# The entire point of staging is that it is where a bad commit is allowed to be
+# discovered, so there is no reason to wave the suite through here -- and every
+# reason to run it, since this is the last gate before the same commit is
+# merged to main and deployed to the live site. `warn` and not `block`: the
+# suite is red as of Aug 2026 (11 failures, 6 errors, all pre-existing), so
+# blocking today would stop staging deploying at all. The failures are reported
+# in the journal on every deploy, which is where the pressure to fix them
+# belongs. Move this and production's to `block` together once it is green.
+Environment=DEPLOY_TEST_GATE=warn
+# Longer than production's: this one runs the ~6-minute suite. Still shorter
+# than the timer's own margin; overlap is prevented by the flock in deploy.sh.
+TimeoutStartSec=1800
+StandardOutput=journal
+StandardError=journal

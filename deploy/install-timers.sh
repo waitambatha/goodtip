@@ -12,6 +12,21 @@ set -e
 UNIT_SRC="$(cd "$(dirname "$0")" && pwd)/systemd"
 UNIT_DST=/etc/systemd/system
 
+# These units are production's. Every one of them hardcodes the production
+# checkout as its WorkingDirectory, so the scheduled jobs they run write to the
+# production database no matter which copy of this script installed them.
+# Running it from the staging checkout therefore does not give staging its own
+# timers -- it overwrites production's units with whatever the staging branch
+# happens to say and restarts them. Refuse, and say which directory to run it
+# from. Staging's own two units are installed once by bootstrap-staging.sh.
+PROD_DIR="${GOODTIP_PROD_DIR:-/home/mbatha-goodtip/projects/goodtip}"
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+if [ "$(readlink -f "$HERE")" != "$(readlink -f "$PROD_DIR")" ]; then
+  echo "ERROR: these are the production scheduled-job units, but this is $HERE." >&2
+  echo "       Run it from $PROD_DIR, or set GOODTIP_PROD_DIR if production moved." >&2
+  exit 1
+fi
+
 changed=0
 for unit in goodtip-matchsync.service goodtip-matchsync.timer \
             goodtip-jobs.service goodtip-jobs.timer \

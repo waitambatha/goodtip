@@ -1,11 +1,21 @@
 #!/bin/bash
-# Deploy GoodTip: bring this checkout up to origin/main and reload the site.
+# Deploy GoodTip: bring this checkout up to its branch on origin, reload the site.
 #
 # Two callers, one code path:
 #   deploy.sh          -- by hand. Always does the full sequence.
 #   deploy.sh --auto   -- from goodtip-sync.timer, every 2 minutes.
 #                         Exits silently when origin has nothing new, so the
 #                         journal shows deploys and not 720 heartbeats a day.
+#
+# Two deployments, also one code path. The same script runs in two checkouts on
+# the same box, told apart entirely by environment:
+#
+#   goodtip.com.au          GOODTIP_BRANCH=main     (the default)
+#   staging.goodtip.com.au  GOODTIP_BRANCH=staging  GOODTIP_DIR=.../goodtip-staging
+#
+# Everything below that could plausibly reach across from one to the other --
+# which branch is pulled, which gunicorn is signalled, whether the shared
+# scheduled-job units get rewritten -- is scoped deliberately, and says so.
 #
 # Before anything is migrated or served, the pulled code goes through a
 # verification gate (see DEPLOY_TEST_GATE below). A commit that fails is
@@ -36,6 +46,9 @@ fi
 # than only ever being tested in production. Defaults to the real checkout.
 PROJECT_DIR="${GOODTIP_DIR:-/home/mbatha-goodtip/projects/goodtip}"
 VENV="${GOODTIP_VENV:-$PROJECT_DIR/venv}"
+# Defaults to main so the production unit needs no change and behaves exactly
+# as it did before this was a variable at all.
+BRANCH="${GOODTIP_BRANCH:-main}"
 
 cd "$PROJECT_DIR"
 
@@ -57,7 +70,7 @@ fi
 
 # Is there anything to do? Ask before touching the working tree, so the common
 # case (nothing pushed) costs one fetch and no stash, no migrate, no reload.
-git fetch --quiet origin main
+git fetch --quiet origin "$BRANCH"
 BEFORE=$(git rev-parse HEAD)
 REMOTE=$(git rev-parse FETCH_HEAD)
 
@@ -74,8 +87,8 @@ if [ "$AUTO" = 1 ] && [ -f "$BLOCKED_FILE" ] && [ "$(cat "$BLOCKED_FILE")" = "$R
   exit 0
 fi
 
-echo "=== deploy $(date -Is) ==="
-[ "$BEFORE" = "$REMOTE" ] || echo "new on origin/main: $(git log --oneline "$BEFORE".."$REMOTE" | wc -l) commit(s)"
+echo "=== deploy $(date -Is) [$BRANCH -> $PROJECT_DIR] ==="
+[ "$BEFORE" = "$REMOTE" ] || echo "new on origin/$BRANCH: $(git log --oneline "$BEFORE".."$REMOTE" | wc -l) commit(s)"
 
 # The deploy target is a working checkout, so a stray edit would abort the
 # pull. Stash around it -- but only pop what THIS run stashed. `git stash`
@@ -88,7 +101,7 @@ if ! git diff --quiet HEAD; then
   STASHED=1
 fi
 
-git pull --rebase origin main
+git pull --rebase origin "$BRANCH"
 
 AFTER=$(git rev-parse HEAD)
 
@@ -190,7 +203,15 @@ python manage.py collectstatic --noinput
 # site would then be running the old code against the new database with nothing
 # reporting a problem. A timer that failed to install is worth shouting about;
 # it is not worth taking the deploy down with it.
-if grep -q '^deploy/systemd/' <<<"$CHANGED"; then
+#
+# Production only. The unit files under /etc/systemd/system are one shared set
+# for the whole box, and the scheduled jobs they run -- match sync, nightly
+# jobs, backfill -- write to whichever database their WorkingDirectory points
+# at, which is production's. A staging deploy running this would rewrite the
+# production units from the staging branch and restart them: unreviewed code
+# reaching the live database without ever touching main. Staging gets its own
+# two units, installed once by bootstrap-staging.sh and left alone after that.
+if [ "$BRANCH" = "main" ] && grep -q '^deploy/systemd/' <<<"$CHANGED"; then
   if ! bash "$PROJECT_DIR/deploy/install-timers.sh"; then
     echo "WARNING: timer install failed -- run deploy/install-timers.sh by hand." >&2
   fi
@@ -199,13 +220,46 @@ fi
 # Reload the site. SIGHUP respawns the workers under the running arbiter, so
 # this needs no sudo (gunicorn runs as this user) and drops no requests.
 #
-# pkill returns 1 when it matched nothing, which under `set -e` would abort --
-# but "no gunicorn running" is a real problem worth reporting, not swallowing.
-if pkill -HUP -f "gunicorn.*goodtip.wsgi"; then
-  echo "gunicorn reloaded"
-else
-  echo "WARNING: no gunicorn process matched -- is goodtipservice running?" >&2
-fi
+# Which gunicorn, though. Both deployments serve `goodtip.wsgi` as the same
+# user, so the obvious `pkill -f "gunicorn.*goodtip.wsgi"` matches the other
+# site's workers as readily as its own -- a production deploy would recycle
+# staging's arbiter mid-demo, and a staging deploy would reach into production.
+# Nothing on the command line separates them reliably, so match on the one
+# thing that is genuinely per-instance: the working directory each arbiter was
+# started in, read from /proc.
+reload_gunicorn() {
+  local pids=() pid cwd
+  # Both sides through readlink -f: PROJECT_DIR is whatever the unit or the
+  # environment said, and /proc/<pid>/cwd is always fully resolved, so a
+  # trailing slash or a symlinked home would otherwise never compare equal.
+  local want
+  want=$(readlink -f "$PROJECT_DIR")
+  for pid in $(pgrep -f "gunicorn.*goodtip.wsgi" 2>/dev/null); do
+    cwd=$(readlink -f "/proc/$pid/cwd" 2>/dev/null) || continue
+    [ "$cwd" = "$want" ] && pids+=("$pid")
+  done
+
+  if [ ${#pids[@]} -gt 0 ]; then
+    kill -HUP "${pids[@]}"
+    echo "gunicorn reloaded (${#pids[@]} process(es) in $PROJECT_DIR)"
+    return 0
+  fi
+
+  # No gunicorn is running in this directory. Either the service is down, or it
+  # was started somewhere other than its checkout and the cwd test cannot see
+  # it. Fall back to the old broad match rather than silently skip the reload
+  # and serve stale code -- but only when this deployment is the only one that
+  # could own those processes, so the fallback can never cross the boundary the
+  # check above exists to hold.
+  if [ "$BRANCH" = "main" ] && pkill -HUP -f "gunicorn.*goodtip.wsgi"; then
+    echo "WARNING: no gunicorn found with cwd $PROJECT_DIR; reloaded by name instead." >&2
+    return 0
+  fi
+
+  echo "WARNING: no gunicorn process matched in $PROJECT_DIR -- is the service running?" >&2
+  return 0
+}
+reload_gunicorn
 
 rm -f "$BLOCKED_FILE"
 echo "Deployment completed successfully ($BEFORE -> $AFTER)"

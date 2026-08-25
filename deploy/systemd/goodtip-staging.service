@@ -1,0 +1,38 @@
+[Unit]
+# Gunicorn for staging.goodtip.com.au. The production site has an equivalent
+# unit (goodtipservice) that predates this directory and is not tracked here;
+# this one is, because staging was set up from the repo and should stay
+# reproducible from it.
+Description=GoodTip Staging (gunicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=mbatha-goodtip
+Group=mbatha-goodtip
+# WorkingDirectory is load-bearing, not cosmetic. deploy.sh finds the gunicorn
+# to reload by reading /proc/<pid>/cwd and matching it against its own checkout,
+# because both sites serve `goodtip.wsgi` as the same user and nothing else on
+# the command line tells them apart. Change this and a staging deploy stops
+# reloading staging.
+WorkingDirectory=/home/mbatha-goodtip/projects/goodtip-staging
+Environment=PYTHONUNBUFFERED=1
+# Port 8001: production's gunicorn owns 8000. Nginx routes by server_name, so
+# this port is never reached directly from outside.
+ExecStart=/home/mbatha-goodtip/projects/goodtip-staging/venv/bin/gunicorn \
+    goodtip.wsgi:application \
+    --bind 127.0.0.1:8001 \
+    --workers 2 \
+    --timeout 60 \
+    --access-logfile - \
+    --error-logfile -
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

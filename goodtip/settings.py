@@ -11,6 +11,15 @@ SECRET_KEY = os.environ["SECRET_KEY"]
 DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get("ALLOWED_HOSTS", "").split(",") if h.strip()]
 
+# Which deployment this process is. Two non-DEBUG environments now run the same
+# code off the same box — goodtip.com.au from `main`, staging.goodtip.com.au
+# from `staging` — and a handful of settings below have to tell them apart.
+# It is deliberately not derived from the hostname or the checkout path: those
+# are things that get moved, and a staging box that silently decides it is
+# production is exactly the failure this whole arrangement exists to prevent.
+GOODTIP_ENV = os.environ.get("GOODTIP_ENV", "production").strip().lower()
+IS_STAGING = GOODTIP_ENV == "staging"
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -76,10 +85,13 @@ TEMPLATES = [
 # --- Google Analytics 4 -----------------------------------------------------
 # Empty means the tag does not render at all. Defaulted OFF in development so
 # that building the site does not fill the property with your own page views;
-# put GA_MEASUREMENT_ID in .env to force it on anywhere.
+# put GA_MEASUREMENT_ID in .env to force it on anywhere. Off on staging for the
+# same reason it is off in development, and a stronger one: a client clicking
+# through a demo is not site traffic, and those sessions landing in the real
+# property would quietly corrupt the only numbers anyone reports on.
 GA_MEASUREMENT_ID = os.environ.get(
     "GA_MEASUREMENT_ID",
-    "" if DEBUG else "G-ESB1RHRW49",
+    "" if (DEBUG or IS_STAGING) else "G-ESB1RHRW49",
 )
 
 WSGI_APPLICATION = "goodtip.wsgi.application"
@@ -194,16 +206,58 @@ if DEBUG:
 else:
     # Postmark when there's a token, SMTP as the fallback so an environment
     # without one behaves exactly as it did before.
-    EMAIL_BACKEND = (
+    _delivery_backend = (
         "goodtip.email_backends.PostmarkEmailBackend" if POSTMARK_SERVER_TOKEN
         else "django.core.mail.backends.smtp.EmailBackend"
     )
-    # Production site domain. Extra hosts can still be added via ALLOWED_HOSTS env.
-    ALLOWED_HOSTS += ["goodtip.com.au", "www.goodtip.com.au"]
-    CSRF_TRUSTED_ORIGINS = [
-        "https://goodtip.com.au",
-        "https://www.goodtip.com.au",
-    ]
+    if IS_STAGING:
+        # Never a bare delivery backend on staging. See AllowlistEmailBackend:
+        # staging runs on scrubbed production data, so "mail every member of
+        # this org" is a live code path over thousands of real-shaped rows.
+        # Empty allowlist == nothing goes out, which is the correct behaviour
+        # for a forgotten env var.
+        EMAIL_ALLOWLIST_DELEGATE = _delivery_backend
+        EMAIL_BACKEND = "goodtip.email_backends.AllowlistEmailBackend"
+    else:
+        EMAIL_BACKEND = _delivery_backend
+    # Site domain for this environment. Extra hosts can still be added via the
+    # ALLOWED_HOSTS env var; these are the ones that are always right so a
+    # missing env var cannot take the site off the air.
+    if IS_STAGING:
+        ALLOWED_HOSTS += ["staging.goodtip.com.au"]
+        CSRF_TRUSTED_ORIGINS = ["https://staging.goodtip.com.au"]
+    else:
+        ALLOWED_HOSTS += ["goodtip.com.au", "www.goodtip.com.au"]
+        CSRF_TRUSTED_ORIGINS = [
+            "https://goodtip.com.au",
+            "https://www.goodtip.com.au",
+        ]
+
+if IS_STAGING:
+    # Staging sits behind the nginx vhost in deploy/nginx/, which sets
+    # X-Forwarded-Proto on every proxied request unconditionally -- so trusting
+    # it here is safe, and without it request.is_secure() is False behind the
+    # TLS terminator and the gate cookie never gets its Secure flag.
+    #
+    # Scoped to staging on purpose. Production's vhost is managed by hand on
+    # the box and is not in this repo, so whether it sets that header on every
+    # path is not something this file can verify -- and trusting a header the
+    # proxy might not always overwrite is worth more care than a config change
+    # made in passing. Production behaves exactly as it did before.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# CSRF origins had no env escape hatch while production was the only deployment
+# and the list could be a literal. It needs one now: an origin missing from this
+# list fails every POST on the site with a 403 referer check, and that is not a
+# thing to discover by shipping a code change to add a domain.
+CSRF_TRUSTED_ORIGINS += [
+    o.strip() for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if o.strip() and o.strip() not in CSRF_TRUSTED_ORIGINS
+]
+
+# Comma-separated addresses ("me@x.com") or whole domains ("@client.com") that
+# staging is allowed to mail. Consulted only by AllowlistEmailBackend.
+EMAIL_ALLOWLIST = os.environ.get("EMAIL_ALLOWLIST", "")
 
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
@@ -215,8 +269,13 @@ EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "10"))
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "GoodTip <no-reply@goodtip.com.au>")
 # Where "suggest a charity" notifications go for manual review (deck slide 10).
 GOODTIP_TEAM_EMAIL = os.environ.get("GOODTIP_TEAM_EMAIL", "team@goodtip.com.au")
-# Absolute base URL used in outbound email links.
-SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://goodtip.com.au")
+# Absolute base URL used in outbound email links. Defaults per environment so a
+# staging invite cannot hand someone a link into production, which would look
+# like it worked right up until they acted on live data.
+SITE_BASE_URL = os.environ.get(
+    "SITE_BASE_URL",
+    "https://staging.goodtip.com.au" if IS_STAGING else "https://goodtip.com.au",
+)
 
 # Group Recap (docs/ai-group-recap-spec.md) needs no configuration: the
 # writer lives in orgs/recaps.py and runs off the database. Nothing to key,

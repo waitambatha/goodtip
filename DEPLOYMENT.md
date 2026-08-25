@@ -52,6 +52,11 @@ sudo journalctl -u goodtip-sync.service -f
 **Pushing to `main` is the deploy.** `goodtip-sync.timer` checks origin every
 2 minutes, so a push is live within ~2 minutes with nothing to run by hand.
 
+Which is why `main` is not where work goes. Push to `staging` instead: it
+deploys the same way, two minutes later, to `staging.goodtip.com.au`, and
+`main` reaches the live site only as a merge of code the client has already
+approved there. See [STAGING.md](STAGING.md) — it covers both sides.
+
 It is pull-based rather than a GitHub webhook: no inbound port, no public
 endpoint and no shared secret to leak. The box asks GitHub; GitHub is never
 told about the box. The trade is latency, bounded by the timer interval.

@@ -126,3 +126,91 @@ class PostmarkEmailBackend(BaseEmailBackend):
                     res.get("To"), res.get("ErrorCode"), res.get("Message"),
                 )
         return ok
+
+
+class AllowlistEmailBackend(BaseEmailBackend):
+    """Deliver only to approved addresses; log and drop everything else.
+
+    Staging runs on a scrubbed copy of the production database, which means it
+    holds thousands of member rows whose addresses *look* real because they
+    have the same shape as the originals. Any code path that mails "all members
+    of this org" — an election opening, a round reminder, a recap — is one
+    misconfigured token away from doing that for real from a box nobody thinks
+    of as the live site.
+
+    So staging never gets a bare Postmark backend. It gets this, wrapping it.
+    ``EMAIL_ALLOWLIST`` is a comma-separated list of addresses (``me@x.com``)
+    or whole domains (``@client.com``); a message survives only if every one of
+    its recipients matches. Partial delivery is deliberately not a thing: a
+    message that reached half its To: line is harder to reason about than one
+    that was dropped and logged.
+
+    An empty allowlist drops everything. That is the default on staging on
+    purpose — the failure mode of a forgotten env var should be silence, not a
+    send to the entire membership.
+    """
+
+    def __init__(self, fail_silently=False, **kwargs):
+        super().__init__(fail_silently=fail_silently, **kwargs)
+        self.allowed = [
+            entry.strip().lower()
+            for entry in getattr(settings, "EMAIL_ALLOWLIST", "").split(",")
+            if entry.strip()
+        ]
+        self._delegate = None
+
+    @property
+    def delegate(self):
+        """The real backend, built lazily so a fully-blocked send never opens
+        a connection or reads a token it has no use for."""
+        if self._delegate is None:
+            from django.core.mail import get_connection
+
+            self._delegate = get_connection(
+                backend=getattr(
+                    settings,
+                    "EMAIL_ALLOWLIST_DELEGATE",
+                    "django.core.mail.backends.smtp.EmailBackend",
+                ),
+                fail_silently=self.fail_silently,
+            )
+        return self._delegate
+
+    def _permitted(self, address):
+        address = (address or "").strip().lower()
+        if not address:
+            return False
+        domain = address[address.rfind("@"):] if "@" in address else ""
+        return any(
+            address == entry if not entry.startswith("@") else domain == entry
+            for entry in self.allowed
+        )
+
+    def send_messages(self, email_messages):
+        if not email_messages:
+            return 0
+
+        permitted, blocked = [], []
+        for message in email_messages:
+            recipients = message.recipients()
+            if recipients and all(self._permitted(r) for r in recipients):
+                permitted.append(message)
+            else:
+                blocked.append(message)
+
+        if blocked:
+            # One line per message, at WARNING, with the subject: when someone
+            # asks "did staging send that?", the journal has to be able to say.
+            for message in blocked:
+                logger.warning(
+                    "EMAIL_ALLOWLIST: dropped %r to %s",
+                    message.subject,
+                    ", ".join(message.recipients()) or "(no recipients)",
+                )
+            logger.warning(
+                "EMAIL_ALLOWLIST: %d message(s) dropped, %d allowed through.",
+                len(blocked),
+                len(permitted),
+            )
+
+        return self.delegate.send_messages(permitted) if permitted else 0
