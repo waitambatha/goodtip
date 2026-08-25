@@ -69,7 +69,10 @@ sudo -u postgres dropdb --if-exists "$STAGING_DB"
 sudo -u postgres createdb -O "$DB_OWNER" "$STAGING_DB"
 
 echo "==> restoring"
-sudo -u postgres psql -q --set ON_ERROR_STOP=on -d "$STAGING_DB" -f "$DUMP" >/dev/null
+# psql runs as postgres, which cannot open a root-owned 0600 file by path.
+# Redirect instead: root's shell opens the fd, so the dump stays unreadable
+# to everyone else while it sits in /tmp.
+sudo -u postgres psql -q --set ON_ERROR_STOP=on -d "$STAGING_DB" >/dev/null <"$DUMP"
 sudo -u postgres psql -q -d "$STAGING_DB" -c \
   "GRANT ALL ON ALL TABLES IN SCHEMA public TO $DB_OWNER;
    GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO $DB_OWNER;" >/dev/null
