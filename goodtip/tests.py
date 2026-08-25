@@ -118,6 +118,32 @@ class EmailAllowlistTests(SimpleTestCase):
     def test_no_recipients_dropped(self):
         self.assertEqual(self.send(), 0)
 
+    @override_settings(EMAIL_ALLOWLIST="*")
+    def test_wildcard_delivers_to_any_real_address(self):
+        # The gate is the access boundary: everyone who can reach staging was
+        # let in by whoever holds the gate password, so a second list of who
+        # may be emailed only blocks testing invites, signup and sign-in.
+        self.assertEqual(self.send("anyone@bigcorp.example"), 1)
+        self.assertEqual(self.send("someone.else@another.example"), 1)
+
+    @override_settings(EMAIL_ALLOWLIST="*")
+    def test_wildcard_still_drops_scrubbed_addresses(self):
+        # scrub_for_staging mints these for every anonymised member. They can
+        # only hard-bounce, and staging shares production's Postmark token, so
+        # the bounce would be charged against the live site.
+        self.assertEqual(self.send("member42@staging.invalid"), 0)
+        self.assertEqual(mail.outbox, [])
+
+    @override_settings(EMAIL_ALLOWLIST="*")
+    def test_wildcard_drops_a_batch_containing_a_scrubbed_address(self):
+        # The whole-message rule still holds: one unroutable recipient sinks
+        # the message rather than delivering it to the rest.
+        self.assertEqual(self.send("real@example.com", "member42@staging.invalid"), 0)
+
+    @override_settings(EMAIL_ALLOWLIST="@staging.invalid")
+    def test_scrubbed_domain_cannot_be_allowlisted_back_in(self):
+        self.assertEqual(self.send("member42@staging.invalid"), 0)
+
     @override_settings(EMAIL_ALLOWLIST="")
     def test_empty_allowlist_blocks_everything(self):
         # The failure mode of a forgotten env var must be silence, not a send

@@ -19,6 +19,13 @@ from django.core.mail.backends.base import BaseEmailBackend
 
 logger = logging.getLogger(__name__)
 
+# RFC 2606 reserves .invalid to never resolve, and scrub_for_staging mints
+# every anonymised member as <something>@staging.invalid. Mail to these can
+# only ever hard-bounce, and staging sends on the same Postmark token as
+# production -- so a bounce here is charged against the live site's sending
+# reputation. Never deliverable, never delivered, whatever the allowlist says.
+UNROUTABLE_SUFFIXES = (".invalid",)
+
 API_URL = "https://api.postmarkapp.com/email/batch"
 # Postmark's documented ceiling for a batch call.
 MAX_BATCH = 500
@@ -145,6 +152,13 @@ class AllowlistEmailBackend(BaseEmailBackend):
     message that reached half its To: line is harder to reason about than one
     that was dropped and logged.
 
+    A single ``*`` means deliver to every real address. That is the right
+    setting when the staging gate is already the access boundary -- everyone
+    who can reach the site was let in by someone holding the gate password, so
+    a second list of who may be emailed just blocks testing invites, signup
+    and sign-in. ``*`` still does not deliver to ``UNROUTABLE_SUFFIXES``:
+    those addresses are the scrub's own invention and can only bounce.
+
     An empty allowlist drops everything. That is the default on staging on
     purpose — the failure mode of a forgotten env var should be silence, not a
     send to the entire membership.
@@ -152,11 +166,13 @@ class AllowlistEmailBackend(BaseEmailBackend):
 
     def __init__(self, fail_silently=False, **kwargs):
         super().__init__(fail_silently=fail_silently, **kwargs)
-        self.allowed = [
+        entries = [
             entry.strip().lower()
             for entry in getattr(settings, "EMAIL_ALLOWLIST", "").split(",")
             if entry.strip()
         ]
+        self.allow_all = "*" in entries
+        self.allowed = [entry for entry in entries if entry != "*"]
         self._delegate = None
 
     @property
@@ -181,6 +197,10 @@ class AllowlistEmailBackend(BaseEmailBackend):
         if not address:
             return False
         domain = address[address.rfind("@"):] if "@" in address else ""
+        if domain.endswith(UNROUTABLE_SUFFIXES):
+            return False
+        if self.allow_all:
+            return True
         return any(
             address == entry if not entry.startswith("@") else domain == entry
             for entry in self.allowed
