@@ -17,6 +17,7 @@ PROD_DB="${PROD_DB:-goodtip_db}"
 STAGING_DB="${STAGING_DB:-goodtip_staging_db}"
 DB_OWNER="${DB_OWNER:-goodtip_user}"
 STAGING_DIR="${GOODTIP_STAGING_DIR:-/home/mbatha-goodtip/projects/goodtip-staging}"
+PROD_DIR="${GOODTIP_PROD_DIR:-/home/mbatha-goodtip/projects/goodtip}"
 STAGING_USER="${STAGING_USER:-mbatha-goodtip}"
 KEEP=""
 
@@ -95,6 +96,19 @@ sudo -u "$STAGING_USER" bash -c \
 echo "==> scrubbing personal data"
 sudo -u "$STAGING_USER" bash -c \
   "cd '$STAGING_DIR' && venv/bin/python manage.py scrub_for_staging --keep '$KEEP'" || scrub_failed
+
+# The rows just restored reference uploaded files by path -- avatars, org
+# logos, news images. Without this the database and the media directory drift
+# apart and every one of those paths 404s, which looks like a broken page
+# rather than a missing file. --delete because staging's media is a mirror of
+# production's, exactly as its database now is.
+#
+# Not fatal: by this point the database is restored and scrubbed, and aborting
+# here would leave the operator unsure whether the refresh had worked at all.
+echo "==> syncing media"
+sudo -u "$STAGING_USER" rsync -a --delete \
+  "$PROD_DIR/media/" "$STAGING_DIR/media/" \
+  || echo "WARNING: media sync failed; uploaded files may 404 on staging." >&2
 
 echo "==> restarting staging"
 sudo systemctl restart goodtip-staging.service
