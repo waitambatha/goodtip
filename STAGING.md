@@ -27,9 +27,9 @@ deploying, to whichever site owns that branch.
 | gunicorn | `:8000` (`goodtipservice`) | `:8001` (`goodtip-staging`) |
 | deploy timer | `goodtip-sync.timer` | `goodtip-staging-sync.timer` |
 | test gate | `fast` (check only) | `warn` (full suite, reported) |
-| email | Postmark, unrestricted | allowlist only — everything else dropped |
+| email | Postmark, unrestricted | Postmark, `EMAIL_ALLOWLIST=*` (drops `.invalid` only) |
 | analytics | on | off |
-| scheduled jobs | on | off |
+| scheduled jobs | on | on — its own `goodtip-staging-*` units |
 
 ## Daily use
 
@@ -108,7 +108,20 @@ clone you use.
 
 ## Refreshing staging's data
 
-Staging drifts as it gets used. To reset it to a scrubbed copy of production:
+Staging drifts as it gets used. There are two ways to reset it, and they are
+separate scripts on purpose — you should have to name which one you want.
+
+**Verbatim (the current default).** Every account keeps its real address, so
+every role can be signed into and the whole system is testable:
+
+```bash
+sudo bash ~/projects/goodtip-staging/deploy/restore-staging-verbatim.sh
+```
+
+The staging database then holds real personal data, and with `EMAIL_ALLOWLIST=*`
+the jobs timer can mail those people for real.
+
+**Scrubbed.** For when staging should not hold real personal data:
 
 ```bash
 sudo bash ~/projects/goodtip-staging/deploy/refresh-staging-db.sh \
@@ -135,11 +148,12 @@ behind one shared password. Staging is then down until it is re-run.
 matters. `scrub_for_staging` refuses to run if it sees that name, but the
 scrub is not what protects the live database — a staging migration is.
 
-**Staging cannot email real members.** It runs on a copy of the real
-membership, so "email everyone in this org" is a live code path over thousands
-of real-shaped rows. `AllowlistEmailBackend` drops everything not on
-`EMAIL_ALLOWLIST` and logs each one. An empty list sends nothing, which is the
-correct behaviour for a forgotten variable.
+**Staging CAN email real members, by choice.** `EMAIL_ALLOWLIST=*` and the
+database is unscrubbed, so invites, sign-in codes and notifications reach real
+addresses — which is what makes signup, invites and elections testable at all.
+`AllowlistEmailBackend` still refuses `.invalid`: the scrub mints those and
+they can only hard-bounce against the Postmark token live shares. Be deliberate
+about anything that mails a whole organisation.
 
 **Staging has its own `SECRET_KEY`.** Django signs session cookies with it.
 Sharing production's would make a session minted on staging valid on
@@ -152,10 +166,13 @@ matches both. `deploy.sh` reads `/proc/<pid>/cwd` instead. If you ever move a
 checkout, update the `WorkingDirectory` in its unit or its deploys will stop
 reloading it.
 
-**Staging does not install the scheduled-job timers.** Those units hardcode
-production's checkout, so installing them from staging would point production's
-jobs at staging's branch. `install-timers.sh` refuses to run from anywhere but
-the production directory, and `deploy.sh` only calls it on `main`.
+**Staging has its own scheduled-job timers, not production's.**
+Production's units hardcode production's checkout, so installing *those* from
+staging would point production's jobs at staging's branch — `install-timers.sh`
+still refuses to run from anywhere but the production directory. Staging's
+equivalents are `goodtip-staging-{matchsync,backfill,jobs}`, deliberately offset
+from production's schedule so both instances do not scrape the same pages on the
+same tick.
 
 ## When something is wrong on staging
 
