@@ -1,5 +1,6 @@
 from unittest import mock
 
+from django.conf import settings
 from django.core import mail
 from django.core.management.base import CommandError
 from django.db import connection
@@ -147,3 +148,55 @@ class ScrubGuardTests(SimpleTestCase):
             with self.assertRaises(CommandError) as caught:
                 self.run_scrub()
         self.assertIn("goodtip_db", str(caught.exception))
+
+
+@override_settings(**GATE_ON)
+class StagingRobotsTests(SimpleTestCase):
+    """staging.goodtip.com.au must be able to say "do not index me" to a
+    crawler that has not passed the gate -- and production must not gain a
+    robots.txt it never had."""
+
+    def test_robots_is_exempt_from_the_gate(self):
+        # The whole point: a crawler redirected to the lock page never reads
+        # the Disallow, so this path has to answer without the cookie.
+        from django.test import RequestFactory
+
+        from goodtip.staging_gate import StagingGateMiddleware
+
+        sentinel = object()
+        middleware = StagingGateMiddleware(lambda request: sentinel)
+        request = RequestFactory().get("/robots.txt")
+        self.assertIs(middleware(request), sentinel)
+
+    def test_gate_still_intercepts_everything_else(self):
+        from django.test import RequestFactory
+
+        from goodtip.staging_gate import StagingGateMiddleware
+
+        middleware = StagingGateMiddleware(lambda request: self.fail("gate let it through"))
+        response = middleware(RequestFactory().get("/dashboard/"))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].startswith("/gate/"))
+
+    def test_robots_disallows_everything(self):
+        from django.test import RequestFactory
+
+        from goodtip.staging_gate import robots_view
+
+        response = robots_view(RequestFactory().get("/robots.txt"))
+        body = response.content.decode()
+        self.assertEqual(response["Content-Type"], "text/plain")
+        self.assertIn("User-agent: *", body)
+        self.assertIn("Disallow: /", body)
+        # Nothing that could be read as permitting a path.
+        self.assertNotIn("Allow:", body)
+
+    def test_production_has_no_robots_route(self):
+        # The route is registered only under IS_STAGING. This asserts against
+        # the real urlconf as imported in this (non-staging) environment, so it
+        # fails if that condition is ever dropped.
+        from django.urls import NoReverseMatch, reverse
+
+        self.assertFalse(settings.IS_STAGING, "test env should not be staging")
+        with self.assertRaises(NoReverseMatch):
+            reverse("robots")

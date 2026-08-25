@@ -15,6 +15,7 @@ import hmac
 
 from django.conf import settings
 from django.core import signing
+from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.cache import never_cache
@@ -24,9 +25,19 @@ COOKIE_NAME = "gt_gate"
 COOKIE_MAX_AGE = 14 * 24 * 3600  # re-prompt after a fortnight
 SIGNING_SALT = "goodtip.staging_gate"
 
+ROBOTS_PATH = "/robots.txt"
+
 # Paths that must work without the cookie: the gate itself, static assets,
-# and the Stripe webhook (Stripe's servers can't answer a login page).
-EXEMPT_PREFIXES = (GATE_PATH, settings.STATIC_URL, "/stripe/webhook/")
+# the Stripe webhook (Stripe's servers can't answer a login page), and
+# robots.txt.
+#
+# robots.txt is exempt because a crawler that gets redirected to the gate never
+# reads the Disallow. In practice the redirect target carries `noindex` and the
+# staging vhost sets X-Robots-Tag on every response, so staging stays out of
+# the index either way -- but "our robots.txt says Disallow" is the check
+# anyone auditing this will actually run, and it should give a straight answer
+# rather than a 302 to a login page.
+EXEMPT_PREFIXES = (GATE_PATH, settings.STATIC_URL, "/stripe/webhook/", ROBOTS_PATH)
 
 
 def _credentials():
@@ -93,3 +104,21 @@ def gate_view(request):
         error = True
 
     return render(request, "staging_gate.html", {"error": error, "next": next_url}, status=401)
+
+
+@never_cache
+def robots_view(request):
+    """``Disallow: /`` for the whole staging site.
+
+    Registered in urls.py only when IS_STAGING, so production is untouched and
+    keeps whatever its own nginx serves. Belt and braces alongside the
+    X-Robots-Tag header in deploy/nginx/: the header is what actually binds a
+    crawler that has already fetched a page, this is what stops it fetching.
+    """
+    return HttpResponse(
+        "# staging.goodtip.com.au is a pre-release copy of goodtip.com.au.\n"
+        "# Nothing here should be indexed. The live site is https://goodtip.com.au\n"
+        "User-agent: *\n"
+        "Disallow: /\n",
+        content_type="text/plain",
+    )

@@ -12,7 +12,7 @@ from accounts.views import (
 )
 from admin_panel.views import news_detail, news_index
 from billing.views import good_list_view, stripe_webhook
-from goodtip.staging_gate import gate_view
+from goodtip.staging_gate import gate_view, robots_view
 from orgs.views import join_view, public_wall_reply, public_wall_view
 
 
@@ -79,3 +79,9 @@ urlpatterns = [
     # fine at avatar scale; move behind nginx/S3 if uploads ever grow.
     path("media/<path:path>", static_serve, {"document_root": settings.MEDIA_ROOT}, name="media"),
 ]
+
+
+# Staging only. Production keeps whatever its own nginx serves at /robots.txt;
+# nothing here should change what a crawler is told about the live site.
+if getattr(settings, "IS_STAGING", False):
+    urlpatterns += [path("robots.txt", robots_view, name="robots")]
