@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -313,16 +314,66 @@ class GoodListConfig(models.Model):
         return obj
 
 
+class CharityQuerySet(models.QuerySet):
+    """Charity visibility, in one place so no picker has to reinvent it."""
+
+    def approved(self):
+        return self.filter(is_approved=True)
+
+    def available_to(self, org):
+        """Every charity `org` may pick or put on a ballot.
+
+        The vetted global list, PLUS the charities this organisation added for
+        itself. An org-added charity is usable the moment it is created — the
+        admin who typed it is mid-task and should not be told to come back
+        later — but it stays `is_approved=False` so it does not appear in
+        anyone else's picker until GoodTip has looked at it.
+
+        A group's charities are its organisation's: the org is the one that
+        adds them, and its groups choose from what it has made available.
+        """
+        if org is None:
+            return self.approved()
+        return self.filter(models.Q(is_approved=True) | models.Q(owner_org=org))
+
+
 class Charity(models.Model):
     """A charity a league can raise funds for.
 
     Approved charities are vetted by GoodTip and appear in the public picker.
     Custom charities added by a league creator start unapproved.
+
+    WHO CAN ADD ONE. Only an organisation admin, from Manage → Charities. The
+    creation wizard deliberately does NOT offer it any more: someone standing
+    up their first league is the person least able to judge whether "Cancer
+    Council" and "The Cancer Council" are the same row, and every typo made
+    there became a permanent near-duplicate in the picker everyone else reads.
+    Pick from the list at creation; add your own later, once you are in.
     """
 
     name = models.CharField(max_length=200, unique=True)
     slug = models.SlugField(max_length=200, unique=True)
     website = models.URLField(blank=True)
+    # The organisation that added this one, when it wasn't GoodTip. Scopes
+    # visibility (see CharityQuerySet.available_to) and tells the superadmin
+    # review queue who to ask about a name it doesn't recognise. NULL means
+    # curated centrally, which is what every vetted charity is.
+    owner_org = models.ForeignKey(
+        "orgs.Organisation",
+        on_delete=models.SET_NULL,
+        related_name="owned_charities",
+        null=True,
+        blank=True,
+    )
+    # Who typed it, for the same reason.
+    added_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="charities_added",
+        null=True,
+        blank=True,
+    )
+    added_at = models.DateTimeField(null=True, blank=True)
     # Fetched once from the charity's own site — see catalog.logos. Blank is
     # an ordinary state, not a failure: `initials` covers it, so a card is
     # never rendered half-built waiting on a network call that may never
@@ -332,6 +383,8 @@ class Charity(models.Model):
     # has no usable icon is not re-fetched on every pass.
     logo_fetched_at = models.DateTimeField(null=True, blank=True)
     is_approved = models.BooleanField(default=False)
+
+    objects = CharityQuerySet.as_manager()
 
     class Meta:
         ordering = ["name"]

@@ -321,3 +321,12 @@ LOGGING = {
         "data_sync": {"handlers": ["console"], "level": "INFO", "propagate": False},
     },
 }
+
+
+# Charity logo fetching reaches out to a third-party web server on a daemon
+# thread (see catalog.logos.backfill_in_background). That is right in
+# production and wrong under `manage.py test`: the thread outlives the test's
+# transaction, so it wakes to find the charity row rolled away and logs a
+# DatabaseError traceback into every run — and each one is a real network call
+# to a stranger's site from CI. Off during tests, on everywhere else.
+CHARITY_LOGO_FETCH = "test" not in sys.argv

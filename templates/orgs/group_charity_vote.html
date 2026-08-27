@@ -1,0 +1,179 @@
+{% extends "app_base.html" %}
+{% block title %}{{ group.name }}'s charity{% endblock %}
+{% block loader_task %}Opening the ballot{% endblock %}
+{% block body_class %}page-deep sheet-page{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+
+{% block app_content %}
+{% comment %}
+A GROUP'S OWN CHARITY ELECTION.
+
+Why this exists as its own screen rather than a section of the organisation's:
+groups stopped being departments. A franchise — the client's example was
+McDonald's, several restaurants in one city — is one organisation whose groups
+are separate businesses with their own staff and their own local causes. The
+Sydney store backing Ronald McDonald House while head office backs Beyond Blue
+is the feature, not a conflict.
+
+The ballot is the organisation's charity list. A group does not invent a
+charity; the org adds it once in Manage → Charities and every group can then
+vote for it.
+
+Blind vote, exactly as the org-wide one: counts while open, tallies only once
+closed. That rule is implemented once, in views._ballot_context.
+{% endcomment %}
+
+<div class="app-head">
+  <div>
+    <div class="app-eyebrow">{{ org.name }} &middot; {{ group.name }}</div>
+    <h1 class="app-h1">{{ group.name }}'s charity</h1>
+    <p class="app-sub">
+      {% if group.charity %}
+        Chosen by this group. Everything {{ group.name }} raises goes to them.
+      {% elif inherited_charity %}
+        Right now {{ group.name }} backs {{ inherited_charity.name }} — {{ org.name }}'s
+        charity. Run a vote to choose your own.
+      {% else %}
+        This group hasn't chosen a cause yet.
+      {% endif %}
+    </p>
+  </div>
+</div>
+
+{% if group.charity %}
+<div class="card pad-lg ch-current">
+  <div class="ch-current-label">{{ group.name }} is backing</div>
+  {% include "components/_charity_card.html" with charity=group.charity %}
+</div>
+{% endif %}
+
+{% if vote is None %}
+  {# Nothing has ever been run here. Say what it would do, then offer it. #}
+  <div class="card pad-lg" style="text-align:center;">
+    <h2>No election yet</h2>
+    <p class="app-sub">
+      {% if inherited_charity %}
+        Until {{ group.name }} votes, it raises for {{ org.name }}'s charity,
+        {{ inherited_charity.name }}.
+      {% else %}
+        Nobody has put a cause to this group yet.
+      {% endif %}
+    </p>
+    {% if can_run %}
+    <a href="{% url 'orgs:group_election_setup' org.id group.id %}" class="abtn abtn-primary" style="margin-top:18px;">Set up {{ group.name }}'s election &rarr;</a>
+    {% else %}
+    <p class="hint">Your group's admin can start one.</p>
+    {% endif %}
+  </div>
+
+{% elif vote.is_pending_setup %}
+  <div class="card pad-lg" style="text-align:center;">
+    <h2>Election {{ vote.get_status_display|lower }}</h2>
+    {% if vote.scheduled_open_at %}
+    <p class="app-sub">Voting opens {{ vote.scheduled_open_at|date:"j M, g:i a" }}{% if vote.scheduled_close_at %} and closes {{ vote.scheduled_close_at|date:"j M, g:i a" }}{% endif %}.</p>
+    {% endif %}
+    {% if vote.admin_message %}<p class="app-sub" style="font-style:italic;">{{ vote.admin_message }}</p>{% endif %}
+  </div>
+
+{% elif vote.is_tied %}
+  <div class="card pad-lg" style="text-align:center;">
+    <h2>It's a tie</h2>
+    <p class="app-sub">
+      {{ tied_options|length }} charities finished level on
+      {{ tied_options.0.n }} vote{{ tied_options.0.n|pluralize }} each. Nothing is
+      decided until someone makes the call.
+    </p>
+    {% if can_break_tie %}
+    {% comment %}
+    Only the options that ACTUALLY tied. Breaking a deadlock is choosing
+    between what the group put level — reaching for an option that came third
+    would make the whole election advisory.
+    {% endcomment %}
+    <form method="post" action="{% url 'orgs:group_captains_call' org.id group.id %}">
+      {% csrf_token %}
+      <div class="opt-grid cols2" style="margin-top:14px;">
+        {% for opt in tied_options %}
+        <label class="opt-card radio">
+          <input type="radio" name="charity" value="{{ opt.charity_id }}" required>
+          <span class="oc-box"></span>
+          {% include "components/_charity_card.html" with charity=opt.charity count=opt.n %}
+        </label>
+        {% endfor %}
+      </div>
+      <button type="submit" class="abtn abtn-primary" style="margin-top:16px;">Make the call</button>
+    </form>
+    {% else %}
+    <ul class="app-sub" style="list-style:none;padding:0;">
+      {% for opt in tied_options %}<li>{{ opt.charity.name }} — {{ opt.n }}</li>{% endfor %}
+    </ul>
+    <p class="hint">A captain or an admin in {{ group.name }} decides.</p>
+    {% endif %}
+  </div>
+
+{% elif vote.is_open %}
+  {# counts only — never who voted, never the tallies #}
+  <div class="vz-live" role="group" aria-label="Election status">
+    <div class="vz-tile"><b>{{ eligible_count }}</b><small>in {{ group.name }}</small></div>
+    <div class="vz-tile"><b>{{ ballot_count }}</b><small>ballot{{ ballot_count|pluralize }} in</small></div>
+    <div class="vz-tile"><b>{{ turnout_pct }}%</b><small>turnout</small></div>
+  </div>
+  {% if vote.admin_message %}<p class="app-sub" style="font-style:italic;">{{ vote.admin_message }}</p>{% endif %}
+
+  <form method="post" action="{% url 'orgs:cast_group_charity_vote' org.id group.id %}">
+    {% csrf_token %}
+    <div class="opt-grid cols2" style="margin-top:8px;">
+      {% for opt in options %}
+      <label class="opt-card radio">
+        <input type="radio" name="option" value="{{ opt.id }}" {% if opt.id == my_option_id %}checked{% endif %}>
+        <span class="oc-box"></span>
+        {% include "components/_charity_card.html" with charity=opt.charity %}
+        {% if opt.id == my_option_id %}<span class="oc-right"><span class="pill-role">Your pick</span></span>{% endif %}
+      </label>
+      {% endfor %}
+    </div>
+    <button type="submit" class="abtn abtn-primary" style="margin-top:16px;">
+      {% if my_option_id %}Change my vote{% else %}Save my vote{% endif %}
+    </button>
+  </form>
+
+  {% if can_run %}
+  <form method="post" action="{% url 'orgs:close_group_charity_vote' org.id group.id %}" style="margin-top:18px;">
+    {% csrf_token %}
+    <button type="submit" class="abtn abtn-dark">Close the vote now</button>
+    <span class="hint">Closing reveals the tallies to everyone in {{ group.name }}.</span>
+  </form>
+  {% endif %}
+
+{% else %}
+  {# closed — tallies are public now #}
+  <div class="card pad-lg">
+    <h2>{{ vote.winning_charity.name }} won</h2>
+    {% if vote.tie_broken_by %}
+    <p class="app-sub">Finished level — captain's call by {{ vote.tie_broken_by.display_name|default:vote.tie_broken_by.email }}.</p>
+    {% endif %}
+    {% if stats %}
+    <div class="vz-live" role="group" aria-label="Result" style="margin-top:14px;">
+      <div class="vz-tile"><b>{{ stats.ballots }}</b><small>of {{ stats.eligible }} voted</small></div>
+      <div class="vz-tile"><b>{{ stats.turnout_pct }}%</b><small>turnout</small></div>
+      <div class="vz-tile"><b>{{ stats.winner_share }}%</b><small>winning share</small></div>
+    </div>
+    {% endif %}
+    <div class="opt-grid cols2" style="margin-top:16px;">
+      {% for opt in results %}
+      <div class="opt-card is-static{% if opt.charity_id == vote.winning_charity_id %} is-winner{% endif %}">
+        {% include "components/_charity_card.html" with charity=opt.charity count=opt.n %}
+        <div class="vz-track"><i class="{% if opt.charity_id == vote.winning_charity_id %}win{% endif %}" style="width:{{ opt.bar }}%;"></i></div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% if can_run %}
+  <a href="{% url 'orgs:group_election_setup' org.id group.id %}" class="abtn abtn-ghost" style="margin-top:16px;">Run another election &rarr;</a>
+  {% endif %}
+{% endif %}
+
+<p class="hint" style="margin-top:22px;">
+  Ballot options come from {{ org.name }}'s charity list.
+  {% if is_admin %}<a href="{% url 'orgs:charities' org.id %}">Add one &rarr;</a>{% endif %}
+</p>
+{% endblock %}

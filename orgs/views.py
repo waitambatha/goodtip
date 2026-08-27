@@ -20,7 +20,10 @@ from django.views.decorators.http import require_POST
 
 from accounts.views import JOIN_INVITER_SESSION_KEY, JOIN_SESSION_KEY
 from catalog.models import Charity, Country, GroupType
-from .forms import InviteByEmailForm, OrgCreateForm, fed_competitions
+from .forms import (
+    GroupCharityBallotForm, InviteByEmailForm, OrgCharityForm, OrgCreateForm,
+    fed_competitions,
+)
 from .notifications import send_org_invites
 from .models import (
     CharityVote,
@@ -36,7 +39,11 @@ from .models import (
 )
 from .services import (
     active_work_verification,
+    add_charity_for_org,
     add_member,
+    can_run_group_election,
+    create_group_charity_election,
+    group_charity_vote,
     apply_verification_to_org,
     approve_membership_request,
     resend_work_email_code,
@@ -61,7 +68,6 @@ from .services import (
     open_due_elections,
     reassign_child_org_admin,
     nominate_manager_by_email,
-    notify_charity_suggestion,
     open_charity_vote,
     record_charity_selection,
     request_to_join,
@@ -82,6 +88,17 @@ def _membership(user, org):
 def _can_manage(user, org) -> bool:
     m = _membership(user, org)
     return bool(m and m.can_manage)
+
+
+def _org_wide_vote(org):
+    """This organisation's own election — never one of its groups'.
+
+    `org.charity_votes` holds group elections too, because a group's ballot is
+    still that organisation's business to list. Every screen below is about
+    the ORG-wide vote, so the scope has to be stated; without it a department
+    opening its own election took over the organisation's charity screens.
+    """
+    return org.charity_votes.filter(group__isnull=True).first()
 
 
 def _is_creator_admin(user, org, *, membership=None) -> bool:
@@ -179,8 +196,8 @@ WIZARD_STEPS = [
     (5, "The tipping", "Scoring & rules",
      ["competitions", "season", "team_size", "finals_only"]),
     (6, "The charity", "Choose a cause",
-     ["charity_method", "charity", "new_charity_name",
-      "new_charity_url", "vote_charities", "vote_opens_at", "vote_closes_at"]),
+     ["charity_method", "charity", "vote_charities",
+      "vote_opens_at", "vote_closes_at"]),
     (7, "Review", "Check & create", []),
 ]
 VERIFY_STEP = 3
@@ -485,7 +502,7 @@ def _step_saved_message(form, step: int) -> str:
             n = len(data.get("vote_charities") or [])
             return f"Charity vote set up — {n} option{'s' if n != 1 else ''} on the ballot."
         charity = data.get("charity")
-        name = charity.name if charity else (data.get("new_charity_name") or "your charity")
+        name = charity.name if charity else "your charity"
         return f"Charity set: {name}."
     return "Saved."
 
@@ -794,13 +811,6 @@ def create_org_view(request):
                 # Charity was picked at creation — start the timeline.
                 record_charity_selection(org, org.charity, source=OrgCharitySelection.SOURCE_INITIAL)
                 messages.success(request, f"{org.name} created.")
-            suggested = getattr(form, "suggested_charity", None)
-            if suggested is not None:
-                notify_charity_suggestion(suggested, org, request.user)
-                messages.info(
-                    request,
-                    f"{suggested.name} was sent to the GoodTip team for review.",
-                )
             # The draft has served its purpose.
             draft.delete()
             return redirect("orgs:created", org_id=org.id)
@@ -943,7 +953,7 @@ def _draft_summary(form, draft) -> list:
     charity = (
         "The group votes on it"
         if d.get("charity_method") == "vote"
-        else (label_for("charity", d.get("charity")) or d.get("new_charity_name") or "")
+        else (label_for("charity", d.get("charity")) or "")
     )
     ballot_charities = list(
         form.fields["vote_charities"].queryset.filter(
@@ -1088,36 +1098,19 @@ def join_view(request, org_id: int, token: str):
     return render(request, "join_prompt.html", {"org": org, "signup_url": signup_url})
 
 
-@login_required
-def charity_vote_view(request, org_id: int):
-    org = get_object_or_404(Organisation, pk=org_id)
-    if not _is_member(request.user, org):
-        return HttpResponseForbidden()
-    is_admin = _is_creator_admin(request.user, org)
-    # Charity Partner Workflow (categories doc): partners can lock fundraising
-    # to themselves; non-partner charity orgs see the become-a-partner CTA.
-    already_self = bool(org.charity_id and org.charity.name.lower() == org.name.lower())
-    partner_ctx = {
-        "can_lock_fundraising": is_admin and can_lock_fundraising(org) and not already_self,
-        "show_partner_cta": (
-            is_admin and org.organisation_type_id
-            and org.organisation_type.is_charity_type and not org.is_charity_partner
-        ),
-    }
-    # A scheduled election whose time has come opens on first visit — and an
-    # open one whose end time has passed closes and reveals its results.
-    open_due_elections(orgs=[org])
-    close_due_elections(orgs=[org])
-    vote = org.charity_votes.first()
-    if vote is None:
-        return render(request, "orgs/charity_vote.html", {"org": org, "vote": None, **partner_ctx})
-    vote.refresh_from_db()
+def _ballot_context(vote, user, eligible_count):
+    """Everything a charity-vote screen renders, for an org OR a group ballot.
 
+    Extracted when groups gained their own elections. A second copy of the
+    tally maths was the obvious way to do it and the wrong one: the blind-vote
+    rule (counts while open, tallies only once closed) is a promise made to
+    members, and a promise implemented twice is a promise kept once.
+    """
     options = list(vote.options.select_related("charity"))
-    my_ballot = vote.ballots.filter(user=request.user).first()
-    # Everyone in the org may vote — that's the eligible pool. While the vote
-    # is open only the *counts* are shown: never who has voted, never tallies.
-    eligible_count = org.members.count()
+    my_ballot = vote.ballots.filter(user=user).first()
+    # While the vote is open only the *counts* are shown: never who has
+    # voted, never tallies. `eligible_count` is the electorate — the whole
+    # organisation, or just the group when the ballot belongs to one.
     ballot_count = vote.ballots.count()
     turnout_pct = round(ballot_count * 100 / eligible_count) if eligible_count else 0
     results = None
@@ -1126,7 +1119,7 @@ def charity_vote_view(request, org_id: int):
     # and offer the way out — before this, a tie left the page with no winner,
     # no tallies and no controls, which read as a page still loading.
     tied_options = vote.tied_options()
-    can_break_tie = can_break_charity_vote_tie(request.user, vote)
+    can_break_tie = can_break_charity_vote_tie(user, vote)
     if vote.status == CharityVote.STATUS_CLOSED:
         # Tallies are revealed only once the vote has closed (blind vote).
         results = list(
@@ -1160,9 +1153,7 @@ def charity_vote_view(request, org_id: int):
         }
         stats["turnout_deg"] = round(stats["turnout_pct"] * 3.6, 1)
         stats["winner_deg"] = round(stats["winner_share"] * 3.6, 1)
-    return render(request, "orgs/charity_vote.html", {
-        "org": org,
-        "vote": vote,
+    return {
         "options": options,
         "my_option_id": my_ballot.option_id if my_ballot else None,
         "ballot_count": ballot_count,
@@ -1170,9 +1161,42 @@ def charity_vote_view(request, org_id: int):
         "turnout_pct": turnout_pct,
         "results": results,
         "stats": stats,
-        "is_admin": is_admin,
         "tied_options": tied_options,
         "can_break_tie": can_break_tie,
+    }
+
+
+@login_required
+def charity_vote_view(request, org_id: int):
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _is_member(request.user, org):
+        return HttpResponseForbidden()
+    is_admin = _is_creator_admin(request.user, org)
+    # Charity Partner Workflow (categories doc): partners can lock fundraising
+    # to themselves; non-partner charity orgs see the become-a-partner CTA.
+    already_self = bool(org.charity_id and org.charity.name.lower() == org.name.lower())
+    partner_ctx = {
+        "can_lock_fundraising": is_admin and can_lock_fundraising(org) and not already_self,
+        "show_partner_cta": (
+            is_admin and org.organisation_type_id
+            and org.organisation_type.is_charity_type and not org.is_charity_partner
+        ),
+    }
+    # A scheduled election whose time has come opens on first visit — and an
+    # open one whose end time has passed closes and reveals its results.
+    open_due_elections(orgs=[org])
+    close_due_elections(orgs=[org])
+    vote = _org_wide_vote(org)
+    if vote is None:
+        return render(request, "orgs/charity_vote.html", {"org": org, "vote": None, **partner_ctx})
+    vote.refresh_from_db()
+
+    ctx = _ballot_context(vote, request.user, org.members.count())
+    return render(request, "orgs/charity_vote.html", {
+        "org": org,
+        "vote": vote,
+        "is_admin": is_admin,
+        **ctx,
         **partner_ctx,
     })
 
@@ -1183,7 +1207,7 @@ def cast_charity_vote(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _is_member(request.user, org):
         return HttpResponseForbidden()
-    vote = org.charity_votes.first()
+    vote = _org_wide_vote(org)
     if vote is None:
         return redirect("orgs:charity_vote", org_id=org.id)
     option = get_object_or_404(CharityVoteOption, pk=request.POST.get("option"), vote=vote)
@@ -1201,7 +1225,7 @@ def close_charity_vote_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _is_creator_admin(request.user, org):
         return HttpResponseForbidden()
-    vote = org.charity_votes.first()
+    vote = _org_wide_vote(org)
     if vote is not None and vote.is_open:
         winner = close_charity_vote(vote)
         if winner:
@@ -1234,7 +1258,7 @@ def captains_call_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _is_member(request.user, org):
         return HttpResponseForbidden()
-    vote = org.charity_votes.first()
+    vote = _org_wide_vote(org)
     if vote is None or not vote.is_tied:
         return redirect("orgs:charity_vote", org_id=org.id)
     charity = Charity.objects.filter(pk=request.POST.get("charity")).first()
@@ -1256,7 +1280,7 @@ def election_close_time_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _is_creator_admin(request.user, org):
         return HttpResponseForbidden()
-    vote = org.charity_votes.first()
+    vote = _org_wide_vote(org)
     if vote is None or not vote.is_open:
         return redirect("orgs:charity_vote", org_id=org.id)
     from django.utils import timezone as tz
@@ -1620,7 +1644,7 @@ def election_setup_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _is_creator_admin(request.user, org):
         return HttpResponseForbidden()
-    vote = org.charity_votes.first()
+    vote = _org_wide_vote(org)
     if vote is None:
         messages.info(request, "This league has no charity election — its charity was picked directly.")
         return redirect("dashboard")
@@ -2578,3 +2602,227 @@ def groups_view(request, org_id: int):
         "current_group": ctx.current_group(request, root),
         "pending_count": sum(1 for r in rows if r["awaiting_approval"]),
     })
+
+
+# ---------------------------------------------------------------------------
+# The organisation's charities, and its groups' own elections
+# ---------------------------------------------------------------------------
+#
+# Two features that arrived together because they only make sense together.
+#
+# An organisation can now add a charity GoodTip's vetted list does not carry.
+# Its groups can now run their own election and back their own cause. The link
+# between them is deliberate: the ORGANISATION is the only thing that adds
+# charities, and a group votes on what its organisation has made available. A
+# franchise wanting a local cause on the ballot asks head office to add it
+# once, and every store can vote for it from then on.
+
+
+@login_required
+def org_charities_view(request, org_id: int):
+    """Manage → Charities. The list this organisation can pick and ballot.
+
+    Shows the vetted list and the org's own additions together, because the
+    single question the person on this screen is asking is "is my cause
+    already here?" — and an answer split across two tabs is not an answer.
+    """
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _can_manage(request.user, org):
+        return HttpResponseForbidden()
+
+    form = OrgCharityForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            charity = add_charity_for_org(
+                org,
+                name=form.cleaned_data["name"],
+                website=form.cleaned_data.get("website", ""),
+                by_user=request.user,
+            )
+        except ValueError as e:
+            messages.error(request, str(e))
+        else:
+            # add_charity_for_org returns an existing row rather than making a
+            # near-duplicate, so the message has to be honest about which of
+            # the two things just happened.
+            if charity.owner_org_id == org.id and charity.added_by_id == request.user.id:
+                messages.success(
+                    request,
+                    f"{charity.name} added — you can put it to a vote straight away. "
+                    "We'll review it before it shows up for other organisations.",
+                )
+            else:
+                messages.info(
+                    request,
+                    f"{charity.name} was already on the list, so we've used that one.",
+                )
+            return redirect("orgs:charities", org_id=org.id)
+
+    available = Charity.objects.available_to(org).order_by("name")
+    ours = [c for c in available if c.owner_org_id == org.id]
+    vetted = [c for c in available if c.owner_org_id != org.id]
+    # Which groups back which cause — the reason an admin comes here after the
+    # first visit is usually to check that, not to add anything.
+    groups = (
+        org.groups.filter(approval_status=Group.APPROVAL_APPROVED)
+        .select_related("charity")
+        .order_by("name")
+    )
+    return render(request, "orgs/charities.html", {
+        "org": org,
+        "form": form,
+        "ours": ours,
+        "vetted": vetted,
+        "groups": groups,
+        "groups_enabled": org.groups_enabled,
+    })
+
+
+def _group_or_404(org, group_id):
+    return get_object_or_404(
+        Group, pk=group_id, org=org, approval_status=Group.APPROVAL_APPROVED,
+    )
+
+
+def _in_group(user, group) -> bool:
+    return group.memberships.filter(user=user).exists()
+
+
+@login_required
+def group_charity_vote_view(request, org_id: int, group_id: int):
+    """One group's charity election — the group's own version of the org screen.
+
+    Visible to the people in the group and to the organisation's admins. Not
+    to the rest of the organisation: a group's ballot is the group's business,
+    and a company-wide audience for a twelve-person decision is how the
+    notification stopped being read.
+    """
+    org = get_object_or_404(Organisation, pk=org_id)
+    group = _group_or_404(org, group_id)
+    can_run = can_run_group_election(request.user, group)
+    if not (_in_group(request.user, group) or can_run):
+        return HttpResponseForbidden()
+
+    # Same lazy sweep as the org screen: a scheduled election opens on first
+    # visit, an expired one closes and reveals itself.
+    open_due_elections(orgs=[org])
+    close_due_elections(orgs=[org])
+
+    vote = group_charity_vote(group)
+    ctx = {
+        "org": org,
+        "group": group,
+        "vote": vote,
+        "is_admin": can_run,
+        "can_run": can_run,
+        "inherited_charity": org.charity,
+    }
+    if vote is None:
+        return render(request, "orgs/group_charity_vote.html", ctx)
+    vote.refresh_from_db()
+    ctx.update(_ballot_context(vote, request.user, group.memberships.count()))
+    return render(request, "orgs/group_charity_vote.html", ctx)
+
+
+@login_required
+@require_POST
+def cast_group_charity_vote(request, org_id: int, group_id: int):
+    org = get_object_or_404(Organisation, pk=org_id)
+    group = _group_or_404(org, group_id)
+    # Only people IN the group vote in it. An org admin can run the election
+    # without being able to cast a ballot in it, which is the right shape:
+    # running a vote and having a say in it are different powers.
+    if not _in_group(request.user, group):
+        return HttpResponseForbidden()
+    vote = group_charity_vote(group)
+    if vote is None:
+        return redirect("orgs:group_charity_vote", org_id=org.id, group_id=group.id)
+    option = get_object_or_404(CharityVoteOption, pk=request.POST.get("option"), vote=vote)
+    try:
+        cast_charity_ballot(user=request.user, vote=vote, option=option)
+        messages.success(request, "Your vote is in.")
+    except ValueError as e:
+        messages.error(request, str(e))
+    return redirect("orgs:group_charity_vote", org_id=org.id, group_id=group.id)
+
+
+@login_required
+def group_election_setup_view(request, org_id: int, group_id: int):
+    """Build and schedule a group's ballot from the organisation's charities."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    group = _group_or_404(org, group_id)
+    if not can_run_group_election(request.user, group):
+        return HttpResponseForbidden()
+
+    form = GroupCharityBallotForm(request.POST or None, org=org)
+    if request.method == "POST" and form.is_valid():
+        try:
+            vote = create_group_charity_election(group, form.cleaned_data["charities"])
+            opens = form.cleaned_data.get("opens_at") or timezone.now()
+            schedule_charity_election(
+                vote,
+                when=opens,
+                close_at=form.cleaned_data.get("closes_at"),
+                message=form.cleaned_data.get("message", ""),
+            )
+        except ValueError as e:
+            messages.error(request, str(e))
+        else:
+            if vote.status == CharityVote.STATUS_OPEN:
+                messages.success(request, f"{group.name}'s charity vote is open.")
+            else:
+                stamp = timezone.localtime(vote.scheduled_open_at)
+                messages.success(
+                    request,
+                    f"{group.name}'s charity vote opens {stamp:%-d %b at %-I:%M %p}.",
+                )
+            return redirect("orgs:group_charity_vote", org_id=org.id, group_id=group.id)
+
+    return render(request, "orgs/group_election_setup.html", {
+        "org": org,
+        "group": group,
+        "form": form,
+        "charities": Charity.objects.available_to(org).order_by("name"),
+    })
+
+
+@login_required
+@require_POST
+def close_group_charity_vote(request, org_id: int, group_id: int):
+    org = get_object_or_404(Organisation, pk=org_id)
+    group = _group_or_404(org, group_id)
+    if not can_run_group_election(request.user, group):
+        return HttpResponseForbidden()
+    vote = group_charity_vote(group)
+    if vote is not None and vote.is_open:
+        close_charity_vote(vote)
+        vote.refresh_from_db()
+        if vote.is_tied:
+            names = ", ".join(o.charity.name for o in vote.tied_options())
+            messages.info(
+                request,
+                f"It's a tie between {names}. A captain or admin makes the call.",
+            )
+        else:
+            messages.success(request, f"{group.name} is backing {vote.winning_charity.name}.")
+    return redirect("orgs:group_charity_vote", org_id=org.id, group_id=group.id)
+
+
+@login_required
+@require_POST
+def group_captains_call(request, org_id: int, group_id: int):
+    """Break a tied group election. Same rule as the org one: tied options only."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    group = _group_or_404(org, group_id)
+    if not _in_group(request.user, group) and not can_run_group_election(request.user, group):
+        return HttpResponseForbidden()
+    vote = group_charity_vote(group)
+    if vote is None or not vote.is_tied:
+        return redirect("orgs:group_charity_vote", org_id=org.id, group_id=group.id)
+    charity = Charity.objects.filter(pk=request.POST.get("charity")).first()
+    try:
+        break_charity_vote_tie(vote, charity, by_user=request.user)
+        messages.success(request, f"{group.name} is backing {charity.name}.")
+    except ValueError as e:
+        messages.error(request, str(e))
+    return redirect("orgs:group_charity_vote", org_id=org.id, group_id=group.id)

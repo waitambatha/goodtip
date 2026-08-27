@@ -23,8 +23,14 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # URLs. Kept here rather than reverse()d in templates because these go into
 # email and must be absolute.
-def _vote_url(org_id: int) -> str:
-    return site_url(f"/leagues/{org_id}/charity-vote/")
+def _vote_url(org_id: int, *, path: str = "") -> str:
+    """Absolute URL of a charity vote screen.
+
+    `path` lets a caller that already resolved the route — a group election
+    lives at a different one — pass it straight through, rather than this
+    helper growing a second hardcoded string that can drift from urls.py.
+    """
+    return site_url(path or f"/leagues/{org_id}/charity-vote/")
 
 
 def _dashboard_url(org_id: int) -> str:

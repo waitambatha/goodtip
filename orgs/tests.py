@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.urls import reverse
 from django.core.exceptions import ValidationError
 from django.db.models import ProtectedError
 import re
@@ -4212,3 +4213,217 @@ class PacificNationsBoardTests(TestCase):
             {"Papua New Guinea", "Fiji", "Samoa", "Tonga", "Vanuatu",
              "Solomon Islands"},
         )
+
+
+class OrgOwnedCharityTests(TestCase):
+    """An organisation adding a charity GoodTip's vetted list doesn't carry.
+
+    The rule this pins down: usable by that org immediately, invisible to
+    every other org until approved. Both halves matter — the first is why the
+    feature exists (the wizard's approval wait is where people gave up), the
+    second is why it is safe (one org's typo must not become everyone's).
+    """
+
+    def setUp(self):
+        from .services import add_charity_for_org
+
+        self.add = add_charity_for_org
+        self.season = current_form_season()
+        self.vetted, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
+        )
+        self.org = Organisation.objects.create(name="Maccas AU", season=self.season)
+        self.other = Organisation.objects.create(name="Someone Else", season=self.season)
+        self.admin = User.objects.create_user(
+            email="boss@maccas.test", password="x", display_name="Boss",
+        )
+        OrgMember.objects.create(
+            user=self.admin, org=self.org, role=OrgMember.ROLE_MANAGER,
+            is_league_owner=True,
+        )
+
+    def test_added_charity_is_usable_now_but_not_globally(self):
+        rmh = self.add(self.org, name="Ronald McDonald House", by_user=self.admin)
+        self.assertFalse(rmh.is_approved)
+        self.assertEqual(rmh.owner_org, self.org)
+        self.assertEqual(rmh.added_by, self.admin)
+        self.assertIsNotNone(rmh.added_at)
+
+        # Usable here...
+        self.assertIn(rmh, Charity.objects.available_to(self.org))
+        # ...and nowhere else.
+        self.assertNotIn(rmh, Charity.objects.available_to(self.other))
+        self.assertNotIn(rmh, Charity.objects.approved())
+        # The vetted list stays visible to everyone throughout.
+        self.assertIn(self.vetted, Charity.objects.available_to(self.org))
+        self.assertIn(self.vetted, Charity.objects.available_to(self.other))
+
+    def test_same_name_reuses_the_existing_row(self):
+        """Near-duplicates are the damage this whole model exists to stop."""
+        again = self.add(self.org, name="  lifeline  ", by_user=self.admin)
+        self.assertEqual(again, self.vetted)
+        self.assertEqual(Charity.objects.filter(name__iexact="Lifeline").count(), 1)
+        # An existing vetted charity is not quietly reassigned to this org.
+        self.assertIsNone(again.owner_org)
+
+    def test_blank_name_is_refused(self):
+        with self.assertRaises(ValueError):
+            self.add(self.org, name="   ", by_user=self.admin)
+
+    def test_manage_screen_adds_and_lists(self):
+        self.client.force_login(self.admin)
+        url = reverse("orgs:charities", args=[self.org.id])
+        resp = self.client.post(url, {"name": "Ronald McDonald House", "website": ""})
+        self.assertRedirects(resp, url)
+        rmh = Charity.objects.get(name="Ronald McDonald House")
+        self.assertEqual(rmh.owner_org, self.org)
+
+        page = self.client.get(url)
+        self.assertContains(page, "Ronald McDonald House")
+        self.assertContains(page, "Lifeline")
+
+    def test_non_admin_cannot_add(self):
+        nobody = User.objects.create_user(email="cook@maccas.test", password="x", display_name="Cook")
+        OrgMember.objects.create(user=nobody, org=self.org, role=OrgMember.ROLE_PARTICIPANT)
+        self.client.force_login(nobody)
+        resp = self.client.post(
+            reverse("orgs:charities", args=[self.org.id]), {"name": "Sneaky Fund"},
+        )
+        self.assertEqual(resp.status_code, 403)
+        self.assertFalse(Charity.objects.filter(name="Sneaky Fund").exists())
+
+
+class GroupCharityElectionTests(TestCase):
+    """A group backing its own cause — the franchise case.
+
+    One organisation, several groups that are really separate businesses. The
+    Sydney store voting for Ronald McDonald House must not change what head
+    office or the Parramatta store backs.
+    """
+
+    def setUp(self):
+        from .services import add_charity_for_org, create_group_charity_election
+
+        self.add = add_charity_for_org
+        self.start = create_group_charity_election
+        self.season = current_form_season()
+        self.bb, _ = Charity.objects.get_or_create(
+            slug="beyond-blue", defaults={"name": "Beyond Blue", "is_approved": True},
+        )
+        self.ll, _ = Charity.objects.get_or_create(
+            slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
+        )
+        self.org = Organisation.objects.create(
+            name="Maccas AU", season=self.season, charity=self.bb, groups_enabled=True,
+        )
+        self.sydney = Group.objects.create(org=self.org, name="Sydney CBD")
+        self.parra = Group.objects.create(org=self.org, name="Parramatta")
+        self.voter = User.objects.create_user(
+            email="crew@maccas.test", password="x", display_name="Crew",
+        )
+        OrgMember.objects.create(user=self.voter, org=self.org, role=OrgMember.ROLE_PARTICIPANT)
+        GroupMember.objects.create(group=self.sydney, user=self.voter)
+
+    def test_group_inherits_until_it_votes(self):
+        self.assertEqual(self.sydney.effective_charity, self.bb)
+        self.assertFalse(self.sydney.charity_is_own)
+
+    def test_group_vote_sets_only_that_group(self):
+        vote = self.start(self.sydney, [self.bb, self.ll])
+        vote.status = CharityVote.STATUS_OPEN
+        vote.save(update_fields=["status"])
+        cast_charity_ballot(
+            user=self.voter, vote=vote, option=vote.options.get(charity=self.ll),
+        )
+        self.assertEqual(close_charity_vote(vote), self.ll)
+
+        self.sydney.refresh_from_db()
+        self.parra.refresh_from_db()
+        self.org.refresh_from_db()
+        self.assertEqual(self.sydney.charity, self.ll)
+        self.assertTrue(self.sydney.charity_is_own)
+        self.assertEqual(self.sydney.effective_charity, self.ll)
+        # Head office and the other store are untouched.
+        self.assertEqual(self.org.charity, self.bb)
+        self.assertIsNone(self.parra.charity)
+        self.assertEqual(self.parra.effective_charity, self.bb)
+
+    def test_group_vote_is_not_the_orgs_vote(self):
+        """The guard that stops one department's ballot speaking for everyone."""
+        self.start(self.sydney, [self.bb, self.ll])
+        CharityVote.objects.filter(group=self.sydney).update(
+            status=CharityVote.STATUS_OPEN,
+        )
+        self.org.refresh_from_db()
+        self.assertIsNone(self.org.active_charity_vote)
+        self.assertIsNone(self.org.pending_election)
+
+    def test_history_keeps_the_two_timelines_apart(self):
+        from .services import set_group_charity
+
+        set_group_charity(self.sydney, self.ll)
+        rows = self.org.charity_selections.all()
+        self.assertEqual(rows.count(), 1)
+        self.assertEqual(rows.first().group, self.sydney)
+        # The org's own timeline is still empty.
+        self.assertFalse(self.org.charity_selections.filter(group__isnull=True).exists())
+
+    def test_ballot_is_limited_to_the_orgs_charities(self):
+        outsider_org = Organisation.objects.create(name="Rival", season=self.season)
+        theirs = self.add(outsider_org, name="Rival's Cause")
+        with self.assertRaises(ValueError):
+            self.start(self.sydney, [self.bb, theirs])
+
+    def test_one_live_election_per_group(self):
+        self.start(self.sydney, [self.bb, self.ll])
+        with self.assertRaises(ValueError):
+            self.start(self.sydney, [self.bb, self.ll])
+
+    def test_ballot_needs_two_options(self):
+        with self.assertRaises(ValueError):
+            self.start(self.sydney, [self.bb])
+
+    def test_only_group_members_may_cast(self):
+        vote = self.start(self.sydney, [self.bb, self.ll])
+        vote.status = CharityVote.STATUS_OPEN
+        vote.save(update_fields=["status"])
+        outsider = User.objects.create_user(
+            email="other@maccas.test", password="x", display_name="Other",
+        )
+        OrgMember.objects.create(user=outsider, org=self.org, role=OrgMember.ROLE_PARTICIPANT)
+        GroupMember.objects.create(group=self.parra, user=outsider)
+        self.client.force_login(outsider)
+        resp = self.client.post(
+            reverse("orgs:cast_group_charity_vote", args=[self.org.id, self.sydney.id]),
+            {"option": vote.options.first().id},
+        )
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(vote.ballots.count(), 0)
+
+    def test_group_election_screen_renders_for_a_member(self):
+        self.client.force_login(self.voter)
+        resp = self.client.get(
+            reverse("orgs:group_charity_vote", args=[self.org.id, self.sydney.id]),
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Sydney CBD")
+
+
+class WizardCharityEntryRemovedTests(TestCase):
+    """The creation wizard no longer lets anyone invent a charity."""
+
+    def test_form_has_no_free_text_charity_fields(self):
+        from .forms import OrgCreateForm
+
+        fields = OrgCreateForm().fields
+        self.assertNotIn("new_charity_name", fields)
+        self.assertNotIn("new_charity_url", fields)
+        self.assertIn("charity", fields)
+
+    def test_charity_step_requires_a_pick(self):
+        from .forms import OrgCreateForm
+
+        form = OrgCreateForm(data={"charity_method": "pick"})
+        form.is_valid()
+        self.assertIn("charity", form.errors)
+        self.assertIn("Choose a charity from the list.", form.errors["charity"])

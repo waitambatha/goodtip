@@ -550,28 +550,25 @@ missed click and got submitted twice.
       </div>
       {% if form.charity.errors %}<div class="fld-err">{{ form.charity.errors|join:" " }}</div>{% endif %}
 
-      <p class="app-sub" style="margin:16px 0 10px;">Or suggest a new one for approval:</p>
-      <div class="fld-row">
-        <div class="fld">
-          <label for="id_new_charity_name">Charity name</label>
-          <input type="text" name="new_charity_name" id="id_new_charity_name"
-                 value="{{ form.new_charity_name.value|default:'' }}" placeholder="Charity name">
-          {% if form.new_charity_name.errors %}<div class="fld-err">{{ form.new_charity_name.errors|join:" " }}</div>{% endif %}
-        </div>
-        <div class="fld">
-          <label for="id_new_charity_url">Website</label>
-          {% comment %}
-          Filled in from the name as you type — "Beyond Blue" becomes
-          beyondblue.org.au — so nobody has to go and find the link
-          themselves. Still editable: the guess is a starting point, and the
-          field stops guessing the moment it is typed in by hand.
-          {% endcomment %}
-          <input type="url" name="new_charity_url" id="id_new_charity_url"
-                 value="{{ form.new_charity_url.value|default:'' }}" placeholder="https://"
-                 data-url-from="id_new_charity_name">
-          <div class="hint">We'll suggest a web address from the name — change it if it's not right.</div>
-        </div>
-      </div>
+      {% comment %}
+      NO "add your own" HERE ANY MORE.
+
+      This step used to end with a free-text name and website, offered as
+      "suggest a new one for approval". It read as helpful and behaved as a
+      trap: the person filling it in is on their first screen of GoodTip and
+      cannot tell whether the cause they have in mind is already three rows up
+      under a slightly different name, so the picker filled with near-
+      duplicates that every later organisation had to read past.
+
+      Adding a charity is now an admin job, done from Manage → Charities once
+      you are inside — where the existing list is on the same screen. Anything
+      the organisation adds there shows up in this picker for its own groups
+      straight away.
+      {% endcomment %}
+      <p class="hint" style="margin-top:14px;">
+        Can't see the cause you back? Create the organisation, then add it from
+        Manage → Charities — it'll be ready for your next election.
+      </p>
     </div>
 
     <div data-when="vote" style="margin-top:14px;">

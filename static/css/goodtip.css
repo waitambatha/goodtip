@@ -10767,3 +10767,36 @@ body.fxh-open { overflow: hidden; }
 @media (max-width: 640px) {
   .coach-pop { left: 12px !important; right: 12px; width: auto; }
 }
+
+/* ---------- Manage → Charities, and a group's own cause ----------
+   Added Aug 2026 with group-level charities. Four small pieces, all leaning
+   on the existing app tokens rather than introducing a palette: a section
+   heading between stacked lists, the "you are backing this" panel, a
+   non-interactive variant of .opt-card (the same card without the hover and
+   pointer affordances, because these ones are being READ, not chosen), and
+   the group→charity rows. */
+.sec-h { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+         color: var(--muted); margin: 26px 0 10px; }
+
+.ch-current { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.ch-current-label { font-size: 11px; font-weight: 800; letter-spacing: .07em;
+                    text-transform: uppercase; color: var(--muted); }
+
+/* A card nobody can click. Without this the read-only lists rendered with a
+   hover lift and a pointer cursor, which promises an interaction that isn't
+   there — people clicked them and nothing happened. */
+.opt-card.is-static { cursor: default; }
+.opt-card.is-static:hover { transform: none; box-shadow: none; border-color: var(--app-line); }
+.opt-card.is-winner { border-color: var(--forest); box-shadow: 0 0 0 1px var(--forest) inset; }
+.opt-card.is-static .vz-track { margin-top: 10px; }
+
+.gcr { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(140px, 1.4fr) auto;
+       align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--app-line); }
+.gcr:last-child { border-bottom: 0; padding-bottom: 0; }
+.gcr:first-child { padding-top: 0; }
+.gcr-name { font-weight: 700; color: var(--ink); }
+.gcr-ch { color: var(--ink); font-size: 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 560px) {
+  .gcr { grid-template-columns: 1fr auto; }
+  .gcr-ch { grid-column: 1 / -1; }
+}

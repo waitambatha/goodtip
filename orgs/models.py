@@ -208,15 +208,22 @@ class Organisation(models.Model):
         self.save(update_fields=["approval_status", "approved_at", "approved_by"])
         return True
 
+    # `group__isnull=True` on both: since groups can hold their own election,
+    # `charity_votes` contains ballots that are none of the organisation's
+    # business to report as its own. Without the filter, one department
+    # opening a vote made the whole company's dashboard announce an election
+    # nobody else could see options for.
     @property
     def active_charity_vote(self):
-        """The open charity vote for this org, or None."""
-        return self.charity_votes.filter(status="open").first()
+        """The open ORGANISATION-wide charity vote, or None."""
+        return self.charity_votes.filter(status="open", group__isnull=True).first()
 
     @property
     def pending_election(self):
-        """A draft or scheduled (not yet open) charity election, or None."""
-        return self.charity_votes.filter(status__in=("draft", "scheduled")).first()
+        """A draft or scheduled (not yet open) org-wide election, or None."""
+        return self.charity_votes.filter(
+            status__in=("draft", "scheduled"), group__isnull=True,
+        ).first()
 
     @property
     def charity_display(self) -> str:
@@ -362,10 +369,25 @@ class Group(models.Model):
     "Marketing" also meant walking a five-step wizard that asked a department of
     a company to pick a charity and prove it owned a domain.
 
-    A group owns none of that. Competitions, rules, season and charity belong to
-    the organisation and are inherited, which is not a convention here but a
-    fact of the schema: there is nowhere on this model to put them. What a group
-    has is a name, its members, and its own ladder.
+    A group owns none of that. Competitions, rules and season belong to the
+    organisation and are inherited, which is not a convention here but a fact
+    of the schema: there is nowhere on this model to put them. What a group has
+    is a name, its members, its own ladder — and, since Aug 2026, its own cause.
+
+    WHY CHARITY BECAME THE EXCEPTION
+    --------------------------------
+    Groups were modelled as departments of one employer, and a department has
+    no business backing a different charity from the company. That turned out
+    to be too narrow. A franchise — the client's example was McDonald's, which
+    has several restaurants in one city — is one organisation whose groups are
+    separate businesses with their own staff and their own local causes. The
+    Sydney CBD store wanting Ronald McDonald House while head office backs
+    Beyond Blue is not a conflict to resolve; it is the point.
+
+    So a group may hold its own `charity`, chosen by its own members in its own
+    election, from the charities its organisation has made available. Blank is
+    the ordinary state and means "whatever the organisation backs" — see
+    `effective_charity`, which is what every screen should read.
 
     Groups are optional and off by default (`Organisation.groups_enabled`) —
     five people in an office do not need to be sorted into departments, and the
@@ -409,6 +431,15 @@ class Group(models.Model):
         related_name="groups", null=True, blank=True,
     )
 
+    # THIS GROUP'S OWN CAUSE. Blank means it backs whatever the organisation
+    # backs, which is true of most groups and of every group that predates
+    # this field. PROTECT rather than SET_NULL: a charity a group actively
+    # raises for must not be deletable out from under it in one admin click.
+    charity = models.ForeignKey(
+        "catalog.Charity", on_delete=models.PROTECT,
+        related_name="backing_groups", null=True, blank=True,
+    )
+
     # A group raised by an ordinary member is a request until an admin says yes.
     # An admin creating one skips the queue, because asking someone to approve
     # their own request is theatre.
@@ -437,6 +468,36 @@ class Group(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.org.name})"
+
+    @property
+    def effective_charity(self):
+        """The charity this group's members actually raise for.
+
+        Its own if it has voted one, otherwise the organisation's. Every
+        screen that names a member's cause should read this rather than
+        `org.charity`, or a group that chose its own will keep being told it
+        backs head office's.
+        """
+        return self.charity or self.org.charity
+
+    @property
+    def charity_is_own(self) -> bool:
+        """True when this group picked its cause rather than inheriting it.
+
+        The UI says "chosen by your group" vs "your organisation's charity",
+        and those are different enough that members ask about the difference.
+        """
+        return self.charity_id is not None
+
+    @property
+    def open_charity_vote(self):
+        return self.charity_votes.filter(status=CharityVote.STATUS_OPEN).first()
+
+    @property
+    def pending_charity_vote(self):
+        return self.charity_votes.filter(
+            status__in=(CharityVote.STATUS_DRAFT, CharityVote.STATUS_SCHEDULED)
+        ).first()
 
     def clean(self):
         super().clean()
@@ -630,6 +691,20 @@ class CharityVote(models.Model):
     ]
 
     org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name="charity_votes")
+    # WHICH ROOM IS VOTING. NULL is an organisation-wide election, which is
+    # every vote that existed before groups could hold a cause of their own.
+    # Set means this ballot belongs to one group and decides only that group's
+    # charity.
+    #
+    # `org` stays populated either way — a group vote is still that org's
+    # business, and the review screens list both — which means every
+    # org-level lookup MUST filter `group__isnull=True` or a group's private
+    # election starts answering for the whole organisation. The two helpers on
+    # Organisation do exactly that; new callers should use them.
+    group = models.ForeignKey(
+        "Group", on_delete=models.CASCADE, related_name="charity_votes",
+        null=True, blank=True,
+    )
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="open")
     opened_at = models.DateTimeField(auto_now_add=True)
     closed_at = models.DateTimeField(null=True, blank=True)
@@ -669,7 +744,17 @@ class CharityVote(models.Model):
         ordering = ["-opened_at"]
 
     def __str__(self):
-        return f"Charity vote for {self.org.name} ({self.status})"
+        where = f"{self.org.name} / {self.group.name}" if self.group_id else self.org.name
+        return f"Charity vote for {where} ({self.status})"
+
+    @property
+    def is_group_vote(self) -> bool:
+        return self.group_id is not None
+
+    @property
+    def room_label(self) -> str:
+        """What to call the electorate on screen."""
+        return self.group.name if self.group_id else self.org.name
 
     @property
     def is_open(self) -> bool:
@@ -716,12 +801,25 @@ class CharityVote(models.Model):
         included so a group that never assigned a captain — most of them —
         cannot deadlock with no way forward.
         """
-        return self.org.members.filter(
+        eligible = self.org.members.filter(
             models.Q(role__in=[
                 OrgMember.ROLE_CAPTAIN, OrgMember.ROLE_BOTH, OrgMember.ROLE_MANAGER,
             ])
             | models.Q(is_league_owner=True)
         ).select_related("user")
+        if self.group_id:
+            # A group's tie is the group's to break. Restricting to people who
+            # are actually in it stops a manager two departments away deciding
+            # a cause they have no stake in — but org admins stay eligible via
+            # is_league_owner above, so a group with no captain of its own
+            # still has someone who can unstick it.
+            inside = set(
+                self.group.memberships.values_list("user_id", flat=True)
+            )
+            eligible = eligible.filter(
+                models.Q(user_id__in=inside) | models.Q(is_league_owner=True)
+            )
+        return eligible
 
 
 class CharityVoteOption(models.Model):
@@ -773,6 +871,14 @@ class OrgCharitySelection(models.Model):
     ]
 
     org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name="charity_selections")
+    # WHICH ROOM CHOSE IT. NULL is the organisation's own choice — every row
+    # written before groups could back a cause of their own. Set means this
+    # line of the timeline belongs to one group, so a franchise that changes
+    # its local cause does not appear to have changed head office's.
+    group = models.ForeignKey(
+        "Group", on_delete=models.CASCADE, related_name="charity_selections",
+        null=True, blank=True,
+    )
     # Denormalised from org.season so the timeline is queryable by season directly.
     season = models.ForeignKey("catalog.Season", on_delete=models.PROTECT, related_name="charity_selections")
     charity = models.ForeignKey("catalog.Charity", on_delete=models.PROTECT, related_name="selections")
@@ -784,7 +890,8 @@ class OrgCharitySelection(models.Model):
         ordering = ["-effective_from", "-id"]
 
     def __str__(self):
-        return f"{self.org.name} → {self.charity.name} ({self.season}, {self.source})"
+        where = f"{self.org.name}/{self.group.name}" if self.group_id else self.org.name
+        return f"{where} → {self.charity.name} ({self.season}, {self.source})"
 
 
 class Notification(models.Model):

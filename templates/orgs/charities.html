@@ -1,0 +1,108 @@
+{% extends "app_base.html" %}
+{% block title %}Charities, {{ org.name }}{% endblock %}
+{% block loader_task %}Loading your charities{% endblock %}
+{% block body_class %}page-deep sheet-page{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+{% block nav_manage %}is-on{% endblock %}
+
+{% block app_content %}
+{% comment %}
+MANAGE → CHARITIES.
+
+The one screen where an organisation adds a cause GoodTip's vetted list does
+not carry. It used to be a pair of fields buried in step 6 of the creation
+wizard, asked of someone ninety seconds into their first visit; the result was
+a picker full of near-duplicates that every later organisation had to read
+past. The fix was not better validation, it was moving the question to where
+the existing list is visible while you answer it. Hence the order below: what
+you already have first, the form last.
+{% endcomment %}
+
+<div class="app-head">
+  <div>
+    <div class="app-eyebrow">{{ org.name }}</div>
+    <h1 class="app-h1">Charities</h1>
+    <p class="app-sub">
+      The causes {{ org.name }} can pick from and put to a vote.
+      {% if groups_enabled %}Your groups choose from this same list.{% endif %}
+    </p>
+  </div>
+</div>
+
+{% if org.charity %}
+<div class="card pad-lg ch-current">
+  <div class="ch-current-label">{{ org.name }} is backing</div>
+  {% include "components/_charity_card.html" with charity=org.charity %}
+</div>
+{% endif %}
+
+{% if ours %}
+<h2 class="sec-h">Added by {{ org.name }}</h2>
+<p class="hint" style="margin:-4px 0 12px;">
+  Yours to use straight away. We review each one before it appears for other
+  organisations — that review changes nothing for you.
+</p>
+<div class="opt-grid cols2">
+  {% for ch in ours %}
+  <div class="opt-card is-static">
+    {% include "components/_charity_card.html" with charity=ch note=ch.is_approved|yesno:"Approved,Awaiting review" %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if groups_enabled and groups %}
+<h2 class="sec-h">What each group backs</h2>
+<div class="card pad-lg">
+  {% for g in groups %}
+  <div class="gcr">
+    <span class="gcr-name">{{ g.name }}</span>
+    <span class="gcr-ch">
+      {% if g.charity %}
+        {{ g.charity.name }} <span class="pill-role">their own</span>
+      {% elif org.charity %}
+        {{ org.charity.name }} <span class="pill-role">inherited</span>
+      {% else %}
+        <span class="app-sub">Not chosen yet</span>
+      {% endif %}
+    </span>
+    <a class="abtn abtn-ghost abtn-sm" href="{% url 'orgs:group_charity_vote' org.id g.id %}">Election &rarr;</a>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<h2 class="sec-h">On GoodTip's list</h2>
+<div class="opt-grid cols2">
+  {% for ch in vetted %}
+  <div class="opt-card is-static">
+    {% include "components/_charity_card.html" with charity=ch %}
+  </div>
+  {% empty %}
+  <p class="app-sub">Nothing here yet.</p>
+  {% endfor %}
+</div>
+
+<h2 class="sec-h">Add a charity</h2>
+<div class="card pad-lg" style="max-width:620px;">
+  <p class="hint" style="margin-top:0;">
+    Check the lists above first — if it's already there, use that one. Adding a
+    second row for the same cause splits its total in two.
+  </p>
+  <form method="post">
+    {% csrf_token %}
+    <div class="fld">
+      <label for="id_name">{{ form.name.label }}</label>
+      {{ form.name }}
+      {% if form.name.errors %}<div class="fld-err">{{ form.name.errors|join:" " }}</div>{% endif %}
+    </div>
+    <div class="fld">
+      <label for="id_website">{{ form.website.label }}</label>
+      {{ form.website }}
+      <div class="hint">We'll guess one from the name and fetch their logo — change it if it's not right.</div>
+      {% if form.website.errors %}<div class="fld-err">{{ form.website.errors|join:" " }}</div>{% endif %}
+    </div>
+    <button type="submit" class="abtn abtn-primary">Add charity</button>
+  </form>
+</div>
+{% endblock %}

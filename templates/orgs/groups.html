@@ -129,6 +129,13 @@ selling a switch for the sake of it.
         <div class="dc-meta">
           {% if row.group.kind_label %}{{ row.group.kind_label }} &middot; {% endif %}
           {{ row.members }} member{{ row.members|pluralize }}
+          {% comment %}
+          Whose cause this group raises for. Worth a line here because it is
+          now a real difference between two groups in the same organisation —
+          a franchise's stores back their own local charities — and the
+          Groups page is where someone compares them.
+          {% endcomment %}
+          {% if row.group.charity %} &middot; {{ row.group.charity.name }}{% endif %}
         </div>
       </div>
     </div>
@@ -165,6 +172,9 @@ selling a switch for the sake of it.
       {% else %}
       <span class="pill-role owner">You're tipping here</span>
       {% endif %}
+      <a href="{% url 'orgs:group_charity_vote' org.id row.group.id %}" class="abtn abtn-ghost abtn-sm">
+        {% if row.group.charity %}Our charity{% else %}Choose our charity{% endif %}
+      </a>
       <form method="post" action="{% url 'orgs:groups' org.id %}" data-busy="Leaving"
             data-confirm="Your tips in this group stay on its ladder — leaving only takes you out of it."
             data-confirm-title="Leave {{ row.group.name }}?" data-confirm-ok="Leave">

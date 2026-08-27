@@ -6,7 +6,6 @@ from catalog.models import (
 )
 
 from .models import Organisation
-from .services import unique_charity_slug as _unique_charity_slug
 
 
 def fed_competitions():
@@ -113,21 +112,19 @@ class OrgCreateForm(forms.ModelForm):
         initial="pick",
         label="How is the charity decided?",
     )
+    # PICK FROM THE LIST, FULL STOP. This step used to offer "…or add a
+    # different charity" as a free-text name and URL, and it was the wrong
+    # place to ask: someone standing up their first league has no way to know
+    # whether "Cancer Council" is already there under a slightly different
+    # name, and every near-miss they typed became a permanent duplicate in the
+    # picker every other organisation reads. Adding a charity now happens in
+    # Manage → Charities, after creation, by an admin who is looking at the
+    # existing list while they do it — see services.add_charity_for_org.
     charity = forms.ModelChoiceField(
         queryset=Charity.objects.filter(is_approved=True),
         required=False,
         label="Charity",
-        empty_label="Choose an approved charity",
-    )
-    new_charity_name = forms.CharField(
-        required=False,
-        label="…or add a different charity",
-        widget=forms.TextInput(attrs={"placeholder": "Charity name"}),
-    )
-    new_charity_url = forms.URLField(
-        required=False,
-        label="New charity website (optional)",
-        widget=forms.URLInput(attrs={"placeholder": "https://"}),
+        empty_label="Choose a charity",
     )
     # When the vote runs. Both optional: leaving them blank creates the
     # election in draft, which is what happened to every vote before these
@@ -284,50 +281,18 @@ class OrgCreateForm(forms.ModelForm):
                     "Pick at least 2 charities for the group to vote on.",
                 )
         else:  # pick
-            charity = cleaned.get("charity")
-            new_name = (cleaned.get("new_charity_name") or "").strip()
-            if not charity and not new_name:
-                self.add_error(
-                    "charity",
-                    "Choose an approved charity or add a different one.",
-                )
-            if charity and new_name:
-                self.add_error(
-                    "new_charity_name",
-                    "Pick from the list or add a new one — not both.",
-                )
+            if not cleaned.get("charity"):
+                self.add_error("charity", "Choose a charity from the list.")
         return cleaned
 
     @property
     def is_vote(self) -> bool:
         return self.cleaned_data.get("charity_method") == "vote"
 
-    def _resolve_picked_charity(self):
-        charity = self.cleaned_data.get("charity")
-        new_name = (self.cleaned_data.get("new_charity_name") or "").strip()
-        if new_name:
-            charity = Charity.objects.filter(name__iexact=new_name).first()
-            if charity is None:
-                charity = Charity.objects.create(
-                    name=new_name,
-                    slug=_unique_charity_slug(new_name),
-                    website=self.cleaned_data.get("new_charity_url") or "",
-                    is_approved=False,
-                )
-                # Flag for the view to notify the GoodTip team for manual review.
-                self.suggested_charity = charity
-                # Go and find its logo and confirm its address, off the
-                # request thread — the card falls back to initials until it
-                # lands, so nothing on screen is waiting for this.
-                from catalog.logos import backfill_in_background
-
-                backfill_in_background(charity)
-        return charity
-
     def save(self, commit=True):
         org = super().save(commit=False)
         # In vote mode the charity stays unset until the vote resolves.
-        org.charity = None if self.is_vote else self._resolve_picked_charity()
+        org.charity = None if self.is_vote else self.cleaned_data.get("charity")
         if commit:
             org.save()
             self.save_m2m()
@@ -395,4 +360,89 @@ class InviteByEmailForm(forms.Form):
                 f"That's {len(cleaned)} addresses — {self.MAX_PER_SEND} at a time is the limit. "
                 "Send the rest in a second batch."
             )
+        return cleaned
+
+
+class OrgCharityForm(forms.Form):
+    """Add a charity this organisation backs but GoodTip's list doesn't have.
+
+    Deliberately two fields. The wizard's version asked the same thing of
+    someone who had been on the platform for ninety seconds; this one is in
+    Manage, next to the list of what already exists, so the person filling it
+    in can see whether their cause is already there before typing it again.
+    """
+
+    name = forms.CharField(
+        max_length=200,
+        label="Charity name",
+        widget=forms.TextInput(attrs={
+            "placeholder": "e.g. Ronald McDonald House",
+            "autocomplete": "off",
+        }),
+    )
+    website = forms.URLField(
+        required=False,
+        label="Website (optional)",
+        widget=forms.URLInput(attrs={
+            "placeholder": "https://",
+            # Guessed from the name as it is typed — see the wizard's old
+            # field for the same trick. Still hand-editable.
+            "data-url-from": "id_name",
+        }),
+    )
+
+    def clean_name(self):
+        name = (self.cleaned_data.get("name") or "").strip()
+        if len(name) < 3:
+            raise forms.ValidationError("That's too short to be a charity name.")
+        return name
+
+
+class GroupCharityBallotForm(forms.Form):
+    """The charities a group is putting to its members.
+
+    The queryset is the ORGANISATION's available list — vetted plus anything
+    it added — because a group votes on what its organisation offers. Built
+    per-instance, so one org's private charities can never appear on another's
+    ballot.
+    """
+
+    charities = forms.ModelMultipleChoiceField(
+        queryset=Charity.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+        label="Charities on the ballot",
+    )
+    opens_at = forms.DateTimeField(
+        required=False,
+        label="Open the vote",
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+    )
+    closes_at = forms.DateTimeField(
+        required=False,
+        label="Close it",
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+    )
+    message = forms.CharField(
+        required=False,
+        label="A note to your group (optional)",
+        widget=forms.Textarea(attrs={
+            "rows": 3,
+            "placeholder": "Why we're voting, when it closes…",
+        }),
+    )
+
+    def __init__(self, *args, org=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["charities"].queryset = Charity.objects.available_to(org).order_by("name")
+
+    def clean(self):
+        cleaned = super().clean()
+        picked = cleaned.get("charities")
+        if picked is not None and picked.count() < 2:
+            self.add_error("charities", "Pick at least 2 charities to vote between.")
+        opens, closes = cleaned.get("opens_at"), cleaned.get("closes_at")
+        if closes and not opens:
+            self.add_error("opens_at", "Say when it opens as well as when it closes.")
+        if opens and closes and closes <= opens:
+            self.add_error("closes_at", "The vote has to close after it opens.")
         return cleaned

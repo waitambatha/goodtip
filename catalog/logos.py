@@ -255,7 +255,18 @@ def backfill_in_background(charity) -> None:
 
     Daemon thread deliberately: if the process is going down, an in-flight
     logo fetch is not a reason to hold it open.
+
+    Silently does nothing when CHARITY_LOGO_FETCH is off, which is how the
+    test suite runs. The thread outlives a test's transaction, so it woke to
+    find the charity rolled away and logged a DatabaseError traceback into
+    every run that created one — while making a real request to somebody
+    else's web server from CI.
     """
+    from django.conf import settings
+
+    if not getattr(settings, "CHARITY_LOGO_FETCH", True):
+        return
+
     import threading
 
     def run():

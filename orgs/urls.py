@@ -17,6 +17,22 @@ urlpatterns = [
     path("<int:org_id>/groups/toggle/", views.groups_toggle, name="groups_toggle"),
     path("<int:org_id>/requests/<int:req_id>/", views.review_request_view, name="review_request"),
     path("<int:org_id>/request-join/", views.request_join_view, name="request_join"),
+    # The organisation's own charity list — vetted plus whatever it added.
+    path("<int:org_id>/charities/", views.org_charities_view, name="charities"),
+    # A GROUP's election. Separate routes rather than a query string on the
+    # org ones: every permission check below is different (the group's members
+    # rather than the organisation's), and a scope that important should not
+    # depend on a parameter someone can drop.
+    path("<int:org_id>/groups/<int:group_id>/charity/",
+         views.group_charity_vote_view, name="group_charity_vote"),
+    path("<int:org_id>/groups/<int:group_id>/charity/setup/",
+         views.group_election_setup_view, name="group_election_setup"),
+    path("<int:org_id>/groups/<int:group_id>/charity/cast/",
+         views.cast_group_charity_vote, name="cast_group_charity_vote"),
+    path("<int:org_id>/groups/<int:group_id>/charity/close/",
+         views.close_group_charity_vote, name="close_group_charity_vote"),
+    path("<int:org_id>/groups/<int:group_id>/charity/captains-call/",
+         views.group_captains_call, name="group_captains_call"),
     path("<int:org_id>/charity-vote/", views.charity_vote_view, name="charity_vote"),
     path("<int:org_id>/charity-vote/cast/", views.cast_charity_vote, name="cast_charity_vote"),
     path("<int:org_id>/charity-vote/close/", views.close_charity_vote_view, name="close_charity_vote"),

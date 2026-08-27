@@ -9,6 +9,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 
+from catalog.models import Charity
+
 from .models import (
     CharityVote,
     CharityVoteBallot,
@@ -33,17 +35,27 @@ def unique_charity_slug(name: str) -> str:
     return slug
 
 
-def notify_charity_suggestion(charity, org, user) -> None:
-    """Email the GoodTip team that a league suggested an unlisted charity (deck slide 10).
+def notify_charity_suggestion(charity, org, user=None) -> None:
+    """Email the GoodTip team that an organisation added an unlisted charity.
 
-    Best-effort: a mail failure must never block league creation.
+    Best-effort: a mail failure must never block the admin's actual task.
+
+    `user` is optional because the callers changed. This used to fire only
+    from the creation wizard, where there was always a signed-in creator;
+    it now also fires from Manage → Charities and from scripted/seeded adds
+    that have no user at all, and an AttributeError here would be swallowed
+    into a log line saying only that the review email failed.
     """
+    who = (
+        f"{user.display_name} ({user.email})"
+        if user is not None else "Someone at the organisation"
+    )
     try:
         send_mail(
             subject=f"[GoodTip] Charity suggested for review: {charity.name}",
             message=(
-                f"{user.display_name} ({user.email}) created the league "
-                f"\"{org.name}\" and suggested a charity for approval:\n\n"
+                f"{who} added a charity to "
+                f"\"{org.name}\" that isn't on the approved list:\n\n"
                 f"  Name: {charity.name}\n"
                 f"  Website: {charity.website or '—'}\n"
                 f"  Slug: {charity.slug}\n\n"
@@ -333,20 +345,79 @@ def reassign_child_org_admin(child, email: str, *, by_user):
     return member
 
 
-def record_charity_selection(org, charity, *, source=OrgCharitySelection.SOURCE_MANUAL):
-    """Append a timeline row for the charity an org is backing this season.
+def record_charity_selection(org, charity, *, source=OrgCharitySelection.SOURCE_MANUAL,
+                             group=None):
+    """Append a timeline row for the charity a room is backing this season.
 
     No-op when there's no charity, or when it matches the most recent selection
-    (so re-saving the same choice doesn't create duplicate history).
+    for that same room (so re-saving the same choice doesn't create duplicate
+    history). `group=None` is the organisation's own timeline; a group's rows
+    are kept separate, or a franchise changing its local cause would read as
+    head office changing theirs.
     """
     if charity is None:
         return None
-    latest = org.charity_selections.first()
+    latest = org.charity_selections.filter(group=group).first()
     if latest and latest.charity_id == charity.id:
         return latest
     return OrgCharitySelection.objects.create(
-        org=org, season=org.season, charity=charity, source=source,
+        org=org, group=group, season=org.season, charity=charity, source=source,
     )
+
+
+@transaction.atomic
+def set_group_charity(group, charity, *, source=OrgCharitySelection.SOURCE_MANUAL):
+    """Point one group at its own cause, and append it to the timeline.
+
+    Clearing it (charity=None) is meaningful and supported: the group goes
+    back to backing whatever its organisation backs. See
+    Group.effective_charity.
+    """
+    group.charity = charity
+    group.save(update_fields=["charity"])
+    return record_charity_selection(group.org, charity, source=source, group=group)
+
+
+@transaction.atomic
+def add_charity_for_org(org, *, name, website="", by_user=None):
+    """Add a charity an organisation wants that GoodTip's list doesn't have.
+
+    Usable by that organisation the moment it exists — the admin is mid-task
+    and being told to wait for approval is where the old wizard lost people —
+    but `is_approved` stays False, so it does not surface in any other
+    organisation's picker until GoodTip has looked at it.
+
+    An existing charity with the same name is RETURNED rather than duplicated,
+    whoever owns it. Near-duplicate charity rows are the specific damage this
+    whole ownership model exists to stop, and "Beyond Blue" typed by two
+    different admins must not become two rows.
+    """
+    name = (name or "").strip()
+    if not name:
+        raise ValueError("Give the charity a name.")
+    existing = Charity.objects.filter(name__iexact=name).first()
+    if existing is not None:
+        return existing
+    charity = Charity.objects.create(
+        name=name,
+        slug=unique_charity_slug(name),
+        website=(website or "").strip(),
+        is_approved=False,
+        owner_org=org,
+        added_by=by_user,
+        added_at=timezone.now(),
+    )
+    notify_charity_suggestion(charity, org, by_user)
+    # Fire-and-forget: a charity card renders fine on initials, and the
+    # admin must not wait on someone else's web server.
+    from catalog.logos import backfill_in_background
+    backfill_in_background(charity)
+    return charity
+
+
+def charities_for(org):
+    """The charity picker for one organisation: vetted list plus its own."""
+    return Charity.objects.available_to(org).order_by("name")
 
 
 @transaction.atomic
@@ -490,27 +561,40 @@ def _finish_charity_vote(vote: CharityVote, winner, *, by_user=None):
         vote.tie_broken_at = timezone.now()
         fields += ["tie_broken_by", "tie_broken_at"]
     vote.save(update_fields=fields)
-    set_org_charity(vote.org, winner, source=OrgCharitySelection.SOURCE_VOTE)
+    if vote.group_id:
+        set_group_charity(vote.group, winner, source=OrgCharitySelection.SOURCE_VOTE)
+    else:
+        set_org_charity(vote.org, winner, source=OrgCharitySelection.SOURCE_VOTE)
 
+    # A group election is the group's news, not the whole company's, and the
+    # wording has to match: "your group" is what the people in it recognise.
+    room = vote.room_label
+    unit = "group" if vote.group_id else "organisation"
     if by_user is not None:
         who = getattr(by_user, "display_name", "") or by_user.email
         title = f"{winner.name} takes it — captain's call"
         body = (
             f"Your charity vote finished level, so {who} made the call: "
-            f"{vote.org.name} is backing {winner.name}. Everything your "
-            "organisation raises from here goes to them."
+            f"{room} is backing {winner.name}. Everything your "
+            f"{unit} raises from here goes to them."
         )
     else:
         title = f"{winner.name} won your charity vote"
         body = (
-            f"{vote.org.name} has chosen {winner.name}. Everything your organisation "
+            f"{room} has chosen {winner.name}. Everything your {unit} "
             "raises from here goes to them — thanks for having your say."
         )
+    if vote.group_id:
+        audience = [m.user for m in vote.group.memberships.select_related("user")]
+        link = reverse("orgs:group_charity_vote", args=[vote.org_id, vote.group_id])
+    else:
+        audience = [m.user for m in vote.org.members.select_related("user")]
+        link = reverse("orgs:charity_vote", args=[vote.org_id])
     notify(
-        [m.user for m in vote.org.members.select_related("user")], org=vote.org,
+        audience, org=vote.org,
         kind=Notification.KIND_ELECTION_RESULT,
         title=title, message=body,
-        link_url=reverse("orgs:charity_vote", args=[vote.org_id]),
+        link_url=link,
     )
     return winner
 
@@ -615,6 +699,90 @@ def create_charity_election(org, charities) -> CharityVote:
     return vote
 
 
+@transaction.atomic
+def create_group_charity_election(group, charities) -> CharityVote:
+    """Start a charity election inside one group.
+
+    Options are restricted to what the group's ORGANISATION has made available
+    — the vetted list plus anything the org added. A group cannot invent a
+    charity: the org is the one that adds them, so a franchise wanting a local
+    cause on the ballot asks head office to add it once, and every store can
+    then vote for it.
+
+    Refuses to run a second election while one is live, because two open
+    ballots for the same group's charity have no defined winner.
+    """
+    charities = list(charities)
+    if len(charities) < 2:
+        raise ValueError("Put at least two charities on the ballot.")
+    allowed = set(
+        Charity.objects.available_to(group.org)
+        .filter(pk__in=[c.pk for c in charities])
+        .values_list("pk", flat=True)
+    )
+    rejected = [c for c in charities if c.pk not in allowed]
+    if rejected:
+        raise ValueError(
+            f"{rejected[0].name} isn't one of your organisation's charities."
+        )
+    live = group.charity_votes.filter(
+        status__in=(
+            CharityVote.STATUS_DRAFT, CharityVote.STATUS_SCHEDULED,
+            CharityVote.STATUS_OPEN, CharityVote.STATUS_TIED,
+        )
+    ).first()
+    if live is not None:
+        raise ValueError(f"{group.name} already has a charity vote on the go.")
+    vote = CharityVote.objects.create(
+        org=group.org, group=group, status=CharityVote.STATUS_DRAFT,
+    )
+    for charity in charities:
+        CharityVoteOption.objects.create(vote=vote, charity=charity)
+    return vote
+
+
+def group_charity_vote(group):
+    """The group's current or most recent election, or None."""
+    return group.charity_votes.first()
+
+
+def can_run_group_election(user, group) -> bool:
+    """Who may open or close a group's charity vote.
+
+    The group's own admins, plus the organisation's admins — a group whose
+    admin has left must not be stuck with no way to run an election, and an
+    org admin is already able to do everything else to its groups.
+    """
+    if not getattr(user, "is_authenticated", False):
+        return False
+    if is_creator_admin(user, group.org):
+        return True
+    return group.memberships.filter(user=user, is_admin=True).exists()
+
+
+def vote_electorate(vote: CharityVote):
+    """Who votes in this election, and where its screen lives.
+
+    One resolver rather than a `if vote.group_id` at every notification site:
+    the group election was added late, and the failure mode of scattering that
+    branch is a group's ballot emailed to the entire company — which is both a
+    privacy problem and the fastest way to make people stop reading GoodTip's
+    mail. Returns (members, link, room_label) where `members` are OrgMember or
+    GroupMember rows, each with `.user`.
+    """
+    if vote.group_id:
+        return (
+            list(vote.group.memberships.select_related("user")),
+            reverse("orgs:group_charity_vote", args=[vote.org_id, vote.group_id]),
+            vote.group.name,
+        )
+    return (
+        list(vote.org.members.select_related("user")),
+        reverse("orgs:charity_vote", args=[vote.org_id]),
+        vote.org.name,
+    )
+
+
 def schedule_charity_election(vote: CharityVote, *, when, close_at=None, message="") -> CharityVote:
     """Schedule the election to open at `when` (or open immediately if due).
 
@@ -646,12 +814,14 @@ def schedule_charity_election(vote: CharityVote, *, when, close_at=None, message
         formats.date_format(timezone.localtime(close_at), "DATETIME_FORMAT")
         if close_at else ""
     )
+    members, link, room = vote_electorate(vote)
+    unit = "group" if vote.group_id else "organisation"
     notify(
-        [m.user for m in vote.org.members.select_related("user")], org=vote.org,
+        [m.user for m in members], org=vote.org,
         kind=Notification.KIND_ELECTION_SCHEDULED,
-        title=f"Charity vote coming up — {vote.org.name}",
+        title=f"Charity vote coming up — {room}",
         message=(
-            f"Your organisation is about to choose the charity it raises for this season. "
+            f"Your {unit} is about to choose the charity it raises for this season. "
             f"Voting opens {opens}"
             + (f" and closes {closes}" if closes else "")
             # em dash, not a full stop: the localised time already ends in one
@@ -660,7 +830,7 @@ def schedule_charity_election(vote: CharityVote, *, when, close_at=None, message
             "know here the moment it opens."
             + (f"\n\nFrom your admin: {vote.admin_message}" if vote.admin_message else "")
         ),
-        link_url=reverse("orgs:charity_vote", args=[vote.org_id]),
+        link_url=link,
     )
     return vote
 
@@ -689,12 +859,12 @@ def open_charity_election(vote: CharityVote) -> CharityVote:
 
     from .models import Notification
 
-    members = list(vote.org.members.select_related("user"))
-    title = f"Charity election open — {vote.org.name}"
+    members, link, room = vote_electorate(vote)
+    unit = "group" if vote.group_id else "organisation"
+    title = f"Charity election open — {room}"
     body = vote.admin_message or (
-        "Your organisation is choosing where this season's money goes. Cast your vote!"
+        f"Your {unit} is choosing where this season's money goes. Cast your vote!"
     )
-    link = reverse("orgs:charity_vote", args=[vote.org_id])
     Notification.objects.bulk_create([
         Notification(
             user=m.user, org=vote.org,
@@ -718,18 +888,20 @@ def send_election_open_emails(vote: CharityVote) -> int:
     from orgs.notifications import _vote_url
 
     options = list(vote.options.select_related("charity"))
-    vote_url = _vote_url(vote.org_id)
+    members, link, room = vote_electorate(vote)
+    vote_url = _vote_url(vote.org_id, path=link)
     messages = [
         build(
             "election_open",
-            subject=f"Vote now — where should {vote.org.name}'s money go?",
+            subject=f"Vote now — where should {room}'s money go?",
             to=m.user.email,
             context={
                 "user": m.user, "org": vote.org, "vote": vote,
+                "group": vote.group, "room": room,
                 "options": options, "vote_url": vote_url,
             },
         )
-        for m in vote.org.members.select_related("user")
+        for m in members
         if m.user.email
     ]
     return send_bulk(messages)
@@ -748,7 +920,7 @@ def open_due_elections(orgs=None) -> int:
     if orgs is not None:
         qs = qs.filter(org__in=orgs)
     n = 0
-    for vote in qs.select_related("org"):
+    for vote in qs.select_related("org", "group"):
         try:
             open_charity_election(vote)
             n += 1
@@ -770,7 +942,7 @@ def close_due_elections(orgs=None) -> int:
     if orgs is not None:
         qs = qs.filter(org__in=orgs)
     n = 0
-    for vote in qs.select_related("org"):
+    for vote in qs.select_related("org", "group"):
         try:
             close_charity_vote(vote)
             n += 1
@@ -788,12 +960,17 @@ def close_due_elections(orgs=None) -> int:
 # against, and a single leaderboard of 20,000 is not a community. Twelve people
 # in IT who eat lunch together is.
 #
-# Everything but the name and the type is inherited from the parent. A
-# department does not re-answer which codes it tips, which season it is in, or
-# which charity it raises for, because those are the organisation's answers and
-# a department that could contradict them would fragment the roll-up the parent
-# exists to produce. That is also why creating one is a two-field form and not
-# the four-step wizard a top-level org goes through.
+# Everything but the name, the type and the CAUSE is inherited from the parent.
+# A department does not re-answer which codes it tips or which season it is in,
+# because those are the organisation's answers and a department that could
+# contradict them would fragment the roll-up the parent exists to produce. That
+# is also why creating one is a two-field form and not the four-step wizard a
+# top-level org goes through.
+#
+# Charity came out of that list in Aug 2026. A franchise's stores are separate
+# businesses under one banner and back their own local causes, so a group may
+# hold its own charity — chosen in its own election, from the charities its
+# organisation has made available. See Group.effective_charity.
 
 
 def create_group(org, *, name, by_user, kind=None, label="", country=None):

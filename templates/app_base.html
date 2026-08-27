@@ -223,6 +223,16 @@
               </a>
               {% endif %}
               {% comment %}
+              Charities moved out of the creation wizard and to here (Aug
+              2026). Adding a cause is an admin job done next to the list of
+              what already exists, not a free-text field offered to someone
+              ninety seconds into their first visit.
+              {% endcomment %}
+              <a href="{% url 'orgs:charities' primary_org.id %}">
+                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-heart"/></svg></span>
+                <span class="mi-txt"><b>Charities</b><i>The causes you can pick and vote on</i></span>
+              </a>
+              {% comment %}
               Billing is narrower than the rest of this menu — a Team Manager
               runs Members and Settings without ever seeing the bill, so this
               is gated on ownership (primary_org_is_owner) rather than the

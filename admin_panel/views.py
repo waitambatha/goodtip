@@ -14,7 +14,7 @@ from django.utils.html import linebreaks, strip_tags
 from catalog.models import Charity, Competition, Season, Series, Sport
 from data_sync.models import SyncRun, SyncSchedule
 from data_sync.services import get_sync_service, SyncError
-from orgs.forms import _unique_charity_slug
+from orgs.services import unique_charity_slug as _unique_charity_slug
 from orgs.models import MembershipRequest, OrgMember, Organisation
 from orgs.services import approve_membership_request, decline_membership_request
 from orgs.signing import make_join_token

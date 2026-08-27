@@ -1,0 +1,78 @@
+{% extends "app_base.html" %}
+{% block title %}Set up {{ group.name }}'s election{% endblock %}
+{% block loader_task %}Loading the charities{% endblock %}
+{% block body_class %}page-deep sheet-page{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+
+{% block app_content %}
+{% comment %}
+Building one group's ballot. The options are the ORGANISATION's charities —
+vetted plus whatever it added — because a group votes on what its organisation
+offers. There is deliberately no "add a charity" field here: that request goes
+to Manage → Charities, where the existing list is visible while you type.
+
+Both times are optional. Leaving them blank opens the vote now, which is what
+most admins mean by setting one up; the wizard's old behaviour of creating a
+draft nobody ever came back to open left members with an election that never
+happened.
+{% endcomment %}
+
+<div class="app-head">
+  <div>
+    <div class="app-eyebrow">{{ org.name }} &middot; {{ group.name }}</div>
+    <h1 class="app-h1">Set up the election</h1>
+    <p class="app-sub">
+      Pick the charities {{ group.name }} votes between. Everyone in the group
+      gets one vote, and nobody sees the tallies until it closes.
+    </p>
+  </div>
+</div>
+
+<form method="post" style="max-width:760px;">
+  {% csrf_token %}
+
+  <label>Ballot options <span style="color:var(--muted);font-weight:400;">(pick at least 2)</span></label>
+  {% if charities %}
+  <div class="opt-grid cols2" style="margin-top:8px;">
+    {% for ch in charities %}
+    <label class="opt-card">
+      <input type="checkbox" name="charities" value="{{ ch.pk }}">
+      <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
+      {% include "components/_charity_card.html" with charity=ch %}
+    </label>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="app-sub">{{ org.name }} has no charities on its list yet.</p>
+  {% endif %}
+  {% if form.charities.errors %}<div class="fld-err">{{ form.charities.errors|join:" " }}</div>{% endif %}
+  <p class="hint">
+    Missing a cause? <a href="{% url 'orgs:charities' org.id %}">Add it to {{ org.name }}'s list</a>
+    and it'll appear here.
+  </p>
+
+  <div class="fld-row" style="margin-top:18px;">
+    <div class="fld">
+      <label for="id_opens_at">{{ form.opens_at.label }}</label>
+      {{ form.opens_at }}
+      <div class="hint">Leave blank to open it now.</div>
+      {% if form.opens_at.errors %}<div class="fld-err">{{ form.opens_at.errors|join:" " }}</div>{% endif %}
+    </div>
+    <div class="fld">
+      <label for="id_closes_at">{{ form.closes_at.label }}</label>
+      {{ form.closes_at }}
+      <div class="hint">Optional — you can always close it by hand.</div>
+      {% if form.closes_at.errors %}<div class="fld-err">{{ form.closes_at.errors|join:" " }}</div>{% endif %}
+    </div>
+  </div>
+
+  <div class="fld">
+    <label for="id_message">{{ form.message.label }}</label>
+    {{ form.message }}
+    <div class="hint">Goes into the email and the in-app notice your group gets.</div>
+  </div>
+
+  <button type="submit" class="abtn abtn-primary abtn-lg" style="margin-top:8px;">Start the election &rarr;</button>
+  <a href="{% url 'orgs:group_charity_vote' org.id group.id %}" class="abtn abtn-ghost" style="margin-top:8px;">Cancel</a>
+</form>
+{% endblock %}
