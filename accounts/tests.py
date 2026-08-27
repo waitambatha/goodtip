@@ -321,3 +321,173 @@ class DashboardRoundNavTests(TestCase):
         r = self.client.get(f"/dashboard/?org={self.org.id}&round=99")
         self.assertEqual(r.status_code, 200)
         self.assertIn('id="rnavSel"', r.content.decode())
+
+
+class DashboardThisWeekTests(TestCase):
+    """"This week" must not drag in another code's round of the same number.
+
+    A Round row is per (org, series), so one round NUMBER can name several
+    rounds at once. In a league tipping two codes at different points in their
+    seasons, landing on a number showed the live round with the other code's
+    long-finished round of that number stacked underneath it — greyed out,
+    unclickable, months old. The reported symptom was "AFL for the next round
+    showed correctly, but underneath it also displayed NRL Round 3 tips from
+    March".
+    """
+
+    def setUp(self):
+        from catalog.models import Competition, Season, Series, Sport
+        from orgs.models import OrgMember, Organisation
+        from tipping.models import Match, Round, Team
+
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            email="week@example.com", password="x", display_name="Week"
+        )
+        season = Season.objects.create(year=2098, label="2098")
+        self.org = Organisation.objects.create(name="Two Code League", season=season)
+        OrgMember.objects.create(user=self.user, org=self.org)
+
+        now = timezone.now()
+        self.series = {}
+        # Two codes whose seasons are nowhere near each other. "Early" is at
+        # round 3 with round 3 still to come; "Late" has already played its
+        # round 3 and is up to round 20 — so the number 3 exists in both, and
+        # only one of them is live.
+        for slug, played, upcoming in (("early", [1, 2], [3, 4]),
+                                       ("late", [1, 2, 3, 18, 19], [20, 21])):
+            sport = Sport.objects.create(name=f"Sport {slug}", slug=f"sport-{slug}")
+            series = Series.objects.create(sport=sport, name=slug.title(), slug=slug)
+            comp = Competition.objects.create(
+                sport=sport, season=season, name=slug.title(), slug=slug,
+            )
+            comp.series.add(series)
+            self.org.competitions.add(comp)
+            self.series[slug] = series
+            home = Team.objects.create(name=f"{slug} H", slug=f"{slug}-h", series=series)
+            away = Team.objects.create(name=f"{slug} A", slug=f"{slug}-a", series=series)
+            for n in played:
+                rnd = Round.objects.create(
+                    org=self.org, round_number=n, series=series, competition=comp,
+                    lockout_at=now - timedelta(days=60), status="complete",
+                )
+                Match.objects.create(
+                    round=rnd, home_team=home, away_team=away,
+                    kickoff_at=now - timedelta(days=60), status="complete",
+                )
+            for i, n in enumerate(upcoming):
+                rnd = Round.objects.create(
+                    org=self.org, round_number=n, series=series, competition=comp,
+                    lockout_at=now + timedelta(days=3 + i * 7),
+                )
+                Match.objects.create(
+                    round=rnd, home_team=home, away_team=away,
+                    kickoff_at=now + timedelta(days=3 + i * 7), status="scheduled",
+                )
+        self.client.force_login(self.user)
+
+    def _round_headings(self, body):
+        import re
+
+        return re.findall(
+            r'<span class="fxr-n">Round (\d+)</span>\s*'
+            r'<span class="fxr-series">([^<]+)</span>',
+            body,
+        )
+
+    def test_this_week_shows_the_open_round_of_each_competition(self):
+        body = self.client.get(f"/dashboard/?org={self.org.id}").content.decode()
+        shown = {(n, s.strip()) for n, s in self._round_headings(body)}
+        self.assertEqual(shown, {("3", "Early"), ("20", "Late")})
+
+    def test_this_week_does_not_show_a_finished_round_of_the_same_number(self):
+        """The bug itself: Late's round 3 was played and must stay away."""
+        body = self.client.get(f"/dashboard/?org={self.org.id}").content.decode()
+        self.assertNotIn(("3", "Late"), self._round_headings(body))
+
+    def test_each_round_is_one_contiguous_block(self):
+        """{% regroup %} only collects consecutive items, so a round split
+        across the sort order renders its heading again and again."""
+        body = self.client.get(f"/dashboard/?org={self.org.id}").content.decode()
+        headings = self._round_headings(body)
+        self.assertEqual(len(headings), len(set(headings)))
+
+    def test_asking_for_a_number_still_shows_every_round_with_it(self):
+        """Explicitly navigating to round 3 is a history question, and both
+        codes genuinely have one — that is not the bug."""
+        body = self.client.get(
+            f"/dashboard/?org={self.org.id}&round=3"
+        ).content.decode()
+        shown = {s.strip() for _n, s in self._round_headings(body)}
+        self.assertEqual(shown, {"Early", "Late"})
+
+    def test_the_dropdown_offers_this_week_as_its_own_destination(self):
+        body = self.client.get(f"/dashboard/?org={self.org.id}").content.decode()
+        self.assertIn('<option value="" selected>This week</option>', body)
+
+    def test_leaving_this_week_offers_a_way_back_without_a_round(self):
+        """The return link must drop ?round= entirely — pointing it at a
+        number would land back on the mixed-code screen it exists to escape."""
+        body = self.client.get(
+            f"/dashboard/?org={self.org.id}&round=1"
+        ).content.decode()
+        self.assertIn("rnav-now", body)
+        self.assertIn(f'href="/dashboard/?org={self.org.id}"', body)
+
+
+class OnboardingWalkthroughTests(TestCase):
+    """The first-visit walkthrough: shown once, put away for good."""
+
+    def setUp(self):
+        from catalog.models import Season
+        from orgs.models import OrgMember, Organisation
+
+        self.season = Season.objects.create(year=2098, label="2098")
+        self.org = Organisation.objects.create(name="Coach Co", season=self.season)
+        self.user = User.objects.create_user(
+            email="new@example.com", password="x", display_name="Newbie",
+        )
+        OrgMember.objects.create(user=self.user, org=self.org)
+        self.client.force_login(self.user)
+
+    def test_it_shows_on_a_first_visit(self):
+        resp = self.client.get(reverse("dashboard"))
+        self.assertContains(resp, 'id="coach"')
+
+    def test_it_does_not_show_once_it_has_been_put_away(self):
+        self.client.post(reverse("accounts:onboarding_seen"))
+        resp = self.client.get(reverse("dashboard"))
+        self.assertNotContains(resp, 'id="coach"')
+
+    def test_putting_it_away_is_stamped_on_the_user(self):
+        self.client.post(reverse("accounts:onboarding_seen"))
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.onboarding_seen_at)
+
+    def test_the_stamp_is_not_moved_by_a_second_call(self):
+        self.client.post(reverse("accounts:onboarding_seen"))
+        self.user.refresh_from_db()
+        first = self.user.onboarding_seen_at
+        self.client.post(reverse("accounts:onboarding_seen"))
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.onboarding_seen_at, first)
+
+    def test_rendering_alone_does_not_count_as_seeing_it(self):
+        """A page opened and abandoned, or one whose script never ran, must
+        not burn the single chance to explain the app."""
+        self.client.get(reverse("dashboard"))
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.onboarding_seen_at)
+
+    def test_somebody_in_no_organisation_is_not_shown_it(self):
+        """Three of the four things it points at do not exist yet."""
+        from orgs.models import OrgMember
+
+        OrgMember.objects.filter(user=self.user).delete()
+        resp = self.client.get(reverse("dashboard"))
+        self.assertNotContains(resp, 'id="coach"')
+
+    def test_it_needs_a_post(self):
+        self.assertEqual(
+            self.client.get(reverse("accounts:onboarding_seen")).status_code, 405,
+        )

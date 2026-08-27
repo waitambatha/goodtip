@@ -185,8 +185,8 @@
           {% endcomment %}
           <a href="{% url 'tipping:my_tips' primary_org.id %}" class="{% block nav_tips %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-vote"/></svg><span>My Tips</span></a>
           <a href="{% url 'tipping:leaderboard' primary_org.id %}" class="{% block nav_board %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>Leaderboard</span></a>
-          <a href="{% url 'tipping:ladder' primary_org.id %}" class="{% block nav_ladder %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg><span>Ladder</span></a>
-          <a href="{% url 'orgs:wall' primary_org.id %}" class="{% block nav_wall %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-msg"/></svg><span>The Wall</span></a>
+          <a href="{% url 'tipping:ladder' primary_org.id %}" data-coach="ladder" class="{% block nav_ladder %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg><span>Ladder</span></a>
+          <a href="{% url 'orgs:wall' primary_org.id %}" data-coach="wall" class="{% block nav_wall %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-msg"/></svg><span>The Wall</span></a>
           {% comment %}
           Admin-only, and only two items: Members is the hub for everything to
           do with people (invites, join requests, roles), and Season summary is

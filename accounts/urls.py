@@ -12,4 +12,6 @@ urlpatterns = [
     path("verify/", views.verify_view, name="verify"),
     path("logout/", views.logout_view, name="logout"),
     path("htmx/countdown/<int:org_id>/", views.dashboard_countdown_partial, name="dashboard_countdown"),
+    # Put the first-visit walkthrough away. POST-only: it changes state.
+    path("onboarding/seen/", views.onboarding_seen, name="onboarding_seen"),
 ]

@@ -32,13 +32,20 @@ Expects: c (the selected org card), games, open_games, org_series,
         <a href="{% url 'tipping:my_tips' c.org.id %}" class="abtn abtn-dark">Review in My Tips &rarr;</a>
       </div>
       {% else %}
-      <div class="slip-bar">
+      {% comment %}
+      The walkthrough's "make your tips here" points HERE, not at the form
+      around the whole slate. The form is the entire fixture list — on a
+      normal round that is taller than the window, so ringing it put both
+      edges off screen and highlighted nothing. This bar is the thing being
+      described anyway: the count, and the button that confirms.
+      {% endcomment %}
+      <div class="slip-bar" data-coach="tips">
         <div class="slip-info"><b>Make your tips right here</b><span>Tap the team you think wins each match, then confirm. You can change any pick until the round locks.</span></div>
-        <div class="slip-meter"><b id="slipCount">{{ c.tips_done }}</b> of {{ c.tips_total }} picked</div>
+        <div class="slip-meter"><b id="slipCount">{{ slate_done }}</b> of {{ slate_total }} picked</div>
         {# opens the review sheet; the sheet's own button does the real submit #}
         <button type="button" class="abtn abtn-primary abtn-lg" id="slipReview">Confirm my tips</button>
       </div>
-      <div class="pbar slim" style="margin-bottom:14px;"><i id="slipBar" style="width:{% widthratio c.tips_done c.tips_total|default:1 100 %}%"></i></div>
+      <div class="pbar slim" style="margin-bottom:14px;"><i id="slipBar" style="width:{% widthratio slate_done slate_total|default:1 100 %}%"></i></div>
       {% endif %}
 
       {% comment %}
@@ -114,9 +121,21 @@ Expects: c (the selected org card), games, open_games, org_series,
                   hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
                   hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
                   hx-trigger="change" hx-push-url="true">
+            {% comment %}
+            "This week" is its own destination, not a number. Round numbers are
+            per (org, series), so in a four-code league one number names up to
+            five rounds — one live, the rest played out months ago. Selecting
+            the number showed all five. This option shows the current open
+            round of EACH competition instead, which is what "this week"
+            actually means to a member.
+
+            Its value is empty, so choosing it drops ?round= from the URL and
+            lands on the default view.
+            {% endcomment %}
+            <option value="" {% if round_nav.is_week %}selected{% endif %}>This week</option>
             {% for n in round_nav.numbers %}
-            <option value="{{ n }}" {% if n == round_nav.current %}selected{% endif %}>
-              Round {{ n }}{% if n == round_nav.in_play %} &middot; this week{% endif %}
+            <option value="{{ n }}" {% if not round_nav.is_week and n == round_nav.current %}selected{% endif %}>
+              Round {{ n }}
             </option>
             {% endfor %}
           </select>
@@ -153,12 +172,18 @@ Expects: c (the selected org card), games, open_games, org_series,
         through six rounds and then having to step forward six times to return
         is the kind of thing that makes a navigator feel like a trap.
         {% endcomment %}
-        {% if not round_nav.is_in_play %}
+        {% comment %}
+        The way home. It carries NO round parameter — "this week" is the
+        default view, not a numbered round, so naming a number here would land
+        on the very screen this link exists to escape: one live round stacked
+        on top of every other code's round of the same number.
+        {% endcomment %}
+        {% if not round_nav.is_week %}
         <a class="rnav-now{% if round_nav.played %} is-quiet{% endif %}"
-           href="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.in_play }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-           hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}&amp;round={{ round_nav.in_play }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+           href="{{ dash_url }}?org={{ c.org.id }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+           hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
            hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
-           hx-push-url="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.in_play }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}">
+           hx-push-url="{{ dash_url }}?org={{ c.org.id }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}">
           This week
         </a>
         {% endif %}

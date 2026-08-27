@@ -124,6 +124,25 @@ class SecurityForm(forms.ModelForm):
         fields = ["two_factor_enabled"]
 
 
+class TipCarryForm(forms.ModelForm):
+    """How a member's tips behave across the other groups they're in.
+
+    Offered on the profile so the choice made in the middle of a confirm is
+    not a one-way door — "never ask me again" has to be reversible somewhere
+    obvious, or it is a trap rather than a preference.
+    """
+
+    tip_carry_mode = forms.ChoiceField(
+        choices=User.CARRY_CHOICES,
+        widget=forms.RadioSelect,
+        label="When you confirm tips",
+    )
+
+    class Meta:
+        model = User
+        fields = ["tip_carry_mode"]
+
+
 class RegisteredEmailPasswordResetForm(DjangoPasswordResetForm):
     """Password reset that says so when the address isn't registered.
 

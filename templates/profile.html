@@ -82,6 +82,41 @@ stacking context, so a strip rendered inside it paints over the sheet.
       <button type="submit" name="two_factor" value="1" class="abtn abtn-primary" style="margin-top:16px;">Save</button>
     </form>
   </div>
+
+  {% comment %}
+  Only shown to someone who tips in more than one place — for everybody else
+  this setting cannot do anything, and a preference with no effect is just a
+  question you have made somebody read.
+
+  It exists at all so "never ask me again", chosen mid-confirm, is reversible
+  somewhere obvious. A one-way door is a trap, not a preference.
+  {% endcomment %}
+  {% if show_carry %}
+  <div class="card pad-lg">
+    <div class="card-h" style="margin-bottom:6px;">Tipping in more than one group</div>
+    <p class="card-lead" style="margin:0 0 16px;font-size:14px;">
+      You're in several comps that tip the same games. We can put one set of
+      picks into all of them so you don't have to tip the same match twice.
+    </p>
+    <form method="post" action="{% url 'profile' %}">
+      {% csrf_token %}
+      <div class="opt-grid">
+        {% for choice in carry_form.tip_carry_mode %}
+        <label class="opt-card radio">
+          {{ choice.tag }}
+          <span class="oc-box"></span>
+          <span><span class="oc-title">{{ choice.choice_label }}</span></span>
+        </label>
+        {% endfor %}
+      </div>
+      <p class="app-sub" style="margin:12px 0 0;font-size:13px;">
+        Carrying never replaces a pick you've already made somewhere else —
+        if it disagrees, we leave it alone and tell you.
+      </p>
+      <button type="submit" class="abtn abtn-primary" style="margin-top:16px;">Save</button>
+    </form>
+  </div>
+  {% endif %}
 </div>
 
 <div class="card pad-lg">

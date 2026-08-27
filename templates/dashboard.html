@@ -235,7 +235,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
 
 
   {% if c.charity_vote %}
-  <div class="flash info" style="justify-content:space-between;">
+  <div class="flash info" data-coach="charity" style="justify-content:space-between;">
     <span><svg class="cic" style="width:18px;height:18px;stroke:#245b66;"><use href="#ic-vote"/></svg> A charity vote is open for your organisation.</span>
     <a href="{% url 'orgs:charity_vote' c.org.id %}" class="abtn abtn-dark abtn-sm">{% if c.has_voted %}Review{% else %}Vote now{% endif %}</a>
   </div>
@@ -324,7 +324,23 @@ impossible. See gt-busy.js.
           <header class="ts-head">
             <div>
               <h3 id="tsTitle">Check your tips</h3>
-              <p class="ts-sub"><b id="tsCount">0</b> of {{ c.tips_total }} picked &middot; Round {{ c.round.round_number }}</p>
+              {% comment %}
+              THE DENOMINATOR IS WHAT IS ON SCREEN.
+
+              tsCount is counted by the script from the fixtures actually in
+              the sheet; the total beside it used to be c.tips_total, which is
+              the round-in-play's fixture count and a different question
+              entirely. On wildcard weekend the sheet held the 2 finals games
+              and the header read "2 of 9 picked" — the 9 being a standard
+              home-and-away round that was not on screen at all. Two numbers
+              from two sources, presented as a fraction.
+
+              The round number goes the same way: in week mode the sheet spans
+              the current round of every competition, so naming one of them
+              would be picking at random. It shows only where there is a
+              single round to name.
+              {% endcomment %}
+              <p class="ts-sub"><b id="tsCount">0</b> of {{ slate_total }} picked{% if slate_round_no %} &middot; Round {{ slate_round_no }}{% endif %}</p>
             </div>
             <button type="button" class="ts-x" data-sheet-close aria-label="Close">&times;</button>
           </header>
@@ -453,6 +469,14 @@ is the part members care about and the part that is still true.
 
 {% endwith %}
 {% endif %}
+
+{% comment %}
+Last in the content block, and only on a first visit. It measures its targets
+from the live page, so it has to be rendered after them — and it points at the
+sidebar as well as the dashboard, which is why it sits here rather than inside
+any one card.
+{% endcomment %}
+{% if show_onboarding %}{% include "partials/onboarding.html" %}{% endif %}
 {% endblock %}
 
 {% block app_js %}

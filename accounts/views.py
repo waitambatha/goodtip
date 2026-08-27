@@ -7,13 +7,14 @@ from django.contrib.auth import (
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.db import transaction
-from django.http import HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_POST
 
 from orgs.models import Group, OrgMember, Organisation
 from orgs.notifications import send_welcome
@@ -23,7 +24,8 @@ from tipping.services import (
 )
 
 from .forms import (
-    AvatarForm, LoginForm, ProfileForm, SecurityForm, SignupForm, VerifyCodeForm,
+    AvatarForm, LoginForm, ProfileForm, SecurityForm, SignupForm, TipCarryForm,
+    VerifyCodeForm,
 )
 from .models import LoginCode
 from .notifications import send_login_code
@@ -568,6 +570,9 @@ def dashboard_view(request):
     # than a scroll of everything at once.
     games = []
     open_games = 0
+    slate_done = 0
+    slate_total = 0
+    slate_round_ids = set()
     org_series, active_slugs = [], []
     round_nav = None
     if selected:
@@ -593,27 +598,50 @@ def dashboard_view(request):
         # make the arrows feel broken. The number is what a member means when
         # they say "go back to 16".
         numbers = sorted(set(org_rounds.values_list("round_number", flat=True)))
+        # THIS WEEK IS NOT A ROUND NUMBER.
+        #
+        # The navigator moves by round NUMBER, because that is what a member
+        # means by "go back to 16". But a number does not identify a round:
+        # a round row is per (org, series), so "round 3" in a league tipping
+        # four codes is FIVE rows — AFLW round 3, which is on this week, plus
+        # NRL and AFL round 3 from March, NRLW round 3 from July and Origin
+        # game 3. Landing on the number showed all five: one live round and
+        # four months-dead ones stacked underneath it, greyed out and
+        # unclickable. That is the screen the client reported, and it was not
+        # an NRL filtering bug — it was every code at once.
+        #
+        # So the default landing is its own mode rather than a number. "This
+        # week" means the current open round FOR EACH COMPETITION — AFLW 3 and
+        # NRL 26 side by side, each one genuinely tippable. Picking a number
+        # from the dropdown or stepping with the arrows switches to number
+        # mode, which still shows every round sharing that number, because
+        # that is the honest answer to "show me round 3" when four codes have
+        # one.
+        week_round_ids = []
         if numbers:
-            # "This week" must be a round you can actually DO something with.
-            #
-            # It used to come from current_round(), which is the earliest round
-            # holding an unplayed game anywhere in the org. Round numbers are
-            # not aligned across codes — one live league sits at NRL round 25
-            # and AFLW round 2 — so that returned 2, and the navigator then
-            # showed NRL round 2 alongside it: eight games played back in
-            # March, every team unclickable, under a label reading "this week".
-            # The screen looked broken when it was merely pointing at the wrong
-            # round.
-            #
-            # The tipping window is the honest source: it names the rounds that
-            # are open to tip right now, per series. The earliest of those is
-            # where somebody wants to land.
+            # The tipping window names the rounds open to tip right now, per
+            # series. The earliest per series is this week's round for that
+            # code; the rest of the window sits one step along the navigator.
             from tipping.services import tip_window as _tw
 
             open_ids = [rid for rid, st in _tw(selected["org"]).items() if st["open"]]
-            open_numbers = sorted(
-                org_rounds.filter(id__in=open_ids).values_list("round_number", flat=True)
-            )
+            earliest_per_series = {}
+            for rnd in (
+                org_rounds.filter(id__in=open_ids)
+                .order_by("series_id", "round_number")
+                .only("id", "series_id", "round_number")
+            ):
+                prev = earliest_per_series.get(rnd.series_id)
+                if prev is None or rnd.round_number < prev.round_number:
+                    earliest_per_series[rnd.series_id] = rnd
+            week_rounds = list(earliest_per_series.values())
+            week_round_ids = [r.id for r in week_rounds]
+            open_numbers = sorted(r.round_number for r in week_rounds)
+
+            # The number the arrows and the "this week" link step from. With
+            # several codes open at different numbers there is no single right
+            # answer, so the earliest is used — it is the one a member is most
+            # likely to still be filling in.
             if open_numbers:
                 in_play = open_numbers[0]
             elif selected["round"]:
@@ -624,9 +652,14 @@ def dashboard_view(request):
                 wanted = int(request.GET.get("round", ""))
             except (TypeError, ValueError):
                 wanted = None
-            # An out-of-range or hand-edited round falls back to the one being
-            # played rather than 404ing — a stale bookmark should land you
-            # somewhere useful.
+            # Week mode is the default: no ?round= at all, or one that is out
+            # of range or hand-edited. A stale bookmark should land somewhere
+            # useful rather than 404, and "somewhere useful" is this week.
+            is_week = wanted not in numbers
+            # With nothing open anywhere — end of season — there is no week to
+            # show, so fall back to a real number rather than an empty panel.
+            if is_week and not week_round_ids:
+                is_week = False
             current_no = wanted if wanted in numbers else (
                 in_play if in_play in numbers else numbers[-1]
             )
@@ -637,7 +670,9 @@ def dashboard_view(request):
                 "prev": numbers[i - 1] if i > 0 else None,
                 "next": numbers[i + 1] if i < len(numbers) - 1 else None,
                 "in_play": in_play,
-                "is_in_play": current_no == in_play,
+                # Week mode, as opposed to a numbered round. Drives both the
+                # dropdown's selected option and the "back to this week" link.
+                "is_week": is_week,
             }
 
         upcoming = Match.objects.filter(
@@ -646,7 +681,9 @@ def dashboard_view(request):
         )
         if active_series:
             upcoming = upcoming.filter(round__series__in=active_series)
-        if round_nav:
+        if round_nav and round_nav["is_week"]:
+            upcoming = upcoming.filter(round_id__in=week_round_ids)
+        elif round_nav:
             upcoming = upcoming.filter(round__round_number=round_nav["current"])
         else:
             upcoming = upcoming.filter(kickoff_at__gt=now)
@@ -694,6 +731,12 @@ def dashboard_view(request):
         round_points = 0
         round_correct = 0
         round_graded = 0
+        slate_done = 0
+        slate_total = 0
+        # The rounds the TIPPABLE part of the slate spans. In week mode that
+        # is one round per competition, so naming "Round 3" over a sheet
+        # holding AFLW 3 and NRL 26 would be picking one of them at random.
+        slate_round_ids = set()
         for g in upcoming:
             tip = my_tips.get(g.id)
             g.my_tip = my_picks.get(g.id)
@@ -723,6 +766,18 @@ def dashboard_view(request):
             # games that finished a month ago.
             if g.can_tip:
                 open_games += 1
+                # The slate's own progress meter. c.tips_done / c.tips_total
+                # describe the round in play, which is what the stat card is
+                # about; the meter above the fixtures is about the fixtures
+                # actually on screen. Those were the same thing back when the
+                # panel always showed one round, and stopped being the same
+                # thing when "this week" became the current open round of every
+                # competition at once — a slate of 32 fixtures under a meter
+                # reading "3 of 8".
+                slate_total += 1
+                slate_round_ids.add(g.round_id)
+                if g.tipped:
+                    slate_done += 1
             games.append(g)
 
         # PLAYABLE SERIES FIRST.
@@ -741,12 +796,33 @@ def dashboard_view(request):
         # played. Chronology is preserved inside each group, which is what
         # matters once you are reading one.
         played_round = {}
+        round_start = {}
         for g in games:
             if g.round_id not in played_round:
                 played_round[g.round_id] = True
             if not g.is_locked:
                 played_round[g.round_id] = False
-        games.sort(key=lambda g: (played_round.get(g.round_id, False), g.kickoff_at, g.id))
+            first = round_start.get(g.round_id)
+            if first is None or g.kickoff_at < first:
+                round_start[g.round_id] = g.kickoff_at
+        # A ROUND IS A BLOCK, not a scatter of fixtures that happen to share a
+        # number. The template groups with {% regroup %}, which only collects
+        # CONSECUTIVE items — so sorting by kickoff alone broke each round into
+        # as many fragments as it had gaps in the interleaving, and the panel
+        # repeated "Round 3 · AFLW … Round 26 · NRL … Round 3 · AFLW" down the
+        # page. That was survivable while the panel showed one round; showing
+        # the current round of four codes at once turned it into nonsense.
+        #
+        # Rounds are ordered by when they START (still-tippable ones first),
+        # and chronology is preserved inside each — which is what the previous
+        # sort was reaching for and did not quite express.
+        games.sort(key=lambda g: (
+            played_round.get(g.round_id, False),
+            round_start.get(g.round_id, g.kickoff_at),
+            g.round_id,
+            g.kickoff_at,
+            g.id,
+        ))
 
         if round_nav is not None:
             round_nav["graded"] = round_graded
@@ -771,12 +847,24 @@ def dashboard_view(request):
     #
     # `c` is supplied because the full page binds it with {% with c=selected %}
     # around the include, and the partial cannot see that when rendered alone.
+    # One round on the sheet, or several? Only a single-round slate can
+    # honestly be labelled with a round number.
+    slate_round_no = None
+    if len(slate_round_ids) == 1:
+        only = next(iter(slate_round_ids))
+        slate_round_no = next(
+            (g.round.round_number for g in games if g.round_id == only), None,
+        )
+
     if selected and request.headers.get("HX-Request") and request.GET.get("slate"):
         return render(request, "partials/dashboard_slate.html", {
             "c": selected,
             "selected": selected,
             "games": games,
             "open_games": open_games,
+            "slate_done": slate_done,
+            "slate_total": slate_total,
+            "slate_round_no": slate_round_no,
             "org_series": org_series,
             "active_slugs": active_slugs,
             "round_nav": round_nav,
@@ -826,6 +914,20 @@ def dashboard_view(request):
         # only its FIRST kickoff and said "locked" while most of the round was
         # still days away.
         "open_games": open_games,
+        # How much of the slate on screen is picked, as opposed to how much of
+        # the round in play is — see the comment where these are counted.
+        "slate_done": slate_done,
+        "slate_total": slate_total,
+        # The first-visit walkthrough. Only for somebody who is actually in an
+        # organisation: three of the four things it points at do not exist
+        # until then, and a tour of an empty dashboard would be its own kind
+        # of confusion.
+        "show_onboarding": (
+            request.user.onboarding_seen_at is None and bool(memberships)
+        ),
+        # The round number to put on the confirm sheet — only where the slate
+        # is ONE round. See slate_round_ids.
+        "slate_round_no": slate_round_no,
         # Competition filter: the series this org actually has rounds in, and
         # which are selected.
         "org_series": org_series,
@@ -861,10 +963,42 @@ def dashboard_countdown_partial(request, org_id: int):
 
 
 @login_required
+@require_POST
+def onboarding_seen(request):
+    """The member skipped the walkthrough or reached its end.
+
+    Idempotent, and deliberately not fussy about which of the two it was —
+    both mean "do not show me this again", and a bell that has been rung does
+    not need to know who rang it.
+    """
+    if request.user.onboarding_seen_at is None:
+        request.user.onboarding_seen_at = timezone.now()
+        request.user.save(update_fields=["onboarding_seen_at"])
+    return HttpResponse(status=204)
+
+
+def _carry_rooms(user):
+    """Imported lazily: tipping.carry pulls in orgs and tipping models, and
+    accounts is imported by both."""
+    from tipping.carry import rooms_for
+
+    return rooms_for(user)
+
+
+@login_required
 def profile_view(request):
     pwd_form = PasswordChangeForm(request.user)
     form = ProfileForm(instance=request.user)
     security_form = SecurityForm(instance=request.user)
+    carry_form = TipCarryForm(instance=request.user)
+    if request.method == "POST" and "tip_carry_mode" in request.POST:
+        carry_form = TipCarryForm(request.POST, instance=request.user)
+        if carry_form.is_valid():
+            carry_form.save()
+            messages.success(request, dict(User.CARRY_CHOICES).get(
+                request.user.tip_carry_mode, "Saved.",
+            ) + " — saved.")
+        return redirect("profile")
     if request.method == "POST" and "two_factor" in request.POST:
         security_form = SecurityForm(request.POST, instance=request.user)
         if security_form.is_valid():
@@ -909,6 +1043,11 @@ def profile_view(request):
     return render(request, "profile.html", {
         "form": form, "pwd_form": pwd_form, "memberships": memberships,
         "security_form": security_form,
+        "carry_form": carry_form,
+        # The carry setting is meaningless for someone who tips in exactly one
+        # room, so it is only offered to people it can actually do something
+        # for — which today is 5 accounts out of 55.
+        "show_carry": len(_carry_rooms(request.user)) > 1,
     })
 
 

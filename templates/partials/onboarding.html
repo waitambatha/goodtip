@@ -1,0 +1,169 @@
+{% comment %}
+THE FIRST-VISIT WALKTHROUGH.
+
+The client's reason for it, in his words: "just enough to stop first-week
+confusion getting mistaken for bugs." That is the whole brief, and it sets the
+bar — this points at four things and gets out of the way. It is not a product
+tour and should never grow into one.
+
+WHY IT IS BUILT AROUND MISSING TARGETS. The four things it names do not all
+exist on every dashboard: the charity banner only appears while a vote is
+open, and the sidebar is off-screen on a phone. So each step names an element
+by data-coach and any step whose element is not on the page, or not visible,
+is dropped before the tour starts. A bubble pointing at nothing is precisely
+the confusion this exists to prevent.
+
+It is also entirely optional scenery: no target, no tour, and the dashboard is
+unchanged. Nothing here is required for the page to work.
+{% endcomment %}
+<div class="coach" id="coach" hidden aria-live="polite"
+     data-seen-url="{% url 'accounts:onboarding_seen' %}"
+     data-csrf="{{ csrf_token }}">
+  <div class="coach-veil" data-coach-skip></div>
+  <div class="coach-ring" id="coachRing" aria-hidden="true"></div>
+  <div class="coach-pop" id="coachPop" role="dialog" aria-modal="true" aria-labelledby="coachTitle">
+    <div class="coach-step" id="coachStep"></div>
+    <h3 class="coach-title" id="coachTitle"></h3>
+    <p class="coach-body" id="coachBody"></p>
+    <div class="coach-foot">
+      <button type="button" class="coach-skip" data-coach-skip>Skip</button>
+      <div class="coach-dots" id="coachDots"></div>
+      <button type="button" class="abtn abtn-primary abtn-sm" id="coachNext">Next</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var root = document.getElementById('coach');
+  if (!root) return;
+
+  /* MOVED TO THE BODY BEFORE ANYTHING ELSE.
+
+     The dashboard renders this inside main.app-main > .page-sheet, and both
+     of those are position:relative with z-index:1 — each one a stacking
+     context. A z-index of 200 inside a context whose own z-index is 1 does
+     not beat the sticky nav's 50 in the root context, it is simply scoped
+     underneath it. The result was a tour that dimmed the page correctly and
+     then drew its ring UNDER the header, so the two steps pointing at Ladder
+     and The Wall highlighted nothing at all.
+
+     Reparenting to the body puts it in the root stacking context, where its
+     z-index means what it says. Done here rather than by moving the include,
+     so wherever a future page drops this partial it still works. */
+  document.body.appendChild(root);
+
+  /* The script is the source of the copy, not the markup, because a step that
+     finds no target is dropped entirely — including its text. */
+  var STEPS = [
+    ['tips',    'Make your tips here',
+     'Tap the team you think wins each match, then confirm. You can change any pick right up until the round locks.'],
+    ['ladder',  'See where you sit',
+     'Every tip scores on your ladder. Miss a round and you get the away side by default, so you are never on nothing.'],
+    ['wall',    'The Wall is your group chat',
+     'Banter, results and whatever else. It is per organisation, so only your lot can see it.'],
+    ['charity', 'This is what it is all for',
+     'Your organisation raises for a charity. Where the group votes on it, this is where you have your say.']
+  ];
+
+  function visible(el) {
+    if (!el) return false;
+    var r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  }
+
+  var steps = [];
+  STEPS.forEach(function (s) {
+    var el = document.querySelector('[data-coach="' + s[0] + '"]');
+    if (visible(el)) steps.push({ el: el, title: s[1], body: s[2] });
+  });
+  if (!steps.length) return;
+
+  var ring = document.getElementById('coachRing');
+  var pop = document.getElementById('coachPop');
+  var i = 0;
+
+  document.getElementById('coachDots').innerHTML =
+    steps.map(function () { return '<i></i>'; }).join('');
+  var dots = [].slice.call(document.querySelectorAll('#coachDots i'));
+
+  function place() {
+    var s = steps[i];
+    /* INSTANT, NOT SMOOTH.
+
+       A smooth scroll takes as long as the distance demands, and the rect was
+       being read on a fixed 260ms timer — so a target far down the page was
+       still in motion when it was measured, and the ring was drawn where the
+       target had been. On the dashboard that put step one's ring 108px below
+       the fold: a highlight nobody could see, on the one step that matters
+       most. Scrolling instantly makes the measurement deterministic; the ring
+       and card still glide between steps, because that transition is theirs
+       rather than the page's. */
+    try {
+      s.el.scrollIntoView({ block: 'center', behavior: 'instant' });
+    } catch (e) {
+      s.el.scrollIntoView(true);   /* older browsers: no options object */
+    }
+    /* Next frame, so the scroll is committed and the rect is the settled one. */
+    requestAnimationFrame(function () {
+      var r = s.el.getBoundingClientRect();
+      var pad = 6;
+      ring.style.top = (r.top - pad) + 'px';
+      ring.style.left = (r.left - pad) + 'px';
+      ring.style.width = (r.width + pad * 2) + 'px';
+      ring.style.height = (r.height + pad * 2) + 'px';
+
+      /* Below the target where there is room, above it where there is not —
+         and then clamped into the viewport regardless. The clamp is not
+         belt-and-braces: a target taller than the window has BOTH edges off
+         screen, so "above it" and "below it" are both off screen too, and
+         the card was being placed at y=2764 on a 900px window. Off-screen
+         advice is worse than none. */
+      var h = pop.offsetHeight;
+      var below = r.bottom + 14;
+      var top = (below + h < window.innerHeight - 12)
+        ? below
+        : r.top - h - 14;
+      pop.style.top = Math.max(12, Math.min(top, window.innerHeight - h - 12)) + 'px';
+      pop.style.left = Math.max(12, Math.min(
+        r.left, window.innerWidth - pop.offsetWidth - 12
+      )) + 'px';
+    });
+
+    document.getElementById('coachStep').textContent =
+      'Step ' + (i + 1) + ' of ' + steps.length;
+    document.getElementById('coachTitle').textContent = s.title;
+    document.getElementById('coachBody').textContent = s.body;
+    document.getElementById('coachNext').textContent =
+      i === steps.length - 1 ? 'Got it' : 'Next';
+    dots.forEach(function (d, n) { d.className = n === i ? 'on' : ''; });
+  }
+
+  function done() {
+    root.hidden = true;
+    /* Best-effort: the tour is over on screen whatever the server says, and a
+       failed POST costs one repeat rather than a broken dashboard. */
+    var body = new FormData();
+    body.append('csrfmiddlewaretoken', root.getAttribute('data-csrf'));
+    fetch(root.getAttribute('data-seen-url'), {
+      method: 'POST', body: body, credentials: 'same-origin'
+    }).catch(function () {});
+  }
+
+  [].slice.call(document.querySelectorAll('[data-coach-skip]')).forEach(function (b) {
+    b.addEventListener('click', done);
+  });
+  document.getElementById('coachNext').addEventListener('click', function () {
+    i += 1;
+    if (i >= steps.length) { done(); return; }
+    place();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (!root.hidden && e.key === 'Escape') done();
+  });
+  window.addEventListener('resize', function () { if (!root.hidden) place(); });
+
+  root.hidden = false;
+  place();
+})();
+</script>

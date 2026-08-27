@@ -46,6 +46,43 @@ class User(AbstractUser):
     two_factor_enabled = models.BooleanField(default=True)
     email_verified_at = models.DateTimeField(null=True, blank=True)
 
+    # WHETHER A TIP CARRIES TO YOUR OTHER ROOMS.
+    #
+    # Someone in a work comp, a mates' group and a family comp was tipping the
+    # same eight games three times over — the picks are identical, only the
+    # ladder differs. Carrying them is the obvious fix and the wrong default:
+    # a tip is a commitment in each room it lands in, and quietly writing one
+    # into a room somebody did not have in mind is not a convenience.
+    #
+    # So it is asked, once, with the option to stop being asked. ASK is the
+    # default and only ever surfaces for people who are in more than one room
+    # at all — which is nearly nobody today, and the point is that it stays
+    # invisible to them.
+    CARRY_ASK = "ask"
+    CARRY_ALL = "all"
+    CARRY_NONE = "none"
+    CARRY_CHOICES = [
+        (CARRY_ASK, "Ask me each time"),
+        (CARRY_ALL, "Always carry my tips to every group I'm in"),
+        (CARRY_NONE, "Only ever tip the group I'm in"),
+    ]
+    tip_carry_mode = models.CharField(
+        max_length=5, choices=CARRY_CHOICES, default=CARRY_ASK,
+    )
+
+    # WHEN THE FIRST-VISIT WALKTHROUGH WAS PUT AWAY.
+    #
+    # Stamped when the member skips it or reaches the end — not when it is
+    # rendered. Rendering is not seeing: a page opened and abandoned, or one
+    # whose script never ran, would otherwise burn the single chance to
+    # explain the app, silently and permanently.
+    #
+    # A column rather than localStorage because "first visit" ought to mean
+    # the person's first visit, not this browser's. Somebody who signs up on
+    # a laptop and opens the app on their phone that evening has already had
+    # the tour.
+    onboarding_seen_at = models.DateTimeField(null=True, blank=True)
+
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["display_name"]
 
