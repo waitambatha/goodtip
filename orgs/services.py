@@ -1367,7 +1367,7 @@ def _send_work_email_code(row, code: str) -> None:
             "code": code,
             "domain": row.domain,
             "email": row.email,
-            "minutes": int(row.TTL.total_seconds() // 60),
+            "minutes": row.ttl_minutes,
         },
     )
     # send_bulk swallows and logs its own failures. That is deliberate here:

@@ -626,7 +626,7 @@ def create_org_view(request):
                         domain=request.POST.get("domain", ""),
                         email=request.POST.get("work_email", ""),
                     )
-                    messages.success(request, f"Code sent to {row.email}. It expires in 15 minutes.")
+                    messages.success(request, f"Code sent to {row.email}. It expires in {row.ttl_minutes} minutes.")
                     return _create_redirect(parent_org)
                 except ValueError as e:
                     # Render rather than redirect, so the message can sit under
