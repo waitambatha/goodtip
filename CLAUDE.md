@@ -53,6 +53,15 @@ Two consequences worth holding on to:
 
 ## Rules that are load-bearing
 
+**`~/projects/goodtip` is production's live checkout, and it is also the
+default working directory.** Never check another branch out in it. `deploy.sh`
+pulls into **HEAD** (`git pull --rebase origin main`), not into `main`, so a
+checkout left on `staging` means the next push to main rebases staging's
+commits into production's tree and deploys them — migrations included. To put
+work on staging from here: `git push origin HEAD:staging`, never a branch
+switch. If one happens anyway, `git checkout main` before the next 2-minute
+tick and confirm with `git status -sb`.
+
 **Never point staging's `.env` at `goodtip_db`.** One wrong word there and a
 staging migration alters the live database. It is the single most dangerous
 line in either environment.
