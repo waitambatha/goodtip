@@ -68,6 +68,28 @@ answer, so going back to change one costs nothing.
 
 {% if form.non_field_errors %}<div class="flash error" style="margin-bottom:16px;"><span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
 
+{% comment %}
+WHY THE ERRORS ARE SAID TWICE.
+
+Every step marks its own fields, and that is the useful half — it says which
+box. But a field can be off-screen when its error is written: a block this
+step hides by category, a section scrolled past, an answer given on a screen
+that has since changed shape. When that happens the post returns 200, renders
+the same step, and shows nothing, so Continue reads as a dead button. It did:
+an informal group's "what kind of group are you?" was hidden by the category
+script, required by the server, and its error hidden along with it.
+
+So the step says out loud what stopped it, at the top, always. The inline
+marks stay — this only guarantees that SOMETHING is visible.
+{% endcomment %}
+{% if step_errors and step != last_step %}
+<div class="flash error" style="margin-bottom:16px;">
+  <span>
+    Not quite — {% for field, errs in step_errors.items %}{{ errs|join:" " }}{% if not forloop.last %} {% endif %}{% endfor %}
+  </span>
+</div>
+{% endif %}
+
 {% comment %} Not .form-lime: that paints the step card in the lime gradient, which the
    design replaces with cream. The lime is spent on the one thing you are meant
    to press instead of on the whole panel. {% endcomment %}
@@ -79,7 +101,7 @@ remote database — and with only the button changing, a slow step looked like a
 missed click and got submitted twice.
 {% endcomment %}
 <form method="post" action="{% url 'orgs:create' %}" class="wiz-form" enctype="multipart/form-data"
-      data-busy="Saving" data-busy-scope>
+      data-busy="Saving" data-busy-scope data-formality="{{ draft.data.formality|default:'' }}">
   {% csrf_token %}
   <input type="hidden" name="step" value="{{ step }}">
   {% if parent_org %}
@@ -305,8 +327,8 @@ missed click and got submitted twice.
           {% if verification.is_verified %}
             We sent a code to {{ verification.email }} and you entered it. That's all we needed.
           {% elif verify_required %}
-            We send a code to an email address at your organisation's own domain. Reading that
-            inbox is what tells us you're on the inside.
+            We'll send a code to an email address at your organisation's own domain. Reading
+            that inbox is what tells us you're on the inside.
           {% else %}
             Optional for an organisation like yours, but it puts a verified mark on your organisation.
           {% endif %}
@@ -333,7 +355,7 @@ missed click and got submitted twice.
     {% elif verification %}
       {# a code is in flight #}
       <div class="verify-sent">
-        <p>We sent a six-digit code to <b>{{ verification.email }}</b>. It expires 15 minutes after it was sent.</p>
+        <p>We sent a six-digit code to <b>{{ verification.email }}</b>. It expires {{ verification.ttl_minutes }} minutes after it was sent.</p>
       </div>
       <div class="fld">
         <label for="otp-1" style="text-align:center;display:block;">Enter the code</label>
@@ -874,16 +896,34 @@ missed click and got submitted twice.
          select is hidden and empty, and `slug()` is ''. Without this, the
          self-description field ("what kind of group are you?") would be
          hidden along with every other type-dependent block, leaving an
-         informal group a screen with nothing on it but a name. */
+         informal group a screen with nothing on it but a name.
+
+         The radios live on STEP ONE and this code runs on step two, so
+         `informal` is null here and only the form's data-formality knows the
+         answer. Reading the radios alone is what emptied the informal
+         screen: no radios, no 'informal', every [data-cat] block hidden —
+         including the one field an informal group has to fill in. It was
+         then required by the server, so Continue reloaded the same screen
+         with its error inside a hidden div, and the button read as dead. */
       var informal = document.querySelector('input[name="formality"][value="informal"]');
+      var wizForm = document.querySelector('.wiz-form');
+      var declared = wizForm ? (wizForm.getAttribute('data-formality') || '') : '';
       function effectiveSlug(){
-        if (informal && informal.checked) return 'informal';
+        if (informal ? informal.checked : declared === 'informal') return 'informal';
         return slug();
       }
       function sync(clear){
         var s = effectiveSlug();
         document.querySelectorAll('[data-cat]').forEach(function(el){
-          el.style.display = el.getAttribute('data-cat').split(' ').indexOf(s) !== -1 ? '' : 'none';
+          var mine = el.getAttribute('data-cat').split(' ').indexOf(s) !== -1;
+          /* Never hide an error. A message the server rendered against a
+             field this script has decided not to show is a message nobody
+             can read — the exact shape of "I press Continue and nothing
+             happens". A fresh answer (clear) drops the stale one instead. */
+          var err = el.querySelector('.fld-err');
+          if (err && clear) err.remove();
+          else if (err) mine = true;
+          el.style.display = mine ? '' : 'none';
         });
         cards.forEach(function(c){
           var mine = c.getAttribute('data-type') === s;

@@ -4023,6 +4023,43 @@ class FormalityStepTests(TestCase):
                   country=str(self.au.pk))
         self.assertFalse(self.on_verify_screen())
 
+    # ---- the informal screen has to be usable ---------------------------
+    #
+    # Staging, 27 Aug 2026: an informal setup filled in the name and the
+    # country, pressed Continue, and stayed on step two with nothing on
+    # screen to say why. The server was right — informal_label is required —
+    # but the field, and the error against it, were both inside a block the
+    # category script had hidden, because that script decided "is this
+    # informal?" by reading the formality radios, and the radios are on step
+    # one. Two invariants keep it fixed.
+
+    def test_the_details_screen_says_which_branch_it_is_on(self):
+        """What the category script reads. The radios are a step behind it."""
+        self.step(1, formality="informal")
+        body = self.client.get("/leagues/new/").content.decode()
+        self.assertIn('data-formality="informal"', body)
+        self.assertIn('id="id_informal_label"', body)
+
+        self.client.post("/leagues/new/", {"step": "2", "action": "back"})
+        self.step(1, formality="formal")
+        self.assertIn(
+            'data-formality="formal"',
+            self.client.get("/leagues/new/").content.decode(),
+        )
+
+    def test_a_step_that_refuses_to_advance_says_so_where_it_can_be_seen(self):
+        """The dead-button shape: 200, same step, no visible reason.
+
+        Asserted at the top of the page rather than beside the field, because
+        beside the field is exactly the place that can be hidden.
+        """
+        self.step(1, formality="informal")
+        r = self.step(2, name="Sunday Mates", country=str(self.au.pk))
+        self.assertEqual(self.draft().step, 2)          # it did refuse
+        body = r.content.decode()
+        banner = body[: body.index('<form method="post"')]
+        self.assertIn("what kind of group you are", banner)
+
     def test_a_type_that_disagrees_with_the_answer_is_dropped(self):
         """The wizard hides the mismatched options, but the value arrives from
         a browser and a stale draft can carry the old one."""

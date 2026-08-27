@@ -1126,7 +1126,16 @@ class WorkEmailVerification(models.Model):
         be redeemed against a different address.
     """
 
-    TTL = timedelta(minutes=15)
+    # An hour, not the sign-in code's fifteen minutes. This code is not
+    # racing a person who is sitting at their own inbox — it is racing a
+    # corporate mail gateway. A tester's went to a university on 27 Aug 2026:
+    # Postmark handed it to their Cisco gateway two seconds after the button
+    # was pressed, and it surfaced in the inbox four hours later, long dead.
+    # We cannot make somebody else's filter faster; we can stop it costing the
+    # signup. Nothing else about the check is loosened — still six digits,
+    # still hashed, still single-use, still five attempts, still bound to the
+    # one address it was mailed to, so the window is the only thing that grew.
+    TTL = timedelta(minutes=60)
     MAX_ATTEMPTS = 5
     MAX_SENDS = 5
     RESEND_AFTER = timedelta(seconds=60)
@@ -1178,6 +1187,16 @@ class WorkEmailVerification(models.Model):
             expires_at=timezone.now() + cls.TTL,
         )
         return row, code
+
+    @property
+    def ttl_minutes(self) -> int:
+        """The window, for the screens and emails that quote it.
+
+        Said in one place because it was said in three, and two of them were
+        the literal "15 minutes" that would have gone on being wrong the
+        moment TTL moved.
+        """
+        return int(self.TTL.total_seconds() // 60)
 
     @property
     def is_verified(self) -> bool:
