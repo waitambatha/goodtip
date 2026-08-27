@@ -73,10 +73,11 @@ gate password. Do not commit them.
 
 ## Things that will look like bugs and are not
 
-- **~17 failures in `orgs.tests`.** Stale tests: their setUps pin a competition
-  to season 2099, while the signup form now offers only the current season
-  (`orgs/forms.py:164`). The wizard, group creation and elections all work.
-  The deploy gate runs in `fast` mode because of this.
+- ~~**~17 failures in `orgs.tests`.**~~ Fixed 2026-08-27: those setUps pinned a
+  competition to season 2099 while the signup form offers only the current
+  season. The suite is green — 576 tests, 0 failures, from the production
+  checkout. The deploy gate is still `fast` because of them; it can now be
+  moved to `block`, which is a deliberate choice and not made here.
 - **`No module named 'sklearn'`** in the jobs log. A lazy import in
   `matchreader/training.py:72`; absent from *both* venvs and not in
   `requirements.txt`, so matchreader retraining is a no-op everywhere.
