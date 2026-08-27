@@ -1,0 +1,35 @@
+{% comment %}
+One charity, shown as a card rather than as a line of text.
+
+WHY THIS IS A COMPONENT. A charity was previously rendered wherever it was
+needed as `{{ charity.name }}` — in the wizard's picker, on the election
+ballot, in the review summary, on the result. That gave the same thing four
+slightly different treatments, none of which showed a logo, and the review
+step's tinted row in particular read as an error state rather than as the
+choice somebody had just made. Doing it once means the picker, the ballot and
+the result are recognisably the same object.
+
+THE TILE IS NOT A FALLBACK FOR A BROKEN IMAGE. Plenty of charities publish no
+usable icon at all (bot-protected sites, sites with a 16px favicon), so the
+initials tile is a designed state, not a gap waiting to be filled. Its colour
+is derived from the name and so is stable across every screen — the same
+charity is the same colour on the picker as on the result.
+
+Params:
+  charity  (required)
+  count    optional — ballots, shown on the right
+  note     optional — small line under the website
+{% endcomment %}
+<span class="ch-card">
+  {% if charity.logo %}
+  <img class="ch-tile" src="{{ charity.logo.url }}" alt="" loading="lazy" width="44" height="44">
+  {% else %}
+  <span class="ch-tile ch-tile-initials" style="--ch-hue:{{ charity.tile_hue }};" aria-hidden="true">{{ charity.initials }}</span>
+  {% endif %}
+  <span class="ch-body">
+    <span class="ch-name">{{ charity.name }}</span>
+    {% if charity.website_label %}<span class="ch-url">{{ charity.website_label }}</span>{% endif %}
+    {% if note %}<span class="ch-note">{{ note }}</span>{% endif %}
+  </span>
+  {% if count is not None %}<span class="ch-count">{{ count }}</span>{% endif %}
+</span>

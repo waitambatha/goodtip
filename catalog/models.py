@@ -125,6 +125,72 @@ class State(models.Model):
         return self.name
 
 
+class Country(models.Model):
+    """Where a group is actually based.
+
+    ASKED AT GROUP LEVEL, NOT ORG LEVEL. One business can run offices in
+    Sydney, Melbourne and Port Moresby under a single organisation, so an
+    org-level answer cannot describe it — the org would have to claim to be in
+    one country while most of its people were not. Groups carry the answer and
+    the organisation carries the default, which is what an org with no groups
+    (most of them) uses. See Organisation.country / Group.country.
+
+    THE SEGMENT IS DERIVED, NOT ASKED. Nobody should have to answer "which
+    market are you in" on top of "where are you" — one field, no double entry.
+
+    NEW ZEALAND CURRENTLY SITS IN THE AUSTRALIA SEGMENT. The choice is still
+    here, and NZ is still its own COUNTRY — the Good List's country breakdown
+    lists it separately, and always did. What folding means is narrower: a
+    segment is what a future ladder or charity shortlist would be split on,
+    and the client's instruction is that New Zealand does not get its own
+    yet ("they'll get their own charity shortlist and leaderboard down the
+    track, but that's a later item"). Until then NZ groups compete on the
+    main ladder, so they carry the same segment as the groups they are
+    competing against.
+
+    Splitting it back out is a data migration and nothing else, which is
+    precisely why the segment stayed a field on the country rather than
+    being inferred from the code wherever it was needed.
+
+    NOT A CURRENCY. Payment stays in AUD whatever is chosen here; this exists
+    to know where a group is based so it can be segmented cleanly, and changes
+    nothing about pricing.
+    """
+
+    SEGMENT_AUSTRALIA = "australia"
+    # Defined, and deliberately unused today — see the class docstring. Kept
+    # so that splitting New Zealand out later is a migration rather than a
+    # schema change plus a hunt for everywhere the string was written out.
+    SEGMENT_NEW_ZEALAND = "new_zealand"
+    SEGMENT_GLOBAL = "global"
+    SEGMENT_CHOICES = [
+        (SEGMENT_AUSTRALIA, "Australia"),
+        (SEGMENT_NEW_ZEALAND, "New Zealand"),
+        (SEGMENT_GLOBAL, "Global"),
+    ]
+
+    # ISO 3166-1 alpha-2, so this lines up with anything external later.
+    code = models.CharField(max_length=2, unique=True)
+    name = models.CharField(max_length=60, unique=True)
+    segment = models.CharField(
+        max_length=12, choices=SEGMENT_CHOICES, default=SEGMENT_GLOBAL,
+    )
+    # Kept separate from `segment` deliberately. Today every non-AU/NZ country
+    # here is a Pacific nation, so the two look interchangeable — but the
+    # moment a country outside the Pacific is added it would be swept into the
+    # Pacific Nations board purely for not being Australian.
+    is_pacific = models.BooleanField(default=False)
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["sort_order", "name"]
+        verbose_name_plural = "countries"
+
+    def __str__(self):
+        return self.name
+
+
 class OrganisationType(models.Model):
     """The organisation type an org self-selects at sign-up (categories doc,
     7 Jul 2026): Community, Business, Education, Charities, Informal — in that
@@ -144,6 +210,22 @@ class OrganisationType(models.Model):
 
     slug = models.SlugField(max_length=30, unique=True)
     name = models.CharField(max_length=50, unique=True)
+    # FORMAL OR INFORMAL — the first question the signup wizard asks, and the
+    # one that decides what validation the rest of it applies.
+    #
+    # It used to be implied by the type, several screens in, which is why
+    # someone setting up a family comp or a mates' group with a Gmail address
+    # ran into workplace validation before anything had established that they
+    # were not a workplace. Asking it first means an informal group never
+    # meets a rule written for an employer.
+    #
+    # A field rather than a slug test so the GoodTip team can add a type in
+    # admin and say which side it falls on, without a code change.
+    is_formal = models.BooleanField(
+        default=True,
+        help_text="Formal: workplace, school, club, registered entity. "
+                  "Informal: mates, family, community group.",
+    )
     sort_order = models.PositiveIntegerField(default=0)
 
     class Meta:
@@ -241,6 +323,14 @@ class Charity(models.Model):
     name = models.CharField(max_length=200, unique=True)
     slug = models.SlugField(max_length=200, unique=True)
     website = models.URLField(blank=True)
+    # Fetched once from the charity's own site — see catalog.logos. Blank is
+    # an ordinary state, not a failure: `initials` covers it, so a card is
+    # never rendered half-built waiting on a network call that may never
+    # succeed.
+    logo = models.ImageField(upload_to="charity_logos/", blank=True)
+    # Stamped whether the fetch found anything or not, so a charity whose site
+    # has no usable icon is not re-fetched on every pass.
+    logo_fetched_at = models.DateTimeField(null=True, blank=True)
     is_approved = models.BooleanField(default=False)
 
     class Meta:
@@ -249,6 +339,50 @@ class Charity(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def initials(self) -> str:
+        """One or two letters for the fallback tile.
+
+        Real charity names carry noise words a reader does not use to identify
+        them — "The Smith Family" is SF, not TS — so those are dropped before
+        taking initials. A single-word name gives its first two letters, which
+        reads better at tile size than one lonely capital.
+        """
+        skip = {"the", "of", "and", "for", "a", "an", "australia", "australian"}
+        words = [w for w in self.name.split() if w.strip(".,'\"")]
+        kept = [w for w in words if w.lower().strip(".,") not in skip] or words
+        if not kept:
+            return "?"
+        if len(kept) == 1:
+            return kept[0][:2].upper()
+        return (kept[0][:1] + kept[1][:1]).upper()
+
+    @property
+    def website_label(self) -> str:
+        """The website without the scheme or a trailing slash.
+
+        "beyondblue.org.au" is what people recognise;
+        "https://www.beyondblue.org.au/" is the same thing wearing a hat.
+        """
+        url = (self.website or "").strip()
+        for prefix in ("https://", "http://"):
+            if url.startswith(prefix):
+                url = url[len(prefix):]
+                break
+        if url.startswith("www."):
+            url = url[4:]
+        return url.rstrip("/")
+
+    @property
+    def tile_hue(self) -> int:
+        """A stable colour for the fallback tile, derived from the name.
+
+        Stable is the whole point: the same charity is the same colour on the
+        picker, the ballot and the result, so the tile works as recognition
+        rather than as decoration that reshuffles per page.
+        """
+        return sum(ord(c) for c in self.name) % 360
 
 
 class GroupType(models.Model):
