@@ -10800,3 +10800,117 @@ body.fxh-open { overflow: hidden; }
   .gcr { grid-template-columns: 1fr auto; }
   .gcr-ch { grid-column: 1 / -1; }
 }
+
+/* ============================================================================
+   CONFIRM SHEET, STEP ONE: WHERE THESE TIPS GO
+   ----------------------------------------------------------------------------
+   Added Aug 2026 when carrying moved in front of the save. The client's note
+   on the old full-page version was that it looked like a form from another
+   product — and it did: bare checkboxes, a card per room, a radio group headed
+   "While we're here". The rebuild treats a room as a THING you are sending
+   tips to rather than as a row in a settings page, which is the mental model
+   people already have when they get here.
+
+   Everything below is scoped to .tipsheet so the standalone /tip/carry/ page
+   (the no-JS path) keeps its own existing treatment untouched. */
+
+/* Both panes scroll independently; the panel itself never does. */
+.tipsheet .ts-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 22px; }
+.tipsheet .ts-body[hidden] { display: none; }
+.tipsheet .ts-list { padding: 0; }
+
+/* Step chips. Small, quiet, and only shown when there IS a step one. */
+.tipsheet .ts-steps { display: flex; gap: 6px; padding: 14px 22px 0; }
+.tipsheet .ts-steps[hidden] { display: none; }
+.tipsheet .ts-step {
+  font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--muted); background: rgba(15,46,34,.06);
+  padding: 5px 10px; border-radius: 100px; transition: background .18s, color .18s;
+}
+.tipsheet .ts-step.is-on { background: var(--forest); color: var(--white); }
+
+/* The opening line: a big number and a sentence, not a paragraph. */
+.cs-lede { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.cs-lede p { font-size: 14px; color: var(--ink); line-height: 1.45; margin: 0; }
+.cs-badge {
+  flex: none; display: grid; place-items: center;
+  width: 46px; height: 46px; border-radius: 14px;
+  background: var(--lime); color: var(--deep);
+  font-family: var(--score); font-weight: 900; font-size: 20px;
+}
+
+/* One room. The whole block is the target, and it reads as selected — a
+   checkbox alone left people unsure which rooms were actually ticked. */
+.cs-room {
+  border: 1.5px solid var(--gt-hair); border-radius: 14px;
+  padding: 13px 15px; margin-bottom: 10px;
+  transition: border-color .16s, background .16s;
+}
+.cs-room:has(input[name="room"]:checked) { border-color: var(--forest); background: rgba(45,122,58,.045); }
+.cs-room.has-conflict:has(input[name="room"]:checked) { border-color: #C8901F; background: rgba(200,144,31,.05); }
+.cs-head { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+.cs-head input { position: absolute; opacity: 0; pointer-events: none; }
+.cs-head-body { min-width: 0; }
+.cs-room-name { display: block; font-size: 15px; font-weight: 700; color: var(--ink); }
+.cs-room-meta { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.cs-room-meta b { color: var(--forest); font-weight: 800; }
+
+/* Conflicts. Amber, not red: nothing has gone wrong, there is just a choice
+   here that we refuse to make on the member's behalf. */
+.cs-conflicts { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--gt-hair); }
+.cs-warn { display: flex; gap: 8px; font-size: 12.5px; color: #8A6314; line-height: 1.45; margin-bottom: 10px; }
+.cs-warn svg { width: 15px; height: 15px; flex: none; margin-top: 2px; fill: currentColor; }
+.cs-conflict {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  padding: 8px 0; border-bottom: 1px solid var(--gt-hair);
+}
+.cs-conflict:last-child { border-bottom: 0; padding-bottom: 0; }
+.cs-conflict input { position: absolute; opacity: 0; pointer-events: none; }
+.cc-body { min-width: 0; }
+.cc-teams { display: block; font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.cc-swap { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 12px; }
+.cc-swap svg { width: 12px; height: 12px; stroke: var(--muted); fill: none; stroke-width: 2.4; flex: none; }
+.cc-was { color: var(--muted); text-decoration: line-through; }
+.cc-now { color: var(--forest); font-weight: 700; }
+.cs-note { font-size: 12px; color: var(--muted); margin: 10px 0 0; }
+
+/* "Stop asking me" folds away. It is a real preference, but it is not the
+   question on this screen, and three radios sitting open under every room
+   made the step look like a settings page. */
+.cs-remember { margin-top: 6px; border-top: 1px solid var(--gt-hair); padding-top: 12px; }
+.cs-remember summary {
+  cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--forest);
+  list-style: none;
+}
+.cs-remember summary::-webkit-details-marker { display: none; }
+.cs-remember summary::after { content: " ⌄"; }
+.cs-remember[open] summary::after { content: " ⌃"; }
+.cs-opt { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; padding: 9px 0; }
+.cs-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.cs-opt b { display: block; font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.cs-opt i { display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-top: 1px; line-height: 1.4; }
+.cs-fine { font-size: 11.5px; color: var(--muted); margin: 6px 0 0; }
+
+/* The tick boxes reuse .oc-box from the option cards, so a checkbox in the
+   sheet looks like every other checkbox in the product. */
+.cs-head .oc-box, .cs-conflict .oc-box, .cs-opt .oc-box { flex: none; margin-top: 1px; }
+
+/* ---------------------------------------------------------------------------
+   STEP TWO: THE PREVIEW, MADE WORTH LOOKING AT
+   Was a flat list of "Team v Team" with a pill on the right, which read as a
+   receipt. The pick is the thing being confirmed, so the pick is what gets the
+   weight: a tick, the chosen team at full size, the losing side struck back. */
+.tipsheet .ts-item {
+  align-items: center; gap: 12px; padding: 12px 0;
+}
+.tipsheet .ts-item .tsi-match b { font-size: 14px; font-weight: 600; color: var(--muted); }
+.tipsheet .ts-item .tsi-yes {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13.5px; font-weight: 800;
+}
+.tipsheet .ts-item .tsi-yes::before {
+  content: "✓"; display: grid; place-items: center;
+  width: 17px; height: 17px; border-radius: 50%;
+  background: var(--forest); color: var(--white); font-size: 11px; font-weight: 900;
+}
+.tipsheet .ts-item.none { opacity: .72; }

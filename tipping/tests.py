@@ -1076,3 +1076,144 @@ class MidSeasonJoinerTests(TestCase):
         self.assertEqual(
             Tip.objects.filter(user=user, org=self.org, group=None).count(), 2,
         )
+
+
+class CarryBeforeSaveTests(TestCase):
+    """Carrying is asked BEFORE the tips are written, and answered in one post.
+
+    The old order wrote the slate, then sent you to a separate screen to
+    decide whether it should also go to your other rooms. These pin the new
+    shape: the preview endpoint writes nothing, and a confirm that carries an
+    answer with it does not bounce anybody to that screen a second time.
+    """
+
+    def setUp(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from catalog.models import Competition, Season, Series, Sport
+        from orgs.models import OrgMember, Organisation
+        from tipping.models import Match, Round, Team
+
+        self.user = User.objects.create_user(
+            email="two-step@example.com", password="x", display_name="Twostep",
+        )
+        season = Season.objects.create(year=2095, label="2095")
+        sport = Sport.objects.create(name="Step Footy", slug="step-footy")
+        series = Series.objects.create(sport=sport, name="Step Series", slug="step-series")
+        comp = Competition.objects.create(
+            sport=sport, season=season, name="Step Comp", slug="step-comp",
+        )
+        comp.series.add(series)
+        home = Team.objects.create(name="Reds", slug="step-reds", series=series)
+        away = Team.objects.create(name="Golds", slug="step-golds", series=series)
+        now = timezone.now()
+
+        self.orgs = {}
+        for name in ("Work", "Mates"):
+            org = Organisation.objects.create(name=name, season=season)
+            org.competitions.add(comp)
+            OrgMember.objects.create(user=self.user, org=org)
+            rnd = Round.objects.create(
+                org=org, round_number=1, series=series, competition=comp,
+                lockout_at=now + timedelta(days=2),
+            )
+            for ext in ("S-1", "S-2"):
+                Match.objects.create(
+                    round=rnd, home_team=home, away_team=away,
+                    kickoff_at=now + timedelta(days=2), external_id=ext,
+                )
+            self.orgs[name] = org
+        self.client.force_login(self.user)
+
+    def _match(self, org_name, ext):
+        from tipping.models import Match
+
+        return Match.objects.get(round__org=self.orgs[org_name], external_id=ext)
+
+    def _slate(self):
+        return {
+            f"match_{self._match('Work', 'S-1').id}": "home",
+            f"match_{self._match('Work', 'S-2').id}": "away",
+        }
+
+    def test_preview_writes_nothing(self):
+        """The whole reason this can run before the save."""
+        from tipping.models import Tip
+
+        resp = self.client.post(
+            reverse("tipping:carry_preview", args=[self.orgs["Work"].id]), self._slate(),
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Mates")
+        self.assertEqual(Tip.objects.count(), 0)
+
+    def test_preview_is_204_when_there_is_nowhere_to_carry(self):
+        """The majority case: one room, so the sheet skips the step."""
+        from orgs.models import OrgMember
+
+        OrgMember.objects.filter(user=self.user, org=self.orgs["Mates"]).delete()
+        resp = self.client.post(
+            reverse("tipping:carry_preview", args=[self.orgs["Work"].id]), self._slate(),
+        )
+        self.assertEqual(resp.status_code, 204)
+
+    def test_confirm_with_an_answer_carries_and_does_not_redirect_to_the_screen(self):
+        from tipping.models import Tip
+
+        data = self._slate()
+        data["carry_answered"] = "1"
+        data["room"] = f"{self.orgs['Mates'].id}:0"
+        resp = self.client.post(
+            reverse("tipping:tip_confirm_upcoming", args=[self.orgs["Work"].id]), data,
+        )
+        # Straight back to the dashboard — NOT to /tip/carry/.
+        self.assertEqual(resp.status_code, 302)
+        self.assertNotIn("/carry/", resp["Location"])
+        self.assertEqual(Tip.objects.filter(org=self.orgs["Work"]).count(), 2)
+        self.assertEqual(Tip.objects.filter(org=self.orgs["Mates"]).count(), 2)
+
+    def test_confirm_with_an_answer_that_declines_carries_nothing(self):
+        from tipping.models import Tip
+
+        data = self._slate()
+        data["carry_answered"] = "1"          # asked, and every room unticked
+        resp = self.client.post(
+            reverse("tipping:tip_confirm_upcoming", args=[self.orgs["Work"].id]), data,
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertNotIn("/carry/", resp["Location"])
+        self.assertEqual(Tip.objects.filter(org=self.orgs["Work"]).count(), 2)
+        self.assertEqual(Tip.objects.filter(org=self.orgs["Mates"]).count(), 0)
+
+    def test_confirm_without_an_answer_still_uses_the_standalone_screen(self):
+        """The no-JS path has to keep working."""
+        resp = self.client.post(
+            reverse("tipping:tip_confirm_upcoming", args=[self.orgs["Work"].id]),
+            self._slate(),
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/carry/", resp["Location"])
+
+    def test_remember_always_is_saved_from_the_sheet(self):
+        from accounts.models import User as U
+
+        data = self._slate()
+        data["carry_answered"] = "1"
+        data["remember"] = U.CARRY_ALL
+        self.client.post(
+            reverse("tipping:tip_confirm_upcoming", args=[self.orgs["Work"].id]), data,
+        )
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.tip_carry_mode, U.CARRY_ALL)
+
+    def test_preview_refuses_a_non_member(self):
+        other = User.objects.create_user(
+            email="nope@example.com", password="x", display_name="Nope",
+        )
+        self.client.force_login(other)
+        resp = self.client.post(
+            reverse("tipping:carry_preview", args=[self.orgs["Work"].id]), self._slate(),
+        )
+        self.assertEqual(resp.status_code, 403)

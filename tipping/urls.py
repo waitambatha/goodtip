@@ -14,6 +14,9 @@ urlpatterns = [
     # Review what carrying this slate into your other groups would do, then
     # do it. Only ever reached when there IS somewhere else to carry to.
     path("<int:org_id>/tip/carry/", views.tip_carry_view, name="tip_carry"),
+    # The same question asked BEFORE the save, as a fragment for the confirm
+    # sheet. 204 when there is nothing to carry, so the sheet skips the step.
+    path("<int:org_id>/tip/carry/preview/", views.carry_preview, name="carry_preview"),
     path("<int:org_id>/tips/", views.my_tips_view, name="my_tips"),
     # In-play score/clock for one fixture. Not org-scoped: the fragment is
     # identical whoever is looking, and it carries no tip.

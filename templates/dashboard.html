@@ -300,7 +300,14 @@ sit perfectly still through it. A second press on a confirm button is a second
 submission of the slate already in flight, which is exactly what the veil makes
 impossible. See gt-busy.js.
 {% endcomment %}
+{% comment %}
+data-carry-url is read by the sheet's script rather than being built there.
+The script sits in a block at the foot of the page, OUTSIDE the loop that
+defines `c`, so resolving the route down there raised NoReverseMatch on every
+dashboard render. The form is inside the loop and already knows its org.
+{% endcomment %}
 <form method="post" action="{% url 'tipping:tip_confirm_upcoming' c.org.id %}" id="tipSlip"
+      data-carry-url="{% url 'tipping:carry_preview' c.org.id %}"
       data-busy="Saving your tips">
       {% csrf_token %}
 
@@ -321,6 +328,24 @@ impossible. See gt-busy.js.
         submission of a slate already being written.
         {% endcomment %}
         <div class="ts-panel" role="dialog" aria-modal="true" aria-labelledby="tsTitle" data-busy-scope>
+          {% comment %}
+          TWO STEPS, CARRY FIRST, PREVIEW LAST.
+
+          The order was the other way round and it put the small decision in
+          front of the big one: you checked a slate, it was written, and only
+          then were you asked whether it should also go to your other four
+          groups. Carrying is the question with the wider blast radius, so it
+          is asked first, on picks that have not been saved yet — and the
+          check-your-tips pane is the last thing you see before confirming,
+          which is what a confirmation is for.
+
+          Step 1 is skipped entirely for the majority who tip in one room:
+          the endpoint answers 204 and the sheet opens straight on step 2.
+          {% endcomment %}
+          <div class="ts-steps" id="tsSteps" hidden>
+            <span class="ts-step is-on" data-step-dot="carry">1 Where it goes</span>
+            <span class="ts-step" data-step-dot="review">2 Check your tips</span>
+          </div>
           <header class="ts-head">
             <div>
               <h3 id="tsTitle">Check your tips</h3>
@@ -345,16 +370,27 @@ impossible. See gt-busy.js.
             <button type="button" class="ts-x" data-sheet-close aria-label="Close">&times;</button>
           </header>
 
-          <div class="ts-list gt-scroll" id="tsList"></div>
+          {# step 1 — filled in from tipping:carry_preview, hidden when empty #}
+          <div class="ts-body gt-scroll" id="tsCarry" hidden></div>
 
-          <div class="ts-miss" id="tsMiss" hidden>
-            <svg><use href="#ic-clock"/></svg>
-            <span><b id="tsMissN">0</b> match<span id="tsMissP">es</span> still without a tip. You can come back and fill them in until the round locks.</span>
+          {% comment %}
+          Step 2 — built from the form's own radios, so it can never disagree
+          with what is about to be posted.
+          {% endcomment %}
+          <div class="ts-body gt-scroll" id="tsReview">
+            <div class="ts-list" id="tsList"></div>
+            <div class="ts-miss" id="tsMiss" hidden>
+              <svg><use href="#ic-clock"/></svg>
+              <span><b id="tsMissN">0</b> match<span id="tsMissP">es</span> still without a tip. You can come back and fill them in until the round locks.</span>
+            </div>
           </div>
 
           <footer class="ts-foot">
-            <button type="button" class="abtn abtn-dark" data-sheet-close>Keep editing</button>
-            <button type="submit" class="abtn abtn-primary">Confirm and save &rarr;</button>
+            <button type="button" class="abtn abtn-dark" data-sheet-close data-ts-cancel>Keep editing</button>
+            {# only rendered as usable once step 1 has been shown #}
+            <button type="button" class="abtn abtn-dark" id="tsBack" hidden>&larr; Back</button>
+            <button type="button" class="abtn abtn-primary" id="tsNext" hidden>Next: check your tips &rarr;</button>
+            <button type="submit" class="abtn abtn-primary" id="tsConfirm">Confirm and save &rarr;</button>
           </footer>
         </div>
       </div>
@@ -620,21 +656,108 @@ any one card.
           }
         }
 
+        /* ---- the two steps ----
+           Step 1 (carry) is fetched, not pre-rendered: whether there is
+           anything to ask depends on the picks currently on screen, which
+           change every time somebody taps a team. The endpoint writes
+           nothing and answers 204 when there is nothing to carry, so the
+           common case — one room, nothing to ask — opens straight on the
+           review and never sees a spinner. */
+        var tsSteps   = document.getElementById('tsSteps');
+        var tsCarry   = document.getElementById('tsCarry');
+        var tsReview  = document.getElementById('tsReview');
+        var tsBack    = document.getElementById('tsBack');
+        var tsNext    = document.getElementById('tsNext');
+        var tsConfirm = document.getElementById('tsConfirm');
+        var tsTitle   = document.getElementById('tsTitle');
+        var tsSub     = document.querySelector('.ts-sub');
+        var hasCarry  = false;
+
+        function showStep(which){
+          var carry = which === 'carry';
+          tsCarry.hidden  = !carry;
+          tsReview.hidden = carry;
+          /* The buttons are the step indicator people actually read, so they
+             have to be exactly right: no Back on step one, no Confirm until
+             the last screen. A Confirm visible on step one is a member
+             saving without ever seeing their tips. */
+          tsNext.hidden    = !carry;
+          tsBack.hidden    = carry || !hasCarry;
+          tsConfirm.hidden = carry;
+          if (tsTitle) tsTitle.textContent = carry ? 'Where do these tips go?' : 'Check your tips';
+          if (tsSub) tsSub.hidden = carry;
+          if (tsSteps) {
+            tsSteps.querySelectorAll('[data-step-dot]').forEach(function(d){
+              d.classList.toggle('is-on', d.getAttribute('data-step-dot') === which);
+            });
+          }
+          (carry ? tsCarry : tsReview).scrollTop = 0;
+        }
+
+        function loadCarry(){
+          /* Everything the confirm would post, so the plan is built from the
+             same picks the save will write. */
+          var data = new FormData(slip);
+          var url = slip.getAttribute('data-carry-url');
+          if (!url) return Promise.resolve('');
+          return fetch(url, {
+            method: 'POST',
+            body: data,
+            headers: {'X-Requested-With': 'XMLHttpRequest'},
+            credentials: 'same-origin'
+          }).then(function(r){
+            if (r.status === 204) return '';
+            if (!r.ok) return '';
+            return r.text();
+          }).catch(function(){
+            /* Offline, or the endpoint fell over. Carrying is an extra, not
+               the task — losing it must never cost somebody their tips, so
+               the sheet just goes straight to the review and the old
+               after-the-save screen picks the question up instead. */
+            return '';
+          });
+        }
+
         function openSheet(){
           buildSheet();
           lastFocus = document.activeElement;
           sheet.hidden = false;
           sheet.setAttribute('aria-hidden', 'false');
           document.body.classList.add('sheet-open');
+          /* Open on the review immediately and move back to step 1 if the
+             fetch turns up work. Waiting on the network before showing
+             anything would put a blank sheet in front of every member for
+             the sake of a step most of them never see. */
+          hasCarry = false;
+          tsCarry.innerHTML = '';
+          if (tsSteps) tsSteps.hidden = true;
+          showStep('review');
           var first = sheet.querySelector('.ts-x');
           if (first) first.focus();
+
+          loadCarry().then(function(html){
+            if (sheet.hidden) return;          /* they closed it meanwhile */
+            if (!html) return;
+            tsCarry.innerHTML = html;
+            hasCarry = true;
+            if (tsSteps) tsSteps.hidden = false;
+            showStep('carry');
+          });
         }
         function closeSheet(){
           sheet.hidden = true;
           sheet.setAttribute('aria-hidden', 'true');
           document.body.classList.remove('sheet-open');
+          /* Drop the carry answer with the sheet. Leaving those inputs in the
+             form would post a decision from a slate the member has since
+             edited. */
+          tsCarry.innerHTML = '';
+          hasCarry = false;
           if (lastFocus) lastFocus.focus();
         }
+
+        tsNext.addEventListener('click', function(){ showStep('review'); });
+        tsBack.addEventListener('click', function(){ showStep('carry'); });
 
         /* Delegated from the form, which outlives the swap. #slipReview lives
            inside #slipPanel, so a direct binding would be lost the first time

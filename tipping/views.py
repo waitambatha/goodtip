@@ -179,26 +179,20 @@ def tip_confirm_upcoming(request, org_id: int):
     if not _require_member(request.user, org):
         return HttpResponseForbidden()
 
-    ids = []
-    for key, value in request.POST.items():
-        if not key.startswith("match_") or value not in ("home", "away"):
-            continue
-        raw = key[len("match_"):]
-        if raw.isdigit():
-            ids.append(int(raw))
+    picks = _posted_picks(request, org)
     matches = {
         m.id: m
-        for m in Match.objects.filter(pk__in=ids, round__org=org).select_related("round")
+        for m in Match.objects.filter(pk__in=picks, round__org=org).select_related("round")
     }
 
     saved, skipped = 0, 0
-    for mid in ids:
+    for mid, selection in picks.items():
         match = matches.get(mid)
         if match is None:
             continue  # not this org's match — ignore rather than error
         try:
             submit_tip(user=request.user, match=match, org=org, group=_group(request, org),
-                       selection=request.POST[f"match_{mid}"])
+                       selection=selection)
             saved += 1
         except ValueError:
             skipped += 1
@@ -217,7 +211,7 @@ def tip_confirm_upcoming(request, org_id: int):
 
     if saved:
         onward = _carry(request, org, {
-            mid: request.POST[f"match_{mid}"] for mid in ids if mid in matches
+            mid: sel for mid, sel in picks.items() if mid in matches
         })
         if onward is not None:
             return onward
@@ -250,6 +244,23 @@ def _carry(request, org, picks):
     if not plans:
         return None
 
+    # ALREADY ANSWERED. The confirm sheet now asks about carrying BEFORE the
+    # save, so by the time we get here the member has usually made the call
+    # and it is posted alongside the slate. Asking a second time — which is
+    # what redirecting to the standalone screen would do — is the bug this
+    # marker exists to prevent. The screen stays reachable for the no-JS path,
+    # where the marker is simply absent.
+    if request.POST.get("carry_answered"):
+        _remember_carry_mode(request)
+        result = apply_plan(
+            request.user, plans,
+            rooms=set(request.POST.getlist("room")),
+            overrides=set(request.POST.getlist("override")),
+        )
+        if result["carried"] or result["overwritten"]:
+            messages.success(request, _carry_message(result))
+        return None
+
     if mode == User.CARRY_ALL:
         # "Yes, and never ask me again" carries into rooms with nothing in
         # them. It deliberately does NOT overwrite a pick that disagrees:
@@ -269,6 +280,17 @@ def _carry(request, org, picks):
         "picks": {str(k): v for k, v in picks.items()},
     }
     return redirect("tipping:tip_carry", org_id=org.id)
+
+
+def _remember_carry_mode(request) -> None:
+    """Persist "always"/"never" when the member ticked it. Same field either
+    way, so the sheet and the standalone screen cannot drift apart."""
+    from accounts.models import User
+
+    remember = request.POST.get("remember")
+    if remember in (User.CARRY_ALL, User.CARRY_NONE):
+        request.user.tip_carry_mode = remember
+        request.user.save(update_fields=["tip_carry_mode"])
 
 
 def _carry_message(result) -> str:
@@ -291,6 +313,85 @@ def _carry_message(result) -> str:
             "the different pick you'd already made there."
         )
     return " ".join(bits) or "Nothing to carry — your other groups were already up to date."
+
+
+@login_required
+@require_POST
+def carry_preview(request, org_id: int):
+    """The carry step, rendered as a fragment BEFORE anything is saved.
+
+    WHY THIS EXISTS AS ITS OWN ENDPOINT. Carrying used to be a screen you
+    landed on *after* confirming, which put the two decisions in the wrong
+    order: you approved a slate, it was written, and only then were you asked
+    the bigger question — should this go to your other four groups too. The
+    client's note was blunter than that; the screen also looked like a form
+    from a different product.
+
+    So the question moves in front of the save. `build_plan` writes nothing
+    and takes picks as a plain dict, so it can answer "what WOULD this do"
+    from the radios still sitting on the page. Nothing here mutates anything;
+    the single write happens once, at the end, when the member confirms.
+
+    Returns 204 when there is nothing to ask about — the overwhelming
+    majority, who tip in exactly one room — so the sheet can skip the step
+    entirely rather than showing an empty pane.
+    """
+    from accounts.models import User
+
+    from .carry import Room, build_plan
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_member(request.user, org):
+        return HttpResponseForbidden()
+
+    mode = getattr(request.user, "tip_carry_mode", User.CARRY_ASK)
+    if mode == User.CARRY_NONE:
+        return HttpResponse(status=204)
+
+    picks = _posted_picks(request, org)
+    if not picks:
+        return HttpResponse(status=204)
+
+    source = Room(org=org, group=_group(request, org))
+    plans = [p for p in build_plan(request.user, picks, source) if p.has_work]
+    if not plans:
+        return HttpResponse(status=204)
+
+    return render(request, "partials/carry_step.html", {
+        "org": org,
+        "source": source,
+        "plans": plans,
+        "total_rooms": len(plans),
+        "total_changes": sum(p.change_count for p in plans),
+        "conflict_count": sum(len(p.conflicts) for p in plans),
+        # "Yes, always" is offered here rather than only on the profile,
+        # because this is the moment the member has an opinion about it.
+        "auto_mode": mode == User.CARRY_ALL,
+    })
+
+
+def _posted_picks(request, org) -> dict:
+    """{match_id: selection} from a posted slate, scoped to this org.
+
+    Shared by the confirm and the carry preview so the plan is built from
+    exactly the fixtures the confirm will write — re-deriving it separately in
+    each was how the two could disagree. Ids that are not this org's matches
+    are dropped rather than raising: a posted id nobody can tip is not an
+    error worth failing a whole slate over.
+    """
+    ids = []
+    for key, value in request.POST.items():
+        if not key.startswith("match_") or value not in ("home", "away"):
+            continue
+        raw = key[len("match_"):]
+        if raw.isdigit():
+            ids.append(int(raw))
+    if not ids:
+        return {}
+    valid = set(
+        Match.objects.filter(pk__in=ids, round__org=org).values_list("id", flat=True)
+    )
+    return {i: request.POST[f"match_{i}"] for i in ids if i in valid}
 
 
 @login_required
@@ -330,9 +431,7 @@ def tip_carry_view(request, org_id: int):
 
     if request.method == "POST":
         remember = request.POST.get("remember")
-        if remember in (User.CARRY_ALL, User.CARRY_NONE):
-            request.user.tip_carry_mode = remember
-            request.user.save(update_fields=["tip_carry_mode"])
+        _remember_carry_mode(request)
         if request.POST.get("action") == "skip":
             request.session.pop(CARRY_SESSION_KEY, None)
             if remember == User.CARRY_NONE:

@@ -1,0 +1,116 @@
+{% comment %}
+STEP ONE OF THE CONFIRM SHEET: where these tips are going.
+
+Rendered by tipping.views.carry_preview into the sheet, BEFORE anything is
+saved. The order is the point. This used to be a full page you landed on after
+confirming — picks written, then asked the larger question about your other
+four groups, on a screen that looked like it came from another product. Now
+the bigger question is asked first, in the same sheet, and one confirm at the
+end does the lot.
+
+Nothing here is a form of its own: these inputs live inside the dashboard's
+confirm form, so their values post alongside the slate. That is why there is no
+{% templatetag openblock %} csrf_token {% templatetag closeblock %} and no
+<form> — adding either would nest a form inside a form, which browsers silently
+discard.
+
+Conflicts stay opt-in and unticked. Somebody who deliberately tipped their own
+club at home and against it at work meant both, and carrying that away without
+asking destroys a decision they cannot get back.
+{% endcomment %}
+<input type="hidden" name="carry_answered" value="1">
+
+<div class="cs-lede">
+  <span class="cs-badge">{{ total_changes }}</span>
+  <p>
+    You also tip in {{ total_rooms }} other
+    {% if total_rooms == 1 %}group{% else %}groups{% endif %}.
+    We can put these same picks there so you don't have to tip twice.
+  </p>
+</div>
+
+{% for plan in plans %}
+<div class="cs-room{% if plan.conflicts %} has-conflict{% endif %}">
+  <label class="cs-head">
+    {% comment %}
+    Ticked by default: carrying is the helpful answer and the one most people
+    want. The rows that are NOT safe to assume are the conflicting games
+    below, and those start unticked.
+    {% endcomment %}
+    <input type="checkbox" name="room" value="{{ plan.room.key }}" checked>
+    <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
+    <span class="cs-head-body">
+      <span class="cs-room-name">{{ plan.room.label }}</span>
+      <span class="cs-room-meta">
+        {% if plan.writes %}<b>{{ plan.writes|length }}</b> to add{% endif %}
+        {% if plan.writes and plan.conflicts %} &middot; {% endif %}
+        {% if plan.conflicts %}<b>{{ plan.conflicts|length }}</b> tipped differently{% endif %}
+        {% if plan.unchanged %} &middot; {{ plan.unchanged|length }} already match{% endif %}
+      </span>
+    </span>
+  </label>
+
+  {% if plan.conflicts %}
+  <div class="cs-conflicts">
+    <p class="cs-warn">
+      <svg aria-hidden="true"><use href="#ic-flag"/></svg>
+      <span>You tipped {% if plan.conflicts|length == 1 %}this one{% else %}these{% endif %}
+      differently here. We'll leave {% if plan.conflicts|length == 1 %}it{% else %}them{% endif %}
+      as {% if plan.conflicts|length == 1 %}it is{% else %}they are{% endif %} unless you tick
+      {% if plan.conflicts|length == 1 %}it{% else %}them{% endif %}.</span>
+    </p>
+    {% for row in plan.conflicts %}
+    <label class="cs-conflict">
+      <input type="checkbox" name="override" value="{{ plan.room.key }}:{{ row.match.id }}">
+      <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
+      <span class="cc-body">
+        <span class="cc-teams">{{ row.match.home_team.name }} v {{ row.match.away_team.name }}</span>
+        <span class="cc-swap">
+          <span class="cc-was">{% if row.existing == 'home' %}{{ row.match.home_team.name }}{% else %}{{ row.match.away_team.name }}{% endif %}</span>
+          <svg aria-hidden="true"><use href="#ic-arrow-right"/></svg>
+          <span class="cc-now">{% if row.selection == 'home' %}{{ row.match.home_team.name }}{% else %}{{ row.match.away_team.name }}{% endif %}</span>
+        </span>
+      </span>
+    </label>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if plan.blocked %}
+  <p class="cs-note">
+    {{ plan.blocked|length }} game{{ plan.blocked|length|pluralize }} can't carry here —
+    {% if plan.blocked|length == 1 %}it's{% else %}they're{% endif %} already started,
+    or that round isn't open there yet.
+  </p>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% comment %}
+"Don't ask again" in both directions. The client asked for the yes-forever
+half; the no-forever half matters as much, because somebody who keeps their
+comps deliberately separate should be able to stop being asked too.
+
+Note what "always" does NOT do: it never overwrites a contradicting pick.
+Switching the question off is not consent to have a deliberate different tip
+replaced — that stays an explicit act, here.
+{% endcomment %}
+<details class="cs-remember">
+  <summary>Stop asking me every time</summary>
+  <label class="cs-opt">
+    <input type="radio" name="remember" value="" checked>
+    <span class="oc-box"></span>
+    <span><b>Just this once</b><i>Ask me again next time.</i></span>
+  </label>
+  <label class="cs-opt">
+    <input type="radio" name="remember" value="all">
+    <span class="oc-box"></span>
+    <span><b>Always carry across</b><i>New picks go to every group automatically. Anywhere you've tipped differently is left alone.</i></span>
+  </label>
+  <label class="cs-opt">
+    <input type="radio" name="remember" value="none">
+    <span class="oc-box"></span>
+    <span><b>Never — keep my groups separate</b><i>Tips only count for the group you make them in.</i></span>
+  </label>
+  <p class="cs-fine">You can change this any time in your profile.</p>
+</details>
