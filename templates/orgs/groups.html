@@ -234,6 +234,24 @@ the view already expects (name, kind, label), so nothing behind this changed.
                  placeholder="e.g. The Cave, Melbourne Office, Night Shift" autocomplete="off">
           <div class="hint">Pick one above to fill this in, or type whatever {{ org.name }} actually calls the team.</div>
         </div>
+
+        {% comment %}
+        WHERE THIS GROUP IS. The reason country is asked here and not only on
+        the organisation: one business can run offices in Sydney, Melbourne
+        and Port Moresby, and an org-level answer cannot describe that.
+
+        Blank is a real answer — it means "wherever {{ org.name }} is", which
+        is the right answer for most groups and the reason this is not
+        required. Only a group somewhere different has to say so.
+        {% endcomment %}
+        <div class="fld">
+          <label for="gmCountry">Country <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+          <select name="country" id="gmCountry">
+            <option value="">Same as {{ org.name }}{% if org.country %} — {{ org.country.name }}{% endif %}</option>
+            {% for co in countries %}<option value="{{ co.pk }}">{{ co.name }}</option>{% endfor %}
+          </select>
+          <div class="hint">Only if this team is based somewhere else. Payments stay in AUD either way.</div>
+        </div>
       </div>
 
       <div class="gm-foot">

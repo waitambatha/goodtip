@@ -20,6 +20,8 @@ urlpatterns = [
     path("<int:org_id>/charity-vote/", views.charity_vote_view, name="charity_vote"),
     path("<int:org_id>/charity-vote/cast/", views.cast_charity_vote, name="cast_charity_vote"),
     path("<int:org_id>/charity-vote/close/", views.close_charity_vote_view, name="close_charity_vote"),
+    # Breaking a tie is the captain's, not the manager's — see captains_call_view.
+    path("<int:org_id>/charity-vote/captains-call/", views.captains_call_view, name="captains_call"),
     path("<int:org_id>/charity-vote/close-time/", views.election_close_time_view, name="election_close_time"),
     path("<int:org_id>/lock-fundraising/", views.lock_fundraising_view, name="lock_fundraising"),
     path("<int:org_id>/election/", views.election_setup_view, name="election_setup"),

@@ -166,6 +166,72 @@
       {% endif %}
     </div>
   </section>
+
+  {% comment %}
+  RAISED BY COUNTRY, and the Pacific Nations pooled underneath it.
+
+  The pooled board is the point. Each Pacific nation on its own is far too
+  small to be a leaderboard early on, and six boards each showing one group is
+  worse than no board — but counted together they are a competition somebody
+  can actually be in. It is a grouping layer over the same country data, not a
+  second source.
+  {% endcomment %}
+  <section class="section on-cream">
+    <div class="wrap">
+      {% comment %}
+      A breakdown by country, which is not the same thing as a leaderboard per
+      country. New Zealand keeps its own row here while sharing the Australia
+      SEGMENT — the segment is what a separate ladder would later be split on,
+      and NZ does not get one yet. See catalog migration 0019.
+      {% endcomment %}
+      <div class="lb-head reveal"><h2>Raised by country</h2><div class="note">Australia, New Zealand and the Pacific.</div></div>
+      {% if by_country %}
+      <div class="lb lb--metric reveal">
+        <div class="lb-colhead"><span>Rank</span><span>Country</span><span class="r-amt">Groups</span><span class="r-amt">Raised</span></div>
+        {% for row in by_country %}
+        <div class="lb-row {% if forloop.counter <= 3 %}t3{% endif %}"><span class="lb-rank">{{ forloop.counter|stringformat:"02d" }}</span><span class="lb-name"><b>{{ row.label }}</b></span><span class="lb-count">{{ row.groups }}</span><span class="lb-amt">${{ row.raised|floatformat:0|intcomma }}</span></div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="gl-empty reveal">
+        <span class="ge-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z"/></svg></span>
+        <h3>Nothing to show here yet.</h3>
+        <p class="note">Country totals appear once at least {{ privacy_min }} groups sit behind a figure, that keeps any single organisation's giving private.</p>
+      </div>
+      {% endif %}
+
+      <div class="lb-head reveal" style="margin-top:38px;">
+        <h2>Pacific Nations</h2>
+        <div class="note">{{ pacific.countries|join:", " }}, counted as one.</div>
+      </div>
+      {% if pacific.groups %}
+      <div class="lb lb--metric reveal">
+        <div class="lb-colhead"><span></span><span>Nation</span><span class="r-amt">Groups</span><span class="r-amt">Raised</span></div>
+        <div class="lb-row t3">
+          <span class="lb-rank"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z"/><circle cx="12" cy="12" r="9"/></svg></span>
+          <span class="lb-name"><b>{{ pacific.label }}</b></span>
+          <span class="lb-count">{{ pacific.groups }}</span>
+          <span class="lb-amt">${{ pacific.raised|floatformat:0|intcomma }}</span>
+        </div>
+        {% comment %}
+        A member nation is broken out only once it clears the privacy
+        threshold on its own. The pooled row above always shows — pooling six
+        countries IS the anonymising step, so gating it as well would hide the
+        board for exactly as long as it is most needed.
+        {% endcomment %}
+        {% for row in pacific.members %}
+        <div class="lb-row"><span class="lb-rank"></span><span class="lb-name" style="padding-left:18px;">{{ row.label }}</span><span class="lb-count">{{ row.groups }}</span><span class="lb-amt">${{ row.raised|floatformat:0|intcomma }}</span></div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="gl-empty reveal">
+        <span class="ge-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z"/></svg></span>
+        <h3>The Pacific board opens with its first group.</h3>
+        <p class="note">{{ pacific.countries|join:", " }} compete together, so a single group anywhere in the Pacific puts this board on the map.</p>
+      </div>
+      {% endif %}
+    </div>
+  </section>
 </div>
 
 {% include "public/partials/_contact.html" with contact_id="contact" %}

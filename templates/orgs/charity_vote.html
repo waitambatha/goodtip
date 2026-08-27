@@ -47,6 +47,67 @@
   </div>
 </div>
 
+{% elif vote.is_tied %}
+{% comment %}
+TIED — counted, but undecided.
+
+This branch is the whole point of the tied status. Before it existed a tie
+fell through to the closed branch, which renders "Winning charity: -" over an
+empty result grid: no winner, no tallies, no controls, nothing explaining why.
+Members reported it as a page that loaded forever, and they were right to —
+nothing on it said the vote had finished, and nothing offered a way on.
+{% endcomment %}
+<div style="max-width:640px;">
+  <div class="card pad-lg" style="text-align:center;margin-bottom:16px;">
+    <div class="app-eyebrow">Charity election</div>
+    <h2 class="app-h1" style="color:var(--forest);margin-top:6px;">It's a tie</h2>
+    <p class="app-sub" style="margin-top:8px;">
+      Voting closed{% if vote.closed_at %} {{ vote.closed_at|date:"j M Y" }}{% endif %} and
+      {{ tied_options|length }} charities finished level on
+      {{ tied_options.0.n }} vote{{ tied_options.0.n|pluralize }} each.
+      {% if can_break_tie %}It's your call.{% else %}Your captain will make the call — you'll hear as soon as they have.{% endif %}
+    </p>
+  </div>
+
+  {% if can_break_tie %}
+  {% comment %}
+  Only the charities that ACTUALLY tied are offered. A captain breaking a
+  deadlock is choosing between the options the group put level, not overriding
+  the group — being able to reach for the one that came third would make the
+  election advisory.
+  {% endcomment %}
+  <form method="post" action="{% url 'orgs:captains_call' org.id %}">
+    {% csrf_token %}
+    <div class="app-eyebrow" style="margin-bottom:10px;">Captain's call</div>
+    <div class="opt-grid" style="margin-bottom:16px;">
+      {% for opt in tied_options %}
+      <label class="opt-card radio">
+        <input type="radio" name="charity" value="{{ opt.charity_id }}" required>
+        <span class="oc-box"></span>
+        {% include "components/_charity_card.html" with charity=opt.charity count=opt.n %}
+      </label>
+      {% endfor %}
+    </div>
+    <div style="display:flex;justify-content:flex-end;">
+      <button type="submit" class="abtn abtn-primary"
+              data-confirm="This locks the charity in for the whole organisation and tells every member it was your call."
+              data-confirm-title="Make the captain's call?" data-confirm-ok="Lock it in">
+        Make the call &rarr;
+      </button>
+    </div>
+  </form>
+  {% else %}
+  <div class="card pad-lg">
+    <div class="app-eyebrow" style="margin-bottom:10px;">Level on votes</div>
+    {% for opt in tied_options %}
+    <div class="vote-card" style="margin-bottom:10px;display:flex;">
+      {% include "components/_charity_card.html" with charity=opt.charity count=opt.n %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
 {% elif vote.is_open %}
 <div style="max-width:640px;">
 
@@ -64,7 +125,12 @@
     {% csrf_token %}
     <div class="opt-grid" style="margin-bottom:16px;">
       {% for opt in options %}
-      <label class="opt-card radio"><input type="radio" name="option" value="{{ opt.id }}" {% if opt.id == my_option_id %}checked{% endif %}><span class="oc-box"></span><span><span class="oc-title">{{ opt.charity.name }}</span>{% if opt.charity.website %}<span class="oc-sub">{{ opt.charity.website }}</span>{% endif %}</span>{% if opt.id == my_option_id %}<span class="oc-right"><span class="pill-role">Your pick</span></span>{% endif %}</label>
+      <label class="opt-card radio">
+        <input type="radio" name="option" value="{{ opt.id }}" {% if opt.id == my_option_id %}checked{% endif %}>
+        <span class="oc-box"></span>
+        {% include "components/_charity_card.html" with charity=opt.charity %}
+        {% if opt.id == my_option_id %}<span class="oc-right"><span class="pill-role">Your pick</span></span>{% endif %}
+      </label>
       {% endfor %}
     </div>
     <div style="display:flex;justify-content:flex-end;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -99,7 +165,15 @@
 
 {% else %}
 <div style="max-width:860px;">
-  <div class="card pad-lg" style="text-align:center;margin-bottom:16px;"><div class="app-eyebrow">Winning charity</div><h2 class="app-h1" style="color:var(--forest);margin-top:6px;">{{ vote.winning_charity.name|default:"-" }}</h2><p class="app-sub" style="margin-top:4px;">Vote closed {{ vote.closed_at|date:"j M Y" }}</p></div>
+  <div class="card pad-lg" style="text-align:center;margin-bottom:16px;"><div class="app-eyebrow">Winning charity</div>
+  {% if vote.winning_charity %}
+  <div style="display:flex;justify-content:center;margin-top:10px;">
+    {% include "components/_charity_card.html" with charity=vote.winning_charity %}
+  </div>
+  {% else %}
+  <h2 class="app-h1" style="color:var(--forest);margin-top:6px;">-</h2>
+  {% endif %}<p class="app-sub" style="margin-top:4px;">Vote closed {{ vote.closed_at|date:"j M Y" }}{% if vote.tie_broken_by %} &middot; captain's call by {{ vote.tie_broken_by.display_name|default:vote.tie_broken_by.email }}{% endif %}</p>
+  {% if vote.tie_broken_by %}<p class="app-sub" style="margin-top:4px;">The vote finished level, so the call was made on the group's behalf.</p>{% endif %}</div>
 
   {% if stats %}
   <div class="vz-grid">
@@ -109,7 +183,10 @@
       <div class="vz-bars">
         {% for opt in results %}
         <div class="vz-row">
-          <span class="vz-lab">{{ opt.charity.name }}{% if opt.charity_id == vote.winning_charity_id %} <span class="pill-role" style="margin-left:6px;">Winner</span>{% endif %}</span>
+          <span class="vz-lab">
+            {% if opt.charity.logo %}<img class="vz-logo" src="{{ opt.charity.logo.url }}" alt="" loading="lazy" width="20" height="20">{% endif %}
+            {{ opt.charity.name }}{% if opt.charity_id == vote.winning_charity_id %} <span class="pill-role" style="margin-left:6px;">Winner</span>{% endif %}
+          </span>
           <span class="vz-track"><i class="{% if opt.charity_id == vote.winning_charity_id %}win{% endif %}" style="width:{{ opt.bar }}%"></i></span>
           <span class="vz-num">{{ opt.n }} <small>({{ opt.pct }}%)</small></span>
         </div>

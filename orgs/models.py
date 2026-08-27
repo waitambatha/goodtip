@@ -52,6 +52,13 @@ class Organisation(models.Model):
     is_charity_partner = models.BooleanField(default=False)
     # Location is optional — for orgs that operate nationally — and powers the
     # Good List's state/territory filter.
+    # The organisation's home country, and the default every group inherits
+    # unless it names its own. Nullable because 30 organisations existed
+    # before the field did and a country cannot be invented for them.
+    country = models.ForeignKey(
+        "catalog.Country", on_delete=models.SET_NULL,
+        related_name="organisations", null=True, blank=True,
+    )
     state = models.ForeignKey(
         "catalog.State", on_delete=models.SET_NULL,
         related_name="organisations", null=True, blank=True,
@@ -391,6 +398,17 @@ class Group(models.Model):
     )
     label = models.CharField(max_length=80, blank=True)
 
+    # WHERE THIS GROUP ACTUALLY IS. The reason country is asked here rather
+    # than only on the organisation: a business with offices in Sydney,
+    # Melbourne and Port Moresby is one organisation and three very different
+    # answers. Blank falls back to the organisation's own country — see
+    # effective_country — so a group that has not been asked is never counted
+    # as nowhere.
+    country = models.ForeignKey(
+        "catalog.Country", on_delete=models.SET_NULL,
+        related_name="groups", null=True, blank=True,
+    )
+
     # A group raised by an ordinary member is a request until an admin says yes.
     # An admin creating one skips the queue, because asking someone to approve
     # their own request is theatre.
@@ -439,6 +457,25 @@ class Group(models.Model):
         if self.kind_id:
             return self.kind.name
         return self.label
+
+    @property
+    def effective_country(self):
+        """This group's country, or the organisation's if it has none.
+
+        The fallback is what stops group-level country leaving most of the
+        platform uncounted: groups are opt-in and off for the majority of
+        organisations, so a group-only field would have meant no country at
+        all for nearly every member. One rule, stated once, so a caller cannot
+        read `group.country` directly and quietly get None for a group whose
+        organisation answered perfectly well.
+        """
+        return self.country or self.org.country
+
+    @property
+    def segment(self) -> str:
+        """Australia, New Zealand or Global — derived, never asked."""
+        country = self.effective_country
+        return country.segment if country else ""
 
 
 class GroupMember(models.Model):
@@ -563,16 +600,32 @@ class CharityVote(models.Model):
     up) → scheduled (admin picked a date, or "now") → open (members voting,
     notified by email + in-app) → closed (winner locked in).
     Legacy votes created before scheduling existed go straight to "open".
+
+    With one detour: a vote whose top count is shared goes open → TIED →
+    closed, and only a captain's call gets it out of "tied". See the comment
+    on that status below.
     """
 
     STATUS_DRAFT = "draft"
     STATUS_SCHEDULED = "scheduled"
     STATUS_OPEN = "open"
+    # Counted, and the top is shared. The vote is over — nobody may cast or
+    # change a ballot — but there is no winner yet, so the charity is NOT set
+    # and the result is not announced.
+    #
+    # This exists because the alternative was a silent lie. Closing used to
+    # take `.order_by("-n").first()`, which on a tie hands back whichever row
+    # the database happened to return first: a winner presented as the group's
+    # decision that was really an accident of query planning. Ties are not
+    # rare in a twelve-person office picking between two charities — they are
+    # the expected outcome of an even split.
+    STATUS_TIED = "tied"
     STATUS_CLOSED = "closed"
     STATUS_CHOICES = [
         (STATUS_DRAFT, "Draft"),
         (STATUS_SCHEDULED, "Scheduled"),
         (STATUS_OPEN, "Open"),
+        (STATUS_TIED, "Tied — awaiting captain's call"),
         (STATUS_CLOSED, "Closed"),
     ]
 
@@ -594,6 +647,18 @@ class CharityVote(models.Model):
         null=True,
         blank=True,
     )
+    # WHO BROKE THE TIE, and when. A charity chosen by one person rather than
+    # by the count is a different kind of decision, and the result screen has
+    # to be able to say so — "Captain's call by Sam" is honest where a bare
+    # winner would imply the group picked it.
+    tie_broken_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="charity_ties_broken",
+        null=True,
+        blank=True,
+    )
+    tie_broken_at = models.DateTimeField(null=True, blank=True)
     # Stamps for the outbound emails, so a cron that runs every ten minutes
     # can't send the same reminder six times. Set once, then checked.
     reminder_day_sent_at = models.DateTimeField(null=True, blank=True)
@@ -613,6 +678,50 @@ class CharityVote(models.Model):
     @property
     def is_pending_setup(self) -> bool:
         return self.status in (self.STATUS_DRAFT, self.STATUS_SCHEDULED)
+
+    @property
+    def is_tied(self) -> bool:
+        return self.status == self.STATUS_TIED
+
+    @property
+    def is_decided(self) -> bool:
+        """Counted AND resolved. A tied vote is counted but not decided, and
+        the difference is the whole point of the tied status."""
+        return self.status == self.STATUS_CLOSED
+
+    def tied_options(self):
+        """The options sharing the top count, best-first by name.
+
+        Returns [] unless the vote is actually tied, so a caller cannot
+        accidentally offer a captain's call on a vote that has a winner.
+        """
+        if not self.is_tied:
+            return []
+        from django.db.models import Count
+
+        tally = list(
+            self.options.select_related("charity")
+            .annotate(n=Count("ballots"))
+            .order_by("-n", "charity__name")
+        )
+        if not tally:
+            return []
+        top = tally[0].n
+        return [o for o in tally if o.n == top]
+
+    def resolve_by(self):
+        """Who may break this tie: captains, managers and the league owner.
+
+        Captains first, because it is their call. Managers and the owner are
+        included so a group that never assigned a captain — most of them —
+        cannot deadlock with no way forward.
+        """
+        return self.org.members.filter(
+            models.Q(role__in=[
+                OrgMember.ROLE_CAPTAIN, OrgMember.ROLE_BOTH, OrgMember.ROLE_MANAGER,
+            ])
+            | models.Q(is_league_owner=True)
+        ).select_related("user")
 
 
 class CharityVoteOption(models.Model):
@@ -687,6 +796,9 @@ class Notification(models.Model):
     KIND_ELECTION_OPEN = "election_open"
     KIND_ELECTION_RESULT = "election_result"
     KIND_ELECTION_SCHEDULED = "election_sched"
+    # Not a result — a job. The captain has to do something before there is
+    # a result at all, so it must not be filed under "election result".
+    KIND_ELECTION_TIED = "election_tied"
     KIND_ADMIN_NOTE = "admin_note"
     KIND_WALL_REPLY = "wall_reply"
     KIND_WALL_POST = "wall_post"
@@ -701,6 +813,7 @@ class Notification(models.Model):
         (KIND_ELECTION_OPEN, "Charity election open"),
         (KIND_ELECTION_RESULT, "Charity election result"),
         (KIND_ELECTION_SCHEDULED, "Charity election scheduled"),
+        (KIND_ELECTION_TIED, "Charity election tied"),
         (KIND_ADMIN_NOTE, "Note from your admin"),
         (KIND_WALL_REPLY, "Reply to your post"),
         (KIND_WALL_POST, "New post on your Wall"),
@@ -715,6 +828,7 @@ class Notification(models.Model):
         KIND_ELECTION_OPEN: "ic-vote",
         KIND_ELECTION_RESULT: "ic-vote",
         KIND_ELECTION_SCHEDULED: "ic-calendar",
+        KIND_ELECTION_TIED: "ic-vote",
         KIND_ADMIN_NOTE: "ic-msg",
         KIND_WALL_REPLY: "ic-msg",
         KIND_WALL_POST: "ic-flame",

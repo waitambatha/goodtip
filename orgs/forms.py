@@ -1,7 +1,9 @@
 from django import forms
 from django.utils import timezone
 
-from catalog.models import Charity, Competition, OrganisationType, Season, State, SubCategory
+from catalog.models import (
+    Charity, Competition, Country, OrganisationType, Season, State, SubCategory,
+)
 
 from .models import Organisation
 from .services import unique_charity_slug as _unique_charity_slug
@@ -53,10 +55,33 @@ class OrgCreateForm(forms.ModelForm):
         widget=forms.HiddenInput,
     )
 
+    # ASKED BEFORE ANYTHING ELSE. See WIZARD_STEPS in views.py — this is step
+    # one on its own, and every rule below keys off it. Someone setting up a
+    # family comp used to meet workplace validation before anything had
+    # established they were not a workplace.
+    FORMALITY_FORMAL = "formal"
+    FORMALITY_INFORMAL = "informal"
+    FORMALITY_CHOICES = [
+        (FORMALITY_FORMAL, "Formal"),
+        (FORMALITY_INFORMAL, "Informal"),
+    ]
+    formality = forms.ChoiceField(
+        choices=FORMALITY_CHOICES,
+        widget=forms.RadioSelect,
+        label="What kind of setup is this?",
+    )
     organisation_type = forms.ModelChoiceField(
         queryset=OrganisationType.objects.all(),  # ordered by sort_order per the spec
+        required=False,
         label="Organisation type",
         empty_label="Choose your organisation type",
+    )
+    country = forms.ModelChoiceField(
+        queryset=Country.objects.filter(is_active=True),
+        required=False,
+        label="Country",
+        empty_label="Choose a country",
+        help_text="Where the group is based. Payment stays in AUD either way.",
     )
     sub_categories = forms.ModelMultipleChoiceField(
         queryset=SubCategory.objects.filter(is_active=True).select_related("organisation_type"),
@@ -141,7 +166,8 @@ class OrgCreateForm(forms.ModelForm):
     class Meta:
         model = Organisation
         fields = [
-            "name", "parent", "organisation_type", "sub_categories", "informal_label", "state",
+            "name", "parent", "organisation_type", "sub_categories", "informal_label",
+            "country", "state",
             "competitions", "season", "team_size", "finals_only", "groups_enabled",
         ]
         labels = {
@@ -179,6 +205,35 @@ class OrgCreateForm(forms.ModelForm):
         if not self.is_bound and not self.initial.get("season") and current:
             self.initial["season"] = current.pk
 
+    def _clean_formality(self, cleaned):
+        """Resolve the Formal / Informal answer into a concrete type.
+
+        This runs BEFORE the per-type rules, because it is what decides which
+        of them apply. Two things happen here:
+
+        * Informal needs no type question at all — there is exactly one
+          informal type, so asking someone to choose from a list of one is
+          pure friction. It is filled in for them.
+        * A type that disagrees with the formality answer is dropped rather
+          than trusted. The wizard hides the mismatched options, but the value
+          arrives from a browser and a stale draft can easily still carry the
+          type someone picked before going back and changing their mind.
+        """
+        formality = cleaned.get("formality")
+        if not formality:
+            return
+        informal = formality == self.FORMALITY_INFORMAL
+        gt = cleaned.get("organisation_type")
+        if gt is not None and gt.is_formal == informal:
+            gt = None                       # answers disagree — the first wins
+        if informal:
+            gt = OrganisationType.objects.filter(
+                slug=OrganisationType.SLUG_INFORMAL
+            ).first()
+        elif gt is None:
+            self.add_error("organisation_type", "Choose your organisation type.")
+        cleaned["organisation_type"] = gt
+
     def _clean_categories(self, cleaned):
         """Per-type rules from the categories doc: Community/Business pick one
         sub-category, Education picks one or the Primary+Secondary pair,
@@ -212,6 +267,7 @@ class OrgCreateForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        self._clean_formality(cleaned)
         self._clean_categories(cleaned)
         method = cleaned.get("charity_method")
         if method == "vote":
@@ -260,6 +316,12 @@ class OrgCreateForm(forms.ModelForm):
                 )
                 # Flag for the view to notify the GoodTip team for manual review.
                 self.suggested_charity = charity
+                # Go and find its logo and confirm its address, off the
+                # request thread — the card falls back to initials until it
+                # lands, so nothing on screen is waiting for this.
+                from catalog.logos import backfill_in_background
+
+                backfill_in_background(charity)
         return charity
 
     def save(self, commit=True):

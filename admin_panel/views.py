@@ -116,6 +116,10 @@ def orgs_list(request):
                 website=request.POST.get("charity_url", "").strip(),
                 is_approved=True,
             )
+            # Same as the signup wizard: find the logo off the request thread.
+            from catalog.logos import backfill_in_background
+
+            backfill_in_background(charity)
         org = Organisation.objects.create(
             name=request.POST["name"].strip(),
             season=season,

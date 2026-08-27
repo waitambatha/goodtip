@@ -56,6 +56,10 @@ def good_list_view(request):
         ),
         "by_charity": goodlist.by_charity(),
         "by_state": goodlist.by_state(),
+        "by_country": goodlist.by_country(),
+        # The Pacific grouping — see goodlist.pacific_nations for why it is
+        # not privacy-gated the way a single country's row is.
+        "pacific": goodlist.pacific_nations(),
         "by_sub_category": goodlist.by_sub_category(),
         "organisation_types": organisation_types,
         "states": states,

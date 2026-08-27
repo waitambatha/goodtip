@@ -22,6 +22,20 @@ from .models import (
     WallPost,
 )
 from .recaps import build_talking_points, compose_recap, fallback_line
+# The wizard's step NUMBERS, taken from the wizard itself rather than written
+# out here. They have already shifted once — inserting the formality step at
+# the front moved every screen behind it — and a test that hardcodes a 4 does
+# not fail when that happens, it silently posts the tipping fields at the
+# groups screen and then asserts about the wrong thing.
+from .views import (
+    CHARITY_STEP,
+    COMPETITION_STEP as TIPPING_STEP,
+    DETAILS_STEP,
+    FORMALITY_STEP,
+    GROUPS_STEP,
+    LAST_STEP as REVIEW_STEP,
+    VERIFY_STEP,
+)
 from .services import (
     approve_membership_request,
     cast_charity_ballot,
@@ -38,7 +52,7 @@ User = get_user_model()
 
 class CharityTimelineTests(TestCase):
     def setUp(self):
-        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
+        self.season = current_form_season()
         self.sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
         self.lifeline, _ = Charity.objects.get_or_create(slug="lifeline", defaults={"name": "Lifeline", "is_approved": True})
         self.beyondblue, _ = Charity.objects.get_or_create(slug="beyond-blue", defaults={"name": "Beyond Blue", "is_approved": True})
@@ -104,22 +118,53 @@ class PaymentCharityFreezeTests(TestCase):
         self.assertEqual(early_payment.charity, self.lifeline)
 
 
+def current_form_season():
+    """The season OrgCreateForm actually offers competitions from.
+
+    Nobody signing up picks a year — the form pins itself to the season in
+    play (see OrgCreateForm.__init__) and hides the field. A fixture that
+    invents a far-future season therefore builds a competition the form will
+    not accept, and every test using it fails with "N is not one of the
+    available choices" — which reads as a wizard bug and is really the test
+    asking for a competition that is not on offer.
+
+    Derived the same way the form derives it, so the two cannot disagree.
+    """
+    from django.utils import timezone
+
+    return (
+        Season.objects.filter(year=timezone.now().year).first()
+        or Season.objects.filter(year__lte=timezone.now().year).first()
+        or Season.objects.first()
+    )
+
+
+def current_form_competition(slug="afl"):
+    """A competition the form will actually accept, from the seeded catalog.
+
+    Building one in a fixture instead collided with the real seeded row —
+    same (slug, season), different Sport — so get_or_create missed on the
+    lookup and then violated the unique constraint on the insert. The seeded
+    rows already carry their series, and they are what production looks like.
+    """
+    from catalog.models import Competition
+
+    return Competition.objects.filter(
+        slug=slug, season=current_form_season(),
+    ).first()
+
+
 class OrgCategoryFormTests(TestCase):
     """Per-type sign-up rules from the categories doc (7 Jul 2026)."""
 
     def setUp(self):
         from catalog.models import Competition, OrganisationType, SubCategory
 
-        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
-        self.sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
-        self.comp, _ = Competition.objects.get_or_create(
-            sport=self.sport, season=self.season, slug="afl", defaults={"name": "AFL"},
-        )
-        # A Competition with no Series cannot deliver a fixture, and the signup
-        # form now offers only competitions a feed can actually serve — so a
-        # bare competition is correctly unselectable. Attach the real AFL
-        # series, which is what production rows look like.
-        self.comp.series.set([Series.objects.get(name="AFL")])
+        self.season = current_form_season()
+        # The real seeded AFL competition for the season in play. It already
+        # carries its series, so it is exactly what the form offers.
+        self.comp = current_form_competition()
+        self.sport = self.comp.sport
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
         )
@@ -129,7 +174,11 @@ class OrgCategoryFormTests(TestCase):
     def form(self, **extra):
         from .forms import OrgCreateForm
 
+        # Formality is answered before anything else in the real wizard, and
+        # it is what decides whether a type is required at all — so the
+        # default here is the formal path these type rules are about.
         data = {
+            "formality": "formal",
             "name": "Testers", "season": self.season.pk, "competitions": [self.comp.pk],
             "charity_method": "pick", "charity": self.charity.pk, "groups_enabled": "no",
         }
@@ -145,9 +194,17 @@ class OrgCategoryFormTests(TestCase):
         )
 
     def test_type_is_required(self):
+        """For a FORMAL organisation. Informal has exactly one type and is
+        filled in rather than asked — see test_informal_needs_no_type."""
         f = self.form()
         self.assertFalse(f.is_valid())
         self.assertIn("organisation_type", f.errors)
+
+    def test_informal_needs_no_type(self):
+        f = self.form(formality="informal", informal_label="Mates comp")
+        f.is_valid()
+        self.assertNotIn("organisation_type", f.errors)
+        self.assertTrue(f.cleaned_data["organisation_type"].is_informal)
 
     def test_business_requires_exactly_one_sub_category(self):
         f = self.form(organisation_type=self.types["business"].pk)
@@ -176,10 +233,14 @@ class OrgCategoryFormTests(TestCase):
         self.assertIn("sub_categories", f.errors)
 
     def test_informal_requires_self_description(self):
-        f = self.form(organisation_type=self.types["informal"].pk)
+        # Asked as the FORMALITY answer, not as a type: the informal type is
+        # filled in by the form once formality says so, and posting the type
+        # alongside formality="formal" is a contradiction the form resolves in
+        # favour of the first answer rather than a way of reaching this rule.
+        f = self.form(formality="informal")
         self.assertFalse(f.is_valid())
         self.assertIn("informal_label", f.errors)
-        f = self.form(organisation_type=self.types["informal"].pk, informal_label="Book Club")
+        f = self.form(formality="informal", informal_label="Book Club")
         self.assertTrue(f.is_valid(), f.errors)
         org = f.save()
         self.assertEqual(org.category_label, "Book Club")
@@ -550,24 +611,35 @@ def _walk_create_wizard(client, case, name, **extra):
     parent = extra.get("parent", "")
     # Informal, deliberately. These callers are about duplicate names and
     # parent/child rules, and an Informal group has no employer domain to
-    # prove — so step 2 waves it through instead of demanding an email code
-    # that has nothing to do with what is being tested. Verification has its
-    # own tests.
+    # prove — so the verify step is not merely waved through, it is not shown
+    # at all (see views._advance), and nothing here has to answer an email
+    # code that has nothing to do with what is being tested. Verification has
+    # its own tests.
+    #
+    # Formality is its own first step now, and it is what excuses the verify
+    # step — so it is answered before the name rather than implied by the type
+    # posted alongside it. The type itself is not posted: the form fills in
+    # the one informal type once formality says informal.
     client.post(url, {
-        "step": 1, "action": "next", "name": name,
-        "organisation_type": case.gtype.pk, "informal_label": "Book Club", "parent": parent,
+        "step": FORMALITY_STEP, "action": "next", "formality": "informal",
+        "parent": parent,
     })
-    client.post(url, {"step": 2, "action": "next", "parent": parent})
-    client.post(url, {"step": 3, "action": "next", "groups_enabled": "no", "parent": parent})
     client.post(url, {
-        "step": 4, "action": "next",
+        "step": DETAILS_STEP, "action": "next", "name": name,
+        "informal_label": "Book Club", "parent": parent,
+    })
+    client.post(url, {
+        "step": GROUPS_STEP, "action": "next", "groups_enabled": "no", "parent": parent,
+    })
+    client.post(url, {
+        "step": TIPPING_STEP, "action": "next",
         "competitions": [case.comp.pk], "season": case.season.pk, "parent": parent,
     })
     client.post(url, {
-        "step": 5, "action": "next",
+        "step": CHARITY_STEP, "action": "next",
         "charity_method": "pick", "charity": case.charity.pk, "parent": parent,
     })
-    final = {"step": 6, "action": "next", "parent": parent}
+    final = {"step": REVIEW_STEP, "action": "next", "parent": parent}
     if extra.get("duplicate_confirmed"):
         final["duplicate_confirmed"] = extra["duplicate_confirmed"]
     return client.post(url, final)
@@ -578,20 +650,16 @@ class DuplicateDetectionTests(TestCase):
     exists needs one explicit confirmation — friction, not prevention."""
 
     def setUp(self):
-        from catalog.models import Competition, OrganisationType, Series
+        from catalog.models import OrganisationType
 
-        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
-        sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
-        self.comp, _ = Competition.objects.get_or_create(
-            sport=sport, season=self.season, slug="afl", defaults={"name": "AFL"},
-        )
-        # See CreateWizardTests.setUp: fed_competitions() hides a competition
-        # whose series resolve to no scraper, and a competition with no series
-        # at all resolves to nothing.
-        series, _ = Series.objects.get_or_create(
-            name="AFL", defaults={"sport": sport, "slug": "afl"},
-        )
-        self.comp.series.add(series)
+        # The season and competition the FORM offers, not one invented here.
+        # A fixture season of 2099 built a competition the wizard's tipping
+        # step then refused — its queryset is the current season only — so the
+        # walk stalled there and every assertion about what happens at the END
+        # of the wizard failed on a screen four steps earlier. See
+        # current_form_season().
+        self.season = current_form_season()
+        self.comp = current_form_competition()
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
         )
@@ -639,20 +707,16 @@ class ChildOrgCreationTests(TestCase):
     """
 
     def setUp(self):
-        from catalog.models import Competition, OrganisationType, Series
+        from catalog.models import OrganisationType
 
-        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
-        sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
-        self.comp, _ = Competition.objects.get_or_create(
-            sport=sport, season=self.season, slug="afl", defaults={"name": "AFL"},
-        )
-        # See CreateWizardTests.setUp: fed_competitions() hides a competition
-        # whose series resolve to no scraper, and a competition with no series
-        # at all resolves to nothing.
-        series, _ = Series.objects.get_or_create(
-            name="AFL", defaults={"sport": sport, "slug": "afl"},
-        )
-        self.comp.series.add(series)
+        # The season and competition the FORM offers, not one invented here.
+        # A fixture season of 2099 built a competition the wizard's tipping
+        # step then refused — its queryset is the current season only — so the
+        # walk stalled there and every assertion about what happens at the END
+        # of the wizard failed on a screen four steps earlier. See
+        # current_form_season().
+        self.season = current_form_season()
+        self.comp = current_form_competition()
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
         )
@@ -1453,21 +1517,14 @@ class CreateWizardTests(TestCase):
     def setUp(self):
         from catalog.models import Competition, OrganisationType, Series
 
-        self.season, _ = Season.objects.get_or_create(year=2093, defaults={"label": "2093"})
-        self.sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
-        self.comp, _ = Competition.objects.get_or_create(
-            sport=self.sport, season=self.season, slug="afl", defaults={"name": "AFL"},
-        )
-        # The signup form only offers competitions a feed can actually deliver
-        # (orgs.forms.fed_competitions), and that test is "does any of its
-        # series resolve to a scraper". A Competition with no series attached
-        # resolves to nothing, so it was silently absent from the form and the
-        # tipping step rejected it with "7 is not one of the available
-        # choices" — which read as a wizard bug rather than a fixture gap.
-        self.series, _ = Series.objects.get_or_create(
-            name="AFL", defaults={"sport": self.sport, "slug": "afl"},
-        )
-        self.comp.series.add(self.series)
+        self.season = current_form_season()
+        # The real seeded AFL competition for the season in play, series and
+        # all. Building one here collided with the seeded row on
+        # (slug, season), and asked for a season nobody is tipping — which
+        # read as a wizard bug and was really a fixture gap.
+        self.comp = current_form_competition()
+        self.sport = self.comp.sport
+        self.series = self.comp.series.first()
         self.gtype = OrganisationType.objects.get(slug="informal")
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
@@ -1475,55 +1532,87 @@ class CreateWizardTests(TestCase):
         self.user = User.objects.create_user(email="w@w.com", password="x", display_name="Wiz")
         self.client.force_login(self.user)
 
-    def _step1(self, name="Wizard Group"):
+    # STEP NUMBERS COME FROM THE WIZARD, NEVER FROM THIS FILE.
+    #
+    # These helpers were already named rather than numbered, for exactly the
+    # right reason — "so the next insertion does not silently repoint every
+    # test at the wrong screen". The numbers were still written out inside
+    # them, though, so the next insertion did precisely that. Reading them off
+    # WIZARD_STEPS is what the comment was reaching for.
+
+    @property
+    def _steps(self):
+        from orgs.views import (
+            CHARITY_STEP, COMPETITION_STEP, DETAILS_STEP, FORMALITY_STEP,
+            GROUPS_STEP, LAST_STEP, VERIFY_STEP,
+        )
+
+        return {
+            "formality": FORMALITY_STEP, "details": DETAILS_STEP,
+            "verify": VERIFY_STEP, "groups": GROUPS_STEP,
+            "tipping": COMPETITION_STEP, "charity": CHARITY_STEP,
+            "review": LAST_STEP,
+        }
+
+    def _formality_step(self, kind="informal"):
+        """Step one, and the branch everything after it reads."""
         return self.client.post(self.URL, {
-            "step": 1, "action": "next", "name": name,
-            "organisation_type": self.gtype.pk, "informal_label": "Book Club",
+            "step": self._steps["formality"], "action": "next", "formality": kind,
         })
 
-    # The wizard gained a step: Verify sits at 2 now, between the basics and
-    # the tipping rules. These helpers are named rather than numbered so the
-    # next insertion does not silently repoint every test at the wrong screen —
-    # which is exactly what happened to the numbered ones.
+    def _step1(self, name="Wizard Group"):
+        """Formality, then the basics — the two screens a name now sits behind.
+
+        These tests run the INFORMAL path (see self.gtype), so no organisation
+        type is posted: there is exactly one informal type and the form fills
+        it in rather than asking.
+        """
+        self._formality_step("informal")
+        return self.client.post(self.URL, {
+            "step": self._steps["details"], "action": "next", "name": name,
+            "informal_label": "Book Club",
+        })
 
     def _verify_step(self):
-        """Step 2, the work-domain check.
+        """A no-op on this path, and that is the point.
 
-        An Informal group has no employer domain to prove and never will, so it
-        passes straight through — but it is still a step, and skipping it in a
-        test means everything after lands one screen early.
+        An informal group has no employer domain to prove and never will, so
+        the wizard now steps OVER the verify screen rather than showing it and
+        letting them press past — a family comp being asked to prove a work
+        domain was the wall the client reported. Kept as a call so the walk
+        still reads as the sequence a person goes through.
         """
-        return self.client.post(self.URL, {"step": 2, "action": "next"})
+        return None
 
     def _groups_step(self, enabled=False):
-        """Step 3, whether the organisation wants sub-groups.
+        """Whether the organisation wants sub-groups.
 
-        Defaults to "no" — an Informal book club has no use for departments,
+        Defaults to "no" — an informal book club has no use for departments,
         and most of these tests are not about groups at all. Must still be
         walked through on any path that finishes creation, because the field
-        is required on the form: skipping it is exactly the "step" numbers
-        drifting out from under a test that the named-helper pattern here
-        exists to prevent.
+        is required on the form.
         """
         return self.client.post(self.URL, {
-            "step": 3, "action": "next",
+            "step": self._steps["groups"], "action": "next",
             "groups_enabled": "yes" if enabled else "no",
         })
 
     def _tipping_step(self):
         return self.client.post(self.URL, {
-            "step": 4, "action": "next",
+            "step": self._steps["tipping"], "action": "next",
             "competitions": [self.comp.pk], "season": self.season.pk,
         })
 
     def _charity_step(self):
         return self.client.post(self.URL, {
-            "step": 5, "action": "next",
+            "step": self._steps["charity"], "action": "next",
             "charity_method": "pick", "charity": self.charity.pk,
         })
 
     def _review_step(self):
-        return self.client.post(self.URL, {"step": 6, "action": "next"})
+        return self.client.post(self.URL, {
+            "step": self._steps["review"], "action": "next",
+        })
 
     def _through_to_review(self, name="Wizard Group"):
         self._step1(name)
@@ -1533,6 +1622,12 @@ class CreateWizardTests(TestCase):
         self._charity_step()
 
     def test_one_step_shows_at_a_time(self):
+        body = self.client.get(self.URL).content
+        # The first screen asks formal-or-informal and nothing else — that is
+        # the whole point of it being its own step.
+        self.assertIn(b'name="formality"', body)
+        self.assertNotIn(b'id="id_name"', body)
+        self._formality_step("informal")
         body = self.client.get(self.URL).content
         self.assertIn(b'id="id_name"', body)
         self.assertNotIn(b'name="groups_enabled"', body)
@@ -1550,15 +1645,24 @@ class CreateWizardTests(TestCase):
     def test_a_missing_answer_holds_you_on_that_step(self):
         from .models import OrgDraft
 
-        self.client.post(self.URL, {"step": 1, "action": "next", "name": ""})
-        self.assertEqual(OrgDraft.objects.get(user=self.user).step, 1)
+        self._formality_step("informal")
+        self.client.post(self.URL, {
+            "step": self._steps["details"], "action": "next", "name": "",
+        })
+        self.assertEqual(
+            OrgDraft.objects.get(user=self.user).step, self._steps["details"],
+        )
 
     def test_a_later_step_does_not_block_an_earlier_one(self):
         """Step 1 must not fail because no charity has been chosen yet."""
         from .models import OrgDraft
 
         self._step1()
-        self.assertEqual(OrgDraft.objects.get(user=self.user).step, 2)
+        # Informal steps straight over verify, so the details screen advances
+        # to the groups question rather than to the work-domain check.
+        self.assertEqual(
+            OrgDraft.objects.get(user=self.user).step, self._steps["groups"],
+        )
 
     def test_progress_survives_a_brand_new_session(self):
         self._step1()
@@ -1576,7 +1680,9 @@ class CreateWizardTests(TestCase):
         self._verify_step()
         self._groups_step()
         self._tipping_step()
-        self.client.post(self.URL, {"step": 5, "action": "back"})
+        self.client.post(self.URL, {
+            "step": self._steps["charity"], "action": "back",
+        })
         body = self.client.get(self.URL).content
         self.assertIn(b'id="id_season"', body)
         self.assertIn(str(self.comp.pk).encode(), body)
@@ -1622,8 +1728,14 @@ class CreateWizardTests(TestCase):
         resp = self.client.get(self.URL)
         self.assertNotContains(resp, "Part of Masterclass")
         self.assertNotContains(resp, "Department name")
-        self.assertContains(resp, "Organisation name")
         self.assertIsNone(OrgDraft.objects.get(user=self.user).data.get("parent"))
+        # The name field is a step further in than it used to be — formality
+        # is asked first now — so reaching it is part of the assertion rather
+        # than something the first GET can show.
+        self._formality_step("informal")
+        resp = self.client.get(self.URL)
+        self.assertNotContains(resp, "Department name")
+        self.assertContains(resp, "Organisation name")
 
     def test_a_department_in_progress_keeps_its_parent_between_steps(self):
         """The other half: clearing the parent must not break a real flow.
@@ -1640,10 +1752,10 @@ class CreateWizardTests(TestCase):
             role=OrgMember.ROLE_BOTH, is_league_owner=True,
         )
         self.client.get(f"{self.URL}?parent={parent.id}")
+        self._formality_step("informal")
         resp = self.client.post(self.URL, {
-            "step": 1, "action": "next", "name": "Finance",
-            "organisation_type": self.gtype.pk, "informal_label": "Book Club",
-            "parent": parent.id,
+            "step": self._steps["details"], "action": "next", "name": "Finance",
+            "informal_label": "Book Club", "parent": parent.id,
         })
         # The redirect carries the parent, so the next screen is still a
         # department rather than silently becoming a new organisation.
@@ -1678,15 +1790,18 @@ class CreateWizardTests(TestCase):
             self.skipTest("no business group type in this catalog")
         sub = business.sub_categories.first()
 
+        self._formality_step("formal")
         payload = {
-            "step": 1, "action": "next", "name": "Verify Step Co",
-            "organisation_type": business.pk,
+            "step": self._steps["details"], "action": "next",
+            "name": "Verify Step Co", "organisation_type": business.pk,
         }
         if sub is not None:
             payload["sub_categories"] = [sub.pk]
         self.client.post(self.URL, payload)
 
-        self.assertEqual(OrgDraft.objects.get(user=self.user).step, 2)
+        self.assertEqual(
+            OrgDraft.objects.get(user=self.user).step, self._steps["verify"],
+        )
         self.assertFalse(WorkEmailVerification.objects.filter(user=self.user).exists())
 
         resp = self.client.get(self.URL)
@@ -1963,22 +2078,36 @@ class WizardEndToEndTests(TestCase):
         self.assertIsNotNone(self.gtype, "no non-verifying group type seeded")
         self.assertIsNotNone(self.comp, "no AFL 2026 competition seeded")
 
-        # 1 — who you are
-        self._post(1, name="Wizard Walk FC", organisation_type=self.gtype.id,
-                   sub_categories=self.subcat.id if self.subcat else "")
-        # 2 — verification, not required for this type
-        self._post(2)
-        # 3 — groups, not for this small a crew
-        self._post(3, groups_enabled="no")
-        # 4 — what you tip
-        self._post(
-            4, competitions=self.comp.id, season=self.comp.season_id,
-            team_size="10",
+        # Step numbers are read from the wizard itself rather than written
+        # out, so inserting a step moves this walk with it instead of
+        # silently pointing each post at the wrong screen — which is exactly
+        # what happened when the formality step went in at the front.
+        from orgs.views import (
+            CHARITY_STEP, COMPETITION_STEP, DETAILS_STEP, FORMALITY_STEP,
+            GROUPS_STEP, LAST_STEP, VERIFY_STEP,
         )
-        # 5 — the cause
-        self._post(5, charity_method="pick", charity=self.charity.id)
-        # 6 — create
-        self._post(6)
+        from catalog.models import Country
+
+        # 1 — formal or informal. Everything after this reads the answer.
+        self._post(FORMALITY_STEP, formality="formal")
+        # 2 — who you are
+        self._post(DETAILS_STEP, name="Wizard Walk FC",
+                   organisation_type=self.gtype.id,
+                   country=Country.objects.get(code="AU").pk,
+                   sub_categories=self.subcat.id if self.subcat else "")
+        # 3 — verification, not required for this type
+        self._post(VERIFY_STEP)
+        # 4 — groups, not for this small a crew
+        self._post(GROUPS_STEP, groups_enabled="no")
+        # 5 — what you tip
+        self._post(
+            COMPETITION_STEP, competitions=self.comp.id,
+            season=self.comp.season_id, team_size="10",
+        )
+        # 6 — the cause
+        self._post(CHARITY_STEP, charity_method="pick", charity=self.charity.id)
+        # 7 — create
+        self._post(LAST_STEP)
 
         org = Organisation.objects.filter(name="Wizard Walk FC").first()
         self.assertIsNotNone(org, "the wizard finished without creating a group")
@@ -2814,8 +2943,15 @@ class CharityVoteAtCreationTests(CreateWizardTests):
     """
 
     def _charity_step(self, **extra):
+        # The step number comes from the wizard, like every other helper on
+        # the parent class. Written out as a 5 here, it survived the formality
+        # step being inserted at the front and quietly started posting the
+        # ballot at the TIPPING screen — which has no charity fields to
+        # complain about, so the walk stalled there and every vote in this
+        # class was simply never created.
         data = {
-            "step": 5, "action": "next", "charity_method": "vote",
+            "step": self._steps["charity"], "action": "next",
+            "charity_method": "vote",
             "vote_charities": [self.charity.pk, self.second_charity.pk],
         }
         data.update(extra)
@@ -3552,3 +3688,527 @@ class GroupScopeLeakTests(TestCase):
         }
         self.assertEqual(org_board.get(self.user.id), 3)
         self.assertEqual(grp_board.get(self.user.id), 5)
+
+
+class CharityVoteTieTests(TestCase):
+    """A tie must stop and ask a person, not pick one and call it a result.
+
+    Closing used to be ``.order_by("-n").first()``, so a level vote handed
+    back whichever row the database returned first and presented it to the
+    organisation as its decision. An even split between two charities is the
+    ordinary outcome for a group with an even number of people, not an edge
+    case — and a vote nobody turned up to ties every option at nil.
+    """
+
+    def setUp(self):
+        from .models import CharityVote, Notification, OrgMember, Organisation
+        from .services import cast_charity_ballot, open_charity_vote
+
+        User = get_user_model()
+        self.season = Season.objects.create(year=2097, label="2097")
+        self.org = Organisation.objects.create(name="Tie Co", season=self.season)
+        self.captain = User.objects.create_user(
+            email="captain@tie.test", password="x", display_name="Cap Skipper",
+        )
+        self.alice = User.objects.create_user(
+            email="alice@tie.test", password="x", display_name="Alice",
+        )
+        self.bob = User.objects.create_user(
+            email="bob@tie.test", password="x", display_name="Bob",
+        )
+        OrgMember.objects.create(
+            user=self.captain, org=self.org, role=OrgMember.ROLE_CAPTAIN,
+        )
+        OrgMember.objects.create(user=self.alice, org=self.org)
+        OrgMember.objects.create(user=self.bob, org=self.org)
+        self.one = Charity.objects.create(
+            name="Tie Charity One", slug="tie-one", is_approved=True,
+            website="https://one.example",
+        )
+        self.two = Charity.objects.create(
+            name="Tie Charity Two", slug="tie-two", is_approved=True,
+        )
+        self.vote = open_charity_vote(self.org, [self.one, self.two])
+        self.opt_one, self.opt_two = list(
+            self.vote.options.order_by("charity__name")
+        )
+        self._cast = cast_charity_ballot
+
+    def _split_the_vote(self):
+        self._cast(user=self.alice, vote=self.vote, option=self.opt_one)
+        self._cast(user=self.bob, vote=self.vote, option=self.opt_two)
+
+    def _close(self):
+        from .services import close_charity_vote
+
+        winner = close_charity_vote(self.vote)
+        self.vote.refresh_from_db()
+        self.org.refresh_from_db()
+        return winner
+
+    def _url(self, name):
+        from django.urls import reverse
+
+        return reverse(f"orgs:{name}", args=[self.org.id])
+
+    # ---- closing -------------------------------------------------------
+
+    def test_a_level_vote_becomes_tied_rather_than_picking_one(self):
+        from .models import CharityVote
+
+        self._split_the_vote()
+        self.assertIsNone(self._close())
+        self.assertEqual(self.vote.status, CharityVote.STATUS_TIED)
+
+    def test_a_tie_sets_no_charity_on_the_organisation(self):
+        """The half that actually mattered: an arbitrary winner was being
+        written onto the org and taking the season's donations with it."""
+        self._split_the_vote()
+        self._close()
+        self.assertIsNone(self.org.charity_id)
+
+    def test_a_vote_nobody_cast_ties_rather_than_crowning_the_first_option(self):
+        from .models import CharityVote
+
+        self.assertIsNone(self._close())
+        self.assertEqual(self.vote.status, CharityVote.STATUS_TIED)
+        self.assertIsNone(self.org.charity_id)
+
+    def test_a_clear_winner_still_closes_normally(self):
+        from .models import CharityVote
+
+        self._cast(user=self.alice, vote=self.vote, option=self.opt_one)
+        self._cast(user=self.bob, vote=self.vote, option=self.opt_one)
+        self.assertEqual(self._close(), self.one)
+        self.assertEqual(self.vote.status, CharityVote.STATUS_CLOSED)
+        self.assertEqual(self.org.charity_id, self.one.pk)
+
+    def test_tied_options_are_the_ones_that_actually_tied(self):
+        third = Charity.objects.create(
+            name="Tie Charity Three", slug="tie-three", is_approved=True,
+        )
+        from .models import CharityVoteOption
+
+        opt_three = CharityVoteOption.objects.create(vote=self.vote, charity=third)
+        self._split_the_vote()          # one and two get 1 each, three gets 0
+        self._close()
+        self.assertEqual(
+            {o.charity_id for o in self.vote.tied_options()},
+            {self.one.pk, self.two.pk},
+        )
+
+    def test_everyone_is_told_the_vote_tied(self):
+        from .models import Notification
+
+        self._split_the_vote()
+        self._close()
+        told = Notification.objects.filter(kind=Notification.KIND_ELECTION_TIED)
+        self.assertEqual(told.count(), 3)
+
+    def test_the_auto_closer_does_not_pick_the_tie_up_again(self):
+        """close_due_elections filters on `open`, so a tied vote must fall out
+        of it — otherwise every cron tick would re-close the same vote."""
+        from django.utils import timezone
+
+        from .services import close_due_elections
+
+        self._split_the_vote()
+        self.vote.scheduled_close_at = timezone.now() - timedelta(minutes=5)
+        self.vote.save(update_fields=["scheduled_close_at"])
+        self._close()
+        self.assertEqual(close_due_elections(orgs=[self.org]), 0)
+
+    # ---- the captain's call --------------------------------------------
+
+    def test_a_captain_may_break_it(self):
+        from .models import CharityVote
+        from .services import break_charity_vote_tie
+
+        self._split_the_vote()
+        self._close()
+        break_charity_vote_tie(self.vote, self.two, by_user=self.captain)
+        self.vote.refresh_from_db()
+        self.org.refresh_from_db()
+        self.assertEqual(self.vote.status, CharityVote.STATUS_CLOSED)
+        self.assertEqual(self.vote.winning_charity_id, self.two.pk)
+        self.assertEqual(self.org.charity_id, self.two.pk)
+        self.assertEqual(self.vote.tie_broken_by_id, self.captain.pk)
+
+    def test_an_ordinary_member_may_not(self):
+        from .services import break_charity_vote_tie
+
+        self._split_the_vote()
+        self._close()
+        with self.assertRaises(ValueError):
+            break_charity_vote_tie(self.vote, self.two, by_user=self.alice)
+
+    def test_a_charity_that_did_not_tie_is_refused(self):
+        """Breaking a tie is choosing between the options the group put level.
+        Reaching past them would make the election advisory."""
+        from .models import CharityVoteOption
+        from .services import break_charity_vote_tie
+
+        third = Charity.objects.create(
+            name="Tie Charity Three", slug="tie-three", is_approved=True,
+        )
+        CharityVoteOption.objects.create(vote=self.vote, charity=third)
+        self._split_the_vote()
+        self._close()
+        with self.assertRaises(ValueError):
+            break_charity_vote_tie(self.vote, third, by_user=self.captain)
+
+    def test_a_vote_that_is_not_tied_cannot_be_overridden(self):
+        from .services import break_charity_vote_tie
+
+        self._cast(user=self.alice, vote=self.vote, option=self.opt_one)
+        self._cast(user=self.bob, vote=self.vote, option=self.opt_one)
+        self._close()
+        with self.assertRaises(ValueError):
+            break_charity_vote_tie(self.vote, self.two, by_user=self.captain)
+
+    def test_a_league_owner_can_break_it_when_there_is_no_captain(self):
+        """Most groups never assign a captain. Gating this on the captain role
+        alone would leave them deadlocked with no way forward."""
+        from .models import OrgMember
+        from .services import break_charity_vote_tie
+
+        User = get_user_model()
+        owner = User.objects.create_user(
+            email="owner@tie.test", password="x", display_name="Owner",
+        )
+        OrgMember.objects.create(user=owner, org=self.org, is_league_owner=True)
+        self._split_the_vote()
+        self._close()
+        break_charity_vote_tie(self.vote, self.one, by_user=owner)
+        self.vote.refresh_from_db()
+        self.assertEqual(self.vote.winning_charity_id, self.one.pk)
+
+    # ---- the screen ----------------------------------------------------
+
+    def test_the_page_says_it_tied_rather_than_showing_an_empty_result(self):
+        """The reported symptom was a page that "just spins, loading, loading,
+        forever". It was really the closed branch with no winner: no result, no
+        tallies, no controls and nothing saying why."""
+        self._split_the_vote()
+        self._close()
+        self.client.force_login(self.alice)
+        body = self.client.get(self._url("charity_vote")).content.decode()
+        self.assertIn("a tie", body)
+        self.assertIn("Tie Charity One", body)
+
+    def test_only_a_decider_is_offered_the_control(self):
+        self._split_the_vote()
+        self._close()
+        self.client.force_login(self.alice)
+        self.assertNotIn(
+            "captains-call", self.client.get(self._url("charity_vote")).content.decode()
+        )
+        self.client.force_login(self.captain)
+        self.assertIn(
+            "captains-call", self.client.get(self._url("charity_vote")).content.decode()
+        )
+
+    def test_posting_the_call_as_a_member_changes_nothing(self):
+        from .models import CharityVote
+
+        self._split_the_vote()
+        self._close()
+        self.client.force_login(self.alice)
+        self.client.post(self._url("captains_call"), {"charity": self.one.pk})
+        self.vote.refresh_from_db()
+        self.assertEqual(self.vote.status, CharityVote.STATUS_TIED)
+
+    def test_the_result_page_credits_the_call(self):
+        """A charity chosen by one person is a different kind of decision from
+        one the group picked, and the page has to say so."""
+        from .services import break_charity_vote_tie
+
+        self._split_the_vote()
+        self._close()
+        break_charity_vote_tie(self.vote, self.two, by_user=self.captain)
+        self.client.force_login(self.alice)
+        body = self.client.get(self._url("charity_vote")).content.decode()
+        self.assertIn("Cap Skipper", body)
+
+
+class FormalityStepTests(TestCase):
+    """Org type is asked FIRST, and informal never meets workplace validation.
+
+    The reported symptom: "everyone gets funnelled through the same formal-org
+    validation, which is why someone trying to set up an informal mates' group
+    or family comp with a Gmail address hits a wall." The wall was never one
+    check — it was that the question deciding which checks apply sat alongside
+    four other fields, so nothing knew it was talking to a family until it had
+    finished asking a business's questions.
+    """
+
+    def setUp(self):
+        from catalog.models import Country, OrganisationType, SubCategory
+        from .models import OrgDraft
+
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            email="wiz@example.com", password="x", display_name="Wiz",
+        )
+        self.client.force_login(self.user)
+        self.business = OrganisationType.objects.get(slug="business")
+        self.sub = SubCategory.objects.filter(
+            organisation_type=self.business, is_active=True,
+        ).first()
+        self.au = Country.objects.get(code="AU")
+        self.pg = Country.objects.get(code="PG")
+
+    def draft(self):
+        from .models import OrgDraft
+
+        return OrgDraft.objects.get(user=self.user)
+
+    def step(self, n, **data):
+        data.setdefault("action", "next")
+        data["step"] = str(n)
+        return self.client.post("/leagues/new/", data)
+
+    def on_verify_screen(self) -> bool:
+        body = self.client.get("/leagues/new/").content.decode()
+        return 'name="action" value="send_code"' in body
+
+    # ---- the question comes first --------------------------------------
+
+    def test_the_first_screen_asks_only_formal_or_informal(self):
+        body = self.client.get("/leagues/new/").content.decode()
+        self.assertIn('name="formality"', body)
+        self.assertNotIn('id="id_name"', body)
+
+    def test_the_name_is_not_asked_until_after_it(self):
+        self.step(1, formality="informal")
+        self.assertIn('id="id_name"', self.client.get("/leagues/new/").content.decode())
+
+    # ---- what the answer changes ---------------------------------------
+
+    def test_an_informal_group_never_sees_the_verify_step(self):
+        """The wall itself. It is not enough for the check to be unenforced —
+        a screen asking a family comp to prove a work domain must not be
+        there at all."""
+        self.step(1, formality="informal")
+        self.step(2, name="Sunday Mates", informal_label="Mates comp",
+                  country=str(self.au.pk))
+        self.assertFalse(self.on_verify_screen())
+
+    def test_a_formal_org_still_has_to_verify(self):
+        self.step(1, formality="formal")
+        self.step(2, name="Acme Pty", organisation_type=str(self.business.pk),
+                  sub_categories=str(self.sub.pk), country=str(self.au.pk))
+        self.assertTrue(self.on_verify_screen())
+
+    def test_an_informal_group_needs_no_organisation_type(self):
+        """There is exactly one informal type, so choosing from a list of one
+        is pure friction — the form fills it in."""
+        from catalog.models import OrganisationType
+
+        self.step(1, formality="informal")
+        self.step(2, name="Book Club", informal_label="Book club",
+                  country=str(self.au.pk))
+        self.assertGreater(self.draft().step, 2)
+
+    def test_switching_to_informal_steps_back_over_the_verify_screen(self):
+        """A draft can hold a step that stopped applying."""
+        self.step(1, formality="formal")
+        self.step(2, name="Acme Pty", organisation_type=str(self.business.pk),
+                  sub_categories=str(self.sub.pk), country=str(self.au.pk))
+        self.assertTrue(self.on_verify_screen())
+        self.client.post("/leagues/new/", {"step": "3", "action": "back"})
+        self.client.post("/leagues/new/", {"step": "2", "action": "back"})
+        self.step(1, formality="informal")
+        self.step(2, name="Acme Mates", informal_label="Mates",
+                  country=str(self.au.pk))
+        self.assertFalse(self.on_verify_screen())
+
+    def test_a_type_that_disagrees_with_the_answer_is_dropped(self):
+        """The wizard hides the mismatched options, but the value arrives from
+        a browser and a stale draft can carry the old one."""
+        from .forms import OrgCreateForm
+
+        form = OrgCreateForm(data={
+            "formality": "informal",
+            "name": "Mates",
+            "organisation_type": self.business.pk,
+            "informal_label": "Mates comp",
+        })
+        form.is_valid()
+        self.assertTrue(form.cleaned_data["organisation_type"].is_informal)
+
+
+class CountrySegmentTests(TestCase):
+    """Country lives on the group, falling back to the organisation."""
+
+    def setUp(self):
+        from catalog.models import Country, Season
+        from .models import Group, Organisation
+
+        self.season = Season.objects.create(year=2093, label="2093")
+        self.au = Country.objects.get(code="AU")
+        self.pg = Country.objects.get(code="PG")
+        self.nz = Country.objects.get(code="NZ")
+        self.org = Organisation.objects.create(
+            name="Westpac-ish", season=self.season, country=self.au,
+            groups_enabled=True,
+        )
+        self.sydney = Group.objects.create(org=self.org, name="Sydney")
+        self.moresby = Group.objects.create(
+            org=self.org, name="Port Moresby", country=self.pg,
+        )
+
+    def test_a_group_with_no_country_inherits_the_organisations(self):
+        """Groups are opt-in and off for most orgs — without the fallback,
+        nearly every member would resolve to no country at all."""
+        self.assertEqual(self.sydney.effective_country, self.au)
+
+    def test_a_groups_own_country_wins(self):
+        """The case the whole field exists for: one business, offices in
+        Sydney, Melbourne and Port Moresby."""
+        self.assertEqual(self.moresby.effective_country, self.pg)
+
+    def test_the_segment_is_derived_not_asked(self):
+        from catalog.models import Country
+
+        self.assertEqual(self.sydney.segment, Country.SEGMENT_AUSTRALIA)
+        self.assertEqual(self.moresby.segment, Country.SEGMENT_GLOBAL)
+
+    def test_new_zealand_plays_on_the_main_ladder_for_now(self):
+        """Client instruction of 2026-08-26: NZ folds into the Australia
+        ladder until it gets a board of its own. Groups competing against each
+        other share a segment, so while NZ groups play on the main ladder they
+        carry the main ladder's segment — see catalog migration 0019."""
+        from catalog.models import Country
+
+        self.org.country = self.nz
+        self.org.save(update_fields=["country"])
+        self.sydney.refresh_from_db()
+        self.assertEqual(self.sydney.segment, Country.SEGMENT_AUSTRALIA)
+
+    def test_new_zealand_is_still_its_own_country(self):
+        """Folding the SEGMENT is not merging the country. The Good List's
+        country breakdown must still be able to show New Zealand on its own
+        row — rolling its money into Australia's would label NZ giving as
+        Australian, which is a different claim entirely."""
+        from billing.goodlist import group_counts_by_country
+
+        self.org.country = self.nz
+        self.org.save(update_fields=["country"])
+        counts = {r["label"]: r["groups"] for r in group_counts_by_country()}
+        self.assertEqual(counts.get("New Zealand"), 1)
+
+    def test_every_pacific_nation_the_client_named_is_seeded(self):
+        from catalog.models import Country
+
+        named = {
+            "Papua New Guinea", "Fiji", "Samoa", "Tonga", "Vanuatu",
+            "Solomon Islands",
+        }
+        self.assertEqual(
+            named,
+            set(Country.objects.filter(is_pacific=True).values_list("name", flat=True)),
+        )
+
+    def test_australia_and_new_zealand_are_not_pacific_nations(self):
+        """They have their own segments; sweeping them into the pooled board
+        would drown the thing it exists to make visible."""
+        from catalog.models import Country
+
+        self.assertFalse(Country.objects.get(code="AU").is_pacific)
+        self.assertFalse(Country.objects.get(code="NZ").is_pacific)
+
+    def test_a_group_counts_for_the_country_it_resolves_to(self):
+        from billing.goodlist import group_counts_by_country
+
+        counts = {r["label"]: r["groups"] for r in group_counts_by_country()}
+        self.assertEqual(counts.get("Papua New Guinea"), 1)
+        self.assertEqual(counts.get("Australia"), 1)
+
+
+class PacificNationsBoardTests(TestCase):
+    """The pooled board the client asked for: PNG, Fiji, Samoa, Tonga, Vanuatu
+    and the Solomons competing as one.
+
+    Each of those countries on its own is far too small to be a leaderboard —
+    that is the whole premise — so what has to be asserted is the POOLING. A
+    test that only checked the per-country rows would pass just as happily
+    against six separate boards, which is the thing this replaced.
+    """
+
+    def setUp(self):
+        from decimal import Decimal
+
+        from django.utils import timezone
+
+        from billing.models import DonationPayment, DonationPledge
+        from catalog.models import Charity, Country, Season
+
+        self.season = Season.objects.create(year=2094, label="2094")
+        self.charity = Charity.objects.create(
+            slug="pacific-aid", name="Pacific Aid", is_approved=True,
+        )
+
+        def org_in(code, name, amount):
+            org = Organisation.objects.create(
+                name=name, season=self.season, charity=self.charity,
+                country=Country.objects.get(code=code),
+            )
+            pledge = DonationPledge.objects.create(
+                org=org, season=self.season, charity=self.charity,
+                pledged_amount_aud=Decimal(amount),
+            )
+            DonationPayment.objects.create(
+                pledge=pledge, org=org, charity=self.charity,
+                amount_aud=Decimal(amount),
+                type=DonationPayment.TYPE_BASE,
+                paid_by=DonationPayment.PAID_BY_OWNER,
+                settled_at=timezone.now(),
+            )
+            return org
+
+        self.png = org_in("PG", "Moresby Mob", "100.00")
+        self.fiji = org_in("FJ", "Suva Crew", "50.00")
+        self.aus = org_in("AU", "Melbourne Office", "900.00")
+
+    def test_the_pacific_countries_are_counted_as_one_board(self):
+        from billing.goodlist import pacific_nations
+
+        board = pacific_nations()
+        self.assertEqual(board["groups"], 2)
+        self.assertEqual(str(board["raised"]), "150.00")
+
+    def test_australia_is_not_swept_into_it(self):
+        """Australia has its own segment and 6x the money here — pooling it in
+        would drown exactly what the board exists to make visible."""
+        from billing.goodlist import pacific_nations
+
+        self.assertNotIn("Australia", [m["label"] for m in pacific_nations()["members"]])
+        self.assertEqual(str(pacific_nations()["raised"]), "150.00")
+
+    def test_the_pooled_total_shows_below_the_privacy_threshold(self):
+        """A single country's row is gated so a total cannot be traced back to
+        one identifiable group. Pooling six countries IS the anonymising step,
+        so gating the pool as well would hide the board for precisely as long
+        as it is most needed — its first season."""
+        from billing.goodlist import pacific_nations
+        from catalog.models import GoodListConfig
+
+        cfg = GoodListConfig.get()
+        cfg.privacy_min_groups = 5
+        cfg.save(update_fields=["privacy_min_groups"])
+
+        board = pacific_nations()
+        self.assertEqual(board["groups"], 2)          # pooled total: shown
+        self.assertEqual(board["members"], [])        # per-country rows: gated
+
+    def test_it_names_the_countries_even_with_no_money_in_yet(self):
+        """The empty state tells people who they would be competing with, so
+        the first group in the Pacific has something to sign up to."""
+        from billing.goodlist import pacific_nations
+
+        self.assertEqual(
+            set(pacific_nations()["countries"]),
+            {"Papua New Guinea", "Fiji", "Samoa", "Tonga", "Vanuatu",
+             "Solomon Islands"},
+        )

@@ -19,7 +19,7 @@ from django.utils.timesince import timesince
 from django.views.decorators.http import require_POST
 
 from accounts.views import JOIN_INVITER_SESSION_KEY, JOIN_SESSION_KEY
-from catalog.models import GroupType
+from catalog.models import Charity, Country, GroupType
 from .forms import InviteByEmailForm, OrgCreateForm, fed_competitions
 from .notifications import send_org_invites
 from .models import (
@@ -41,6 +41,8 @@ from .services import (
     approve_membership_request,
     resend_work_email_code,
     start_work_email_verification,
+    break_charity_vote_tie,
+    can_break_charity_vote_tie,
     can_lock_fundraising,
     cast_charity_ballot,
     close_charity_vote,
@@ -146,35 +148,57 @@ def _requested_parent(request):
 # wants a name or a whole charity policy, and the rail is the only place someone
 # can see what is still ahead of them before committing to start.
 WIZARD_STEPS = [
-    (1, "Your organisation", "Basic details",
-     ["name", "organisation_type", "sub_categories", "informal_label", "state"]),
-    # Step 2 owns no form fields: it is the work-email check, and it is held in
-    # its own table rather than in the draft's JSON because a hashed code with
-    # an expiry, an attempt count and a send count is not a form value. It sits
-    # here, straight after the name, so nobody fills in three more screens
-    # before finding out they cannot prove the organisation is theirs.
-    (2, "Verify", "Prove it's yours", []),
+    # FORMALITY FIRST, ON ITS OWN. The client's report: "everyone gets
+    # funnelled through the same formal-org validation, which is why someone
+    # trying to set up an informal mates' group or family comp with a Gmail
+    # address hits a wall."
+    #
+    # The wall was never a single check — it was that the question deciding
+    # which checks apply sat alongside four other fields on a screen already
+    # phrased for workplaces, so nothing about the form knew it was talking to
+    # a family until it had finished asking a business's questions. On its own
+    # screen, and answered first, it is the branch it always should have been:
+    # everything after this point reads it.
+    (1, "You", "Formal or informal", ["formality"]),
+    (2, "Your organisation", "Basic details",
+     ["name", "organisation_type", "sub_categories", "informal_label",
+      "country", "state"]),
+    # This step owns no form fields: it is the work-email check, and it is held
+    # in its own table rather than in the draft's JSON because a hashed code
+    # with an expiry, an attempt count and a send count is not a form value. It
+    # sits here, straight after the name, so nobody fills in three more screens
+    # before finding out they cannot prove the organisation is theirs. An
+    # informal group never reaches it — see _verification_required.
+    (3, "Verify", "Prove it's yours", []),
     # Asked straight after verification, and before anything about the season
     # or the charity: whether this organisation needs sub-groups is a shape
     # question, like step 1's type, not a setting to bury on a settings page
     # someone has to go looking for after the fact.
-    (3, "Groups", "One ladder, or several",
+    (4, "Groups", "One ladder, or several",
      ["groups_enabled"]),
-    (4, "The tipping", "Scoring & rules",
+    (5, "The tipping", "Scoring & rules",
      ["competitions", "season", "team_size", "finals_only"]),
-    (5, "The charity", "Choose a cause",
+    (6, "The charity", "Choose a cause",
      ["charity_method", "charity", "new_charity_name",
       "new_charity_url", "vote_charities", "vote_opens_at", "vote_closes_at"]),
-    (6, "Review", "Check & create", []),
+    (7, "Review", "Check & create", []),
 ]
-VERIFY_STEP = 2
+VERIFY_STEP = 3
 # The step that collects `competitions`, and so the earliest point at which the
 # feeds to fetch are known. Derived from WIZARD_STEPS rather than written as a
 # 4, so inserting a step ahead of it cannot silently start the prewarm against
 # the wrong screen.
-COMPETITION_STEP = next(
-    (n for n, _label, _sub, fields in WIZARD_STEPS if "competitions" in fields), 4
-)
+def _step_owning(field: str, fallback: int) -> int:
+    return next(
+        (n for n, _label, _sub, fields in WIZARD_STEPS if field in fields), fallback,
+    )
+
+
+COMPETITION_STEP = _step_owning("competitions", 5)
+FORMALITY_STEP = _step_owning("formality", 1)
+DETAILS_STEP = _step_owning("name", 2)
+GROUPS_STEP = _step_owning("groups_enabled", 4)
+CHARITY_STEP = _step_owning("charity_method", 6)
 
 # Types that have a work domain to prove. A book club or a cycling crew has no
 # organisational domain and never will, so requiring one would block exactly the
@@ -193,16 +217,55 @@ def _wizard_fields(step: int) -> list:
     return next((f for n, _, _sub, f in WIZARD_STEPS if n == step), [])
 
 
+def _step_applies(draft, step: int) -> bool:
+    """Is `step` a screen THIS draft has to see at all?
+
+    Only the verify step is ever skipped, and only for a draft that has
+    nothing to verify. Everything else always applies.
+    """
+    if step == VERIFY_STEP:
+        return _verification_required(draft)
+    return True
+
+
+def _advance(draft, step: int, delta: int) -> int:
+    """The next (or previous) step this draft actually has, skipping any it
+    does not.
+
+    Written as a walk rather than as "step + 1, and +1 again if it is the
+    verify step" so that a future optional step cannot be half-handled: the
+    rule is stated once, in _step_applies, and both directions obey it.
+
+    A verify screen that is merely UNENFORCED is not skipped — it is still
+    shown, and an informal group pressing Continue past a page asking them to
+    prove a work domain is precisely the wall the client reported. It has to
+    not be there.
+    """
+    n = step + delta
+    while 1 < n < LAST_STEP and not _step_applies(draft, n):
+        n += delta
+    return max(1, min(n, LAST_STEP))
+
+
 def _verification_required(draft) -> bool:
     """Does this draft have to prove a work domain before it can go on?
 
-    Read off the type chosen at step one. Unknown or unset counts as NOT
-    required: a draft that has not reached the question yet must not be
-    blocked by it, and the gate is re-evaluated on every submit, so choosing
-    Business later still brings the requirement with it.
+    THE INFORMAL ANSWER SETTLES IT ON ITS OWN. A mates' group or a family comp
+    has no organisational domain and never will, so it is excused here before
+    any type is even consulted — the type is chosen on the step AFTER
+    formality, and an informal draft has none until the form fills one in.
+    Reading only the type, as this used to, meant an informal draft looked
+    identical to one that simply had not got that far yet.
+
+    Otherwise read off the type. Unknown or unset counts as NOT required: a
+    draft that has not reached the question yet must not be blocked by it, and
+    the gate is re-evaluated on every submit, so choosing Business later still
+    brings the requirement with it.
     """
     from catalog.models import OrganisationType
 
+    if draft.data.get("formality") == OrgCreateForm.FORMALITY_INFORMAL:
+        return False
     gt_id = draft.data.get("organisation_type")
     if not gt_id or not str(gt_id).isdigit():
         return False
@@ -324,6 +387,17 @@ def _seed_fixtures_for(org) -> None:
             call_command(
                 "sync_matches", fixtures=True, discover=True, org=org_id, verbosity=0,
             )
+            # A league started mid-season has a draw stretching back to March,
+            # and the members already in it joined BEFORE any of it existed —
+            # their backdating ran against an org with no matches and did
+            # nothing. Anyone invited an hour later would be backdated for the
+            # lot, so the founder would sit at the bottom of a ladder of their
+            # own league on a technicality. Run it here, once the fixtures are
+            # actually there. Idempotent, so the later joiners are unaffected.
+            from tipping.services import backdate_missed_tips
+
+            for m in OrgMember.objects.filter(org_id=org_id).select_related("user"):
+                backdate_missed_tips(m.user, m.org)
         except Exception:  # noqa: BLE001 — the scheduled sync will retry
             logger.exception("fixture sync failed for new org %s", org_id)
         finally:
@@ -344,21 +418,43 @@ def _step_intro(step: int, parent_org=None) -> dict:
     the highlighted step and read its label.
     """
     where = f" under {parent_org.name}" if parent_org else ""
+    # KEYED BY THE STEP CONSTANTS, NOT BY 1..6. This dict was written out as
+    # literals and did not move when the formality step was inserted at the
+    # front, so every screen wore the previous screen's heading: the
+    # formal-or-informal question was titled "Naming your organisation", and
+    # the review step got whatever fell off the end.
     intros = {
-        1: ("Naming your organisation",
-            "What it's called, what kind of outfit it is, and where it's based."),
-        2: ("Proving the domain is yours",
-            "A code to an address at your own domain — that's what shows you're on the inside."),
-        3: ("Deciding on groups",
-            "One ladder for everyone, or a separate ladder per team. Either can change later."),
-        4: ("Setting up the tipping",
-            "The competitions you'll tip, and any scoring rules on top of them."),
-        5: ("Choosing the cause",
-            "Pick the charity yourself, or put it to a vote and let the organisation decide."),
-        6: ("Checking it over",
-            "Nothing is created until you press the button. Step back to change anything."),
+        FORMALITY_STEP: (
+            "Formal or informal",
+            "This decides what we ask you for. A mates' comp is not a workplace, "
+            "and should not be made to prove it is.",
+        ),
+        DETAILS_STEP: (
+            "Naming your organisation",
+            "What it's called, what kind of outfit it is, and where it's based.",
+        ),
+        VERIFY_STEP: (
+            "Proving the domain is yours",
+            "A code to an address at your own domain — that's what shows you're on the inside.",
+        ),
+        GROUPS_STEP: (
+            "Deciding on groups",
+            "One ladder for everyone, or a separate ladder per team. Either can change later.",
+        ),
+        COMPETITION_STEP: (
+            "Setting up the tipping",
+            "The competitions you'll tip, and any scoring rules on top of them.",
+        ),
+        CHARITY_STEP: (
+            "Choosing the cause",
+            "Pick the charity yourself, or put it to a vote and let the organisation decide.",
+        ),
+        LAST_STEP: (
+            "Checking it over",
+            "Nothing is created until you press the button. Step back to change anything.",
+        ),
     }
-    eyebrow, sub = intros.get(step, (f"New organisation{where}", "Five short steps."))
+    eyebrow, sub = intros.get(step, (f"New organisation{where}", "A few short steps."))
     return {"eyebrow": f"{eyebrow}{where}", "sub": sub}
 
 
@@ -367,18 +463,24 @@ def _step_saved_message(form, step: int) -> str:
     reading — the generic "Draft saved" already covers the "nothing broke"
     case, so this is the step's own answer to "what did that button do"."""
     data = form.cleaned_data
-    if step == 1:
+    if step == FORMALITY_STEP:
+        return (
+            "Informal group — we'll keep the paperwork out of it."
+            if data.get("formality") == OrgCreateForm.FORMALITY_INFORMAL
+            else "Formal organisation."
+        )
+    if step == DETAILS_STEP:
         return f"“{data.get('name', '').strip()}” saved."
-    if step == 3:
+    if step == GROUPS_STEP:
         return (
             "Groups switched on — members can start their own."
             if data.get("groups_enabled")
             else "Groups: not for now — one ladder for everyone."
         )
-    if step == 4:
+    if step == COMPETITION_STEP:
         n = len(data.get("competitions") or [])
         return f"Tipping set up — {n} competition{'s' if n != 1 else ''} selected."
-    if step == 5:
+    if step == CHARITY_STEP:
         if data.get("charity_method") == "vote":
             n = len(data.get("vote_charities") or [])
             return f"Charity vote set up — {n} option{'s' if n != 1 else ''} on the ballot."
@@ -423,6 +525,15 @@ def create_org_view(request):
     parent_org = _requested_parent(request) or _parent_from_draft(draft)
 
     step = draft.step or 1
+    # A draft can hold a step that stopped applying — someone chose Formal,
+    # reached the verify screen, then went back and chose Informal. Resolve it
+    # before anything else reads it, so the wizard cannot render a screen this
+    # draft is meant to have skipped.
+    if not _step_applies(draft, step):
+        step = _advance(draft, step, +1)
+        if draft.step != step:
+            draft.step = step
+            draft.save(update_fields=["step", "updated_at"])
     errors, duplicates = {}, None
 
     if request.method == "POST":
@@ -451,7 +562,7 @@ def create_org_view(request):
                 if row and not row.is_verified:
                     row.delete()
                     return _create_redirect(parent_org)
-            draft.step = max(1, step - 1)
+            draft.step = _advance(draft, step, -1)
             draft.save()
             return _create_redirect(parent_org)
 
@@ -571,7 +682,7 @@ def create_org_view(request):
                         "is what proves the domain is yours.",
                     )
                     return _create_redirect(parent_org)
-                draft.step = step + 1
+                draft.step = _advance(draft, step, +1)
                 draft.save()
                 return _create_redirect(parent_org)
 
@@ -597,7 +708,7 @@ def create_org_view(request):
             # steps are done and Create is pressed — see _prewarm_fixtures_for.
             if step == COMPETITION_STEP:
                 _prewarm_fixtures_for(form)
-            draft.step = step + 1
+            draft.step = _advance(draft, step, +1)
             draft.save()
             return _create_redirect(parent_org)
 
@@ -761,7 +872,17 @@ def _render_wizard(request, draft, form, step, parent_org, *, errors=None, dupli
         # "verified" tick could not show on the review step.
         "verification": active_work_verification(request.user),
         "verify_required": _verification_required(draft),
+        # Every step the template branches on, by NAME. It used to hardcode
+        # 3, 4 and 5, so inserting the formality step at the front left each
+        # screen rendering the one after it — the tipping fields appearing on
+        # the groups step and the charity step showing nothing at all. Only
+        # verify was passed this way, and only verify survived the insertion.
+        "formality_step": FORMALITY_STEP,
+        "details_step": DETAILS_STEP,
         "verify_step": VERIFY_STEP,
+        "groups_step": GROUPS_STEP,
+        "tipping_step": COMPETITION_STEP,
+        "charity_step": CHARITY_STEP,
         # {"field": "domain"|"work_email"|"role"|None, "message": str}
         "verify_error": verify_error,
         "verify_values": verify_values or {},
@@ -777,7 +898,7 @@ def _render_wizard(request, draft, form, step, parent_org, *, errors=None, dupli
         # "which season is current" logic living in two places.
         "current_season": (
             getattr(form.fields["competitions"].queryset.first(), "season", None)
-            if step == 4 else None
+            if step == COMPETITION_STEP else None
         ),
     })
 
@@ -810,11 +931,25 @@ def _draft_summary(form, draft) -> list:
         return ", ".join(str(o) for o in qs)
 
     d = draft.data
+    # The chosen charity as an OBJECT where there is one, so the review row can
+    # show the same card the picker did. It used to be a bare name in a tinted
+    # row, which read as a warning about the charity rather than as a
+    # read-back of the choice just made.
+    chosen_charity = None
+    if d.get("charity_method") != "vote" and d.get("charity"):
+        chosen_charity = form.fields["charity"].queryset.filter(
+            pk=d.get("charity")
+        ).first()
     charity = (
         "The group votes on it"
         if d.get("charity_method") == "vote"
         else (label_for("charity", d.get("charity")) or d.get("new_charity_name") or "")
     )
+    ballot_charities = list(
+        form.fields["vote_charities"].queryset.filter(
+            pk__in=d.get("vote_charities") or []
+        )
+    ) if d.get("charity_method") == "vote" else []
     # (label, value, icon, colour band). The band is fixed per field rather than
     # computed from the row's position in the final list, so which tint a row
     # gets never shifts around depending on which OTHER rows happened to have
@@ -822,7 +957,15 @@ def _draft_summary(form, draft) -> list:
     # up above it.
     rows = [
         ("Group name", d.get("name", ""), "ic-people", "c1"),
+        (
+            "Setup",
+            {"formal": "Formal — a workplace, school, club or entity",
+             "informal": "Informal — mates, family or a community group"}.get(
+                d.get("formality"), ""),
+            "ic-people", "c1",
+        ),
         ("Type", label_for("organisation_type", d.get("organisation_type")), "ic-org", "c1"),
+        ("Country", label_for("country", d.get("country")), "ic-pin", "c2"),
         ("Sub-category", labels_for("sub_categories", d.get("sub_categories")), "ic-sliders", "c1"),
         ("Described as", d.get("informal_label", ""), "ic-doc", "c2"),
         ("State", label_for("state", d.get("state")) or "National", "ic-pin", "c2"),
@@ -839,10 +982,19 @@ def _draft_summary(form, draft) -> list:
         ("Charity", charity, "ic-heart", "c5"),
         ("On the ballot", labels_for("vote_charities", d.get("vote_charities")), "ic-vote", "c6"),
     ]
-    return [
+    out = [
         {"label": k, "value": v, "icon": icon, "band": band}
         for k, v, icon, band in rows if v
     ]
+    # Hang the charity objects off their rows so the template can render cards
+    # instead of names. Attached rather than passed separately so a row always
+    # travels with whatever it needs to draw itself.
+    for row in out:
+        if row["label"] == "Charity" and chosen_charity is not None:
+            row["charity"] = chosen_charity
+        elif row["label"] == "On the ballot" and ballot_charities:
+            row["charities"] = ballot_charities
+    return out
 
 
 @login_required
@@ -970,6 +1122,11 @@ def charity_vote_view(request, org_id: int):
     turnout_pct = round(ballot_count * 100 / eligible_count) if eligible_count else 0
     results = None
     stats = None
+    # A tied vote is counted but undecided. The screen has to say that plainly
+    # and offer the way out — before this, a tie left the page with no winner,
+    # no tallies and no controls, which read as a page still loading.
+    tied_options = vote.tied_options()
+    can_break_tie = can_break_charity_vote_tie(request.user, vote)
     if vote.status == CharityVote.STATUS_CLOSED:
         # Tallies are revealed only once the vote has closed (blind vote).
         results = list(
@@ -1014,6 +1171,8 @@ def charity_vote_view(request, org_id: int):
         "results": results,
         "stats": stats,
         "is_admin": is_admin,
+        "tied_options": tied_options,
+        "can_break_tie": can_break_tie,
         **partner_ctx,
     })
 
@@ -1047,8 +1206,46 @@ def close_charity_vote_view(request, org_id: int):
         winner = close_charity_vote(vote)
         if winner:
             messages.success(request, f"Vote closed — {winner.name} won.")
+        elif vote.is_tied:
+            # Not an error, and emphatically not silence: voting is over and
+            # the next move belongs to a person.
+            names = ", ".join(o.charity.name for o in vote.tied_options())
+            messages.info(
+                request,
+                f"Voting is closed and it's a tie — {names} finished level. "
+                "A captain or manager needs to make the call.",
+            )
         else:
             messages.error(request, "Vote closed, but no ballots were cast.")
+    return redirect("orgs:charity_vote", org_id=org.id)
+
+
+@login_required
+@require_POST
+def captains_call_view(request, org_id: int):
+    """Break a tied charity election by picking the winner.
+
+    Deliberately NOT gated on _is_creator_admin like the rest of this file.
+    Breaking a tie is the captain's job, and a captain is not necessarily a
+    manager — gating it the usual way would leave the exact person the
+    feature is named after unable to use it. The service decides who may act
+    and refuses anything that is not one of the tied options.
+    """
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _is_member(request.user, org):
+        return HttpResponseForbidden()
+    vote = org.charity_votes.first()
+    if vote is None or not vote.is_tied:
+        return redirect("orgs:charity_vote", org_id=org.id)
+    charity = Charity.objects.filter(pk=request.POST.get("charity")).first()
+    try:
+        winner = break_charity_vote_tie(vote, charity, by_user=request.user)
+        messages.success(
+            request,
+            f"Captain's call made — {winner.name} takes it. Everyone's been told.",
+        )
+    except ValueError as e:
+        messages.error(request, str(e))
     return redirect("orgs:charity_vote", org_id=org.id)
 
 
@@ -2276,12 +2473,21 @@ def groups_view(request, org_id: int):
                 if raw_kind.isdigit() else None
             )
             try:
+                raw_country = request.POST.get("country") or ""
                 group = create_group(
                     root,
                     name=request.POST.get("name", ""),
                     by_user=request.user,
                     kind=kind,
                     label=request.POST.get("label", ""),
+                    # Blank means "same as the organisation" — see
+                    # Group.effective_country. Not defaulted to the org's own
+                    # country here, or a group would stop following the org if
+                    # the org's country were later corrected.
+                    country=(
+                        Country.objects.filter(pk=raw_country, is_active=True).first()
+                        if raw_country.isdigit() else None
+                    ),
                 )
                 if group.is_pending_approval:
                     messages.success(
@@ -2367,6 +2573,7 @@ def groups_view(request, org_id: int):
         "rows": rows,
         "q": q,
         "kind_choices": kind_choices,
+        "countries": Country.objects.filter(is_active=True),
         "is_admin": is_admin,
         "current_group": ctx.current_group(request, root),
         "pending_count": sum(1 for r in rows if r["awaiting_approval"]),

@@ -95,7 +95,51 @@ missed click and got submitted twice.
   </div>
   {% endif %}
 
-  {% if step == 1 %}
+  {% comment %}
+  STEP ONE: FORMAL OR INFORMAL, AND NOTHING ELSE ON THE SCREEN.
+
+  This question decides which rules the rest of the wizard applies, so it is
+  asked before the wizard has applied any. Previously it was implied by the
+  organisation type, which sat on a screen of workplace-shaped fields — so
+  somebody setting up a family comp with a Gmail address met an employer's
+  validation before anything had established they were not an employer.
+
+  Two cards, no dropdown. The whole value of asking first is lost if the
+  answer is buried in a list beside four other questions.
+  {% endcomment %}
+  {% if step == formality_step %}
+  <div class="card pad-lg wiz-card" style="margin-bottom:16px;">
+    <div class="wc-head">
+      <span class="wc-ic" aria-hidden="true"><svg style="stroke:currentColor;fill:none;stroke-width:1.7;"><use href="#ic-people"/></svg></span>
+      <div><h2>First up — what kind of setup is this?</h2><p>It changes what we ask you for. Nothing here is set in stone.</p></div>
+    </div>
+    <div class="opt-grid cols2 formality-grid">
+      <label class="opt-card radio">
+        <input type="radio" name="formality" value="formal"
+               {% if form.formality.value == 'formal' %}checked{% endif %}>
+        <span class="oc-box"></span>
+        <span>
+          <span class="oc-title">Formal</span>
+          <span class="oc-sub">A workplace, school, club or registered entity.</span>
+          <span class="oc-sub" style="margin-top:6px;">We'll ask you to confirm a work email so members know it's really you.</span>
+        </span>
+      </label>
+      <label class="opt-card radio">
+        <input type="radio" name="formality" value="informal"
+               {% if form.formality.value == 'informal' %}checked{% endif %}>
+        <span class="oc-box"></span>
+        <span>
+          <span class="oc-title">Informal</span>
+          <span class="oc-sub">Mates, family, or a community group.</span>
+          <span class="oc-sub" style="margin-top:6px;">No work email, no paperwork — any address is fine.</span>
+        </span>
+      </label>
+    </div>
+    {% if form.formality.errors %}<div class="fld-err">{{ form.formality.errors|join:" " }}</div>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if step == details_step %}
   <div class="card pad-lg wiz-card" style="margin-bottom:16px;">
     <div class="wc-head">
       <span class="wc-ic" aria-hidden="true"><svg style="stroke:currentColor;fill:none;stroke-width:1.7;"><use href="#ic-org"/></svg></span>
@@ -153,7 +197,12 @@ missed click and got submitted twice.
         <ul id="dupeHintList" style="margin:6px 0 0;padding-left:18px;"></ul>
       </div></div>
 
-    <div class="fld"><label for="id_organisation_type">Organisation type</label>
+    {% comment %}
+    Only formal setups choose a type. There is exactly one informal type, so
+    asking an informal group to pick from a list of one is pure friction —
+    the form fills it in (see OrgCreateForm._clean_formality).
+    {% endcomment %}
+    <div class="fld" data-formal-only {% if draft.data.formality == 'informal' %}style="display:none;"{% endif %}><label for="id_organisation_type">Organisation type</label>
       <div class="fld-ic">
         <span class="fi-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -178,7 +227,7 @@ missed click and got submitted twice.
       {% if form.sub_categories.errors %}<div class="fld-err">{{ form.sub_categories.errors|join:" " }}</div>{% endif %}
     </div>
 
-    <div class="fld" data-cat="informal" style="display:none;">
+    <div class="fld" data-cat="informal" {% if draft.data.formality != 'informal' %}style="display:none;"{% endif %}>
       <label for="id_informal_label">What kind of organisation are you?</label>
       <input type="text" name="informal_label" id="id_informal_label" maxlength="60" value="{{ form.informal_label.value|default:'' }}" placeholder="e.g. Book Club, Gaming Group, Cycling Crew">
       <div class="hint">This label shows next to your name on The Good List.</div>
@@ -192,7 +241,31 @@ missed click and got submitted twice.
       </div>
     </div>
 
-    <div class="fld"><label for="id_state">State or territory <span style="color:var(--muted);font-weight:400;">(optional, skip if it's not nationally)</span></label>
+    {% comment %}
+    COUNTRY, AND THE SEGMENT COMES FROM IT. One field, no double entry — the
+    market (Australia / New Zealand / Global) is derived from the answer
+    rather than asked separately. Groups can override it with their own, which
+    is what lets one business cover Sydney, Melbourne and Port Moresby.
+
+    Payment is unaffected: everything stays in AUD whatever is chosen.
+    {% endcomment %}
+    <div class="fld"><label for="id_country">Country</label>
+      <div class="fld-ic">
+        <span class="fi-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z"/>
+          </svg>
+        </span>
+        <select name="country" id="id_country">
+          <option value="">Choose a country</option>
+          {% for co in form.fields.country.queryset %}<option value="{{ co.pk }}" {% if form.country.value|stringformat:'s' == co.pk|stringformat:'s' %}selected{% endif %}>{{ co.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="hint">Where your group is based. Payments stay in AUD wherever you are.</div>
+      {% if form.country.errors %}<div class="fld-err">{{ form.country.errors|join:" " }}</div>{% endif %}
+    </div>
+
+    <div class="fld" data-au-only><label for="id_state">State or territory <span style="color:var(--muted);font-weight:400;">(optional, skip if it's not nationally)</span></label>
       <div class="fld-ic">
         <span class="fi-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -359,7 +432,7 @@ missed click and got submitted twice.
   screen, but it is a shape decision, not a setting to leave buried on a
   settings page nobody visits until they already have the problem it solves.
   {% endcomment %}
-  {% if step == 3 %}
+  {% if step == groups_step %}
   <div class="card pad-lg wiz-card" style="margin-bottom:16px;">
     <div class="wc-head">
       <span class="wc-ic" aria-hidden="true">
@@ -389,7 +462,7 @@ missed click and got submitted twice.
   </div>
   {% endif %}
 
-  {% if step == 4 %}
+  {% if step == tipping_step %}
   <div class="card pad-lg wiz-card" style="margin-bottom:16px;">
     <div class="wc-head">
       <span class="wc-ic" aria-hidden="true"><svg style="stroke:currentColor;fill:none;stroke-width:1.8;"><use href="#ic-trophy"/></svg></span>
@@ -445,7 +518,7 @@ missed click and got submitted twice.
   </div>
   {% endif %}
 
-  {% if step == 5 %}
+  {% if step == charity_step %}
   <div class="card pad-lg wiz-card" style="margin-bottom:16px;">
     <div class="wc-head">
       <span class="wc-ic" aria-hidden="true"><svg style="stroke:currentColor;fill:none;stroke-width:1.8;"><use href="#ic-heart"/></svg></span>
@@ -457,22 +530,59 @@ missed click and got submitted twice.
     </div>
 
     <div data-when="pick" class="show" style="margin-top:14px;">
-      <div class="fld"><label for="id_charity">Choose an approved charity</label>
-        <select name="charity" id="id_charity">
-          <option value="">Choose an approved charity</option>
-          {% for ch in form.fields.charity.queryset %}<option value="{{ ch.pk }}" {% is_checked form.charity ch.pk %}>{{ ch.name }}</option>{% endfor %}
-        </select>
-        {% if form.charity.errors %}<div class="fld-err">{{ form.charity.errors|join:" " }}</div>{% endif %}
+      {% comment %}
+      A CARD GRID, NOT A DROPDOWN. Choosing the cause the whole organisation
+      raises for is the most considered decision in this form, and it was a
+      bare <select> of names — no logo, nothing to recognise a charity by, and
+      no way to see what you were choosing between without opening a list.
+      The card is the same one the ballot and the result use.
+      {% endcomment %}
+      <label>Choose an approved charity</label>
+      <div class="opt-grid cols2 ch-picker" style="margin-top:8px;">
+        {% for ch in form.fields.charity.queryset %}
+        <label class="opt-card radio">
+          <input type="radio" name="charity" value="{{ ch.pk }}" {% is_checked form.charity ch.pk %}
+                 data-charity-url="{{ ch.website }}">
+          <span class="oc-box"></span>
+          {% include "components/_charity_card.html" with charity=ch %}
+        </label>
+        {% endfor %}
       </div>
-      <p class="app-sub" style="margin:10px 0;">Or suggest a new one for approval:</p>
-      <div class="fld-row"><div class="fld"><label for="id_new_charity_name">Charity name</label><input type="text" name="new_charity_name" id="id_new_charity_name" value="{{ form.new_charity_name.value|default:'' }}" placeholder="Charity name">{% if form.new_charity_name.errors %}<div class="fld-err">{{ form.new_charity_name.errors|join:" " }}</div>{% endif %}</div><div class="fld"><label for="id_new_charity_url">Website</label><input type="url" name="new_charity_url" id="id_new_charity_url" value="{{ form.new_charity_url.value|default:'' }}" placeholder="https://"></div></div>
+      {% if form.charity.errors %}<div class="fld-err">{{ form.charity.errors|join:" " }}</div>{% endif %}
+
+      <p class="app-sub" style="margin:16px 0 10px;">Or suggest a new one for approval:</p>
+      <div class="fld-row">
+        <div class="fld">
+          <label for="id_new_charity_name">Charity name</label>
+          <input type="text" name="new_charity_name" id="id_new_charity_name"
+                 value="{{ form.new_charity_name.value|default:'' }}" placeholder="Charity name">
+          {% if form.new_charity_name.errors %}<div class="fld-err">{{ form.new_charity_name.errors|join:" " }}</div>{% endif %}
+        </div>
+        <div class="fld">
+          <label for="id_new_charity_url">Website</label>
+          {% comment %}
+          Filled in from the name as you type — "Beyond Blue" becomes
+          beyondblue.org.au — so nobody has to go and find the link
+          themselves. Still editable: the guess is a starting point, and the
+          field stops guessing the moment it is typed in by hand.
+          {% endcomment %}
+          <input type="url" name="new_charity_url" id="id_new_charity_url"
+                 value="{{ form.new_charity_url.value|default:'' }}" placeholder="https://"
+                 data-url-from="id_new_charity_name">
+          <div class="hint">We'll suggest a web address from the name — change it if it's not right.</div>
+        </div>
+      </div>
     </div>
 
     <div data-when="vote" style="margin-top:14px;">
       <label>Ballot options <span style="color:var(--muted);font-weight:400;">(pick at least 2)</span></label>
       <div class="opt-grid cols2" style="margin-top:8px;">
         {% for ch in form.fields.vote_charities.queryset %}
-        <label class="opt-card"><input type="checkbox" name="vote_charities" value="{{ ch.pk }}" {% is_checked form.vote_charities ch.pk %}><span class="oc-box"><svg><use href="#ic-check"/></svg></span><span class="oc-title">{{ ch.name }}</span></label>
+        <label class="opt-card">
+          <input type="checkbox" name="vote_charities" value="{{ ch.pk }}" {% is_checked form.vote_charities ch.pk %}>
+          <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
+          {% include "components/_charity_card.html" with charity=ch %}
+        </label>
         {% endfor %}
       </div>
       {% if form.vote_charities.errors %}<div class="fld-err">{{ form.vote_charities.errors|join:" " }}</div>{% endif %}
@@ -519,7 +629,22 @@ missed click and got submitted twice.
           <span class="wsum-label">{{ row.label }}</span>
         </span>
         <span class="wsum-r">
-          <span class="wsum-val">{{ row.value }}</span>
+          {% comment %}
+          The charity rows show the same card as the picker did. A name alone
+          in a tinted row was the "charity name in red text, no card or logo"
+          the client reported — the tint is a per-field colour band, but with
+          nothing in the row but a name it reads as a warning about the
+          charity rather than a read-back of the choice.
+          {% endcomment %}
+          {% if row.charity %}
+            {% include "components/_charity_card.html" with charity=row.charity %}
+          {% elif row.charities %}
+            <span class="wsum-chlist">
+              {% for ch in row.charities %}{% include "components/_charity_card.html" with charity=ch %}{% endfor %}
+            </span>
+          {% else %}
+            <span class="wsum-val">{{ row.value }}</span>
+          {% endif %}
           <span class="wsum-check" aria-hidden="true"><svg><use href="#ic-check"/></svg></span>
         </span>
       </div>
@@ -709,6 +834,32 @@ missed click and got submitted twice.
       sync();
     })();
 
+    /* ---- suggest a website from the charity name -----------------------
+       "The URL should auto-generate rather than requiring manual entry" —
+       before this, anyone suggesting a charity had to go and find its address
+       themselves, mid-form.
+
+       Two rules keep the guess honest. It only ever fills a field the user has
+       not typed in, and the moment they do type, it stops guessing for good:
+       an address that rewrites itself under someone correcting it is worse
+       than no address at all. The guess is a plain .org.au from the name,
+       which is what the overwhelming majority of Australian charities use;
+       the server confirms it by actually fetching it before it is stored
+       anywhere (see catalog/logos.py resolve_website). */
+    (function(){
+      var url = document.querySelector('[data-url-from]');
+      if (!url) return;
+      var name = document.getElementById(url.getAttribute('data-url-from'));
+      if (!name) return;
+      var touched = url.value.trim() !== '';
+      url.addEventListener('input', function(){ touched = true; });
+      name.addEventListener('input', function(){
+        if (touched) return;
+        var slug = name.value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+        url.value = slug ? 'https://' + slug + '.org.au' : '';
+      });
+    })();
+
     /* organisation type -> dependent sub-category / informal / charity blocks */
     (function(){
       var typeSel = document.getElementById('id_organisation_type');
@@ -719,8 +870,18 @@ missed click and got submitted twice.
         var o = typeSel.options[typeSel.selectedIndex];
         return o ? (o.getAttribute('data-slug') || '') : '';
       }
+      /* The informal path never picks a type — there is only one — so the
+         select is hidden and empty, and `slug()` is ''. Without this, the
+         self-description field ("what kind of group are you?") would be
+         hidden along with every other type-dependent block, leaving an
+         informal group a screen with nothing on it but a name. */
+      var informal = document.querySelector('input[name="formality"][value="informal"]');
+      function effectiveSlug(){
+        if (informal && informal.checked) return 'informal';
+        return slug();
+      }
       function sync(clear){
-        var s = slug();
+        var s = effectiveSlug();
         document.querySelectorAll('[data-cat]').forEach(function(el){
           el.style.display = el.getAttribute('data-cat').split(' ').indexOf(s) !== -1 ? '' : 'none';
         });
@@ -743,7 +904,33 @@ missed click and got submitted twice.
         });
       });
       typeSel.addEventListener('change', function(){ sync(true); });
+      document.querySelectorAll('input[name="formality"]').forEach(function(r){
+        r.addEventListener('change', function(){
+          var isInformal = informal && informal.checked;
+          document.querySelectorAll('[data-formal-only]').forEach(function(el){
+            el.style.display = isInformal ? 'none' : '';
+          });
+          sync(true);
+        });
+      });
       sync(false); /* keep server-rendered state on validation re-render */
+    })();
+
+    /* State/territory is an Australian question. Asking a Fijian group which
+       Australian state it is in is not merely useless, it reads as the form
+       not having listened to the answer above it. */
+    (function(){
+      var country = document.getElementById('id_country');
+      if (!country) return;
+      function sync(){
+        var label = country.options[country.selectedIndex];
+        var isAU = label && label.text.trim() === 'Australia';
+        document.querySelectorAll('[data-au-only]').forEach(function(el){
+          el.style.display = (isAU || !country.value) ? '' : 'none';
+        });
+      }
+      country.addEventListener('change', sync);
+      sync();
     })();
 
     /* §4 Stage 1 duplicate detection: as the name is typed, surface existing

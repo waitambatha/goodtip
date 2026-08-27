@@ -74,6 +74,8 @@ def _resolve_inviter(org, inviter_id, joining_user):
 
 def add_member(user, org, *, inviter_id=None, role=OrgMember.ROLE_PARTICIPANT) -> OrgMember:
     """Add a user to an org, recording who referred them (if known)."""
+    from tipping.services import backdate_missed_tips
+
     inviter = _resolve_inviter(org, inviter_id, user)
     member, created = OrgMember.objects.get_or_create(
         user=user, org=org, defaults={"role": role, "invited_by": inviter},
@@ -82,6 +84,14 @@ def add_member(user, org, *, inviter_id=None, role=OrgMember.ROLE_PARTICIPANT) -
     if not created and member.invited_by_id is None and inviter is not None:
         member.invited_by = inviter
         member.save(update_fields=["invited_by"])
+    if created:
+        # A mid-season joiner starts on the away side for every round that is
+        # already gone, rather than on nothing. See backdate_missed_tips for
+        # why this cannot be left to the grading-time default.
+        #
+        # Only on the join itself: it is idempotent, but re-running it on
+        # every call would be a full-season scan on each of these.
+        backdate_missed_tips(user, org)
     return member
 
 
@@ -374,36 +384,127 @@ def cast_charity_ballot(*, user, vote: CharityVote, option: CharityVoteOption) -
 
 @transaction.atomic
 def close_charity_vote(vote: CharityVote):
-    """Tally a vote, set the winning charity on the org, and mark it closed.
+    """Tally a vote and either lock in the winner or hand it to a captain.
 
-    Ties are broken by the option with the most votes, then alphabetically by
-    charity name (CharityVoteOption default ordering).
+    A SHARED TOP COUNT IS NOT A RESULT. This used to take
+    ``.order_by("-n").first()``, which on a tie returns whichever row the
+    database felt like returning first — an arbitrary charity, presented to
+    the whole organisation as its decision. Ties are not an edge case here:
+    an even split between two charities is the expected outcome for a group
+    with an even number of people, and a vote nobody turned up to ties every
+    option at nil.
+
+    So a tie stops. The vote moves to ``tied``, no charity is set, nothing is
+    announced as a result, and the people who can break it are asked to. See
+    ``break_charity_vote_tie``.
+
+    Returns the winning charity, or None when the vote is now tied or had no
+    options at all.
     """
     if not vote.is_open:
         return vote.winning_charity
-    tally = vote.options.annotate(n=Count("ballots")).order_by("-n")
-    top = tally.first()
-    winner = top.charity if top else None
-    vote.winning_charity = winner
-    vote.status = "closed"
-    vote.closed_at = timezone.now()
-    vote.save(update_fields=["winning_charity", "status", "closed_at"])
-    if winner is not None:
-        set_org_charity(vote.org, winner, source=OrgCharitySelection.SOURCE_VOTE)
-
+    tally = list(
+        vote.options.select_related("charity")
+        .annotate(n=Count("ballots"))
+        .order_by("-n", "charity__name")
+    )
     from .models import Notification
 
-    if winner is not None:
+    if not tally:
+        # Nothing was ever on the ballot. There is no tie to break and no
+        # winner to find, so this closes with no result, as it always did.
+        vote.status = CharityVote.STATUS_CLOSED
+        vote.closed_at = timezone.now()
+        vote.save(update_fields=["status", "closed_at"])
+        notify(
+            [m.user for m in vote.org.members.select_related("user")], org=vote.org,
+            kind=Notification.KIND_ELECTION_RESULT,
+            title=f"Charity vote closed — {vote.org.name}",
+            message=(
+                "The vote has closed without a result, so no charity was chosen "
+                "this time. Your admin can start another one whenever the "
+                "group's ready."
+            ),
+            link_url=reverse("orgs:charity_vote", args=[vote.org_id]),
+        )
+        return None
+
+    top = tally[0].n
+    tied = [o for o in tally if o.n == top]
+    if len(tied) > 1:
+        vote.status = CharityVote.STATUS_TIED
+        vote.closed_at = timezone.now()
+        vote.save(update_fields=["status", "closed_at"])
+        names = _readable_list([o.charity.name for o in tied])
+        # Everyone hears that voting is over and why there is no winner yet —
+        # silence here is what made the old screen look like it was still
+        # loading. Only the people who can act are told to act.
+        deciders = {m.user_id for m in vote.resolve_by()}
+        for member in vote.org.members.select_related("user"):
+            can_act = member.user_id in deciders
+            notify(
+                [member.user], org=vote.org,
+                kind=Notification.KIND_ELECTION_TIED,
+                title=f"Your charity vote is tied — {vote.org.name}",
+                message=(
+                    f"{names} finished level on {top} vote{'s' if top != 1 else ''}. "
+                    + ("It's your call: pick the one that goes through."
+                       if can_act else
+                       "Your captain will make the call and you'll hear as soon "
+                       "as they have.")
+                ),
+                link_url=reverse("orgs:charity_vote", args=[vote.org_id]),
+            )
+        return None
+
+    return _finish_charity_vote(vote, tally[0].charity)
+
+
+def _readable_list(names) -> str:
+    """"A, B and C" — for a sentence, not a bulleted list."""
+    names = list(names)
+    if len(names) <= 1:
+        return names[0] if names else ""
+    return f"{', '.join(names[:-1])} and {names[-1]}"
+
+
+@transaction.atomic
+def _finish_charity_vote(vote: CharityVote, winner, *, by_user=None):
+    """Lock in ``winner``, tell everyone, and mark the vote closed.
+
+    Shared by the ordinary path (one option had the most votes) and the
+    captain's call, so a tie-broken vote lands in exactly the same state as a
+    clean one — same charity record, same selection history, same
+    announcement. The only difference is that the announcement says who made
+    the call.
+    """
+    from .models import Notification
+
+    vote.winning_charity = winner
+    vote.status = CharityVote.STATUS_CLOSED
+    if vote.closed_at is None:
+        vote.closed_at = timezone.now()
+    fields = ["winning_charity", "status", "closed_at"]
+    if by_user is not None:
+        vote.tie_broken_by = by_user
+        vote.tie_broken_at = timezone.now()
+        fields += ["tie_broken_by", "tie_broken_at"]
+    vote.save(update_fields=fields)
+    set_org_charity(vote.org, winner, source=OrgCharitySelection.SOURCE_VOTE)
+
+    if by_user is not None:
+        who = getattr(by_user, "display_name", "") or by_user.email
+        title = f"{winner.name} takes it — captain's call"
+        body = (
+            f"Your charity vote finished level, so {who} made the call: "
+            f"{vote.org.name} is backing {winner.name}. Everything your "
+            "organisation raises from here goes to them."
+        )
+    else:
         title = f"{winner.name} won your charity vote"
         body = (
             f"{vote.org.name} has chosen {winner.name}. Everything your organisation "
             "raises from here goes to them — thanks for having your say."
-        )
-    else:
-        title = f"Charity vote closed — {vote.org.name}"
-        body = (
-            "The vote has closed without a result, so no charity was chosen this "
-            "time. Your admin can start another one whenever the group's ready."
         )
     notify(
         [m.user for m in vote.org.members.select_related("user")], org=vote.org,
@@ -412,6 +513,31 @@ def close_charity_vote(vote: CharityVote):
         link_url=reverse("orgs:charity_vote", args=[vote.org_id]),
     )
     return winner
+
+
+def can_break_charity_vote_tie(user, vote: CharityVote) -> bool:
+    """Captains, managers and the league owner. See CharityVote.resolve_by."""
+    if not getattr(user, "is_authenticated", False) or not vote.is_tied:
+        return False
+    return vote.resolve_by().filter(user=user).exists()
+
+
+@transaction.atomic
+def break_charity_vote_tie(vote: CharityVote, charity, *, by_user):
+    """The captain's call: pick which of the tied charities goes through.
+
+    Restricted to the options that ACTUALLY tied. A captain resolving a
+    deadlock is breaking a tie, not overriding the vote — letting them reach
+    for an option that came third would make the whole election advisory.
+    """
+    if not vote.is_tied:
+        raise ValueError("That vote isn't tied.")
+    if not can_break_charity_vote_tie(by_user, vote):
+        raise ValueError("Only a captain or manager can make that call.")
+    tied_ids = {o.charity_id for o in vote.tied_options()}
+    if charity is None or charity.pk not in tied_ids:
+        raise ValueError("Pick one of the charities that tied.")
+    return _finish_charity_vote(vote, charity, by_user=by_user)
 
 
 def can_lock_fundraising(org) -> bool:
@@ -670,7 +796,7 @@ def close_due_elections(orgs=None) -> int:
 # the four-step wizard a top-level org goes through.
 
 
-def create_group(org, *, name, by_user, kind=None, label=""):
+def create_group(org, *, name, by_user, kind=None, label="", country=None):
     """Create a group inside ``org``.
 
     Who is asking decides whether it is live or a request. An admin creates it
@@ -709,6 +835,10 @@ def create_group(org, *, name, by_user, kind=None, label=""):
             name=name,
             kind=kind,
             label=(label or "").strip(),
+            # Blank is a real answer, not a missing one: it means "wherever
+            # the organisation is", which Group.effective_country resolves.
+            # Only a group that is somewhere DIFFERENT needs to say so.
+            country=country,
             created_by=by_user,
             approval_status=(
                 Group.APPROVAL_APPROVED if is_admin else Group.APPROVAL_PENDING
@@ -806,7 +936,13 @@ def join_group(group, *, user):
         raise ValueError("That group is still waiting to be approved.")
     if not OrgMember.objects.filter(user=user, org=group.org).exists():
         raise ValueError("You have to be in the organisation first.")
-    member, _ = GroupMember.objects.get_or_create(group=group, user=user)
+    member, created = GroupMember.objects.get_or_create(group=group, user=user)
+    if created:
+        # A group is its own ladder, so it needs its own backdating — the
+        # organisation's rows do not score here. See backdate_missed_tips.
+        from tipping.services import backdate_missed_tips
+
+        backdate_missed_tips(user, group.org, group=group)
     return member
 
 

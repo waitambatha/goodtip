@@ -93,6 +93,112 @@ def by_type() -> list[dict]:
     return _aggregate_by("org__organisation_type__name")
 
 
+def by_country() -> list[dict]:
+    """Raised per country.
+
+    ATTRIBUTED THROUGH THE ORGANISATION, not the group, because money is. A
+    DonationPayment carries an org and no group, so an organisation running
+    offices in two countries has all of its money counted under its own
+    country here. That is a real limitation and worth stating plainly: the
+    group-level country field drives who is in which market (see
+    `group_counts_by_country`), and money follows it only as far as the
+    schema allows. Splitting a multi-country org's money would need
+    DonationPayment to carry the group it came from.
+    """
+    return _aggregate_by("org__country__name")
+
+
+def pacific_nations() -> dict:
+    """The Pacific Nations board: PNG, Fiji, Samoa, Tonga, Vanuatu and the
+    Solomons counted as one.
+
+    A grouping layer over the same country data, not a new source. Its whole
+    reason for existing is scale — each of these countries on its own is far
+    too small to be a leaderboard, and six empty boards is worse than none,
+    but together they are a competition somebody can actually be in.
+
+    Deliberately NOT privacy-gated the way `_aggregate_by` gates a single
+    country. The threshold exists so a total cannot be traced back to one
+    identifiable group; pooling six countries is itself the anonymising step,
+    and applying the per-row gate on top would hide the board for exactly as
+    long as it is most needed. The member countries' individual rows stay
+    gated.
+    """
+    from catalog.models import Country
+
+    codes = list(
+        Country.objects.filter(is_pacific=True, is_active=True)
+        .values_list("code", flat=True)
+    )
+    agg = (
+        _settled()
+        .filter(org__country__code__in=codes)
+        .aggregate(groups=Count("org", distinct=True), raised=Sum("amount_aud"))
+    )
+    members = (
+        _settled()
+        .filter(org__country__code__in=codes)
+        .values("org__country__name")
+        .annotate(groups=Count("org", distinct=True), raised=Sum("amount_aud"))
+        .order_by("-raised")
+    )
+    cfg = GoodListConfig.get()
+    return {
+        "label": "Pacific Nations",
+        "groups": agg["groups"] or 0,
+        "raised": _q(agg["raised"]),
+        # Shown only where a single country clears the privacy threshold on
+        # its own; the pooled total above always shows.
+        "members": [
+            {
+                "label": r["org__country__name"],
+                "groups": r["groups"],
+                "raised": _q(r["raised"]),
+            }
+            for r in members
+            if r["org__country__name"] and r["groups"] >= cfg.privacy_min_groups
+        ],
+        "countries": list(
+            Country.objects.filter(is_pacific=True, is_active=True)
+            .values_list("name", flat=True)
+        ),
+    }
+
+
+def group_counts_by_country() -> list[dict]:
+    """How many GROUPS sit in each country — no money involved.
+
+    This is what the group-level country field buys that org-level could not:
+    a business headquartered in Sydney with a team in Port Moresby shows up in
+    both. Counting groups rather than dollars also means it is live from the
+    first signup in a new market, well before any money has settled — which is
+    the point when knowing where people are is most useful.
+    """
+    from django.db.models import Q
+
+    from catalog.models import Country
+    from orgs.models import Group
+
+    out = []
+    for country in Country.objects.filter(is_active=True):
+        # A group counts for a country when it names it, OR when it names
+        # nothing and its organisation names it — the same fallback
+        # Group.effective_country applies, expressed as a query.
+        n = Group.objects.filter(
+            Q(country=country) | Q(country__isnull=True, org__country=country),
+            approval_status=Group.APPROVAL_APPROVED,
+        ).count()
+        orgs = Organisation.objects.filter(country=country).count()
+        if n or orgs:
+            out.append({
+                "code": country.code, "label": country.name,
+                "segment": country.get_segment_display(),
+                "is_pacific": country.is_pacific,
+                "groups": n, "orgs": orgs,
+            })
+    return out
+
+
 def _consenting_org_totals(
     organisation_type_slug: str | None = None,
     sub_category_slug: str | None = None,
