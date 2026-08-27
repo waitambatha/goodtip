@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from billing.donations import donation_summary
-from orgs.models import OrgMember, Organisation
+from orgs.models import Group, OrgMember, Organisation
 from .models import LadderEntry, Match, Round, Tip
 from .services import (
     annotate_play_state, competition_filter, current_round,
@@ -130,6 +130,7 @@ def tip_round_confirm(request, org_id: int, round_id: int):
     # too. Locking is a property of a match, and submit_tip already enforces it
     # per match, so a late tipper keeps every game that has not begun.
     saved, skipped = 0, 0
+    picks = {}
     for match in round_obj.matches.all():
         selection = request.POST.get(f"match_{match.id}")
         if selection not in ("home", "away"):
@@ -138,6 +139,7 @@ def tip_round_confirm(request, org_id: int, round_id: int):
             submit_tip(user=request.user, match=match, org=org, selection=selection,
                        group=_group(request, org))
             saved += 1
+            picks[match.id] = selection
         except ValueError:
             skipped += 1
     if saved:
@@ -149,6 +151,10 @@ def tip_round_confirm(request, org_id: int, round_id: int):
         messages.error(request, "Those matches have already kicked off — tips there are final.")
     else:
         messages.info(request, "Tap a team on each match to pick it, then press Confirm my tips.")
+    if saved:
+        onward = _carry(request, org, picks)
+        if onward is not None:
+            return onward
     return redirect(dest)
 
 
@@ -208,7 +214,157 @@ def tip_confirm_upcoming(request, org_id: int):
         messages.error(request, "Those matches have already kicked off — tips there are final.")
     else:
         messages.info(request, "Tap a team on each match to pick it, then press Confirm my tips.")
+
+    if saved:
+        onward = _carry(request, org, {
+            mid: request.POST[f"match_{mid}"] for mid in ids if mid in matches
+        })
+        if onward is not None:
+            return onward
     return redirect(f"{reverse('dashboard')}?org={org.id}")
+
+
+# ---------------------------------------------------------------------------
+# Carrying picks into a member's other rooms
+# ---------------------------------------------------------------------------
+CARRY_SESSION_KEY = "tip_carry_pending"
+
+
+def _carry(request, org, picks):
+    """Deal with the member's other rooms after a confirm. See tipping.carry.
+
+    Returns a redirect to the review screen when one is needed, or None to let
+    the caller finish normally — which is what happens for the overwhelming
+    majority: somebody in exactly one room has nothing to carry anywhere, and
+    must not be shown a screen about it.
+    """
+    from accounts.models import User
+
+    from .carry import Room, apply_plan, build_plan
+
+    mode = getattr(request.user, "tip_carry_mode", User.CARRY_ASK)
+    if mode == User.CARRY_NONE:
+        return None
+    source = Room(org=org, group=_group(request, org))
+    plans = [p for p in build_plan(request.user, picks, source) if p.has_work]
+    if not plans:
+        return None
+
+    if mode == User.CARRY_ALL:
+        # "Yes, and never ask me again" carries into rooms with nothing in
+        # them. It deliberately does NOT overwrite a pick that disagrees:
+        # turning off the question is not consent to have a deliberate
+        # different tip replaced, and overriding one is always an explicit
+        # act. Those are reported instead.
+        result = apply_plan(
+            request.user, plans,
+            rooms={p.room.key for p in plans}, overrides=set(),
+        )
+        messages.success(request, _carry_message(result))
+        return None
+
+    request.session[CARRY_SESSION_KEY] = {
+        "org": org.id,
+        "group": source.group.id if source.group else None,
+        "picks": {str(k): v for k, v in picks.items()},
+    }
+    return redirect("tipping:tip_carry", org_id=org.id)
+
+
+def _carry_message(result) -> str:
+    """Plain-language account of what carrying just did."""
+    bits = []
+    if result["carried"]:
+        where = ", ".join(result["rooms"])
+        bits.append(
+            f"{result['carried']} tip{'s' if result['carried'] != 1 else ''} "
+            f"carried across to {where}."
+        )
+    if result["overwritten"]:
+        bits.append(
+            f"{result['overwritten']} existing pick"
+            f"{'s were' if result['overwritten'] != 1 else ' was'} replaced."
+        )
+    if result["kept"]:
+        bits.append(
+            f"{result['kept']} room{'s' if result['kept'] != 1 else ''} kept "
+            "the different pick you'd already made there."
+        )
+    return " ".join(bits) or "Nothing to carry — your other groups were already up to date."
+
+
+@login_required
+def tip_carry_view(request, org_id: int):
+    """Review what carrying would do, then do it.
+
+    A GET renders the plan; a POST applies whichever rooms were ticked. The
+    picks come from the session rather than from hidden fields — they were
+    already saved in the source room by the confirm that redirected here, so
+    re-posting them would be asking the browser to hold state the server
+    already has.
+    """
+    from accounts.models import User
+
+    from .carry import Room, apply_plan, build_plan
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_member(request.user, org):
+        return HttpResponseForbidden()
+
+    pending = request.session.get(CARRY_SESSION_KEY) or {}
+    dest = f"{reverse('dashboard')}?org={org.id}"
+    if pending.get("org") != org.id or not pending.get("picks"):
+        return redirect(dest)
+
+    group = None
+    if pending.get("group"):
+        group = Group.objects.filter(
+            pk=pending["group"], org=org, memberships__user=request.user,
+        ).first()
+    source = Room(org=org, group=group)
+    picks = {int(k): v for k, v in pending["picks"].items()}
+    plans = [p for p in build_plan(request.user, picks, source) if p.has_work]
+    if not plans:
+        request.session.pop(CARRY_SESSION_KEY, None)
+        return redirect(dest)
+
+    if request.method == "POST":
+        remember = request.POST.get("remember")
+        if remember in (User.CARRY_ALL, User.CARRY_NONE):
+            request.user.tip_carry_mode = remember
+            request.user.save(update_fields=["tip_carry_mode"])
+        if request.POST.get("action") == "skip":
+            request.session.pop(CARRY_SESSION_KEY, None)
+            if remember == User.CARRY_NONE:
+                messages.info(
+                    request,
+                    "Got it — from now on your tips stay in the group you make "
+                    "them in. You can change that in your profile.",
+                )
+            return redirect(dest)
+        result = apply_plan(
+            request.user, plans,
+            rooms=set(request.POST.getlist("room")),
+            overrides=set(request.POST.getlist("override")),
+        )
+        request.session.pop(CARRY_SESSION_KEY, None)
+        messages.success(request, _carry_message(result))
+        if remember == User.CARRY_ALL:
+            messages.info(
+                request,
+                "From now on your tips carry across automatically. You can "
+                "change that in your profile.",
+            )
+        return redirect(dest)
+
+    return render(request, "tip_carry.html", {
+        "org": org,
+        "source": source,
+        "plans": plans,
+        "total_rooms": len(plans),
+        "total_changes": sum(p.change_count for p in plans),
+        "conflict_count": sum(len(p.conflicts) for p in plans),
+    })
 
 
 logger = logging.getLogger(__name__)

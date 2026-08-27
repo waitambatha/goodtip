@@ -496,3 +496,583 @@ class MyTipsScopeTests(TestCase):
         r = self.client.get(f"/org/{self.org.id}/tips/?round={self.rnd.id}")
         self.assertEqual(r.context["total_matches"], 4)
         self.assertEqual(r.context["tips_this_round"], 1)
+
+
+class TipCarryTests(TestCase):
+    """One set of picks, landing in every room a member tips in.
+
+    The hard part is not the copy — it is that a Round belongs to an
+    Organisation and a Match belongs to a Round, so every org holds its OWN
+    copy of every fixture. "The same match" is not a row two orgs share; it is
+    an external_id that appears once per org. These tests pin that, and pin
+    the rule that a contradicting pick is never overwritten unasked.
+    """
+
+    def setUp(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from catalog.models import Competition, Season, Series, Sport
+        from orgs.models import Group, GroupMember, OrgMember, Organisation
+        from tipping.models import Match, Round, Team
+
+        self.user = User.objects.create_user(
+            email="carry@example.com", password="x", display_name="Carrie",
+        )
+        season = Season.objects.create(year=2094, label="2094")
+        sport = Sport.objects.create(name="Carry Footy", slug="carry-footy")
+        self.series = Series.objects.create(
+            sport=sport, name="Carry Series", slug="carry-series",
+        )
+        comp = Competition.objects.create(
+            sport=sport, season=season, name="Carry Comp", slug="carry-comp",
+        )
+        comp.series.add(self.series)
+        home = Team.objects.create(name="Pies", slug="carry-pies", series=self.series)
+        away = Team.objects.create(name="Blues", slug="carry-blues", series=self.series)
+        now = timezone.now()
+
+        self.orgs = {}
+        for name, groups_on in (("Work", True), ("Mates", False), ("Family", False)):
+            org = Organisation.objects.create(
+                name=name, season=season, groups_enabled=groups_on,
+            )
+            org.competitions.add(comp)
+            OrgMember.objects.create(user=self.user, org=org)
+            rnd = Round.objects.create(
+                org=org, round_number=1, series=self.series, competition=comp,
+                lockout_at=now + timedelta(days=2),
+            )
+            # The SAME two real fixtures, as this org's own rows.
+            for ext in ("EXT-1", "EXT-2"):
+                Match.objects.create(
+                    round=rnd, home_team=home, away_team=away,
+                    kickoff_at=now + timedelta(days=2), external_id=ext,
+                )
+            self.orgs[name] = org
+        self.group = Group.objects.create(org=self.orgs["Work"], name="Marketing")
+        GroupMember.objects.create(group=self.group, user=self.user)
+        self.client.force_login(self.user)
+
+    def match(self, org_name, ext):
+        from tipping.models import Match
+
+        return Match.objects.get(round__org=self.orgs[org_name], external_id=ext)
+
+    def tip_in(self, org_name, ext, group=None):
+        from tipping.models import Tip
+
+        return Tip.objects.filter(
+            user=self.user, org=self.orgs[org_name], group=group,
+            match__external_id=ext,
+        ).first()
+
+    def confirm_in_work(self):
+        org = self.orgs["Work"]
+        return self.client.post(f"/org/{org.id}/tip/confirm/", {
+            f"match_{self.match('Work', 'EXT-1').id}": "home",
+            f"match_{self.match('Work', 'EXT-2').id}": "home",
+        })
+
+    def carry_url(self):
+        return f"/org/{self.orgs['Work'].id}/tip/carry/"
+
+    def form_values(self, name):
+        import re
+
+        body = self.client.get(self.carry_url()).content.decode()
+        return re.findall(rf'name="{name}" value="([^"]+)"', body)
+
+    # ---- what a room is ------------------------------------------------
+
+    def test_the_organisation_and_its_group_are_separate_rooms(self):
+        """Being in Marketing does not stop you tipping for the company —
+        the room switcher exists so you can do both."""
+        from tipping.carry import rooms_for
+
+        labels = {r.label for r in rooms_for(self.user)}
+        self.assertIn("Work", labels)
+        self.assertIn("Work · Marketing", labels)
+
+    def test_a_group_is_not_a_room_when_the_org_has_groups_off(self):
+        from orgs.models import Group, GroupMember
+        from tipping.carry import rooms_for
+
+        g = Group.objects.create(org=self.orgs["Mates"], name="Hidden")
+        GroupMember.objects.create(group=g, user=self.user)
+        self.assertNotIn(
+            "Mates · Hidden", {r.label for r in rooms_for(self.user)},
+        )
+
+    # ---- the plan ------------------------------------------------------
+
+    def test_picks_are_matched_across_orgs_by_external_id(self):
+        """Each org holds its own row for the same fixture — the plan has to
+        find the right one in each."""
+        from tipping.carry import Room, build_plan
+
+        plans = build_plan(
+            self.user,
+            {self.match("Work", "EXT-1").id: "home"},
+            Room(org=self.orgs["Work"]),
+        )
+        by_label = {p.room.label: p for p in plans}
+        self.assertEqual(
+            by_label["Mates"].writes[0]["match"].id, self.match("Mates", "EXT-1").id,
+        )
+
+    def test_a_fixture_with_no_external_id_cannot_carry(self):
+        from tipping.carry import Room, build_plan
+        from tipping.models import Match
+
+        m = self.match("Work", "EXT-1")
+        Match.objects.filter(pk=m.pk).update(external_id="")
+        m.refresh_from_db()
+        self.assertEqual(build_plan(self.user, {m.id: "home"}, Room(org=self.orgs["Work"])), [])
+
+    def test_an_identical_pick_elsewhere_is_not_a_conflict(self):
+        from tipping.carry import Room, build_plan
+        from tipping.services import submit_tip
+
+        submit_tip(
+            user=self.user, match=self.match("Mates", "EXT-1"),
+            org=self.orgs["Mates"], selection="home",
+        )
+        plans = {
+            p.room.label: p
+            for p in build_plan(
+                self.user, {self.match("Work", "EXT-1").id: "home"},
+                Room(org=self.orgs["Work"]),
+            )
+        }
+        self.assertEqual(plans["Mates"].conflicts, [])
+        self.assertEqual(len(plans["Mates"].unchanged), 1)
+
+    def test_a_different_pick_elsewhere_is_a_conflict(self):
+        from tipping.carry import Room, build_plan
+        from tipping.services import submit_tip
+
+        submit_tip(
+            user=self.user, match=self.match("Mates", "EXT-1"),
+            org=self.orgs["Mates"], selection="away",
+        )
+        plans = {
+            p.room.label: p
+            for p in build_plan(
+                self.user, {self.match("Work", "EXT-1").id: "home"},
+                Room(org=self.orgs["Work"]),
+            )
+        }
+        self.assertEqual(len(plans["Mates"].conflicts), 1)
+        self.assertEqual(plans["Mates"].conflicts[0]["existing"], "away")
+
+    # ---- the review screen ---------------------------------------------
+
+    def test_confirming_sends_a_multi_room_member_to_the_review(self):
+        r = self.confirm_in_work()
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.headers["Location"], self.carry_url())
+
+    def test_a_single_room_member_is_never_shown_it(self):
+        """Nearly everybody. The feature has to stay invisible to them."""
+        from orgs.models import OrgMember
+
+        OrgMember.objects.filter(user=self.user).exclude(
+            org=self.orgs["Work"],
+        ).delete()
+        self.group.memberships.all().delete()
+        r = self.confirm_in_work()
+        self.assertIn("/dashboard/", r.headers["Location"])
+
+    def test_carrying_writes_into_every_ticked_room(self):
+        self.confirm_in_work()
+        self.client.post(self.carry_url(), {
+            "action": "carry", "room": self.form_values("room"),
+        })
+        self.assertEqual(self.tip_in("Mates", "EXT-1").selection, "home")
+        self.assertEqual(self.tip_in("Family", "EXT-2").selection, "home")
+        self.assertEqual(
+            self.tip_in("Work", "EXT-1", group=self.group).selection, "home",
+        )
+
+    def test_an_unticked_room_gets_nothing(self):
+        self.confirm_in_work()
+        rooms = [k for k in self.form_values("room")
+                 if k.startswith(str(self.orgs["Mates"].id))]
+        self.client.post(self.carry_url(), {"action": "carry", "room": rooms})
+        self.assertIsNotNone(self.tip_in("Mates", "EXT-1"))
+        self.assertIsNone(self.tip_in("Family", "EXT-1"))
+
+    # ---- the rule that matters -----------------------------------------
+
+    def test_a_contradicting_pick_survives_a_plain_carry(self):
+        """Somebody who tipped their own club at home and against it at work
+        meant both. Carrying must not quietly reconcile them."""
+        from tipping.services import submit_tip
+
+        submit_tip(
+            user=self.user, match=self.match("Mates", "EXT-1"),
+            org=self.orgs["Mates"], selection="away",
+        )
+        self.confirm_in_work()
+        self.client.post(self.carry_url(), {
+            "action": "carry", "room": self.form_values("room"),
+        })
+        self.assertEqual(self.tip_in("Mates", "EXT-1").selection, "away")
+        # ...while the game with no prior pick still carries.
+        self.assertEqual(self.tip_in("Mates", "EXT-2").selection, "home")
+
+    def test_it_is_replaced_only_when_explicitly_overridden(self):
+        from tipping.services import submit_tip
+
+        submit_tip(
+            user=self.user, match=self.match("Mates", "EXT-1"),
+            org=self.orgs["Mates"], selection="away",
+        )
+        self.confirm_in_work()
+        self.client.post(self.carry_url(), {
+            "action": "carry",
+            "room": self.form_values("room"),
+            "override": self.form_values("override"),
+        })
+        self.assertEqual(self.tip_in("Mates", "EXT-1").selection, "home")
+
+    def test_an_override_for_an_unticked_room_does_nothing(self):
+        """The screen dims those, but the POST must enforce it — an override
+        is meaningless without the room it belongs to."""
+        from tipping.services import submit_tip
+
+        submit_tip(
+            user=self.user, match=self.match("Mates", "EXT-1"),
+            org=self.orgs["Mates"], selection="away",
+        )
+        self.confirm_in_work()
+        self.client.post(self.carry_url(), {
+            "action": "carry", "room": [], "override": self.form_values("override"),
+        })
+        self.assertEqual(self.tip_in("Mates", "EXT-1").selection, "away")
+
+    def test_not_this_time_carries_nothing(self):
+        self.confirm_in_work()
+        self.client.post(self.carry_url(), {"action": "skip"})
+        self.assertIsNone(self.tip_in("Mates", "EXT-1"))
+        # ...but the source room keeps what was confirmed.
+        self.assertEqual(self.tip_in("Work", "EXT-1").selection, "home")
+
+    # ---- remembering the answer ----------------------------------------
+
+    def test_always_skips_the_review_entirely(self):
+        from accounts.models import User
+
+        self.user.tip_carry_mode = User.CARRY_ALL
+        self.user.save(update_fields=["tip_carry_mode"])
+        r = self.confirm_in_work()
+        self.assertIn("/dashboard/", r.headers["Location"])
+        self.assertEqual(self.tip_in("Family", "EXT-1").selection, "home")
+
+    def test_always_still_does_not_overwrite_a_different_pick(self):
+        """Turning the question off is not consent to have a deliberate
+        different tip replaced. Overriding stays an explicit act."""
+        from accounts.models import User
+        from tipping.services import submit_tip
+
+        submit_tip(
+            user=self.user, match=self.match("Mates", "EXT-1"),
+            org=self.orgs["Mates"], selection="away",
+        )
+        self.user.tip_carry_mode = User.CARRY_ALL
+        self.user.save(update_fields=["tip_carry_mode"])
+        self.confirm_in_work()
+        self.assertEqual(self.tip_in("Mates", "EXT-1").selection, "away")
+
+    def test_never_carries_nothing_and_asks_nothing(self):
+        from accounts.models import User
+
+        self.user.tip_carry_mode = User.CARRY_NONE
+        self.user.save(update_fields=["tip_carry_mode"])
+        r = self.confirm_in_work()
+        self.assertIn("/dashboard/", r.headers["Location"])
+        self.assertIsNone(self.tip_in("Mates", "EXT-1"))
+
+    def test_the_review_can_set_the_preference(self):
+        from accounts.models import User
+
+        self.confirm_in_work()
+        self.client.post(self.carry_url(), {
+            "action": "carry", "room": self.form_values("room"), "remember": "all",
+        })
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.tip_carry_mode, User.CARRY_ALL)
+
+    def test_the_preference_is_reversible_from_the_profile(self):
+        """"Never ask me again" has to be undoable somewhere obvious, or it
+        is a trap rather than a preference."""
+        from accounts.models import User
+
+        self.user.tip_carry_mode = User.CARRY_NONE
+        self.user.save(update_fields=["tip_carry_mode"])
+        self.client.post("/profile/", {"tip_carry_mode": User.CARRY_ASK})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.tip_carry_mode, User.CARRY_ASK)
+
+    def test_the_profile_hides_the_setting_from_single_room_members(self):
+        from orgs.models import OrgMember
+
+        OrgMember.objects.filter(user=self.user).exclude(org=self.orgs["Work"]).delete()
+        self.group.memberships.all().delete()
+        body = self.client.get("/profile/").content.decode()
+        self.assertNotIn("Tipping in more than one group", body)
+
+    # ---- safety --------------------------------------------------------
+
+    def test_the_review_cannot_be_opened_for_someone_elses_org(self):
+        other = User.objects.create_user(
+            email="nosy@example.com", password="x", display_name="Nosy",
+        )
+        self.confirm_in_work()
+        self.client.force_login(other)
+        r = self.client.get(self.carry_url())
+        self.assertEqual(r.status_code, 403)
+
+    def test_the_review_redirects_when_there_is_nothing_pending(self):
+        r = self.client.get(self.carry_url())
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("/dashboard/", r.headers["Location"])
+
+
+class RoundInPlayTests(TestCase):
+    """Which round the dashboard calls "this round".
+
+    The client's report: on wildcard finals weekend, with two AFL games on,
+    the confirm sheet read "2 from 9 pick". Nine is a standard home-and-away
+    round, so it looked like finals rounds were being given a regular round's
+    fixture count. They were not — the finals round had its two fixtures and
+    counted them correctly. A DIFFERENT round was being counted.
+    """
+
+    def setUp(self):
+        # Its own sport and series: the real "afl" slug is seeded, and these
+        # tests are about round bookkeeping rather than any particular code.
+        self.sport = Sport.objects.create(name="Wildcard Footy", slug="wc-footy")
+        self.series = Series.objects.create(
+            sport=self.sport, name="Wildcard Premiership", slug="wc-prem",
+        )
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(name="Wildcard FC", season=self.season)
+        self.home = Team.objects.create(name="Blues", slug="blues", series=self.series)
+        self.away = Team.objects.create(name="Pies", slug="pies", series=self.series)
+        self.now = timezone.now()
+
+    def _round(self, number, stage=Round.STAGE_REGULAR):
+        return Round.objects.create(
+            org=self.org, round_number=number, series=self.series, stage=stage,
+            lockout_at=self.now,
+        )
+
+    def _match(self, rnd, *, kickoff, complete):
+        return Match.objects.create(
+            round=rnd, home_team=self.home, away_team=self.away,
+            kickoff_at=kickoff,
+            status=Match.STATUS_COMPLETE if complete else Match.STATUS_SCHEDULED,
+            home_score=30 if complete else None,
+            away_score=10 if complete else None,
+        )
+
+    def _in_play(self):
+        from tipping.services import annotate_play_state, current_round
+
+        return current_round(list(
+            annotate_play_state(Round.objects.filter(org=self.org))
+            .order_by("-round_number")
+        ))
+
+    def test_a_fixture_that_never_got_graded_does_not_pin_the_season(self):
+        """THE BUG. Round 1 kept three fixtures at "scheduled" — a dropped
+        feed, or a game abandoned and never closed out. Five months later
+        those rows still said "not complete", so the earliest round still in
+        play was Round 1, and the stat card offered its 9 games while the
+        slate underneath showed the finals."""
+        march = self._round(1)
+        for _ in range(3):
+            self._match(march, kickoff=self.now - timedelta(days=150), complete=False)
+        for _ in range(6):
+            self._match(march, kickoff=self.now - timedelta(days=150), complete=True)
+
+        finals = self._round(25, stage=Round.STAGE_FINALS)
+        for _ in range(2):
+            self._match(finals, kickoff=self.now + timedelta(days=2), complete=False)
+
+        rnd = self._in_play()
+        self.assertEqual(rnd.round_number, 25)
+        self.assertEqual(rnd.matches.count(), 2)
+
+    def test_a_game_currently_being_played_still_counts(self):
+        """The reason this is a time window and not "kickoff is in the
+        future". A round must not skip forward the moment its last game
+        bounces — Sunday afternoon is exactly when people are watching."""
+        live = self._round(10)
+        self._match(live, kickoff=self.now - timedelta(hours=1), complete=False)
+        later = self._round(11)
+        self._match(later, kickoff=self.now + timedelta(days=6), complete=False)
+
+        self.assertEqual(self._in_play().round_number, 10)
+
+    def test_a_finals_round_is_counted_by_its_own_fixtures(self):
+        """What the client thought was broken, asserted directly so the real
+        fix cannot be mistaken for this one later."""
+        finals = self._round(25, stage=Round.STAGE_FINALS)
+        for _ in range(2):
+            self._match(finals, kickoff=self.now + timedelta(days=1), complete=False)
+
+        self.assertEqual(self._in_play().matches.count(), 2)
+
+    def test_a_finished_season_still_names_a_round(self):
+        """Every round played out: fall back to the most recent rather than
+        leaving the dashboard with no round at all."""
+        done = self._round(24)
+        self._match(done, kickoff=self.now - timedelta(days=9), complete=True)
+
+        self.assertEqual(self._in_play().round_number, 24)
+
+
+class MidSeasonJoinerTests(TestCase):
+    """Somebody joining in round 20 starts on the away side for rounds 1-19,
+    not on nothing.
+
+    Without this they sit on zero for two-thirds of a season they never had a
+    chance at, and the ladder reads as though they played badly rather than
+    that they arrived late.
+    """
+
+    def setUp(self):
+        self.sport = Sport.objects.create(name="Join Footy", slug="join-footy")
+        self.series = Series.objects.create(
+            sport=self.sport, name="Join Premiership", slug="join-prem",
+        )
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(name="Late Starters", season=self.season)
+        self.home = Team.objects.create(name="Reds", slug="j-reds", series=self.series)
+        self.away = Team.objects.create(name="Greens", slug="j-greens", series=self.series)
+        self.now = timezone.now()
+
+        # Two rounds already played out, and one still to come.
+        self.played = []
+        for n in (1, 2):
+            rnd = Round.objects.create(
+                org=self.org, round_number=n, series=self.series,
+                lockout_at=self.now - timedelta(days=40 - n),
+            )
+            m = Match.objects.create(
+                round=rnd, home_team=self.home, away_team=self.away,
+                kickoff_at=self.now - timedelta(days=40 - n),
+            )
+            # Away wins both, so a backdated pick is worth something and the
+            # test can tell scored from merely written.
+            record_match_result(m, 10, 30)
+            self.played.append(m)
+
+        self.upcoming_round = Round.objects.create(
+            org=self.org, round_number=3, series=self.series,
+            lockout_at=self.now + timedelta(days=3),
+        )
+        self.upcoming = Match.objects.create(
+            round=self.upcoming_round, home_team=self.home, away_team=self.away,
+            kickoff_at=self.now + timedelta(days=3),
+        )
+
+    def _join(self, email="late@example.com", **kwargs):
+        from orgs.services import add_member
+
+        user = User.objects.create_user(
+            email=email, password="x", display_name="Latecomer",
+        )
+        add_member(user, self.org, **kwargs)
+        return user
+
+    def test_rounds_already_played_are_backdated_to_the_away_side(self):
+        user = self._join()
+        tips = Tip.objects.filter(user=user, org=self.org, group=None)
+        self.assertEqual(tips.count(), 2)
+        self.assertTrue(all(t.selection == "away" for t in tips))
+
+    def test_the_backdated_picks_are_scored(self):
+        """The whole point. An unscored backdated tip helps nobody."""
+        user = self._join()
+        self.assertEqual(
+            user_org_stats(user, self.org)["points"], 2,   # away won both, 1pt each
+        )
+
+    def test_they_are_flagged_as_auto_so_accuracy_is_untouched(self):
+        """Points include the default; a strike rate is a claim about
+        judgement and cannot include picks the system made."""
+        user = self._join()
+        self.assertTrue(all(
+            t.is_auto for t in Tip.objects.filter(user=user, org=self.org)
+        ))
+        self.assertEqual(user_org_stats(user, self.org)["tips_correct"], 0)
+
+    def test_a_game_they_can_still_tip_is_left_alone(self):
+        """Joining on Friday still lets you pick Saturday yourself."""
+        user = self._join()
+        self.assertFalse(
+            Tip.objects.filter(user=user, match=self.upcoming).exists()
+        )
+
+    def test_a_manager_who_never_tips_is_not_entered(self):
+        from orgs.models import OrgMember
+
+        user = self._join(email="boss@example.com", role=OrgMember.ROLE_MANAGER)
+        self.assertEqual(Tip.objects.filter(user=user, org=self.org).count(), 0)
+
+    def test_running_it_again_changes_nothing(self):
+        from tipping.services import backdate_missed_tips
+
+        user = self._join()
+        before = list(
+            Tip.objects.filter(user=user, org=self.org)
+            .order_by("match_id").values_list("match_id", "selection")
+        )
+        backdate_missed_tips(user, self.org)
+        after = list(
+            Tip.objects.filter(user=user, org=self.org)
+            .order_by("match_id").values_list("match_id", "selection")
+        )
+        self.assertEqual(before, after)
+
+    def test_a_real_pick_is_never_overwritten(self):
+        """Somebody who tipped, left and rejoined keeps what they chose."""
+        from tipping.services import backdate_missed_tips
+
+        user = self._join()
+        tip = Tip.objects.get(user=user, match=self.played[0], group=None)
+        tip.selection = "home"
+        tip.is_auto = False
+        tip.save(update_fields=["selection", "is_auto"])
+
+        backdate_missed_tips(user, self.org)
+        tip.refresh_from_db()
+        self.assertEqual(tip.selection, "home")
+        self.assertFalse(tip.is_auto)
+
+    def test_a_group_is_backdated_on_its_own_ladder(self):
+        """A group scores separately, so the organisation's rows do not cover
+        it — joining both backdates both."""
+        from orgs.services import join_group
+        from orgs.models import Group
+
+        self.org.groups_enabled = True
+        self.org.save(update_fields=["groups_enabled"])
+        group = Group.objects.create(
+            org=self.org, name="Night Shift",
+            approval_status=Group.APPROVAL_APPROVED,
+        )
+        user = self._join()
+        join_group(group, user=user)
+
+        self.assertEqual(
+            Tip.objects.filter(user=user, org=self.org, group=group).count(), 2,
+        )
+        self.assertEqual(
+            Tip.objects.filter(user=user, org=self.org, group=None).count(), 2,
+        )

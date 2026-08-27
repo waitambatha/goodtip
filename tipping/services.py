@@ -1,8 +1,19 @@
 from django.db import transaction
 from django.db.models import Count, Q, Sum, Value
 from django.db.models.functions import Coalesce
+from django.utils import timezone
 
 from .models import Match, Round, Tip
+
+# How long after kickoff a fixture can still honestly be called "yet to be
+# played". Long enough for any AFL or NRL game plus a rain delay and a slow
+# feed; short enough that last season's ungraded rows cannot masquerade as
+# this weekend's football.
+#
+# See annotate_play_state for what goes wrong without it.
+from datetime import timedelta
+
+STILL_RUNNING = timedelta(hours=6)
 
 
 def annotate_play_state(rounds):
@@ -11,12 +22,34 @@ def annotate_play_state(rounds):
     Kept next to ``current_round`` because the two are a pair: calling the
     latter on an unannotated queryset raises AttributeError, and doing the
     counting per round instead would be a query each.
+
+    UNPLAYED MEANS "STILL TO COME", NOT "NEVER GRADED".
+
+    It used to mean the second: any match whose status was not `complete`.
+    That is the same thing only while grading never falls behind, and grading
+    does fall behind — a feed drops three fixtures, or a game is abandoned and
+    nobody closes it out. Those rows sit at `scheduled` forever.
+
+    `current_round` returns the EARLIEST round still in play, so one stale row
+    from March pinned the whole dashboard to March for the rest of the season:
+    in late August, with the finals under way, the round-in-play was AFL Round
+    1 and the stat card read "Tips this round — / 14". The tipping slate sat
+    right underneath showing the two finals games it had worked out for
+    itself, so the screen disagreed with itself by nine games. That is the
+    "2 from 9" the client reported on wildcard weekend, and it was never
+    anything to do with finals: the finals round had its 2 fixtures, correctly,
+    and something else entirely was being counted.
+
+    So a fixture counts as unplayed while it has not finished AND it has not
+    already had its chance to — kickoff still ahead, or recent enough that the
+    game could genuinely still be running.
     """
+    playable = Q(matches__kickoff_at__gt=timezone.now() - STILL_RUNNING)
     return rounds.annotate(
         match_count=Count("matches", distinct=True),
         unplayed=Count(
             "matches",
-            filter=~Q(matches__status=Match.STATUS_COMPLETE),
+            filter=~Q(matches__status=Match.STATUS_COMPLETE) & playable,
             distinct=True,
         ),
     )
@@ -75,6 +108,23 @@ def record_match_result(match: Match, home_score: int, away_score: int) -> int:
         RoundRecap.objects.filter(round=match.round).update(needs_review=True)
     _fill_missed_tips(match)
     return _recalculate_tips_for_match(match)
+
+
+MISSED_TIP_SELECTION = "away"
+"""The side a tip nobody made is given.
+
+The away side specifically, because it has to be a rule nobody can work an
+advantage from — home teams win more often than not, so defaulting to home
+would hand a bonus to whoever skipped the round.
+
+Named here rather than written as a literal in two places, because it is now
+applied from two directions: forward, when a round grades and somebody did not
+tip it (``_fill_missed_tips``), and backward, when somebody joins part-way
+through a season (``backdate_missed_tips``). The client refers to this as the
+"home/away/average missed-tip config" — worth being plain that no such config
+exists: the rule is away, in one constant, and making it selectable per league
+would be a new piece of work rather than a setting to flip.
+"""
 
 
 def _fill_missed_tips(match: Match) -> int:
@@ -148,7 +198,7 @@ def _fill_missed_tips(match: Match) -> int:
         for uid in users - have.get(group_id, set()):
             rows.append(Tip(
                 user_id=uid, match=match, org_id=org_id, group_id=group_id,
-                selection="away", is_auto=True,
+                selection=MISSED_TIP_SELECTION, is_auto=True,
             ))
     if not rows:
         return 0
@@ -159,6 +209,86 @@ def _fill_missed_tips(match: Match) -> int:
         ignore_conflicts=True,
     )
     return len(rows)
+
+
+def backdate_missed_tips(user, org, *, group=None) -> int:
+    """Give a mid-season joiner the away side for every game they could not tip.
+
+    WHY THIS IS NOT JUST ``_fill_missed_tips`` WITH A FILTER REMOVED.
+
+    That function runs when a match grades, and deliberately skips anyone who
+    joined after kickoff — a default is for a tip somebody could have made and
+    did not. It is still right about the matches it sees. But it only ever
+    sees matches grading NOW, so a member who joins in round 20 has rounds 1
+    to 19 graded and gone: nothing will ever revisit them, and the member sits
+    on zero for two-thirds of a season they cannot catch up on. The ladder
+    then reads as though they played badly rather than that they arrived late.
+
+    So the backdating happens once, at the moment of joining, and covers every
+    match already locked. Both halves of the rule stay honest that way: from
+    here forward you are defaulted because you could have tipped and did not;
+    from here backward you are defaulted because you could not have tipped at
+    all.
+
+    WHAT IT DOES NOT DO
+    -------------------
+    Touch a match that can still be tipped. Somebody joining on Friday can
+    still pick Saturday's games themselves, and writing an away tip they would
+    then have to correct is worse than leaving the slate open — that one is
+    ``_fill_missed_tips``'s job if they never get to it.
+
+    Overwrite anything. A tip already in this context is left exactly as it
+    is, which is what makes re-running this safe: rejoining a league, or a
+    second call from a group join, adds nothing the first did not.
+
+    Score dishonestly. Every row is written with ``is_auto=True``, so it pays
+    points — that is the whole point of the default — but is excluded from the
+    accuracy record, which is a claim about judgement and cannot include picks
+    the system made.
+
+    ``group=None`` is the organisation's own ladder, which is a real context
+    rather than a missing one, so joining an org and then a group inside it
+    backdates both — separately, as they are scored.
+    """
+    from orgs.models import OrgMember
+
+    # Same role rule as the forward default: a Team Manager who runs the
+    # league and never makes a pick must not be auto-entered into a season.
+    if not OrgMember.objects.filter(user=user, org=org).exclude(
+        role=OrgMember.ROLE_MANAGER,
+    ).exists():
+        return 0
+
+    now = timezone.now()
+    already = set(
+        Tip.objects.filter(user=user, org=org, group=group)
+        .values_list("match_id", flat=True)
+    )
+    missed = (
+        Match.objects.filter(round__org=org, kickoff_at__lte=now)
+        .exclude(pk__in=already)
+        .select_related("round")
+    )
+    written = []
+    for match in missed:
+        written.append(Tip(
+            user=user, match=match, org=org, group=group,
+            selection=MISSED_TIP_SELECTION, is_auto=True,
+        ))
+    if not written:
+        return 0
+    # ignore_conflicts so a concurrent join cannot raise on the per-context
+    # unique constraint — the row that lands first is as good as this one.
+    Tip.objects.bulk_create(written, ignore_conflicts=True)
+
+    # Grade them. Without this they sit unscored until something else happens
+    # to re-grade the match, which for a round finished in March is never —
+    # and an unscored backdated tip helps nobody, which is the very thing
+    # this exists to fix.
+    for match in {t.match for t in written}:
+        if match.result is not None:
+            _recalculate_tips_for_match(match)
+    return len(written)
 
 
 def _recalculate_tips_for_match(match: Match) -> int:

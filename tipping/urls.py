@@ -11,6 +11,9 @@ urlpatterns = [
     path("<int:org_id>/tip/<int:round_id>/confirm/", views.tip_round_confirm, name="tip_confirm"),
     # Cross-round confirm for the dashboard's "everything still to play" slate.
     path("<int:org_id>/tip/confirm/", views.tip_confirm_upcoming, name="tip_confirm_upcoming"),
+    # Review what carrying this slate into your other groups would do, then
+    # do it. Only ever reached when there IS somewhere else to carry to.
+    path("<int:org_id>/tip/carry/", views.tip_carry_view, name="tip_carry"),
     path("<int:org_id>/tips/", views.my_tips_view, name="my_tips"),
     # In-play score/clock for one fixture. Not org-scoped: the fragment is
     # identical whoever is looking, and it carries no tip.

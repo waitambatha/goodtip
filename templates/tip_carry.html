@@ -1,0 +1,141 @@
+{% extends "app_base.html" %}
+{% block title %}Carry your tips across{% endblock %}
+{% block loader_task %}Checking your other groups{% endblock %}
+{% block body_class %}page-deep sheet-page{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+{% block app_content %}
+{% comment %}
+THE REVIEW BEFORE THE CARRY.
+
+Your picks are already saved in {{ source.label }} — that happened on the
+confirm that sent you here, and nothing on this screen can undo it. This is
+only about the OTHER rooms you tip in.
+
+Conflicts are the reason this screen exists rather than a checkbox. Somebody
+who deliberately tipped their own club in the family comp and against it at
+work meant both, and carrying that away without showing them would destroy a
+decision they cannot get back. So a room with a different pick already in it
+is listed game by game, unticked, and stays as it is unless it is ticked.
+{% endcomment %}
+<div class="app-head">
+  <div>
+    <div class="app-eyebrow">{{ source.label }}</div>
+    <h1 class="app-h1">Carry these tips across?</h1>
+    <p class="app-sub">
+      Your picks are locked in for {{ source.label }}. You're in
+      {{ total_rooms }} other {% if total_rooms == 1 %}group{% else %}groups{% endif %} —
+      we can put the same picks there so you don't have to tip twice.
+    </p>
+  </div>
+</div>
+
+<form method="post" style="max-width:720px;">
+  {% csrf_token %}
+
+  {% for plan in plans %}
+  <div class="card pad-lg carry-room" style="margin-bottom:14px;">
+    <label class="carry-head">
+      {% comment %}
+      Ticked by default, because carrying is what the member asked for by
+      arriving here. The rooms that are NOT safe to assume — the ones with a
+      contradicting pick — are the individual games below, and those start
+      unticked.
+      {% endcomment %}
+      <input type="checkbox" name="room" value="{{ plan.room.key }}" checked>
+      <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
+      <span class="carry-head-body">
+        <span class="oc-title">{{ plan.room.label }}</span>
+        <span class="oc-sub">
+          {% if plan.writes %}{{ plan.writes|length }} tip{{ plan.writes|length|pluralize }} to add{% endif %}
+          {% if plan.writes and plan.conflicts %} · {% endif %}
+          {% if plan.conflicts %}{{ plan.conflicts|length }} already tipped differently{% endif %}
+          {% if plan.unchanged %} · {{ plan.unchanged|length }} already the same{% endif %}
+        </span>
+      </span>
+    </label>
+
+    {% if plan.conflicts %}
+    <div class="carry-conflicts">
+      <p class="carry-warn">
+        <svg aria-hidden="true"><use href="#ic-flag"/></svg>
+        You've already tipped {{ plan.conflicts|length }}
+        {% if plan.conflicts|length == 1 %}of these games{% else %}of these games{% endif %}
+        differently here. We'll leave {% if plan.conflicts|length == 1 %}it{% else %}them{% endif %}
+        alone unless you say otherwise.
+      </p>
+      {% for row in plan.conflicts %}
+      <label class="carry-conflict">
+        <input type="checkbox" name="override" value="{{ plan.room.key }}:{{ row.match.id }}">
+        <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
+        <span class="cc-body">
+          <span class="cc-teams">{{ row.match.home_team.name }} v {{ row.match.away_team.name }}</span>
+          <span class="cc-swap">
+            <span class="cc-was">{% if row.existing == 'home' %}{{ row.match.home_team.name }}{% else %}{{ row.match.away_team.name }}{% endif %}</span>
+            <svg aria-hidden="true"><use href="#ic-arrow-right"/></svg>
+            <span class="cc-now">{% if row.selection == 'home' %}{{ row.match.home_team.name }}{% else %}{{ row.match.away_team.name }}{% endif %}</span>
+          </span>
+        </span>
+      </label>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if plan.blocked %}
+    <p class="carry-note">
+      {{ plan.blocked|length }} game{{ plan.blocked|length|pluralize }} can't carry here —
+      {% if plan.blocked|length == 1 %}it's{% else %}they're{% endif %} already
+      started, or that round isn't open in this group yet.
+    </p>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {% comment %}
+  "Never ask me again" in both directions. The client asked for the yes-forever
+  half; the no-forever half matters just as much, because somebody who keeps
+  their comps deliberately separate should be able to stop being asked too,
+  and a one-way switch would keep interrupting exactly the people who have
+  most clearly said no.
+
+  Note what "always" does NOT do: it never overwrites a contradicting pick.
+  Switching the question off is not consent to have a deliberate different tip
+  replaced — that stays an explicit act, on this screen.
+  {% endcomment %}
+  <div class="card pad-lg" style="margin-bottom:16px;">
+    <div class="app-eyebrow" style="margin-bottom:10px;">While we're here</div>
+    <div class="opt-grid">
+      <label class="opt-card radio">
+        <input type="radio" name="remember" value="" checked>
+        <span class="oc-box"></span>
+        <span><span class="oc-title">Just this once</span><span class="oc-sub">Ask me again next time.</span></span>
+      </label>
+      <label class="opt-card radio">
+        <input type="radio" name="remember" value="all">
+        <span class="oc-box"></span>
+        <span>
+          <span class="oc-title">Always carry my tips across — don't ask again</span>
+          <span class="oc-sub">New picks go to every group automatically. Anywhere you've already tipped differently is left alone.</span>
+        </span>
+      </label>
+      <label class="opt-card radio">
+        <input type="radio" name="remember" value="none">
+        <span class="oc-box"></span>
+        <span>
+          <span class="oc-title">Never — keep my groups separate</span>
+          <span class="oc-sub">Tips only ever count for the group you make them in.</span>
+        </span>
+      </label>
+    </div>
+    <p class="app-sub" style="margin:12px 0 0;">You can change this any time in your profile.</p>
+  </div>
+
+  <div style="display:flex;justify-content:flex-end;gap:12px;flex-wrap:wrap;">
+    <button type="submit" name="action" value="skip" class="abtn abtn-ghost" formnovalidate>
+      Not this time
+    </button>
+    <button type="submit" name="action" value="carry" class="abtn abtn-primary">
+      Carry {{ total_changes }} tip{{ total_changes|pluralize }} across &rarr;
+    </button>
+  </div>
+</form>
+{% endblock %}
