@@ -40,11 +40,23 @@ sudo -u postgres createdb -O "$DB_OWNER" "$STAGING_DB"
 
 # Redirect rather than -f: psql runs as postgres and cannot open a root-owned
 # 0600 file by path.
+# SET ROLE first, so every object the restore creates is OWNED by the app user
+# rather than by postgres. Without it the restore still works and staging still
+# serves -- but GRANT ALL confers reading and writing, not ownership, and
+# ALTER TABLE requires ownership. Staging then cannot run a single migration
+# ("must be owner of table accounts_user"), which surfaces days later on the
+# first deploy that carries a schema change rather than here where it was
+# caused.
 echo "==> restoring verbatim (no scrub)"
-sudo -u postgres psql -q --set ON_ERROR_STOP=on -d "$STAGING_DB" >/dev/null <"$DUMP"
+{ echo "SET ROLE $DB_OWNER;"; cat "$DUMP"; } |
+  sudo -u postgres psql -q --set ON_ERROR_STOP=on -d "$STAGING_DB" >/dev/null
 sudo -u postgres psql -q -d "$STAGING_DB" -c \
   "GRANT ALL ON ALL TABLES IN SCHEMA public TO $DB_OWNER;
    GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO $DB_OWNER;" >/dev/null
+
+# And re-assert it regardless, so a restore run from an older copy of this
+# script, or one interrupted midway, cannot leave staging un-migratable.
+bash "$(dirname "$0")/fix-staging-ownership.sh" >/dev/null
 
 echo "==> syncing media"
 sudo -u "$APP_USER" rsync -a --delete "$PROD_DIR/media/" "$STAGING_DIR/media/"
