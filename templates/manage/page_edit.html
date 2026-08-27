@@ -1,0 +1,131 @@
+{% extends "admin_base.html" %}
+{% block title %}{{ page.title }}. Public pages{% endblock %}
+{% block nav_pages %}on{% endblock %}
+{% block hero_title %}{{ page.title }}{% endblock %}
+{% block hero_lead %}Change the wording. The layout stays as it is.{% endblock %}
+{% block admin_content %}
+
+{% comment %}
+EDITING ONE PAGE.
+
+Each field shows what the site says NOW and, underneath, what it said
+originally. That pairing is doing real work: without it, somebody looking at a
+box full of text cannot tell whether they are reading their own edit or the
+copy we wrote, and the only way to find out was to go and look at the live
+page in another tab.
+
+Grouped by the first part of the slot key ("hero.title", "hero.sub" → Hero), so
+the form reads in the same order as the page rather than as one long column of
+unrelated sentences.
+{% endcomment %}
+
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">
+  <a class="abtn abtn-ghost abtn-sm" href="{% url 'manage:pages' %}">&larr; All pages</a>
+  <a class="abtn abtn-ghost abtn-sm" href="{% url page.url_name %}" target="_blank" rel="noopener">View the live page &rarr;</a>
+</div>
+
+<form method="post" data-busy="Saving your changes">
+  {% csrf_token %}
+  {% for group, slots in groups.items %}
+  <div class="card pad-lg" style="margin-bottom:16px;">
+    <div class="app-eyebrow" style="margin-bottom:14px;">{{ group|title }}</div>
+    {% for slot in slots %}
+    <div class="pe-field">
+      <label for="f-{{ slot.key }}">
+        {{ slot.label }}
+        {% if slot.is_overridden %}<span class="pill-role">edited</span>{% endif %}
+      </label>
+      {% if slot.is_long %}
+      <textarea id="f-{{ slot.key }}" name="slot__{{ slot.key }}" rows="4">{{ slot.value|default:slot.default }}</textarea>
+      {% else %}
+      <input type="text" id="f-{{ slot.key }}" name="slot__{{ slot.key }}"
+             value="{{ slot.value|default:slot.default }}">
+      {% endif %}
+      {% if slot.is_overridden %}
+      <p class="pe-orig">Originally: &ldquo;{{ slot.default }}&rdquo;</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  <div class="pe-save">
+    <button type="submit" class="abtn abtn-primary abtn-lg">Save changes</button>
+    <span class="hint">Clearing a box puts the original wording back.</span>
+  </div>
+</form>
+
+{% comment %}
+PICTURES AND VIDEO.
+
+Two different things share this panel and the copy has to keep them apart. A
+file uploaded into a SLOT replaces the picture the page already shows there.
+A file uploaded with no slot just goes in the library, ready to be pointed at.
+
+"Hide" exists because the page's own pictures live in static files, not here —
+there is no row to delete, so hiding is the only honest way to offer "take that
+one off the page". Delete removes an uploaded file and its bytes for good.
+{% endcomment %}
+<h2 class="sec-h">Pictures and video</h2>
+
+{% if media %}
+<div class="pe-media">
+  {% for m in media %}
+  <div class="pe-m{% if m.is_hidden %} is-hidden{% endif %}">
+    {% if m.is_video %}
+    <video src="{{ m.file.url }}" muted playsinline preload="metadata"></video>
+    {% else %}
+    <img src="{{ m.file.url }}" alt="{{ m.alt }}" loading="lazy">
+    {% endif %}
+    <div class="pe-m-body">
+      <b>{{ m.slot|default:"Library" }}</b>
+      <small>{{ m.get_kind_display }}{% if m.is_hidden %} · hidden{% endif %}</small>
+    </div>
+    <div class="pe-m-acts">
+      {% if m.slot %}
+      <form method="post" action="{% url 'manage:page_media_toggle' page.slug m.id %}">
+        {% csrf_token %}
+        <button type="submit" class="abtn abtn-ghost abtn-sm">{% if m.is_hidden %}Show{% else %}Hide{% endif %}</button>
+      </form>
+      {% endif %}
+      <form method="post" action="{% url 'manage:page_media_delete' page.slug m.id %}"
+            data-confirm="The file is removed for good, and any page pointing at it goes back to the original picture."
+            data-confirm-title="Delete this file?" data-confirm-ok="Delete" data-confirm-danger>
+        {% csrf_token %}
+        <button type="submit" class="abtn abtn-ghost abtn-sm">Delete</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="hint">Nothing uploaded for this page yet — it's using the pictures the site ships with.</p>
+{% endif %}
+
+<div class="card pad-lg" style="max-width:560px;margin-top:16px;">
+  <form method="post" action="{% url 'manage:page_media_upload' page.slug %}"
+        enctype="multipart/form-data" data-busy="Uploading">
+    {% csrf_token %}
+    <div class="fld">
+      <label for="pm-file">Choose a picture or video</label>
+      <input type="file" id="pm-file" name="file" accept="image/*,video/*" required>
+    </div>
+    {% if page.image_slots %}
+    <div class="fld">
+      <label for="pm-slot">Where does it go?</label>
+      <select id="pm-slot" name="slot">
+        <option value="">Just add it to the library</option>
+        {% for s in page.image_slots %}
+        <option value="{{ s }}">Replace the {{ s }} picture</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="fld">
+      <label for="pm-alt">Describe it (for screen readers)</label>
+      <input type="text" id="pm-alt" name="alt" placeholder="e.g. Players celebrating a goal">
+    </div>
+    <button type="submit" class="abtn abtn-primary">Upload</button>
+  </form>
+</div>
+{% endblock %}

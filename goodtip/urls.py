@@ -36,6 +36,18 @@ urlpatterns = [
     path("wall/<int:post_id>/reply/", public_wall_reply, name="public_wall_reply"),
     # The Good List — live, privacy-gated data (no placeholder figures).
     path("leaderboard/", good_list_view, name="good_list"),
+    # About and Privacy are ordinary TemplateViews like their neighbours —
+    # every word on them is a CMS slot, so the client edits the copy from
+    # Manage → Public pages and the view never has to know. See
+    # admin_panel.templatetags.pagecms.
+    path("about/", TemplateView.as_view(
+        template_name="public/about.html",
+        extra_context={"active": "about"},
+    ), name="about"),
+    path("privacy/", TemplateView.as_view(
+        template_name="public/privacy.html",
+        extra_context={"active": "privacy"},
+    ), name="privacy"),
     path("pricing/", TemplateView.as_view(
         template_name="public/pricing.html",
         extra_context={"active": "pricing"},

@@ -15,6 +15,13 @@ urlpatterns = [
     path("sync/", views.sync_panel, name="sync"),
     path("enquiries/", views.enquiries, name="enquiries"),
     path("enquiries/<int:enquiry_id>/", views.enquiry_detail, name="enquiry_detail"),
+    # Public-page copy and media. See admin_panel.pagecms for how the slots
+    # are discovered from the templates themselves.
+    path("pages/", views.pages_list, name="pages"),
+    path("pages/<slug:slug>/", views.page_edit, name="page_edit"),
+    path("pages/<slug:slug>/media/", views.page_media_upload, name="page_media_upload"),
+    path("pages/<slug:slug>/media/<int:media_id>/delete/", views.page_media_delete, name="page_media_delete"),
+    path("pages/<slug:slug>/media/<int:media_id>/toggle/", views.page_media_toggle, name="page_media_toggle"),
     path("news/", views.news_list, name="news"),
     path("news/new/", views.news_new, name="news_new"),
     path("news/upload-image/", views.news_upload_image, name="news_upload_image"),

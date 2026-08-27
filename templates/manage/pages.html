@@ -1,0 +1,38 @@
+{% extends "admin_base.html" %}
+{% block title %}Public pages. Manage{% endblock %}
+{% block nav_pages %}on{% endblock %}
+{% block hero_title %}Public pages{% endblock %}
+{% block hero_lead %}Change the words on the public site yourself.{% endblock %}
+{% block admin_content %}
+
+{% comment %}
+The index. One row per page, each saying how much has been changed on it —
+which is the question somebody arriving here actually has ("did I already edit
+this, or am I thinking of the other page?").
+{% endcomment %}
+
+<div class="card pad-lg" style="margin-bottom:18px;">
+  <p style="margin:0;color:var(--muted);font-size:14px;line-height:1.55;">
+    Edit any wording on the public site without waiting on a developer. The
+    layout stays as it is — you're changing the words in it. Anything you
+    haven't touched shows the original, and clearing a box puts the original
+    back.
+  </p>
+</div>
+
+<div class="gt-rows">
+  {% for p in pages %}
+  <a class="gt-row" href="{% url 'manage:page_edit' p.slug %}">
+    <span class="gr-body">
+      <b>{{ p.title }}</b>
+      <small>
+        {{ p.slots|length }} editable bit{{ p.slots|length|pluralize }}
+        {% if p.edited_count %} &middot; {{ p.edited_count }} changed{% else %} &middot; all original{% endif %}
+        {% if p.image_slots %} &middot; {{ p.image_slots|length }} picture slot{{ p.image_slots|length|pluralize }}{% endif %}
+      </small>
+    </span>
+    <span class="gr-go">Edit &rarr;</span>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

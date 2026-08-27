@@ -281,3 +281,117 @@ class NewsEditorTests(TestCase):
         self.client.post(reverse("manage:news_edit", args=[post.id]), self._post())
         post.refresh_from_db()
         self.assertEqual(post.image.name, "news/hero.jpg")
+
+
+class PageCMSTests(TestCase):
+    """The client editing their own copy.
+
+    The property worth pinning is the one the whole design rests on: the
+    template owns the words, this table only ever holds an override, and an
+    empty table renders the site exactly as shipped.
+    """
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        self.staff = User.objects.create_user(
+            email="editor@goodtip.test", password="x", display_name="Editor",
+        )
+        self.staff.is_staff = True
+        self.staff.is_superuser = True
+        self.staff.save(update_fields=["is_staff", "is_superuser"])
+        self.client.force_login(self.staff)
+
+    def test_slots_are_discovered_from_the_templates(self):
+        from admin_panel import pagecms
+
+        for slug in ("home", "how", "pricing", "about", "privacy"):
+            info = pagecms.discover(slug)
+            self.assertIsNotNone(info, slug)
+            self.assertTrue(info.slots, f"{slug} has no editable copy")
+
+    def test_an_empty_table_renders_the_original_words(self):
+        from admin_panel.models import PageText
+
+        self.assertEqual(PageText.objects.count(), 0)
+        body = self.client.get("/about/").content.decode()
+        self.assertIn("The comp you already run", body)
+
+    def test_an_override_replaces_the_default_on_the_live_page(self):
+        from admin_panel.models import PageText
+
+        PageText.objects.create(
+            page="about", key="hero.sub", value="Completely different words.",
+        )
+        body = self.client.get("/about/").content.decode()
+        self.assertIn("Completely different words.", body)
+        self.assertNotIn("GoodTip started with a simple observation", body)
+
+    def test_an_override_is_escaped(self):
+        """Staff access must not be a stored-XSS primitive on the public site."""
+        from admin_panel.models import PageText
+
+        PageText.objects.create(
+            page="about", key="hero.sub", value="<script>alert(1)</script>",
+        )
+        body = self.client.get("/about/").content.decode()
+        self.assertNotIn("<script>alert(1)</script>", body)
+        self.assertIn("&lt;script&gt;", body)
+
+    def test_saving_only_stores_what_differs_from_the_default(self):
+        from admin_panel import pagecms
+        from admin_panel.models import PageText
+
+        info = pagecms.discover("about")
+        data = {f"slot__{s.key}": s.default for s in info.slots}
+        data["slot__hero.sub"] = "A new opening line."
+        self.client.post(reverse("manage:page_edit", args=["about"]), data)
+
+        # One row, not one per slot: the table means "what the client changed".
+        self.assertEqual(PageText.objects.filter(page="about").count(), 1)
+        self.assertEqual(PageText.objects.get(page="about").key, "hero.sub")
+
+    def test_clearing_a_box_puts_the_original_back(self):
+        from admin_panel import pagecms
+        from admin_panel.models import PageText
+
+        PageText.objects.create(page="about", key="hero.sub", value="Temporary.")
+        info = pagecms.discover("about")
+        data = {f"slot__{s.key}": s.default for s in info.slots}
+        data["slot__hero.sub"] = ""
+        self.client.post(reverse("manage:page_edit", args=["about"]), data)
+
+        self.assertFalse(PageText.objects.filter(page="about", key="hero.sub").exists())
+        body = self.client.get("/about/").content.decode()
+        self.assertIn("GoodTip started with a simple observation", body)
+
+    def test_a_blank_override_never_leaves_a_hole_on_the_page(self):
+        from admin_panel.models import PageText
+
+        PageText.objects.create(page="about", key="hero.title", value="")
+        body = self.client.get("/about/").content.decode()
+        self.assertIn("The comp you already run", body)
+
+    def test_the_editor_needs_staff(self):
+        from django.contrib.auth import get_user_model
+
+        member = get_user_model().objects.create_user(
+            email="member@goodtip.test", password="x", display_name="Member",
+        )
+        self.client.force_login(member)
+        resp = self.client.get(reverse("manage:page_edit", args=["about"]))
+        self.assertEqual(resp.status_code, 302)         # bounced to admin login
+
+    def test_an_unknown_page_is_a_404(self):
+        resp = self.client.get(reverse("manage:page_edit", args=["nope"]))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_the_new_public_pages_are_reachable(self):
+        for path in ("/about/", "/privacy/"):
+            self.assertEqual(self.client.get(path).status_code, 200, path)
+
+    def test_the_footer_privacy_link_is_no_longer_dead(self):
+        body = self.client.get("/").content.decode()
+        self.assertIn('href="/privacy/"', body)
+        self.assertIn('href="/about/"', body)

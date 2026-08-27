@@ -5,13 +5,17 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.files.storage import default_storage
 from django.db.models import Q
-from django.http import HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.html import linebreaks, strip_tags
 
 from catalog.models import Charity, Competition, Season, Series, Sport
+from django.views.decorators.http import require_POST
+
+from . import pagecms
+from .models import PageMedia, PageText
 from data_sync.models import SyncRun, SyncSchedule
 from data_sync.services import get_sync_service, SyncError
 from orgs.services import unique_charity_slug as _unique_charity_slug
@@ -684,3 +688,129 @@ def enquiry_detail(request, enquiry_id):
         return redirect("manage:enquiries")
 
     return render(request, "manage/enquiry_detail.html", {"enquiry": enquiry})
+
+
+# ---------------------------------------------------------------------------
+# Public pages — the client edits their own copy
+# ---------------------------------------------------------------------------
+#
+# The problem this solves, in the client's words: they read the site, wanted a
+# word changed, and had to come to us — a developer, a commit and a deploy, to
+# alter a sentence.
+#
+# What it deliberately does NOT let them do is move things. Copy changes
+# weekly; structure is what breaks when it does. So the template keeps the
+# layout AND the original words (see admin_panel.templatetags.pagecms), and
+# these screens only ever write an override. Deleting one puts the page back.
+
+
+@staff_member_required
+def pages_list(request):
+    """Every editable public page, with how much has been changed on each."""
+    return render(request, "manage/pages.html", {"pages": pagecms.all_pages()})
+
+
+@staff_member_required
+def page_edit(request, slug: str):
+    """Edit one page's copy and its pictures.
+
+    Saving writes only what DIFFERS from the template's default, and clears
+    the row for anything set back to it. That keeps the table meaning "here
+    is what the client changed" rather than "here is a copy of the site" —
+    which matters the day a developer improves a default and every page is
+    still silently serving a year-old duplicate of it.
+    """
+    info = pagecms.discover(slug)
+    if info is None:
+        raise Http404("No such page.")
+
+    if request.method == "POST":
+        changed = cleared = 0
+        for slot in info.slots:
+            posted = (request.POST.get(f"slot__{slot.key}") or "").strip()
+            if posted and posted != slot.default:
+                _, created = PageText.objects.update_or_create(
+                    page=slug, key=slot.key,
+                    defaults={"value": posted, "updated_by": request.user},
+                )
+                changed += 1
+            else:
+                # Empty, or identical to the default — either way there is
+                # nothing to override. Blank is "put it back", not "leave a
+                # hole on the live site"; the tag treats it the same way.
+                cleared += PageText.objects.filter(page=slug, key=slot.key).delete()[0]
+        bits = []
+        if changed:
+            bits.append(f"{changed} change{'s' if changed != 1 else ''} saved")
+        if cleared:
+            bits.append(f"{cleared} back to the original")
+        messages.success(request, f"{info.title}: {' · '.join(bits) or 'nothing changed'}.")
+        return redirect("manage:page_edit", slug=slug)
+
+    groups = {}
+    for slot in info.slots:
+        groups.setdefault(slot.group or "Page", []).append(slot)
+    return render(request, "manage/page_edit.html", {
+        "page": info,
+        "groups": groups,
+        "media": PageMedia.objects.filter(page=slug),
+    })
+
+
+@staff_member_required
+@require_POST
+def page_media_upload(request, slug: str):
+    """Add a picture or a video to a page, or replace the one in a slot."""
+    if pagecms.PAGES_BY_SLUG.get(slug) is None:
+        raise Http404("No such page.")
+    upload = request.FILES.get("file")
+    if upload is None:
+        messages.error(request, "Choose a file first.")
+        return redirect("manage:page_edit", slug=slug)
+
+    name = upload.name.lower()
+    kind = (
+        PageMedia.KIND_VIDEO
+        if name.endswith((".mp4", ".webm", ".mov", ".m4v"))
+        else PageMedia.KIND_IMAGE
+    )
+    PageMedia.objects.create(
+        page=slug,
+        slot=(request.POST.get("slot") or "").strip(),
+        kind=kind,
+        file=upload,
+        alt=(request.POST.get("alt") or "").strip(),
+        uploaded_by=request.user,
+    )
+    messages.success(request, f"{upload.name} uploaded.")
+    return redirect("manage:page_edit", slug=slug)
+
+
+@staff_member_required
+@require_POST
+def page_media_delete(request, slug: str, media_id: int):
+    """Remove an uploaded file for good, and its bytes with it."""
+    row = get_object_or_404(PageMedia, pk=media_id, page=slug)
+    label = row.file.name.rsplit("/", 1)[-1]
+    # Delete the file too. A CMS that drops the row and leaves the bytes on
+    # disk turns "delete this photo" into "hide this photo", which is not what
+    # anybody means by it — least of all somebody removing a picture because
+    # they no longer have the right to publish it.
+    row.file.delete(save=False)
+    row.delete()
+    messages.success(request, f"{label} deleted.")
+    return redirect("manage:page_edit", slug=slug)
+
+
+@staff_member_required
+@require_POST
+def page_media_toggle(request, slug: str, media_id: int):
+    """Show or hide a slot's picture without deleting it."""
+    row = get_object_or_404(PageMedia, pk=media_id, page=slug)
+    row.is_hidden = not row.is_hidden
+    row.save(update_fields=["is_hidden"])
+    messages.success(
+        request,
+        f"Picture {'hidden' if row.is_hidden else 'showing'} on {slug}.",
+    )
+    return redirect("manage:page_edit", slug=slug)

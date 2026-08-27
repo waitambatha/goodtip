@@ -136,3 +136,101 @@ class Enquiry(models.Model):
     @property
     def is_answered(self) -> bool:
         return self.status == self.STATUS_REPLIED
+
+
+class PageText(models.Model):
+    """One editable piece of copy on a public page.
+
+    WHY THIS EXISTS. The client read the site, wanted a word changed, and had
+    to ask us — which meant a developer, a commit, and a deploy, to alter a
+    sentence. That is the wrong shape for copy. It is the right shape for
+    layout, and the distinction is what this model is built around: the
+    TEMPLATE still owns the structure and the original words, and this table
+    only ever holds an override.
+
+    Consequences of that choice, all deliberate:
+
+    * An empty table renders the site exactly as it is today. Nothing has to
+      be seeded, and a lost database costs no copy.
+    * Deleting a row is "put it back how it was", which is the undo people
+      actually ask for.
+    * A slot that is removed from a template simply stops being read. No
+      orphan cleanup, no broken page.
+
+    The value is stored as plain text and escaped on output. Letting the
+    client paste HTML here would hand anyone with staff access a stored-XSS
+    primitive on the public site, in exchange for formatting that the layout
+    already provides.
+    """
+
+    page = models.CharField(max_length=40)
+    # Dotted, e.g. "hero.title". Namespacing by hand rather than by nesting
+    # tables: the editor groups on the prefix, and a two-level model would
+    # have bought nothing except joins.
+    key = models.CharField(max_length=80)
+    value = models.TextField(blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name="page_texts_edited", null=True, blank=True,
+    )
+
+    class Meta:
+        ordering = ["page", "key"]
+        constraints = [
+            models.UniqueConstraint(fields=["page", "key"], name="uniq_page_text_slot"),
+        ]
+        verbose_name = "page text"
+        verbose_name_plural = "page text"
+
+    def __str__(self):
+        return f"{self.page}.{self.key}"
+
+
+class PageMedia(models.Model):
+    """An image or video the client put on a public page, or wants gone.
+
+    Two jobs in one table, which is why `slot` may be blank:
+
+    * A slot-filling upload REPLACES the picture a template already points at
+      — same position, same crop, different photograph.
+    * A slot-less upload is a file in the library, uploaded so it can be
+      pointed at from somewhere else.
+
+    Removing a template's own built-in image is done with `is_hidden` rather
+    than by deleting anything, because there is nothing to delete: the
+    original lives in static files, not here. Hiding it is the only honest
+    representation of "take that picture off the page".
+    """
+
+    KIND_IMAGE = "image"
+    KIND_VIDEO = "video"
+    KIND_CHOICES = [(KIND_IMAGE, "Image"), (KIND_VIDEO, "Video")]
+
+    page = models.CharField(max_length=40)
+    slot = models.CharField(max_length=80, blank=True)
+    kind = models.CharField(max_length=6, choices=KIND_CHOICES, default=KIND_IMAGE)
+    file = models.FileField(upload_to="pages/")
+    # Not optional in spirit even though it is in the schema: an empty alt on
+    # a decorative image is a real answer, but an empty alt on a photograph
+    # that carries meaning is a page that excludes people.
+    alt = models.CharField(max_length=200, blank=True)
+    is_hidden = models.BooleanField(default=False)
+    sort_order = models.PositiveIntegerField(default=0)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name="page_media_uploaded", null=True, blank=True,
+    )
+
+    class Meta:
+        ordering = ["page", "slot", "sort_order", "-uploaded_at"]
+        verbose_name = "page media"
+        verbose_name_plural = "page media"
+
+    def __str__(self):
+        return f"{self.page}/{self.slot or 'library'} — {self.file.name}"
+
+    @property
+    def is_video(self) -> bool:
+        return self.kind == self.KIND_VIDEO
