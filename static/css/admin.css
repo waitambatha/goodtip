@@ -1,0 +1,332 @@
+/* ============================================================================
+   GOODTIP ADMIN SKIN
+   ----------------------------------------------------------------------------
+   Django's admin, wearing the product's own clothes.
+
+   WHAT THIS IS AND IS NOT. It is a re-skin: same markup, same behaviour, same
+   keyboard paths, restyled. It is NOT a rebuild of the admin, and nothing here
+   changes what a control does — an admin who knows Django's admin still knows
+   this one, which is the whole reason to re-skin rather than replace. Every
+   rule below targets a selector Django itself emits.
+
+   The default admin is not ugly so much as ANONYMOUS: the same blue-grey as a
+   hundred thousand other Django sites, sitting one click away from a product
+   with a strong identity. Somebody moving between the member app and the
+   control plane felt like they had left the product. Same palette, same
+   typefaces, same green.
+
+   Kept deliberately: Django's information density. An admin is a tool for
+   people who use it all day, and airy line-height and generous padding — the
+   instinct when "making something attractive" — would mean fewer rows per
+   screen on the exact screens where more rows is the point.
+
+   VARIABLES. Django 4.2+ themes its own admin through CSS custom properties on
+   :root, so most of the work below is restating those in brand colours rather
+   than out-specificity-ing rules one at a time. Where a component predates
+   that system, it is styled directly and says so.
+   ========================================================================= */
+
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Black&display=swap");
+
+:root {
+  --gt-deep:   #0F2E22;
+  --gt-deep-2: #0B2319;
+  --gt-panel:  #152B1E;
+  --gt-forest: #2D7A3A;
+  --gt-lime:   #C8F135;
+  --gt-cream:  #E8E4D5;
+  --gt-cream-2:#F2EFE6;
+  --gt-ink:    #0F2E22;
+  --gt-muted:  #6B7A6E;
+  --gt-line:   rgba(15,46,34,.13);
+  --gt-body:   'Archivo', system-ui, -apple-system, sans-serif;
+  --gt-display:'Archivo Black', system-ui, sans-serif;
+
+  /* ---- Django's own admin theme variables, restated ---- */
+  --primary:            var(--gt-deep);
+  --secondary:          var(--gt-deep);
+  --accent:             var(--gt-lime);
+  --primary-fg:         #ffffff;
+
+  --header-color:       var(--gt-cream);
+  --header-branding-color: var(--gt-lime);
+  --header-bg:          var(--gt-deep);
+  --header-link-color:  #ffffff;
+
+  --breadcrumbs-fg:     var(--gt-cream);
+  --breadcrumbs-link-fg: #ffffff;
+  --breadcrumbs-bg:     var(--gt-panel);
+
+  --link-fg:            var(--gt-forest);
+  --link-hover-color:   var(--gt-deep);
+  --link-selected-fg:   var(--gt-deep);
+
+  --body-fg:            #23281f;
+  --body-bg:            #F7F6F0;
+  --body-quiet-color:   var(--gt-muted);
+  --body-loud-color:    var(--gt-ink);
+
+  --hairline-color:     var(--gt-line);
+  --border-color:       var(--gt-line);
+
+  --button-bg:          var(--gt-forest);
+  --button-fg:          #ffffff;
+  --button-hover-bg:    var(--gt-deep);
+  --default-button-bg:  var(--gt-deep);
+  --default-button-hover-bg: var(--gt-forest);
+  --close-button-bg:    var(--gt-muted);
+  --close-button-hover-bg: #4d594f;
+  --delete-button-bg:   #B3341F;
+  --delete-button-hover-bg: #8E2818;
+
+  --object-tools-bg:    var(--gt-forest);
+  --object-tools-fg:    #ffffff;
+  --object-tools-hover-bg: var(--gt-deep);
+
+  --selected-bg:        #EAF3E4;
+  --selected-row:       #FBF6D8;
+  --darkened-bg:        var(--gt-cream-2);
+
+  --message-success-bg: #E4F1DC;
+  --message-warning-bg: #FBF0D4;
+  --message-error-bg:   #F7DFDB;
+}
+
+body, input, select, textarea, button, .button {
+  font-family: var(--gt-body);
+}
+
+/* ---- Masthead --------------------------------------------------------------
+   The wordmark is set in the display face and given the lime, so the control
+   plane opens with the same two marks as the front door. */
+#header {
+  background: var(--gt-deep);
+  border-bottom: 3px solid var(--gt-lime);
+  padding: 13px 40px;
+}
+#branding h1, #site-name {
+  font-family: var(--gt-display);
+  font-size: 19px;
+  letter-spacing: .01em;
+}
+#branding h1 a:link, #branding h1 a:visited { color: var(--gt-lime); }
+#user-tools { font-size: 12.5px; color: var(--gt-cream); }
+#user-tools a { border-bottom-color: rgba(200,241,53,.5); }
+#user-tools a:hover { color: var(--gt-lime); border-bottom-color: var(--gt-lime); }
+
+div.breadcrumbs {
+  background: var(--gt-panel);
+  color: var(--gt-cream);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  padding: 9px 40px;
+  font-size: 12.5px;
+}
+
+/* ---- Modules ---------------------------------------------------------------
+   A card, not a boxed table. The rounded corner and the hairline do the
+   separating that the old grey caption bar did with colour. */
+.module {
+  background: #fff;
+  border: 1px solid var(--gt-line);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15,46,34,.04);
+  margin-bottom: 18px;
+}
+.module h2, .module caption, .inline-group h2 {
+  background: var(--gt-cream-2);
+  color: var(--gt-ink);
+  font-family: var(--gt-body);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--gt-line);
+}
+.module caption a, .module h2 a { color: var(--gt-forest); }
+
+/* App list on the index: the app name is the thing being scanned, so it gets
+   the weight, and the row is the target rather than just the link text. */
+.dashboard .module table th { font-weight: 600; }
+.dashboard .module table td a, .dashboard .module table th a { display: block; padding: 9px 14px; }
+.dashboard .module table tr:hover { background: var(--gt-cream-2); }
+
+/* ---- Tables ----------------------------------------------------------------
+   Density preserved on purpose — see the note at the top. The only changes are
+   a quieter header, a real hover, and tabular numerals so columns of ids and
+   money line up instead of shimmering. */
+#changelist table thead th {
+  background: var(--gt-cream-2);
+  border-bottom: 1px solid var(--gt-line);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--gt-muted);
+}
+#changelist table thead th a { color: var(--gt-ink); }
+#changelist tbody tr:hover { background: #FAFBF7; }
+#changelist tbody td, #changelist tbody th { border-bottom: 1px solid var(--gt-line); }
+#changelist td.field-id, #changelist td[class*="field-"] time,
+.field-amount_aud, .field-total_disbursed_aud {
+  font-variant-numeric: tabular-nums;
+}
+#changelist-filter { background: #fff; border-left: 1px solid var(--gt-line); }
+#changelist-filter h2 {
+  background: var(--gt-cream-2); color: var(--gt-ink);
+  font-size: 11px; letter-spacing: .07em;
+}
+#changelist-filter li.selected a { color: var(--gt-forest); font-weight: 700; }
+#toolbar { background: var(--gt-cream-2); border-bottom: 1px solid var(--gt-line); padding: 9px 12px; }
+#toolbar input[type="text"] { border-radius: 7px; border: 1px solid var(--gt-line); padding: 6px 9px; }
+
+/* ---- Buttons ---------------------------------------------------------------
+   Rounded to match the product's own, and given a real pressed state. Delete
+   stays red: it is the one control whose colour is doing safety work. */
+.button, input[type=submit], input[type=button], .submit-row input, a.button {
+  border-radius: 9px;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 9px 15px;
+  border: 0;
+  transition: background .15s ease, transform .06s ease;
+}
+.button:active, input[type=submit]:active, .submit-row input:active { transform: translateY(1px); }
+.submit-row { background: var(--gt-cream-2); border-top: 1px solid var(--gt-line); border-radius: 0 0 12px 12px; }
+.object-tools a { border-radius: 100px; font-weight: 700; letter-spacing: .02em; }
+
+/* ---- Forms ---------------------------------------------------------------- */
+.form-row { border-bottom: 1px solid var(--gt-line); }
+input[type=text], input[type=password], input[type=email], input[type=url],
+input[type=number], textarea, select, .vTextField {
+  border: 1px solid var(--gt-line);
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+input:focus, textarea:focus, select:focus {
+  outline: 2px solid var(--gt-forest);
+  outline-offset: 1px;
+  border-color: var(--gt-forest);
+}
+.help, .form-row .help { color: var(--gt-muted); font-size: 12px; }
+fieldset.collapsed h2 { background: var(--gt-cream-2); }
+
+/* ---- Messages -------------------------------------------------------------- */
+ul.messagelist li {
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--gt-ink);
+  padding: 11px 14px 11px 40px;
+}
+
+/* ---- Login ---------------------------------------------------------------- */
+body.login { background: var(--gt-deep); }
+body.login #container {
+  border: 0; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 30px 70px rgba(0,0,0,.45);
+}
+body.login #header { border-radius: 0; border-bottom: 3px solid var(--gt-lime); }
+body.login .submit-row { border-radius: 0; }
+body.login #content { padding: 22px; }
+
+/* ---- Sidebar --------------------------------------------------------------- */
+#nav-sidebar { background: #fff; border-right: 1px solid var(--gt-line); }
+#nav-sidebar .current-model { background: var(--gt-forest); }
+#nav-sidebar .current-model a:link, #nav-sidebar .current-model a:visited { color: #fff; }
+.sticky { background: transparent; }
+
+/* ============================================================================
+   THE SECOND-FACTOR SCREEN (sysadmin/views.admin_verify)
+   ----------------------------------------------------------------------------
+   Standalone page, so it carries its own layout — it deliberately does not
+   extend the admin base (see the template for why). Dark, centred, one field:
+   there is exactly one thing to do here, and the design should not imply
+   otherwise.
+   ========================================================================= */
+body.gtv {
+  margin: 0; min-height: 100vh;
+  display: grid; place-items: center; padding: 24px;
+  background: radial-gradient(1200px 600px at 50% -10%, #17402D 0%, var(--gt-deep) 55%, var(--gt-deep-2) 100%);
+  font-family: var(--gt-body);
+  color: var(--gt-cream);
+}
+.gtv-card {
+  width: min(420px, 100%);
+  background: rgba(255,255,255,.045);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 18px;
+  padding: 32px 30px 26px;
+  text-align: center;
+  box-shadow: 0 30px 70px rgba(0,0,0,.4);
+}
+.gtv-mark {
+  width: 46px; height: 46px; margin: 0 auto 16px;
+  display: grid; place-items: center;
+  border-radius: 13px; background: var(--gt-lime); color: var(--gt-deep);
+}
+.gtv-mark svg { width: 25px; height: 25px; }
+.gtv-card h1 {
+  font-family: var(--gt-display); font-size: 25px; color: #fff;
+  margin: 0 0 8px; letter-spacing: .01em;
+}
+.gtv-lead { font-size: 14px; line-height: 1.55; color: rgba(232,228,213,.8); margin: 0 0 20px; }
+.gtv-lead b { color: var(--gt-lime); font-weight: 700; word-break: break-all; }
+
+.gtv-err {
+  background: rgba(179,52,31,.2); border: 1px solid rgba(240,120,100,.45);
+  color: #FFD9D2; border-radius: 10px; padding: 10px 12px;
+  font-size: 13px; margin-bottom: 16px; text-align: left;
+}
+
+/* The code field is the page. Monospaced, wide-tracked and big enough to check
+   against a phone at arm's length without leaning in. */
+.gtv-code {
+  width: 100%; box-sizing: border-box;
+  background: rgba(0,0,0,.28);
+  border: 1.5px solid rgba(255,255,255,.16);
+  border-radius: 12px;
+  color: #fff;
+  font-family: 'Barlow Semi Condensed', ui-monospace, monospace;
+  font-size: 34px; font-weight: 700;
+  letter-spacing: .34em; text-indent: .34em;   /* indent cancels the trailing gap */
+  text-align: center;
+  padding: 13px 0;
+}
+.gtv-code::placeholder { color: rgba(255,255,255,.2); letter-spacing: .34em; }
+.gtv-code:focus { outline: 0; border-color: var(--gt-lime); background: rgba(0,0,0,.36); }
+
+.gtv-go {
+  width: 100%; margin-top: 14px;
+  background: var(--gt-lime); color: var(--gt-deep);
+  border: 0; border-radius: 12px; padding: 13px;
+  font-family: var(--gt-body); font-size: 14.5px; font-weight: 800;
+  cursor: pointer; transition: background .15s ease, transform .06s ease;
+}
+.gtv-go:hover { background: #D6FA55; }
+.gtv-go:active { transform: translateY(1px); }
+
+.gtv-alt {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin-top: 18px;
+}
+.gtv-alt form { margin: 0; }
+.gtv-link {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: var(--gt-body); font-size: 13px; font-weight: 600;
+  color: rgba(232,228,213,.85); text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.gtv-link:hover { color: var(--gt-lime); }
+.gtv-dot { color: rgba(232,228,213,.35); }
+.gtv-fine { font-size: 11.5px; color: rgba(232,228,213,.5); margin: 18px 0 0; }
+
+/* Environment tag beside the wordmark. Only rendered on staging — on
+   production its absence is the signal. */
+.gt-env {
+  display: inline-block; margin-left: 10px; vertical-align: 2px;
+  background: var(--gt-lime); color: var(--gt-deep);
+  font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 100px;
+}

@@ -1,0 +1,16 @@
+Hello {{ user.display_name|default:user.email }},
+
+Someone signed in to a GoodTip staff account and is trying to open the admin
+control panel. Enter the code below to continue.
+
+    {{ code }}
+
+This code expires in {{ ttl_minutes }} minutes.
+
+If this was not you, do not enter the code. Someone holds the password to a
+staff account, and that password should be changed immediately.
+
+GoodTip will never ask you for this code by phone, text message or reply to
+this email.
+
+— GoodTip

@@ -103,9 +103,16 @@ class LoginCode(models.Model):
 
     PURPOSE_LOGIN = "login"
     PURPOSE_SIGNUP = "signup"
+    # The Django admin's own gate. Separate from PURPOSE_LOGIN on purpose: a
+    # code emailed to get into the member app must not also open the control
+    # plane, and issuing burns any earlier unused code for the SAME purpose
+    # only — so being asked to verify for /admin/ cannot invalidate a sign-in
+    # code the same person is part-way through using.
+    PURPOSE_ADMIN = "admin"
     PURPOSE_CHOICES = [
         (PURPOSE_LOGIN, "Sign-in verification"),
         (PURPOSE_SIGNUP, "Email verification at signup"),
+        (PURPOSE_ADMIN, "Admin access verification"),
     ]
 
     TTL = timedelta(minutes=10)

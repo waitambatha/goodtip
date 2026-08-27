@@ -1,0 +1,26 @@
+{% extends "admin/base.html" %}
+{% load static %}
+{% comment %}
+Brands the whole admin. Two blocks, both of which Django's own base template
+provides for exactly this.
+
+`extrastyle` rather than replacing the admin's stylesheet: the skin in
+admin.css is a re-skin, not a rebuild, and it works by restating Django's own
+CSS custom properties. Dropping the base sheet would take the layout with it
+and leave a control plane that had to be re-implemented from nothing every
+time Django changed a template.
+{% endcomment %}
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | GoodTip admin{% endblock %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin.css' %}">{% endblock %}
+
+{% block branding %}
+<div id="site-name"><a href="{% url 'admin:index' %}">GoodTip</a></div>
+{% if user.is_authenticated and user.is_staff %}
+  {% comment %}
+  Says which environment you are in. On staging this is the difference between
+  a test and an incident, and the admin's own chrome says nothing about it.
+  {% endcomment %}
+  {% if is_staging %}<span class="gt-env">staging</span>{% endif %}
+{% endif %}
+{% endblock %}

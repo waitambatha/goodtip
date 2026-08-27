@@ -18,6 +18,9 @@ from orgs.views import join_view, public_wall_reply, public_wall_view
 
 urlpatterns = [
     path("gate/", gate_view, name="staging_gate"),
+    # BEFORE admin.site.urls — the admin catches everything under its prefix,
+    # so a gate mounted after it would never be reached.
+    path("admin/", include("sysadmin.urls", namespace="sysadmin")),
     path("admin/", admin.site.urls),
     # Public marketing pages (no login required)
     path("", TemplateView.as_view(

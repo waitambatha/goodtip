@@ -48,6 +48,11 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "goodtip.middleware.ForceCsrfCookieMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # After AuthenticationMiddleware (it reads request.user) and before the
+    # view runs. The Django admin is the control plane; a password alone is
+    # the same single factor a member's tipping account has, so it asks for an
+    # emailed code too. See sysadmin.otp.
+    "sysadmin.middleware.AdminOTPMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # Traffic-driven fallback, enabled only by opting in — see AUTOSYNC_ENABLED.
@@ -77,6 +82,7 @@ TEMPLATES = [
                 "orgs.context_processors.user_orgs",
                 "orgs.context_processors.contact_form",
                 "goodtip.context_processors.analytics",
+                "goodtip.context_processors.environment",
             ],
         },
     },
