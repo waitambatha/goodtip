@@ -86,7 +86,7 @@ read what.
 {% if posts %}
 {# the feed scrolls in place so the composer above it stays reachable #}
 <div class="gt-listwrap">
-<div class="gt-feed gt-scroll">
+<div class="gt-feed gt-scroll" data-coach="wall-feed">
   {% for p in posts %}
   <article class="gt-post {% if p.kind == 'recap' %}is-recap{% elif p.kind == 'system' %}is-system{% endif %}" id="post-{{ p.id }}">
     <div class="gpt-head">
@@ -165,7 +165,7 @@ read what.
       <div class="gcm-body">
         <h3>Your turn.</h3>
         <p class="gcm-lead">Lock your tip, talk it up, or throw a little shade.</p>
-        <textarea name="body" maxlength="500" placeholder="Lock your tip, talk it up, or sledge&hellip;" aria-label="Write a post" data-count></textarea>
+        <textarea name="body" data-coach="wall-composer" maxlength="500" placeholder="Lock your tip, talk it up, or sledge&hellip;" aria-label="Write a post" data-count></textarea>
         <div class="gcm-count"><span data-count-out>0</span>/500</div>
         <div class="gcm-pick">
           <span>Attach a pick <i>(optional)</i></span>

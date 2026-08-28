@@ -479,15 +479,70 @@ class OnboardingWalkthroughTests(TestCase):
         self.user.refresh_from_db()
         self.assertIsNone(self.user.onboarding_seen_at)
 
-    def test_somebody_in_no_organisation_is_not_shown_it(self):
-        """Three of the four things it points at do not exist yet."""
+    def test_somebody_in_no_organisation_gets_the_starting_walkthrough(self):
+        """The moment a new member is most lost is the empty dashboard telling
+        them to create an organisation or find one. It used to be the one
+        moment nothing explained itself."""
         from orgs.models import OrgMember
 
         OrgMember.objects.filter(user=self.user).delete()
         resp = self.client.get(reverse("dashboard"))
-        self.assertNotContains(resp, 'id="coach"')
+        self.assertContains(resp, 'data-key="dashboard-start"')
 
     def test_it_needs_a_post(self):
         self.assertEqual(
             self.client.get(reverse("accounts:onboarding_seen")).status_code, 405,
         )
+
+    def test_the_dashboard_carries_the_dashboard_tour(self):
+        resp = self.client.get(reverse("dashboard"))
+        self.assertContains(resp, 'data-key="dashboard"')
+
+    def test_finishing_one_page_does_not_put_away_another(self):
+        """The whole point of per-page: each screen introduces itself once, and
+        the others are still owed."""
+        self.client.post(reverse("accounts:onboarding_seen"), {"key": "dashboard"})
+        self.assertNotContains(self.client.get(reverse("dashboard")), 'id="coach"')
+        self.assertContains(self.client.get(reverse("profile")), 'data-key="profile"')
+
+    def test_a_page_stays_put_away(self):
+        self.client.post(reverse("accounts:onboarding_seen"), {"key": "profile"})
+        self.assertNotContains(self.client.get(reverse("profile")), 'id="coach"')
+
+    def test_the_starting_walkthrough_does_not_burn_the_dashboard_one(self):
+        """Somebody who is shown the empty dashboard, puts it away, and then
+        joins an organisation has never seen the real dashboard tour."""
+        from orgs.models import OrgMember
+
+        OrgMember.objects.filter(user=self.user).delete()
+        self.client.post(
+            reverse("accounts:onboarding_seen"), {"key": "dashboard-start"},
+        )
+        OrgMember.objects.create(user=self.user, org=self.org)
+        self.assertContains(self.client.get(reverse("dashboard")), 'data-key="dashboard"')
+
+    def test_an_unknown_key_is_not_written_to_the_user(self):
+        """The endpoint is public, so a key it does not recognise must not be
+        able to grow the column without limit."""
+        self.client.post(reverse("accounts:onboarding_seen"), {"key": "../../nonsense"})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.onboarding_pages_seen, [])
+
+    def test_a_member_who_saw_the_old_single_walkthrough_is_not_shown_it_again(self):
+        """Existing members on the day this ships have already had the
+        dashboard's four bubbles."""
+        self.user.onboarding_seen_at = timezone.now()
+        self.user.save(update_fields=["onboarding_seen_at"])
+        self.assertNotContains(self.client.get(reverse("dashboard")), 'id="coach"')
+
+    def test_but_their_other_pages_are_still_new_to_them(self):
+        self.user.onboarding_seen_at = timezone.now()
+        self.user.save(update_fields=["onboarding_seen_at"])
+        self.assertContains(self.client.get(reverse("profile")), 'data-key="profile"')
+
+    def test_a_page_with_no_tour_registered_carries_none(self):
+        self.assertNotContains(self.client.get(reverse("orgs:search")), 'data-key="dashboard"')
+
+    def test_signed_out_pages_carry_no_walkthrough(self):
+        self.client.logout()
+        self.assertNotContains(self.client.get(reverse("landing")), 'id="coach"')

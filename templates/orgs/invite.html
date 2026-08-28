@@ -8,7 +8,7 @@
 <div class="grid-app g-2" style="align-items:start;">
   <div>
     <div class="card pad-lg">
-      <div class="card-h">Invite by email</div>
+      <div class="card-h" data-coach="invite-email">Invite by email</div>
       <p class="card-lead" style="margin:4px 0 14px;">
         We'll email them the same join link, from you.
       </p>
@@ -33,7 +33,7 @@
     </div>
 
     <div class="card pad-lg" style="margin-top:16px;">
-      <div class="card-h">Or share the link</div>
+      <div class="card-h" data-coach="invite-link">Or share the link</div>
       <p class="card-lead" style="margin:4px 0 14px;">Anyone with this link can join your comp.</p>
       <div class="copy-field"><input id="inviteLink" type="text" readonly value="{{ invite_url }}"><button type="button" class="abtn abtn-dark" data-copy="#inviteLink">Copy</button></div>
       <div style="display:flex;gap:22px;margin-top:20px;">

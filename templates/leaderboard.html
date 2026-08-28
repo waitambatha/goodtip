@@ -30,7 +30,7 @@
 {% if is_family %}
 {# §8: same competition, two views — local standings and the national board #}
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
-  <a href="?scope=local" class="gt-pill {% if scope == 'local' %}solid{% endif %}">{{ org.name }}</a>
+  <a href="?scope=local" data-coach="board-scope" class="gt-pill {% if scope == 'local' %}solid{% endif %}">{{ org.name }}</a>
   <a href="?scope=national" class="gt-pill {% if scope == 'national' %}solid{% endif %}">National &middot; {{ org.root.name }}</a>
 </div>
 {% if scope == 'national' %}<p class="gh-lead" style="margin:-10px 0 20px;">Every tipper across {{ org.root.name }} and all its child organisations, ranked together.</p>{% endif %}
@@ -77,7 +77,7 @@
 </div>
 {% endif %}
 
-<div class="gt-shell">
+<div class="gt-shell" data-coach="board-table">
   <div>
     {% include "partials/leaderboard_table.html" with ranked=ranked me=request.user %}
     <div class="gt-note">

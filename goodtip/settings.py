@@ -80,6 +80,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "orgs.context_processors.user_orgs",
+                "accounts.context_processors.onboarding",
                 "orgs.context_processors.contact_form",
                 "goodtip.context_processors.analytics",
                 "goodtip.context_processors.environment",

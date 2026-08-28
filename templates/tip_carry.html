@@ -33,7 +33,7 @@ is listed game by game, unticked, and stays as it is unless it is ticked.
   {% csrf_token %}
 
   {% for plan in plans %}
-  <div class="card pad-lg carry-room" style="margin-bottom:14px;">
+  <div class="card pad-lg carry-room" data-coach="carry-choice" style="margin-bottom:14px;">
     <label class="carry-head">
       {% comment %}
       Ticked by default, because carrying is what the member asked for by

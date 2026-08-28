@@ -36,7 +36,7 @@ a half-built thing in the list.
     list permanently, so the page ended on a form whether or not anyone wanted
     one. The sheet asks the real question instead: which team is this?
     {% endcomment %}
-    <button type="button" class="abtn abtn-primary abtn-lg dh-cta" data-group-open>
+    <button type="button" data-coach="groups-create" class="abtn abtn-primary abtn-lg dh-cta" data-group-open>
       <svg class="cic" aria-hidden="true" viewBox="0 0 24 24"><path d="M11 5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5Z"/></svg>
       Create group
     </button>
@@ -114,7 +114,7 @@ selling a switch for the sake of it.
   </form>
 </div>
 
-<div class="grid-app g-3" style="margin-top:18px;">
+<div class="grid-app g-3" data-coach="groups-list" style="margin-top:18px;">
   {% for row in rows %}
   <div class="card pad-lg dept-card{% if row.awaiting_approval %} is-pending{% endif %}">
     <div style="display:flex;align-items:center;gap:12px;">

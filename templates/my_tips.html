@@ -17,7 +17,7 @@
   </div>
   {% if selected_round %}
   <div class="gh-actions">
-    <div class="gt-rounder">
+    <div class="gt-rounder" data-coach="tips-current">
       <a href="?round={{ prev_round.id }}" class="rnd-btn {% if not prev_round %}off{% endif %}" aria-label="Previous round"><svg><use href="#ic-chev-left"/></svg></a>
       <div>
         <div class="rnd-now">
@@ -69,7 +69,9 @@
     {% url 'tipping:my_tips' org.id as tips_url %}
     {% include "partials/series_filter.html" with base=tips_url %}
 
+    <div data-coach="tips-rounds">
     {% include "partials/my_tips_round.html" with round=selected_round rows=rows state=state phase_counts=phase_counts total_all=total_all %}
+    </div>
 
     <div class="gt-note">
       <svg><use href="#ic-shield-check"/></svg>

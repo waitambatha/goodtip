@@ -16,7 +16,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
   <div>
     <div class="app-eyebrow">{{ org.name }} &middot; {{ org.sport_label }}</div>
     <h1 class="app-h1">Round {{ round.round_number }}, your tips</h1>
-    <p class="app-sub">{% if locked %}This round is locked, tips are final.{% else %}Tap a team to pick it. Saves the instant you choose, no submit button.{% endif %}</p>
+    <p class="app-sub" data-coach="round-lock">{% if locked %}This round is locked, tips are final.{% else %}Tap a team to pick it. Saves the instant you choose, no submit button.{% endif %}</p>
   </div>
   {% countdown_cells round.lockout_at %}
 </div>
@@ -27,7 +27,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
 
 {% for row in rows %}
   {% with m=row.match %}
-  <div class="match-row">
+  <div class="match-row" data-coach="round-matches">
     <div class="match-meta"><span>{{ m.kickoff_at|date:"D j M &middot; g:i a" }}</span>{% if m.venue %}<span class="venue">{{ m.venue }}</span>{% endif %}</div>
     <div class="pick">
       <label class="team {% if row.tip == 'home' %}sel{% endif %}">{% crest m.home_team %}<span>{{ m.home_team.name }}</span>

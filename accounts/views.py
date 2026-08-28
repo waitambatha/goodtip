@@ -28,6 +28,7 @@ from .forms import (
     VerifyCodeForm,
 )
 from .models import LoginCode
+from .onboarding import TOURS
 from .notifications import send_login_code
 
 logger = logging.getLogger(__name__)
@@ -918,13 +919,6 @@ def dashboard_view(request):
         # the round in play is — see the comment where these are counted.
         "slate_done": slate_done,
         "slate_total": slate_total,
-        # The first-visit walkthrough. Only for somebody who is actually in an
-        # organisation: three of the four things it points at do not exist
-        # until then, and a tour of an empty dashboard would be its own kind
-        # of confusion.
-        "show_onboarding": (
-            request.user.onboarding_seen_at is None and bool(memberships)
-        ),
         # The round number to put on the confirm sheet — only where the slate
         # is ONE round. See slate_round_ids.
         "slate_round_no": slate_round_no,
@@ -965,13 +959,27 @@ def dashboard_countdown_partial(request, org_id: int):
 @login_required
 @require_POST
 def onboarding_seen(request):
-    """The member skipped the walkthrough or reached its end.
+    """The member skipped a page's walkthrough or reached its end.
 
     Idempotent, and deliberately not fussy about which of the two it was —
     both mean "do not show me this again", and a bell that has been rung does
     not need to know who rang it.
+
+    `key` names the page. It is checked against the registry rather than
+    trusted, because this is a public endpoint and an unchecked key would let
+    anyone write arbitrary strings into the column forever. An unknown key is
+    not an error to the caller — there is nothing for the browser to do about
+    it, and the tour is already gone from the screen either way.
     """
-    if request.user.onboarding_seen_at is None:
+    key = (request.POST.get("key") or "").strip()
+    if key in TOURS:
+        request.user.mark_tour_seen(key)
+
+    # The original single flag, still stamped for anyone who finishes the
+    # dashboard's tour. It is what tells this feature not to re-run that one
+    # walkthrough at every member who had already seen it before the per-page
+    # version shipped — see tour_for_request.
+    if key in ("", "dashboard") and request.user.onboarding_seen_at is None:
         request.user.onboarding_seen_at = timezone.now()
         request.user.save(update_fields=["onboarding_seen_at"])
     return HttpResponse(status=204)

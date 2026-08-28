@@ -17,7 +17,7 @@ organisation that started on NRL and wanted AFL the next year had to ask
 support. This is that missing page.
 {% endcomment %}
 <div class="card pad-lg" style="max-width:720px;">
-  <div class="card-h" style="font-size:19px;">What you tip on</div>
+  <div class="card-h" data-coach="settings-comps" style="font-size:19px;">What you tip on</div>
   <p class="card-lead" style="margin:8px 0 4px;">
     Members only ever see fixtures from the competitions picked here. Each one
     brings its whole code with it — pick NRL and everyone gets NRL <b>and</b>
@@ -49,7 +49,7 @@ support. This is that missing page.
 </div>
 
 <div class="card pad-lg" style="max-width:720px;margin-top:20px;">
-  <div class="card-h" style="font-size:19px;">Groups</div>
+  <div class="card-h" data-coach="settings-groups" style="font-size:19px;">Groups</div>
   <p class="card-lead" style="margin:8px 0 16px;">
     {% if org.groups_enabled %}Groups are on. Marketing, IT, Sales — each with its own ladder inside {{ org.name }}.
     {% else %}Split {{ org.name }} into teams, each with its own ladder. Most organisations don't need this.{% endif %}

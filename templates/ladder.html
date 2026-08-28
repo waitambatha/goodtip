@@ -35,7 +35,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
     {% endcomment %}
     <form method="get" class="dc-pick" data-veil-for="#ladderTable" data-veil-label="Loading the ladder">
       <span class="dc-lab">Competition</span>
-      <select name="series" onchange="this.form.submit()">
+      <select name="series" data-coach="ladder-series" onchange="this.form.submit()">
         {% for s in series_options %}
         <option value="{{ s.id }}" {% if s.id == selected_series.id %}selected{% endif %}>{{ s.name }}</option>
         {% endfor %}
@@ -53,7 +53,7 @@ a reader watches is the table, so veiling only the rows would leave the header
 sitting bright above a blank space.
 {% endcomment %}
 <div class="gt-listwrap" id="ladderTable" data-veil data-veil-label="Loading the ladder">
-  <div class="gt-board ladder">
+  <div class="gt-board ladder" data-coach="ladder-table">
     {% comment %}
     Column heads carry .lad-col so they stripe with the cells beneath them —
     the numeric columns share a tint that runs the height of the table, which

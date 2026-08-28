@@ -26,8 +26,8 @@ stacking context, so a strip rendered inside it paints over the sheet.
   <div class="card pad-lg" style="text-align:center;">
     <div class="card-h" style="font-size:20px;">You're not in an organisation yet</div>
     <p class="card-lead" style="margin:6px 0 18px;">Start your own, find your organisation, or ask an organisation manager for a join link.</p>
-    <a href="{% url 'orgs:create' %}" class="abtn abtn-primary abtn-lg">Create an organisation</a>
-    <a href="{% url 'orgs:search' %}" class="abtn abtn-ghost abtn-lg">Find your organisation</a>
+    <a href="{% url 'orgs:create' %}" data-coach="create-org" class="abtn abtn-primary abtn-lg">Create an organisation</a>
+    <a href="{% url 'orgs:search' %}" data-coach="find-org" class="abtn abtn-ghost abtn-lg">Find your organisation</a>
   </div>
 
   {% if preview_round %}
@@ -36,7 +36,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
   nothing to post to, so the teams are buttons that open the join dialog rather
   than radios that could look tippable.
   {% endcomment %}
-  <div class="card" style="background:var(--app-card-2);margin-top:16px;">
+  <div class="card" data-coach="preview-round" style="background:var(--app-card-2);margin-top:16px;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
       <div>
         <span class="badge-live">{% if preview_round.is_locked %}Locked{% else %}Live &middot; locks soon{% endif %}</span>
@@ -512,7 +512,6 @@ from the live page, so it has to be rendered after them — and it points at the
 sidebar as well as the dashboard, which is why it sits here rather than inside
 any one card.
 {% endcomment %}
-{% if show_onboarding %}{% include "partials/onboarding.html" %}{% endif %}
 {% endblock %}
 
 {% block app_js %}

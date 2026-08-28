@@ -1,23 +1,31 @@
 {% comment %}
-THE FIRST-VISIT WALKTHROUGH.
+THE PER-PAGE WALKTHROUGH.
 
 The client's reason for it, in his words: "just enough to stop first-week
 confusion getting mistaken for bugs." That is the whole brief, and it sets the
-bar — this points at four things and gets out of the way. It is not a product
-tour and should never grow into one.
+bar — each page points at a few things and gets out of the way. It is not a
+product tour and should never grow into one.
 
-WHY IT IS BUILT AROUND MISSING TARGETS. The four things it names do not all
-exist on every dashboard: the charity banner only appears while a vote is
-open, and the sidebar is off-screen on a phone. So each step names an element
-by data-coach and any step whose element is not on the page, or not visible,
-is dropped before the tour starts. A bubble pointing at nothing is precisely
-the confusion this exists to prevent.
+WHAT IS HERE AND WHAT IS NOT. This file is only the mechanism: the ring, the
+bubble, where to put them, and telling the server when it has been put away.
+Which page gets which steps, and the copy, is in accounts/onboarding.py. That
+split is why this include sits in app_base.html and works on every private page
+without knowing what any of them are.
 
-It is also entirely optional scenery: no target, no tour, and the dashboard is
-unchanged. Nothing here is required for the page to work.
+WHY IT IS BUILT AROUND MISSING TARGETS. A page's steps do not all exist on
+every render of it — the charity banner only appears while a vote is open, the
+sidebar is off-screen on a phone, and a manager's page has controls a member's
+does not. So each step names an element by data-coach, and any step whose
+element is not on the page, or not visible, is dropped before the tour starts.
+A bubble pointing at nothing is precisely the confusion this exists to prevent.
+
+It is also entirely optional scenery: no target, no tour, and the page is
+unchanged. Nothing here is required for any page to work.
 {% endcomment %}
 <div class="coach" id="coach" hidden aria-live="polite"
      data-seen-url="{% url 'accounts:onboarding_seen' %}"
+     data-key="{{ onboarding_tour_key }}"
+     data-steps="{{ onboarding_tour_steps }}"
      data-csrf="{{ csrf_token }}">
   <div class="coach-veil" data-coach-skip></div>
   <div class="coach-ring" id="coachRing" aria-hidden="true"></div>
@@ -40,31 +48,28 @@ unchanged. Nothing here is required for the page to work.
 
   /* MOVED TO THE BODY BEFORE ANYTHING ELSE.
 
-     The dashboard renders this inside main.app-main > .page-sheet, and both
-     of those are position:relative with z-index:1 — each one a stacking
-     context. A z-index of 200 inside a context whose own z-index is 1 does
-     not beat the sticky nav's 50 in the root context, it is simply scoped
-     underneath it. The result was a tour that dimmed the page correctly and
-     then drew its ring UNDER the header, so the two steps pointing at Ladder
-     and The Wall highlighted nothing at all.
+     Pages render this inside main.app-main > .page-sheet, and both of those
+     are position:relative with z-index:1 — each one a stacking context. A
+     z-index of 200 inside a context whose own z-index is 1 does not beat the
+     sticky nav's 50 in the root context, it is simply scoped underneath it.
+     The result was a tour that dimmed the page correctly and then drew its
+     ring UNDER the header, so the steps pointing at Ladder and The Wall
+     highlighted nothing at all.
 
      Reparenting to the body puts it in the root stacking context, where its
-     z-index means what it says. Done here rather than by moving the include,
-     so wherever a future page drops this partial it still works. */
+     z-index means what it says. */
   document.body.appendChild(root);
 
-  /* The script is the source of the copy, not the markup, because a step that
-     finds no target is dropped entirely — including its text. */
-  var STEPS = [
-    ['tips',    'Make your tips here',
-     'Tap the team you think wins each match, then confirm. You can change any pick right up until the round locks.'],
-    ['ladder',  'See where you sit',
-     'Every tip scores on your ladder. Miss a round and you get the away side by default, so you are never on nothing.'],
-    ['wall',    'The Wall is your group chat',
-     'Banter, results and whatever else. It is per organisation, so only your lot can see it.'],
-    ['charity', 'This is what it is all for',
-     'Your organisation raises for a charity. Where the group votes on it, this is where you have your say.']
-  ];
+  /* The steps come from the server (accounts/onboarding.py), because a step
+     that finds no target is dropped entirely — including its text — and the
+     markup should never carry wording for a bubble that may not be shown. */
+  var STEPS;
+  try {
+    STEPS = JSON.parse(root.getAttribute('data-steps') || '[]');
+  } catch (e) {
+    return;   /* a malformed tour is not worth breaking a page over */
+  }
+  if (!STEPS.length) return;
 
   function visible(el) {
     if (!el) return false;
@@ -74,8 +79,8 @@ unchanged. Nothing here is required for the page to work.
 
   var steps = [];
   STEPS.forEach(function (s) {
-    var el = document.querySelector('[data-coach="' + s[0] + '"]');
-    if (visible(el)) steps.push({ el: el, title: s[1], body: s[2] });
+    var el = document.querySelector('[data-coach="' + s.target + '"]');
+    if (visible(el)) steps.push({ el: el, title: s.title, body: s.body });
   });
   if (!steps.length) return;
 
@@ -142,9 +147,12 @@ unchanged. Nothing here is required for the page to work.
   function done() {
     root.hidden = true;
     /* Best-effort: the tour is over on screen whatever the server says, and a
-       failed POST costs one repeat rather than a broken dashboard. */
+       failed POST costs one repeat rather than a broken page. The key is what
+       marks THIS page done — without it the server would have no idea which
+       of the walkthroughs was just dismissed. */
     var body = new FormData();
     body.append('csrfmiddlewaretoken', root.getAttribute('data-csrf'));
+    body.append('key', root.getAttribute('data-key'));
     fetch(root.getAttribute('data-seen-url'), {
       method: 'POST', body: body, credentials: 'same-origin'
     }).catch(function () {});

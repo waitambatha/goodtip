@@ -83,6 +83,43 @@ class User(AbstractUser):
     # the tour.
     onboarding_seen_at = models.DateTimeField(null=True, blank=True)
 
+    # WHICH PAGES' WALKTHROUGHS HAVE BEEN PUT AWAY, by tour key.
+    #
+    # The one flag above could only ever answer "has this person had THE
+    # tour", which was true while there was exactly one, on the dashboard.
+    # Every private page now introduces itself the first time it is opened,
+    # so the question became "has this person had the tour FOR THIS PAGE" —
+    # a set, not a boolean.
+    #
+    # A JSON list on the row rather than a table of (user, key) because this
+    # is read on every private page render and the user row is already
+    # loaded: a set membership test against a column costs nothing, where a
+    # second table costs a query per page — and against the server database
+    # that is a ~274ms round-trip for a fact that is almost always "yes,
+    # already seen, show nothing".
+    #
+    # Keys are the tour names in accounts/onboarding.py, not URL paths, so a
+    # route can be renamed without re-showing a tour somebody has finished.
+    onboarding_pages_seen = models.JSONField(default=list, blank=True)
+
+    def has_seen_tour(self, key: str) -> bool:
+        return key in (self.onboarding_pages_seen or [])
+
+    def mark_tour_seen(self, key: str) -> bool:
+        """Record that a page's walkthrough is done. True if this changed anything.
+
+        Idempotent, like the flag it replaces: a bell that has been rung does
+        not need ringing twice, and the endpoint behind this is fired by both
+        "Skip" and "Got it".
+        """
+        seen = list(self.onboarding_pages_seen or [])
+        if key in seen:
+            return False
+        seen.append(key)
+        self.onboarding_pages_seen = seen
+        self.save(update_fields=["onboarding_pages_seen"])
+        return True
+
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["display_name"]
 

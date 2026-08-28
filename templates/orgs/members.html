@@ -18,7 +18,7 @@ anyone would look for it.
     <h1 class="app-h1">Members</h1>
     <p class="app-sub">Invite people, approve requests and set roles.{% if is_owner %} Owners can nominate managers.{% endif %}</p>
   </div>
-  <a href="{% url 'orgs:invite' org.id %}" class="abtn abtn-primary abtn-sm">Invite people &rarr;</a>
+  <a href="{% url 'orgs:invite' org.id %}" data-coach="members-invite" class="abtn abtn-primary abtn-sm">Invite people &rarr;</a>
 </div>
 
 {% if pending_requests %}
@@ -48,7 +48,7 @@ anyone would look for it.
 </div>
 {% endif %}
 
-<div style="overflow-x:auto;">
+<div style="overflow-x:auto;" data-coach="members-list">
 <table class="atable">
   <thead><tr><th>Member</th><th>Roles</th><th>Joined</th><th style="text-align:right;">Set role</th></tr></thead>
   <tbody>

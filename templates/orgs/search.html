@@ -22,7 +22,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
 <div class="ac" id="orgAc">
   <div class="ac-box">
     <svg class="ac-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-    <input type="search" id="orgSearch" placeholder="e.g. National Tiles" autocomplete="off" autofocus
+    <input type="search" id="orgSearch" data-coach="search-box" placeholder="e.g. National Tiles" autocomplete="off" autofocus
            role="combobox" aria-expanded="false" aria-controls="acPanel" aria-autocomplete="list">
     <span class="ac-spin" id="acSpin" hidden></span>
   </div>
@@ -75,7 +75,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
         {% if row.is_member %}<span class="pill-role participant">Member</span>
         {% elif row.pending %}<span class="pill-role captain">Request pending</span>
         {% else %}
-        <form method="post" action="{% url 'orgs:request_join' row.org.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}"><button type="submit" class="abtn abtn-primary abtn-sm">Ask to join</button></form>
+        <form method="post" action="{% url 'orgs:request_join' row.org.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}"><button type="submit" data-coach="search-request" class="abtn abtn-primary abtn-sm">Ask to join</button></form>
         {% endif %}
         {% if row.can_manage %}
         <a href="{% url 'orgs:create' %}?parent={{ row.org.id }}" class="abtn abtn-ghost abtn-sm">Start an organisation under this</a>

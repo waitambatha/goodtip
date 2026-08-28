@@ -596,5 +596,14 @@
   })();
   </script>
   {% block scripts %}{% endblock %}
+  {% comment %}
+  THE PER-PAGE WALKTHROUGH, for every private page at once.
+
+  Outside {% block scripts %} on purpose: that block is overridden by a dozen
+  child templates, and an include inside it would silently vanish from exactly
+  the busiest pages. The context processor decides whether there is anything to
+  show, so on the overwhelming majority of page views this renders nothing.
+  {% endcomment %}
+  {% if onboarding_tour_key %}{% include "partials/onboarding.html" %}{% endif %}
 </body>
 </html>

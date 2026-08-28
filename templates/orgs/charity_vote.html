@@ -116,14 +116,14 @@ nothing on it said the vote had finished, and nothing offered a way on.
     <div class="vz-tile"><b>{{ eligible_count }}</b><small>eligible voter{{ eligible_count|pluralize }}</small></div>
     <div class="vz-tile"><b>{{ ballot_count }}</b><small>ballot{{ ballot_count|pluralize }} in</small></div>
     <div class="vz-tile"><b>{{ turnout_pct }}%</b><small>turnout</small></div>
-    {% if vote.scheduled_close_at %}<div class="vz-tile"><b>{{ vote.scheduled_close_at|date:"D g:i A" }}</b><small>voting ends</small></div>{% endif %}
+    {% if vote.scheduled_close_at %}<div class="vz-tile" data-coach="vote-closes"><b>{{ vote.scheduled_close_at|date:"D g:i A" }}</b><small>voting ends</small></div>{% endif %}
   </div>
   <div class="vz-meter" aria-hidden="true"><i style="width:{{ turnout_pct }}%"></i></div>
   <p class="app-sub" style="margin:8px 0 18px;">Blind vote, who has voted and where the tallies stand stays hidden until voting {% if vote.scheduled_close_at %}ends {{ vote.scheduled_close_at|date:"l j F, g:i A" }}{% else %}is closed by a manager{% endif %}.</p>
 
   <form method="post" action="{% url 'orgs:cast_charity_vote' org.id %}">
     {% csrf_token %}
-    <div class="opt-grid" style="margin-bottom:16px;">
+    <div class="opt-grid" data-coach="vote-options" style="margin-bottom:16px;">
       {% for opt in options %}
       <label class="opt-card radio">
         <input type="radio" name="option" value="{{ opt.id }}" {% if opt.id == my_option_id %}checked{% endif %}>
@@ -134,7 +134,7 @@ nothing on it said the vote had finished, and nothing offered a way on.
       {% endfor %}
     </div>
     <div style="display:flex;justify-content:flex-end;align-items:center;gap:12px;flex-wrap:wrap;">
-      <button type="submit" class="abtn abtn-primary">{% if my_option_id %}Change my vote{% else %}Save my vote{% endif %}</button>
+      <button type="submit" data-coach="vote-cast" class="abtn abtn-primary">{% if my_option_id %}Change my vote{% else %}Save my vote{% endif %}</button>
     </div>
   </form>
 

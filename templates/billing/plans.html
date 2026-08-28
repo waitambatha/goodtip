@@ -8,11 +8,11 @@
 <div class="flash info" style="margin-bottom:18px;"><svg class="cic" style="width:18px;height:18px;stroke:#245b66;fill:none;flex:none;"><use href="#ic-lock"/></svg><span>Payments aren't switched on yet, your choice is saved and we'll confirm before charging.</span></div>
 {% endif %}
 
-<div class="tier-cards">
+<div class="tier-cards" data-coach="plan-tiers">
   {% for t in tiers %}
   <div class="tier {% if t.popular %}featured{% endif %} {% if current and current.tier == t.key %}current{% endif %}">
     {% if t.popular %}<span class="tier-flag">Popular</span>{% endif %}
-    {% if current and current.tier == t.key %}<span class="tier-current">Current</span>{% endif %}
+    {% if current and current.tier == t.key %}<span class="tier-current" data-coach="plan-current">Current</span>{% endif %}
     <div class="tier-name">{{ t.label }}</div>
     <div class="tier-for">{{ t.seat_label }} &middot; {{ t.audience }}</div>
     <div class="tier-price">${{ t.price }}<span>/yr</span></div>
