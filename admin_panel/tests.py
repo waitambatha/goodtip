@@ -36,13 +36,21 @@ class TemplateCommentTests(TestCase):
     MULTILINE_COMMENT = re.compile(r"\{#(?:(?!#\}).)*\n(?:(?!#\}).)*#\}", re.S)
 
     def test_no_template_comment_spans_a_newline(self):
-        root = Path(settings.BASE_DIR) / "templates"
+        # Every template the project can load, not just templates/ — app
+        # directories are on the loader path too (APP_DIRS is on), and the
+        # first template written under one of them leaked a comment onto an
+        # admin page precisely because this test was only looking in one place.
+        root = Path(settings.BASE_DIR)
+        roots = [root / "templates"] + sorted(
+            d for d in root.glob("*/templates") if "venv" not in d.parts
+        )
         offenders = []
-        for path in sorted(root.rglob("*.html")):
-            body = path.read_text()
-            for match in self.MULTILINE_COMMENT.finditer(body):
-                line = body[: match.start()].count("\n") + 1
-                offenders.append(f"{path.relative_to(root)}:{line}")
+        for base in roots:
+            for path in sorted(base.rglob("*.html")):
+                body = path.read_text()
+                for match in self.MULTILINE_COMMENT.finditer(body):
+                    line = body[: match.start()].count("\n") + 1
+                    offenders.append(f"{path.relative_to(root)}:{line}")
         self.assertEqual(
             offenders, [],
             "Multi-line {# #} renders as page text — use {% comment %} instead:\n  "

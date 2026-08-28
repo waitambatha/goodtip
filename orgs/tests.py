@@ -6,6 +6,7 @@ from django.db.models import ProtectedError
 import re
 
 from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
 
 from catalog.models import Charity, Season, Series, Sport
 
@@ -34,6 +35,48 @@ from .services import (
 )
 
 User = get_user_model()
+
+
+def signup_fixtures():
+    """A (season, competition) pair `OrgCreateForm` will actually offer.
+
+    Two rules decide what the signup form shows, and a test that guesses at
+    either one fails in a way that reads as a wizard bug rather than a fixture
+    gap:
+
+    * the season must be the one in play — the form filters to
+      `orgs.forms.current_signup_season()`, so a competition built for 2093 is
+      never on the page;
+    * the competition must have a series a feed can resolve
+      (`orgs.forms.fed_competitions()`), so a bare Competition with no Series
+      is correctly unselectable.
+
+    Asking the form itself which season that is, rather than writing a year
+    into the test, is what stops this drifting apart again the next time the
+    calendar turns over.
+    """
+    from catalog.models import Competition
+
+    from .forms import current_signup_season
+
+    season = current_signup_season()
+    if season is None:
+        season = Season.objects.create(year=timezone.now().year, label="Test")
+    # Looked up on (season, slug) — the unique constraint the table actually
+    # has. A get_or_create on (sport, season, slug) misses the AFL row the
+    # migrations already seed for this season whenever the seeded row points at
+    # a different Sport, then fails the constraint trying to insert a second.
+    comp = Competition.objects.filter(season=season, slug="afl").first()
+    if comp is None:
+        sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
+        comp = Competition.objects.create(
+            sport=sport, season=season, slug="afl", name="AFL",
+        )
+    series, _ = Series.objects.get_or_create(
+        name="AFL", defaults={"sport": comp.sport, "slug": "afl"},
+    )
+    comp.series.add(series)
+    return season, comp
 
 
 class CharityTimelineTests(TestCase):
@@ -110,16 +153,10 @@ class OrgCategoryFormTests(TestCase):
     def setUp(self):
         from catalog.models import Competition, OrganisationType, SubCategory
 
-        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
-        self.sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
-        self.comp, _ = Competition.objects.get_or_create(
-            sport=self.sport, season=self.season, slug="afl", defaults={"name": "AFL"},
-        )
-        # A Competition with no Series cannot deliver a fixture, and the signup
-        # form now offers only competitions a feed can actually serve — so a
-        # bare competition is correctly unselectable. Attach the real AFL
-        # series, which is what production rows look like.
-        self.comp.series.set([Series.objects.get(name="AFL")])
+        # The season and competition the signup form actually offers — see
+        # signup_fixtures().
+        self.season, self.comp = signup_fixtures()
+        self.sport = self.comp.sport
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
         )
@@ -580,18 +617,9 @@ class DuplicateDetectionTests(TestCase):
     def setUp(self):
         from catalog.models import Competition, OrganisationType, Series
 
-        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
-        sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
-        self.comp, _ = Competition.objects.get_or_create(
-            sport=sport, season=self.season, slug="afl", defaults={"name": "AFL"},
-        )
-        # See CreateWizardTests.setUp: fed_competitions() hides a competition
-        # whose series resolve to no scraper, and a competition with no series
-        # at all resolves to nothing.
-        series, _ = Series.objects.get_or_create(
-            name="AFL", defaults={"sport": sport, "slug": "afl"},
-        )
-        self.comp.series.add(series)
+        # The season and competition the signup form actually offers — see
+        # signup_fixtures().
+        self.season, self.comp = signup_fixtures()
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
         )
@@ -641,18 +669,9 @@ class ChildOrgCreationTests(TestCase):
     def setUp(self):
         from catalog.models import Competition, OrganisationType, Series
 
-        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
-        sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
-        self.comp, _ = Competition.objects.get_or_create(
-            sport=sport, season=self.season, slug="afl", defaults={"name": "AFL"},
-        )
-        # See CreateWizardTests.setUp: fed_competitions() hides a competition
-        # whose series resolve to no scraper, and a competition with no series
-        # at all resolves to nothing.
-        series, _ = Series.objects.get_or_create(
-            name="AFL", defaults={"sport": sport, "slug": "afl"},
-        )
-        self.comp.series.add(series)
+        # The season and competition the signup form actually offers — see
+        # signup_fixtures().
+        self.season, self.comp = signup_fixtures()
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
         )
@@ -1453,21 +1472,13 @@ class CreateWizardTests(TestCase):
     def setUp(self):
         from catalog.models import Competition, OrganisationType, Series
 
-        self.season, _ = Season.objects.get_or_create(year=2093, defaults={"label": "2093"})
-        self.sport, _ = Sport.objects.get_or_create(name="AFL", defaults={"slug": "afl"})
-        self.comp, _ = Competition.objects.get_or_create(
-            sport=self.sport, season=self.season, slug="afl", defaults={"name": "AFL"},
-        )
-        # The signup form only offers competitions a feed can actually deliver
-        # (orgs.forms.fed_competitions), and that test is "does any of its
-        # series resolve to a scraper". A Competition with no series attached
-        # resolves to nothing, so it was silently absent from the form and the
-        # tipping step rejected it with "7 is not one of the available
-        # choices" — which read as a wizard bug rather than a fixture gap.
-        self.series, _ = Series.objects.get_or_create(
-            name="AFL", defaults={"sport": self.sport, "slug": "afl"},
-        )
-        self.comp.series.add(self.series)
+        # The season and competition the signup form actually offers. Both
+        # rules it applies — current season, and a series a feed can resolve —
+        # live in signup_fixtures(); guessing at either from here is what made
+        # the whole wizard suite fail on "not one of the available choices".
+        self.season, self.comp = signup_fixtures()
+        self.sport = self.comp.sport
+        self.series = self.comp.series.first()
         self.gtype = OrganisationType.objects.get(slug="informal")
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},

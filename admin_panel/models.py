@@ -136,3 +136,101 @@ class Enquiry(models.Model):
     @property
     def is_answered(self) -> bool:
         return self.status == self.STATUS_REPLIED
+
+
+class SiteContent(models.Model):
+    """One editable slot on a public page — the super admin's override of it.
+
+    The public templates are the source of truth for *what slots exist* and
+    what they say by default; this table only holds the edits. That split is
+    deliberate:
+
+    * A fresh database renders the real site, not a page full of empty
+      placeholders — so staging, a new dev checkout and a restored backup all
+      look right without a fixture to load first.
+    * Copy that has never been edited stays in version control where it can be
+      reviewed in a diff, and an edit that turns out badly can be undone by
+      deleting one row ("Reset to default" in the editor) rather than by
+      remembering the old wording.
+
+    The slots themselves are declared in admin_panel/site_blocks.py, which is
+    what the editor renders and what the {% site_text %} family reads defaults
+    from. A key with no row here has simply never been edited.
+    """
+
+    KIND_TEXT = "text"
+    KIND_RICH = "rich"
+    KIND_IMAGE = "image"
+    KIND_VIDEO = "video"
+
+    key = models.CharField(max_length=140, unique=True)
+    # Plain text, and rich HTML, kept in separate columns rather than one:
+    # switching a slot's kind in site_blocks.py must not silently reinterpret
+    # stored markup as text (or worse, the other way round).
+    text = models.TextField(blank=True)
+    html = models.TextField(blank=True)
+    image = models.ImageField(upload_to="site/", blank=True, null=True)
+    video = models.FileField(upload_to="site/", blank=True, null=True)
+    # Still frame shown before the clip plays (and instead of it on a metered
+    # connection or with reduced motion on) — see static/js/gt-video.js.
+    video_poster = models.ImageField(upload_to="site/", blank=True, null=True)
+    alt_text = models.CharField(max_length=300, blank=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="site_content_edits",
+    )
+
+    class Meta:
+        ordering = ["key"]
+        verbose_name = "site content block"
+        verbose_name_plural = "site content"
+
+    def __str__(self):
+        return self.key
+
+    @property
+    def is_empty(self) -> bool:
+        """True when nothing is actually overridden.
+
+        The editor saves a row per submitted form, so a slot cleared back to
+        blank leaves an empty row behind; treating that as "no override" is
+        what makes clearing a field fall back to the template default instead
+        of publishing an empty string to the live site.
+        """
+        return not (
+            self.text or self.html or self.image or self.video
+            or self.video_poster or self.alt_text
+        )
+
+    # -- cache -------------------------------------------------------------
+    # The public home page reads ~40 slots. One query per slot per request is
+    # the obvious way to make a CMS slower than the hard-coded page it
+    # replaced, so the whole (small) table is loaded once and cached, and the
+    # cache is dropped whenever a row changes.
+    CACHE_KEY = "site_content_map_v1"
+
+    @classmethod
+    def map(cls):
+        from django.core.cache import cache
+
+        cached = cache.get(cls.CACHE_KEY)
+        if cached is None:
+            cached = {obj.key: obj for obj in cls.objects.all()}
+            cache.set(cls.CACHE_KEY, cached, 60 * 60)
+        return cached
+
+    @classmethod
+    def bust(cls):
+        from django.core.cache import cache
+
+        cache.delete(cls.CACHE_KEY)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.bust()
+
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+        self.bust()
