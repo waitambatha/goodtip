@@ -1,26 +1,87 @@
 {% extends "admin/base.html" %}
-{% load static %}
+{% load i18n static gtadmin %}
+
 {% comment %}
-Brands the whole admin. Two blocks, both of which Django's own base template
-provides for exactly this.
+The GoodTip skin's entry point.
 
-`extrastyle` rather than replacing the admin's stylesheet: the skin in
-admin.css is a re-skin, not a rebuild, and it works by restating Django's own
-CSS custom properties. Dropping the base sheet would take the layout with it
-and leave a control plane that had to be re-implemented from nothing every
-time Django changed a template.
+Everything the skin needs is hung off blocks Django's admin/base.html already
+provides — extrastyle for the stylesheet, branding for the wordmark, userlinks
+for the account chip, nav-global for the sub-nav — so no admin template is
+forked and an upgrade to base.html carries straight through.
 {% endcomment %}
-{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | GoodTip admin{% endblock %}
 
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin.css' %}">{% endblock %}
+{% block title %}{% if subtitle %}{{ subtitle }} &middot; {% endif %}{{ title }} &middot; GoodTip HQ{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+{% include "partials/_fonts.html" %}
+<link rel="stylesheet" href="{% static 'css/admin.css' %}">
+<link rel="stylesheet" href="{% static 'gtadmin/css/gtadmin.css' %}">
+{% include "partials/_favicon.html" %}
+{% endblock %}
 
 {% block branding %}
-<div id="site-name"><a href="{% url 'admin:index' %}">GoodTip</a></div>
-{% if user.is_authenticated and user.is_staff %}
-  {% comment %}
-  Says which environment you are in. On staging this is the difference between
-  a test and an incident, and the admin's own chrome says nothing about it.
-  {% endcomment %}
-  {% if is_staging %}<span class="gt-env">staging</span>{% endif %}
+<a href="{% url 'admin:index' %}" class="gta-wordmark">GOOD<span>TIP</span><span class="gta-dot">.</span></a>
+{% comment %}
+Which environment you are in. On staging that is the difference between a test
+and an incident, and the admin's own chrome says nothing about it. `is_staging`
+comes from goodtip.context_processors, so it follows the setting rather than
+guessing from the Host header.
+{% endcomment %}
+<span class="gta-envtag"{% if is_staging %} data-env="staging"{% endif %}>
+  {% if is_staging %}Staging{% else %}Control&nbsp;plane{% endif %}
+</span>
+{% if user.is_anonymous %}{% include "admin/color_theme_toggle.html" %}{% endif %}
+{% endblock %}
+
+{% block welcome-msg %}{% endblock %}
+
+{% block userlinks %}
+<span class="gta-who">
+  <span class="gta-avatar">
+    {% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{{ user.get_short_name|default:user.get_username|slice:":1"|upper }}{% endif %}
+  </span>
+  <span>
+    <b>{% firstof user.get_short_name user.get_username %}</b>
+    <small>{% if user.is_superuser %}Super admin{% else %}Staff{% endif %}</small>
+  </span>
+</span>
+{% if site_url %}<a href="{{ site_url }}">{% translate 'View site' %}</a>{% endif %}
+{% if user.has_usable_password %}<a href="{% url 'admin:password_change' %}">{% translate 'Password' %}</a>{% endif %}
+<form id="logout-form" method="post" action="{% url 'admin:logout' %}">
+  {% csrf_token %}
+  <button type="submit">{% translate 'Log out' %}</button>
+</form>
+{% include "admin/color_theme_toggle.html" %}
+{% endblock %}
+
+{% block nav-global %}
+{# One sprite for the whole page — every {% templatetag openblock %} use %} in the admin resolves against it. #}
+{% include "public/partials/_icons.html" %}
+{% if user.is_superuser %}
+{% gta_nav_counts as nav_counts %}
+{% url 'admin:index' as u_index %}
+{% url 'admin:system_report' as u_report %}
+{% url 'admin:site_content' as u_content %}
+{% safe_url 'manage:overview' as u_manage %}
+{% safe_url 'manage:approvals' as u_approvals %}
+{% safe_url 'manage:enquiries' as u_enquiries %}
+{% safe_url 'manage:news' as u_news %}
+<nav class="gta-subnav" aria-label="Admin sections">
+  <a href="{{ u_index }}" class="{% if request.path == u_index %}on{% endif %}">
+    <svg><use href="#ic-home"/></svg>Dashboard</a>
+  <a href="{{ u_report }}" class="{% if request.path == u_report %}on{% endif %}">
+    <svg><use href="#ic-chart"/></svg>System report</a>
+  <a href="{{ u_content }}" class="{% if u_content in request.path %}on{% endif %}">
+    <svg><use href="#ic-image"/></svg>Site content</a>
+  {% if u_approvals %}<a href="{{ u_approvals }}">
+    <svg><use href="#ic-shield-check"/></svg>Approvals{% if nav_counts.approvals %}<span class="gta-count">{{ nav_counts.approvals }}</span>{% endif %}</a>{% endif %}
+  {% if u_enquiries %}<a href="{{ u_enquiries }}">
+    <svg><use href="#ic-mail"/></svg>Enquiries{% if nav_counts.enquiries %}<span class="gta-count">{{ nav_counts.enquiries }}</span>{% endif %}</a>{% endif %}
+  {% if u_news %}<a href="{{ u_news }}">
+    <svg><use href="#ic-doc"/></svg>News &amp; blog</a>{% endif %}
+  {% if u_manage %}<a href="{{ u_manage }}">
+    <svg><use href="#ic-sliders"/></svg>Manage HQ</a>{% endif %}
+</nav>
 {% endif %}
 {% endblock %}

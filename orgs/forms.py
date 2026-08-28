@@ -8,6 +8,28 @@ from catalog.models import (
 from .models import Organisation
 
 
+def current_signup_season():
+    """The season a new organisation is created into.
+
+    The same fallback a betting site's "current round" resolves to without ever
+    asking a punter to pick a year: this year if it exists, otherwise the most
+    recent one on file, otherwise whatever there is.
+
+    It lives here rather than inline in the form because two other places have
+    to agree with it — the form's own `clean()`, which fills the season in when
+    the hidden field is not posted, and the tests, which have to build fixtures
+    into a season the form will actually offer. When the rule was written out
+    inline, tests built competitions for 2093 and 2099, the form silently never
+    offered them, and every wizard test failed on "not one of the available
+    choices" as though the wizard were broken.
+    """
+    return (
+        Season.objects.filter(year=timezone.now().year).first()
+        or Season.objects.filter(year__lte=timezone.now().year).first()
+        or Season.objects.first()
+    )
+
+
 def fed_competitions():
     """Competitions a feed can actually deliver fixtures for.
 
@@ -179,16 +201,10 @@ class OrgCreateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # The season actually in play right now — the same fallback a betting
-        # site's "current round" resolves to without ever asking a punter to
-        # pick a year. Nobody signing up should have to know that a 2027
-        # competition row exists on file before its season has even started;
-        # they tip the season that is live, full stop.
-        current = (
-            Season.objects.filter(year=timezone.now().year).first()
-            or Season.objects.filter(year__lte=timezone.now().year).first()
-            or Season.objects.first()
-        )
+        # Nobody signing up should have to know that a 2027 competition row
+        # exists on file before its season has even started; they tip the
+        # season that is live, full stop. See current_signup_season().
+        current = current_signup_season()
         self.fields["competitions"].queryset = (
             fed_competitions().filter(season=current) if current else fed_competitions()
         )
@@ -266,6 +282,7 @@ class OrgCreateForm(forms.ModelForm):
         cleaned = super().clean()
         self._clean_formality(cleaned)
         self._clean_categories(cleaned)
+        self._fill_season(cleaned)
         method = cleaned.get("charity_method")
         if method == "vote":
             opens = cleaned.get("vote_opens_at")
@@ -284,6 +301,27 @@ class OrgCreateForm(forms.ModelForm):
             if not cleaned.get("charity"):
                 self.add_error("charity", "Choose a charity from the list.")
         return cleaned
+
+    def _fill_season(self, cleaned):
+        """Supply the season when the hidden field was not posted.
+
+        `season` is hidden and not required — it is not a question anyone
+        answers — but the column is NOT NULL, so a submit that leaves it out
+        used to reach the database and 500 with an IntegrityError. A form that
+        stops asking a question owns the answer: take it from the competitions
+        that were picked (the choices are already filtered to one season), and
+        fall back to the season in play.
+        """
+        if cleaned.get("season"):
+            return
+        competitions = cleaned.get("competitions")
+        first = competitions.first() if competitions else None
+        season = getattr(first, "season", None) or current_signup_season()
+        if season is None:
+            self.add_error(None, "No season is set up yet — nothing can be created.")
+            return
+        cleaned["season"] = season
+        self.instance.season = season
 
     @property
     def is_vote(self) -> bool:

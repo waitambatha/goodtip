@@ -23,8 +23,14 @@ from django.conf import settings
 
 # The public pages a client may edit, in the order they appear in the nav.
 # `template` is what gets scanned; `title` is what the editor calls it.
+# Home is deliberately absent. Its copy moved to the Site content editor in
+# /admin/, which declares its slots in admin_panel/site_blocks.py instead of
+# discovering them here — two editors cannot both own one template, and the
+# home page is the one with pictures and video worth managing slot by slot.
+# The other four pages are still edited here. Which of the two editors we keep
+# is an open decision; until it is made, this is the split that leaves both
+# working rather than one silently empty.
 PAGES = [
-    {"slug": "home",     "title": "Home",            "template": "public/home.html",         "url_name": "landing"},
     {"slug": "how",      "title": "How it works",    "template": "public/how_it_works.html", "url_name": "how_it_works"},
     {"slug": "pricing",  "title": "Pricing",         "template": "public/pricing.html",      "url_name": "pricing"},
     {"slug": "about",    "title": "About us",        "template": "public/about.html",        "url_name": "about"},

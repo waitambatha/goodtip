@@ -1,0 +1,38 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Home</a> &rsaquo; Site content</div>
+{% endblock %}
+
+{# The hero already carries the page title; the stock h1 above it repeats it. #}
+{% block content_title %}{% endblock %}
+
+{% block content %}
+<section class="gta-hero">
+  <p class="gta-hero-eyebrow">Public site</p>
+  <h1>Site content</h1>
+  <p>Change the words, photos and video on the public pages without touching a template. Anything you haven't edited keeps saying what it says today — clearing a field puts the original back.</p>
+  <div class="gta-hero-links">
+    <a href="/" target="_blank" rel="noopener" class="primary"><svg><use href="#ic-eye"/></svg>View the live site</a>
+  </div>
+</section>
+
+<div class="gtc-pages">
+  {% for c in cards %}
+  <a class="gtc-page-card" href="{% url 'admin:site_content_page' c.page.slug %}">
+    <span class="gta-app-ic" style="--app-accent:var(--gt-c2);margin-bottom:10px;"><svg><use href="#{{ c.page.icon }}"/></svg></span>
+    <h3>{{ c.page.label }}</h3>
+    <p>{{ c.page.blurb }}</p>
+    <div class="gtc-page-meta">
+      <span class="gta-pill {% if c.edited %}warn{% else %}ok{% endif %}">
+        {% if c.edited %}{{ c.edited }} of {{ c.total }} edited{% else %}All defaults{% endif %}
+      </span>
+      {% if c.last_edited %}<span>Last change {{ c.last_edited|date:"j M Y, g:i a" }}</span>{% endif %}
+    </div>
+  </a>
+  {% empty %}
+  <p class="gta-empty">No pages have editable content declared yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}

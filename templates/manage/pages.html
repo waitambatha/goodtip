@@ -20,6 +20,14 @@ this, or am I thinking of the other page?").
   </p>
 </div>
 
+<div class="card pad-lg" style="margin-bottom:18px;">
+  <p style="margin:0;color:var(--muted);font-size:14px;line-height:1.55;">
+    <b>Looking for the home page?</b> Its words, photos and video are edited in
+    the admin under <b>Site content</b>, which handles pictures and video as
+    well as copy. Everything else on the public site is here.
+  </p>
+</div>
+
 <div class="gt-rows">
   {% for p in pages %}
   <a class="gt-row" href="{% url 'manage:page_edit' p.slug %}">

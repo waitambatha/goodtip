@@ -1,62 +1,141 @@
 {% extends "admin/base_site.html" %}
-{% load i18n static %}
+{% load i18n static gtadmin %}
 
 {% comment %}
-Cannot `{% extends "admin/index.html" %}` from a template of this same name —
-Django re-resolves that name and finds this file again, recursing forever.
-Extending admin/base_site.html and rebuilding the two blocks admin/index.html
-normally fills (content + sidebar) is the documented way around that, per
-Django's own admin-template-override docs.
+Cannot `{% templatetag openblock %} extends "admin/index.html" {% templatetag closeblock %}`
+from a template of this same name — Django re-resolves that name and finds this
+file again, recursing forever. Extending admin/base_site.html and rebuilding
+the two blocks admin/index.html normally fills (content + sidebar) is the
+documented way around that, per Django's own admin-template-override docs.
+
+What replaced the stock page: the app list was the only thing on it, sorted
+alphabetically, with no indication of whether anything needed attention. The
+first screen of the control plane now answers "is anything waiting for me?"
+before it answers "where is the Organisation model?".
 {% endcomment %}
 
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static "admin/css/dashboard.css" %}">{% endblock %}
-{% block coltype %}colMS{% endblock %}
+{% block extrahead %}{{ block.super }}
+<script src="{% static 'gtadmin/js/gt-charts.js' %}" defer></script>
+{% endblock %}
+
+{% block coltype %}colM{% endblock %}
 {% block bodyclass %}{{ block.super }} dashboard{% endblock %}
 {% block nav-breadcrumbs %}{% endblock %}
-{% block nav-sidebar %}{% endblock %}
+{% block content_title %}{% endblock %}
 
 {% block content %}
-<div id="content-main">
-  <div class="module">
-    <table>
-      <caption>
-        <a href="{% url 'admin:system_report' %}" style="display:block;">{% translate "System report" %} &rarr;</a>
-      </caption>
-    </table>
+{% gta_dashboard_stats as gta %}
+
+<section class="gta-hero">
+  <p class="gta-hero-eyebrow">GoodTip HQ</p>
+  <h1>Welcome back, {% firstof user.get_short_name user.get_username %}.</h1>
+  <p>Everything the platform runs on lives here — the people, the organisations, the fixtures, and the words on the public site.</p>
+  <div class="gta-hero-links">
+    <a href="{% url 'admin:system_report' %}" class="primary"><svg><use href="#ic-chart"/></svg>System report</a>
+    <a href="{% url 'admin:site_content' %}"><svg><use href="#ic-image"/></svg>Edit the public site</a>
+    {% safe_url 'manage:overview' as u_manage %}{% if u_manage %}<a href="{{ u_manage }}"><svg><use href="#ic-sliders"/></svg>Manage HQ</a>{% endif %}
+    <a href="/" target="_blank" rel="noopener"><svg><use href="#ic-eye"/></svg>View the site</a>
   </div>
-  {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+</section>
+
+{% if gta.tiles %}
+<div class="gta-kpis">
+  {% for t in gta.tiles %}
+  {% if t.url %}<a href="{% url t.url %}" class="gta-kpi" style="--tile-accent:{{ t.accent }}">{% else %}<div class="gta-kpi" style="--tile-accent:{{ t.accent }}">{% endif %}
+    <div class="gta-kpi-top">
+      <span class="gta-kpi-ic"><svg><use href="#{{ t.icon }}"/></svg></span>
+      <span class="gta-kpi-label">{{ t.label }}</span>
+    </div>
+    <div class="gta-kpi-num">{{ t.value }}</div>
+    <div class="gta-kpi-sub">
+      {{ t.sub }}
+      {% if t.delta is not None %}
+        &middot; <span class="gta-delta {% if t.delta > 0 %}up{% elif t.delta < 0 %}down{% else %}flat{% endif %}">{% if t.delta > 0 %}&uarr;{% elif t.delta < 0 %}&darr;{% else %}&mdash;{% endif %} {{ t.delta }}%</span>
+      {% endif %}
+    </div>
+  {% if t.url %}</a>{% else %}</div>{% endif %}
+  {% endfor %}
+</div>
+
+<div class="gta-card">
+  <div class="gta-card-head">
+    <div>
+      <h2>Last 14 days</h2>
+      <p>New members joining, and successful sign-ins. Hover the chart for any single day.</p>
+    </div>
+    <a class="gta-range" href="{% url 'admin:system_report' %}"><span style="padding:6px 13px;font-size:12.5px;font-weight:600;">Full report &rarr;</span></a>
+  </div>
+  <div class="gta-card-body">
+    <div class="gt-chart" id="c-dash"></div>
+    {{ gta.activity_chart|json_script:"c-dash-data" }}
+  </div>
+</div>
+{% endif %}
+
+<div class="gta-cols">
+  <div>
+    <div class="gta-section-head"><h2>{% translate "Everything in the database" %}</h2></div>
+    {% if app_list %}
+    <div class="gta-apps">
+      {% for app in app_list %}
+      <section class="gta-app" style="--app-accent:{% app_accent app.app_label %}">
+        <div class="gta-app-head">
+          <span class="gta-app-ic"><svg><use href="#{% app_icon app.app_label %}"/></svg></span>
+          <h3><a href="{{ app.app_url }}" class="section" title="{% blocktranslate with name=app.name %}Models in the {{ name }} application{% endblocktranslate %}">{{ app.name }}</a></h3>
+        </div>
+        <ul class="gta-app-models">
+          {% for model in app.models %}
+          <li>
+            {% if model.admin_url %}
+              <a href="{{ model.admin_url }}"{% if model.admin_url in request.path %} aria-current="page"{% endif %}>{{ model.name }}</a>
+            {% else %}
+              <span class="gta-model-flat">{{ model.name }}</span>
+            {% endif %}
+            {% if model.add_url %}<a href="{{ model.add_url }}" class="gta-add" title="{% translate 'Add' %} {{ model.name }}">+</a>{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="gta-empty">{% translate "You don't have permission to view or edit anything." %}</p>
+    {% endif %}
+  </div>
+
+  <aside class="gta-side">
+    <div class="module">
+      <h2>{% translate 'Recent actions' %}</h2>
+      {% load log %}
+      {% get_admin_log 12 as admin_log for_user user %}
+      {% if not admin_log %}
+        <p class="gta-empty">{% translate 'None available' %}</p>
+      {% else %}
+      <ul class="gta-actions">
+        {% for entry in admin_log %}
+        <li>
+          <div class="gta-act-row">
+            <span class="gta-act-dot {% if entry.is_addition %}add{% elif entry.is_change %}change{% elif entry.is_deletion %}delete{% endif %}" aria-hidden="true"></span>
+            <div class="gta-act-body">
+              {% if entry.is_deletion or not entry.get_admin_url %}
+                <span class="obj">{{ entry.object_repr }}</span>
+              {% else %}
+                <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+              {% endif %}
+              <div class="gta-act-meta">
+                {% if entry.is_addition %}{% translate 'Added' %}{% elif entry.is_change %}{% translate 'Changed' %}{% else %}{% translate 'Deleted' %}{% endif %}
+                &middot; {% if entry.content_type %}{{ entry.content_type.name|capfirst }}{% else %}{% translate 'Unknown content' %}{% endif %}
+                &middot; {{ entry.action_time|date:"j M, g:i a" }}
+              </div>
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+  </aside>
 </div>
 {% endblock %}
 
-{% block sidebar %}
-<div id="content-related">
-    <div class="module" id="recent-actions-module">
-        <h2>{% translate 'Recent actions' %}</h2>
-        <h3>{% translate 'My actions' %}</h3>
-            {% load log %}
-            {% get_admin_log 10 as admin_log for_user user %}
-            {% if not admin_log %}
-            <p>{% translate 'None available' %}</p>
-            {% else %}
-            <ul class="actionlist">
-            {% for entry in admin_log %}
-            <li class="{% if entry.is_addition %}addlink{% endif %}{% if entry.is_change %}changelink{% endif %}{% if entry.is_deletion %}deletelink{% endif %}">
-                <span class="visually-hidden">{% if entry.is_addition %}{% translate 'Added:' %}{% elif entry.is_change %}{% translate 'Changed:' %}{% elif entry.is_deletion %}{% translate 'Deleted:' %}{% endif %}</span>
-                {% if entry.is_deletion or not entry.get_admin_url %}
-                    {{ entry.object_repr }}
-                {% else %}
-                    <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
-                {% endif %}
-                <br>
-                {% if entry.content_type %}
-                    <span class="mini quiet">{% filter capfirst %}{{ entry.content_type.name }}{% endfilter %}</span>
-                {% else %}
-                    <span class="mini quiet">{% translate 'Unknown content' %}</span>
-                {% endif %}
-            </li>
-            {% endfor %}
-            </ul>
-            {% endif %}
-    </div>
-</div>
-{% endblock %}
+{% block sidebar %}{% endblock %}

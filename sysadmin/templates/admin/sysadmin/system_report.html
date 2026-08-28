@@ -1,82 +1,212 @@
 {% extends "admin/base_site.html" %}
+{% load static humanize %}
+
+{% block extrahead %}{{ block.super }}
+<script src="{% static 'gtadmin/js/gt-charts.js' %}" defer></script>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Home</a> &rsaquo; System report</div>
+{% endblock %}
 
 {% block content %}
-<div style="max-width: 980px;">
-  <p>Generated {{ generated_at }}.</p>
+<p class="gta-stamp">
+  Live figures, computed when this page loaded &mdash; {{ generated_at|date:"j M Y, g:i a" }}.
+</p>
 
-  <h2>Overview</h2>
-  <table>
-    <tr><th style="text-align:left; padding-right: 24px;">Users</th><td>{{ counts.users }}</td></tr>
-    <tr><th style="text-align:left; padding-right: 24px;">Organisations</th><td>{{ counts.orgs }} ({{ counts.orgs_last_7d }} in the last 7 days, {{ counts.orgs_last_30d }} in the last 30)</td></tr>
-    <tr><th style="text-align:left; padding-right: 24px;">Groups</th><td>{{ counts.groups }}</td></tr>
-    <tr><th style="text-align:left; padding-right: 24px;">Org memberships</th><td>{{ counts.memberships }}</td></tr>
-    <tr><th style="text-align:left; padding-right: 24px;">Pending join requests</th><td>{{ counts.pending_join_requests }}</td></tr>
-    <tr><th style="text-align:left; padding-right: 24px;">Open enquiries</th><td>{{ counts.open_enquiries }}</td></tr>
-  </table>
+{# ---- headline numbers ---- #}
+<div class="gta-kpis">
+  <a href="{% url 'admin:accounts_user_changelist' %}" class="gta-kpi" style="--tile-accent:var(--gt-c1)">
+    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-users"/></svg></span><span class="gta-kpi-label">Members</span></div>
+    <div class="gta-kpi-num">{{ counts.users|intcomma }}</div>
+    <div class="gta-kpi-sub">+{{ counts.users_last_7d }} in the last 7 days</div>
+  </a>
+  <a href="{% url 'admin:orgs_organisation_changelist' %}" class="gta-kpi" style="--tile-accent:var(--gt-c2)">
+    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-org"/></svg></span><span class="gta-kpi-label">Organisations</span></div>
+    <div class="gta-kpi-num">{{ counts.orgs|intcomma }}</div>
+    <div class="gta-kpi-sub">{{ counts.orgs_last_7d }} this week &middot; {{ counts.orgs_last_30d }} this month</div>
+  </a>
+  <div class="gta-kpi" style="--tile-accent:var(--gt-c4)">
+    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-people"/></svg></span><span class="gta-kpi-label">Memberships</span></div>
+    <div class="gta-kpi-num">{{ counts.memberships|intcomma }}</div>
+    <div class="gta-kpi-sub">across {{ counts.groups|intcomma }} group{{ counts.groups|pluralize }}</div>
+  </div>
+  <div class="gta-kpi" style="--tile-accent:var(--gt-c3)">
+    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-target"/></svg></span><span class="gta-kpi-label">Tips</span></div>
+    <div class="gta-kpi-num">{{ counts.tips|intcomma }}</div>
+    <div class="gta-kpi-sub">{{ counts.tips_last_7d|intcomma }} in the last 7 days</div>
+  </div>
+</div>
 
-  <h2>Logins</h2>
-  <table>
-    <tr><th style="text-align:left; padding-right: 24px;">Successful, last 24h</th><td>{{ login_counts.last_24h }}</td></tr>
-    <tr><th style="text-align:left; padding-right: 24px;">Successful, last 7 days</th><td>{{ login_counts.last_7d }}</td></tr>
-    <tr><th style="text-align:left; padding-right: 24px;">Failed, last 24h</th><td>{{ login_counts.failed_last_24h }}</td></tr>
-    <tr><th style="text-align:left; padding-right: 24px;">Failed, last 7 days</th><td>{{ login_counts.failed_last_7d }}</td></tr>
-  </table>
-
-  <h3>Recent logins</h3>
-  {% if recent_logins %}
-  <table id="result_list">
-    <thead><tr><th>When</th><th>Email</th><th>User</th><th>Result</th><th>IP</th></tr></thead>
-    <tbody>
-      {% for ev in recent_logins %}
-      <tr>
-        <td>{{ ev.created_at }}</td>
-        <td>{{ ev.email }}</td>
-        <td>{% if ev.user %}<a href="{% url 'admin:accounts_user_change' ev.user_id %}">{{ ev.user }}</a>{% else %}—{% endif %}</td>
-        <td>{% if ev.success %}ok{% else %}failed{% endif %}</td>
-        <td>{{ ev.ip_address|default:"—" }}</td>
-      </tr>
+{# ---- trend charts ---- #}
+<div class="gta-card">
+  <div class="gta-card-head">
+    <div>
+      <h2>Growth</h2>
+      <p>New members and new organisations, one point per day. Hover for a single day; click a name to hide that line.</p>
+    </div>
+    <div class="gta-range">
+      {% for opt in span_options %}
+      <a href="?days={{ opt }}" class="{% if span == opt %}on{% endif %}">{{ opt }} days</a>
       {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p>No logins recorded yet.</p>
-  {% endif %}
-  <p><a href="{% url 'admin:sysadmin_loginevent_changelist' %}">Full login history &rarr;</a></p>
+    </div>
+  </div>
+  <div class="gta-card-body">
+    <div class="gt-chart" id="c-growth"></div>
+    {{ growth_chart|json_script:"c-growth-data" }}
+  </div>
+</div>
 
-  <h2>Stress tests</h2>
-  {% if recent_stress_tests %}
-  <table id="result_list">
-    <thead><tr><th>Label</th><th>Started</th><th>Requests</th><th>Success</th><th>Failures</th><th>Avg (ms)</th><th>Req/s</th></tr></thead>
-    <tbody>
-      {% for run in recent_stress_tests %}
-      <tr>
-        <td><a href="{% url 'admin:sysadmin_stresstestrun_change' run.pk %}">{{ run.label }}</a></td>
-        <td>{{ run.started_at }}</td>
-        <td>{{ run.total_requests }}</td>
-        <td>{{ run.success_count }}</td>
-        <td>{{ run.failure_count }}</td>
-        <td>{{ run.avg_response_ms|default:"—" }}</td>
-        <td>{{ run.requests_per_sec|default:"—" }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p>No stress test runs recorded yet — add one via the "Add stress test run" button in the admin, or pipe results in with <code>manage.py record_stress_test_run</code>.</p>
-  {% endif %}
-  <p><a href="{% url 'admin:sysadmin_stresstestrun_add' %}">Add a stress test run &rarr;</a></p>
+<div class="gta-grid-2">
+  <div class="gta-card">
+    <div class="gta-card-head">
+      <div>
+        <h2>Sign-ins</h2>
+        <p>Stacked per day: who got in, and who didn't.</p>
+      </div>
+      <span class="gta-pill {% if login_counts.fail_rate_7d > 25 %}bad{% elif login_counts.fail_rate_7d > 10 %}warn{% else %}ok{% endif %}">
+        {{ login_counts.fail_rate_7d }}% failed this week
+      </span>
+    </div>
+    <div class="gta-card-body">
+      <div class="gt-chart" id="c-logins"></div>
+      {{ login_chart|json_script:"c-logins-data" }}
+    </div>
+  </div>
 
-  <h2>System</h2>
-  <table>
-    {% if system.disk_total_gb %}
-    <tr><th style="text-align:left; padding-right: 24px;">Disk</th><td>{{ system.disk_used_gb }} GB used of {{ system.disk_total_gb }} GB ({{ system.disk_used_pct }}%), {{ system.disk_free_gb }} GB free</td></tr>
+  <div class="gta-card">
+    <div class="gta-card-head">
+      <div>
+        <h2>Tipping activity</h2>
+        <p>Tips submitted per day &mdash; the shape of a round.</p>
+      </div>
+    </div>
+    <div class="gta-card-body">
+      <div class="gt-chart" id="c-tips"></div>
+      {{ tips_chart|json_script:"c-tips-data" }}
+    </div>
+  </div>
+</div>
+
+<div class="gta-grid-2">
+  <div class="gta-card">
+    <div class="gta-card-head">
+      <div><h2>Organisation sizes</h2><p>How many members each organisation has.</p></div>
+    </div>
+    <div class="gta-card-body">
+      <div class="gt-chart" id="c-sizes"></div>
+      {{ size_chart|json_script:"c-sizes-data" }}
+    </div>
+  </div>
+
+  <div class="gta-card">
+    <div class="gta-card-head">
+      <div><h2>Biggest organisations</h2><p>Top eight by member count.</p></div>
+      <a class="gtc-view" href="{% url 'admin:orgs_organisation_changelist' %}">All organisations</a>
+    </div>
+    <div class="gta-card-body">
+      <div class="gt-chart" id="c-toporgs"></div>
+      {{ top_orgs_chart|json_script:"c-toporgs-data" }}
+    </div>
+  </div>
+</div>
+
+{# ---- attention + machine ---- #}
+<div class="gta-grid-2">
+  <div class="gta-card">
+    <div class="gta-card-head"><div><h2>Waiting on you</h2></div></div>
+    <div class="gta-card-body">
+      <ul class="gta-defs">
+        <li><span class="k">Pending join requests</span><span class="v">{{ counts.pending_join_requests }}</span></li>
+        <li><span class="k">Open enquiries</span><span class="v">{{ counts.open_enquiries }}</span></li>
+        <li><span class="k">Failed sign-ins, last 24h</span><span class="v">{{ login_counts.failed_last_24h }}</span></li>
+        <li><span class="k">Successful sign-ins, last 24h</span><span class="v">{{ login_counts.last_24h }}</span></li>
+      </ul>
+      <div style="margin-top:16px;">
+        <div class="gt-chart" id="c-enquiries"></div>
+        {{ enquiry_chart|json_script:"c-enquiries-data" }}
+      </div>
+    </div>
+  </div>
+
+  <div class="gta-card">
+    <div class="gta-card-head"><div><h2>The machine</h2><p>Disk and load on the box serving this page.</p></div></div>
+    <div class="gta-card-body">
+      {% if system.disk_total_gb %}
+      <div class="gta-meter" style="--meter-accent:{% if system.disk_used_pct > 90 %}var(--gt-c6){% elif system.disk_used_pct > 75 %}var(--gt-c3){% else %}var(--gt-c1){% endif %}">
+        <div class="gta-meter-top"><span class="k">Disk</span><span class="v">{{ system.disk_used_pct }}%</span></div>
+        <div class="gta-meter-bar"><i style="width:{{ system.disk_used_pct }}%"></i></div>
+        <p class="gta-meter-note">{{ system.disk_used_gb }} GB used of {{ system.disk_total_gb }} GB &middot; {{ system.disk_free_gb }} GB free</p>
+      </div>
+      {% endif %}
+      {% if system.load_avg %}
+      <div class="gta-meter" style="--meter-accent:{% if system.load_pct > 90 %}var(--gt-c6){% elif system.load_pct > 60 %}var(--gt-c3){% else %}var(--gt-c1){% endif %}">
+        <div class="gta-meter-top"><span class="k">Load, 1 minute</span><span class="v">{{ system.load_avg.0 }}</span></div>
+        <div class="gta-meter-bar"><i style="width:{{ system.load_pct }}%"></i></div>
+        <p class="gta-meter-note">{{ system.load_avg.0 }} / {{ system.load_avg.1 }} / {{ system.load_avg.2 }} over 1/5/15 min, across {{ system.cpu_count }} core{{ system.cpu_count|pluralize }}</p>
+      </div>
+      {% endif %}
+      {% if not system.disk_total_gb and not system.load_avg %}
+      <p class="gta-empty" style="padding:0;">Not available on this platform.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# ---- tables ---- #}
+<div class="gta-card">
+  <div class="gta-card-head">
+    <div><h2>Recent sign-ins</h2></div>
+    <a class="gtc-view" href="{% url 'admin:sysadmin_loginevent_changelist' %}">Full history</a>
+  </div>
+  <div class="gta-card-body flush">
+    {% if recent_logins %}
+    <table class="gta-table">
+      <thead><tr><th>When</th><th>Email</th><th>Account</th><th>Result</th><th>IP</th></tr></thead>
+      <tbody>
+        {% for ev in recent_logins %}
+        <tr>
+          <td>{{ ev.created_at|date:"j M, g:i a" }}</td>
+          <td>{{ ev.email }}</td>
+          <td>{% if ev.user %}<a href="{% url 'admin:accounts_user_change' ev.user_id %}">{{ ev.user }}</a>{% else %}&mdash;{% endif %}</td>
+          <td><span class="gta-pill {% if ev.success %}ok{% else %}bad{% endif %}">{% if ev.success %}Signed in{% else %}Failed{% endif %}</span></td>
+          <td>{{ ev.ip_address|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="gta-empty">No sign-ins recorded yet.</p>
     {% endif %}
-    {% if system.load_avg %}
-    <tr><th style="text-align:left; padding-right: 24px;">Load average (1/5/15 min)</th><td>{{ system.load_avg.0 }} / {{ system.load_avg.1 }} / {{ system.load_avg.2 }}</td></tr>
+  </div>
+</div>
+
+<div class="gta-card">
+  <div class="gta-card-head">
+    <div><h2>Stress tests</h2></div>
+    <a class="gtc-view" href="{% url 'admin:sysadmin_stresstestrun_add' %}">Record a run</a>
+  </div>
+  <div class="gta-card-body flush">
+    {% if recent_stress_tests %}
+    <table class="gta-table">
+      <thead><tr><th>Label</th><th>Started</th><th>Requests</th><th>OK</th><th>Failed</th><th>Avg ms</th><th>Req/s</th></tr></thead>
+      <tbody>
+        {% for run in recent_stress_tests %}
+        <tr>
+          <td><a href="{% url 'admin:sysadmin_stresstestrun_change' run.pk %}">{{ run.label }}</a></td>
+          <td>{{ run.started_at|date:"j M, g:i a" }}</td>
+          <td>{{ run.total_requests|intcomma }}</td>
+          <td>{{ run.success_count|intcomma }}</td>
+          <td>{{ run.failure_count|intcomma }}</td>
+          <td>{{ run.avg_response_ms|default:"—" }}</td>
+          <td>{{ run.requests_per_sec|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="gta-empty">No stress test runs recorded yet &mdash; record one above, or pipe results in with <code>manage.py record_stress_test_run</code>.</p>
     {% endif %}
-    {% if not system.disk_total_gb and not system.load_avg %}
-    <tr><td colspan="2">Not available on this platform.</td></tr>
-    {% endif %}
-  </table>
+  </div>
 </div>
 {% endblock %}

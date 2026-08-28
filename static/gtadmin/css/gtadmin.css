@@ -1,0 +1,1269 @@
+/* ==========================================================================
+   GoodTip admin skin
+   --------------------------------------------------------------------------
+   Loaded after Django's own admin/css/base.css (and dark_mode.css) from
+   templates/admin/base_site.html, so everything here is either a redefinition
+   of one of Django's documented CSS custom properties or a targeted override
+   of a class Django's admin markup actually emits.
+
+   Two rules kept this from turning into a fork of the admin stylesheet:
+
+   1. Colour goes through Django's variables, never through per-element rules.
+      Django recolours the whole admin from ~40 custom properties on :root;
+      redefining those means every widget we never touched — the calendar
+      pop-up, the filter horizontal box, the inline delete links — comes out
+      in brand colours too, and keeps working when Django changes its markup.
+
+   2. Dark mode is redefined in the same three places Django defines it
+      (:root, the prefers-color-scheme media query, and html[data-theme=...]),
+      so the admin's own light/dark/auto toggle still drives it.
+   ========================================================================== */
+
+/* ---- Brand constants (theme-independent) --------------------------------- */
+:root {
+  --gt-deep:    #0F2E22;
+  --gt-deep-2:  #0B2319;
+  --gt-panel:   #152B1E;
+  --gt-forest:  #2D7A3A;
+  --gt-lime:    #C8F135;
+  --gt-lime-dk: #A9D11C;
+  --gt-cream:   #E8E4D5;
+
+  --gt-r-card: 14px;
+  --gt-r-ctl:  9px;
+  --gt-r-pill: 999px;
+
+  --gt-shadow-sm: 0 1px 2px rgba(15,46,34,.06), 0 1px 3px rgba(15,46,34,.05);
+  --gt-shadow:    0 2px 4px rgba(15,46,34,.04), 0 8px 24px -8px rgba(15,46,34,.14);
+  --gt-shadow-lg: 0 24px 60px -22px rgba(15,46,34,.34);
+
+  --gt-display: 'Archivo Black', system-ui, sans-serif;
+  --gt-body:    'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --gt-mark:    'Barlow Condensed', system-ui, sans-serif;
+  --gt-num:     'Barlow Semi Condensed', system-ui, sans-serif;
+
+  /* Categorical series colours for the charts. Ordered so the first three are
+     distinguishable in the common forms of colour-blindness, and every one of
+     them clears 3:1 against both the light and the dark card surface. */
+  --gt-c1: #2D7A3A;
+  --gt-c2: #1F7A63;
+  --gt-c3: #C77C1E;
+  --gt-c4: #2E6E7A;
+  --gt-c5: #7A4FA3;
+  --gt-c6: #B23434;
+}
+
+/* ---- Light theme --------------------------------------------------------- */
+html[data-theme="light"],
+:root {
+  --primary: var(--gt-deep);
+  --secondary: var(--gt-deep);
+  --accent: var(--gt-lime);
+  --primary-fg: #fff;
+
+  --body-fg: #16241D;
+  --body-bg: #F1F4EE;
+  --body-quiet-color: #66756B;
+  --body-medium-color: #43554A;
+  --body-loud-color: var(--gt-deep);
+
+  --header-color: rgba(255,255,255,.72);
+  --header-branding-color: var(--gt-lime);
+  --header-bg: var(--gt-deep);
+  --header-link-color: #fff;
+
+  --breadcrumbs-fg: #5C6D62;
+  --breadcrumbs-link-fg: var(--gt-deep);
+  --breadcrumbs-bg: transparent;
+
+  --link-fg: #1F6B45;
+  --link-hover-color: var(--gt-deep);
+  --link-selected-fg: var(--gt-deep);
+
+  --hairline-color: rgba(15,46,34,.09);
+  --border-color: rgba(15,46,34,.14);
+
+  --error-fg: #A62121;
+
+  --message-success-bg: #E4F3DF;
+  --message-warning-bg: #FBF0D2;
+  --message-error-bg: #FBE7E7;
+
+  --darkened-bg: #E9EEE5;
+  --selected-bg: #E4EDDD;
+  --selected-row: #F6F8C9;
+
+  --button-fg: #fff;
+  --button-bg: var(--gt-deep);
+  --button-hover-bg: #1B4735;
+  --default-button-bg: var(--gt-forest);
+  --default-button-hover-bg: #256632;
+  --close-button-bg: #6B7A6E;
+  --close-button-hover-bg: #4A5850;
+  --delete-button-bg: #A62121;
+  --delete-button-hover-bg: #8A1919;
+
+  --object-tools-fg: var(--gt-deep);
+  --object-tools-bg: var(--gt-lime);
+  --object-tools-hover-bg: var(--gt-lime-dk);
+
+  --font-family-primary: var(--gt-body);
+
+  /* Skin-local surfaces. Everything that draws a card reads these, so the
+     dark blocks below only have to restate these four. */
+  --gt-surface: #FFFFFF;
+  --gt-surface-2: #F7F9F4;
+  --gt-surface-3: #EDF1E8;
+  --gt-on-deep: rgba(255,255,255,.72);
+
+  color-scheme: light;
+}
+
+/* ---- Dark theme ---------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: var(--gt-lime);
+    --primary-fg: var(--gt-deep);
+
+    --body-fg: #E6EDE7;
+    --body-bg: #0A1310;
+    --body-quiet-color: #9BAEA1;
+    --body-medium-color: #C3D2C7;
+    --body-loud-color: #FFFFFF;
+
+    --header-bg: #0A1B14;
+    --header-color: rgba(255,255,255,.66);
+    --header-branding-color: var(--gt-lime);
+    --header-link-color: #fff;
+
+    --breadcrumbs-fg: #93A798;
+    --breadcrumbs-link-fg: #D7E3D9;
+    --breadcrumbs-bg: transparent;
+
+    --link-fg: var(--gt-lime);
+    --link-hover-color: #DFF77B;
+    --link-selected-fg: var(--gt-lime);
+
+    --hairline-color: rgba(200,241,53,.10);
+    --border-color: rgba(200,241,53,.16);
+
+    --error-fg: #F08A8A;
+    --message-success-bg: #133B22;
+    --message-warning-bg: #3D3110;
+    --message-error-bg: #401616;
+
+    --darkened-bg: #101E17;
+    --selected-bg: #16291F;
+    --selected-row: #1E3520;
+
+    --button-fg: var(--gt-deep);
+    --button-bg: var(--gt-lime);
+    --button-hover-bg: var(--gt-lime-dk);
+    --default-button-bg: var(--gt-lime);
+    --default-button-hover-bg: var(--gt-lime-dk);
+    --close-button-bg: #33453A;
+    --close-button-hover-bg: #465B4E;
+    --delete-button-bg: #B23434;
+    --delete-button-hover-bg: #932A2A;
+
+    --object-tools-fg: var(--gt-deep);
+    --object-tools-bg: var(--gt-lime);
+    --object-tools-hover-bg: var(--gt-lime-dk);
+
+    --gt-surface: #12211A;
+    --gt-surface-2: #0F1C16;
+    --gt-surface-3: #182A20;
+    --gt-on-deep: rgba(255,255,255,.66);
+
+    --gt-c1: #7BD48A;
+    --gt-c2: #5CCFB4;
+    --gt-c3: #E8B45C;
+    --gt-c4: #6FC0D0;
+    --gt-c5: #BFA0E0;
+    --gt-c6: #F08A8A;
+
+    --gt-shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+    --gt-shadow: 0 2px 4px rgba(0,0,0,.3), 0 10px 28px -10px rgba(0,0,0,.6);
+    --gt-shadow-lg: 0 24px 60px -22px rgba(0,0,0,.7);
+
+    color-scheme: dark;
+  }
+}
+
+html[data-theme="dark"] {
+  --primary: var(--gt-lime);
+  --primary-fg: var(--gt-deep);
+
+  --body-fg: #E6EDE7;
+  --body-bg: #0A1310;
+  --body-quiet-color: #9BAEA1;
+  --body-medium-color: #C3D2C7;
+  --body-loud-color: #FFFFFF;
+
+  --header-bg: #0A1B14;
+  --header-color: rgba(255,255,255,.66);
+  --header-branding-color: var(--gt-lime);
+  --header-link-color: #fff;
+
+  --breadcrumbs-fg: #93A798;
+  --breadcrumbs-link-fg: #D7E3D9;
+  --breadcrumbs-bg: transparent;
+
+  --link-fg: var(--gt-lime);
+  --link-hover-color: #DFF77B;
+  --link-selected-fg: var(--gt-lime);
+
+  --hairline-color: rgba(200,241,53,.10);
+  --border-color: rgba(200,241,53,.16);
+
+  --error-fg: #F08A8A;
+  --message-success-bg: #133B22;
+  --message-warning-bg: #3D3110;
+  --message-error-bg: #401616;
+
+  --darkened-bg: #101E17;
+  --selected-bg: #16291F;
+  --selected-row: #1E3520;
+
+  --button-fg: var(--gt-deep);
+  --button-bg: var(--gt-lime);
+  --button-hover-bg: var(--gt-lime-dk);
+  --default-button-bg: var(--gt-lime);
+  --default-button-hover-bg: var(--gt-lime-dk);
+  --close-button-bg: #33453A;
+  --close-button-hover-bg: #465B4E;
+  --delete-button-bg: #B23434;
+  --delete-button-hover-bg: #932A2A;
+
+  --object-tools-fg: var(--gt-deep);
+  --object-tools-bg: var(--gt-lime);
+  --object-tools-hover-bg: var(--gt-lime-dk);
+
+  --gt-surface: #12211A;
+  --gt-surface-2: #0F1C16;
+  --gt-surface-3: #182A20;
+  --gt-on-deep: rgba(255,255,255,.66);
+
+  --gt-c1: #7BD48A;
+  --gt-c2: #5CCFB4;
+  --gt-c3: #E8B45C;
+  --gt-c4: #6FC0D0;
+  --gt-c5: #BFA0E0;
+  --gt-c6: #F08A8A;
+
+  --gt-shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+  --gt-shadow: 0 2px 4px rgba(0,0,0,.3), 0 10px 28px -10px rgba(0,0,0,.6);
+  --gt-shadow-lg: 0 24px 60px -22px rgba(0,0,0,.7);
+
+  color-scheme: dark;
+}
+
+/* ==========================================================================
+   2. CHROME — header, breadcrumbs, sidebar, footer
+   ========================================================================== */
+
+body {
+  font-family: var(--gt-body);
+  font-size: .875rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+#container { min-height: 100%; }
+
+/* ---- Header -------------------------------------------------------------- */
+#header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding: 0 clamp(16px, 3vw, 32px);
+  min-height: 60px;
+  gap: 18px;
+  /* Django lays #header out as a single flex row. The sub-nav is a third
+     child that has to sit on its own line under the other two, which is what
+     wrap + a 100% basis on it buys. */
+  flex-wrap: wrap;
+  align-items: center;
+  background: var(--header-bg);
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(255,255,255,.06), 0 6px 22px -14px rgba(0,0,0,.9);
+}
+
+/* The lime rule under the bar is the one piece of brand furniture that has to
+   survive every theme, so it is painted rather than inherited. */
+#header::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--gt-lime), var(--gt-forest) 55%, transparent);
+  opacity: .85;
+}
+
+#branding { display: flex; align-items: center; gap: 14px; }
+
+.gta-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  font-family: var(--gt-mark);
+  font-weight: 900;
+  font-size: 26px;
+  letter-spacing: .06em;
+  line-height: 1;
+  color: #fff;
+  text-transform: uppercase;
+}
+.gta-wordmark span { color: var(--gt-lime); }
+.gta-wordmark:link, .gta-wordmark:visited { color: #fff; text-decoration: none; }
+.gta-wordmark:hover { color: #fff; }
+.gta-wordmark .gta-dot { color: var(--gt-lime); }
+
+.gta-envtag {
+  font-family: var(--gt-mark);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: var(--gt-r-pill);
+  border: 1px solid rgba(200,241,53,.38);
+  color: var(--gt-lime);
+  white-space: nowrap;
+}
+.gta-envtag[data-env="staging"] { border-color: rgba(232,180,92,.5); color: #E8B45C; }
+
+#user-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--gt-on-deep);
+  padding: 0;
+}
+#user-tools a, #user-tools a:link, #user-tools a:visited {
+  color: rgba(255,255,255,.86);
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: var(--gt-r-pill);
+  padding: 6px 12px;
+  text-decoration: none;
+  transition: background .15s, border-color .15s, color .15s;
+}
+#user-tools a:hover, #user-tools a:focus {
+  background: rgba(200,241,53,.14);
+  border-color: rgba(200,241,53,.5);
+  color: #fff;
+  text-decoration: none;
+}
+#user-tools #logout-form { display: inline; margin: 0; padding: 0; }
+#user-tools #logout-form button {
+  font: inherit;
+  color: rgba(255,255,255,.86);
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: var(--gt-r-pill);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+#user-tools #logout-form button:hover {
+  background: rgba(178,52,52,.28);
+  border-color: rgba(240,138,138,.5);
+  color: #fff;
+}
+.gta-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding-right: 4px;
+}
+.gta-avatar {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--gt-lime);
+  color: var(--gt-deep);
+  font-family: var(--gt-display);
+  font-size: 13px;
+  overflow: hidden;
+  flex: none;
+}
+.gta-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.gta-who b { color: #fff; font-weight: 600; display: block; line-height: 1.15; }
+.gta-who small { color: var(--gt-lime); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; }
+
+/* Django's theme toggle sits in #user-tools; make it match the pills. */
+#user-tools .theme-toggle {
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: var(--gt-r-pill);
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  color: #fff;
+}
+#user-tools .theme-toggle:hover { background: rgba(200,241,53,.14); border-color: rgba(200,241,53,.5); }
+#user-tools .theme-toggle svg { fill: currentColor; }
+
+/* ---- Global sub-nav ------------------------------------------------------ */
+.gta-subnav {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0 clamp(16px, 3vw, 32px);
+  margin: 0 calc(clamp(16px, 3vw, 32px) * -1) 0;
+  width: calc(100% + clamp(16px, 3vw, 32px) * 2);
+  background: rgba(0,0,0,.22);
+  border-top: 1px solid rgba(255,255,255,.07);
+}
+.gta-subnav::-webkit-scrollbar { display: none; }
+.gta-subnav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  padding: 11px 13px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,.7);
+  border-bottom: 2px solid transparent;
+  text-decoration: none;
+}
+.gta-subnav a svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.9; }
+.gta-subnav a:hover { color: #fff; background: rgba(255,255,255,.05); text-decoration: none; }
+.gta-subnav a.on { color: var(--gt-lime); border-bottom-color: var(--gt-lime); }
+.gta-subnav .gta-count {
+  font-family: var(--gt-num);
+  font-size: 11px;
+  font-weight: 800;
+  background: var(--gt-lime);
+  color: var(--gt-deep);
+  border-radius: var(--gt-r-pill);
+  padding: 1px 6px;
+}
+
+/* ---- Breadcrumbs --------------------------------------------------------- */
+div.breadcrumbs {
+  background: transparent;
+  color: var(--breadcrumbs-fg);
+  padding: 14px clamp(16px, 3vw, 32px) 0;
+  font-size: 12.5px;
+  border: 0;
+}
+div.breadcrumbs a { color: var(--breadcrumbs-link-fg); font-weight: 600; }
+
+/* ---- Main / sidebar ------------------------------------------------------ */
+.main > #nav-sidebar { flex: 0 0 250px; }
+#nav-sidebar {
+  background: var(--gt-surface);
+  border-right: 1px solid var(--hairline-color);
+  padding: 14px 10px 40px;
+}
+#nav-sidebar .module th,
+#nav-sidebar .module caption {
+  font-family: var(--gt-mark);
+  font-size: 12px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--body-quiet-color);
+  background: transparent;
+  padding: 14px 10px 6px;
+  border: 0;
+}
+#nav-sidebar .module caption a,
+#nav-sidebar .module caption a:link,
+#nav-sidebar .module caption a:visited { color: var(--body-quiet-color); }
+#nav-sidebar table { border-spacing: 0; }
+#nav-sidebar td, #nav-sidebar th { border: 0; padding: 0; }
+#nav-sidebar .model a,
+#nav-sidebar th a {
+  display: block;
+  border-radius: var(--gt-r-ctl);
+  padding: 8px 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--body-fg);
+}
+#nav-sidebar .model a:hover,
+#nav-sidebar th a:hover { background: var(--gt-surface-3); color: var(--body-loud-color); text-decoration: none; }
+#nav-sidebar .current-model a,
+#nav-sidebar .current-model th a,
+#nav-sidebar tr.current-model a {
+  background: var(--gt-deep);
+  color: #fff;
+  font-weight: 600;
+}
+html[data-theme="dark"] #nav-sidebar tr.current-model a { background: var(--gt-lime); color: var(--gt-deep); }
+#nav-filter-field {
+  border-radius: var(--gt-r-ctl);
+  border: 1px solid var(--border-color);
+  background: var(--gt-surface-2);
+  padding: 8px 11px;
+  width: 100%;
+  box-sizing: border-box;
+}
+#toggle-nav-sidebar {
+  border-right: 1px solid var(--hairline-color);
+  background: var(--gt-surface);
+  color: var(--body-quiet-color);
+}
+#toggle-nav-sidebar:hover { background: var(--gt-surface-3); }
+
+.main > .content, #content { padding: 18px clamp(16px, 3vw, 32px) 48px; }
+#content > h1 {
+  font-family: var(--gt-display);
+  font-size: clamp(24px, 2.6vw, 34px);
+  letter-spacing: -.015em;
+  color: var(--body-loud-color);
+  margin: 6px 0 20px;
+}
+#content > h2 { font-size: 16px; color: var(--body-quiet-color); font-weight: 600; margin-top: -12px; }
+
+#footer { padding: 0 clamp(16px, 3vw, 32px) 28px; color: var(--body-quiet-color); font-size: 12px; }
+
+/* ==========================================================================
+   3. SURFACES — modules, cards, tables
+   ========================================================================== */
+
+.module {
+  background: var(--gt-surface);
+  border: 1px solid var(--hairline-color);
+  border-radius: var(--gt-r-card);
+  box-shadow: var(--gt-shadow-sm);
+  overflow: hidden;
+  margin-bottom: 20px;
+  padding: 0;
+}
+.module > h2, .module caption, .inline-group h2 {
+  font-family: var(--gt-mark);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  background: var(--gt-surface-3);
+  color: var(--body-medium-color);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hairline-color);
+}
+.module h3 { padding: 0 16px; }
+.module p, .module ul, .module ol { padding-left: 16px; padding-right: 16px; }
+
+.dashboard #content { max-width: none; }
+
+/* Tables ------------------------------------------------------------------- */
+table { border-collapse: separate; border-spacing: 0; }
+thead th, thead th a:link, thead th a:visited {
+  font-family: var(--gt-mark);
+  font-size: 12px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--body-quiet-color);
+}
+#result_list, table.gta-table { width: 100%; background: var(--gt-surface); }
+#result_list thead th, table.gta-table thead th {
+  background: var(--gt-surface-3);
+  border-bottom: 1px solid var(--hairline-color);
+  padding: 11px 14px;
+  text-align: left;
+}
+#result_list tbody td, #result_list tbody th,
+table.gta-table tbody td, table.gta-table tbody th {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--hairline-color);
+  vertical-align: middle;
+}
+#result_list tbody tr:hover td, #result_list tbody tr:hover th,
+table.gta-table tbody tr:hover td { background: var(--gt-surface-2); }
+#result_list tbody tr:last-child td, table.gta-table tbody tr:last-child td { border-bottom: 0; }
+tr.row1, tr.row2 { background: transparent; }
+
+.paginator {
+  border-top: 1px solid var(--hairline-color);
+  background: var(--gt-surface-2);
+  padding: 12px 14px;
+  font-size: 13px;
+}
+.paginator a:link, .paginator a:visited {
+  background: var(--gt-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--gt-r-ctl);
+  color: var(--body-fg);
+  padding: 4px 10px;
+}
+.paginator a.showall { border: 0; background: transparent; }
+.paginator .this-page {
+  background: var(--gt-deep);
+  color: #fff;
+  border-radius: var(--gt-r-ctl);
+  padding: 4px 10px;
+}
+html[data-theme="dark"] .paginator .this-page { background: var(--gt-lime); color: var(--gt-deep); }
+
+/* Changelist --------------------------------------------------------------- */
+#changelist { gap: 20px; }
+#changelist .actions {
+  background: var(--gt-surface-2);
+  border-bottom: 1px solid var(--hairline-color);
+  padding: 10px 14px;
+  border-radius: 0;
+}
+#changelist-search, #toolbar {
+  background: transparent;
+  border: 0;
+  padding: 0 0 14px;
+}
+#toolbar form#changelist-search {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+#toolbar #searchbar {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-radius: var(--gt-r-pill);
+  border: 1px solid var(--border-color);
+  background: var(--gt-surface);
+  padding: 10px 16px;
+  font-size: 14px;
+  box-shadow: var(--gt-shadow-sm);
+}
+#toolbar #searchbar:focus { outline: 2px solid var(--gt-forest); outline-offset: 1px; }
+
+#changelist-filter {
+  background: var(--gt-surface);
+  border: 1px solid var(--hairline-color);
+  border-radius: var(--gt-r-card);
+  box-shadow: var(--gt-shadow-sm);
+  overflow: hidden;
+}
+#changelist-filter h2 {
+  font-family: var(--gt-mark);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  font-size: 12px;
+  background: var(--gt-surface-3);
+  color: var(--body-medium-color);
+  border-bottom: 1px solid var(--hairline-color);
+  padding: 12px 16px;
+}
+#changelist-filter li.selected a { color: var(--link-selected-fg); font-weight: 600; }
+
+/* ==========================================================================
+   4. CONTROLS — buttons, object tools, forms
+   ========================================================================== */
+
+.button, input[type=submit], input[type=button], .submit-row input, a.button {
+  border-radius: var(--gt-r-ctl);
+  padding: 9px 16px;
+  font-weight: 600;
+  font-size: 13.5px;
+  letter-spacing: .01em;
+  border: 0;
+  box-shadow: var(--gt-shadow-sm);
+  transition: background .15s, transform .06s, box-shadow .15s;
+}
+.button:active, input[type=submit]:active { transform: translateY(1px); }
+.submit-row {
+  background: var(--gt-surface);
+  border: 1px solid var(--hairline-color);
+  border-radius: var(--gt-r-card);
+  padding: 14px 16px;
+  box-shadow: var(--gt-shadow-sm);
+}
+
+.object-tools a, .object-tools a:link, .object-tools a:visited {
+  border-radius: var(--gt-r-pill);
+  font-family: var(--gt-body);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: none;
+  padding: 8px 15px;
+  box-shadow: var(--gt-shadow-sm);
+}
+
+fieldset.module { padding-bottom: 6px; }
+.form-row { padding: 12px 16px; border-bottom: 1px solid var(--hairline-color); }
+.aligned label { font-weight: 600; color: var(--body-medium-color); }
+.help, .helptext, p.help { color: var(--body-quiet-color); font-size: 12.5px; }
+
+input[type=text], input[type=password], input[type=email], input[type=url],
+input[type=number], input[type=tel], textarea, select, .vTextField {
+  border-radius: var(--gt-r-ctl);
+  border: 1px solid var(--border-color);
+  background: var(--gt-surface);
+  color: var(--body-fg);
+  padding: 9px 12px;
+  font-family: var(--gt-body);
+  font-size: 14px;
+  transition: border-color .15s, box-shadow .15s;
+}
+input[type=text]:focus, input[type=password]:focus, input[type=email]:focus,
+input[type=url]:focus, input[type=number]:focus, textarea:focus, select:focus,
+.vTextField:focus {
+  border-color: var(--gt-forest);
+  box-shadow: 0 0 0 3px rgba(45,122,58,.16);
+  outline: none;
+}
+
+.messagelist li {
+  border-radius: var(--gt-r-ctl);
+  box-shadow: var(--gt-shadow-sm);
+  padding: 12px 16px 12px 42px;
+  font-weight: 500;
+  color: var(--body-fg);
+}
+
+/* ==========================================================================
+   5. LOGIN
+   ========================================================================== */
+body.login {
+  background:
+    radial-gradient(900px 520px at 12% -10%, rgba(200,241,53,.14), transparent 60%),
+    radial-gradient(760px 500px at 100% 8%, rgba(45,122,58,.28), transparent 62%),
+    var(--gt-deep-2);
+}
+body.login #container {
+  background: var(--gt-surface);
+  border: 1px solid var(--hairline-color);
+  border-radius: 18px;
+  box-shadow: var(--gt-shadow-lg);
+  overflow: hidden;
+  max-width: 420px;
+  margin-top: 8vh;
+}
+body.login #header {
+  position: static;
+  background: var(--gt-deep-2);
+  padding: 22px 26px;
+  min-height: 0;
+  display: block;
+  text-align: center;
+}
+body.login #header::after { display: none; }
+body.login .gta-wordmark { font-size: 30px; }
+body.login #content { padding: 26px; }
+body.login .form-row { padding: 0 0 14px; border: 0; }
+body.login .form-row label { display: block; margin-bottom: 6px; }
+body.login .form-row input { width: 100%; box-sizing: border-box; }
+body.login .submit-row { border: 0; box-shadow: none; padding: 6px 0 0; background: transparent; }
+body.login .submit-row input { width: 100%; padding: 12px; font-size: 15px; }
+body.login .gta-login-note {
+  text-align: center;
+  color: var(--body-quiet-color);
+  font-size: 12.5px;
+  margin: 16px 0 0;
+}
+
+/* ==========================================================================
+   6. RESPONSIVE
+   ========================================================================== */
+@media (max-width: 767px) {
+  #header { flex-wrap: wrap; padding: 10px 16px; gap: 10px; }
+  #user-tools { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
+  .gta-subnav { margin: 0 -16px; padding: 0 16px; width: calc(100% + 32px); }
+}
+
+/* ==========================================================================
+   7. DASHBOARD — the rebuilt admin index
+   ========================================================================== */
+
+.gta-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  padding: clamp(22px, 3vw, 34px);
+  margin: 4px 0 22px;
+  color: #fff;
+  background:
+    radial-gradient(760px 380px at 8% -30%, rgba(200,241,53,.20), transparent 62%),
+    radial-gradient(680px 420px at 102% 0%, rgba(45,122,58,.42), transparent 60%),
+    var(--gt-deep);
+  box-shadow: var(--gt-shadow-lg);
+}
+.gta-hero > * { position: relative; }
+.gta-hero-eyebrow {
+  font-family: var(--gt-mark);
+  font-size: 12px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--gt-lime);
+  margin: 0 0 6px;
+}
+.gta-hero h1 {
+  font-family: var(--gt-display);
+  font-size: clamp(26px, 3.4vw, 40px);
+  line-height: 1.06;
+  letter-spacing: -.02em;
+  margin: 0 0 8px;
+  color: #fff;
+}
+.gta-hero p { color: rgba(255,255,255,.76); margin: 0; max-width: 60ch; font-size: 15px; }
+.gta-hero-links { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+.gta-hero-links a {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 15px;
+  border-radius: var(--gt-r-pill);
+  font-size: 13px; font-weight: 700;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.16);
+  color: #fff;
+  text-decoration: none;
+}
+.gta-hero-links a svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.9; }
+.gta-hero-links a:hover { background: rgba(200,241,53,.16); border-color: rgba(200,241,53,.55); color: #fff; text-decoration: none; }
+.gta-hero-links a.primary { background: var(--gt-lime); border-color: var(--gt-lime); color: var(--gt-deep); }
+.gta-hero-links a.primary:hover { background: #fff; border-color: #fff; }
+
+/* ---- KPI tiles ----------------------------------------------------------- */
+.gta-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.gta-kpi {
+  position: relative;
+  background: var(--gt-surface);
+  border: 1px solid var(--hairline-color);
+  border-radius: var(--gt-r-card);
+  box-shadow: var(--gt-shadow-sm);
+  padding: 16px 16px 15px;
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  transition: transform .12s var(--ease, ease), box-shadow .15s, border-color .15s;
+}
+a.gta-kpi:hover { transform: translateY(-2px); box-shadow: var(--gt-shadow); border-color: var(--border-color); text-decoration: none; color: inherit; }
+.gta-kpi::before {
+  content: "";
+  position: absolute; left: 0; top: 14px; bottom: 14px;
+  width: 3px; border-radius: 0 3px 3px 0;
+  background: var(--tile-accent, var(--gt-forest));
+}
+.gta-kpi-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.gta-kpi-ic {
+  width: 30px; height: 30px; flex: none;
+  border-radius: 9px;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--tile-accent, var(--gt-forest)) 14%, transparent);
+  color: var(--tile-accent, var(--gt-forest));
+}
+.gta-kpi-ic svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.9; }
+.gta-kpi-label {
+  font-family: var(--gt-mark);
+  font-size: 12px; font-weight: 600;
+  letter-spacing: .11em; text-transform: uppercase;
+  color: var(--body-quiet-color);
+}
+.gta-kpi-num {
+  font-family: var(--gt-num);
+  font-weight: 800;
+  font-size: 38px;
+  line-height: 1;
+  letter-spacing: -.01em;
+  color: var(--body-loud-color);
+  font-variant-numeric: tabular-nums;
+}
+.gta-kpi-sub { font-size: 12.5px; color: var(--body-quiet-color); margin-top: 6px; }
+.gta-delta { font-weight: 700; font-size: 12px; }
+.gta-delta.up { color: var(--gt-c1); }
+.gta-delta.down { color: var(--gt-c6); }
+.gta-delta.flat { color: var(--body-quiet-color); }
+
+/* ---- Two-column dashboard layout ---------------------------------------- */
+.gta-cols { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 20px; align-items: start; }
+@media (max-width: 1100px) { .gta-cols { grid-template-columns: minmax(0,1fr); } }
+
+.gta-section-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; margin: 4px 0 12px;
+}
+.gta-section-head h2 {
+  font-family: var(--gt-mark);
+  font-size: 13px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--body-quiet-color);
+  margin: 0; padding: 0; background: none; border: 0;
+}
+
+/* ---- App cards ----------------------------------------------------------- */
+.gta-apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 14px; }
+.gta-app {
+  background: var(--gt-surface);
+  border: 1px solid var(--hairline-color);
+  border-radius: var(--gt-r-card);
+  box-shadow: var(--gt-shadow-sm);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.gta-app-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 15px;
+  background: var(--gt-surface-3);
+  border-bottom: 1px solid var(--hairline-color);
+}
+.gta-app-ic {
+  width: 28px; height: 28px; flex: none;
+  border-radius: 8px; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--app-accent, var(--gt-forest)) 16%, transparent);
+  color: var(--app-accent, var(--gt-forest));
+}
+.gta-app-ic svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.9; }
+.gta-app-head h3 {
+  margin: 0; padding: 0;
+  font-family: var(--gt-body);
+  font-size: 14px; font-weight: 700;
+  letter-spacing: 0; text-transform: none;
+}
+/* Django styles a.section for the (white-on-dark) header, so it has to be
+   re-coloured for use on a light card. */
+.gta-app-head h3 a.section,
+.gta-app-head h3 a.section:link,
+.gta-app-head h3 a.section:visited { color: var(--body-loud-color); }
+.gta-app-head h3 a.section:hover { color: var(--link-fg); }
+.gta-model-flat { flex: 1 1 auto; padding: 8px 9px; font-size: 13.5px; color: var(--body-quiet-color); }
+.gta-app-models { list-style: none; margin: 0; padding: 6px; display: block; }
+.gta-app-models li { display: flex; align-items: center; gap: 6px; }
+.gta-app-models li > a {
+  flex: 1 1 auto;
+  padding: 8px 9px;
+  border-radius: var(--gt-r-ctl);
+  font-size: 13.5px;
+  color: var(--body-fg);
+  min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gta-app-models li > a:hover { background: var(--gt-surface-2); color: var(--body-loud-color); text-decoration: none; }
+.gta-app-models .gta-add {
+  flex: none;
+  width: 26px; height: 26px; margin-right: 4px;
+  border-radius: 7px;
+  display: grid; place-items: center;
+  color: var(--body-quiet-color);
+  border: 1px solid transparent;
+  font-size: 16px; line-height: 1;
+}
+.gta-app-models .gta-add:hover { background: var(--gt-lime); color: var(--gt-deep); text-decoration: none; }
+
+/* ---- Recent actions ------------------------------------------------------ */
+.gta-side .module { margin-bottom: 16px; }
+/* `.module ul` sets a horizontal padding these lists do not want, and it wins
+   on specificity — hence the qualified selector rather than a bare class. */
+.module .gta-actions, .gta-actions { list-style: none; margin: 0; padding: 6px; }
+.gta-actions li { padding: 9px 10px; border-radius: var(--gt-r-ctl); }
+.gta-actions li + li { border-top: 1px solid var(--hairline-color); border-radius: 0; }
+.gta-actions .gta-act-row { display: flex; align-items: flex-start; gap: 9px; }
+.gta-act-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex: none; margin-top: 6px;
+  background: var(--body-quiet-color);
+}
+.gta-act-dot.add { background: var(--gt-c1); }
+.gta-act-dot.change { background: var(--gt-c3); }
+.gta-act-dot.delete { background: var(--gt-c6); }
+.gta-act-body { min-width: 0; }
+.gta-act-body a, .gta-act-body span.obj { font-size: 13.5px; font-weight: 600; display: block; }
+.gta-act-meta { font-size: 11.5px; color: var(--body-quiet-color); margin-top: 2px; }
+.gta-empty { padding: 18px 16px; color: var(--body-quiet-color); font-size: 13px; }
+
+/* ==========================================================================
+   8. CHARTS + SYSTEM REPORT
+   ========================================================================== */
+
+.gta-card {
+  background: var(--gt-surface);
+  border: 1px solid var(--hairline-color);
+  border-radius: var(--gt-r-card);
+  box-shadow: var(--gt-shadow-sm);
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+.gta-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--hairline-color);
+  background: var(--gt-surface-2);
+}
+.gta-card-head h2, .gta-card-head h3 {
+  margin: 0; padding: 0; border: 0; background: none;
+  font-family: var(--gt-body);
+  font-size: 15px; font-weight: 700; letter-spacing: 0; text-transform: none;
+  color: var(--body-loud-color);
+}
+.gta-card-head p { margin: 3px 0 0; padding: 0; font-size: 12.5px; color: var(--body-quiet-color); }
+.gta-card-body { padding: 16px; }
+.gta-card-body.flush { padding: 0; }
+
+.gta-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 18px; }
+.gta-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px; }
+
+/* ---- Chart shell --------------------------------------------------------- */
+.gt-chart { position: relative; width: 100%; }
+.gt-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.gt-chart .gt-axis line { stroke: var(--hairline-color); stroke-width: 1; }
+.gt-chart .gt-axis text,
+.gt-chart .gt-tick {
+  font-family: var(--gt-body);
+  font-size: 11px;
+  fill: var(--body-quiet-color);
+}
+.gt-chart .gt-grid line { stroke: var(--hairline-color); stroke-width: 1; }
+.gt-chart .gt-hit { fill: transparent; cursor: crosshair; }
+.gt-chart .gt-crosshair { stroke: var(--body-quiet-color); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0; }
+.gt-chart.is-hover .gt-crosshair { opacity: .7; }
+.gt-chart .gt-dot { opacity: 0; }
+.gt-chart.is-hover .gt-dot { opacity: 1; }
+.gt-chart .gt-bar { transition: opacity .12s; cursor: pointer; }
+.gt-chart .gt-bar.dim { opacity: .35; }
+.gt-chart .gt-arc { transition: opacity .12s; cursor: pointer; }
+.gt-chart .gt-arc.dim { opacity: .3; }
+.gt-chart .gt-series.off { display: none; }
+
+.gt-tip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -100%);
+  transition: opacity .1s;
+  background: var(--gt-deep);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  box-shadow: var(--gt-shadow-lg);
+  white-space: nowrap;
+  min-width: 120px;
+}
+.gt-tip.on { opacity: 1; }
+.gt-tip b { display: block; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--gt-lime); margin-bottom: 5px; font-weight: 600; }
+.gt-tip .r { display: flex; align-items: center; gap: 7px; justify-content: space-between; }
+.gt-tip .r .k { display: inline-flex; align-items: center; gap: 6px; color: rgba(255,255,255,.8); }
+.gt-tip .sw { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.gt-tip .v { font-family: var(--gt-num); font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
+
+.gt-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.gt-legend button {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--gt-r-pill);
+  padding: 5px 11px;
+  font: inherit; font-size: 12.5px; font-weight: 600;
+  color: var(--body-fg);
+  cursor: pointer;
+  box-shadow: none;
+  transition: opacity .12s, background .12s;
+}
+.gt-legend button:hover { background: var(--gt-surface-3); }
+.gt-legend button[aria-pressed="false"] { opacity: .45; }
+.gt-legend .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.gt-legend .n { color: var(--body-quiet-color); font-family: var(--gt-num); font-weight: 800; font-variant-numeric: tabular-nums; }
+
+.gt-chart-empty {
+  display: grid; place-items: center;
+  min-height: 140px;
+  color: var(--body-quiet-color);
+  font-size: 13px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--gt-r-ctl);
+}
+
+/* ---- Range switcher ------------------------------------------------------ */
+.gta-range { display: inline-flex; border: 1px solid var(--border-color); border-radius: var(--gt-r-pill); overflow: hidden; }
+.gta-range a {
+  padding: 6px 13px; font-size: 12.5px; font-weight: 600;
+  color: var(--body-quiet-color); text-decoration: none;
+}
+.gta-range a + a { border-left: 1px solid var(--border-color); }
+.gta-range a:hover { background: var(--gt-surface-3); text-decoration: none; }
+.gta-range a.on { background: var(--gt-deep); color: #fff; }
+html[data-theme="dark"] .gta-range a.on { background: var(--gt-lime); color: var(--gt-deep); }
+
+/* ---- Meters -------------------------------------------------------------- */
+.gta-meter { margin-bottom: 16px; }
+.gta-meter:last-child { margin-bottom: 0; }
+.gta-meter-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 7px; }
+.gta-meter-top .k { font-size: 13px; font-weight: 600; color: var(--body-medium-color); }
+.gta-meter-top .v { font-family: var(--gt-num); font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; color: var(--body-loud-color); }
+.gta-meter-bar { height: 9px; border-radius: var(--gt-r-pill); background: var(--gt-surface-3); overflow: hidden; }
+.gta-meter-bar i { display: block; height: 100%; border-radius: inherit; background: var(--meter-accent, var(--gt-forest)); transition: width .5s var(--ease, ease); }
+.gta-meter-note { font-size: 12px; color: var(--body-quiet-color); margin-top: 6px; }
+
+.gta-defs { list-style: none; margin: 0; padding: 0; }
+.gta-defs li { display: flex; justify-content: space-between; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--hairline-color); font-size: 13.5px; }
+.gta-defs li:last-child { border-bottom: 0; }
+.gta-defs .k { color: var(--body-quiet-color); }
+.gta-defs .v { font-family: var(--gt-num); font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; color: var(--body-loud-color); }
+
+.gta-pill { display: inline-block; padding: 2px 9px; border-radius: var(--gt-r-pill); font-size: 11.5px; font-weight: 700; }
+.gta-pill.ok { background: color-mix(in srgb, var(--gt-c1) 18%, transparent); color: var(--gt-c1); }
+.gta-pill.bad { background: color-mix(in srgb, var(--gt-c6) 18%, transparent); color: var(--gt-c6); }
+.gta-pill.warn { background: color-mix(in srgb, var(--gt-c3) 20%, transparent); color: var(--gt-c3); }
+
+.gta-stamp { font-size: 12.5px; color: var(--body-quiet-color); margin: -8px 0 18px; }
+
+/* ==========================================================================
+   9. SITE CONTENT EDITOR
+   ========================================================================== */
+
+.gtc-pages { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.gtc-page-card {
+  display: block;
+  text-decoration: none; color: inherit;
+  background: var(--gt-surface);
+  border: 1px solid var(--hairline-color);
+  border-radius: var(--gt-r-card);
+  box-shadow: var(--gt-shadow-sm);
+  padding: 18px;
+  transition: transform .12s, box-shadow .15s;
+}
+.gtc-page-card:hover { transform: translateY(-2px); box-shadow: var(--gt-shadow); color: inherit; text-decoration: none; }
+.gtc-page-card h3 {
+  margin: 0 0 6px; padding: 0;
+  font-family: var(--gt-display);
+  font-size: 19px; color: var(--body-loud-color);
+  letter-spacing: -.01em; text-transform: none; background: none;
+}
+.gtc-page-card p { margin: 0 0 14px; padding: 0; font-size: 13px; color: var(--body-quiet-color); line-height: 1.55; }
+.gtc-page-meta { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--body-quiet-color); }
+
+/* ---- Sticky editor toolbar ---------------------------------------------- */
+.gtc-bar {
+  position: sticky; top: calc(var(--gta-header-h, 102px) + 8px); z-index: 20;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px 16px;
+  margin-bottom: 18px;
+  background: var(--gt-surface);
+  border: 1px solid var(--hairline-color);
+  border-radius: var(--gt-r-card);
+  box-shadow: var(--gt-shadow);
+}
+.gtc-bar .grow { flex: 1 1 auto; min-width: 0; }
+.gtc-bar .gtc-count { font-size: 12.5px; color: var(--body-quiet-color); }
+.gtc-bar .gtc-save {
+  background: var(--gt-lime); color: var(--gt-deep);
+  border: 0; border-radius: var(--gt-r-ctl);
+  padding: 10px 20px; font: inherit; font-weight: 700; font-size: 14px;
+  cursor: pointer; box-shadow: var(--gt-shadow-sm);
+}
+.gtc-bar .gtc-save:hover { background: var(--gt-lime-dk); }
+.gtc-bar .gtc-view {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--border-color); border-radius: var(--gt-r-ctl);
+  padding: 9px 15px; font-size: 13.5px; font-weight: 600;
+  color: var(--body-fg); text-decoration: none;
+}
+.gtc-bar .gtc-view:hover { background: var(--gt-surface-3); text-decoration: none; }
+.gtc-bar .gtc-view svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.9; }
+
+/* ---- Section jump rail --------------------------------------------------- */
+.gtc-rail { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+.gtc-rail a {
+  padding: 6px 12px; border-radius: var(--gt-r-pill);
+  border: 1px solid var(--border-color);
+  font-size: 12.5px; font-weight: 600;
+  color: var(--body-quiet-color); text-decoration: none;
+}
+.gtc-rail a:hover { background: var(--gt-surface-3); color: var(--body-loud-color); text-decoration: none; }
+
+/* ---- Groups + slots ------------------------------------------------------ */
+.gtc-group { scroll-margin-top: calc(var(--gta-header-h, 102px) + 76px); }
+.gtc-slot {
+  padding: 16px;
+  border-bottom: 1px solid var(--hairline-color);
+}
+.gtc-slot:last-child { border-bottom: 0; }
+.gtc-slot-head { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; flex-wrap: wrap; }
+.gtc-slot-head label { font-weight: 700; font-size: 13.5px; color: var(--body-loud-color); }
+.gtc-badge {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: var(--gt-r-pill);
+  background: color-mix(in srgb, var(--gt-c3) 20%, transparent); color: var(--gt-c3);
+}
+.gtc-kind {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: var(--gt-r-pill);
+  border: 1px solid var(--border-color); color: var(--body-quiet-color);
+}
+.gtc-key { margin-left: auto; font-family: var(--font-family-monospace); font-size: 11px; color: var(--body-quiet-color); }
+.gtc-help { font-size: 12.5px; color: var(--body-quiet-color); margin: 0 0 9px; padding: 0; line-height: 1.5; }
+.gtc-slot input[type=text], .gtc-slot textarea { width: 100%; box-sizing: border-box; }
+.gtc-slot textarea { resize: vertical; line-height: 1.55; min-height: 44px; }
+
+/* ---- Rich field ---------------------------------------------------------- */
+.gtc-rich {
+  border: 1px solid var(--border-color);
+  border-radius: var(--gt-r-ctl);
+  background: var(--gt-surface);
+  overflow: hidden;
+}
+.gtc-rich:focus-within { border-color: var(--gt-forest); box-shadow: 0 0 0 3px rgba(45,122,58,.16); }
+.gtc-rich-tools {
+  display: flex; gap: 2px; align-items: center;
+  padding: 5px 6px;
+  background: var(--gt-surface-3);
+  border-bottom: 1px solid var(--hairline-color);
+}
+.gtc-rich-tools button {
+  width: 30px; height: 28px;
+  display: grid; place-items: center;
+  background: transparent; border: 0; border-radius: 6px;
+  color: var(--body-medium-color);
+  font-size: 13px; font-weight: 700;
+  cursor: pointer; box-shadow: none;
+  padding: 0;
+}
+.gtc-rich-tools button:hover { background: var(--gt-surface); color: var(--body-loud-color); }
+.gtc-rich-tools .sep { width: 1px; height: 18px; background: var(--border-color); margin: 0 4px; }
+.gtc-rich-tools .hint { margin-left: auto; font-size: 11px; color: var(--body-quiet-color); padding-right: 6px; }
+.gtc-rich-area {
+  padding: 10px 12px;
+  min-height: 44px;
+  font-size: 14px; line-height: 1.55;
+  outline: none;
+}
+.gtc-rich-area em { font-style: italic; }
+.gtc-rich-area:empty::before { content: attr(data-placeholder); color: var(--body-quiet-color); }
+
+/* ---- Media field --------------------------------------------------------- */
+.gtc-media { display: grid; grid-template-columns: 190px minmax(0,1fr); gap: 16px; align-items: start; }
+@media (max-width: 640px) { .gtc-media { grid-template-columns: minmax(0,1fr); } }
+.gtc-thumb {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--gt-r-ctl);
+  overflow: hidden;
+  background: var(--gt-surface-3) center/cover no-repeat;
+  border: 1px solid var(--hairline-color);
+}
+.gtc-thumb img, .gtc-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gtc-thumb-tag {
+  position: absolute; left: 6px; bottom: 6px;
+  font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: var(--gt-r-pill);
+  background: rgba(15,46,34,.82); color: #fff;
+}
+.gtc-drop {
+  display: block;
+  border: 1.5px dashed var(--border-color);
+  border-radius: var(--gt-r-ctl);
+  padding: 14px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--body-quiet-color);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.gtc-drop:hover, .gtc-drop.over { border-color: var(--gt-forest); background: var(--gt-surface-2); color: var(--body-fg); }
+.gtc-drop b { color: var(--link-fg); }
+.gtc-drop input[type=file] { display: none; }
+.gtc-drop .picked { display: block; margin-top: 6px; font-weight: 700; color: var(--body-loud-color); word-break: break-all; }
+.gtc-media-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 12.5px; }
+.gtc-reset { display: inline-flex; align-items: center; gap: 6px; color: var(--body-quiet-color); cursor: pointer; }
+.gtc-reset input { margin: 0; }
