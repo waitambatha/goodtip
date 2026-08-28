@@ -29,11 +29,10 @@ before it answers "where is the Organisation model?".
 <section class="gta-hero">
   <p class="gta-hero-eyebrow">GoodTip HQ</p>
   <h1>Welcome back, {% firstof user.get_short_name user.get_username %}.</h1>
-  <p>Everything the platform runs on lives here — the people, the organisations, the fixtures, and the words on the public site.</p>
+  <p>The system view: everyone on the platform, every organisation, and the words on the public site. Running a single organisation happens in that organisation's own admin, not here.</p>
   <div class="gta-hero-links">
     <a href="{% url 'admin:system_report' %}" class="primary"><svg><use href="#ic-chart"/></svg>System report</a>
     <a href="{% url 'admin:site_content' %}"><svg><use href="#ic-image"/></svg>Edit the public site</a>
-    {% safe_url 'manage:overview' as u_manage %}{% if u_manage %}<a href="{{ u_manage }}"><svg><use href="#ic-sliders"/></svg>Manage HQ</a>{% endif %}
     <a href="/" target="_blank" rel="noopener"><svg><use href="#ic-eye"/></svg>View the site</a>
   </div>
 </section>

@@ -17,6 +17,17 @@ forked and an upgrade to base.html carries straight through.
 {% include "partials/_fonts.html" %}
 <link rel="stylesheet" href="{% static 'css/admin.css' %}">
 <link rel="stylesheet" href="{% static 'gtadmin/css/gtadmin.css' %}">
+<script>
+  /* Restore the menu's collapsed state before first paint. Doing this from a
+     deferred script instead makes the rail visibly snap from wide to narrow on
+     every page load. */
+  try {
+    if (localStorage.getItem("gtAdminRailCollapsed") === "1") {
+      document.documentElement.classList.add("gta-rail-collapsed");
+    }
+  } catch (e) {}
+</script>
+<script src="{% static 'gtadmin/js/gt-rail.js' %}" defer></script>
 {% include "partials/_favicon.html" %}
 {% endblock %}
 
@@ -55,33 +66,67 @@ guessing from the Host header.
 {% include "admin/color_theme_toggle.html" %}
 {% endblock %}
 
-{% block nav-global %}
-{# One sprite for the whole page — every {% templatetag openblock %} use %} in the admin resolves against it. #}
+{% block header %}
 {% include "public/partials/_icons.html" %}
-{% if user.is_superuser %}
-{% gta_nav_counts as nav_counts %}
+{{ block.super }}
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{% comment %}
+THE RAIL.
+
+Sections used to ride in a strip across the header, which cost the page a
+whole row of vertical space on every screen and still had nowhere to put the
+model list. As a rail it gets room to group things, it collapses to icons when
+the content wants the width, and the model list from `available_apps` sits
+underneath the sections instead of in a second sidebar.
+
+Rendered into Django's own nav-sidebar block so it lands inside `.main`, where
+the admin's layout already expects a sidebar to be.
+{% endcomment %}
+{% block nav-sidebar %}
+{% if user.is_authenticated and user.is_staff %}
 {% url 'admin:index' as u_index %}
 {% url 'admin:system_report' as u_report %}
 {% url 'admin:site_content' as u_content %}
-{% safe_url 'manage:overview' as u_manage %}
-{% safe_url 'manage:approvals' as u_approvals %}
-{% safe_url 'manage:enquiries' as u_enquiries %}
-{% safe_url 'manage:news' as u_news %}
-<nav class="gta-subnav" aria-label="Admin sections">
-  <a href="{{ u_index }}" class="{% if request.path == u_index %}on{% endif %}">
-    <svg><use href="#ic-home"/></svg>Dashboard</a>
-  <a href="{{ u_report }}" class="{% if request.path == u_report %}on{% endif %}">
-    <svg><use href="#ic-chart"/></svg>System report</a>
-  <a href="{{ u_content }}" class="{% if u_content in request.path %}on{% endif %}">
-    <svg><use href="#ic-image"/></svg>Site content</a>
-  {% if u_approvals %}<a href="{{ u_approvals }}">
-    <svg><use href="#ic-shield-check"/></svg>Approvals{% if nav_counts.approvals %}<span class="gta-count">{{ nav_counts.approvals }}</span>{% endif %}</a>{% endif %}
-  {% if u_enquiries %}<a href="{{ u_enquiries }}">
-    <svg><use href="#ic-mail"/></svg>Enquiries{% if nav_counts.enquiries %}<span class="gta-count">{{ nav_counts.enquiries }}</span>{% endif %}</a>{% endif %}
-  {% if u_news %}<a href="{{ u_news }}">
-    <svg><use href="#ic-doc"/></svg>News &amp; blog</a>{% endif %}
-  {% if u_manage %}<a href="{{ u_manage }}">
-    <svg><use href="#ic-sliders"/></svg>Manage HQ</a>{% endif %}
+<nav id="nav-sidebar" class="gta-rail" aria-label="Admin sections">
+
+  <button type="button" class="gta-rail-toggle" data-rail-toggle
+          aria-label="Collapse or expand the menu">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
+    <span class="lbl">Collapse menu</span>
+  </button>
+
+  <div class="gta-rail-group">
+    <div class="gta-rail-title">Overview</div>
+    <a href="{{ u_index }}" class="{% if request.path == u_index %}on{% endif %}" title="Dashboard">
+      <svg class="ic"><use href="#ic-home"/></svg><span class="lbl">Dashboard</span></a>
+    <a href="{{ u_report }}" class="{% if request.path == u_report %}on{% endif %}" title="System report">
+      <svg class="ic"><use href="#ic-chart"/></svg><span class="lbl">System report</span></a>
+  </div>
+
+  {% if user.is_superuser %}
+  <div class="gta-rail-group">
+    <div class="gta-rail-title">The public site</div>
+    <a href="{{ u_content }}" class="{% if u_content in request.path %}on{% endif %}" title="Site content">
+      <svg class="ic"><use href="#ic-image"/></svg><span class="lbl">Site content</span></a>
+  </div>
+  {% endif %}
+
+  <div class="gta-rail-group">
+    <div class="gta-rail-title">Data</div>
+    {% for app in available_apps %}
+      {% for model in app.models %}
+        {% if model.admin_url %}
+        <a href="{{ model.admin_url }}" class="{% if request.path == model.admin_url %}on{% endif %}"
+           title="{{ model.name }}">
+          <svg class="ic"><use href="#{% model_icon model.object_name %}"/></svg>
+          <span class="lbl">{{ model.name }}</span></a>
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+  </div>
 </nav>
 {% endif %}
 {% endblock %}
