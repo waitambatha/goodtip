@@ -36,6 +36,17 @@ body.gt-shell .page-backdrop,
 body.gt-shell .gt-hero { display: none !important; }
 
 body.gt-shell {
+  /* NAME COLLISION, and it is load-bearing. goodtip.css already owns
+     `.gt-shell` as a page-level two-column layout —
+     `display: grid; grid-template-columns: minmax(0,1fr) 320px` — for content
+     beside a sidebar. This file uses the same name on <body> as a namespace,
+     so every HQ page inherited that grid: the top bar took column one and the
+     entire rail-and-content row was squeezed into the 320px column.
+
+     `body.gt-shell` out-specifies the bare class, so stating the display here
+     is what keeps the two meanings apart. Renaming one of them is the real
+     fix; until then this line is the only thing separating them. */
+  display: block;
   background: var(--gts-shell) !important;
   color: var(--gts-fg);
 }

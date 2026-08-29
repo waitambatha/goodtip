@@ -1,5 +1,5 @@
 {% extends "admin/base_site.html" %}
-{% load i18n static gtadmin %}
+{% load i18n static log gtadmin %}
 
 {% comment %}
 Cannot `{% templatetag openblock %} extends "admin/index.html" {% templatetag closeblock %}`
@@ -9,9 +9,10 @@ the two blocks admin/index.html normally fills (content + sidebar) is the
 documented way around that, per Django's own admin-template-override docs.
 
 What replaced the stock page: the app list was the only thing on it, sorted
-alphabetically, with no indication of whether anything needed attention. The
-first screen of the control plane now answers "is anything waiting for me?"
-before it answers "where is the Organisation model?".
+alphabetically, with no indication of whether anything needed attention. This
+screen answers "is anything waiting for me?" and "how did the fortnight go?"
+before it answers "where is the Organisation model?", and it groups that model
+list rather than pouring twenty-five entries out in one column.
 {% endcomment %}
 
 {% block extrahead %}{{ block.super }}
@@ -19,7 +20,7 @@ before it answers "where is the Organisation model?".
 {% endblock %}
 
 {% block coltype %}colM{% endblock %}
-{% block bodyclass %}{{ block.super }} dashboard{% endblock %}
+{% block bodyclass %}{{ block.super }} dashboard gta-dash{% endblock %}
 {% block nav-breadcrumbs %}{% endblock %}
 {% block content_title %}{% endblock %}
 
@@ -27,113 +28,183 @@ before it answers "where is the Organisation model?".
 {% gta_dashboard_stats as gta %}
 
 <section class="gta-hero">
-  <p class="gta-hero-eyebrow">GoodTip HQ</p>
-  <h1>Welcome back, {% firstof user.get_short_name user.get_username %}.</h1>
-  <p>The system view: everyone on the platform, every organisation, and the words on the public site. Running a single organisation happens in that organisation's own admin, not here.</p>
-  <div class="gta-hero-links">
-    <a href="{% url 'admin:system_report' %}" class="primary"><svg><use href="#ic-chart"/></svg>System report</a>
-    <a href="{% url 'admin:site_content' %}"><svg><use href="#ic-image"/></svg>Edit the public site</a>
-    <a href="/" target="_blank" rel="noopener"><svg><use href="#ic-eye"/></svg>View the site</a>
+  <div class="gta-hero-say">
+    <h1>{% blocktranslate with name=user.get_short_name|default:user.get_username %}Welcome back, {{ name }}{% endblocktranslate %} <span class="gta-wave" aria-hidden="true">&#128075;</span></h1>
+    <p>Here&rsquo;s what&rsquo;s happening across GoodTip.</p>
+  </div>
+  <div class="gta-hero-acts">
+    <a href="{% url 'admin:system_report' %}" class="gta-act">
+      <span class="gta-act-ic green"><svg><use href="#ic-trend"/></svg></span>
+      <span class="gta-act-txt"><b>System report</b><small>Deep system overview</small></span>
+    </a>
+    {% if user.is_superuser %}
+    <a href="{% url 'admin:site_content' %}" class="gta-act">
+      <span class="gta-act-ic gold"><svg><use href="#ic-image"/></svg></span>
+      <span class="gta-act-txt"><b>Edit the public site</b><small>Manage content</small></span>
+    </a>
+    {% endif %}
+    <a href="{{ site_url|default:'/' }}" target="_blank" rel="noopener" class="gta-act">
+      <span class="gta-act-ic ink"><svg><use href="#ic-eye"/></svg></span>
+      <span class="gta-act-txt"><b>View the site</b><small>Open the live site</small></span>
+      <svg class="gta-act-go" aria-hidden="true"><use href="#ic-chev-left"/></svg>
+    </a>
   </div>
 </section>
 
 {% if gta.tiles %}
 <div class="gta-kpis">
   {% for t in gta.tiles %}
-  {% if t.url %}<a href="{% url t.url %}" class="gta-kpi" style="--tile-accent:{{ t.accent }}">{% else %}<div class="gta-kpi" style="--tile-accent:{{ t.accent }}">{% endif %}
-    <div class="gta-kpi-top">
-      <span class="gta-kpi-ic"><svg><use href="#{{ t.icon }}"/></svg></span>
-      <span class="gta-kpi-label">{{ t.label }}</span>
+  {% if t.url %}<a href="{% url t.url %}" class="gta-kpi">{% else %}<div class="gta-kpi">{% endif %}
+    <div class="gta-kpi-body">
+      <span class="gta-kpi-ic {{ t.tone }}"><svg><use href="#{{ t.icon }}"/></svg></span>
+      <div class="gta-kpi-txt">
+        <span class="gta-kpi-label">{{ t.label }}</span>
+        <span class="gta-kpi-num">{{ t.value|floatformat:"0" }}</span>
+      </div>
     </div>
-    <div class="gta-kpi-num">{{ t.value }}</div>
-    <div class="gta-kpi-sub">
-      {{ t.sub }}
-      {% if t.delta is not None %}
-        &middot; <span class="gta-delta {% if t.delta > 0 %}up{% elif t.delta < 0 %}down{% else %}flat{% endif %}">{% if t.delta > 0 %}&uarr;{% elif t.delta < 0 %}&darr;{% else %}&mdash;{% endif %} {{ t.delta }}%</span>
-      {% endif %}
+    <div class="gta-kpi-foot">
+      <div class="gta-kpi-delta">
+        {% if t.delta is not None %}
+          <span class="gta-delta {% if t.delta > 0 %}up{% elif t.delta < 0 %}down{% else %}flat{% endif %}">
+            {% if t.delta > 0 %}&#8599;{% elif t.delta < 0 %}&#8600;{% else %}&mdash;{% endif %} {{ t.delta }}%
+          </span>
+        {% endif %}
+        <small>{{ t.sub }}</small>
+      </div>
+      {% with n=forloop.counter|stringformat:"s" %}{% with did="spark-"|add:n|add:"-data" %}
+      <div class="gt-chart gta-kpi-spark" id="spark-{{ n }}"></div>
+      {{ t.spark|json_script:did }}
+      {% endwith %}{% endwith %}
     </div>
   {% if t.url %}</a>{% else %}</div>{% endif %}
   {% endfor %}
 </div>
-
-<div class="gta-card">
-  <div class="gta-card-head">
-    <div>
-      <h2>Last 14 days</h2>
-      <p>New members joining, and successful sign-ins. Hover the chart for any single day.</p>
-    </div>
-    <a class="gta-range" href="{% url 'admin:system_report' %}"><span style="padding:6px 13px;font-size:12.5px;font-weight:600;">Full report &rarr;</span></a>
-  </div>
-  <div class="gta-card-body">
-    <div class="gt-chart" id="c-dash"></div>
-    {{ gta.activity_chart|json_script:"c-dash-data" }}
-  </div>
-</div>
 {% endif %}
 
-<div class="gta-cols">
-  <div>
-    <div class="gta-section-head"><h2>{% translate "Everything in the database" %}</h2></div>
-    {% if app_list %}
-    <div class="gta-apps">
-      {% for app in app_list %}
-      <section class="gta-app" style="--app-accent:{% app_accent app.app_label %}">
-        <div class="gta-app-head">
-          <span class="gta-app-ic"><svg><use href="#{% app_icon app.app_label %}"/></svg></span>
-          <h3><a href="{{ app.app_url }}" class="section" title="{% blocktranslate with name=app.name %}Models in the {{ name }} application{% endblocktranslate %}">{{ app.name }}</a></h3>
-        </div>
-        <ul class="gta-app-models">
-          {% for model in app.models %}
-          <li>
-            {% if model.admin_url %}
-              <a href="{{ model.admin_url }}"{% if model.admin_url in request.path %} aria-current="page"{% endif %}>{{ model.name }}</a>
-            {% else %}
-              <span class="gta-model-flat">{{ model.name }}</span>
-            {% endif %}
-            {% if model.add_url %}<a href="{{ model.add_url }}" class="gta-add" title="{% translate 'Add' %} {{ model.name }}">+</a>{% endif %}
-          </li>
-          {% endfor %}
-        </ul>
-      </section>
-      {% endfor %}
-    </div>
-    {% else %}
-    <p class="gta-empty">{% translate "You don't have permission to view or edit anything." %}</p>
-    {% endif %}
-  </div>
+<div class="gta-grid">
 
-  <aside class="gta-side">
-    <div class="module">
+  <section class="gta-card gta-card-chart">
+    <div class="gta-card-head">
+      <div>
+        <h2>New members vs successful sign-ins</h2>
+        <ul class="gta-key">
+          <li><i style="background:var(--gt-c1)"></i>New members</li>
+          <li><i style="background:var(--gt-gold)"></i>Successful sign-ins</li>
+        </ul>
+      </div>
+      <form method="get" action="{% url 'admin:index' %}" class="gta-range">
+        <label class="gta-sr" for="gta-days">{% translate 'Window' %}</label>
+        <select name="days" id="gta-days" data-autosubmit>
+          {% for opt in gta.span_options %}
+          <option value="{{ opt }}"{% if opt == gta.span %} selected{% endif %}>{{ opt }} days</option>
+          {% endfor %}
+        </select>
+        <noscript><button type="submit">{% translate 'Go' %}</button></noscript>
+      </form>
+    </div>
+    <div class="gta-card-body">
+      <div class="gt-chart" id="c-dash"></div>
+      {{ gta.activity_chart|json_script:"c-dash-data" }}
+    </div>
+  </section>
+
+  <section class="gta-card">
+    <div class="gta-card-head"><h2>{% translate 'Waiting on you' %}</h2></div>
+    <div class="gta-card-body">
+      <ul class="gta-queue">
+        {% for a in gta.alerts %}
+        <li>
+          {% if a.url %}<a href="{{ a.url }}{{ a.query }}">{% else %}<span>{% endif %}
+            <span class="gta-queue-lbl">{{ a.label }}</span>
+            <span class="gta-queue-n{% if a.count %} hot{% endif %}">{{ a.count }}</span>
+          {% if a.url %}</a>{% else %}</span>{% endif %}
+        </li>
+        {% empty %}
+        <li class="gta-empty">{% translate 'Nothing is waiting.' %}</li>
+        {% endfor %}
+      </ul>
+      {% if gta.alerts %}
+      <a class="gta-btn gold" href="{% safe_url 'admin:hq_enquiries' %}">
+        {% translate 'Go to enquiries' %} <svg aria-hidden="true"><use href="#ic-arrow-right"/></svg>
+      </a>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="gta-card">
+    <div class="gta-card-head">
+      <h2>{% translate 'Everything in the database' %}</h2>
+      <span class="gta-card-note">{% translate 'Grouped by what they are, not by which app they live in' %}</span>
+    </div>
+    <div class="gta-card-body">
+      {% gta_sections as sections %}
+      {% if sections %}
+      <div class="gta-apps">
+        {% for s in sections %}
+        <section class="gta-app" style="--app-accent:{{ s.accent }}">
+          <div class="gta-app-head">
+            <span class="gta-app-ic"><svg><use href="#{{ s.icon }}"/></svg></span>
+            <div>
+              <h3>{{ s.label }}</h3>
+              <p>{{ s.count }} table{{ s.count|pluralize }}</p>
+            </div>
+          </div>
+          <ul class="gta-app-models">
+            {% for m in s.models %}
+            <li>
+              {% if m.admin_url %}
+                <a href="{{ m.admin_url }}"{% if request.path == m.admin_url %} aria-current="page"{% endif %}>{{ m.name }}</a>
+              {% else %}
+                <span class="gta-model-flat">{{ m.name }}</span>
+              {% endif %}
+              {% if m.add_url %}<a href="{{ m.add_url }}" class="gta-add" title="{% translate 'Add' %} {{ m.name }}" aria-label="{% translate 'Add' %} {{ m.name }}">+</a>{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+        </section>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="gta-empty">{% translate "You don't have permission to view or edit anything." %}</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="gta-card">
+    <div class="gta-card-head">
       <h2>{% translate 'Recent actions' %}</h2>
-      {% load log %}
-      {% get_admin_log 12 as admin_log for_user user %}
+      <a class="gta-card-link" href="{% safe_url 'admin:sysadmin_auditlog_changelist' %}">{% translate 'View all' %}</a>
+    </div>
+    <div class="gta-card-body">
+      {% get_admin_log 8 as admin_log for_user user %}
       {% if not admin_log %}
-        <p class="gta-empty">{% translate 'None available' %}</p>
+        <p class="gta-empty">{% translate 'Nothing yet. Your edits show up here.' %}</p>
       {% else %}
       <ul class="gta-actions">
         {% for entry in admin_log %}
         <li>
-          <div class="gta-act-row">
-            <span class="gta-act-dot {% if entry.is_addition %}add{% elif entry.is_change %}change{% elif entry.is_deletion %}delete{% endif %}" aria-hidden="true"></span>
-            <div class="gta-act-body">
-              {% if entry.is_deletion or not entry.get_admin_url %}
-                <span class="obj">{{ entry.object_repr }}</span>
-              {% else %}
-                <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
-              {% endif %}
-              <div class="gta-act-meta">
-                {% if entry.is_addition %}{% translate 'Added' %}{% elif entry.is_change %}{% translate 'Changed' %}{% else %}{% translate 'Deleted' %}{% endif %}
-                &middot; {% if entry.content_type %}{{ entry.content_type.name|capfirst }}{% else %}{% translate 'Unknown content' %}{% endif %}
-                &middot; {{ entry.action_time|date:"j M, g:i a" }}
-              </div>
-            </div>
+          <span class="gta-act-dot {% if entry.is_addition %}add{% elif entry.is_change %}change{% else %}delete{% endif %}">
+            <svg><use href="#{% if entry.content_type %}{% model_icon entry.content_type.model %}{% else %}ic-doc{% endif %}"/></svg>
+          </span>
+          <div class="gta-act-body">
+            <b>
+              {% if entry.is_addition %}{% translate 'Added' %}{% elif entry.is_change %}{% translate 'Updated' %}{% else %}{% translate 'Deleted' %}{% endif %}
+              {% if entry.content_type %}{{ entry.content_type.name|lower }}{% else %}{% translate 'record' %}{% endif %}
+            </b>
+            {% if entry.is_deletion or not entry.get_admin_url %}
+              <small>{{ entry.object_repr }}</small>
+            {% else %}
+              <small><a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a></small>
+            {% endif %}
           </div>
+          <time datetime="{{ entry.action_time|date:'c' }}" title="{{ entry.action_time|date:'j M Y, g:i a' }}">{{ entry.action_time|compact_since }}</time>
         </li>
         {% endfor %}
       </ul>
       {% endif %}
     </div>
-  </aside>
+  </section>
+
 </div>
 {% endblock %}
 

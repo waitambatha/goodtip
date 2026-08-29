@@ -29,6 +29,16 @@
   --gt-lime-dk: #A9D11C;
   --gt-cream:   #E8E4D5;
 
+  /* Gold. The second brand colour, and the one the control plane leans on:
+     the rail is green on white already, so a green "you are here" pill reads
+     as another heading. Gold is the only mark on these screens that is not
+     also the brand's body colour, which is what makes it legible as state.
+     --gt-gold is the ink weight (strokes, icon fills, the primary button);
+     --gt-gold-hi is the lighter fill behind dark text. */
+  --gt-gold:      #E9A81C;
+  --gt-gold-hi:   #F7C948;
+  --gt-gold-soft: rgba(233,168,28,.14);
+
   --gt-r-card: 14px;
   --gt-r-ctl:  9px;
   --gt-r-pill: 999px;
@@ -188,6 +198,10 @@ html[data-theme="light"],
     --gt-rail-fg: #C3D2C7;
     --gt-on-deep: rgba(255,255,255,.66);
 
+    --gt-gold:      #E8B45C;
+    --gt-gold-hi:   #F0C464;
+    --gt-gold-soft: rgba(232,180,92,.18);
+
     --gt-c1: #7BD48A;
     --gt-c2: #5CCFB4;
     --gt-c3: #E8B45C;
@@ -260,6 +274,10 @@ html[data-theme="dark"] {
   --gt-rail-fg: #C3D2C7;
   --gt-on-deep: rgba(255,255,255,.66);
 
+  --gt-gold:      #E8B45C;
+  --gt-gold-hi:   #F0C464;
+  --gt-gold-soft: rgba(232,180,92,.18);
+
   --gt-c1: #7BD48A;
   --gt-c2: #5CCFB4;
   --gt-c3: #E8B45C;
@@ -275,7 +293,13 @@ html[data-theme="dark"] {
 }
 
 /* ==========================================================================
-   2. CHROME — header, rail, breadcrumbs
+   2. CHROME — the rail, the bar, breadcrumbs
+
+   THE SHAPE. The menu is a fixed full-height column and #container is padded
+   to clear it. Django's markup puts #header above .main and the sidebar inside
+   .main, which cannot produce a menu that starts at the top of the window;
+   taking the rail out of flow is the only way there without forking base.html,
+   and it costs exactly one padding rule.
    ========================================================================== */
 
 body {
@@ -286,227 +310,490 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ---- Header --------------------------------------------------------------
-   Slim and light. The old bar was a full-width block of deep green carrying
-   the wordmark, the account, the theme switch AND a row of section links —
-   which is what made the page feel squeezed before any content had loaded.
-   The sections moved to the rail; what is left is identity and account.
+:root { --gta-rail-w: 253px; --gta-bar-h: 66px; }
+html.gta-rail-collapsed { --gta-rail-w: 74px; }
+
+body.gta-shell #container {
+  /* Django sets `#container { width: 100% }` under a content-box default, so
+     the padding that clears the rail is ADDED to a full-width box and pushes
+     253px of the page off the right edge. Border-box is what makes the padding
+     inset instead of extend. */
+  box-sizing: border-box;
+  min-width: 0;
+  padding-left: var(--gta-rail-w);
+  transition: padding-left .18s ease;
+}
+body.gta-shell .main { align-items: stretch; }
+#toggle-nav-sidebar { display: none; }
+
+.gta-sr {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---- The bar -------------------------------------------------------------
+   Identity is in the rail now, so the bar carries only three things: which
+   environment you are in, a way to jump somewhere, and who you are signed in
+   as. Everything that used to crowd it moved into the menu.
    ------------------------------------------------------------------------- */
-#header {
+body.gta-shell #header {
   position: sticky;
   top: 0;
   z-index: 40;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  height: 64px;
-  padding: 0 28px;
-  background: var(--header-bg);
+  gap: 18px;
+  height: var(--gta-bar-h);
+  padding: 0 26px;
+  background: var(--gt-surface);
   color: var(--body-fg);
   border-bottom: 1px solid var(--hairline-color);
 }
-#branding { display: flex; align-items: center; gap: 14px; }
+body.gta-shell #branding { order: 1; display: flex; align-items: center; gap: 12px; flex: none; }
+body.gta-shell #header .gta-search { order: 2; margin-left: auto; margin-right: auto; }
+body.gta-shell #user-tools { order: 3; }
 
-.gta-wordmark {
-  display: inline-flex;
-  align-items: baseline;
-  font-family: var(--gt-mark);
-  font-weight: 900;
-  font-size: 25px;
-  letter-spacing: .05em;
-  line-height: 1;
-  color: var(--gt-deep);
-  text-transform: uppercase;
-}
-.gta-wordmark:link, .gta-wordmark:visited, .gta-wordmark:hover { color: var(--gt-deep); text-decoration: none; }
-.gta-wordmark span { color: var(--gt-forest); }
-.gta-wordmark .gta-dot { color: var(--gt-lime-dk); }
-html[data-theme="dark"] .gta-wordmark,
-html[data-theme="dark"] .gta-wordmark:link { color: #fff; }
-html[data-theme="dark"] .gta-wordmark span { color: var(--gt-lime); }
-
-.gta-envtag {
-  font-family: var(--gt-mark);
+.gta-env {
+  font-family: var(--gt-body);
   font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: .14em;
+  font-weight: 700;
+  letter-spacing: .1em;
   text-transform: uppercase;
-  padding: 4px 11px;
+  padding: 5px 13px;
   border-radius: var(--gt-r-pill);
-  border: 1px solid var(--border-color);
-  color: var(--body-quiet-color);
+  background: var(--gt-forest);
+  color: #fff;
   white-space: nowrap;
 }
-.gta-envtag[data-env="staging"] {
-  border-color: rgba(199,124,30,.45);
-  background: rgba(199,124,30,.10);
-  color: #A9660F;
-}
+.gta-env.on { background: var(--gt-forest); }
+.gta-area { font-size: 14.5px; font-weight: 600; color: var(--gt-forest); white-space: nowrap; }
+html[data-theme="dark"] .gta-area { color: var(--gt-lime); }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) .gta-area { color: var(--gt-lime); } }
 
-#user-tools {
+/* ---- Search --------------------------------------------------------------
+   It searches the MENU — sections, tables, HQ screens — and not your records,
+   which is why the placeholder says "jump to" rather than "search". A box that
+   looks like it finds members but only matches the word "Members" is worse
+   than no box at all.
+   ------------------------------------------------------------------------- */
+.gta-search {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
+  width: min(420px, 38vw);
+  height: 40px;
+  padding: 0 12px 0 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--gt-r-pill);
+  background: var(--gt-surface-2);
+}
+.gta-search:focus-within { border-color: var(--gt-forest); background: var(--gt-surface); box-shadow: 0 0 0 3px rgba(45,122,58,.13); }
+.gta-search > .ic { width: 17px; height: 17px; flex: none; stroke: var(--body-quiet-color); fill: none; stroke-width: 2; }
+.gta-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--body-fg);
+  padding: 0;
+  margin: 0;
+}
+.gta-search input:focus { outline: none; box-shadow: none; }
+.gta-search input::-webkit-search-cancel-button { display: none; }
+.gta-search kbd {
+  flex: none;
+  font-family: var(--gt-body);
+  font-size: 11px;
+  color: var(--body-quiet-color);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  padding: 1px 6px;
+  background: var(--gt-surface);
+}
+.gta-search:focus-within kbd { display: none; }
+
+.gta-palette {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--gt-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--gt-r-card);
+  box-shadow: var(--gt-shadow-lg);
+}
+.gta-palette li { margin: 0; }
+.gta-palette a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: var(--gt-r-ctl);
+  color: var(--body-fg);
+  font-size: 14px;
+  text-decoration: none;
+}
+.gta-palette a small { margin-left: auto; font-size: 11.5px; color: var(--body-quiet-color); }
+.gta-palette a:hover, .gta-palette a.on { background: var(--gt-surface-3); text-decoration: none; }
+.gta-palette .gta-palette-none { padding: 12px; font-size: 13.5px; color: var(--body-quiet-color); }
+
+/* ---- Account -------------------------------------------------------------- */
+body.gta-shell #user-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--body-fg);
   font-size: 13px;
   text-transform: none;
   letter-spacing: 0;
   padding: 0;
   margin: 0;
+  flex: none;
 }
-#user-tools a, #user-tools a:link, #user-tools a:visited {
-  color: var(--body-medium-color);
-  border-radius: var(--gt-r-pill);
-  padding: 7px 13px;
-  text-decoration: none;
-}
-#user-tools a:hover { background: var(--gt-surface-3); color: var(--body-loud-color); text-decoration: none; }
-#user-tools #logout-form { display: inline; margin: 0; padding: 0; }
-#user-tools #logout-form button {
-  font: inherit;
-  color: var(--body-medium-color);
-  background: transparent;
+#user-tools .theme-toggle {
   border: 1px solid var(--border-color);
-  border-radius: var(--gt-r-pill);
-  padding: 7px 13px;
-  cursor: pointer;
+  border-radius: 50%;
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  color: var(--body-medium-color);
+  background: var(--gt-surface);
 }
-#user-tools #logout-form button:hover { background: rgba(178,52,52,.10); border-color: rgba(166,33,33,.4); color: #A62121; }
+#user-tools .theme-toggle:hover { background: var(--gt-surface-3); }
+#user-tools .theme-toggle svg { fill: currentColor; width: 18px; height: 18px; }
 
-.gta-who { display: inline-flex; align-items: center; gap: 10px; padding-left: 6px; }
+.gta-acct { position: relative; }
+.gta-acct > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--gt-r-pill);
+  cursor: pointer;
+  list-style: none;
+}
+.gta-acct > summary::-webkit-details-marker { display: none; }
+.gta-acct > summary:hover { background: var(--gt-surface-3); }
+.gta-acct[open] > summary { background: var(--gt-surface-3); }
 .gta-avatar {
-  width: 34px; height: 34px;
+  width: 38px; height: 38px;
   border-radius: 50%;
   display: grid; place-items: center;
-  background: var(--gt-deep);
-  color: var(--gt-lime);
-  font-family: var(--gt-display);
-  font-size: 14px;
+  background: var(--gt-forest);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: uppercase;
   overflow: hidden;
   flex: none;
 }
 .gta-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.gta-who b { color: var(--body-loud-color); font-weight: 600; display: block; line-height: 1.2; font-size: 13.5px; }
-.gta-who small { color: var(--body-quiet-color); font-size: 11px; letter-spacing: .07em; text-transform: uppercase; }
+.gta-acct-who b { color: var(--body-loud-color); font-weight: 600; display: block; line-height: 1.25; font-size: 13.5px; }
+.gta-acct-who small { color: var(--body-quiet-color); font-size: 11.5px; display: block; line-height: 1.2; }
+.gta-acct-chev { width: 15px; height: 15px; stroke: var(--body-quiet-color); fill: none; stroke-width: 2; flex: none; }
+.gta-acct[open] .gta-acct-chev { transform: rotate(180deg); }
 
-#user-tools .theme-toggle {
+.gta-acct-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  min-width: 208px;
+  padding: 6px;
+  background: var(--gt-surface);
   border: 1px solid var(--border-color);
-  border-radius: var(--gt-r-pill);
-  width: 34px; height: 34px;
-  display: grid; place-items: center;
-  color: var(--body-medium-color);
+  border-radius: var(--gt-r-card);
+  box-shadow: var(--gt-shadow-lg);
 }
-#user-tools .theme-toggle:hover { background: var(--gt-surface-3); }
-#user-tools .theme-toggle svg { fill: currentColor; }
-
-/* ==========================================================================
-   2b. THE RAIL — the collapsible section menu
-   ========================================================================== */
-
-:root { --gta-rail-w: 268px; }
-html.gta-rail-collapsed { --gta-rail-w: 72px; }
-
-.main { align-items: stretch; }
-
-#nav-sidebar {
-  position: sticky;
-  top: 64px;
-  align-self: flex-start;
-  flex: 0 0 var(--gta-rail-w);
-  width: var(--gta-rail-w);
-  height: calc(100vh - 64px);
-  overflow-y: auto;
-  overflow-x: hidden;
-  background: var(--gt-rail);
-  border-right: 1px solid var(--hairline-color);
-  padding: 16px 12px 32px;
-  transition: flex-basis .18s ease, width .18s ease;
-  scrollbar-width: thin;
-}
-.main > #nav-sidebar { flex: 0 0 var(--gta-rail-w); }
-
-.gta-rail-toggle {
-  display: flex; align-items: center; gap: 10px;
-  width: 100%;
-  background: transparent;
-  border: 1px solid var(--border-color);
-  border-radius: var(--gt-r-ctl);
-  padding: 9px 11px;
-  margin-bottom: 18px;
-  font: inherit; font-size: 12.5px; font-weight: 600;
-  color: var(--body-quiet-color);
-  cursor: pointer;
-  box-shadow: none;
-}
-.gta-rail-toggle:hover { background: var(--gt-surface-3); color: var(--body-loud-color); }
-.gta-rail-toggle svg { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 2; }
-html.gta-rail-collapsed .gta-rail-toggle { justify-content: center; padding: 9px 0; }
-html.gta-rail-collapsed .gta-rail-toggle svg { transform: rotate(180deg); }
-
-.gta-rail-group { margin-bottom: 22px; }
-.gta-rail-group:last-child { margin-bottom: 0; }
-.gta-rail-title {
-  font-family: var(--gt-mark);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: .16em;
-  text-transform: uppercase;
-  color: var(--body-quiet-color);
-  padding: 0 11px 8px;
-  white-space: nowrap;
-}
-.gta-rail a {
+.gta-acct-menu a,
+.gta-acct-menu button {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 11px;
-  margin-bottom: 2px;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 11px;
+  border: 0;
   border-radius: var(--gt-r-ctl);
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--body-fg);
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none;
+}
+.gta-acct-menu a:hover, .gta-acct-menu button:hover { background: var(--gt-surface-3); text-decoration: none; }
+.gta-acct-menu svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.9; flex: none; opacity: .75; }
+.gta-acct-menu #logout-form { margin: 4px 0 0; padding: 4px 0 0; border-top: 1px solid var(--hairline-color); }
+.gta-acct-menu button:hover { color: #A62121; }
+html[data-theme="dark"] .gta-acct-menu button:hover { color: #F08A8A; }
+
+/* ==========================================================================
+   2b. THE RAIL — brand, three bands, and the way out
+   ========================================================================== */
+
+#nav-sidebar.gta-rail {
+  /* Django's nav_sidebar.css parks the sidebar at `margin-left: -276px` and
+     relies on its own nav_sidebar.js adding `shifted` to #main to bring it
+     back. This template replaces that markup — there is no #toggle-nav-sidebar
+     for that script to bind to — so the class never arrives and the rail sits
+     just off the left edge, present in the DOM and invisible on screen.
+
+     Three declarations undo it, and all three are needed: the offset lives in
+     `#nav-sidebar { left; margin-left }` and the hiding in a separate
+     `.main > #nav-sidebar { visibility: hidden }`, so fixing the position
+     alone leaves a correctly-placed invisible menu. */
+  margin-left: 0;
+  visibility: visible;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 45;
+  width: var(--gta-rail-w);
+  display: flex;
+  flex-direction: column;
+  background: var(--gt-rail);
+  border-right: 1px solid var(--hairline-color);
+  transition: width .18s ease;
+  overflow: hidden;
+}
+
+.gta-rail-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--gta-bar-h);
+  padding: 0 14px 0 20px;
+  flex: none;
+}
+.gta-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; min-width: 0; }
+.gta-brand:hover { text-decoration: none; }
+.gta-mark {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--gt-forest);
+  display: grid; place-items: center;
+  flex: none;
+}
+.gta-mark svg { width: 17px; height: 17px; stroke: #fff; fill: none; stroke-width: 3; }
+.gta-word {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -.015em;
+  color: var(--gt-deep);
+  white-space: nowrap;
+}
+.gta-word span { color: var(--gt-forest); }
+html[data-theme="dark"] .gta-word { color: #fff; }
+html[data-theme="dark"] .gta-word span { color: var(--gt-lime); }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .gta-word { color: #fff; }
+  html:not([data-theme="light"]) .gta-word span { color: var(--gt-lime); }
+}
+
+.gta-rail-toggle {
+  margin-left: auto;
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border: 0;
+  border-radius: var(--gt-r-ctl);
+  background: none;
+  color: var(--body-quiet-color);
+  cursor: pointer;
+  flex: none;
+}
+.gta-rail-toggle:hover { background: var(--gt-surface-3); color: var(--body-loud-color); }
+.gta-rail-toggle svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 2; }
+html.gta-rail-collapsed .gta-rail-toggle svg { transform: rotate(180deg); }
+
+.gta-rail-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 12px 14px;
+  scrollbar-width: thin;
+}
+.gta-rail-scroll::-webkit-scrollbar { width: 8px; }
+.gta-rail-scroll::-webkit-scrollbar-thumb { background: var(--gt-surface-3); border-radius: 8px; }
+
+.gta-rail-title {
+  margin: 18px 0 6px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--gt-forest);
+}
+html[data-theme="dark"] .gta-rail-title { color: var(--gt-lime); }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) .gta-rail-title { color: var(--gt-lime); } }
+
+.gta-nav { list-style: none; margin: 0; padding: 0; }
+.gta-nav > li { margin: 1px 0; }
+
+/* One row, whether it is a link or a <summary> that opens a group. */
+.gta-nav-a {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: var(--gt-rail-fg);
   font-size: 14px;
   font-weight: 500;
-  color: var(--gt-rail-fg);
   text-decoration: none;
+  cursor: pointer;
+  list-style: none;
   white-space: nowrap;
-  position: relative;
 }
-.gta-rail a svg.ic { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; }
-.gta-rail a:hover { background: var(--gt-surface-3); color: var(--body-loud-color); text-decoration: none; }
-.gta-rail a.on {
-  background: var(--gt-deep);
-  color: #fff;
+.gta-nav-a::-webkit-details-marker { display: none; }
+.gta-nav-a:hover { background: var(--gt-surface-3); color: var(--body-loud-color); text-decoration: none; }
+.gta-nav-a .ic { width: 19px; height: 19px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; opacity: .85; }
+.gta-nav-a .lbl { overflow: hidden; text-overflow: ellipsis; }
+
+/* Where you are. Gold rather than green: the rail is already green-on-white,
+   and a green pill on it reads as another heading instead of as "here". */
+.gta-nav-a.on {
+  background: var(--gt-gold-hi);
+  color: var(--gt-deep);
   font-weight: 600;
 }
-.gta-rail a.on svg.ic { stroke: var(--gt-lime); }
-html[data-theme="dark"] .gta-rail a.on { background: var(--gt-lime); color: var(--gt-deep); }
-html[data-theme="dark"] .gta-rail a.on svg.ic { stroke: var(--gt-deep); }
+.gta-nav-a.on .ic { opacity: 1; }
+html[data-theme="dark"] .gta-nav-a.on { background: var(--gt-gold); color: var(--gt-deep); }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) .gta-nav-a.on { background: var(--gt-gold); color: var(--gt-deep); } }
 
-.gta-rail .gta-count {
+.gta-sec-n {
   margin-left: auto;
-  font-family: var(--gt-num);
-  font-size: 11.5px;
-  font-weight: 800;
-  background: var(--gt-lime);
-  color: var(--gt-deep);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--body-quiet-color);
+  background: var(--gt-surface-3);
   border-radius: var(--gt-r-pill);
   padding: 1px 7px;
+  flex: none;
 }
-.gta-rail a.on .gta-count { background: var(--gt-lime); color: var(--gt-deep); }
+.gta-sec-n.alert { background: rgba(199,124,30,.16); color: #A9660F; }
+html[data-theme="dark"] .gta-sec-n.alert { background: rgba(232,180,92,.2); color: var(--gt-c3); }
 
-/* Collapsed: an icon rail. Labels are hidden rather than removed so the
-   markup — and the screen reader — still has them, and the title attribute
-   carries the name to a mouse. */
-html.gta-rail-collapsed .gta-rail a { justify-content: center; padding: 11px 0; }
-html.gta-rail-collapsed .gta-rail .lbl,
+.gta-sec-chev {
+  width: 14px; height: 14px;
+  flex: none;
+  stroke: currentColor; fill: none; stroke-width: 2;
+  opacity: .55;
+  transition: transform .15s ease;
+}
+.gta-sec[open] > .gta-nav-a > .gta-sec-chev { transform: rotate(180deg); }
+.gta-sec[open] > .gta-nav-a { color: var(--body-loud-color); }
+.gta-sec > summary + .gta-sub { margin-top: 1px; }
+
+/* The models inside a group. Indented under the icon column rather than given
+   their own icons — twelve groups of icons is a texture, not a hierarchy. */
+.gta-sub { list-style: none; margin: 0 0 6px; padding: 0 0 0 30px; position: relative; }
+.gta-sub::before {
+  content: "";
+  position: absolute;
+  left: 19px; top: 4px; bottom: 4px;
+  width: 1px;
+  background: var(--hairline-color);
+}
+.gta-sub a {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: var(--body-medium-color);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gta-sub a:hover { background: var(--gt-surface-3); color: var(--body-loud-color); text-decoration: none; }
+.gta-sub a.on { color: var(--gt-forest); font-weight: 600; background: var(--gt-surface-3); }
+html[data-theme="dark"] .gta-sub a.on { color: var(--gt-lime); }
+
+.gta-rail-foot { flex: none; padding: 12px; border-top: 1px solid var(--hairline-color); }
+.gta-viewsite {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 11px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--body-loud-color);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.gta-viewsite:hover { background: var(--gt-surface-3); text-decoration: none; }
+.gta-viewsite svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; flex: none; }
+
+/* ---- Collapsed ------------------------------------------------------------
+   Icons only. The groups collapse shut too: an indented list of model names
+   under a 74px rail has nothing left to indent from.
+   ------------------------------------------------------------------------- */
+html.gta-rail-collapsed .gta-word,
 html.gta-rail-collapsed .gta-rail-title,
-html.gta-rail-collapsed .gta-rail-toggle .lbl { display: none; }
-html.gta-rail-collapsed .gta-rail .gta-count {
-  position: absolute; top: 4px; right: 8px; margin: 0;
-  font-size: 10px; padding: 0 5px;
-}
-html.gta-rail-collapsed .gta-rail-group { margin-bottom: 14px; border-top: 1px solid var(--hairline-color); padding-top: 14px; }
-html.gta-rail-collapsed .gta-rail-group:first-of-type { border-top: 0; padding-top: 0; }
+html.gta-rail-collapsed .gta-nav-a .lbl,
+html.gta-rail-collapsed .gta-sec-n,
+html.gta-rail-collapsed .gta-sec-chev,
+html.gta-rail-collapsed .gta-sub,
+html.gta-rail-collapsed .gta-viewsite .lbl { display: none; }
+html.gta-rail-collapsed .gta-rail-top { padding: 0 6px; gap: 3px; justify-content: center; }
+html.gta-rail-collapsed .gta-mark { width: 30px; height: 30px; }
+html.gta-rail-collapsed .gta-rail-toggle { margin-left: 0; width: 26px; height: 26px; }
+html.gta-rail-collapsed .gta-nav-a { justify-content: center; padding: 10px 0; gap: 0; }
+html.gta-rail-collapsed .gta-rail-scroll { padding-left: 14px; padding-right: 14px; }
+html.gta-rail-collapsed .gta-viewsite { padding: 11px 0; }
 
-#toggle-nav-sidebar { display: none; }
+/* Under a laptop width the menu is more valuable as content, so it starts
+   collapsed there (gt-rail.js) and the search box gives up its width first. */
+@media (max-width: 1000px) { .gta-search { display: none; } }
+
+/* ---- Out-specifying admin/base.css ---------------------------------------
+   Django styles `#header a:hover` and `#logout-form button` by id, which beats
+   a class selector however carefully it is written. These four rules exist for
+   no other reason; each one restates something already declared above at a
+   weight that survives the cascade.
+   ------------------------------------------------------------------------- */
+body.gta-shell #header .gta-acct-menu a:hover,
+body.gta-shell #header .gta-acct-menu a:focus,
+body.gta-shell #header .gta-palette a:hover { text-decoration: none; }
+body.gta-shell #header .gta-acct-menu #logout-form { display: block; }
+body.gta-shell #header .gta-acct-menu #logout-form button { font-family: var(--gt-body); }
+
+/* ---- Focus ---------------------------------------------------------------
+   Everything new in the chrome is reachable by keyboard, so everything new in
+   the chrome has to show where the keyboard is. */
+.gta-nav-a:focus-visible,
+.gta-sub a:focus-visible,
+.gta-viewsite:focus-visible,
+.gta-rail-toggle:focus-visible,
+.gta-acct > summary:focus-visible,
+.gta-acct-menu a:focus-visible,
+.gta-acct-menu button:focus-visible,
+.gta-palette a:focus-visible {
+  outline: 2px solid var(--gt-forest);
+  outline-offset: 2px;
+}
+html[data-theme="dark"] .gta-nav-a:focus-visible,
+html[data-theme="dark"] .gta-sub a:focus-visible { outline-color: var(--gt-lime); }
+
+@media (prefers-reduced-motion: reduce) {
+  body.gta-shell #container,
+  #nav-sidebar.gta-rail,
+  .gta-sec-chev { transition: none; }
+}
 
 /* ---- Breadcrumbs + content ------------------------------------------------ */
 div.breadcrumbs {
@@ -786,206 +1073,344 @@ body.login .gta-login-note {
 
 /* ==========================================================================
    7. DASHBOARD — the rebuilt admin index
+
+   Read top to bottom it answers three questions in order: who am I and what
+   can I jump to, how did the fortnight go, and what is waiting on me. The
+   model list comes last because it is the only one of the four a person can
+   answer for themselves.
    ========================================================================== */
 
-.gta-hero {
-  position: relative;
-  overflow: hidden;
-  border-radius: 18px;
-  padding: clamp(28px, 3.2vw, 42px);
-  margin: 4px 0 30px;
-  color: #fff;
-  background:
-    radial-gradient(760px 380px at 8% -30%, rgba(200,241,53,.20), transparent 62%),
-    radial-gradient(680px 420px at 102% 0%, rgba(45,122,58,.42), transparent 60%),
-    var(--gt-deep);
-  box-shadow: var(--gt-shadow-lg);
-}
-.gta-hero > * { position: relative; }
-.gta-hero-eyebrow {
-  font-family: var(--gt-mark);
-  font-size: 12px;
-  letter-spacing: .18em;
-  text-transform: uppercase;
-  color: var(--gt-lime);
-  margin: 0 0 6px;
-}
-.gta-hero h1 {
-  font-family: var(--gt-display);
-  font-size: clamp(26px, 3.4vw, 40px);
-  line-height: 1.06;
-  letter-spacing: -.02em;
-  margin: 0 0 8px;
-  color: #fff;
-}
-.gta-hero p { color: rgba(255,255,255,.76); margin: 0; max-width: 60ch; font-size: 15px; }
-.gta-hero-links { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
-.gta-hero-links a {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 9px 15px;
-  border-radius: var(--gt-r-pill);
-  font-size: 13px; font-weight: 700;
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.16);
-  color: #fff;
-  text-decoration: none;
-}
-.gta-hero-links a svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.9; }
-.gta-hero-links a:hover { background: rgba(200,241,53,.16); border-color: rgba(200,241,53,.55); color: #fff; text-decoration: none; }
-.gta-hero-links a.primary { background: var(--gt-lime); border-color: var(--gt-lime); color: var(--gt-deep); }
-.gta-hero-links a.primary:hover { background: #fff; border-color: #fff; }
+/* Django pins the stock index to `.dashboard #content { width: 600px }`,
+   at the same specificity as this rule — so the width has to be stated
+   here, not merely left unset, or the whole screen renders in a column. */
+.gta-dash #content { width: auto; max-width: 1580px; padding: 26px 30px 40px; }
 
-/* ---- KPI tiles ----------------------------------------------------------- */
+/* ---- Hero ---------------------------------------------------------------- */
+.gta-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 26px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.gta-hero-say h1 {
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1.2;
+  color: var(--body-loud-color);
+  margin: 0 0 5px;
+  text-wrap: balance;
+}
+.gta-hero-say p { margin: 0; color: var(--body-quiet-color); font-size: 14.5px; }
+.gta-wave { display: inline-block; }
+
+.gta-hero-acts { display: flex; gap: 12px; flex-wrap: wrap; }
+.gta-act {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px 12px 12px;
+  min-width: 208px;
+  background: var(--gt-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: var(--gt-shadow-sm);
+  text-decoration: none;
+  color: var(--body-fg);
+}
+.gta-act:hover { border-color: var(--gt-forest); text-decoration: none; box-shadow: var(--gt-shadow); }
+.gta-act-ic {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  display: grid; place-items: center;
+  flex: none;
+}
+.gta-act-ic svg { width: 19px; height: 19px; stroke: #fff; fill: none; stroke-width: 2; }
+.gta-act-ic.green { background: var(--gt-forest); }
+.gta-act-ic.gold  { background: var(--gt-gold); }
+.gta-act-ic.gold svg { stroke: var(--gt-deep); }
+.gta-act-ic.ink   { background: var(--gt-deep); }
+html[data-theme="dark"] .gta-act-ic.ink { background: var(--gt-surface-3); }
+.gta-act-txt { min-width: 0; }
+.gta-act-txt b { display: block; font-size: 14px; font-weight: 600; color: var(--body-loud-color); line-height: 1.3; }
+.gta-act-txt small { display: block; font-size: 12px; color: var(--body-quiet-color); }
+.gta-act-go { width: 15px; height: 15px; margin-left: auto; stroke: var(--body-quiet-color); fill: none; stroke-width: 2; transform: rotate(180deg); flex: none; }
+
+/* ---- KPI tiles -----------------------------------------------------------
+   A number, its direction, and the shape it made getting there. The sparkline
+   carries no scale on purpose — the tile states the figure, and what it cannot
+   state is whether that figure climbed all fortnight or spiked this morning.
+   ------------------------------------------------------------------------- */
 .gta-kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
-  gap: 20px;
-  margin-bottom: 28px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
 }
 .gta-kpi {
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 20px 16px;
   background: var(--gt-surface);
-  border: 1px solid var(--hairline-color);
+  border: 1px solid var(--border-color);
   border-radius: var(--gt-r-card);
   box-shadow: var(--gt-shadow-sm);
-  padding: 22px 22px 20px;
-  display: block;
-  color: inherit;
+  color: var(--body-fg);
   text-decoration: none;
-  transition: transform .12s var(--ease, ease), box-shadow .15s, border-color .15s;
 }
-a.gta-kpi:hover { transform: translateY(-2px); box-shadow: var(--gt-shadow); border-color: var(--border-color); text-decoration: none; color: inherit; }
-.gta-kpi::before {
-  content: "";
-  position: absolute; left: 0; top: 14px; bottom: 14px;
-  width: 3px; border-radius: 0 3px 3px 0;
-  background: var(--tile-accent, var(--gt-forest));
-}
-.gta-kpi-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+a.gta-kpi:hover { border-color: var(--gt-forest); text-decoration: none; box-shadow: var(--gt-shadow); }
+.gta-kpi-body { display: flex; align-items: flex-start; gap: 13px; }
 .gta-kpi-ic {
-  width: 30px; height: 30px; flex: none;
-  border-radius: 9px;
+  width: 42px; height: 42px;
+  border-radius: 50%;
   display: grid; place-items: center;
-  background: color-mix(in srgb, var(--tile-accent, var(--gt-forest)) 14%, transparent);
-  color: var(--tile-accent, var(--gt-forest));
+  flex: none;
 }
-.gta-kpi-ic svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.9; }
-.gta-kpi-label {
-  font-family: var(--gt-mark);
-  font-size: 12px; font-weight: 600;
-  letter-spacing: .11em; text-transform: uppercase;
-  color: var(--body-quiet-color);
-}
+.gta-kpi-ic svg { width: 20px; height: 20px; fill: currentColor; stroke: none; }
+.gta-kpi-ic.green { background: var(--gt-forest); color: #fff; }
+.gta-kpi-ic.gold { background: var(--gt-gold); color: var(--gt-deep); }
+.gta-kpi-txt { min-width: 0; }
+.gta-kpi-label { display: block; font-size: 13.5px; color: var(--body-quiet-color); line-height: 1.4; }
 .gta-kpi-num {
-  font-family: var(--gt-num);
-  font-weight: 800;
-  font-size: 38px;
-  line-height: 1;
-  letter-spacing: -.01em;
+  display: block;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1.15;
   color: var(--body-loud-color);
   font-variant-numeric: tabular-nums;
 }
-.gta-kpi-sub { font-size: 12.5px; color: var(--body-quiet-color); margin-top: 6px; }
-.gta-delta { font-weight: 700; font-size: 12px; }
-.gta-delta.up { color: var(--gt-c1); }
-.gta-delta.down { color: var(--gt-c6); }
+.gta-kpi-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: auto; }
+.gta-kpi-delta { flex: 1 1 auto; min-width: 0; }
+.gta-kpi-delta small { display: block; font-size: 11.5px; color: var(--body-quiet-color); line-height: 1.5; }
+.gta-delta { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gta-delta.up { color: var(--gt-forest); }
+.gta-delta.down { color: #A9660F; }
 .gta-delta.flat { color: var(--body-quiet-color); }
+html[data-theme="dark"] .gta-delta.up { color: var(--gt-c1); }
+html[data-theme="dark"] .gta-delta.down { color: var(--gt-c3); }
+.gta-kpi-spark { width: 96px; height: 46px; flex: 0 0 96px; }
+.gta-kpi-spark .gt-chart-empty { display: none; }
 
-/* ---- Two-column dashboard layout ---------------------------------------- */
-.gta-cols { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 28px; align-items: start; }
-@media (max-width: 1100px) { .gta-cols { grid-template-columns: minmax(0,1fr); } }
-
-.gta-section-head {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 12px; margin: 4px 0 12px;
+/* ---- The two-column body -------------------------------------------------
+   Four cards, two columns, so the chart and the queue share a row and the
+   model list and the log share the next one.
+   ------------------------------------------------------------------------- */
+.gta-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 344px;
+  gap: 18px;
+  align-items: start;
 }
-.gta-section-head h2 {
-  font-family: var(--gt-mark);
-  font-size: 13px; font-weight: 600;
-  letter-spacing: .14em; text-transform: uppercase;
-  color: var(--body-quiet-color);
-  margin: 0; padding: 0; background: none; border: 0;
-}
+@media (max-width: 1180px) { .gta-grid { grid-template-columns: minmax(0, 1fr); } }
 
-/* ---- App cards ----------------------------------------------------------- */
-.gta-apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 20px; }
-.gta-app {
+.gta-card {
   background: var(--gt-surface);
-  border: 1px solid var(--hairline-color);
+  border: 1px solid var(--border-color);
   border-radius: var(--gt-r-card);
   box-shadow: var(--gt-shadow-sm);
   overflow: hidden;
-  display: flex; flex-direction: column;
 }
-.gta-app-head {
-  display: flex; align-items: center; gap: 10px;
-  padding: 13px 15px;
-  background: var(--gt-surface-3);
-  border-bottom: 1px solid var(--hairline-color);
+.gta-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 0;
 }
-.gta-app-ic {
-  width: 28px; height: 28px; flex: none;
-  border-radius: 8px; display: grid; place-items: center;
-  background: color-mix(in srgb, var(--app-accent, var(--gt-forest)) 16%, transparent);
-  color: var(--app-accent, var(--gt-forest));
+.gta-card-head h2 {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  color: var(--body-loud-color);
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  text-transform: none;
 }
-.gta-app-ic svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.9; }
-.gta-app-head h3 {
-  margin: 0; padding: 0;
-  font-family: var(--gt-body);
-  font-size: 14px; font-weight: 700;
-  letter-spacing: 0; text-transform: none;
-}
-/* Django styles a.section for the (white-on-dark) header, so it has to be
-   re-coloured for use on a light card. */
-.gta-app-head h3 a.section,
-.gta-app-head h3 a.section:link,
-.gta-app-head h3 a.section:visited { color: var(--body-loud-color); }
-.gta-app-head h3 a.section:hover { color: var(--link-fg); }
-.gta-model-flat { flex: 1 1 auto; padding: 8px 9px; font-size: 13.5px; color: var(--body-quiet-color); }
-.gta-app-models { list-style: none; margin: 0; padding: 6px; display: block; }
-.gta-app-models li { display: flex; align-items: center; gap: 6px; }
-.gta-app-models li > a {
-  flex: 1 1 auto;
-  padding: 8px 9px;
+.gta-card-note { font-size: 12px; color: var(--body-quiet-color); text-align: right; max-width: 30ch; }
+.gta-card-body { padding: 14px 20px 20px; }
+.gta-card-link { font-size: 12.5px; font-weight: 600; color: var(--gt-forest); white-space: nowrap; }
+html[data-theme="dark"] .gta-card-link { color: var(--gt-lime); }
+
+.gta-key { display: flex; gap: 16px; list-style: none; margin: 7px 0 0; padding: 0; }
+.gta-key li { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--body-quiet-color); }
+.gta-key i { width: 9px; height: 9px; border-radius: 50%; display: block; flex: none; }
+
+.gta-range select {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-color);
   border-radius: var(--gt-r-ctl);
-  font-size: 13.5px;
+  background: var(--gt-surface);
   color: var(--body-fg);
-  min-width: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  cursor: pointer;
 }
-.gta-app-models li > a:hover { background: var(--gt-surface-2); color: var(--body-loud-color); text-decoration: none; }
-.gta-app-models .gta-add {
+.gta-card-chart .gt-chart { min-height: 300px; }
+
+/* ---- Waiting on you ------------------------------------------------------ */
+.gta-queue { list-style: none; margin: 0 0 16px; padding: 0; }
+.gta-queue li + li { border-top: 1px solid var(--hairline-color); }
+.gta-queue a, .gta-queue > li > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 4px;
+  color: var(--body-fg);
+  text-decoration: none;
+  font-size: 14px;
+}
+.gta-queue a:hover { color: var(--gt-forest); text-decoration: none; }
+.gta-queue-lbl { min-width: 0; }
+.gta-queue-n {
   flex: none;
-  width: 26px; height: 26px; margin-right: 4px;
-  border-radius: 7px;
-  display: grid; place-items: center;
+  min-width: 28px;
+  padding: 2px 9px;
+  border-radius: var(--gt-r-pill);
+  background: var(--gt-surface-3);
   color: var(--body-quiet-color);
-  border: 1px solid transparent;
-  font-size: 16px; line-height: 1;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
-.gta-app-models .gta-add:hover { background: var(--gt-lime); color: var(--gt-deep); text-decoration: none; }
+.gta-queue-n.hot { background: var(--gt-gold-soft); color: #8A5A08; }
+html[data-theme="dark"] .gta-queue-n.hot { background: rgba(232,180,92,.2); color: var(--gt-gold); }
+
+.gta-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.gta-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; }
+.gta-btn.gold { background: var(--gt-gold); color: var(--gt-deep); }
+.gta-btn.gold:hover { background: var(--gt-gold-hi); color: var(--gt-deep); text-decoration: none; }
+
+/* ---- The model list ------------------------------------------------------
+   Grouped by what things are rather than by which app they live in. The flat
+   `available_apps` loop this replaced put Season between Sport and Charity;
+   the grouping is declared in sysadmin.templatetags.gtadmin.SECTIONS.
+   ------------------------------------------------------------------------- */
+.gta-apps {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(198px, 1fr));
+  gap: 14px;
+}
+.gta-app {
+  border: 1px solid var(--hairline-color);
+  border-radius: 12px;
+  padding: 14px 15px 12px;
+  background: var(--gt-surface-2);
+}
+.gta-app-head { display: flex; align-items: center; gap: 11px; margin-bottom: 10px; }
+.gta-app-ic {
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  display: grid; place-items: center;
+  flex: none;
+  background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+}
+.gta-app-ic svg { width: 17px; height: 17px; stroke: var(--app-accent); fill: none; stroke-width: 1.9; }
+.gta-app-head h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--body-loud-color);
+  margin: 0;
+  line-height: 1.3;
+}
+.gta-app-head p { margin: 0; font-size: 11.5px; color: var(--body-quiet-color); }
+
+.gta-app-models { list-style: none; margin: 0; padding: 0; }
+.gta-app-models li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-top: 1px solid var(--hairline-color);
+}
+.gta-app-models a {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 2px;
+  font-size: 13px;
+  color: var(--body-medium-color);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gta-app-models a:hover { color: var(--gt-forest); text-decoration: none; }
+.gta-app-models a[aria-current="page"] { color: var(--gt-forest); font-weight: 600; }
+.gta-model-flat { flex: 1 1 auto; padding: 7px 2px; font-size: 13px; color: var(--body-quiet-color); }
+.gta-add {
+  flex: none;
+  width: 20px; height: 20px;
+  display: grid; place-items: center;
+  border-radius: 6px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--body-quiet-color);
+  opacity: 0;
+}
+.gta-app-models li:hover .gta-add, .gta-add:focus-visible { opacity: 1; }
+.gta-add:hover { background: var(--gt-surface-3); color: var(--gt-forest); text-decoration: none; }
 
 /* ---- Recent actions ------------------------------------------------------ */
-.gta-side .module { margin-bottom: 16px; }
-/* `.module ul` sets a horizontal padding these lists do not want, and it wins
-   on specificity — hence the qualified selector rather than a bare class. */
-.module .gta-actions, .gta-actions { list-style: none; margin: 0; padding: 6px; }
-.gta-actions li { padding: 9px 10px; border-radius: var(--gt-r-ctl); }
-.gta-actions li + li { border-top: 1px solid var(--hairline-color); border-radius: 0; }
-.gta-actions .gta-act-row { display: flex; align-items: flex-start; gap: 9px; }
-.gta-act-dot {
-  width: 7px; height: 7px; border-radius: 50%; flex: none; margin-top: 6px;
-  background: var(--body-quiet-color);
+.gta-actions { list-style: none; margin: 0; padding: 0; }
+.gta-actions li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 0;
 }
-.gta-act-dot.add { background: var(--gt-c1); }
-.gta-act-dot.change { background: var(--gt-c3); }
-.gta-act-dot.delete { background: var(--gt-c6); }
-.gta-act-body { min-width: 0; }
-.gta-act-body a, .gta-act-body span.obj { font-size: 13.5px; font-weight: 600; display: block; }
-.gta-act-meta { font-size: 11.5px; color: var(--body-quiet-color); margin-top: 2px; }
-.gta-empty { padding: 18px 16px; color: var(--body-quiet-color); font-size: 13px; }
+.gta-actions li + li { border-top: 1px solid var(--hairline-color); }
+.gta-act-dot {
+  width: 32px; height: 32px;
+  border-radius: 9px;
+  display: grid; place-items: center;
+  flex: none;
+  background: var(--gt-surface-3);
+}
+.gta-act-dot svg { width: 15px; height: 15px; stroke: var(--body-medium-color); fill: none; stroke-width: 1.9; }
+.gta-act-dot.add svg { stroke: var(--gt-c1); }
+.gta-act-dot.change svg { stroke: var(--gt-c4); }
+.gta-act-dot.delete svg { stroke: var(--gt-c6); }
+.gta-act-body { min-width: 0; flex: 1 1 auto; }
+.gta-act-body b { display: block; font-size: 13.5px; font-weight: 600; color: var(--body-loud-color); line-height: 1.35; }
+.gta-act-body small { display: block; font-size: 12px; color: var(--body-quiet-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gta-act-body small a { color: inherit; }
+.gta-act-body small a:hover { color: var(--gt-forest); }
+.gta-actions time { flex: none; font-size: 11.5px; color: var(--body-quiet-color); white-space: nowrap; }
 
+.gta-empty { padding: 16px 2px; color: var(--body-quiet-color); font-size: 13.5px; }
+
+/* ---- Footer -------------------------------------------------------------- */
+#footer .gta-foot {
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+  padding: 18px 30px 26px;
+  font-size: 12.5px;
+  color: var(--body-quiet-color);
+}
+
+@media (max-width: 760px) {
+  .gta-dash #content { padding: 20px 16px 32px; }
+  .gta-hero-acts { width: 100%; }
+  .gta-act { flex: 1 1 200px; min-width: 0; }
+}
 /* ==========================================================================
    8. CHARTS + SYSTEM REPORT
    ========================================================================== */

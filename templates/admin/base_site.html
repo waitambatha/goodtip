@@ -5,12 +5,28 @@
 The GoodTip skin's entry point.
 
 Everything the skin needs is hung off blocks Django's admin/base.html already
-provides — extrastyle for the stylesheet, branding for the wordmark, userlinks
-for the account chip, nav-global for the sub-nav — so no admin template is
-forked and an upgrade to base.html carries straight through.
+provides — extrastyle for the stylesheet, branding for the environment tag,
+nav-global for the search box, userlinks for the account menu, nav-sidebar for
+the menu itself — so no admin template is forked and an upgrade to base.html
+carries straight through.
+
+THE LAYOUT. The menu is a full-height fixed column down the left, and the
+container is padded to clear it. Django's own markup puts #header above .main
+and the sidebar inside .main, which cannot produce a menu that starts at the
+top of the window; taking the rail out of flow is the only way to get there
+without forking base.html, and it costs one padding rule.
 {% endcomment %}
 
 {% block title %}{% if subtitle %}{{ subtitle }} &middot; {% endif %}{{ title }} &middot; GoodTip HQ{% endblock %}
+
+{% comment %}
+`gta-shell` marks the pages that actually have the rail, and it is what the new
+chrome is scoped to. The login screen and popups render no rail, so without it
+they would be indented 253px past a menu that is not there — and they keep the
+masthead they already had instead of half-adopting a bar built for a layout
+they do not use.
+{% endcomment %}
+{% block bodyclass %}{% if user.is_authenticated and user.is_staff and is_nav_sidebar_enabled and not is_popup %}gta-shell{% endif %}{% endblock %}
 
 {% block extrastyle %}
 {{ block.super }}
@@ -28,42 +44,66 @@ forked and an upgrade to base.html carries straight through.
   } catch (e) {}
 </script>
 <script src="{% static 'gtadmin/js/gt-rail.js' %}" defer></script>
+<script src="{% static 'gtadmin/js/gt-palette.js' %}" defer></script>
 {% include "partials/_favicon.html" %}
 {% endblock %}
 
-{% block branding %}
-<a href="{% url 'admin:index' %}" class="gta-wordmark">GOOD<span>TIP</span><span class="gta-dot">.</span></a>
 {% comment %}
-Which environment you are in. On staging that is the difference between a test
-and an incident, and the admin's own chrome says nothing about it. `is_staging`
-comes from goodtip.context_processors, so it follows the setting rather than
-guessing from the Host header.
+Which environment you are in, first thing on the bar. On staging that is the
+difference between a test and an incident, and the admin's own chrome says
+nothing about it. `is_staging` comes from goodtip.context_processors, so it
+follows the setting rather than guessing from the Host header.
 {% endcomment %}
-<span class="gta-envtag"{% if is_staging %} data-env="staging"{% endif %}>
-  {% if is_staging %}Staging{% else %}Control&nbsp;plane{% endif %}
-</span>
+{% block branding %}
+<span class="gta-env{% if is_staging %} on{% endif %}">{% if is_staging %}Staging{% else %}Live{% endif %}</span>
+<span class="gta-area">Control plane</span>
 {% if user.is_anonymous %}{% include "admin/color_theme_toggle.html" %}{% endif %}
 {% endblock %}
 
 {% block welcome-msg %}{% endblock %}
 
+{% comment %}
+Search. Client-side, over the menu that is already on the page — every section,
+every table, every HQ screen. It does not search records, and says so in its
+own placeholder, because a box that looks like it searches your members but
+only finds the word "Members" is worse than no box.
+{% endcomment %}
+{% block nav-global %}
+{% if user.is_authenticated and user.is_staff %}
+<div class="gta-search" data-palette>
+  <svg class="ic" aria-hidden="true"><use href="#ic-search"/></svg>
+  <input type="search" id="gta-palette-input" autocomplete="off" spellcheck="false"
+         placeholder="Jump to a screen or table&hellip;" aria-label="Jump to a screen or table"
+         aria-expanded="false" aria-controls="gta-palette-results" role="combobox">
+  <kbd>/</kbd>
+  <ul class="gta-palette" id="gta-palette-results" role="listbox" hidden></ul>
+</div>
+{% endif %}
+{% endblock %}
+
 {% block userlinks %}
-<span class="gta-who">
-  <span class="gta-avatar">
-    {% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{{ user.get_short_name|default:user.get_username|slice:":1"|upper }}{% endif %}
-  </span>
-  <span>
-    <b>{% firstof user.get_short_name user.get_username %}</b>
-    <small>{% if user.is_superuser %}Super admin{% else %}Staff{% endif %}</small>
-  </span>
-</span>
-{% if site_url %}<a href="{{ site_url }}">{% translate 'View site' %}</a>{% endif %}
-{% if user.has_usable_password %}<a href="{% url 'admin:password_change' %}">{% translate 'Password' %}</a>{% endif %}
-<form id="logout-form" method="post" action="{% url 'admin:logout' %}">
-  {% csrf_token %}
-  <button type="submit">{% translate 'Log out' %}</button>
-</form>
 {% include "admin/color_theme_toggle.html" %}
+<details class="gta-acct">
+  <summary>
+    <span class="gta-avatar">
+      {% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{% firstof user.get_short_name user.get_username|slice:":2" %}{% endif %}
+    </span>
+    <span class="gta-acct-who">
+      <b>{% firstof user.get_short_name user.get_username %}</b>
+      <small>{% if user.is_superuser %}Superuser{% else %}Staff{% endif %}</small>
+    </span>
+    <svg class="gta-acct-chev" aria-hidden="true"><use href="#ic-chev-down"/></svg>
+  </summary>
+  <div class="gta-acct-menu">
+    <a href="{% url 'profile' %}"><svg><use href="#ic-users"/></svg>{% translate 'Your profile' %}</a>
+    {% if site_url %}<a href="{{ site_url }}" target="_blank" rel="noopener"><svg><use href="#ic-eye"/></svg>{% translate 'View site' %}</a>{% endif %}
+    {% if user.has_usable_password %}<a href="{% url 'admin:password_change' %}"><svg><use href="#ic-lock"/></svg>{% translate 'Change password' %}</a>{% endif %}
+    <form id="logout-form" method="post" action="{% url 'admin:logout' %}">
+      {% csrf_token %}
+      <button type="submit"><svg><use href="#ic-logout"/></svg>{% translate 'Log out' %}</button>
+    </form>
+  </div>
+</details>
 {% endblock %}
 
 {% block header %}
@@ -71,62 +111,118 @@ guessing from the Host header.
 {{ block.super }}
 {% endblock %}
 
-{% block nav-global %}{% endblock %}
-
 {% comment %}
-THE RAIL.
+THE MENU.
 
-Sections used to ride in a strip across the header, which cost the page a
-whole row of vertical space on every screen and still had nowhere to put the
-model list. As a rail it gets room to group things, it collapses to icons when
-the content wants the width, and the model list from `available_apps` sits
-underneath the sections instead of in a second sidebar.
+Three bands. The top one is the control plane's own screens. PLATFORM is the
+database, regrouped by sysadmin.templatetags.gtadmin.SECTIONS — the flat
+`available_apps` loop this replaced put Season between Sport and Charity with
+nothing separating catalog from tipping, which is what twenty-five ungrouped
+entries look like. HQ is the four screens that used to be reachable only by
+knowing their URL, because neither menu in the old split listed them.
 
-Rendered into Django's own nav-sidebar block so it lands inside `.main`, where
-the admin's layout already expects a sidebar to be.
+Every section is a <details>: native disclosure, so it opens with a keyboard
+and works with the stylesheet off, and the group holding the current page
+arrives already open.
 {% endcomment %}
 {% block nav-sidebar %}
 {% if user.is_authenticated and user.is_staff %}
+{% gta_alerts as alerts %}
 {% url 'admin:index' as u_index %}
 {% url 'admin:system_report' as u_report %}
 {% url 'admin:site_content' as u_content %}
-<nav id="nav-sidebar" class="gta-rail" aria-label="Admin sections">
+{% safe_url 'admin:hq_sync' as u_sync %}
+{% safe_url 'admin:hq_enquiries' as u_enq %}
+{% safe_url 'admin:hq_news' as u_news %}
+{% safe_url 'admin:hq_pages' as u_pages %}
+<nav id="nav-sidebar" class="gta-rail" aria-label="{% translate 'Admin sections' %}">
 
-  <button type="button" class="gta-rail-toggle" data-rail-toggle
-          aria-label="Collapse or expand the menu">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
-    <span class="lbl">Collapse menu</span>
-  </button>
-
-  <div class="gta-rail-group">
-    <div class="gta-rail-title">Overview</div>
-    <a href="{{ u_index }}" class="{% if request.path == u_index %}on{% endif %}" title="Dashboard">
-      <svg class="ic"><use href="#ic-home"/></svg><span class="lbl">Dashboard</span></a>
-    <a href="{{ u_report }}" class="{% if request.path == u_report %}on{% endif %}" title="System report">
-      <svg class="ic"><use href="#ic-chart"/></svg><span class="lbl">System report</span></a>
+  <div class="gta-rail-top">
+    <a href="{{ u_index }}" class="gta-brand">
+      <span class="gta-mark"><svg aria-hidden="true"><use href="#ic-check"/></svg></span>
+      <span class="gta-word">Good<span>Tip</span></span>
+    </a>
+    <button type="button" class="gta-rail-toggle" data-rail-toggle aria-expanded="true"
+            aria-label="{% translate 'Collapse or expand the menu' %}">
+      <svg aria-hidden="true"><use href="#ic-chev-left"/></svg>
+    </button>
   </div>
 
-  {% if user.is_superuser %}
-  <div class="gta-rail-group">
-    <div class="gta-rail-title">The public site</div>
-    <a href="{{ u_content }}" class="{% if u_content in request.path %}on{% endif %}" title="Site content">
-      <svg class="ic"><use href="#ic-image"/></svg><span class="lbl">Site content</span></a>
-  </div>
-  {% endif %}
+  <div class="gta-rail-scroll">
+    <ul class="gta-nav">
+      <li><a href="{{ u_index }}" class="gta-nav-a{% if request.path == u_index %} on{% endif %}" data-jump="Dashboard">
+        <svg class="ic"><use href="#ic-home"/></svg><span class="lbl">Dashboard</span></a></li>
+      <li><a href="{{ u_report }}" class="gta-nav-a{% if request.path == u_report %} on{% endif %}" data-jump="System report">
+        <svg class="ic"><use href="#ic-chart"/></svg><span class="lbl">System report</span></a></li>
+      {% if user.is_superuser and u_content %}
+      <li><a href="{{ u_content }}" class="gta-nav-a{% if u_content in request.path %} on{% endif %}" data-jump="Site content">
+        <svg class="ic"><use href="#ic-image"/></svg><span class="lbl">Site content</span></a></li>
+      {% endif %}
+    </ul>
 
-  <div class="gta-rail-group">
-    <div class="gta-rail-title">Data</div>
-    {% for app in available_apps %}
-      {% for model in app.models %}
-        {% if model.admin_url %}
-        <a href="{{ model.admin_url }}" class="{% if request.path == model.admin_url %}on{% endif %}"
-           title="{{ model.name }}">
-          <svg class="ic"><use href="#{% model_icon model.object_name %}"/></svg>
-          <span class="lbl">{{ model.name }}</span></a>
-        {% endif %}
+    {% gta_sections as sections %}
+    {% if sections %}
+    <p class="gta-rail-title">{% translate 'Platform' %}</p>
+    <ul class="gta-nav">
+      {% for s in sections %}
+      <li>
+        <details class="gta-sec" data-sec="{{ s.key }}"{% if s.is_open %} open{% endif %}>
+          <summary class="gta-nav-a" style="--sec-accent:{{ s.accent }}">
+            <svg class="ic"><use href="#{{ s.icon }}"/></svg>
+            <span class="lbl">{{ s.label }}</span>
+            <span class="gta-sec-n">{{ s.count }}</span>
+            <svg class="gta-sec-chev" aria-hidden="true"><use href="#ic-chev-down"/></svg>
+          </summary>
+          <ul class="gta-sub">
+            {% for m in s.models %}
+            <li><a href="{{ m.admin_url }}"{% if request.path == m.admin_url %} class="on" aria-current="page"{% endif %}
+                   data-jump="{{ s.label }} &rsaquo; {{ m.name }}">{{ m.name }}</a></li>
+            {% endfor %}
+          </ul>
+        </details>
+      </li>
       {% endfor %}
-    {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if user.is_superuser %}
+    <p class="gta-rail-title">{% translate 'HQ' %}</p>
+    <ul class="gta-nav">
+      {% if u_sync %}
+      <li><a href="{{ u_sync }}" class="gta-nav-a{% if request.path == u_sync %} on{% endif %}" data-jump="Sync panel">
+        <svg class="ic"><use href="#ic-cloud-sync"/></svg><span class="lbl">Sync panel</span></a></li>
+      {% endif %}
+      {% if u_enq %}
+      <li><a href="{{ u_enq }}" class="gta-nav-a{% if u_enq in request.path %} on{% endif %}" data-jump="Enquiries inbox">
+        <svg class="ic"><use href="#ic-mail"/></svg><span class="lbl">Enquiries inbox</span>
+        {% if alerts.enquiries %}<span class="gta-sec-n alert">{{ alerts.enquiries }}</span>{% endif %}</a></li>
+      {% endif %}
+      {% if u_news %}
+      <li><a href="{{ u_news }}" class="gta-nav-a{% if u_news in request.path %} on{% endif %}" data-jump="News &amp; blog editor">
+        <svg class="ic"><use href="#ic-doc"/></svg><span class="lbl">News &amp; blog</span></a></li>
+      {% endif %}
+      {% if u_pages %}
+      <li><a href="{{ u_pages }}" class="gta-nav-a{% if u_pages in request.path %} on{% endif %}" data-jump="Public pages">
+        <svg class="ic"><use href="#ic-globe"/></svg><span class="lbl">Public pages</span></a></li>
+      {% endif %}
+    </ul>
+    {% endif %}
+  </div>
+
+  <div class="gta-rail-foot">
+    <a href="{{ site_url|default:'/' }}" target="_blank" rel="noopener" class="gta-viewsite">
+      <span class="lbl">{% translate 'View the site' %}</span>
+      <svg aria-hidden="true"><use href="#ic-link"/></svg>
+    </a>
   </div>
 </nav>
 {% endif %}
+{% endblock %}
+
+{% block footer %}
+<div class="gta-foot">
+  <span>GoodTip Admin</span>
+  <span aria-hidden="true">&middot;</span>
+  <span>{% if is_staging %}Staging environment{% else %}Production{% endif %}</span>
+</div>
 {% endblock %}

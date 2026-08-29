@@ -4,11 +4,12 @@ import shutil
 
 from django.conf import settings
 from django.contrib import admin
+from django.contrib.admin.models import ADDITION, CHANGE, DELETION
 from django.urls import path
 from django.utils import timezone
 from django.utils.html import format_html
 
-from .models import LoginEvent, StressTestRun
+from .models import AuditLog, LoginEvent, StressTestRun
 
 
 @admin.register(LoginEvent)
@@ -25,6 +26,42 @@ class LoginEventAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    """The audit log — who changed what, in the admin, and when.
+
+    Django writes LogEntry on every admin save and delete but registers no
+    ModelAdmin for it, so the only view of it anyone had was the dashboard's
+    "recent actions" panel: your own last handful, and no way to see anybody
+    else's or anything older. That is a strange gap in a control plane where
+    several people share superuser.
+
+    Read-only in all three directions. A record of what happened that can be
+    edited is not a record of what happened, and deleting rows here is how an
+    audit log stops being one.
+    """
+    list_display = ("action_time", "user", "content_type", "object_repr", "_action")
+    list_filter = ("action_flag", "content_type")
+    search_fields = ("object_repr", "change_message", "user__email")
+    date_hierarchy = "action_time"
+    list_select_related = ("user", "content_type")
+
+    @admin.display(description="Action", ordering="action_flag")
+    def _action(self, obj):
+        return {ADDITION: "Added", CHANGE: "Changed", DELETION: "Deleted"}.get(
+            obj.action_flag, obj.action_flag,
+        )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False
 
 

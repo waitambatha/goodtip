@@ -404,6 +404,58 @@
   }
 
   /* ======================================================================
+     Sparkline — the shape behind a stat tile
+
+     No axes, no grid, no tooltip, and deliberately no scale: the tile already
+     states the number, and what it cannot say is whether that number has been
+     climbing all fortnight or spiked this morning. Drawn edge to edge so it
+     reads as a texture rather than as a chart somebody forgot to label.
+     ====================================================================== */
+  function drawSpark(host, cfg) {
+    var W = host.clientWidth || 140;
+    var H = cfg.height || 46;
+    var s = (cfg.series || [])[0];
+    var data = (s && s.data) || [];
+    if (data.length < 2) return;
+
+    // One pixel of headroom top and bottom so a flat run and a peak are both
+    // visible instead of being clipped against the edge.
+    var padT = 5, padB = 3;
+    var ih = Math.max(4, H - padT - padB);
+    var max = Math.max.apply(null, data) || 1;
+    var color = seriesColor(s, 0);
+    var uid = "gtspark-" + (cfg.uid || "0");
+
+    var svg = el("svg", {
+      viewBox: "0 0 " + W + " " + H, width: W, height: H,
+      preserveAspectRatio: "none", class: "gt-spark", "aria-hidden": "true",
+    }, host);
+
+    var x = function (i) { return (i / (data.length - 1)) * W; };
+    var y = function (v) { return padT + ih - (v / max) * ih; };
+    var pts = data.map(function (v, i) { return x(i) + "," + y(v || 0); });
+
+    var defs = el("defs", null, svg);
+    var lg = el("linearGradient", { id: uid, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    el("stop", { offset: "0%", "stop-color": color, "stop-opacity": ".30" }, lg);
+    el("stop", { offset: "100%", "stop-color": color, "stop-opacity": "0" }, lg);
+
+    el("polygon", {
+      points: "0," + H + " " + pts.join(" ") + " " + W + "," + H,
+      fill: "url(#" + uid + ")",
+    }, svg);
+    el("polyline", {
+      points: pts.join(" "), fill: "none", stroke: color,
+      "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round",
+      "vector-effect": "non-scaling-stroke",
+    }, svg);
+    el("circle", {
+      cx: x(data.length - 1), cy: y(data[data.length - 1] || 0), r: 2.6,
+      fill: color, stroke: "var(--gt-surface)", "stroke-width": 1.5,
+    }, svg);
+  }
+
+  /* ======================================================================
      Mount / legend / resize
      ====================================================================== */
   var mounted = [];
@@ -413,6 +465,7 @@
     host._tip = null;
     if (cfg.type === "donut") drawDonut(host, cfg);
     else if (cfg.type === "bar") drawBar(host, cfg);
+    else if (cfg.type === "spark") drawSpark(host, cfg);
     else drawLine(host, cfg);
   }
 

@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.admin.models import LogEntry
 from django.db import models
 
 
@@ -73,3 +74,19 @@ class StressTestRun(models.Model):
 
     def __str__(self):
         return f"{self.label} @ {self.started_at:%Y-%m-%d %H:%M}"
+
+
+class AuditLog(LogEntry):
+    """django.contrib.admin's LogEntry, under the name people look for.
+
+    A proxy rather than a second table: the rows are Django's own, written on
+    every admin save and delete, and duplicating them would mean two records of
+    the same event that can disagree. All this buys is the label — "Log entries"
+    is what Django calls it, "Audit log" is what somebody scanning the menu for
+    it is actually looking for.
+    """
+
+    class Meta:
+        proxy = True
+        verbose_name = "audit log entry"
+        verbose_name_plural = "Audit log"
