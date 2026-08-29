@@ -31,6 +31,11 @@ Environment=GOODTIP_VENV=/home/mbatha-goodtip/projects/goodtip-staging/venv
 # never have passed here. That assertion is now conditional on the environment
 # and the suite is green in staging's own env -- a red suite from here is a
 # real regression, and stopping the deploy is the right answer to one.
+# NOT installed by deploy/install-timers.sh -- that script carries production's
+# units and refuses to run from this checkout. Editing this file changes nothing
+# until someone with root runs:
+#   sudo install -m 644 deploy/systemd/goodtip-staging-sync.service \
+#        /etc/systemd/system/goodtip-staging-sync.service && sudo systemctl daemon-reload
 Environment=DEPLOY_TEST_GATE=block
 # Longer than production's: this one runs the ~6-minute suite. Still shorter
 # than the timer's own margin; overlap is prevented by the flock in deploy.sh.
