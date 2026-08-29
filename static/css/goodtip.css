@@ -10859,7 +10859,7 @@ body.fxh-open { overflow: hidden; }
    here that we refuse to make on the member's behalf. */
 .cs-conflicts { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--gt-hair); }
 .cs-warn { display: flex; gap: 8px; font-size: 12.5px; color: #8A6314; line-height: 1.45; margin-bottom: 10px; }
-.cs-warn svg { width: 15px; height: 15px; flex: none; margin-top: 2px; fill: currentColor; }
+.cs-warn svg { width: 15px; height: 15px; flex: none; margin-top: 2px; stroke: currentColor; fill: none; stroke-width: 2; }
 .cs-conflict {
   display: flex; align-items: center; gap: 10px; cursor: pointer;
   padding: 8px 0; border-bottom: 1px solid var(--gt-hair);
@@ -10877,23 +10877,98 @@ body.fxh-open { overflow: hidden; }
 /* "Stop asking me" folds away. It is a real preference, but it is not the
    question on this screen, and three radios sitting open under every room
    made the step look like a settings page. */
-.cs-remember { margin-top: 6px; border-top: 1px solid var(--gt-hair); padding-top: 12px; }
+.cs-remember {
+  margin-top: 4px;
+  border: 1px solid var(--gt-hair); border-radius: 14px;
+  background: var(--white);
+}
 .cs-remember summary {
-  cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--forest);
-  list-style: none;
+  cursor: pointer; list-style: none;
+  display: flex; align-items: center; gap: 12px;
+  padding: 15px 16px;
+  font-size: 14.5px; font-weight: 600; color: var(--ink);
 }
 .cs-remember summary::-webkit-details-marker { display: none; }
-.cs-remember summary::after { content: " ⌄"; }
-.cs-remember[open] summary::after { content: " ⌃"; }
+.cs-remember summary span { flex: 1 1 auto; }
+.cs-remember .cs-gear { width: 18px; height: 18px; flex: none; stroke: var(--muted); fill: none; stroke-width: 1.8; }
+.cs-remember .cs-chev { width: 16px; height: 16px; flex: none; stroke: var(--muted); fill: none; stroke-width: 2.2; transition: transform .16s var(--ease); }
+.cs-remember[open] .cs-chev { transform: rotate(180deg); }
+.cs-remember[open] summary { border-bottom: 1px solid var(--gt-hair); }
+.cs-remember > .cs-opt:first-of-type { margin-top: 6px; }
+.cs-remember > .cs-opt, .cs-remember > .cs-fine { padding-left: 16px; padding-right: 16px; }
+.cs-remember > .cs-fine { padding-bottom: 14px; }
 .cs-opt { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; padding: 9px 0; }
 .cs-opt input { position: absolute; opacity: 0; pointer-events: none; }
 .cs-opt b { display: block; font-size: 13.5px; font-weight: 700; color: var(--ink); }
 .cs-opt i { display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-top: 1px; line-height: 1.4; }
 .cs-fine { font-size: 11.5px; color: var(--muted); margin: 6px 0 0; }
 
-/* The tick boxes reuse .oc-box from the option cards, so a checkbox in the
-   sheet looks like every other checkbox in the product. */
-.cs-head .oc-box, .cs-conflict .oc-box, .cs-opt .oc-box { flex: none; margin-top: 1px; }
+/* THE TICK BOXES, AND WHY THEY NEEDED WRITING OUT.
+
+   This block used to say the sheet "reuses .oc-box from the option cards".
+   It does not — every dimension of .oc-box is scoped to `.opt-card .oc-box`,
+   `.carry-head .oc-box` and `.carry-conflict .oc-box`, which are the OLD carry
+   screen's class names. Step one was rebuilt on `cs-` classes, so the only
+   rule reaching these boxes was `flex: none`.
+
+   An unsized <span> around an unsized <svg> does not vanish quietly: the icon
+   took its intrinsic size, filled the card, and painted the check path in
+   default black. Every room read as a giant black arrow. Sizes belong here. */
+.cs-head .oc-box {
+  flex: none;
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  border: 2px solid var(--gt-hair);
+  background: var(--white);
+  display: grid; place-items: center;
+  transition: background .15s var(--ease), border-color .15s var(--ease);
+}
+.cs-head .oc-box svg { width: 17px; height: 17px; stroke: #fff; fill: none; stroke-width: 3.2; opacity: 0; }
+.cs-head:has(input:checked) .oc-box { background: var(--deep); border-color: var(--deep); }
+.cs-head:has(input:checked) .oc-box svg { opacity: 1; }
+
+.cs-conflict .oc-box {
+  flex: none;
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  border: 2px solid var(--gt-hair);
+  background: var(--white);
+  display: grid; place-items: center;
+}
+.cs-conflict .oc-box svg { width: 13px; height: 13px; stroke: #fff; fill: none; stroke-width: 3.2; opacity: 0; }
+.cs-conflict:has(input:checked) .oc-box { background: var(--forest); border-color: var(--forest); }
+.cs-conflict:has(input:checked) .oc-box svg { opacity: 1; }
+
+/* The remember radios carry no icon in the markup, so the dot is drawn here. */
+.cs-opt .oc-box {
+  flex: none;
+  width: 20px; height: 20px; margin-top: 1px;
+  border-radius: 50%;
+  border: 2px solid var(--gt-hair);
+  background: var(--white);
+  display: grid; place-items: center;
+}
+.cs-opt .oc-box::after {
+  content: ""; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--forest); transform: scale(0); transition: transform .14s var(--ease);
+}
+.cs-opt:has(input:checked) .oc-box { border-color: var(--forest); }
+.cs-opt:has(input:checked) .oc-box::after { transform: scale(1); }
+
+/* "Needs your decision". Named on the head rather than left to be discovered
+   further down the card: a room that is about to overwrite a deliberate pick
+   should say so where the room is named. Amber for the same reason the card
+   is — a choice to make, not a mistake to fix. */
+.cs-flag {
+  margin-left: auto; align-self: flex-start; flex: none;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--mark); font-size: 11px; font-weight: 800;
+  letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
+  color: #8A6314; background: rgba(200,144,31,.14);
+  border: 1px solid rgba(200,144,31,.32);
+  padding: 4px 10px; border-radius: 100px;
+}
+.cs-flag svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.2; flex: none; }
 
 /* ---------------------------------------------------------------------------
    STEP TWO: THE PREVIEW, MADE WORTH LOOKING AT

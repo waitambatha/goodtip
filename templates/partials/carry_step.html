@@ -48,6 +48,9 @@ asking destroys a decision they cannot get back.
         {% if plan.unchanged %} &middot; {{ plan.unchanged|length }} already match{% endif %}
       </span>
     </span>
+    {% if plan.conflicts %}
+    <span class="cs-flag"><svg aria-hidden="true"><use href="#ic-flag"/></svg>Needs your decision</span>
+    {% endif %}
   </label>
 
   {% if plan.conflicts %}
@@ -96,7 +99,11 @@ Switching the question off is not consent to have a deliberate different tip
 replaced — that stays an explicit act, here.
 {% endcomment %}
 <details class="cs-remember">
-  <summary>Stop asking me every time</summary>
+  <summary>
+    <svg class="cs-gear" aria-hidden="true"><use href="#ic-sliders"/></svg>
+    <span>Stop asking me every time</span>
+    <svg class="cs-chev" aria-hidden="true"><use href="#ic-chev-down"/></svg>
+  </summary>
   <label class="cs-opt">
     <input type="radio" name="remember" value="" checked>
     <span class="oc-box"></span>
