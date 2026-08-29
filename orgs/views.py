@@ -2851,10 +2851,19 @@ def member_messages_view(request, org_id: int):
         raise Http404("No organisation matches the given query.")
 
     if request.method == "POST":
-        subject = (request.POST.get("subject") or "").strip()
+        # The composer offers a short list of subjects with "Something else"
+        # as the escape hatch, so the subject arrives in one of two fields.
+        # `subject` is still read first: the plain field is what the no-JS
+        # path and the old form post, and neither should break.
+        choice = (request.POST.get("subject_choice") or "").strip()
+        if choice == "__other" or not choice:
+            subject = (request.POST.get("subject_other")
+                       or request.POST.get("subject") or "").strip()
+        else:
+            subject = choice
         body = (request.POST.get("body") or "").strip()
         if not subject or not body:
-            messages.error(request, "Give it a subject and say what's up.")
+            messages.error(request, "Pick what it's about and say what's up.")
         else:
             thread = MessageThread.objects.create(
                 org=org, kind=MessageThread.KIND_RAISED, subject=subject,

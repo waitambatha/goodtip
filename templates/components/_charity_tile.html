@@ -1,0 +1,32 @@
+{% comment %}
+One charity as a TILE, for grids where the charities are the content.
+
+The sibling _charity_card.html is a row — a logo, a name and a line of text —
+built for ballots and summaries where the charity sits inside somebody else's
+sentence. This is the other shape: the logo carried at a size you can actually
+recognise, because on the charity screens the question is "which of these do I
+know?" and a 44px mark does not answer it.
+
+The initials tile is a designed state, not a broken image. Plenty of charities
+publish no usable icon — bot-protected sites, a 16px favicon of mush — and its
+colour is derived from the name, so the same charity is the same colour here as
+on the ballot.
+
+Params:
+  charity  (required)
+  note     optional — small line under the website
+  chip     optional — a short status word, top right
+{% endcomment %}
+<div class="ch-item">
+  <div class="ch-item-top">
+    {% if charity.logo %}
+    <img class="ch-item-logo" src="{{ charity.logo.url }}" alt="" loading="lazy" width="56" height="56">
+    {% else %}
+    <span class="ch-item-logo ch-item-initials" style="--ch-hue:{{ charity.tile_hue }};" aria-hidden="true">{{ charity.initials }}</span>
+    {% endif %}
+    {% if chip %}<span class="ch-item-chip">{{ chip }}</span>{% endif %}
+  </div>
+  <div class="ch-item-name">{{ charity.name }}</div>
+  {% if charity.website_label %}<div class="ch-item-url">{{ charity.website_label }}</div>{% endif %}
+  {% if note %}<div class="ch-item-note">{{ note }}</div>{% endif %}
+</div>

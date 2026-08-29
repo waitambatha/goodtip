@@ -185,18 +185,70 @@
     // while the other pulls back, instead of both scaling in lockstep — which
     // would read as the whole hero pulsing rather than as two live images.
     var dirs = panes.map(function (_, n) { return n % 2 === 0; });
-    panes.forEach(function (p, n) {
-      var shots = p.querySelectorAll('.shot');
-      if (shots.length) show(shots, startIndex(shots), dirs[n]);
-    });
-    var idx = panes.map(function (p) { return startIndex(p.querySelectorAll('.shot')); });
+
+    /* ONE SIDE IS ALWAYS VIDEO.
+
+       Each pane holds both kinds — photographs and a clip, the clip marked
+       `is-clip` — and each pane is assigned ONE kind at a time. The two panes
+       are always assigned opposite kinds, so whichever half is showing a
+       photo, the other is showing video. Advancing steps to the next shot of
+       the pane's own kind rather than the next shot in the list.
+
+       This is why the kinds cannot simply alternate per pane on a timer. The
+       two panes advance on staggered timers, half a beat apart, so a pane that
+       flipped its own kind on every step would spend half of every beat
+       matching its neighbour — two photos, then two clips. Holding a kind and
+       swapping the assignment between panes keeps the invariant true at every
+       moment, including mid-stagger. */
+    function shotsOf(pane, wantClip) {
+      var out = [];
+      var all = pane.querySelectorAll('.shot');
+      for (var k = 0; k < all.length; k++) {
+        if (all[k].classList.contains('is-clip') === wantClip) out.push(all[k]);
+      }
+      // A pane with no clip of its own keeps its photographs rather than
+      // going blank — the markup is allowed to be one-sided.
+      return out.length ? out : [].slice.call(all);
+    }
+
+    // Odd panes open on video, so the hero's first frame already has one side
+    // moving. Matches the `is-clip active` the template marks on the right.
+    var wantsClip = panes.map(function (_, n) { return n % 2 === 1; });
+    var idx = panes.map(function () { return 0; });
+
+    function render(n) {
+      var pool = shotsOf(panes[n], wantsClip[n]);
+      var all = panes[n].querySelectorAll('.shot');
+      if (!pool.length) return;
+      idx[n] = idx[n] % pool.length;
+      // show() clears every shot in the pane and lights one, so it is handed
+      // the full list with the chosen shot's index in it.
+      var target = pool[idx[n]];
+      for (var k = 0; k < all.length; k++) {
+        if (all[k] === target) { show(all, k, dirs[n]); return; }
+      }
+    }
+
+    panes.forEach(function (_, n) { render(n); });
 
     function advance(n) {
-      var shots = panes[n].querySelectorAll('.shot');
-      if (shots.length < 2) return;
-      idx[n] = (idx[n] + 1) % shots.length;
+      var pool = shotsOf(panes[n], wantsClip[n]);
+      if (pool.length > 1) idx[n] = (idx[n] + 1) % pool.length;
       dirs[n] = !dirs[n];
-      show(shots, idx[n], dirs[n]);
+      render(n);
+    }
+
+    /* Hand the video from one side to the other. Both panes change in the same
+       tick on purpose: that is the only way the "exactly one clip" invariant
+       survives the swap, and it is deliberately tied to the reframe, which is
+       already the hero's big gesture. */
+    function swapKinds() {
+      for (var n = 0; n < panes.length; n++) {
+        wantsClip[n] = !wantsClip[n];
+        idx[n] = 0;
+        dirs[n] = !dirs[n];
+        render(n);
+      }
     }
 
     panes.forEach(function (_, n) {
@@ -231,6 +283,11 @@
 
     function reframe() {
       si = (si + 1) % states.length;
+      // Back to the top of the cycle: both halves have had their turn at the
+      // full frame, so the video changes sides. Doing it here rather than on
+      // its own timer means the swap rides the reframe instead of adding a
+      // third thing moving on its own schedule.
+      if (si === 0) swapKinds();
       var st = states[si];
       var isSplit = st === 'split';
       col.classList.toggle('split', isSplit);

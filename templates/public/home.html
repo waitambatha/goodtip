@@ -10,13 +10,25 @@
 <!-- HERO (full crossfading image) -->
 <section class="hero has-shots">
   <div class="hero-bg collage" aria-hidden="true">
+    {% comment %}
+    Each pane carries both kinds — three photographs and one clip — and
+    gt-scenes.js keeps the two halves on OPPOSITE kinds: whichever side is
+    showing a photo, the other is showing video, and the pair swaps sides on
+    the reframe. That is why there are two clips rather than one, and why the
+    clips are marked `is-clip`: the engine picks the next shot of the kind the
+    pane is currently holding, not simply the next shot in the list.
+    {% endcomment %}
     <div class="pane">
       <div class="shot active" style="background-image:url('{% site_img "home.hero.shot1" %}')"></div>
       <div class="shot" style="background-image:url('{% site_img "home.hero.shot2" %}')"></div>
       <div class="shot" style="background-image:url('{% site_img "home.hero.shot3" %}')"></div>
+      <div class="shot is-clip" style="background-image:url('{% site_poster "home.hero.clip2" %}')">
+        <video data-src="{% site_video "home.hero.clip2" %}" poster="{% site_poster "home.hero.clip2" %}"
+               muted loop playsinline preload="none" aria-hidden="true" tabindex="-1"></video>
+      </div>
     </div>
     <div class="pane">
-      <div class="shot active" style="background-image:url('{% site_img "home.hero.shot4" %}')"></div>
+      <div class="shot" style="background-image:url('{% site_img "home.hero.shot4" %}')"></div>
       <div class="shot" style="background-image:url('{% site_img "home.hero.shot5" %}')"></div>
       <div class="shot" style="background-image:url('{% site_img "home.hero.shot6" %}')"></div>
       {% comment %}
@@ -30,7 +42,7 @@
       gets that far — reduced motion, a metered connection — simply keeps
       seeing the poster photo. Same shot, sometimes it moves.
       {% endcomment %}
-      <div class="shot" style="background-image:url('{% site_poster "home.hero.clip" %}')">
+      <div class="shot is-clip active" style="background-image:url('{% site_poster "home.hero.clip" %}')">
         <video data-src="{% site_video "home.hero.clip" %}" poster="{% site_poster "home.hero.clip" %}"
                muted loop playsinline preload="none" aria-hidden="true" tabindex="-1"></video>
       </div>

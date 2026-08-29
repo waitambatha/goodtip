@@ -100,6 +100,10 @@ HOME = Page(
                 Block("home.hero.clip", "Background video (right)", VIDEO, "video/match-action.mp4",
                       help="Muted, looping, no sound. Its poster frame is what visitors on a "
                            "metered connection or with reduced motion turned on see instead."),
+                Block("home.hero.clip2", "Background video (left)", VIDEO, "video/crowd-salute.mp4",
+                      help="The other half's clip. The hero keeps one side on video and the "
+                           "other on a photo at all times, and swaps which is which — so this "
+                           "one plays whenever the right-hand clip is not."),
             ],
         ),
         Group(

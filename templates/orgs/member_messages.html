@@ -1,49 +1,199 @@
 {% extends "app_base.html" %}
 {% block title %}Messages &middot; {{ org.name }}{% endblock %}
+{% block loader_task %}Opening your messages{% endblock %}
 {% block body_class %}page-deep sheet-page{% endblock %}
+{% comment %}
+Side imagery, like every other member page. This screen was built after the
+rest and never picked it up, which is why it sat on a flat backdrop while its
+neighbours had the rotating strips.
+{% endcomment %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+
 {% block app_content %}
-<section class="wrap" style="padding:28px 0 60px;">
-  <h1 style="font-family:var(--display);font-size:clamp(24px,3vw,34px);margin:0 0 6px;">Messages</h1>
-  <p style="color:var(--muted);margin:0 0 26px;">
-    Anything you want to raise with the people who run {{ org.name }} — and the
-    notices they send out. Only they can see what you raise here.
-  </p>
+{% comment %}
+MESSAGES.
 
-  <form method="post" class="card pad-lg" style="margin-bottom:24px;">
-    {% csrf_token %}
-    <div class="fld">
-      <label for="s">What's it about?</label>
-      <input type="text" id="s" name="subject" maxlength="160" required
-             placeholder="e.g. My tips didn't save last round">
-    </div>
-    <div class="fld" style="margin-bottom:12px;">
-      <label for="b">Tell them</label>
-      <textarea id="b" name="body" rows="4" required></textarea>
-    </div>
-    <button type="submit" class="btn-primary">Send to the admins</button>
-  </form>
+The composer is a sheet rather than a form sitting permanently on the page.
+Writing to your admins is something you do occasionally; the thing you come
+back for is the answer. A form that is always open puts the rare action above
+the common one and pushes the replies below the fold.
 
-  {% if threads %}
-  <div class="gt-rows">
-    {% for t in threads %}
-    <a class="gt-row" href="{% url 'orgs:member_message_thread' org.id t.id %}">
-      <span class="gr-body">
-        <b>{{ t.subject }}</b>
-        <small>
-          {% if t.kind == 'notice' %}From the admins{% else %}You raised this{% endif %}
-          &middot; {{ t.last_message_at|date:"j M, g:i a" }}
-        </small>
-      </span>
-      <span class="gr-go">
-        {% if t.status == 'answered' %}<span class="gts-status ok">Answered</span>
-        {% elif t.status == 'closed' %}<span class="gts-status">Closed</span>
-        {% elif t.kind == 'raised' %}<span class="gts-status warn">Waiting</span>{% endif %}
-      </span>
-    </a>
-    {% endfor %}
+So the page is the conversations, and the compose button opens the sheet.
+{% endcomment %}
+<div class="msg-hero">
+  <span class="msg-hero-ic" aria-hidden="true"><svg><use href="#ic-msg"/></svg></span>
+  <div class="msg-hero-body">
+    <h1>Messages</h1>
+    <p>
+      Anything you want to raise with the people who run {{ org.name }} — and
+      the notices they send out. Only they can see what you raise here.
+    </p>
   </div>
-  {% else %}
-  <p style="color:var(--muted);">Nothing yet.</p>
-  {% endif %}
-</section>
+  <div class="msg-private">
+    <svg aria-hidden="true"><use href="#ic-shield-check"/></svg>
+    <span><b>Private &amp; secure</b><small>Only admins can see this</small></span>
+  </div>
+</div>
+
+<div class="msg-actions">
+  <button type="button" class="abtn abtn-primary abtn-lg" data-msg-open>
+    <svg aria-hidden="true"><use href="#ic-send"/></svg>
+    Write to the admins
+  </button>
+</div>
+
+{% if threads %}
+<div class="gt-rows msg-list">
+  {% for t in threads %}
+  <a class="gt-row" href="{% url 'orgs:member_message_thread' org.id t.id %}">
+    <span class="msg-row-ic {% if t.kind == 'notice' %}notice{% endif %}" aria-hidden="true">
+      <svg><use href="#{% if t.kind == 'notice' %}ic-bell{% else %}ic-msg{% endif %}"/></svg>
+    </span>
+    <span class="gr-body">
+      <b>{{ t.subject }}</b>
+      <small>
+        {% if t.kind == 'notice' %}From the admins{% else %}You raised this{% endif %}
+        &middot; {{ t.last_message_at|date:"j M, g:i a" }}
+      </small>
+    </span>
+    <span class="gr-go">
+      {% if t.status == 'answered' %}<span class="gts-status ok">Answered</span>
+      {% elif t.status == 'closed' %}<span class="gts-status">Closed</span>
+      {% elif t.kind == 'raised' %}<span class="gts-status warn">Waiting</span>{% endif %}
+    </span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="msg-empty">
+  <svg aria-hidden="true"><use href="#ic-mail"/></svg>
+  <b>Nothing yet.</b>
+  <span>Your messages to the admins will appear here.</span>
+</div>
+{% endif %}
+
+{% comment %}
+THE COMPOSER.
+
+Subject is a picker with a free-text escape rather than an open field. Left
+open, the same handful of things arrive spelled five ways, which makes an
+admin's inbox harder to scan than it needs to be — and somebody staring at an
+empty box labelled "What's it about?" writes "hi" more often than anything
+useful. The list is a prompt; "Something else" is always there for the case
+the list does not cover.
+{% endcomment %}
+<div class="tipsheet msg-sheet" id="msgSheet" hidden aria-hidden="true">
+  <div class="ts-veil" data-msg-close></div>
+  <form method="post" class="ts-panel" role="dialog" aria-modal="true" aria-labelledby="msgTitle">
+    {% csrf_token %}
+    <header class="ts-head">
+      <div>
+        <h3 id="msgTitle">Write to the admins</h3>
+        <p class="ts-sub">{{ org.name }} &middot; only they can see this</p>
+      </div>
+      <button type="button" class="ts-x" data-msg-close aria-label="Close">&times;</button>
+    </header>
+
+    <div class="ts-body msg-form">
+      <div class="msg-fld">
+        <label for="msgSubject"><svg aria-hidden="true"><use href="#ic-msg"/></svg>What's it about?</label>
+        <select id="msgSubject" name="subject_choice" data-msg-subject>
+          <option value="" disabled selected>Pick the closest thing&hellip;</option>
+          <option>My tips didn't save</option>
+          <option>A question about the ladder or points</option>
+          <option>Something about my group</option>
+          <option>A problem with the site</option>
+          <option>Joining or leaving the organisation</option>
+          <option value="__other">Something else</option>
+        </select>
+      </div>
+
+      {% comment %}
+      Revealed only for "Something else". Not required in the markup — a
+      required field inside a hidden block stops the form submitting with a
+      validation bubble pointing at nothing the member can see. The view
+      checks it instead.
+      {% endcomment %}
+      <div class="msg-fld" data-msg-other hidden>
+        <label for="msgOther"><svg aria-hidden="true"><use href="#ic-doc"/></svg>In a few words</label>
+        <input type="text" id="msgOther" name="subject_other" maxlength="160"
+               placeholder="e.g. My tips didn't save last round">
+      </div>
+
+      <div class="msg-fld">
+        <label for="msgBody"><svg aria-hidden="true"><use href="#ic-doc"/></svg>Tell them</label>
+        <div class="msg-area">
+          <textarea id="msgBody" name="body" rows="5" maxlength="1000" required
+                    placeholder="Type your message here&hellip;" data-msg-body></textarea>
+          <span class="msg-count"><b data-msg-count>0</b> / 1000</span>
+        </div>
+      </div>
+    </div>
+
+    <footer class="ts-foot msg-foot">
+      <button type="button" class="abtn abtn-dark" data-msg-close>Cancel</button>
+      <button type="submit" class="abtn abtn-primary">
+        <svg aria-hidden="true"><use href="#ic-send"/></svg>
+        Send to the admins
+      </button>
+    </footer>
+  </form>
+</div>
+
+<script>
+(function () {
+  var sheet = document.getElementById("msgSheet");
+  if (!sheet) return;
+  var body = sheet.querySelector("[data-msg-body]");
+  var count = sheet.querySelector("[data-msg-count]");
+  var subject = sheet.querySelector("[data-msg-subject]");
+  var other = sheet.querySelector("[data-msg-other]");
+  var otherInput = other && other.querySelector("input");
+  var lastFocus = null;
+
+  function open() {
+    lastFocus = document.activeElement;
+    sheet.hidden = false;
+    sheet.setAttribute("aria-hidden", "false");
+    document.body.classList.add("sheet-open");
+    if (subject) subject.focus();
+  }
+  function close() {
+    sheet.hidden = true;
+    sheet.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("sheet-open");
+    if (lastFocus) lastFocus.focus();
+  }
+
+  document.querySelectorAll("[data-msg-open]").forEach(function (b) {
+    b.addEventListener("click", open);
+  });
+  sheet.querySelectorAll("[data-msg-close]").forEach(function (b) {
+    b.addEventListener("click", close);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !sheet.hidden) close();
+  });
+
+  /* The free-text box only exists for "Something else", and only then does it
+     matter whether it is filled in. */
+  if (subject && other) {
+    subject.addEventListener("change", function () {
+      var isOther = subject.value === "__other";
+      other.hidden = !isOther;
+      if (isOther && otherInput) otherInput.focus();
+    });
+  }
+
+  if (body && count) {
+    var tick = function () { count.textContent = body.value.length; };
+    body.addEventListener("input", tick);
+    tick();
+  }
+
+  /* Opened straight into the composer from elsewhere — a dashboard prompt, or
+     a link somebody was sent. */
+  if (location.hash === "#write") open();
+})();
+</script>
 {% endblock %}

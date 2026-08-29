@@ -42,11 +42,9 @@ you already have first, the form last.
   Yours to use straight away. We review each one before it appears for other
   organisations — that review changes nothing for you.
 </p>
-<div class="opt-grid cols2">
+<div class="ch-grid">
   {% for ch in ours %}
-  <div class="opt-card is-static">
-    {% include "components/_charity_card.html" with charity=ch note=ch.is_approved|yesno:"Approved,Awaiting review" %}
-  </div>
+  {% include "components/_charity_tile.html" with charity=ch chip=ch.is_approved|yesno:"Approved,In review" %}
   {% endfor %}
 </div>
 {% endif %}
@@ -73,36 +71,81 @@ you already have first, the form last.
 {% endif %}
 
 <h2 class="sec-h" data-coach="charity-list">On GoodTip's list</h2>
-<div class="opt-grid cols2">
+<div class="ch-grid">
   {% for ch in vetted %}
-  <div class="opt-card is-static">
-    {% include "components/_charity_card.html" with charity=ch %}
-  </div>
+  {% include "components/_charity_tile.html" with charity=ch %}
   {% empty %}
   <p class="app-sub">Nothing here yet.</p>
   {% endfor %}
 </div>
 
-<h2 class="sec-h" data-coach="charity-add">Add a charity</h2>
-<div class="card pad-lg" style="max-width:620px;">
-  <p class="hint" style="margin-top:0;">
-    Check the lists above first — if it's already there, use that one. Adding a
-    second row for the same cause splits its total in two.
-  </p>
-  <form method="post">
+<div class="ch-add-row" data-coach="charity-add">
+  <div>
+    <h2 class="sec-h" style="margin:0;">Can't see your cause?</h2>
+    <p class="app-sub" style="margin:2px 0 0;">Add it, and we'll fetch their logo for you.</p>
+  </div>
+  <button type="button" class="abtn abtn-primary" data-ch-open>
+    <svg aria-hidden="true"><use href="#ic-heart"/></svg>
+    Add a charity
+  </button>
+</div>
+
+{% comment %}
+The form is a sheet now. It used to sit open at the bottom under both lists,
+which put a writing task below everything a reader had to scroll past — and the
+order of this screen is the point: you see what already exists before you add
+to it. A button keeps that order and still makes adding one click away.
+{% endcomment %}
+<div class="tipsheet ch-sheet" id="chSheet" hidden aria-hidden="true">
+  <div class="ts-veil" data-ch-close></div>
+  <form method="post" class="ts-panel" role="dialog" aria-modal="true" aria-labelledby="chTitle">
     {% csrf_token %}
-    <div class="fld">
-      <label for="id_name">{{ form.name.label }}</label>
-      {{ form.name }}
-      {% if form.name.errors %}<div class="fld-err">{{ form.name.errors|join:" " }}</div>{% endif %}
+    <header class="ts-head">
+      <div>
+        <h3 id="chTitle">Add a charity</h3>
+        <p class="ts-sub">For {{ org.name }} to put to a vote</p>
+      </div>
+      <button type="button" class="ts-x" data-ch-close aria-label="Close">&times;</button>
+    </header>
+    <div class="ts-body ch-form">
+      <p class="ch-form-hint">
+        Check the lists first — if it's already there, use that one. A second row
+        for the same cause splits its total in two.
+      </p>
+      <div class="msg-fld">
+        <label for="id_name"><svg aria-hidden="true"><use href="#ic-heart"/></svg>{{ form.name.label }}</label>
+        {{ form.name }}
+        {% if form.name.errors %}<div class="fld-err">{{ form.name.errors|join:" " }}</div>{% endif %}
+      </div>
+      <div class="msg-fld">
+        <label for="id_website"><svg aria-hidden="true"><use href="#ic-globe"/></svg>{{ form.website.label }}</label>
+        {{ form.website }}
+        <div class="hint">We'll guess one from the name and fetch their logo — change it if it's not right.</div>
+        {% if form.website.errors %}<div class="fld-err">{{ form.website.errors|join:" " }}</div>{% endif %}
+      </div>
     </div>
-    <div class="fld">
-      <label for="id_website">{{ form.website.label }}</label>
-      {{ form.website }}
-      <div class="hint">We'll guess one from the name and fetch their logo — change it if it's not right.</div>
-      {% if form.website.errors %}<div class="fld-err">{{ form.website.errors|join:" " }}</div>{% endif %}
-    </div>
-    <button type="submit" class="abtn abtn-primary">Add charity</button>
+    <footer class="ts-foot ch-foot">
+      <button type="button" class="abtn abtn-dark" data-ch-close>Cancel</button>
+      <button type="submit" class="abtn abtn-primary">Add charity</button>
+    </footer>
   </form>
 </div>
+
+<script>
+(function () {
+  var sheet = document.getElementById("chSheet");
+  if (!sheet) return;
+  function open()  { sheet.hidden = false; sheet.setAttribute("aria-hidden", "false");
+                     document.body.classList.add("sheet-open");
+                     var f = sheet.querySelector("input"); if (f) f.focus(); }
+  function close() { sheet.hidden = true; sheet.setAttribute("aria-hidden", "true");
+                     document.body.classList.remove("sheet-open"); }
+  document.querySelectorAll("[data-ch-open]").forEach(function (b) { b.addEventListener("click", open); });
+  sheet.querySelectorAll("[data-ch-close]").forEach(function (b) { b.addEventListener("click", close); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !sheet.hidden) close(); });
+  /* A rejected submission must not hide its own errors behind a closed sheet. */
+  if (sheet.querySelector(".fld-err")) open();
+})();
+</script>
+
 {% endblock %}

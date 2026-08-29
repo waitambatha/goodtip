@@ -1,4 +1,5 @@
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.utils.html import format_html
 
 from .models import (
     Charity,
@@ -69,7 +70,48 @@ class SeasonAdmin(admin.ModelAdmin):
 
 @admin.register(Charity)
 class CharityAdmin(admin.ModelAdmin):
-    list_display = ("name", "is_approved", "website", "slug")
+    list_display = ("name", "_logo", "is_approved", "website", "slug")
+    actions = ("refetch_logos",)
+
+    @admin.display(description="Logo")
+    def _logo(self, obj):
+        if not obj.logo:
+            return "—" if obj.logo_fetched_at else "not tried"
+        return format_html(
+            '<img src="{}" style="height:26px;width:26px;object-fit:contain;'
+            'background:#fff;border-radius:5px;padding:2px">', obj.logo.url,
+        )
+
+    @admin.action(description="Fetch the logo again from the charity's own site")
+    def refetch_logos(self, request, queryset):
+        """Retry the fetch for the selected charities.
+
+        Synchronous on purpose, unlike the wizard's fire-and-forget thread:
+        somebody who ticked five rows and chose this is waiting for an answer
+        about those five rows, and "it might have worked" is not one.
+        """
+        from catalog.logos import backfill_charity
+
+        got = failed = 0
+        for charity in queryset:
+            try:
+                backfill_charity(charity, force=True)
+            except Exception:                       # noqa: BLE001
+                failed += 1
+                continue
+            charity.refresh_from_db(fields=["logo"])
+            if charity.logo:
+                got += 1
+            else:
+                failed += 1
+        if got:
+            self.message_user(request, f"Fetched {got} logo{'' if got == 1 else 's'}.")
+        if failed:
+            self.message_user(
+                request,
+                f"{failed} still without one — their site published nothing usable.",
+                level=messages.WARNING,
+            )
     list_filter = ("is_approved",)
     search_fields = ("name",)
     prepopulated_fields = {"slug": ("name",)}

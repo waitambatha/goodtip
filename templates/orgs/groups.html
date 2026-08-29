@@ -106,21 +106,39 @@ selling a switch for the sake of it.
 </div>
 {% endif %}
 
-<div class="dept-searchbar">
-  <form method="get" action="{% url 'orgs:groups' org.id %}" class="dept-search">
-    <input type="search" name="q" value="{{ q }}" placeholder="Search groups in {{ org.name }}" aria-label="Search groups">
-    <button type="submit" class="abtn abtn-ghost">Search</button>
-    {% if q %}<a href="{% url 'orgs:groups' org.id %}" class="abtn abtn-ghost">Clear</a>{% endif %}
+{% comment %}
+SEARCH.
+
+Was a bare input with a Search button and a Clear link beside it, which meant a
+round trip to the server to answer "which of these is the Finance one?" — a
+question the browser already has every answer to, because every group is on the
+page. It filters as you type now.
+
+The form is still a real GET form: pressing Enter with scripting off submits it
+and the server-side `q` filter answers exactly as before. The live filter is an
+enhancement on top, not the mechanism.
+{% endcomment %}
+<div class="grp-search" data-grp-search>
+  <form method="get" action="{% url 'orgs:groups' org.id %}" class="grp-search-form" role="search">
+    <svg class="grp-search-ic" aria-hidden="true"><use href="#ic-search"/></svg>
+    <input type="search" name="q" value="{{ q }}" data-grp-input
+           placeholder="Search groups in {{ org.name }}" aria-label="Search groups"
+           autocomplete="off">
+    <button type="button" class="grp-search-x" data-grp-clear hidden aria-label="Clear search">&times;</button>
+    <button type="submit" class="grp-search-go">Search</button>
   </form>
+  <p class="grp-search-count" data-grp-count hidden></p>
 </div>
 
-<div class="grid-app g-3" data-coach="groups-list" style="margin-top:18px;">
+<p class="grp-none" data-grp-none hidden>No groups match that.</p>
+<div class="grid-app g-3" data-coach="groups-list" style="margin-top:18px;" data-grp-list>
   {% for row in rows %}
-  <div class="card pad-lg dept-card{% if row.awaiting_approval %} is-pending{% endif %}">
-    <div style="display:flex;align-items:center;gap:12px;">
+  <div class="card pad-lg dept-card{% if row.awaiting_approval %} is-pending{% endif %}"
+       data-grp-item data-grp-name="{{ row.group.name|lower }}">
+    <div class="dc-top">
       <span class="dc-ic tone-{{ row.tone }}"><svg><use href="#{{ row.icon }}"/></svg></span>
-      <div style="min-width:0;">
-        <div class="card-h" style="font-size:17px;">{{ row.group.name }}</div>
+      <div class="dc-head">
+        <div class="dc-name">{{ row.group.name }}</div>
         {% comment %} .dc-meta, not .app-sub. This page is `page-deep sheet-page`, where
            .app-sub is coloured cream for the dark sheet behind — but this line sits
            INSIDE a cream card, so it was cream-on-cream at a contrast ratio of
@@ -349,4 +367,47 @@ the view already expects (name, kind, label), so nothing behind this changed.
       }
     });
   })();
+
+<script>
+(function () {
+  var box   = document.querySelector('[data-grp-search]');
+  var input = document.querySelector('[data-grp-input]');
+  var list  = document.querySelector('[data-grp-list]');
+  if (!box || !input || !list) return;
+
+  var items = [].slice.call(list.querySelectorAll('[data-grp-item]'));
+  var clear = box.querySelector('[data-grp-clear]');
+  var count = box.querySelector('[data-grp-count]');
+  var none  = document.querySelector('[data-grp-none]');
+  if (!items.length) return;
+
+  function apply() {
+    var q = input.value.trim().toLowerCase();
+    var shown = 0;
+    items.forEach(function (el) {
+      var hit = !q || (el.getAttribute('data-grp-name') || '').indexOf(q) !== -1;
+      el.hidden = !hit;
+      if (hit) shown++;
+    });
+    if (clear) clear.hidden = !q;
+    if (none)  none.hidden = !(q && shown === 0);
+    if (count) {
+      count.hidden = !q;
+      count.textContent = shown + ' of ' + items.length +
+        (items.length === 1 ? ' group' : ' groups');
+    }
+  }
+
+  input.addEventListener('input', apply);
+  if (clear) clear.addEventListener('click', function () {
+    input.value = ''; apply(); input.focus();
+  });
+  /* Escape clears rather than submitting an empty search. */
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && input.value) { e.preventDefault(); input.value = ''; apply(); }
+  });
+  apply();
+})();
+</script>
+
 {% endblock %}

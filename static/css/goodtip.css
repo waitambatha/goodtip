@@ -11032,3 +11032,239 @@ body.fxh-open { overflow: hidden; }
 .pe-m-body small { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 .pe-m-acts { display: flex; gap: 6px; padding: 8px 12px 12px; margin-top: auto; }
 .pe-m-acts form { margin: 0; }
+
+/* ==========================================================================
+   MESSAGES (templates/orgs/member_messages.html)
+
+   The page is the conversations; writing one is a sheet. A compose form left
+   permanently open put the rare action above the common one and pushed the
+   replies — the thing people come back for — below the fold.
+   ========================================================================== */
+.msg-hero {
+  display: flex; align-items: flex-start; gap: 18px; flex-wrap: wrap;
+  /* NOT --gt-card. That token is the light cream card used on the sheet, and
+     this panel sits on `page-deep` carrying white text — borrowing it painted
+     white on white and the whole heading vanished. A translucent white over
+     the dark page is what the other panels on these screens use. */
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 20px;
+  padding: 26px 28px;
+  margin-bottom: 18px;
+}
+.msg-hero-ic {
+  flex: none; width: 66px; height: 66px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: rgba(200,241,53,.10); border: 1px solid rgba(200,241,53,.30);
+}
+.msg-hero-ic svg { width: 28px; height: 28px; stroke: var(--lime); fill: none; stroke-width: 2; }
+.msg-hero-body { flex: 1 1 340px; min-width: 0; }
+.msg-hero-body h1 {
+  font-family: var(--display); font-size: clamp(26px, 3.4vw, 38px);
+  color: #fff; margin: 0 0 6px; letter-spacing: -.01em;
+}
+.msg-hero-body p { margin: 0; color: rgba(255,255,255,.66); font-size: 15px; max-width: 62ch; }
+
+.msg-private { display: flex; align-items: flex-start; gap: 10px; flex: none; }
+.msg-private svg { width: 20px; height: 20px; stroke: var(--lime); fill: none; stroke-width: 1.9; margin-top: 2px; flex: none; }
+.msg-private b { display: block; color: #fff; font-size: 14px; font-weight: 700; line-height: 1.3; }
+.msg-private small { display: block; color: rgba(255,255,255,.55); font-size: 12.5px; }
+
+.msg-actions { margin-bottom: 20px; }
+.msg-actions .abtn svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+.msg-list .gt-row { align-items: center; }
+.msg-row-ic {
+  flex: none; width: 38px; height: 38px; border-radius: 11px;
+  display: grid; place-items: center; margin-right: 12px;
+  background: rgba(255,255,255,.06);
+}
+.msg-row-ic svg { width: 17px; height: 17px; stroke: rgba(255,255,255,.72); fill: none; stroke-width: 1.9; }
+.msg-row-ic.notice { background: rgba(200,241,53,.12); }
+.msg-row-ic.notice svg { stroke: var(--lime); }
+
+/* The empty state is a designed state, not a gap — most members will never
+   have written to their admins, and that is not a failure. */
+.msg-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 46px 20px;
+  border: 1.5px dashed rgba(255,255,255,.18);
+  border-radius: 18px;
+  text-align: center;
+}
+.msg-empty svg { width: 26px; height: 26px; stroke: var(--lime); fill: none; stroke-width: 1.8; margin-bottom: 4px; }
+.msg-empty b { color: #fff; font-size: 16px; font-weight: 700; }
+.msg-empty span { color: rgba(255,255,255,.55); font-size: 14px; }
+
+/* ---- The composer -------------------------------------------------------- */
+.msg-sheet .ts-panel { width: min(660px, 100%); }
+.msg-form { background: var(--cream); padding: 20px 22px 22px; }
+.msg-fld { margin-bottom: 16px; }
+.msg-fld:last-child { margin-bottom: 0; }
+.msg-fld > label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14.5px; font-weight: 700; color: var(--deep);
+  margin-bottom: 8px;
+}
+.msg-fld > label svg { width: 16px; height: 16px; stroke: var(--forest); fill: none; stroke-width: 2; flex: none; }
+.msg-fld select, .msg-fld input[type="text"], .msg-fld textarea {
+  width: 100%; font: inherit; font-size: 15px; color: var(--ink);
+  background: #fff; border: 1px solid var(--gt-hair); border-radius: 11px;
+  padding: 13px 14px;
+}
+.msg-fld select:focus, .msg-fld input:focus, .msg-fld textarea:focus {
+  outline: none; border-color: var(--forest); box-shadow: 0 0 0 3px rgba(45,122,58,.14);
+}
+.msg-fld textarea { resize: vertical; min-height: 132px; line-height: 1.55; }
+.msg-fld[hidden] { display: none; }
+
+.msg-area { position: relative; }
+.msg-count {
+  position: absolute; right: 12px; bottom: 10px;
+  font-size: 11.5px; color: var(--muted); pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.msg-foot { background: var(--cream); border-top: 1px solid var(--gt-hair); }
+.msg-foot .abtn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+@media (max-width: 620px) {
+  .msg-hero { padding: 20px; }
+  .msg-private { order: 3; width: 100%; }
+}
+
+/* ==========================================================================
+   CHARITY TILES (templates/components/_charity_tile.html)
+
+   On the charity screens the charities ARE the content, and the question is
+   "which of these do I recognise?" — which a 44px mark inside a text row does
+   not answer. So the logo is carried at a size worth looking at and the grid
+   is even, so a page of causes reads as a set rather than as a list.
+   ========================================================================== */
+.ch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: 14px;
+  margin-bottom: 26px;
+}
+.ch-item {
+  position: relative;
+  display: flex; flex-direction: column;
+  padding: 18px 18px 16px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 16px;
+  transition: border-color .16s var(--ease), background .16s var(--ease);
+}
+.ch-item:hover { border-color: rgba(200,241,53,.34); background: rgba(255,255,255,.07); }
+.ch-item-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 13px; }
+
+/* White plate behind the mark. Charity logos are drawn for white and a good
+   half of them ship as dark PNGs with no background of their own; dropped
+   straight onto the deep green they disappear. */
+.ch-item-logo {
+  width: 56px; height: 56px; border-radius: 14px; flex: none;
+  object-fit: contain; background: #fff; padding: 7px;
+}
+.ch-item-initials {
+  display: grid; place-items: center; padding: 0;
+  background: hsl(var(--ch-hue, 140) 46% 90%);
+  color: hsl(var(--ch-hue, 140) 52% 26%);
+  font-family: var(--display); font-size: 19px; letter-spacing: .01em;
+}
+.ch-item-chip {
+  font-family: var(--mark); font-size: 10.5px; font-weight: 800;
+  letter-spacing: .07em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 100px; white-space: nowrap;
+  background: rgba(200,241,53,.14); color: var(--lime);
+  border: 1px solid rgba(200,241,53,.28);
+}
+.ch-item-name { font-size: 15px; font-weight: 700; color: #fff; line-height: 1.3; }
+.ch-item-url { font-size: 12.5px; color: rgba(255,255,255,.50); margin-top: 3px; word-break: break-word; }
+.ch-item-note { font-size: 12px; color: rgba(255,255,255,.42); margin-top: 6px; }
+
+.ch-add-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; flex-wrap: wrap;
+  padding: 20px 22px;
+  border: 1.5px dashed rgba(255,255,255,.18);
+  border-radius: 18px;
+  margin-top: 6px;
+}
+.ch-add-row .abtn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+.ch-sheet .ts-panel { width: min(560px, 100%); }
+.ch-form { background: var(--cream); padding: 18px 22px 22px; }
+.ch-form-hint { font-size: 13px; color: var(--muted); margin: 0 0 16px; line-height: 1.5; }
+.ch-form .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.ch-form input[type="text"], .ch-form input[type="url"] {
+  width: 100%; font: inherit; font-size: 15px; color: var(--ink);
+  background: #fff; border: 1px solid var(--gt-hair); border-radius: 11px; padding: 13px 14px;
+}
+.ch-form input:focus { outline: none; border-color: var(--forest); box-shadow: 0 0 0 3px rgba(45,122,58,.14); }
+.ch-form .fld-err { font-size: 12.5px; color: #A62121; margin-top: 6px; }
+.ch-foot { background: var(--cream); border-top: 1px solid var(--gt-hair); }
+
+/* ==========================================================================
+   GROUPS — search and card head (templates/orgs/groups.html)
+
+   The search was an input with a Search button and a Clear link beside it: a
+   round trip to the server to answer "which of these is the Finance one?",
+   which the browser could already answer because every group is on the page.
+   It reads as one field now, and it filters as you type.
+   ========================================================================== */
+.grp-search { margin-top: 4px; }
+.grp-search-form {
+  display: flex; align-items: center; gap: 10px;
+  max-width: 560px;
+  padding: 0 6px 0 15px;
+  height: 50px;
+  background: var(--gt-card);
+  border: 1px solid var(--gt-hair);
+  border-radius: 100px;
+  transition: border-color .15s var(--ease), box-shadow .15s var(--ease);
+}
+.grp-search-form:focus-within { border-color: var(--forest); box-shadow: 0 0 0 3px rgba(45,122,58,.14); }
+.grp-search-ic { width: 18px; height: 18px; flex: none; stroke: var(--muted); fill: none; stroke-width: 2; }
+.grp-search-form input {
+  flex: 1 1 auto; min-width: 0;
+  border: 0; background: none; font: inherit; font-size: 15px;
+  color: var(--ink); padding: 0;
+}
+.grp-search-form input:focus { outline: none; box-shadow: none; }
+.grp-search-form input::-webkit-search-cancel-button { display: none; }
+
+.grp-search-x {
+  flex: none; width: 26px; height: 26px; border: 0; border-radius: 50%;
+  background: rgba(15,46,34,.08); color: var(--muted);
+  font-size: 18px; line-height: 1; cursor: pointer;
+}
+.grp-search-x:hover { background: rgba(15,46,34,.15); color: var(--ink); }
+.grp-search-x[hidden] { display: none; }
+
+/* The submit is what makes this a real form for anyone without scripting; with
+   the live filter running it is redundant, so it stays quiet rather than
+   competing with the field it sits inside. */
+.grp-search-go {
+  flex: none; border: 0; border-radius: 100px; cursor: pointer;
+  padding: 9px 18px; font: inherit; font-size: 14px; font-weight: 700;
+  background: var(--deep); color: #fff;
+}
+.grp-search-go:hover { background: var(--forest); }
+
+.grp-search-count {
+  margin: 9px 0 0; padding-left: 4px;
+  font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.grp-search-count[hidden] { display: none; }
+.grp-none { margin: 16px 0 0; color: var(--muted); font-size: 15px; }
+.grp-none[hidden] { display: none; }
+.dept-card[hidden] { display: none; }
+
+/* The card head, out of inline styles and into names — the member count and
+   the cause now sit on their own line instead of being run together. */
+.dept-card .dc-head { min-width: 0; }
+.dept-card .dc-name {
+  font-family: var(--display); font-size: 17px; color: var(--ink);
+  line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
