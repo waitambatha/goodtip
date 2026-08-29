@@ -1,0 +1,32 @@
+{% comment %}
+The organisation admin's menu. Only what the creator of an organisation needs
+to run it — no sync, no enquiries, no news editor. Those are GoodTip's, not
+theirs, and they live in /admin/ now.
+{% endcomment %}
+<nav class="gts-rail" aria-label="Organisation admin sections">
+  <button type="button" class="gts-toggle" data-shell-toggle aria-expanded="true"
+          aria-label="Collapse or expand the menu">
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 6-6 6 6 6"/></svg>
+    <span class="lbl">Collapse menu</span>
+  </button>
+
+  <div class="gts-group">
+    <div class="gts-group-title">Your organisation</div>
+    <a href="{% url 'manage:overview' %}" class="{% block nav_overview %}{% endblock %}" title="Overview">
+      <svg><use href="#ic-home"/></svg><span class="lbl">Overview</span></a>
+    <a href="{% url 'manage:orgs_list' %}" class="{% block nav_orgs %}{% endblock %}" title="Organisations">
+      <svg><use href="#ic-org"/></svg><span class="lbl">Organisations</span></a>
+    <a href="{% url 'manage:approvals' %}" class="{% block nav_approvals %}{% endblock %}" title="Join requests">
+      <svg><use href="#ic-shield-check"/></svg><span class="lbl">Join requests</span>
+      {% if pending_approval_count %}<span class="n">{{ pending_approval_count }}</span>{% endif %}</a>
+  </div>
+
+  <div class="gts-group">
+    <div class="gts-group-title">People</div>
+    <a href="{% url 'manage:messages' %}" class="{% block nav_messages %}{% endblock %}" title="Messages">
+      <svg><use href="#ic-msg"/></svg><span class="lbl">Messages</span>
+      {% if unread_thread_count %}<span class="n">{{ unread_thread_count }}</span>{% endif %}</a>
+    <a href="{% url 'manage:charity' %}" class="{% block nav_charity %}{% endblock %}" title="Charity">
+      <svg><use href="#ic-heart"/></svg><span class="lbl">Charity</span></a>
+  </div>
+</nav>

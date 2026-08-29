@@ -1365,3 +1365,127 @@ class WorkEmailVerification(models.Model):
         self.verified_at = timezone.now()
         self.save(update_fields=["verified_at"])
         return True
+
+
+class MessageThread(models.Model):
+    """A conversation inside one organisation.
+
+    Replaces nothing — the org admin previously had no way to hear from a
+    member at all. The public contact form goes to GoodTip the company, not to
+    the organisation, so a member with a question about THEIR comp had only the
+    Wall, which is a public room and the wrong place to raise a problem.
+
+    Two shapes, one model, because they are the same conversation seen from
+    different ends:
+
+    * a member raises something and the admins answer it (KIND_RAISED);
+    * an admin sends something out, to everyone or to named people, and any of
+      them can reply (KIND_NOTICE).
+
+    Who can read it is `recipients` plus every admin of the org. An empty
+    recipients set means "everyone in the organisation" — stored as absence
+    rather than as a row per member so that somebody joining next week can read
+    the notice that went out today.
+    """
+
+    KIND_RAISED = "raised"
+    KIND_NOTICE = "notice"
+    KIND_CHOICES = [
+        (KIND_RAISED, "Raised by a member"),
+        (KIND_NOTICE, "Sent by an admin"),
+    ]
+
+    STATUS_OPEN = "open"
+    STATUS_ANSWERED = "answered"
+    STATUS_CLOSED = "closed"
+    STATUS_CHOICES = [
+        (STATUS_OPEN, "Open"),
+        (STATUS_ANSWERED, "Answered"),
+        (STATUS_CLOSED, "Closed"),
+    ]
+
+    org = models.ForeignKey(
+        Organisation, on_delete=models.CASCADE, related_name="message_threads",
+    )
+    # Optional: a thread can belong to one group rather than the whole org.
+    group = models.ForeignKey(
+        "orgs.Group", on_delete=models.CASCADE,
+        related_name="message_threads", null=True, blank=True,
+    )
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default=KIND_RAISED)
+    subject = models.CharField(max_length=160)
+    started_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="threads_started",
+    )
+    # Empty = everyone in the organisation, including people who join later.
+    recipients = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, related_name="threads_addressed", blank=True,
+    )
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_OPEN)
+    created_at = models.DateTimeField(default=timezone.now)
+    # Denormalised so the inbox can sort by activity without joining and
+    # aggregating over every message on every page load.
+    last_message_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-last_message_at"]
+
+    def __str__(self):
+        return f"{self.org.name}: {self.subject}"
+
+    @property
+    def is_broadcast(self) -> bool:
+        return self.kind == self.KIND_NOTICE and not self.recipients.exists()
+
+    def can_read(self, user) -> bool:
+        """Admins of the org see everything in it; a member sees their own.
+
+        Deliberately not "anyone in the org sees everything": a member raising
+        a problem with their own participation is entitled to have that read by
+        the admins and not by the rest of the room.
+        """
+        if not (user and user.is_authenticated):
+            return False
+        member = OrgMember.objects.filter(org_id=self.org_id, user=user).first()
+        if member is None:
+            return False
+        if member.can_manage:
+            return True
+        if self.started_by_id == user.id:
+            return True
+        if self.kind == self.KIND_NOTICE:
+            # A notice with no named recipients went to the whole organisation.
+            return not self.recipients.exists() or self.recipients.filter(pk=user.pk).exists()
+        return False
+
+
+class Message(models.Model):
+    """One entry in a thread."""
+
+    thread = models.ForeignKey(
+        MessageThread, on_delete=models.CASCADE, related_name="messages",
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="org_messages",
+    )
+    body = models.TextField()
+    created_at = models.DateTimeField(default=timezone.now)
+    # Who has opened the thread since this landed. A read *receipt* per message
+    # rather than a per-thread pointer, so "3 unread" stays correct when an
+    # admin answers a thread the member had already caught up on.
+    read_by = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, related_name="messages_read", blank=True,
+    )
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"{self.author}: {self.body[:40]}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Keep the thread's sort key honest.
+        MessageThread.objects.filter(pk=self.thread_id).update(
+            last_message_at=self.created_at,
+        )

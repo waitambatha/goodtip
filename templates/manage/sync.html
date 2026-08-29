@@ -1,4 +1,4 @@
-{% extends "admin_base.html" %}
+{% extends "hq_base.html" %}
 {% load static %}
 {% block title %}Sync. Manage{% endblock %}
 {% block nav_sync %}on{% endblock %}
@@ -92,7 +92,7 @@ them, and "why has nothing appeared" should have an answer on this page.
 </div>
 
 <div class="gt-shell gt-shell-wide">
-  <form method="post" action="{% url 'manage:sync' %}" class="gt-dark"
+  <form method="post" action="{% url 'admin:hq_sync' %}" class="gt-dark"
         data-busy="Syncing" data-busy-scope>
     {% csrf_token %}
     <div class="gd-head"><svg><use href="#ic-sliders"/></svg><span>Manual sync &middot; not normally needed</span></div>

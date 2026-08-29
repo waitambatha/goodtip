@@ -1,0 +1,12 @@
+{% comment %}Shared empty state for the org-admin pages that need an organisation.{% endcomment %}
+<div class="gts-empty">
+  <h2>You don't run an organisation yet</h2>
+  <p>
+    This area is for the organisations you created. Set one up and its members,
+    join requests and messages appear here.
+    {% if user.is_superuser %}
+    The platform's own work — enquiries, news, sync — is in <a href="/admin/">GoodTip HQ</a>.
+    {% endif %}
+  </p>
+  <a href="{% url 'orgs:create' %}" class="btn-primary">Set up an organisation &rarr;</a>
+</div>

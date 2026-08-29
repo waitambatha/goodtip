@@ -1,4 +1,4 @@
-{% extends "admin_base.html" %}
+{% extends "hq_base.html" %}
 {% load static %}
 {% block title %}{% if is_new %}New post{% else %}Edit post{% endif %} &middot; Manage{% endblock %}
 {% block nav_news %}on{% endblock %}
@@ -13,7 +13,7 @@
 
 <div class="ned-shell">
   <div class="ned-topbar">
-    <a href="{% url 'manage:news' %}" class="ned-back">&larr; All posts</a>
+    <a href="{% url 'admin:hq_news' %}" class="ned-back">&larr; All posts</a>
 
     {% comment %}
     THE STORY'S OWN ADDRESS.
@@ -40,7 +40,7 @@
   </div>
 
   <form method="post"
-        action="{% if is_new %}{% url 'manage:news_new' %}{% else %}{% url 'manage:news_edit' post.id %}{% endif %}"
+        action="{% if is_new %}{% url 'admin:hq_news_new' %}{% else %}{% url 'admin:hq_news_edit' post.id %}{% endif %}"
         enctype="multipart/form-data" data-busy="Saving">
     {% csrf_token %}
 
@@ -120,7 +120,7 @@
     </div>
 
     <label class="ned-field-label" style="margin-top:26px;">Full story</label>
-    <div class="ned-editor is-body" data-editor="body" data-upload-url="{% url 'manage:news_upload_image' %}">
+    <div class="ned-editor is-body" data-editor="body" data-upload-url="{% url 'admin:hq_news_upload_image' %}">
       <div class="ned-toolbar">
         <select class="ned-pick is-wide" data-cmd="formatBlock" title="Style">
           <option value="">Style</option>

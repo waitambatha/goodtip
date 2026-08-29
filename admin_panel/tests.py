@@ -18,6 +18,23 @@ from .models import NewsPost
 User = get_user_model()
 
 
+def sign_in_to_hq(client, user):
+    """Log in and clear the admin's second factor.
+
+    News, Enquiries and the public-page editor moved under /admin/ when the
+    organisation admin and the super admin were split apart, and /admin/ is
+    behind an emailed six-digit code (sysadmin.middleware). Stamping the
+    session is what the OTP flow does on success.
+    """
+    from sysadmin import otp
+
+    client.force_login(user)
+    session = client.session
+    otp.mark_verified(session)
+    session.save()
+
+
+
 class TemplateCommentTests(TestCase):
     """No `{# ... #}` comment may span a newline, anywhere in the project.
 
@@ -63,7 +80,7 @@ class NewsEditorTests(TestCase):
         self.admin = User.objects.create_superuser(
             email="editor@goodtip.test", password="Str0ng!pass", display_name="Editor"
         )
-        self.client.force_login(self.admin)
+        sign_in_to_hq(self.client, self.admin)
 
     def _post(self, **overrides):
         data = {
@@ -79,7 +96,7 @@ class NewsEditorTests(TestCase):
     # ---- the teaser is rich text now, with a plain-text mirror --------------
 
     def test_teaser_keeps_its_formatting_and_mirrors_plain_text(self):
-        self.client.post(reverse("manage:news_new"), self._post())
+        self.client.post(reverse("admin:hq_news_new"), self._post())
         post = NewsPost.objects.get()
         self.assertEqual(post.excerpt_html, "<b>Two</b> games separate fourth from ninth.")
         # The plain mirror feeds the OG description, the announcement email and
@@ -93,7 +110,7 @@ class NewsEditorTests(TestCase):
         the email subject and the OG tags, so a literal entity there comes out
         as "Tips &amp;amp; tricks" on the page.
         """
-        self.client.post(reverse("manage:news_new"), self._post(
+        self.client.post(reverse("admin:hq_news_new"), self._post(
             title_html="Tips &amp; tricks",
             excerpt_html="Fourth &amp; ninth",
         ))
@@ -102,7 +119,7 @@ class NewsEditorTests(TestCase):
         self.assertEqual(post.excerpt, "Fourth & ninth")
 
     def test_article_shows_the_formatted_teaser(self):
-        self.client.post(reverse("manage:news_new"), self._post())
+        self.client.post(reverse("admin:hq_news_new"), self._post())
         post = NewsPost.objects.get()
         html = self.client.get(post.get_absolute_url()).content.decode()
         self.assertIn("<b>Two</b> games separate fourth from ninth.", html)
@@ -129,7 +146,7 @@ class NewsEditorTests(TestCase):
             title="Old story", excerpt="A teaser from before the editor existed.",
             is_published=True,
         )
-        html = self.client.get(reverse("manage:news_edit", args=[post.id])).content.decode()
+        html = self.client.get(reverse("admin:hq_news_edit", args=[post.id])).content.decode()
         surface = html.split('data-hidden-input="np_excerpt_html"')[1]
         self.assertIn("A teaser from before the editor existed.", surface.split("</div>")[0])
 
@@ -146,7 +163,7 @@ class NewsEditorTests(TestCase):
             title="Old story", excerpt="A teaser from before.", is_published=True,
         )
         self.client.post(
-            reverse("manage:news_edit", args=[post.id]),
+            reverse("admin:hq_news_edit", args=[post.id]),
             self._post(excerpt_html="A teaser from before."),
         )
         post.refresh_from_db()
@@ -156,21 +173,21 @@ class NewsEditorTests(TestCase):
     # ---- the URL is generated, unique and stable ----------------------------
 
     def test_slug_is_generated_from_the_headline(self):
-        self.client.post(reverse("manage:news_new"), self._post())
+        self.client.post(reverse("admin:hq_news_new"), self._post())
         self.assertEqual(NewsPost.objects.get().slug, "finals-race-tightens")
 
     def test_a_second_story_with_the_same_headline_gets_its_own_url(self):
-        self.client.post(reverse("manage:news_new"), self._post())
-        self.client.post(reverse("manage:news_new"), self._post())
+        self.client.post(reverse("admin:hq_news_new"), self._post())
+        self.client.post(reverse("admin:hq_news_new"), self._post())
         slugs = set(NewsPost.objects.values_list("slug", flat=True))
         self.assertEqual(slugs, {"finals-race-tightens", "finals-race-tightens-2"})
 
     def test_editing_the_headline_does_not_move_the_story(self):
         """Links already shared have to keep working."""
-        self.client.post(reverse("manage:news_new"), self._post())
+        self.client.post(reverse("admin:hq_news_new"), self._post())
         post = NewsPost.objects.get()
         self.client.post(
-            reverse("manage:news_edit", args=[post.id]),
+            reverse("admin:hq_news_edit", args=[post.id]),
             self._post(title_html="A completely different headline"),
         )
         post.refresh_from_db()
@@ -178,48 +195,48 @@ class NewsEditorTests(TestCase):
         self.assertEqual(post.slug, "finals-race-tightens")
 
     def test_the_post_list_offers_the_link_to_copy(self):
-        self.client.post(reverse("manage:news_new"), self._post())
-        html = self.client.get(reverse("manage:news")).content.decode()
+        self.client.post(reverse("admin:hq_news_new"), self._post())
+        html = self.client.get(reverse("admin:hq_news")).content.decode()
         self.assertIn("/news/finals-race-tightens/", html)
         self.assertIn("data-copy-link", html)
 
     def test_the_edit_page_shows_the_live_url_with_copy_and_view(self):
-        self.client.post(reverse("manage:news_new"), self._post())
+        self.client.post(reverse("admin:hq_news_new"), self._post())
         post = NewsPost.objects.get()
-        html = self.client.get(reverse("manage:news_edit", args=[post.id])).content.decode()
+        html = self.client.get(reverse("admin:hq_news_edit", args=[post.id])).content.decode()
         self.assertIn("Live at", html)
         self.assertIn("data-slug-fixed=\"finals-race-tightens\"", html)
         self.assertIn("http://testserver/news/finals-race-tightens/", html)
 
     def test_a_new_post_previews_the_url_it_will_get(self):
-        html = self.client.get(reverse("manage:news_new")).content.decode()
+        html = self.client.get(reverse("admin:hq_news_new")).content.decode()
         self.assertIn("Will publish at", html)
         self.assertNotIn("data-slug-fixed", html)
 
     def test_an_unpublished_post_offers_no_link_because_it_would_404(self):
-        self.client.post(reverse("manage:news_new"), self._post(is_published=""))
-        html = self.client.get(reverse("manage:news")).content.decode()
+        self.client.post(reverse("admin:hq_news_new"), self._post(is_published=""))
+        html = self.client.get(reverse("admin:hq_news")).content.decode()
         self.assertNotIn("data-copy-link", html)
 
     # ---- "link to full story" is gone, sources stay -------------------------
 
     def test_the_editor_no_longer_offers_a_link_to_a_story_elsewhere(self):
-        html = self.client.get(reverse("manage:news_new")).content.decode()
+        html = self.client.get(reverse("admin:hq_news_new")).content.decode()
         self.assertNotIn('name="link_url"', html)
         self.assertIn('name="source_url"', html)
 
     def test_a_posted_link_url_is_ignored(self):
-        self.client.post(reverse("manage:news_new"), self._post(link_url="https://elsewhere.test/"))
+        self.client.post(reverse("admin:hq_news_new"), self._post(link_url="https://elsewhere.test/"))
         self.assertEqual(NewsPost.objects.get().link_url, "")
 
     def test_the_article_sends_nobody_off_to_an_original_story(self):
-        self.client.post(reverse("manage:news_new"), self._post())
+        self.client.post(reverse("admin:hq_news_new"), self._post())
         post = NewsPost.objects.get()
         html = self.client.get(post.get_absolute_url()).content.decode()
         self.assertNotIn("Read the original story", html)
 
     def test_sources_still_save(self):
-        self.client.post(reverse("manage:news_new"), self._post(
+        self.client.post(reverse("admin:hq_news_new"), self._post(
             source_label="AFL.com.au", source_url="https://afl.com.au/news",
         ))
         self.assertEqual(
@@ -230,14 +247,14 @@ class NewsEditorTests(TestCase):
     # ---- toolbar controls ---------------------------------------------------
 
     def test_font_size_is_a_number_not_a_named_bucket(self):
-        html = self.client.get(reverse("manage:news_new")).content.decode()
+        html = self.client.get(reverse("admin:hq_news_new")).content.decode()
         self.assertIn('data-cmd="fontSizePx"', html)
         self.assertIn('data-size-step="-1"', html)
         self.assertNotIn("fontSizeCustom", html)
 
     def test_every_writing_surface_has_a_toolbar(self):
         """The teaser used to be the one plain textarea left on the page."""
-        html = self.client.get(reverse("manage:news_new")).content.decode()
+        html = self.client.get(reverse("admin:hq_news_new")).content.decode()
         for surface in ("headline", "teaser", "body"):
             self.assertIn(f'data-editor="{surface}"', html)
         self.assertNotIn("<textarea", html)
@@ -251,12 +268,12 @@ class NewsEditorTests(TestCase):
         item, which stole the width from the real label and wrapped it one
         character per line.
         """
-        html = self.client.get(reverse("manage:news_new")).content.decode()
+        html = self.client.get(reverse("admin:hq_news_new")).content.decode()
         self.assertNotIn("{#", html)
         self.assertNotIn("bare file input cannot be styled", html)
 
     def test_no_comment_text_leaks_onto_the_published_article(self):
-        self.client.post(reverse("manage:news_new"), self._post())
+        self.client.post(reverse("admin:hq_news_new"), self._post())
         post = NewsPost.objects.get()
         html = self.client.get(post.get_absolute_url()).content.decode()
         self.assertNotIn("{#", html)
@@ -268,25 +285,25 @@ class NewsEditorTests(TestCase):
 
 
     def test_the_featured_image_can_be_taken_back_off_a_post(self):
-        self.client.post(reverse("manage:news_new"), self._post())
+        self.client.post(reverse("admin:hq_news_new"), self._post())
         post = NewsPost.objects.get()
         post.image = "news/hero.jpg"
         post.save(update_fields=["image"])
 
         self.client.post(
-            reverse("manage:news_edit", args=[post.id]),
+            reverse("admin:hq_news_edit", args=[post.id]),
             self._post(image_clear="1"),
         )
         post.refresh_from_db()
         self.assertFalse(post.image)
 
     def test_saving_without_touching_the_image_keeps_it(self):
-        self.client.post(reverse("manage:news_new"), self._post())
+        self.client.post(reverse("admin:hq_news_new"), self._post())
         post = NewsPost.objects.get()
         post.image = "news/hero.jpg"
         post.save(update_fields=["image"])
 
-        self.client.post(reverse("manage:news_edit", args=[post.id]), self._post())
+        self.client.post(reverse("admin:hq_news_edit", args=[post.id]), self._post())
         post.refresh_from_db()
         self.assertEqual(post.image.name, "news/hero.jpg")
 
@@ -309,7 +326,7 @@ class PageCMSTests(TestCase):
         self.staff.is_staff = True
         self.staff.is_superuser = True
         self.staff.save(update_fields=["is_staff", "is_superuser"])
-        self.client.force_login(self.staff)
+        sign_in_to_hq(self.client, self.staff)
 
     def test_slots_are_discovered_from_the_templates(self):
         from admin_panel import pagecms
@@ -356,7 +373,7 @@ class PageCMSTests(TestCase):
         info = pagecms.discover("about")
         data = {f"slot__{s.key}": s.default for s in info.slots}
         data["slot__hero.sub"] = "A new opening line."
-        self.client.post(reverse("manage:page_edit", args=["about"]), data)
+        self.client.post(reverse("admin:hq_page_edit", args=["about"]), data)
 
         # One row, not one per slot: the table means "what the client changed".
         self.assertEqual(PageText.objects.filter(page="about").count(), 1)
@@ -370,7 +387,7 @@ class PageCMSTests(TestCase):
         info = pagecms.discover("about")
         data = {f"slot__{s.key}": s.default for s in info.slots}
         data["slot__hero.sub"] = ""
-        self.client.post(reverse("manage:page_edit", args=["about"]), data)
+        self.client.post(reverse("admin:hq_page_edit", args=["about"]), data)
 
         self.assertFalse(PageText.objects.filter(page="about", key="hero.sub").exists())
         body = self.client.get("/about/").content.decode()
@@ -390,11 +407,11 @@ class PageCMSTests(TestCase):
             email="member@goodtip.test", password="x", display_name="Member",
         )
         self.client.force_login(member)
-        resp = self.client.get(reverse("manage:page_edit", args=["about"]))
+        resp = self.client.get(reverse("admin:hq_page_edit", args=["about"]))
         self.assertEqual(resp.status_code, 302)         # bounced to admin login
 
     def test_an_unknown_page_is_a_404(self):
-        resp = self.client.get(reverse("manage:page_edit", args=["nope"]))
+        resp = self.client.get(reverse("admin:hq_page_edit", args=["nope"]))
         self.assertEqual(resp.status_code, 404)
 
     def test_the_new_public_pages_are_reachable(self):

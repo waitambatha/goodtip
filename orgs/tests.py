@@ -1403,42 +1403,74 @@ class ReviewRequestPageTests(TestCase):
         self.assertIn(b"Already", r.content)
 
 
-class StaffApprovalsPageTests(TestCase):
-    """The admin menu's Approvals queue — every pending request in one place."""
+class OrgAdminApprovalsPageTests(TestCase):
+    """The organisation admin's Approvals queue.
+
+    This page used to list every pending request on the platform and was gated
+    on `is_staff` — which, since nothing but create_superuser sets that flag,
+    meant superusers only. It is the ORG ADMIN's queue now: the requests to
+    join the organisations they run, and nobody else's.
+    """
 
     def setUp(self):
         self.season, _ = Season.objects.get_or_create(year=2094, defaults={"label": "2094"})
-        self.org = Organisation.objects.create(name="Orphan Group", season=self.season)
-        self.staff = User.objects.create_user(
-            email="staff@w.com", password="x", display_name="Sam", is_staff=True,
+        self.org = Organisation.objects.create(name="Mine", season=self.season)
+        self.other = Organisation.objects.create(name="Somebody Else's", season=self.season)
+
+        self.owner = User.objects.create_user(
+            email="owner@w.com", password="x", display_name="Ollie",
         )
+        OrgMember.objects.create(
+            user=self.owner, org=self.org,
+            role=OrgMember.ROLE_BOTH, is_league_owner=True,
+        )
+
         self.joiner = User.objects.create_user(email="kim@w.com", password="x", display_name="Kim")
         self.req = request_to_join(self.joiner, self.org)
 
-    def test_the_queue_lists_pending_requests(self):
-        self.client.force_login(self.staff)
+        self.stranger = User.objects.create_user(email="zed@w.com", password="x", display_name="Zed")
+        self.other_req = request_to_join(self.stranger, self.other)
+
+    def test_the_queue_lists_requests_for_your_own_organisation(self):
+        self.client.force_login(self.owner)
         r = self.client.get("/manage/approvals/")
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"kim@w.com", r.content)
 
-    def test_staff_can_approve_a_group_with_no_admin_of_its_own(self):
-        """The reason this page exists: nobody else can clear this request."""
-        self.client.force_login(self.staff)
+    def test_somebody_elses_organisation_is_not_in_your_queue(self):
+        self.client.force_login(self.owner)
+        r = self.client.get("/manage/approvals/")
+        self.assertNotIn(b"zed@w.com", r.content)
+
+    def test_an_org_admin_can_clear_their_own_queue(self):
+        self.client.force_login(self.owner)
         self.client.post(
             "/manage/approvals/", {"action": "approve", "request_id": self.req.id}
         )
         self.assertTrue(OrgMember.objects.filter(user=self.joiner, org=self.org).exists())
 
-    def test_the_nav_carries_the_waiting_count(self):
-        self.client.force_login(self.staff)
-        self.assertIn(b'class="an-count">1<', self.client.get("/manage/").content)
+    def test_posting_somebody_elses_request_id_does_nothing(self):
+        """The scoping is on the QUERY, not on which links the page drew.
 
-    def test_a_non_staff_member_cannot_reach_it(self):
+        Hiding the row and then trusting the POST is how this kind of page
+        leaks: the id is guessable and the form is not the only way to send one.
+        """
+        self.client.force_login(self.owner)
+        r = self.client.post(
+            "/manage/approvals/", {"action": "approve", "request_id": self.other_req.id}
+        )
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(OrgMember.objects.filter(user=self.stranger, org=self.other).exists())
+
+    def test_the_nav_carries_your_waiting_count(self):
+        self.client.force_login(self.owner)
+        body = self.client.get("/manage/").content
+        self.assertIn(b'class="n">1<', body)
+
+    def test_a_member_who_runs_nothing_cannot_reach_it(self):
         self.client.force_login(self.joiner)
         r = self.client.get("/manage/approvals/")
-        self.assertEqual(r.status_code, 302)
-        # Bounced to the admin login rather than served the queue.
-        self.assertTrue(r["Location"].startswith("/admin/login/"))
+        self.assertEqual(r.status_code, 403)
 
 
 class CreateWizardTests(TestCase):

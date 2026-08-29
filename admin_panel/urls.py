@@ -1,6 +1,14 @@
+"""The ORGANISATION admin's URLs.
+
+Everything system-level that used to live here — the sync panel, the public
+site's enquiries, the news editor — moved to /admin/ when the two areas were
+split. What is left is what the creator of an organisation needs to run the
+organisation they created, and every view behind it is scoped by
+admin_panel.perms.managed_orgs().
+"""
 from django.urls import path
 
-from . import views
+from . import org_views, views
 
 
 app_name = "manage"
@@ -12,21 +20,11 @@ urlpatterns = [
     path("org/<int:org_id>/rounds/", views.org_rounds, name="org_rounds"),
     path("org/<int:org_id>/round/<int:round_id>/matches/", views.round_matches, name="round_matches"),
     path("org/<int:org_id>/members/", views.org_members, name="org_members"),
-    path("sync/", views.sync_panel, name="sync"),
-    path("enquiries/", views.enquiries, name="enquiries"),
-    path("enquiries/<int:enquiry_id>/", views.enquiry_detail, name="enquiry_detail"),
-    # Public-page copy and media. See admin_panel.pagecms for how the slots
-    # are discovered from the templates themselves.
-    path("pages/", views.pages_list, name="pages"),
-    path("pages/<slug:slug>/", views.page_edit, name="page_edit"),
-    path("pages/<slug:slug>/media/", views.page_media_upload, name="page_media_upload"),
-    path("pages/<slug:slug>/media/<int:media_id>/delete/", views.page_media_delete, name="page_media_delete"),
-    path("pages/<slug:slug>/media/<int:media_id>/toggle/", views.page_media_toggle, name="page_media_toggle"),
-    path("news/", views.news_list, name="news"),
-    path("news/new/", views.news_new, name="news_new"),
-    path("news/upload-image/", views.news_upload_image, name="news_upload_image"),
-    path("news/<int:post_id>/edit/", views.news_edit, name="news_edit"),
-    path("news/<int:post_id>/toggle/", views.news_toggle, name="news_toggle"),
-    path("news/<int:post_id>/announce/", views.news_announce, name="news_announce"),
-    path("news/<int:post_id>/delete/", views.news_delete, name="news_delete"),
+    # Member <-> admin conversation, new with the split: a member had nowhere
+    # to raise anything with their own admin, because the public contact form
+    # goes to GoodTip rather than to their organisation.
+    path("messages/", org_views.message_list, name="messages"),
+    path("messages/new/", org_views.message_new, name="message_new"),
+    path("messages/<int:thread_id>/", org_views.message_thread, name="message_thread"),
+    path("charity/", org_views.charity_redirect, name="charity"),
 ]

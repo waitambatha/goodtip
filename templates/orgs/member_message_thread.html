@@ -1,0 +1,33 @@
+{% extends "app_base.html" %}
+{% block title %}{{ thread.subject }} &middot; {{ org.name }}{% endblock %}
+{% block body_class %}page-deep sheet-page{% endblock %}
+{% block app_content %}
+<section class="wrap" style="padding:28px 0 60px;max-width:820px;">
+  <p style="margin:0 0 14px;"><a href="{% url 'orgs:member_messages' org.id %}" style="font-size:13px;">&larr; All messages</a></p>
+  <h1 style="font-family:var(--display);font-size:clamp(22px,2.6vw,30px);margin:0 0 4px;">{{ thread.subject }}</h1>
+  <p style="color:var(--muted);margin:0 0 22px;font-size:13px;">
+    {% if thread.kind == 'notice' %}From the admins of {{ org.name }}{% else %}Raised with the admins of {{ org.name }}{% endif %}
+  </p>
+
+  <div class="card pad-lg" style="margin-bottom:18px;">
+    {% for e in entries %}
+    <div style="padding:14px 0;{% if not forloop.last %}border-bottom:1px solid var(--line);{% endif %}">
+      <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;">
+        <b style="font-size:14px;">{{ e.author.display_name }}</b>
+        <small style="color:var(--muted);">{{ e.created_at|date:"j M Y, g:i a" }}</small>
+      </div>
+      <p style="margin:6px 0 0;white-space:pre-wrap;line-height:1.6;">{{ e.body }}</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <form method="post" class="card pad-lg">
+    {% csrf_token %}
+    <div class="fld" style="margin-bottom:12px;">
+      <label for="r">Reply</label>
+      <textarea id="r" name="body" rows="4" required></textarea>
+    </div>
+    <button type="submit" class="btn-primary">Send</button>
+  </form>
+</section>
+{% endblock %}

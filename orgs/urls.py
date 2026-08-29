@@ -41,6 +41,11 @@ urlpatterns = [
     path("<int:org_id>/charity-vote/close-time/", views.election_close_time_view, name="election_close_time"),
     path("<int:org_id>/lock-fundraising/", views.lock_fundraising_view, name="lock_fundraising"),
     path("<int:org_id>/election/", views.election_setup_view, name="election_setup"),
+    # Member <-> admin messages. The admin's end of the same threads is in
+    # /manage/messages/.
+    path("<int:org_id>/messages/", views.member_messages_view, name="member_messages"),
+    path("<int:org_id>/messages/<int:thread_id>/", views.member_message_thread_view,
+         name="member_message_thread"),
     path("<int:org_id>/wall/", views.wall_view, name="wall"),
     path("<int:org_id>/wall/post/", views.wall_post_create, name="wall_post"),
     path("<int:org_id>/wall/<int:post_id>/react/", views.wall_react, name="wall_react"),

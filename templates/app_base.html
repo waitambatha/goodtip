@@ -188,6 +188,12 @@
           <a href="{% url 'tipping:ladder' primary_org.id %}" data-coach="ladder" class="{% block nav_ladder %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg><span>Ladder</span></a>
           <a href="{% url 'orgs:wall' primary_org.id %}" data-coach="wall" class="{% block nav_wall %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-msg"/></svg><span>The Wall</span></a>
           {% comment %}
+          The Wall is the room; this is the quiet word with whoever runs it.
+          Separate on purpose — a member with a problem about their own
+          participation should not have to raise it in front of everybody.
+          {% endcomment %}
+          <a href="{% url 'orgs:member_messages' primary_org.id %}" class="{% block nav_msgs %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-mail"/></svg><span>Messages</span></a>
+          {% comment %}
           Admin-only, and only two items: Members is the hub for everything to
           do with people (invites, join requests, roles), and Season summary is
           the money. These were buttons buried on the dashboard's org card,

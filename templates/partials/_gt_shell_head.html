@@ -1,0 +1,24 @@
+{% load static %}
+{% comment %}
+Everything both admin shells need in <head>. One file so the org area and the
+HQ area cannot drift apart on fonts, icons or the rail's paint-blocking
+snippet.
+{% endcomment %}
+{% include "partials/_favicon.html" %}
+{% include "partials/_fonts.html" %}
+<link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
+<link rel="stylesheet" href="{% static 'css/gt-shell.css' %}">
+<script>
+  /* Restore the rail's collapsed state before first paint — doing it from the
+     deferred script instead makes the menu snap from wide to narrow on load. */
+  try {
+    if (localStorage.getItem("gtShellCollapsed") === "1") {
+      document.documentElement.classList.add("gts-collapsed");
+    }
+  } catch (e) {}
+</script>
+<script src="{% static 'js/gt-shell.js' %}" defer></script>
+<script src="{% static 'js/gt-ui.js' %}" defer></script>
+<script src="{% static 'js/gt-busy.js' %}" defer></script>
+<script src="{% static 'js/gt-confirm.js' %}" defer></script>
+<script src="{% static 'js/gt-lists.js' %}" defer></script>

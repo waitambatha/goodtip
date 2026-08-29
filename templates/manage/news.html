@@ -1,4 +1,4 @@
-{% extends "admin_base.html" %}
+{% extends "hq_base.html" %}
 {% load static %}
 {% block title %}News &amp; blog. Manage{% endblock %}
 {% block nav_news %}on{% endblock %}
@@ -17,7 +17,7 @@
         <div class="gp-sub">{{ posts|length }} post{{ posts|length|pluralize }} &middot; only the super admin can publish.</div>
       </div>
       <div class="gp-right">
-        <a href="{% url 'manage:news_new' %}" class="gt-go-btn" style="width:auto;">Create post <svg><use href="#ic-arrow-right"/></svg></a>
+        <a href="{% url 'admin:hq_news_new' %}" class="gt-go-btn" style="width:auto;">Create post <svg><use href="#ic-arrow-right"/></svg></a>
       </div>
     </div>
 
@@ -69,7 +69,7 @@
           </p>
 
           <div class="np-acts">
-            <a class="np-btn" href="{% url 'manage:news_edit' p.id %}">Edit</a>
+            <a class="np-btn" href="{% url 'admin:hq_news_edit' p.id %}">Edit</a>
 
             {% comment %}
             The story's own address, ready to paste. It only shows on published
@@ -82,7 +82,7 @@
             </button>
             {% endif %}
 
-            <form method="post" action="{% url 'manage:news_toggle' p.id %}" data-busy="Saving">
+            <form method="post" action="{% url 'admin:hq_news_toggle' p.id %}" data-busy="Saving">
               {% csrf_token %}
               <button type="submit" class="np-btn">{% if p.is_published %}Unpublish{% else %}Publish{% endif %}</button>
             </form>
@@ -92,7 +92,7 @@
             than showing a button that would send a duplicate to every member.
             {% endcomment %}
             {% if p.is_published and not p.announced_at %}
-            <form method="post" action="{% url 'manage:news_announce' p.id %}" data-busy="Sending"
+            <form method="post" action="{% url 'admin:hq_news_announce' p.id %}" data-busy="Sending"
                   data-confirm="Every member with email notifications on will receive this post. This cannot be recalled."
                   data-confirm-title="Email this to all members?" data-confirm-ok="Send email">
               {% csrf_token %}
@@ -101,7 +101,7 @@
             {% endif %}
 
             {# Destructive, so it sits apart and is coloured as the exception. #}
-            <form method="post" action="{% url 'manage:news_delete' p.id %}" class="np-del" data-busy="Deleting"
+            <form method="post" action="{% url 'admin:hq_news_delete' p.id %}" class="np-del" data-busy="Deleting"
                   data-confirm="The post will be removed from the site permanently."
                   data-confirm-title="Delete this post?" data-confirm-ok="Delete" data-confirm-danger>
               {% csrf_token %}
@@ -112,7 +112,7 @@
       </article>
       {% empty %}
       <div class="gt-empty" style="padding:34px 20px;text-align:center;">
-        Nothing posted yet, <a href="{% url 'manage:news_new' %}" style="color:var(--forest);font-weight:700;">write your first story</a>.
+        Nothing posted yet, <a href="{% url 'admin:hq_news_new' %}" style="color:var(--forest);font-weight:700;">write your first story</a>.
       </div>
       {% endfor %}
     </div>

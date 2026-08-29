@@ -1,4 +1,4 @@
-{% extends "admin_base.html" %}
+{% extends "hq_base.html" %}
 {% load static %}
 {% block title %}{{ enquiry.name }}. Enquiries{% endblock %}
 {% block nav_enquiries %}on{% endblock %}
@@ -8,7 +8,7 @@
 {% block admin_content %}
 
 <div class="gt-shell gt-shell-wide">
-  <p class="gt-back"><a href="{% url 'manage:enquiries' %}">&larr; All enquiries</a></p>
+  <p class="gt-back"><a href="{% url 'admin:hq_enquiries' %}">&larr; All enquiries</a></p>
 
   <section class="gt-panel">
     <div class="gt-panel-head">

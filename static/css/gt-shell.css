@@ -1,0 +1,229 @@
+/* ==========================================================================
+   gt-shell.css — the admin shell for /manage/ (organisation admin) and the
+   GoodTip HQ pages moved out of it.
+
+   Loaded AFTER goodtip.css, and deliberately dependent on it: every page in
+   these areas is built from goodtip.css components (.card, .fld, .btn,
+   .gt-rows), and rewriting all of them to a second component set to change a
+   layout would have been the expensive way to move a menu.
+
+   So this file changes only the shell — the frame around the content — and
+   leaves the content's own styles alone:
+
+     * out goes the full-bleed stadium backdrop and the photographic hero,
+       which cost the top third of every screen to say the page's name;
+     * in comes a cream page, white panels and a rail down the left that
+       collapses to icons;
+     * green stops being the background and goes back to being an accent.
+   ========================================================================== */
+
+:root {
+  --gts-rail-w: 268px;
+  --gts-shell: #F7F5EE;
+  --gts-surface: #FFFFFF;
+  --gts-surface-2: #FBFAF4;
+  --gts-surface-3: #F2F0E6;
+  --gts-line: rgba(15,46,34,.09);
+  --gts-line-2: rgba(15,46,34,.15);
+  --gts-fg: #23302A;
+  --gts-quiet: #75847A;
+  --gts-head-h: 64px;
+}
+html.gts-collapsed { --gts-rail-w: 72px; }
+
+/* ---- Kill the old chrome -------------------------------------------------- */
+body.gt-shell .page-backdrop,
+body.gt-shell .gt-hero { display: none !important; }
+
+body.gt-shell {
+  background: var(--gts-shell) !important;
+  color: var(--gts-fg);
+}
+
+/* ---- Top bar -------------------------------------------------------------- */
+.gts-top {
+  position: sticky; top: 0; z-index: 60;
+  display: flex; align-items: center; gap: 18px;
+  height: var(--gts-head-h);
+  padding: 0 26px;
+  background: var(--gts-surface);
+  border-bottom: 1px solid var(--gts-line);
+}
+.gts-brand {
+  display: inline-flex; align-items: baseline;
+  font-family: var(--mark); font-weight: 900; font-size: 24px;
+  letter-spacing: .05em; text-transform: uppercase;
+  color: var(--deep); text-decoration: none;
+}
+.gts-brand span { color: var(--forest); }
+.gts-brand em { color: var(--lime-dk); font-style: normal; }
+.gts-brand:hover { text-decoration: none; color: var(--deep); }
+
+.gts-area {
+  font-family: var(--mark); font-size: 11.5px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase;
+  padding: 4px 11px; border-radius: 999px;
+  border: 1px solid var(--gts-line-2); color: var(--gts-quiet);
+  white-space: nowrap;
+}
+.gts-area[data-area="hq"] { border-color: rgba(45,122,58,.4); background: rgba(45,122,58,.08); color: #226B45; }
+
+.gts-spacer { flex: 1 1 auto; }
+.gts-actions { display: flex; align-items: center; gap: 8px; }
+.gts-actions a, .gts-actions button {
+  display: inline-flex; align-items: center; gap: 7px;
+  font: inherit; font-size: 13px; font-weight: 500;
+  color: #47564D; background: transparent;
+  border: 1px solid transparent; border-radius: 999px;
+  padding: 7px 13px; cursor: pointer; text-decoration: none;
+}
+.gts-actions a:hover, .gts-actions button:hover { background: var(--gts-surface-3); color: var(--deep); text-decoration: none; }
+.gts-actions svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.9; }
+
+.gts-who { display: inline-flex; align-items: center; gap: 10px; }
+.gts-av {
+  width: 34px; height: 34px; border-radius: 50%; flex: none; overflow: hidden;
+  display: grid; place-items: center;
+  background: var(--deep); color: var(--lime);
+  font-family: var(--display); font-size: 14px;
+}
+.gts-av img { width: 100%; height: 100%; object-fit: cover; }
+.gts-who b { display: block; font-size: 13.5px; font-weight: 600; color: var(--deep); line-height: 1.2; }
+.gts-who small { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--gts-quiet); }
+
+/* ---- Layout --------------------------------------------------------------- */
+.gts-body { display: flex; align-items: flex-start; min-height: calc(100vh - var(--gts-head-h)); }
+
+.gts-rail {
+  position: sticky; top: var(--gts-head-h);
+  flex: 0 0 var(--gts-rail-w); width: var(--gts-rail-w);
+  height: calc(100vh - var(--gts-head-h));
+  overflow-y: auto; overflow-x: hidden;
+  background: var(--gts-surface);
+  border-right: 1px solid var(--gts-line);
+  padding: 16px 12px 32px;
+  transition: flex-basis .18s ease, width .18s ease;
+}
+.gts-toggle {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  background: transparent; border: 1px solid var(--gts-line-2);
+  border-radius: 9px; padding: 9px 11px; margin-bottom: 18px;
+  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--gts-quiet);
+  cursor: pointer;
+}
+.gts-toggle:hover { background: var(--gts-surface-3); color: var(--deep); }
+.gts-toggle svg { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 2; }
+html.gts-collapsed .gts-toggle { justify-content: center; padding: 9px 0; }
+html.gts-collapsed .gts-toggle svg { transform: rotate(180deg); }
+
+.gts-group { margin-bottom: 22px; }
+.gts-group-title {
+  font-family: var(--mark); font-size: 11px; font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--gts-quiet);
+  padding: 0 11px 8px; white-space: nowrap;
+}
+.gts-rail a {
+  position: relative;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 11px; margin-bottom: 2px;
+  border-radius: 9px;
+  font-size: 14px; font-weight: 500; color: #3C4A42;
+  text-decoration: none; white-space: nowrap;
+}
+.gts-rail a svg { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.gts-rail a:hover { background: var(--gts-surface-3); color: var(--deep); text-decoration: none; }
+.gts-rail a.on { background: var(--deep); color: #fff; font-weight: 600; }
+.gts-rail a.on svg { stroke: var(--lime); }
+.gts-rail .n {
+  margin-left: auto;
+  font-family: var(--score); font-size: 11.5px; font-weight: 800;
+  background: var(--lime); color: var(--deep);
+  border-radius: 999px; padding: 1px 7px;
+}
+html.gts-collapsed .gts-rail a { justify-content: center; padding: 11px 0; }
+html.gts-collapsed .gts-rail .lbl,
+html.gts-collapsed .gts-group-title,
+html.gts-collapsed .gts-toggle .lbl { display: none; }
+html.gts-collapsed .gts-rail .n { position: absolute; top: 4px; right: 8px; margin: 0; font-size: 10px; padding: 0 5px; }
+html.gts-collapsed .gts-group { margin-bottom: 14px; border-top: 1px solid var(--gts-line); padding-top: 14px; }
+html.gts-collapsed .gts-group:first-of-type { border-top: 0; padding-top: 0; }
+
+.gts-main { flex: 1 1 auto; min-width: 0; padding: 30px 40px 64px; max-width: 1440px; }
+
+/* ---- Page heading (replaces the photographic hero) ------------------------ */
+.gts-head { margin-bottom: 28px; }
+.gts-head .eyebrow {
+  font-family: var(--mark); font-size: 11.5px; font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--gts-quiet);
+  margin: 0 0 6px;
+}
+.gts-head h1 {
+  font-family: var(--display);
+  font-size: clamp(26px, 2.7vw, 38px); line-height: 1.12; letter-spacing: -.02em;
+  color: var(--deep); margin: 0 0 8px;
+}
+.gts-head p { margin: 0; color: var(--gts-quiet); font-size: 15px; max-width: 68ch; }
+
+/* Content panels sit on cream now, so they need their own edge. */
+body.gt-shell .card {
+  background: var(--gts-surface);
+  border: 1px solid var(--gts-line);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15,46,34,.05);
+}
+body.gt-shell .pad-lg { padding: 24px; }
+
+.gts-empty {
+  background: var(--gts-surface); border: 1px dashed var(--gts-line-2);
+  border-radius: 14px; padding: 40px 28px; text-align: center;
+}
+.gts-empty h2 { font-family: var(--display); font-size: 20px; color: var(--deep); margin: 0 0 8px; }
+.gts-empty p { color: var(--gts-quiet); margin: 0 auto 18px; max-width: 52ch; }
+
+@media (max-width: 900px) {
+  :root, html.gts-collapsed { --gts-rail-w: 60px; }
+  .gts-rail .lbl, .gts-group-title, .gts-toggle { display: none; }
+  .gts-rail a { justify-content: center; padding: 11px 0; }
+  .gts-main { padding: 22px 18px 56px; }
+  .gts-top { padding: 0 16px; }
+  .gts-who b, .gts-who small { display: none; }
+}
+
+/* ---- Tabs + pills used by the org-admin pages ----------------------------- */
+.gt-tab {
+  display: inline-flex; align-items: center;
+  padding: 7px 14px; border-radius: 999px;
+  border: 1px solid var(--gts-line-2);
+  font-size: 13px; font-weight: 600; color: var(--gts-quiet);
+  text-decoration: none;
+}
+.gt-tab:hover { background: var(--gts-surface-3); color: var(--deep); text-decoration: none; }
+.gt-tab.on { background: var(--deep); border-color: var(--deep); color: #fff; }
+
+.gt-pill {
+  display: inline-block; padding: 3px 10px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 700;
+  background: var(--gts-surface-3); color: var(--gts-quiet);
+}
+.gt-pill.ok { background: rgba(45,122,58,.14); color: #226B45; }
+.gt-pill.warn { background: rgba(199,124,30,.16); color: #A9660F; }
+
+body.gt-shell .gt-rows { display: grid; gap: 10px; }
+body.gt-shell .gt-row {
+  display: flex; align-items: center; gap: 16px;
+  background: var(--gts-surface);
+  border: 1px solid var(--gts-line);
+  border-radius: 12px;
+  padding: 16px 20px;
+  text-decoration: none; color: inherit;
+  transition: border-color .14s, box-shadow .14s;
+}
+body.gt-shell .gt-row:hover {
+  border-color: var(--gts-line-2);
+  box-shadow: 0 2px 10px -4px rgba(15,46,34,.18);
+  text-decoration: none;
+}
+body.gt-shell .gt-row .gr-body { flex: 1 1 auto; min-width: 0; }
+body.gt-shell .gt-row .gr-body b { display: block; font-size: 15px; color: var(--deep); }
+body.gt-shell .gt-row .gr-body small { display: block; margin-top: 3px; font-size: 12.5px; color: var(--gts-quiet); }
+body.gt-shell .gt-row .gr-go { flex: none; font-size: 13px; font-weight: 600; color: var(--forest); }

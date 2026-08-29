@@ -8,7 +8,7 @@ from django.core.management import call_command
 from django.contrib.auth.decorators import login_required
 from django.db import connection, models
 from django.db.models import Count, Q
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import Http404, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 from django.urls import reverse
@@ -2826,3 +2826,78 @@ def group_captains_call(request, org_id: int, group_id: int):
     except ValueError as e:
         messages.error(request, str(e))
     return redirect("orgs:group_charity_vote", org_id=org.id, group_id=group.id)
+
+
+# ---------------------------------------------------------------------------
+# Messages, member side
+#
+# The admin half lives in admin_panel.org_views. This is the other end of the
+# same conversation: a member raising something with the people who run their
+# organisation, and reading the notices those people send out.
+#
+# Before this there was nowhere to do it. The public contact form goes to
+# GoodTip the company rather than to anybody's organisation, so a member with a
+# question about their own comp had only the Wall — a public room, and the
+# wrong place to raise a problem with your own participation.
+# ---------------------------------------------------------------------------
+
+@login_required
+def member_messages_view(request, org_id: int):
+    from orgs.models import Message, MessageThread
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    me = _membership(request.user, org)
+    if me is None:
+        raise Http404("No organisation matches the given query.")
+
+    if request.method == "POST":
+        subject = (request.POST.get("subject") or "").strip()
+        body = (request.POST.get("body") or "").strip()
+        if not subject or not body:
+            messages.error(request, "Give it a subject and say what's up.")
+        else:
+            thread = MessageThread.objects.create(
+                org=org, kind=MessageThread.KIND_RAISED, subject=subject,
+                started_by=request.user, status=MessageThread.STATUS_OPEN,
+            )
+            Message.objects.create(thread=thread, author=request.user, body=body)
+            messages.success(request, "Sent to your organisation's admins.")
+            return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
+
+    # Filtered in Python rather than by a query: can_read() is the one place
+    # that decides who sees what, and a second expression of it in SQL is a
+    # second thing to keep in step.
+    readable = [
+        t for t in MessageThread.objects.filter(org=org).select_related("started_by")
+        if t.can_read(request.user)
+    ]
+    return render(request, "orgs/member_messages.html", {
+        "org": org, "threads": readable, "can_manage": me.can_manage,
+    })
+
+
+@login_required
+def member_message_thread_view(request, org_id: int, thread_id: int):
+    from orgs.models import Message, MessageThread
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    thread = get_object_or_404(MessageThread, pk=thread_id, org=org)
+    if not thread.can_read(request.user):
+        raise Http404("No thread matches the given query.")
+
+    if request.method == "POST":
+        body = (request.POST.get("body") or "").strip()
+        if body:
+            Message.objects.create(thread=thread, author=request.user, body=body)
+            if thread.status == MessageThread.STATUS_CLOSED:
+                thread.status = MessageThread.STATUS_OPEN
+                thread.save(update_fields=["status"])
+            messages.success(request, "Sent.")
+        return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
+
+    entries = thread.messages.select_related("author").order_by("created_at")
+    for entry in entries:
+        entry.read_by.add(request.user)
+    return render(request, "orgs/member_message_thread.html", {
+        "org": org, "thread": thread, "entries": entries,
+    })

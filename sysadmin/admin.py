@@ -323,11 +323,47 @@ def _get_urls():
     # get_urls() is called every app is loaded.
     from admin_panel import site_content_admin
 
+    # The organisation admin's area kept these three for as long as it was the
+    # only admin there was. They are GoodTip's own work, not any
+    # organisation's: an enquiry is addressed to the company, the news feed is
+    # the company's, and the sync panel drives the platform's fixtures. They
+    # answer to the super admin, so they live here now.
+    from admin_panel import views as manage_views
+
     custom = [
         path("system-report/", admin.site.admin_view(system_report_view), name="system_report"),
         path("site-content/", admin.site.admin_view(site_content_admin.index), name="site_content"),
         path("site-content/<slug:slug>/", admin.site.admin_view(site_content_admin.page),
              name="site_content_page"),
+
+        path("sync/", admin.site.admin_view(manage_views.sync_panel), name="hq_sync"),
+
+        path("enquiries/", admin.site.admin_view(manage_views.enquiries), name="hq_enquiries"),
+        path("enquiries/<int:enquiry_id>/", admin.site.admin_view(manage_views.enquiry_detail),
+             name="hq_enquiry_detail"),
+
+        path("news/", admin.site.admin_view(manage_views.news_list), name="hq_news"),
+        path("news/new/", admin.site.admin_view(manage_views.news_new), name="hq_news_new"),
+        path("news/upload-image/", admin.site.admin_view(manage_views.news_upload_image),
+             name="hq_news_upload_image"),
+        path("news/<int:post_id>/edit/", admin.site.admin_view(manage_views.news_edit),
+             name="hq_news_edit"),
+        path("news/<int:post_id>/toggle/", admin.site.admin_view(manage_views.news_toggle),
+             name="hq_news_toggle"),
+        path("news/<int:post_id>/announce/", admin.site.admin_view(manage_views.news_announce),
+             name="hq_news_announce"),
+        path("news/<int:post_id>/delete/", admin.site.admin_view(manage_views.news_delete),
+             name="hq_news_delete"),
+
+        # The public-page copy editor moved with the rest of the public site.
+        path("pages/", admin.site.admin_view(manage_views.pages_list), name="hq_pages"),
+        path("pages/<slug:slug>/", admin.site.admin_view(manage_views.page_edit), name="hq_page_edit"),
+        path("pages/<slug:slug>/media/", admin.site.admin_view(manage_views.page_media_upload),
+             name="hq_page_media_upload"),
+        path("pages/<slug:slug>/media/<int:media_id>/delete/",
+             admin.site.admin_view(manage_views.page_media_delete), name="hq_page_media_delete"),
+        path("pages/<slug:slug>/media/<int:media_id>/toggle/",
+             admin.site.admin_view(manage_views.page_media_toggle), name="hq_page_media_toggle"),
     ]
     return custom + _original_get_urls()
 

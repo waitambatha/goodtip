@@ -1333,7 +1333,7 @@ def contact_submit_view(request):
                 # sends them to the login page carrying this as ?next=, so they
                 # land here the moment they are through it.
                 "enquiry_url": site_url(
-                    reverse("manage:enquiry_detail", args=[enquiry.pk])
+                    reverse("admin:hq_enquiry_detail", args=[enquiry.pk])
                 ),
             },
             # Reply-to the enquirer, so hitting reply in a mail client works

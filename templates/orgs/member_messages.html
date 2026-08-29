@@ -1,0 +1,49 @@
+{% extends "app_base.html" %}
+{% block title %}Messages &middot; {{ org.name }}{% endblock %}
+{% block body_class %}page-deep sheet-page{% endblock %}
+{% block app_content %}
+<section class="wrap" style="padding:28px 0 60px;">
+  <h1 style="font-family:var(--display);font-size:clamp(24px,3vw,34px);margin:0 0 6px;">Messages</h1>
+  <p style="color:var(--muted);margin:0 0 26px;">
+    Anything you want to raise with the people who run {{ org.name }} — and the
+    notices they send out. Only they can see what you raise here.
+  </p>
+
+  <form method="post" class="card pad-lg" style="margin-bottom:24px;">
+    {% csrf_token %}
+    <div class="fld">
+      <label for="s">What's it about?</label>
+      <input type="text" id="s" name="subject" maxlength="160" required
+             placeholder="e.g. My tips didn't save last round">
+    </div>
+    <div class="fld" style="margin-bottom:12px;">
+      <label for="b">Tell them</label>
+      <textarea id="b" name="body" rows="4" required></textarea>
+    </div>
+    <button type="submit" class="btn-primary">Send to the admins</button>
+  </form>
+
+  {% if threads %}
+  <div class="gt-rows">
+    {% for t in threads %}
+    <a class="gt-row" href="{% url 'orgs:member_message_thread' org.id t.id %}">
+      <span class="gr-body">
+        <b>{{ t.subject }}</b>
+        <small>
+          {% if t.kind == 'notice' %}From the admins{% else %}You raised this{% endif %}
+          &middot; {{ t.last_message_at|date:"j M, g:i a" }}
+        </small>
+      </span>
+      <span class="gr-go">
+        {% if t.status == 'answered' %}<span class="gt-pill ok">Answered</span>
+        {% elif t.status == 'closed' %}<span class="gt-pill">Closed</span>
+        {% elif t.kind == 'raised' %}<span class="gt-pill warn">Waiting</span>{% endif %}
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p style="color:var(--muted);">Nothing yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

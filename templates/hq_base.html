@@ -3,56 +3,48 @@
 <html lang="en" class="no-js">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}{{ page_title|default:"Organisation admin" }} &middot; GoodTip{% endblock %}</title>
+  <title>{% block title %}GoodTip HQ{% endblock %}</title>
   <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
   {% include "partials/_gt_shell_head.html" %}
   {% block extra_head %}{% endblock %}
-  {% include "partials/_analytics.html" %}
 </head>
 {% comment %}
-THE ORGANISATION ADMIN.
+GOODTIP HQ.
 
-This shell used to be the system control plane wearing the word "Manage": it
-showed every organisation on the platform, the sync panel, the public site's
-enquiries and the news editor, and it was reachable only by superusers because
-nothing but create_superuser ever sets is_staff.
+The three pages that moved out of the organisation admin when the two areas
+were split — the sync panel, the public site's enquiries, and the news editor.
+None of them belongs to any organisation: an enquiry is addressed to GoodTip
+the company, the news feed is the company's, and sync drives the platform's
+fixtures for everybody.
 
-It is now what its name always claimed — the place the CREATOR of an
-organisation runs the organisation they created. Everything system-level moved
-to /admin/, and every query behind these pages is scoped by
-admin_panel.perms.managed_orgs().
-
-The stadium backdrop and photographic hero are gone. They cost the top third
-of every screen to say the page's name, on pages whose job is a table.
+They live under /admin/ URLs now, but keep this shell rather than Django's
+admin chrome. Their markup is built from goodtip.css components — the sync
+panel alone is 13KB of them — and rebuilding all of it in the Django admin's
+component set to change a menu would have been the expensive way round. Same
+design language as the org admin and as /admin/: cream, white panels, a rail
+that collapses.
 {% endcomment %}
 <body class="app gt-v2 gt-sheet gt-shell">
   {% include "public/partials/_icons.html" %}
 
   <header class="gts-top">
-    <a href="{% url 'manage:overview' %}" class="gts-brand">GOOD<span>TIP</span><em>.</em></a>
-    <span class="gts-area">Organisation admin</span>
+    <a href="/admin/" class="gts-brand">GOOD<span>TIP</span><em>.</em></a>
+    <span class="gts-area" data-area="hq">GoodTip HQ</span>
     <span class="gts-spacer"></span>
     <div class="gts-actions">
-      <a href="{% url 'dashboard' %}"><svg><use href="#ic-arrow-left"/></svg><span>Back to app</span></a>
-      {% if user.is_superuser %}
-      {% comment %}
-      The one link between the two areas, and it is deliberately one-way and
-      labelled: a super admin has business in the system view, an org admin
-      does not, so this appears for superusers only.
-      {% endcomment %}
-      <a href="/admin/"><svg><use href="#ic-shield-star"/></svg><span>GoodTip HQ</span></a>
-      {% endif %}
+      <a href="/admin/"><svg><use href="#ic-sliders"/></svg><span>Django admin</span></a>
+      <a href="/" target="_blank" rel="noopener"><svg><use href="#ic-eye"/></svg><span>View site</span></a>
       <a href="{% url 'profile' %}" class="gts-who">
         <span class="gts-av">
           {% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{{ user.display_name|slice:":1"|upper }}{% endif %}
         </span>
-        <span><b>{{ user.display_name }}</b><small>Organisation admin</small></span>
+        <span><b>{{ user.display_name }}</b><small>Super admin</small></span>
       </a>
     </div>
   </header>
 
   <div class="gts-body">
-    {% include "partials/_rail_org.html" %}
+    {% include "partials/_rail_hq.html" %}
 
     <main class="gts-main">
       {% if messages %}
@@ -65,9 +57,9 @@ of every screen to say the page's name, on pages whose job is a table.
 
       {% block admin_hero %}
       <div class="gts-head">
-        <p class="eyebrow">{% block hero_eyebrow %}Organisation admin{% endblock %}</p>
-        <h1>{% block hero_title %}Manage{% endblock %}</h1>
-        <p>{% block hero_lead %}Run the organisations you created.{% endblock %}</p>
+        <p class="eyebrow">{% block hero_eyebrow %}GoodTip HQ{% endblock %}</p>
+        <h1>{% block hero_title %}HQ{% endblock %}</h1>
+        <p>{% block hero_lead %}The platform's own work, not any organisation's.{% endblock %}</p>
       </div>
       {% endblock %}
 

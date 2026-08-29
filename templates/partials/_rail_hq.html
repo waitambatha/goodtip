@@ -1,0 +1,35 @@
+{% comment %}
+The super admin's menu. Mirrors the rail in /admin/ so the two never read as
+different products, and links back into it for the model tables.
+{% endcomment %}
+<nav class="gts-rail" aria-label="GoodTip HQ sections">
+  <button type="button" class="gts-toggle" data-shell-toggle aria-expanded="true"
+          aria-label="Collapse or expand the menu">
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 6-6 6 6 6"/></svg>
+    <span class="lbl">Collapse menu</span>
+  </button>
+
+  <div class="gts-group">
+    <div class="gts-group-title">Overview</div>
+    <a href="/admin/" title="Dashboard"><svg><use href="#ic-home"/></svg><span class="lbl">Dashboard</span></a>
+    <a href="{% url 'admin:system_report' %}" title="System report"><svg><use href="#ic-chart"/></svg><span class="lbl">System report</span></a>
+  </div>
+
+  <div class="gts-group">
+    <div class="gts-group-title">The public site</div>
+    <a href="{% url 'admin:site_content' %}" title="Site content"><svg><use href="#ic-image"/></svg><span class="lbl">Site content</span></a>
+    <a href="{% url 'admin:hq_news' %}" class="{% block nav_news %}{% endblock %}" title="News &amp; blog">
+      <svg><use href="#ic-doc"/></svg><span class="lbl">News &amp; blog</span></a>
+    <a href="{% url 'admin:hq_enquiries' %}" class="{% block nav_enquiries %}{% endblock %}" title="Enquiries">
+      <svg><use href="#ic-mail"/></svg><span class="lbl">Enquiries</span>
+      {% if hq_open_enquiry_count %}<span class="n">{{ hq_open_enquiry_count }}</span>{% endif %}</a>
+  </div>
+
+  <div class="gts-group">
+    <div class="gts-group-title">Platform</div>
+    <a href="{% url 'admin:hq_sync' %}" class="{% block nav_sync %}{% endblock %}" title="Sync">
+      <svg><use href="#ic-cloud-sync"/></svg><span class="lbl">Sync</span></a>
+    <a href="{% url 'admin:orgs_organisation_changelist' %}" title="All organisations">
+      <svg><use href="#ic-org"/></svg><span class="lbl">All organisations</span></a>
+  </div>
+</nav>

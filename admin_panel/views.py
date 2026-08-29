@@ -19,8 +19,10 @@ from .models import PageMedia, PageText
 from data_sync.models import SyncRun, SyncSchedule
 from data_sync.services import get_sync_service, SyncError
 from orgs.services import unique_charity_slug as _unique_charity_slug
-from orgs.models import MembershipRequest, OrgMember, Organisation
+from orgs.models import MembershipRequest, Message, MessageThread, OrgMember, Organisation
 from orgs.services import approve_membership_request, decline_membership_request
+
+from .perms import get_managed_org_or_404, managed_orgs, org_admin_required
 from orgs.signing import make_join_token
 from tipping.models import Match, Round, Team, Tip
 from tipping.services import record_match_result
@@ -30,32 +32,47 @@ from tipping.services import record_match_result
 COMP_FORM_MAP = {"AFL": ["afl"], "NRL": ["nrl"], "BOTH": ["afl", "nrl"]}
 
 
-@staff_member_required
+@org_admin_required
 def overview(request):
-    org_count = Organisation.objects.count()
-    round_count = Round.objects.count()
-    match_count = Match.objects.count()
-    tip_count = Tip.objects.count()
-    recent_orgs = Organisation.objects.order_by("-created_at")[:5]
+    """The org admin's front page: their organisations, nobody else's.
+
+    Every count here used to be platform-wide, which was correct when this area
+    was superuser-only and wrong the moment an org creator could open it.
+    """
+    mine = managed_orgs(request.user)
+    org_ids = list(mine.values_list("id", flat=True))
     return render(request, "manage/overview.html", {
-        "org_count": org_count, "round_count": round_count,
-        "match_count": match_count, "tip_count": tip_count,
-        "recent_orgs": recent_orgs,
+        "org_count": len(org_ids),
+        "round_count": Round.objects.filter(org_id__in=org_ids).count(),
+        "match_count": Match.objects.filter(round__org_id__in=org_ids).count(),
+        "tip_count": Tip.objects.filter(org_id__in=org_ids).count(),
+        "member_count": OrgMember.objects.filter(org_id__in=org_ids).count(),
+        "recent_orgs": mine.order_by("-created_at")[:5],
+        "pending_count": MembershipRequest.objects.filter(
+            org_id__in=org_ids, status=MembershipRequest.STATUS_PENDING,
+        ).count(),
+        "open_thread_count": MessageThread.objects.filter(
+            org_id__in=org_ids, status=MessageThread.STATUS_OPEN,
+            kind=MessageThread.KIND_RAISED,
+        ).count(),
     })
 
 
-@staff_member_required
+@org_admin_required
 def approvals(request):
-    """Every join request waiting on somebody, across all orgs.
+    """Join requests waiting on YOU — one queue across the orgs you run.
 
-    Approval is normally the org admin's job on their own Members page, but
-    that leaves a request stuck when a group's admin is away or the group has
-    no admin at all. This is the staff view of the same queue — one list, act
-    on any of it, so nothing sits pending unnoticed.
+    This was every pending request on the platform, which made sense while the
+    page was superuser-only. It is the org admin's queue now, so both the list
+    and the act-on-it POST are scoped: a request for somebody else's
+    organisation is not found rather than refused, because whether it exists is
+    not this user's business.
     """
     if request.method == "POST":
         join_req = get_object_or_404(
-            MembershipRequest, pk=request.POST.get("request_id"),
+            MembershipRequest,
+            pk=request.POST.get("request_id"),
+            org__in=managed_orgs(request.user),
         )
         action = request.POST.get("action")
         try:
@@ -75,9 +92,10 @@ def approvals(request):
             messages.info(request, str(e))
         return redirect("manage:approvals")
 
+    mine = managed_orgs(request.user)
     pending = (
         MembershipRequest.objects
-        .filter(status=MembershipRequest.STATUS_PENDING)
+        .filter(status=MembershipRequest.STATUS_PENDING, org__in=mine)
         .select_related("user", "org")
         .order_by("org__name", "created_at")
     )
@@ -95,6 +113,7 @@ def approvals(request):
     rows = [{"req": r, "admins": admins_by_org.get(r.org_id, [])} for r in pending]
     recent = (
         MembershipRequest.objects
+        .filter(org__in=mine)
         .exclude(status=MembershipRequest.STATUS_PENDING)
         .select_related("user", "org", "decided_by")
         .order_by("-decided_at")[:10]
@@ -104,42 +123,24 @@ def approvals(request):
     })
 
 
-@staff_member_required
+@org_admin_required
 def orgs_list(request):
-    if request.method == "POST":
-        season, _ = Season.objects.get_or_create(
-            year=int(request.POST["season"]),
-            defaults={"label": request.POST["season"].strip()},
-        )
-        charity_name = request.POST["charity_name"].strip()
-        charity = Charity.objects.filter(name__iexact=charity_name).first()
-        if charity is None:
-            charity = Charity.objects.create(
-                name=charity_name,
-                slug=_unique_charity_slug(charity_name),
-                website=request.POST.get("charity_url", "").strip(),
-                is_approved=True,
-            )
-            # Same as the signup wizard: find the logo off the request thread.
-            from catalog.logos import backfill_in_background
+    """The organisations this person runs.
 
-            backfill_in_background(charity)
-        org = Organisation.objects.create(
-            name=request.POST["name"].strip(),
-            season=season,
-            charity=charity,
-        )
-        comp_slugs = COMP_FORM_MAP.get(request.POST["sport"], [])
-        org.competitions.set(Competition.objects.filter(slug__in=comp_slugs, season=season))
-        messages.success(request, "Org created.")
-        return redirect("manage:orgs_list")
+    The POST that used to live here built an organisation straight from a form
+    — arbitrary season, charity created on the spot, competitions mapped from a
+    three-way dropdown. That is a system tool, and it bypassed every rule the
+    signup wizard enforces (categories, verification, duplicate detection). Org
+    admins create organisations through the wizard like everyone else; there is
+    a link to it from the empty state.
+    """
     orgs = (
-        Organisation.objects
+        managed_orgs(request.user)
         .select_related("charity", "season")
         .prefetch_related("competitions__sport")
         .order_by("-created_at")
     )
-    # The list doubles as a finder once there are more than a screenful:
+    # The list doubles as a finder once somebody runs more than a screenful:
     # free-text over org and charity name, plus a sport filter.
     q = (request.GET.get("q") or "").strip()
     if q:
@@ -149,7 +150,7 @@ def orgs_list(request):
         orgs = orgs.filter(competitions__sport__name=sport)
     orgs = orgs.distinct()
     sports = list(
-        Sport.objects.filter(competitions__organisations__isnull=False)
+        Sport.objects.filter(competitions__organisations__in=managed_orgs(request.user))
         .order_by("name").values_list("name", flat=True).distinct()
     )
     return render(request, "manage/orgs_list.html", {
@@ -157,9 +158,9 @@ def orgs_list(request):
     })
 
 
-@staff_member_required
+@org_admin_required
 def org_rounds(request, org_id: int):
-    org = get_object_or_404(Organisation, pk=org_id)
+    org = get_managed_org_or_404(request.user, org_id)
     if request.method == "POST":
         action = request.POST.get("action", "create")
         if action == "create":
@@ -184,9 +185,9 @@ def org_rounds(request, org_id: int):
     return render(request, "manage/org_rounds.html", {"org": org, "rounds": rounds})
 
 
-@staff_member_required
+@org_admin_required
 def round_matches(request, org_id: int, round_id: int):
-    org = get_object_or_404(Organisation, pk=org_id)
+    org = get_managed_org_or_404(request.user, org_id)
     round_obj = get_object_or_404(Round, pk=round_id, org=org)
     if request.method == "POST":
         action = request.POST.get("action")
@@ -218,9 +219,9 @@ def round_matches(request, org_id: int, round_id: int):
     })
 
 
-@staff_member_required
+@org_admin_required
 def org_members(request, org_id: int):
-    org = get_object_or_404(Organisation, pk=org_id)
+    org = get_managed_org_or_404(request.user, org_id)
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "remove":
@@ -264,7 +265,7 @@ def sync_panel(request):
             messages.success(request, f"Synced {n} {LABELS[kind]}.")
         except SyncError as e:
             messages.error(request, str(e))
-        return redirect("manage:sync")
+        return redirect("admin:hq_sync")
     orgs = Organisation.objects.select_related("season").all()
     return render(request, "manage/sync.html", {
         "orgs": orgs,
@@ -445,7 +446,7 @@ def news_new(request):
         post = NewsPost(created_by=request.user, published_at=timezone.now())
         _apply_news_form(request, post)
         messages.success(request, "Post published." if post.is_published else "Post saved as a draft.")
-        return redirect("manage:news")
+        return redirect("admin:hq_news")
     return render(request, "manage/news_editor.html", {
         "tag_choices": NewsPost.TAG_CHOICES, "is_new": True,
     })
@@ -464,7 +465,7 @@ def news_edit(request, post_id: int):
             })
         _apply_news_form(request, post)
         messages.success(request, "Post updated.")
-        return redirect("manage:news")
+        return redirect("admin:hq_news")
     return render(request, "manage/news_editor.html", {
         "post": post, "tag_choices": NewsPost.TAG_CHOICES, "is_new": False,
         "initial_body": _editor_body_html(post.body),
@@ -491,7 +492,7 @@ def news_toggle(request, post_id: int):
         post.is_published = not post.is_published
         post.save(update_fields=["is_published"])
         messages.success(request, "Post published." if post.is_published else "Post unpublished.")
-    return redirect("manage:news")
+    return redirect("admin:hq_news")
 
 
 @superuser_required
@@ -504,7 +505,7 @@ def news_announce(request, post_id: int):
     """
     post = get_object_or_404(NewsPost, pk=post_id)
     if request.method != "POST":
-        return redirect("manage:news")
+        return redirect("admin:hq_news")
 
     if not post.is_published:
         messages.error(request, "Publish the post before emailing it out.")
@@ -526,7 +527,7 @@ def news_announce(request, post_id: int):
                 request,
                 "Nothing sent — check the email settings and the server log.",
             )
-    return redirect("manage:news")
+    return redirect("admin:hq_news")
 
 
 @superuser_required
@@ -535,7 +536,7 @@ def news_delete(request, post_id: int):
     if request.method == "POST":
         post.delete()
         messages.success(request, "Post deleted.")
-    return redirect("manage:news")
+    return redirect("admin:hq_news")
 
 
 # ---- member-facing news pages (any logged-in user) ------------------------
@@ -646,18 +647,18 @@ def enquiry_detail(request, enquiry_id):
             enquiry.status = Enquiry.STATUS_CLOSED
             enquiry.save(update_fields=["status"])
             messages.success(request, "Enquiry closed without a reply.")
-            return redirect("manage:enquiries")
+            return redirect("admin:hq_enquiries")
 
         if action == "reopen":
             enquiry.status = Enquiry.STATUS_NEW
             enquiry.save(update_fields=["status"])
             messages.info(request, "Enquiry reopened.")
-            return redirect("manage:enquiry_detail", enquiry_id=enquiry.pk)
+            return redirect("admin:hq_enquiry_detail", enquiry_id=enquiry.pk)
 
         body = (request.POST.get("reply_body") or "").strip()
         if not body:
             messages.error(request, "Write something before sending.")
-            return redirect("manage:enquiry_detail", enquiry_id=enquiry.pk)
+            return redirect("admin:hq_enquiry_detail", enquiry_id=enquiry.pk)
 
         sent = send_template(
             "enquiry_reply",
@@ -677,7 +678,7 @@ def enquiry_detail(request, enquiry_id):
                 "That couldn't be sent — the enquiry is still open. Check the mail "
                 "settings and try again.",
             )
-            return redirect("manage:enquiry_detail", enquiry_id=enquiry.pk)
+            return redirect("admin:hq_enquiry_detail", enquiry_id=enquiry.pk)
 
         enquiry.reply_body = body
         enquiry.replied_at = tz.now()
@@ -685,7 +686,7 @@ def enquiry_detail(request, enquiry_id):
         enquiry.status = Enquiry.STATUS_REPLIED
         enquiry.save(update_fields=["reply_body", "replied_at", "replied_by", "status"])
         messages.success(request, f"Replied to {enquiry.name} at {enquiry.email}.")
-        return redirect("manage:enquiries")
+        return redirect("admin:hq_enquiries")
 
     return render(request, "manage/enquiry_detail.html", {"enquiry": enquiry})
 
@@ -745,7 +746,7 @@ def page_edit(request, slug: str):
         if cleared:
             bits.append(f"{cleared} back to the original")
         messages.success(request, f"{info.title}: {' · '.join(bits) or 'nothing changed'}.")
-        return redirect("manage:page_edit", slug=slug)
+        return redirect("admin:hq_page_edit", slug=slug)
 
     groups = {}
     for slot in info.slots:
@@ -766,7 +767,7 @@ def page_media_upload(request, slug: str):
     upload = request.FILES.get("file")
     if upload is None:
         messages.error(request, "Choose a file first.")
-        return redirect("manage:page_edit", slug=slug)
+        return redirect("admin:hq_page_edit", slug=slug)
 
     name = upload.name.lower()
     kind = (
@@ -783,7 +784,7 @@ def page_media_upload(request, slug: str):
         uploaded_by=request.user,
     )
     messages.success(request, f"{upload.name} uploaded.")
-    return redirect("manage:page_edit", slug=slug)
+    return redirect("admin:hq_page_edit", slug=slug)
 
 
 @staff_member_required
@@ -799,7 +800,7 @@ def page_media_delete(request, slug: str, media_id: int):
     row.file.delete(save=False)
     row.delete()
     messages.success(request, f"{label} deleted.")
-    return redirect("manage:page_edit", slug=slug)
+    return redirect("admin:hq_page_edit", slug=slug)
 
 
 @staff_member_required
@@ -813,4 +814,4 @@ def page_media_toggle(request, slug: str, media_id: int):
         request,
         f"Picture {'hidden' if row.is_hidden else 'showing'} on {slug}.",
     )
-    return redirect("manage:page_edit", slug=slug)
+    return redirect("admin:hq_page_edit", slug=slug)

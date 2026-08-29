@@ -1,4 +1,4 @@
-{% extends "admin_base.html" %}
+{% extends "hq_base.html" %}
 {% load static %}
 {% block title %}Enquiries. Manage{% endblock %}
 {% block nav_enquiries %}on{% endblock %}
@@ -53,7 +53,7 @@
             </td>
             <td class="fit">
               <span class="gt-actions">
-                <a href="{% url 'manage:enquiry_detail' e.id %}">{% if e.status == 'new' %}Reply{% else %}View{% endif %}</a>
+                <a href="{% url 'admin:hq_enquiry_detail' e.id %}">{% if e.status == 'new' %}Reply{% else %}View{% endif %}</a>
               </span>
             </td>
           </tr>

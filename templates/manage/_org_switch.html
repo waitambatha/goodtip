@@ -1,0 +1,12 @@
+{% comment %}
+Only shown to someone who runs more than one organisation. Asking which one
+every time would be noise for the majority who run exactly one.
+{% endcomment %}
+{% if orgs|length > 1 %}
+<div class="card pad-lg" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+  <span style="font-size:13px;color:var(--muted);">Organisation</span>
+  {% for o in orgs %}
+  <a href="?org={{ o.id }}" class="gt-tab {% if o.id == org.id %}on{% endif %}">{{ o.name }}</a>
+  {% endfor %}
+</div>
+{% endif %}

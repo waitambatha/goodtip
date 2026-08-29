@@ -1,0 +1,47 @@
+{% extends "admin_base.html" %}
+{% block nav_messages %}on{% endblock %}
+{% block hero_title %}Send a message{% endblock %}
+{% block hero_lead %}To everyone in {{ org.name }}, or to the people you pick.{% endblock %}
+{% block admin_content %}
+<form method="post" data-busy="Sending" style="max-width:760px;">
+  {% csrf_token %}
+  <input type="hidden" name="org" value="{{ org.id }}">
+
+  <div class="card pad-lg" style="margin-bottom:18px;">
+    <div class="fld">
+      <label for="m_subject">Subject</label>
+      <input type="text" id="m_subject" name="subject" maxlength="160" required
+             placeholder="e.g. Round 3 tips close Friday 7pm">
+    </div>
+    <div class="fld" style="margin-bottom:0;">
+      <label for="m_body">Message</label>
+      <textarea id="m_body" name="body" rows="7" required
+                placeholder="Anything your members need to know."></textarea>
+    </div>
+  </div>
+
+  <div class="card pad-lg" style="margin-bottom:18px;">
+    <p style="margin:0 0 6px;font-weight:700;color:var(--ink);">Who gets it</p>
+    <p style="margin:0 0 14px;font-size:13px;color:var(--muted);line-height:1.55;">
+      Leave everyone unticked to send it to the whole organisation — including
+      people who join later, who will still be able to read it. Tick names to
+      send it to just those people.
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;max-height:340px;overflow:auto;">
+      {% for m in members %}
+      <label style="display:flex;align-items:center;gap:9px;font-size:14px;padding:7px 9px;border-radius:9px;">
+        <input type="checkbox" name="recipients" value="{{ m.user_id }}">
+        <span>{{ m.user.display_name }}{% if m.can_manage %} <small style="color:var(--muted);">admin</small>{% endif %}</span>
+      </label>
+      {% empty %}
+      <p style="color:var(--muted);font-size:14px;">Nobody has joined {{ org.name }} yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;">
+    <button type="submit" class="btn-primary">Send &rarr;</button>
+    <a href="{% url 'manage:messages' %}?org={{ org.id }}" class="btn-ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

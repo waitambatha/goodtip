@@ -1,0 +1,54 @@
+{% extends "admin_base.html" %}
+{% block nav_messages %}on{% endblock %}
+{% block hero_eyebrow %}{% if thread.kind == 'raised' %}Raised by a member{% else %}Sent by an admin{% endif %}{% endblock %}
+{% block hero_title %}{{ thread.subject }}{% endblock %}
+{% block hero_lead %}
+  {{ org.name }}
+  {% if thread.is_broadcast %}&middot; everyone
+  {% elif recipients %}&middot; {% for r in recipients %}{{ r.display_name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+  {% endif %}
+{% endblock %}
+{% block admin_content %}
+<div style="max-width:820px;">
+  <p style="margin:-10px 0 18px;">
+    <a href="{% url 'manage:messages' %}?org={{ org.id }}" style="font-size:13px;">&larr; All messages</a>
+  </p>
+
+  <div class="card pad-lg" style="margin-bottom:18px;">
+    {% for e in entries %}
+    <div style="display:flex;gap:12px;padding:14px 0;{% if not forloop.last %}border-bottom:1px solid var(--line);{% endif %}">
+      <span class="gts-av" style="width:38px;height:38px;flex:none;">
+        {% if e.author.avatar %}<img src="{{ e.author.avatar.url }}" alt="">{% else %}{{ e.author.display_name|slice:":1"|upper }}{% endif %}
+      </span>
+      <div style="min-width:0;flex:1 1 auto;">
+        <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;">
+          <b style="font-size:14px;">{{ e.author.display_name }}</b>
+          <small style="color:var(--muted);">{{ e.created_at|date:"j M Y, g:i a" }}</small>
+        </div>
+        <p style="margin:6px 0 0;white-space:pre-wrap;line-height:1.6;">{{ e.body }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if thread.status != 'closed' %}
+  <form method="post" data-busy="Sending" class="card pad-lg" style="margin-bottom:14px;">
+    {% csrf_token %}
+    <div class="fld" style="margin-bottom:12px;">
+      <label for="r_body">Reply</label>
+      <textarea id="r_body" name="body" rows="4" required placeholder="Write back…"></textarea>
+    </div>
+    <button type="submit" class="btn-primary">Send reply</button>
+  </form>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    {% if thread.status == 'closed' %}
+      <button type="submit" name="action" value="reopen" class="btn-ghost">Reopen</button>
+    {% else %}
+      <button type="submit" name="action" value="close" class="btn-ghost">Mark as closed</button>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}

@@ -1,4 +1,4 @@
-{% extends "admin_base.html" %}
+{% extends "hq_base.html" %}
 {% block title %}Public pages. Manage{% endblock %}
 {% block nav_pages %}on{% endblock %}
 {% block hero_title %}Public pages{% endblock %}
@@ -30,7 +30,7 @@ this, or am I thinking of the other page?").
 
 <div class="gt-rows">
   {% for p in pages %}
-  <a class="gt-row" href="{% url 'manage:page_edit' p.slug %}">
+  <a class="gt-row" href="{% url 'admin:hq_page_edit' p.slug %}">
     <span class="gr-body">
       <b>{{ p.title }}</b>
       <small>

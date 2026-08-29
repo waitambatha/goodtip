@@ -46,23 +46,31 @@ def user_orgs(request):
     unread = sum(1 for n in notes if n.read_at is None)
     # The popup: newest not-yet-dismissed notification.
     popup = next((n for n in notes if n.dismissed_at is None), None)
-    # Staff nav badge: anything waiting in the Approvals queue, shown on every
-    # admin page so a request can't sit there unseen.
+    # Nav badges for the organisation admin. Scoped to the organisations this
+    # person actually runs — the counts used to be platform-wide and gated on
+    # is_staff, which was correct while /manage/ was superuser-only and became
+    # a leak the moment an org creator could open it.
+    #
+    # The enquiry badge is gone from here: an enquiry comes from the public
+    # contact form and is addressed to GoodTip the company, not to anybody's
+    # organisation. It belongs to the super admin and lives in /admin/ now.
     pending_approval_count = 0
-    open_enquiry_count = 0
-    if request.user.is_staff:
-        from .models import MembershipRequest
+    unread_thread_count = 0
+    if request.user.is_authenticated:
+        from admin_panel.perms import managed_orgs
 
-        pending_approval_count = MembershipRequest.objects.filter(
-            status=MembershipRequest.STATUS_PENDING,
-        ).count()
+        mine = list(managed_orgs(request.user).values_list("id", flat=True))
+        if mine:
+            from .models import MembershipRequest, MessageThread
 
-        # Same idea for the enquiry inbox: a customer asking a question is at
-        # least as time-sensitive as a join request, and the badge is what stops
-        # it sitting unread because nobody thought to go looking for it.
-        from admin_panel.models import Enquiry
-
-        open_enquiry_count = Enquiry.objects.filter(status=Enquiry.STATUS_NEW).count()
+            pending_approval_count = MembershipRequest.objects.filter(
+                status=MembershipRequest.STATUS_PENDING, org_id__in=mine,
+            ).count()
+            unread_thread_count = MessageThread.objects.filter(
+                org_id__in=mine,
+                kind=MessageThread.KIND_RAISED,
+                status=MessageThread.STATUS_OPEN,
+            ).count()
 
     # Where the user actually is, rather than whichever membership the query
     # happened to return first. `primary_org` is kept as the name the nav
@@ -113,7 +121,7 @@ def user_orgs(request):
         "my_notifications": notes,
         "unread_notification_count": unread,
         "pending_approval_count": pending_approval_count,
-        "open_enquiry_count": open_enquiry_count,
+        "unread_thread_count": unread_thread_count,
         "popup_notification": popup,
         # Watermark for the live poll: the page only toasts things that
         # arrive after it was rendered.
