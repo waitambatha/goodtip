@@ -3,87 +3,160 @@
 <html lang="en" class="no-js">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}{{ page_title|default:"Organisation admin" }} &middot; GoodTip{% endblock %}</title>
+  <title>{% block title %}Manage &middot; GoodTip{% endblock %}</title>
   <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
-  {% include "partials/_gt_shell_head.html" %}
+  {% include "partials/_favicon.html" %}
+  {% include "partials/_fonts.html" %}
+  <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
+  {% comment %}
+  Only for the handful of components the Messages pages need (.gt-tab,
+  .gt-pill, the empty state). The shell rules in here are all scoped to
+  `body.gt-shell`, which this page does not set — so the stadium backdrop and
+  the hero stay exactly as they were.
+  {% endcomment %}
+  <link rel="stylesheet" href="{% static 'css/gt-shell.css' %}">
+  <script src="{% static 'js/gt-ui.js' %}" defer></script>
+  {% comment %}
+  Manage runs real work — syncing a round, emailing every member, deleting a
+  post — and had no submit feedback at all, so a slow POST looked like a missed
+  click. Same busy/veil behaviour as the member app.
+  {% endcomment %}
+  <script src="{% static 'js/gt-busy.js' %}" defer></script>
+  <script src="{% static 'js/gt-confirm.js' %}" defer></script>
+  <script src="{% static 'js/gt-scenes.js' %}" defer></script>
+  <script src="{% static 'js/gt-lists.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
   {% include "partials/_analytics.html" %}
 </head>
-{% comment %}
-THE ORGANISATION ADMIN.
-
-This shell used to be the system control plane wearing the word "Manage": it
-showed every organisation on the platform, the sync panel, the public site's
-enquiries and the news editor, and it was reachable only by superusers because
-nothing but create_superuser ever sets is_staff.
-
-It is now what its name always claimed — the place the CREATOR of an
-organisation runs the organisation they created. Everything system-level moved
-to /admin/, and every query behind these pages is scoped by
-admin_panel.perms.managed_orgs().
-
-The stadium backdrop and photographic hero are gone. They cost the top third
-of every screen to say the page's name, on pages whose job is a table.
-{% endcomment %}
-<body class="app gt-v2 gt-sheet gt-shell">
+<body class="app manage-app gt-v2 gt-sheet">
   {% include "public/partials/_icons.html" %}
 
-  <header class="gts-top">
-    <a href="{% url 'manage:overview' %}" class="gts-brand">GOOD<span>TIP</span><em>.</em></a>
-    <span class="gts-area">Organisation admin</span>
-    <span class="gts-spacer"></span>
-    <div class="gts-actions">
-      <a href="{% url 'dashboard' %}"><svg><use href="#ic-arrow-left"/></svg><span>Back to app</span></a>
-      {% if user.is_superuser %}
-      {% comment %}
-      The one link between the two areas, and it is deliberately one-way and
-      labelled: a super admin has business in the system view, an org admin
-      does not, so this appears for superusers only.
-      {% endcomment %}
-      <a href="/admin/"><svg><use href="#ic-shield-star"/></svg><span>GoodTip HQ</span></a>
-      {% endif %}
-      <a href="{% url 'profile' %}" class="gts-who">
-        <span class="gts-av">
-          {% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{{ user.display_name|slice:":1"|upper }}{% endif %}
-        </span>
-        <span><b>{{ user.display_name }}</b><small>Organisation admin</small></span>
-      </a>
-    </div>
-  </header>
-
-  <div class="gts-body">
-    {% include "partials/_rail_org.html" %}
-
-    <main class="gts-main">
-      {% if messages %}
-        <div class="flash-stack">
-          {% for m in messages %}
-            <div class="flash {% if m.tags == 'success' %}success{% elif m.tags == 'error' %}error{% else %}info{% endif %}"><span>{{ m }}</span></div>
-          {% endfor %}
-        </div>
-      {% endif %}
-
-      {% block admin_hero %}
-      <div class="gts-head">
-        <p class="eyebrow">{% block hero_eyebrow %}Organisation admin{% endblock %}</p>
-        <h1>{% block hero_title %}Manage{% endblock %}</h1>
-        <p>{% block hero_lead %}Run the organisations you created.{% endblock %}</p>
+  {# ---- same sticky nav as the app, wearing the Manage links ---- #}
+  <nav class="app-nav">
+    <div class="an-inner">
+      <a href="{% url 'manage:overview' %}" class="an-brand">GOOD<span>TIP</span></a>
+      <span class="an-org">Manage</span>
+      <div class="an-links">
+        <a href="{% url 'manage:overview' %}" class="{% block nav_overview %}{% endblock %}">Overview</a>
+        {# count rides on the link so a waiting request is visible from any admin page #}
+        <a href="{% url 'manage:approvals' %}" class="{% block nav_approvals %}{% endblock %}">Approvals{% if pending_approval_count %} <span class="an-count">{{ pending_approval_count }}</span>{% endif %}</a>
+        <a href="{% url 'manage:orgs_list' %}" class="{% block nav_orgs %}{% endblock %}">Orgs</a>
+        {% comment %}
+        Sync, Enquiries, News and Public pages have gone to /admin/. None of
+        them belongs to an organisation: sync drives the platform's fixtures
+        for everybody, and an enquiry from the public contact form is
+        addressed to GoodTip rather than to anybody's league.
+        {% endcomment %}
+        <a href="{% url 'manage:messages' %}" class="{% block nav_messages %}{% endblock %}">Messages{% if unread_thread_count %} <span class="an-count">{{ unread_thread_count }}</span>{% endif %}</a>
+        <a href="{% url 'manage:charity' %}" class="{% block nav_charity %}{% endblock %}">Charity</a>
       </div>
-      {% endblock %}
+      <div class="an-right">
+        {% if user.is_superuser %}<a href="/admin/" class="an-backpill" title="GoodTip HQ (system admin)"><svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2"><use href="#ic-shield-star"/></svg><span>GoodTip HQ</span></a>{% endif %}
+        <a href="{% url 'dashboard' %}" class="an-backpill" title="Back to app"><svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2"><use href="#ic-arrow-left"/></svg><span>Back to app</span></a>
+        <div class="an-bell" id="anBell">
+          <button type="button" class="bell-btn" aria-label="Notifications" data-bell>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+            {% if unread_notification_count %}<span class="bell-badge">{{ unread_notification_count }}</span>{% endif %}
+          </button>
+          <div class="bell-panel" id="bellPanel">
+            <div class="bp-head">Notifications</div>
+            {% for n in my_notifications %}
+            <a class="bp-item {% if n.is_unread %}unread{% endif %}" href="{{ n.link_url|default:'#' }}">
+              <span class="bp-title">{{ n.title }}</span>
+              {% if n.message %}<span class="bp-msg">{{ n.message|truncatechars:120 }}</span>{% endif %}
+              <span class="bp-meta">{% if n.org %}{{ n.org.name }} &middot; {% endif %}{{ n.created_at|date:"j M, g:i A" }}</span>
+            </a>
+            {% empty %}
+            <div class="bp-empty">Nothing yet, admin messages and election news land here.</div>
+            {% endfor %}
+          </div>
+        </div>
+        <a href="{% url 'profile' %}" class="an-chip" title="Profile">
+          {% if user.avatar %}<span class="an-avatar has-img"><img src="{{ user.avatar.url }}" alt=""></span>
+          {% else %}<span class="an-avatar">{{ user.display_name|slice:":1"|upper }}</span>{% endif %}
+          <span class="cn"><b>{{ user.display_name }}</b><small>Organisation admin</small></span>
+        </a>
+        <button class="an-burger" aria-label="Menu" data-sheet-open><svg><use href="#ic-menu"/></svg></button>
+      </div>
+    </div>
+  </nav>
 
-      {% block admin_content %}{% endblock %}
-    </main>
+  {# ---- mobile sheet ---- #}
+  <div class="app-sheet" id="appSheet">
+    <div class="sheet-panel">
+      <a href="{% url 'manage:overview' %}">Overview</a>
+      <a href="{% url 'manage:approvals' %}">Approvals{% if pending_approval_count %} ({{ pending_approval_count }}){% endif %}</a>
+      <a href="{% url 'manage:orgs_list' %}">Orgs</a>
+      <a href="{% url 'manage:messages' %}">Messages{% if unread_thread_count %} ({{ unread_thread_count }}){% endif %}</a>
+      <a href="{% url 'manage:charity' %}">Charity</a>
+      {% if user.is_superuser %}<a href="/admin/">GoodTip HQ &rarr;</a>{% endif %}
+      <a href="{% url 'profile' %}">Profile</a>
+      <a href="{% url 'dashboard' %}">&larr; Back to app</a>
+    </div>
   </div>
 
-  <script>
-    document.querySelectorAll('[data-copy]').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        var t=document.querySelector(btn.getAttribute('data-copy')); if(!t)return;
-        var v=t.value!==undefined?t.value:t.textContent;
-        if(navigator.clipboard)navigator.clipboard.writeText(v);
-        var o=btn.innerHTML; btn.innerHTML='Copied &#10003;'; setTimeout(function(){btn.innerHTML=o;},1500);
+  {# ---- full-bleed stadium backdrop; the cream sheet sits on top of it ---- #}
+  <div class="page-backdrop" aria-hidden="true">
+    <div class="shot on" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
+    <div class="wash"></div>
+  </div>
+
+  <main class="app-main">
+    {% if messages %}
+      <div class="flash-stack">
+        {% for m in messages %}
+          <div class="flash {% if m.tags == 'success' %}success{% elif m.tags == 'error' %}error{% else %}info{% endif %}"><span>{{ m }}</span></div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% block admin_hero %}
+    <header class="gt-hero">
+      <div class="gh-shot" style="background-image:url('{% block hero_shot %}{% static 'img/scenes/stadium-panorama.jpg' %}{% endblock %}')"></div>
+      <div class="gh-veil"></div>
+      <div>
+        <div class="gh-eyebrow">{% block hero_eyebrow %}Organisation admin{% endblock %}</div>
+        <h1>{% block hero_title %}Manage{% endblock %}</h1>
+        <p>{% block hero_lead %}Run your leagues. Empower your community.{% endblock %}</p>
+      </div>
+      {% block hero_aside %}
+      <div class="gh-who">
+        <span class="av">{% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{{ user.display_name|slice:":1"|upper }}{% endif %}</span>
+        <span><b>{{ user.display_name }}</b><small>Organisation admin</small></span>
+      </div>
+      {% endblock %}
+    </header>
+    {% endblock %}
+
+    {% block admin_content %}{% endblock %}
+  </main>
+  <script>(function(){
+    var burger = document.querySelector('[data-sheet-open]');
+    var sheet = document.getElementById('appSheet');
+    if (burger && sheet) {
+      burger.addEventListener('click', function(){ sheet.classList.add('open'); });
+      sheet.addEventListener('click', function(e){ if (e.target === sheet) sheet.classList.remove('open'); });
+    }
+    /* notifications bell */
+    var bell = document.querySelector('[data-bell]');
+    var panel = document.getElementById('bellPanel');
+    if (bell && panel) {
+      bell.addEventListener('click', function(e){
+        e.stopPropagation();
+        var opening = !panel.classList.contains('open');
+        panel.classList.toggle('open');
+        if (opening) {
+          var badge = bell.querySelector('.bell-badge');
+          if (badge) { fetch('{% url "orgs:notifications_read_all" %}', { method:'POST', headers:{ 'X-CSRFToken': '{{ csrf_token }}' } }); badge.remove(); }
+        }
       });
+      document.addEventListener('click', function(e){ if (!panel.contains(e.target)) panel.classList.remove('open'); });
+    }
+    /* backdrop rotation is handled by gt-scenes.js */
+    document.querySelectorAll('[data-copy]').forEach(function(btn){
+      btn.addEventListener('click', function(){ var t=document.querySelector(btn.getAttribute('data-copy')); if(!t)return; var v=t.value!==undefined?t.value:t.textContent; if(navigator.clipboard)navigator.clipboard.writeText(v); var o=btn.innerHTML; btn.innerHTML='Copied &#10003;'; setTimeout(function(){btn.innerHTML=o;},1500); });
     });
-  </script>
+  })();</script>
 </body>
 </html>

@@ -35,9 +35,9 @@
         </small>
       </span>
       <span class="gr-go">
-        {% if t.status == 'answered' %}<span class="gt-pill ok">Answered</span>
-        {% elif t.status == 'closed' %}<span class="gt-pill">Closed</span>
-        {% elif t.kind == 'raised' %}<span class="gt-pill warn">Waiting</span>{% endif %}
+        {% if t.status == 'answered' %}<span class="gts-status ok">Answered</span>
+        {% elif t.status == 'closed' %}<span class="gts-status">Closed</span>
+        {% elif t.kind == 'raised' %}<span class="gts-status warn">Waiting</span>{% endif %}
       </span>
     </a>
     {% endfor %}

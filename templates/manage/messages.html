@@ -12,10 +12,10 @@
 
 <div class="card pad-lg" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;">
   <div style="display:flex;gap:6px;">
-    <a href="?org={{ org.id }}&tab=raised" class="gt-tab {% if tab == 'raised' %}on{% endif %}">
+    <a href="?org={{ org.id }}&tab=raised" class="gts-tab {% if tab == 'raised' %}on{% endif %}">
       Raised by members{% if open_count %} ({{ open_count }}){% endif %}</a>
-    <a href="?org={{ org.id }}&tab=notices" class="gt-tab {% if tab == 'notices' %}on{% endif %}">Sent by you</a>
-    <a href="?org={{ org.id }}&tab=closed" class="gt-tab {% if tab == 'closed' %}on{% endif %}">Closed</a>
+    <a href="?org={{ org.id }}&tab=notices" class="gts-tab {% if tab == 'notices' %}on{% endif %}">Sent by you</a>
+    <a href="?org={{ org.id }}&tab=closed" class="gts-tab {% if tab == 'closed' %}on{% endif %}">Closed</a>
   </div>
   <span style="flex:1 1 auto;"></span>
   <a href="{% url 'manage:message_new' %}?org={{ org.id }}" class="btn-primary">Send a message &rarr;</a>
@@ -35,9 +35,9 @@
       </small>
     </span>
     <span class="gr-go">
-      {% if t.status == 'open' and t.kind == 'raised' %}<span class="gt-pill warn">Needs a reply</span>
-      {% elif t.status == 'answered' %}<span class="gt-pill ok">Answered</span>
-      {% elif t.status == 'closed' %}<span class="gt-pill">Closed</span>{% endif %}
+      {% if t.status == 'open' and t.kind == 'raised' %}<span class="gts-status warn">Needs a reply</span>
+      {% elif t.status == 'answered' %}<span class="gts-status ok">Answered</span>
+      {% elif t.status == 'closed' %}<span class="gts-status">Closed</span>{% endif %}
     </span>
   </a>
   {% endfor %}

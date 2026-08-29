@@ -189,24 +189,25 @@ body.gt-shell .pad-lg { padding: 24px; }
   .gts-who b, .gts-who small { display: none; }
 }
 
-/* ---- Tabs + pills used by the org-admin pages ----------------------------- */
-.gt-tab {
+/* ---- Tabs + status badges (gts- namespaced: goodtip.css already
+       owns .gt-pill for something else entirely) ----------------------------- */
+.gts-tab {
   display: inline-flex; align-items: center;
   padding: 7px 14px; border-radius: 999px;
   border: 1px solid var(--gts-line-2);
   font-size: 13px; font-weight: 600; color: var(--gts-quiet);
   text-decoration: none;
 }
-.gt-tab:hover { background: var(--gts-surface-3); color: var(--deep); text-decoration: none; }
-.gt-tab.on { background: var(--deep); border-color: var(--deep); color: #fff; }
+.gts-tab:hover { background: var(--gts-surface-3); color: var(--deep); text-decoration: none; }
+.gts-tab.on { background: var(--deep); border-color: var(--deep); color: #fff; }
 
-.gt-pill {
+.gts-status {
   display: inline-block; padding: 3px 10px; border-radius: 999px;
   font-size: 11.5px; font-weight: 700;
   background: var(--gts-surface-3); color: var(--gts-quiet);
 }
-.gt-pill.ok { background: rgba(45,122,58,.14); color: #226B45; }
-.gt-pill.warn { background: rgba(199,124,30,.16); color: #A9660F; }
+.gts-status.ok { background: rgba(45,122,58,.14); color: #226B45; }
+.gts-status.warn { background: rgba(199,124,30,.16); color: #A9660F; }
 
 body.gt-shell .gt-rows { display: grid; gap: 10px; }
 body.gt-shell .gt-row {

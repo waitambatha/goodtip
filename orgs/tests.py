@@ -1465,7 +1465,7 @@ class OrgAdminApprovalsPageTests(TestCase):
     def test_the_nav_carries_your_waiting_count(self):
         self.client.force_login(self.owner)
         body = self.client.get("/manage/").content
-        self.assertIn(b'class="n">1<', body)
+        self.assertIn(b'class="an-count">1<', body)
 
     def test_a_member_who_runs_nothing_cannot_reach_it(self):
         self.client.force_login(self.joiner)
