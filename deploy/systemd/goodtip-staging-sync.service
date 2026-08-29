@@ -23,12 +23,15 @@ Environment=GOODTIP_VENV=/home/mbatha-goodtip/projects/goodtip-staging/venv
 # The entire point of staging is that it is where a bad commit is allowed to be
 # discovered, so there is no reason to wave the suite through here -- and every
 # reason to run it, since this is the last gate before the same commit is
-# merged to main and deployed to the live site. `warn` and not `block`: the
-# suite is red as of Aug 2026 (11 failures, 6 errors, all pre-existing), so
-# blocking today would stop staging deploying at all. The failures are reported
-# in the journal on every deploy, which is where the pressure to fix them
-# belongs. Move this and production's to `block` together once it is green.
-Environment=DEPLOY_TEST_GATE=warn
+# merged to main and deployed to the live site.
+#
+# `block` since 2026-08-29. It sat at `warn` while the suite was red, and then
+# for one last reason after it went green: StagingRobotsTests asserted that
+# IS_STAGING was false, which no run on this box can satisfy, so the gate could
+# never have passed here. That assertion is now conditional on the environment
+# and the suite is green in staging's own env -- a red suite from here is a
+# real regression, and stopping the deploy is the right answer to one.
+Environment=DEPLOY_TEST_GATE=block
 # Longer than production's: this one runs the ~6-minute suite. Still shorter
 # than the timer's own margin; overlap is prevented by the flock in deploy.sh.
 TimeoutStartSec=1800

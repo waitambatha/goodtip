@@ -217,12 +217,19 @@ class StagingRobotsTests(SimpleTestCase):
         # Nothing that could be read as permitting a path.
         self.assertNotIn("Allow:", body)
 
-    def test_production_has_no_robots_route(self):
-        # The route is registered only under IS_STAGING. This asserts against
-        # the real urlconf as imported in this (non-staging) environment, so it
-        # fails if that condition is ever dropped.
+    def test_robots_route_is_registered_only_on_staging(self):
+        # goodtip/urls.py adds this route at import time, so override_settings
+        # cannot flip it -- whichever environment the suite runs in decides
+        # which half of the invariant is checkable here, and we assert that
+        # half rather than demanding a non-staging env. The half that matters,
+        # "production must not gain a robots.txt it never had", is still
+        # enforced: production's own deploy gate runs this same suite with
+        # IS_STAGING false. Asserting it unconditionally is what made the
+        # staging deploy gate unusable above `warn`.
         from django.urls import NoReverseMatch, reverse
 
-        self.assertFalse(settings.IS_STAGING, "test env should not be staging")
-        with self.assertRaises(NoReverseMatch):
-            reverse("robots")
+        if settings.IS_STAGING:
+            self.assertEqual(reverse("robots"), "/robots.txt")
+        else:
+            with self.assertRaises(NoReverseMatch):
+                reverse("robots")
