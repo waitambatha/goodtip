@@ -8,6 +8,7 @@ from django.core.management import call_command
 from django.contrib.auth.decorators import login_required
 from django.db import connection, models
 from django.db.models import Count, Q
+from django.db.models.functions import Lower
 from django.http import Http404, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -1034,11 +1035,15 @@ def org_invite_view(request, org_id: int):
             # Anyone already in the group gets nothing — a "come join us" mail
             # to someone who is already a member reads as a system that isn't
             # paying attention.
-            existing = set(
-                OrgMember.objects.filter(org=org, user__email__in=emails)
-                .values_list("user__email", flat=True)
+            # Matched case-insensitively. `user__email__in=emails` is an exact
+            # match in Postgres, so typing your own address with a capital
+            # letter slipped past this check and mailed a "come join us" to
+            # somebody already in the group.
+            existing_lower = set(
+                OrgMember.objects.annotate(_email=Lower("user__email"))
+                .filter(org=org, _email__in=[e.lower() for e in emails])
+                .values_list("_email", flat=True)
             )
-            existing_lower = {e.lower() for e in existing}
             to_send = [e for e in emails if e.lower() not in existing_lower]
 
             sent = 0
@@ -1087,6 +1092,15 @@ def join_view(request, org_id: int, token: str):
     if request.user.is_authenticated:
         already_member = _is_member(request.user, org)
         add_member(request.user, org, inviter_id=inviter_id)
+        # Stand them IN the organisation they just accepted an invitation to.
+        # Without this, joining wrote a membership row and nothing else, so
+        # somebody who already belonged to other organisations followed an
+        # invite and landed on the dashboard for whichever org the session —
+        # or, on a fresh session, the alphabetical fallback in
+        # context.current_org — happened to name. The mail says one
+        # organisation and the screen says another, which reads as the
+        # invitation having joined you to the wrong one.
+        ctx.set_current_org(request, org)
         messages.success(request, f"Joined {org.name}.")
         from accounts.views import post_join_redirect
 

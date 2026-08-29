@@ -290,6 +290,16 @@
               {% endfor %}
             </div>
           </div>
+          {% comment %}
+          The ticker: one notification at a time, next to the bell that holds
+          the rest. Empty in the markup and filled by JS on each turn — see the
+          bell-ticker block in the script below for the timing.
+          {% endcomment %}
+          <div class="bell-tick" id="bellTick" role="status" aria-live="polite" hidden>
+            <span class="bt-ic" aria-hidden="true"><svg><use href="#ic-msg"/></svg></span>
+            <span class="bt-txt"><span class="bt-eyebrow"></span><span class="bt-title"></span></span>
+            <button type="button" class="bt-x" aria-label="Stop showing this">&times;</button>
+          </div>
         </div>
         {% comment %}
         Three icon buttons on one rhythm — notifications, you, and the way out.
@@ -312,22 +322,11 @@
   {% endcomment %}
   <div class="gt-toasts" id="gtToasts" aria-live="polite" aria-atomic="false"></div>
 
-  {# ---- election / admin-note popup: clean, dismissible, one at a time ---- #}
-  {% if popup_notification %}
-  <div class="note-pop" id="notePop" role="alert">
-    <div class="np-accent"></div>
-    <div class="np-body">
-      <div class="np-eyebrow">{% if popup_notification.org %}{{ popup_notification.org.name }}{% else %}GoodTip{% endif %}</div>
-      <div class="np-title">{{ popup_notification.title }}</div>
-      {% if popup_notification.message %}<p class="np-msg">{{ popup_notification.message }}</p>{% endif %}
-      <div class="np-actions">
-        {% if popup_notification.link_url %}<a href="{{ popup_notification.link_url }}" class="abtn abtn-primary abtn-sm">Open &rarr;</a>{% endif %}
-        <button type="button" class="abtn abtn-ghost abtn-sm" data-dismiss-note="{{ popup_notification.id }}">Dismiss</button>
-      </div>
-    </div>
-    <button type="button" class="np-x" aria-label="Dismiss" data-dismiss-note="{{ popup_notification.id }}">&times;</button>
-  </div>
-  {% endif %}
+  {% comment %}
+  The ticker's queue. Rendered through json_script so a notification title with
+  a quote or an angle bracket in it cannot escape into the page.
+  {% endcomment %}
+  {{ ticker_notifications|json_script:"bellTickData" }}
 
   {% block charity_strip %}
   {% if primary_org %}
@@ -467,15 +466,107 @@
         });
         document.addEventListener('click', function(e){ if (!panel.contains(e.target)) panel.classList.remove('open'); });
       }
-      document.querySelectorAll('[data-dismiss-note]').forEach(function(btn){
-        btn.addEventListener('click', function(){
-          var pop = document.getElementById('notePop');
-          if (pop) { pop.classList.add('out'); setTimeout(function(){ pop.remove(); }, 350); }
-          post('/leagues/notifications/' + btn.getAttribute('data-dismiss-note') + '/dismiss/');
+      /* ---- bell ticker -------------------------------------------------
+         Notifications take turns at the bell rather than one card sitting on
+         the page waiting to be closed. A turn is: buzz the bell (~2s), slide
+         a one-line teaser out beside it (~3s), clear it. A beat, then the
+         next one goes; after the last it starts again at the top, so missing
+         a turn costs nothing — it comes round again.
+
+         Only the title is in the teaser. It is a hook: enough to decide
+         whether to look, and clicking it opens the real thing. The message
+         body stays in the bell panel.
+
+         A chain of timeouts, not an interval. An interval keeps firing while
+         the tab is hidden or the pointer is parked on the teaser, and every
+         turn it banked then arrives in a clump when attention comes back. */
+      var tick = document.getElementById('bellTick');
+      var tickData = document.getElementById('bellTickData');
+      var bellWrap = document.getElementById('anBell');
+      if (tick && tickData && bellWrap) (function(){
+        var queue;
+        try { queue = JSON.parse(tickData.textContent) || []; } catch (e) { queue = []; }
+        if (!queue.length) return;
+
+        var FIRST = 5000, BUZZ = 2000, SHOW = 3000, GAP = 1500;
+        var at = 0, timer = null, paused = false, current = null;
+        var icon = tick.querySelector('.bt-ic use');
+        var eyebrow = tick.querySelector('.bt-eyebrow');
+        var title = tick.querySelector('.bt-title');
+
+        function wait(ms, fn){ clearTimeout(timer); timer = setTimeout(fn, ms); }
+
+        function hide(next){
+          tick.classList.remove('in');
+          // Let the slide-out finish before the text is swapped, or the next
+          // title flashes up inside the one that is still leaving.
+          wait(reduce ? 0 : 260, function(){ tick.hidden = true; if (next) next(); });
+        }
+
+        function turn(){
+          // Not while the panel is open (the full list is already on screen,
+          // and a teaser of a line they are reading is noise), not while the
+          // pointer is on the teaser, not while the tab is in the background.
+          if (paused || document.hidden || (panel && panel.classList.contains('open'))) {
+            wait(1000, turn);
+            return;
+          }
+          if (!queue.length) return;
+          current = queue[at % queue.length];
+          at = (at + 1) % queue.length;
+
+          if (!reduce) {
+            bellWrap.classList.add('buzz');
+            wait(BUZZ, function(){ bellWrap.classList.remove('buzz'); show(); });
+          } else {
+            show();
+          }
+        }
+
+        function show(){
+          icon.setAttribute('href', '#' + (current.icon || 'ic-msg'));
+          eyebrow.textContent = current.org || 'GoodTip';
+          title.textContent = current.title || '';
+          tick.hidden = false;
+          // Two frames, not one: unhiding and adding .in inside the same style
+          // recalculation gives the transition nothing to animate from, and
+          // the teaser snaps in instead of sliding.
+          requestAnimationFrame(function(){
+            requestAnimationFrame(function(){ tick.classList.add('in'); });
+          });
+          wait(SHOW, function(){ hide(function(){ wait(GAP, turn); }); });
+        }
+
+        // Hovering holds the turn open — the whole point is that it can be
+        // clicked, and three seconds is not long enough to read AND reach it.
+        tick.addEventListener('mouseenter', function(){ paused = true; clearTimeout(timer); });
+        tick.addEventListener('mouseleave', function(){
+          paused = false;
+          hide(function(){ wait(GAP, turn); });
         });
-      });
-      var pop = document.getElementById('notePop');
-      if (pop) setTimeout(function(){ pop.classList.add('in'); }, reduce ? 0 : 3200);
+
+        tick.addEventListener('click', function(e){
+          if (e.target.closest('.bt-x')) return;
+          if (!current) return;
+          post('/leagues/notifications/' + current.id + '/open/');
+          if (current.url) { window.location.href = current.url; }
+          else if (panel) { panel.classList.add('open'); hide(); }
+        });
+
+        // Dismissing takes it out of the loop for good, here and on the server.
+        tick.querySelector('.bt-x').addEventListener('click', function(e){
+          e.stopPropagation();
+          if (!current) return;
+          var gone = current.id;
+          post('/leagues/notifications/' + gone + '/dismiss/');
+          queue = queue.filter(function(n){ return n.id !== gone; });
+          at = 0;
+          paused = false;
+          hide(function(){ if (queue.length) wait(GAP, turn); });
+        });
+
+        wait(FIRST, turn);
+      })();
 
       /* clicking a bell item marks it read before it navigates */
       var list = document.getElementById('bellList');

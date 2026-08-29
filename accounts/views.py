@@ -49,9 +49,14 @@ def _consume_pending_join(request):
         org = Organisation.objects.get(pk=org_id)
     except Organisation.DoesNotExist:
         return None
+    from orgs.context import set_current_org
     from orgs.services import add_member
 
     add_member(request.user, org, inviter_id=inviter_id)
+    # Same reason as orgs.views.join_view: the organisation they were invited
+    # to has to become the one they are standing in, or the dashboard they
+    # land on names a different one.
+    set_current_org(request, org)
     messages.success(request, f"Joined {org.name}.")
     return org
 

@@ -44,8 +44,34 @@ def user_orgs(request):
         request.user.notifications.select_related("org").order_by("-created_at")[:12]
     )
     unread = sum(1 for n in notes if n.read_at is None)
-    # The popup: newest not-yet-dismissed notification.
-    popup = next((n for n in notes if n.dismissed_at is None), None)
+    # The bell ticker.
+    #
+    # This used to be a single `popup` — the newest undismissed notification —
+    # rendered as a card pinned bottom-right until someone closed it. One card
+    # is one notification: the second and third waited behind it, unseen, and
+    # the first sat over the page as a thing to clear before you could work.
+    #
+    # Now every undismissed notification takes a turn at the bell instead: the
+    # bell buzzes, a one-line teaser appears next to it for a few seconds, and
+    # the loop moves on. Nothing has to be closed, and being away from the
+    # screen for one turn costs nothing because it comes round again.
+    #
+    # Only the title travels — the teaser is a hook, not the message. The
+    # message, the timestamp and the full list stay in the bell panel, which is
+    # where clicking a teaser goes.
+    #
+    # Capped at five: past that the loop is long enough that the first one is
+    # forgotten before it returns, and the panel already holds the rest.
+    ticker = [
+        {
+            "id": n.id,
+            "org": n.org.name if n.org else "GoodTip",
+            "title": n.title,
+            "url": n.link_url or "",
+            "icon": n.icon,
+        }
+        for n in notes if n.dismissed_at is None
+    ][:5]
     # Nav badges for the organisation admin. Scoped to the organisations this
     # person actually runs — the counts used to be platform-wide and gated on
     # is_staff, which was correct while /manage/ was superuser-only and became
@@ -122,7 +148,7 @@ def user_orgs(request):
         "unread_notification_count": unread,
         "pending_approval_count": pending_approval_count,
         "unread_thread_count": unread_thread_count,
-        "popup_notification": popup,
+        "ticker_notifications": ticker,
         # Watermark for the live poll: the page only toasts things that
         # arrive after it was rendered.
         "latest_notification_id": notes[0].id if notes else 0,

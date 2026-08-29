@@ -1268,6 +1268,174 @@ class InviteByEmailTests(TestCase):
         self.assertEqual(resp.status_code, 403)
         self.assertEqual(len(mail.outbox), 0)
 
+    def test_existing_members_are_skipped_whatever_the_casing(self):
+        """Postgres matches email exactly, addresses do not.
+
+        Typing your own address with a capital letter used to slip past the
+        already-a-member check and mail a "come join us" to somebody who was
+        standing in the group already.
+        """
+        from django.core import mail
+
+        mate = User.objects.create_user(
+            email="mate@example.com", password="Str0ng!pass", display_name="Mate"
+        )
+        OrgMember.objects.create(user=mate, org=self.org)
+        self._post("Mate@Example.com, fresh@example.com")
+        self.assertEqual([m.to[0] for m in mail.outbox], ["fresh@example.com"])
+
+
+class JoinLinkContextTests(TestCase):
+    """Following an invite link has to leave you standing in the organisation
+    that invited you.
+
+    It used to write the membership row and nothing else, so a member of
+    several organisations followed an invite and landed on the dashboard for
+    whichever one the session happened to name — the mail said one
+    organisation, the screen said another.
+    """
+
+    def setUp(self):
+        self.season, _ = Season.objects.get_or_create(year=2032, defaults={"label": "2032"})
+        # Named so the alphabetical fallback in context.current_org is NOT the
+        # org being joined — that is the case that was broken.
+        self.other = Organisation.objects.create(name="AquaFlow", season=self.season)
+        self.org = Organisation.objects.create(name="Masterclass", season=self.season)
+        self.admin = User.objects.create_user(
+            email="boss@m.com", password="Str0ng!pass", display_name="Bea"
+        )
+        OrgMember.objects.create(user=self.admin, org=self.org, is_league_owner=True)
+        self.joiner = User.objects.create_user(
+            email="new@m.com", password="Str0ng!pass", display_name="Nia"
+        )
+        OrgMember.objects.create(user=self.joiner, org=self.other)
+
+    def _join(self):
+        from .signing import make_join_token
+
+        token = make_join_token(self.org.id, inviter_id=self.admin.id)
+        return self.client.get(f"/join/{self.org.id}/{token}/")
+
+    def test_joining_puts_you_in_the_organisation_you_were_invited_to(self):
+        from .context import ORG_KEY
+
+        self.client.force_login(self.joiner)
+        self._join()
+        self.assertEqual(self.client.session[ORG_KEY], self.org.id)
+
+    def test_it_overrides_wherever_you_were_standing(self):
+        from .context import ORG_KEY
+
+        self.client.force_login(self.joiner)
+        self.client.post(reverse("orgs:switch_org", args=[self.other.id]))
+        self._join()
+        self.assertEqual(self.client.session[ORG_KEY], self.org.id)
+
+    def test_a_second_click_still_lands_you_there(self):
+        """An invite followed twice is the likeliest way to hit this: the
+        member is already in, so nothing is written, and the context still has
+        to move."""
+        from .context import ORG_KEY
+
+        self.client.force_login(self.joiner)
+        self._join()
+        self.client.post(reverse("orgs:switch_org", args=[self.other.id]))
+        self._join()
+        self.assertEqual(self.client.session[ORG_KEY], self.org.id)
+
+    def test_following_the_link_signed_out_then_signing_in_lands_there_too(self):
+        """The link is usually opened in the mail client, signed out. The join
+        is held in the session and completed on the way in, and it has to move
+        the context the same way the signed-in path does."""
+        from .context import ORG_KEY
+
+        # Straight through the password, so the test is about the join and not
+        # about the emailed code.
+        self.joiner.two_factor_enabled = False
+        self.joiner.save(update_fields=["two_factor_enabled"])
+        self._join()                            # signed out: nothing joined yet
+        self.assertFalse(OrgMember.objects.filter(user=self.joiner, org=self.org).exists())
+        self.client.post(reverse("accounts:login"), {
+            "email": "new@m.com", "password": "Str0ng!pass",
+        })
+        self.assertTrue(OrgMember.objects.filter(user=self.joiner, org=self.org).exists())
+        self.assertEqual(self.client.session[ORG_KEY], self.org.id)
+
+
+class BellTickerTests(TestCase):
+    """Undismissed notifications take turns at the bell.
+
+    They used to be one pinned card showing only the newest, which had to be
+    closed before the page underneath could be used, and which hid every
+    notification behind it.
+    """
+
+    def setUp(self):
+        self.season, _ = Season.objects.get_or_create(year=2033, defaults={"label": "2033"})
+        self.org = Organisation.objects.create(name="Ticker FC", season=self.season)
+        self.user = User.objects.create_user(
+            email="tick@t.com", password="Str0ng!pass", display_name="Tam"
+        )
+        OrgMember.objects.create(user=self.user, org=self.org, is_league_owner=True)
+        self.client.force_login(self.user)
+
+    def _note(self, title, **kw):
+        from .models import Notification
+
+        return Notification.objects.create(
+            user=self.user, org=self.org, kind=Notification.KIND_ADMIN_NOTE,
+            title=title, message="the body stays in the panel", **kw
+        )
+
+    def _queue(self):
+        """The ticker's queue, read back out of the rendered page."""
+        import json
+        import re
+
+        html = self.client.get(reverse("dashboard")).content.decode()
+        m = re.search(
+            r'<script id="bellTickData"[^>]*>(.*?)</script>', html, re.S
+        )
+        self.assertIsNotNone(m, "the ticker's queue is not on the page")
+        return json.loads(m.group(1))
+
+    def test_every_undismissed_notification_is_in_the_queue(self):
+        self._note("Charity election not set up")
+        self._note("Round 3 results are in")
+        titles = [n["title"] for n in self._queue()]
+        self.assertEqual(
+            sorted(titles), ["Charity election not set up", "Round 3 results are in"]
+        )
+
+    def test_a_dismissed_one_does_not_come_round_again(self):
+        from django.utils import timezone
+
+        self._note("Still going")
+        self._note("Closed for good", dismissed_at=timezone.now())
+        self.assertEqual([n["title"] for n in self._queue()], ["Still going"])
+
+    def test_the_teaser_carries_the_title_but_not_the_message(self):
+        """It is a hook, not a delivery — the body is what the panel is for."""
+        self._note("Charity election not set up")
+        item = self._queue()[0]
+        self.assertEqual(item["title"], "Charity election not set up")
+        self.assertEqual(item["org"], "Ticker FC")
+        self.assertNotIn("message", item)
+
+    def test_the_queue_is_capped(self):
+        for n in range(8):
+            self._note(f"Note {n}")
+        self.assertEqual(len(self._queue()), 5)
+
+    def test_the_pinned_card_is_gone(self):
+        self._note("Charity election not set up")
+        html = self.client.get(reverse("dashboard")).content.decode()
+        self.assertNotIn("notePop", html)
+        self.assertIn('id="bellTick"', html)
+
+    def test_no_notifications_means_an_empty_queue_not_a_crash(self):
+        self.assertEqual(self._queue(), [])
+
 
 class ProcessNotificationTests(TestCase):
     """Joining and elections are multi-step and slow, so each step reports back

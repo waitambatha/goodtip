@@ -2897,18 +2897,70 @@ a.news-item.news-link:hover .nt { color: var(--forest); }
 .bell-panel .bp-empty { padding: 18px 12px; font-size: 13px; color: var(--muted); text-align: center; }
 @media (max-width: 680px) { .bell-panel { position: fixed; top: 64px; left: 12px; right: 12px; width: auto; } }
 
-.note-pop { position: fixed; right: 18px; bottom: 18px; z-index: 200; width: min(380px, calc(100vw - 36px)); display: flex; background: #fff; border: 1px solid var(--app-line); border-radius: 16px; box-shadow: 0 30px 60px -24px rgba(0,0,0,.5); overflow: hidden; opacity: 0; transform: translateY(14px); transition: opacity .35s var(--ease), transform .35s var(--ease); pointer-events: none; }
-.note-pop.in { opacity: 1; transform: none; pointer-events: auto; }
-.note-pop.out { opacity: 0; transform: translateY(14px); pointer-events: none; }
-.note-pop .np-accent { width: 6px; background: linear-gradient(180deg, var(--lime), var(--forest)); flex: none; }
-.note-pop .np-body { padding: 16px 18px; }
-.note-pop .np-eyebrow { font-family: var(--mark); font-weight: 700; font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--forest); }
-.note-pop .np-title { font-weight: 800; font-size: 15px; color: var(--ink); margin-top: 3px; }
-.note-pop .np-msg { font-size: 13.5px; color: var(--muted); line-height: 1.5; margin: 6px 0 0; }
-.note-pop .np-actions { display: flex; gap: 8px; margin-top: 12px; }
-.note-pop .np-x { position: absolute; top: 8px; right: 10px; background: none; border: 0; cursor: pointer; font-size: 20px; color: var(--muted); line-height: 1; padding: 4px; }
-.note-pop .np-x:hover { color: var(--ink); }
-@media (prefers-reduced-motion: reduce) { .note-pop { transition: none; } }
+/* THE BELL TICKER — one notification at a time, beside the bell that holds
+   the rest.
+
+   What this replaces: .note-pop, a card pinned bottom-right showing the newest
+   undismissed notification until somebody closed it. It had two faults. One
+   card is one notification, so the second and third waited behind it unseen;
+   and a card that must be closed is a chore laid over the page before the page
+   can be used.
+
+   The teaser is deliberately one line. It carries the organisation and the
+   title and stops — enough to decide whether to look. Anyone who wants the
+   rest clicks, and the message body, the timestamp and the whole list are in
+   the panel directly above it. It is a hook, not a delivery.
+
+   Sized off the bell rather than the viewport, and pinned to the same edge as
+   .bell-panel, so the thing that buzzed and the thing that appeared read as one
+   object. Timing lives in the JS (app_base.html). */
+.bell-tick {
+  position: absolute; top: calc(100% + 10px); right: -8px; z-index: 59;
+  display: flex; align-items: center; gap: 9px;
+  width: max-content; max-width: min(320px, calc(100vw - 32px));
+  padding: 9px 8px 9px 11px;
+  background: #fff; border: 1px solid var(--app-line); border-radius: 12px;
+  box-shadow: 0 18px 38px -20px rgba(0,0,0,.45);
+  cursor: pointer;
+  opacity: 0; transform: translateY(-8px) scale(.97); transform-origin: 90% 0;
+  transition: opacity .24s var(--ease), transform .24s var(--ease);
+}
+.bell-tick.in { opacity: 1; transform: none; }
+/* display:flex above outranks the browser's own [hidden]{display:none}, so
+   without this the teaser is never actually hidden between turns — it just
+   sits there at opacity 0, over the top of anything under it. */
+.bell-tick[hidden] { display: none; }
+.bell-tick:hover { border-color: rgba(45,122,58,.35); }
+.bell-tick .bt-ic {
+  flex: none; width: 26px; height: 26px; border-radius: 8px;
+  background: rgba(200,241,53,.34); display: grid; place-items: center;
+}
+.bell-tick .bt-ic svg { width: 14px; height: 14px; stroke: var(--forest); fill: none; stroke-width: 1.9; }
+.bell-tick .bt-txt { min-width: 0; display: block; }
+.bell-tick .bt-eyebrow {
+  display: block; font-family: var(--mark); font-weight: 700; font-size: 9.5px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--forest);
+}
+/* One line, always. A title long enough to wrap would make the teaser a card
+   again, which is the thing being got rid of. */
+.bell-tick .bt-title {
+  display: block; font-weight: 700; font-size: 13px; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.bell-tick .bt-x {
+  flex: none; background: none; border: 0; cursor: pointer; padding: 2px 4px;
+  font-size: 17px; line-height: 1; color: var(--muted);
+}
+.bell-tick .bt-x:hover { color: var(--ink); }
+@media (prefers-reduced-motion: reduce) {
+  .bell-tick { transition: none; transform: none; }
+}
+
+/* The buzz before the teaser: the same shake the bell already does when
+   something lands live, three times over, so it reads as the same bell doing
+   the same thing rather than a second animation vocabulary. */
+.an-bell.buzz .bell-btn { animation: gt-ring .66s var(--ease) 3; transform-origin: 50% 12%; }
+@media (prefers-reduced-motion: reduce) { .an-bell.buzz .bell-btn { animation: none; } }
 
 /* ---------- ELECTION SETUP: the when picker ---------- */
 .election-when { display: block; width: 100%; padding: 13px 16px; border: 1.5px solid rgba(15,46,34,.22); border-radius: 12px; background: #fff; font-family: var(--body); font-size: 15px; font-weight: 600; color: var(--ink); }
@@ -5123,26 +5175,44 @@ html.no-js [data-shots] .shot:first-child { opacity: 1; }
    max-height is in vh so it always leaves room for the surrounding chrome, with
    a px floor so a short viewport still shows a few rows rather than a sliver.
    ========================================================================= */
+/* The thumb is a wayfinding device — on a round of nine fixtures it is the
+   only thing saying how much list is left — so it is drawn to be seen, in
+   green, rather than tinted almost out of existence.
+
+   It used to be lime at 30% alpha on the deep pages (.page-deep covers the
+   dashboard, the ladder and the Wall). Lime is the brand's spark colour, but
+   the fixtures list sits on a CREAM card even on those pages, and #C8F135 at
+   .30 over cream is very nearly the cream: a yellow sliver you cannot find. */
 .gt-scroll {
+  --scroll-thumb:    rgba(63,158,85,.85);   /* mid green, actually seen */
+  --scroll-thumb-hi: #3F9E55;
   overflow-y: auto; overflow-x: hidden;
   max-height: max(320px, 62vh);
   /* Room so the last card's shadow isn't clipped by the scroll edge. */
   padding-right: 4px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(15,46,34,.28) transparent;
+  scrollbar-color: var(--scroll-thumb) transparent;
   overscroll-behavior: contain;
 }
-.gt-scroll::-webkit-scrollbar { width: 9px; }
+/* 12px of gutter with a 2px inset leaves an 8px stick. The old 9px/2px left
+   five, which is thin enough to read as a hairline rather than a control. */
+.gt-scroll::-webkit-scrollbar { width: 12px; }
 .gt-scroll::-webkit-scrollbar-track { background: transparent; }
 .gt-scroll::-webkit-scrollbar-thumb {
-  background-color: rgba(15,46,34,.24); border-radius: 100px;
+  background-color: var(--scroll-thumb); border-radius: 100px;
   border: 2px solid transparent; background-clip: content-box;
 }
-.gt-scroll::-webkit-scrollbar-thumb:hover { background-color: rgba(15,46,34,.42); background-clip: content-box; }
-/* On the dark app surfaces the dark thumb disappears, so invert it. */
-.page-deep .gt-scroll, .gt-scroll.on-dark { scrollbar-color: rgba(200,241,53,.34) transparent; }
-.page-deep .gt-scroll::-webkit-scrollbar-thumb,
-.gt-scroll.on-dark::-webkit-scrollbar-thumb { background-color: rgba(200,241,53,.30); }
+.gt-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scroll-thumb-hi); background-clip: content-box;
+}
+/* One green for every surface, deliberately. .gt-scroll lists sit on cream
+   cards in some places and straight on a deep panel in others, and which is
+   which is not something the CSS can tell — the old rule guessed from
+   .page-deep and guessed wrong for the fixtures, which are cream-carded on a
+   deep page. #3F9E55 is light enough to separate from the deep panels
+   (#152B1E) and dark enough to separate from the cream cards (#FCFBF5), so
+   there is nothing left to get wrong. */
+.gt-scroll.on-dark { --scroll-thumb: rgba(93,199,116,.75); --scroll-thumb-hi: #5DC774; }
 /* Match cards (.fxc) run ~210px tall with the MatchReader row, so the generic
    floor above only ever fit about two before scrolling. Raised so roughly
    four sit in view first — same self-scrolling behaviour, just a bigger window. */
