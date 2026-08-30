@@ -4619,7 +4619,16 @@ class AdminGroupRegistryTests(TestCase):
         self.admin = get_user_model().objects.create_superuser(
             email="root@example.com", password="pw", display_name="Root",
         )
+        # /admin/ is behind an emailed one-time code (sysadmin.middleware), so
+        # force_login alone lands on the verify screen instead of the page
+        # under test. Stamping the session is what the OTP flow does on
+        # success — same as sysadmin/test_control_plane.sign_in_to_admin.
+        from sysadmin import otp
+
         self.client.force_login(self.admin)
+        session = self.client.session
+        otp.mark_verified(session)
+        session.save()
 
         season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
         self.org = Organisation.objects.create(name="Acme Pty Ltd", season=season)
