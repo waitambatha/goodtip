@@ -1,0 +1,22 @@
+{% extends "admin/base.html" %}
+{% load i18n static %}
+
+{% comment %}
+Django's own admin/base_site.html, plus one stylesheet. It cannot
+`{% extends "admin/base_site.html" %}` — the name would resolve back to this
+file and recurse — so it extends admin/base.html and re-fills the two blocks
+base_site.html normally fills, exactly as Django's copy does.
+{% endcomment %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/gt-admin.css' %}">{% endblock %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block branding %}
+<div id="site-name"><a href="{% url 'admin:index' %}">{{ site_header|default:_('Django administration') }}</a></div>
+{% if user.is_anonymous %}
+  {% include "admin/color_theme_toggle.html" %}
+{% endif %}
+{% endblock %}
+
+{% block nav-global %}{% endblock %}

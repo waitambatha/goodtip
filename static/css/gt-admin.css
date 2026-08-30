@@ -1,0 +1,83 @@
+/* GoodTip's additions to the Django admin.
+ *
+ * Loaded from templates/admin/base_site.html, so it lands on every admin page
+ * after Django's own base.css / dark_mode.css and can override them. Kept to
+ * the things the client actually flagged rather than a reskin — the admin is a
+ * working tool and Django's own layout is fine.
+ */
+
+/* ---------------------------------------------------------------------------
+   THEME SWITCH
+   Django ships this as a 16px icon with no label, wedged between "Change
+   password" and "Log out". The client never spotted it. Same button and the
+   same theme.js behind it — this just gives it a size, a border and the name
+   of the theme it is currently on.
+   --------------------------------------------------------------------------- */
+#header .gt-theme-toggle,
+.gt-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 0 12px;
+  padding: 5px 12px 5px 9px;
+  border: 1px solid var(--header-link-color, #ffc);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--header-link-color, #ffc);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  /* The header row is text links; this has to read as a control among them. */
+  vertical-align: middle;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+
+.gt-theme-toggle:hover,
+.gt-theme-toggle:focus-visible {
+  background: color-mix(in srgb, var(--header-link-color, #ffc) 16%, transparent);
+}
+
+.gt-theme-toggle .gt-tt-ic {
+  display: inline-flex;
+  width: 17px;
+  height: 17px;
+}
+
+/* Django's rules size these to 1rem and hide/show them by html[data-theme].
+   Only the box they sit in changes here. */
+.gt-theme-toggle svg {
+  width: 17px;
+  height: 17px;
+  vertical-align: middle;
+}
+
+.gt-theme-toggle .gt-tt-txt {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.gt-theme-toggle .gt-tt-k {
+  opacity: .72;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-size: 10px;
+}
+
+.gt-theme-toggle b {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+/* Three labels, one shown. Django's stylesheet only supplies the `display:
+   block` half of this pair, because in its own markup the labels carry
+   .visually-hidden and are hidden by that instead. These are real text, so
+   they need the hiding rule too. */
+.gt-theme-toggle .theme-label-when-auto,
+.gt-theme-toggle .theme-label-when-dark,
+.gt-theme-toggle .theme-label-when-light { display: none; }
+
+html[data-theme="auto"] .gt-theme-toggle .theme-label-when-auto,
+html[data-theme="dark"] .gt-theme-toggle .theme-label-when-dark,
+html[data-theme="light"] .gt-theme-toggle .theme-label-when-light { display: inline; }

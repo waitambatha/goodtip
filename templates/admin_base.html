@@ -36,6 +36,7 @@
         <a href="{% url 'manage:orgs_list' %}" class="{% block nav_orgs %}{% endblock %}">Orgs</a>
         <a href="{% url 'manage:sync' %}" class="{% block nav_sync %}{% endblock %}">Sync</a>
         <a href="{% url 'manage:enquiries' %}" class="{% block nav_enquiries %}{% endblock %}">Enquiries{% if open_enquiry_count %} <span class="an-count">{{ open_enquiry_count }}</span>{% endif %}</a>
+        {% if user.is_superuser %}<a href="{% url 'manage:pages' %}" class="{% block nav_pages %}{% endblock %}">Pages</a>{% endif %}
         {% if user.is_superuser %}<a href="{% url 'manage:news' %}" class="{% block nav_news %}{% endblock %}">News &amp; blog</a>{% endif %}
       </div>
       <div class="an-right">
@@ -76,6 +77,7 @@
       <a href="{% url 'manage:orgs_list' %}">Orgs</a>
       <a href="{% url 'manage:sync' %}">Sync</a>
       <a href="{% url 'manage:enquiries' %}">Enquiries{% if open_enquiry_count %} ({{ open_enquiry_count }}){% endif %}</a>
+      {% if user.is_superuser %}<a href="{% url 'manage:pages' %}">Pages</a>{% endif %}
       {% if user.is_superuser %}<a href="{% url 'manage:news' %}">News &amp; blog</a>{% endif %}
       <a href="{% url 'profile' %}">Profile</a>
       <a href="{% url 'dashboard' %}">&larr; Back to app</a>

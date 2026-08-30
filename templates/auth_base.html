@@ -14,6 +14,7 @@
   <script src="{% static 'js/gt-loader.js' %}" defer></script>
   <script src="{% static 'js/gt-busy.js' %}" defer></script>
   <script src="{% static 'js/gt-confirm.js' %}" defer></script>
+  {% block extra_head %}{% endblock %}
   {% include "partials/_analytics.html" %}
 </head>
 <body class="auth-body">

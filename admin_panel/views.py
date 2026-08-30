@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.files.storage import default_storage
 from django.db.models import Q
-from django.http import HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -680,3 +680,215 @@ def enquiry_detail(request, enquiry_id):
         return redirect("manage:enquiries")
 
     return render(request, "manage/enquiry_detail.html", {"enquiry": enquiry})
+
+
+# ---------------------------------------------------------------------------
+# Pages — the words on the site, edited on the page itself.
+#
+# The client's picture of this: click a page, see everything on it, click
+# Edit, change the wording, save, and the site says the new thing. So this is
+# deliberately not a form full of named fields — the page *is* the form. These
+# three views are only the index, the save, and the undo; the editing happens
+# on the real page, tagged up by PageEditMiddleware and driven by
+# static/js/gt-page-editor.js.
+# ---------------------------------------------------------------------------
+import json  # noqa: E402
+
+from django.db.models import Count as _Count  # noqa: E402
+from django.urls import NoReverseMatch  # noqa: E402
+from django.views.decorators.http import require_POST  # noqa: E402
+
+from . import pages as page_registry  # noqa: E402
+from .middleware import EDIT_PARAM  # noqa: E402
+from .models import PageEdit  # noqa: E402
+
+
+def _sample_org_id(request):
+    """An organisation to build the org-scoped page links with.
+
+    Those pages — my tips, the group wall, plans — only exist inside an
+    organisation, so the index needs one to link to. The one the admin is
+    currently standing in, or failing that any organisation at all; if there
+    are none, those rows say so rather than linking nowhere.
+    """
+    from orgs.context import current_org
+
+    org = current_org(request)
+    if org is not None:
+        return org.pk
+    row = Organisation.objects.values_list("pk", flat=True).first()
+    return row
+
+
+def _page_rows(request, group):
+    counts = dict(
+        PageEdit.objects.values_list("page").annotate(n=_Count("id")).values_list("page", "n")
+    )
+    stale = set(
+        PageEdit.objects.filter(last_applied_at__isnull=True).values_list("page", flat=True)
+    )
+    org_id = _sample_org_id(request)
+    round_id = None
+
+    rows = []
+    for page in page_registry.PAGES:
+        if page.group != group:
+            continue
+        args = []
+        blocked = ""
+        for need in page.needs:
+            if need == "org_id":
+                if org_id is None:
+                    blocked = "No groups exist yet."
+                    break
+                args.append(org_id)
+            elif need == "round_id":
+                if round_id is None:
+                    round_id = (
+                        Round.objects.filter(org_id=org_id)
+                        .values_list("pk", flat=True).first()
+                    )
+                if round_id is None:
+                    blocked = "This group has no rounds yet."
+                    break
+                args.append(round_id)
+
+        url = ""
+        if not blocked:
+            try:
+                url = reverse(page.view_name, args=args)
+            except NoReverseMatch:
+                blocked = "This page has moved."
+
+        rows.append({
+            "page": page,
+            "url": url,
+            # The same address with edit mode already on, which is what the
+            # "Edit wording" button opens.
+            "edit_url": f"{url}?{EDIT_PARAM}=1" if url else "",
+            "blocked": blocked,
+            "edit_count": counts.get(page.key, 0),
+            "has_stale": page.key in stale,
+        })
+    return rows
+
+
+@superuser_required
+def pages_list(request):
+    return render(request, "manage/pages.html", {
+        "public_rows": _page_rows(request, page_registry.GROUP_PUBLIC),
+        "private_rows": _page_rows(request, page_registry.GROUP_PRIVATE),
+        "total_edits": PageEdit.objects.count(),
+        "stale_edits": PageEdit.objects.filter(last_applied_at__isnull=True).count(),
+    })
+
+
+@superuser_required
+def page_edits(request, page_key: str):
+    """Every edit made to one page: what it said, what it says now."""
+    page = page_registry.BY_KEY.get(page_key)
+    if page is None:
+        raise Http404("No such page.")
+    return render(request, "manage/page_edits.html", {
+        "page": page,
+        "edits": PageEdit.objects.filter(page=page_key),
+    })
+
+
+@superuser_required
+@require_POST
+def page_save(request):
+    """Store the blocks the editor changed.
+
+    Takes JSON rather than form fields because what is being sent is a set of
+    blocks whose names are not known until the page is on screen — the whole
+    point being that no template had to declare them in advance.
+    """
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"error": "Could not read that."}, status=400)
+
+    page_key = payload.get("page") or ""
+    if page_key not in page_registry.BY_KEY:
+        return JsonResponse({"error": "Unknown page."}, status=400)
+
+    blocks = payload.get("blocks")
+    if not isinstance(blocks, list):
+        return JsonResponse({"error": "No blocks given."}, status=400)
+
+    saved = 0
+    reverted = 0
+    for block in blocks[:400]:
+        if not isinstance(block, dict):
+            continue
+        key = str(block.get("key") or "")[:64]
+        if not key:
+            continue
+
+        # An empty edit is not an edit: it means "put the original back", which
+        # is the only way to undo one from the page itself.
+        if block.get("revert"):
+            reverted += PageEdit.objects.filter(page=page_key, block_key=key).delete()[0]
+            continue
+
+        PageEdit.objects.update_or_create(
+            page=page_key, block_key=key,
+            defaults={
+                "kind": PageEdit.KIND_TEXT,
+                # Same second layer as the story editor: the only people who
+                # can reach this are superusers, but a compromised account
+                # should not be able to put a <script> on the landing page.
+                "html": sanitize_editor_html(str(block.get("html") or ""))[:200_000],
+                "original_html": str(block.get("original") or "")[:200_000],
+                "updated_by": request.user,
+                # Cleared rather than kept: whether the new edit matches
+                # anything is decided by the next render, not by this one.
+                "last_applied_at": None,
+            },
+        )
+        saved += 1
+
+    return JsonResponse({"saved": saved, "reverted": reverted})
+
+
+@superuser_required
+@require_POST
+def page_upload_image(request):
+    """Replace one image on a page. Returns the URL the editor swaps in."""
+    page_key = request.POST.get("page") or ""
+    key = str(request.POST.get("key") or "")[:64]
+    f = request.FILES.get("file")
+    if page_key not in page_registry.BY_KEY or not key or not f:
+        return JsonResponse({"error": "Missing image."}, status=400)
+    if not (f.content_type or "").startswith("image/"):
+        return JsonResponse({"error": "That's not an image."}, status=400)
+
+    row, _ = PageEdit.objects.update_or_create(
+        page=page_key, block_key=key,
+        defaults={
+            "kind": PageEdit.KIND_IMAGE,
+            "html": "",
+            "original_html": str(request.POST.get("original") or "")[:2000],
+            "updated_by": request.user,
+            "last_applied_at": None,
+        },
+    )
+    row.image = f
+    row.save(update_fields=["image"])
+    return JsonResponse({"url": row.image.url})
+
+
+@superuser_required
+@require_POST
+def page_revert(request, page_key: str):
+    """Put every word on one page back to what the template says."""
+    if page_key not in page_registry.BY_KEY:
+        raise Http404("No such page.")
+    n = PageEdit.objects.filter(page=page_key).delete()[0]
+    messages.success(
+        request,
+        f"{n} edit{'s' if n != 1 else ''} removed — that page is back to its original wording."
+        if n else "That page had no edits to remove.",
+    )
+    return redirect("manage:pages")

@@ -136,3 +136,87 @@ class Enquiry(models.Model):
     @property
     def is_answered(self) -> bool:
         return self.status == self.STATUS_REPLIED
+
+
+class PageEdit(models.Model):
+    """One block of wording on one page, rewritten by an admin.
+
+    HOW A BLOCK IS IDENTIFIED
+    -------------------------
+    Not by position. An edit keyed on "the fourth paragraph" moves onto a
+    different paragraph the moment a developer adds one above it, and silently
+    rewrites the wrong sentence — which is worse than losing the edit.
+
+    So the key is built from the wording the edit replaced: the tag name plus a
+    hash of that element's original inner HTML (see `pagetext.block_key`). An
+    edit therefore survives the page being reordered, sections being added
+    around it, and the element moving anywhere on the page. What it does not
+    survive is somebody changing that original wording in the template — and
+    that is the point, because at that moment nobody can honestly say whether
+    the admin's rewrite still means what they wanted it to. The edit stops
+    applying, the original shows, and the manage page marks it stale rather
+    than pretending.
+
+    `original_html` is kept alongside for exactly that: so the manage page can
+    show what was replaced, and so a stale edit can still be read back.
+    """
+
+    KIND_TEXT = "text"
+    KIND_IMAGE = "image"
+    KIND_CHOICES = [(KIND_TEXT, "Wording"), (KIND_IMAGE, "Image")]
+
+    # A key from admin_panel.pages.PAGES. Not an FK — the registry is code, not
+    # rows, and an edit for a page that has since been retired should sit
+    # harmlessly in the table rather than block a deploy.
+    page = models.CharField(max_length=40)
+    block_key = models.CharField(max_length=64)
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default=KIND_TEXT)
+
+    # What the admin wants shown. For KIND_TEXT this is the element's new inner
+    # HTML; for KIND_IMAGE it is empty and `image` carries the replacement.
+    html = models.TextField(blank=True)
+    image = models.ImageField(upload_to="page_edits/", blank=True, null=True)
+
+    # What was there before, so the manage page can show the change and so a
+    # stale edit is still readable.
+    original_html = models.TextField(blank=True)
+
+    # Stamped every time the rewriter actually uses this edit. Null means it
+    # has never matched since it was saved — the wording it was made against
+    # is gone, and the page is showing the original.
+    last_applied_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="page_edits",
+    )
+
+    class Meta:
+        ordering = ["page", "block_key"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["page", "block_key"], name="uniq_page_edit_block",
+            ),
+        ]
+        indexes = [models.Index(fields=["page"])]
+
+    def __str__(self):
+        return f"{self.page}:{self.block_key}"
+
+    @property
+    def is_live(self) -> bool:
+        """Whether this edit is currently showing on the page.
+
+        False means the template's own wording has changed since the edit was
+        made, so the key no longer matches anything and readers are seeing the
+        original. See the class docstring for why that is the safe answer.
+        """
+        return self.last_applied_at is not None
+
+    @property
+    def replacement(self) -> str:
+        if self.kind == self.KIND_IMAGE:
+            return self.image.url if self.image else ""
+        return self.html

@@ -253,6 +253,11 @@ def verify_view(request):
         "email": user.email,
         "purpose": purpose,
         "minutes": int(LoginCode.TTL.total_seconds() // 60),
+        # The page used to print the form field's max_length here, which is 16
+        # — deliberately loose so a pasted "123 456" survives — and so told
+        # every member to expect a 16-digit code. This is the real length, and
+        # the same number the page auto-submits on.
+        "code_length": LoginCode.CODE_LENGTH,
     })
 
 

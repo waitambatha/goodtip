@@ -3,6 +3,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import PasswordResetForm as DjangoPasswordResetForm
 from django.contrib.auth.password_validation import validate_password
 
+from .models import LoginCode
+
 
 User = get_user_model()
 
@@ -106,8 +108,10 @@ class VerifyCodeForm(forms.Form):
 
     def clean_code(self):
         digits = "".join(c for c in self.cleaned_data["code"] if c.isdigit())
-        if len(digits) != 6:
-            raise forms.ValidationError("Enter the 6-digit code from your email.")
+        if len(digits) != LoginCode.CODE_LENGTH:
+            raise forms.ValidationError(
+                f"Enter the {LoginCode.CODE_LENGTH}-digit code from your email."
+            )
         return digits
 
 

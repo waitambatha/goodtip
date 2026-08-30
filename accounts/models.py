@@ -76,6 +76,14 @@ class LoginCode(models.Model):
     # Long enough that a mistyped digit isn't a lockout, short enough that a
     # stolen code is worthless by the time anyone gets to it.
 
+    # How many digits a code has. Named rather than left as a literal in three
+    # places, because three things have to agree on it and used not to: the
+    # generator below, the form's "exactly six digits" rule, and the sentence
+    # on the verify page that tells the member what to expect. That sentence
+    # printed the *form field's* max_length instead and so advertised a
+    # 16-digit code. The verify page's auto-submit now needs the number too.
+    CODE_LENGTH = 6
+
     user = models.ForeignKey(
         "accounts.User", on_delete=models.CASCADE, related_name="login_codes"
     )
@@ -104,7 +112,7 @@ class LoginCode(models.Model):
             user=user, purpose=purpose, consumed_at__isnull=True
         ).update(consumed_at=timezone.now())
         # secrets, not random — this is a credential.
-        code = f"{secrets.randbelow(1_000_000):06d}"
+        code = f"{secrets.randbelow(10 ** cls.CODE_LENGTH):0{cls.CODE_LENGTH}d}"
         row = cls.objects.create(
             user=user,
             code_hash=make_password(code),

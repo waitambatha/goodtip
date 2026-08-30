@@ -1,0 +1,64 @@
+{% extends "admin_base.html" %}
+{% load static %}
+{% block title %}Pages &middot; Manage{% endblock %}
+{% block nav_pages %}on{% endblock %}
+{% block hero_title %}The words on the site{% endblock %}
+{% block hero_lead %}Open a page, click Edit, change the wording, save. It goes live straight away.{% endblock %}
+{% block hero_shot %}{% static 'img/scenes/stadium-panorama.jpg' %}{% endblock %}
+{% block admin_content %}
+
+<div class="gt-shell gt-shell-wide">
+
+  {% if stale_edits %}
+  {% comment %}
+  Surfaced at the top rather than buried per row, because a stale edit is
+  invisible from the site itself — the page looks the way it always did, and
+  the admin is the only one who would ever wonder why their change went away.
+  {% endcomment %}
+  <div class="gt-note is-warn">
+    <b>{{ stale_edits }} edit{{ stale_edits|pluralize }} {{ stale_edits|pluralize:"is,are" }} no longer showing.</b>
+    The original wording those edits replaced has since been changed in the site
+    itself, so they have stopped being applied and readers are seeing the new
+    original. Open the page below to see which, and make the change again.
+  </div>
+  {% endif %}
+
+  {% for group in "12"|make_list %}
+  {% if group == "1" %}
+    {% include "manage/_pages_group.html" with rows=public_rows title="Public pages" sub="Anyone can reach these without signing in." icon="ic-globe" %}
+  {% else %}
+    {% include "manage/_pages_group.html" with rows=private_rows title="Private pages" sub="Only visible to a member who has signed in." icon="ic-shield" %}
+  {% endif %}
+  {% endfor %}
+
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-doc"/></svg></span>
+      <div>
+        <h2>How editing a page works</h2>
+        <div class="gp-sub">{{ total_edits }} edit{{ total_edits|pluralize }} saved across the site.</div>
+      </div>
+    </div>
+    <ul class="pg-bullets">
+        <li><b>Everything on the page is editable.</b> Every heading, paragraph,
+          caption, button label and picture. Click the words to type over them,
+          click a picture to swap it.</li>
+        <li><b>Nothing is live until you press Save</b> — except pictures, which
+          save as soon as they finish uploading.</li>
+        <li><b>Ctrl+Z undoes,</b> the same as anywhere else. So does the undo
+          button in the toolbar.</li>
+        <li><b>An edit is tied to the wording it replaced.</b> If that original
+          wording is later changed in the site itself, the edit stops applying
+          and is listed above rather than being silently pasted over something
+          it was never written for.</li>
+        <li><b>Shared furniture is edited per page.</b> The top menu and the
+          footer appear on every page, but an edit made here belongs to the
+          page it was made on — change the menu on Home and Home is what
+          changes.</li>
+        <li><b>Numbers and names that the page works out for itself</b> — a
+          member's name, a ladder position, a total raised — can be typed over
+          but will not stay changed. They are recalculated on every visit.</li>
+    </ul>
+  </section>
+</div>
+{% endblock %}

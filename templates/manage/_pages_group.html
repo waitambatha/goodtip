@@ -1,0 +1,56 @@
+{% comment %}
+One half of the Pages index — the public pages, or the signed-in ones. Both
+halves are the same table, so they are one template used twice rather than two
+that drift apart.
+{% endcomment %}
+<section class="gt-panel">
+  <div class="gt-panel-head">
+    <span class="gp-ic"><svg><use href="#{{ icon }}"/></svg></span>
+    <div>
+      <h2>{{ title }}</h2>
+      <div class="gp-sub">{{ sub }}</div>
+    </div>
+  </div>
+
+  <div class="gt-tablewrap">
+    <table class="gt-table">
+      <thead>
+        <tr><th>Page</th><th>Address</th><th>Edits</th><th class="fit">&nbsp;</th></tr>
+      </thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td>
+            <span class="gt-namecell">
+              <span>
+                <b>{{ row.page.label }}</b>
+                <small>{{ row.page.blurb }}</small>
+              </span>
+            </span>
+          </td>
+          <td>
+            {% if row.url %}<code class="pg-url">{{ row.url }}</code>
+            {% else %}<span class="gt-muted">{{ row.blocked }}</span>{% endif %}
+          </td>
+          <td>
+            {% if row.edit_count %}
+              <a href="{% url 'manage:page_edits' row.page.key %}" class="gt-pill is-quiet">
+                {{ row.edit_count }} edit{{ row.edit_count|pluralize }}
+              </a>
+              {% if row.has_stale %}<span class="pg-tag is-warn">some not showing</span>{% endif %}
+            {% else %}
+              <span class="gt-muted">&mdash;</span>
+            {% endif %}
+          </td>
+          <td class="fit">
+            {% if row.url %}
+            <a href="{{ row.url }}" class="gt-pill is-quiet" target="_blank" rel="noopener">View</a>
+            <a href="{{ row.edit_url }}" class="gt-pill">Edit wording</a>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>

@@ -1,0 +1,136 @@
+/* The editing chrome that rides on top of a real page.
+ *
+ * Loaded only when a superuser opens a page with ?gt_edit=1, so none of this
+ * reaches a visitor. It has to sit over pages whose own CSS it has never met,
+ * which is why the bar is fixed, high z-index, and states its own colours
+ * rather than inheriting any.
+ */
+
+.gte-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 2147483000;
+  background: #0F2E22;
+  color: #E8E4D5;
+  font-family: 'Archivo', system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, .28);
+}
+
+/* The bar sits over the top of the page. Push the page down by its height so
+   nothing is hidden underneath it.
+
+   Both of this site's navs are `position: sticky; top: 0`, which pins them to
+   the top of the *viewport* — so padding alone moves them on first paint and
+   then lets them slide back under the bar the moment you scroll. They need
+   their own offset to match. Only ever in edit mode: this file is loaded
+   nowhere else.
+
+   The height is measured and published as --gte-h by gt-page-editor.js rather
+   than written here as a number, because it changes: the toolbar and the hint
+   line appear when editing starts, and the whole bar wraps to two rows on a
+   narrow window. A hardcoded guess is wrong in three of those four states. */
+body { padding-top: var(--gte-h, 52px); }
+.nav, .app-nav { top: var(--gte-h, 52px); }
+
+.gte-bar-in {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 16px;
+  min-height: 52px;
+  box-sizing: border-box;
+}
+
+.gte-home {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: #E8E4D5; text-decoration: none; opacity: .8;
+  font-weight: 600; white-space: nowrap;
+}
+.gte-home:hover { opacity: 1; }
+.gte-home svg { width: 15px; height: 15px; }
+
+.gte-which { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
+.gte-which b {
+  font-size: 14px; font-weight: 700; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+
+.gte-state {
+  padding: 2px 9px; border-radius: 999px;
+  background: rgba(232, 228, 213, .14);
+  font-size: 11px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase;
+  white-space: nowrap;
+}
+.gte-state.is-editing { background: #C8F135; color: #0F2E22; }
+.gte-state.is-saved { background: #2D7A3A; color: #fff; }
+.gte-state.is-error { background: #C0392B; color: #fff; }
+
+.gte-acts { margin-left: auto; display: flex; gap: 8px; }
+
+.gte-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 999px;
+  border: 1px solid rgba(232, 228, 213, .35);
+  background: transparent; color: #E8E4D5;
+  font-family: inherit; font-size: 13px; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+}
+.gte-btn:hover { background: rgba(232, 228, 213, .12); }
+.gte-btn svg { width: 15px; height: 15px; }
+.gte-btn.is-go { background: #C8F135; border-color: #C8F135; color: #0F2E22; }
+.gte-btn.is-go:hover { background: #d6f95c; }
+.gte-btn:disabled { opacity: .45; cursor: default; }
+.gte-btn:disabled:hover { background: #C8F135; }
+
+/* The format toolbar is the story editor's, so it keeps its own look — a
+   cream strip — rather than being restyled dark and diverging from it. */
+.gte-tools.ned-toolbar {
+  border-radius: 0;
+  border-left: 0; border-right: 0; border-top: 0;
+  padding: 6px 16px;
+}
+
+.gte-hint {
+  margin: 0; padding: 5px 16px 7px;
+  background: rgba(0, 0, 0, .22);
+  font-size: 12px; opacity: .8;
+}
+
+.gte-revert-one {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #8a3c33 !important;
+}
+.gte-revert-one:disabled { opacity: .4; cursor: default; }
+
+/* ---- the blocks themselves ----
+   Only ever while editing. A dotted outline on hover says "this is a thing you
+   can click", and a solid one says "this is the thing the toolbar is aimed
+   at" — without which a page of forty editable paragraphs gives no clue which
+   one a colour change is about to land on. */
+body.gte-editing [data-gte] {
+  outline: 1px dashed rgba(45, 122, 58, .45);
+  outline-offset: 2px;
+  border-radius: 2px;
+  cursor: text;
+}
+body.gte-editing [data-gte]:hover { outline-color: rgba(45, 122, 58, .9); }
+body.gte-editing [data-gte].gte-on,
+body.gte-editing [data-gte]:focus {
+  outline: 2px solid #2D7A3A;
+  background: rgba(200, 241, 53, .10);
+}
+
+body.gte-editing .gte-img {
+  outline: 2px dashed rgba(45, 122, 58, .7);
+  outline-offset: 3px;
+  cursor: pointer;
+}
+body.gte-editing .gte-img:hover { outline-style: solid; }
+
+@media (max-width: 720px) {
+  .gte-which b { display: none; }
+  .gte-btn { padding: 7px 10px; }
+}

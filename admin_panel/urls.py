@@ -15,6 +15,12 @@ urlpatterns = [
     path("sync/", views.sync_panel, name="sync"),
     path("enquiries/", views.enquiries, name="enquiries"),
     path("enquiries/<int:enquiry_id>/", views.enquiry_detail, name="enquiry_detail"),
+    # Pages — the words on the public and members-only pages, edited in place.
+    path("pages/", views.pages_list, name="pages"),
+    path("pages/save/", views.page_save, name="page_save"),
+    path("pages/upload-image/", views.page_upload_image, name="page_upload_image"),
+    path("pages/<str:page_key>/", views.page_edits, name="page_edits"),
+    path("pages/<str:page_key>/revert/", views.page_revert, name="page_revert"),
     path("news/", views.news_list, name="news"),
     path("news/new/", views.news_new, name="news_new"),
     path("news/upload-image/", views.news_upload_image, name="news_upload_image"),
