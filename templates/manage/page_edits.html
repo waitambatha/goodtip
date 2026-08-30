@@ -1,0 +1,68 @@
+{% extends "hq_base.html" %}
+{% load static %}
+{% block title %}{{ page.label }} edits &middot; Manage{% endblock %}
+{% block nav_pages %}on{% endblock %}
+{% block hero_title %}{{ page.label }}{% endblock %}
+{% block hero_lead %}Every change made to the wording on this page.{% endblock %}
+{% block admin_content %}
+
+<div class="gt-shell gt-shell-wide">
+  <div class="ned-topbar">
+    <a href="{% url 'admin:hq_pages' %}" class="ned-back">&larr; All pages</a>
+  </div>
+
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-doc"/></svg></span>
+      <div>
+        <h2>Changes on this page</h2>
+        <div class="gp-sub">{{ page.blurb }}</div>
+      </div>
+      {% if edits %}
+      <form method="post" action="{% url 'admin:hq_page_revert' page.key %}" class="gp-right"
+            data-confirm="Every edit on this page will be removed and the original wording comes back."
+            data-busy="Reverting">
+        {% csrf_token %}
+        <button type="submit" class="gt-pill is-danger">Put the whole page back</button>
+      </form>
+      {% endif %}
+    </div>
+
+    {% if edits %}
+    <div class="gt-tablewrap">
+      <table class="gt-table">
+        <thead><tr><th>Was</th><th>Now</th><th>Changed</th><th>Showing</th></tr></thead>
+        <tbody>
+        {% for e in edits %}
+          <tr>
+            <td class="pe-cell"><div class="pe-was">{{ e.original_html|striptags|truncatechars:180 }}</div></td>
+            <td class="pe-cell">
+              {% if e.kind == "image" %}
+                {% if e.image %}<img src="{{ e.image.url }}" alt="" class="pe-shot">{% else %}<span class="gt-muted">Picture missing</span>{% endif %}
+              {% else %}
+                <div class="pe-now">{{ e.html|striptags|truncatechars:180 }}</div>
+              {% endif %}
+            </td>
+            <td>
+              <small>{{ e.updated_at|date:"j M Y, g:i A" }}</small><br>
+              <small class="gt-muted">{{ e.updated_by.display_name|default:"—" }}</small>
+            </td>
+            <td>
+              {% if e.is_live %}
+                <span class="pg-tag is-ok">Live</span>
+              {% else %}
+                <span class="pg-tag is-warn">Not showing</span>
+                <small class="gt-muted">The original wording this replaced has changed.</small>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="gt-muted">Nothing has been changed on this page yet.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

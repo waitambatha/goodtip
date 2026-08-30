@@ -33,6 +33,11 @@ they do not use.
 {% include "partials/_fonts.html" %}
 <link rel="stylesheet" href="{% static 'css/admin.css' %}">
 <link rel="stylesheet" href="{% static 'gtadmin/css/gtadmin.css' %}">
+{% comment %}
+After gtadmin.css on purpose: it carries the theme switch's labelled pill,
+which has to out-rank the skin's own `#user-tools .theme-toggle` circle.
+{% endcomment %}
+<link rel="stylesheet" href="{% static 'css/gt-admin.css' %}">
 <script>
   /* Restore the menu's collapsed state before first paint. Doing this from a
      deferred script instead makes the rail visibly snap from wide to narrow on
@@ -130,7 +135,6 @@ arrives already open.
 {% gta_alerts as alerts %}
 {% url 'admin:index' as u_index %}
 {% url 'admin:system_report' as u_report %}
-{% url 'admin:site_content' as u_content %}
 {% safe_url 'admin:hq_sync' as u_sync %}
 {% safe_url 'admin:hq_enquiries' as u_enq %}
 {% safe_url 'admin:hq_news' as u_news %}
@@ -154,10 +158,6 @@ arrives already open.
         <svg class="ic"><use href="#ic-home"/></svg><span class="lbl">Dashboard</span></a></li>
       <li><a href="{{ u_report }}" class="gta-nav-a{% if request.path == u_report %} on{% endif %}" data-jump="System report">
         <svg class="ic"><use href="#ic-chart"/></svg><span class="lbl">System report</span></a></li>
-      {% if user.is_superuser and u_content %}
-      <li><a href="{{ u_content }}" class="gta-nav-a{% if u_content in request.path %} on{% endif %}" data-jump="Site content">
-        <svg class="ic"><use href="#ic-image"/></svg><span class="lbl">Site content</span></a></li>
-      {% endif %}
     </ul>
 
     {% gta_sections as sections %}
@@ -202,8 +202,8 @@ arrives already open.
         <svg class="ic"><use href="#ic-doc"/></svg><span class="lbl">News &amp; blog</span></a></li>
       {% endif %}
       {% if u_pages %}
-      <li><a href="{{ u_pages }}" class="gta-nav-a{% if u_pages in request.path %} on{% endif %}" data-jump="Public pages">
-        <svg class="ic"><use href="#ic-globe"/></svg><span class="lbl">Public pages</span></a></li>
+      <li><a href="{{ u_pages }}" class="gta-nav-a{% if u_pages in request.path %} on{% endif %}" data-jump="Pages — the words on the site">
+        <svg class="ic"><use href="#ic-globe"/></svg><span class="lbl">Pages</span></a></li>
       {% endif %}
     </ul>
     {% endif %}

@@ -546,3 +546,53 @@ class OnboardingWalkthroughTests(TestCase):
     def test_signed_out_pages_carry_no_walkthrough(self):
         self.client.logout()
         self.assertNotContains(self.client.get(reverse("landing")), 'id="coach"')
+class VerifyPageTests(TestCase):
+    """The code page. Two things the client asked about, and one bug beside them.
+
+    The ask: entering the last digit should sign you in — no Enter, no
+    Verify button. The bug found while doing it: the page told every member to
+    expect a *sixteen*-digit code, because it printed the form field's
+    max_length. That field is deliberately loose so a pasted "123 456" survives
+    validation; it was never the length of anything.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="member@example.com", password="Str0ng-Pass-9x", display_name="Mem",
+        )
+        self.user.two_factor_enabled = True
+        self.user.save(update_fields=["two_factor_enabled"])
+        self.client.post(reverse("accounts:login"), {
+            "email": "member@example.com", "password": "Str0ng-Pass-9x",
+        })
+
+    def test_the_page_names_the_real_code_length(self):
+        html = self.client.get(reverse("accounts:verify")).content.decode()
+        self.assertIn(f"We've sent a {LoginCode.CODE_LENGTH}-digit code", html)
+        self.assertNotIn("16-digit code", html)
+
+    def test_the_field_tells_the_page_when_to_submit_itself(self):
+        html = self.client.get(reverse("accounts:verify")).content.decode()
+        self.assertIn(f'data-otp-length="{LoginCode.CODE_LENGTH}"', html)
+        self.assertIn("gt-otp.js", html)
+
+    def test_the_generated_code_is_that_many_digits(self):
+        _, code = LoginCode.issue(self.user)
+        self.assertEqual(len(code), LoginCode.CODE_LENGTH)
+        self.assertTrue(code.isdigit())
+
+    def test_a_pasted_code_with_spaces_is_still_accepted(self):
+        """Why max_length stays loose — the auto-submit strips these client
+        side, but the server cannot rely on that having happened."""
+        from .forms import VerifyCodeForm
+
+        form = VerifyCodeForm({"code": " 123 456 "})
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["code"], "123456")
+
+    def test_a_code_of_the_wrong_length_is_refused(self):
+        from .forms import VerifyCodeForm
+
+        form = VerifyCodeForm({"code": "12345"})
+        self.assertFalse(form.is_valid())
+        self.assertIn(f"{LoginCode.CODE_LENGTH}-digit", str(form.errors))

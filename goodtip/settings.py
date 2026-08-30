@@ -57,6 +57,9 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # Traffic-driven fallback, enabled only by opting in — see AUTOSYNC_ENABLED.
     "data_sync.autosync.AutoSyncMiddleware",
+    # Last, so it sees the finished HTML. Passes everything straight through
+    # except the handful of pages named in admin_panel.pages.
+    "admin_panel.middleware.PageEditMiddleware",
 ]
 
 # Syncing runs on the server's clock via goodtip-matchsync.timer, NOT on site

@@ -1,0 +1,91 @@
+{% comment %}
+Colour control for a story-editor toolbar. Used twice per toolbar:
+
+  {% include "manage/_ned_colour.html" with kind="text" %}
+  {% include "manage/_ned_colour.html" with kind="mark" %}
+
+`kind="text"` sets the letters, `kind="mark"` sets the highlight behind them.
+
+This replaced a bare <input type="color">, which had the same two problems the
+font <select> had. The OS colour dialog is a full modal — three clicks and a
+context switch to make one word red — and it has no idea what the house colours
+are, so every admin was mixing their own approximation of the brand green. A
+grid of swatches makes the common choice one click and the right green the
+obvious one, and Custom is still there underneath for anything else.
+
+Highlight gets a "None" that text colour does not: taking a highlight off is
+a thing people do constantly, and there is no colour that means "no colour".
+It writes `transparent` rather than an empty value, because an empty one only
+clears this run's own background and would lose to a highlight set further up
+the tree.
+{% endcomment %}
+<span class="ned-swatch" data-swatch="{{ kind }}">
+  <button type="button" class="ned-swatch-btn" data-swatch-toggle
+          title="{% if kind == 'mark' %}Highlight{% else %}Text colour{% endif %}"
+          aria-haspopup="listbox" aria-expanded="false">
+    {% if kind == "mark" %}
+    <svg viewBox="0 0 20 20" aria-hidden="true" class="ned-sw-ic">
+      <path d="M4 13.5 11.8 5.7a1.6 1.6 0 0 1 2.3 0l1.2 1.2a1.6 1.6 0 0 1 0 2.3L7.5 17H4z"
+            fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+    </svg>
+    {% else %}
+    <svg viewBox="0 0 20 20" aria-hidden="true" class="ned-sw-ic">
+      <path d="M4.5 15 10 4l5.5 11M6.7 11.4h6.6"
+            fill="none" stroke="currentColor" stroke-width="1.7"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    {% endif %}
+    {% comment %}The bar under the icon shows the colour this button will apply.{% endcomment %}
+    <span class="ned-sw-bar" data-swatch-bar></span>
+    <svg class="ned-caret" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg>
+  </button>
+
+  <div class="ned-menu is-swatches" data-swatch-menu role="listbox"
+       aria-label="{% if kind == 'mark' %}Highlight colour{% else %}Text colour{% endif %}">
+    {% if kind == "mark" %}
+    <button type="button" class="ned-menu-item ned-sw-none" data-colour="transparent">
+      <span class="ned-sw-nib is-none"></span> No highlight
+    </button>
+    <p class="ned-menu-head">Highlights</p>
+    <div class="ned-sw-grid">
+      <button type="button" class="ned-sw" data-colour="#C8F135" style="--sw:#C8F135" title="GoodTip lime"></button>
+      <button type="button" class="ned-sw" data-colour="#FFF3A3" style="--sw:#FFF3A3" title="Yellow"></button>
+      <button type="button" class="ned-sw" data-colour="#C7F0D2" style="--sw:#C7F0D2" title="Mint"></button>
+      <button type="button" class="ned-sw" data-colour="#CFE4FF" style="--sw:#CFE4FF" title="Sky"></button>
+      <button type="button" class="ned-sw" data-colour="#FFD6E7" style="--sw:#FFD6E7" title="Pink"></button>
+      <button type="button" class="ned-sw" data-colour="#FFE0C2" style="--sw:#FFE0C2" title="Peach"></button>
+      <button type="button" class="ned-sw" data-colour="#E4E7DC" style="--sw:#E4E7DC" title="Stone"></button>
+      <button type="button" class="ned-sw" data-colour="#0F2E22" style="--sw:#0F2E22" title="Deep green"></button>
+    </div>
+    {% else %}
+    <p class="ned-menu-head">GoodTip's own</p>
+    <div class="ned-sw-grid">
+      <button type="button" class="ned-sw" data-colour="#0F2E22" style="--sw:#0F2E22" title="Deep green"></button>
+      <button type="button" class="ned-sw" data-colour="#2D7A3A" style="--sw:#2D7A3A" title="Forest"></button>
+      <button type="button" class="ned-sw" data-colour="#C8F135" style="--sw:#C8F135" title="Lime"></button>
+      <button type="button" class="ned-sw" data-colour="#E8E4D5" style="--sw:#E8E4D5" title="Cream"></button>
+    </div>
+    <p class="ned-menu-head">Everything else</p>
+    <div class="ned-sw-grid">
+      <button type="button" class="ned-sw" data-colour="#111111" style="--sw:#111111" title="Near black"></button>
+      <button type="button" class="ned-sw" data-colour="#4B5563" style="--sw:#4B5563" title="Slate"></button>
+      <button type="button" class="ned-sw" data-colour="#9CA3AF" style="--sw:#9CA3AF" title="Grey"></button>
+      <button type="button" class="ned-sw" data-colour="#FFFFFF" style="--sw:#FFFFFF" title="White"></button>
+      <button type="button" class="ned-sw" data-colour="#C0392B" style="--sw:#C0392B" title="Red"></button>
+      <button type="button" class="ned-sw" data-colour="#E67E22" style="--sw:#E67E22" title="Orange"></button>
+      <button type="button" class="ned-sw" data-colour="#D4A017" style="--sw:#D4A017" title="Amber"></button>
+      <button type="button" class="ned-sw" data-colour="#1F6FEB" style="--sw:#1F6FEB" title="Blue"></button>
+      <button type="button" class="ned-sw" data-colour="#7C3AED" style="--sw:#7C3AED" title="Purple"></button>
+      <button type="button" class="ned-sw" data-colour="#0E7490" style="--sw:#0E7490" title="Teal"></button>
+    </div>
+    {% endif %}
+    <label class="ned-sw-custom">
+      Custom
+      {% comment %}
+      Not a data-cmd input: wireSwatchControl owns it, so it must not fall
+      through to the generic execCommand handler.
+      {% endcomment %}
+      <input type="color" data-swatch-custom value="{% if kind == 'mark' %}#FFF3A3{% else %}#0F2E22{% endif %}">
+    </label>
+  </div>
+</span>

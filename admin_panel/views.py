@@ -14,8 +14,6 @@ from django.utils.html import linebreaks, strip_tags
 from catalog.models import Charity, Competition, Season, Series, Sport
 from django.views.decorators.http import require_POST
 
-from . import pagecms
-from .models import PageMedia, PageText
 from data_sync.models import SyncRun, SyncSchedule
 from data_sync.services import get_sync_service, SyncError
 from orgs.services import unique_charity_slug as _unique_charity_slug
@@ -692,126 +690,212 @@ def enquiry_detail(request, enquiry_id):
 
 
 # ---------------------------------------------------------------------------
-# Public pages — the client edits their own copy
+# Pages — the words on the site, edited on the page itself.
+#
+# The client's picture of this: click a page, see everything on it, click
+# Edit, change the wording, save, and the site says the new thing. So this is
+# deliberately not a form full of named fields — the page *is* the form. These
+# three views are only the index, the save, and the undo; the editing happens
+# on the real page, tagged up by PageEditMiddleware and driven by
+# static/js/gt-page-editor.js.
 # ---------------------------------------------------------------------------
-#
-# The problem this solves, in the client's words: they read the site, wanted a
-# word changed, and had to come to us — a developer, a commit and a deploy, to
-# alter a sentence.
-#
-# What it deliberately does NOT let them do is move things. Copy changes
-# weekly; structure is what breaks when it does. So the template keeps the
-# layout AND the original words (see admin_panel.templatetags.pagecms), and
-# these screens only ever write an override. Deleting one puts the page back.
+import json  # noqa: E402
+
+from django.db.models import Count as _Count  # noqa: E402
+from django.urls import NoReverseMatch  # noqa: E402
+from django.views.decorators.http import require_POST  # noqa: E402
+
+from . import pages as page_registry  # noqa: E402
+from .middleware import EDIT_PARAM  # noqa: E402
+from .models import PageEdit  # noqa: E402
 
 
-@staff_member_required
-def pages_list(request):
-    """Every editable public page, with how much has been changed on each."""
-    return render(request, "manage/pages.html", {"pages": pagecms.all_pages()})
+def _sample_org_id(request):
+    """An organisation to build the org-scoped page links with.
 
-
-@staff_member_required
-def page_edit(request, slug: str):
-    """Edit one page's copy and its pictures.
-
-    Saving writes only what DIFFERS from the template's default, and clears
-    the row for anything set back to it. That keeps the table meaning "here
-    is what the client changed" rather than "here is a copy of the site" —
-    which matters the day a developer improves a default and every page is
-    still silently serving a year-old duplicate of it.
+    Those pages — my tips, the group wall, plans — only exist inside an
+    organisation, so the index needs one to link to. The one the admin is
+    currently standing in, or failing that any organisation at all; if there
+    are none, those rows say so rather than linking nowhere.
     """
-    info = pagecms.discover(slug)
-    if info is None:
-        raise Http404("No such page.")
+    from orgs.context import current_org
 
-    if request.method == "POST":
-        changed = cleared = 0
-        for slot in info.slots:
-            posted = (request.POST.get(f"slot__{slot.key}") or "").strip()
-            if posted and posted != slot.default:
-                _, created = PageText.objects.update_or_create(
-                    page=slug, key=slot.key,
-                    defaults={"value": posted, "updated_by": request.user},
-                )
-                changed += 1
-            else:
-                # Empty, or identical to the default — either way there is
-                # nothing to override. Blank is "put it back", not "leave a
-                # hole on the live site"; the tag treats it the same way.
-                cleared += PageText.objects.filter(page=slug, key=slot.key).delete()[0]
-        bits = []
-        if changed:
-            bits.append(f"{changed} change{'s' if changed != 1 else ''} saved")
-        if cleared:
-            bits.append(f"{cleared} back to the original")
-        messages.success(request, f"{info.title}: {' · '.join(bits) or 'nothing changed'}.")
-        return redirect("admin:hq_page_edit", slug=slug)
+    org = current_org(request)
+    if org is not None:
+        return org.pk
+    row = Organisation.objects.values_list("pk", flat=True).first()
+    return row
 
-    groups = {}
-    for slot in info.slots:
-        groups.setdefault(slot.group or "Page", []).append(slot)
-    return render(request, "manage/page_edit.html", {
-        "page": info,
-        "groups": groups,
-        "media": PageMedia.objects.filter(page=slug),
+
+def _page_rows(request, group):
+    counts = dict(
+        PageEdit.objects.values_list("page").annotate(n=_Count("id")).values_list("page", "n")
+    )
+    stale = set(
+        PageEdit.objects.filter(last_applied_at__isnull=True).values_list("page", flat=True)
+    )
+    org_id = _sample_org_id(request)
+    round_id = None
+
+    rows = []
+    for page in page_registry.PAGES:
+        if page.group != group:
+            continue
+        args = []
+        blocked = ""
+        for need in page.needs:
+            if need == "org_id":
+                if org_id is None:
+                    blocked = "No groups exist yet."
+                    break
+                args.append(org_id)
+            elif need == "round_id":
+                if round_id is None:
+                    round_id = (
+                        Round.objects.filter(org_id=org_id)
+                        .values_list("pk", flat=True).first()
+                    )
+                if round_id is None:
+                    blocked = "This group has no rounds yet."
+                    break
+                args.append(round_id)
+
+        url = ""
+        if not blocked:
+            try:
+                url = reverse(page.view_name, args=args)
+            except NoReverseMatch:
+                blocked = "This page has moved."
+
+        rows.append({
+            "page": page,
+            "url": url,
+            # The same address with edit mode already on, which is what the
+            # "Edit wording" button opens.
+            "edit_url": f"{url}?{EDIT_PARAM}=1" if url else "",
+            "blocked": blocked,
+            "edit_count": counts.get(page.key, 0),
+            "has_stale": page.key in stale,
+        })
+    return rows
+
+
+@superuser_required
+def pages_list(request):
+    return render(request, "manage/pages.html", {
+        "public_rows": _page_rows(request, page_registry.GROUP_PUBLIC),
+        "private_rows": _page_rows(request, page_registry.GROUP_PRIVATE),
+        "total_edits": PageEdit.objects.count(),
+        "stale_edits": PageEdit.objects.filter(last_applied_at__isnull=True).count(),
     })
 
 
-@staff_member_required
-@require_POST
-def page_media_upload(request, slug: str):
-    """Add a picture or a video to a page, or replace the one in a slot."""
-    if pagecms.PAGES_BY_SLUG.get(slug) is None:
+@superuser_required
+def page_edits(request, page_key: str):
+    """Every edit made to one page: what it said, what it says now."""
+    page = page_registry.BY_KEY.get(page_key)
+    if page is None:
         raise Http404("No such page.")
-    upload = request.FILES.get("file")
-    if upload is None:
-        messages.error(request, "Choose a file first.")
-        return redirect("admin:hq_page_edit", slug=slug)
-
-    name = upload.name.lower()
-    kind = (
-        PageMedia.KIND_VIDEO
-        if name.endswith((".mp4", ".webm", ".mov", ".m4v"))
-        else PageMedia.KIND_IMAGE
-    )
-    PageMedia.objects.create(
-        page=slug,
-        slot=(request.POST.get("slot") or "").strip(),
-        kind=kind,
-        file=upload,
-        alt=(request.POST.get("alt") or "").strip(),
-        uploaded_by=request.user,
-    )
-    messages.success(request, f"{upload.name} uploaded.")
-    return redirect("admin:hq_page_edit", slug=slug)
+    return render(request, "manage/page_edits.html", {
+        "page": page,
+        "edits": PageEdit.objects.filter(page=page_key),
+    })
 
 
-@staff_member_required
+@superuser_required
 @require_POST
-def page_media_delete(request, slug: str, media_id: int):
-    """Remove an uploaded file for good, and its bytes with it."""
-    row = get_object_or_404(PageMedia, pk=media_id, page=slug)
-    label = row.file.name.rsplit("/", 1)[-1]
-    # Delete the file too. A CMS that drops the row and leaves the bytes on
-    # disk turns "delete this photo" into "hide this photo", which is not what
-    # anybody means by it — least of all somebody removing a picture because
-    # they no longer have the right to publish it.
-    row.file.delete(save=False)
-    row.delete()
-    messages.success(request, f"{label} deleted.")
-    return redirect("admin:hq_page_edit", slug=slug)
+def page_save(request):
+    """Store the blocks the editor changed.
+
+    Takes JSON rather than form fields because what is being sent is a set of
+    blocks whose names are not known until the page is on screen — the whole
+    point being that no template had to declare them in advance.
+    """
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"error": "Could not read that."}, status=400)
+
+    page_key = payload.get("page") or ""
+    if page_key not in page_registry.BY_KEY:
+        return JsonResponse({"error": "Unknown page."}, status=400)
+
+    blocks = payload.get("blocks")
+    if not isinstance(blocks, list):
+        return JsonResponse({"error": "No blocks given."}, status=400)
+
+    saved = 0
+    reverted = 0
+    for block in blocks[:400]:
+        if not isinstance(block, dict):
+            continue
+        key = str(block.get("key") or "")[:64]
+        if not key:
+            continue
+
+        # An empty edit is not an edit: it means "put the original back", which
+        # is the only way to undo one from the page itself.
+        if block.get("revert"):
+            reverted += PageEdit.objects.filter(page=page_key, block_key=key).delete()[0]
+            continue
+
+        PageEdit.objects.update_or_create(
+            page=page_key, block_key=key,
+            defaults={
+                "kind": PageEdit.KIND_TEXT,
+                # Same second layer as the story editor: the only people who
+                # can reach this are superusers, but a compromised account
+                # should not be able to put a <script> on the landing page.
+                "html": sanitize_editor_html(str(block.get("html") or ""))[:200_000],
+                "original_html": str(block.get("original") or "")[:200_000],
+                "updated_by": request.user,
+                # Cleared rather than kept: whether the new edit matches
+                # anything is decided by the next render, not by this one.
+                "last_applied_at": None,
+            },
+        )
+        saved += 1
+
+    return JsonResponse({"saved": saved, "reverted": reverted})
 
 
-@staff_member_required
+@superuser_required
 @require_POST
-def page_media_toggle(request, slug: str, media_id: int):
-    """Show or hide a slot's picture without deleting it."""
-    row = get_object_or_404(PageMedia, pk=media_id, page=slug)
-    row.is_hidden = not row.is_hidden
-    row.save(update_fields=["is_hidden"])
+def page_upload_image(request):
+    """Replace one image on a page. Returns the URL the editor swaps in."""
+    page_key = request.POST.get("page") or ""
+    key = str(request.POST.get("key") or "")[:64]
+    f = request.FILES.get("file")
+    if page_key not in page_registry.BY_KEY or not key or not f:
+        return JsonResponse({"error": "Missing image."}, status=400)
+    if not (f.content_type or "").startswith("image/"):
+        return JsonResponse({"error": "That's not an image."}, status=400)
+
+    row, _ = PageEdit.objects.update_or_create(
+        page=page_key, block_key=key,
+        defaults={
+            "kind": PageEdit.KIND_IMAGE,
+            "html": "",
+            "original_html": str(request.POST.get("original") or "")[:2000],
+            "updated_by": request.user,
+            "last_applied_at": None,
+        },
+    )
+    row.image = f
+    row.save(update_fields=["image"])
+    return JsonResponse({"url": row.image.url})
+
+
+@superuser_required
+@require_POST
+def page_revert(request, page_key: str):
+    """Put every word on one page back to what the template says."""
+    if page_key not in page_registry.BY_KEY:
+        raise Http404("No such page.")
+    n = PageEdit.objects.filter(page=page_key).delete()[0]
     messages.success(
         request,
-        f"Picture {'hidden' if row.is_hidden else 'showing'} on {slug}.",
+        f"{n} edit{'s' if n != 1 else ''} removed — that page is back to its original wording."
+        if n else "That page had no edits to remove.",
     )
-    return redirect("admin:hq_page_edit", slug=slug)
+    return redirect("admin:hq_pages")

@@ -58,12 +58,26 @@
     <label class="ned-field-label">Headline</label>
     <div class="ned-editor is-headline" data-editor="headline">
       <div class="ned-toolbar">
-        <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
-        <button type="button" data-cmd="underline" title="Underline"><u>U</u></button>
+        <button type="button" data-history="undo" title="Undo (Ctrl+Z)" aria-label="Undo">
+          <svg viewBox="0 0 20 20" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;"><path d="M4 9h8.5a4 4 0 0 1 0 8H8"/><path d="M7 5.5 3.5 9 7 12.5"/></svg>
+        </button>
+        <button type="button" data-history="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
+          <svg viewBox="0 0 20 20" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;"><path d="M16 9H7.5a4 4 0 0 0 0 8H12"/><path d="M13 5.5 16.5 9 13 12.5"/></svg>
+        </button>
+        <span class="ned-sep"></span>
+        <button type="button" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+        <button type="button" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+        <button type="button" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+        <button type="button" data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
         <span class="ned-sep"></span>
         {% include "manage/_ned_font.html" %}
         {% include "manage/_ned_size.html" with default=34 %}
-        <input type="color" data-cmd="foreColor" title="Colour" value="#0F2E22">
+        {% include "manage/_ned_colour.html" with kind="text" %}
+        {% include "manage/_ned_colour.html" with kind="mark" %}
+        <span class="ned-sep"></span>
+        <button type="button" data-action="clearFormat" title="Clear formatting" class="ned-clear">
+          <svg viewBox="0 0 20 20" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;"><path d="M7.5 15.5h8"/><path d="m5.5 12.5 6-8 3.5 2.5-5 7z"/><path d="m3.5 15.5 2.5-3"/></svg>
+        </button>
       </div>
       <div class="ned-surface" contenteditable="true" data-hidden-input="np_title_html"
            data-placeholder="Finals race tightens as the top eight pulls away"
@@ -80,13 +94,26 @@
     <label class="ned-field-label">Teaser <span class="ned-hint">one or two sentences, shown on the dashboard card and above the story</span></label>
     <div class="ned-editor is-teaser" data-editor="teaser">
       <div class="ned-toolbar">
-        <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
-        <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
-        <button type="button" data-cmd="underline" title="Underline"><u>U</u></button>
+        <button type="button" data-history="undo" title="Undo (Ctrl+Z)" aria-label="Undo">
+          <svg viewBox="0 0 20 20" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;"><path d="M4 9h8.5a4 4 0 0 1 0 8H8"/><path d="M7 5.5 3.5 9 7 12.5"/></svg>
+        </button>
+        <button type="button" data-history="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
+          <svg viewBox="0 0 20 20" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;"><path d="M16 9H7.5a4 4 0 0 0 0 8H12"/><path d="M13 5.5 16.5 9 13 12.5"/></svg>
+        </button>
+        <span class="ned-sep"></span>
+        <button type="button" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+        <button type="button" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+        <button type="button" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+        <button type="button" data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
         <span class="ned-sep"></span>
         {% include "manage/_ned_font.html" %}
         {% include "manage/_ned_size.html" with default=17 %}
-        <input type="color" data-cmd="foreColor" title="Colour" value="#0F2E22">
+        {% include "manage/_ned_colour.html" with kind="text" %}
+        {% include "manage/_ned_colour.html" with kind="mark" %}
+        <span class="ned-sep"></span>
+        <button type="button" data-action="clearFormat" title="Clear formatting" class="ned-clear">
+          <svg viewBox="0 0 20 20" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;"><path d="M7.5 15.5h8"/><path d="m5.5 12.5 6-8 3.5 2.5-5 7z"/><path d="m3.5 15.5 2.5-3"/></svg>
+        </button>
       </div>
       <div class="ned-surface" contenteditable="true" data-hidden-input="np_excerpt_html"
            data-placeholder="Two games separate fourth from ninth with three rounds to play."
@@ -122,6 +149,13 @@
     <label class="ned-field-label" style="margin-top:26px;">Full story</label>
     <div class="ned-editor is-body" data-editor="body" data-upload-url="{% url 'admin:hq_news_upload_image' %}">
       <div class="ned-toolbar">
+        <button type="button" data-history="undo" title="Undo (Ctrl+Z)" aria-label="Undo">
+          <svg viewBox="0 0 20 20" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;"><path d="M4 9h8.5a4 4 0 0 1 0 8H8"/><path d="M7 5.5 3.5 9 7 12.5"/></svg>
+        </button>
+        <button type="button" data-history="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
+          <svg viewBox="0 0 20 20" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;"><path d="M16 9H7.5a4 4 0 0 0 0 8H12"/><path d="M13 5.5 16.5 9 13 12.5"/></svg>
+        </button>
+        <span class="ned-sep"></span>
         <select class="ned-pick is-wide" data-cmd="formatBlock" title="Style">
           <option value="">Style</option>
           <option value="P">Paragraph</option>
@@ -130,13 +164,18 @@
           <option value="BLOCKQUOTE">Quote</option>
         </select>
         <span class="ned-sep"></span>
-        <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
-        <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
-        <button type="button" data-cmd="underline" title="Underline"><u>U</u></button>
+        <button type="button" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+        <button type="button" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+        <button type="button" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+        <button type="button" data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
         <span class="ned-sep"></span>
         {% include "manage/_ned_font.html" %}
         {% include "manage/_ned_size.html" with default=16 %}
-        <input type="color" data-cmd="foreColor" title="Colour" value="#0F2E22">
+        {% include "manage/_ned_colour.html" with kind="text" %}
+        {% include "manage/_ned_colour.html" with kind="mark" %}
+        <button type="button" data-action="clearFormat" title="Clear formatting" class="ned-clear">
+          <svg viewBox="0 0 20 20" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;"><path d="M7.5 15.5h8"/><path d="m5.5 12.5 6-8 3.5 2.5-5 7z"/><path d="m3.5 15.5 2.5-3"/></svg>
+        </button>
         <span class="ned-sep"></span>
         <button type="button" data-cmd="justifyLeft" title="Align left">
           <svg viewBox="0 0 20 14" style="width:16px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;"><line x1="1" y1="2" x2="19" y2="2"/><line x1="1" y1="7" x2="13" y2="7"/><line x1="1" y1="12" x2="16" y2="12"/></svg>

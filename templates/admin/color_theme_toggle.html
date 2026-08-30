@@ -1,0 +1,28 @@
+{% load i18n %}
+{% comment %}
+Overrides Django's own toggle (django/contrib/admin/templates/admin/
+color_theme_toggle.html), which is a bare 16px icon sitting in a row of text
+links. The client's report was simply that they did not see it — and a control
+that changes the colour of every page in the admin should not be the smallest
+thing in the header.
+
+Same button, same class, same three `theme-*-when-*` hooks, so Django's own
+theme.js still binds to it and still cycles auto → light → dark untouched.
+What changes is that it now says which theme it is on, in words, inside a
+pill that reads as a control. Styling is in css/gt-admin.css.
+{% endcomment %}
+<button class="theme-toggle gt-theme-toggle" type="button"
+        title="{% translate 'Switch between the light and dark admin theme' %}">
+  <span class="gt-tt-ic" aria-hidden="true">
+    <svg class="theme-icon-when-auto"><use xlink:href="#icon-auto" /></svg>
+    <svg class="theme-icon-when-dark"><use xlink:href="#icon-moon" /></svg>
+    <svg class="theme-icon-when-light"><use xlink:href="#icon-sun" /></svg>
+  </span>
+  <span class="gt-tt-txt">
+    <span class="gt-tt-k">{% translate 'Theme' %}</span>
+    {# One of these three is shown at a time, picked by html[data-theme] in CSS. #}
+    <b class="theme-label-when-auto">{% translate 'Auto' %}</b>
+    <b class="theme-label-when-dark">{% translate 'Dark' %}</b>
+    <b class="theme-label-when-light">{% translate 'Light' %}</b>
+  </span>
+</button>

@@ -1,5 +1,5 @@
 {% extends "public/base.html" %}
-{% load static pagecms %}
+{% load static %}
 
 {% block title %}Pricing &middot; GoodTip{% endblock %}
 {% block loader_task %}Loading the pricing{% endblock %}
@@ -12,8 +12,8 @@
 <section class="hero-split">
   <div class="hs-left">
     <span class="pill" style="align-self:flex-start;margin-bottom:24px;"><span class="dot"></span>Pricing</span>
-    <h1>{% ptext "pricing" "title.101" %}One price. <em>All year.</em> All sports.{% endptext %}</h1>
-    <p class="hero-sub">{% ptext "pricing" "lead.1" %}One flat annual fee covering every season of every code. Tipping is free for your people, and GoodTip funds the donation.{% endptext %}</p>
+    <h1>One price. <em>All year.</em> All sports.</h1>
+    <p class="hero-sub">One flat annual fee covering every season of every code. Tipping is free for your people, and GoodTip funds the donation.</p>
     <div class="hero-ctas" style="justify-content:flex-start;"><a href="#tiers" class="btn-primary">See the plans &rarr;</a></div>
   </div>
   <div class="hs-right">
@@ -30,9 +30,9 @@
 <!-- TIER CARDS (shaded) -->
 <section class="section on-cream" id="tiers">
   <div class="wrap">
-    <p class="eyebrow reveal">{% ptext "pricing" "eyebrow.1" %}Plans{% endptext %}</p>
-    <h2 class="section-heading reveal">{% ptext "pricing" "heading.1" %}Priced by team size. Nothing else.{% endptext %}</h2>
-    <p class="section-sub reveal">{% ptext "pricing" "body.101" %}Every plan includes the full platform, no feature gates, no per-sport upsells.{% endptext %}</p>
+    <p class="eyebrow reveal">Plans</p>
+    <h2 class="section-heading reveal">Priced by team size. Nothing else.</h2>
+    <p class="section-sub reveal">Every plan includes the full platform, no feature gates, no per-sport upsells.</p>
     <div class="tier-table-wrap reveal">
       <table class="tier-table">
         <thead>
@@ -84,16 +84,16 @@
 <!-- EVERY PLAN — feature v2 -->
 <section class="section on-paper">
   <div class="wrap">
-    <p class="eyebrow reveal">{% ptext "pricing" "eyebrow.2" %}Every plan{% endptext %}</p>
-    <h2 class="section-heading reveal">{% ptext "pricing" "heading.2" %}The full platform. No feature gates.{% endptext %}</h2>
-    <p class="section-sub reveal">{% ptext "pricing" "body.102" %}The same product whether you're twelve people or twelve hundred. You're paying for size, not features.{% endptext %}</p>
+    <p class="eyebrow reveal">Every plan</p>
+    <h2 class="section-heading reveal">The full platform. No feature gates.</h2>
+    <p class="section-sub reveal">The same product whether you're twelve people or twelve hundred. You're paying for size, not features.</p>
     <div class="feature-grid2 reveal" data-cards>
-      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-flag"/></svg></div><h3>{% ptext "pricing" "sub.1" %}Your codes, all year{% endptext %}</h3><p>AFL, AFLW, NRL, NRLW. Run one, run both. Women's comps come with the men's, same price.</p></div>
-      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-vote"/></svg></div><h3>{% ptext "pricing" "sub.2" %}Charity Vote{% endptext %}</h3><p>Your organisation nominates and votes on where the season's money goes. Majority wins.</p></div>
-      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-trophy"/></svg></div><h3>{% ptext "pricing" "sub.3" %}Live ladder &amp; the Wall{% endptext %}</h3><p>Round-by-round ladder, the running charity tally, and the social feed that keeps people coming back.</p></div>
-      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-bell"/></svg></div><h3>{% ptext "pricing" "sub.4" %}Round reminders{% endptext %}</h3><p>Automated nudges before each round close, on email and the Wall, until your people are in.</p></div>
-      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-users"/></svg></div><h3>{% ptext "pricing" "sub.5" %}Captain &amp; Manager roles{% endptext %}</h3><p>Clear ownership for setup and season energy, built in from the start.</p></div>
-      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-doc"/></svg></div><h3>{% ptext "pricing" "sub.6" %}Impact Report{% endptext %}</h3><p>A clean, branded season summary your board and ESG team will actually use.</p></div>
+      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-flag"/></svg></div><h3>Your codes, all year</h3><p>AFL, AFLW, NRL, NRLW. Run one, run both. Women's comps come with the men's, same price.</p></div>
+      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-vote"/></svg></div><h3>Charity Vote</h3><p>Your organisation nominates and votes on where the season's money goes. Majority wins.</p></div>
+      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-trophy"/></svg></div><h3>Live ladder &amp; the Wall</h3><p>Round-by-round ladder, the running charity tally, and the social feed that keeps people coming back.</p></div>
+      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-bell"/></svg></div><h3>Round reminders</h3><p>Automated nudges before each round close, on email and the Wall, until your people are in.</p></div>
+      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-users"/></svg></div><h3>Captain &amp; Manager roles</h3><p>Clear ownership for setup and season energy, built in from the start.</p></div>
+      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-doc"/></svg></div><h3>Impact Report</h3><p>A clean, branded season summary your board and ESG team will actually use.</p></div>
     </div>
   </div>
 </section>
@@ -108,9 +108,9 @@ movements that never happen.
 {% endcomment %}
 <section class="section on-dark">
   <div class="wrap">
-    <p class="eyebrow reveal">{% ptext "pricing" "eyebrow.3" %}Transparency{% endptext %}</p>
-    <h2 class="section-heading reveal">{% ptext "pricing" "heading.101" %}One fee. <em>That's the whole story.</em>{% endptext %}</h2>
-    <p class="section-sub reveal">{% ptext "pricing" "body.103" %}Your organisation pays one flat fee. GoodTip gives a share of it to the charity your organisation picked.{% endptext %}</p>
+    <p class="eyebrow reveal">Transparency</p>
+    <h2 class="section-heading reveal">One fee. <em>That's the whole story.</em></h2>
+    <p class="section-sub reveal">Your organisation pays one flat fee. GoodTip gives a share of it to the charity your organisation picked.</p>
   </div>
 </section>
 
@@ -119,9 +119,9 @@ movements that never happen.
   <div class="wrap">
     <div class="fp-inner" style="grid-template-columns:1.3fr 1fr;">
       <div class="reveal from-left">
-        <p class="eyebrow">{% ptext "pricing" "eyebrow.4" %}Enterprise{% endptext %}</p>
-        <h2 class="section-heading">{% ptext "pricing" "heading.3" %}2,500 people or more? Let's build it properly.{% endptext %}</h2>
-        <p class="section-sub" style="margin-bottom:0;">{% ptext "pricing" "body.104" %}For large enterprises and multi-site organisations, we build a bespoke rollout, white-label, dedicated account management, and reporting that maps to your CSR framework. Tell us the shape of it and we'll price it for you.{% endptext %}</p>
+        <p class="eyebrow">Enterprise</p>
+        <h2 class="section-heading">2,500 people or more? Let's build it properly.</h2>
+        <p class="section-sub" style="margin-bottom:0;">For large enterprises and multi-site organisations, we build a bespoke rollout, white-label, dedicated account management, and reporting that maps to your CSR framework. Tell us the shape of it and we'll price it for you.</p>
       </div>
       <div class="reveal from-right" style="display:flex;flex-direction:column;gap:12px;align-items:flex-start;">
         <a class="email-cta" href="mailto:hello@goodtip.com.au" style="background:var(--cream-2);border-color:rgba(15,46,34,.12);">
@@ -138,9 +138,9 @@ movements that never happen.
 <section class="section on-paper">
   <div class="wrap faq-grid">
     <div class="faq-aside reveal from-left">
-      <p class="eyebrow">{% ptext "pricing" "eyebrow.5" %}FAQ{% endptext %}</p>
-      <h2 class="section-heading">{% ptext "pricing" "heading.4" %}Pricing, answered.{% endptext %}</h2>
-      <p class="section-sub" style="margin-bottom:0;">{% ptext "pricing" "body.105" %}The questions we get most about plans and money.{% endptext %}</p>
+      <p class="eyebrow">FAQ</p>
+      <h2 class="section-heading">Pricing, answered.</h2>
+      <p class="section-sub" style="margin-bottom:0;">The questions we get most about plans and money.</p>
     </div>
     <div class="reveal">
       <div class="faq-item" data-open="true"><button class="faq-q"><span><span class="qn">01</span> Can we choose which sports we tip?</span><span class="qx"></span></button><div class="faq-a">Yes. Run AFL only, NRL only, or both. Women's competitions aren't optional. AFLW comes with AFL, NRLW comes with NRL. The price is the same either way. Women's sport is structural, not decorative.</div></div>

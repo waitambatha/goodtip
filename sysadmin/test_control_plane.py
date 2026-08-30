@@ -134,7 +134,7 @@ class MenuTests(TestCase):
 
         html = self.client.get(reverse("admin:index")).content.decode()
         self.assertNotIn(reverse("admin:hq_sync"), html)
-        self.assertNotIn(reverse("admin:site_content"), html)
+        self.assertNotIn(reverse("admin:hq_pages"), html)
 
     def test_the_shell_class_marks_pages_that_have_a_rail(self):
         """The chrome is scoped to it; without it the login screen would be

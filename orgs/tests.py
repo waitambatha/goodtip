@@ -4595,3 +4595,80 @@ class WizardCharityEntryRemovedTests(TestCase):
         form.is_valid()
         self.assertIn("charity", form.errors)
         self.assertIn("Choose a charity from the list.", form.errors["charity"])
+# ---------------------------------------------------------------------------
+# The admin's own view of organisations and groups.
+#
+# The client's report: "I went to Groups and found zero groups, then went to
+# Organisations and found groups are in Organisation." Both halves were true,
+# and neither was about the data — it was about which model the admin menu was
+# pointing at.
+# ---------------------------------------------------------------------------
+# Imported here rather than added to the block at the top of the file, and
+# under its own name: this class is appended to a file that is edited on more
+# than one branch at a time, and a new line in a shared import block is the
+# most reliable way to manufacture a merge conflict out of nothing.
+from django.urls import reverse as admin_reverse  # noqa: E402
+
+
+class AdminGroupRegistryTests(TestCase):
+
+    def setUp(self):
+        from django.contrib.auth.models import Group as AuthGroup
+
+        self.AuthGroup = AuthGroup
+        self.admin = get_user_model().objects.create_superuser(
+            email="root@example.com", password="pw", display_name="Root",
+        )
+        self.client.force_login(self.admin)
+
+        season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test"})
+        self.org = Organisation.objects.create(name="Acme Pty Ltd", season=season)
+        self.other = Organisation.objects.create(name="Beta Pty Ltd", season=season)
+        self.marketing = Group.objects.create(org=self.org, name="Marketing")
+        GroupMember.objects.create(group=self.marketing, user=self.admin, is_admin=True)
+
+    def test_the_empty_permissions_group_is_off_the_menu(self):
+        """It is the page the client found, and it was correctly empty.
+
+        django.contrib.auth's Group is the permissions bucket. Nothing in this
+        site has ever put anybody in one, so its changelist always showed zero
+        — while GoodTip's own Group, the thing they were looking for, was not
+        registered anywhere.
+        """
+        from django.contrib import admin as django_admin
+
+        self.assertNotIn(self.AuthGroup, django_admin.site._registry)
+
+    def test_groups_opens_on_goodtip_groups(self):
+        res = self.client.get(admin_reverse("admin:orgs_group_changelist"))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Marketing")
+
+    def test_a_group_row_names_the_organisation_it_belongs_to(self):
+        """One group belongs to exactly one organisation, and the list has to
+        say which — that relationship is the thing the client could not see."""
+        res = self.client.get(admin_reverse("admin:orgs_group_changelist"))
+        self.assertContains(res, "Acme Pty Ltd")
+
+    def test_a_group_page_shows_its_members(self):
+        res = self.client.get(admin_reverse("admin:orgs_group_change", args=[self.marketing.pk]))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Root")
+
+    def test_an_organisation_lists_its_own_groups(self):
+        """The other direction: one organisation, many groups."""
+        res = self.client.get(admin_reverse("admin:orgs_organisation_change", args=[self.org.pk]))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Marketing")
+
+    def test_the_organisation_list_counts_groups_and_links_to_them(self):
+        res = self.client.get(admin_reverse("admin:orgs_organisation_changelist"))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, f"org__id__exact={self.org.pk}")
+
+    def test_a_group_belongs_to_one_organisation_only(self):
+        """Not a UI fact — a schema one, and worth pinning so the admin's
+        framing stays honest if the model is ever revisited."""
+        field = Group._meta.get_field("org")
+        self.assertTrue(field.many_to_one)
+        self.assertEqual(field.related_model, Organisation)

@@ -18,6 +18,16 @@
   'use strict';
 
   var lastRange = new WeakMap();
+  // One undo stack per surface, reachable from the styling helpers below so a
+  // font/size/colour change is a step you can take back like any other.
+  var histories = new WeakMap();
+
+  /* Bracket an edit with a commit on each side: the state before it becomes a
+   * step to come back to, and the state after it becomes the new present. */
+  function mark(surface) {
+    var h = histories.get(surface);
+    if (h) h.commit();
+  }
 
   function inSurface(surface, node) {
     return !!node && surface.contains(node);
@@ -78,6 +88,7 @@
     restoreSelection(surface);
     var sel = window.getSelection();
     if (!sel || !sel.rangeCount) return;
+    mark(surface);
 
     if (sel.isCollapsed) {
       // Nothing selected. Rather than do nothing — which is what it looked
@@ -94,6 +105,7 @@
       sel.addRange(inside);
       lastRange.set(surface, inside.cloneRange());
       syncHidden(surface);
+      mark(surface);
       return;
     }
 
@@ -104,7 +116,7 @@
 
     var legacy = prop === 'fontSize' ? 'size' : 'face';
     var made = surface.querySelectorAll('font[size="7"], span[style*="xxx-large"]');
-    if (!made.length) { syncHidden(surface); return; }
+    if (!made.length) { syncHidden(surface); mark(surface); return; }
 
     var spans = [];
     made.forEach(function (el) {
@@ -135,6 +147,7 @@
     sel.addRange(range);
     lastRange.set(surface, range.cloneRange());
     syncHidden(surface);
+    mark(surface);
   }
 
   function applyFontSize(surface, px) {
@@ -143,6 +156,18 @@
 
   function applyFontFamily(surface, stack) {
     applyInlineStyle(surface, 'fontFamily', stack);
+  }
+
+  function applyTextColour(surface, colour) {
+    applyInlineStyle(surface, 'color', colour);
+  }
+
+  /* Highlight. "None" arrives here as `transparent` rather than an empty
+   * string on purpose: an empty value only clears the background on the run
+   * being written, and a highlight applied further up the tree would show
+   * straight through it. */
+  function applyHighlight(surface, colour) {
+    applyInlineStyle(surface, 'backgroundColor', colour);
   }
 
   /* "Georgia, serif" and '"Georgia", serif' are the same font asked for two
@@ -161,6 +186,144 @@
     if (!el) return null;
     var px = parseFloat(window.getComputedStyle(el).fontSize);
     return px ? Math.round(px) : null;
+  }
+
+  /* ---- Undo / redo ------------------------------------------------------
+   *
+   * The browser has its own undo stack and this editor cannot use it. Size,
+   * font and colour are applied by rewriting nodes directly (applyInlineStyle
+   * above swaps every <font> tag execCommand makes for a span), and a DOM edit
+   * made outside execCommand is not something the native stack knows how to
+   * put back. The visible symptom was Ctrl+Z either doing nothing or unwinding
+   * to some state the author never typed.
+   *
+   * So each surface keeps its own stack of snapshots. A snapshot is the
+   * surface's HTML plus where the caret was, measured as a count of characters
+   * from the start of the surface — an offset survives having the whole
+   * innerHTML replaced, which a Range pointing at particular nodes does not.
+   *
+   * Typing is coalesced: a burst of keystrokes settles into one step after a
+   * short pause, so undo steps back a word or a phrase rather than a letter.
+   * Toolbar commands commit on both sides of themselves, so one Ctrl+Z always
+   * takes a formatting change straight back off.
+   */
+
+  var TYPING_PAUSE = 400;
+  var MAX_STEPS = 120;
+
+  function caretOffset(surface) {
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+    var range = sel.getRangeAt(0);
+    if (!surface.contains(range.endContainer)) return null;
+    var probe = range.cloneRange();
+    probe.selectNodeContents(surface);
+    probe.setEnd(range.endContainer, range.endOffset);
+    return probe.toString().length;
+  }
+
+  function setCaretOffset(surface, offset) {
+    if (offset == null) return;
+    var walker = document.createTreeWalker(surface, NodeFilter.SHOW_TEXT, null);
+    var seen = 0;
+    var node;
+    while ((node = walker.nextNode())) {
+      var end = seen + node.length;
+      if (offset <= end) {
+        var range = document.createRange();
+        range.setStart(node, offset - seen);
+        range.collapse(true);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        lastRange.set(surface, range.cloneRange());
+        return;
+      }
+      seen = end;
+    }
+    // Ran off the end — the restored HTML is shorter than the offset. Park the
+    // caret at the end rather than leaving it in the previous document.
+    var tail = document.createRange();
+    tail.selectNodeContents(surface);
+    tail.collapse(false);
+    var s2 = window.getSelection();
+    s2.removeAllRanges();
+    s2.addRange(tail);
+    lastRange.set(surface, tail.cloneRange());
+  }
+
+  function makeHistory(surface) {
+    var stack = [];
+    var index = -1;
+    var timer = null;
+    var restoring = false;
+    var listeners = [];
+
+    function notify() {
+      listeners.forEach(function (fn) { fn(index > 0, index < stack.length - 1); });
+    }
+
+    /* Put the surface as it stands right now on the stack. A no-op when
+     * nothing has changed since the last entry, which is what lets this be
+     * called liberally — before a command, after a command, on a typing
+     * pause — without filling the stack with duplicates. */
+    function commit() {
+      if (restoring) return false;
+      var html = surface.innerHTML;
+      if (index >= 0 && stack[index].html === html) return false;
+      // Anything that was undone past is abandoned the moment a new edit is
+      // made, the same as every other editor.
+      stack.length = index + 1;
+      stack.push({ html: html, caret: caretOffset(surface) });
+      if (stack.length > MAX_STEPS) stack.shift();
+      index = stack.length - 1;
+      notify();
+      return true;
+    }
+
+    function schedule() {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(commit, TYPING_PAUSE);
+    }
+
+    function restore(state) {
+      restoring = true;
+      surface.innerHTML = state.html;
+      surface.focus();
+      setCaretOffset(surface, state.caret);
+      restoring = false;
+      syncHidden(surface);
+      notify();
+    }
+
+    function undo() {
+      window.clearTimeout(timer);
+      // Whatever has been typed since the last commit is itself a step, or
+      // the first Ctrl+Z would leap over it.
+      commit();
+      if (index <= 0) return;
+      index -= 1;
+      restore(stack[index]);
+    }
+
+    function redo() {
+      window.clearTimeout(timer);
+      if (index >= stack.length - 1) return;
+      index += 1;
+      restore(stack[index]);
+    }
+
+    commit();
+
+    return {
+      commit: commit,
+      schedule: schedule,
+      undo: undo,
+      redo: redo,
+      canUndo: function () { return index > 0; },
+      canRedo: function () { return index < stack.length - 1; },
+      onChange: function (fn) { listeners.push(fn); fn(index > 0, index < stack.length - 1); },
+    };
   }
 
   /* ---- Toolbar drop-downs ---------------------------------------------
@@ -211,7 +374,7 @@
    * selection. The − and + buttons cancel mousedown, because the surface loses
    * its text selection the moment focus moves and there would be nothing left
    * to resize; the number box does not, because it has to be typeable. */
-  function wireSizeControl(editor, surface) {
+  function wireSizeControl(editor, getSurface) {
     var box = editor.querySelector('.ned-size');
     if (!box) return null;
     var num = box.querySelector('[data-cmd="fontSizePx"]');
@@ -229,7 +392,7 @@
 
     function apply(px) {
       num.value = px;
-      applyFontSize(surface, px);
+      applyFontSize(getSurface(), px);
     }
 
     if (menu) {
@@ -288,7 +451,7 @@
    *
    * Returns a function that re-labels the button for wherever the caret is,
    * so the toolbar says which font you are in rather than a fixed "Font". */
-  function wireFontControl(editor, surface) {
+  function wireFontControl(editor, getSurface) {
     var box = editor.querySelector('.ned-font');
     if (!box) return null;
     var toggle = box.querySelector('[data-font-toggle]');
@@ -299,8 +462,9 @@
     function stackOf(item) { return item.getAttribute('data-font'); }
 
     function current() {
+      var surface = getSurface();
       var sel = window.getSelection();
-      if (!sel || !sel.rangeCount || !inSurface(surface, sel.anchorNode)) return null;
+      if (!surface || !sel || !sel.rangeCount || !inSurface(surface, sel.anchorNode)) return null;
       var node = sel.anchorNode;
       var el = node.nodeType === 1 ? node : node.parentElement;
       if (!el) return null;
@@ -321,7 +485,7 @@
       if (!item) return;
       e.preventDefault();
       setMenuOpen(menu, false);
-      applyFontFamily(surface, stackOf(item));
+      applyFontFamily(getSurface(), stackOf(item));
     });
 
     return function syncLabel() {
@@ -336,6 +500,113 @@
       // Show it in the font it names, the same as the list does.
       label.style.fontFamily = match ? stackOf(match) : '';
     };
+  }
+
+  /* The colour and highlight controls: a button over a grid of swatches.
+   *
+   * Same shape as the font and size pickers, and for the same reason — the
+   * native <input type="color"> opens the operating system's colour dialog,
+   * which is a modal three clicks deep and knows nothing about the house
+   * palette. The custom input is still in the menu for anything off-palette.
+   *
+   * Returns a function that re-paints the bar under the button to show the
+   * colour the caret is currently sitting in. */
+  function wireSwatchControl(editor, getSurface, box) {
+    var kind = box.getAttribute('data-swatch');
+    var prop = kind === 'mark' ? 'backgroundColor' : 'color';
+    var toggle = box.querySelector('[data-swatch-toggle]');
+    var menu = box.querySelector('[data-swatch-menu]');
+    var bar = box.querySelector('[data-swatch-bar]');
+    var custom = box.querySelector('[data-swatch-custom]');
+    if (!toggle || !menu) return null;
+
+    function apply(colour) {
+      var surface = getSurface();
+      if (!surface) return;
+      if (kind === 'mark') applyHighlight(surface, colour);
+      else applyTextColour(surface, colour);
+      if (bar) bar.style.background = colour;
+    }
+
+    toggle.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      if (menu.classList.contains('open')) { setMenuOpen(menu, false); return; }
+      var now = currentColour();
+      openMenu(editor, menu, function (item) {
+        var c = item.getAttribute('data-colour');
+        return !!now && !!c && sameColour(c, now);
+      });
+    });
+
+    menu.addEventListener('mousedown', function (e) {
+      var item = e.target.closest('[data-colour]');
+      if (!item) return;
+      e.preventDefault();
+      setMenuOpen(menu, false);
+      apply(item.getAttribute('data-colour'));
+    });
+
+    // The custom picker fires `input` continuously while the dialog is open,
+    // which would put a step on the undo stack for every shade dragged
+    // through. `change` fires once, when they settle on one.
+    if (custom) {
+      custom.addEventListener('mousedown', function () {
+        var surface = getSurface();
+        if (surface) saveSelection(surface);
+      });
+      custom.addEventListener('change', function () {
+        setMenuOpen(menu, false);
+        apply(custom.value);
+      });
+    }
+
+    function currentColour() {
+      var surface = getSurface();
+      var sel = window.getSelection();
+      if (!surface || !sel || !sel.rangeCount || !inSurface(surface, sel.anchorNode)) return null;
+      var node = sel.anchorNode;
+      var el = node.nodeType === 1 ? node : node.parentElement;
+      if (!el) return null;
+      return window.getComputedStyle(el)[prop];
+    }
+
+    return function syncBar() {
+      if (!bar) return;
+      var now = currentColour();
+      // A see-through background means no highlight — show the button as
+      // empty rather than painting it the colour of the page behind it.
+      if (!now || (kind === 'mark' && isTransparent(now))) {
+        bar.style.background = '';
+        bar.classList.add('is-none');
+        return;
+      }
+      bar.classList.remove('is-none');
+      bar.style.background = now;
+    };
+  }
+
+  function isTransparent(value) {
+    return /^(transparent|rgba\(0,\s*0,\s*0,\s*0\))$/i.test((value || '').trim());
+  }
+
+  /* "#C8F135" from the markup versus "rgb(200, 241, 53)" from getComputedStyle
+   * are the same colour written two ways. Resolve both through the browser and
+   * compare what comes back. */
+  var colourProbe = null;
+  function resolveColour(value) {
+    if (!colourProbe) {
+      colourProbe = document.createElement('span');
+      colourProbe.style.display = 'none';
+      document.body.appendChild(colourProbe);
+    }
+    colourProbe.style.color = '';
+    colourProbe.style.color = value;
+    return window.getComputedStyle(colourProbe).color;
+  }
+
+  function sameColour(a, b) {
+    if (isTransparent(a) || isTransparent(b)) return isTransparent(a) && isTransparent(b);
+    try { return resolveColour(a) === resolveColour(b); } catch (e) { return false; }
   }
 
   function insertLink(surface, url) {
@@ -392,23 +663,169 @@
     closeMenus(editor);
   }
 
-  function wireEditor(editor) {
-    var surface = editor.querySelector('.ned-surface');
-    if (!surface) return;
+  /* The undo/redo pair. Buttons as well as the keyboard shortcut, because the
+   * shortcut is invisible: an author who has just made a mess with the colour
+   * picker needs to be able to see the way back. Both grey out when there is
+   * nothing left in that direction, which is also the only feedback that the
+   * stack is tracking their work at all. */
+  function wireHistoryButtons(editor, getSurface) {
+    var undoBtn = editor.querySelector('[data-history="undo"]');
+    var redoBtn = editor.querySelector('[data-history="redo"]');
+    if (!undoBtn && !redoBtn) return null;
 
-    syncHidden(surface);
-    surface.addEventListener('input', function () { syncHidden(surface); });
-    surface.addEventListener('blur', function () { syncHidden(surface); });
+    [[undoBtn, 'undo'], [redoBtn, 'redo']].forEach(function (pair) {
+      if (!pair[0]) return;
+      pair[0].addEventListener('mousedown', function (e) {
+        e.preventDefault();
+        var h = histories.get(getSurface());
+        if (h) h[pair[1]]();
+      });
+    });
 
-    var sizeBox = wireSizeControl(editor, surface);
-    var syncFontLabel = wireFontControl(editor, surface);
-    document.addEventListener('selectionchange', function () {
-      saveSelection(surface);
+    // Called after anything that could have changed what is available, and
+    // whenever the toolbar changes which surface it is pointed at.
+    return function syncHistoryButtons() {
+      var h = histories.get(getSurface());
+      if (undoBtn) undoBtn.disabled = !(h && h.canUndo());
+      if (redoBtn) redoBtn.disabled = !(h && h.canRedo());
+    };
+  }
+
+  /* Light up bold/italic/underline/strikethrough and the alignment buttons for
+   * whatever the caret is inside. Without this the toolbar is write-only —
+   * you can turn bold on but the button looks identical either way, so the
+   * only way to know is to look at the letters. */
+  var STATE_CMDS = [
+    'bold', 'italic', 'underline', 'strikeThrough',
+    'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull',
+    'insertUnorderedList', 'insertOrderedList',
+  ];
+
+  function syncActiveStates(editor, surface) {
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !inSurface(surface, sel.anchorNode)) return;
+    STATE_CMDS.forEach(function (cmd) {
+      var btn = editor.querySelector('button[data-cmd="' + cmd + '"]');
+      if (!btn) return;
+      var on = false;
+      // queryCommandState throws on commands a browser does not implement.
+      try { on = document.queryCommandState(cmd); } catch (e) { on = false; }
+      btn.classList.toggle('is-on', !!on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
+  /* ---- The two halves of an editor -------------------------------------
+   *
+   * Split because the same machinery drives two different things. The story
+   * form has one toolbar per surface, sitting directly above it. The page
+   * editor (gt-page-editor.js) has one floating toolbar and a whole page full
+   * of surfaces, and it points that toolbar at whichever block is being
+   * edited. Everything below is therefore written against "the surface the
+   * toolbar is currently for" rather than a fixed one.
+   */
+
+  /* Give a contenteditable element its undo stack and its keyboard. */
+  function attachSurface(surface, opts) {
+    if (histories.has(surface)) return histories.get(surface);
+    opts = opts || {};
+
+    var history = makeHistory(surface);
+    histories.set(surface, history);
+
+    function changed() {
+      syncHidden(surface);
+      if (opts.onChange) opts.onChange(surface);
+    }
+
+    changed();
+    surface.addEventListener('input', function () {
+      changed();
+      // Coalesced: a run of keystrokes becomes one step once typing pauses.
+      history.schedule();
+    });
+    surface.addEventListener('blur', function () {
+      changed();
+      history.commit();
+    });
+
+    /* Ctrl/Cmd+Z and Ctrl+Shift+Z (or Ctrl+Y) drive this editor's own stack.
+     * The browser's native undo has to be stopped rather than left alongside
+     * it: the two disagree — the DOM rewriting that size, font and colour do
+     * is invisible to the native one — and letting both run is how you end up
+     * somewhere the author never typed. */
+    surface.addEventListener('keydown', function (e) {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      var key = (e.key || '').toLowerCase();
+      if (key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) history.redo(); else history.undo();
+        changed();
+      } else if (key === 'y') {
+        e.preventDefault();
+        history.redo();
+        changed();
+      }
+    });
+    // Undo reached any other way — the browser's Edit menu, a trackpad
+    // gesture, a phone keyboard — arrives as beforeinput and never as a
+    // keydown, so it needs catching separately or it would bypass the stack.
+    surface.addEventListener('beforeinput', function (e) {
+      if (e.inputType === 'historyUndo') { e.preventDefault(); history.undo(); changed(); }
+      else if (e.inputType === 'historyRedo') { e.preventDefault(); history.redo(); changed(); }
+    });
+
+    return history;
+  }
+
+  /* Wire every control in `editor` to whatever getSurface() returns.
+   *
+   * Returns a `sync` function that repaints the toolbar — pressed states, the
+   * font name, the size box, the colour bars, the undo/redo buttons — for the
+   * current selection. It runs on selectionchange, and the page editor calls
+   * it again whenever it re-points the toolbar at a different block.
+   */
+  function wireToolbar(editor, getSurface, opts) {
+    opts = opts || {};
+
+    function surfaceNow() { return getSurface(); }
+    function after() {
+      var surface = surfaceNow();
+      if (!surface) return;
+      syncHidden(surface);
+      if (opts.onChange) opts.onChange(surface);
+    }
+    function commit() {
+      var h = histories.get(surfaceNow());
+      if (h) h.commit();
+    }
+
+    var sizeBox = wireSizeControl(editor, surfaceNow);
+    var syncFontLabel = wireFontControl(editor, surfaceNow);
+    var syncSwatches = [];
+    editor.querySelectorAll('[data-swatch]').forEach(function (box) {
+      var fn = wireSwatchControl(editor, surfaceNow, box);
+      if (fn) syncSwatches.push(fn);
+    });
+    var syncHistoryButtons = wireHistoryButtons(editor, surfaceNow);
+
+    function sync() {
+      var surface = surfaceNow();
+      if (syncHistoryButtons) syncHistoryButtons();
+      if (!surface) return;
       if (syncFontLabel) syncFontLabel();
+      syncSwatches.forEach(function (fn) { fn(); });
+      syncActiveStates(editor, surface);
       // Don't fight the author while they are typing a number into the box.
       if (!sizeBox || document.activeElement === sizeBox) return;
       var px = currentFontSize(surface);
       if (px) sizeBox.value = px;
+    }
+
+    document.addEventListener('selectionchange', function () {
+      var surface = surfaceNow();
+      if (surface) saveSelection(surface);
+      sync();
     });
 
     editor.querySelectorAll('[data-cmd]').forEach(function (ctrl) {
@@ -419,9 +836,14 @@
         // alive — a click alone would blur the surface first.
         ctrl.addEventListener('mousedown', function (e) {
           e.preventDefault();
+          var surface = surfaceNow();
+          if (!surface) return;
           restoreSelection(surface);
+          commit();
           document.execCommand(cmd, false, ctrl.getAttribute('data-value') || undefined);
-          syncHidden(surface);
+          after();
+          commit();
+          sync();
         });
         return;
       }
@@ -432,20 +854,31 @@
 
       if (ctrl.tagName === 'SELECT') {
         ctrl.addEventListener('change', function () {
-          if (!ctrl.value) return;
+          var surface = surfaceNow();
+          if (!ctrl.value || !surface) return;
           restoreSelection(surface);
+          commit();
           document.execCommand(cmd, false, ctrl.value);
-          syncHidden(surface);
+          after();
+          commit();
           ctrl.selectedIndex = 0;
+          sync();
         });
         return;
       }
 
       if (ctrl.type === 'color') {
-        ctrl.addEventListener('input', function () {
+        // `change`, not `input`: a colour dialog fires `input` for every shade
+        // dragged through, and each one would land on the undo stack.
+        ctrl.addEventListener('change', function () {
+          var surface = surfaceNow();
+          if (!surface) return;
           restoreSelection(surface);
+          commit();
           document.execCommand(cmd, false, ctrl.value);
-          syncHidden(surface);
+          after();
+          commit();
+          sync();
         });
       }
     });
@@ -453,11 +886,45 @@
     editor.querySelectorAll('[data-action]').forEach(function (ctrl) {
       var action = ctrl.getAttribute('data-action');
 
+      /* Strip formatting back to plain text.
+       *
+       * removeFormat alone is not enough here. It clears what execCommand
+       * itself applied — bold, italic, <font> — but the size, font and colour
+       * controls write inline styles onto spans, and those it leaves exactly
+       * where they are. So the styles this editor puts on are taken off by
+       * hand afterwards, over every element the selection touches. */
+      if (action === 'clearFormat') {
+        ctrl.addEventListener('mousedown', function (e) {
+          e.preventDefault();
+          var surface = surfaceNow();
+          if (!surface) return;
+          restoreSelection(surface);
+          commit();
+          document.execCommand('removeFormat');
+          var sel = window.getSelection();
+          if (sel && sel.rangeCount && !sel.isCollapsed) {
+            var range = sel.getRangeAt(0);
+            surface.querySelectorAll('[style]').forEach(function (el) {
+              if (!range.intersectsNode(el)) return;
+              ['fontSize', 'fontFamily', 'color', 'backgroundColor'].forEach(function (prop) {
+                el.style[prop] = '';
+              });
+              if (!el.getAttribute('style')) el.removeAttribute('style');
+            });
+          }
+          after();
+          commit();
+          sync();
+        });
+        return;
+      }
+
       if (action === 'link') {
         var pop = editor.querySelector('.ned-pop[data-pop="link"]');
         ctrl.addEventListener('mousedown', function (e) {
           e.preventDefault();
-          saveSelection(surface);
+          var surface = surfaceNow();
+          if (surface) saveSelection(surface);
           closePopovers(editor);
           if (pop) {
             pop.classList.add('open');
@@ -467,13 +934,18 @@
         });
         if (pop) {
           var applyBtn = pop.querySelector('[data-pop-apply]');
-          var input = pop.querySelector('input');
+          var linkInput = pop.querySelector('input');
           var apply = function () {
-            insertLink(surface, input.value);
+            var surface = surfaceNow();
+            if (!surface) return;
+            commit();
+            insertLink(surface, linkInput.value);
+            after();
+            commit();
             pop.classList.remove('open');
           };
           if (applyBtn) applyBtn.addEventListener('click', apply);
-          if (input) input.addEventListener('keydown', function (e) {
+          if (linkInput) linkInput.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') { e.preventDefault(); apply(); }
             if (e.key === 'Escape') pop.classList.remove('open');
           });
@@ -485,13 +957,16 @@
         var fileInput = editor.querySelector('[data-inline-image]');
         ctrl.addEventListener('mousedown', function (e) {
           e.preventDefault();
-          saveSelection(surface);
+          var surface = surfaceNow();
+          if (surface) saveSelection(surface);
         });
         ctrl.addEventListener('click', function () {
           if (fileInput) fileInput.click();
         });
         if (fileInput) fileInput.addEventListener('change', function () {
-          if (fileInput.files && fileInput.files[0]) {
+          var surface = surfaceNow();
+          if (surface && fileInput.files && fileInput.files[0]) {
+            commit();
             insertImage(editor, surface, fileInput.files[0]);
           }
           fileInput.value = '';
@@ -512,6 +987,19 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') closeMenus(editor);
     });
+
+    return sync;
+  }
+
+  function wireEditor(editor) {
+    var surface = editor.querySelector('.ned-surface');
+    if (!surface) return;
+
+    var history = attachSurface(surface);
+    var sync = wireToolbar(editor, function () { return surface; });
+    // The undo/redo buttons otherwise only repainted on selectionchange, so
+    // they lagged a typing burst by however long the coalescing pause is.
+    history.onChange(sync);
 
     var form = surface.closest('form');
     if (form) form.addEventListener('submit', function () { syncHidden(surface); });
@@ -668,6 +1156,24 @@
       accept(files[0]);
     });
   }
+
+  /* The engine, published for the page editor.
+   *
+   * gt-page-editor.js drives the same toolbar over a whole page of blocks
+   * instead of one story form, and reimplementing 400 lines of selection
+   * handling, undo stack and font/size/colour plumbing to do it would leave
+   * two copies to keep in step. It loads this file first and builds on what
+   * is here. Nothing else should reach for this. */
+  window.GTEditor = {
+    attachSurface: attachSurface,
+    wireToolbar: wireToolbar,
+    histories: histories,
+    saveSelection: saveSelection,
+    restoreSelection: restoreSelection,
+    escapeAttr: escapeAttr,
+    closeMenus: closeMenus,
+    closePopovers: closePopovers,
+  };
 
   document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('[data-editor]').forEach(wireEditor);

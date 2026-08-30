@@ -16,8 +16,9 @@ different products, and links back into it for the model tables.
   </div>
 
   <div class="gts-group">
-    <div class="gts-group-title">The public site</div>
-    <a href="{% url 'admin:site_content' %}" title="Site content"><svg><use href="#ic-image"/></svg><span class="lbl">Site content</span></a>
+    <div class="gts-group-title">The site's own words</div>
+    <a href="{% url 'admin:hq_pages' %}" class="{% block nav_pages %}{% endblock %}" title="Pages">
+      <svg><use href="#ic-globe"/></svg><span class="lbl">Pages</span></a>
     <a href="{% url 'admin:hq_news' %}" class="{% block nav_news %}{% endblock %}" title="News &amp; blog">
       <svg><use href="#ic-doc"/></svg><span class="lbl">News &amp; blog</span></a>
     <a href="{% url 'admin:hq_enquiries' %}" class="{% block nav_enquiries %}{% endblock %}" title="Enquiries">

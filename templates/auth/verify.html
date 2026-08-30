@@ -1,6 +1,8 @@
 {% extends "auth_base.html" %}
+{% load static %}
 {% block title %}Enter your code &middot; GoodTip{% endblock %}
 {% block loader_task %}Checking it's you{% endblock %}
+{% block extra_head %}{{ block.super }}<script src="{% static 'js/gt-otp.js' %}" defer></script>{% endblock %}
 
 {% comment %}
 Single-purpose step: the brand aside is dropped and the card sits centred
@@ -14,19 +16,25 @@ between the two rotating backdrop panes.
   <span class="otp-badge"><svg><use href="#ic-shield-check"/></svg></span>
   <h1>{% if purpose == "signup" %}Confirm your email{% else %}Two-step verification{% endif %}</h1>
   <p class="sub">
-    We've sent a {{ form.code.max_length }}-digit code to<br>
+    We've sent a {{ code_length }}-digit code to<br>
     <b class="otp-email">{{ email }}</b>
   </p>
 </div>
 
 <form method="post" action="{% url 'accounts:verify' %}" novalidate data-busy="Checking your code">
   {% csrf_token %}
-  <div class="fld">
+  {% comment %}
+  data-otp-length is what gt-otp.js watches: the field posts itself the moment
+  that many digits are in it, so the last digit typed is the last action taken.
+  The button below stays for keyboards, screen readers and JS-off.
+  {% endcomment %}
+  <div class="fld" data-otp-length="{{ code_length }}">
     <label for="id_code" class="sr-only">Verification code</label>
     {{ form.code }}
     {% if form.code.errors %}<div class="fld-err">{{ form.code.errors|join:" " }}</div>{% endif %}
   </div>
   <button type="submit" class="abtn abtn-primary abtn-block">Verify &rarr;</button>
+  <p class="sub otp-auto-note">Enter all {{ code_length }} digits and we'll take it from there.</p>
 </form>
 
 <form method="post" action="{% url 'accounts:verify' %}" class="otp-resend">

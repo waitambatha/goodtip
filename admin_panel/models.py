@@ -138,197 +138,85 @@ class Enquiry(models.Model):
         return self.status == self.STATUS_REPLIED
 
 
-class PageText(models.Model):
-    """One editable piece of copy on a public page.
+class PageEdit(models.Model):
+    """One block of wording on one page, rewritten by an admin.
 
-    WHY THIS EXISTS. The client read the site, wanted a word changed, and had
-    to ask us — which meant a developer, a commit, and a deploy, to alter a
-    sentence. That is the wrong shape for copy. It is the right shape for
-    layout, and the distinction is what this model is built around: the
-    TEMPLATE still owns the structure and the original words, and this table
-    only ever holds an override.
+    HOW A BLOCK IS IDENTIFIED
+    -------------------------
+    Not by position. An edit keyed on "the fourth paragraph" moves onto a
+    different paragraph the moment a developer adds one above it, and silently
+    rewrites the wrong sentence — which is worse than losing the edit.
 
-    Consequences of that choice, all deliberate:
+    So the key is built from the wording the edit replaced: the tag name plus a
+    hash of that element's original inner HTML (see `pagetext.block_key`). An
+    edit therefore survives the page being reordered, sections being added
+    around it, and the element moving anywhere on the page. What it does not
+    survive is somebody changing that original wording in the template — and
+    that is the point, because at that moment nobody can honestly say whether
+    the admin's rewrite still means what they wanted it to. The edit stops
+    applying, the original shows, and the manage page marks it stale rather
+    than pretending.
 
-    * An empty table renders the site exactly as it is today. Nothing has to
-      be seeded, and a lost database costs no copy.
-    * Deleting a row is "put it back how it was", which is the undo people
-      actually ask for.
-    * A slot that is removed from a template simply stops being read. No
-      orphan cleanup, no broken page.
-
-    The value is stored as plain text and escaped on output. Letting the
-    client paste HTML here would hand anyone with staff access a stored-XSS
-    primitive on the public site, in exchange for formatting that the layout
-    already provides.
-    """
-
-    page = models.CharField(max_length=40)
-    # Dotted, e.g. "hero.title". Namespacing by hand rather than by nesting
-    # tables: the editor groups on the prefix, and a two-level model would
-    # have bought nothing except joins.
-    key = models.CharField(max_length=80)
-    value = models.TextField(blank=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    updated_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        related_name="page_texts_edited", null=True, blank=True,
-    )
-
-    class Meta:
-        ordering = ["page", "key"]
-        constraints = [
-            models.UniqueConstraint(fields=["page", "key"], name="uniq_page_text_slot"),
-        ]
-        verbose_name = "page text"
-        verbose_name_plural = "page text"
-
-    def __str__(self):
-        return f"{self.page}.{self.key}"
-
-
-class PageMedia(models.Model):
-    """An image or video the client put on a public page, or wants gone.
-
-    Two jobs in one table, which is why `slot` may be blank:
-
-    * A slot-filling upload REPLACES the picture a template already points at
-      — same position, same crop, different photograph.
-    * A slot-less upload is a file in the library, uploaded so it can be
-      pointed at from somewhere else.
-
-    Removing a template's own built-in image is done with `is_hidden` rather
-    than by deleting anything, because there is nothing to delete: the
-    original lives in static files, not here. Hiding it is the only honest
-    representation of "take that picture off the page".
-    """
-
-    KIND_IMAGE = "image"
-    KIND_VIDEO = "video"
-    KIND_CHOICES = [(KIND_IMAGE, "Image"), (KIND_VIDEO, "Video")]
-
-    page = models.CharField(max_length=40)
-    slot = models.CharField(max_length=80, blank=True)
-    kind = models.CharField(max_length=6, choices=KIND_CHOICES, default=KIND_IMAGE)
-    file = models.FileField(upload_to="pages/")
-    # Not optional in spirit even though it is in the schema: an empty alt on
-    # a decorative image is a real answer, but an empty alt on a photograph
-    # that carries meaning is a page that excludes people.
-    alt = models.CharField(max_length=200, blank=True)
-    is_hidden = models.BooleanField(default=False)
-    sort_order = models.PositiveIntegerField(default=0)
-    uploaded_at = models.DateTimeField(auto_now_add=True)
-    uploaded_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        related_name="page_media_uploaded", null=True, blank=True,
-    )
-
-    class Meta:
-        ordering = ["page", "slot", "sort_order", "-uploaded_at"]
-        verbose_name = "page media"
-        verbose_name_plural = "page media"
-
-    def __str__(self):
-        return f"{self.page}/{self.slot or 'library'} — {self.file.name}"
-
-    @property
-    def is_video(self) -> bool:
-        return self.kind == self.KIND_VIDEO
-
-
-class SiteContent(models.Model):
-    """One editable slot on a public page — the super admin's override of it.
-
-    The public templates are the source of truth for *what slots exist* and
-    what they say by default; this table only holds the edits. That split is
-    deliberate:
-
-    * A fresh database renders the real site, not a page full of empty
-      placeholders — so staging, a new dev checkout and a restored backup all
-      look right without a fixture to load first.
-    * Copy that has never been edited stays in version control where it can be
-      reviewed in a diff, and an edit that turns out badly can be undone by
-      deleting one row ("Reset to default" in the editor) rather than by
-      remembering the old wording.
-
-    The slots themselves are declared in admin_panel/site_blocks.py, which is
-    what the editor renders and what the {% site_text %} family reads defaults
-    from. A key with no row here has simply never been edited.
+    `original_html` is kept alongside for exactly that: so the manage page can
+    show what was replaced, and so a stale edit can still be read back.
     """
 
     KIND_TEXT = "text"
-    KIND_RICH = "rich"
     KIND_IMAGE = "image"
-    KIND_VIDEO = "video"
+    KIND_CHOICES = [(KIND_TEXT, "Wording"), (KIND_IMAGE, "Image")]
 
-    key = models.CharField(max_length=140, unique=True)
-    # Plain text, and rich HTML, kept in separate columns rather than one:
-    # switching a slot's kind in site_blocks.py must not silently reinterpret
-    # stored markup as text (or worse, the other way round).
-    text = models.TextField(blank=True)
+    # A key from admin_panel.pages.PAGES. Not an FK — the registry is code, not
+    # rows, and an edit for a page that has since been retired should sit
+    # harmlessly in the table rather than block a deploy.
+    page = models.CharField(max_length=40)
+    block_key = models.CharField(max_length=64)
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default=KIND_TEXT)
+
+    # What the admin wants shown. For KIND_TEXT this is the element's new inner
+    # HTML; for KIND_IMAGE it is empty and `image` carries the replacement.
     html = models.TextField(blank=True)
-    image = models.ImageField(upload_to="site/", blank=True, null=True)
-    video = models.FileField(upload_to="site/", blank=True, null=True)
-    # Still frame shown before the clip plays (and instead of it on a metered
-    # connection or with reduced motion on) — see static/js/gt-video.js.
-    video_poster = models.ImageField(upload_to="site/", blank=True, null=True)
-    alt_text = models.CharField(max_length=300, blank=True)
+    image = models.ImageField(upload_to="page_edits/", blank=True, null=True)
 
+    # What was there before, so the manage page can show the change and so a
+    # stale edit is still readable.
+    original_html = models.TextField(blank=True)
+
+    # Stamped every time the rewriter actually uses this edit. Null means it
+    # has never matched since it was saved — the wording it was made against
+    # is gone, and the page is showing the original.
+    last_applied_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="site_content_edits",
+        related_name="page_edits",
     )
 
     class Meta:
-        ordering = ["key"]
-        verbose_name = "site content block"
-        verbose_name_plural = "site content"
+        ordering = ["page", "block_key"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["page", "block_key"], name="uniq_page_edit_block",
+            ),
+        ]
+        indexes = [models.Index(fields=["page"])]
 
     def __str__(self):
-        return self.key
+        return f"{self.page}:{self.block_key}"
 
     @property
-    def is_empty(self) -> bool:
-        """True when nothing is actually overridden.
+    def is_live(self) -> bool:
+        """Whether this edit is currently showing on the page.
 
-        The editor saves a row per submitted form, so a slot cleared back to
-        blank leaves an empty row behind; treating that as "no override" is
-        what makes clearing a field fall back to the template default instead
-        of publishing an empty string to the live site.
+        False means the template's own wording has changed since the edit was
+        made, so the key no longer matches anything and readers are seeing the
+        original. See the class docstring for why that is the safe answer.
         """
-        return not (
-            self.text or self.html or self.image or self.video
-            or self.video_poster or self.alt_text
-        )
+        return self.last_applied_at is not None
 
-    # -- cache -------------------------------------------------------------
-    # The public home page reads ~40 slots. One query per slot per request is
-    # the obvious way to make a CMS slower than the hard-coded page it
-    # replaced, so the whole (small) table is loaded once and cached, and the
-    # cache is dropped whenever a row changes.
-    CACHE_KEY = "site_content_map_v1"
-
-    @classmethod
-    def map(cls):
-        from django.core.cache import cache
-
-        cached = cache.get(cls.CACHE_KEY)
-        if cached is None:
-            cached = {obj.key: obj for obj in cls.objects.all()}
-            cache.set(cls.CACHE_KEY, cached, 60 * 60)
-        return cached
-
-    @classmethod
-    def bust(cls):
-        from django.core.cache import cache
-
-        cache.delete(cls.CACHE_KEY)
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        self.bust()
-
-    def delete(self, *args, **kwargs):
-        super().delete(*args, **kwargs)
-        self.bust()
+    @property
+    def replacement(self) -> str:
+        if self.kind == self.KIND_IMAGE:
+            return self.image.url if self.image else ""
+        return self.html

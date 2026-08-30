@@ -358,8 +358,6 @@ def _get_urls():
     # admin autodiscovery, and importing another app's admin code at import
     # time is how circular-import problems get introduced. By the time
     # get_urls() is called every app is loaded.
-    from admin_panel import site_content_admin
-
     # The organisation admin's area kept these three for as long as it was the
     # only admin there was. They are GoodTip's own work, not any
     # organisation's: an enquiry is addressed to the company, the news feed is
@@ -369,10 +367,6 @@ def _get_urls():
 
     custom = [
         path("system-report/", admin.site.admin_view(system_report_view), name="system_report"),
-        path("site-content/", admin.site.admin_view(site_content_admin.index), name="site_content"),
-        path("site-content/<slug:slug>/", admin.site.admin_view(site_content_admin.page),
-             name="site_content_page"),
-
         path("sync/", admin.site.admin_view(manage_views.sync_panel), name="hq_sync"),
 
         path("enquiries/", admin.site.admin_view(manage_views.enquiries), name="hq_enquiries"),
@@ -392,15 +386,24 @@ def _get_urls():
         path("news/<int:post_id>/delete/", admin.site.admin_view(manage_views.news_delete),
              name="hq_news_delete"),
 
-        # The public-page copy editor moved with the rest of the public site.
+        # Pages — one editor for the whole site.
+        #
+        # This replaced two. "Site content" owned the home page and declared
+        # its slots in site_blocks.py; a separate slot editor owned four other
+        # public pages and discovered its slots by scanning template source for
+        # {% templatetag openblock %} ptext {% templatetag closeblock %} tags.
+        # Neither could touch anything behind the login, both needed every
+        # editable sentence marked up in advance, and their own note said which
+        # of the two to keep was an open question. The client answered it: one
+        # editor, every public page and every private one, nothing to mark up.
         path("pages/", admin.site.admin_view(manage_views.pages_list), name="hq_pages"),
-        path("pages/<slug:slug>/", admin.site.admin_view(manage_views.page_edit), name="hq_page_edit"),
-        path("pages/<slug:slug>/media/", admin.site.admin_view(manage_views.page_media_upload),
-             name="hq_page_media_upload"),
-        path("pages/<slug:slug>/media/<int:media_id>/delete/",
-             admin.site.admin_view(manage_views.page_media_delete), name="hq_page_media_delete"),
-        path("pages/<slug:slug>/media/<int:media_id>/toggle/",
-             admin.site.admin_view(manage_views.page_media_toggle), name="hq_page_media_toggle"),
+        path("pages/save/", admin.site.admin_view(manage_views.page_save), name="hq_page_save"),
+        path("pages/upload-image/", admin.site.admin_view(manage_views.page_upload_image),
+             name="hq_page_upload_image"),
+        path("pages/<str:page_key>/", admin.site.admin_view(manage_views.page_edits),
+             name="hq_page_edits"),
+        path("pages/<str:page_key>/revert/", admin.site.admin_view(manage_views.page_revert),
+             name="hq_page_revert"),
     ]
     return custom + _original_get_urls()
 

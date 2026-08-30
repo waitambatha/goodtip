@@ -38,9 +38,9 @@ list rather than pouring twenty-five entries out in one column.
       <span class="gta-act-txt"><b>System report</b><small>Deep system overview</small></span>
     </a>
     {% if user.is_superuser %}
-    <a href="{% url 'admin:site_content' %}" class="gta-act">
+    <a href="{% url 'admin:hq_pages' %}" class="gta-act">
       <span class="gta-act-ic gold"><svg><use href="#ic-image"/></svg></span>
-      <span class="gta-act-txt"><b>Edit the public site</b><small>Manage content</small></span>
+      <span class="gta-act-txt"><b>Edit the site's words</b><small>Every page, public and private</small></span>
     </a>
     {% endif %}
     <a href="{{ site_url|default:'/' }}" target="_blank" rel="noopener" class="gta-act">
