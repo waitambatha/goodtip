@@ -1,0 +1,15 @@
+{% extends "auth_base.html" %}
+{% block title %}Invitation. GoodTip{% endblock %}
+{% block auth_mood %}mood-green solo{% endblock %}
+{% block auth_aside %}{% endblock %}
+{% block auth_form %}
+<div class="otp-head">
+  <span class="otp-badge"><svg><use href="#ic-lock"/></svg></span>
+  <h1>This invitation can't be used</h1>
+  <p class="sub">{{ reason }}</p>
+</div>
+{% if expired %}
+<p class="alt">Ask whoever invited you to send a new one &mdash; it only takes them a moment.</p>
+{% endif %}
+<p class="alt"><a href="{% url 'accounts:login' %}">Back to sign in</a></p>
+{% endblock %}

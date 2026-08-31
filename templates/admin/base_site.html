@@ -139,6 +139,12 @@ arrives already open.
 {% safe_url 'admin:hq_enquiries' as u_enq %}
 {% safe_url 'admin:hq_news' as u_news %}
 {% safe_url 'admin:hq_pages' as u_pages %}
+{% safe_url 'admin:hq_team' as u_team %}
+{% safe_url 'admin:hq_reviews' as u_reviews %}
+{% safe_url 'admin:hq_my_work' as u_mywork %}
+{% safe_url 'admin:hq_activity' as u_activity %}
+{% gta_is_full_access as is_full_access %}
+{% gta_review_counts as waiting %}
 <nav id="nav-sidebar" class="gta-rail" aria-label="{% translate 'Admin sections' %}">
 
   <div class="gta-rail-top">
@@ -185,28 +191,68 @@ arrives already open.
     </ul>
     {% endif %}
 
-    {% if user.is_superuser %}
+    {% comment %}
+    HQ used to be wrapped in {% templatetag openblock %} if user.is_superuser
+    {% templatetag closeblock %}, which was right while every administrator was
+    either the owner or nobody. A restricted administrator is not a superuser,
+    so that check would have hidden the very screens they were created to use.
+    Each link now asks the capability it leads to, which is the same answer for
+    the owner (full access holds everything) and the correct one for everybody
+    else.
+    {% endcomment %}
+    {% gta_can 'data.sync' as may_sync %}
+    {% gta_can 'enquiries.read' as may_enq %}
+    {% gta_can 'news.write' as may_news %}
+    {% gta_can 'pages.edit' as may_pages %}
+    {% if may_sync or may_enq or may_news or may_pages %}
     <p class="gta-rail-title">{% translate 'HQ' %}</p>
     <ul class="gta-nav">
-      {% if u_sync %}
+      {% if u_sync and may_sync %}
       <li><a href="{{ u_sync }}" class="gta-nav-a{% if request.path == u_sync %} on{% endif %}" data-jump="Sync panel">
         <svg class="ic"><use href="#ic-cloud-sync"/></svg><span class="lbl">Sync panel</span></a></li>
       {% endif %}
-      {% if u_enq %}
+      {% if u_enq and may_enq %}
       <li><a href="{{ u_enq }}" class="gta-nav-a{% if u_enq in request.path %} on{% endif %}" data-jump="Enquiries inbox">
         <svg class="ic"><use href="#ic-mail"/></svg><span class="lbl">Enquiries inbox</span>
         {% if alerts.enquiries %}<span class="gta-sec-n alert">{{ alerts.enquiries }}</span>{% endif %}</a></li>
       {% endif %}
-      {% if u_news %}
+      {% if u_news and may_news %}
       <li><a href="{{ u_news }}" class="gta-nav-a{% if u_news in request.path %} on{% endif %}" data-jump="News &amp; blog editor">
         <svg class="ic"><use href="#ic-doc"/></svg><span class="lbl">News &amp; blog</span></a></li>
       {% endif %}
-      {% if u_pages %}
+      {% if u_pages and may_pages %}
       <li><a href="{{ u_pages }}" class="gta-nav-a{% if u_pages in request.path %} on{% endif %}" data-jump="Pages — the words on the site">
         <svg class="ic"><use href="#ic-globe"/></svg><span class="lbl">Pages</span></a></li>
       {% endif %}
     </ul>
     {% endif %}
+
+    {% comment %}
+    Running the team. "Your work" is for everybody — it is where a restricted
+    administrator finds out what they are allowed to do and what came back from
+    review. The other three are the powers that are never delegated.
+    {% endcomment %}
+    <p class="gta-rail-title">{% translate 'Your team' %}</p>
+    <ul class="gta-nav">
+      {% if u_mywork %}
+      <li><a href="{{ u_mywork }}" class="gta-nav-a{% if request.path == u_mywork %} on{% endif %}" data-jump="Your work">
+        <svg class="ic"><use href="#ic-f-home"/></svg><span class="lbl">Your work</span>
+        {% if waiting.tasks %}<span class="gta-sec-n alert">{{ waiting.tasks }}</span>{% endif %}</a></li>
+      {% endif %}
+      {% if is_full_access and u_reviews %}
+      <li><a href="{{ u_reviews }}" class="gta-nav-a{% if u_reviews in request.path %} on{% endif %}" data-jump="Waiting for review">
+        <svg class="ic"><use href="#ic-clock"/></svg><span class="lbl">Waiting for review</span>
+        {% if waiting.to_review %}<span class="gta-sec-n alert">{{ waiting.to_review }}</span>{% endif %}</a></li>
+      {% endif %}
+      {% if is_full_access and u_team %}
+      <li><a href="{{ u_team }}" class="gta-nav-a{% if u_team in request.path %} on{% endif %}" data-jump="Administrators">
+        <svg class="ic"><use href="#ic-shield-star"/></svg><span class="lbl">Administrators</span></a></li>
+      {% endif %}
+      {% if is_full_access and u_activity %}
+      <li><a href="{{ u_activity }}" class="gta-nav-a{% if u_activity in request.path %} on{% endif %}" data-jump="Activity log">
+        <svg class="ic"><use href="#ic-doc"/></svg><span class="lbl">Activity</span></a></li>
+      {% endif %}
+    </ul>
   </div>
 
   <div class="gta-rail-foot">

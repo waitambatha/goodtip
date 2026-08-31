@@ -434,3 +434,57 @@ def compact_since(value):
         if seconds < cutoff:
             return f"{int(seconds // divisor)}{suffix} ago"
     return f"{int(seconds // 2592000)}mo ago"
+
+
+# ---------------------------------------------------------------------------
+# Delegated administration: what this person is allowed to see
+# ---------------------------------------------------------------------------
+
+@register.simple_tag(takes_context=True)
+def gta_can(context, capability):
+    """Whether the signed-in administrator holds one capability.
+
+    Used by the menu. A restricted administrator seeing a link they cannot open
+    is worse than not seeing it: they click it, get refused, and learn that the
+    product is broken rather than that they were not given that job.
+    """
+    from sysadmin import access
+
+    request = context.get("request")
+    return access.can(getattr(request, "user", None), capability)
+
+
+@register.simple_tag(takes_context=True)
+def gta_is_full_access(context):
+    from sysadmin import access
+
+    request = context.get("request")
+    return access.is_full_access(getattr(request, "user", None))
+
+
+@register.simple_tag(takes_context=True)
+def gta_review_counts(context):
+    """What is waiting on this person, for the badges in the menu.
+
+    Two different numbers depending on who is asking: a full-access
+    administrator wants the size of the review queue, and everybody else wants
+    to know how much of their own work is still sitting in it.
+    """
+    from sysadmin import access
+    from sysadmin.models import AdminTask, ChangeRequest
+
+    request = context.get("request")
+    user = getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return {}
+
+    out = {
+        "tasks": AdminTask.objects.filter(
+            assigned_to=user, status=AdminTask.OPEN).count(),
+        "mine_waiting": ChangeRequest.objects.filter(
+            requested_by=user, status=ChangeRequest.PENDING).count(),
+    }
+    if access.is_full_access(user):
+        out["to_review"] = ChangeRequest.objects.filter(
+            status=ChangeRequest.PENDING).exclude(requested_by=user).count()
+    return out

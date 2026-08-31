@@ -1,0 +1,15 @@
+Hello {{ name }},
+
+{{ author }} has submitted something in {{ area }} and it is waiting for you.
+Nothing has changed on the site yet.
+
+    {{ summary }}
+
+Review it:
+{{ link }}
+
+You can approve it, make changes and approve it, or send it back with a note.
+
+Everything waiting: {{ queue_link }}
+
+— GoodTip

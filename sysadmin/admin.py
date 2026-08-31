@@ -365,6 +365,8 @@ def _get_urls():
     # answer to the super admin, so they live here now.
     from admin_panel import views as manage_views
 
+    from . import team_views
+
     custom = [
         path("system-report/", admin.site.admin_view(system_report_view), name="system_report"),
         path("sync/", admin.site.admin_view(manage_views.sync_panel), name="hq_sync"),
@@ -385,6 +387,28 @@ def _get_urls():
              name="hq_news_announce"),
         path("news/<int:post_id>/delete/", admin.site.admin_view(manage_views.news_delete),
              name="hq_news_delete"),
+
+        # Delegated administration: who the admins are, what they may do,
+        # the queue of work waiting on approval, and the record of all of it.
+        path("team/", admin.site.admin_view(team_views.team), name="hq_team"),
+        path("team/new/", admin.site.admin_view(team_views.team_new), name="hq_team_new"),
+        path("team/<int:access_id>/", admin.site.admin_view(team_views.team_edit),
+             name="hq_team_edit"),
+        path("team/<int:access_id>/resend/", admin.site.admin_view(team_views.team_resend),
+             name="hq_team_resend"),
+        path("team/<int:access_id>/toggle/", admin.site.admin_view(team_views.team_toggle),
+             name="hq_team_toggle"),
+
+        path("reviews/", admin.site.admin_view(team_views.reviews), name="hq_reviews"),
+        path("reviews/<int:request_id>/", admin.site.admin_view(team_views.review_detail),
+             name="hq_review_detail"),
+
+        path("my-work/", admin.site.admin_view(team_views.my_work), name="hq_my_work"),
+        path("tasks/new/", admin.site.admin_view(team_views.task_new), name="hq_task_new"),
+        path("tasks/<int:task_id>/done/", admin.site.admin_view(team_views.task_done),
+             name="hq_task_done"),
+
+        path("activity/", admin.site.admin_view(team_views.activity), name="hq_activity"),
 
         # Pages — one editor for the whole site.
         #

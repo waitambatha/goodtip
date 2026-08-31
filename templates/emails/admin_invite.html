@@ -1,0 +1,61 @@
+{% extends "emails/_base.html" %}
+{% comment %}
+The invitation to become an administrator.
+
+Two things it has to do that a plain "you've been added" note does not. It has
+to say exactly what the person is being trusted with, because consent to a
+power you were not told about is not consent — so the granted areas are listed,
+and the ones that go through review are listed separately and labelled as such.
+And it has to be usable without the sender ever knowing the password: the code
+here is exchanged for one the recipient chooses.
+{% endcomment %}
+{% block title %}You've been given access to GoodTip HQ{% endblock %}
+{% block eyebrow %}Administrator invitation{% endblock %}
+{% block badge %}&#128273;{% endblock %}
+{% block preheader %}{{ inviter }} has given you access to GoodTip HQ. Use {{ code }} to set your password.{% endblock %}
+{% block content %}
+
+  <p style="margin:0 0 10px;font-size:19px;font-weight:bold;color:#0F2E22;text-align:center;line-height:1.3;">
+    Hello <span style="color:#7FA828;">{{ name }}</span>,
+  </p>
+  <p style="margin:0 0 18px;font-size:14.5px;line-height:1.6;color:#4a4a41;text-align:center;">
+    {{ inviter }} has given you an administrator account for GoodTip.
+    Use the code below to choose your password and get started.
+  </p>
+
+  {% include "emails/_bits.html" with bit="code" code=code code_label="Your set-up code" %}
+
+  {% include "emails/_bits.html" with bit="button" url=link label="Set your password" %}
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 0;">
+    <tr>
+      <td bgcolor="#F2F1E7" style="background-color:#F2F1E7;border-radius:10px;padding:16px 18px;">
+        <p style="margin:0 0 10px;font-size:14px;font-weight:bold;color:#0F2E22;">What you'll be able to do</p>
+        {% if is_full_access %}
+        <p style="margin:0;font-size:13.5px;line-height:1.6;color:#4a4a41;">
+          Everything. You have full access, including adding other
+          administrators and reviewing their work.
+        </p>
+        {% else %}
+          {% if direct %}
+          <p style="margin:0 0 6px;font-size:13px;line-height:1.6;color:#4a4a41;">
+            <b style="color:#0F2E22;">Straight away:</b>
+            {% for item in direct %}{{ item }}{% if not forloop.last %}; {% endif %}{% endfor %}.
+          </p>
+          {% endif %}
+          {% if reviewed %}
+          <p style="margin:0;font-size:13px;line-height:1.6;color:#4a4a41;">
+            <b style="color:#0F2E22;">After a review:</b>
+            {% for item in reviewed %}{{ item }}{% if not forloop.last %}; {% endif %}{% endfor %}.
+            Work in these areas is sent to a full-access administrator to
+            approve before it goes live, and you'll hear back either way.
+          </p>
+          {% endif %}
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+
+  {% include "emails/_bits.html" with bit="note" note_label="Before you start" note_body="This code expires in three days and can only be used once. If you were not expecting this, ignore it and let the GoodTip team know — no account is active until the code is used." %}
+
+{% endblock %}

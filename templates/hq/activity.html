@@ -1,0 +1,65 @@
+{% extends "hq_base.html" %}
+{% block title %}Activity. GoodTip HQ{% endblock %}
+{% block nav_activity %}on{% endblock %}
+{% block hero_title %}Activity{% endblock %}
+{% block hero_lead %}Who was given what, who approved what, and why anything was turned down.{% endblock %}
+{% block admin_content %}
+
+<div class="gt-shell gt-shell-wide">
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-doc"/></svg></span>
+      <div><h2>The record</h2><div class="gp-sub">Newest first. Kept even after an account is removed.</div></div>
+      <div class="gp-right">
+        <form method="get" class="ad-filter">
+          <select name="what" onchange="this.form.submit()">
+            <option value="">Everything</option>
+            {% for val, label in actions %}
+            <option value="{{ val }}" {% if what == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <select name="who" onchange="this.form.submit()">
+            <option value="">Anyone</option>
+            {% for p in people %}
+            <option value="{{ p.pk }}" {% if who == p.pk|stringformat:"s" %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+    </div>
+
+    <div class="gt-tablewrap">
+      <table class="gt-table">
+        <thead><tr><th>When</th><th>Who</th><th>Did what</th><th>Details</th></tr></thead>
+        <tbody>
+        {% for e in events %}
+          <tr>
+            <td><small>{{ e.created_at|date:"j M Y" }}<br>{{ e.created_at|date:"g:i A" }}</small></td>
+            <td><b>{{ e.actor_name|default:"—" }}</b></td>
+            <td>
+              {{ e.get_action_display }}
+              {% if e.subject_name %}<br><small class="gt-muted">&rarr; {{ e.subject_name }}</small>{% endif %}
+            </td>
+            <td>
+              {% if e.summary %}{{ e.summary }}{% endif %}
+              {% if e.detail.granted %}
+                <br><small class="gt-muted">Given: {% for k in e.detail.granted %}{{ k }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
+              {% endif %}
+              {% if e.detail.reviewed %}
+                <br><small class="gt-muted">Needing approval: {% for k in e.detail.reviewed %}{{ k }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
+              {% endif %}
+              {% if e.detail.feedback %}<br><small class="gt-muted">&ldquo;{{ e.detail.feedback|truncatechars:140 }}&rdquo;</small>{% endif %}
+              {% if e.detail.changed_fields %}
+                <br><small class="gt-muted">Changed: {% for k in e.detail.changed_fields %}{{ k }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="gt-muted">Nothing recorded yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

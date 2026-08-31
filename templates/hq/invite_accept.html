@@ -1,0 +1,86 @@
+{% extends "auth_base.html" %}
+{% load static %}
+{% block title %}Set up your account. GoodTip{% endblock %}
+{% block loader_task %}Setting you up{% endblock %}
+{% block auth_mood %}mood-green solo{% endblock %}
+{% block auth_aside %}{% endblock %}
+{% block extra_head %}{{ block.super }}<script src="{% static 'js/auth.js' %}" defer></script>{% endblock %}
+{% block auth_form %}
+
+<div class="otp-head">
+  <span class="otp-badge"><svg><use href="#ic-shield-check"/></svg></span>
+  <h1>Welcome, {{ user.display_name|default:user.email }}</h1>
+  <p class="sub">
+    {% if verified %}
+      Now choose a password. Make it a good one &mdash; this account can change the site.
+    {% else %}
+      Enter the {{ code_length }}-character code from your invitation email.
+    {% endif %}
+  </p>
+</div>
+
+{% if error %}<div class="flash error"><span>{{ error }}</span></div>{% endif %}
+
+{% comment %}
+WHAT THEY ARE AGREEING TO.
+
+Shown before the password, not after. Somebody accepting an administrator
+account should be able to see what they are taking on while they still have
+the option of asking about it — and the two lists are kept apart because
+"you can do this" and "you can do this, and I will read it first" are
+genuinely different jobs, and finding out about the second one later feels
+like being checked up on rather than being supported.
+{% endcomment %}
+<div class="inv-grants">
+  {% if is_full_access %}
+    <p class="inv-grant-head">You have full access</p>
+    <p class="sub">Everything in GoodTip HQ, including adding other administrators and approving their work.</p>
+  {% else %}
+    {% if direct %}
+    <p class="inv-grant-head">You can</p>
+    <ul>{% for item in direct %}<li>{{ item }}</li>{% endfor %}</ul>
+    {% endif %}
+    {% if reviewed %}
+    <p class="inv-grant-head">You can, once someone approves it</p>
+    <ul class="is-reviewed">{% for item in reviewed %}<li>{{ item }}</li>{% endfor %}</ul>
+    <p class="sub inv-note">
+      Work in these areas goes to a full-access administrator first. You'll get
+      an email when they've looked, whichever way it goes.
+    </p>
+    {% endif %}
+  {% endif %}
+</div>
+
+{% if not verified %}
+<form method="post" novalidate data-busy="Checking your code">
+  {% csrf_token %}
+  <input type="hidden" name="step" value="code">
+  <div class="fld">
+    <label for="id_invite_code" class="sr-only">Your set-up code</label>
+    <input type="text" name="code" id="id_invite_code" class="otp-input"
+           maxlength="{{ code_length }}" autocomplete="one-time-code"
+           autocapitalize="characters" spellcheck="false" autofocus
+           placeholder="{% for i in code_length|make_list %}&middot;{% endfor %}">
+  </div>
+  <button type="submit" class="abtn abtn-primary abtn-block">Continue &rarr;</button>
+</form>
+{% else %}
+<form method="post" novalidate data-busy="Setting your password">
+  {% csrf_token %}
+  <input type="hidden" name="step" value="password">
+  <div class="fld">
+    <label for="id_password1">Choose a password</label>
+    <input type="password" name="password1" id="id_password1" required
+           autocomplete="new-password" data-pw-strength data-pw-checklist>
+  </div>
+  <div class="fld">
+    <label for="id_password2">And again, to be sure</label>
+    <input type="password" name="password2" id="id_password2" required
+           autocomplete="new-password" data-pw-match="id_password1">
+  </div>
+  <button type="submit" class="abtn abtn-primary abtn-block">Set it and go in &rarr;</button>
+</form>
+{% endif %}
+
+<p class="alt">Signed in as the wrong person? <a href="{% url 'accounts:login' %}">Start again</a></p>
+{% endblock %}

@@ -1,0 +1,11 @@
+Hello {{ name }},
+
+{{ assigner }} has asked you to take care of something.
+
+    {{ title }}
+{% if detail %}
+{{ detail }}
+{% endif %}
+Open your work: {{ link }}
+
+— GoodTip

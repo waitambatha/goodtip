@@ -1,28 +1,81 @@
 {% load i18n %}
 {% comment %}
-Overrides Django's own toggle (django/contrib/admin/templates/admin/
-color_theme_toggle.html), which is a bare 16px icon sitting in a row of text
-links. The client's report was simply that they did not see it — and a control
-that changes the colour of every page in the admin should not be the smallest
-thing in the header.
+The theme control, as a segmented switch.
 
-Same button, same class, same three `theme-*-when-*` hooks, so Django's own
-theme.js still binds to it and still cycles auto → light → dark untouched.
-What changes is that it now says which theme it is on, in words, inside a
-pill that reads as a control. Styling is in css/gt-admin.css.
+It has been through two shapes before this one. Django ships a bare 16px icon
+that cycles auto -> light -> dark on click, and the client never spotted it. A
+labelled pill fixed the spotting but kept the cycling, which has the deeper
+problem: a control that changes meaning every time you press it cannot be
+aimed. You want dark, you press once, you get light, you press again.
+
+Three segments answer both. Every option is visible, the one you are on is
+filled, and any of them is one click away. There is no hidden state to
+discover by pressing.
+
+Django's theme.js is not used here. It binds to `.theme-toggle` and only knows
+how to cycle; these buttons each set one mode outright, which is a different
+behaviour, so the (small) handler lives with the markup. The storage key and
+the `data-theme` attribute are exactly what Django uses, so its own early-boot
+script still restores the right theme before first paint and nothing else in
+the admin has to know this was replaced.
 {% endcomment %}
-<button class="theme-toggle gt-theme-toggle" type="button"
-        title="{% translate 'Switch between the light and dark admin theme' %}">
-  <span class="gt-tt-ic" aria-hidden="true">
-    <svg class="theme-icon-when-auto"><use xlink:href="#icon-auto" /></svg>
-    <svg class="theme-icon-when-dark"><use xlink:href="#icon-moon" /></svg>
-    <svg class="theme-icon-when-light"><use xlink:href="#icon-sun" /></svg>
-  </span>
-  <span class="gt-tt-txt">
-    <span class="gt-tt-k">{% translate 'Theme' %}</span>
-    {# One of these three is shown at a time, picked by html[data-theme] in CSS. #}
-    <b class="theme-label-when-auto">{% translate 'Auto' %}</b>
-    <b class="theme-label-when-dark">{% translate 'Dark' %}</b>
-    <b class="theme-label-when-light">{% translate 'Light' %}</b>
-  </span>
-</button>
+<div class="gt-theme" role="group" aria-label="{% translate 'Colour theme' %}">
+  <button type="button" class="gt-theme-opt" data-set-theme="auto"
+          title="{% translate 'Follow my device setting' %}">
+    <svg aria-hidden="true" viewBox="0 0 16 16" class="gt-theme-ic">
+      <circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <path d="M8 1.8a6.2 6.2 0 0 0 0 12.4z" fill="currentColor"/>
+    </svg>
+    <span>{% translate 'Auto' %}</span>
+  </button>
+  <button type="button" class="gt-theme-opt" data-set-theme="light"
+          title="{% translate 'Always light' %}">
+    <svg aria-hidden="true" viewBox="0 0 16 16" class="gt-theme-ic">
+      <circle cx="8" cy="8" r="3.1" fill="currentColor"/>
+      <g stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+      </g>
+    </svg>
+    <span>{% translate 'Light' %}</span>
+  </button>
+  <button type="button" class="gt-theme-opt" data-set-theme="dark"
+          title="{% translate 'Always dark' %}">
+    <svg aria-hidden="true" viewBox="0 0 16 16" class="gt-theme-ic">
+      <path d="M13.4 9.9A5.9 5.9 0 0 1 6.1 2.6a5.9 5.9 0 1 0 7.3 7.3z"
+            fill="currentColor"/>
+    </svg>
+    <span>{% translate 'Dark' %}</span>
+  </button>
+</div>
+<script>
+(function () {
+  var box = document.currentScript.previousElementSibling;
+  if (!box) return;
+  var opts = box.querySelectorAll('[data-set-theme]');
+
+  function paint(mode) {
+    opts.forEach(function (b) {
+      var on = b.getAttribute('data-set-theme') === mode;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
+  function read() {
+    try { return localStorage.getItem('theme') || 'auto'; } catch (e) { return 'auto'; }
+  }
+
+  opts.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var mode = b.getAttribute('data-set-theme');
+      /* Same two writes Django's own setTheme makes, so its early-boot script
+         restores this choice on the next page before anything is painted. */
+      document.documentElement.dataset.theme = mode;
+      try { localStorage.setItem('theme', mode); } catch (e) {}
+      paint(mode);
+    });
+  });
+
+  paint(read());
+})();
+</script>

@@ -1,7 +1,23 @@
+{% load gtadmin %}
 {% comment %}
 The super admin's menu. Mirrors the rail in /admin/ so the two never read as
 different products, and links back into it for the model tables.
+
+Every entry asks the capability it leads to. Before delegated administration
+there was only one kind of administrator and the whole menu was safe to show;
+now a link somebody cannot open does real harm — they click it, get refused,
+and learn that the product is broken rather than that they were not given that
+job. Full access holds everything, so the owner sees exactly what they always
+did.
 {% endcomment %}
+{% gta_can 'pages.edit' as may_pages %}
+{% gta_can 'news.write' as may_news %}
+{% gta_can 'enquiries.read' as may_enq %}
+{% gta_can 'data.sync' as may_sync %}
+{% gta_can 'data.report' as may_report %}
+{% gta_can 'orgs.view' as may_orgs %}
+{% gta_is_full_access as is_full_access %}
+{% gta_review_counts as waiting %}
 <nav class="gts-rail" aria-label="GoodTip HQ sections">
   <button type="button" class="gts-toggle" data-shell-toggle aria-expanded="true"
           aria-label="Collapse or expand the menu">
@@ -11,26 +27,60 @@ different products, and links back into it for the model tables.
 
   <div class="gts-group">
     <div class="gts-group-title">Overview</div>
+    <a href="{% url 'admin:hq_my_work' %}" class="{% block nav_mywork %}{% endblock %}" title="Your work">
+      <svg><use href="#ic-f-home"/></svg><span class="lbl">Your work</span>
+      {% if waiting.tasks %}<span class="n">{{ waiting.tasks }}</span>{% endif %}</a>
+    {% if is_full_access %}
     <a href="/admin/" title="Dashboard"><svg><use href="#ic-home"/></svg><span class="lbl">Dashboard</span></a>
+    {% endif %}
+    {% if may_report %}
     <a href="{% url 'admin:system_report' %}" title="System report"><svg><use href="#ic-chart"/></svg><span class="lbl">System report</span></a>
+    {% endif %}
   </div>
 
+  {% if may_pages or may_news or may_enq %}
   <div class="gts-group">
     <div class="gts-group-title">The site's own words</div>
+    {% if may_pages %}
     <a href="{% url 'admin:hq_pages' %}" class="{% block nav_pages %}{% endblock %}" title="Pages">
       <svg><use href="#ic-globe"/></svg><span class="lbl">Pages</span></a>
+    {% endif %}
+    {% if may_news %}
     <a href="{% url 'admin:hq_news' %}" class="{% block nav_news %}{% endblock %}" title="News &amp; blog">
       <svg><use href="#ic-doc"/></svg><span class="lbl">News &amp; blog</span></a>
+    {% endif %}
+    {% if may_enq %}
     <a href="{% url 'admin:hq_enquiries' %}" class="{% block nav_enquiries %}{% endblock %}" title="Enquiries">
       <svg><use href="#ic-mail"/></svg><span class="lbl">Enquiries</span>
       {% if hq_open_enquiry_count %}<span class="n">{{ hq_open_enquiry_count }}</span>{% endif %}</a>
+    {% endif %}
   </div>
+  {% endif %}
 
+  {% if may_sync or may_orgs %}
   <div class="gts-group">
     <div class="gts-group-title">Platform</div>
+    {% if may_sync %}
     <a href="{% url 'admin:hq_sync' %}" class="{% block nav_sync %}{% endblock %}" title="Sync">
       <svg><use href="#ic-cloud-sync"/></svg><span class="lbl">Sync</span></a>
+    {% endif %}
+    {% if may_orgs %}
     <a href="{% url 'admin:orgs_organisation_changelist' %}" title="All organisations">
       <svg><use href="#ic-org"/></svg><span class="lbl">All organisations</span></a>
+    {% endif %}
   </div>
+  {% endif %}
+
+  {% if is_full_access %}
+  <div class="gts-group">
+    <div class="gts-group-title">Your team</div>
+    <a href="{% url 'admin:hq_reviews' %}" class="{% block nav_reviews %}{% endblock %}" title="Waiting for review">
+      <svg><use href="#ic-clock"/></svg><span class="lbl">Waiting for review</span>
+      {% if waiting.to_review %}<span class="n">{{ waiting.to_review }}</span>{% endif %}</a>
+    <a href="{% url 'admin:hq_team' %}" class="{% block nav_team %}{% endblock %}" title="Administrators">
+      <svg><use href="#ic-shield-star"/></svg><span class="lbl">Administrators</span></a>
+    <a href="{% url 'admin:hq_activity' %}" class="{% block nav_activity %}{% endblock %}" title="Activity">
+      <svg><use href="#ic-doc"/></svg><span class="lbl">Activity</span></a>
+  </div>
+  {% endif %}
 </nav>

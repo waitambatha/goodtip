@@ -1,0 +1,95 @@
+{% extends "hq_base.html" %}
+{% load static %}
+{% block title %}Add an administrator. GoodTip HQ{% endblock %}
+{% block nav_team %}on{% endblock %}
+{% block hero_title %}Add an administrator{% endblock %}
+{% block hero_lead %}Choose what they can do, and what has to come past you first.{% endblock %}
+{% block extra_head %}<script src="{% static 'gtadmin/js/gt-team.js' %}" defer></script>{% endblock %}
+{% block admin_content %}
+
+<div class="gt-shell">
+  <div class="ned-topbar">
+    <a href="{% url 'admin:hq_team' %}" class="ned-back">&larr; All administrators</a>
+  </div>
+
+  <form method="post" action="{% url 'admin:hq_team_new' %}" data-busy="Creating" data-team-form>
+    {% csrf_token %}
+
+    {% comment %}
+    Three steps on one page, not three pages. What is being decided is a single
+    shape — this person, these powers, these ones reviewed — and splitting it
+    across requests means parking a half-made decision in a session and working
+    out what to do when somebody wanders off in the middle of it.
+    {% endcomment %}
+
+    <section class="gt-panel ad-step" data-step="1">
+      <div class="gt-panel-head">
+        <span class="ad-stepnum">1</span>
+        <div><h2>Who is it?</h2><div class="gp-sub">They'll get an email with a code to set their own password. You never see it.</div></div>
+      </div>
+      <div class="ad-fields">
+        <div class="fld">
+          <label for="a_name">Their name</label>
+          <input type="text" name="display_name" id="a_name" maxlength="100" required
+                 value="{{ form.display_name|default:'' }}" placeholder="Jordan Smith">
+        </div>
+        <div class="fld">
+          <label for="a_email">Their email address</label>
+          <input type="email" name="email" id="a_email" required
+                 value="{{ form.email|default:'' }}" placeholder="jordan@example.com">
+        </div>
+        <div class="fld">
+          <label for="a_note">What are they here to do? <span class="ned-hint">optional, shown in the list</span></label>
+          <input type="text" name="note" id="a_note" maxlength="200"
+                 value="{{ form.note|default:'' }}" placeholder="Writes the blog">
+        </div>
+      </div>
+    </section>
+
+    <section class="gt-panel ad-step" data-step="2">
+      <div class="gt-panel-head">
+        <span class="ad-stepnum">2</span>
+        <div><h2>What can they do?</h2><div class="gp-sub">Tick what they need. Leave the rest — you can change any of this later.</div></div>
+      </div>
+
+      <div class="ad-level">
+        <label class="ad-levelopt">
+          <input type="radio" name="access_level" value="limited" data-level
+                 {% if form.access_level != "full" %}checked{% endif %}>
+          <span><b>Only what I choose</b><small>They see the areas you tick and nothing else.</small></span>
+        </label>
+        <label class="ad-levelopt is-full">
+          <input type="radio" name="access_level" value="full" data-level
+                 {% if form.access_level == "full" %}checked{% endif %}>
+          <span><b>Full access</b><small>Everything, including adding administrators and approving other people's work. Give this only to someone you would trust with the whole business.</small></span>
+        </label>
+      </div>
+
+      <div data-limited-only>
+        {% include "hq/_capability_picker.html" with groups=groups held_keys=form.capability reviewed_keys=form.review %}
+      </div>
+    </section>
+
+    <section class="gt-panel ad-step" data-step="3">
+      <div class="gt-panel-head">
+        <span class="ad-stepnum">3</span>
+        <div><h2>Check it over</h2><div class="gp-sub">This is what they'll be able to do the moment they accept.</div></div>
+      </div>
+      {% comment %}
+      Built by gt-team.js from the boxes above rather than on a second request,
+      so the summary cannot drift from what is actually ticked — a preview
+      screen that is generated separately is a preview of something else.
+      {% endcomment %}
+      <div class="ad-preview" data-preview>
+        <p class="gt-muted">Tick something above and it will appear here.</p>
+      </div>
+
+      <div class="ad-actions">
+        <button type="submit" class="gt-go-btn" style="width:auto;">
+          Create and send the invitation <svg><use href="#ic-check"/></svg>
+        </button>
+      </div>
+    </section>
+  </form>
+</div>
+{% endblock %}

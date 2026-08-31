@@ -1,0 +1,39 @@
+{% extends "emails/_base.html" %}
+{% comment %}
+Sent to every full-access administrator when work is waiting.
+
+Deliberately says who and what, and nothing about whether it is any good — the
+judgement is the reviewer's, and a summary that editorialises ("a rough draft
+from...") would prejudice it before they have looked.
+{% endcomment %}
+{% block title %}Waiting for your review{% endblock %}
+{% block eyebrow %}Needs your approval{% endblock %}
+{% block badge %}&#128100;{% endblock %}
+{% block preheader %}{{ author }} has submitted "{{ summary }}" for your approval.{% endblock %}
+{% block content %}
+
+  <p style="margin:0 0 10px;font-size:19px;font-weight:bold;color:#0F2E22;text-align:center;line-height:1.3;">
+    Hello <span style="color:#7FA828;">{{ name }}</span>,
+  </p>
+  <p style="margin:0 0 18px;font-size:14.5px;line-height:1.6;color:#4a4a41;text-align:center;">
+    <b>{{ author }}</b> has submitted something in <b>{{ area }}</b> and it is
+    waiting for you. Nothing has changed on the site yet.
+  </p>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px;">
+    <tr>
+      <td bgcolor="#F2F1E7" style="background-color:#F2F1E7;border-radius:10px;padding:16px 18px;">
+        <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#6b6b5e;margin-bottom:6px;">What it is</div>
+        <p style="margin:0;font-size:15px;line-height:1.5;color:#0F2E22;font-weight:bold;">{{ summary }}</p>
+      </td>
+    </tr>
+  </table>
+
+  {% include "emails/_bits.html" with bit="button" url=link label="Review it" %}
+
+  <p style="margin:18px 0 0;font-size:13px;line-height:1.6;color:#6b6b5e;text-align:center;">
+    You can approve it, make changes and approve it, or send it back with a
+    note. Anything else waiting is at <a href="{{ queue_link }}" style="color:#2D7A3A;">your review queue</a>.
+  </p>
+
+{% endblock %}

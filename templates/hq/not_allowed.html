@@ -1,0 +1,30 @@
+{% extends "hq_base.html" %}
+{% block title %}Not your area. GoodTip HQ{% endblock %}
+{% block hero_title %}That one isn't yours{% endblock %}
+{% block hero_lead %}You haven't been given access to this part of GoodTip HQ.{% endblock %}
+{% block admin_content %}
+<div class="gt-shell">
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-lock"/></svg></span>
+      <div>
+        <h2>{% if capability %}{{ capability.label }}{% else %}This screen{% endif %}</h2>
+        <div class="gp-sub">{% if capability %}{{ capability.detail }}{% endif %}</div>
+      </div>
+    </div>
+    {% comment %}
+    Deliberately not a bare 403. The person reading this was told they are an
+    administrator and has just clicked something that did nothing — the useful
+    answer is which power this needed and who can grant it, not "Forbidden".
+    {% endcomment %}
+    <p class="gt-muted">
+      If you need this, ask a full-access administrator to add it to your
+      account. They can do it from Administrators &rarr; Change access, and it
+      takes effect immediately.
+    </p>
+    <div class="ad-actions">
+      <a href="{% url 'admin:hq_my_work' %}" class="gt-pill">See what you can do</a>
+    </div>
+  </section>
+</div>
+{% endblock %}

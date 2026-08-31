@@ -14,6 +14,7 @@ from admin_panel.views import news_detail, news_index
 from billing.views import good_list_view, stripe_webhook
 from goodtip.staging_gate import gate_view, robots_view
 from orgs.views import join_view, public_wall_reply, public_wall_view
+from sysadmin.invite_views import accept as admin_invite_accept
 
 
 urlpatterns = [
@@ -22,6 +23,10 @@ urlpatterns = [
     # so a gate mounted after it would never be reached.
     path("admin/", include("sysadmin.urls", namespace="sysadmin")),
     path("admin/", admin.site.urls),
+    # Accepting an administrator invitation. Outside /admin/ on purpose: the
+    # person following this link has no password yet and no session, so every
+    # guard in there would bounce them to a login they cannot pass.
+    path("admin-invite/<str:token>/", admin_invite_accept, name="admin_invite_accept"),
     # Public marketing pages (no login required)
     path("", TemplateView.as_view(
         template_name="public/home.html",

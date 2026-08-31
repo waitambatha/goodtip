@@ -1,0 +1,118 @@
+{% extends "hq_base.html" %}
+{% block title %}Administrators. GoodTip HQ{% endblock %}
+{% block nav_team %}on{% endblock %}
+{% block hero_title %}Administrators{% endblock %}
+{% block hero_lead %}Who can get in, what they can do, and what has to come past you first.{% endblock %}
+{% block admin_content %}
+
+<div class="gt-shell gt-shell-wide">
+
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-shield-star"/></svg></span>
+      <div>
+        <h2>The team</h2>
+        <div class="gp-sub">Full access can do everything, including approving other people's work.</div>
+      </div>
+      <div class="gp-right">
+        <a href="{% url 'admin:hq_team_new' %}" class="gt-pill">Add an administrator</a>
+      </div>
+    </div>
+
+    <div class="gt-tablewrap">
+      <table class="gt-table">
+        <thead><tr><th>Person</th><th>Can do</th><th>Added</th><th class="fit">&nbsp;</th></tr></thead>
+        <tbody>
+        {% for row in rows %}
+          <tr{% if not row.is_active %} class="is-off"{% endif %}>
+            <td>
+              <span class="gt-namecell">
+                <span>
+                  <b>{{ row.user.display_name|default:row.user.email }}</b>
+                  <small>{{ row.user.email }}{% if row.note %} &middot; {{ row.note }}{% endif %}</small>
+                </span>
+              </span>
+            </td>
+            <td>
+              {% if row.is_full_access %}
+                <span class="pg-tag is-ok">Full access</span>
+              {% else %}
+                <span class="ad-caps">
+                  {% for g in row.grants.all %}
+                    <span class="ad-cap{% if g.requires_approval %} is-reviewed{% endif %}"
+                          title="{% if g.requires_approval %}Goes to you for approval first{% else %}Happens straight away{% endif %}">
+                      {{ g.label }}{% if g.requires_approval %} <em>reviewed</em>{% endif %}
+                    </span>
+                  {% empty %}
+                    <span class="gt-muted">Nothing yet</span>
+                  {% endfor %}
+                </span>
+              {% endif %}
+              {% if not row.is_active %}<span class="pg-tag is-warn">Suspended</span>{% endif %}
+              {% if not row.user.is_active and row.is_active %}<span class="pg-tag is-warn">Invitation not accepted</span>{% endif %}
+            </td>
+            <td>
+              <small>{{ row.created_at|date:"j M Y" }}</small><br>
+              <small class="gt-muted">{% if row.created_by %}by {{ row.created_by }}{% else %}founding account{% endif %}</small>
+            </td>
+            <td class="fit">
+              <a href="{% url 'admin:hq_team_edit' row.pk %}" class="gt-pill is-quiet">Change access</a>
+              {% if not row.user.is_active and row.is_active %}
+              <form method="post" action="{% url 'admin:hq_team_resend' row.pk %}" style="display:inline;">
+                {% csrf_token %}<button type="submit" class="gt-pill is-quiet">Resend invitation</button>
+              </form>
+              {% endif %}
+              {% if row.user_id != user.pk %}
+              <form method="post" action="{% url 'admin:hq_team_toggle' row.pk %}" style="display:inline;"
+                    data-confirm="{% if row.is_active %}They will not be able to sign in until you restore them.{% else %}They will be able to sign in again.{% endif %}">
+                {% csrf_token %}
+                <button type="submit" class="gt-pill{% if row.is_active %} is-danger{% endif %}">{% if row.is_active %}Suspend{% else %}Restore{% endif %}</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {% comment %}
+  Assigning work. Lives on this page rather than its own because the question
+  "who should do this?" is answered by looking at who there is, which is the
+  table directly above it.
+  {% endcomment %}
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-doc"/></svg></span>
+      <div>
+        <h2>Ask someone to do something</h2>
+        <div class="gp-sub">It shows up on their own page and lands in their inbox.</div>
+      </div>
+    </div>
+    <form method="post" action="{% url 'admin:hq_task_new' %}" class="ad-task-form" data-busy="Sending">
+      {% csrf_token %}
+      <div class="fld">
+        <label for="t_who">Who</label>
+        <select name="assigned_to" id="t_who">
+          {% for row in rows %}{% if row.is_active and row.user_id != user.pk %}
+          <option value="{{ row.user_id }}">{{ row.user.display_name|default:row.user.email }}</option>
+          {% endif %}{% endfor %}
+        </select>
+      </div>
+      <div class="fld">
+        <label for="t_title">What</label>
+        <input type="text" name="title" id="t_title" maxlength="160"
+               placeholder="Write something about the AFLW finals" required>
+      </div>
+      <div class="fld">
+        <label for="t_detail">Any detail <span class="ned-hint">optional</span></label>
+        <textarea name="detail" id="t_detail" rows="2"
+                  placeholder="Two or three paragraphs, with a picture if you can find one."></textarea>
+      </div>
+      <button type="submit" class="gt-pill">Send it</button>
+    </form>
+  </section>
+
+</div>
+{% endblock %}

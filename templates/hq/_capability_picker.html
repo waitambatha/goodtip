@@ -1,0 +1,49 @@
+{% comment %}
+The capability picker, shared by "add an administrator" and "change access".
+
+Each capability is one row with two controls, and the second only means
+anything once the first is on: hold it, and then optionally hold it under
+review. That pairing is the whole feature — "write the blog, but I see it
+first" — so it is one row rather than two separate lists you have to keep
+mentally aligned.
+
+`held_keys` / `reviewed_keys` pre-tick it when editing somebody who already
+exists; both are empty when adding.
+{% endcomment %}
+<div class="ad-caps-pick" data-caps>
+  {% for group in groups %}
+  <section class="ad-capgroup">
+    <header>
+      <label class="ad-capgroup-all">
+        <input type="checkbox" data-group-all="{{ group.key }}">
+        <span><b>{{ group.label }}</b><small>{{ group.blurb }}</small></span>
+      </label>
+    </header>
+    <div class="ad-caplist">
+      {% for cap in group.capabilities %}
+      <div class="ad-caprow{% if cap.sensitive %} is-sensitive{% endif %}" data-group="{{ group.key }}">
+        <label class="ad-capmain">
+          <input type="checkbox" name="capability" value="{{ cap.key }}"
+                 data-cap="{{ cap.key }}"
+                 {% if cap.key in held_keys %}checked{% endif %}>
+          <span>
+            <b>{{ cap.label }}{% if cap.sensitive %} <em class="ad-warn">care</em>{% endif %}</b>
+            <small>{{ cap.detail }}</small>
+          </span>
+        </label>
+        {% if cap.reviewable %}
+        <label class="ad-capreview" title="They can do it, but it waits for you to approve it first.">
+          <input type="checkbox" name="review" value="{{ cap.key }}"
+                 data-review="{{ cap.key }}"
+                 {% if cap.key in reviewed_keys %}checked{% endif %}>
+          <span>Needs my approval</span>
+        </label>
+        {% else %}
+        <span class="ad-capreview is-na" title="There is nothing to hold back — this either happens or it doesn't.">&mdash;</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</div>

@@ -1,0 +1,84 @@
+{% extends "hq_base.html" %}
+{% block title %}Waiting for review. GoodTip HQ{% endblock %}
+{% block nav_reviews %}on{% endblock %}
+{% block hero_title %}Waiting for you{% endblock %}
+{% block hero_lead %}Work from administrators whose changes come past you first.{% endblock %}
+{% block admin_content %}
+
+<div class="gt-shell gt-shell-wide">
+
+  {% if failed %}
+  <div class="gt-note is-warn">
+    <b>{{ failed|length }} approved change{{ failed|length|pluralize }} could not be carried out.</b>
+    They were approved but the site refused them, so nothing happened. Open one
+    to see the error.
+  </div>
+  {% endif %}
+
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-clock"/></svg></span>
+      <div>
+        <h2>Waiting</h2>
+        <div class="gp-sub">
+          {% if waiting %}Nothing here has changed the site yet.{% else %}Nothing waiting. All clear.{% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if waiting %}
+    <div class="gt-tablewrap">
+      <table class="gt-table">
+        <thead><tr><th>What</th><th>Who</th><th>Area</th><th>Sent</th><th class="fit">&nbsp;</th></tr></thead>
+        <tbody>
+        {% for cr in waiting %}
+          <tr>
+            <td><b>{{ cr.summary }}</b></td>
+            <td>{{ cr.requested_by }}</td>
+            <td><span class="pg-tag">{{ cr.capability_label }}</span></td>
+            <td><small>{{ cr.created_at|date:"j M, g:i A" }}</small></td>
+            <td class="fit"><a href="{% url 'admin:hq_review_detail' cr.pk %}" class="gt-pill">Review it</a></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </section>
+
+  {% if decided %}
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-check"/></svg></span>
+      <div><h2>Recently decided</h2><div class="gp-sub">The last {{ decided|length }}.</div></div>
+    </div>
+    <div class="gt-tablewrap">
+      <table class="gt-table">
+        <thead><tr><th>What</th><th>Who</th><th>Outcome</th><th>Reviewed</th></tr></thead>
+        <tbody>
+        {% for cr in decided %}
+          <tr>
+            <td>
+              <b>{{ cr.summary }}</b>
+              {% if cr.feedback %}<br><small class="gt-muted">&ldquo;{{ cr.feedback|truncatechars:110 }}&rdquo;</small>{% endif %}
+            </td>
+            <td>{{ cr.requested_by }}</td>
+            <td>
+              {% if cr.status == "approved" %}<span class="pg-tag is-ok">Approved</span>
+              {% elif cr.status == "amended" %}<span class="pg-tag is-ok">Approved, changed</span>
+              {% else %}<span class="pg-tag is-warn">Sent back</span>{% endif %}
+              {% if cr.apply_error %}<span class="pg-tag is-warn">Did not apply</span>{% endif %}
+            </td>
+            <td>
+              <small>{{ cr.reviewed_at|date:"j M, g:i A" }}</small><br>
+              <small class="gt-muted">{{ cr.reviewed_by|default:"—" }}</small>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

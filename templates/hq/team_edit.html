@@ -1,0 +1,59 @@
+{% extends "hq_base.html" %}
+{% load static %}
+{% block title %}{{ row.user }}. GoodTip HQ{% endblock %}
+{% block nav_team %}on{% endblock %}
+{% block hero_title %}{{ row.user.display_name|default:row.user.email }}{% endblock %}
+{% block hero_lead %}Change what they can do, and what has to come past you first.{% endblock %}
+{% block extra_head %}<script src="{% static 'gtadmin/js/gt-team.js' %}" defer></script>{% endblock %}
+{% block admin_content %}
+
+<div class="gt-shell">
+  <div class="ned-topbar">
+    <a href="{% url 'admin:hq_team' %}" class="ned-back">&larr; All administrators</a>
+  </div>
+
+  <form method="post" data-busy="Saving" data-team-form>
+    {% csrf_token %}
+
+    <section class="gt-panel">
+      <div class="gt-panel-head">
+        <span class="gp-ic"><svg><use href="#ic-shield"/></svg></span>
+        <div>
+          <h2>{{ row.user.email }}</h2>
+          <div class="gp-sub">
+            Added {{ row.created_at|date:"j M Y" }}{% if row.created_by %} by {{ row.created_by }}{% endif %}.
+          </div>
+        </div>
+      </div>
+
+      <div class="fld">
+        <label for="e_note">What are they here to do?</label>
+        <input type="text" name="note" id="e_note" maxlength="200" value="{{ row.note }}">
+      </div>
+
+      <div class="ad-level">
+        <label class="ad-levelopt">
+          <input type="radio" name="access_level" value="limited" data-level
+                 {% if not row.is_full_access %}checked{% endif %}>
+          <span><b>Only what I choose</b><small>They see the areas you tick and nothing else.</small></span>
+        </label>
+        <label class="ad-levelopt is-full">
+          <input type="radio" name="access_level" value="full" data-level
+                 {% if row.is_full_access %}checked{% endif %}>
+          <span><b>Full access</b><small>Everything, including adding administrators and approving other people's work.</small></span>
+        </label>
+      </div>
+
+      <div data-limited-only>
+        {% include "hq/_capability_picker.html" with groups=groups held_keys=held_keys reviewed_keys=reviewed_keys %}
+      </div>
+
+      <div class="ad-preview" data-preview></div>
+
+      <div class="ad-actions">
+        <button type="submit" class="gt-go-btn" style="width:auto;">Save changes <svg><use href="#ic-check"/></svg></button>
+      </div>
+    </section>
+  </form>
+</div>
+{% endblock %}

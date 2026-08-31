@@ -11460,3 +11460,145 @@ body.fxh-open { overflow: hidden; }
   font-family: var(--display); font-size: 17px; color: var(--ink);
   line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+/* ---------------------------------------------------------------------------
+   DELEGATED ADMINISTRATION
+   The screens for running a team: who the administrators are, what each may
+   do, the queue of work waiting on approval, and the record of all of it.
+   --------------------------------------------------------------------------- */
+
+/* ---- The capability picker ---- */
+.ad-capgroup { border: 1px solid var(--gt-hair); border-radius: 12px; margin-bottom: 14px; overflow: hidden; }
+.ad-capgroup > header { background: rgba(15, 46, 34, .04); border-bottom: 1px solid var(--gt-hair); padding: 12px 16px; }
+.ad-capgroup-all { display: flex; align-items: flex-start; gap: 11px; cursor: pointer; margin: 0; }
+.ad-capgroup-all b { display: block; font-size: 14px; color: var(--ink); }
+.ad-capgroup-all small { display: block; font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+
+.ad-caplist { padding: 4px 0; }
+/* One row per capability, with the two decisions side by side: hold it, and
+   optionally hold it under review. Two separate lists would be two things to
+   keep mentally aligned. */
+.ad-caprow {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 16px; border-bottom: 1px solid rgba(15, 46, 34, .06);
+}
+.ad-caprow:last-child { border-bottom: 0; }
+.ad-caprow:hover { background: rgba(45, 122, 58, .04); }
+.ad-capmain { display: flex; align-items: flex-start; gap: 11px; flex: 1; cursor: pointer; margin: 0; min-width: 0; }
+.ad-capmain b { display: block; font-size: 13.5px; color: var(--ink); font-weight: 700; }
+.ad-capmain small { display: block; font-size: 12.5px; line-height: 1.5; color: var(--muted); margin-top: 2px; }
+.ad-warn {
+  font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: .07em;
+  text-transform: uppercase; color: #8a6508; background: rgba(212, 160, 23, .18);
+  padding: 1px 6px; border-radius: 999px; margin-left: 5px; vertical-align: 1px;
+}
+
+.ad-capreview {
+  display: flex; align-items: center; gap: 6px; flex: none; margin: 0;
+  font-size: 12px; font-weight: 600; color: var(--forest); cursor: pointer;
+  white-space: nowrap;
+}
+/* Greyed rather than hidden when the capability is not held: a control that
+   vanishes and reappears makes the row jump as you tick down the list. */
+.ad-capreview.is-off { opacity: .3; cursor: default; }
+.ad-capreview.is-na { opacity: .25; color: var(--muted); }
+
+/* ---- Full access vs picking ---- */
+.ad-level { display: grid; gap: 10px; margin-bottom: 20px; }
+@media (min-width: 720px) { .ad-level { grid-template-columns: 1fr 1fr; } }
+.ad-levelopt {
+  display: flex; align-items: flex-start; gap: 11px; margin: 0; cursor: pointer;
+  padding: 14px 16px; border: 1px solid var(--gt-hair); border-radius: 12px; background: #fff;
+}
+.ad-levelopt:has(input:checked) { border-color: var(--forest); background: rgba(45, 122, 58, .05); }
+.ad-levelopt.is-full:has(input:checked) { border-color: #C0392B; background: rgba(192, 57, 43, .05); }
+.ad-levelopt b { display: block; font-size: 14px; color: var(--ink); }
+.ad-levelopt small { display: block; font-size: 12.5px; line-height: 1.5; color: var(--muted); margin-top: 3px; }
+
+/* ---- The wizard's three steps ---- */
+.ad-step { position: relative; }
+.ad-stepnum {
+  display: grid; place-items: center; width: 34px; height: 34px; flex: none;
+  border-radius: 50%; background: var(--deep); color: var(--lime);
+  font-family: var(--display); font-size: 16px;
+}
+.ad-fields { display: grid; gap: 14px; }
+@media (min-width: 720px) { .ad-fields { grid-template-columns: 1fr 1fr; } .ad-fields .fld:last-child { grid-column: 1 / -1; } }
+.ad-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 20px; }
+
+/* ---- The preview, built from the boxes above ---- */
+.ad-preview { border: 1px dashed var(--gt-hair); border-radius: 12px; padding: 16px 18px; background: rgba(15, 46, 34, .02); }
+.ad-pv-head { margin: 14px 0 6px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.ad-pv-head:first-child { margin-top: 0; }
+.ad-pv-list { margin: 0; padding-left: 20px; font-size: 13.5px; line-height: 1.7; color: var(--ink); }
+.ad-pv-list.is-wait { color: #8a6508; }
+
+/* ---- What one administrator holds, on the team list ---- */
+.ad-caps { display: flex; flex-wrap: wrap; gap: 5px; }
+.ad-cap {
+  display: inline-block; padding: 3px 9px; border-radius: 999px;
+  background: rgba(45, 122, 58, .12); color: var(--forest);
+  font-size: 11.5px; font-weight: 600;
+}
+.ad-cap.is-reviewed { background: rgba(212, 160, 23, .16); color: #8a6508; }
+.ad-cap em { font-style: normal; font-weight: 800; font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; opacity: .8; }
+tr.is-off { opacity: .55; }
+
+/* ---- "What you can do", on a person's own page ---- */
+.ad-mine { display: grid; gap: 10px; }
+.ad-mine-row { display: flex; align-items: flex-start; gap: 12px; }
+.ad-mine-ic { display: grid; place-items: center; width: 26px; height: 26px; flex: none; border-radius: 50%; }
+.ad-mine-ic svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+.ad-mine-ic.is-go { background: rgba(45, 122, 58, .14); color: var(--forest); }
+.ad-mine-ic.is-wait { background: rgba(212, 160, 23, .18); color: #8a6508; }
+.ad-mine-row b { display: block; font-size: 14px; color: var(--ink); }
+.ad-mine-row small { display: block; font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+
+/* ---- Tasks ---- */
+.ad-task-form { display: grid; gap: 12px; max-width: 620px; }
+.ad-tasks { display: grid; gap: 12px; }
+.ad-task {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 14px 16px; border: 1px solid var(--gt-hair); border-radius: 12px; background: #fff;
+}
+.ad-task b { font-size: 14px; color: var(--ink); }
+.ad-task p { margin: 5px 0 4px; font-size: 13px; line-height: 1.55; color: var(--muted); }
+
+/* ---- What came back from review ---- */
+.ad-decisions { display: grid; gap: 12px; }
+.ad-decision { padding: 14px 16px; border: 1px solid var(--gt-hair); border-radius: 12px; background: #fff; }
+.ad-dec-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.ad-dec-note {
+  margin: 9px 0 0; padding-left: 12px; border-left: 3px solid var(--lime);
+  font-size: 13.5px; line-height: 1.6; color: var(--ink);
+}
+.ad-dec-changed { margin: 8px 0 0; font-size: 12.5px; }
+
+/* ---- Reviewing one submission ---- */
+.rv-field { margin-bottom: 16px; }
+.rv-box { width: 100%; font-size: 13.5px; line-height: 1.6; }
+.rv-box.is-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+.rv-static {
+  padding: 10px 12px; border: 1px solid var(--gt-hair); border-radius: 8px;
+  background: rgba(15, 46, 34, .03); font-size: 13px; line-height: 1.6;
+  color: var(--muted); white-space: pre-wrap; word-break: break-word;
+}
+/* The markup fields are the ones worth seeing rendered — judging a blog post
+   by reading its HTML is not reviewing it. */
+.rv-preview { margin-top: 8px; }
+.rv-preview summary { font-size: 12.5px; font-weight: 700; color: var(--forest); cursor: pointer; }
+.rv-render { margin-top: 10px; padding: 16px 18px; border: 1px solid var(--gt-hair); border-radius: 10px; background: #fff; }
+.rv-render img { max-width: 100%; height: auto; }
+.rv-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 18px; }
+
+/* ---- The activity filter ---- */
+.ad-filter { display: flex; gap: 8px; flex-wrap: wrap; }
+.ad-filter select { padding: 6px 10px; border: 1px solid var(--gt-hair); border-radius: 8px; background: #fff; font-family: var(--body); font-size: 13px; }
+
+/* ---- What an invitation says you are being trusted with ---- */
+.inv-grants { margin: 0 0 22px; padding: 16px 18px; border-radius: 12px; background: rgba(232, 228, 213, .08); border: 1px solid rgba(232, 228, 213, .16); }
+.inv-grant-head { margin: 0 0 6px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--lime); }
+.inv-grants ul { margin: 0 0 12px; padding-left: 20px; font-size: 14px; line-height: 1.7; }
+.inv-grants ul.is-reviewed { color: #E8D48A; }
+.inv-grants ul:last-child { margin-bottom: 0; }
+.inv-note { font-size: 12.5px; opacity: .75; margin: 0; }

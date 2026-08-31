@@ -1,0 +1,139 @@
+{% extends "hq_base.html" %}
+{% block title %}Your work. GoodTip HQ{% endblock %}
+{% block nav_mywork %}on{% endblock %}
+{% block hero_title %}Your work{% endblock %}
+{% block hero_lead %}What you can do here, what you've sent for approval, and what's been asked of you.{% endblock %}
+{% block admin_content %}
+
+<div class="gt-shell gt-shell-wide">
+
+  {% comment %}
+  What you can do comes first, and it is the reason this page exists. Somebody
+  who has just accepted an invitation has been told they are an administrator
+  and has no idea what that means in practice; a menu they can partly see does
+  not answer it. This does, in the words the person who invited them ticked.
+  {% endcomment %}
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-shield"/></svg></span>
+      <div>
+        <h2>What you can do</h2>
+        <div class="gp-sub">
+          {% if is_full %}You have full access.{% else %}Ask a full-access administrator if you need more.{% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if is_full %}
+      <p>Everything in GoodTip HQ, including adding administrators and approving other people's work.</p>
+    {% else %}
+      <div class="ad-mine">
+        {% for g in grants %}
+          {% if not g.requires_approval %}
+          <div class="ad-mine-row">
+            <span class="ad-mine-ic is-go"><svg><use href="#ic-check"/></svg></span>
+            <span><b>{{ g.label }}</b><small>Happens straight away.</small></span>
+          </div>
+          {% endif %}
+        {% endfor %}
+        {% for g in grants %}
+          {% if g.requires_approval %}
+          <div class="ad-mine-row">
+            <span class="ad-mine-ic is-wait"><svg><use href="#ic-clock"/></svg></span>
+            <span><b>{{ g.label }}</b><small>Goes to a full-access administrator to approve first.</small></span>
+          </div>
+          {% endif %}
+        {% endfor %}
+        {% if not grants %}
+        <p class="gt-muted">Nothing has been assigned to you yet.</p>
+        {% endif %}
+      </div>
+    {% endif %}
+  </section>
+
+  {% if tasks %}
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-doc"/></svg></span>
+      <div><h2>Asked of you</h2><div class="gp-sub">{{ tasks|length }} to do.</div></div>
+    </div>
+    <div class="ad-tasks">
+      {% for t in tasks %}
+      <div class="ad-task">
+        <div>
+          <b>{{ t.title }}</b>
+          {% if t.detail %}<p>{{ t.detail|linebreaksbr }}</p>{% endif %}
+          <small class="gt-muted">From {{ t.assigned_by|default:"an administrator" }} &middot; {{ t.created_at|date:"j M" }}</small>
+        </div>
+        <form method="post" action="{% url 'admin:hq_task_done' t.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="gt-pill">Mark done</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if waiting %}
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-clock"/></svg></span>
+      <div><h2>Waiting on approval</h2><div class="gp-sub">Sent, but not live yet.</div></div>
+    </div>
+    <div class="gt-tablewrap">
+      <table class="gt-table">
+        <thead><tr><th>What</th><th>Area</th><th>Sent</th></tr></thead>
+        <tbody>
+        {% for cr in waiting %}
+        <tr><td><b>{{ cr.summary }}</b></td><td>{{ cr.capability_label }}</td>
+            <td><small>{{ cr.created_at|date:"j M, g:i A" }}</small></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if decided %}
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-msg"/></svg></span>
+      <div><h2>What came back</h2><div class="gp-sub">Including anything they changed before approving it.</div></div>
+    </div>
+    <div class="ad-decisions">
+      {% for cr in decided %}
+      <div class="ad-decision">
+        <div class="ad-dec-head">
+          {% if cr.status == "approved" %}<span class="pg-tag is-ok">Approved</span>
+          {% elif cr.status == "amended" %}<span class="pg-tag is-ok">Approved, with changes</span>
+          {% else %}<span class="pg-tag is-warn">Sent back</span>{% endif %}
+          <b>{{ cr.summary }}</b>
+          <small class="gt-muted">{{ cr.reviewed_by|default:"" }} &middot; {{ cr.reviewed_at|date:"j M" }}</small>
+        </div>
+        {% if cr.feedback %}<p class="ad-dec-note">&ldquo;{{ cr.feedback }}&rdquo;</p>{% endif %}
+        {% if cr.changed_fields %}
+        <p class="gt-muted ad-dec-changed">
+          They changed:
+          {% for name, before, after in cr.changed_fields %}<b>{{ name }}</b>{% if not forloop.last %}, {% endif %}{% endfor %}.
+        </p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if done_tasks %}
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-check"/></svg></span>
+      <div><h2>Done</h2></div>
+    </div>
+    <ul class="pg-bullets">
+      {% for t in done_tasks %}<li>{{ t.title }} <span class="gt-muted">&middot; {{ t.completed_at|date:"j M" }}</span></li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

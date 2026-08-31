@@ -1,91 +1,83 @@
 /* GoodTip's additions to the Django admin.
  *
- * Loaded from templates/admin/base_site.html, so it lands on every admin page
- * after Django's own base.css / dark_mode.css and can override them. Kept to
- * the things the client actually flagged rather than a reskin — the admin is a
- * working tool and Django's own layout is fine.
+ * Loaded from templates/admin/base_site.html after the skin's own stylesheet,
+ * so it can out-rank rules there. Two things live here: the theme switch, and
+ * nothing else — everything for the delegated-admin screens is in goodtip.css
+ * with the rest of the HQ components, because those screens use the HQ shell
+ * rather than Django's chrome.
  */
 
 /* ---------------------------------------------------------------------------
    THEME SWITCH
-   Django ships this as a 16px icon with no label, wedged between "Change
-   password" and "Log out". The client never spotted it. Same button and the
-   same theme.js behind it — this just gives it a size, a border and the name
-   of the theme it is currently on.
+   Three segments rather than Django's one cycling icon. The client could not
+   find the icon, and cycling has the deeper problem that the control means
+   something different on every press — you cannot aim it. Every option is
+   visible here and any of them is one click away.
    --------------------------------------------------------------------------- */
-/* `#user-tools` matches the skin's own rule (gtadmin/css/gtadmin.css), which
-   makes the toggle a 38px circle — still icon-only, so the client's "I never
-   saw it" applies there too. Same specificity, loaded after, so this wins. */
-#user-tools .gt-theme-toggle,
-#header .gt-theme-toggle,
-.gt-theme-toggle {
+#user-tools .gt-theme,
+.gt-theme {
   display: inline-flex;
+  align-items: stretch;
+  gap: 2px;
+  margin: 0 0 0 12px;
+  padding: 2px;
+  border: 1px solid color-mix(in srgb, var(--header-link-color, #ffc) 34%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--header-link-color, #ffc) 8%, transparent);
+  vertical-align: middle;
+  line-height: 1;
+}
+
+#user-tools .gt-theme-opt,
+.gt-theme-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  /* Overrides the skin's 38px circle for .theme-toggle, which these replace. */
   width: auto;
   height: auto;
-  align-items: center;
-  gap: 7px;
-  margin: 0 0 0 12px;
-  padding: 5px 12px 5px 9px;
-  border: 1px solid var(--header-link-color, #ffc);
+  padding: 5px 11px;
+  border: 0;
   border-radius: 999px;
   background: transparent;
   color: var(--header-link-color, #ffc);
+  font-family: inherit;
   font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
-  /* The header row is text links; this has to read as a control among them. */
-  vertical-align: middle;
-  transition: background-color .15s ease, border-color .15s ease;
-}
-
-#user-tools .gt-theme-toggle:hover,
-.gt-theme-toggle:hover,
-.gt-theme-toggle:focus-visible {
-  background: color-mix(in srgb, var(--header-link-color, #ffc) 16%, transparent);
-}
-
-.gt-theme-toggle .gt-tt-ic {
-  display: inline-flex;
-  width: 17px;
-  height: 17px;
-}
-
-/* Django's rules size these to 1rem and hide/show them by html[data-theme].
-   Only the box they sit in changes here. */
-#user-tools .gt-theme-toggle svg,
-.gt-theme-toggle svg {
-  width: 17px;
-  height: 17px;
-  vertical-align: middle;
-}
-
-.gt-theme-toggle .gt-tt-txt {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  white-space: nowrap;
-}
-
-.gt-theme-toggle .gt-tt-k {
-  opacity: .72;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  font-size: 10px;
-}
-
-.gt-theme-toggle b {
   font-weight: 600;
-  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+  opacity: .72;
+  transition: background-color .14s ease, opacity .14s ease;
 }
 
-/* Three labels, one shown. Django's stylesheet only supplies the `display:
-   block` half of this pair, because in its own markup the labels carry
-   .visually-hidden and are hidden by that instead. These are real text, so
-   they need the hiding rule too. */
-.gt-theme-toggle .theme-label-when-auto,
-.gt-theme-toggle .theme-label-when-dark,
-.gt-theme-toggle .theme-label-when-light { display: none; }
+#user-tools .gt-theme-opt:hover,
+.gt-theme-opt:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--header-link-color, #ffc) 14%, transparent);
+}
 
-html[data-theme="auto"] .gt-theme-toggle .theme-label-when-auto,
-html[data-theme="dark"] .gt-theme-toggle .theme-label-when-dark,
-html[data-theme="light"] .gt-theme-toggle .theme-label-when-light { display: inline; }
+/* The one you are on. Filled rather than merely brighter, because "slightly
+   less faded" is not a state anybody reads off a toolbar at a glance. */
+#user-tools .gt-theme-opt.on,
+.gt-theme-opt.on {
+  opacity: 1;
+  background: var(--header-link-color, #ffc);
+  color: var(--header-bg, #0C4B33);
+}
+
+.gt-theme-ic { width: 14px; height: 14px; flex: none; }
+
+/* Under about 900px the header has no room for three labels; the icons carry
+   it, and each button keeps its title attribute for the tooltip. */
+@media (max-width: 900px) {
+  .gt-theme-opt span { display: none; }
+  .gt-theme-opt { padding: 6px 9px; }
+}
+
+/* Django renders this control a second time on the login screen, where there
+   is no header colour to inherit from. */
+body.login .gt-theme,
+.gt-theme:not(#user-tools *) {
+  --header-link-color: var(--body-fg, #333);
+}

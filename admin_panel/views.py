@@ -24,6 +24,11 @@ from .perms import get_managed_org_or_404, managed_orgs, org_admin_required
 from orgs.signing import make_join_token
 from tipping.models import Match, Round, Team, Tip
 from tipping.services import record_match_result
+# What a screen needs, and whether the person doing it is reviewed, comes from
+# this rather than a blanket superuser check — see sysadmin/capabilities.py for
+# why the unit is a job rather than a model permission. superuser_required
+# stays for the screens that are genuinely owner-only and never delegated.
+from sysadmin.guards import requires
 
 
 # Map the org-creation form's value to one or more Competition slugs.
@@ -240,7 +245,7 @@ def org_members(request, org_id: int):
     })
 
 
-@staff_member_required
+@requires("data.sync")
 def sync_panel(request):
     msg = None
     if request.method == "POST":
@@ -420,7 +425,7 @@ def _editor_body_html(body: str) -> str:
     return linebreaks(body)
 
 
-@superuser_required
+@requires("news.write")
 def news_list(request):
     # Each row carries the story's own public URL so it can be copied straight
     # from the list — the point of the auto-generated slug is that the link is
@@ -431,7 +436,7 @@ def news_list(request):
     return render(request, "manage/news.html", {"posts": posts})
 
 
-@superuser_required
+@requires("news.write", lambda r: f"New story: {_headline_text(r) or 'untitled'}")
 def news_new(request):
     if request.method == "POST":
         if not _headline_text(request):
@@ -450,7 +455,7 @@ def news_new(request):
     })
 
 
-@superuser_required
+@requires("news.write", lambda r: f"Edit story: {_headline_text(r) or 'untitled'}")
 def news_edit(request, post_id: int):
     post = get_object_or_404(NewsPost, pk=post_id)
     if request.method == "POST":
@@ -471,7 +476,7 @@ def news_edit(request, post_id: int):
     })
 
 
-@superuser_required
+@requires("news.write")
 def news_upload_image(request):
     """Inline image upload for the story editor — returns the URL to insert."""
     f = request.FILES.get("file")
@@ -483,7 +488,7 @@ def news_upload_image(request):
     return JsonResponse({"url": default_storage.url(path)})
 
 
-@superuser_required
+@requires("news.publish", "Publish or unpublish a story")
 def news_toggle(request, post_id: int):
     post = get_object_or_404(NewsPost, pk=post_id)
     if request.method == "POST":
@@ -493,7 +498,7 @@ def news_toggle(request, post_id: int):
     return redirect("admin:hq_news")
 
 
-@superuser_required
+@requires("news.email", "Email a story to every member")
 def news_announce(request, post_id: int):
     """Email a published post to every member — once.
 
@@ -528,7 +533,7 @@ def news_announce(request, post_id: int):
     return redirect("admin:hq_news")
 
 
-@superuser_required
+@requires("news.delete", "Delete a story")
 def news_delete(request, post_id: int):
     post = get_object_or_404(NewsPost, pk=post_id)
     if request.method == "POST":
@@ -594,7 +599,7 @@ def news_detail(request, slug: str):
 staff_login_required = staff_member_required(login_url=reverse_lazy("accounts:login"))
 
 
-@staff_login_required
+@requires("enquiries.read")
 def enquiries(request):
     """The enquiry inbox.
 
@@ -621,7 +626,7 @@ def enquiries(request):
     })
 
 
-@staff_login_required
+@requires("enquiries.read", "Reply to an enquiry", to_submit="enquiries.reply")
 def enquiry_detail(request, enquiry_id):
     """One enquiry, and the box to answer it in.
 
@@ -780,7 +785,7 @@ def _page_rows(request, group):
     return rows
 
 
-@superuser_required
+@requires("pages.edit")
 def pages_list(request):
     return render(request, "manage/pages.html", {
         "public_rows": _page_rows(request, page_registry.GROUP_PUBLIC),
@@ -790,7 +795,7 @@ def pages_list(request):
     })
 
 
-@superuser_required
+@requires("pages.edit")
 def page_edits(request, page_key: str):
     """Every edit made to one page: what it said, what it says now."""
     page = page_registry.BY_KEY.get(page_key)
@@ -802,7 +807,7 @@ def page_edits(request, page_key: str):
     })
 
 
-@superuser_required
+@requires("pages.edit", "Change the wording on a page")
 @require_POST
 def page_save(request):
     """Store the blocks the editor changed.
@@ -859,7 +864,7 @@ def page_save(request):
     return JsonResponse({"saved": saved, "reverted": reverted})
 
 
-@superuser_required
+@requires("pages.images", "Replace a picture on a page")
 @require_POST
 def page_upload_image(request):
     """Replace one image on a page. Returns the URL the editor swaps in."""
@@ -886,7 +891,7 @@ def page_upload_image(request):
     return JsonResponse({"url": row.image.url})
 
 
-@superuser_required
+@requires("pages.revert", "Put a page back to its original wording")
 @require_POST
 def page_revert(request, page_key: str):
     """Put every word on one page back to what the template says."""

@@ -1,0 +1,22 @@
+Hello {{ name }},
+
+{% if outcome == "approved" %}{{ reviewer }} approved your work in {{ area }}. It is live now.
+{% elif outcome == "amended" %}{{ reviewer }} approved your work in {{ area }} after making a few changes.
+It is live now, with those changes included.
+{% else %}{{ reviewer }} has sent your work in {{ area }} back to you. Nothing has
+changed on the site.
+{% endif %}
+    {{ summary }}
+{% if feedback %}
+WHAT THEY SAID
+{{ feedback }}
+{% endif %}{% if changed %}
+WHAT THEY CHANGED
+{% for name, before, after in changed %}- {{ name }}
+{% endfor %}{% endif %}{% if failed %}
+NOTE: this was approved but could not be carried out. A full-access
+administrator has been shown the error.
+{% endif %}
+See your work: {{ link }}
+
+— GoodTip

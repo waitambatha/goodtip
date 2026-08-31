@@ -618,11 +618,14 @@ class PageEditFlowTests(TestCase):
 class AdminThemeToggleTests(TestCase):
     """The green/cream switch in /admin/.
 
-    Django ships it as a bare 16px icon wedged into the header's row of text
-    links, and the client's report was simply that they never saw it. The
-    override keeps Django's button, class and behaviour — theme.js still binds
-    to `.theme-toggle` and still cycles auto/light/dark — and adds the thing
-    that was missing: words saying which theme you are on.
+    Django ships this as one small icon that CYCLES auto -> light -> dark on
+    click. The client could not find it, which is what the first rewrite fixed
+    by labelling it — but cycling has the deeper problem that the control means
+    something different on every press, so it cannot be aimed: you want dark,
+    you press once, you get light.
+
+    Three segments answer both. Every option is visible, the one in use is
+    filled, and any of them is one click away.
     """
 
     def setUp(self):
@@ -631,28 +634,29 @@ class AdminThemeToggleTests(TestCase):
         )
         sign_in_to_admin(self.client, self.admin)
 
-    def test_the_toggle_says_which_theme_it_is_on(self):
+    def test_all_three_modes_are_on_screen_at_once(self):
         html = self.client.get(reverse("admin:index")).content.decode()
-        self.assertIn("Theme", html)
-        for label in ("Auto", "Dark", "Light"):
-            self.assertIn(f'class="theme-label-when-{label.lower()}">{label}<', html)
+        for mode in ("auto", "light", "dark"):
+            self.assertIn(f'data-set-theme="{mode}"', html)
+        for label in ("Auto", "Light", "Dark"):
+            self.assertIn(f"<span>{label}</span>", html)
 
-    def test_django_still_recognises_it_as_its_own_control(self):
-        """theme.js finds the button by class name and nothing else. Lose the
-        class and the control becomes decorative."""
+    def test_nothing_cycles_each_button_sets_one_mode(self):
+        """The bug in the shipped control: pressing it is a guess."""
         html = self.client.get(reverse("admin:index")).content.decode()
-        self.assertIn('class="theme-toggle gt-theme-toggle"', html)
-        for icon in ("icon-auto", "icon-moon", "icon-sun"):
-            self.assertIn(icon, html)
+        self.assertNotIn("cycleTheme", html)
+        # The attribute with a value is a button; bare occurrences are the
+        # script's own selectors.
+        self.assertEqual(html.count('data-set-theme="'), 3)
 
-    def test_the_labels_are_not_screen_reader_only_any_more(self):
-        """The whole change: they used to carry .visually-hidden, which is why
-        the control was three states of the same small icon."""
+    def test_it_writes_the_same_place_django_reads_from(self):
+        """Django's early-boot script restores the theme before first paint by
+        reading localStorage["theme"] and stamping data-theme. Write anywhere
+        else and the choice is forgotten on the next page."""
         html = self.client.get(reverse("admin:index")).content.decode()
-        toggle = html[html.find("theme-toggle"):]
-        toggle = toggle[:toggle.find("</button>")]
-        self.assertNotIn("visually-hidden", toggle)
+        self.assertIn("localStorage.setItem('theme'", html)
+        self.assertIn("document.documentElement.dataset.theme", html)
 
-    def test_the_stylesheet_that_sizes_it_is_loaded(self):
+    def test_the_stylesheet_that_shapes_it_is_loaded(self):
         html = self.client.get(reverse("admin:index")).content.decode()
         self.assertIn("css/gt-admin.css", html)

@@ -1,0 +1,137 @@
+{% extends "hq_base.html" %}
+{% block title %}{{ cr.summary }}. Review{% endblock %}
+{% block nav_reviews %}on{% endblock %}
+{% block hero_title %}{{ cr.summary }}{% endblock %}
+{% block hero_lead %}From {{ cr.requested_by }} &middot; {{ cr.capability_label }} &middot; {{ cr.created_at|date:"j M Y, g:i A" }}{% endblock %}
+{% block admin_content %}
+
+<div class="gt-shell gt-shell-wide">
+  <div class="ned-topbar">
+    <a href="{% url 'admin:hq_reviews' %}" class="ned-back">&larr; Everything waiting</a>
+  </div>
+
+  {% if cr.apply_error %}
+  <div class="gt-note is-warn">
+    <b>This was approved but could not be carried out.</b>
+    <code class="pg-url">{{ cr.apply_error }}</code>
+  </div>
+  {% endif %}
+
+  <form method="post" data-busy="Saving your decision">
+    {% csrf_token %}
+
+    <section class="gt-panel">
+      <div class="gt-panel-head">
+        <span class="gp-ic"><svg><use href="#ic-doc"/></svg></span>
+        <div>
+          <h2>What they sent</h2>
+          <div class="gp-sub">
+            {% comment %}
+            The fields are editable in place. That is deliberate: the common
+            answer to a piece of writing is neither yes nor no but "yes, once
+            the second paragraph is fixed", and making the reviewer send it
+            back for a one-word change wastes a round trip and discourages them
+            from reviewing carefully at all.
+            {% endcomment %}
+            Change anything here and choose &ldquo;Approve with my changes&rdquo; &mdash;
+            they'll be told exactly what you altered.
+          </div>
+        </div>
+      </div>
+
+      {% if cr.is_pending %}
+        {% for f in fields %}
+        <div class="fld rv-field">
+          <label for="rv_{{ f.name }}">{{ f.name }}</label>
+          {% if f.long %}
+          <textarea name="field_{{ f.name }}" id="rv_{{ f.name }}" rows="{% if f.rich %}12{% else %}4{% endif %}"
+                    class="rv-box{% if f.rich %} is-code{% endif %}">{{ f.value }}</textarea>
+          {% if f.rich %}
+          <details class="rv-preview">
+            <summary>See it the way a reader will</summary>
+            <div class="rv-render">{{ f.value|safe }}</div>
+          </details>
+          {% endif %}
+          {% else %}
+          <input type="text" name="field_{{ f.name }}" id="rv_{{ f.name }}" value="{{ f.value }}">
+          {% endif %}
+        </div>
+        {% empty %}
+        <p class="gt-muted">This submission carried no fields &mdash; it is an action rather than a form.</p>
+        {% endfor %}
+      {% else %}
+        {% for f in fields %}
+        <div class="fld rv-field">
+          <label>{{ f.name }}</label>
+          <div class="rv-static">{{ f.value|truncatechars:600 }}</div>
+        </div>
+        {% endfor %}
+      {% endif %}
+
+      {% if files %}
+      <div class="fld">
+        <label>Files they attached</label>
+        <ul class="pg-bullets">
+          {% for f in files %}
+          <li><a href="{{ f.upload.url }}" target="_blank" rel="noopener">{{ f.original_name }}</a>
+            <span class="gt-muted">({{ f.field_name }})</span></li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </section>
+
+    {% if cr.is_pending %}
+    <section class="gt-panel">
+      <div class="gt-panel-head">
+        <span class="gp-ic"><svg><use href="#ic-msg"/></svg></span>
+        <div>
+          <h2>Your decision</h2>
+          <div class="gp-sub">Whatever you choose, {{ cr.requested_by }} gets an email saying what happened and why.</div>
+        </div>
+      </div>
+
+      <div class="fld">
+        <label for="rv_feedback">
+          A note back
+          <span class="ned-hint">required if you're sending it back &mdash; it's all they have to work from</span>
+        </label>
+        <textarea name="feedback" id="rv_feedback" rows="3"
+                  placeholder="Good piece. Can you check the date in the second paragraph before this goes out?"></textarea>
+      </div>
+
+      <div class="rv-actions">
+        <button type="submit" name="decision" value="approve" class="gt-go-btn" style="width:auto;">
+          Approve as it is <svg><use href="#ic-check"/></svg>
+        </button>
+        <button type="submit" name="decision" value="amend" class="gt-pill">
+          Approve with my changes
+        </button>
+        <button type="submit" name="decision" value="decline" class="gt-pill is-danger">
+          Send it back
+        </button>
+      </div>
+    </section>
+    {% else %}
+    <section class="gt-panel">
+      <div class="gt-panel-head">
+        <span class="gp-ic"><svg><use href="#ic-check"/></svg></span>
+        <div>
+          <h2>Already decided</h2>
+          <div class="gp-sub">
+            {{ cr.get_status_display }} by {{ cr.reviewed_by|default:"someone" }}
+            on {{ cr.reviewed_at|date:"j M Y, g:i A" }}.
+          </div>
+        </div>
+      </div>
+      {% if cr.feedback %}<p>&ldquo;{{ cr.feedback }}&rdquo;</p>{% endif %}
+      {% if cr.changed_fields %}
+      <p class="gt-muted">Changed before approving:
+        {% for name, before, after in cr.changed_fields %}<b>{{ name }}</b>{% if not forloop.last %}, {% endif %}{% endfor %}.
+      </p>
+      {% endif %}
+    </section>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}
