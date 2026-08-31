@@ -421,3 +421,10 @@ html[data-theme="dark"] .gts-theme button.on { background: var(--lime); }
 /* Below the fold of a laptop bar the labels go and the icons carry it. */
 @media (max-width: 1120px) { .gts-theme button span { display: none; } .gts-theme button { padding: 6px 8px; } }
 @media (max-width: 620px) { .gts-theme { display: none; } }
+
+/* The news editor's toolbar names #fff for its hover, which is a white flash
+   on a dark toolbar. Scoped to the shell so the public site's editor, which
+   is light-only, keeps the literal. */
+body.gt-shell .ned-toolbar .ned-font-btn:hover,
+body.gt-shell .ned-toolbar .ned-swatch-btn:hover,
+body.gt-shell .ned-toolbar select.ned-pick:hover { background: var(--ad-head-h); }
