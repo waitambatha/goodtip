@@ -10,10 +10,17 @@ are the DEFAULTS: what the page says until somebody overrides them, and what
 it goes back to if the override is removed. The layout is not editable, on
 purpose: copy changes weekly, structure is what breaks when it does.
 
-This page used to wrap every sentence in a {% templatetag openblock %} ptext
-{% templatetag closeblock %} tag for the same purpose. That editor is gone —
-one editor now covers every public and private page instead of four public
-ones — and the tags came off without changing a word.
+THE LAYOUT, AND WHY IT CHANGED (Aug 2026)
+The first version of this page named four classes the stylesheet did not have
+— .prose, .cards-3, .card-lift, .wrap-narrow — so its three "values" cards
+rendered as square undecorated divs and the story ran the full width of the
+page as one unbroken column. Nothing threw; it simply looked unfinished, which
+is what the client saw. Those classes now exist (goodtip.css, ABOUT US +
+PRIVACY POLICY) and this page is rebuilt on them.
+
+The rhythm is deliberate: a moving hero, then three flat facts, then one long
+read, then cards. Cards early would have made it a brochure; the argument for
+GoodTip is a paragraph, and the cards are what you remember it by afterwards.
 {% endcomment %}
 
 {% block title %}About Us &middot; GoodTip{% endblock %}
@@ -23,59 +30,193 @@ ones — and the tags came off without changing a word.
 
 {% block content %}
 
+<!-- HERO -->
 <section class="hero-split">
   <div class="hs-left">
     <span class="pill" style="align-self:flex-start;margin-bottom:24px;"><span class="dot"></span>About us</span>
     <h1>The comp you already run, <em>doing something else as well.</em></h1>
     <p class="hero-sub">GoodTip started with a simple observation: hundreds of thousands of Australians already tip the footy at work every winter, and none of it goes anywhere.</p>
+    <div class="hero-ctas" style="justify-content:flex-start;">
+      <a href="/how-it-works/" class="btn-primary">See how it works &rarr;</a>
+      <a href="/leaderboard/" class="btn-ghost">The Good List</a>
+    </div>
   </div>
   <div class="hs-right">
+    {% comment %}
+    Four shots, not one. Every other hero on the site rotates and this one did
+    not, which made About Us the one page that looked like a screenshot of the
+    site rather than part of it. gt-scenes.js drives any stack of .shot
+    children, so this needs no wiring beyond the markup.
+    {% endcomment %}
     <div class="hero-bg" aria-hidden="true">
       <div class="shot active" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/afl-training.jpg' %}')"></div>
     </div>
     <div class="hs-veil" aria-hidden="true"></div>
+    <div class="hs-tagstrip"><span class="live-dot">Every winter, in every office</span></div>
   </div>
 </section>
 
-<section class="section on-cream">
+<!-- THE THREE FACTS -->
+<section class="section on-cream" style="padding-top:clamp(40px,5vw,64px);">
   <div class="wrap">
-    <p class="eyebrow reveal">Why we built it</p>
-    <h2 class="section-heading reveal">A tipping comp is already a community. It was just missing a cause.</h2>
-    <div class="prose reveal" style="margin-top:26px;">
-      <p>Every season, offices, clubs, pubs and family group chats run a footy tipping comp. People check the ladder on Monday, argue about a Thursday night upset, and give the winner a trophy nobody keeps. It works because it is small, regular and social — the same three things that make fundraising hard.</p>
-      <p>GoodTip keeps all of that and changes one thing at the end: the money lands somewhere good. Your organisation picks a charity, or puts it to a vote and lets the members decide. Everything raised goes there.</p>
-      <p>Tipping stays free for everyone playing. We are not trying to change how anybody spends their Friday — only where the pot ends up.</p>
+    <div class="fact-row reveal" data-cards>
+      <div class="fact"><b>Free</b><span>to play, for every participant</span></div>
+      <div class="fact"><b>4</b><span>codes: AFL, AFLW, NRL, NRLW</span></div>
+      <div class="fact"><b>100%</b><span>of the cause chosen by your people</span></div>
     </div>
   </div>
 </section>
 
+<!-- THE STORY -->
+<section class="section on-cream has-rails" style="padding-top:clamp(28px,4vw,44px);">
+  {% comment %}
+  Side rails. The client asked for the changing imagery that runs down the
+  edges of the private pages to be standard everywhere, and this is the public
+  equivalent — anchored to the section rather than to the viewport, so it
+  fills the margin this narrow column is not using and vanishes when there
+  isn't one. See .pg-rails in goodtip.css.
+  {% endcomment %}
+  <div class="pg-rails" aria-hidden="true">
+    <div class="rail left">
+      <div class="shot on" style="background-image:url('{% static 'img/scenes/afl-goal-posts.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/afl-player-training.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-ground-dusk.jpg' %}')"></div>
+    </div>
+    <div class="rail right">
+      <div class="shot on" style="background-image:url('{% static 'img/scenes/mcg-stadium.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-players-fans.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-panorama.jpg' %}')"></div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="story-split">
+      <div class="ss-aside reveal from-left">
+        <p class="eyebrow">Why we built it</p>
+        <h2>A tipping comp is already a community. It was just missing a cause.</h2>
+        <div class="ss-rule" aria-hidden="true"></div>
+      </div>
+      <div class="prose reveal">
+        <p>Every season, offices, clubs, pubs and family group chats run a footy tipping comp. People check the ladder on Monday, argue about a Thursday night upset, and give the winner a trophy nobody keeps. It works because it is small, regular and social — the same three things that make fundraising hard.</p>
+        <p>GoodTip keeps all of that and changes one thing at the end: the money lands somewhere good. Your organisation picks a charity, or puts it to a vote and lets the members decide. Everything raised goes there.</p>
+        <p>Tipping stays free for everyone playing. We are not trying to change how anybody spends their Friday — only where the pot ends up.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VALUES -->
 <section class="section">
   <div class="wrap">
     <p class="eyebrow reveal">What we stand on</p>
     <h2 class="section-heading reveal">Three things we will not trade away.</h2>
-    <div class="cards-3" style="margin-top:34px;">
-      <div class="card-lift reveal">
+    <p class="section-sub reveal">Everything else about GoodTip is up for debate. These are not.</p>
+    <div class="cards-3" style="margin-top:34px;" data-cards>
+      <article class="card-lift">
+        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-people"/></svg></span>
         <h3>Free to play</h3>
         <p>Nobody pays to enter a tipping comp on GoodTip. If a member has to reach for a card to join in, we have built the wrong thing.</p>
-      </div>
-      <div class="card-lift reveal">
+        <span class="cl-n" aria-hidden="true">01</span>
+      </article>
+      <article class="card-lift">
+        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-eye"/></svg></span>
         <h3>The money is traceable</h3>
         <p>Every dollar is tied to the charity that was active when it was raised. The Good List shows what has actually been settled — never a projection dressed up as a total.</p>
-      </div>
-      <div class="card-lift reveal">
+        <span class="cl-n" aria-hidden="true">02</span>
+      </article>
+      <article class="card-lift">
+        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-vote"/></svg></span>
         <h3>The group decides</h3>
         <p>Which cause you back is your organisation's call, not ours. Pick it, or hold a vote and let every member have a say.</p>
-      </div>
+        <span class="cl-n" aria-hidden="true">03</span>
+      </article>
     </div>
   </div>
 </section>
 
+<!-- HOW THE MONEY MOVES -->
+<section class="section on-dark">
+  <div class="wrap">
+    <p class="eyebrow reveal" style="color:var(--lime);">Where the money comes from</p>
+    <h2 class="section-heading reveal" style="color:var(--white);">Nobody in the comp puts a dollar in.</h2>
+    <p class="section-sub reveal" style="color:rgba(232,228,213,.8);">This is the part people ask about first, so it is worth being plain about.</p>
+    <div class="cards-3" style="margin-top:34px;" data-flow>
+      <article class="card-lift">
+        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-org"/></svg></span>
+        <h3>Your organisation subscribes</h3>
+        <p>One platform fee for the season, paid by the organisation when the first round locks in. Not by the people tipping.</p>
+        <span class="cl-n" aria-hidden="true">01</span>
+      </article>
+      <article class="card-lift">
+        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-heart"/></svg></span>
+        <h3>GoodTip gives a share of it</h3>
+        <p>A share of that fee goes to the charity your organisation is backing. It comes out of our revenue, not out of anybody's pay packet.</p>
+        <span class="cl-n" aria-hidden="true">02</span>
+      </article>
+      <article class="card-lift">
+        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-doc"/></svg></span>
+        <h3>You get the receipt</h3>
+        <p>At the end of the season the Impact Report goes out: total raised, charity named, tipping results. One number your board can cite.</p>
+        <span class="cl-n" aria-hidden="true">03</span>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- IMAGE BAND -->
+<section class="image-band">
+  <div class="shot active" style="background-image:url('{% static 'img/scenes/afl-posts-mcg.jpg' %}')" aria-hidden="true"></div>
+  <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-posts-sunset.jpg' %}')" aria-hidden="true"></div>
+  <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')" aria-hidden="true"></div>
+  <div class="veil" aria-hidden="true"></div>
+  <div class="wrap reveal from-left">
+    <p class="eyebrow" style="color:var(--lime);">The bit that lasts</p>
+    <blockquote>The comp is over by October. The money is still doing something in March.</blockquote>
+    <p class="src">Season done well</p>
+  </div>
+</section>
+
+<!-- STRAIGHT ANSWERS -->
 <section class="section on-cream">
-  <div class="wrap" style="text-align:center;">
-    <h2 class="section-heading reveal">Want it running where you work?</h2>
-    <p class="reveal" style="max-width:560px;margin:14px auto 26px;">Setting up takes a few minutes, and your first season can start on the next round.</p>
-    <div class="hero-ctas reveal">
-      <a href="/#start" class="btn-primary">Set up your organisation &rarr;</a>
+  <div class="wrap">
+    <p class="eyebrow reveal">Straight answers</p>
+    <h2 class="section-heading reveal">The questions we get before anyone signs up.</h2>
+    <div class="cards-2" style="margin-top:32px;" data-cards>
+      <article class="card-lift">
+        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-coins"/></svg></span>
+        <h3>Do our people pay anything?</h3>
+        <p>No. Tipping is free for every participant, every round, all season. The only invoice GoodTip sends goes to the organisation.</p>
+      </article>
+      <article class="card-lift">
+        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-shield-check"/></svg></span>
+        <h3>Who picks the charity?</h3>
+        <p>Your organisation. Choose one outright, or run the Charity Vote — everyone nominates, everyone votes, and the ballot stays blind until it closes.</p>
+      </article>
+      <article class="card-lift">
+        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-lock"/></svg></span>
+        <h3>What happens to our data?</h3>
+        <p>It runs the comp and nothing else. We do not sell personal information and we do not pass it to advertisers — the <a href="/privacy/">Privacy Policy</a> says exactly what we hold and why.</p>
+      </article>
+      <article class="card-lift">
+        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-clock"/></svg></span>
+        <h3>How long does setting up take?</h3>
+        <p>A few minutes. Name the comp, invite your people, run the vote while the organisation fills. You pay nothing until the first tips lock in.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+{% include "public/partials/_contact.html" with contact_id="contact" %}
+
+<!-- CTA -->
+<section class="cta-pro">
+  <div class="wrap reveal zoom">
+    <h2>Want it running where you work?</h2>
+    <p>Setting up takes a few minutes, and your first season can start on the next round.</p>
+    <div class="hero-ctas">
+      <a href="/#start" class="btn-dark">Set up your organisation &rarr;</a>
       <a href="/tell-the-boss/" class="btn-ghost">Tell the boss</a>
     </div>
   </div>

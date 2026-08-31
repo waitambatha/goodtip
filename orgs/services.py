@@ -1,5 +1,6 @@
 import logging
 import sys
+from pathlib import Path
 
 from django.conf import settings
 from django.core.mail import send_mail
@@ -1394,3 +1395,239 @@ def apply_verification_to_org(org, row) -> None:
     org.save(update_fields=["domain", "contact_role", "domain_verified_at"])
     row.org = org
     row.save(update_fields=["org"])
+
+
+# ---------------------------------------------------------------------------
+# Message attachments
+# ---------------------------------------------------------------------------
+
+def attach_files(message, files) -> list:
+    """Hang uploaded files off a message. Returns the problems, not raises.
+
+    A partial send is the right outcome here and an exception cannot express
+    it. Somebody attaches four screenshots and one of them is a 40 MB video:
+    losing the message, the other three files and everything they typed —
+    which is what raising would do — is a much worse answer than sending what
+    was valid and telling them which one did not go.
+
+    Three limits, all cheap and all checked here rather than in the browser,
+    because the browser's copy of them is a convenience and not a control:
+    count, size, and an allowlist of suffixes (MessageAttachment).
+    """
+    from .models import MessageAttachment
+
+    problems = []
+    kept = 0
+    for upload in files or []:
+        if kept >= MessageAttachment.MAX_PER_MESSAGE:
+            problems.append(
+                f"Only {MessageAttachment.MAX_PER_MESSAGE} files per message — "
+                f"“{upload.name}” wasn't attached."
+            )
+            continue
+        suffix = Path(upload.name).suffix.lower()
+        if suffix not in MessageAttachment.ALLOWED_SUFFIXES:
+            problems.append(
+                f"“{upload.name}” isn't a kind of file we accept "
+                "(images, PDFs, documents and spreadsheets)."
+            )
+            continue
+        if upload.size > MessageAttachment.MAX_BYTES:
+            problems.append(
+                f"“{upload.name}” is bigger than "
+                f"{MessageAttachment.MAX_BYTES // (1024 * 1024)} MB."
+            )
+            continue
+        MessageAttachment.objects.create(
+            message=message,
+            file=upload,
+            # Truncated to the column, and only ever a label: the path on disk
+            # is a UUID (message_attachment_path).
+            original_name=upload.name[:200],
+            content_type=(getattr(upload, "content_type", "") or "")[:100],
+            size=upload.size or 0,
+        )
+        kept += 1
+    return problems
+
+
+# ---------------------------------------------------------------------------
+# The member's inbox
+# ---------------------------------------------------------------------------
+
+def member_threads(user, *, org=None) -> list:
+    """Every message thread this member can read, newest activity first.
+
+    ACROSS ALL THEIR ORGANISATIONS, and that is the point of it. The screen
+    this feeds used to be scoped to one organisation — whichever one the nav
+    happened to be pointing at — so a member of seven orgs who raised something
+    in the sixth went back to Messages and was told "Nothing yet". The message
+    was fine. It was in another room, and nothing on the page said so or
+    offered a way there.
+
+    An organisation can still be named to narrow it, which is what the
+    per-organisation views want; the inbox passes nothing.
+
+    Readability is decided by MessageThread.can_read and not re-expressed as a
+    filter here, because there is one rule about who may read a thread and a
+    second copy of it in SQL is a second thing to keep in step. What this does
+    do is hand can_read the membership row it would otherwise fetch itself, so
+    the loop costs no queries at all.
+    """
+    from .models import MessageThread, OrgMember
+
+    if not (user and user.is_authenticated):
+        return []
+    memberships = {
+        m.org_id: m for m in OrgMember.objects.filter(user=user).select_related("org")
+    }
+    if org is not None:
+        memberships = {k: v for k, v in memberships.items() if k == org.id}
+    if not memberships:
+        return []
+
+    threads = (
+        MessageThread.objects
+        .filter(org_id__in=memberships)
+        .select_related("started_by", "org", "group")
+        .prefetch_related("recipients")
+        .order_by("-last_message_at")
+    )
+    return [
+        t for t in threads
+        if t.can_read(user, membership=memberships.get(t.org_id))
+    ]
+
+
+def unread_message_count(user) -> int:
+    """How many threads have something in them this member has not opened.
+
+    Counted in THREADS, not messages: the badge sits on a menu item that opens
+    a list of conversations, so "3" has to mean three conversations to look at.
+    A count of messages would read as three things to do when it might be one
+    admin sending three lines in a row.
+
+    Their own messages never count. You do not have unread mail because you
+    sent some.
+
+    NARROW FIRST, THEN ASK WHO MAY READ IT. This runs from the context
+    processor on every authenticated page view, so it must not walk the
+    organisation's whole message history to draw a badge — an admin of a large
+    organisation has every thread in it in `member_threads`, and materialising
+    all of them per request to count three is the kind of thing that is
+    invisible until it is not.
+
+    So the unread messages are found first, in one query, and only the handful
+    of threads they belong to are put through can_read. The rule itself is
+    still MessageThread.can_read and is not restated as SQL — a second
+    expression of who may read a thread is a second thing to keep in step.
+    """
+    from .models import Message, MessageThread, OrgMember
+
+    if not (user and user.is_authenticated):
+        return 0
+    org_ids = list(
+        OrgMember.objects.filter(user=user).values_list("org_id", flat=True)
+    )
+    if not org_ids:
+        return 0
+
+    candidates = set(
+        Message.objects
+        .filter(thread__org_id__in=org_ids)
+        .exclude(author=user)
+        .exclude(read_by=user)
+        .values_list("thread_id", flat=True)
+    )
+    if not candidates:
+        return 0
+
+    memberships = {
+        m.org_id: m for m in OrgMember.objects.filter(user=user, org_id__in=org_ids)
+    }
+    threads = (
+        MessageThread.objects.filter(pk__in=candidates).prefetch_related("recipients")
+    )
+    return sum(
+        1 for t in threads
+        if t.can_read(user, membership=memberships.get(t.org_id))
+    )
+
+
+# ---------------------------------------------------------------------------
+# One thread, read and written from both ends
+# ---------------------------------------------------------------------------
+#
+# The member's view (orgs.views) and the organisation admin's
+# (admin_panel.org_views) are two chairs at one conversation, so the logic for
+# reading and quoting it lives here rather than in either of them. It was
+# briefly in the member's view with the admin's importing the private names
+# across — which works, and says the wrong thing about where it belongs.
+
+def quoted_message(thread, raw_id):
+    """The message a reply is answering, or None.
+
+    Scoped to the thread on purpose: the id arrives from a hidden field the
+    page filled in, and a posted id from another conversation would otherwise
+    let somebody quote a message they are not allowed to read — putting words
+    a person said in private into a thread they never wrote in.
+    """
+    raw = (raw_id or "").strip()
+    if not raw.isdigit():
+        return None
+    return thread.messages.filter(pk=int(raw)).first()
+
+
+def thread_entries(thread, user):
+    """A thread's messages, ready to draw as a conversation.
+
+    Marks everything read for this reader — opening the thread IS reading it —
+    and decorates each entry with three things the chat needs and the model
+    cannot answer on its own:
+
+    * `is_mine`, which decides the side of the page a bubble sits on;
+    * `show_head`, whether this bubble repeats the sender's name and face. A
+      run of four messages from the same person is one turn in the
+      conversation, and stamping the name on all four makes it read as four
+      separate arrivals;
+    * `author_role`, for the card that opens when you press somebody's name.
+
+    Roles are fetched in ONE query for the whole thread rather than per
+    message. Threads are short, but a query per bubble is the kind of thing
+    that is invisible until a thread is fifty bubbles long.
+    """
+    from .models import OrgMember
+
+    entries = list(
+        thread.messages
+        .select_related("author", "reply_to", "reply_to__author")
+        .prefetch_related("attachments")
+        .order_by("created_at")
+    )
+    roles = {
+        m.user_id: m
+        for m in OrgMember.objects.filter(
+            org_id=thread.org_id,
+            user_id__in={e.author_id for e in entries},
+        )
+    }
+    previous = None
+    for entry in entries:
+        entry.read_by.add(user)
+        entry.is_mine = entry.author_id == user.id
+        entry.show_head = (
+            previous is None
+            or previous.author_id != entry.author_id
+            # A gap long enough that the two are not one breath. Same rule
+            # every chat app uses, and for the same reason: a reply the next
+            # morning is a new turn even from the same person.
+            or (entry.created_at - previous.created_at).total_seconds() > 900
+        )
+        member = roles.get(entry.author_id)
+        entry.author_role = (
+            "Organisation admin" if (member and member.can_manage)
+            else "Member" if member
+            else "No longer a member"
+        )
+        previous = entry
+    return entries

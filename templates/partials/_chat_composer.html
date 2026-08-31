@@ -1,0 +1,49 @@
+{% comment %}
+THE COMPOSER, for both ends of a message thread.
+
+Three things sit above the box and only when they apply, because a composer
+that always shows its reply banner and its attachment tray is a form, and this
+has to feel like the last line of a conversation:
+
+  * the reply banner, when you have picked a message to answer;
+  * the attachment tray, once you have chosen files;
+  * nothing at all, the rest of the time.
+
+enctype is not optional here. Without multipart the files silently do not
+arrive — request.FILES is empty, the message saves with only its text, and
+nothing anywhere reports a problem.
+
+Expects: action (URL). Optional: placeholder, send_label.
+{% endcomment %}
+<form method="post" action="{{ action }}" class="chat-composer" enctype="multipart/form-data"
+      data-chat-form data-busy="Sending">
+  {% csrf_token %}
+
+  {# Filled in by gt-chat.js when a message is picked; posted as reply_to. #}
+  <div class="cc-quote" data-reply-banner hidden>
+    <span class="ccq-bar" aria-hidden="true"></span>
+    <span class="ccq-txt"><b data-reply-who></b><small data-reply-quote></small></span>
+    <button type="button" class="ccq-x" data-reply-cancel aria-label="Don't reply to that message">&times;</button>
+  </div>
+  <input type="hidden" name="reply_to" value="" data-reply-id>
+
+  {# One chip per chosen file, each removable before sending. #}
+  <div class="cc-files" data-file-tray hidden></div>
+
+  <div class="cc-row">
+    <label class="cc-clip" title="Attach a file">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.2-9.19a3.66 3.66 0 1 1 5.18 5.18l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.5-8.48"/></svg>
+      <input type="file" name="files" multiple data-files
+             accept=".png,.jpg,.jpeg,.gif,.webp,.heic,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx">
+      <span class="sr-only">Attach a file</span>
+    </label>
+    <textarea name="body" rows="1" maxlength="2000" data-chat-body
+              placeholder="{{ placeholder|default:'Write a message…' }}"
+              aria-label="{{ placeholder|default:'Write a message' }}"></textarea>
+    <button type="submit" class="cc-send" aria-label="{{ send_label|default:'Send' }}">
+      <svg aria-hidden="true"><use href="#ic-send"/></svg>
+      <span>{{ send_label|default:"Send" }}</span>
+    </button>
+  </div>
+  <p class="cc-hint">Enter sends &middot; Shift+Enter for a new line &middot; images, PDFs and documents up to 8&nbsp;MB</p>
+</form>

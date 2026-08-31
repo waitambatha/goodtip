@@ -26,10 +26,16 @@ Expects: team, form (a reader row, optional), pick ("home"|"away"),
   Bulldogs" reads as two words of a club rather than as truncated text.
   {% endcomment %}
   {% if editable and mode == "htmx" %}
+  {% comment %}
+  Pressing the side you already picked posts "none", which takes the tip back
+  rather than saving the same thing again. aria-pressed already told a screen
+  reader this control was a toggle; until now it was the only part of the page
+  that behaved like one.
+  {% endcomment %}
   <button type="button"
           class="fxc-team{% if selection == pick %} sel{% endif %}"
           hx-post="{% url 'tipping:tip_save' org.id match.round_id match.id %}"
-          hx-vals='{"selection":"{{ pick }}","view":"mytips"}'
+          hx-vals='{"selection":"{% if selection == pick %}none{% else %}{{ pick }}{% endif %}","view":"mytips"}'
           hx-target="#fxc-{{ match.id }}" hx-swap="outerHTML"
           aria-pressed="{% if selection == pick %}true{% else %}false{% endif %}">
     <span class="fxc-crest">{% crest team %}</span>

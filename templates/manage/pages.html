@@ -6,7 +6,15 @@
 {% block hero_lead %}Open a page, click Edit, change the wording, save. It goes live straight away.{% endblock %}
 {% block admin_content %}
 
-<div class="gt-shell gt-shell-wide">
+{% comment %}
+gt-shell-SINGLE, not gt-shell-wide. `.gt-shell-wide` is a 1.55fr / 1fr split
+meant for a list beside a form, and the two page tables were being poured into
+it — so the private table, the longer of the two, was living in the 1fr column
+at roughly 40% of the width, against a table with `min-width: 640px`. That is
+where the sideways scroll came from. One table at a time, full width, and the
+constraint is simply gone.
+{% endcomment %}
+<div class="gt-shell gt-shell-single">
 
   {% if stale_edits %}
   {% comment %}
@@ -22,13 +30,45 @@
   </div>
   {% endif %}
 
-  {% for group in "12"|make_list %}
-  {% if group == "1" %}
-    {% include "manage/_pages_group.html" with rows=public_rows title="Public pages" sub="Anyone can reach these without signing in." icon="ic-globe" %}
+  {% comment %}
+  ONE GROUP AT A TIME.
+
+  Both tables used to sit here stacked. The second one was unusable: two full
+  tables in a fixed-width shell squeezed the private list — the longer of the
+  two, with the longer addresses — until its columns collapsed and it scrolled
+  sideways inside its own panel. Pick a side, and that list gets the whole
+  width, which is all either of them ever needed.
+
+  Links rather than a JS toggle: "the private pages" becomes something you can
+  send somebody, and the screen comes back to the side you were on after an
+  edit rather than resetting to public.
+  {% endcomment %}
+  <div class="pg-scope" role="tablist" aria-label="Which pages">
+    <a href="?scope=public" class="pg-scope-tab {% if scope == 'public' %}on{% endif %}"
+       role="tab" aria-selected="{% if scope == 'public' %}true{% else %}false{% endif %}">
+      <span class="pgs-ic"><svg><use href="#ic-globe"/></svg></span>
+      <span class="pgs-txt">
+        <b>Public pages</b>
+        <small>Anyone can reach these without signing in</small>
+      </span>
+      <span class="pgs-n">{{ public_count }}</span>
+    </a>
+    <a href="?scope=private" class="pg-scope-tab {% if scope == 'private' %}on{% endif %}"
+       role="tab" aria-selected="{% if scope == 'private' %}true{% else %}false{% endif %}">
+      <span class="pgs-ic"><svg><use href="#ic-shield"/></svg></span>
+      <span class="pgs-txt">
+        <b>Private pages</b>
+        <small>Only visible to a member who has signed in</small>
+      </span>
+      <span class="pgs-n">{{ private_count }}</span>
+    </a>
+  </div>
+
+  {% if scope == 'public' %}
+    {% include "manage/_pages_group.html" with rows=rows title="Public pages" sub="Anyone can reach these without signing in." icon="ic-globe" %}
   {% else %}
-    {% include "manage/_pages_group.html" with rows=private_rows title="Private pages" sub="Only visible to a member who has signed in." icon="ic-shield" %}
+    {% include "manage/_pages_group.html" with rows=rows title="Private pages" sub="Only visible to a member who has signed in." icon="ic-shield" %}
   {% endif %}
-  {% endfor %}
 
   <section class="gt-panel">
     <div class="gt-panel-head">

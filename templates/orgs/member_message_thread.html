@@ -1,33 +1,58 @@
 {% extends "app_base.html" %}
+{% load static %}
 {% block title %}{{ thread.subject }} &middot; {{ org.name }}{% endblock %}
+{% block loader_task %}Opening the conversation{% endblock %}
+{% block nav_msgs %}on{% endblock %}
 {% block body_class %}page-deep sheet-page{% endblock %}
+{% comment %}
+Side imagery, like every other member page. The client asked for the changing
+strips to be standard, and this screen and the one it links from were the two
+that never picked them up.
+{% endcomment %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+{% block extra_head %}<script src="{% static 'js/gt-chat.js' %}" defer></script>{% endblock %}
+
 {% block app_content %}
-<section class="wrap" style="padding:28px 0 60px;max-width:820px;">
-  <p style="margin:0 0 14px;"><a href="{% url 'orgs:member_messages' org.id %}" style="font-size:13px;">&larr; All messages</a></p>
-  <h1 style="font-family:var(--display);font-size:clamp(22px,2.6vw,30px);margin:0 0 4px;">{{ thread.subject }}</h1>
-  <p style="color:var(--muted);margin:0 0 22px;font-size:13px;">
-    {% if thread.kind == 'notice' %}From the admins of {{ org.name }}{% else %}Raised with the admins of {{ org.name }}{% endif %}
-  </p>
+{% comment %}
+ONE THREAD, THE MEMBER'S END.
 
-  <div class="card pad-lg" style="margin-bottom:18px;">
-    {% for e in entries %}
-    <div style="padding:14px 0;{% if not forloop.last %}border-bottom:1px solid var(--line);{% endif %}">
-      <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;">
-        <b style="font-size:14px;">{{ e.author.display_name }}</b>
-        <small style="color:var(--muted);">{{ e.created_at|date:"j M Y, g:i a" }}</small>
-      </div>
-      <p style="margin:6px 0 0;white-space:pre-wrap;line-height:1.6;">{{ e.body }}</p>
+Was a card of stacked paragraphs with a name over each and a Reply box under
+it. It carried the words and nothing else — you could not see at a glance who
+had said what, there was no way to answer one message in particular, and
+attaching the screenshot that would have explained the whole problem was not
+possible at all.
+
+The conversation itself is partials/_chat.html, shared with the admin's end
+(manage/message_thread.html) so the two ends of one conversation cannot end up
+looking like two different products.
+{% endcomment %}
+<div class="app-head">
+  <div>
+    <div class="app-eyebrow">
+      <a href="{% url 'orgs:member_messages' org.id %}" class="ch-back">&larr; All messages</a>
     </div>
-    {% endfor %}
+    <h1 class="app-h1">{{ thread.subject }}</h1>
+    <p class="app-sub">
+      {% if thread.kind == 'notice' %}From the admins of {{ org.name }}
+      {% else %}Raised with the admins of {{ org.name }}{% endif %}
+      {% if thread.status == 'answered' %}&middot; answered
+      {% elif thread.status == 'closed' %}&middot; closed{% endif %}
+    </p>
   </div>
+  <div class="msg-private">
+    <svg aria-hidden="true"><use href="#ic-shield-check"/></svg>
+    <span><b>Private &amp; secure</b><small>Only {{ org.name }}'s admins can see this</small></span>
+  </div>
+</div>
 
-  <form method="post" class="card pad-lg">
-    {% csrf_token %}
-    <div class="fld" style="margin-bottom:12px;">
-      <label for="r">Reply</label>
-      <textarea id="r" name="body" rows="4" required></textarea>
-    </div>
-    <button type="submit" class="btn-primary">Send</button>
-  </form>
+<section class="chat-shell" data-chat-scope>
+  {% include "partials/_chat.html" with entries=entries thread=thread %}
+  {% if thread.status == 'closed' %}
+  <div class="chat-shut">
+    <svg aria-hidden="true"><use href="#ic-lock"/></svg>
+    <span>The admins marked this closed. Writing here opens it again.</span>
+  </div>
+  {% endif %}
+  {% include "partials/_chat_composer.html" with action=request.path placeholder="Write a message…" send_label="Send" %}
 </section>
 {% endblock %}

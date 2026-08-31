@@ -436,6 +436,71 @@ class OrgCharityForm(forms.Form):
         return name
 
 
+class CharityEditForm(forms.ModelForm):
+    """Fix up a charity: its name, its website, and its logo by hand.
+
+    THE LOGO FIELD IS THE POINT OF THIS FORM. Logos are fetched automatically
+    from the charity's own site (catalog.logos), and for a good number of
+    charities that quietly finds nothing — a bot-protected site, a 16px
+    favicon of mush, an og:image that turns out to be a stock banner. The
+    initials tile that results is a designed state and not a failure, but
+    until now it was also a DEAD END: there was no way for anybody short of a
+    Django admin to supply the logo they had sitting on their desktop.
+
+    Name is editable because a charity added in a hurry is usually the one
+    that needs it ("Beyondblue", "the smith family"), and the slug follows so
+    the two do not drift apart.
+    """
+
+    # Not a model field — a request to go and look again, which is worth
+    # offering because a site that had no usable icon last year often has one
+    # now, and the alternative is asking the client to find the file.
+    refetch = forms.BooleanField(
+        required=False,
+        label="Try fetching the logo from their website again",
+        help_text="Only replaces what's there if it finds something usable.",
+    )
+
+    class Meta:
+        model = Charity
+        fields = ["name", "website", "logo"]
+        labels = {
+            "name": "Charity name",
+            "website": "Website",
+            "logo": "Logo",
+        }
+        widgets = {
+            "name": forms.TextInput(attrs={"autocomplete": "off"}),
+            "website": forms.URLInput(attrs={"placeholder": "https://"}),
+        }
+
+    def clean_name(self):
+        name = (self.cleaned_data.get("name") or "").strip()
+        if len(name) < 3:
+            raise forms.ValidationError("That's too short to be a charity name.")
+        # unique=True on the column would raise this anyway, as an integrity
+        # error at save time. Asked here it is a sentence the person can act
+        # on, and it excludes THIS row so saving without touching the name is
+        # not reported as a clash with itself.
+        clash = Charity.objects.filter(name__iexact=name)
+        if self.instance.pk:
+            clash = clash.exclude(pk=self.instance.pk)
+        if clash.exists():
+            raise forms.ValidationError(
+                "Another charity already has that name. Two rows for one cause "
+                "splits its total in two, so use the existing one."
+            )
+        return name
+
+    def clean_logo(self):
+        logo = self.cleaned_data.get("logo")
+        # Only a fresh upload has a file wrapper; an untouched field hands back
+        # the stored FieldFile, which has no size worth checking.
+        if logo and hasattr(logo, "size") and logo.size > 4 * 1024 * 1024:
+            raise forms.ValidationError("That image is over 4 MB — try a smaller one.")
+        return logo
+
+
 class GroupCharityBallotForm(forms.Form):
     """The charities a group is putting to its members.
 

@@ -29,14 +29,38 @@ stacking context, so a strip rendered inside it paints over the sheet.
   {% with m=row.match %}
   <div class="match-row" data-coach="round-matches">
     <div class="match-meta"><span>{{ m.kickoff_at|date:"D j M &middot; g:i a" }}</span>{% if m.venue %}<span class="venue">{{ m.venue }}</span>{% endif %}</div>
+    {% comment %}
+    BUTTONS, NOT RADIOS (Aug 2026).
+
+    These were two labels over a hidden radio group, each radio posting itself
+    on `change`. That shape cannot express "no tip": a radio group has no way
+    back to none, and pressing the side you had already chosen fires no change
+    event at all, so the second press did nothing — which is exactly what the
+    client reported. Buttons have no such state to get stuck in.
+
+    Each button posts the side it names, or "none" when it IS the current pick,
+    so the same control picks and un-picks. Same contract as the My Tips card
+    (partials/_fixture_team.html), which is the other place a tip saves the
+    instant it is made.
+    {% endcomment %}
     <div class="pick">
-      <label class="team {% if row.tip == 'home' %}sel{% endif %}">{% crest m.home_team %}<span>{{ m.home_team.name }}</span>
-        <input type="radio" name="sel-{{ m.id }}" value="home" hidden {% if row.tip == 'home' %}checked{% endif %}
-               {% if not locked %}hx-post="{{ row.save_url }}" hx-vals='{"selection":"home"}' hx-trigger="change" hx-target="#s{{ m.id }}" hx-swap="outerHTML"{% else %}disabled{% endif %}></label>
+      <button type="button" class="team {% if row.tip == 'home' %}sel{% endif %}"
+              {% if locked %}disabled{% else %}
+              hx-post="{{ row.save_url }}"
+              hx-vals='{"selection":"{% if row.tip == 'home' %}none{% else %}home{% endif %}"}'
+              hx-target="#s{{ m.id }}" hx-swap="outerHTML"
+              {% endif %}
+              aria-pressed="{% if row.tip == 'home' %}true{% else %}false{% endif %}"
+              data-pick="home">{% crest m.home_team %}<span>{{ m.home_team.name }}</span></button>
       <div class="vs">vs</div>
-      <label class="team away {% if row.tip == 'away' %}sel{% endif %}">{% crest m.away_team %}<span>{{ m.away_team.name }}</span>
-        <input type="radio" name="sel-{{ m.id }}" value="away" hidden {% if row.tip == 'away' %}checked{% endif %}
-               {% if not locked %}hx-post="{{ row.save_url }}" hx-vals='{"selection":"away"}' hx-trigger="change" hx-target="#s{{ m.id }}" hx-swap="outerHTML"{% else %}disabled{% endif %}></label>
+      <button type="button" class="team away {% if row.tip == 'away' %}sel{% endif %}"
+              {% if locked %}disabled{% else %}
+              hx-post="{{ row.save_url }}"
+              hx-vals='{"selection":"{% if row.tip == 'away' %}none{% else %}away{% endif %}"}'
+              hx-target="#s{{ m.id }}" hx-swap="outerHTML"
+              {% endif %}
+              aria-pressed="{% if row.tip == 'away' %}true{% else %}false{% endif %}"
+              data-pick="away">{% crest m.away_team %}<span>{{ m.away_team.name }}</span></button>
     </div>
     <div class="saved-tick {% if row.tip %}show{% endif %}" id="s{{ m.id }}"><svg><use href="#ic-check"/></svg> Saved</div>
   </div>
@@ -52,15 +76,27 @@ stacking context, so a strip rendered inside it paints over the sheet.
 {% endblock %}
 
 {% block app_js %}
-    /* reflect the chosen team visually (htmx saves it server-side) */
-    document.querySelectorAll('.pick').forEach(function(pick){
-      pick.querySelectorAll('.team').forEach(function(team){
-        var input = team.querySelector('input');
-        if (input && input.disabled) return;
-        team.addEventListener('click', function(){
-          pick.querySelectorAll('.team').forEach(function(t){ t.classList.remove('sel'); });
-          team.classList.add('sel');
-        });
+    /* Reflect the press immediately; htmx saves it server-side in parallel.
+     *
+     * Delegated from the document rather than bound per row, so it survives
+     * anything htmx swaps in. Three things have to move together and did not
+     * before: the drawn selection, aria-pressed, and — the one that made the
+     * toggle work at all — the hx-vals each button will post NEXT time. A
+     * button that has just become the pick must go on to post "none"; the one
+     * that has just stopped being it must go back to posting its own side.
+     */
+    document.addEventListener('click', function (e) {
+      var team = e.target.closest('.pick .team');
+      if (!team || team.disabled) return;
+      var pick = team.closest('.pick');
+      var undo = team.classList.contains('sel');
+
+      pick.querySelectorAll('.team').forEach(function (t) {
+        var on = (t === team) && !undo;
+        t.classList.toggle('sel', on);
+        t.setAttribute('aria-pressed', on ? 'true' : 'false');
+        var side = t.getAttribute('data-pick');
+        if (side) t.setAttribute('hx-vals', JSON.stringify({ selection: on ? 'none' : side }));
       });
     });
 {% endblock %}

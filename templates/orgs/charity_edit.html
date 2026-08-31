@@ -1,0 +1,98 @@
+{% extends "app_base.html" %}
+{% block title %}Edit {{ charity.name }}, {{ org.name }}{% endblock %}
+{% block loader_task %}Opening the charity{% endblock %}
+{% block body_class %}page-deep sheet-page{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+{% block nav_manage %}is-on{% endblock %}
+
+{% block app_content %}
+{% comment %}
+EDIT ONE CHARITY.
+
+The logo field is why this screen exists. Logos are fetched from the charity's
+own site (catalog.logos) and for a fair number of causes that quietly finds
+nothing — a bot-protected site, a 16px favicon, an og:image that turns out to
+be a stock banner. The initials tile is a designed state and not a failure,
+but it was a DEAD END: short of the Django admin nobody could supply the file
+they already had on their desktop.
+
+The current mark is shown at the size it is actually used at, next to the
+field that replaces it. A file input with no sight of what it is replacing is
+how somebody uploads a logo over a better one.
+{% endcomment %}
+
+<div class="app-head">
+  <div>
+    <div class="app-eyebrow">
+      <a href="{% url 'orgs:charities' org.id %}" class="ch-back">&larr; All charities</a>
+    </div>
+    <h1 class="app-h1">{{ charity.name }}</h1>
+    <p class="app-sub">
+      {% if is_ours %}
+        Added by {{ org.name }}. Yours to change — it isn't on anyone else's list yet.
+      {% else %}
+        On GoodTip's vetted list, so every organisation sees these details.
+        Change them carefully.
+      {% endif %}
+    </p>
+  </div>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="card pad-lg ch-edit" data-busy="Saving">
+  {% csrf_token %}
+
+  <div class="che-now">
+    <div class="che-mark">
+      {% if charity.logo %}
+      <img src="{{ charity.logo.url }}" alt="" width="72" height="72">
+      {% else %}
+      <span class="che-initials" style="--ch-hue:{{ charity.tile_hue }};">{{ charity.initials }}</span>
+      {% endif %}
+    </div>
+    <div class="che-now-txt">
+      <b>{% if charity.logo %}Current logo{% else %}No logo yet{% endif %}</b>
+      <small>
+        {% if charity.logo %}
+          This is what members see on the ballot and in the picker.
+        {% else %}
+          Members see the initials tile until there's a logo. It's a finished
+          look, not a broken image — but the real mark is better.
+        {% endif %}
+      </small>
+    </div>
+  </div>
+
+  <div class="msg-fld">
+    <label for="{{ form.name.id_for_label }}"><svg aria-hidden="true"><use href="#ic-heart"/></svg>{{ form.name.label }}</label>
+    {{ form.name }}
+    {% if form.name.errors %}<div class="fld-err">{{ form.name.errors|join:" " }}</div>{% endif %}
+  </div>
+
+  <div class="msg-fld">
+    <label for="{{ form.website.id_for_label }}"><svg aria-hidden="true"><use href="#ic-globe"/></svg>{{ form.website.label }}</label>
+    {{ form.website }}
+    <div class="hint">Where the automatic logo fetch looks. Get this right and it often just works.</div>
+    {% if form.website.errors %}<div class="fld-err">{{ form.website.errors|join:" " }}</div>{% endif %}
+  </div>
+
+  <div class="msg-fld">
+    <label for="{{ form.logo.id_for_label }}"><svg aria-hidden="true"><use href="#ic-image"/></svg>Upload a logo</label>
+    {{ form.logo }}
+    <div class="hint">A square PNG or JPG works best. Up to 4&nbsp;MB.</div>
+    {% if form.logo.errors %}<div class="fld-err">{{ form.logo.errors|join:" " }}</div>{% endif %}
+  </div>
+
+  <label class="che-refetch">
+    {{ form.refetch }}
+    <span>
+      <b>{{ form.refetch.label }}</b>
+      <small>{{ form.refetch.help_text }}</small>
+    </span>
+  </label>
+
+  <div class="che-foot">
+    <a href="{% url 'orgs:charities' org.id %}" class="abtn abtn-dark">Cancel</a>
+    <button type="submit" class="abtn abtn-primary">Save changes</button>
+  </div>
+</form>
+{% endblock %}

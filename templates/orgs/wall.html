@@ -6,6 +6,11 @@
 {% block nav_wall %}on{% endblock %}
 {% block body_class %}page-deep sheet-page{% endblock %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+{% comment %}
+Reply-to-a-message, and the swipe that picks one. The same file drives the
+message threads — one behaviour, one implementation.
+{% endcomment %}
+{% block extra_head %}<script src="{% static 'js/gt-chat.js' %}" defer></script>{% endblock %}
 
 {% block app_content %}
 
@@ -88,7 +93,13 @@ read what.
 <div class="gt-listwrap">
 <div class="gt-feed gt-scroll" data-coach="wall-feed">
   {% for p in posts %}
-  <article class="gt-post {% if p.kind == 'recap' %}is-recap{% elif p.kind == 'system' %}is-system{% endif %}" id="post-{{ p.id }}">
+  {% comment %}
+  data-chat-scope is what keeps the reply controls honest on a feed. Picking a
+  reply under one post has to fill in THAT post's box; gt-chat.js looks for the
+  composer inside the nearest scope, so without this every swipe on the page
+  would land in the first composer in the document.
+  {% endcomment %}
+  <article class="gt-post {% if p.kind == 'recap' %}is-recap{% elif p.kind == 'system' %}is-system{% endif %}" id="post-{{ p.id }}" data-chat-scope>
     <div class="gpt-head">
       {% if p.kind == 'member' and p.author %}
         <span class="gpt-av">{% if p.author.avatar %}<img src="{{ p.author.avatar.url }}" alt="">{% else %}{{ p.author.display_name|slice:":2"|upper }}{% endif %}</span>
@@ -115,30 +126,79 @@ read what.
     {% include "partials/wall_reactions.html" with post=p bar=p.reaction_bar %}
 
     {% if p.thread %}
+    {% comment %}
+    THE THREAD.
+
+    Each reply carries what a reply-to needs — its id, who wrote it, one line
+    of it — so the arrow beside it and a swipe across it can fill the box below
+    without a round trip. Same attributes and the same handler as a message
+    thread (static/js/gt-chat.js), because the client asked for one behaviour
+    in both places and two implementations of "swipe to reply" is two things to
+    keep in step.
+
+    A reply that answers another one shows the quote, and the quote is a link:
+    in a thread of a dozen, "nah he's cooked" is only an answer if you can get
+    to what it answers.
+    {% endcomment %}
     <div class="gpt-thread">
       {% for r in p.thread %}
-      <div class="gpt-reply">
-        <span class="gpr-av{% if r.is_guest %} guest{% endif %}">{{ r.initials }}</span>
+      <div class="gpt-reply{% if r.is_mine %} mine{% endif %}" id="reply-{{ r.id }}"
+           data-msg="{{ r.id }}"
+           data-author="{% if r.is_mine %}You{% else %}{{ r.display_name }}{% endif %}"
+           data-quote="{{ r.quote }}">
+        <button type="button" class="gpr-av{% if r.is_guest %} guest{% endif %}" data-peek aria-expanded="false"
+                aria-label="About {{ r.display_name }}">{{ r.initials }}</button>
         <div class="gpr-body">
           <b>{{ r.display_name }}{% if r.is_guest %} <i>visitor</i>{% endif %}</b>
           <small>{{ r.created_at|naturaltime }}</small>
+          {% if r.reply_to %}
+          <a class="chat-quote" href="#reply-{{ r.reply_to.id }}" data-jump="{{ r.reply_to.id }}">
+            <b>{{ r.reply_to.display_name }}</b>
+            <span>{{ r.reply_to.quote }}</span>
+          </a>
+          {% endif %}
           <p>{{ r.body|linebreaksbr }}</p>
+          <div class="chat-peek" hidden>
+            <span class="cp-av">{{ r.initials }}</span>
+            <span class="cp-body">
+              <b>{{ r.display_name }}</b>
+              <small>{% if r.is_guest %}Visitor &middot; replied from the public Wall{% else %}Member &middot; {{ org.name }}{% endif %}</small>
+            </span>
+          </div>
         </div>
-        {% if r.can_remove %}
-        <form method="post" action="{% url 'orgs:wall_reply_remove' org.id r.id %}" class="gpr-x" data-confirm="The reply will be removed for everyone. It cannot be undone." data-confirm-title="Remove this reply?" data-confirm-ok="Remove reply" data-confirm-danger>
-          {% csrf_token %}<button type="submit" title="Remove reply">&times;</button>
-        </form>
-        {% endif %}
+        <div class="gpr-tools">
+          <button type="button" class="chat-replybtn" data-reply-to="{{ r.id }}"
+                  aria-label="Reply to {{ r.display_name }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 7 7v4"/></svg>
+          </button>
+          {% if r.can_remove %}
+          <form method="post" action="{% url 'orgs:wall_reply_remove' org.id r.id %}" class="gpr-x" data-confirm="The reply will be removed for everyone. It cannot be undone." data-confirm-title="Remove this reply?" data-confirm-ok="Remove reply" data-confirm-danger>
+            {% csrf_token %}<button type="submit" title="Remove reply">&times;</button>
+          </form>
+          {% endif %}
+        </div>
       </div>
       {% endfor %}
     </div>
     {% endif %}
 
-    <form method="post" action="{% url 'orgs:wall_reply' org.id p.id %}" class="gpt-replybox">
+    <form method="post" action="{% url 'orgs:wall_reply' org.id p.id %}" class="gpt-replybox" data-chat-form>
       {% csrf_token %}
-      <span class="gpr-av mine">{% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{{ user.display_name|slice:":2"|upper }}{% endif %}</span>
-      <textarea name="body" rows="1" maxlength="500" placeholder="Reply&hellip;" aria-label="Reply to {% if p.author %}{{ p.author.display_name }}{% else %}GoodTip{% endif %}" required data-grow></textarea>
-      <button type="submit" class="abtn abtn-dark abtn-sm">Reply</button>
+      {% comment %}
+      Filled in by gt-chat.js when a reply is picked. Absent means "answering
+      the post", which is the default and what the box did before.
+      {% endcomment %}
+      <div class="cc-quote" data-reply-banner hidden>
+        <span class="ccq-bar" aria-hidden="true"></span>
+        <span class="ccq-txt"><b data-reply-who></b><small data-reply-quote></small></span>
+        <button type="button" class="ccq-x" data-reply-cancel aria-label="Reply to the post instead">&times;</button>
+      </div>
+      <input type="hidden" name="reply_to" value="" data-reply-id>
+      <div class="gpr-row">
+        <span class="gpr-av mine">{% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{{ user.display_name|slice:":2"|upper }}{% endif %}</span>
+        <textarea name="body" rows="1" maxlength="500" placeholder="Reply&hellip;" aria-label="Reply to {% if p.author %}{{ p.author.display_name }}{% else %}GoodTip{% endif %}" required data-grow data-chat-body></textarea>
+        <button type="submit" class="abtn abtn-dark abtn-sm">Reply</button>
+      </div>
     </form>
   </article>
   {% endfor %}

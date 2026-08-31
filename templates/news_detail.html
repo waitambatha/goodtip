@@ -3,30 +3,80 @@
 {% load humanize %}
 {% block title %}{{ post.title }} &middot; GoodTip{% endblock %}
 {% block loader_task %}Opening the story{% endblock %}
+{% comment %}
+The deep-green stage every other member page stands on, so the rotating side
+strips have a margin to sit in and the story reads as part of the app rather
+than as a document that wandered in. The article itself is a cream card on
+that ground — see .art-page.
+{% endcomment %}
+{% block body_class %}page-deep sheet-page{% endblock %}
 {% block extra_head %}
 {% include "partials/_news_og.html" %}
 <script src="{% static 'js/gt-share.js' %}" defer></script>
 {% endblock %}
+{% comment %}
+The changing side imagery, which every other member page has and this one did
+not. The client asked for it to be the standard treatment; a story page read
+on a flat backdrop was the odd one out.
+{% endcomment %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% block app_content %}
 
-<div class="article">
+<article class="article art-page">
   <a href="{% url 'news_index' %}" class="art-back">&larr; All news &amp; blog</a>
 
+  {% comment %}
+  THE HEAD IS ABOVE THE PICTURE NOW.
+
+  It used to be picture, then headline, then date. On a phone that meant the
+  first two-thirds of the screen was a stock photograph and you had to scroll
+  to find out what the story was — the picture was doing the job of a
+  headline, which is a job it cannot do. Kicker, headline and byline first;
+  the photograph follows as the thing that illustrates them.
+  {% endcomment %}
+  <header class="art-head">
+    <span class="art-kicker">{{ post.get_tag_display }}</span>
+    <h1 class="art-title">{% if post.title_html %}{{ post.title_html|safe }}{% else %}{{ post.title }}{% endif %}</h1>
+    {% if post.excerpt_html %}<p class="art-lead">{{ post.excerpt_html|safe }}</p>
+    {% elif post.excerpt %}<p class="art-lead">{{ post.excerpt }}</p>{% endif %}
+    <div class="art-byline">
+      {% if post.created_by %}
+      <span class="ab-who">
+        <span class="ab-av">
+          {% if post.created_by.avatar %}<img src="{{ post.created_by.avatar.url }}" alt="">
+          {% else %}{{ post.created_by.display_name|slice:":1"|upper }}{% endif %}
+        </span>
+        <b>{{ post.created_by.display_name }}</b>
+      </span>
+      {% endif %}
+      <span class="ab-when" title="{{ post.published_at|date:'l j F Y, g:i a' }}">
+        {{ post.published_at|date:"j F Y" }} &middot; {{ post.published_at|naturaltime }}
+      </span>
+    </div>
+  </header>
+
   {% if post.image %}<div class="art-hero" style="background-image:url('{{ post.image.url }}')"><span class="sport-tag">{{ post.get_tag_display }}</span></div>
-  {% else %}<div class="art-hero noimg"><span class="sport-tag">{{ post.get_tag_display }}</span><span class="noimg-mark">GOOD<span>TIP</span></span></div>{% endif %}
+  {% else %}
+  {% comment %}
+  No picture on the post, so the slot rotates through the site's own match-day
+  shots rather than sitting as a flat green panel with a wordmark on it. Same
+  markup the heroes use, so gt-scenes.js drives it without extra wiring.
+  {% endcomment %}
+  <div class="art-hero art-hero-shots" data-shots>
+    <div class="shot on" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
+    <span class="sport-tag">{{ post.get_tag_display }}</span>
+  </div>
+  {% endif %}
 
-  <h1 class="art-title">{% if post.title_html %}{{ post.title_html|safe }}{% else %}{{ post.title }}{% endif %}</h1>
-  <div class="art-meta">{{ post.published_at|date:"l j F Y, g:i a" }} &middot; {{ post.published_at|naturaltime }}{% if post.created_by %} &middot; by {{ post.created_by.display_name }}{% endif %}</div>
-
-  {% if post.excerpt_html %}<p class="art-lead">{{ post.excerpt_html|safe }}</p>
-  {% elif post.excerpt %}<p class="art-lead">{{ post.excerpt }}</p>{% endif %}
   {% if post.body %}<div class="art-body">{% if "<" in post.body %}{{ post.body|safe }}{% else %}{{ post.body|linebreaks }}{% endif %}</div>{% endif %}
 
   {% include "partials/_news_share.html" with prefix="art" %}
-</div>
+</article>
 
 {% if more %}
-<div class="article" style="margin-top:34px;">
+<div class="article art-more">
   <div class="hub-h" style="margin-bottom:12px;"><span class="k">More news &amp; blog</span><a href="{% url 'news_index' %}">See everything &rarr;</a></div>
   <div class="news-list">
     {% for p in more %}

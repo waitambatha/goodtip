@@ -22,10 +22,11 @@ from django.views.decorators.http import require_POST
 from accounts.views import JOIN_INVITER_SESSION_KEY, JOIN_SESSION_KEY
 from catalog.models import Charity, Country, GroupType
 from .forms import (
-    GroupCharityBallotForm, InviteByEmailForm, OrgCharityForm, OrgCreateForm,
+    CharityEditForm, GroupCharityBallotForm, InviteByEmailForm, OrgCharityForm,
+    OrgCreateForm,
     fed_competitions,
 )
-from .notifications import send_org_invites
+from .notifications import notify_new_message, send_org_invites
 from .models import (
     CharityVote,
     CharityVoteOption,
@@ -40,7 +41,10 @@ from .models import (
 )
 from .services import (
     active_work_verification,
+    quoted_message,
+    thread_entries,
     add_charity_for_org,
+    unique_charity_slug,
     add_member,
     can_run_group_election,
     create_group_charity_election,
@@ -1760,7 +1764,10 @@ def _attach_threads(posts, *, viewer=None):
         return posts
     replies = (
         WallReply.objects.filter(post__in=posts, is_approved=True, is_hidden=False)
-        .select_related("author")
+        # reply_to and its author come along so the quote block above a reply
+        # costs no query. Without them a thread of ten replies where half
+        # answer each other is ten extra round trips per post on the page.
+        .select_related("author", "reply_to", "reply_to__author")
         .order_by("created_at")
     )
     by_post = {}
@@ -1769,6 +1776,8 @@ def _attach_threads(posts, *, viewer=None):
             viewer and viewer.is_authenticated
             and (r.author_id == viewer.id or viewer.is_staff)
         )
+        # Which side of the thread it sits on, the same way a message does.
+        r.is_mine = bool(viewer and viewer.is_authenticated and r.author_id == viewer.id)
         by_post.setdefault(r.post_id, []).append(r)
     for p in posts:
         p.thread = by_post.get(p.id, [])
@@ -1997,9 +2006,22 @@ def wall_reply_create(request, org_id: int, post_id: int):
     if not body:
         messages.error(request, "Write something first.")
         return redirect(_wall_anchor(org, post))
-    reply = WallReply.objects.create(post=post, author=request.user, body=body)
+    # Answering one reply in particular, rather than the post. Resolved inside
+    # THIS post's own thread: the id comes from a hidden field the page filled
+    # in, and a reply from another post quoted into this one would show its
+    # author words they never said here. Anything that does not resolve falls
+    # back to a plain reply, which is what the control does by default anyway.
+    parent = None
+    raw = (request.POST.get("reply_to") or "").strip()
+    if raw.isdigit():
+        parent = post.replies.filter(pk=int(raw), is_hidden=False).first()
+    reply = WallReply.objects.create(
+        post=post, author=request.user, body=body, reply_to=parent,
+    )
     _notify_wall_reply(reply)
-    return redirect(_wall_anchor(org, post))
+    # Land on the reply just written rather than on the top of the post, so
+    # a long thread does not send the author back to hunt for their own line.
+    return redirect(reverse("orgs:wall", args=[org.id]) + f"#reply-{reply.id}")
 
 
 def _wall_anchor(org, post):
@@ -2673,6 +2695,11 @@ def org_charities_view(request, org_id: int):
             return redirect("orgs:charities", org_id=org.id)
 
     available = Charity.objects.available_to(org).order_by("name")
+    for charity in available:
+        # Drives whether a tile is a link to the edit screen or just a tile.
+        # Computed here rather than asked per tile in the template, where it
+        # would be a permission lookup per charity on a list of fifty.
+        charity.can_edit = _can_edit_charity(request.user, org, charity)
     ours = [c for c in available if c.owner_org_id == org.id]
     vetted = [c for c in available if c.owner_org_id != org.id]
     # Which groups back which cause — the reason an admin comes here after the
@@ -2689,6 +2716,85 @@ def org_charities_view(request, org_id: int):
         "vetted": vetted,
         "groups": groups,
         "groups_enabled": org.groups_enabled,
+    })
+
+
+def _can_edit_charity(user, org, charity) -> bool:
+    """Who may change a charity's details from an organisation's screen.
+
+    An organisation's OWN additions, yes — it typed them, it can fix them, and
+    nobody else can see them until GoodTip has approved them anyway.
+
+    GoodTip's vetted list, only for staff. A vetted charity appears in every
+    organisation's picker, and letting one org admin rename or re-logo a shared
+    row would let them change what every other organisation sees. That is not a
+    permission an organisation admin has anywhere else in this system and it
+    should not appear here because the button happens to be nearby.
+    """
+    if charity.owner_org_id == org.id:
+        return _can_manage(user, org)
+    return bool(user.is_staff)
+
+
+@login_required
+def org_charity_edit_view(request, org_id: int, charity_id: int):
+    """Fix a charity up — its name, its website, and its logo by hand.
+
+    Exists because the automatic logo fetch quietly finds nothing for a good
+    number of charities (bot-protected sites, a favicon of mush, an og:image
+    that is really a stock banner). The initials tile that results is a
+    designed state, but it was also a dead end: short of the Django admin
+    there was no way to supply the file somebody already had.
+    """
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _can_manage(request.user, org):
+        return HttpResponseForbidden()
+    # Scoped to what this organisation can see at all, so a charity id from
+    # another org's private list cannot be reached by editing the URL.
+    charity = get_object_or_404(Charity.objects.available_to(org), pk=charity_id)
+    if not _can_edit_charity(request.user, org, charity):
+        return HttpResponseForbidden()
+
+    form = CharityEditForm(
+        request.POST or None, request.FILES or None, instance=charity,
+    )
+    if request.method == "POST" and form.is_valid():
+        renamed = "name" in form.changed_data
+        charity = form.save(commit=False)
+        if renamed:
+            # The slug is derived from the name and is what URLs and file
+            # names are built from; leaving it on the old name is how a
+            # charity ends up filed under something it is no longer called.
+            charity.slug = unique_charity_slug(charity.name)
+        charity.save()
+
+        if form.cleaned_data.get("refetch"):
+            # In the request, not in a thread — unlike the fetch on creation.
+            # Here somebody has ASKED for it and is waiting for the answer, so
+            # doing it in the background would mean reporting a result we do
+            # not have yet. backfill_charity never raises and is capped at an
+            # 8-second timeout per host.
+            from catalog.logos import backfill_charity
+
+            if backfill_charity(charity, force=True):
+                messages.success(request, f"Found a logo for {charity.name}.")
+            else:
+                messages.info(
+                    request,
+                    f"Couldn't find a usable logo on {charity.website_label or 'their site'}. "
+                    "Upload one here instead.",
+                )
+        else:
+            messages.success(request, f"{charity.name} updated.")
+        return redirect("orgs:charities", org_id=org.id)
+
+    return render(request, "orgs/charity_edit.html", {
+        "org": org,
+        "charity": charity,
+        "form": form,
+        # Says whose row this is, which is what decides how loud the warning
+        # above the form needs to be.
+        "is_ours": charity.owner_org_id == org.id,
     })
 
 
@@ -2857,7 +2963,23 @@ def group_captains_call(request, org_id: int, group_id: int):
 
 @login_required
 def member_messages_view(request, org_id: int):
+    """The member's inbox — every organisation they are in, on one page.
+
+    It used to be scoped to the organisation in the URL, which is where the
+    client hit it: a member of seven organisations raised something in one of
+    them, pressed Messages in the nav, and was told "Nothing yet" by the page
+    for a DIFFERENT organisation. The nav points at whichever organisation you
+    are currently standing in, the message was in another, and nothing on the
+    screen said either of those things.
+
+    Scoping the inbox to a room was the mistake. Mail does not work that way —
+    you have one inbox and each item says who it is from — so the list is now
+    everything readable across every membership, each row naming its
+    organisation. The org in the URL survives as the composer's default, which
+    is the one place it was doing useful work.
+    """
     from orgs.models import Message, MessageThread
+    from orgs.services import attach_files, member_threads
 
     org = get_object_or_404(Organisation, pk=org_id)
     me = _membership(request.user, org)
@@ -2865,6 +2987,17 @@ def member_messages_view(request, org_id: int):
         raise Http404("No organisation matches the given query.")
 
     if request.method == "POST":
+        # Which organisation this is being raised with. Posted rather than
+        # taken from the URL because the composer offers the choice, and
+        # re-checked against this member's own memberships — a posted id is
+        # not permission to write into somebody else's organisation.
+        target = org
+        posted = (request.POST.get("org") or "").strip()
+        if posted.isdigit() and int(posted) != org.id:
+            candidate = Organisation.objects.filter(pk=int(posted)).first()
+            if candidate is not None and _membership(request.user, candidate) is not None:
+                target = candidate
+
         # The composer offers a short list of subjects with "Something else"
         # as the escape hatch, so the subject arrives in one of two fields.
         # `subject` is still read first: the plain field is what the no-JS
@@ -2876,32 +3009,61 @@ def member_messages_view(request, org_id: int):
         else:
             subject = choice
         body = (request.POST.get("body") or "").strip()
-        if not subject or not body:
+        uploads = request.FILES.getlist("files")
+        # A message can be a screenshot with nothing typed — that is often the
+        # clearest bug report anyone sends — so body is required only when
+        # nothing is attached.
+        if not subject or not (body or uploads):
             messages.error(request, "Pick what it's about and say what's up.")
         else:
             thread = MessageThread.objects.create(
-                org=org, kind=MessageThread.KIND_RAISED, subject=subject,
+                org=target, kind=MessageThread.KIND_RAISED, subject=subject,
                 started_by=request.user, status=MessageThread.STATUS_OPEN,
             )
-            Message.objects.create(thread=thread, author=request.user, body=body)
-            messages.success(request, "Sent to your organisation's admins.")
-            return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
+            entry = Message.objects.create(
+                thread=thread, author=request.user, body=body,
+            )
+            for problem in attach_files(entry, uploads):
+                messages.error(request, problem)
+            # Ring the admins' bells. Raising something and hearing nothing
+            # back for a day because nobody happened to open the inbox is the
+            # failure this whole screen exists to fix.
+            notify_new_message(entry)
+            messages.success(request, f"Sent to the admins of {target.name}.")
+            return redirect("orgs:member_message_thread",
+                            org_id=target.id, thread_id=thread.id)
 
-    # Filtered in Python rather than by a query: can_read() is the one place
-    # that decides who sees what, and a second expression of it in SQL is a
-    # second thing to keep in step.
-    readable = [
-        t for t in MessageThread.objects.filter(org=org).select_related("started_by")
-        if t.can_read(request.user)
-    ]
+    threads = member_threads(request.user)
+    # Which of them have something new in them. Counted once here rather than
+    # asked per row in the template, where it would be a query per thread.
+    unread_ids = set(
+        Message.objects
+        .filter(thread_id__in=[t.id for t in threads])
+        .exclude(author=request.user)
+        .exclude(read_by=request.user)
+        .values_list("thread_id", flat=True)
+    )
+    for thread in threads:
+        thread.is_unread = thread.id in unread_ids
+
     return render(request, "orgs/member_messages.html", {
-        "org": org, "threads": readable, "can_manage": me.can_manage,
+        "org": org,
+        "threads": threads,
+        "can_manage": me.can_manage,
+        # The composer's organisation picker. One membership means there is no
+        # choice to make and the picker does not render.
+        "my_orgs": [
+            m.org for m in
+            OrgMember.objects.filter(user=request.user)
+            .select_related("org").order_by("org__name")
+        ],
     })
 
 
 @login_required
 def member_message_thread_view(request, org_id: int, thread_id: int):
     from orgs.models import Message, MessageThread
+    from orgs.services import attach_files
 
     org = get_object_or_404(Organisation, pk=org_id)
     thread = get_object_or_404(MessageThread, pk=thread_id, org=org)
@@ -2910,17 +3072,58 @@ def member_message_thread_view(request, org_id: int, thread_id: int):
 
     if request.method == "POST":
         body = (request.POST.get("body") or "").strip()
-        if body:
-            Message.objects.create(thread=thread, author=request.user, body=body)
+        uploads = request.FILES.getlist("files")
+        if body or uploads:
+            entry = Message.objects.create(
+                thread=thread, author=request.user, body=body,
+                reply_to=quoted_message(thread, request.POST.get("reply_to")),
+            )
+            for problem in attach_files(entry, uploads):
+                messages.error(request, problem)
+            notify_new_message(entry)
             if thread.status == MessageThread.STATUS_CLOSED:
                 thread.status = MessageThread.STATUS_OPEN
                 thread.save(update_fields=["status"])
             messages.success(request, "Sent.")
         return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
 
-    entries = thread.messages.select_related("author").order_by("created_at")
-    for entry in entries:
-        entry.read_by.add(request.user)
+    entries = thread_entries(thread, request.user)
     return render(request, "orgs/member_message_thread.html", {
         "org": org, "thread": thread, "entries": entries,
     })
+
+
+@login_required
+def message_file(request, thread_id: int, attachment_id: int):
+    """Hand back one attachment, to somebody allowed to read its thread.
+
+    NOT /media/. Everything else this system stores as a file is meant to be
+    looked at by other people — an avatar, an organisation's logo — where an
+    unguessable path is protection enough. A file attached to a message is the
+    opposite: the thread is private to its author and the organisation's
+    admins by design, and serving it from a public path would quietly undo
+    that for anyone who came across the URL.
+
+    So the same question the thread page asks is asked again here, on every
+    fetch. `thread_id` is in the URL and the attachment is looked up inside it
+    rather than by id alone, so an id from another conversation cannot be
+    walked into.
+    """
+    from django.http import FileResponse
+
+    from orgs.models import MessageAttachment, MessageThread
+
+    thread = get_object_or_404(MessageThread, pk=thread_id)
+    if not thread.can_read(request.user):
+        raise Http404("No attachment matches the given query.")
+    attachment = get_object_or_404(
+        MessageAttachment, pk=attachment_id, message__thread=thread,
+    )
+    return FileResponse(
+        attachment.file.open("rb"),
+        # Inline so an image can be shown in the conversation rather than
+        # downloaded to look at. as_attachment is what a "Download" link on
+        # the chip asks for, via ?download=1.
+        as_attachment=bool(request.GET.get("download")),
+        filename=attachment.original_name,
+    )

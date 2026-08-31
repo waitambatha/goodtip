@@ -1,3 +1,5 @@
+import shutil
+import tempfile
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -6,7 +8,8 @@ from django.core.exceptions import ValidationError
 from django.db.models import ProtectedError
 import re
 
-from django.test import SimpleTestCase, TestCase
+from django.conf import settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from catalog.models import Charity, Season, Series, Sport
@@ -4681,3 +4684,508 @@ class AdminGroupRegistryTests(TestCase):
         field = Group._meta.get_field("org")
         self.assertTrue(field.many_to_one)
         self.assertEqual(field.related_model, Organisation)
+
+
+class MemberInboxTests(TestCase):
+    """One inbox, every organisation — the bug the client actually hit.
+
+    They raised something with the admins of one of their organisations,
+    pressed Messages in the nav, and were told "Nothing yet" by the page for a
+    DIFFERENT organisation. The message was fine; the page was scoped to
+    whichever organisation the nav happened to point at, said nothing about
+    which one that was, and offered no way to reach the others.
+    """
+
+    def setUp(self):
+        from .models import Message, MessageThread
+
+        User = get_user_model()
+        self.season = Season.objects.create(year=2096, label="2096")
+        # Named so the alphabetical fallback picks Aardvark, which is NOT where
+        # the message is. That ordering is what made the old page look empty.
+        self.first = Organisation.objects.create(name="Aardvark Pty", season=self.season)
+        self.other = Organisation.objects.create(name="Zebra Pty", season=self.season)
+        self.member = User.objects.create_user(email="m@b.com", password="x", display_name="Mem")
+        self.admin = User.objects.create_user(email="ad@b.com", password="x", display_name="Ad")
+        OrgMember.objects.create(user=self.member, org=self.first)
+        OrgMember.objects.create(user=self.member, org=self.other)
+        OrgMember.objects.create(user=self.admin, org=self.other, role=OrgMember.ROLE_BOTH)
+
+        # A subject NOT on the composer's canned list. "Something about my
+        # group" is one of the options in the picker, so asserting a page does
+        # not contain it matches the <option> and never the row — the test
+        # would pass or fail on the dropdown rather than on the inbox.
+        self.subject = "Zebra roster query 4471"
+        self.thread = MessageThread.objects.create(
+            org=self.other, kind=MessageThread.KIND_RAISED,
+            subject=self.subject, started_by=self.member,
+        )
+        Message.objects.create(thread=self.thread, author=self.member, body="How do I invite someone?")
+        self.client.force_login(self.member)
+
+    def test_the_inbox_shows_threads_from_every_organisation(self):
+        r = self.client.get(reverse("orgs:member_messages", args=[self.first.id]))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, self.subject)
+        # And says which room it is in, which is the part that was missing.
+        self.assertContains(r, "Zebra Pty")
+
+    def test_a_thread_from_an_organisation_you_left_is_not_shown(self):
+        OrgMember.objects.filter(user=self.member, org=self.other).delete()
+        r = self.client.get(reverse("orgs:member_messages", args=[self.first.id]))
+        self.assertNotContains(r, self.subject)
+
+    def test_another_members_thread_stays_private(self):
+        """A member raising a problem is entitled to have the admins read it
+        and not the rest of the room."""
+        User = get_user_model()
+        nosy = User.objects.create_user(email="n@b.com", password="x", display_name="Nosy")
+        OrgMember.objects.create(user=nosy, org=self.other)
+        self.client.force_login(nosy)
+        r = self.client.get(reverse("orgs:member_messages", args=[self.other.id]))
+        self.assertNotContains(r, self.subject)
+
+    def test_the_composer_writes_to_the_organisation_it_was_told_to(self):
+        r = self.client.post(
+            reverse("orgs:member_messages", args=[self.first.id]),
+            {"subject_choice": "A problem with the site", "body": "Broken.",
+             "org": str(self.other.id)},
+        )
+        self.assertEqual(r.status_code, 302)
+        from .models import MessageThread
+
+        made = MessageThread.objects.get(subject="A problem with the site")
+        self.assertEqual(made.org_id, self.other.id)
+
+    def test_the_composer_refuses_an_organisation_you_are_not_in(self):
+        outsider = Organisation.objects.create(name="Not Yours", season=self.season)
+        self.client.post(
+            reverse("orgs:member_messages", args=[self.first.id]),
+            {"subject_choice": "A problem with the site", "body": "Broken.",
+             "org": str(outsider.id)},
+        )
+        from .models import MessageThread
+
+        made = MessageThread.objects.get(subject="A problem with the site")
+        # Falls back to the organisation in the URL rather than trusting the id.
+        self.assertEqual(made.org_id, self.first.id)
+
+    def test_unread_counts_threads_not_messages(self):
+        from .models import Message
+        from .services import unread_message_count
+
+        # Their own message is not unread mail.
+        self.assertEqual(unread_message_count(self.member), 0)
+        Message.objects.create(thread=self.thread, author=self.admin, body="Here you go.")
+        Message.objects.create(thread=self.thread, author=self.admin, body="And this.")
+        # Two messages, one conversation to look at.
+        self.assertEqual(unread_message_count(self.member), 1)
+
+    def test_opening_a_thread_marks_it_read(self):
+        from .models import Message
+        from .services import unread_message_count
+
+        Message.objects.create(thread=self.thread, author=self.admin, body="Here you go.")
+        self.assertEqual(unread_message_count(self.member), 1)
+        self.client.get(reverse("orgs:member_message_thread",
+                                args=[self.other.id, self.thread.id]))
+        self.assertEqual(unread_message_count(self.member), 0)
+
+
+# MEDIA_ROOT is not isolated by Django's test runner, so an upload made in a
+# test lands in the real one — and on this box that is the running staging
+# instance's own media directory. The first run of the class below left
+# twenty-one PNGs in it. A temporary directory per run, removed afterwards,
+# is the fix; nothing about the behaviour under test depends on where the
+# files go.
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="gt-test-media-"))
+class MessageReplyAndAttachmentTests(TestCase):
+    """Replying to one message in particular, and sending a file with it."""
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        from .models import Message, MessageThread
+
+        User = get_user_model()
+        self.season = Season.objects.create(year=2095, label="2095")
+        self.org = Organisation.objects.create(name="Attach Co", season=self.season)
+        self.member = User.objects.create_user(email="am@b.com", password="x", display_name="AM")
+        OrgMember.objects.create(user=self.member, org=self.org)
+        self.thread = MessageThread.objects.create(
+            org=self.org, kind=MessageThread.KIND_RAISED,
+            subject="A question", started_by=self.member,
+        )
+        self.first = Message.objects.create(
+            thread=self.thread, author=self.member, body="The original question.",
+        )
+        self.url = reverse("orgs:member_message_thread", args=[self.org.id, self.thread.id])
+        self.client.force_login(self.member)
+
+    def _png(self, name="shot.png"):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return SimpleUploadedFile(name, b"\x89PNG\r\n\x1a\n" + b"0" * 40, content_type="image/png")
+
+    def test_a_reply_records_which_message_it_answers(self):
+        from .models import Message
+
+        self.client.post(self.url, {"body": "Answering that.", "reply_to": str(self.first.id)})
+        latest = Message.objects.order_by("-id").first()
+        self.assertEqual(latest.reply_to_id, self.first.id)
+
+    def test_a_message_id_from_another_thread_cannot_be_quoted(self):
+        """The id arrives from a hidden field the page filled in.
+
+        A posted one from a conversation the sender cannot read would put words
+        somebody said elsewhere into this thread, attributed to them.
+        """
+        from .models import Message, MessageThread
+
+        elsewhere = MessageThread.objects.create(
+            org=self.org, kind=MessageThread.KIND_RAISED,
+            subject="Private", started_by=self.member,
+        )
+        secret = Message.objects.create(thread=elsewhere, author=self.member, body="Secret.")
+        self.client.post(self.url, {"body": "Hi", "reply_to": str(secret.id)})
+        latest = Message.objects.filter(thread=self.thread).order_by("-id").first()
+        self.assertIsNone(latest.reply_to_id)
+
+    def test_a_file_can_be_sent_with_nothing_typed(self):
+        """A screenshot IS the message often enough to be worth allowing.
+
+        It is also the clearest bug report anyone sends, so requiring words
+        beside it would be requiring the less useful half.
+        """
+        from .models import Message
+
+        self.client.post(self.url, {"body": "", "files": [self._png()]})
+        latest = Message.objects.filter(thread=self.thread).order_by("-id").first()
+        self.assertEqual(latest.attachments.count(), 1)
+        self.assertTrue(latest.attachments.first().is_image)
+
+    def test_the_stored_path_never_uses_the_uploaded_name(self):
+        """A filename from a browser is attacker-controlled.
+
+        Keeping it only as a label means nothing from outside ever reaches the
+        filesystem — and two people attaching "screenshot.png" to one thread
+        do not collide.
+        """
+        from .models import Message
+
+        self.client.post(self.url, {"body": "x", "files": [self._png("../../etc/passwd.png")]})
+        att = Message.objects.order_by("-id").first().attachments.first()
+        self.assertNotIn("passwd", att.file.name)
+        self.assertNotIn("..", att.file.name)
+        self.assertTrue(att.file.name.endswith(".png"))
+
+    def test_a_kind_of_file_we_do_not_accept_is_refused(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from .models import Message
+
+        bad = SimpleUploadedFile("run.exe", b"MZ" + b"0" * 20, content_type="application/octet-stream")
+        self.client.post(self.url, {"body": "here", "files": [bad]})
+        latest = Message.objects.order_by("-id").first()
+        # The message still sends — losing what somebody typed because one
+        # attachment was wrong is a worse answer than sending it without.
+        self.assertEqual(latest.body, "here")
+        self.assertEqual(latest.attachments.count(), 0)
+
+    def test_only_the_first_four_files_are_kept(self):
+        from .models import Message, MessageAttachment
+
+        files = [self._png(f"s{i}.png") for i in range(6)]
+        self.client.post(self.url, {"body": "lots", "files": files})
+        latest = Message.objects.order_by("-id").first()
+        self.assertEqual(latest.attachments.count(), MessageAttachment.MAX_PER_MESSAGE)
+
+    def test_an_attachment_is_refused_to_someone_who_cannot_read_the_thread(self):
+        """The file is served by a view, not from /media/, for exactly this.
+
+        An unguessable path is protection enough for an avatar, whose whole
+        purpose is to be looked at. A file on a private thread is the opposite.
+        """
+        from .models import Message
+
+        self.client.post(self.url, {"body": "x", "files": [self._png()]})
+        att = Message.objects.order_by("-id").first().attachments.first()
+        url = reverse("orgs:message_file", args=[self.thread.id, att.id])
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+        User = get_user_model()
+        stranger = User.objects.create_user(email="s@b.com", password="x", display_name="S")
+        self.client.force_login(stranger)
+        self.assertEqual(self.client.get(url).status_code, 404)
+
+
+class WallReplyThreadingTests(TestCase):
+    """Replying to one reply under a post, not just to the post."""
+
+    def setUp(self):
+        from .models import WallReply
+
+        User = get_user_model()
+        self.season = Season.objects.create(year=2094, label="2094")
+        self.org = Organisation.objects.create(name="Wall Co", season=self.season)
+        self.user = User.objects.create_user(email="w@b.com", password="x", display_name="W")
+        OrgMember.objects.create(user=self.user, org=self.org)
+        self.post = WallPost.objects.create(org=self.org, author=self.user, body="Big call.")
+        self.first = WallReply.objects.create(post=self.post, author=self.user, body="Nah.")
+        self.client.force_login(self.user)
+
+    def test_a_reply_can_answer_another_reply(self):
+        from .models import WallReply
+
+        self.client.post(
+            reverse("orgs:wall_reply", args=[self.org.id, self.post.id]),
+            {"body": "Yeah he's cooked.", "reply_to": str(self.first.id)},
+        )
+        latest = WallReply.objects.order_by("-id").first()
+        self.assertEqual(latest.reply_to_id, self.first.id)
+
+    def test_a_reply_from_another_post_cannot_be_quoted(self):
+        """Resolved inside THIS post's own thread.
+
+        A reply from elsewhere quoted in here would show its author saying
+        something they never said on this post.
+        """
+        from .models import WallReply
+
+        elsewhere = WallPost.objects.create(org=self.org, author=self.user, body="Other.")
+        stray = WallReply.objects.create(post=elsewhere, author=self.user, body="Elsewhere.")
+        self.client.post(
+            reverse("orgs:wall_reply", args=[self.org.id, self.post.id]),
+            {"body": "Hi", "reply_to": str(stray.id)},
+        )
+        latest = WallReply.objects.filter(post=self.post).order_by("-id").first()
+        self.assertIsNone(latest.reply_to_id)
+
+
+class CharityEditTests(TestCase):
+    """Fixing a charity up, and who is allowed to.
+
+    The logo fetch quietly finds nothing for a fair number of charities, and
+    until now the initials tile it falls back to was a dead end: nobody short
+    of a Django admin could supply the file they already had.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2093, label="2093")
+        self.org = Organisation.objects.create(name="Charity Co", season=self.season)
+        self.admin = User.objects.create_user(email="ca@b.com", password="x", display_name="CA")
+        self.member = User.objects.create_user(email="cm@b.com", password="x", display_name="CM")
+        OrgMember.objects.create(user=self.admin, org=self.org, role=OrgMember.ROLE_BOTH)
+        OrgMember.objects.create(user=self.member, org=self.org)
+        self.ours = Charity.objects.create(
+            name="Our Local Cause", slug="our-local-cause",
+            owner_org=self.org, is_approved=False,
+        )
+        self.vetted = Charity.objects.create(
+            name="Vetted Cause", slug="vetted-cause", is_approved=True,
+        )
+
+    def _url(self, charity):
+        return reverse("orgs:charity_edit", args=[self.org.id, charity.id])
+
+    def test_an_admin_can_rename_their_own_charity_and_the_slug_follows(self):
+        self.client.force_login(self.admin)
+        r = self.client.post(self._url(self.ours), {
+            "name": "Our Local Cause Inc", "website": "", "logo": "",
+        })
+        self.assertEqual(r.status_code, 302)
+        self.ours.refresh_from_db()
+        self.assertEqual(self.ours.name, "Our Local Cause Inc")
+        # Leaving the slug behind is how a charity ends up filed under a name
+        # it is no longer called.
+        self.assertEqual(self.ours.slug, "our-local-cause-inc")
+
+    def test_a_plain_member_cannot_edit_anything(self):
+        self.client.force_login(self.member)
+        self.assertEqual(self.client.get(self._url(self.ours)).status_code, 403)
+
+    def test_an_org_admin_cannot_edit_a_vetted_charity(self):
+        """A vetted row is in every organisation's picker.
+
+        Letting one org admin rename or re-logo it would change what every
+        other organisation sees — a permission they have nowhere else in this
+        system, and not one they should gain because the button is nearby.
+        """
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(self._url(self.vetted)).status_code, 403)
+
+    def test_staff_can_edit_a_vetted_charity(self):
+        User = get_user_model()
+        staff = User.objects.create_user(
+            email="st@b.com", password="x", display_name="St", is_staff=True,
+        )
+        OrgMember.objects.create(user=staff, org=self.org, role=OrgMember.ROLE_BOTH)
+        self.client.force_login(staff)
+        self.assertEqual(self.client.get(self._url(self.vetted)).status_code, 200)
+
+    def test_a_name_another_charity_already_has_is_refused(self):
+        """unique=True would raise this as an integrity error at save time.
+
+        Asked in the form it is a sentence the person can act on — and two
+        rows for one cause split its total in two, which is the damage the
+        whole ownership model exists to stop.
+        """
+        self.client.force_login(self.admin)
+        r = self.client.post(self._url(self.ours), {
+            "name": "Vetted Cause", "website": "", "logo": "",
+        })
+        self.assertEqual(r.status_code, 200)
+        self.ours.refresh_from_db()
+        self.assertEqual(self.ours.name, "Our Local Cause")
+
+    def test_a_charity_from_outside_this_organisations_list_is_not_reachable(self):
+        other_org = Organisation.objects.create(name="Someone Else", season=self.season)
+        theirs = Charity.objects.create(
+            name="Their Private Cause", slug="their-private-cause",
+            owner_org=other_org, is_approved=False,
+        )
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(self._url(theirs)).status_code, 404)
+
+
+class MessageNotificationTests(TestCase):
+    """The bell finally has something to say about messages.
+
+    A member's question sat in an admin's inbox, or an admin's answer sat in a
+    member's, and the only way to find out was to go and look — for the one
+    kind of thing on this platform that is addressed to a person by name.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2092, label="2092")
+        self.org = Organisation.objects.create(name="Bell Co", season=self.season)
+        self.member = User.objects.create_user(email="bm@b.com", password="x", display_name="Bea")
+        self.other = User.objects.create_user(email="bo@b.com", password="x", display_name="Otto")
+        self.admin = User.objects.create_user(email="ba@b.com", password="x", display_name="Ada")
+        OrgMember.objects.create(user=self.member, org=self.org)
+        OrgMember.objects.create(user=self.other, org=self.org)
+        OrgMember.objects.create(user=self.admin, org=self.org, role=OrgMember.ROLE_BOTH)
+
+    def _unread(self, user):
+        from .models import Notification
+
+        return Notification.objects.filter(
+            user=user, kind=Notification.KIND_MESSAGE, read_at__isnull=True,
+        )
+
+    def test_raising_something_rings_the_admins(self):
+        self.client.force_login(self.member)
+        self.client.post(
+            reverse("orgs:member_messages", args=[self.org.id]),
+            {"subject_choice": "A problem with the site", "body": "It's broken."},
+        )
+        self.assertEqual(self._unread(self.admin).count(), 1)
+        # Not the whole room — a member's problem is between them and the
+        # admins, and Otto has nothing to do with it.
+        self.assertEqual(self._unread(self.other).count(), 0)
+        # And never your own message.
+        self.assertEqual(self._unread(self.member).count(), 0)
+
+    def test_the_admins_answer_rings_the_member(self):
+        from .models import Message, MessageThread
+
+        thread = MessageThread.objects.create(
+            org=self.org, kind=MessageThread.KIND_RAISED,
+            subject="A question", started_by=self.member,
+        )
+        Message.objects.create(thread=thread, author=self.member, body="Hi")
+        self.client.force_login(self.admin)
+        self.client.post(reverse("manage:message_thread", args=[thread.id]), {"body": "Here you go."})
+        self.assertEqual(self._unread(self.member).count(), 1)
+        note = self._unread(self.member).first()
+        self.assertIn("Ada", note.title)
+        # The toast has to say something before it is opened.
+        self.assertIn("Here you go.", note.message)
+        self.assertIn(f"/messages/{thread.id}/", note.link_url)
+
+    def test_each_recipient_lands_on_their_own_side_of_it(self):
+        """Both ends render the same thread, but not the same controls.
+
+        An admin dropped on the member's page has the close/reopen buttons
+        missing and a back link to the wrong inbox.
+        """
+        from .models import Notification
+
+        self.client.force_login(self.member)
+        self.client.post(
+            reverse("orgs:member_messages", args=[self.org.id]),
+            {"subject_choice": "A problem with the site", "body": "It's broken."},
+        )
+        note = self._unread(self.admin).first()
+        self.assertTrue(note.link_url.startswith("/manage/messages/"), note.link_url)
+
+        thread = self.org.message_threads.first()
+        Notification.objects.all().delete()
+        self.client.force_login(self.admin)
+        self.client.post(reverse("manage:message_thread", args=[thread.id]), {"body": "Fixed."})
+        note = self._unread(self.member).first()
+        self.assertTrue(note.link_url.startswith(f"/leagues/{self.org.id}/"), note.link_url)
+
+    def test_a_notice_to_everyone_rings_everyone(self):
+        """The one message genuinely addressed to the whole room."""
+        self.client.force_login(self.admin)
+        self.client.post(
+            reverse("manage:message_new") + f"?org={self.org.id}",
+            {"subject": "Round 3 closes Friday", "body": "Get your tips in.", "org": self.org.id},
+        )
+        self.assertEqual(self._unread(self.member).count(), 1)
+        self.assertEqual(self._unread(self.other).count(), 1)
+        self.assertEqual(self._unread(self.admin).count(), 0)
+
+    def test_a_notice_to_named_people_rings_only_them(self):
+        self.client.force_login(self.admin)
+        self.client.post(
+            reverse("manage:message_new") + f"?org={self.org.id}",
+            {"subject": "About your group", "body": "A word.",
+             "org": self.org.id, "recipients": [self.member.id]},
+        )
+        self.assertEqual(self._unread(self.member).count(), 1)
+        self.assertEqual(self._unread(self.other).count(), 0)
+
+    def test_a_reply_under_a_broadcast_does_not_ring_the_whole_room(self):
+        """One member saying "thanks" must not ring two hundred bells.
+
+        This is why replies are narrowed to the admins and the thread's owner
+        rather than to everyone who can read the thread — a broadcast notice
+        is readable by the whole organisation.
+        """
+        from .models import Notification
+
+        self.client.force_login(self.admin)
+        self.client.post(
+            reverse("manage:message_new") + f"?org={self.org.id}",
+            {"subject": "Round 3 closes Friday", "body": "Get your tips in.", "org": self.org.id},
+        )
+        Notification.objects.all().delete()
+
+        thread = self.org.message_threads.get(subject="Round 3 closes Friday")
+        self.client.force_login(self.member)
+        self.client.post(
+            reverse("orgs:member_message_thread", args=[self.org.id, thread.id]),
+            {"body": "Thanks!"},
+        )
+        self.assertEqual(self._unread(self.admin).count(), 1)
+        self.assertEqual(self._unread(self.other).count(), 0)
+
+    def test_somebody_who_has_left_is_not_rung(self):
+        from .models import Message, MessageThread
+
+        thread = MessageThread.objects.create(
+            org=self.org, kind=MessageThread.KIND_RAISED,
+            subject="A question", started_by=self.member,
+        )
+        Message.objects.create(thread=thread, author=self.member, body="Hi")
+        OrgMember.objects.filter(user=self.member, org=self.org).delete()
+
+        self.client.force_login(self.admin)
+        self.client.post(reverse("manage:message_thread", args=[thread.id]), {"body": "Reply"})
+        self.assertEqual(self._unread(self.member).count(), 0)

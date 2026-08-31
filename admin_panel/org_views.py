@@ -14,6 +14,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from orgs.models import Message, MessageThread, OrgMember, Organisation
+from orgs.notifications import notify_new_message
+# The two ends of a thread read and write it the same way, so the logic lives
+# in orgs.services rather than in either view module — there is one
+# conversation here, seen from two chairs.
+from orgs.services import attach_files, quoted_message, thread_entries
 
 from .perms import get_managed_org_or_404, managed_orgs, org_admin_required
 
@@ -80,8 +85,8 @@ def message_new(request):
     if request.method == "POST":
         subject = (request.POST.get("subject") or "").strip()
         body = (request.POST.get("body") or "").strip()
-        if not subject or not body:
-            flash.error(request, "A notice needs both a subject and something to say.")
+        if not subject or not (body or request.FILES.getlist("files")):
+            flash.error(request, "A notice needs a subject, and either a message or a file.")
         else:
             thread = MessageThread.objects.create(
                 org=org, kind=MessageThread.KIND_NOTICE, subject=subject,
@@ -95,7 +100,16 @@ def message_new(request):
                     org=org, user_id__in=picked,
                 ).values_list("user_id", flat=True)
                 thread.recipients.set(list(member_users))
-            Message.objects.create(thread=thread, author=request.user, body=body)
+            entry = Message.objects.create(
+                thread=thread, author=request.user, body=body,
+            )
+            for problem in attach_files(entry, request.FILES.getlist("files")):
+                flash.error(request, problem)
+            # A notice is the one message genuinely addressed to everybody it
+            # can reach, so this one goes wider than notify_new_message —
+            # which deliberately narrows replies to the admins and the person
+            # whose thread it is. See its docstring.
+            _notify_notice(thread, entry, picked)
             who = "everyone" if not picked else f"{len(picked)} member(s)"
             flash.success(request, f"Sent to {who}.")
             return redirect("manage:message_thread", thread_id=thread.id)
@@ -106,6 +120,42 @@ def message_new(request):
     return render(request, "manage/message_new.html", {
         "org": org, "orgs": mine, "members": members,
     })
+
+
+def _notify_notice(thread, entry, picked):
+    """Ring the bell of everybody a notice was actually sent to.
+
+    Separate from notify_new_message because the audience is a different
+    question. That one narrows a REPLY to the admins and the thread's owner,
+    so a member saying "thanks" under a whole-organisation notice does not
+    ring two hundred bells. This is the notice itself, which is addressed to
+    everybody it names — or to the whole organisation when it names nobody.
+    """
+    from orgs.models import Notification
+
+    if picked:
+        user_ids = list(
+            OrgMember.objects.filter(org=thread.org, user_id__in=picked)
+            .values_list("user_id", flat=True)
+        )
+    else:
+        user_ids = list(
+            OrgMember.objects.filter(org=thread.org).values_list("user_id", flat=True)
+        )
+    user_ids = [uid for uid in user_ids if uid != entry.author_id]
+    if not user_ids:
+        return 0
+    Notification.objects.bulk_create([
+        Notification(
+            user_id=uid, org=thread.org,
+            kind=Notification.KIND_MESSAGE,
+            title=thread.subject,
+            message=(entry.body or "").strip()[:140],
+            link_url=f"/leagues/{thread.org_id}/messages/{thread.id}/",
+        )
+        for uid in user_ids
+    ])
+    return len(user_ids)
 
 
 @org_admin_required
@@ -127,18 +177,29 @@ def message_thread(request, thread_id: int):
             thread.save(update_fields=["status"])
         else:
             body = (request.POST.get("body") or "").strip()
-            if body:
-                Message.objects.create(thread=thread, author=request.user, body=body)
+            uploads = request.FILES.getlist("files")
+            if body or uploads:
+                entry = Message.objects.create(
+                    thread=thread, author=request.user, body=body,
+                    # Which message this answers, when the admin picked one.
+                    # Looked up inside the thread, so an id from another
+                    # conversation cannot be quoted into this one.
+                    reply_to=quoted_message(thread, request.POST.get("reply_to")),
+                )
+                for problem in attach_files(entry, uploads):
+                    flash.error(request, problem)
+                # The member's bell. An answer that sits unread because nobody
+                # told them it arrived is the same as not having answered.
+                notify_new_message(entry)
                 if thread.status == MessageThread.STATUS_OPEN:
                     thread.status = MessageThread.STATUS_ANSWERED
                     thread.save(update_fields=["status"])
                 flash.success(request, "Reply sent.")
         return redirect("manage:message_thread", thread_id=thread.id)
 
-    entries = thread.messages.select_related("author").order_by("created_at")
-    # Opening the thread is what marks it read for this admin.
-    for entry in entries:
-        entry.read_by.add(request.user)
+    # Same shape as the member's end of the thread — one conversation drawn
+    # one way, from partials/_chat.html — so the two ends cannot drift apart.
+    entries = thread_entries(thread, request.user)
 
     return render(request, "manage/message_thread.html", {
         "org": thread.org, "orgs": mine, "thread": thread, "entries": entries,

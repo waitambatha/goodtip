@@ -451,6 +451,37 @@ def submit_tip(*, user, match: Match, org, selection: str, group=None) -> Tip:
     return tip
 
 
+@transaction.atomic
+def clear_tip(*, user, match: Match, org, group=None) -> bool:
+    """Take a tip back. Returns whether there was one to take back.
+
+    The other half of submit_tip, and it exists because picking a team was a
+    one-way door: the control is a radio, and a radio group has no way to
+    return to "none" once one of its members is checked. A member who tapped
+    the wrong side could change their mind about WHICH team, but not about
+    whether they had tipped at all — and on a card with a favourite they did
+    not fancy, "no tip" is a real answer.
+
+    Same lock rule as submitting, for the same reason: once a match has begun,
+    what you tipped is a matter of record. Deleting it then would be a way to
+    quietly erase a wrong call after the fact.
+
+    An auto-assigned tip is deleted like any other. The missed-tip default is
+    written when a round closes with nothing picked, and by then the match is
+    locked and this cannot run at all — so the only auto rows reachable here
+    are ones a future rule wrote early, and a member should be able to clear
+    those exactly as they can overwrite them with submit_tip.
+    """
+    if match.is_locked:
+        raise ValueError("Match is locked")
+    if group is not None and group.org_id != org.id:
+        raise ValueError("That group belongs to a different organisation.")
+    deleted, _ = Tip.objects.filter(
+        user=user, match=match, org=org, group=group,
+    ).delete()
+    return bool(deleted)
+
+
 def _leaderboard(org_ids, tip_filter):
     """Points, and the accuracy record — which count DIFFERENT things.
 

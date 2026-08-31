@@ -1,0 +1,47 @@
+{% extends "emails/_base.html" %}
+{% comment %}
+THE AUTO-ACKNOWLEDGEMENT, sent the moment somebody uses the public contact
+form. It replaces silence: before this an enquiry produced a "sent" flag on
+the page and then nothing at all until a human got round to answering, which
+on a slow week is days. Somebody who has just written to a company they are
+considering paying should not have to wonder whether it arrived.
+
+WHAT IT DOES NOT DO. It does not promise a time, because nobody has committed
+to one, and a made-up "within 24 hours" is a promise the inbox cannot keep. It
+says what is true: it is here, a person will read it, and here is what you
+wrote so you can tell this is the right message.
+
+Their own words are quoted back for the same reason the reply email quotes
+them: an acknowledgement with no content in it reads like an autoresponder,
+and an autoresponder is the thing people ignore.
+{% endcomment %}
+{% block title %}We've got your message{% endblock %}
+{% block eyebrow %}From the GoodTip team{% endblock %}
+{% block badge %}&#10003;{% endblock %}{# tick — it arrived #}
+{% block preheader %}Your message reached us. A person will read it and get back to you.{% endblock %}
+{% block content %}
+  <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">Hi {{ enquiry.name }},</p>
+  <p style="margin:0 0 22px;font-size:16px;line-height:1.6;color:#1A1A14;">
+    Thanks for getting in touch. This is just to say your message has reached
+    GoodTip — it's with the team now, a real person reads every one, and we'll
+    get back to you as soon as we can.
+  </p>
+
+  {% include "emails/_bits.html" with bit="eyebrow" label="What you sent us" %}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
+    <tr>
+      <td style="padding:16px 20px;background:#F2F1E7;border-left:4px solid #C8F135;border-radius:0 10px 10px 0;font-size:15px;line-height:1.65;color:#1A1A14;">
+        {% if enquiry.interest %}<div style="font-size:12px;color:#6b6b5e;margin-bottom:8px;">About: {{ enquiry.interest }}</div>{% endif %}
+        {{ enquiry.message|linebreaksbr }}
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#1A1A14;">
+    Nothing to do at your end. If you remember something you left out, just
+    reply to this email &mdash; it comes straight back to us and lands with the
+    same message.
+  </p>
+
+  {% include "emails/_bits.html" with bit="button" url=site_link label="Have a look around GoodTip" %}
+{% endblock %}

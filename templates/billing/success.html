@@ -1,6 +1,13 @@
 {% extends "app_base.html" %}
 {% block title %}You're set, {{ org.name }}{% endblock %}
 {% block loader_task %}Confirming your payment{% endblock %}
+{% comment %}
+The rotating side strips. Standard on every member page (client request,
+Aug 2026) — these were the last screens without them. Outside the sheet,
+never inside it: the strips belong to the page background, and a sheet
+drawn over them is the whole point of the look.
+{% endcomment %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% block app_content %}
 <div style="max-width:560px;margin:0 auto;text-align:center;">
   <div style="width:64px;height:64px;border-radius:50%;background:var(--lime);display:grid;place-items:center;margin:12px auto 20px;"><svg class="cic" style="width:34px;height:34px;stroke:var(--deep);stroke-width:2.4;"><use href="#ic-check"/></svg></div>

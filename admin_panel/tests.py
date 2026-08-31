@@ -13,6 +13,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from sysadmin.models import AdminAccess
+
 from .models import NewsPost
 
 User = get_user_model()
@@ -660,3 +662,194 @@ class AdminThemeToggleTests(TestCase):
     def test_the_stylesheet_that_shapes_it_is_loaded(self):
         html = self.client.get(reverse("admin:index")).content.decode()
         self.assertIn("css/gt-admin.css", html)
+
+
+class EnquiryAcknowledgementTests(TestCase):
+    """Somebody who writes in gets told straight away that it arrived.
+
+    Before this an enquiry produced a "sent" flag on the page and then nothing
+    at all until a human got round to it — days, on a slow week. Somebody who
+    has just written to a company they are considering paying should not have
+    to wonder whether the form worked.
+    """
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            email="boss@example.com", password="pw", display_name="Boss", is_staff=True,
+        )
+        self.payload = {
+            "name": "Jane Tester", "email": "jane@example.com",
+            "organisation": "Acme Pty", "interest": "Setting up a comp",
+            "message": "How much for 40 people?", "source": "/",
+        }
+
+    def _send(self, **overrides):
+        data = {**self.payload, **overrides}
+        return self.client.post(reverse("contact_submit"), data)
+
+    def test_the_sender_is_emailed_as_well_as_the_team(self):
+        from django.core import mail
+
+        with self.settings(EMAIL_HOST="localhost", EMAIL_ALLOWLIST="*"):
+            self._send()
+        to = [m.to for m in mail.outbox]
+        self.assertIn(["jane@example.com"], to)
+        self.assertIn([self.staff.email], to)
+
+    def test_the_acknowledgement_quotes_what_they_wrote(self):
+        """An acknowledgement with nothing in it reads like an autoresponder.
+
+        Quoting the message back is what makes it recognisable as a reply to
+        the thing they actually sent, and lets them see it arrived intact.
+        """
+        from django.core import mail
+
+        with self.settings(EMAIL_HOST="localhost", EMAIL_ALLOWLIST="*"):
+            self._send()
+        ack = next(m for m in mail.outbox if m.to == ["jane@example.com"])
+        self.assertIn("How much for 40 people?", ack.body)
+        self.assertIn("Jane Tester", ack.body)
+
+    def test_a_reply_to_the_acknowledgement_reaches_a_person(self):
+        """It says "just reply to this", so replying has to work.
+
+        The from address is no-reply@; an acknowledgement that invites a reply
+        and then bounces is worse than not sending one.
+        """
+        from django.core import mail
+
+        from accounts.views import CONTACT_REPLY_TO
+
+        with self.settings(EMAIL_HOST="localhost", EMAIL_ALLOWLIST="*"):
+            self._send()
+        ack = next(m for m in mail.outbox if m.to == ["jane@example.com"])
+        self.assertEqual(ack.reply_to, [CONTACT_REPLY_TO])
+        self.assertNotIn("no-reply", CONTACT_REPLY_TO)
+
+    def test_a_rejected_enquiry_sends_nothing(self):
+        from django.core import mail
+
+        with self.settings(EMAIL_HOST="localhost", EMAIL_ALLOWLIST="*"):
+            self._send(message="")
+        self.assertEqual(mail.outbox, [])
+
+    def test_the_enquiry_is_still_recorded_when_the_mail_fails(self):
+        """Stored first, emailed second, and the order is the point.
+
+        Losing a sales lead to a mail outage is the one failure this path is
+        engineered against — so a send that blows up must not take the record
+        with it, or cost the sender their "it arrived" page.
+        """
+        from unittest.mock import patch
+
+        from .models import Enquiry
+
+        with patch("goodtip.mail.send_template", side_effect=RuntimeError("mail is down")):
+            response = self._send()
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Enquiry.objects.filter(email="jane@example.com").exists())
+
+
+class PagesScopeTests(TestCase):
+    """Public or private, one list at a time.
+
+    Both tables used to sit on the screen together inside `.gt-shell-wide`, a
+    1.55fr / 1fr split meant for a list beside a form. The private table — the
+    longer of the two, with the longer addresses — was living in the 1fr
+    column against a `min-width: 640px` table, so it collapsed and scrolled
+    sideways inside its own panel.
+    """
+
+    def setUp(self):
+        self.boss = User.objects.create_superuser(
+            email="pages-boss@example.com", password="pw", display_name="Boss",
+        )
+        sign_in_to_admin(self.client, self.boss)
+
+    def _get(self, query=""):
+        return self.client.get(reverse("admin:hq_pages") + query)
+
+    def test_public_is_what_you_get_without_asking(self):
+        r = self._get()
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context["scope"], "public")
+        self.assertTrue(all(row["page"].is_public for row in r.context["rows"]))
+
+    def test_asking_for_private_gets_only_private(self):
+        r = self._get("?scope=private")
+        self.assertEqual(r.context["scope"], "private")
+        self.assertTrue(r.context["rows"])
+        self.assertFalse(any(row["page"].is_public for row in r.context["rows"]))
+
+    def test_a_scope_nobody_offers_falls_back_to_public(self):
+        """The value picks a list; it is not passed to anything else.
+
+        Still clamped rather than trusted, because a querystring that reaches
+        a lookup unchecked is the shape of a bug even when this one is benign.
+        """
+        self.assertEqual(self._get("?scope=../secret").context["scope"], "public")
+        self.assertEqual(self._get("?scope=").context["scope"], "public")
+
+    def test_both_counts_are_offered_whichever_side_is_showing(self):
+        """The tab that is not open still has to say how much is behind it."""
+        r = self._get("?scope=private")
+        self.assertGreater(r.context["public_count"], 0)
+        self.assertGreater(r.context["private_count"], 0)
+
+    def test_the_page_no_longer_uses_the_two_column_shell(self):
+        """The split was the whole cause of the squeeze, so it is asserted.
+
+        A future edit putting `gt-shell-wide` back would bring the sideways
+        scroll back with it, silently and only at certain widths.
+        """
+        html = self._get().content.decode()
+        self.assertIn("gt-shell-single", html)
+        self.assertNotIn("gt-shell-wide", html)
+
+
+class SystemReportTilesTests(TestCase):
+    """The top row answers for the screens an admin actually opens.
+
+    It carried four platform figures and stopped. News, Pages, Enquiries and
+    the team each have a screen somebody visits weekly and had no number
+    anywhere, so "is there anything in News?" meant opening News to find out.
+    """
+
+    def setUp(self):
+        self.boss = User.objects.create_superuser(
+            email="report-boss@example.com", password="pw", display_name="Boss",
+        )
+        sign_in_to_admin(self.client, self.boss)
+
+    def test_the_four_new_figures_are_counted(self):
+        NewsPost.objects.create(title="One", slug="one", is_published=True)
+        NewsPost.objects.create(title="Two", slug="two", is_published=False)
+        counts = self.client.get(reverse("admin:system_report")).context["counts"]
+        self.assertEqual(counts["news"], 2)
+        self.assertEqual(counts["news_published"], 1)
+        self.assertGreater(counts["pages"], 0)
+        self.assertEqual(counts["team"], AdminAccess.objects.count())
+        self.assertIn("enquiries", counts)
+
+    def test_every_tile_that_claims_a_destination_has_one(self):
+        """Four of the eight are new links, and a NoReverseMatch in a template
+        takes the whole report down rather than one tile with it."""
+        r = self.client.get(reverse("admin:system_report"))
+        self.assertEqual(r.status_code, 200)
+        html = r.content.decode()
+        for url in ("admin:hq_news", "admin:hq_pages", "admin:hq_enquiries", "admin:hq_team"):
+            self.assertIn(reverse(url), html)
+
+    def test_the_report_survives_a_missing_model(self):
+        """The added counts are one guarded block on a diagnostic screen.
+
+        The report is where somebody looks when something is already wrong, so
+        a count that cannot be computed must cost its own tile and nothing
+        else.
+        """
+        from unittest.mock import patch
+
+        with patch("admin_panel.models.NewsPost.objects") as broken:
+            broken.count.side_effect = RuntimeError("mid-migration")
+            r = self.client.get(reverse("admin:system_report"))
+        self.assertEqual(r.status_code, 200)

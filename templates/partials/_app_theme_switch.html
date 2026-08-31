@@ -1,0 +1,79 @@
+{% comment %}
+THE MEMBER APP'S THEME SWITCH.
+
+Same three-segment shape, same storage and same attribute as the ones in
+/admin/ and in the HQ shell (partials/_gt_theme_switch.html): it writes
+`localStorage.theme` and `<html data-theme>`. So a choice made on any GoodTip
+screen is still in force on every other one, and no area has to know the
+others exist.
+
+WHAT "DARK" AND "LIGHT" MEAN HERE, WHICH IS NOT WHAT THEY MEAN IN /admin/.
+The member app's designed look is the deep green — that IS its dark theme, and
+it is the default. The light theme is the same screens on cream with green as
+an accent rather than as the ground.
+
+AUTO DOES NOT MEAN "FOLLOW THE DEVICE" ON THESE PAGES, and that asymmetry is
+deliberate. In HQ the light palette is the design and the dark one is the
+accommodation, so following prefers-color-scheme is the right default. Here it
+is the other way round: the green is the product. Having `auto` quietly hand
+the majority of visitors — anyone whose phone is on dark — a look nobody has
+signed off would be a redesign by side effect. So `auto` keeps the green, and
+light is something you choose.
+
+Three segments rather than a cycling icon because a control that changes
+meaning on every press cannot be aimed: you want light, you press once, you
+get light.
+{% endcomment %}
+<div class="an-theme" role="group" aria-label="Colour theme">
+  <button type="button" data-set-theme="dark" title="The GoodTip green">
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M13.4 9.9A5.9 5.9 0 0 1 6.1 2.6a5.9 5.9 0 1 0 7.3 7.3z" fill="currentColor"/>
+    </svg>
+    <span>Green</span>
+  </button>
+  <button type="button" data-set-theme="light" title="Cream, with green as the accent">
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <circle cx="8" cy="8" r="3.1" fill="currentColor"/>
+      <g stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/>
+      </g>
+    </svg>
+    <span>Light</span>
+  </button>
+</div>
+<script>
+(function () {
+  var box = document.currentScript.previousElementSibling;
+  if (!box) return;
+  var opts = box.querySelectorAll('[data-set-theme]');
+
+  function paint(mode) {
+    /* Anything that is not an explicit "light" is the green, so auto and an
+       unset key both light up the Green segment — the switch has to show what
+       the page is actually wearing, not what the key literally says. */
+    var shown = mode === 'light' ? 'light' : 'dark';
+    opts.forEach(function (b) {
+      var on = b.getAttribute('data-set-theme') === shown;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
+  opts.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var mode = b.getAttribute('data-set-theme');
+      document.documentElement.dataset.theme = mode;
+      try { localStorage.setItem('theme', mode); } catch (e) {}
+      /* This partial is on the page twice — once in the bar, once in the
+         mobile menu — so a press has to repaint both. Announced rather than
+         reached for: neither copy knows the other is there, and a third one
+         somewhere else would join in for free. */
+      document.dispatchEvent(new CustomEvent('gt:theme', { detail: mode }));
+    });
+  });
+
+  document.addEventListener('gt:theme', function (e) { paint(e.detail); });
+
+  try { paint(localStorage.getItem('theme') || 'auto'); } catch (e) { paint('auto'); }
+})();
+</script>

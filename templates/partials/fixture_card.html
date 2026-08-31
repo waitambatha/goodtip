@@ -78,6 +78,23 @@ rest.
   question being asked.
   {% endcomment %}
   <div class="fxc-teams">
+    {% comment %}
+    THE THIRD OPTION, and it is why un-picking works at all on this variant.
+
+    The two sides are labels over one radio group, and a radio group cannot be
+    returned to "none" by unchecking — the browser gives you no way to do it,
+    which is why tapping your own pick a second time used to do nothing. So the
+    group has a third member with no visible control: gt-fixture.js checks it
+    when you press the side that is already selected, and the confirm view
+    reads that value as "take this one back" (tipping.views.NO_TIP).
+
+    Absent from the posted slate is NOT the same thing. A fixture nobody
+    touched must not clear a tip made last week from another device, so only an
+    explicit press writes this.
+    {% endcomment %}
+    {% if editable and mode != "htmx" %}
+    <input type="radio" name="match_{{ match.id }}" value="none" hidden data-no-tip>
+    {% endif %}
     {% include "partials/_fixture_team.html" with team=match.home_team form=reader.home pick="home" side="home" %}
     <span class="fxc-v" aria-hidden="true">vs</span>
     {% include "partials/_fixture_team.html" with team=match.away_team form=reader.away pick="away" side="away" %}

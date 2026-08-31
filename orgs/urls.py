@@ -19,6 +19,11 @@ urlpatterns = [
     path("<int:org_id>/request-join/", views.request_join_view, name="request_join"),
     # The organisation's own charity list — vetted plus whatever it added.
     path("<int:org_id>/charities/", views.org_charities_view, name="charities"),
+    # Fix one up — its name, its website, and the logo the automatic fetch
+    # could not find. Scoped to what this organisation can see; who may
+    # actually change it is orgs.views._can_edit_charity.
+    path("<int:org_id>/charities/<int:charity_id>/edit/", views.org_charity_edit_view,
+         name="charity_edit"),
     # A GROUP's election. Separate routes rather than a query string on the
     # org ones: every permission check below is different (the group's members
     # rather than the organisation's), and a scope that important should not
@@ -46,6 +51,12 @@ urlpatterns = [
     path("<int:org_id>/messages/", views.member_messages_view, name="member_messages"),
     path("<int:org_id>/messages/<int:thread_id>/", views.member_message_thread_view,
          name="member_message_thread"),
+    # Attachments, served by a view rather than from /media/ so the same
+    # can_read check the thread page makes is made again on every fetch. Not
+    # org-scoped: the thread id already decides who may read it, and the org
+    # would be a second thing to keep in step for no extra protection.
+    path("messages/<int:thread_id>/file/<int:attachment_id>/", views.message_file,
+         name="message_file"),
     path("<int:org_id>/wall/", views.wall_view, name="wall"),
     path("<int:org_id>/wall/post/", views.wall_post_create, name="wall_post"),
     path("<int:org_id>/wall/<int:post_id>/react/", views.wall_react, name="wall_react"),

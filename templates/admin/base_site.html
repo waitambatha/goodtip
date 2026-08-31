@@ -88,21 +88,70 @@ only finds the word "Members" is worse than no box.
 
 {% block userlinks %}
 {% include "admin/color_theme_toggle.html" %}
+{% comment %}
+THE ACCOUNT MENU.
+
+Four items in a flat list, each wearing a hairline that Django's own base.css
+draws under every `#user-tools a` — so the menu arrived with a line ruled
+across each row, uppercased and set at 11px, which is what the client saw. The
+overrides for that live in gtadmin.css under "Out-specifying admin/base.css";
+they have to be there rather than here because Django styles those elements by
+id and an id beats any class selector however it is written.
+
+What is here is the arrangement. A card at the top saying WHO is signed in —
+name, the whole address, and the level of access — because the bar itself only
+has room for a short name, and "which account am I in?" is the question this
+menu is opened to answer as often as any of its links. Then the items in two
+labelled groups: the two that change your own account, and the one that leaves
+the admin. Signing out is last, alone, and the only red thing in the menu.
+{% endcomment %}
 <details class="gta-acct">
   <summary>
     <span class="gta-avatar">
       {% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{% firstof user.get_short_name user.get_username|slice:":2" %}{% endif %}
     </span>
     <span class="gta-acct-who">
-      <b>{% firstof user.get_short_name user.get_username %}</b>
+      <b>{% firstof user.display_name user.get_short_name user.get_username %}</b>
       <small>{% if user.is_superuser %}Superuser{% else %}Staff{% endif %}</small>
     </span>
     <svg class="gta-acct-chev" aria-hidden="true"><use href="#ic-chev-down"/></svg>
   </summary>
   <div class="gta-acct-menu">
-    <a href="{% url 'profile' %}"><svg><use href="#ic-users"/></svg>{% translate 'Your profile' %}</a>
-    {% if site_url %}<a href="{{ site_url }}" target="_blank" rel="noopener"><svg><use href="#ic-eye"/></svg>{% translate 'View site' %}</a>{% endif %}
-    {% if user.has_usable_password %}<a href="{% url 'admin:password_change' %}"><svg><use href="#ic-lock"/></svg>{% translate 'Change password' %}</a>{% endif %}
+
+    <div class="gta-acct-card">
+      <span class="gta-acct-face">
+        {% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{% firstof user.get_short_name user.get_username|slice:":2" %}{% endif %}
+      </span>
+      <span class="gta-acct-id">
+        <b>{% firstof user.display_name user.get_short_name user.get_username %}</b>
+        <small title="{{ user.email }}">{{ user.email }}</small>
+        <span class="gta-acct-role {% if user.is_superuser %}is-super{% endif %}">
+          <svg aria-hidden="true"><use href="#{% if user.is_superuser %}ic-f-shield-star{% else %}ic-f-shield{% endif %}"/></svg>
+          {% if user.is_superuser %}Superuser{% else %}Staff{% endif %}
+        </span>
+      </span>
+    </div>
+
+    <div class="gta-acct-group">
+      <p class="gta-acct-cap">{% translate 'Your account' %}</p>
+      <a href="{% url 'profile' %}"><svg><use href="#ic-users"/></svg>{% translate 'Your profile' %}</a>
+      {% if user.has_usable_password %}<a href="{% url 'admin:password_change' %}"><svg><use href="#ic-lock"/></svg>{% translate 'Change password' %}</a>{% endif %}
+    </div>
+
+    {% if site_url %}
+    <div class="gta-acct-group">
+      <p class="gta-acct-cap">GoodTip</p>
+      {% comment %}
+      Opens in a new tab, so it says so. A link that quietly takes over the
+      window is the one people lose their place in the admin to.
+      {% endcomment %}
+      <a href="{{ site_url }}" target="_blank" rel="noopener">
+        <svg><use href="#ic-eye"/></svg>{% translate 'View site' %}
+        <svg class="gta-acct-out" aria-hidden="true"><use href="#ic-arrow-right"/></svg>
+      </a>
+    </div>
+    {% endif %}
+
     <form id="logout-form" method="post" action="{% url 'admin:logout' %}">
       {% csrf_token %}
       <button type="submit"><svg><use href="#ic-logout"/></svg>{% translate 'Log out' %}</button>

@@ -2,6 +2,13 @@
 {% load humanize %}
 {% block title %}News &amp; blog &middot; GoodTip{% endblock %}
 {% block loader_task %}Fetching the latest stories{% endblock %}
+{% comment %}
+The rotating side strips. Standard on every member page (client request,
+Aug 2026) — these were the last screens without them. Outside the sheet,
+never inside it: the strips belong to the page background, and a sheet
+drawn over them is the whole point of the look.
+{% endcomment %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% block app_content %}
 <div class="app-head"><div><div class="app-eyebrow">Around the grounds</div><h1 class="app-h1">News &amp; blog</h1><p class="app-sub">Stories, previews and updates from the GoodTip team.</p></div></div>
 

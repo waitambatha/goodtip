@@ -12,6 +12,15 @@ system ACTUALLY does — the data it holds, why, and who it goes to — rather
 than boilerplate copied from another product. They are honest as written, but
 they are not legal advice and have not been through a lawyer. Whoever signs
 this off should read every clause and edit it on the Pages screen.
+
+WHY IT IS BUILT LIKE A REFERENCE, NOT AN ARTICLE (Aug 2026)
+It used to be one 900-word column of undifferentiated <p> — and `.prose`,
+the class it asked for, did not exist, so it was not even that. Nobody reads a
+privacy policy end to end. They arrive from a link asking one question: who
+can see my email address, can I delete my account, do you sell this. So the
+clauses are cards with edges you can point at, and a sticky contents rail
+takes you to the one you came for. The rail's active state is driven by an
+observer at the bottom of this file.
 {% endcomment %}
 
 {% block title %}Privacy Policy &middot; GoodTip{% endblock %}
@@ -21,45 +30,195 @@ this off should read every clause and edit it on the Pages screen.
 
 {% block content %}
 
-<section class="section">
-  <div class="wrap wrap-narrow">
-    <p class="eyebrow">Legal</p>
-    <h1 class="section-heading">Privacy Policy</h1>
-    <p class="hero-sub">Last updated: August 2026</p>
-
-    <div class="prose" style="margin-top:32px;">
-      <p>GoodTip runs charity footy tipping competitions for Australian organisations. This policy explains what personal information we collect, why we collect it, and what we do with it. It applies to goodtip.com.au and to the GoodTip app.</p>
-
-      <h2>What we collect</h2>
-      <p>When you create an account we collect your name, email address and password. If you join an organisation we record which organisation and group you belong to, and your role in it. As you play we store the tips you make, your results, and anything you post to a wall.</p>
-      <p>Some details are optional and only stored if you provide them — a profile photo, and a work email address where your organisation verifies membership that way.</p>
-
-      <h2>Why we collect it</h2>
-      <p>We use your information to run the competition you have joined: to show ladders and leaderboards, to send the emails you have asked for, to let your organisation's admins manage their members, and to record which charity your organisation is raising for. We do not sell your personal information, and we do not share it with advertisers.</p>
-
-      <h2>Who can see what</h2>
-      <p>Other members of your organisation can see your display name, your tips once a round has locked, your position on the ladder, and anything you choose to post. Your email address is visible to the admins of the organisations you belong to. Charity votes are blind: while a vote is open nobody — including admins — can see who voted for what, and only the totals are published once it closes.</p>
-      <p>The Good List shows fundraising totals by organisation only where that organisation has consented to appear, and aggregate figures are withheld until enough organisations sit behind them that no single one can be identified.</p>
-
-      <h2>Service providers</h2>
-      <p>We use third parties to deliver parts of the service: an email provider to send sign-in codes and notifications, a payment provider to process donations, and hosting infrastructure to run the site. They receive only what they need to perform their function and are not permitted to use it for anything else.</p>
-
-      <h2>Keeping it safe</h2>
-      <p>Passwords are stored hashed, never in plain text. Sign-in verification codes are stored as hashes too, expire after ten minutes, and can only be used once. Access to administrative tools requires a second factor in addition to a password.</p>
-
-      <h2>Your choices</h2>
-      <p>You can view and change your details at any time from your profile, and turn notification emails off there. You can ask us for a copy of the personal information we hold about you, ask us to correct it, or ask us to delete your account. Some records — donation receipts in particular — may need to be retained where the law requires it.</p>
-
-      <h2>Cookies</h2>
-      <p>We use cookies to keep you signed in and to remember which organisation you are currently viewing. Where analytics are enabled we use them to understand which pages are used, never to identify individuals.</p>
-
-      <h2>Contact us</h2>
-      <p>If you have a question about this policy, or want to make a privacy request, email us at hello@goodtip.com.au and we will respond.</p>
-
-      <h2>Changes to this policy</h2>
-      <p>We may update this policy as the service changes. The date at the top shows when it was last revised, and material changes will be notified in the app.</p>
+<!-- HERO -->
+<section class="hero-lean">
+  <div class="hl-bg" aria-hidden="true">
+    <div class="shot on" style="background-image:url('{% static 'img/scenes/stadium-panorama.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+    <div class="shot" style="background-image:url('{% static 'img/scenes/mcg-stadium.jpg' %}')"></div>
+  </div>
+  <div class="hl-veil" aria-hidden="true"></div>
+  <div class="wrap">
+    <p class="eyebrow" style="color:var(--lime);">Legal</p>
+    <h1>Privacy Policy</h1>
+    <p class="hl-sub">What we collect, why we collect it, and who can see it. In plain English, because a policy nobody can read is not a policy anybody agreed to.</p>
+    <div class="hl-meta">
+      <span class="hl-chip"><svg><use href="#ic-clock"/></svg> Last updated: August 2026</span>
+      <span class="hl-chip"><svg><use href="#ic-shield-check"/></svg> Applies to goodtip.com.au and the GoodTip app</span>
     </div>
   </div>
 </section>
+
+<!-- THE POLICY -->
+<section class="section on-cream has-rails" style="padding-top:clamp(36px,5vw,56px);">
+  <div class="pg-rails" aria-hidden="true">
+    <div class="rail left">
+      <div class="shot on" style="background-image:url('{% static 'img/scenes/afl-goal-posts.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-goal-posts.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/afl-training.jpg' %}')"></div>
+    </div>
+    <div class="rail right">
+      <div class="shot on" style="background-image:url('{% static 'img/scenes/nrl-ground-dusk.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/afl-ball-grass.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="legal-layout" data-legal>
+
+      <!-- CONTENTS RAIL -->
+      <nav class="legal-toc" aria-label="Contents">
+        <div class="lt-head">On this page</div>
+        <a href="#collect"><i>01</i><span>What we collect</span></a>
+        <a href="#why"><i>02</i><span>Why we collect it</span></a>
+        <a href="#who"><i>03</i><span>Who can see what</span></a>
+        <a href="#providers"><i>04</i><span>Service providers</span></a>
+        <a href="#safe"><i>05</i><span>Keeping it safe</span></a>
+        <a href="#choices"><i>06</i><span>Your choices</span></a>
+        <a href="#cookies"><i>07</i><span>Cookies</span></a>
+        <a href="#contact"><i>08</i><span>Contact us</span></a>
+        <a href="#changes"><i>09</i><span>Changes to this policy</span></a>
+      </nav>
+
+      <!-- CLAUSES -->
+      <div class="legal-body">
+        <div class="legal-note reveal">
+          <svg aria-hidden="true"><use href="#ic-shield-check"/></svg>
+          <p><b>The short version.</b> We hold what is needed to run the tipping comp you joined and nothing more. We do not sell your personal information and we do not share it with advertisers. Your email address is visible to the admins of the organisations you belong to, and to nobody else playing.</p>
+        </div>
+
+        <article class="legal-card reveal" id="collect">
+          <h2><span class="lc-n">01</span> What we collect</h2>
+          <div class="prose">
+            <p>When you create an account we collect your name, email address and password. If you join an organisation we record which organisation and group you belong to, and your role in it. As you play we store the tips you make, your results, and anything you post to a wall.</p>
+            <p>Some details are optional and only stored if you provide them — a profile photo, and a work email address where your organisation verifies membership that way.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="why">
+          <h2><span class="lc-n">02</span> Why we collect it</h2>
+          <div class="prose">
+            <p>We use your information to run the competition you have joined: to show ladders and leaderboards, to send the emails you have asked for, to let your organisation's admins manage their members, and to record which charity your organisation is raising for. We do not sell your personal information, and we do not share it with advertisers.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="who">
+          <h2><span class="lc-n">03</span> Who can see what</h2>
+          <div class="prose">
+            <p>Other members of your organisation can see your display name, your tips once a round has locked, your position on the ladder, and anything you choose to post. Your email address is visible to the admins of the organisations you belong to. Charity votes are blind: while a vote is open nobody — including admins — can see who voted for what, and only the totals are published once it closes.</p>
+            <p>Messages you raise with your organisation's admins are private to them. Other members cannot see them, and neither can the admins of any other organisation.</p>
+            <p>The Good List shows fundraising totals by organisation only where that organisation has consented to appear, and aggregate figures are withheld until enough organisations sit behind them that no single one can be identified.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="providers">
+          <h2><span class="lc-n">04</span> Service providers</h2>
+          <div class="prose">
+            <p>We use third parties to deliver parts of the service: an email provider to send sign-in codes and notifications, a payment provider to process donations, and hosting infrastructure to run the site. They receive only what they need to perform their function and are not permitted to use it for anything else.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="safe">
+          <h2><span class="lc-n">05</span> Keeping it safe</h2>
+          <div class="prose">
+            <p>Passwords are stored hashed, never in plain text. Sign-in verification codes are stored as hashes too, expire after ten minutes, and can only be used once. Access to administrative tools requires a second factor in addition to a password.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="choices">
+          <h2><span class="lc-n">06</span> Your choices</h2>
+          <div class="prose">
+            <p>You can view and change your details at any time from your profile, and turn notification emails off there. You can ask us for a copy of the personal information we hold about you, ask us to correct it, or ask us to delete your account. Some records — donation receipts in particular — may need to be retained where the law requires it.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="cookies">
+          <h2><span class="lc-n">07</span> Cookies</h2>
+          <div class="prose">
+            <p>We use cookies to keep you signed in and to remember which organisation you are currently viewing. Where analytics are enabled we use them to understand which pages are used, never to identify individuals.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="contact">
+          <h2><span class="lc-n">08</span> Contact us</h2>
+          <div class="prose">
+            <p>If you have a question about this policy, or want to make a privacy request, email us at <a href="mailto:hello@goodtip.com.au">hello@goodtip.com.au</a> and we will respond.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="changes">
+          <h2><span class="lc-n">09</span> Changes to this policy</h2>
+          <div class="prose">
+            <p>We may update this policy as the service changes. The date at the top shows when it was last revised, and material changes will be notified in the app.</p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-pro">
+  <div class="wrap reveal zoom">
+    <h2>Still got a question?</h2>
+    <p>Ask us directly. A person reads every one of these.</p>
+    <div class="hero-ctas">
+      <a href="/#start" class="btn-dark">Get in touch &rarr;</a>
+      <a href="/about/" class="btn-ghost">About GoodTip</a>
+    </div>
+  </div>
+</section>
+
+<script>
+/* The contents rail's active state.
+ *
+ * An observer rather than a scroll handler: the question is "which clause is
+ * on screen", which is exactly what IntersectionObserver answers, and a
+ * scroll listener would have to re-measure nine cards on every frame to reach
+ * the same answer.
+ *
+ * The root margin pins the decision line a third of the way down the viewport.
+ * Without it the last clause can never win — it is short, it sits at the
+ * bottom of the document, and it never reaches the middle of the screen — so
+ * the rail would freeze on clause 08 for the whole tail of the page.
+ */
+(function () {
+  var scope = document.querySelector('[data-legal]');
+  if (!scope || !('IntersectionObserver' in window)) return;
+  var links = scope.querySelectorAll('.legal-toc a');
+  var byId = {};
+  var cards = [];
+  links.forEach(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var card = document.getElementById(id);
+    if (!card) return;
+    byId[id] = a;
+    cards.push(card);
+  });
+  if (!cards.length) return;
+
+  var seen = new Set();
+  function paint() {
+    /* The topmost clause still intersecting wins, so scrolling back up hands
+       the highlight back rather than leaving it on whatever left last. */
+    var winner = null;
+    for (var i = 0; i < cards.length; i++) {
+      if (seen.has(cards[i].id)) { winner = cards[i].id; break; }
+    }
+    links.forEach(function (a) { a.classList.remove('on'); });
+    if (winner && byId[winner]) byId[winner].classList.add('on');
+  }
+
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) seen.add(e.target.id); else seen.delete(e.target.id);
+    });
+    paint();
+  }, { rootMargin: '-33% 0px -55% 0px' });
+
+  cards.forEach(function (c) { io.observe(c); });
+})();
+</script>
 
 {% endblock %}

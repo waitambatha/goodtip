@@ -98,6 +98,18 @@ def user_orgs(request):
                 status=MessageThread.STATUS_OPEN,
             ).count()
 
+    # The member's own count, which is a different question from the admin's
+    # above. That one asks "how many members are waiting on me"; this asks "how
+    # many conversations have something in them I haven't read" — and it is
+    # what the Messages item in the member nav wears. Without it the member
+    # side was the only place on the site where a reply arrived and nothing
+    # anywhere said so, which is exactly what the client hit.
+    unread_message_count = 0
+    if request.user.is_authenticated:
+        from .services import unread_message_count as _member_unread
+
+        unread_message_count = _member_unread(request.user)
+
     # Where the user actually is, rather than whichever membership the query
     # happened to return first. `primary_org` is kept as the name the nav
     # templates already use; it now means "current" instead of "arbitrary".
@@ -148,6 +160,7 @@ def user_orgs(request):
         "unread_notification_count": unread,
         "pending_approval_count": pending_approval_count,
         "unread_thread_count": unread_thread_count,
+        "unread_message_count": unread_message_count,
         "ticker_notifications": ticker,
         # Watermark for the live poll: the page only toasts things that
         # arrive after it was rendered.

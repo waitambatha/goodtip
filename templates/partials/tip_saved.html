@@ -1,1 +1,11 @@
+{% comment %}
+The tick beside a fixture on the round page. Two states, because the same
+endpoint now does two things: saving a pick, and taking one back. A press
+that undid a tip and answered "Saved" would be telling the member the
+opposite of what just happened.
+{% endcomment %}
+{% if undone %}
+<div class="saved-tick undo show" id="s{{ match.id }}"><svg><use href="#ic-cross"/></svg> No tip</div>
+{% else %}
 <div class="saved-tick show" id="s{{ match.id }}"><svg><use href="#ic-check"/></svg> Saved</div>
+{% endif %}

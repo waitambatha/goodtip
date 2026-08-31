@@ -4,8 +4,8 @@
 
    Loaded AFTER goodtip.css, and deliberately dependent on it: every page in
    these areas is built from goodtip.css components (.card, .fld, .btn,
-   .gt-rows), and rewriting all of them to a second component set to change a
-   layout would have been the expensive way to move a menu.
+   .gt-panel), and rewriting all of them to a second component set to change
+   a layout would have been the expensive way to move a menu.
 
    So this file changes only the shell — the frame around the content — and
    leaves the content's own styles alone:
@@ -188,7 +188,11 @@ body.gt-shell .pad-lg { padding: 24px; }
   background: var(--gts-surface); border: 1px dashed var(--gts-line-2);
   border-radius: 14px; padding: 40px 28px; text-align: center;
 }
-.gts-empty h2 { font-family: var(--display); font-size: 20px; color: var(--deep); margin: 0 0 8px; }
+/* Was `color: var(--deep)`, which is the deep forest — on the dark palette
+   that put a near-black heading on a near-black card. The empty state is the
+   one component on these screens that is nothing BUT a heading and a
+   sentence, so losing the heading loses the whole thing. */
+.gts-empty h2 { font-family: var(--display); font-size: 20px; color: var(--gts-fg); margin: 0 0 8px; }
 .gts-empty p { color: var(--gts-quiet); margin: 0 auto 18px; max-width: 52ch; }
 
 @media (max-width: 900px) {
@@ -211,6 +215,17 @@ body.gt-shell .pad-lg { padding: 24px; }
 }
 .gts-tab:hover { background: var(--gts-surface-3); color: var(--deep); text-decoration: none; }
 .gts-tab.on { background: var(--deep); border-color: var(--deep); color: #fff; }
+/* A near-black pill on a near-black card is not a selected tab, it is a hole.
+   On dark the accent takes over the job, the same swap the theme block makes
+   for buttons. */
+html[data-theme="dark"] .gts-tab.on { background: var(--lime); border-color: var(--lime); color: var(--deep); }
+html[data-theme="dark"] .gts-tab { border-color: var(--gts-line-2); color: var(--gts-quiet); }
+html[data-theme="dark"] .gts-tab:hover { background: var(--gts-surface-3); color: var(--gts-fg); }
+@media (prefers-color-scheme: dark) {
+  html[data-theme="auto"] .gts-tab.on, html:not([data-theme]) .gts-tab.on {
+    background: var(--lime); border-color: var(--lime); color: var(--deep);
+  }
+}
 
 .gts-status {
   display: inline-block; padding: 3px 10px; border-radius: 999px;
@@ -220,25 +235,12 @@ body.gt-shell .pad-lg { padding: 24px; }
 .gts-status.ok { background: rgba(45,122,58,.14); color: #226B45; }
 .gts-status.warn { background: rgba(199,124,30,.16); color: #A9660F; }
 
-body.gt-shell .gt-rows { display: grid; gap: 10px; }
-body.gt-shell .gt-row {
-  display: flex; align-items: center; gap: 16px;
-  background: var(--gts-surface);
-  border: 1px solid var(--gts-line);
-  border-radius: 12px;
-  padding: 16px 20px;
-  text-decoration: none; color: inherit;
-  transition: border-color .14s, box-shadow .14s;
-}
-body.gt-shell .gt-row:hover {
-  border-color: var(--gts-line-2);
-  box-shadow: 0 2px 10px -4px rgba(15,46,34,.18);
-  text-decoration: none;
-}
-body.gt-shell .gt-row .gr-body { flex: 1 1 auto; min-width: 0; }
-body.gt-shell .gt-row .gr-body b { display: block; font-size: 15px; color: var(--deep); }
-body.gt-shell .gt-row .gr-body small { display: block; margin-top: 3px; font-size: 12.5px; color: var(--gts-quiet); }
-body.gt-shell .gt-row .gr-go { flex: none; font-size: 13px; font-weight: 600; color: var(--forest); }
+/* `.gt-row` used to be defined here, scoped to body.gt-shell — and the only
+   page that ever used it was /manage/messages/, which is NOT a gt-shell
+   page. So the organisation admin's message list rendered as bare anchors
+   with no card, no spacing and no colour on the secondary line. It is now
+   `.msg-item` in goodtip.css, shared with the member's inbox, and the dead
+   rules are gone rather than left to be found and reused. */
 
 /* ==========================================================================
    THE HQ THEME
@@ -284,6 +286,17 @@ html[data-theme="light"] {
   --ad-ic-fg:       #2D7A3A;
   --ad-ic-bg-gold:  rgba(212,160,23,.16);
   --ad-ic-fg-gold:  #8A6508;
+
+  /* THE THREE SEMANTIC PAIRS the HQ components were spelling as literals.
+     A status chip, an empty state and a destructive button each named a
+     colour picked to read on cream — #1c5e30, #EDEBE1, #9a2b2b — and a
+     literal cannot follow a palette. They are tokens now, and every one of
+     those rules asks for the token with its old value as the fallback, so
+     the member app and the public site (neither of which loads this file)
+     keep exactly the colour they had. */
+  --ad-ok-fg:       #1C5E30;
+  --ad-quiet-bg:    rgba(15,46,34,.06);
+  --ad-empty-bg:    #EDEBE1;
 }
 
 html[data-theme="dark"] {
@@ -325,6 +338,10 @@ html[data-theme="dark"] {
   --ad-ic-bg-gold:  rgba(244,196,48,.15);
   --ad-ic-fg-gold:  #F0CB63;
 
+  --ad-ok-fg:       #A7DE7E;
+  --ad-quiet-bg:    rgba(232,228,213,.08);
+  --ad-empty-bg:    #0E2519;
+
   /* The two brand greens have to move on a dark ground: forest at #2D7A3A on
      near-black is a 2.3:1 button, which is a button nobody can read. Lime is
      the accent that survives the swap, so on dark it takes over the jobs
@@ -336,6 +353,20 @@ html[data-theme="dark"] {
   --gt-sheet:       #0B1F16;
   --gt-hair:        rgba(232,228,213,.11);
   --app-line:       rgba(232,228,213,.16);
+
+  /* THE THREE THAT WERE MISSING, and the bug they caused.
+     --ink above goes near-white on dark, but --app-card was left at the cream
+     #FCFBF5 it is on light. Every .card, .stat-card, .atable cell and
+     .match-row in /manage/ therefore painted near-white text onto a cream
+     surface: not a subtle contrast problem, an invisible one. Anything that
+     names --ink has to be able to assume the surface under it moved too. */
+  --danger:         #FF8B7E;
+  --app-card:       #102A1D;
+  --app-card-2:     #14321F;
+  --app-bg:         #0B1F16;
+  --app-line-2:     rgba(232,228,213,.09);
+  --line:           rgba(232,228,213,.14);
+  --card-1:         #17351F;
 }
 
 /* Follow the device when nothing has been chosen. Same attribute contract as
@@ -357,9 +388,16 @@ html[data-theme="dark"] {
     --ad-gold-fg: #F0CB63;
     --ad-ic-bg: rgba(200,241,53,.14); --ad-ic-fg: #C8F135;
     --ad-ic-bg-gold: rgba(244,196,48,.15); --ad-ic-fg-gold: #F0CB63;
+    --ad-ok-fg: #A7DE7E; --ad-quiet-bg: rgba(232,228,213,.08);
+    --ad-empty-bg: #0E2519;
     --forest: #7DC24A; --ink: #E9F0EA; --muted: #9BAE9F;
     --gt-card: #102A1D; --gt-sheet: #0B1F16;
     --gt-hair: rgba(232,228,213,.11); --app-line: rgba(232,228,213,.16);
+    /* Same three as the explicit block above — see the note there. */
+    --danger: #FF8B7E;
+    --app-card: #102A1D; --app-card-2: #14321F; --app-bg: #0B1F16;
+    --app-line-2: rgba(232,228,213,.09); --line: rgba(232,228,213,.14);
+    --card-1: #17351F;
   }
 }
 
@@ -421,6 +459,119 @@ html[data-theme="dark"] .gts-theme button.on { background: var(--lime); }
 /* Below the fold of a laptop bar the labels go and the icons carry it. */
 @media (max-width: 1120px) { .gts-theme button span { display: none; } .gts-theme button { padding: 6px 8px; } }
 @media (max-width: 620px) { .gts-theme { display: none; } }
+
+/* ==========================================================================
+   THE .gt-v2 SHADOW, AND WHY THESE THREE HAVE TO BE RESTATED
+   ==========================================================================
+   goodtip.css declares `.gt-v2 { --gt-card: #FFFFFF; --gt-sheet: #F4F2EA;
+   --gt-hair: rgba(15,46,34,.10) }`, and `.gt-v2` is on the <body> of every
+   admin page. The dark block above sets the same three on <html>.
+
+   Specificity is not what decides this — inheritance is. A custom property set
+   on <body> replaces the one inherited from <html> for the whole subtree,
+   however weak the selector that set it. So under the dark palette these
+   three stayed at their light values for every descendant, and anything
+   painting from them stayed white: a `.gt-pill`, the striped ground on a draft
+   news row, any panel reaching for --gt-card.
+
+   Restating them on the body itself is the fix. `body.gt-shell` and
+   `body.manage-app` out-specify the bare `.gt-v2` on the same element, which
+   is what it takes when the two rules are competing for one element rather
+   than one inheriting from the other.
+
+   Only the surfaces move. --gt-deep and its two shades are brand darks that
+   are already dark in both themes, and a dark panel is still a dark panel. */
+html[data-theme="dark"] body.gt-shell,
+html[data-theme="dark"] body.manage-app {
+  --gt-card:  #102A1D;
+  --gt-sheet: #0B1F16;
+  --gt-hair:  rgba(232,228,213,.11);
+  --app-line: rgba(232,228,213,.16);
+}
+@media (prefers-color-scheme: dark) {
+  html[data-theme="auto"] body.gt-shell,
+  html:not([data-theme]) body.gt-shell {
+    --gt-card:  #102A1D;
+    --gt-sheet: #0B1F16;
+    --gt-hair:  rgba(232,228,213,.11);
+    --app-line: rgba(232,228,213,.16);
+  }
+}
+
+/* ==========================================================================
+   /manage/ ON THE DARK PALETTE
+   ==========================================================================
+   The organisation-admin area is not a gt-shell page — it kept the stadium
+   backdrop and the cream sheet — but it DOES load this file for the handful
+   of components it shares with HQ, and the theme is stored under one key for
+   the whole product. So the moment somebody chose Dark in /admin/, /manage/
+   inherited the dark token block and nothing else: --ink went near-white
+   while every surface under it stayed cream.
+
+   The block above now moves --app-card with --ink, which fixes the cards. The
+   rules here cover the rest — the components that named a literal white
+   instead of a token, which no palette swap can reach. They are restated
+   rather than edited in place because the same components are used on the
+   public site, which is light-only and must not move.
+   ========================================================================== */
+html[data-theme="dark"] body.manage-app { background: #071710; }
+html[data-theme="dark"] body.manage-app .gt-sheet .app-main,
+html[data-theme="dark"] body.manage-app.gt-sheet .app-main { background: var(--gts-shell); }
+
+html[data-theme="dark"] body.manage-app .fld input,
+html[data-theme="dark"] body.manage-app .fld select,
+html[data-theme="dark"] body.manage-app .fld textarea,
+html[data-theme="dark"] body.manage-app .gt-select,
+html[data-theme="dark"] body.manage-app .gt-search input,
+html[data-theme="dark"] body.manage-app .dd-btn,
+html[data-theme="dark"] body.manage-app .dd-menu,
+html[data-theme="dark"] body.manage-app .inline-select select,
+html[data-theme="dark"] body.manage-app .copy-field input,
+html[data-theme="dark"] body.manage-app .ned-editor,
+html[data-theme="dark"] body.manage-app .ned-surface {
+  background: var(--ad-field); color: var(--ad-ink); border-color: var(--ad-line-2);
+}
+html[data-theme="dark"] body.manage-app .gt-panel,
+html[data-theme="dark"] body.manage-app .gt-note,
+html[data-theme="dark"] body.manage-app .gt-pill,
+html[data-theme="dark"] body.manage-app .gt-stat,
+html[data-theme="dark"] body.manage-app .gt-step,
+html[data-theme="dark"] body.manage-app .msg-item {
+  background: var(--ad-card); color: var(--ad-ink); border-color: var(--ad-line);
+}
+html[data-theme="dark"] body.manage-app .gt-table thead th { background: var(--ad-head); color: var(--ad-quiet); }
+html[data-theme="dark"] body.manage-app .gt-table tbody td { border-bottom-color: var(--ad-line); }
+html[data-theme="dark"] body.manage-app .gt-table tbody tr:hover { background: var(--ad-row-h); }
+html[data-theme="dark"] body.manage-app .gt-muted,
+html[data-theme="dark"] body.manage-app .app-sub { color: var(--ad-quiet); }
+html[data-theme="dark"] body.manage-app .msg-item .mi-org { background: rgba(232,228,213,.09); color: var(--ad-quiet); }
+html[data-theme="dark"] body.manage-app .msg-item .mi-top b { color: var(--ad-ink); }
+
+/* The last few literals in the manage area's shared components. Each names a
+   colour tuned for cream and has no token to follow, so a dark ground turns
+   it into low-contrast text rather than into a different shade of the same
+   idea. */
+html[data-theme="dark"] body.manage-app .flash.success { background: rgba(125,194,74,.14); border-color: rgba(125,194,74,.45); color: #A7DE7E; }
+html[data-theme="dark"] body.manage-app .flash.error { background: rgba(255,139,126,.12); border-color: rgba(255,139,126,.45); color: #FF8B7E; }
+html[data-theme="dark"] body.manage-app .flash.info { background: rgba(111,210,232,.12); border-color: rgba(111,210,232,.42); color: #8FD9EA; }
+/* .btn-ghost is cream-on-transparent, which is right on the deep-green public
+   sections it was written for and invisible on the cream sheet these pages
+   used to be. Now that the sheet can also be dark, it needs saying in both. */
+html[data-theme="dark"] body.manage-app .btn-ghost { color: var(--ad-ink); border-color: var(--ad-line-3); }
+html[data-theme="dark"] body.manage-app .btn-ghost:hover { border-color: var(--forest); color: var(--forest); }
+html[data-theme="dark"] body.manage-app .card-h,
+html[data-theme="dark"] body.manage-app .gt-panel-head h2,
+html[data-theme="dark"] body.manage-app .admin-h1 { color: var(--ad-ink); }
+html[data-theme="dark"] body.manage-app .card-lead,
+html[data-theme="dark"] body.manage-app .hint,
+html[data-theme="dark"] body.manage-app .gt-panel-head .gp-sub { color: var(--ad-quiet); }
+
+/* Status chips carry meaning by colour, so on a dark ground they need their
+   own pair rather than a tint of a light one — a 14%-alpha green on cream is
+   a soft badge, and the same value on near-black is invisible. */
+html[data-theme="dark"] .gts-status { background: rgba(232,228,213,.09); color: var(--gts-quiet); }
+html[data-theme="dark"] .gts-status.ok { background: rgba(125,194,74,.18); color: #A7DE7E; }
+html[data-theme="dark"] .gts-status.warn { background: rgba(240,203,99,.18); color: #F0CB63; }
 
 /* The news editor's toolbar names #fff for its hover, which is a white flash
    on a dark toolbar. Scoped to the shell so the public site's editor, which

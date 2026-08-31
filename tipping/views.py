@@ -11,10 +11,17 @@ from billing.donations import donation_summary
 from orgs.models import Group, OrgMember, Organisation
 from .models import LadderEntry, Match, Round, Tip
 from .services import (
-    annotate_play_state, competition_filter, current_round,
+    annotate_play_state, clear_tip, competition_filter, current_round,
     leaderboard_for_family, leaderboard_for_org, submit_tip, tip_window,
     user_org_stats, user_rank_in_org,
 )
+
+# What a control posts to mean "I have changed my mind about tipping this one
+# at all", as opposed to "home" or "away". Named rather than spelled inline in
+# four places: the value travels from a hidden radio on the dashboard, from an
+# hx-vals on My Tips and from the round page's own fetch, and all three have to
+# agree with what the views below test for.
+NO_TIP = "none"
 
 
 def _require_member(user, org):
@@ -91,9 +98,18 @@ def tip_save_partial(request, org_id: int, round_id: int, match_id: int):
         return HttpResponseForbidden()
     match = get_object_or_404(Match, pk=match_id, round_id=round_id, round__org=org)
     selection = request.POST.get("selection")
+    # Pressing the team you already picked takes the tip back rather than
+    # re-saving it. A radio cannot return to "none" on its own, so without this
+    # the only way out of a pick was to pick the other side — see clear_tip.
+    undo = selection in (NO_TIP, "", None)
     try:
-        submit_tip(user=request.user, match=match, org=org, selection=selection,
-                       group=_group(request, org))
+        if undo:
+            clear_tip(user=request.user, match=match, org=org,
+                      group=_group(request, org))
+            selection = ""
+        else:
+            submit_tip(user=request.user, match=match, org=org,
+                       selection=selection, group=_group(request, org))
     except ValueError as e:
         return HttpResponse(f"<span class='text-red-400 text-xs'>{e}</span>", status=400)
     if request.POST.get("view") == "mytips":
@@ -107,7 +123,9 @@ def tip_save_partial(request, org_id: int, round_id: int, match_id: int):
             "editable": True, "saved": True, "mode": "htmx",
             "reader": read_match_verbose(match),
         })
-    return render(request, "partials/tip_saved.html", {"match": match, "selection": selection})
+    return render(request, "partials/tip_saved.html", {
+        "match": match, "selection": selection, "undone": undo,
+    })
 
 
 @login_required
@@ -129,10 +147,21 @@ def tip_round_confirm(request, org_id: int, round_id: int):
     # that had not started — someone who missed Thursday night lost Saturday
     # too. Locking is a property of a match, and submit_tip already enforces it
     # per match, so a late tipper keeps every game that has not begun.
-    saved, skipped = 0, 0
+    saved, skipped, cleared = 0, 0, 0
     picks = {}
     for match in round_obj.matches.all():
         selection = request.POST.get(f"match_{match.id}")
+        # An explicit "no tip" is a decision, not an absence. A fixture the
+        # member never touched simply isn't in the POST and is left alone; one
+        # they un-picked posts NO_TIP, and any tip already saved for it goes.
+        if selection == NO_TIP:
+            try:
+                if clear_tip(user=request.user, match=match, org=org,
+                             group=_group(request, org)):
+                    cleared += 1
+            except ValueError:
+                skipped += 1
+            continue
         if selection not in ("home", "away"):
             continue
         try:
@@ -144,9 +173,17 @@ def tip_round_confirm(request, org_id: int, round_id: int):
             skipped += 1
     if saved:
         note = f"{saved} tip{'s' if saved != 1 else ''} confirmed — find them under My Tips. You can change any pick until the round locks."
+        if cleared:
+            note += f" {cleared} taken back."
         if skipped:
             note += f" ({skipped} match{'es' if skipped != 1 else ''} had already kicked off and couldn't be changed.)"
         messages.success(request, note)
+    elif cleared:
+        messages.success(
+            request,
+            f"{cleared} tip{'s' if cleared != 1 else ''} taken back. "
+            "You can pick again any time before the round locks.",
+        )
     elif skipped:
         messages.error(request, "Those matches have already kicked off — tips there are final.")
     else:
@@ -197,13 +234,31 @@ def tip_confirm_upcoming(request, org_id: int):
         except ValueError:
             skipped += 1
 
+    # Fixtures the member took a tip back on. Same slate, same submit.
+    cleared = 0
+    for match in _posted_clears(request, org):
+        try:
+            if clear_tip(user=request.user, match=match, org=org,
+                         group=_group(request, org)):
+                cleared += 1
+        except ValueError:
+            skipped += 1
+
     if saved:
         note = (f"{saved} tip{'s' if saved != 1 else ''} confirmed — find them under "
                 "My Tips. You can change any pick until that game kicks off.")
+        if cleared:
+            note += f" {cleared} taken back."
         if skipped:
             note += (f" ({skipped} match{'es' if skipped != 1 else ''} had already "
                      "started and couldn't be changed.)")
         messages.success(request, note)
+    elif cleared:
+        messages.success(
+            request,
+            f"{cleared} tip{'s' if cleared != 1 else ''} taken back. "
+            "You can pick again any time before the game starts.",
+        )
     elif skipped:
         messages.error(request, "Those matches have already kicked off — tips there are final.")
     else:
@@ -392,6 +447,29 @@ def _posted_picks(request, org) -> dict:
         Match.objects.filter(pk__in=ids, round__org=org).values_list("id", flat=True)
     )
     return {i: request.POST[f"match_{i}"] for i in ids if i in valid}
+
+
+def _posted_clears(request, org) -> list:
+    """Match ids the slate explicitly un-picked, scoped to this org.
+
+    Kept apart from _posted_picks rather than folded into it as a third
+    selection value, because that dict feeds the carry planner — and a
+    "carry no tip into your other groups" plan is not a thing. What the
+    planner wants is the picks; what the confirm additionally has to act on
+    is the take-backs, and they are different questions.
+    """
+    ids = []
+    for key, value in request.POST.items():
+        if not key.startswith("match_") or value != NO_TIP:
+            continue
+        raw = key[len("match_"):]
+        if raw.isdigit():
+            ids.append(int(raw))
+    if not ids:
+        return []
+    return list(
+        Match.objects.filter(pk__in=ids, round__org=org).select_related("round")
+    )
 
 
 @login_required

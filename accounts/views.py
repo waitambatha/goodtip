@@ -1,5 +1,6 @@
 import logging
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import (
     authenticate, get_user_model, login, logout, update_session_auth_hash,
@@ -903,14 +904,6 @@ def dashboard_view(request):
                 .order_by("kickoff_at", "id")
             )
 
-    locking_soon = sorted(
-        (
-            c for c in cards
-            if c is not selected and c["round"] and c["round"].lockout_at >= now
-        ),
-        key=lambda c: c["round"].lockout_at,
-    )
-
     # News & blog — posted by the super admin from /manage/news/.
     from admin_panel.models import NewsPost
 
@@ -941,7 +934,6 @@ def dashboard_view(request):
         # how the member went.
         "round_nav": round_nav,
         "preview_round": preview_round,
-        "locking_soon": locking_soon,
         "create_url": reverse("orgs:create"),
         "news_leads": news_posts[:3],
         "news_more": news_posts[3:],
@@ -1248,6 +1240,15 @@ def boss_progress_view(request):
 ENQUIRY_LIMIT = 4            # per session…
 ENQUIRY_WINDOW = 3600        # …per hour
 
+# Where a reply to the acknowledgement email lands.
+#
+# NOT the DEFAULT_FROM_EMAIL, which is no-reply@ — an acknowledgement that
+# says "just reply to this" and then bounces is worse than no acknowledgement
+# at all. This is the address the public site already publishes in its footer,
+# so it is one a person actually reads. Overridable, because the address on
+# the footer is the client's to change.
+CONTACT_REPLY_TO = getattr(settings, "CONTACT_REPLY_TO", "hello@goodtip.com.au")
+
 
 def contact_submit_view(request):
     """Take a message from the public contact form.
@@ -1324,31 +1325,61 @@ def contact_submit_view(request):
     request.session.pop("enquiry_error", None)
     request.session.pop("enquiry_draft", None)
 
-    # Everyone who can act on it. Staff rather than superusers only: the point
-    # is that somebody answers, and narrowing it to one account means one
-    # person's holiday is an unanswered enquiry.
-    staff_emails = list(
-        User.objects.filter(is_staff=True, is_active=True)
-        .exclude(email="")
-        .values_list("email", flat=True)
-    )
-    if staff_emails:
-        send_template(
-            "enquiry_admin",
-            subject=f"New enquiry — {name}" + (f" ({organisation})" if organisation else ""),
-            to=staff_emails,
-            context={
-                "enquiry": enquiry,
-                # Straight to the one enquiry. Not logged in? staff_member_required
-                # sends them to the login page carrying this as ?next=, so they
-                # land here the moment they are through it.
-                "enquiry_url": site_url(
-                    reverse("admin:hq_enquiry_detail", args=[enquiry.pk])
-                ),
-            },
-            # Reply-to the enquirer, so hitting reply in a mail client works
-            # even when nobody feels like opening the admin.
-            reply_to=[email],
+    # THE ENQUIRY IS SAVED. NOTHING BELOW MAY UNDO THAT.
+    #
+    # Both sends sit inside one try. send_template already swallows and logs a
+    # failed *send*, but that is not the whole surface: rendering a template,
+    # resolving a URL and opening a connection all happen before it gets that
+    # far, and any of them raising would 500 a request whose Enquiry row is
+    # already written — telling somebody their message did not send while it
+    # sits in the inbox, and costing the lead this path exists to protect.
+    #
+    # Broad except on purpose. There is no failure here worth showing a
+    # visitor, because there is nothing they could do about it and nothing has
+    # actually been lost.
+    try:
+        # Everyone who can act on it. Staff rather than superusers only: the
+        # point is that somebody answers, and narrowing it to one account
+        # means one person's holiday is an unanswered enquiry.
+        staff_emails = list(
+            User.objects.filter(is_staff=True, is_active=True)
+            .exclude(email="")
+            .values_list("email", flat=True)
         )
+        if staff_emails:
+            send_template(
+                "enquiry_admin",
+                subject=f"New enquiry — {name}" + (f" ({organisation})" if organisation else ""),
+                to=staff_emails,
+                context={
+                    "enquiry": enquiry,
+                    # Straight to the one enquiry. Not logged in?
+                    # staff_member_required sends them to the login page
+                    # carrying this as ?next=, so they land here the moment
+                    # they are through it.
+                    "enquiry_url": site_url(
+                        reverse("admin:hq_enquiry_detail", args=[enquiry.pk])
+                    ),
+                },
+                # Reply-to the enquirer, so hitting reply in a mail client
+                # works even when nobody feels like opening the admin.
+                reply_to=[email],
+            )
+
+        # And an acknowledgement to the person who wrote it. Before this, an
+        # enquiry produced a "sent" flag on the page and then silence until a
+        # human got round to it — days, on a slow week.
+        send_template(
+            "enquiry_received",
+            subject="We've got your message — GoodTip",
+            to=[email],
+            context={"enquiry": enquiry, "site_link": site_url("/")},
+            # Replying to the acknowledgement reaches a person rather than a
+            # no-reply address, which is the difference between an
+            # acknowledgement and an autoresponder.
+            reply_to=[CONTACT_REPLY_TO],
+        )
+    except Exception:  # noqa: BLE001 — see the note above
+        logger.exception("Enquiry %s saved, but its email(s) failed", enquiry.pk)
 
     return redirect(f"{back}?sent=1#contact-form")

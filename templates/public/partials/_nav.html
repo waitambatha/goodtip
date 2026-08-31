@@ -6,7 +6,7 @@ actually useful.
 
 The two auth actions sit in their own group with a divider. They are the only
 items that change your state rather than move you around, so grouping them by
-what they DO is more honest than leaving them as the last two of nine links.
+what they DO is more honest than leaving them as the last two of ten links.
 
 Each item carries a glyph. Four of these labels are near-neighbours at a
 glance — News, The Wall, The Good List, Charities are all "somewhere with a
@@ -33,6 +33,7 @@ narrow layouts are unchanged.
       <li><a href="/#charities" {% if active == 'charities' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-heart"/></svg><span>Charities</span></a></li>
       <li><a href="/pricing/" {% if active == 'pricing' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-coins"/></svg><span>Pricing</span></a></li>
       <li><a href="/about/" {% if active == 'about' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-spark"/></svg><span>About Us</span></a></li>
+      <li><a href="/privacy/" {% if active == 'privacy' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Privacy</span></a></li>
 
       <li class="nav-sep" aria-hidden="true"></li>
       <li class="nav-auth"><a href="/login/" class="nav-login"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-login"/></svg><span>Log in</span></a></li>

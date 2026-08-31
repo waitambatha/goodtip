@@ -15,27 +15,84 @@
 </p>
 
 {# ---- headline numbers ---- #}
+{% comment %}
+EIGHT TILES, IN TWO READINGS.
+
+The first four are the platform: people, organisations, memberships, tips.
+The second four are the things an admin actually opens during a week — news,
+pages, enquiries, the team — and none of them had a number anywhere, so
+"is there anything in News?" or "how many people can get into HQ?" meant
+opening the page to find out.
+
+Tips became a link — it was a plain div on a screen whose whole job is to be
+the way in. Memberships stays a tile because OrgMember is not registered in
+the admin, so there is no list to send anybody to.
+
+The glyphs are chosen to be told apart at a glance rather than to be literal:
+Members and Memberships are the same noun twice, so one is a person and the
+other is a crowd; News is a single document and Pages is a stack of
+them, because the difference between them is that one is a story and the
+other is the whole site.
+{% endcomment %}
 <div class="gta-kpis">
   <a href="{% url 'admin:accounts_user_changelist' %}" class="gta-kpi" style="--tile-accent:var(--gt-c1)">
-    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-users"/></svg></span><span class="gta-kpi-label">Members</span></div>
+    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-f-users"/></svg></span><span class="gta-kpi-label">Members</span></div>
     <div class="gta-kpi-num">{{ counts.users|intcomma }}</div>
     <div class="gta-kpi-sub">+{{ counts.users_last_7d }} in the last 7 days</div>
   </a>
   <a href="{% url 'admin:orgs_organisation_changelist' %}" class="gta-kpi" style="--tile-accent:var(--gt-c2)">
-    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-org"/></svg></span><span class="gta-kpi-label">Organisations</span></div>
+    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-f-org"/></svg></span><span class="gta-kpi-label">Organisations</span></div>
     <div class="gta-kpi-num">{{ counts.orgs|intcomma }}</div>
     <div class="gta-kpi-sub">{{ counts.orgs_last_7d }} this week &middot; {{ counts.orgs_last_30d }} this month</div>
   </a>
+  {% comment %}
+  OrgMember is not registered in the admin, so this one has nowhere to go and
+  stays a tile rather than pretending to be a link.
+  {% endcomment %}
   <div class="gta-kpi" style="--tile-accent:var(--gt-c4)">
-    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-people"/></svg></span><span class="gta-kpi-label">Memberships</span></div>
+    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-f-people"/></svg></span><span class="gta-kpi-label">Memberships</span></div>
     <div class="gta-kpi-num">{{ counts.memberships|intcomma }}</div>
     <div class="gta-kpi-sub">across {{ counts.groups|intcomma }} group{{ counts.groups|pluralize }}</div>
   </div>
-  <div class="gta-kpi" style="--tile-accent:var(--gt-c3)">
-    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-target"/></svg></span><span class="gta-kpi-label">Tips</span></div>
+  <a href="{% url 'admin:tipping_tip_changelist' %}" class="gta-kpi" style="--tile-accent:var(--gt-c3)">
+    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-f-vote"/></svg></span><span class="gta-kpi-label">Tips</span></div>
     <div class="gta-kpi-num">{{ counts.tips|intcomma }}</div>
     <div class="gta-kpi-sub">{{ counts.tips_last_7d|intcomma }} in the last 7 days</div>
-  </div>
+  </a>
+
+  <a href="{% url 'admin:hq_news' %}" class="gta-kpi" style="--tile-accent:var(--gt-c2)">
+    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-f-doc"/></svg></span><span class="gta-kpi-label">News &amp; blog</span></div>
+    <div class="gta-kpi-num">{{ counts.news|default:0|intcomma }}</div>
+    <div class="gta-kpi-sub">
+      {{ counts.news_published|default:0 }} published
+      {% if counts.news_last_30d %}&middot; {{ counts.news_last_30d }} this month{% endif %}
+    </div>
+  </a>
+  <a href="{% url 'admin:hq_pages' %}" class="gta-kpi" style="--tile-accent:var(--gt-c1)">
+    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-f-pages"/></svg></span><span class="gta-kpi-label">Pages</span></div>
+    <div class="gta-kpi-num">{{ counts.pages|default:0|intcomma }}</div>
+    <div class="gta-kpi-sub">
+      {{ counts.pages_public|default:0 }} public &middot;
+      {{ counts.page_edits|default:0 }} edit{{ counts.page_edits|default:0|pluralize }} saved
+    </div>
+  </a>
+  <a href="{% url 'admin:hq_enquiries' %}" class="gta-kpi" style="--tile-accent:var(--gt-c3)">
+    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-f-mail"/></svg></span><span class="gta-kpi-label">Enquiries</span></div>
+    <div class="gta-kpi-num">{{ counts.enquiries|default:0|intcomma }}</div>
+    <div class="gta-kpi-sub">
+      {% if counts.open_enquiries %}<b class="gta-kpi-hot">{{ counts.open_enquiries }} waiting</b>
+      {% else %}all answered{% endif %}
+      {% if counts.enquiries_last_7d %}&middot; {{ counts.enquiries_last_7d }} this week{% endif %}
+    </div>
+  </a>
+  <a href="{% url 'admin:hq_team' %}" class="gta-kpi" style="--tile-accent:var(--gt-c4)">
+    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-f-shield-star"/></svg></span><span class="gta-kpi-label">Your team</span></div>
+    <div class="gta-kpi-num">{{ counts.team|default:0|intcomma }}</div>
+    <div class="gta-kpi-sub">
+      {{ counts.team_active|default:0 }} active
+      {% if counts.team and counts.team_active < counts.team %}&middot; {{ counts.team|add:"-"|add:counts.team_active }} switched off{% endif %}
+    </div>
+  </a>
 </div>
 
 {# ---- trend charts ---- #}

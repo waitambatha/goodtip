@@ -1,0 +1,17 @@
+Hi {{ enquiry.name }},
+
+Thanks for getting in touch. This is just to say your message has reached
+GoodTip — it's with the team now, a real person reads every one, and we'll get
+back to you as soon as we can.
+
+WHAT YOU SENT US
+{% if enquiry.interest %}About: {{ enquiry.interest }}
+{% endif %}{{ enquiry.message }}
+
+Nothing to do at your end. If you remember something you left out, just reply
+to this email — it comes straight back to us and lands with the same message.
+
+Have a look around GoodTip while you wait:
+{{ site_link }}
+
+— GoodTip

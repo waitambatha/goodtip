@@ -1,0 +1,134 @@
+{% load humanize %}
+{% comment %}
+ONE CONVERSATION, DRAWN AS A CONVERSATION.
+
+Used by both ends of a message thread — the member's (orgs/member_message_-
+thread.html) and the admin's (manage/message_thread.html) — so the two cannot
+drift into being different products. They were: one was a stack of paragraphs
+with a name above each, the other the same stack with an avatar bolted on, and
+neither told you who was speaking to whom without reading the names.
+
+WHY SIDES.
+A thread here always has exactly two parties — a member, and the people who
+run their organisation — so left and right can carry that and the reader
+stops having to check the name on every bubble. It is the arrangement every
+messaging app people already use has settled on, which matters more than
+whether it is objectively best: it is the one nobody has to learn.
+
+WHAT A BUBBLE SHOWS, AND WHAT IT DOESN'T.
+The sender's face and name appear on the FIRST bubble of a run and not on the
+rest (see _thread_entries: show_head). Four messages from the same person in
+the same minute is one turn in the conversation; stamping the name on all four
+makes it read as four separate arrivals.
+
+REPLYING TO ONE MESSAGE.
+Every bubble carries the data a reply needs — its id, its author, a one-line
+quote — so the composer can be filled in without a round trip. gt-chat.js
+binds two ways in: the small arrow, and a swipe across the bubble on touch.
+Both do the same thing, which is what makes the swipe safe to have: nobody has
+to discover it.
+
+Expects: entries (from orgs.views._thread_entries), thread.
+{% endcomment %}
+<div class="chat" data-chat>
+  <ol class="chat-list">
+    {% for e in entries %}
+    <li class="chat-row {% if e.is_mine %}mine{% else %}theirs{% endif %}{% if not e.show_head %} tail{% endif %}"
+        id="msg-{{ e.id }}" data-msg="{{ e.id }}"
+        data-author="{% if e.is_mine %}You{% else %}{{ e.author.display_name }}{% endif %}"
+        data-quote="{{ e.quote }}">
+
+      {% comment %}
+      The face sits outside the bubble on the sender's side. Rendered on every
+      row and made invisible on the tail ones rather than dropped, so the
+      bubbles in a run stay on the same left edge — remove the element and the
+      second bubble of a run slides sideways under the first.
+      {% endcomment %}
+      {% comment %}
+      Always aria-hidden: the sender's name is written out beside it in text,
+      so the face is decoration in every state. (It briefly rendered
+      `aria-hidden=""` on the first bubble of a run, which is not a value the
+      attribute has.)
+      {% endcomment %}
+      <span class="chat-av" aria-hidden="true">
+        {% if e.author.avatar %}<img src="{{ e.author.avatar.url }}" alt="">
+        {% else %}{{ e.author.display_name|slice:":1"|upper }}{% endif %}
+      </span>
+
+      <div class="chat-col">
+        {% if e.show_head %}
+        <div class="chat-head">
+          {% comment %}
+          The name is a button because pressing it does something: it opens
+          the card below it. "See his profile through that" — and there is no
+          member-profile page to send anyone to, so the card carries what this
+          thread actually knows about them.
+          {% endcomment %}
+          <button type="button" class="chat-who" data-peek aria-expanded="false">
+            {% if e.is_mine %}You{% else %}{{ e.author.display_name }}{% endif %}
+          </button>
+          <span class="chat-when" title="{{ e.created_at|date:'l j F Y, g:i a' }}">{{ e.created_at|naturaltime }}</span>
+        </div>
+        <div class="chat-peek" hidden>
+          <span class="cp-av">
+            {% if e.author.avatar %}<img src="{{ e.author.avatar.url }}" alt="">
+            {% else %}{{ e.author.display_name|slice:":1"|upper }}{% endif %}
+          </span>
+          <span class="cp-body">
+            <b>{{ e.author.display_name }}</b>
+            <small>{{ e.author_role }} &middot; {{ thread.org.name }}</small>
+          </span>
+        </div>
+        {% endif %}
+
+        <div class="chat-bubble">
+          {% if e.reply_to %}
+          {% comment %}
+          The quote is a LINK to the message it quotes, not a copy of it left
+          floating. In a long thread "as I said above" is only useful if above
+          is one press away.
+          {% endcomment %}
+          <a class="chat-quote" href="#msg-{{ e.reply_to.id }}" data-jump="{{ e.reply_to.id }}">
+            <b>{{ e.reply_to.author.display_name }}</b>
+            <span>{{ e.reply_to.quote }}</span>
+          </a>
+          {% endif %}
+
+          {% if e.body %}<p class="chat-text">{{ e.body|linebreaksbr }}</p>{% endif %}
+
+          {% if e.attachments.all %}
+          <div class="chat-files">
+            {% for a in e.attachments.all %}
+              {% if a.is_image %}
+              {% comment %}
+              Shown, not listed. A screenshot IS the message most of the time,
+              and a filename chip makes the reader open something to find out
+              what was sent.
+              {% endcomment %}
+              <a class="chat-shot" href="{% url 'orgs:message_file' thread.id a.id %}" target="_blank" rel="noopener">
+                <img src="{% url 'orgs:message_file' thread.id a.id %}" alt="{{ a.original_name }}" loading="lazy">
+              </a>
+              {% else %}
+              <a class="chat-file" href="{% url 'orgs:message_file' thread.id a.id %}?download=1">
+                <span class="cf-ic" aria-hidden="true"><svg><use href="#ic-doc"/></svg></span>
+                <span class="cf-txt"><b>{{ a.original_name }}</b><small>{{ a.size_label }}</small></span>
+              </a>
+              {% endif %}
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          <span class="chat-stamp">{{ e.created_at|date:"g:i a" }}</span>
+        </div>
+      </div>
+
+      <button type="button" class="chat-replybtn" data-reply-to="{{ e.id }}"
+              aria-label="Reply to this message">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 7 7v4"/></svg>
+      </button>
+    </li>
+    {% empty %}
+    <li class="chat-none">Nothing in this conversation yet.</li>
+    {% endfor %}
+  </ol>
+</div>

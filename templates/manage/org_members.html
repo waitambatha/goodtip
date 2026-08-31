@@ -16,7 +16,7 @@
       <td style="text-align:right;">
         {% if not m.is_league_owner %}
         <form method="post" action="{% url 'manage:org_members' org.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="action" value="promote"><input type="hidden" name="member_id" value="{{ m.id }}"><button class="abtn abtn-ghost abtn-sm" type="submit">{% if m.is_manager %}Make Participant{% else %}Make Manager{% endif %}</button></form>
-        <form method="post" action="{% url 'manage:org_members' org.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="member_id" value="{{ m.id }}"><button class="abtn abtn-ghost abtn-sm" type="submit" style="color:#9a2b2b;">Remove</button></form>
+        <form method="post" action="{% url 'manage:org_members' org.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="member_id" value="{{ m.id }}"><button class="abtn abtn-ghost abtn-sm" type="submit" style="color:var(--danger);">Remove</button></form>
         {% else %}<span style="color:var(--muted);">-</span>{% endif %}
       </td>
     </tr>

@@ -9,9 +9,11 @@ from catalog.models import Season, Series, Sport
 from orgs.models import OrgMember, Organisation
 from tipping.models import Match, Round, Team, Tip
 from tipping.services import (
+    clear_tip,
     leaderboard_for_family,
     leaderboard_for_org,
     record_match_result,
+    submit_tip,
     user_org_stats,
 )
 
@@ -1217,3 +1219,141 @@ class CarryBeforeSaveTests(TestCase):
             reverse("tipping:carry_preview", args=[self.orgs["Work"].id]), self._slate(),
         )
         self.assertEqual(resp.status_code, 403)
+
+
+class TakingATipBackTests(TestCase):
+    """Pressing the team you already picked un-picks it.
+
+    Before this a pick was a one-way door. The control is a radio, and a radio
+    group has no way back to "none" once one of its members is checked — so a
+    member could change their mind about WHICH side, but not about whether they
+    had tipped at all. On a game they did not fancy either way, "no tip" is a
+    real answer.
+    """
+
+    def setUp(self):
+        self.sport = Sport.objects.create(name="Undo Footy", slug="undo-footy")
+        self.series = Series.objects.create(sport=self.sport, name="Undo Series", slug="undo-series")
+        self.season = Season.objects.create(year=2098, label="2098")
+        self.org = Organisation.objects.create(name="Undo League", season=self.season)
+        self.user = User.objects.create_user(email="undo@b.com", password="x", display_name="Undo")
+        OrgMember.objects.create(user=self.user, org=self.org)
+        self.home = Team.objects.create(name="Reds", slug="undo-reds", series=self.series)
+        self.away = Team.objects.create(name="Blues", slug="undo-blues", series=self.series)
+        self.round = Round.objects.create(
+            org=self.org, round_number=1, series=self.series,
+            lockout_at=timezone.now() + timedelta(days=2),
+        )
+        self.match = Match.objects.create(
+            round=self.round, home_team=self.home, away_team=self.away,
+            kickoff_at=timezone.now() + timedelta(days=2),
+        )
+        self.client.force_login(self.user)
+
+    def _tip(self, selection="home"):
+        return submit_tip(user=self.user, match=self.match, org=self.org, selection=selection)
+
+    def test_clear_tip_removes_it(self):
+        self._tip()
+        self.assertTrue(clear_tip(user=self.user, match=self.match, org=self.org))
+        self.assertFalse(Tip.objects.filter(user=self.user, match=self.match).exists())
+
+    def test_clear_tip_reports_when_there_was_nothing_to_clear(self):
+        # Not an error — un-picking something never picked is a no-op, and the
+        # dashboard posts one for any fixture the member toggled off.
+        self.assertFalse(clear_tip(user=self.user, match=self.match, org=self.org))
+
+    def test_clear_tip_refuses_once_the_match_has_started(self):
+        """What you tipped is a matter of record once the game is under way.
+
+        Without this, clearing would be a way to quietly erase a wrong call
+        after the fact — the same reason submit_tip refuses a locked match.
+        """
+        self._tip()
+        Match.objects.filter(pk=self.match.pk).update(
+            kickoff_at=timezone.now() - timedelta(hours=1),
+        )
+        self.match.refresh_from_db()
+        with self.assertRaises(ValueError):
+            clear_tip(user=self.user, match=self.match, org=self.org)
+        self.assertTrue(Tip.objects.filter(user=self.user, match=self.match).exists())
+
+    def test_posting_none_to_the_save_endpoint_clears(self):
+        self._tip()
+        url = reverse("tipping:tip_save", args=[self.org.id, self.round.id, self.match.id])
+        r = self.client.post(url, {"selection": "none"})
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(Tip.objects.filter(user=self.user, match=self.match).exists())
+        # The tick has to say which of the two things happened; answering
+        # "Saved" to a take-back tells the member the opposite of the truth.
+        self.assertContains(r, "No tip")
+
+    def test_the_card_that_comes_back_offers_the_pick_again(self):
+        """After un-picking, the same button must post the side again.
+
+        The card is re-rendered from the server, so this is the check that the
+        toggle does not get stuck: an hx-vals still saying "none" would make
+        the second press a second un-pick and the team unpickable.
+        """
+        self._tip()
+        url = reverse("tipping:tip_save", args=[self.org.id, self.round.id, self.match.id])
+        r = self.client.post(url, {"selection": "none", "view": "mytips"})
+        self.assertContains(r, '"selection":"home"')
+        self.assertNotContains(r, '"selection":"none"')
+
+    def test_bulk_confirm_clears_what_the_slate_un_picked(self):
+        self._tip()
+        r = self.client.post(
+            reverse("tipping:tip_confirm", args=[self.org.id, self.round.id]),
+            {f"match_{self.match.id}": "none"},
+        )
+        self.assertEqual(r.status_code, 302)
+        self.assertFalse(Tip.objects.filter(user=self.user, match=self.match).exists())
+
+    def test_a_fixture_absent_from_the_slate_keeps_its_tip(self):
+        """Absent is not the same as un-picked, and the difference matters.
+
+        A member confirms a slate on a phone while a tip made last week from a
+        desktop is not on screen. Treating "not in the POST" as "take it back"
+        would silently delete it.
+        """
+        self._tip()
+        self.client.post(
+            reverse("tipping:tip_confirm", args=[self.org.id, self.round.id]),
+            {},
+        )
+        self.assertTrue(Tip.objects.filter(user=self.user, match=self.match).exists())
+
+    def test_cross_round_confirm_clears_too(self):
+        self._tip()
+        self.client.post(
+            reverse("tipping:tip_confirm_upcoming", args=[self.org.id]),
+            {f"match_{self.match.id}": "none"},
+        )
+        self.assertFalse(Tip.objects.filter(user=self.user, match=self.match).exists())
+
+    def test_a_clear_for_another_org_is_ignored(self):
+        """The posted ids are re-checked against this organisation's matches.
+
+        Same rule as the picks beside them: an id from a league you are not in
+        must not reach a delete just because you can spell it.
+        """
+        other_season = Season.objects.create(year=2097, label="2097")
+        other = Organisation.objects.create(name="Someone Else", season=other_season)
+        other_round = Round.objects.create(
+            org=other, round_number=1, series=self.series,
+            lockout_at=timezone.now() + timedelta(days=2),
+        )
+        other_match = Match.objects.create(
+            round=other_round, home_team=self.home, away_team=self.away,
+            kickoff_at=timezone.now() + timedelta(days=2),
+        )
+        victim = User.objects.create_user(email="v@b.com", password="x", display_name="V")
+        OrgMember.objects.create(user=victim, org=other)
+        Tip.objects.create(user=self.user, match=other_match, org=other, selection="home")
+
+        self.client.post(
+            reverse("tipping:tip_confirm_upcoming", args=[self.org.id]),
+            {f"match_{other_match.id}": "none"},
+        )
+        self.assertTrue(Tip.objects.filter(match=other_match).exists())

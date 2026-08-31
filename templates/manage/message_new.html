@@ -3,7 +3,12 @@
 {% block hero_title %}Send a message{% endblock %}
 {% block hero_lead %}To everyone in {{ org.name }}, or to the people you pick.{% endblock %}
 {% block admin_content %}
-<form method="post" data-busy="Sending" style="max-width:760px;">
+{% comment %}
+enctype is what makes the attachment field below do anything. Without it the
+files are simply not in the request — request.FILES is empty, the notice saves
+with only its words, and nothing anywhere reports a problem.
+{% endcomment %}
+<form method="post" data-busy="Sending" enctype="multipart/form-data" style="max-width:760px;">
   {% csrf_token %}
   <input type="hidden" name="org" value="{{ org.id }}">
 
@@ -13,10 +18,23 @@
       <input type="text" id="m_subject" name="subject" maxlength="160" required
              placeholder="e.g. Round 3 tips close Friday 7pm">
     </div>
-    <div class="fld" style="margin-bottom:0;">
+    <div class="fld">
       <label for="m_body">Message</label>
-      <textarea id="m_body" name="body" rows="7" required
+      <textarea id="m_body" name="body" rows="7"
                 placeholder="Anything your members need to know."></textarea>
+    </div>
+    {% comment %}
+    Neither the message nor the attachment is required on its own — the view
+    requires one of the two. A fixture list as a PDF with nothing typed is a
+    real notice, and `required` on the textarea would refuse it.
+    {% endcomment %}
+    <div class="fld" style="margin-bottom:0;">
+      <label for="m_files">Attach files <small style="color:var(--muted);font-weight:400;">(optional)</small></label>
+      <input type="file" id="m_files" name="files" multiple
+             accept=".png,.jpg,.jpeg,.gif,.webp,.heic,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx">
+      <p style="margin:6px 0 0;font-size:12.5px;color:var(--muted);">
+        Up to 4 files, 8&nbsp;MB each. Images, PDFs, documents and spreadsheets.
+      </p>
     </div>
   </div>
 

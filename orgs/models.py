@@ -1,5 +1,7 @@
 import secrets
+import uuid
 from datetime import timedelta
+from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
@@ -909,6 +911,11 @@ class Notification(models.Model):
     KIND_ADMIN_NOTE = "admin_note"
     KIND_WALL_REPLY = "wall_reply"
     KIND_WALL_POST = "wall_post"
+    # A message thread moved — see orgs.notifications.notify_new_message.
+    # Distinct from ADMIN_NOTE, which is a one-way announcement: this is a
+    # conversation you are in, and the bell has to be able to say which of the
+    # two it is before you open it.
+    KIND_MESSAGE = "message"
     # Joining is a conversation with an admin, not an instant action, so each
     # step of it reports back here — otherwise the wait after "Ask to join"
     # looks like nothing happened.
@@ -924,6 +931,7 @@ class Notification(models.Model):
         (KIND_ADMIN_NOTE, "Note from your admin"),
         (KIND_WALL_REPLY, "Reply to your post"),
         (KIND_WALL_POST, "New post on your Wall"),
+        (KIND_MESSAGE, "New message"),
         (KIND_JOIN_REQUESTED, "Join request sent"),
         (KIND_JOIN_REVIEW, "Join request to review"),
         (KIND_JOIN_APPROVED, "Join request approved"),
@@ -939,6 +947,7 @@ class Notification(models.Model):
         KIND_ADMIN_NOTE: "ic-msg",
         KIND_WALL_REPLY: "ic-msg",
         KIND_WALL_POST: "ic-flame",
+        KIND_MESSAGE: "ic-mail",
         KIND_JOIN_REQUESTED: "ic-clock",
         KIND_JOIN_REVIEW: "ic-people",
         KIND_JOIN_APPROVED: "ic-check",
@@ -1157,6 +1166,18 @@ class WallReply(models.Model):
     )
     guest_name = models.CharField(max_length=80, blank=True)
     guest_email = models.EmailField(blank=True)
+    # Which reply in the thread this one answers, when it answers one in
+    # particular. Same idea and same reasoning as Message.reply_to: under a
+    # post with a dozen replies, "nah he's cooked" is only an answer if you can
+    # see what it is an answer to.
+    #
+    # Only ever another reply on the SAME post — enforced in the view, because
+    # a self-FK cannot express it. Replying to the post itself is the default
+    # and is represented by NULL, not by pointing at something.
+    reply_to = models.ForeignKey(
+        "self", on_delete=models.SET_NULL,
+        related_name="replies", null=True, blank=True,
+    )
     body = models.TextField(max_length=500)
     created_at = models.DateTimeField(auto_now_add=True)
     # Members are approved on arrival; guests wait for a staff review.
@@ -1186,6 +1207,16 @@ class WallReply(models.Model):
     @property
     def initials(self) -> str:
         return (self.display_name or "?")[:2].upper()
+
+    @property
+    def quote(self) -> str:
+        """One line of this reply, for the block that quotes it.
+
+        Same shape and same job as Message.quote, so the reply control on the
+        Wall and the one in a message thread show the reader the same thing.
+        """
+        text = (self.body or "").strip()
+        return text[:120] + ("\u2026" if len(text) > 120 else "")
 
 
 class WallReaction(models.Model):
@@ -1437,19 +1468,27 @@ class MessageThread(models.Model):
     def is_broadcast(self) -> bool:
         return self.kind == self.KIND_NOTICE and not self.recipients.exists()
 
-    def can_read(self, user) -> bool:
+    def can_read(self, user, *, membership=...) -> bool:
         """Admins of the org see everything in it; a member sees their own.
 
         Deliberately not "anyone in the org sees everything": a member raising
         a problem with their own participation is entitled to have that read by
         the admins and not by the rest of the room.
+
+        `membership` lets a caller that already holds the OrgMember row hand it
+        over. The member's inbox spans every organisation they belong to and
+        asks this of every thread; without it that is one SELECT per thread for
+        rows the caller fetched in a single query before the loop started. Pass
+        None to mean "checked, and they are not a member" — hence the `...`
+        default, since None is a real answer here rather than an absent one.
         """
         if not (user and user.is_authenticated):
             return False
-        member = OrgMember.objects.filter(org_id=self.org_id, user=user).first()
-        if member is None:
+        if membership is ...:
+            membership = OrgMember.objects.filter(org_id=self.org_id, user=user).first()
+        if membership is None:
             return False
-        if member.can_manage:
+        if membership.can_manage:
             return True
         if self.started_by_id == user.id:
             return True
@@ -1468,7 +1507,22 @@ class Message(models.Model):
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="org_messages",
     )
-    body = models.TextField()
+    body = models.TextField(blank=True)
+    # The message this one answers, when it answers one in particular.
+    #
+    # A thread is a conversation, and once it is more than four messages long
+    # "Yes, that's right" stops being an answer to anything you can point at.
+    # Every chat app people already use solves this the same way — you pick the
+    # message and your reply carries a quote of it — so the model has to be
+    # able to say which message that was.
+    #
+    # SET_NULL rather than CASCADE: deleting a message must not take the
+    # replies to it with it. The quote block simply stops rendering, which is
+    # the honest outcome — the reply is still something somebody said.
+    reply_to = models.ForeignKey(
+        "self", on_delete=models.SET_NULL,
+        related_name="replies", null=True, blank=True,
+    )
     created_at = models.DateTimeField(default=timezone.now)
     # Who has opened the thread since this landed. A read *receipt* per message
     # rather than a per-thread pointer, so "3 unread" stays correct when an
@@ -1489,3 +1543,94 @@ class Message(models.Model):
         MessageThread.objects.filter(pk=self.thread_id).update(
             last_message_at=self.created_at,
         )
+
+    @property
+    def quote(self) -> str:
+        """One line of this message, for the reply block that quotes it.
+
+        Falls back to naming the attachment when there are no words, because a
+        reply to a photo quoting an empty string reads as a bug.
+        """
+        text = (self.body or "").strip()
+        if text:
+            return text[:120] + ("\u2026" if len(text) > 120 else "")
+        first = self.attachments.first()
+        if first is not None:
+            return first.original_name
+        return "\u2026"
+
+
+def message_attachment_path(instance, filename):
+    """Where an uploaded file lands.
+
+    The name on disk is a UUID, never the name the uploader typed. Two people
+    attaching "screenshot.png" to the same thread must not collide, and a
+    filename that arrives from a browser is attacker-controlled — keeping it
+    only as a label in the database means nothing from outside ever reaches
+    the filesystem. Foldered by thread so a thread's files can be found.
+    """
+    suffix = Path(filename).suffix.lower()[:12]
+    return f"message_files/{instance.message.thread_id}/{uuid.uuid4().hex}{suffix}"
+
+
+class MessageAttachment(models.Model):
+    """A file sent with a message.
+
+    NEVER SERVED FROM /media/. Everything else this system stores as a file is
+    a profile photo or an organisation logo — things whose whole purpose is to
+    be shown to other people, where an unguessable URL is protection enough.
+    This is the opposite: the thread it hangs off is private to its author and
+    the organisation's admins by design (MessageThread.can_read), and a URL
+    that anybody who has it can fetch would quietly undo that. It goes out
+    through a view that asks can_read first — see orgs.views.message_file.
+    """
+
+    # What the composer accepts. An allowlist, not a blocklist: the question
+    # "is this dangerous" has no reliable answer, and "is this one of the
+    # handful of things people actually attach to a message about a tipping
+    # comp" does.
+    ALLOWED_SUFFIXES = {
+        ".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic",
+        ".pdf", ".txt", ".csv", ".doc", ".docx", ".xls", ".xlsx",
+    }
+    MAX_BYTES = 8 * 1024 * 1024      # 8 MB per file
+    MAX_PER_MESSAGE = 4
+
+    message = models.ForeignKey(
+        Message, on_delete=models.CASCADE, related_name="attachments",
+    )
+    file = models.FileField(upload_to=message_attachment_path)
+    # The name the sender saw, kept for display and for the download's
+    # Content-Disposition. Not used to build the path — see above.
+    original_name = models.CharField(max_length=200)
+    content_type = models.CharField(max_length=100, blank=True)
+    size = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return self.original_name
+
+    @property
+    def is_image(self) -> bool:
+        """Whether to show it or link to it.
+
+        Decided on the SUFFIX, not on the content type the browser claimed.
+        The stored type is whatever the uploading client said it was, and
+        `<img src>` on a file that turns out not to be an image is a broken
+        icon in the middle of a conversation.
+        """
+        return Path(self.original_name).suffix.lower() in {
+            ".png", ".jpg", ".jpeg", ".gif", ".webp",
+        }
+
+    @property
+    def size_label(self) -> str:
+        n = self.size or 0
+        if n < 1024:
+            return f"{n} B"
+        if n < 1024 * 1024:
+            return f"{n / 1024:.0f} KB"
+        return f"{n / (1024 * 1024):.1f} MB"

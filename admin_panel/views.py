@@ -787,9 +787,37 @@ def _page_rows(request, group):
 
 @requires("pages.edit")
 def pages_list(request):
+    """The index of pages whose wording an admin can rewrite.
+
+    ONE GROUP AT A TIME. Both lists used to sit on the page together, and the
+    second one was unusable: two full tables stacked in a fixed-width shell
+    meant the private table — the longer of the two, with the longer
+    addresses — was squeezed until its columns collapsed and it scrolled
+    sideways inside its own panel. Splitting them gives whichever list you
+    asked for the whole width, which is all either of them ever needed.
+
+    The choice is a query parameter rather than a JS toggle so that a link to
+    "the private pages" is a link somebody can send, and so the screen works
+    with the tab that was chosen after a page save redirects back to it.
+    """
+    scope = request.GET.get("scope")
+    if scope not in ("public", "private"):
+        scope = "public"
+    group = (
+        page_registry.GROUP_PUBLIC if scope == "public"
+        else page_registry.GROUP_PRIVATE
+    )
     return render(request, "manage/pages.html", {
-        "public_rows": _page_rows(request, page_registry.GROUP_PUBLIC),
-        "private_rows": _page_rows(request, page_registry.GROUP_PRIVATE),
+        "scope": scope,
+        "rows": _page_rows(request, group),
+        # Both counts, always — the tab that is not showing still has to be
+        # able to say how much is behind it.
+        "public_count": sum(
+            1 for pg in page_registry.PAGES if pg.group == page_registry.GROUP_PUBLIC
+        ),
+        "private_count": sum(
+            1 for pg in page_registry.PAGES if pg.group == page_registry.GROUP_PRIVATE
+        ),
         "total_edits": PageEdit.objects.count(),
         "stale_edits": PageEdit.objects.filter(last_applied_at__isnull=True).count(),
     })

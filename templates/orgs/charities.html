@@ -14,8 +14,21 @@ not carry. It used to be a pair of fields buried in step 6 of the creation
 wizard, asked of someone ninety seconds into their first visit; the result was
 a picker full of near-duplicates that every later organisation had to read
 past. The fix was not better validation, it was moving the question to where
-the existing list is visible while you answer it. Hence the order below: what
-you already have first, the form last.
+the existing list is visible while you answer it.
+
+WHERE "ADD A CHARITY" SITS (changed Aug 2026, client request).
+It used to be the last thing on the page, on the argument that you should see
+what exists before adding to it. The argument was right and the placement was
+wrong: the button opens a SHEET, and the sheet's own first line is "check the
+lists first". The lists are still above it in reading order — the button is
+just no longer at the bottom of a screen you have to scroll a fifty-charity
+grid to reach.
+
+CLICKING A CHARITY OPENS IT. Every tile an admin may change is a link to the
+edit form, which is where a logo the automatic fetch could not find gets
+supplied by hand. Vetted charities are links only for GoodTip staff: that row
+appears in every organisation's picker, and one org admin renaming it would
+change what everyone else sees.
 {% endcomment %}
 
 <div class="app-head">
@@ -27,6 +40,17 @@ you already have first, the form last.
       {% if groups_enabled %}Your groups choose from this same list.{% endif %}
     </p>
   </div>
+</div>
+
+<div class="ch-add-row" data-coach="charity-add">
+  <div>
+    <h2 class="sec-h" style="margin:0;">Can't see your cause?</h2>
+    <p class="app-sub" style="margin:2px 0 0;">Add it, and we'll fetch their logo for you.</p>
+  </div>
+  <button type="button" class="abtn abtn-primary" data-ch-open>
+    <svg aria-hidden="true"><use href="#ic-heart"/></svg>
+    Add a charity
+  </button>
 </div>
 
 {% if org.charity %}
@@ -44,7 +68,8 @@ you already have first, the form last.
 </p>
 <div class="ch-grid">
   {% for ch in ours %}
-  {% include "components/_charity_tile.html" with charity=ch chip=ch.is_approved|yesno:"Approved,In review" %}
+  {% url 'orgs:charity_edit' org.id ch.id as ch_edit %}
+  {% include "components/_charity_tile.html" with charity=ch chip=ch.is_approved|yesno:"Approved,In review" edit_url=ch_edit %}
   {% endfor %}
 </div>
 {% endif %}
@@ -71,23 +96,17 @@ you already have first, the form last.
 {% endif %}
 
 <h2 class="sec-h" data-coach="charity-list">On GoodTip's list</h2>
+<p class="hint" style="margin:-4px 0 12px;">
+  Vetted by GoodTip and available to every organisation.
+  {% if user.is_staff %}You can edit these because you're GoodTip staff — a change here shows up for everyone.{% endif %}
+</p>
 <div class="ch-grid">
   {% for ch in vetted %}
-  {% include "components/_charity_tile.html" with charity=ch %}
+  {% url 'orgs:charity_edit' org.id ch.id as ch_edit %}
+  {% include "components/_charity_tile.html" with charity=ch edit_url=ch_edit %}
   {% empty %}
   <p class="app-sub">Nothing here yet.</p>
   {% endfor %}
-</div>
-
-<div class="ch-add-row" data-coach="charity-add">
-  <div>
-    <h2 class="sec-h" style="margin:0;">Can't see your cause?</h2>
-    <p class="app-sub" style="margin:2px 0 0;">Add it, and we'll fetch their logo for you.</p>
-  </div>
-  <button type="button" class="abtn abtn-primary" data-ch-open>
-    <svg aria-hidden="true"><use href="#ic-heart"/></svg>
-    Add a charity
-  </button>
 </div>
 
 {% comment %}

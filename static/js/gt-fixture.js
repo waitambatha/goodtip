@@ -124,11 +124,33 @@
   function refresh(form) {
     var cards = form.querySelectorAll('.fxc');
     var picked = 0;
-    cards.forEach(function (c) { if (c.querySelector('input:checked')) picked++; });
+    cards.forEach(function (c) {
+      /* :checked alone would count the hidden "no tip" member of the group,
+         so a slate where everything had been un-picked reported itself full. */
+      if (c.querySelector('input[type="radio"]:checked:not([data-no-tip])')) picked++;
+    });
     var count = document.getElementById('slipCount');
     var bar = document.getElementById('slipBar');
     if (count) count.textContent = picked;
     if (bar && cards.length) bar.style.width = Math.round(picked / cards.length * 100) + '%';
+  }
+
+  /* Draw a card as picked or not. One function for both directions, because
+     the two are not symmetrical by accident — every property the pick sets has
+     to be the property the un-pick clears, and keeping them apart is how a
+     card ends up un-picked but still wearing a green "Picked" chip. */
+  function paint(card, team) {
+    card.querySelectorAll('.fxc-team').forEach(function (t) { t.classList.remove('sel'); });
+    card.classList.toggle('is-picked', !!team);
+    if (team) team.classList.add('sel');
+    var chip = card.querySelector('.fxc-state');
+    if (chip) {
+      chip.textContent = team ? 'Picked' : 'Open';
+      /* Keep the class in step with the word, or a pick keeps the grey
+         "Open" styling while claiming to be chosen — and an un-pick keeps the
+         green one while claiming not to be. */
+      chip.className = 'fxc-state ' + (team ? 'is-tipped' : 'is-open');
+    }
   }
 
   document.addEventListener('click', function (e) {
@@ -141,21 +163,32 @@
     var form = team.closest('form');
     if (!card || !form) return;
 
+    /* Read the BEFORE state from our own class, not from input.checked.
+       Clicking a label checks its radio as part of the label's activation
+       behaviour, which has already run by the time the frame below fires — so
+       input.checked cannot tell us whether this press was a change of mind or
+       a second press on the same team. The class can: nothing but this handler
+       ever sets it. */
+    var undo = team.classList.contains('sel');
+
     /* The label checks its own radio; this only keeps the drawn state in
-     * step. Done on the next frame so the browser's own handling has already
-     * run and input.checked is true even when the click landed on the label
-     * rather than the input. */
+       step. Done on the next frame so the browser's own handling has already
+       run and input.checked is true even when the click landed on the label
+       rather than the input. */
     requestAnimationFrame(function () {
-      card.querySelectorAll('.fxc-team').forEach(function (t) { t.classList.remove('sel'); });
-      team.classList.add('sel');
-      input.checked = true;
-      card.classList.add('is-picked');
-      var chip = card.querySelector('.fxc-state');
-      if (chip) {
-        chip.textContent = 'Picked';
-        /* Keep the class in step with the word, or a pick keeps the grey
-         * "Open" styling while claiming to be chosen. */
-        chip.className = 'fxc-state is-tipped';
+      if (undo) {
+        /* A radio group has no "uncheck" — the only way back to none is to
+           check a different member, which is what the hidden one is for. It
+           also carries the take-back to the server on confirm; clearing
+           input.checked on its own would look right and post nothing, and the
+           tip would still be there next time the page loaded. */
+        var none = card.querySelector('input[data-no-tip]');
+        if (none) none.checked = true;
+        else input.checked = false;
+        paint(card, null);
+      } else {
+        input.checked = true;
+        paint(card, team);
       }
       refresh(form);
     });

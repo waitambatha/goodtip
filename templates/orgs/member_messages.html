@@ -1,6 +1,8 @@
 {% extends "app_base.html" %}
-{% block title %}Messages &middot; {{ org.name }}{% endblock %}
+{% load static %}
+{% block title %}Messages{% endblock %}
 {% block loader_task %}Opening your messages{% endblock %}
+{% block nav_msgs %}on{% endblock %}
 {% block body_class %}page-deep sheet-page{% endblock %}
 {% comment %}
 Side imagery, like every other member page. This screen was built after the
@@ -11,22 +13,31 @@ neighbours had the rotating strips.
 
 {% block app_content %}
 {% comment %}
-MESSAGES.
+MESSAGES — ONE INBOX, EVERY ORGANISATION.
 
-The composer is a sheet rather than a form sitting permanently on the page.
-Writing to your admins is something you do occasionally; the thing you come
-back for is the answer. A form that is always open puts the rare action above
-the common one and pushes the replies below the fold.
+This page used to be scoped to a single organisation: whichever one the nav
+happened to be pointing at. That is where the client hit it. They raised
+something with the admins of one of their organisations, pressed Messages, and
+were told "Nothing yet" — by the page for a different organisation. Nothing on
+the screen said which organisation it was showing, and there was no way to get
+to the others.
 
-So the page is the conversations, and the compose button opens the sheet.
+Mail does not work like that. You have one inbox, and each item says who it is
+from. So the list is now every thread this member can read across every
+membership, each row naming its organisation, and the composer asks which
+organisation you are writing to instead of assuming.
+
+The composer is still a sheet rather than a form sitting permanently on the
+page. Writing to your admins is something you do occasionally; the thing you
+come back for is the answer.
 {% endcomment %}
 <div class="msg-hero">
   <span class="msg-hero-ic" aria-hidden="true"><svg><use href="#ic-msg"/></svg></span>
   <div class="msg-hero-body">
     <h1>Messages</h1>
     <p>
-      Anything you want to raise with the people who run {{ org.name }} — and
-      the notices they send out. Only they can see what you raise here.
+      Anything you've raised with the people who run your organisations — and
+      the notices they send out. Only those admins can see what you raise.
     </p>
   </div>
   <div class="msg-private">
@@ -40,35 +51,51 @@ So the page is the conversations, and the compose button opens the sheet.
     <svg aria-hidden="true"><use href="#ic-send"/></svg>
     Write to the admins
   </button>
+  {% if threads %}
+  <span class="msg-tally">{{ threads|length }} conversation{{ threads|length|pluralize }}</span>
+  {% endif %}
 </div>
 
 {% if threads %}
-<div class="gt-rows msg-list">
+<ul class="msg-list">
   {% for t in threads %}
-  <a class="gt-row" href="{% url 'orgs:member_message_thread' org.id t.id %}">
-    <span class="msg-row-ic {% if t.kind == 'notice' %}notice{% endif %}" aria-hidden="true">
-      <svg><use href="#{% if t.kind == 'notice' %}ic-bell{% else %}ic-msg{% endif %}"/></svg>
-    </span>
-    <span class="gr-body">
-      <b>{{ t.subject }}</b>
-      <small>
-        {% if t.kind == 'notice' %}From the admins{% else %}You raised this{% endif %}
-        &middot; {{ t.last_message_at|date:"j M, g:i a" }}
-      </small>
-    </span>
-    <span class="gr-go">
-      {% if t.status == 'answered' %}<span class="gts-status ok">Answered</span>
-      {% elif t.status == 'closed' %}<span class="gts-status">Closed</span>
-      {% elif t.kind == 'raised' %}<span class="gts-status warn">Waiting</span>{% endif %}
-    </span>
-  </a>
+  <li>
+    <a class="msg-item{% if t.is_unread %} is-new{% endif %}"
+       href="{% url 'orgs:member_message_thread' t.org.id t.id %}">
+      <span class="mi-ic {% if t.kind == 'notice' %}notice{% endif %}" aria-hidden="true">
+        <svg><use href="#{% if t.kind == 'notice' %}ic-bell{% else %}ic-msg{% endif %}"/></svg>
+      </span>
+      <span class="mi-main">
+        <span class="mi-top">
+          <b>{{ t.subject }}</b>
+          {% comment %}
+          The organisation, on every row. It is the thing that was missing:
+          without it a member in several organisations cannot tell which comp a
+          conversation belongs to, and a page that shows only one of them
+          cannot say so either.
+          {% endcomment %}
+          <span class="mi-org">{{ t.org.name }}{% if t.group %} &rsaquo; {{ t.group.name }}{% endif %}</span>
+        </span>
+        <small>
+          {% if t.kind == 'notice' %}From the admins{% else %}You raised this{% endif %}
+          &middot; {{ t.last_message_at|date:"j M Y, g:i a" }}
+        </small>
+      </span>
+      <span class="mi-end">
+        {% if t.is_unread %}<span class="mi-dot" title="Something new in here"></span>{% endif %}
+        {% if t.status == 'answered' %}<span class="gts-status ok">Answered</span>
+        {% elif t.status == 'closed' %}<span class="gts-status">Closed</span>
+        {% elif t.kind == 'raised' %}<span class="gts-status warn">Waiting</span>{% endif %}
+      </span>
+    </a>
+  </li>
   {% endfor %}
-</div>
+</ul>
 {% else %}
 <div class="msg-empty">
   <svg aria-hidden="true"><use href="#ic-mail"/></svg>
   <b>Nothing yet.</b>
-  <span>Your messages to the admins will appear here.</span>
+  <span>Anything you raise with your organisation's admins — and anything they send you — shows up here.</span>
 </div>
 {% endif %}
 
@@ -84,17 +111,37 @@ the list does not cover.
 {% endcomment %}
 <div class="tipsheet msg-sheet" id="msgSheet" hidden aria-hidden="true">
   <div class="ts-veil" data-msg-close></div>
-  <form method="post" class="ts-panel" role="dialog" aria-modal="true" aria-labelledby="msgTitle">
+  <form method="post" class="ts-panel" role="dialog" aria-modal="true" aria-labelledby="msgTitle"
+        enctype="multipart/form-data">
     {% csrf_token %}
     <header class="ts-head">
       <div>
         <h3 id="msgTitle">Write to the admins</h3>
-        <p class="ts-sub">{{ org.name }} &middot; only they can see this</p>
+        <p class="ts-sub">Only they can see this</p>
       </div>
       <button type="button" class="ts-x" data-msg-close aria-label="Close">&times;</button>
     </header>
 
     <div class="ts-body msg-form">
+      {% if my_orgs|length > 1 %}
+      {% comment %}
+      Asked, not assumed. The old form wrote into whichever organisation the
+      URL named, which for a member of several is whichever one the nav was
+      pointing at when they pressed the button — so the message could land in
+      a different comp from the one they had in mind, and nothing said so.
+      {% endcomment %}
+      <div class="msg-fld">
+        <label for="msgOrg"><svg aria-hidden="true"><use href="#ic-org"/></svg>Which organisation?</label>
+        <select id="msgOrg" name="org">
+          {% for o in my_orgs %}
+          <option value="{{ o.id }}" {% if o.id == org.id %}selected{% endif %}>{{ o.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% else %}
+      <input type="hidden" name="org" value="{{ org.id }}">
+      {% endif %}
+
       <div class="msg-fld">
         <label for="msgSubject"><svg aria-hidden="true"><use href="#ic-msg"/></svg>What's it about?</label>
         <select id="msgSubject" name="subject_choice" data-msg-subject>
@@ -123,10 +170,22 @@ the list does not cover.
       <div class="msg-fld">
         <label for="msgBody"><svg aria-hidden="true"><use href="#ic-doc"/></svg>Tell them</label>
         <div class="msg-area">
-          <textarea id="msgBody" name="body" rows="5" maxlength="1000" required
+          <textarea id="msgBody" name="body" rows="5" maxlength="1000"
                     placeholder="Type your message here&hellip;" data-msg-body></textarea>
           <span class="msg-count"><b data-msg-count>0</b> / 1000</span>
         </div>
+      </div>
+
+      {% comment %}
+      Attachments. A screenshot of the thing that went wrong is worth more than
+      any description of it, and this was the one thing an admin asked for
+      every time a member reported a problem they could not reproduce.
+      {% endcomment %}
+      <div class="msg-fld">
+        <label for="msgFiles"><svg aria-hidden="true"><use href="#ic-image"/></svg>Attach a screenshot or file <i>(optional)</i></label>
+        <input type="file" id="msgFiles" name="files" multiple
+               accept=".png,.jpg,.jpeg,.gif,.webp,.heic,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx">
+        <div class="hint">Up to 4 files, 8&nbsp;MB each.</div>
       </div>
     </div>
 
@@ -156,7 +215,8 @@ the list does not cover.
     sheet.hidden = false;
     sheet.setAttribute("aria-hidden", "false");
     document.body.classList.add("sheet-open");
-    if (subject) subject.focus();
+    var first = sheet.querySelector("select");
+    if (first) first.focus();
   }
   function close() {
     sheet.hidden = true;

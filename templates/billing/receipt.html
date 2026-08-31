@@ -1,6 +1,13 @@
 {% extends "app_base.html" %}
 {% block title %}Receipt, {{ org.name }}{% endblock %}
 {% block loader_task %}Fetching your receipt{% endblock %}
+{% comment %}
+The rotating side strips. Standard on every member page (client request,
+Aug 2026) — these were the last screens without them. Outside the sheet,
+never inside it: the strips belong to the page background, and a sheet
+drawn over them is the whole point of the look.
+{% endcomment %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% block app_content %}
 <div style="display:flex;justify-content:flex-end;max-width:640px;margin:0 auto 14px;" class="no-print"><button type="button" class="abtn abtn-ghost abtn-sm" onclick="window.print()">Print / Save PDF</button></div>
 <div class="receipt">

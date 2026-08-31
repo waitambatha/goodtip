@@ -534,9 +534,62 @@ body.gta-shell #user-tools {
 }
 .gta-acct-menu a:hover, .gta-acct-menu button:hover { background: var(--gt-surface-3); text-decoration: none; }
 .gta-acct-menu svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.9; flex: none; opacity: .75; }
-.gta-acct-menu #logout-form { margin: 4px 0 0; padding: 4px 0 0; border-top: 1px solid var(--hairline-color); }
-.gta-acct-menu button:hover { color: #A62121; }
-html[data-theme="dark"] .gta-acct-menu button:hover { color: #F08A8A; }
+.gta-acct-menu #logout-form { margin: 6px 0 0; padding: 6px 0 0; border-top: 1px solid var(--hairline-color); }
+.gta-acct-menu button:hover { color: #A62121; background: rgba(166,33,33,.07); }
+html[data-theme="dark"] .gta-acct-menu button:hover { color: #F08A8A; background: rgba(240,138,138,.10); }
+
+/* ---- Who is signed in ----------------------------------------------------
+   The bar has room for a short name and nothing else, so "which account am I
+   in?" — the question this menu gets opened for as often as any of its links
+   — had no answer anywhere. The card answers it: the name, the whole address,
+   and the level of access, before any of the actions. */
+.gta-acct-card {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 11px 11px 12px;
+  margin: -6px -6px 4px;
+  border-bottom: 1px solid var(--hairline-color);
+  background: var(--gt-surface-2, transparent);
+  border-radius: var(--gt-r-card) var(--gt-r-card) 0 0;
+}
+.gta-acct-face {
+  width: 40px; height: 40px; border-radius: 50%; flex: none; overflow: hidden;
+  display: grid; place-items: center;
+  background: var(--gt-forest); color: #fff;
+  font-size: 14px; font-weight: 700; text-transform: uppercase;
+}
+.gta-acct-face img { width: 100%; height: 100%; object-fit: cover; }
+.gta-acct-id { min-width: 0; }
+.gta-acct-id b { display: block; font-size: 14px; font-weight: 600; color: var(--body-loud-color); line-height: 1.3; }
+/* The address is the identifying fact, so it is never truncated to something
+   that could match two accounts — it wraps. */
+.gta-acct-id small {
+  display: block; font-size: 12px; color: var(--body-quiet-color);
+  line-height: 1.35; margin-top: 1px; overflow-wrap: anywhere;
+}
+.gta-acct-role {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 7px;
+  padding: 2px 8px 2px 6px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  background: var(--gt-surface-3); color: var(--body-quiet-color);
+}
+.gta-acct-role.is-super { background: var(--gt-gold-soft); color: var(--gt-gold); }
+html[data-theme="dark"] .gta-acct-role.is-super { color: var(--gt-gold-hi); }
+.gta-acct-role svg { width: 12px; height: 12px; fill: currentColor; stroke: none; opacity: 1; }
+
+/* ---- Two labelled groups -------------------------------------------------
+   Four links in one flat list is a list you read end to end every time. Two
+   of these change your own account and one leaves the site; saying so lets
+   the eye go straight to the half it wants. */
+.gta-acct-group + .gta-acct-group { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--hairline-color); }
+.gta-acct-cap {
+  margin: 6px 11px 3px; font-size: 10.5px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--body-quiet-color); opacity: .8;
+}
+/* The "opens elsewhere" mark, pushed to the far end of its row. */
+.gta-acct-menu .gta-acct-out { margin-left: auto; width: 13px; height: 13px; opacity: .5; transform: rotate(-45deg); }
+
+.gta-acct-menu { min-width: 244px; }
 
 /* ==========================================================================
    2b. THE RAIL — brand, three bands, and the way out
@@ -770,7 +823,37 @@ body.gta-shell #header .gta-acct-menu a:hover,
 body.gta-shell #header .gta-acct-menu a:focus,
 body.gta-shell #header .gta-palette a:hover { text-decoration: none; }
 body.gta-shell #header .gta-acct-menu #logout-form { display: block; }
-body.gta-shell #header .gta-acct-menu #logout-form button { font-family: var(--gt-body); }
+
+/* THE LINE THROUGH EVERY ROW.
+   base.css: `#user-tools a, #logout-form button { border-bottom: 1px solid
+   rgba(255,255,255,.25) }`. That rule is for the stock admin's header strip,
+   where the links sit in a row on dark green and the underline is what marks
+   them as links. Inside a dropdown it draws a rule across every single item —
+   which is what it was doing, and what the client saw.
+
+   The same block also sets `text-transform: uppercase`, `letter-spacing:
+   .5px` and an 11px size on `#user-tools` and on `#logout-form button`, so
+   the menu was in small caps as well. All of it is undone here, by id,
+   because an id is what it takes. */
+body.gta-shell #header #user-tools .gta-acct-menu a,
+body.gta-shell #header #user-tools .gta-acct-menu button,
+body.gta-shell #header .gta-acct-menu #logout-form button {
+  border-bottom: 0;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 13.5px;
+  font-weight: 500;
+  font-family: var(--gt-body);
+}
+/* base.css nudges the button down 1px on hover to compensate for the border
+   it is losing. There is no border here, so the nudge is just a wobble. */
+body.gta-shell #header .gta-acct-menu #logout-form button:active,
+body.gta-shell #header .gta-acct-menu #logout-form button:hover { margin-bottom: 0; }
+/* And the card at the top of the menu is not a link row at all. */
+body.gta-shell #header #user-tools .gta-acct-card,
+body.gta-shell #header #user-tools .gta-acct-cap {
+  text-transform: none; letter-spacing: normal;
+}
 
 /* ---- Focus ---------------------------------------------------------------
    Everything new in the chrome is reachable by keyboard, so everything new in
@@ -1710,3 +1793,39 @@ html[data-theme="dark"] .gta-range a.on { background: var(--gt-lime); color: var
 .gtc-media-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 12.5px; }
 .gtc-reset { display: inline-flex; align-items: center; gap: 6px; color: var(--body-quiet-color); cursor: pointer; }
 .gtc-reset input { margin: 0; }
+
+/* ---- The system report's own tiles ---------------------------------------
+   These were never styled. The report writes `.gta-kpi-top`, `.gta-kpi-sub`
+   and a `--tile-accent`, and none of the three existed in this file — so its
+   eight tiles borrowed the dashboard's `.gta-kpi` shell and then laid their
+   contents out as a bare flex column, with an icon on a transparent disc.
+   They look like the dashboard's now, and the accent each tile already
+   declared is what finally colours it.
+
+   `--tile-accent` is a chart colour, and every one of those is chosen to clear
+   3:1 against both the light and the dark card surface — so the disc can be a
+   tint of it and the glyph the colour itself, in either theme, without a
+   second set of values.
+   ------------------------------------------------------------------------- */
+.gta-kpi-top { display: flex; align-items: center; gap: 11px; }
+.gta-kpi-top .gta-kpi-ic {
+  width: 38px; height: 38px; border-radius: 11px;
+  background: color-mix(in srgb, var(--tile-accent, var(--gt-c1)) 15%, transparent);
+  color: var(--tile-accent, var(--gt-c1));
+}
+.gta-kpi-top .gta-kpi-ic svg { width: 19px; height: 19px; fill: currentColor; stroke: none; }
+.gta-kpi-top .gta-kpi-label {
+  font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--body-quiet-color);
+}
+/* The report's tiles have three rows, not the dashboard's two-plus-sparkline,
+   so the gap that suits four cards would leave a hole in the middle of these. */
+.gta-kpi:has(.gta-kpi-top) { gap: 12px; }
+.gta-kpi:has(.gta-kpi-top) .gta-kpi-num { font-size: 32px; }
+.gta-kpi-sub {
+  font-size: 12.5px; line-height: 1.5; color: var(--body-quiet-color);
+  margin-top: auto;
+}
+/* "3 waiting" is the one thing on this row anybody acts on. */
+.gta-kpi-hot { color: var(--gt-gold); font-weight: 700; }
+html[data-theme="dark"] .gta-kpi-hot { color: var(--gt-gold-hi); }

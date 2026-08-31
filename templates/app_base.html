@@ -9,6 +9,16 @@
   {% include "partials/_favicon.html" %}
   {% include "partials/_fonts.html" %}
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
+  <script>
+    /* The theme, before anything is painted. Restoring it from a deferred
+       script instead would mean every light-theme page load starts with a
+       full flash of the deep green. Same key and same attribute /admin/ and
+       the HQ shell use, so a choice carries between all three in both
+       directions — see partials/_app_theme_switch.html. */
+    try {
+      document.documentElement.dataset.theme = localStorage.getItem("theme") || "auto";
+    } catch (e) {}
+  </script>
   {# vendored: unpkg was a blocking third-party round-trip on every page load #}
   <script src="{% static 'js/htmx-1.9.12.min.js' %}" defer></script>
   <script src="{% static 'js/gt-ui.js' %}" defer></script>
@@ -192,7 +202,14 @@
           Separate on purpose — a member with a problem about their own
           participation should not have to raise it in front of everybody.
           {% endcomment %}
-          <a href="{% url 'orgs:member_messages' primary_org.id %}" class="{% block nav_msgs %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-mail"/></svg><span>Messages</span></a>
+          {% comment %}
+          The count rides on the link, the way the admin bar's Approvals and
+          Messages counts do. Before this, a reply from your organisation's
+          admins landed and NOTHING on the member side said so — the item read
+          "Messages" whether there were three answers waiting or none, so the
+          only way to find out was to go and look.
+          {% endcomment %}
+          <a href="{% url 'orgs:member_messages' primary_org.id %}" class="{% block nav_msgs %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-mail"/></svg><span>Messages</span>{% if unread_message_count %}<span class="an-count">{{ unread_message_count }}</span>{% endif %}</a>
           {% comment %}
           Admin-only, and only two items: Members is the hub for everything to
           do with people (invites, join requests, roles), and Season summary is
@@ -268,7 +285,13 @@
         {% if user.is_staff %}<a href="{% url 'manage:overview' %}" class="{% block nav_admin %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Admin</span></a>{% endif %}
       </div>
       <div class="an-right">
-        <div class="an-bell" id="anBell">
+        {% comment %}
+        `has-new` from the server, not from the script, so the badge is red on the
+        first paint. Added by JS afterwards it would be lime for however long the
+        deferred bundle takes to run — a flash of the "all good" colour on a bell
+        that is telling you the opposite.
+        {% endcomment %}
+        <div class="an-bell{% if unread_notification_count %} has-new{% endif %}" id="anBell">
           <button type="button" class="bell-btn" aria-label="Notifications" data-bell>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
             {% if unread_notification_count %}<span class="bell-badge">{{ unread_notification_count }}</span>{% endif %}
@@ -301,6 +324,13 @@
             <button type="button" class="bt-x" aria-label="Stop showing this">&times;</button>
           </div>
         </div>
+        {% comment %}
+        The theme switch sits ahead of the icon set rather than among it: it is
+        a segmented control, not a 40px target, and dropping it into that
+        rhythm would break the thing the comment below is about. It disappears
+        at the widths where the bar is tight — the mobile menu carries a copy.
+        {% endcomment %}
+        {% include "partials/_app_theme_switch.html" %}
         {% comment %}
         Three icon buttons on one rhythm — notifications, you, and the way out.
         Each is the same round 40px target with the same hover, so the corner
@@ -379,6 +409,7 @@
         <a href="{% url 'tipping:leaderboard' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>Leaderboard</span></a>
         <a href="{% url 'tipping:ladder' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg><span>Ladder</span></a>
         <a href="{% url 'orgs:wall' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-msg"/></svg><span>The Wall</span></a>
+        <a href="{% url 'orgs:member_messages' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-mail"/></svg><span>Messages</span>{% if unread_message_count %}<span class="an-count">{{ unread_message_count }}</span>{% endif %}</a>
         {% if primary_org_is_admin %}
           <span class="sheet-label">Manage</span>
           <a href="{% url 'orgs:members' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-users"/></svg><span>Members</span></a>
@@ -387,6 +418,15 @@
         {% endif %}
       {% endif %}
       {% if user.is_staff %}<a href="{% url 'manage:overview' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Admin</span></a>{% endif %}
+      {% comment %}
+      The theme switch again, because the bar's copy is hidden at the widths
+      where this panel exists — and a phone is where somebody is most likely to
+      want the light one.
+      {% endcomment %}
+      <div class="sheet-theme">
+        <span class="sheet-label">Colour</span>
+        {% include "partials/_app_theme_switch.html" %}
+      </div>
       {# Profile is the header — a second row for it would point at the panel's own top #}
       <a href="{% url 'accounts:logout' %}" class="sheet-logout"><svg class="an-ic" aria-hidden="true"><use href="#ic-logout"/></svg><span>Log out</span></a>
     </div>
@@ -616,14 +656,48 @@
         el.addEventListener('mouseleave', function(){ timer = setTimeout(dropIt, 3000); });
       }
 
+      /* The bell's two jobs: carry the count, and be noticed when it changes.
+       *
+       * The ring used to be put on the BUTTON — `bell` is the [data-bell]
+       * element — while the stylesheet has always keyed it on the wrapper
+       * (`.an-bell.ring .bell-btn`). So the class landed one level too deep
+       * and the bell has never actually rung. `anBell` is the wrapper. */
+      var anBell = document.getElementById('anBell');
+
+      function ring(){
+        if (!anBell) return;
+        anBell.classList.remove('ring');
+        void anBell.offsetWidth;      /* restart it if it is already running */
+        anBell.classList.add('ring');
+        setTimeout(function(){ anBell.classList.remove('ring'); }, 1000);
+      }
+
       function badge(count){
         if (!bell) return;
         var b = bell.querySelector('.bell-badge');
-        if (!count) { if (b) b.remove(); return; }
+        if (!count) {
+          if (b) b.remove();
+          if (anBell) anBell.classList.remove('has-new');
+          return;
+        }
+        var had = !!b;
         if (!b) { b = document.createElement('span'); b.className = 'bell-badge'; bell.appendChild(b); }
+        var was = parseInt(b.textContent, 10) || 0;
         b.textContent = count;
-        bell.classList.add('ring');
-        setTimeout(function(){ bell.classList.remove('ring'); }, 900);
+        /* Marks the bell as carrying something, which is what turns the badge
+           red and starts its halo. Separate from the ring: the ring is the
+           moment it arrived, this is the state it leaves behind. */
+        if (anBell) anBell.classList.add('has-new');
+        if (!had || count > was) ring();
+      }
+
+      /* Ring once on arrival if something is already waiting. Without this the
+         bell only ever moved when a notification landed while you happened to
+         be looking at the page — so anything that came in overnight sat there
+         silently, which is the case the client described. */
+      if (anBell && anBell.querySelector('.bell-badge')) {
+        anBell.classList.add('has-new');
+        setTimeout(ring, 600);
       }
 
       function poll(){

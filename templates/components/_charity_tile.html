@@ -12,12 +12,25 @@ publish no usable icon — bot-protected sites, a 16px favicon of mush — and i
 colour is derived from the name, so the same charity is the same colour here as
 on the ballot.
 
+A tile becomes a LINK when `edit_url` is given and the charity is one this
+viewer may change (charity.can_edit, set by the view). That is how a logo the
+automatic fetch could not find gets supplied: press the charity, land on the
+form. Without an edit_url it stays a plain tile, which is what the ballot and
+the summaries want — those are places you read a charity, not places you
+change one.
+
 Params:
-  charity  (required)
-  note     optional — small line under the website
-  chip     optional — a short status word, top right
+  charity   (required)
+  edit_url  optional — makes the tile a link when charity.can_edit
+  note      optional — small line under the website
+  chip      optional — a short status word, top right
 {% endcomment %}
+{% if edit_url and charity.can_edit %}
+<a class="ch-item is-editable" href="{{ edit_url }}" title="Edit {{ charity.name }}">
+  <span class="ch-item-edit" aria-hidden="true"><svg><use href="#ic-sliders"/></svg></span>
+{% else %}
 <div class="ch-item">
+{% endif %}
   <div class="ch-item-top">
     {% if charity.logo %}
     <img class="ch-item-logo" src="{{ charity.logo.url }}" alt="" loading="lazy" width="56" height="56">
@@ -29,4 +42,12 @@ Params:
   <div class="ch-item-name">{{ charity.name }}</div>
   {% if charity.website_label %}<div class="ch-item-url">{{ charity.website_label }}</div>{% endif %}
   {% if note %}<div class="ch-item-note">{{ note }}</div>{% endif %}
-</div>
+  {% if edit_url and charity.can_edit and not charity.logo %}
+  {% comment %}
+  Said out loud on the tiles that need it. "No logo" is the one thing an admin
+  on this screen can fix in thirty seconds, and it is invisible unless you
+  already know the initials tile is a fallback rather than the design.
+  {% endcomment %}
+  <div class="ch-item-fix">Add a logo &rarr;</div>
+  {% endif %}
+{% if edit_url and charity.can_edit %}</a>{% else %}</div>{% endif %}

@@ -218,11 +218,11 @@ them, and "why has nothing appeared" should have an answer on this page.
             {% if run.state == "ok" %}
               <b style="color:var(--forest);">{{ run.matches_touched }}</b>
             {% elif run.is_stuck %}
-              <b style="color:#C0392B;">stalled</b>
+              <b style="color:var(--danger);">stalled</b>
             {% elif run.state == "running" %}
               <b style="color:var(--ink);opacity:.6;">running</b>
             {% else %}
-              <b style="color:#C0392B;" title="{{ run.message }}">failed</b>
+              <b style="color:var(--danger);" title="{{ run.message }}">failed</b>
             {% endif %}
           </div>
           {% endfor %}
@@ -258,8 +258,8 @@ them, and "why has nothing appeared" should have an answer on this page.
       <div class="gsc-row" style="font-size:12.5px;align-items:flex-start;">
         <span>
           <b>{{ c.series.name }}</b>
-          {% if not c.feed %}<br><small style="color:#C0392B;">No feed &mdash; fixtures cannot be fetched</small>
-          {% elif c.missing %}<br><small style="color:#C0392B;">Missing rounds {{ c.missing|join:", " }}</small>
+          {% if not c.feed %}<br><small style="color:var(--danger);">No feed &mdash; fixtures cannot be fetched</small>
+          {% elif c.missing %}<br><small style="color:var(--danger);">Missing rounds {{ c.missing|join:", " }}</small>
           {% endif %}
         </span>
         <b style="text-align:right;white-space:nowrap;">

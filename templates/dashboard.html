@@ -453,22 +453,6 @@ is the part members care about and the part that is still true.
   {% endcomment %}
 </div>
 
-<!-- what's locking across your other comps -->
-{% if locking_soon %}
-<div class="hub-h" style="margin-bottom:12px;"><span class="k">Locking soon in your other comps</span></div>
-<div class="locksoon">
-  {% for oc in locking_soon|slice:":6" %}
-  <a class="ls-row" href="?org={{ oc.org.id }}">
-    <span class="ls-live">Live</span>
-    <span class="ls-name">{{ oc.org.name }}</span>
-    <span class="ls-round">R{{ oc.round.round_number }} &middot; {{ oc.round.series }}</span>
-    <span class="ls-tips {% if oc.tips_done < oc.tips_total %}warn{% endif %}">{{ oc.tips_done }}/{{ oc.tips_total }}</span>
-    <span class="ls-lock">locks in {{ oc.round.lockout_at|timeuntil }}</span>
-  </a>
-  {% endfor %}
-</div>
-{% endif %}
-
 <!-- news & blog — cards click through to the full story -->
 {% if news_leads %}
 <div class="hub-h" style="margin-bottom:14px;"><span class="k">News &amp; blog</span><a href="{% url 'news_index' %}">All news &amp; blog &rarr;</a></div>

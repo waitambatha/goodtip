@@ -169,6 +169,38 @@ def system_report_view(request):
         "tips_last_7d": Tip.objects.filter(submitted_at__gte=last_7d).count(),
     }
 
+    # The four things the top row was missing. Each of these has a screen an
+    # admin visits regularly, and none of them had a number anywhere — so
+    # "is there anything in News?" or "how many people can get into HQ?" meant
+    # opening the page to find out.
+    #
+    # Guarded as a block: the report is a diagnostic screen and must still
+    # render if one of these models is mid-migration. A chrome element is
+    # never the thing that takes the admin down.
+    try:
+        from admin_panel.models import NewsPost, PageEdit
+        from admin_panel import pages as page_registry
+
+        from .models import AdminAccess
+
+        counts.update({
+            "news": NewsPost.objects.count(),
+            "news_published": NewsPost.objects.filter(is_published=True).count(),
+            "news_last_30d": NewsPost.objects.filter(published_at__gte=last_30d).count(),
+            "pages": len(page_registry.PAGES),
+            "pages_public": sum(
+                1 for pg in page_registry.PAGES
+                if pg.group == page_registry.GROUP_PUBLIC
+            ),
+            "page_edits": PageEdit.objects.count(),
+            "enquiries": Enquiry.objects.count(),
+            "enquiries_last_7d": Enquiry.objects.filter(created_at__gte=last_7d).count(),
+            "team": AdminAccess.objects.count(),
+            "team_active": AdminAccess.objects.filter(is_active=True).count(),
+        })
+    except Exception:
+        pass
+
     login_counts = {
         "last_24h": LoginEvent.objects.filter(created_at__gte=last_24h, success=True).count(),
         "last_7d": LoginEvent.objects.filter(created_at__gte=last_7d, success=True).count(),

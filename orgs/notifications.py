@@ -322,3 +322,77 @@ def send_news_published(post, recipients) -> int:
             },
         ))
     return send_bulk(messages)
+
+
+def notify_new_message(entry) -> int:
+    """Tell whoever is in this conversation that it just moved.
+
+    The bell had nothing to say about messages at all: a member's question sat
+    in an admin's inbox, or an admin's answer sat in a member's, and the only
+    way to find out was to go and look. It is the one kind of thing on this
+    platform that is addressed to a *person*, which makes it the last thing
+    that should have been silent.
+
+    WHO GETS TOLD, AND WHY IT IS NOT "EVERYONE WHO CAN READ IT".
+    A notice sent to the whole organisation is readable by all of it. If a
+    reply to one notified everyone who could read it, one member answering
+    "thanks" would ring two hundred bells. So:
+
+      * the admins of the organisation, because answering is their job; and
+      * whoever started the thread, because it is their conversation.
+
+    Never the author — you do not get a notification for your own message —
+    and never somebody who has since left the organisation.
+
+    The FIRST message of a broadcast notice is the exception, and it is
+    handled where notices are sent rather than here: that one really is
+    addressed to everybody.
+    """
+    from .models import Notification, OrgMember
+
+    thread = entry.thread
+    audience = set(
+        OrgMember.objects
+        .filter(org_id=thread.org_id, role__in=(OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH))
+        .values_list("user_id", flat=True)
+    )
+    if thread.started_by_id:
+        audience.add(thread.started_by_id)
+    audience.discard(entry.author_id)
+    # Membership is re-checked rather than assumed: started_by may have left.
+    members = set(
+        OrgMember.objects.filter(org_id=thread.org_id, user_id__in=audience)
+        .values_list("user_id", flat=True)
+    )
+    if not members:
+        return 0
+
+    who = getattr(entry.author, "display_name", None) or "Someone"
+
+    # Each recipient is sent to their OWN side of the conversation. Both ends
+    # render the same thread and an admin may read it either way, but landing
+    # an admin on the member's page means the close/reopen controls are not
+    # where they left them — and the back link goes to the wrong inbox.
+    admin_ids = set(
+        OrgMember.objects
+        .filter(org_id=thread.org_id, user_id__in=members,
+                role__in=(OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH))
+        .values_list("user_id", flat=True)
+    )
+    member_link = f"/leagues/{thread.org_id}/messages/{thread.id}/"
+    admin_link = f"/manage/messages/{thread.id}/"
+
+    Notification.objects.bulk_create([
+        Notification(
+            user_id=uid,
+            org_id=thread.org_id,
+            kind=Notification.KIND_MESSAGE,
+            title=f"{who}: {thread.subject}",
+            # One line of it, so the toast says something before it is opened.
+            # The whole body would be a toast the size of the page.
+            message=(entry.body or "").strip()[:140],
+            link_url=admin_link if uid in admin_ids else member_link,
+        )
+        for uid in members
+    ])
+    return len(members)

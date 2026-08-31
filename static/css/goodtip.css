@@ -53,6 +53,12 @@
   --section-y: clamp(64px, 9vw, 112px);
   --maxw: 1180px;
 
+  /* ---- State ----
+     "Something is wrong" as a token rather than a literal. The five places
+     that spelled a red inline (#C0392B, #9a2b2b) all sat on cream and stopped
+     being legible the moment the surface under them could go dark. */
+  --danger: #B3261E;
+
   /* ---- Misc ---- */
   --radius: 2px;          /* angular, sporty — almost no rounding */
   --ease: cubic-bezier(.22,.61,.36,1);
@@ -2415,9 +2421,9 @@ a.news-item.news-link:hover .nt { color: var(--forest); }
 .atable.compact td { padding: 10px 14px; }
 .mini-form { background: var(--app-card); border: 1px solid var(--app-line); border-radius: 12px; padding: 20px; }
 .status-pill { font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 3px 9px; border-radius: 100px; }
-.status-pill.open { background: rgba(45,122,58,.15); color: #1c5e30; }
-.status-pill.locked { background: rgba(15,46,34,.1); color: var(--muted); }
-.status-pill.draft { background: rgba(178,120,40,.14); color: #8a5a12; }
+.status-pill.open { background: rgba(45,122,58,.15); color: var(--ad-ok-fg, #1c5e30); }
+.status-pill.locked { background: var(--ad-quiet-bg, rgba(15,46,34,.1)); color: var(--muted); }
+.status-pill.draft { background: rgba(178,120,40,.14); color: var(--ad-gold-fg, #8a5a12); }
 
 /* ==========================================================================
    ============ v8 — password toggle · copy feedback · ADMIN polish ========
@@ -2742,16 +2748,11 @@ a.news-item.news-link:hover .nt { color: var(--forest); }
 .ac-empty { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 16px; font-size: 14px; color: var(--muted); }
 
 /* other comps about to lock — a notification strip, not a wall of cards */
-.locksoon { display: flex; flex-direction: column; gap: 8px; margin-bottom: 26px; }
-.ls-row { display: grid; grid-template-columns: auto 1fr auto auto auto; align-items: center; gap: 14px; padding: 12px 16px; background: var(--app-card); border: 1px solid var(--app-line); border-radius: 12px; text-decoration: none; transition: border-color .15s var(--ease), transform .15s var(--ease); }
-.ls-row:hover { border-color: rgba(169,209,28,.6); transform: translateX(3px); }
-.ls-live { font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--deep); background: var(--lime); padding: 4px 9px; border-radius: 100px; }
-.ls-name { font-weight: 700; color: var(--ink); font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ls-round { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
-.ls-tips { font-family: var(--score); font-weight: 800; font-size: 14px; color: var(--forest); }
-.ls-tips.warn { color: #9a6b1f; }
-.ls-lock { font-size: 12.5px; font-weight: 700; color: var(--ink); opacity: .75; white-space: nowrap; }
-@media (max-width: 680px){ .ls-row { grid-template-columns: auto 1fr auto; } .ls-round, .ls-tips { display: none; } }
+/* The dashboard's "Locking soon in your other comps" strip used to live
+   here. Removed Aug 2026 at the client's request: on an account in six
+   organisations it repeated the same round six times under the fixtures
+   the member had actually come to tip. The organisation switcher in the
+   nav is how you reach another comp. */
 
 /* ==========================================================================
    ===== CREATE PAGE — deep green stage (no cream), imagery through glass ===
@@ -3634,10 +3635,10 @@ a.gt-stat:hover .gs-go { opacity: 1; color: var(--lime); }
 .gt-prov.ok .gpv-state { color: var(--forest); }
 .gt-prov.wait .gpv-state { color: #8a5a12; }
 .gt-chip { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: 4px 11px; border-radius: 100px; }
-.gt-chip.ready { background: rgba(45,122,58,.15); color: #1c5e30; }
-.gt-chip.needs { background: rgba(212,160,48,.22); color: #7a5410; }
-.gt-chip.live  { background: rgba(45,122,58,.15); color: #1c5e30; }
-.gt-chip.draft { background: rgba(15,46,34,.09); color: var(--muted); }
+.gt-chip.ready { background: rgba(45,122,58,.15); color: var(--ad-ok-fg, #1c5e30); }
+.gt-chip.needs { background: rgba(212,160,48,.22); color: var(--ad-gold-fg, #7a5410); }
+.gt-chip.live  { background: rgba(45,122,58,.15); color: var(--ad-ok-fg, #1c5e30); }
+.gt-chip.draft { background: var(--ad-quiet-bg, rgba(15,46,34,.09)); color: var(--muted); }
 
 /* ==========================================================================
    MEMBER PAGES — My Tips, Leaderboard, The Wall
@@ -3908,7 +3909,7 @@ a.gt-stat:hover .gs-go { opacity: 1; color: var(--lime); }
 .pg-url {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12.5px; color: var(--muted);
-  background: rgba(15, 46, 34, .05);
+  background: var(--ad-quiet-bg, rgba(15, 46, 34, .05));
   padding: 3px 7px; border-radius: 5px;
 }
 
@@ -3917,7 +3918,7 @@ a.gt-stat:hover .gs-go { opacity: 1; color: var(--lime); }
   font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
 }
 .pg-tag.is-ok { background: rgba(45, 122, 58, .14); color: var(--forest); }
-.pg-tag.is-warn { background: rgba(212, 160, 23, .18); color: #8a6508; }
+.pg-tag.is-warn { background: rgba(212, 160, 23, .18); color: var(--ad-gold-fg, #8a6508); }
 
 .pg-bullets { margin: 0; padding-left: 20px; color: var(--muted); font-size: 14px; }
 .pg-bullets li { margin-bottom: 9px; line-height: 1.55; }
@@ -3987,7 +3988,7 @@ a.gt-stat:hover .gs-go { opacity: 1; color: var(--lime); }
 /* empty state */
 .gt-empty {
   display: flex; align-items: center; gap: 20px; position: relative; overflow: hidden;
-  background: #EDEBE1; border: 1px solid var(--gt-hair);
+  background: var(--ad-empty-bg, #EDEBE1); border: 1px solid var(--gt-hair);
   border-radius: var(--gt-r); padding: 28px clamp(22px, 2.6vw, 30px);
 }
 .gt-empty .ge-ic { width: 58px; height: 58px; border-radius: 50%; flex: none; display: grid; place-items: center; background: var(--gt-deep); color: var(--lime); }
@@ -4069,8 +4070,8 @@ a.gt-stat:hover .gs-go { opacity: 1; color: var(--lime); }
   transition: border-color .15s var(--ease), background .15s var(--ease);
 }
 .gt-actions button:hover, .gt-actions a:hover { border-color: var(--forest); background: rgba(45,122,58,.07); }
-.gt-actions button.danger { color: #9a2b2b; }
-.gt-actions button.danger:hover { border-color: #9a2b2b; background: rgba(154,43,43,.07); }
+.gt-actions button.danger { color: var(--danger, #9a2b2b); }
+.gt-actions button.danger:hover { border-color: var(--danger, #9a2b2b); background: rgba(154,43,43,.07); }
 
 /* ---- search field with a leading icon ---------------------------------- */
 .gt-search { position: relative; }
@@ -4562,9 +4563,10 @@ body.gwm-open { overflow: hidden; }
 .gpt-replybox textarea:focus { outline: none; border-color: var(--forest); box-shadow: 0 0 0 3px rgba(45,122,58,.12); }
 .gpt-replybox button { flex: 0 0 auto; }
 @media (max-width: 560px) {
-  .gpt-replybox { flex-wrap: wrap; }
-  .gpt-replybox textarea { flex: 1 1 100%; order: 1; }
-  .gpt-replybox button { order: 2; margin-left: auto; }
+  /* Superseded by the .gpr-row rules further down: the box is a column now,
+     and it is the row inside it that wraps. Left as a no-op would be a rule
+     fighting the layout, so it states the row instead. */
+  .gpt-replybox .gpr-row { flex-wrap: wrap; }
 }
 
 /* ==========================================================================
@@ -7246,13 +7248,22 @@ body.gtc-open { overflow: hidden; }
 }
 .enq-tabs a:hover { opacity: 1; border-color: rgba(15,46,34,.34); }
 .enq-tabs a.on { opacity: 1; background: var(--deep); color: var(--cream); border-color: var(--deep); }
+/* On the dark palette a deep-forest pill on a near-black card reads as a
+   hole, not as the tab you are on. The accent takes the job over, the same
+   way .gts-tab and .gt-chip do. */
+html[data-theme="dark"] .enq-tabs a.on { background: var(--lime); color: var(--deep); border-color: var(--lime); }
+@media (prefers-color-scheme: dark) {
+  html[data-theme="auto"] .enq-tabs a.on, html:not([data-theme]) .enq-tabs a.on {
+    background: var(--lime); color: var(--deep); border-color: var(--lime);
+  }
+}
 
 .enq-snip { display: block; margin-top: 4px; color: var(--muted); font-size: 13px; }
 .gt-muted { color: var(--muted); }
 
 .enq-body {
   font-size: 16px; line-height: 1.7; color: var(--ink);
-  background: rgba(15,46,34,.04); border-left: 3px solid var(--forest);
+  background: var(--ad-quiet-bg, rgba(15,46,34,.04)); border-left: 3px solid var(--forest);
   border-radius: 0 12px 12px 0; padding: 18px 22px; margin-bottom: 20px;
 }
 .enq-body.enq-reply { border-left-color: var(--lime); }
@@ -7267,7 +7278,7 @@ body.gtc-open { overflow: hidden; }
 .enq-label { display: block; font-weight: 700; font-size: 14px; color: var(--ink); margin-bottom: 8px; }
 .enq-textarea {
   width: 100%; padding: 16px 18px; border-radius: 12px;
-  border: 1.5px solid rgba(15,46,34,.2); background: #fff;
+  border: 1.5px solid var(--ad-line-3, rgba(15,46,34,.2)); background: var(--ad-field, #fff);
   font-family: var(--body); font-size: 15.5px; line-height: 1.65; color: var(--ink);
   resize: vertical; outline: none;
 }
@@ -10107,7 +10118,7 @@ body.fxh-open { overflow: hidden; }
 /* Delete is pushed to the far end AND coloured, because in the old row it was
    the fourth of four identical links — one slip from Email members. */
 .np-del { margin-left: auto; }
-.np-btn-danger { color: #9a2b2b; border-color: rgba(154,43,43,.28); background: rgba(154,43,43,.05); }
+.np-btn-danger { color: var(--danger, #9a2b2b); border-color: rgba(154,43,43,.28); background: rgba(154,43,43,.05); }
 .np-btn-danger:hover { background: #9a2b2b; border-color: #9a2b2b; color: #fff; }
 
 @media (max-width: 560px) {
@@ -11265,15 +11276,11 @@ body.fxh-open { overflow: hidden; }
 .msg-actions { margin-bottom: 20px; }
 .msg-actions .abtn svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 2; }
 
-.msg-list .gt-row { align-items: center; }
-.msg-row-ic {
-  flex: none; width: 38px; height: 38px; border-radius: 11px;
-  display: grid; place-items: center; margin-right: 12px;
-  background: rgba(255,255,255,.06);
-}
-.msg-row-ic svg { width: 17px; height: 17px; stroke: rgba(255,255,255,.72); fill: none; stroke-width: 1.9; }
-.msg-row-ic.notice { background: rgba(200,241,53,.12); }
-.msg-row-ic.notice svg { stroke: var(--lime); }
+/* `.msg-list .gt-row` and `.msg-row-ic` used to sit here. Both were written
+   against `.gt-row`, a component that only ever existed inside gt-shell.css's
+   `body.gt-shell` block — which the member's inbox is not — so the row they
+   were tuning had no styling to tune. The inbox row is `.msg-item` now,
+   shared with the organisation admin's list, and it carries its own icon. */
 
 /* The empty state is a designed state, not a gap — most members will never
    have written to their admins, and that is not a failure. */
@@ -11855,3 +11862,1158 @@ tr.is-off { opacity: .55; }
 .inv-grants ul.is-reviewed { color: #E8D48A; }
 .inv-grants ul:last-child { margin-bottom: 0; }
 .inv-note { font-size: 12.5px; opacity: .75; margin: 0; }
+
+/* ==========================================================================
+   ABOUT US + PRIVACY POLICY
+   ==========================================================================
+   Both pages shipped with markup that named classes this stylesheet did not
+   have — `.prose`, `.cards-3`, `.card-lift`, `.wrap-narrow`. Nothing was
+   broken in the sense of throwing; the pages simply rendered as unstyled
+   paragraphs and square divs, which is what "the About page doesn't look
+   finished" meant. Everything below is the missing half.
+
+   The two pages share a vocabulary on purpose. A privacy policy that looks
+   like it was bolted on by a different team is the exact thing that makes a
+   reader distrust it, so it gets the same rails, the same card, the same
+   heading rhythm as the page that sells the product — only quieter.
+   ========================================================================== */
+
+/* ---- Prose ---------------------------------------------------------------
+   Measure first. These are the only two pages on the site where somebody
+   reads more than three sentences in a row, so the column is capped at 68
+   characters and the leading is opened up; everything else here follows from
+   that. */
+.prose { max-width: 68ch; font-size: 17px; line-height: 1.78; color: var(--ink); }
+.prose > * + * { margin-top: 18px; }
+.prose p { margin: 0; }
+.prose strong { font-weight: 700; color: var(--deep); }
+.prose a { color: var(--forest); text-decoration: underline; text-underline-offset: 3px; }
+.prose a:hover { color: var(--deep); }
+.prose h2 {
+  font-family: var(--display); font-size: 22px; line-height: 1.25;
+  color: var(--deep); margin-top: 34px;
+}
+.prose h3 { font-family: var(--display); font-size: 18px; color: var(--deep); margin-top: 26px; }
+.prose ul, .prose ol { margin: 0; padding-left: 22px; }
+.prose li + li { margin-top: 8px; }
+.prose-wide { max-width: 78ch; }
+
+.wrap-narrow { max-width: 860px; margin-left: auto; margin-right: auto; }
+
+/* ---- Rotating side rails, for public pages with a narrow column ----------
+   The app has `.page-scenes` for this and it is the right shape, but it is
+   fixed to the viewport edges — which works there because the app content
+   sits on a centred sheet. A public section is full-bleed, so the same markup
+   would simply be painted over. `.pg-rails` is the public variant: it hangs
+   off the section rather than the viewport, so it fills exactly the margin
+   the content is not using and disappears the moment that margin is gone. */
+.pg-rails { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.pg-rails .rail { position: absolute; top: 0; bottom: 0; width: clamp(120px, 13vw, 230px); overflow: hidden; }
+.pg-rails .rail.left { left: 0; }
+.pg-rails .rail.right { right: 0; }
+.pg-rails .shot {
+  position: absolute; inset: 0; background-size: cover; background-position: center;
+  opacity: 0; transition: opacity 2s var(--ease);
+}
+.pg-rails .shot.on { opacity: 1; }
+/* A wash towards the content, so the column never has to compete with a
+   photograph for the reader's eye at the edge of the measure. */
+.pg-rails .rail::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(244,242,234,.25), rgba(244,242,234,.86) 62%, var(--cream-2));
+}
+.pg-rails .rail.right::after {
+  background: linear-gradient(270deg, rgba(244,242,234,.25), rgba(244,242,234,.86) 62%, var(--cream-2));
+}
+.has-rails { position: relative; }
+.has-rails > .wrap, .has-rails > .wrap-narrow { position: relative; z-index: 1; }
+@media (max-width: 1240px) { .pg-rails { display: none; } }
+
+/* ---- The card that lifts -------------------------------------------------
+   Used by both pages and by the values grid. Three things happen on hover and
+   they are one gesture, not three: the card rises, its top rule fills from
+   the left in lime, and the icon tile warms. Pulling any one of them out
+   leaves a hover that reads as a mistake rather than as a response. */
+.cards-3 { display: grid; gap: 18px; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+.cards-2 { display: grid; gap: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+@media (max-width: 900px) { .cards-3, .cards-2 { grid-template-columns: 1fr; } }
+
+.card-lift {
+  position: relative; display: flex; flex-direction: column; gap: 10px;
+  background: var(--white);
+  border: 1px solid rgba(15,46,34,.10);
+  border-radius: 16px;
+  padding: 26px 24px 24px;
+  overflow: hidden;
+  transition: transform .3s var(--ease), box-shadow .3s var(--ease), border-color .3s var(--ease);
+}
+.card-lift::before {
+  content: ""; position: absolute; left: 0; top: 0; height: 3px; width: 100%;
+  background: linear-gradient(90deg, var(--lime), var(--forest));
+  transform: scaleX(0); transform-origin: left;
+  transition: transform .45s var(--ease);
+}
+.card-lift:hover, .card-lift:focus-within {
+  transform: translateY(-6px);
+  border-color: rgba(45,122,58,.28);
+  box-shadow: 0 18px 40px -22px rgba(15,46,34,.45);
+}
+.card-lift:hover::before, .card-lift:focus-within::before { transform: scaleX(1); }
+.card-lift h3 { font-family: var(--display); font-size: 19px; line-height: 1.25; color: var(--deep); margin: 0; }
+.card-lift p { margin: 0; font-size: 15px; line-height: 1.65; color: #4A5A4F; }
+
+/* The icon tile. Its lime ring is drawn as a second box so it can scale
+   independently of the glyph — scaling the tile itself would drag the icon
+   with it and read as a zoom rather than as a pulse. */
+.card-lift .cl-ic {
+  position: relative; width: 46px; height: 46px; border-radius: 13px;
+  display: grid; place-items: center; margin-bottom: 4px;
+  background: rgba(45,122,58,.10); color: var(--forest);
+  transition: background .3s var(--ease), color .3s var(--ease);
+}
+.card-lift .cl-ic svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.card-lift .cl-ic::after {
+  content: ""; position: absolute; inset: -5px; border-radius: 17px;
+  border: 1px solid rgba(200,241,53,0);
+  transition: border-color .35s var(--ease), inset .35s var(--ease);
+}
+.card-lift:hover .cl-ic { background: var(--deep); color: var(--lime); }
+.card-lift:hover .cl-ic::after { border-color: rgba(200,241,53,.55); inset: -8px; }
+
+/* A watermark numeral, bottom right. Decorative and deliberately nearly
+   invisible until the card is hovered — it gives the set an order without
+   spending a line of the card on one. */
+.card-lift .cl-n {
+  position: absolute; right: 14px; bottom: 2px;
+  font-family: var(--display); font-size: 62px; line-height: 1;
+  color: rgba(15,46,34,.05); pointer-events: none;
+  transition: color .35s var(--ease), transform .35s var(--ease);
+}
+.card-lift:hover .cl-n { color: rgba(45,122,58,.10); transform: translateY(-3px); }
+
+/* On dark sections the same card flips its ground rather than getting a
+   second class — one component, two grounds. */
+.on-dark .card-lift { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.12); }
+.on-dark .card-lift h3 { color: var(--white); }
+.on-dark .card-lift p { color: rgba(232,228,213,.78); }
+.on-dark .card-lift .cl-ic { background: rgba(200,241,53,.14); color: var(--lime); }
+.on-dark .card-lift .cl-n { color: rgba(255,255,255,.05); }
+.on-dark .card-lift:hover { border-color: rgba(200,241,53,.4); }
+.on-dark .card-lift:hover .cl-ic { background: var(--lime); color: var(--deep); }
+
+/* ---- About: the story split ---------------------------------------------
+   Heading sticks while the prose scrolls past it. The two are one thought and
+   the heading is the half you need to still have in view at the bottom of
+   the column. Collapses to stacked below 960px, where sticky would mean the
+   heading eating a third of a phone screen for the whole section. */
+.story-split { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: clamp(28px, 5vw, 72px); align-items: start; }
+.story-split .ss-aside { position: sticky; top: 108px; }
+.story-split .ss-aside .eyebrow { margin-bottom: 10px; }
+.story-split .ss-aside h2 { font-family: var(--display); font-size: clamp(26px, 3vw, 38px); line-height: 1.14; color: var(--deep); margin: 0; }
+.story-split .ss-aside .ss-rule { width: 62px; height: 3px; margin-top: 18px; background: linear-gradient(90deg, var(--lime), var(--forest)); border-radius: 2px; }
+@media (max-width: 960px) {
+  .story-split { grid-template-columns: 1fr; }
+  .story-split .ss-aside { position: static; }
+}
+
+/* ---- About: the figure row ----------------------------------------------
+   Three facts, equal weight, no ranking. Sits half over the section boundary
+   so it reads as belonging to both the hero above and the story below. */
+.fact-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: rgba(15,46,34,.10); border: 1px solid rgba(15,46,34,.10); border-radius: 16px; overflow: hidden; }
+.fact-row .fact { background: var(--white); padding: 26px 22px; text-align: center; transition: background .3s var(--ease); }
+.fact-row .fact:hover { background: var(--cream-2); }
+.fact-row .fact b { display: block; font-family: var(--display); font-size: clamp(28px, 3.4vw, 40px); line-height: 1; color: var(--deep); }
+.fact-row .fact span { display: block; margin-top: 8px; font-size: 13px; letter-spacing: .04em; color: var(--muted); }
+@media (max-width: 760px) { .fact-row { grid-template-columns: 1fr; } }
+
+/* ---- Privacy: the layout -------------------------------------------------
+   A contents rail beside the clauses, because a privacy policy is a reference
+   document and nobody reads one end to end — they arrive looking for the one
+   paragraph about who can see their email address. The rail is sticky and
+   marks where you are; the clauses are cards so a section has an edge you can
+   see, which is what makes "this bit here" possible to point at. */
+.legal-layout { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: clamp(24px, 4vw, 56px); align-items: start; }
+.legal-toc { position: sticky; top: 104px; }
+.legal-toc .lt-head {
+  font-family: var(--mark); font-size: 11.5px; font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--muted);
+  padding: 0 12px 10px;
+}
+.legal-toc a {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 9px; margin-bottom: 2px;
+  font-size: 13.5px; line-height: 1.3; color: #4A5A4F; text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: background .18s, color .18s, border-color .18s;
+}
+.legal-toc a:hover { background: rgba(45,122,58,.07); color: var(--deep); text-decoration: none; }
+.legal-toc a.on { background: rgba(45,122,58,.10); border-left-color: var(--forest); color: var(--deep); font-weight: 600; }
+.legal-toc a i { font-style: normal; font-family: var(--score); font-size: 12px; color: var(--muted); min-width: 16px; }
+.legal-toc a.on i { color: var(--forest); }
+@media (max-width: 960px) {
+  .legal-layout { grid-template-columns: 1fr; }
+  /* Horizontal chip row on a phone: a 12-item vertical list above the content
+     is a wall the reader has to scroll past to reach the thing it indexes. */
+  .legal-toc { position: static; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; -webkit-overflow-scrolling: touch; }
+  .legal-toc .lt-head { display: none; }
+  .legal-toc a { flex: none; border-left: 0; border: 1px solid rgba(15,46,34,.12); border-radius: 999px; white-space: nowrap; }
+  .legal-toc a.on { border-color: var(--forest); }
+}
+
+.legal-card {
+  position: relative;
+  background: var(--white);
+  border: 1px solid rgba(15,46,34,.10);
+  border-radius: 16px;
+  padding: 26px clamp(20px, 3vw, 32px) 28px;
+  margin-bottom: 16px;
+  /* Clears the sticky nav when jumped to from the contents rail. */
+  scroll-margin-top: 96px;
+  transition: border-color .3s var(--ease), box-shadow .3s var(--ease);
+}
+.legal-card:hover { border-color: rgba(45,122,58,.24); box-shadow: 0 14px 34px -24px rgba(15,46,34,.5); }
+.legal-card > h2 {
+  display: flex; align-items: baseline; gap: 12px;
+  font-family: var(--display); font-size: 20px; line-height: 1.25; color: var(--deep);
+  margin: 0 0 14px;
+}
+.legal-card > h2 .lc-n {
+  font-family: var(--score); font-size: 13px; font-weight: 600; letter-spacing: .06em;
+  color: var(--forest); background: rgba(45,122,58,.10);
+  border-radius: 7px; padding: 3px 8px; flex: none;
+}
+/* Inside a card the prose has already been given its measure by the card. */
+.legal-card .prose { max-width: none; font-size: 15.5px; line-height: 1.72; }
+.legal-card .prose h2 { font-size: 17px; margin-top: 24px; }
+
+.legal-note {
+  display: flex; gap: 14px; align-items: flex-start;
+  background: rgba(45,122,58,.06);
+  border: 1px solid rgba(45,122,58,.18);
+  border-radius: 14px; padding: 18px 20px; margin-bottom: 20px;
+}
+.legal-note svg { width: 20px; height: 20px; flex: none; margin-top: 2px; fill: none; stroke: var(--forest); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.legal-note p { margin: 0; font-size: 14px; line-height: 1.6; color: #3C4B41; }
+.legal-note b { color: var(--deep); }
+
+/* ---- A compact hero, for pages that are mostly reading ------------------- */
+.hero-lean { position: relative; overflow: hidden; background: var(--deep); color: var(--cream); padding: clamp(96px, 12vw, 132px) 0 clamp(44px, 6vw, 64px); }
+.hero-lean .hl-bg { position: absolute; inset: 0; }
+.hero-lean .hl-bg .shot { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; transition: opacity 2s var(--ease); }
+.hero-lean .hl-bg .shot.on { opacity: .34; }
+.hero-lean .hl-veil { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(12,36,23,.72), rgba(12,36,23,.92)); }
+.hero-lean .wrap { position: relative; z-index: 1; }
+.hero-lean h1 { font-family: var(--display); font-size: clamp(34px, 5.2vw, 58px); line-height: 1.06; margin: 14px 0 0; color: var(--white); }
+.hero-lean .hl-sub { margin: 16px 0 0; max-width: 62ch; font-size: 17px; line-height: 1.7; color: rgba(232,228,213,.86); }
+.hero-lean .hl-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.hero-lean .hl-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 14px; border-radius: 999px;
+  border: 1px solid rgba(200,241,53,.35); background: rgba(200,241,53,.08);
+  font-size: 12.5px; font-weight: 600; letter-spacing: .04em; color: var(--lime);
+}
+.hero-lean .hl-chip svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; }
+
+/* ==========================================================================
+   TAKING A TIP BACK
+   ==========================================================================
+   The round page's two sides became <button>s when picking had to become a
+   toggle (templates/tip_round.html). They were labels, and a <button> arrives
+   with a user-agent font, its own text alignment and a shrink-to-fit width, so
+   the three properties a label got for free are restated here. Everything else
+   about how a side looks is unchanged — same .pick .team rules as before.
+   ========================================================================== */
+.pick button.team {
+  font: inherit; width: 100%; text-align: left;
+  appearance: none; -webkit-appearance: none;
+}
+.pick button.team.away { text-align: right; }
+.pick button.team:disabled { cursor: default; opacity: .75; }
+.pick button.team:focus-visible { outline: 2px solid var(--forest); outline-offset: 2px; }
+
+/* The tick beside a fixture has two things to say now. "Saved" is the good
+   news in forest; a take-back is not bad news and must not be red — it is the
+   member telling us something, and it reads quietly. */
+.saved-tick.undo { color: var(--muted); }
+.saved-tick.undo svg { opacity: .8; }
+
+/* ==========================================================================
+   THE CHAT
+   ==========================================================================
+   One conversation component, used by both ends of a message thread and by
+   the Wall's reply threads. Before this the three were three different
+   treatments of the same object, and the message thread in particular was a
+   stack of <p> with a name above each — legible, and not something anyone
+   would call a conversation.
+
+   TOKENS FIRST, so the component can sit on the member app's cream sheet and
+   on the manage area's white cards without a second copy of every rule. Only
+   these five change between grounds; everything below paints from them.
+   ========================================================================== */
+.chat {
+  --ch-mine:      #123A25;                    /* your bubble  — deep forest  */
+  --ch-mine-fg:   #F1F5EC;
+  --ch-theirs:    #FFFFFF;                    /* their bubble — white on cream */
+  --ch-theirs-fg: #17342A;
+  --ch-line:      rgba(15,46,34,.12);
+  --ch-quiet:     #6B7A6E;
+  --ch-accent:    var(--forest);
+}
+/* On a dark ground the two sides swap roles rather than both going dark: the
+   point of the arrangement is that the sides are TOLD APART at a glance, and
+   two dark bubbles on dark is one colour with a gap in it. */
+.page-deep .chat, .gt-dark .chat {
+  --ch-mine:      #C8F135;
+  --ch-mine-fg:   #0C2417;
+  --ch-theirs:    rgba(255,255,255,.07);
+  --ch-theirs-fg: #E8E4D5;
+  --ch-line:      rgba(232,228,213,.16);
+  --ch-quiet:     #9BAE9F;
+  --ch-accent:    var(--lime);
+}
+
+.chat-list { list-style: none; margin: 0; padding: 4px 2px 8px; display: flex; flex-direction: column; gap: 4px; }
+
+.chat-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 30px;
+  align-items: end; gap: 9px;
+  /* Set by the swipe gesture (gt-chat.js). Declared here so the transform
+     below has something to read on a row that has never been touched. */
+  --swipe: 0px;
+  transform: translateX(var(--swipe));
+  transition: transform .22s var(--ease);
+}
+/* While a finger is on it the bubble must track the finger exactly, so the
+   easing that makes the spring-back feel good has to come off. */
+.chat-row.swiping { transition: none; }
+.chat-row.mine { grid-template-columns: 30px minmax(0, 1fr) 34px; }
+.chat-row + .chat-row { margin-top: 2px; }
+/* A run from one sender closes up; a change of speaker gets air. */
+.chat-row:not(.tail) { margin-top: 14px; }
+.chat-row:first-child { margin-top: 0; }
+
+.chat-av {
+  grid-column: 1; width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center; overflow: hidden; flex: none;
+  background: var(--forest); color: #fff;
+  font-family: var(--display); font-size: 13px; line-height: 1;
+  align-self: flex-end;
+}
+.chat-av img { width: 100%; height: 100%; object-fit: cover; }
+/* Kept in the layout, hidden from view: removing it would let the second
+   bubble of a run slide under the first. */
+.chat-row.tail .chat-av { visibility: hidden; }
+.chat-row.mine .chat-av { grid-column: 3; background: var(--deep); color: var(--lime); }
+.page-deep .chat-row.mine .chat-av { background: var(--lime); color: var(--deep); }
+
+.chat-col { grid-column: 2; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+.chat-row.mine .chat-col { align-items: flex-end; }
+
+.chat-head { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; padding: 0 4px; }
+.chat-who {
+  font: inherit; font-size: 13px; font-weight: 700; line-height: 1.2;
+  color: var(--ch-theirs-fg); background: none; border: 0; padding: 0;
+  cursor: pointer; border-bottom: 1px dotted transparent;
+}
+.chat-who:hover { border-bottom-color: currentColor; }
+.chat-when { font-size: 11.5px; color: var(--ch-quiet); }
+
+/* The profile card. Sits under the name it belongs to rather than floating at
+   the pointer — a popover that follows the cursor has to be dismissed before
+   you can read anything behind it, and this is a detail you glance at. */
+.chat-peek {
+  display: inline-flex; align-items: center; gap: 10px;
+  margin: 0 0 6px; padding: 8px 12px 8px 8px;
+  background: var(--ch-theirs); color: var(--ch-theirs-fg);
+  border: 1px solid var(--ch-line); border-radius: 12px;
+  box-shadow: 0 8px 22px -14px rgba(15,46,34,.5);
+}
+.chat-peek .cp-av {
+  width: 36px; height: 36px; border-radius: 50%; overflow: hidden; flex: none;
+  display: grid; place-items: center; background: var(--forest); color: #fff;
+  font-family: var(--display); font-size: 14px;
+}
+.chat-peek .cp-av img { width: 100%; height: 100%; object-fit: cover; }
+.chat-peek .cp-body b { display: block; font-size: 13.5px; line-height: 1.25; }
+.chat-peek .cp-body small { display: block; font-size: 11.5px; color: var(--ch-quiet); }
+
+.chat-bubble {
+  position: relative;
+  max-width: min(78%, 560px);
+  padding: 10px 13px 8px;
+  border-radius: 16px;
+  background: var(--ch-theirs); color: var(--ch-theirs-fg);
+  border: 1px solid var(--ch-line);
+  box-shadow: 0 1px 2px rgba(15,46,34,.05);
+  /* The tail. One square corner on the sender's side, which is the whole of
+     the "speech bubble" idea and costs no pseudo-element. */
+  border-bottom-left-radius: 5px;
+}
+.chat-row.mine .chat-bubble {
+  background: var(--ch-mine); color: var(--ch-mine-fg);
+  border-color: transparent;
+  border-bottom-left-radius: 16px; border-bottom-right-radius: 5px;
+}
+/* Only the LAST bubble of a run wears the tail; the ones above it are the
+   same person still talking. A row is mid-run when the row after it is a
+   tail — which is a look-ahead, so :has() rather than :not(:last-child). That
+   earlier form asked a different question ("is this the last row on the
+   page") and got the answer wrong for every run but the final one. */
+.chat-row:has(+ .chat-row.tail) .chat-bubble { border-bottom-left-radius: 16px; }
+.chat-row.mine:has(+ .chat-row.tail) .chat-bubble { border-bottom-right-radius: 16px; }
+
+.chat-text { margin: 0; font-size: 14.5px; line-height: 1.55; overflow-wrap: anywhere; }
+.chat-stamp { display: block; margin-top: 3px; font-size: 10.5px; text-align: right; opacity: .6; }
+
+/* The quote of the message being answered. A left bar and a tint, the shape
+   every chat app uses for this — recognised before it is read. */
+.chat-quote {
+  display: block; margin: -2px 0 7px; padding: 6px 10px;
+  border-left: 3px solid var(--ch-accent); border-radius: 7px;
+  background: rgba(15,46,34,.06); text-decoration: none; color: inherit;
+}
+.chat-row.mine .chat-quote { background: rgba(255,255,255,.12); }
+.page-deep .chat-quote { background: rgba(255,255,255,.09); }
+.page-deep .chat-row.mine .chat-quote { background: rgba(12,36,23,.14); }
+.chat-quote:hover { text-decoration: none; filter: brightness(.97); }
+.chat-quote b { display: block; font-size: 11.5px; letter-spacing: .01em; }
+.chat-quote span { display: block; font-size: 12.5px; opacity: .78; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Landing on a quoted message. Two beats, so it is visible on a screen the
+   reader is still scrolling. */
+@keyframes chat-flash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(200,241,53,0); }
+  20%, 60% { box-shadow: 0 0 0 4px rgba(200,241,53,.55); }
+}
+.chat-row.chat-lit .chat-bubble { animation: chat-flash 1.5s var(--ease); border-radius: 16px; }
+
+.chat-files { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 2px; }
+.chat-shot {
+  display: block; width: 148px; height: 108px; border-radius: 10px; overflow: hidden;
+  border: 1px solid var(--ch-line); background: rgba(15,46,34,.06);
+}
+.chat-shot img { width: 100%; height: 100%; object-fit: cover; transition: transform .3s var(--ease); }
+.chat-shot:hover img { transform: scale(1.05); }
+.chat-file {
+  display: inline-flex; align-items: center; gap: 9px; max-width: 100%;
+  padding: 8px 12px 8px 9px; border-radius: 10px; text-decoration: none;
+  background: rgba(15,46,34,.06); border: 1px solid var(--ch-line); color: inherit;
+}
+.chat-row.mine .chat-file { background: rgba(255,255,255,.12); }
+.chat-file:hover { text-decoration: none; border-color: var(--ch-accent); }
+.chat-file .cf-ic { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: rgba(255,255,255,.18); flex: none; }
+.chat-file .cf-ic svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.9; }
+.chat-file .cf-txt { min-width: 0; }
+.chat-file .cf-txt b { display: block; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-file .cf-txt small { display: block; font-size: 11px; opacity: .7; }
+
+/* The reply arrow. Present but nearly invisible until the row is hovered, so
+   a thread is bubbles rather than bubbles-and-a-column-of-buttons. It stays
+   fully visible on touch, where there is no hover to reveal it with. */
+.chat-replybtn {
+  grid-column: 3; align-self: center; justify-self: center;
+  width: 28px; height: 28px; border-radius: 50%; padding: 0;
+  display: grid; place-items: center; cursor: pointer;
+  background: transparent; border: 1px solid transparent; color: var(--ch-quiet);
+  opacity: 0; transition: opacity .18s, background .18s, color .18s;
+}
+.chat-row.mine .chat-replybtn { grid-column: 1; }
+.chat-replybtn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.chat-row:hover .chat-replybtn, .chat-replybtn:focus-visible { opacity: 1; }
+.chat-replybtn:hover { background: rgba(45,122,58,.12); color: var(--ch-accent); border-color: var(--ch-line); }
+@media (hover: none) { .chat-replybtn { opacity: .5; } }
+
+/* The swipe target, revealed from under the bubble as it travels. Positioned
+   from the row's own box rather than placed in the grid — an auto-placed
+   pseudo-element would take a grid cell and push the avatar out of one. */
+.chat-row::before {
+  content: ""; position: absolute; top: 50%; transform: translateY(-50%);
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--ch-accent); opacity: 0;
+  transition: opacity .15s;
+  pointer-events: none;
+}
+.chat-row.theirs::before { left: 2px; }
+.chat-row.mine::before { right: 2px; }
+.chat-row.will-reply::before { opacity: .9; }
+
+.chat-none { text-align: center; padding: 26px 0; color: var(--ch-quiet); font-size: 14px; }
+
+/* ---- The composer -------------------------------------------------------- */
+.chat-composer {
+  margin-top: 14px; padding: 10px;
+  background: var(--ch-theirs); border: 1px solid var(--ch-line);
+  border-radius: 16px;
+}
+.page-deep .chat-composer { background: rgba(255,255,255,.05); }
+
+.cc-quote {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 8px 7px 0; margin: 0 2px 8px;
+  border-radius: 9px; background: rgba(45,122,58,.08);
+}
+.cc-quote .ccq-bar { width: 3px; align-self: stretch; border-radius: 3px; background: var(--ch-accent); margin-left: 8px; flex: none; }
+.cc-quote .ccq-txt { min-width: 0; flex: 1 1 auto; }
+.cc-quote .ccq-txt b { display: block; font-size: 12px; color: var(--ch-accent); }
+.cc-quote .ccq-txt small { display: block; font-size: 12.5px; color: var(--ch-quiet); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-quote .ccq-x { font: inherit; font-size: 19px; line-height: 1; background: none; border: 0; color: var(--ch-quiet); cursor: pointer; padding: 0 6px; }
+.cc-quote .ccq-x:hover { color: var(--ch-theirs-fg); }
+
+.cc-files { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 2px 8px; }
+.cc-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 6px 5px 10px; border-radius: 999px;
+  background: rgba(45,122,58,.10); border: 1px solid var(--ch-line);
+  font-size: 12px; max-width: 100%;
+}
+.cc-chip b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.cc-chip small { color: var(--ch-quiet); }
+.cc-chip-x { font: inherit; font-size: 15px; line-height: 1; background: none; border: 0; cursor: pointer; color: var(--ch-quiet); padding: 0 2px; }
+.cc-chip-x:hover { color: #B3261E; }
+
+.cc-row { display: flex; align-items: flex-end; gap: 8px; }
+.cc-clip {
+  display: grid; place-items: center; width: 38px; height: 38px; flex: none;
+  border-radius: 50%; cursor: pointer; color: var(--ch-quiet);
+  transition: background .15s, color .15s;
+}
+.cc-clip:hover { background: rgba(45,122,58,.12); color: var(--ch-accent); }
+.cc-clip svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.cc-clip input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+.chat-composer textarea {
+  flex: 1 1 auto; min-width: 0; resize: none; overflow-y: auto;
+  min-height: 38px; max-height: 190px; padding: 9px 13px;
+  font: inherit; font-size: 14.5px; line-height: 1.45;
+  color: var(--ch-theirs-fg);
+  background: rgba(15,46,34,.04);
+  border: 1px solid var(--ch-line); border-radius: 19px;
+}
+.page-deep .chat-composer textarea { background: rgba(255,255,255,.06); }
+.chat-composer textarea:focus { outline: none; border-color: var(--ch-accent); background: transparent; }
+.chat-composer textarea::placeholder { color: var(--ch-quiet); }
+
+.cc-send {
+  display: inline-flex; align-items: center; gap: 7px; flex: none;
+  height: 38px; padding: 0 16px; border-radius: 19px; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 700;
+  background: var(--forest); color: #fff; border: 0;
+  transition: background .15s, transform .1s;
+}
+.page-deep .cc-send { background: var(--lime); color: var(--deep); }
+.cc-send:hover { background: var(--deep); }
+.page-deep .cc-send:hover { background: #DBFF57; }
+.cc-send:active { transform: translateY(1px); }
+.cc-send svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+@media (max-width: 560px) { .cc-send span { display: none; } .cc-send { padding: 0 13px; } }
+
+.cc-hint { margin: 8px 4px 0; font-size: 11.5px; color: var(--ch-quiet); }
+@media (max-width: 700px) { .cc-hint { display: none; } }
+
+.chat-shut {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 14px; padding: 12px 16px; border-radius: 12px;
+  background: rgba(15,46,34,.05); border: 1px dashed var(--ch-line);
+  font-size: 13px; color: var(--ch-quiet);
+}
+.chat-shut svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.9; }
+
+@media (max-width: 620px) {
+  .chat-bubble { max-width: 84%; }
+  .chat-shot { width: 118px; height: 88px; }
+}
+
+/* ==========================================================================
+   THE MESSAGE INBOX ROW
+   ==========================================================================
+   Shared by the member's inbox and the organisation admin's. It replaces
+   `.gt-row`, which was styled inside gt-shell.css under `body.gt-shell` — a
+   class the /manage/ pages do not set. So the admin's message list arrived
+   with NO styling at all: bare anchors, black on cream, subject and status
+   running together on one line. That is what "some text are not visible" was.
+
+   One component instead of a second copy, because both lists answer the same
+   question with the same parts: what it is about, whose room it is in, when it
+   last moved, and whether it needs you.
+   ========================================================================== */
+.msg-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+
+.msg-item {
+  display: flex; align-items: center; gap: 15px;
+  padding: 15px 18px;
+  background: var(--gt-card, #fff);
+  border: 1px solid var(--gt-hair, rgba(15,46,34,.10));
+  border-radius: 14px;
+  text-decoration: none; color: inherit;
+  transition: border-color .16s var(--ease), box-shadow .16s var(--ease), transform .16s var(--ease);
+}
+.msg-item:hover {
+  text-decoration: none;
+  border-color: rgba(45,122,58,.35);
+  box-shadow: 0 10px 26px -18px rgba(15,46,34,.55);
+  transform: translateY(-1px);
+}
+/* Something unread is the only thing on the row worth an accent, so it gets
+   the only one: a lime edge down the left. A whole row tinted for "new" makes
+   the list read as a wall of alerts by the third one. */
+.msg-item.is-new { border-left: 3px solid var(--lime); padding-left: 16px; }
+
+.msg-item .mi-ic {
+  display: grid; place-items: center; flex: none;
+  width: 40px; height: 40px; border-radius: 12px;
+  background: rgba(45,122,58,.10); color: var(--forest);
+}
+.msg-item .mi-ic.notice { background: rgba(212,160,23,.16); color: #8A6508; }
+.msg-item .mi-ic svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+
+.msg-item .mi-main { flex: 1 1 auto; min-width: 0; }
+.msg-item .mi-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.msg-item .mi-top b { font-size: 15px; font-weight: 700; color: var(--ink); }
+/* The organisation. On the member's inbox this is the row's most important
+   secondary fact — it is the thing that was missing when the page showed one
+   organisation's threads and said nothing about which. */
+.msg-item .mi-org {
+  font-size: 11.5px; font-weight: 600; letter-spacing: .03em;
+  padding: 2px 9px; border-radius: 999px;
+  background: rgba(15,46,34,.07); color: var(--muted);
+  white-space: nowrap;
+}
+.msg-item .mi-main small { display: block; margin-top: 4px; font-size: 12.5px; color: var(--muted); }
+.msg-item .mi-end { flex: none; display: flex; align-items: center; gap: 10px; }
+.msg-item .mi-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 0 3px rgba(200,241,53,.25); }
+
+/* Inside a page sheet the reading surface is the warm cream every .card on
+   one of these screens uses, not pure white — a single white row among cream
+   cards reads as a different component rather than the same list. */
+.sheet-page .page-sheet .msg-item { background: #F6F4EA; }
+
+.msg-tally { font-size: 13px; color: var(--muted); }
+
+@media (max-width: 620px) {
+  .msg-item { gap: 12px; padding: 13px 14px; }
+  .msg-item .mi-ic { width: 34px; height: 34px; border-radius: 10px; }
+  .msg-item .mi-top b { font-size: 14px; }
+}
+
+/* ---- The page a thread sits on ------------------------------------------ */
+.chat-shell { max-width: 860px; }
+.chat-page { max-width: 900px; }
+.chat-top { display: flex; align-items: center; gap: 14px; margin: -6px 0 16px; }
+.chat-top-status { margin-left: auto; }
+.chat-card { padding: 18px 20px 20px; }
+.chat-close { margin-top: 16px; }
+
+.ch-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 600; color: var(--forest); text-decoration: none;
+}
+.ch-back:hover { color: var(--deep); text-decoration: underline; }
+.page-deep .ch-back { color: var(--lime); }
+.page-deep .ch-back:hover { color: #DBFF57; }
+
+/* The mobile sheet's own copy of the nav count. `.an-count` is scoped to
+   `.an-links a`, and the sheet is a different list — so without this the
+   badge simply vanished at the width where the bar becomes a burger, which is
+   the width where a member is most likely to be looking. */
+.sheet-panel a .an-count {
+  display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 6px;
+  border-radius: 100px; background: var(--lime); color: var(--deep);
+  font-size: 11px; font-weight: 800; line-height: 18px; text-align: center;
+  vertical-align: middle;
+}
+
+/* The manage inbox's tab row. Was an inline flex with a spacer span pushing
+   the action to the right; at tablet widths the tabs and the button collided
+   because nothing was allowed to wrap. */
+.msg-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+.msg-tabs { display: flex; gap: 6px; flex-wrap: wrap; flex: 1 1 auto; }
+/* The open count, inside the tab rather than in the label. A parenthesised
+   number in the text moves the tab's width every time a member writes in. */
+.gts-tab i {
+  font-style: normal; margin-left: 7px; padding: 1px 7px; border-radius: 999px;
+  background: rgba(45,122,58,.14); color: var(--forest); font-size: 11.5px; font-weight: 800;
+}
+.gts-tab.on i { background: rgba(255,255,255,.22); color: #fff; }
+
+/* ==========================================================================
+   THE WALL'S THREADS, REPLYING TO ONE REPLY
+   ==========================================================================
+   The Wall already had avatars, names and a thread under each post. What it
+   had no way to say was WHICH reply a reply was answering, so under a post
+   with a dozen of them a one-line joke was floating free of the thing it was
+   about. It now uses the same controls as a message thread — the arrow, the
+   swipe, the quote block — because the client asked for one behaviour in both
+   places and a second implementation is a second thing to keep in step.
+   ========================================================================== */
+.gpt-reply { position: relative; --swipe: 0px; transform: translateX(var(--swipe)); transition: transform .22s var(--ease); }
+.gpt-reply.swiping { transition: none; }
+/* The swipe target under the reply, same as a chat row's. */
+.gpt-reply::before {
+  content: ""; position: absolute; top: 50%; left: 0; transform: translateY(-50%);
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--forest); opacity: 0; transition: opacity .15s; pointer-events: none;
+}
+.gpt-reply.mine::before { left: auto; right: 0; background: var(--lime); }
+.gpt-reply.will-reply::before { opacity: .9; }
+
+/* The avatar became a button so the profile card has something to hang off.
+   A <button> arrives with a user-agent font and border, and this one has to
+   keep looking exactly like the <span> it replaces. */
+button.gpr-av { font: inherit; border: 0; padding: 0; cursor: pointer; font-weight: 700; font-size: 12px; }
+button.gpr-av:hover { filter: brightness(1.08); }
+
+.gpr-tools { display: flex; align-items: flex-start; gap: 2px; flex: none; }
+/* On the Wall the arrow lives in a row of controls rather than in its own grid
+   column, so it drops the chat's absolute placement and keeps only the look. */
+.gpt-reply .chat-replybtn { position: static; }
+.gpt-reply:hover .chat-replybtn { opacity: 1; }
+
+/* The quote inside a Wall reply. The chat's own rule paints from --ch- tokens
+   that only exist inside .chat, so the Wall states the two it needs. */
+.gpr-body .chat-quote {
+  margin: 5px 0 4px; background: rgba(15,46,34,.06);
+  border-left-color: var(--forest); max-width: 460px;
+}
+.gpr-body .chat-quote b { color: var(--forest); }
+.gpr-body .chat-quote span { color: var(--ink); }
+.gpr-body .chat-peek { margin-top: 8px; }
+.gpr-body .chat-peek .cp-av { font-size: 13px; }
+.gpt-reply.chat-lit { animation: chat-flash 1.5s var(--ease); border-radius: 10px; }
+
+/* The reply box gained a banner above it, so it stops being one flex row and
+   becomes a column with a row inside. */
+.gpt-replybox { display: block; }
+.gpr-row { display: flex; align-items: flex-end; gap: 10px; }
+.gpt-replybox .cc-quote { max-width: 520px; }
+@media (max-width: 640px) {
+  .gpr-row { flex-wrap: wrap; }
+  .gpr-row textarea { flex: 1 1 100%; order: 1; }
+  .gpr-row button[type="submit"] { order: 2; margin-left: auto; }
+}
+
+/* ==========================================================================
+   CHARITIES YOU CAN FIX
+   ==========================================================================
+   A charity with no logo was a dead end: the initials tile is a designed
+   fallback, but nothing on the screen said it could be replaced, and nothing
+   let anybody replace it. Every tile an admin may change is now a link to the
+   edit form, and the ones missing a mark say so.
+   ========================================================================== */
+a.ch-item { text-decoration: none; color: inherit; }
+a.ch-item:hover { text-decoration: none; transform: translateY(-2px); }
+a.ch-item { transition: border-color .16s var(--ease), background .16s var(--ease), transform .16s var(--ease); }
+
+/* The pencil, top-right, revealed on hover. Always visible it is a column of
+   identical glyphs down a grid of fifty; on hover it is an affordance that
+   turns up exactly where the pointer already is. */
+.ch-item-edit {
+  position: absolute; top: 10px; right: 10px;
+  display: grid; place-items: center; width: 26px; height: 26px;
+  border-radius: 8px; background: rgba(200,241,53,.16); color: var(--lime);
+  opacity: 0; transition: opacity .16s var(--ease);
+}
+.ch-item-edit svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; }
+a.ch-item:hover .ch-item-edit, a.ch-item:focus-visible .ch-item-edit { opacity: 1; }
+
+.ch-item-fix {
+  margin-top: 10px; font-size: 12px; font-weight: 700; color: var(--lime); opacity: .85;
+}
+
+/* ---- The edit form ------------------------------------------------------- */
+.ch-edit { max-width: 640px; }
+.che-now {
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px; margin-bottom: 20px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 14px;
+}
+.che-mark { flex: none; }
+.che-mark img, .che-initials {
+  width: 72px; height: 72px; border-radius: 16px;
+  object-fit: contain; background: #fff; padding: 8px;
+}
+.che-initials {
+  display: grid; place-items: center; padding: 0;
+  background: hsl(var(--ch-hue, 140) 46% 90%);
+  color: hsl(var(--ch-hue, 140) 52% 26%);
+  font-family: var(--display); font-size: 24px;
+}
+.che-now-txt b { display: block; font-size: 14.5px; color: #fff; }
+.che-now-txt small { display: block; margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: rgba(255,255,255,.6); max-width: 46ch; }
+
+.che-refetch {
+  display: flex; align-items: flex-start; gap: 11px; cursor: pointer;
+  padding: 14px 16px; margin-top: 4px;
+  background: rgba(200,241,53,.07);
+  border: 1px solid rgba(200,241,53,.22);
+  border-radius: 12px;
+}
+.che-refetch input { margin-top: 3px; width: 16px; height: 16px; flex: none; accent-color: var(--lime); }
+.che-refetch b { display: block; font-size: 14px; color: #fff; font-weight: 600; }
+.che-refetch small { display: block; margin-top: 3px; font-size: 12.5px; color: rgba(255,255,255,.6); }
+
+.che-foot { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+
+/* ==========================================================================
+   A STORY PAGE THAT LOOKS LIKE THE REST OF THE APP
+   ==========================================================================
+   News detail was the one member screen with no side imagery, no stage, and
+   no card — a bare column of text with a photograph on top of it, on whatever
+   background it happened to inherit. It now stands on the same deep-green
+   ground as the dashboard, with the rotating strips down the edges, and the
+   article is a cream card on it.
+
+   The head moved above the picture at the same time. On a phone the old order
+   spent the first two-thirds of the screen on a stock photograph and made you
+   scroll to find out what the story was.
+   ========================================================================== */
+.art-page, .art-more {
+  background: var(--gt-sheet, #F4F2EA);
+  border: 1px solid var(--gt-hair, rgba(15,46,34,.10));
+  border-radius: 20px;
+  padding: clamp(22px, 3.4vw, 40px);
+  box-shadow: 0 24px 60px -34px rgba(0,0,0,.55);
+}
+.art-more { margin-top: 28px; }
+.art-page .art-back { color: var(--forest); }
+
+.art-head { margin-bottom: 22px; }
+.art-kicker {
+  display: inline-block; margin-bottom: 12px;
+  font-family: var(--mark); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  padding: 4px 11px; border-radius: 999px;
+  background: rgba(45,122,58,.12); color: var(--forest);
+}
+.art-page .art-title { margin-bottom: 12px; }
+.art-page .art-lead {
+  font-size: 18.5px; line-height: 1.6; color: #34433A; font-weight: 500;
+  margin: 0 0 18px; max-width: 62ch;
+  /* A rule down the left, so the standfirst is visibly not the first
+     paragraph of the story. Without it the two run together and the lead
+     reads as an oddly bold opening. */
+  border-left: 3px solid var(--lime); padding-left: 16px;
+}
+
+.art-byline { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding-top: 4px; border-top: 1px solid var(--gt-hair, rgba(15,46,34,.10)); }
+.art-byline .ab-who { display: inline-flex; align-items: center; gap: 9px; margin-top: 12px; }
+.art-byline .ab-av {
+  width: 30px; height: 30px; border-radius: 50%; overflow: hidden; flex: none;
+  display: grid; place-items: center; background: var(--deep); color: var(--lime);
+  font-family: var(--display); font-size: 12px;
+}
+.art-byline .ab-av img { width: 100%; height: 100%; object-fit: cover; }
+.art-byline .ab-who b { font-size: 13.5px; color: var(--ink); }
+.art-byline .ab-when { margin-top: 12px; font-size: 12.5px; color: var(--muted); }
+
+/* The rotating slot for a post with no picture of its own. Was a flat green
+   panel with the wordmark stamped on it, which said "this post has no image"
+   rather more clearly than it needed to. */
+.art-hero-shots { position: relative; }
+.art-hero-shots .shot {
+  position: absolute; inset: 0; background-size: cover; background-position: center 35%;
+  opacity: 0; transition: opacity 2s var(--ease);
+}
+.art-hero-shots .shot.on { opacity: 1; }
+.art-hero-shots .sport-tag { z-index: 1; }
+
+/* Reading measure, and the rhythm inside it. The body is authored in the news
+   editor and arrives as arbitrary HTML, so these have to cover headings and
+   quotes the template never sees. */
+.art-page .art-body { max-width: 68ch; }
+.art-page .art-body h2 { font-family: var(--display); font-size: 22px; line-height: 1.25; color: var(--deep); margin: 30px 0 12px; }
+.art-page .art-body h3 { font-family: var(--display); font-size: 18px; color: var(--deep); margin: 24px 0 10px; }
+.art-page .art-body ul, .art-page .art-body ol { margin: 0 0 16px; padding-left: 22px; }
+.art-page .art-body li { margin-bottom: 7px; }
+.art-page .art-body img { border-radius: 12px; margin: 18px 0; }
+.art-page .art-body blockquote {
+  margin: 20px 0; padding: 4px 0 4px 18px;
+  border-left: 3px solid var(--forest);
+  font-size: 17px; line-height: 1.6; color: #34433A;
+}
+.art-page .art-body a { color: var(--forest); text-decoration: underline; text-underline-offset: 3px; }
+.art-page .art-body a:hover { color: var(--deep); }
+
+/* ==========================================================================
+   THE MEMBER APP'S LIGHT THEME
+   ==========================================================================
+   The app's designed look is the deep green — that IS its dark theme, and it
+   stays the default. This is the same screens on cream, with green demoted
+   from the ground to an accent, offered through the switch in the nav
+   (partials/_app_theme_switch.html).
+
+   WHY IT KEYS ON [data-theme="light"] AND NOTHING ELSE.
+   /admin/ and the HQ shell are light by design and go dark on `auto` when the
+   device asks. Here it is the other way round: the green is the product, so
+   `auto` and an unset key both keep it. Letting prefers-color-scheme flip the
+   member app would hand every visitor whose phone is on dark mode a look
+   nobody has signed off — a redesign by side effect rather than a choice.
+
+   WHAT IT ACTUALLY CHANGES. Very little, because the content was already
+   light: the cards, tables and forms in here are cream on a green stage and
+   they are untouched. What moves is the FRAME — the stage, the nav, the
+   sheet, the strips down the edges and the handful of places that print white
+   text because they knew they were on green.
+   ========================================================================== */
+html[data-theme="light"] {
+  /* One or two hairlines have to come up a little: a border tuned to read
+     against near-black is invisible against cream. */
+  --app-line: rgba(15,46,34,.14);
+}
+
+/* ---- The stage ---------------------------------------------------------- */
+html[data-theme="light"] .app.page-deep {
+  background:
+    radial-gradient(900px 560px at 78% -10%, rgba(200,241,53,.30), transparent 60%),
+    radial-gradient(720px 520px at -10% 112%, rgba(45,122,58,.13), transparent 62%),
+    #EFEDE3;
+}
+html[data-theme="light"] .app.page-deep .app-head .app-h1 { color: var(--deep); }
+html[data-theme="light"] .app.page-deep .app-head .app-eyebrow { color: var(--forest); }
+html[data-theme="light"] .app.page-deep .app-head .app-sub { color: #4A5A4F; opacity: 1; }
+
+/* ---- The nav ------------------------------------------------------------ */
+html[data-theme="light"] .app-nav,
+html[data-theme="light"] .gt-v2 .app-nav {
+  background: #FFFFFF;
+  border-bottom: 1px solid rgba(15,46,34,.10);
+}
+html[data-theme="light"] .an-brand { color: var(--deep); }
+html[data-theme="light"] .an-brand span { color: var(--forest); }
+html[data-theme="light"] .an-links a { color: #3C4B41; opacity: 1; }
+html[data-theme="light"] .gt-v2 .an-links a.on,
+html[data-theme="light"] .an-links a.on { background: var(--deep); color: #fff; }
+html[data-theme="light"] .an-links a:hover { background: rgba(45,122,58,.10); color: var(--deep); }
+html[data-theme="light"] .an-menu-btn { color: #3C4B41; }
+html[data-theme="light"] .an-ctx-btn { color: var(--deep); border-color: rgba(15,46,34,.16); }
+html[data-theme="light"] .an-iconbtn { color: #3C4B41; }
+html[data-theme="light"] .an-iconbtn:hover { background: rgba(45,122,58,.10); color: var(--deep); }
+html[data-theme="light"] .an-burger { color: var(--deep); }
+html[data-theme="light"] .bell-btn { color: #3C4B41; }
+html[data-theme="light"] .gt-v2 .an-chip .cn b { color: var(--deep); }
+
+/* ---- The charity strip -------------------------------------------------- */
+html[data-theme="light"] .charity-strip,
+html[data-theme="light"] .gt-v2 .charity-strip {
+  background: #F3F1E7; color: #3C4B41;
+  border-bottom: 1px solid rgba(15,46,34,.08);
+}
+html[data-theme="light"] .charity-strip .cs-amt { color: var(--deep); }
+html[data-theme="light"] .charity-strip svg { fill: var(--forest); }
+html[data-theme="light"] .charity-strip .cs-bar { background: rgba(15,46,34,.10); }
+html[data-theme="light"] .charity-strip .cs-bar > i { background: var(--forest); }
+html[data-theme="light"] .charity-strip.nopledge .cs-amt { color: var(--forest); }
+
+/* ---- The page sheet ------------------------------------------------------
+   The dark green panel the cards sit on becomes a white one. Its headings
+   were told to print white because they knew what was under them, so they are
+   told otherwise here. */
+html[data-theme="light"] .sheet-page .page-sheet {
+  background: linear-gradient(180deg, #FFFFFF, #FBFAF4);
+  border: 1px solid rgba(15,46,34,.10);
+  box-shadow: 0 34px 80px -50px rgba(15,46,34,.55);
+}
+html[data-theme="light"] .sheet-page .page-sheet .app-h1 { color: var(--deep); }
+html[data-theme="light"] .sheet-page .page-sheet .app-eyebrow { color: var(--forest); }
+html[data-theme="light"] .sheet-page .page-sheet .app-sub { color: #4A5A4F; }
+html[data-theme="light"] .sheet-page .page-sheet .card {
+  background: #F6F4EA;
+  box-shadow: 0 14px 34px -26px rgba(15,46,34,.5);
+}
+html[data-theme="light"] .gt-sheet .app-main {
+  background: #FBFAF4;
+  box-shadow: 0 0 90px -30px rgba(15,46,34,.28);
+}
+
+/* ---- The photo strips ----------------------------------------------------
+   Their wash is a gradient towards the page, so it has to be the page's
+   colour. Left on the dark one, the strips end in a black smear against a
+   cream margin. */
+html[data-theme="light"] .app.page-deep .page-scenes .scene.left::after {
+  background: linear-gradient(90deg, rgba(239,237,227,.20), rgba(239,237,227,.80) 55%, rgba(239,237,227,.97));
+  border-right-color: rgba(15,46,34,.10);
+}
+html[data-theme="light"] .app.page-deep .page-scenes .scene.right::after {
+  background: linear-gradient(270deg, rgba(239,237,227,.20), rgba(239,237,227,.80) 55%, rgba(239,237,227,.97));
+  border-left-color: rgba(15,46,34,.10);
+}
+
+/* ---- The conversation ----------------------------------------------------
+   .chat paints from its own tokens, and `.page-deep .chat` swaps them for the
+   on-green set. On a light page that swap is wrong twice over, so it is put
+   back — one block rather than a rule per bubble part, which is the reason
+   the component took tokens in the first place. */
+html[data-theme="light"] .page-deep .chat {
+  --ch-mine:      #123A25;
+  --ch-mine-fg:   #F1F5EC;
+  --ch-theirs:    #FFFFFF;
+  --ch-theirs-fg: #17342A;
+  --ch-line:      rgba(15,46,34,.12);
+  --ch-quiet:     #6B7A6E;
+  --ch-accent:    var(--forest);
+}
+html[data-theme="light"] .page-deep .chat-composer { background: #FFFFFF; }
+html[data-theme="light"] .page-deep .chat-composer textarea { background: rgba(15,46,34,.04); }
+html[data-theme="light"] .page-deep .cc-send { background: var(--forest); color: #fff; }
+html[data-theme="light"] .page-deep .cc-send:hover { background: var(--deep); }
+html[data-theme="light"] .page-deep .ch-back { color: var(--forest); }
+html[data-theme="light"] .page-deep .chat-quote { background: rgba(15,46,34,.06); }
+html[data-theme="light"] .page-deep .chat-row.mine .chat-quote { background: rgba(255,255,255,.12); }
+
+/* ---- Panels that knew they were on green -------------------------------- */
+html[data-theme="light"] .ch-item {
+  background: #FFFFFF; border-color: rgba(15,46,34,.10);
+}
+html[data-theme="light"] .ch-item:hover { background: #FBFAF4; border-color: rgba(45,122,58,.30); }
+html[data-theme="light"] .ch-item-name { color: var(--deep); }
+html[data-theme="light"] .ch-item-url { color: var(--muted); }
+html[data-theme="light"] .ch-item-note { color: var(--muted); }
+html[data-theme="light"] .ch-item-chip { background: rgba(45,122,58,.12); color: var(--forest); border-color: rgba(45,122,58,.28); }
+html[data-theme="light"] .ch-item-edit { background: rgba(45,122,58,.14); color: var(--forest); }
+html[data-theme="light"] .ch-item-fix { color: var(--forest); opacity: 1; }
+html[data-theme="light"] .ch-add-row { border-color: rgba(15,46,34,.18); }
+html[data-theme="light"] .che-now,
+html[data-theme="light"] .che-refetch { background: #FFFFFF; border-color: rgba(15,46,34,.12); }
+html[data-theme="light"] .che-now-txt b { color: var(--deep); }
+html[data-theme="light"] .che-now-txt small,
+html[data-theme="light"] .che-refetch small { color: var(--muted); }
+html[data-theme="light"] .che-refetch b { color: var(--deep); }
+html[data-theme="light"] .msg-item { background: #FFFFFF; }
+html[data-theme="light"] .art-page,
+html[data-theme="light"] .art-more { background: #FFFFFF; box-shadow: 0 20px 50px -38px rgba(15,46,34,.5); }
+
+/* ---- The switch itself --------------------------------------------------- */
+.an-theme {
+  display: inline-flex; align-items: center; gap: 2px; flex: none;
+  padding: 3px; border-radius: 999px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.12);
+}
+.an-theme button {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: inherit; font-size: 12px; font-weight: 600; line-height: 1;
+  color: rgba(232,228,213,.72); background: transparent;
+  border: 0; border-radius: 999px; padding: 6px 11px; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.an-theme button svg { width: 13px; height: 13px; flex: none; }
+.an-theme button:hover { color: #fff; }
+.an-theme button.on { background: var(--lime); color: var(--deep); }
+html[data-theme="light"] .an-theme { background: rgba(15,46,34,.06); border-color: rgba(15,46,34,.12); }
+html[data-theme="light"] .an-theme button { color: #6B7A6E; }
+html[data-theme="light"] .an-theme button:hover { color: var(--deep); }
+html[data-theme="light"] .an-theme button.on { background: var(--forest); color: #fff; }
+/* Below the widths where the bar has room, the labels go and then the whole
+   control does — the mobile menu carries its own copy.
+
+   The labels go EARLY, at 1400px rather than at the width where they would
+   actually collide. The link row is already squeezed between 1181 and 1360
+   (see the .an-links media query above: "the fix is fewer things in the row,
+   not smaller things"), and this control arrived after that budget was set —
+   so it gives its ~90px back before the links have to give up anything. */
+@media (max-width: 1400px) { .an-theme button span { display: none; } .an-theme button { padding: 6px 8px; } }
+@media (max-width: 1060px) { .an-theme { display: none; } }
+
+.sheet-theme { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 4px 4px; }
+.sheet-theme .an-theme { display: inline-flex; }
+.sheet-theme .an-theme button span { display: inline; }
+
+/* ==========================================================================
+   PAGES: PUBLIC OR PRIVATE, ONE AT A TIME
+   ==========================================================================
+   Two big buttons rather than a row of small tabs. There are exactly two
+   choices, each needs a sentence to explain what it holds, and both are worth
+   the same amount of space — which is a segmented pair, not a tab strip.
+   ========================================================================== */
+.pg-scope { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+@media (max-width: 700px) { .pg-scope { grid-template-columns: 1fr; } }
+
+.pg-scope-tab {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 18px; border-radius: 14px;
+  background: var(--ad-card, #fff);
+  border: 1px solid var(--ad-line, rgba(15,46,34,.10));
+  text-decoration: none; color: inherit;
+  transition: border-color .16s var(--ease), box-shadow .16s var(--ease), background .16s var(--ease);
+}
+.pg-scope-tab:hover { text-decoration: none; border-color: rgba(45,122,58,.34); }
+/* The chosen one is filled, not merely outlined. An outline-only "selected"
+   state on a card this size is invisible next to its sibling. */
+.pg-scope-tab.on {
+  background: var(--deep); border-color: var(--deep);
+  box-shadow: 0 14px 30px -20px rgba(15,46,34,.6);
+}
+.pg-scope-tab .pgs-ic {
+  display: grid; place-items: center; width: 40px; height: 40px; flex: none;
+  border-radius: 12px; background: var(--ad-ic-bg, rgba(45,122,58,.11)); color: var(--ad-ic-fg, #2D7A3A);
+}
+.pg-scope-tab .pgs-ic svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.pg-scope-tab .pgs-txt { min-width: 0; flex: 1 1 auto; }
+.pg-scope-tab .pgs-txt b { display: block; font-size: 15px; color: var(--ad-ink, var(--ink)); }
+.pg-scope-tab .pgs-txt small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--ad-quiet, var(--muted)); }
+.pg-scope-tab .pgs-n {
+  flex: none; min-width: 30px; text-align: center;
+  font-family: var(--score); font-weight: 800; font-size: 15px;
+  padding: 3px 9px; border-radius: 999px;
+  background: var(--ad-quiet-bg, rgba(15,46,34,.06)); color: var(--ad-quiet, var(--muted));
+}
+/* On the filled tab everything inverts together — half-inverted is worse than
+   either state on its own. */
+.pg-scope-tab.on .pgs-ic { background: rgba(200,241,53,.18); color: var(--lime); }
+.pg-scope-tab.on .pgs-txt b { color: #fff; }
+.pg-scope-tab.on .pgs-txt small { color: rgba(232,228,213,.72); }
+.pg-scope-tab.on .pgs-n { background: rgba(200,241,53,.20); color: var(--lime); }
+
+/* ==========================================================================
+   THE BELL, WHEN SOMETHING IS WAITING
+   ==========================================================================
+   Two problems, both reported by the client: the badge did not read as "you
+   have something", and the bell never moved.
+
+   RED, NOT LIME. Lime is this product's *approval* colour — a saved tip, a
+   correct pick, the active nav item. A count wearing it says "all good" at
+   the exact moment it means "three things are waiting", and on the deep-green
+   nav a lime dot is one accent among several rather than the one thing that
+   was not there a second ago. Red is the only colour in the palette that is
+   not spent on anything else in this bar.
+
+   AND IT NEVER RANG. `.an-bell.ring .bell-btn` has been in this file the
+   whole time; the script was putting the class on the button instead of on
+   the wrapper, one level too deep, so the keyframes never matched anything.
+   Fixed in app_base.html — this is the state the ring leaves behind.
+   ========================================================================== */
+.an-bell.has-new .bell-badge {
+  background: #E5372B;
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--gt-deep, #0C2417);
+}
+html[data-theme="light"] .an-bell.has-new .bell-badge { box-shadow: 0 0 0 2px #fff; }
+
+/* A halo that breathes rather than blinks. A blink is an alarm and this is a
+   notification; the point is to be findable in peripheral vision, not to
+   demand the next three seconds. It stops on its own after four passes —
+   an indicator that pulses forever stops being an indicator. */
+.an-bell.has-new .bell-badge::after {
+  content: ""; position: absolute; inset: -3px;
+  border-radius: 100px; border: 2px solid #E5372B;
+  animation: gt-bell-halo 1.8s var(--ease) 4;
+  pointer-events: none;
+}
+@keyframes gt-bell-halo {
+  0%   { transform: scale(.85); opacity: .85; }
+  70%  { transform: scale(1.75); opacity: 0; }
+  100% { transform: scale(1.75); opacity: 0; }
+}
+.an-bell.has-new .bell-badge { position: absolute; }
+/* The bell itself stops being a dimmed piece of furniture while it is
+   carrying something. */
+.an-bell.has-new .bell-btn { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* The colour and the count still say everything the movement said. What
+     goes is the movement, which is the part the setting is about. */
+  .an-bell.has-new .bell-badge::after { animation: none; opacity: 0; }
+}
