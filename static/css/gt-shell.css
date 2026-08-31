@@ -239,3 +239,185 @@ body.gt-shell .gt-row .gr-body { flex: 1 1 auto; min-width: 0; }
 body.gt-shell .gt-row .gr-body b { display: block; font-size: 15px; color: var(--deep); }
 body.gt-shell .gt-row .gr-body small { display: block; margin-top: 3px; font-size: 12.5px; color: var(--gts-quiet); }
 body.gt-shell .gt-row .gr-go { flex: none; font-size: 13px; font-weight: 600; color: var(--forest); }
+
+/* ==========================================================================
+   THE HQ THEME
+   ==========================================================================
+   Two palettes, one set of names. Every HQ screen and every component in the
+   delegated-administration block paints from these tokens and never from a
+   literal, so the switch below repaints the area by redefining the block
+   rather than by shipping a second copy of every rule.
+
+   The dark values are not the light ones inverted. Cream inverted is a flat
+   charcoal that loses the brand entirely; these are mixed towards the deep
+   forest so the dark mode still reads as GoodTip and the greens and golds
+   keep enough contrast against it to stay legible.
+   ========================================================================== */
+
+:root,
+html[data-theme="light"] {
+  --gold-dk:        #B8860B;
+
+  --ad-card:        #FFFFFF;
+  --ad-field:       #FFFFFF;
+  --ad-bar:         rgba(255,255,255,.92);
+  --ad-head:        #FAF9F3;
+  --ad-head-h:      #F2F0E6;
+  --ad-row-h:       rgba(15,46,34,.028);
+
+  --ad-ink:         #17342A;
+  --ad-quiet:       #6B7A6E;
+  --ad-faint:       #9BA79D;
+
+  --ad-line:        rgba(15,46,34,.09);
+  --ad-line-2:      rgba(15,46,34,.15);
+  --ad-line-3:      rgba(15,46,34,.24);
+  --ad-ring:        rgba(45,122,58,.16);
+
+  --ad-tint:        rgba(45,122,58,.045);
+  --ad-tint-2:      rgba(45,122,58,.12);
+  --ad-tint-gold:   rgba(244,196,48,.10);
+  --ad-tint-gold-2: rgba(212,160,23,.17);
+  --ad-gold-fg:     #8A6508;
+
+  --ad-ic-bg:       rgba(45,122,58,.11);
+  --ad-ic-fg:       #2D7A3A;
+  --ad-ic-bg-gold:  rgba(212,160,23,.16);
+  --ad-ic-fg-gold:  #8A6508;
+}
+
+html[data-theme="dark"] {
+  --gold-dk:        #E0B341;
+
+  --gts-shell:      #0B1F16;
+  --gts-surface:    #102A1D;
+  --gts-surface-2:  #14321F;
+  --gts-surface-3:  #1B4029;
+  --gts-line:       rgba(232,228,213,.10);
+  --gts-line-2:     rgba(232,228,213,.17);
+  --gts-fg:         #E6EDE7;
+  --gts-quiet:      #93A697;
+
+  --ad-card:        #102A1D;
+  --ad-field:       #0C2417;
+  --ad-bar:         rgba(16,42,29,.94);
+  --ad-head:        #0E2519;
+  --ad-head-h:      #17351F;
+  --ad-row-h:       rgba(232,228,213,.035);
+
+  --ad-ink:         #E9F0EA;
+  --ad-quiet:       #9BAE9F;
+  --ad-faint:       #718576;
+
+  --ad-line:        rgba(232,228,213,.11);
+  --ad-line-2:      rgba(232,228,213,.18);
+  --ad-line-3:      rgba(232,228,213,.30);
+  --ad-ring:        rgba(200,241,53,.22);
+
+  --ad-tint:        rgba(200,241,53,.06);
+  --ad-tint-2:      rgba(200,241,53,.16);
+  --ad-tint-gold:   rgba(244,196,48,.10);
+  --ad-tint-gold-2: rgba(244,196,48,.16);
+  --ad-gold-fg:     #F0CB63;
+
+  --ad-ic-bg:       rgba(200,241,53,.14);
+  --ad-ic-fg:       #C8F135;
+  --ad-ic-bg-gold:  rgba(244,196,48,.15);
+  --ad-ic-fg-gold:  #F0CB63;
+
+  /* The two brand greens have to move on a dark ground: forest at #2D7A3A on
+     near-black is a 2.3:1 button, which is a button nobody can read. Lime is
+     the accent that survives the swap, so on dark it takes over the jobs
+     forest does on light. */
+  --forest:         #7DC24A;
+  --ink:            #E9F0EA;
+  --muted:          #9BAE9F;
+  --gt-card:        #102A1D;
+  --gt-sheet:       #0B1F16;
+  --gt-hair:        rgba(232,228,213,.11);
+  --app-line:       rgba(232,228,213,.16);
+}
+
+/* Follow the device when nothing has been chosen. Same attribute contract as
+   the Django admin's own early-boot script: `auto` and unset both fall
+   through to the query, an explicit choice out-ranks it. */
+@media (prefers-color-scheme: dark) {
+  html[data-theme="auto"], html:not([data-theme]) {
+    --gold-dk: #E0B341;
+    --gts-shell: #0B1F16; --gts-surface: #102A1D; --gts-surface-2: #14321F;
+    --gts-surface-3: #1B4029; --gts-line: rgba(232,228,213,.10);
+    --gts-line-2: rgba(232,228,213,.17); --gts-fg: #E6EDE7; --gts-quiet: #93A697;
+    --ad-card: #102A1D; --ad-field: #0C2417; --ad-bar: rgba(16,42,29,.94);
+    --ad-head: #0E2519; --ad-head-h: #17351F; --ad-row-h: rgba(232,228,213,.035);
+    --ad-ink: #E9F0EA; --ad-quiet: #9BAE9F; --ad-faint: #718576;
+    --ad-line: rgba(232,228,213,.11); --ad-line-2: rgba(232,228,213,.18);
+    --ad-line-3: rgba(232,228,213,.30); --ad-ring: rgba(200,241,53,.22);
+    --ad-tint: rgba(200,241,53,.06); --ad-tint-2: rgba(200,241,53,.16);
+    --ad-tint-gold: rgba(244,196,48,.10); --ad-tint-gold-2: rgba(244,196,48,.16);
+    --ad-gold-fg: #F0CB63;
+    --ad-ic-bg: rgba(200,241,53,.14); --ad-ic-fg: #C8F135;
+    --ad-ic-bg-gold: rgba(244,196,48,.15); --ad-ic-fg-gold: #F0CB63;
+    --forest: #7DC24A; --ink: #E9F0EA; --muted: #9BAE9F;
+    --gt-card: #102A1D; --gt-sheet: #0B1F16;
+    --gt-hair: rgba(232,228,213,.11); --app-line: rgba(232,228,213,.16);
+  }
+}
+
+/* ---- The shell's own hard-coded whites, now themed ----------------------
+   Twelve rules across the HQ component set named a literal instead of a
+   token. They are restated here rather than edited in place because these
+   components are shared with the public site, which is light-only and must
+   not move. */
+body.gt-shell .gt-panel,
+body.gt-shell .gt-scard,
+body.gt-shell .gt-note,
+body.gt-shell .gt-pill,
+body.gt-shell .fld input,
+body.gt-shell .fld select,
+body.gt-shell .fld textarea { background: var(--ad-card); color: var(--ad-ink); }
+body.gt-shell .gt-panel,
+body.gt-shell .gt-scard,
+body.gt-shell .gt-pill { border-color: var(--ad-line); }
+body.gt-shell .gt-table thead th { background: var(--ad-head); color: var(--ad-quiet); }
+body.gt-shell .gt-table tbody td { border-bottom-color: var(--ad-line); }
+body.gt-shell .gt-table tbody tr:hover td { background: var(--ad-row-h); }
+body.gt-shell .gt-muted { color: var(--ad-quiet); }
+
+/* ---- The theme switch ----------------------------------------------------
+   Three segments, not a cycling icon. Every option is on screen, the one in
+   use is filled, and any of them is one click away — a control that changes
+   meaning on each press cannot be aimed at the mode you want.
+
+   Cream track, forest thumb: the same green-on-cream pairing the rest of HQ
+   uses, so the switch reads as part of the product rather than as a browser
+   control that wandered in. */
+.gts-theme {
+  display: inline-flex; align-items: center; gap: 2px; flex: none;
+  padding: 3px; border-radius: 999px;
+  background: var(--gts-surface-3);
+  border: 1px solid var(--gts-line);
+}
+.gts-theme button {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: inherit; font-size: 12px; font-weight: 600; line-height: 1;
+  color: var(--gts-quiet); background: transparent;
+  border: 0; border-radius: 999px; padding: 6px 11px; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.gts-theme button:hover { color: var(--deep); background: transparent; }
+.gts-theme button svg { width: 13px; height: 13px; flex: none; }
+.gts-theme button.on {
+  background: var(--forest); color: #fff;
+  box-shadow: 0 1px 3px rgba(15,46,34,.22);
+}
+.gts-theme button.on:hover { color: #fff; }
+html[data-theme="dark"] .gts-theme button.on,
+html[data-theme="dark"] .gts-theme button:hover { color: var(--deep); }
+html[data-theme="dark"] .gts-theme button.on { background: var(--lime); }
+@media (prefers-color-scheme: dark) {
+  html[data-theme="auto"] .gts-theme button.on,
+  html:not([data-theme]) .gts-theme button.on { background: var(--lime); color: var(--deep); }
+}
+/* Below the fold of a laptop bar the labels go and the icons carry it. */
+@media (max-width: 1120px) { .gts-theme button span { display: none; } .gts-theme button { padding: 6px 8px; } }
+@media (max-width: 620px) { .gts-theme { display: none; } }

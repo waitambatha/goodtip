@@ -7,9 +7,17 @@
 {% block extra_head %}<script src="{% static 'gtadmin/js/gt-team.js' %}" defer></script>{% endblock %}
 {% block admin_content %}
 
-<div class="gt-shell">
-  <div class="ned-topbar">
-    <a href="{% url 'admin:hq_team' %}" class="ned-back">&larr; All administrators</a>
+{% comment %}
+NOT wrapped in `.gt-shell`. That class is a two-column grid — content beside a
+320px sidebar — and this page has no sidebar, so it used to park the whole
+wizard in the narrow column with a dead strip down the right. `.ad-page` is
+the same measure without the second track.
+{% endcomment %}
+<div class="ad-page">
+  <div class="ad-crumb">
+    <a href="{% url 'admin:hq_team' %}">
+      <svg aria-hidden="true"><use href="#ic-chev-left"/></svg> All administrators
+    </a>
   </div>
 
   <form method="post" action="{% url 'admin:hq_team_new' %}" data-busy="Creating" data-team-form>
@@ -22,11 +30,15 @@
     out what to do when somebody wanders off in the middle of it.
     {% endcomment %}
 
-    <section class="gt-panel ad-step" data-step="1">
-      <div class="gt-panel-head">
+    <section class="ad-card" data-step="1">
+      <div class="ad-cardhead">
         <span class="ad-stepnum">1</span>
-        <div><h2>Who is it?</h2><div class="gp-sub">They'll get an email with a code to set their own password. You never see it.</div></div>
+        <div>
+          <h2>Who is it?</h2>
+          <p>They'll get an email with a code to set their own password. You never see it.</p>
+        </div>
       </div>
+
       <div class="ad-fields">
         <div class="fld">
           <label for="a_name">Their name</label>
@@ -38,7 +50,7 @@
           <input type="email" name="email" id="a_email" required
                  value="{{ form.email|default:'' }}" placeholder="jordan@example.com">
         </div>
-        <div class="fld">
+        <div class="fld fld-full">
           <label for="a_note">What are they here to do? <span class="ned-hint">optional, shown in the list</span></label>
           <input type="text" name="note" id="a_note" maxlength="200"
                  value="{{ form.note|default:'' }}" placeholder="Writes the blog">
@@ -46,22 +58,49 @@
       </div>
     </section>
 
-    <section class="gt-panel ad-step" data-step="2">
-      <div class="gt-panel-head">
+    <section class="ad-card" data-step="2">
+      <div class="ad-cardhead">
         <span class="ad-stepnum">2</span>
-        <div><h2>What can they do?</h2><div class="gp-sub">Tick what they need. Leave the rest — you can change any of this later.</div></div>
+        <div>
+          <h2>What can they do?</h2>
+          <p>Tick what they need. Leave the rest — you can change any of this later.</p>
+        </div>
       </div>
 
       <div class="ad-level">
         <label class="ad-levelopt">
           <input type="radio" name="access_level" value="limited" data-level
                  {% if form.access_level != "full" %}checked{% endif %}>
-          <span><b>Only what I choose</b><small>They see the areas you tick and nothing else.</small></span>
+          <span class="ad-radio" aria-hidden="true"></span>
+          <span class="ad-optbody">
+            <b>Only what I choose</b>
+            <small>They see the areas you tick and nothing else.</small>
+          </span>
+          {% comment %}Decorative: a short checklist. The border and radio carry the state.{% endcomment %}
+          <span class="ad-optart" aria-hidden="true">
+            <svg viewBox="0 0 48 48" fill="none">
+              <rect x="7" y="5" width="34" height="38" rx="6" fill="var(--ad-tint-2)"/>
+              <path d="m14 17 3 3 6-6" stroke="var(--forest)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="m14 28 3 3 6-6" stroke="var(--forest)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M27 18h8M27 29h8" stroke="var(--forest)" stroke-width="2.6" stroke-linecap="round" opacity=".45"/>
+            </svg>
+          </span>
         </label>
+
         <label class="ad-levelopt is-full">
           <input type="radio" name="access_level" value="full" data-level
                  {% if form.access_level == "full" %}checked{% endif %}>
-          <span><b>Full access</b><small>Everything, including adding administrators and approving other people's work. Give this only to someone you would trust with the whole business.</small></span>
+          <span class="ad-radio" aria-hidden="true"></span>
+          <span class="ad-optbody">
+            <b>Full access</b>
+            <small>Everything, including adding administrators and approving other people's work. Give this only to someone you would trust with the whole business.</small>
+          </span>
+          <span class="ad-optart" aria-hidden="true">
+            <svg viewBox="0 0 48 48" fill="none">
+              <path d="M8 33 6 14l10 7 8-12 8 12 10-7-2 19z" fill="var(--ad-tint-gold-2)" stroke="var(--gold-dk)" stroke-width="2.4" stroke-linejoin="round"/>
+              <path d="M9 38h30" stroke="var(--gold-dk)" stroke-width="2.8" stroke-linecap="round"/>
+            </svg>
+          </span>
         </label>
       </div>
 
@@ -70,26 +109,37 @@
       </div>
     </section>
 
-    <section class="gt-panel ad-step" data-step="3">
-      <div class="gt-panel-head">
+    <section class="ad-card" data-step="3">
+      <div class="ad-cardhead">
         <span class="ad-stepnum">3</span>
-        <div><h2>Check it over</h2><div class="gp-sub">This is what they'll be able to do the moment they accept.</div></div>
+        <div>
+          <h2>Check it over</h2>
+          <p>This is what they'll be able to do the moment they accept.</p>
+        </div>
       </div>
       {% comment %}
       Built by gt-team.js from the boxes above rather than on a second request,
       so the summary cannot drift from what is actually ticked — a preview
       screen that is generated separately is a preview of something else.
       {% endcomment %}
-      <div class="ad-preview" data-preview>
-        <p class="gt-muted">Tick something above and it will appear here.</p>
-      </div>
-
-      <div class="ad-actions">
-        <button type="submit" class="gt-go-btn" style="width:auto;">
-          Create and send the invitation <svg><use href="#ic-check"/></svg>
-        </button>
+      <div class="ad-preview is-empty" data-preview>
+        <div class="ad-pv-empty">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-check"/></svg>
+          <p>Tick something above and it will appear here.</p>
+        </div>
       </div>
     </section>
+
+    <div class="ad-bar">
+      <p class="ad-barnote">Nothing is sent until you press the button.</p>
+      <div class="ad-barright">
+        <a href="{% url 'admin:hq_team' %}" class="ad-btn is-quiet">Cancel</a>
+        <button type="submit" class="ad-btn is-go">
+          Create and send the invitation
+          <svg aria-hidden="true"><use href="#ic-send"/></svg>
+        </button>
+      </div>
+    </div>
   </form>
 </div>
 {% endblock %}

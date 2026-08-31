@@ -1,12 +1,14 @@
 /* The add-an-administrator form.
  *
- * Three jobs, all of them about not letting the form say something the person
+ * Four jobs, all of them about not letting the form say something the person
  * filling it in did not mean:
  *
  *   - "Needs my approval" only means anything on a capability they actually
  *     hold, so it follows its own row's tick and cannot be left stranded on;
  *   - full access is all-or-nothing, so the per-capability list goes away
  *     rather than sitting there looking like it still decides something;
+ *   - each area's heading says how many of its rows are on, so a collapsed
+ *     group still tells you something;
  *   - the summary at the bottom is generated from the boxes themselves, so it
  *     cannot drift from what is really ticked.
  */
@@ -23,6 +25,12 @@
 
   function reviewFor(key) {
     return form.querySelector('[data-review="' + CSS.escape(key) + '"]');
+  }
+
+  function rowsIn(key) {
+    return form.querySelectorAll(
+      '.ad-caprow[data-group="' + CSS.escape(key) + '"] [data-cap]'
+    );
   }
 
   function isFull() {
@@ -43,20 +51,45 @@
 
   function syncGroupHeaders() {
     form.querySelectorAll('[data-group-all]').forEach(function (all) {
-      var key = all.getAttribute('data-group-all');
-      var rows = form.querySelectorAll('.ad-caprow[data-group="' + CSS.escape(key) + '"] [data-cap]');
+      var rows = rowsIn(all.getAttribute('data-group-all'));
       var on = 0;
       rows.forEach(function (r) { if (r.checked) on++; });
       all.checked = on > 0 && on === rows.length;
       all.indeterminate = on > 0 && on < rows.length;
     });
+
+    /* The count on the summary bar. Worded rather than "3/4": the heading is
+     * read at a glance and a fraction asks to be worked out. */
+    form.querySelectorAll('[data-group-count]').forEach(function (tag) {
+      var rows = rowsIn(tag.getAttribute('data-group-count'));
+      var on = 0;
+      rows.forEach(function (r) { if (r.checked) on++; });
+      tag.classList.toggle('is-on', on > 0);
+      tag.textContent = on === 0 ? 'None'
+        : on === rows.length ? 'All ' + on
+        : on + ' of ' + rows.length;
+    });
   }
 
-  function line(text, cls) {
-    var p = document.createElement('p');
-    p.className = cls || '';
-    p.textContent = text;
-    return p;
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text) node.textContent = text;
+    return node;
+  }
+
+  function listOf(names, cls) {
+    var ul = el('ul', 'ad-pv-list ' + cls);
+    names.forEach(function (n) { ul.appendChild(el('li', '', n)); });
+    return ul;
+  }
+
+  function empty(message) {
+    var wrap = el('div', 'ad-pv-empty');
+    wrap.innerHTML =
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-check"/></svg>';
+    wrap.appendChild(el('p', '', message));
+    return wrap;
   }
 
   function render() {
@@ -65,13 +98,15 @@
     if (!preview) return;
 
     preview.innerHTML = '';
+    preview.classList.remove('is-empty');
 
     if (full) {
-      preview.appendChild(line('Full access.', 'ad-pv-head'));
-      preview.appendChild(line(
-        'Everything in GoodTip HQ, including adding other administrators and ' +
-        'approving their work. Nothing they do will wait for anybody.'
-      ));
+      preview.appendChild(el('div', 'ad-pv-head', 'Full access'));
+      preview.appendChild(listOf([
+        'Everything in GoodTip HQ, including adding other administrators ' +
+        'and approving their work.',
+        'Nothing they do will wait for anybody.'
+      ], 'is-go'));
       return;
     }
 
@@ -85,33 +120,23 @@
     });
 
     if (!direct.length && !reviewed.length) {
-      preview.appendChild(line('Tick something above and it will appear here.', 'gt-muted'));
+      preview.classList.add('is-empty');
+      preview.appendChild(empty('Tick something above and it will appear here.'));
       return;
     }
 
     if (direct.length) {
-      preview.appendChild(line('They can do this straight away', 'ad-pv-head'));
+      preview.appendChild(el('div', 'ad-pv-head', 'They can do this straight away'));
       preview.appendChild(listOf(direct, 'is-go'));
     }
     if (reviewed.length) {
-      preview.appendChild(line('This waits for you to approve it', 'ad-pv-head'));
+      preview.appendChild(el('div', 'ad-pv-head', 'This waits for you to approve it'));
       preview.appendChild(listOf(reviewed, 'is-wait'));
-      preview.appendChild(line(
-        'They will be emailed when you have looked, whichever way it goes.',
-        'gt-muted'
+      preview.appendChild(el(
+        'p', 'ad-pv-note',
+        'They will be emailed when you have looked, whichever way it goes.'
       ));
     }
-  }
-
-  function listOf(names, cls) {
-    var ul = document.createElement('ul');
-    ul.className = 'ad-pv-list ' + cls;
-    names.forEach(function (n) {
-      var li = document.createElement('li');
-      li.textContent = n;
-      ul.appendChild(li);
-    });
-    return ul;
   }
 
   caps.forEach(function (box) {
@@ -129,12 +154,10 @@
 
   form.querySelectorAll('[data-group-all]').forEach(function (all) {
     all.addEventListener('change', function () {
-      var key = all.getAttribute('data-group-all');
-      form.querySelectorAll('.ad-caprow[data-group="' + CSS.escape(key) + '"] [data-cap]')
-        .forEach(function (box) {
-          box.checked = all.checked;
-          syncRow(box);
-        });
+      rowsIn(all.getAttribute('data-group-all')).forEach(function (box) {
+        box.checked = all.checked;
+        syncRow(box);
+      });
       syncGroupHeaders();
       render();
     });

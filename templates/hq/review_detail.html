@@ -5,9 +5,11 @@
 {% block hero_lead %}From {{ cr.requested_by }} &middot; {{ cr.capability_label }} &middot; {{ cr.created_at|date:"j M Y, g:i A" }}{% endblock %}
 {% block admin_content %}
 
-<div class="gt-shell gt-shell-wide">
-  <div class="ned-topbar">
-    <a href="{% url 'admin:hq_reviews' %}" class="ned-back">&larr; Everything waiting</a>
+<div class="ad-page">
+  <div class="ad-crumb">
+    <a href="{% url 'admin:hq_reviews' %}">
+      <svg aria-hidden="true"><use href="#ic-chev-left"/></svg> Everything waiting
+    </a>
   </div>
 
   {% if cr.apply_error %}
@@ -101,7 +103,7 @@
       </div>
 
       <div class="rv-actions">
-        <button type="submit" name="decision" value="approve" class="gt-go-btn" style="width:auto;">
+        <button type="submit" name="decision" value="approve" class="ad-btn is-go">
           Approve as it is <svg><use href="#ic-check"/></svg>
         </button>
         <button type="submit" name="decision" value="amend" class="gt-pill">

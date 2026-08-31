@@ -488,3 +488,27 @@ def gta_review_counts(context):
         out["to_review"] = ChangeRequest.objects.filter(
             status=ChangeRequest.PENDING).exclude(requested_by=user).count()
     return out
+
+
+# ---------------------------------------------------------------------------
+# Delegated administration: the picker's chrome
+# ---------------------------------------------------------------------------
+
+# One icon per capability group, for the picker's section headings. Purely
+# presentational, which is why it lives here and not on the Group dataclass —
+# capabilities.py states what an administrator may do, and it should not have
+# to be edited to change a drawing.
+CAP_GROUP_ICONS = {
+    "news": "ic-doc",
+    "pages": "ic-globe",
+    "enquiries": "ic-mail",
+    "orgs": "ic-org",
+    "people": "ic-users",
+    "charities": "ic-heart",
+    "data": "ic-cloud-sync",
+}
+
+
+@register.simple_tag
+def cap_group_icon(key):
+    return CAP_GROUP_ICONS.get(key, "ic-sliders")

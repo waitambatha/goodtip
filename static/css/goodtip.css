@@ -11461,141 +11461,394 @@ body.fxh-open { overflow: hidden; }
   line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-/* ---------------------------------------------------------------------------
+/* ===========================================================================
    DELEGATED ADMINISTRATION
    The screens for running a team: who the administrators are, what each may
    do, the queue of work waiting on approval, and the record of all of it.
-   --------------------------------------------------------------------------- */
 
-/* ---- The capability picker ---- */
-.ad-capgroup { border: 1px solid var(--gt-hair); border-radius: 12px; margin-bottom: 14px; overflow: hidden; }
-.ad-capgroup > header { background: rgba(15, 46, 34, .04); border-bottom: 1px solid var(--gt-hair); padding: 12px 16px; }
-.ad-capgroup-all { display: flex; align-items: flex-start; gap: 11px; cursor: pointer; margin: 0; }
-.ad-capgroup-all b { display: block; font-size: 14px; color: var(--ink); }
-.ad-capgroup-all small { display: block; font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+   Everything here is written against tokens rather than literal colours, so
+   the HQ theme switch can repaint the whole area by redefining eight
+   variables instead of this file re-stating every rule in a dark block.
+   The tokens themselves live in gt-shell.css beside the shell's own.
+   =========================================================================== */
 
-.ad-caplist { padding: 4px 0; }
-/* One row per capability, with the two decisions side by side: hold it, and
-   optionally hold it under review. Two separate lists would be two things to
-   keep mentally aligned. */
-.ad-caprow {
-  display: flex; align-items: center; gap: 14px;
-  padding: 10px 16px; border-bottom: 1px solid rgba(15, 46, 34, .06);
+/* ---- The page the wizard sits on ----------------------------------------
+   NOT `.gt-shell`. That class is a two-column grid (content + a 320px
+   sidebar) and these pages have no sidebar, so using it parked the whole
+   wizard in the narrow column with a dead strip beside it — the single
+   biggest reason the screens read as unfinished. This is the same measure
+   without the second track. */
+.ad-page { max-width: 1080px; }
+.ad-page.is-wide { max-width: none; }
+
+/* ---- Back to the list ---- */
+.ad-crumb { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+.ad-crumb a {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 600; color: var(--ad-quiet);
+  text-decoration: none; padding: 6px 12px 6px 9px;
+  border: 1px solid var(--ad-line); border-radius: 999px;
+  background: var(--ad-card); transition: border-color .15s, color .15s;
 }
-.ad-caprow:last-child { border-bottom: 0; }
-.ad-caprow:hover { background: rgba(45, 122, 58, .04); }
-.ad-capmain { display: flex; align-items: flex-start; gap: 11px; flex: 1; cursor: pointer; margin: 0; min-width: 0; }
-.ad-capmain b { display: block; font-size: 13.5px; color: var(--ink); font-weight: 700; }
-.ad-capmain small { display: block; font-size: 12.5px; line-height: 1.5; color: var(--muted); margin-top: 2px; }
+.ad-crumb a:hover { color: var(--forest); border-color: var(--forest); text-decoration: none; }
+.ad-crumb svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.1; }
+
+/* ---- A step card ---------------------------------------------------------
+   The wizard is three of these stacked. They are the same object as the
+   product's `.gt-panel` but with more air, because the middle one is a
+   nineteen-row consent screen and a panel built for a table does not give it
+   room to be read. */
+.ad-card {
+  background: var(--ad-card);
+  border: 1px solid var(--ad-line);
+  border-radius: 18px;
+  padding: 28px clamp(18px, 3vw, 34px) 30px;
+  box-shadow: 0 1px 2px rgba(15,46,34,.04), 0 8px 24px -18px rgba(15,46,34,.28);
+}
+.ad-card + .ad-card { margin-top: 20px; }
+
+.ad-cardhead { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 24px; }
+.ad-cardhead h2 {
+  font-family: var(--display); font-size: 22px; line-height: 1.15;
+  color: var(--ad-ink); margin: 0;
+}
+.ad-cardhead p { margin: 6px 0 0; font-size: 14px; line-height: 1.55; color: var(--ad-quiet); max-width: 62ch; }
+.ad-cardhead .ad-headright { margin-left: auto; flex: none; }
+
+/* The step number. Deep forest disc, lime numeral — the brand's one loud
+   pairing, used once per card and nowhere else on the page. */
+.ad-stepnum {
+  display: grid; place-items: center; flex: none;
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--deep); color: var(--lime);
+  font-family: var(--display); font-size: 17px; line-height: 1;
+}
+
+/* ---- Step 1: the fields ---- */
+.ad-fields { display: grid; gap: 18px; }
+@media (min-width: 760px) {
+  .ad-fields { grid-template-columns: 1fr 1fr; }
+  .ad-fields .fld-full { grid-column: 1 / -1; }
+}
+.ad-fields .fld { margin-bottom: 0; }
+.ad-fields .fld > label { font-size: 13px; font-weight: 700; color: var(--ad-ink); margin-bottom: 8px; }
+.ad-fields input, .ad-fields select, .ad-fields textarea {
+  background: var(--ad-field); border: 1px solid var(--ad-line-2);
+  color: var(--ad-ink); border-radius: 12px; padding: 13px 15px; font-size: 14.5px;
+}
+.ad-fields input::placeholder, .ad-fields textarea::placeholder { color: var(--ad-faint); }
+.ad-fields input:focus, .ad-fields select:focus, .ad-fields textarea:focus {
+  border-color: var(--forest); box-shadow: 0 0 0 3px var(--ad-ring);
+}
+
+/* ---- Step 2: full access, or pick ---------------------------------------
+   Two cards rather than a select, because the difference between them is a
+   paragraph and not a word. The illustration on the right is decorative and
+   carries no state the border and radio do not already carry. */
+.ad-level { display: grid; gap: 14px; margin-bottom: 26px; }
+@media (min-width: 820px) { .ad-level { grid-template-columns: 1fr 1fr; } }
+
+.ad-levelopt {
+  position: relative; display: flex; align-items: flex-start; gap: 14px;
+  margin: 0; cursor: pointer; padding: 20px 22px;
+  border: 1.5px solid var(--ad-line-2); border-radius: 16px;
+  background: var(--ad-card); transition: border-color .16s, background .16s, box-shadow .16s;
+}
+.ad-levelopt:hover { border-color: var(--ad-line-3); }
+.ad-levelopt .ad-optbody { flex: 1; min-width: 0; }
+.ad-levelopt b { display: block; font-family: var(--display); font-size: 16px; color: var(--ad-ink); line-height: 1.2; }
+.ad-levelopt small { display: block; font-size: 13px; line-height: 1.55; color: var(--ad-quiet); margin-top: 6px; }
+
+/* The radio, drawn rather than native, so the two cards agree across
+   browsers about how big "selected" looks. */
+.ad-levelopt input[type="radio"],
+.ad-check input[type="checkbox"] { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
+.ad-radio {
+  flex: none; width: 20px; height: 20px; margin-top: 2px; border-radius: 50%;
+  border: 2px solid var(--ad-line-3); background: var(--ad-card);
+  display: grid; place-items: center; transition: border-color .16s, background .16s;
+}
+.ad-radio::after {
+  content: ""; width: 9px; height: 9px; border-radius: 50%;
+  background: transparent; transition: background .16s;
+}
+.ad-levelopt:has(input:checked) { border-color: var(--forest); background: var(--ad-tint); box-shadow: 0 0 0 1px var(--forest) inset; }
+.ad-levelopt:has(input:checked) .ad-radio { border-color: var(--forest); }
+.ad-levelopt:has(input:checked) .ad-radio::after { background: var(--forest); }
+.ad-levelopt:has(input:focus-visible) { box-shadow: 0 0 0 3px var(--ad-ring); }
+
+/* Full access reads gold, not red. It is a legitimate choice the owner's
+   partner is expected to hold — the page should make it weighty, not alarming. */
+.ad-levelopt.is-full:has(input:checked) { border-color: var(--gold-dk); background: var(--ad-tint-gold); box-shadow: 0 0 0 1px var(--gold-dk) inset; }
+.ad-levelopt.is-full:has(input:checked) .ad-radio { border-color: var(--gold-dk); }
+.ad-levelopt.is-full:has(input:checked) .ad-radio::after { background: var(--gold-dk); }
+
+.ad-optart { flex: none; width: 46px; height: 46px; align-self: center; opacity: .9; }
+.ad-optart svg { width: 100%; height: 100%; display: block; }
+
+/* ---- Step 2: the capability groups --------------------------------------
+   One collapsible card per area. Open on load: the point of the screen is
+   that somebody reads the nineteen things before consenting to them, and a
+   stack of shut drawers invites ticking the headers instead. */
+.ad-caps-pick { display: grid; gap: 14px; }
+
+.ad-capgroup {
+  border: 1px solid var(--ad-line); border-radius: 16px;
+  background: var(--ad-card); overflow: hidden;
+}
+.ad-capgroup[open] { border-color: var(--ad-line-2); }
+
+.ad-capgroup > summary {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 20px; cursor: pointer; list-style: none;
+  background: var(--ad-head); transition: background .15s;
+}
+.ad-capgroup > summary::-webkit-details-marker { display: none; }
+.ad-capgroup > summary:hover { background: var(--ad-head-h); }
+
+/* The area's icon, in a soft disc. Green for the everyday areas, gold for
+   the two that reach members' own records. */
+.ad-capic {
+  flex: none; display: grid; place-items: center;
+  width: 38px; height: 38px; border-radius: 12px;
+  background: var(--ad-ic-bg); color: var(--ad-ic-fg);
+}
+.ad-capic svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.ad-capgroup.is-care .ad-capic { background: var(--ad-ic-bg-gold); color: var(--ad-ic-fg-gold); }
+
+.ad-capgroup-t { flex: 1; min-width: 0; }
+.ad-capgroup-t b { display: block; font-size: 15px; font-weight: 700; color: var(--ad-ink); line-height: 1.25; }
+.ad-capgroup-t small { display: block; font-size: 12.5px; color: var(--ad-quiet); margin-top: 2px; }
+
+/* How many of this group's rows are on, so a collapsed card still says
+   something. Driven by gt-team.js. */
+.ad-capcount {
+  flex: none; font-size: 11.5px; font-weight: 700; letter-spacing: .02em;
+  padding: 4px 10px; border-radius: 999px;
+  background: var(--ad-head-h); color: var(--ad-quiet);
+}
+.ad-capcount.is-on { background: var(--ad-tint-2); color: var(--forest); }
+
+.ad-capchev { flex: none; width: 16px; height: 16px; stroke: var(--ad-faint); fill: none; stroke-width: 2.2; transition: transform .18s; }
+.ad-capgroup[open] .ad-capchev { transform: rotate(180deg); }
+
+/* "Tick all of these" lives inside the open card, not in the summary bar:
+   a checkbox in a row that also toggles the drawer is a coin flip on what a
+   click does. */
+.ad-capall {
+  display: flex; align-items: center; gap: 11px; margin: 0;
+  padding: 12px 20px; border-top: 1px solid var(--ad-line);
+  font-size: 12.5px; font-weight: 600; color: var(--ad-quiet); cursor: pointer;
+}
+.ad-capall:hover { color: var(--forest); }
+
+.ad-caplist { padding: 0; }
+
+/* One row per capability, carrying both decisions: hold it, and optionally
+   hold it under review. Two separate lists would be two things to keep
+   mentally aligned. */
+.ad-caprow {
+  display: flex; align-items: center; gap: 18px;
+  padding: 14px 20px; border-top: 1px solid var(--ad-line);
+  transition: background .13s;
+}
+.ad-caprow:hover { background: var(--ad-row-h); }
+.ad-caprow:has(> .ad-capmain input:checked) { background: var(--ad-tint); }
+
+.ad-capmain { display: flex; align-items: flex-start; gap: 13px; flex: 1; cursor: pointer; margin: 0; min-width: 0; }
+.ad-capmain b { display: block; font-size: 14px; font-weight: 700; color: var(--ad-ink); line-height: 1.35; }
+.ad-capmain small { display: block; font-size: 12.5px; line-height: 1.55; color: var(--ad-quiet); margin-top: 3px; max-width: 58ch; }
+
+/* The drawn checkbox, matching the drawn radio above. */
+.ad-check { position: relative; flex: none; margin-top: 1px; line-height: 0; }
+.ad-box {
+  display: grid; place-items: center; width: 20px; height: 20px;
+  border: 2px solid var(--ad-line-3); border-radius: 6px;
+  background: var(--ad-card); transition: background .15s, border-color .15s;
+}
+.ad-box svg { width: 12px; height: 12px; stroke: #fff; fill: none; stroke-width: 3; opacity: 0; transition: opacity .13s; }
+.ad-check input:checked + .ad-box { background: var(--forest); border-color: var(--forest); }
+.ad-check input:checked + .ad-box svg { opacity: 1; }
+.ad-check input:indeterminate + .ad-box { background: var(--forest); border-color: var(--forest); }
+.ad-check input:indeterminate + .ad-box::after {
+  content: ""; position: absolute; width: 10px; height: 2px; border-radius: 2px; background: #fff;
+}
+.ad-check input:indeterminate + .ad-box svg { opacity: 0; }
+.ad-check input:focus-visible + .ad-box { box-shadow: 0 0 0 3px var(--ad-ring); }
+.ad-box { position: relative; }
+
+/* "care" — a different amount of thought before ticking, not a different check. */
 .ad-warn {
   font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: .07em;
-  text-transform: uppercase; color: #8a6508; background: rgba(212, 160, 23, .18);
-  padding: 1px 6px; border-radius: 999px; margin-left: 5px; vertical-align: 1px;
+  text-transform: uppercase; color: var(--ad-gold-fg); background: var(--ad-tint-gold-2);
+  padding: 2px 7px; border-radius: 999px; margin-left: 7px; vertical-align: 1px;
 }
 
+/* The approval control, on the right of its own row. */
 .ad-capreview {
-  display: flex; align-items: center; gap: 6px; flex: none; margin: 0;
-  font-size: 12px; font-weight: 600; color: var(--forest); cursor: pointer;
-  white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 8px; flex: none; margin: 0;
+  font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  padding: 6px 12px 6px 9px; border-radius: 999px;
+  border: 1px solid var(--ad-line-2); background: var(--ad-card); color: var(--ad-quiet);
+  transition: background .15s, border-color .15s, color .15s, opacity .15s;
 }
+.ad-capreview .ad-box { width: 16px; height: 16px; border-width: 1.5px; border-radius: 5px; }
+.ad-capreview .ad-box svg { width: 10px; }
+.ad-capreview:has(input:checked) {
+  background: var(--ad-tint-gold-2); border-color: var(--gold-dk); color: var(--ad-gold-fg);
+}
+.ad-capreview:has(input:checked) .ad-box { background: var(--gold-dk); border-color: var(--gold-dk); }
 /* Greyed rather than hidden when the capability is not held: a control that
    vanishes and reappears makes the row jump as you tick down the list. */
-.ad-capreview.is-off { opacity: .3; cursor: default; }
-.ad-capreview.is-na { opacity: .25; color: var(--muted); }
-
-/* ---- Full access vs picking ---- */
-.ad-level { display: grid; gap: 10px; margin-bottom: 20px; }
-@media (min-width: 720px) { .ad-level { grid-template-columns: 1fr 1fr; } }
-.ad-levelopt {
-  display: flex; align-items: flex-start; gap: 11px; margin: 0; cursor: pointer;
-  padding: 14px 16px; border: 1px solid var(--gt-hair); border-radius: 12px; background: #fff;
+.ad-capreview.is-off { opacity: .32; cursor: default; }
+/* Nothing to hold back — this either happens or it doesn't. */
+.ad-capreview.is-na {
+  border-color: transparent; background: transparent;
+  color: var(--ad-faint); font-weight: 600; cursor: default; padding-right: 12px;
 }
-.ad-levelopt:has(input:checked) { border-color: var(--forest); background: rgba(45, 122, 58, .05); }
-.ad-levelopt.is-full:has(input:checked) { border-color: #C0392B; background: rgba(192, 57, 43, .05); }
-.ad-levelopt b { display: block; font-size: 14px; color: var(--ink); }
-.ad-levelopt small { display: block; font-size: 12.5px; line-height: 1.5; color: var(--muted); margin-top: 3px; }
 
-/* ---- The wizard's three steps ---- */
-.ad-step { position: relative; }
-.ad-stepnum {
-  display: grid; place-items: center; width: 34px; height: 34px; flex: none;
-  border-radius: 50%; background: var(--deep); color: var(--lime);
-  font-family: var(--display); font-size: 16px;
+/* ---- Step 3: the summary, built from the boxes above --------------------- */
+.ad-preview {
+  border: 1px solid var(--ad-line); border-radius: 16px;
+  padding: 22px 24px; background: var(--ad-head);
 }
-.ad-fields { display: grid; gap: 14px; }
-@media (min-width: 720px) { .ad-fields { grid-template-columns: 1fr 1fr; } .ad-fields .fld:last-child { grid-column: 1 / -1; } }
-.ad-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 20px; }
+.ad-preview.is-empty { border-style: dashed; text-align: center; padding: 34px 24px; }
+.ad-pv-empty svg { width: 34px; height: 34px; stroke: var(--ad-faint); fill: none; stroke-width: 1.5; margin-bottom: 10px; }
+.ad-pv-empty p { margin: 0; font-size: 13.5px; color: var(--ad-quiet); }
 
-/* ---- The preview, built from the boxes above ---- */
-.ad-preview { border: 1px dashed var(--gt-hair); border-radius: 12px; padding: 16px 18px; background: rgba(15, 46, 34, .02); }
-.ad-pv-head { margin: 14px 0 6px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.ad-pv-head {
+  display: flex; align-items: center; gap: 8px;
+  margin: 22px 0 10px; font-size: 11px; font-weight: 800;
+  letter-spacing: .09em; text-transform: uppercase; color: var(--ad-quiet);
+}
 .ad-pv-head:first-child { margin-top: 0; }
-.ad-pv-list { margin: 0; padding-left: 20px; font-size: 13.5px; line-height: 1.7; color: var(--ink); }
-.ad-pv-list.is-wait { color: #8a6508; }
+.ad-pv-head::after { content: ""; flex: 1; height: 1px; background: var(--ad-line); }
+.ad-pv-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.ad-pv-list li {
+  display: flex; align-items: flex-start; gap: 9px;
+  font-size: 13.5px; line-height: 1.5; color: var(--ad-ink);
+}
+.ad-pv-list li::before {
+  content: ""; flex: none; width: 6px; height: 6px; margin-top: 6px;
+  border-radius: 50%; background: var(--forest);
+}
+.ad-pv-list.is-wait li { color: var(--ad-gold-fg); }
+.ad-pv-list.is-wait li::before { background: var(--gold-dk); }
+.ad-pv-note { margin: 12px 0 0; font-size: 12.5px; color: var(--ad-quiet); }
+
+/* ---- The action bar ------------------------------------------------------
+   Sticky at the foot of the page, not fixed to the viewport: fixed would sit
+   over the last capability row on a laptop, and the one row you cannot read
+   is the one you are about to consent to. Sticky bottom leaves the document
+   its full height and the bar rides the end of it. */
+.ad-bar {
+  position: sticky; bottom: 0; z-index: 20;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin-top: 20px; padding: 16px clamp(18px, 3vw, 26px);
+  background: var(--ad-bar); border: 1px solid var(--ad-line);
+  border-radius: 16px;
+  box-shadow: 0 -2px 20px -8px rgba(15,46,34,.20);
+  backdrop-filter: blur(8px);
+}
+.ad-bar .ad-barnote { font-size: 12.5px; color: var(--ad-quiet); margin: 0; }
+.ad-bar .ad-barright { margin-left: auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.ad-btn {
+  display: inline-flex; align-items: center; gap: 9px;
+  font: inherit; font-size: 14px; font-weight: 700; line-height: 1;
+  padding: 13px 22px; border-radius: 999px; cursor: pointer;
+  text-decoration: none; border: 1.5px solid transparent;
+  transition: filter .15s, border-color .15s, color .15s, background .15s;
+}
+.ad-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+.ad-btn.is-go { background: var(--forest); border-color: var(--forest); color: #fff; }
+.ad-btn.is-go:hover { filter: brightness(1.08); text-decoration: none; color: #fff; }
+.ad-btn.is-go:active { transform: translateY(1px); }
+.ad-btn.is-quiet { background: transparent; border-color: var(--ad-line-3); color: var(--ad-quiet); }
+.ad-btn.is-quiet:hover { border-color: var(--forest); color: var(--forest); text-decoration: none; }
+.ad-btn.is-danger { background: transparent; border-color: rgba(192,57,43,.4); color: #C0392B; }
+.ad-btn.is-danger:hover { background: rgba(192,57,43,.08); text-decoration: none; }
+
+@media (max-width: 620px) {
+  .ad-bar { flex-direction: column; align-items: stretch; }
+  .ad-bar .ad-barright { margin-left: 0; }
+  .ad-bar .ad-btn { justify-content: center; width: 100%; }
+  .ad-caprow { flex-wrap: wrap; gap: 10px; }
+  .ad-capreview { margin-left: 33px; }
+}
 
 /* ---- What one administrator holds, on the team list ---- */
-.ad-caps { display: flex; flex-wrap: wrap; gap: 5px; }
+.ad-caps { display: flex; flex-wrap: wrap; gap: 6px; }
 .ad-cap {
-  display: inline-block; padding: 3px 9px; border-radius: 999px;
-  background: rgba(45, 122, 58, .12); color: var(--forest);
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
+  border-radius: 999px; background: var(--ad-tint-2); color: var(--forest);
   font-size: 11.5px; font-weight: 600;
 }
-.ad-cap.is-reviewed { background: rgba(212, 160, 23, .16); color: #8a6508; }
+.ad-cap.is-reviewed { background: var(--ad-tint-gold-2); color: var(--ad-gold-fg); }
 .ad-cap em { font-style: normal; font-weight: 800; font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; opacity: .8; }
 tr.is-off { opacity: .55; }
 
 /* ---- "What you can do", on a person's own page ---- */
-.ad-mine { display: grid; gap: 10px; }
-.ad-mine-row { display: flex; align-items: flex-start; gap: 12px; }
-.ad-mine-ic { display: grid; place-items: center; width: 26px; height: 26px; flex: none; border-radius: 50%; }
-.ad-mine-ic svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.2; }
-.ad-mine-ic.is-go { background: rgba(45, 122, 58, .14); color: var(--forest); }
-.ad-mine-ic.is-wait { background: rgba(212, 160, 23, .18); color: #8a6508; }
-.ad-mine-row b { display: block; font-size: 14px; color: var(--ink); }
-.ad-mine-row small { display: block; font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+.ad-mine { display: grid; gap: 12px; }
+.ad-mine-row {
+  display: flex; align-items: flex-start; gap: 13px;
+  padding: 14px 16px; border: 1px solid var(--ad-line);
+  border-radius: 14px; background: var(--ad-card);
+}
+.ad-mine-ic { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 10px; }
+.ad-mine-ic svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+.ad-mine-ic.is-go { background: var(--ad-tint-2); color: var(--forest); }
+.ad-mine-ic.is-wait { background: var(--ad-tint-gold-2); color: var(--ad-gold-fg); }
+.ad-mine-row b { display: block; font-size: 14px; color: var(--ad-ink); }
+.ad-mine-row small { display: block; font-size: 12.5px; color: var(--ad-quiet); margin-top: 2px; }
 
 /* ---- Tasks ---- */
-.ad-task-form { display: grid; gap: 12px; max-width: 620px; }
+.ad-task-form { display: grid; gap: 14px; max-width: 620px; }
+.ad-task-form .fld { margin-bottom: 0; }
 .ad-tasks { display: grid; gap: 12px; }
 .ad-task {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
-  padding: 14px 16px; border: 1px solid var(--gt-hair); border-radius: 12px; background: #fff;
+  padding: 16px 18px; border: 1px solid var(--ad-line); border-radius: 14px; background: var(--ad-card);
 }
-.ad-task b { font-size: 14px; color: var(--ink); }
-.ad-task p { margin: 5px 0 4px; font-size: 13px; line-height: 1.55; color: var(--muted); }
+.ad-task b { font-size: 14.5px; color: var(--ad-ink); }
+.ad-task p { margin: 6px 0 4px; font-size: 13px; line-height: 1.55; color: var(--ad-quiet); }
 
 /* ---- What came back from review ---- */
 .ad-decisions { display: grid; gap: 12px; }
-.ad-decision { padding: 14px 16px; border: 1px solid var(--gt-hair); border-radius: 12px; background: #fff; }
+.ad-decision { padding: 16px 18px; border: 1px solid var(--ad-line); border-radius: 14px; background: var(--ad-card); }
 .ad-dec-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
 .ad-dec-note {
-  margin: 9px 0 0; padding-left: 12px; border-left: 3px solid var(--lime);
-  font-size: 13.5px; line-height: 1.6; color: var(--ink);
+  margin: 10px 0 0; padding-left: 13px; border-left: 3px solid var(--lime);
+  font-size: 13.5px; line-height: 1.6; color: var(--ad-ink);
 }
 .ad-dec-changed { margin: 8px 0 0; font-size: 12.5px; }
 
 /* ---- Reviewing one submission ---- */
-.rv-field { margin-bottom: 16px; }
+.rv-field { margin-bottom: 18px; }
 .rv-box { width: 100%; font-size: 13.5px; line-height: 1.6; }
 .rv-box.is-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
 .rv-static {
-  padding: 10px 12px; border: 1px solid var(--gt-hair); border-radius: 8px;
-  background: rgba(15, 46, 34, .03); font-size: 13px; line-height: 1.6;
-  color: var(--muted); white-space: pre-wrap; word-break: break-word;
+  padding: 12px 14px; border: 1px solid var(--ad-line); border-radius: 10px;
+  background: var(--ad-head); font-size: 13px; line-height: 1.6;
+  color: var(--ad-quiet); white-space: pre-wrap; word-break: break-word;
 }
 /* The markup fields are the ones worth seeing rendered — judging a blog post
    by reading its HTML is not reviewing it. */
 .rv-preview { margin-top: 8px; }
 .rv-preview summary { font-size: 12.5px; font-weight: 700; color: var(--forest); cursor: pointer; }
-.rv-render { margin-top: 10px; padding: 16px 18px; border: 1px solid var(--gt-hair); border-radius: 10px; background: #fff; }
+.rv-render { margin-top: 10px; padding: 18px 20px; border: 1px solid var(--ad-line); border-radius: 12px; background: var(--ad-card); }
 .rv-render img { max-width: 100%; height: auto; }
 .rv-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 18px; }
 
 /* ---- The activity filter ---- */
 .ad-filter { display: flex; gap: 8px; flex-wrap: wrap; }
-.ad-filter select { padding: 6px 10px; border: 1px solid var(--gt-hair); border-radius: 8px; background: #fff; font-family: var(--body); font-size: 13px; }
+.ad-filter select {
+  padding: 8px 12px; border: 1px solid var(--ad-line-2); border-radius: 999px;
+  background: var(--ad-card); color: var(--ad-ink); font-family: var(--body); font-size: 13px;
+}
 
-/* ---- What an invitation says you are being trusted with ---- */
+/* ---- What an invitation says you are being trusted with ----
+   On the dark invitation page, which is its own screen and not themed. */
 .inv-grants { margin: 0 0 22px; padding: 16px 18px; border-radius: 12px; background: rgba(232, 228, 213, .08); border: 1px solid rgba(232, 228, 213, .16); }
 .inv-grant-head { margin: 0 0 6px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--lime); }
 .inv-grants ul { margin: 0 0 12px; padding-left: 20px; font-size: 14px; line-height: 1.7; }

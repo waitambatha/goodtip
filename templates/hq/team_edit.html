@@ -7,53 +7,103 @@
 {% block extra_head %}<script src="{% static 'gtadmin/js/gt-team.js' %}" defer></script>{% endblock %}
 {% block admin_content %}
 
-<div class="gt-shell">
-  <div class="ned-topbar">
-    <a href="{% url 'admin:hq_team' %}" class="ned-back">&larr; All administrators</a>
+<div class="ad-page">
+  <div class="ad-crumb">
+    <a href="{% url 'admin:hq_team' %}">
+      <svg aria-hidden="true"><use href="#ic-chev-left"/></svg> All administrators
+    </a>
   </div>
 
   <form method="post" data-busy="Saving" data-team-form>
     {% csrf_token %}
 
-    <section class="gt-panel">
-      <div class="gt-panel-head">
-        <span class="gp-ic"><svg><use href="#ic-shield"/></svg></span>
+    <section class="ad-card">
+      <div class="ad-cardhead">
+        <span class="ad-capic"><svg><use href="#ic-shield"/></svg></span>
         <div>
           <h2>{{ row.user.email }}</h2>
-          <div class="gp-sub">
-            Added {{ row.created_at|date:"j M Y" }}{% if row.created_by %} by {{ row.created_by }}{% endif %}.
-          </div>
+          <p>Added {{ row.created_at|date:"j M Y" }}{% if row.created_by %} by {{ row.created_by }}{% endif %}.</p>
         </div>
       </div>
 
-      <div class="fld">
-        <label for="e_note">What are they here to do?</label>
-        <input type="text" name="note" id="e_note" maxlength="200" value="{{ row.note }}">
+      <div class="ad-fields">
+        <div class="fld fld-full">
+          <label for="e_note">What are they here to do?</label>
+          <input type="text" name="note" id="e_note" maxlength="200" value="{{ row.note }}">
+        </div>
+      </div>
+    </section>
+
+    <section class="ad-card">
+      <div class="ad-cardhead">
+        <span class="ad-stepnum">1</span>
+        <div>
+          <h2>What can they do?</h2>
+          <p>Tick what they need. Leave the rest — you can change any of this later.</p>
+        </div>
       </div>
 
       <div class="ad-level">
         <label class="ad-levelopt">
           <input type="radio" name="access_level" value="limited" data-level
                  {% if not row.is_full_access %}checked{% endif %}>
-          <span><b>Only what I choose</b><small>They see the areas you tick and nothing else.</small></span>
+          <span class="ad-radio" aria-hidden="true"></span>
+          <span class="ad-optbody">
+            <b>Only what I choose</b>
+            <small>They see the areas you tick and nothing else.</small>
+          </span>
+          <span class="ad-optart" aria-hidden="true">
+            <svg viewBox="0 0 48 48" fill="none">
+              <rect x="7" y="5" width="34" height="38" rx="6" fill="var(--ad-tint-2)"/>
+              <path d="m14 17 3 3 6-6" stroke="var(--forest)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="m14 28 3 3 6-6" stroke="var(--forest)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M27 18h8M27 29h8" stroke="var(--forest)" stroke-width="2.6" stroke-linecap="round" opacity=".45"/>
+            </svg>
+          </span>
         </label>
+
         <label class="ad-levelopt is-full">
           <input type="radio" name="access_level" value="full" data-level
                  {% if row.is_full_access %}checked{% endif %}>
-          <span><b>Full access</b><small>Everything, including adding administrators and approving other people's work.</small></span>
+          <span class="ad-radio" aria-hidden="true"></span>
+          <span class="ad-optbody">
+            <b>Full access</b>
+            <small>Everything, including adding administrators and approving other people's work.</small>
+          </span>
+          <span class="ad-optart" aria-hidden="true">
+            <svg viewBox="0 0 48 48" fill="none">
+              <path d="M8 33 6 14l10 7 8-12 8 12 10-7-2 19z" fill="var(--ad-tint-gold-2)" stroke="var(--gold-dk)" stroke-width="2.4" stroke-linejoin="round"/>
+              <path d="M9 38h30" stroke="var(--gold-dk)" stroke-width="2.8" stroke-linecap="round"/>
+            </svg>
+          </span>
         </label>
       </div>
 
       <div data-limited-only>
         {% include "hq/_capability_picker.html" with groups=groups held_keys=held_keys reviewed_keys=reviewed_keys %}
       </div>
-
-      <div class="ad-preview" data-preview></div>
-
-      <div class="ad-actions">
-        <button type="submit" class="gt-go-btn" style="width:auto;">Save changes <svg><use href="#ic-check"/></svg></button>
-      </div>
     </section>
+
+    <section class="ad-card">
+      <div class="ad-cardhead">
+        <span class="ad-stepnum">2</span>
+        <div>
+          <h2>Check it over</h2>
+          <p>This is what they'll be able to do once you save.</p>
+        </div>
+      </div>
+      <div class="ad-preview is-empty" data-preview></div>
+    </section>
+
+    <div class="ad-bar">
+      <p class="ad-barnote">They are not told about a change until you save it.</p>
+      <div class="ad-barright">
+        <a href="{% url 'admin:hq_team' %}" class="ad-btn is-quiet">Cancel</a>
+        <button type="submit" class="ad-btn is-go">
+          Save changes <svg aria-hidden="true"><use href="#ic-check"/></svg>
+        </button>
+      </div>
+    </div>
   </form>
 </div>
 {% endblock %}

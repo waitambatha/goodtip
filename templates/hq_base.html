@@ -32,6 +32,7 @@ that collapses.
     <span class="gts-area" data-area="hq">GoodTip HQ</span>
     <span class="gts-spacer"></span>
     <div class="gts-actions">
+      {% include "partials/_gt_theme_switch.html" %}
       <a href="/admin/"><svg><use href="#ic-sliders"/></svg><span>Django admin</span></a>
       <a href="/" target="_blank" rel="noopener"><svg><use href="#ic-eye"/></svg><span>View site</span></a>
       <a href="{% url 'profile' %}" class="gts-who">

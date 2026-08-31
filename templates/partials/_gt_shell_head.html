@@ -16,6 +16,13 @@ snippet.
       document.documentElement.classList.add("gts-collapsed");
     }
   } catch (e) {}
+  /* And the theme, for the same reason and more urgently: restoring it from a
+     deferred script means every dark-mode page load starts with a full cream
+     flash. Same key and same attribute Django's admin uses, so the choice
+     carries between /admin/ and here in both directions. */
+  try {
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "auto";
+  } catch (e) {}
 </script>
 <script src="{% static 'js/gt-shell.js' %}" defer></script>
 <script src="{% static 'js/gt-ui.js' %}" defer></script>
