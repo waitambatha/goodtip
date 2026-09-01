@@ -12893,18 +12893,22 @@ html[data-theme="light"] .gt-app.page-deep .page-scenes .scene.right { border-le
    have a blend on that white and that green, kind of a fusion, with a nice
    pattern to it."
 
-   Three layers, cheapest first: a fine diagonal hatch at 3.5% green, a wash
-   that carries white across the left two thirds and lets green arrive under
-   the account controls on the right, and white underneath so nothing is
-   translucent. The hatch is what stops the gradient reading as a smudge —
-   it gives the surface a texture to be, at a strength you notice only when
-   you look for it. */
+   END TO END, which the first attempt was not: it held flat white across the
+   left two thirds and only turned green under the account controls, so the
+   "fusion" was really a green corner on a white bar. The wash now starts
+   green at the wordmark, opens to white through the middle where the links
+   are and the labels need the most contrast, and closes green again at the
+   right — a blend across the whole width rather than at one end of it.
+
+   The diagonal hatch over the top is what stops a seven-stop gradient reading
+   as a smudge: it gives the surface a texture to be, at a strength you only
+   notice when you look for it. Both layers sit on nothing translucent. */
 html[data-theme="light"] .gt-app .app-nav {
   background:
     repeating-linear-gradient(135deg,
-      rgba(23,107,69,.035) 0 1.5px, rgba(255,255,255,0) 1.5px 8px),
-    linear-gradient(102deg,
-      #FFFFFF 0%, #FFFFFF 38%, #F6FAEF 66%, #EDF6DC 88%, #E6F3CC 100%);
+      rgba(23,107,69,.04) 0 1.5px, rgba(255,255,255,0) 1.5px 8px),
+    linear-gradient(100deg,
+      #E7F3CE 0%, #F2F9E3 18%, #FBFDF5 38%, #FFFFFF 52%, #F7FBEA 70%, #EDF6DA 86%, #E4F2C6 100%);
   border-bottom: 1px solid rgba(23,107,69,.18);
   box-shadow: 0 1px 0 rgba(255,255,255,.7) inset, 0 10px 22px -20px rgba(15,46,34,.35);
 }
@@ -12931,6 +12935,23 @@ html[data-theme="light"] .gt-app .an-links a.on {
 }
 html[data-theme="light"] .gt-app .an-links a.on svg { stroke: var(--lime); color: var(--lime); }
 html[data-theme="light"] .gt-app .an-links a.on:hover { background: #17402F; color: #FFFFFF; }
+
+/* THE GLYPHS TRAVEL FROM LIGHT GREEN TO DARK GREEN.
+   On the green theme the marks sit at 62% cream and light up lime on hover —
+   dim to bright. On white that reads backwards, because the brighter a green
+   gets the LESS of it there is against the page. So the resting state is a
+   light, friendly green and the hover state is the deep forest: the glyph
+   gets heavier as you approach it, not lighter, which is the same direction
+   the label travels and the same direction the fill travels when the item
+   becomes current. The current item keeps its lime, because by then the tile
+   under it is deep green and lime is the only bright thing left. */
+html[data-theme="light"] .gt-app .an-links a .an-ic,
+html[data-theme="light"] .gt-app .an-menu-btn .an-ic { color: #8DC63F; opacity: 1; }
+html[data-theme="light"] .gt-app .an-links a:hover .an-ic,
+html[data-theme="light"] .gt-app .an-links a:focus-visible .an-ic,
+html[data-theme="light"] .gt-app .an-menu-btn:hover .an-ic,
+html[data-theme="light"] .gt-app .an-menu-btn[aria-expanded="true"] .an-ic { color: var(--lt-ink); opacity: 1; }
+html[data-theme="light"] .gt-app .an-links a.on .an-ic { color: var(--lime); opacity: 1; }
 html[data-theme="light"] .gt-app .an-menu-btn { color: #46554B; }
 html[data-theme="light"] .gt-app .an-menu-btn:hover { color: var(--lt-ink); }
 
@@ -13016,9 +13037,33 @@ html[data-theme="light"] .gt-app .an-ctx-filter {
   background: var(--lt-surface); border-color: var(--lt-line-3); color: var(--lt-ink);
 }
 html[data-theme="light"] .gt-app .an-ctx-filter::placeholder { color: var(--lt-quiet); }
-html[data-theme="light"] .gt-app .an-ctx-scroll::-webkit-scrollbar-thumb {
-  background-color: rgba(23,107,69,.30);
+/* THE ORGANISATION LIST, GREENER. Asked for directly — "make that dropdown
+   scroll still more green for visibility." White rows on a white panel had
+   nothing to say where the list started or ended; on a green bed each row is
+   an object, the scroll region reads as a region, and the current
+   organisation's solid green fill still wins because it is darker than the
+   bed rather than merely different from it. */
+html[data-theme="light"] .gt-app .an-ctx-scroll {
+  background: var(--lt-surface-2);
+  border: 1px solid var(--lt-line-g);
+  border-radius: 11px;
+  scrollbar-color: rgba(23,107,69,.42) transparent;
 }
+html[data-theme="light"] .gt-app .an-ctx-scroll .an-ctx-row:hover { background: #FFFFFF; }
+html[data-theme="light"] .gt-app .an-ctx-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(23,107,69,.42);
+}
+/* The fade at the foot of a scrolling list is a gradient towards the surface
+   under it, and that surface was `--deep-2`. Left alone it painted a dark
+   smear across the bottom two rows of a white panel. */
+html[data-theme="light"] .gt-app .an-ctx-listwrap::after {
+  background: linear-gradient(180deg, rgba(242,247,234,0), var(--lt-surface-2));
+}
+
+/* "JUPITER doesn't use groups" — the one line in the panel that appears only
+   when an organisation has none, at 55% cream, on white. Invisible exactly
+   when it is the only thing the column has to say. */
+html[data-theme="light"] .gt-app .an-ctx-empty { color: var(--lt-quiet); }
 
 /* ==========================================================================
    THE CHARITY STRIP
@@ -13237,50 +13282,67 @@ html[data-theme="light"] .gt-app .dp-cta { background: var(--lt-accent); color: 
 /* ==========================================================================
    THE HERO
    ==========================================================================
-   The stadium photograph stays, and stays prominent — it is the only image on
-   the page and the reason the dashboard looks like sport rather than like an
-   admin tool. What flips is the veil over it: a cream gradient from the left,
-   heavy enough under the type to hold it at contrast and gone by the right
-   edge, so the picture is still a picture.
+   THE PICTURE IS THE PANEL. Two goes at this were wrong in the same way. The
+   first faded white across the whole thing and turned the stadium into a grey
+   ghost behind the words; the second made the left half solid white, which
+   read cleanly but cost half the photograph — "let it fully show the images
+   or video, that split where we have the white background, let it be fully
+   images can be seen, and make the text will be seen."
 
-   The heading takes a short lime rule underneath it. One accent, on the one
-   line that is the point of the panel. */
+   So there is no white half any more. The photograph runs the full width and
+   the type sits ON it, which means the type stops being deep green: nothing
+   dark is readable over a lit stadium at any veil strength that still lets
+   you see the stadium. It goes white, over a green scrim that is heavy enough
+   at the left edge to hold contrast and gone by two thirds across.
+
+   THIS IS THE ONE PLACE THE LIGHT THEME GOES DARK, and that is the right
+   trade rather than an inconsistency. Everywhere else on the page a surface
+   exists to be read against; here the surface is a photograph, and a
+   photograph you have veiled into legibility is no longer worth showing. The
+   scrim is lighter than the green theme's — .88 to .06 against .94 to .35 —
+   so more of the picture survives here than there.
+
+   The lime rule under the headline stays. It is the one accent that reads as
+   well on the photograph as it does on white. */
 html[data-theme="light"] .gt-app .dash-banner {
-  color: var(--lt-ink);
+  color: var(--cream);
   border: 1px solid var(--lt-line);
   border-radius: 22px;
   box-shadow: var(--lt-lift-2);
-  /* The eyebrow is inline-styled `color: var(--lime)` in dashboard.html.
-     Rather than fight it with !important, the variable is redefined here on
-     the banner: the inline declaration resolves it at this element and picks
-     up a green that reads on cream. */
-  --lime: var(--lt-accent-ink);
 }
-/* The veil is the one translucent thing left in the theme, because it has to
-   be — there is a photograph under it. What matters is that it is SOLID white
-   for the whole width the type occupies and then hands over quickly: a long
-   fade across the panel is the haze the client asked to be rid of, and it
-   made the photograph a grey ghost behind the words rather than a photograph.
-   Clean split, so the type is on white and the picture is a picture. */
 html[data-theme="light"] .gt-app .dash-banner .veil {
   background: linear-gradient(100deg,
-    #FFFFFF 0%,
-    #FFFFFF 46%,
-    rgba(255,255,255,.72) 58%,
-    rgba(255,255,255,.16) 70%,
-    rgba(255,255,255,0) 78%);
+    rgba(9,28,19,.82) 0%,
+    rgba(9,28,19,.68) 28%,
+    rgba(9,28,19,.44) 50%,
+    rgba(9,28,19,.20) 72%,
+    rgba(9,28,19,.05) 100%);
 }
-html[data-theme="light"] .gt-app .dash-banner .db-eyebrow { color: var(--lt-accent-ink); opacity: 1; }
-html[data-theme="light"] .gt-app .dash-banner .db-h1 { color: var(--lt-ink); }
-html[data-theme="light"] .gt-app .dash-banner .db-rank { color: var(--lt-quiet); opacity: 1; }
-html[data-theme="light"] .gt-app .dash-banner .dp-greet .dp-txt { color: var(--lt-ink); }
-html[data-theme="light"] .gt-app .dash-banner .dp-txt { color: #24352B; opacity: 1; }
+/* THE SHADOW IS WHY THE SCRIM CAN STAY LIGHT.
+   The headline is a rotating message — it can be four words or two lines —
+   so it runs as far right as it needs to, well past where the scrim has given
+   the picture back. Carrying the whole burden on the scrim would mean veiling
+   two thirds of the photograph to protect a sentence that is usually short.
+   A shadow costs nothing where the type isn't, so the scrim holds the left
+   and the shadow covers wherever the words actually land. */
+html[data-theme="light"] .gt-app .dash-banner .db-eyebrow,
+html[data-theme="light"] .gt-app .dash-banner .db-h1,
+html[data-theme="light"] .gt-app .dash-banner .db-rank,
+html[data-theme="light"] .gt-app .dash-banner .dp-txt,
+html[data-theme="light"] .gt-app .dash-banner .dp-greet .dp-txt {
+  text-shadow: 0 1px 2px rgba(6,20,13,.8), 0 3px 18px rgba(6,20,13,.75);
+}
+html[data-theme="light"] .gt-app .dash-banner .db-eyebrow { color: var(--lime); opacity: .9; }
+html[data-theme="light"] .gt-app .dash-banner .db-h1,
+html[data-theme="light"] .gt-app .dash-banner .dp-greet .dp-txt { color: #FFFFFF; }
+html[data-theme="light"] .gt-app .dash-banner .db-rank { color: var(--cream); opacity: .82; }
+html[data-theme="light"] .gt-app .dash-banner .dp-txt { color: var(--cream); opacity: .95; }
 html[data-theme="light"] .gt-app .dash-banner .dp-ic {
-  background: var(--lt-sel); border-color: rgba(23,107,69,.22);
+  background: rgba(200,241,53,.16); border-color: rgba(200,241,53,.30);
 }
-html[data-theme="light"] .gt-app .dash-banner .dp-ic svg { stroke: var(--lt-forest); }
-html[data-theme="light"] .gt-app .dash-banner .dp-dot { background: rgba(15,46,34,.20); }
-html[data-theme="light"] .gt-app .dash-banner .dp-dot.on { background: var(--lt-accent-ink); }
+html[data-theme="light"] .gt-app .dash-banner .dp-ic svg { stroke: var(--lime); }
+html[data-theme="light"] .gt-app .dash-banner .dp-dot { background: rgba(255,253,244,.32); }
+html[data-theme="light"] .gt-app .dash-banner .dp-dot.on { background: var(--lime); }
 
 /* The rule under the headline. Sized to the type block rather than the panel,
    and only where the greeting stack actually is. */
@@ -13289,28 +13351,29 @@ html[data-theme="light"] .gt-app .dash-banner .db-h1::after {
   content: ""; display: block;
   width: 58px; height: 4px; border-radius: 100px;
   margin-top: 12px;
-  background: linear-gradient(90deg, var(--lt-accent), rgba(196,240,0,.25));
+  background: linear-gradient(90deg, var(--lime), rgba(200,241,53,.25));
 }
-html[data-theme="light"] .gt-app .dash-banner .dash-prompt { position: relative; }
 
-/* The three role chips. OWNER carries the accent; MANAGER and CAPTAIN stay
-   neutral, which is the whole point — if all three are coloured, none of them
-   is telling you anything. */
-html[data-theme="light"] .gt-app .dash-banner .pill-role,
+/* The role chips are on the photograph too, so they keep the on-dark
+   treatment the green theme already gives them: OWNER carries the accent, the
+   other two stay quiet. The chips that appear ELSEWHERE on a light page — on
+   a white card, away from the hero — take ink instead, which is the pair of
+   rules below. */
 html[data-theme="light"] .gt-app.page-deep .pill-role {
   background: var(--lt-surface);
   border: 1px solid var(--lt-line-3);
   color: #3E4E44;
 }
-html[data-theme="light"] .gt-app .dash-banner .pill-role.owner,
 html[data-theme="light"] .gt-app.page-deep .pill-role.owner {
   background: var(--lt-accent); border-color: var(--lt-accent-2); color: var(--lt-ink);
 }
-html[data-theme="light"] .gt-app .dash-banner .pill-role.manager,
-html[data-theme="light"] .gt-app.page-deep .pill-role.manager,
-html[data-theme="light"] .gt-app .dash-banner .pill-role.captain,
-html[data-theme="light"] .gt-app.page-deep .pill-role.captain {
-  background: var(--lt-surface); color: #3E4E44;
+html[data-theme="light"] .gt-app .dash-banner .pill-role {
+  background: rgba(255,255,255,.16);
+  border: 1px solid rgba(255,255,255,.26);
+  color: #fff;
+}
+html[data-theme="light"] .gt-app .dash-banner .pill-role.owner {
+  background: var(--lime); border-color: var(--lime); color: var(--lt-ink);
 }
 
 /* ==========================================================================
