@@ -2219,6 +2219,13 @@ a.news-item.news-link:hover .nt { color: var(--forest); }
 .dash-banner .veil { position: absolute; inset: 0; background: linear-gradient(100deg, rgba(11,35,25,.94) 30%, rgba(11,35,25,.6) 70%, rgba(11,35,25,.35)); }
 .dash-banner > * { position: relative; z-index: 1; }
 
+/* The banner's three text lines used to carry their colours as inline styles
+   on the elements themselves, which no stylesheet can override — so the light
+   theme could not reach them. Same values, on classes, so both themes can. */
+.dash-banner .db-eyebrow { color: var(--lime); opacity: .85; }
+.dash-banner .db-h1 { color: #fff; }
+.dash-banner .db-rank { color: var(--cream); opacity: .8; margin-top: 4px; font-size: 14px; }
+
 /* ==========================================================================
    ================= APP v3 — banner crossfade, nav ========================
    ========================================================================== */
@@ -12741,9 +12748,8 @@ a.ch-item:hover .ch-item-edit, a.ch-item:focus-visible .ch-item-edit { opacity: 
    THE MEMBER APP'S LIGHT THEME
    ==========================================================================
    The app's designed look is the deep green — that IS its dark theme, and it
-   stays the default. This is the same screens on cream, with green demoted
-   from the ground to an accent, offered through the switch in the nav
-   (partials/_app_theme_switch.html).
+   stays the default. This is the same screens translated into warm daylight,
+   offered through the switch in the nav (partials/_app_theme_switch.html).
 
    WHY IT KEYS ON [data-theme="light"] AND NOTHING ELSE.
    /admin/ and the HQ shell are light by design and go dark on `auto` when the
@@ -12752,138 +12758,611 @@ a.ch-item:hover .ch-item-edit, a.ch-item:focus-visible .ch-item-edit { opacity: 
    member app would hand every visitor whose phone is on dark mode a look
    nobody has signed off — a redesign by side effect rather than a choice.
 
-   WHAT IT ACTUALLY CHANGES. Very little, because the content was already
-   light: the cards, tables and forms in here are cream on a green stage and
-   they are untouched. What moves is the FRAME — the stage, the nav, the
-   sheet, the strips down the edges and the handful of places that print white
-   text because they knew they were on green.
+   WHAT IT IS, AS A DESIGN.
+   The first pass translated the frame and left the rest: a dark page turned
+   pale, with the cards still cream and the accents still tuned for green
+   behind them. It read plain and dry, which is the note the client gave. This
+   pass gives light its own palette rather than a de-saturated copy of the
+   dark one, on four layers that never collide:
+
+       warm cream page  →  white cards  →  warm-beige insets  →  lime accents
+
+   White dominates, cream carries the warmth, deep forest carries the
+   contrast, and the lime is spent deliberately — active nav, the primary
+   button, the selected room, one number on one tile — rather than sprayed
+   about. It is a yellow-GREEN, never a bright yellow: #C4F000 as a fill under
+   deep-green text, and #4E7A0B when the accent has to BE the text, because
+   lime on white is a colour you cannot read.
+
+   HOW IT REACHES EVERY OTHER PAGE.
+   Every private screen wears `page-deep sheet-page` (see the body_class block
+   in dashboard.html, ladder.html, wall.html, and the rest), and everything on
+   them is drawn from the same handful of tokens. So the palette below is set
+   once, on <html> and again on <body>, and the dashboard, My Tips, the
+   Leaderboard, the Ladder, the Wall, Messages, Groups, Members and the
+   organisation wizard all inherit the same light theme without a page of
+   their own. The rules after the token block are the places that had a colour
+   welded in because they knew what was behind them.
+
+   WHY THE PALETTE IS RESTATED ON `body`.
+   `.gt-v2` is on the body of every one of these pages and it sets --gt-card,
+   --gt-sheet and --gt-hair itself. That is inheritance, not specificity: a
+   property set on the body replaces the inherited one for the whole subtree
+   however strong the selector on <html> was. Same trap as the admin shell —
+   see the note on gt-shell.css — so the same fix, on the same element.
    ========================================================================== */
-html[data-theme="light"] {
-  /* One or two hairlines have to come up a little: a border tuned to read
-     against near-black is invisible against cream. */
-  --app-line: rgba(15,46,34,.14);
+html[data-theme="light"] body.gt-app {
+  /* ---- The four layers ---- */
+  --lt-page:      #F7F5EE;   /* warm cream — the page itself */
+  --lt-surface:   #FFFFFF;   /* white — the cards you read on */
+  --lt-surface-2: #FBFAF5;   /* barely-there beige — insets inside a card */
+  --lt-tint:      #F4F8EA;   /* very light green — quiet green ground */
+  --lt-sel:       #EEF8C8;   /* pale lime — selected and hovered */
+
+  /* ---- Ink ---- */
+  --lt-ink:    #0F2E22;      /* deep forest — headings and body */
+  --lt-forest: #176B45;      /* rich green — secondary action, status */
+  --lt-quiet:  #737A72;      /* warm grey — supporting copy */
+
+  /* ---- The accent, in its two jobs ----
+     A fill wants the bright end; text wants the dark end. Treating them as
+     one colour is how a lime accent becomes an unreadable yellow caption. */
+  --lt-accent:     #C4F000;  /* fills: buttons, the active pill */
+  --lt-accent-2:   #B8E600;  /* the same fill, pressed */
+  --lt-accent-ink: #4E7A0B;  /* the accent AS type, on white — 4.6:1 */
+
+  /* ---- Hairlines and lift ---- */
+  --lt-line:   rgba(15,46,34,.10);
+  --lt-line-2: rgba(15,46,34,.06);
+  --lt-line-3: rgba(15,46,34,.16);   /* controls, which need a visible edge */
+  --lt-lift:   0 1px 2px rgba(15,46,34,.04), 0 12px 28px -22px rgba(15,46,34,.30);
+  --lt-lift-2: 0 2px 4px rgba(15,46,34,.05), 0 26px 54px -34px rgba(15,46,34,.38);
+
+  /* ---- The existing app tokens, re-pointed ----
+     Everything downstream paints from these, which is why one block reaches
+     screens this file has no rule for. */
+  --app-bg:     var(--lt-page);
+  --app-card:   var(--lt-surface);
+  --app-card-2: var(--lt-surface-2);
+  --app-line:   var(--lt-line);
+  --app-line-2: var(--lt-line-2);
+  --gt-sheet:   var(--lt-surface);
+  --gt-card:    var(--lt-surface);
+  --gt-hair:    var(--lt-line);
+  --card-1:     var(--lt-tint);
+  --line:       var(--lt-line);
+
+  /* --muted and --forest are the two brand tokens tuned for cream-on-green.
+     On white the grey is a shade too cool and the green a shade too light, so
+     both move — once, here, rather than in the forty rules that read them. */
+  --muted:  var(--lt-quiet);
+  --forest: var(--lt-forest);
 }
 
-/* ---- The stage ---------------------------------------------------------- */
-html[data-theme="light"] .app.page-deep {
+/* ==========================================================================
+   THE STAGE
+   ========================================================================== */
+html[data-theme="light"] .gt-app { background: var(--lt-page); color: var(--lt-ink); }
+
+/* Two washes, both nearly invisible: enough that the cream is a lit surface
+   rather than a flat fill, not enough to read as a gradient. The dark theme's
+   equivalents are at .12 and .40 — on cream that same strength is a stain. */
+html[data-theme="light"] .gt-app.page-deep {
   background:
-    radial-gradient(900px 560px at 78% -10%, rgba(200,241,53,.30), transparent 60%),
-    radial-gradient(720px 520px at -10% 112%, rgba(45,122,58,.13), transparent 62%),
-    #EFEDE3;
+    radial-gradient(1100px 620px at 82% -14%, rgba(196,240,0,.16), transparent 62%),
+    radial-gradient(820px 560px at -12% 108%, rgba(23,107,69,.07), transparent 64%),
+    var(--lt-page);
 }
-html[data-theme="light"] .app.page-deep .app-head .app-h1 { color: var(--deep); }
-html[data-theme="light"] .app.page-deep .app-head .app-eyebrow { color: var(--forest); }
-html[data-theme="light"] .app.page-deep .app-head .app-sub { color: #4A5A4F; opacity: 1; }
+html[data-theme="light"] .gt-app.page-deep .app-head .app-h1 { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app.page-deep .app-head .app-eyebrow { color: var(--lt-accent-ink); }
+html[data-theme="light"] .gt-app.page-deep .app-head .app-sub { color: var(--lt-quiet); opacity: 1; }
 
-/* ---- The nav ------------------------------------------------------------ */
-html[data-theme="light"] .app-nav,
-html[data-theme="light"] .gt-v2 .app-nav {
-  background: #FFFFFF;
-  border-bottom: 1px solid rgba(15,46,34,.10);
-}
-html[data-theme="light"] .an-brand { color: var(--deep); }
-html[data-theme="light"] .an-brand span { color: var(--forest); }
-html[data-theme="light"] .an-links a { color: #3C4B41; opacity: 1; }
-html[data-theme="light"] .gt-v2 .an-links a.on,
-html[data-theme="light"] .an-links a.on { background: var(--deep); color: #fff; }
-html[data-theme="light"] .an-links a:hover { background: rgba(45,122,58,.10); color: var(--deep); }
-html[data-theme="light"] .an-menu-btn { color: #3C4B41; }
-html[data-theme="light"] .an-ctx-btn { color: var(--deep); border-color: rgba(15,46,34,.16); }
-html[data-theme="light"] .an-iconbtn { color: #3C4B41; }
-html[data-theme="light"] .an-iconbtn:hover { background: rgba(45,122,58,.10); color: var(--deep); }
-html[data-theme="light"] .an-burger { color: var(--deep); }
-html[data-theme="light"] .bell-btn { color: #3C4B41; }
-html[data-theme="light"] .gt-v2 .an-chip .cn b { color: var(--deep); }
+/* The photo strips down both edges stay — they are the frame this product is
+   recognised by. What changes is only what they fade INTO: their wash is a
+   gradient towards the page, so it has to be the page's colour, or the strips
+   end in a dark smear against cream. */
+html[data-theme="light"] .gt-app.page-deep .page-scenes .scene::after {
+  /* The wash exists only in this theme, and it is the reason the pseudo-element
+     has `content` here and nowhere else: on the deep green the photographs sit
+     down of their own accord, and the decision above this ("clear photos —
+     just a hairline, no mist") stands for the dark theme. On cream the same
+     frames are the loudest thing on the screen, pulling the eye off the page
+     they are supposed to frame. It fades TOWARDS the content, so the outer
+     edge keeps the picture and the inner edge hands over to the page.
 
-/* ---- The charity strip -------------------------------------------------- */
-html[data-theme="light"] .charity-strip,
-html[data-theme="light"] .gt-v2 .charity-strip {
-  background: #F3F1E7; color: #3C4B41;
-  border-bottom: 1px solid rgba(15,46,34,.08);
+     ONE GOTCHA: `z-index: 2`. gt-scenes.js puts fx-slide / fx-zoom / fx-wipe
+     on a stack at random, and those three raise the ENTERING shot to z-index 1
+     so it can animate over the one it replaces. A pseudo-element at auto sits
+     below that, which is why the wash appeared on whichever strip happened to
+     draw fx-fade and vanished on the other one. */
+  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
 }
-html[data-theme="light"] .charity-strip .cs-amt { color: var(--deep); }
-html[data-theme="light"] .charity-strip svg { fill: var(--forest); }
-html[data-theme="light"] .charity-strip .cs-bar { background: rgba(15,46,34,.10); }
-html[data-theme="light"] .charity-strip .cs-bar > i { background: var(--forest); }
-html[data-theme="light"] .charity-strip.nopledge .cs-amt { color: var(--forest); }
+html[data-theme="light"] .gt-app.page-deep .page-scenes .scene.left::after {
+  background: linear-gradient(90deg, rgba(247,245,238,.18), rgba(247,245,238,.52) 55%, rgba(247,245,238,.84));
+}
+html[data-theme="light"] .gt-app.page-deep .page-scenes .scene.right::after {
+  background: linear-gradient(270deg, rgba(247,245,238,.18), rgba(247,245,238,.52) 55%, rgba(247,245,238,.84));
+}
+html[data-theme="light"] .gt-app.page-deep .page-scenes .scene.left { border-right-color: var(--lt-line); }
+html[data-theme="light"] .gt-app.page-deep .page-scenes .scene.right { border-left-color: var(--lt-line); }
 
-/* ---- The page sheet ------------------------------------------------------
-   The dark green panel the cards sit on becomes a white one. Its headings
-   were told to print white because they knew what was under them, so they are
-   told otherwise here. */
-html[data-theme="light"] .sheet-page .page-sheet {
-  background: linear-gradient(180deg, #FFFFFF, #FBFAF4);
-  border: 1px solid rgba(15,46,34,.10);
-  box-shadow: 0 34px 80px -50px rgba(15,46,34,.55);
+/* ==========================================================================
+   THE NAV
+   ==========================================================================
+   White, with a warm hairline and the faintest shadow so it separates from
+   the cream as it sticks. Not a green bar: the header is furniture, and a
+   solid brand colour across the top is the one thing that would stop this
+   reading as a light theme at all. */
+html[data-theme="light"] .gt-app .app-nav {
+  background: var(--lt-surface);
+  border-bottom: 1px solid var(--lt-line);
+  box-shadow: 0 1px 0 rgba(15,46,34,.02), 0 10px 24px -22px rgba(15,46,34,.30);
 }
-html[data-theme="light"] .sheet-page .page-sheet .app-h1 { color: var(--deep); }
-html[data-theme="light"] .sheet-page .page-sheet .app-eyebrow { color: var(--forest); }
-html[data-theme="light"] .sheet-page .page-sheet .app-sub { color: #4A5A4F; }
-html[data-theme="light"] .sheet-page .page-sheet .card {
-  background: #F6F4EA;
-  box-shadow: 0 14px 34px -26px rgba(15,46,34,.5);
+html[data-theme="light"] .gt-app .an-brand { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .an-brand span { color: var(--lt-accent-ink); }
+html[data-theme="light"] .gt-app .an-links a { color: #46554B; opacity: 1; }
+html[data-theme="light"] .gt-app .an-links a:hover { background: var(--lt-tint); color: var(--lt-ink); }
+
+/* THE ACTIVE PAGE, IN THE ACCENT RATHER THAN IN A SLAB OF GREEN.
+   The first pass filled it deep forest with white type, which is legible but
+   reads as a pressed button rather than as "you are here", and puts the
+   heaviest object on the page in the navigation. Pale lime with deep-green
+   type says the same thing at a fraction of the weight — and it is the same
+   selected-state language as the room switcher and the group tabs below, so
+   "chosen" looks like one thing everywhere on the screen. */
+html[data-theme="light"] .gt-app .an-links a.on {
+  background: var(--lt-sel); color: var(--lt-ink); font-weight: 700;
 }
-html[data-theme="light"] .gt-sheet .app-main {
-  background: #FBFAF4;
-  box-shadow: 0 0 90px -30px rgba(15,46,34,.28);
+html[data-theme="light"] .gt-app .an-menu-btn { color: #46554B; }
+html[data-theme="light"] .gt-app .an-menu-btn:hover { color: var(--lt-ink); }
+
+/* The context chip is a control, so it gets a control's edge — a clean white
+   card, not a tinted wash. */
+html[data-theme="light"] .gt-app .an-ctx-btn {
+  color: var(--lt-ink); background: var(--lt-surface);
+  border-color: var(--lt-line-3);
+}
+html[data-theme="light"] .gt-app .an-ctx-btn:hover {
+  border-color: rgba(23,107,69,.45); background: var(--lt-tint);
+}
+html[data-theme="light"] .gt-app .an-ctx-org { opacity: .78; }
+/* The group half decides which ladder a tip lands on, so it stays the
+   emphasised one — in a green that can actually be read on white. */
+html[data-theme="light"] .gt-app .an-ctx-group { color: var(--lt-forest); }
+html[data-theme="light"] .gt-app .an-iconbtn { color: #46554B; }
+html[data-theme="light"] .gt-app .an-iconbtn:hover { background: var(--lt-tint); color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .an-burger { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .bell-btn { color: #46554B; }
+html[data-theme="light"] .gt-app .an-chip .cn b { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .an-org { color: var(--lt-ink); opacity: .78; }
+
+/* The drop-down panels hang off a white bar now, so they need their own edge
+   rather than the contrast the dark bar was giving them for free. */
+html[data-theme="light"] .gt-app .an-menu-panel,
+html[data-theme="light"] .gt-app .an-ctx-panel {
+  background: var(--lt-surface);
+  border: 1px solid var(--lt-line);
+  box-shadow: var(--lt-lift-2);
+}
+html[data-theme="light"] .gt-app .an-ctx-head {
+  color: var(--lt-accent-ink);
+  text-transform: uppercase; letter-spacing: .1em;
+}
+html[data-theme="light"] .gt-app .an-ctx-row:hover { background: var(--lt-tint); }
+html[data-theme="light"] .gt-app .an-ctx-row.on { background: var(--lt-sel); color: var(--lt-ink); }
+
+/* ==========================================================================
+   THE CHARITY STRIP
+   ==========================================================================
+   A quiet beige band under the nav — present, not competing with it. */
+html[data-theme="light"] .gt-app .charity-strip {
+  background: var(--lt-surface-2); color: #3E4E44;
+  border-bottom: 1px solid var(--lt-line-2);
+}
+html[data-theme="light"] .gt-app .charity-strip .cs-amt { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .charity-strip svg { fill: var(--lt-forest); }
+html[data-theme="light"] .gt-app .charity-strip .cs-bar { background: rgba(15,46,34,.09); }
+html[data-theme="light"] .gt-app .charity-strip .cs-bar > i {
+  background: linear-gradient(90deg, var(--lt-forest), var(--lt-accent-2));
+}
+html[data-theme="light"] .gt-app .charity-strip.nopledge .cs-amt { color: var(--lt-forest); }
+
+/* ==========================================================================
+   THE SHEET, AND WHAT SITS ON IT
+   ==========================================================================
+   In the dark theme the sheet is a deep green panel and the cards on it are
+   cream: the sheet is the ground and the cards are the paper. Inverting that
+   literally — a white panel holding cream cards on a cream page — stacks
+   three near-identical warm tones and is exactly the flat, dry look the
+   client described.
+
+   So in light the sheet steps out of the way entirely. It keeps its width and
+   its padding, which is all the layout needs from it, and the page's cream
+   becomes the ground. The cards go pure white, and the layering the eye
+   actually reads is cream → white → beige inset. */
+html[data-theme="light"] .gt-app.sheet-page .page-sheet {
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+@media (max-width: 900px) {
+  html[data-theme="light"] .gt-app.sheet-page .page-sheet { max-width: 100%; }
+}
+html[data-theme="light"] .gt-app.sheet-page .page-sheet .app-h1 { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app.sheet-page .page-sheet .app-eyebrow { color: var(--lt-accent-ink); }
+html[data-theme="light"] .gt-app.sheet-page .page-sheet .app-sub { color: var(--lt-quiet); }
+
+/* The white card. Borders and a soft lift do the separating; on a cream page
+   a card needs an edge, because a white fill alone at this contrast reads as
+   a smudge rather than as an object. */
+html[data-theme="light"] .gt-app .card,
+html[data-theme="light"] .gt-app.sheet-page .page-sheet .card {
+  background: var(--lt-surface);
+  border: 1px solid var(--lt-line);
+  border-radius: 18px;
+  box-shadow: var(--lt-lift);
+}
+/* A card inside a card is an inset section, not a second sheet of paper: warm
+   beige, hairline, no shadow. This is the third layer, and the only one. */
+html[data-theme="light"] .gt-app .card .card,
+html[data-theme="light"] .gt-app.sheet-page .page-sheet .card .card {
+  background: var(--lt-surface-2);
+  border-color: var(--lt-line);
+  box-shadow: none;
+}
+html[data-theme="light"] .gt-app .card-h { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .card-lead { color: var(--lt-quiet); }
+
+/* The reading beds — the ladder, the leaderboard, the Wall's feed, the
+   fixture list. Beige rather than white, so the white rows inside them lift. */
+html[data-theme="light"] .gt-app.sheet-page .gt-listwrap,
+html[data-theme="light"] .gt-app.sheet-page .gt-board,
+html[data-theme="light"] .gt-app.sheet-page .gt-feed {
+  background: var(--lt-surface-2);
+  border: 1px solid var(--lt-line);
+  box-shadow: var(--lt-lift);
+}
+html[data-theme="light"] .gt-app.sheet-page .gt-board .gb-head {
+  color: var(--lt-quiet);
+  border-bottom-color: var(--lt-line-3);
+}
+html[data-theme="light"] .gt-app.sheet-page .gt-post,
+html[data-theme="light"] .gt-app.sheet-page .gt-feed .gt-post,
+html[data-theme="light"] .gt-app.sheet-page .gwh-slot .wr-card,
+html[data-theme="light"] .gt-app.sheet-page .wr-card,
+html[data-theme="light"] .gt-app .msg-item,
+html[data-theme="light"] .gt-app.sheet-page .page-sheet .msg-item {
+  background: var(--lt-surface);
+  border: 1px solid var(--lt-line);
+  box-shadow: var(--lt-lift);
+}
+html[data-theme="light"] .gt-app.sheet-page .gt-post .gpt-thread { background: var(--lt-surface-2); }
+html[data-theme="light"] .gt-app .art-page,
+html[data-theme="light"] .gt-app .art-more {
+  background: var(--lt-surface);
+  border: 1px solid var(--lt-line);
+  box-shadow: var(--lt-lift);
 }
 
-/* ---- The photo strips ----------------------------------------------------
-   Their wash is a gradient towards the page, so it has to be the page's
-   colour. Left on the dark one, the strips end in a black smear against a
-   cream margin. */
-html[data-theme="light"] .app.page-deep .page-scenes .scene.left::after {
-  background: linear-gradient(90deg, rgba(239,237,227,.20), rgba(239,237,227,.80) 55%, rgba(239,237,227,.97));
-  border-right-color: rgba(15,46,34,.10);
+/* PAGE HEADERS ON THE SHEET. These were written white-on-green for the Wall,
+   the Leaderboard and the Ladder, and there is no green left under them. */
+html[data-theme="light"] .gt-app.sheet-page .gt-head .gh-eyebrow,
+html[data-theme="light"] .gt-app.sheet-page .gwall-head .gh-eyebrow { color: var(--lt-accent-ink); }
+html[data-theme="light"] .gt-app.sheet-page .gt-head h1,
+html[data-theme="light"] .gt-app.sheet-page .gt-head .gh-title { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app.sheet-page .gt-head .gh-sub,
+html[data-theme="light"] .gt-app.sheet-page .gt-head p { color: var(--lt-quiet); }
+html[data-theme="light"] .gt-app.sheet-page .gt-rounder,
+html[data-theme="light"] .gt-app.sheet-page .gt-head .rnd-now,
+html[data-theme="light"] .gt-app.sheet-page .gt-head .rnd-when { color: var(--lt-quiet); }
+html[data-theme="light"] .gt-app.sheet-page .gt-head .rnd-now { color: var(--lt-ink); }
+
+/* The icon tile got a lime-on-green treatment for the dark sheet; on white
+   the same alpha is a pale yellow blur. */
+html[data-theme="light"] .gt-app.sheet-page .page-sheet > .gt-ic-tile,
+html[data-theme="light"] .gt-app.page-deep .gt-ic-tile.on-dark {
+  background: var(--lt-sel);
+  border-color: rgba(23,107,69,.24);
+  color: var(--lt-forest);
 }
-html[data-theme="light"] .app.page-deep .page-scenes .scene.right::after {
-  background: linear-gradient(270deg, rgba(239,237,227,.20), rgba(239,237,227,.80) 55%, rgba(239,237,227,.97));
-  border-left-color: rgba(15,46,34,.10);
+html[data-theme="light"] .gt-app .gt-empty .ge-ic {
+  background: linear-gradient(150deg, var(--lt-sel), var(--lt-tint));
+  color: var(--lt-forest);
 }
+
+/* ==========================================================================
+   BUTTONS
+   ==========================================================================
+   Ghost buttons on the sheet were given cream type and a white-alpha border
+   because the sheet was dark green. On a cream page that is white on white —
+   the single worst thing this theme could leave behind, since "Find an
+   organisation" and "Groups" are ghost buttons. They go back to being what
+   they are drawn as: a white control with a hairline. */
+html[data-theme="light"] .gt-app.sheet-page .page-sheet .abtn-ghost,
+html[data-theme="light"] .gt-app.sheet-page .page-sheet .card .abtn-ghost,
+html[data-theme="light"] .gt-app .abtn-ghost {
+  color: var(--lt-ink);
+  border-color: var(--lt-line-3);
+  background: var(--lt-surface);
+}
+html[data-theme="light"] .gt-app.sheet-page .page-sheet .abtn-ghost:hover,
+html[data-theme="light"] .gt-app.sheet-page .page-sheet .card .abtn-ghost:hover,
+html[data-theme="light"] .gt-app .abtn-ghost:hover {
+  color: var(--lt-ink);
+  border-color: rgba(23,107,69,.5);
+  background: var(--lt-tint);
+}
+
+/* The primary: the lime fill with deep-green type on it. This is the one
+   place the accent is allowed to be the largest thing in its row. */
+html[data-theme="light"] .gt-app .abtn-primary {
+  background: var(--lt-accent); color: var(--lt-ink);
+  box-shadow: 0 1px 2px rgba(15,46,34,.06), 0 14px 26px -18px rgba(150,190,0,.75);
+}
+html[data-theme="light"] .gt-app .abtn-primary:hover {
+  background: var(--lt-accent-2); color: var(--lt-ink);
+  box-shadow: 0 2px 4px rgba(15,46,34,.08), 0 18px 32px -18px rgba(150,190,0,.85);
+}
+html[data-theme="light"] .gt-app .abtn-primary:active { background: #A8D400; color: var(--lt-ink); }
+/* The dark button keeps its deep-green fill — it is the contrast anchor in a
+   row of white controls — but its label goes cream rather than lime, which at
+   button size was reading as a warning. */
+html[data-theme="light"] .gt-app .abtn-dark { background: var(--lt-ink); color: #F2F7E4; }
+html[data-theme="light"] .gt-app .abtn-dark:hover { background: #17402F; filter: none; }
+html[data-theme="light"] .gt-app .dp-cta { background: var(--lt-accent); color: var(--lt-ink); }
+
+/* ==========================================================================
+   THE HERO
+   ==========================================================================
+   The stadium photograph stays, and stays prominent — it is the only image on
+   the page and the reason the dashboard looks like sport rather than like an
+   admin tool. What flips is the veil over it: a cream gradient from the left,
+   heavy enough under the type to hold it at contrast and gone by the right
+   edge, so the picture is still a picture.
+
+   The heading takes a short lime rule underneath it. One accent, on the one
+   line that is the point of the panel. */
+html[data-theme="light"] .gt-app .dash-banner {
+  color: var(--lt-ink);
+  border: 1px solid var(--lt-line);
+  border-radius: 22px;
+  box-shadow: var(--lt-lift-2);
+  /* The eyebrow is inline-styled `color: var(--lime)` in dashboard.html.
+     Rather than fight it with !important, the variable is redefined here on
+     the banner: the inline declaration resolves it at this element and picks
+     up a green that reads on cream. */
+  --lime: var(--lt-accent-ink);
+}
+html[data-theme="light"] .gt-app .dash-banner .veil {
+  background: linear-gradient(100deg,
+    rgba(247,245,238,.985) 30%,
+    rgba(247,245,238,.94) 52%,
+    rgba(247,245,238,.66) 72%,
+    rgba(247,245,238,.20));
+}
+html[data-theme="light"] .gt-app .dash-banner .db-eyebrow { color: var(--lt-accent-ink); opacity: 1; }
+html[data-theme="light"] .gt-app .dash-banner .db-h1 { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .dash-banner .db-rank { color: var(--lt-quiet); opacity: 1; }
+html[data-theme="light"] .gt-app .dash-banner .dp-greet .dp-txt { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .dash-banner .dp-txt { color: #24352B; opacity: 1; }
+html[data-theme="light"] .gt-app .dash-banner .dp-ic {
+  background: var(--lt-sel); border-color: rgba(23,107,69,.22);
+}
+html[data-theme="light"] .gt-app .dash-banner .dp-ic svg { stroke: var(--lt-forest); }
+html[data-theme="light"] .gt-app .dash-banner .dp-dot { background: rgba(15,46,34,.20); }
+html[data-theme="light"] .gt-app .dash-banner .dp-dot.on { background: var(--lt-accent-ink); }
+
+/* The rule under the headline. Sized to the type block rather than the panel,
+   and only where the greeting stack actually is. */
+html[data-theme="light"] .gt-app .dash-banner .dash-prompt::after,
+html[data-theme="light"] .gt-app .dash-banner .db-h1::after {
+  content: ""; display: block;
+  width: 58px; height: 4px; border-radius: 100px;
+  margin-top: 12px;
+  background: linear-gradient(90deg, var(--lt-accent), rgba(196,240,0,.25));
+}
+html[data-theme="light"] .gt-app .dash-banner .dash-prompt { position: relative; }
+
+/* The three role chips. OWNER carries the accent; MANAGER and CAPTAIN stay
+   neutral, which is the whole point — if all three are coloured, none of them
+   is telling you anything. */
+html[data-theme="light"] .gt-app .dash-banner .pill-role,
+html[data-theme="light"] .gt-app.page-deep .pill-role {
+  background: var(--lt-surface);
+  border: 1px solid var(--lt-line-3);
+  color: #3E4E44;
+}
+html[data-theme="light"] .gt-app .dash-banner .pill-role.owner,
+html[data-theme="light"] .gt-app.page-deep .pill-role.owner {
+  background: var(--lt-accent); border-color: var(--lt-accent-2); color: var(--lt-ink);
+}
+html[data-theme="light"] .gt-app .dash-banner .pill-role.manager,
+html[data-theme="light"] .gt-app.page-deep .pill-role.manager,
+html[data-theme="light"] .gt-app .dash-banner .pill-role.captain,
+html[data-theme="light"] .gt-app.page-deep .pill-role.captain {
+  background: var(--lt-surface); color: #3E4E44;
+}
+
+/* ==========================================================================
+   THE ORGANISATION CONTROL ROW
+   ==========================================================================
+   YOUR ORGANISATION · [ masterclass ▾ ] · Groups · Find an organisation ·
+   + Create an organisation. One row of white controls with one lime primary
+   at the end of it. */
+html[data-theme="light"] .gt-app.page-deep .dc-lab,
+html[data-theme="light"] .gt-app.sheet-page .page-sheet .dash-ctl .dc-lab {
+  color: var(--lt-quiet);
+}
+html[data-theme="light"] .gt-app.page-deep .dc-pick select,
+html[data-theme="light"] .gt-app.page-deep .dash-ctl select,
+html[data-theme="light"] .gt-app .dash-ctl .dc-pick > select {
+  background: var(--lt-surface);
+  border: 1px solid var(--lt-line-3);
+  color: var(--lt-ink);
+  box-shadow: var(--lt-lift);
+}
+html[data-theme="light"] .gt-app .dash-ctl .dc-pick > select:hover { border-color: rgba(23,107,69,.45); }
+
+/* ==========================================================================
+   WHICH ROOM YOU ARE TIPPING IN
+   ==========================================================================
+   The group tabs sit in a warm beige tray, and the chosen one is pale lime
+   with deep-green type — the same "selected" language as the active nav item,
+   deliberately. The dark theme fills the chosen tab with full-strength lime,
+   which on a white card is a slab of yellow. */
+html[data-theme="light"] .gt-app .room-switch.on-light .rw-eyebrow,
+html[data-theme="light"] .gt-app .room-switch.on-dark .rw-eyebrow { color: var(--lt-accent-ink); }
+html[data-theme="light"] .gt-app .room-switch.on-light .rw-note,
+html[data-theme="light"] .gt-app .room-switch.on-dark .rw-note { color: var(--lt-quiet); }
+html[data-theme="light"] .gt-app .room-switch.on-light .rw-note b,
+html[data-theme="light"] .gt-app .room-switch.on-dark .rw-note b { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .room-switch.on-light .rw-seg,
+html[data-theme="light"] .gt-app .room-switch.on-dark .rw-seg {
+  background: var(--lt-surface-2);
+  border: 1px solid var(--lt-line);
+}
+html[data-theme="light"] .gt-app .room-switch.on-light .rw-opt,
+html[data-theme="light"] .gt-app .room-switch.on-dark .rw-opt { color: #3E4E44; }
+html[data-theme="light"] .gt-app .room-switch.on-light .rw-opt:hover,
+html[data-theme="light"] .gt-app .room-switch.on-dark .rw-opt:hover { background: var(--lt-surface); color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .room-switch.on-light .rw-opt.on,
+html[data-theme="light"] .gt-app .room-switch.on-dark .rw-opt.on {
+  background: var(--lt-sel); color: var(--lt-ink);
+  box-shadow: inset 0 0 0 1px rgba(23,107,69,.20);
+}
+html[data-theme="light"] .gt-app .room-switch.on-light .rw-more,
+html[data-theme="light"] .gt-app .room-switch.on-dark .rw-more { color: var(--lt-forest); }
+
+/* ==========================================================================
+   THE ROUND, AND THE COUNTDOWN
+   ==========================================================================
+   LIVE is green because it is a status, not an accent. The countdown cells
+   were deep-green plates with lime numerals, which is right on a dark card
+   and far too heavy on a white one — three black bricks in the corner of the
+   page. White cards, hairline, deep-green numerals. */
+html[data-theme="light"] .gt-app .badge-live { color: var(--lt-forest); }
+html[data-theme="light"] .gt-app .badge-live::before { background: var(--lt-forest); }
+html[data-theme="light"] .gt-app .cd-cell {
+  background: var(--lt-surface);
+  border: 1px solid var(--lt-line-3);
+  color: var(--lt-ink);
+  box-shadow: 0 1px 2px rgba(15,46,34,.04);
+}
+html[data-theme="light"] .gt-app .cd-cell b { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .cd-cell small { color: var(--lt-quiet); opacity: 1; }
+html[data-theme="light"] .gt-app .cd-locked { color: var(--lt-quiet); }
+
+/* ==========================================================================
+   THE THREE TILES
+   ==========================================================================
+   Season points keeps the deep-green fill: with everything else on the page
+   white, one dark object is what stops the row reading as three empty boxes,
+   and the lime numeral on it is the single brightest thing on the dashboard.
+   Rank and Tips this round stay white with a hairline. */
+html[data-theme="light"] .gt-app .stat-card {
+  background: var(--lt-surface);
+  border: 1px solid var(--lt-line);
+  box-shadow: var(--lt-lift);
+}
+html[data-theme="light"] .gt-app .stat-card .s-lab { color: var(--lt-quiet); }
+html[data-theme="light"] .gt-app .stat-card .s-num { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .stat-card .s-sub { color: var(--lt-quiet); }
+html[data-theme="light"] .gt-app .stat-card .s-ic { stroke: var(--lt-forest); opacity: .14; }
+html[data-theme="light"] .gt-app .stat-card.accent {
+  background: linear-gradient(160deg, #14382A, var(--lt-ink));
+  border-color: var(--lt-ink);
+  box-shadow: 0 2px 4px rgba(15,46,34,.10), 0 26px 50px -30px rgba(15,46,34,.55);
+}
+html[data-theme="light"] .gt-app .stat-card.accent .s-lab { color: #D9E4D6; opacity: .78; }
+html[data-theme="light"] .gt-app .stat-card.accent .s-num { color: #CDF23F; }
+html[data-theme="light"] .gt-app .stat-card.accent .s-sub { color: #D9E4D6; opacity: .72; }
+html[data-theme="light"] .gt-app .stat-card.accent .s-ic { stroke: #CDF23F; opacity: .18; }
+
+/* ==========================================================================
+   FIXTURES, TABLES AND PICKS
+   ==========================================================================
+   These were already drawn for a light surface. What they need is the tint
+   strengths adjusted: an alpha tuned to sit on cream disappears on white. */
+html[data-theme="light"] .gt-app .fixtures .fxp:hover { background: var(--lt-sel); }
+html[data-theme="light"] .gt-app .fixtures .fxp.done { background: var(--lt-tint); }
+html[data-theme="light"] .gt-app .fixtures .fxp.done:nth-child(even) { background: #EDF4E0; }
+html[data-theme="light"] .gt-app .pick .team { background: var(--lt-surface); border-color: var(--lt-line-3); }
+html[data-theme="light"] .gt-app .pick .team:hover { border-color: var(--lt-forest); background: var(--lt-tint); }
+html[data-theme="light"] .gt-app .pick .team .crest { background: var(--lt-tint); color: var(--lt-forest); }
+html[data-theme="light"] .gt-app .atable th { background: var(--lt-ink); color: #E8EFE2; }
+html[data-theme="light"] .gt-app .atable td { background: var(--lt-surface); }
+html[data-theme="light"] .gt-app .atable tbody tr:hover td { box-shadow: inset 0 0 0 999px rgba(196,240,0,.14); }
+html[data-theme="light"] .gt-app .atable tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--lt-forest), inset 0 0 0 999px rgba(196,240,0,.14); }
+html[data-theme="light"] .gt-app .atable tr.me td { background: var(--lt-sel); border-color: rgba(184,230,0,.55); }
+
+/* ==========================================================================
+   LEFTOVERS THAT KNEW THEY WERE ON GREEN
+   ========================================================================== */
+html[data-theme="light"] .gt-app.page-deep .flash-close:hover { background: rgba(15,46,34,.08); }
+html[data-theme="light"] .gt-app .ch-item { background: var(--lt-surface); border-color: var(--lt-line); }
+html[data-theme="light"] .gt-app .ch-item:hover { background: var(--lt-tint); border-color: rgba(23,107,69,.32); }
+html[data-theme="light"] .gt-app .ch-item-name { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .ch-item-url,
+html[data-theme="light"] .gt-app .ch-item-note { color: var(--lt-quiet); }
+html[data-theme="light"] .gt-app .ch-item-chip { background: var(--lt-tint); color: var(--lt-forest); border-color: rgba(23,107,69,.26); }
+html[data-theme="light"] .gt-app .ch-item-edit { background: var(--lt-sel); color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .ch-item-fix { color: var(--lt-forest); opacity: 1; }
+html[data-theme="light"] .gt-app .ch-add-row { border-color: var(--lt-line-3); }
+html[data-theme="light"] .gt-app .che-now,
+html[data-theme="light"] .gt-app .che-refetch { background: var(--lt-surface); border-color: var(--lt-line); }
+html[data-theme="light"] .gt-app .che-now-txt b,
+html[data-theme="light"] .gt-app .che-refetch b { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .che-now-txt small,
+html[data-theme="light"] .gt-app .che-refetch small { color: var(--lt-quiet); }
 
 /* ---- The conversation ----------------------------------------------------
    .chat paints from its own tokens, and `.page-deep .chat` swaps them for the
    on-green set. On a light page that swap is wrong twice over, so it is put
    back — one block rather than a rule per bubble part, which is the reason
    the component took tokens in the first place. */
-html[data-theme="light"] .page-deep .chat {
-  --ch-mine:      #123A25;
+html[data-theme="light"] .gt-app.page-deep .chat {
+  --ch-mine:      #14382A;
   --ch-mine-fg:   #F1F5EC;
-  --ch-theirs:    #FFFFFF;
+  --ch-theirs:    var(--lt-surface);
   --ch-theirs-fg: #17342A;
-  --ch-line:      rgba(15,46,34,.12);
-  --ch-quiet:     #6B7A6E;
-  --ch-accent:    var(--forest);
+  --ch-line:      var(--lt-line);
+  --ch-quiet:     var(--lt-quiet);
+  --ch-accent:    var(--lt-forest);
 }
-html[data-theme="light"] .page-deep .chat-composer { background: #FFFFFF; }
-html[data-theme="light"] .page-deep .chat-composer textarea { background: rgba(15,46,34,.04); }
-html[data-theme="light"] .page-deep .cc-send { background: var(--forest); color: #fff; }
-html[data-theme="light"] .page-deep .cc-send:hover { background: var(--deep); }
-html[data-theme="light"] .page-deep .ch-back { color: var(--forest); }
-html[data-theme="light"] .page-deep .chat-quote { background: rgba(15,46,34,.06); }
-html[data-theme="light"] .page-deep .chat-row.mine .chat-quote { background: rgba(255,255,255,.12); }
+html[data-theme="light"] .gt-app.page-deep .chat-composer { background: var(--lt-surface); }
+html[data-theme="light"] .gt-app.page-deep .chat-composer textarea { background: var(--lt-surface-2); }
+html[data-theme="light"] .gt-app.page-deep .cc-send { background: var(--lt-forest); color: #fff; }
+html[data-theme="light"] .gt-app.page-deep .cc-send:hover { background: var(--lt-ink); }
+html[data-theme="light"] .gt-app.page-deep .ch-back { color: var(--lt-forest); }
+html[data-theme="light"] .gt-app.page-deep .ch-back:hover { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app.page-deep .chat-quote { background: rgba(15,46,34,.05); }
+html[data-theme="light"] .gt-app.page-deep .chat-row.mine .chat-quote { background: rgba(255,255,255,.12); }
+html[data-theme="light"] .gt-app.page-deep .chat-row.mine .chat-av { background: var(--lt-accent); color: var(--lt-ink); }
 
-/* ---- Panels that knew they were on green -------------------------------- */
-html[data-theme="light"] .ch-item {
-  background: #FFFFFF; border-color: rgba(15,46,34,.10);
+/* ---- Motion ---------------------------------------------------------------
+   Soft hover on the cards that are also links. Cheap, and it is most of what
+   separates "premium" from "static" at this level of restraint. */
+html[data-theme="light"] .gt-app a > .card,
+html[data-theme="light"] .gt-app .gt-scard,
+html[data-theme="light"] .gt-app .dept-card {
+  transition: border-color .16s var(--ease), box-shadow .16s var(--ease);
 }
-html[data-theme="light"] .ch-item:hover { background: #FBFAF4; border-color: rgba(45,122,58,.30); }
-html[data-theme="light"] .ch-item-name { color: var(--deep); }
-html[data-theme="light"] .ch-item-url { color: var(--muted); }
-html[data-theme="light"] .ch-item-note { color: var(--muted); }
-html[data-theme="light"] .ch-item-chip { background: rgba(45,122,58,.12); color: var(--forest); border-color: rgba(45,122,58,.28); }
-html[data-theme="light"] .ch-item-edit { background: rgba(45,122,58,.14); color: var(--forest); }
-html[data-theme="light"] .ch-item-fix { color: var(--forest); opacity: 1; }
-html[data-theme="light"] .ch-add-row { border-color: rgba(15,46,34,.18); }
-html[data-theme="light"] .che-now,
-html[data-theme="light"] .che-refetch { background: #FFFFFF; border-color: rgba(15,46,34,.12); }
-html[data-theme="light"] .che-now-txt b { color: var(--deep); }
-html[data-theme="light"] .che-now-txt small,
-html[data-theme="light"] .che-refetch small { color: var(--muted); }
-html[data-theme="light"] .che-refetch b { color: var(--deep); }
-html[data-theme="light"] .msg-item { background: #FFFFFF; }
-html[data-theme="light"] .art-page,
-html[data-theme="light"] .art-more { background: #FFFFFF; box-shadow: 0 20px 50px -38px rgba(15,46,34,.5); }
+html[data-theme="light"] .gt-app a:hover > .card,
+html[data-theme="light"] .gt-app .gt-scard:hover,
+html[data-theme="light"] .gt-app .dept-card:hover {
+  border-color: rgba(23,107,69,.30);
+  box-shadow: var(--lt-lift-2);
+}
+
+/* The create-organisation wizard's panel is deliberately a slab of lime — the
+   one screen in the app where the accent IS the surface, in both themes. The
+   white-card rule above is broad enough to flatten it, so it is restated. */
+html[data-theme="light"] .gt-app .form-lime > .card {
+  background: linear-gradient(180deg, #E2F878, var(--lt-accent) 55%, var(--lt-accent-2));
+  border: 1px solid rgba(15,46,34,.24);
+  box-shadow: 0 30px 60px -34px rgba(15,46,34,.45), inset 0 1px 0 rgba(255,255,255,.55);
+}
+html[data-theme="light"] .gt-app .form-lime .card .card { background: rgba(255,255,255,.85); }
 
 /* ---- The switch itself --------------------------------------------------- */
 .an-theme {

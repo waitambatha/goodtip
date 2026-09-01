@@ -37,7 +37,16 @@
   {% block extra_head %}{% endblock %}
   {% include "partials/_analytics.html" %}
 </head>
-<body class="app gt-v2 {% block body_class %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+{% comment %}
+`gt-app` marks the member app, and only the member app. /admin/, /manage/ and
+the HQ shell share this file's `app` and `gt-v2` classes and the same
+localStorage theme key, but their light palette is the one they are designed
+for and lives in gt-shell.css. The member app's light theme is a different
+palette on the same key, so every rule in it hangs off this class rather than
+off [data-theme="light"] alone — see THE MEMBER APP'S LIGHT THEME in
+goodtip.css.
+{% endcomment %}
+<body class="app gt-app gt-v2 {% block body_class %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   {% include "public/partials/_icons.html" %}
 
   {# ---- sport loader — post shape follows the code (AFL: four posts, no crossbar · NRL: one H frame). Never one shape recoloured for both. ---- #}

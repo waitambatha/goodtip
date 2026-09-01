@@ -136,7 +136,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
   <div class="veil"></div>
   <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;">
     <div style="min-width:0;flex:1;">
-      {% if c.round %}<div class="app-eyebrow" style="color:var(--lime);opacity:.85;">Round {{ c.round.round_number }} &middot; {{ c.round.series }}</div>{% endif %}
+      {% if c.round %}<div class="app-eyebrow db-eyebrow">Round {{ c.round.round_number }} &middot; {{ c.round.series }}</div>{% endif %}
 
       {% comment %}
       The headline is a message channel, not a nameplate. It opens on the
@@ -163,9 +163,9 @@ stacking context, so a strip rendered inside it paints over the sheet.
       </div>
       <div class="dp-dots" data-prompt-dots aria-hidden="true"></div>
       {% else %}
-      <h1 class="app-h1" style="color:#fff;">Welcome back, {{ user.display_name }}</h1>
+      <h1 class="app-h1 db-h1">Welcome back, {{ user.display_name }}</h1>
       {% if c.rank %}
-      <p style="color:var(--cream);opacity:.8;margin-top:4px;font-size:14px;">You're {{ c.rank|ordinal }} on the {{ c.org.name }} ladder.</p>
+      <p class="db-rank">You're {{ c.rank|ordinal }} on the {{ c.org.name }} ladder.</p>
       {% endif %}
       {% endif %}
     </div>
