@@ -12792,12 +12792,25 @@ a.ch-item:hover .ch-item-edit, a.ch-item:focus-visible .ch-item-edit { opacity: 
    see the note on gt-shell.css — so the same fix, on the same element.
    ========================================================================== */
 html[data-theme="light"] body.gt-app {
-  /* ---- The four layers ---- */
-  --lt-page:      #F7F5EE;   /* warm cream — the page itself */
+  /* ---- The four layers ----
+     Cream is gone, and so is every translucent overlay that went with it. The
+     client's note was that the cream read as haze rather than as a surface —
+     "that misty vibe", and on the room switcher "that cream, I'm not feeling
+     it, not been able to see it". It was doing two jobs badly: separating
+     surfaces AND carrying warmth, and at the contrast a warm off-white can
+     manage against white it did neither.
+
+     So the page is white, the cards are white, and what separates them is a
+     border and a shadow — a decision, not a tint. Where a surface genuinely
+     has to read as INSIDE another one, it takes a green tint rather than a
+     warm one, because green is the brand and it survives being pale. Every
+     layer below is opaque; nothing on these screens is a translucent white
+     over something else any more. */
+  --lt-page:      #FFFFFF;   /* white — the page itself */
   --lt-surface:   #FFFFFF;   /* white — the cards you read on */
-  --lt-surface-2: #FBFAF5;   /* barely-there beige — insets inside a card */
-  --lt-tint:      #F4F8EA;   /* very light green — quiet green ground */
-  --lt-sel:       #EEF8C8;   /* pale lime — selected and hovered */
+  --lt-surface-2: #F2F7EA;   /* soft green — a box inside a box */
+  --lt-tint:      #F7FBF1;   /* the faintest green — hover, quiet ground */
+  --lt-sel:       #EEF8C8;   /* pale lime — kept only for row highlights */
 
   /* ---- Ink ---- */
   --lt-ink:    #0F2E22;      /* deep forest — headings and body */
@@ -12812,9 +12825,12 @@ html[data-theme="light"] body.gt-app {
   --lt-accent-ink: #4E7A0B;  /* the accent AS type, on white — 4.6:1 */
 
   /* ---- Hairlines and lift ---- */
-  --lt-line:   rgba(15,46,34,.10);
-  --lt-line-2: rgba(15,46,34,.06);
-  --lt-line-3: rgba(15,46,34,.16);   /* controls, which need a visible edge */
+  --lt-line:   rgba(15,46,34,.13);
+  --lt-line-2: rgba(15,46,34,.08);
+  --lt-line-3: rgba(15,46,34,.20);   /* controls, which need a visible edge */
+  /* White on white means the edge IS the separation, so it is drawn a little
+     harder than it would be over cream. */
+  --lt-line-g: rgba(23,107,69,.22);  /* the green edge, for green surfaces */
   --lt-lift:   0 1px 2px rgba(15,46,34,.04), 0 12px 28px -22px rgba(15,46,34,.30);
   --lt-lift-2: 0 2px 4px rgba(15,46,34,.05), 0 26px 54px -34px rgba(15,46,34,.38);
 
@@ -12829,7 +12845,7 @@ html[data-theme="light"] body.gt-app {
   --gt-sheet:   var(--lt-surface);
   --gt-card:    var(--lt-surface);
   --gt-hair:    var(--lt-line);
-  --card-1:     var(--lt-tint);
+  --card-1:     var(--lt-surface-2);
   --line:       var(--lt-line);
 
   /* --muted and --forest are the two brand tokens tuned for cream-on-green.
@@ -12844,15 +12860,11 @@ html[data-theme="light"] body.gt-app {
    ========================================================================== */
 html[data-theme="light"] .gt-app { background: var(--lt-page); color: var(--lt-ink); }
 
-/* Two washes, both nearly invisible: enough that the cream is a lit surface
-   rather than a flat fill, not enough to read as a gradient. The dark theme's
-   equivalents are at .12 and .40 — on cream that same strength is a stain. */
-html[data-theme="light"] .gt-app.page-deep {
-  background:
-    radial-gradient(1100px 620px at 82% -14%, rgba(196,240,0,.16), transparent 62%),
-    radial-gradient(820px 560px at -12% 108%, rgba(23,107,69,.07), transparent 64%),
-    var(--lt-page);
-}
+/* Flat white, and deliberately flat. This carried two big radial washes to
+   keep the cream from reading as a dead fill; on white the same washes are
+   the haze the client asked to be rid of. A light theme does not need the
+   page to be doing anything. */
+html[data-theme="light"] .gt-app.page-deep { background: var(--lt-page); }
 html[data-theme="light"] .gt-app.page-deep .app-head .app-h1 { color: var(--lt-ink); }
 html[data-theme="light"] .gt-app.page-deep .app-head .app-eyebrow { color: var(--lt-accent-ink); }
 html[data-theme="light"] .gt-app.page-deep .app-head .app-sub { color: var(--lt-quiet); opacity: 1; }
@@ -12861,28 +12873,12 @@ html[data-theme="light"] .gt-app.page-deep .app-head .app-sub { color: var(--lt-
    recognised by. What changes is only what they fade INTO: their wash is a
    gradient towards the page, so it has to be the page's colour, or the strips
    end in a dark smear against cream. */
-html[data-theme="light"] .gt-app.page-deep .page-scenes .scene::after {
-  /* The wash exists only in this theme, and it is the reason the pseudo-element
-     has `content` here and nowhere else: on the deep green the photographs sit
-     down of their own accord, and the decision above this ("clear photos —
-     just a hairline, no mist") stands for the dark theme. On cream the same
-     frames are the loudest thing on the screen, pulling the eye off the page
-     they are supposed to frame. It fades TOWARDS the content, so the outer
-     edge keeps the picture and the inner edge hands over to the page.
-
-     ONE GOTCHA: `z-index: 2`. gt-scenes.js puts fx-slide / fx-zoom / fx-wipe
-     on a stack at random, and those three raise the ENTERING shot to z-index 1
-     so it can animate over the one it replaces. A pseudo-element at auto sits
-     below that, which is why the wash appeared on whichever strip happened to
-     draw fx-fade and vanished on the other one. */
-  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
-}
-html[data-theme="light"] .gt-app.page-deep .page-scenes .scene.left::after {
-  background: linear-gradient(90deg, rgba(247,245,238,.18), rgba(247,245,238,.52) 55%, rgba(247,245,238,.84));
-}
-html[data-theme="light"] .gt-app.page-deep .page-scenes .scene.right::after {
-  background: linear-gradient(270deg, rgba(247,245,238,.18), rgba(247,245,238,.52) 55%, rgba(247,245,238,.84));
-}
+/* THE STRIPS KEEP THEIR PHOTOGRAPHS, UNVEILED.
+   A cream wash was tried here and taken straight back out: it is the "misty"
+   the client objected to, and it was solving a problem the cream page created
+   rather than one the photographs have. The decision above — "clear photos,
+   just a hairline where they meet the content, no mist" — turns out to hold
+   in both themes. All light needs is its own hairline. */
 html[data-theme="light"] .gt-app.page-deep .page-scenes .scene.left { border-right-color: var(--lt-line); }
 html[data-theme="light"] .gt-app.page-deep .page-scenes .scene.right { border-left-color: var(--lt-line); }
 
@@ -12893,26 +12889,48 @@ html[data-theme="light"] .gt-app.page-deep .page-scenes .scene.right { border-le
    the cream as it sticks. Not a green bar: the header is furniture, and a
    solid brand colour across the top is the one thing that would stop this
    reading as a light theme at all. */
+/* NOT A FLAT WHITE BAR. The client's words: "instead of just pure white let it
+   have a blend on that white and that green, kind of a fusion, with a nice
+   pattern to it."
+
+   Three layers, cheapest first: a fine diagonal hatch at 3.5% green, a wash
+   that carries white across the left two thirds and lets green arrive under
+   the account controls on the right, and white underneath so nothing is
+   translucent. The hatch is what stops the gradient reading as a smudge —
+   it gives the surface a texture to be, at a strength you notice only when
+   you look for it. */
 html[data-theme="light"] .gt-app .app-nav {
-  background: var(--lt-surface);
-  border-bottom: 1px solid var(--lt-line);
-  box-shadow: 0 1px 0 rgba(15,46,34,.02), 0 10px 24px -22px rgba(15,46,34,.30);
+  background:
+    repeating-linear-gradient(135deg,
+      rgba(23,107,69,.035) 0 1.5px, rgba(255,255,255,0) 1.5px 8px),
+    linear-gradient(102deg,
+      #FFFFFF 0%, #FFFFFF 38%, #F6FAEF 66%, #EDF6DC 88%, #E6F3CC 100%);
+  border-bottom: 1px solid rgba(23,107,69,.18);
+  box-shadow: 0 1px 0 rgba(255,255,255,.7) inset, 0 10px 22px -20px rgba(15,46,34,.35);
 }
 html[data-theme="light"] .gt-app .an-brand { color: var(--lt-ink); }
 html[data-theme="light"] .gt-app .an-brand span { color: var(--lt-accent-ink); }
 html[data-theme="light"] .gt-app .an-links a { color: #46554B; opacity: 1; }
 html[data-theme="light"] .gt-app .an-links a:hover { background: var(--lt-tint); color: var(--lt-ink); }
 
-/* THE ACTIVE PAGE, IN THE ACCENT RATHER THAN IN A SLAB OF GREEN.
-   The first pass filled it deep forest with white type, which is legible but
-   reads as a pressed button rather than as "you are here", and puts the
-   heaviest object on the page in the navigation. Pale lime with deep-green
-   type says the same thing at a fraction of the weight — and it is the same
-   selected-state language as the room switcher and the group tabs below, so
-   "chosen" looks like one thing everywhere on the screen. */
+/* THE ACTIVE PAGE: A SOLID FILL, NOT A TINT.
+   Pale lime was tried and rejected — "that green infill on the menu, it looks
+   like it's drawn with pencil, I don't feel it, make it have a nice colour
+   infill." Correct: a 12%-ish wash of an accent under dark type is a hint that
+   something might be selected, not a statement that it is.
+
+   The answer was already in the product. /manage/ fills its current rail item
+   and its current tab with solid deep forest, white type, lime icon
+   (gt-shell.css `.gts-rail a.on`, `.gts-tab.on`) — the client singled those
+   screens out as handling colour well. So the member app says "you are here"
+   the same way, and the two areas stop disagreeing about what selected looks
+   like. */
 html[data-theme="light"] .gt-app .an-links a.on {
-  background: var(--lt-sel); color: var(--lt-ink); font-weight: 700;
+  background: var(--lt-ink); color: #FFFFFF; font-weight: 600;
+  box-shadow: 0 6px 14px -8px rgba(15,46,34,.55);
 }
+html[data-theme="light"] .gt-app .an-links a.on svg { stroke: var(--lime); color: var(--lime); }
+html[data-theme="light"] .gt-app .an-links a.on:hover { background: #17402F; color: #FFFFFF; }
 html[data-theme="light"] .gt-app .an-menu-btn { color: #46554B; }
 html[data-theme="light"] .gt-app .an-menu-btn:hover { color: var(--lt-ink); }
 
@@ -12938,25 +12956,76 @@ html[data-theme="light"] .gt-app .an-org { color: var(--lt-ink); opacity: .78; }
 
 /* The drop-down panels hang off a white bar now, so they need their own edge
    rather than the contrast the dark bar was giving them for free. */
+/* THE DROP-DOWNS, WHICH WERE UNREADABLE.
+   "In the menu dropdowns words are not visible." They were not: the panels are
+   a deep-green gradient in the green theme and every label inside them is
+   written for it — `.an-menu-panel a b { color: #fff }`, `.an-ctx-row .mi-txt
+   b { color: #fff }`, the sub-labels at 55% cream, the tick and the current
+   organisation in lime. The first pass turned the PANEL white and left all of
+   that alone, so the organisation list, the group list and the Manage and
+   Admin menus were white on white — the one place in the app where a member
+   picks which organisation they are tipping for.
+
+   Every one of them is restated here. It is a long block on purpose: each of
+   those colours was chosen against green, and there is no single token that
+   flips them. */
 html[data-theme="light"] .gt-app .an-menu-panel,
 html[data-theme="light"] .gt-app .an-ctx-panel {
   background: var(--lt-surface);
   border: 1px solid var(--lt-line);
   box-shadow: var(--lt-lift-2);
 }
+html[data-theme="light"] .gt-app .an-menu-panel a,
+html[data-theme="light"] .gt-app .an-ctx-row { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .an-menu-panel a b,
+html[data-theme="light"] .gt-app .an-ctx-row .mi-txt b { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .an-menu-panel a i,
+html[data-theme="light"] .gt-app .an-ctx-row .mi-txt i { color: var(--lt-quiet); }
+html[data-theme="light"] .gt-app .an-menu-panel a:hover { background: var(--lt-tint); }
+html[data-theme="light"] .gt-app .an-menu-panel a .mi-ic {
+  background: var(--lt-surface-2);
+  border-color: var(--lt-line-g);
+  color: var(--lt-forest);
+}
+html[data-theme="light"] .gt-app .an-menu-panel a:hover .mi-ic {
+  background: var(--lt-sel); border-color: rgba(23,107,69,.38); color: var(--lt-ink);
+}
+
+/* Section headings inside the panel — "Your organisation", "Groups". */
 html[data-theme="light"] .gt-app .an-ctx-head {
-  color: var(--lt-accent-ink);
+  color: var(--lt-forest);
   text-transform: uppercase; letter-spacing: .1em;
 }
-html[data-theme="light"] .gt-app .an-ctx-row:hover { background: var(--lt-tint); }
-html[data-theme="light"] .gt-app .an-ctx-row.on { background: var(--lt-sel); color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .an-ctx-col-groups { border-left-color: var(--lt-line); }
+html[data-theme="light"] .gt-app .an-ctx-row:hover,
+html[data-theme="light"] .gt-app .an-ctx-row-static:hover { background: var(--lt-tint); }
+
+/* The organisation you are in gets the same solid fill as the current nav
+   item and /manage/'s current rail row, for the same reason: this is the row
+   the whole panel exists to point at. */
+html[data-theme="light"] .gt-app .an-ctx-row.on,
+html[data-theme="light"] .gt-app .an-ctx-row-static:hover,
+html[data-theme="light"] .gt-app .an-ctx-row.on:hover {
+  background: var(--lt-ink);
+}
+html[data-theme="light"] .gt-app .an-ctx-row.on .mi-txt b { color: #FFFFFF; }
+html[data-theme="light"] .gt-app .an-ctx-row.on .mi-txt i { color: rgba(255,255,255,.66); }
+html[data-theme="light"] .gt-app .an-ctx-row.on::after { color: var(--lime); }
+html[data-theme="light"] .gt-app .an-ctx-more { color: var(--lt-forest); }
+html[data-theme="light"] .gt-app .an-ctx-filter {
+  background: var(--lt-surface); border-color: var(--lt-line-3); color: var(--lt-ink);
+}
+html[data-theme="light"] .gt-app .an-ctx-filter::placeholder { color: var(--lt-quiet); }
+html[data-theme="light"] .gt-app .an-ctx-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(23,107,69,.30);
+}
 
 /* ==========================================================================
    THE CHARITY STRIP
    ==========================================================================
    A quiet beige band under the nav — present, not competing with it. */
 html[data-theme="light"] .gt-app .charity-strip {
-  background: var(--lt-surface-2); color: #3E4E44;
+  background: var(--lt-tint); color: #33453A;
   border-bottom: 1px solid var(--lt-line-2);
 }
 html[data-theme="light"] .gt-app .charity-strip .cs-amt { color: var(--lt-ink); }
@@ -12972,14 +13041,17 @@ html[data-theme="light"] .gt-app .charity-strip.nopledge .cs-amt { color: var(--
    ==========================================================================
    In the dark theme the sheet is a deep green panel and the cards on it are
    cream: the sheet is the ground and the cards are the paper. Inverting that
-   literally — a white panel holding cream cards on a cream page — stacks
-   three near-identical warm tones and is exactly the flat, dry look the
-   client described.
+   literally stacks three near-identical warm tones and is exactly the flat,
+   dry look the client described.
 
    So in light the sheet steps out of the way entirely. It keeps its width and
-   its padding, which is all the layout needs from it, and the page's cream
-   becomes the ground. The cards go pure white, and the layering the eye
-   actually reads is cream → white → beige inset. */
+   its padding, which is all the layout needs from it, and the page becomes
+   the ground. What the eye reads instead is a two-step: a white card with a
+   real edge, and inside it a soft green box for the round. The client
+   described exactly this nesting — "an outer box, then inside it a box that
+   houses this content" — and asked for the outer one to be white rather than
+   cream. It is, and so is the page behind it; the green box is what makes the
+   nesting legible without a third colour. */
 html[data-theme="light"] .gt-app.sheet-page .page-sheet {
   background: none;
   border: 0;
@@ -12992,9 +13064,9 @@ html[data-theme="light"] .gt-app.sheet-page .page-sheet .app-h1 { color: var(--l
 html[data-theme="light"] .gt-app.sheet-page .page-sheet .app-eyebrow { color: var(--lt-accent-ink); }
 html[data-theme="light"] .gt-app.sheet-page .page-sheet .app-sub { color: var(--lt-quiet); }
 
-/* The white card. Borders and a soft lift do the separating; on a cream page
-   a card needs an edge, because a white fill alone at this contrast reads as
-   a smudge rather than as an object. */
+/* The white card on a white page. The edge is doing ALL of the separating
+   now, so it is drawn at a strength you can actually see, with the shadow
+   under it rather than instead of it. */
 html[data-theme="light"] .gt-app .card,
 html[data-theme="light"] .gt-app.sheet-page .page-sheet .card {
   background: var(--lt-surface);
@@ -13002,14 +13074,20 @@ html[data-theme="light"] .gt-app.sheet-page .page-sheet .card {
   border-radius: 18px;
   box-shadow: var(--lt-lift);
 }
-/* A card inside a card is an inset section, not a second sheet of paper: warm
-   beige, hairline, no shadow. This is the third layer, and the only one. */
+/* The box inside the box — the round, its countdown, its tiles and the tip
+   slip. Soft green with a green edge, so it reads as a compartment of the
+   card rather than as another card. This is the third layer, and the only
+   one; anything deeper flattens back to white. */
 html[data-theme="light"] .gt-app .card .card,
 html[data-theme="light"] .gt-app.sheet-page .page-sheet .card .card {
   background: var(--lt-surface-2);
-  border-color: var(--lt-line);
+  border-color: var(--lt-line-g);
   box-shadow: none;
 }
+/* Tiles and controls sitting inside that green box go back to white, or they
+   dissolve into it. */
+html[data-theme="light"] .gt-app .card .card .stat-card,
+html[data-theme="light"] .gt-app .card .card .cd-cell { background: #FFFFFF; }
 html[data-theme="light"] .gt-app .card-h { color: var(--lt-ink); }
 html[data-theme="light"] .gt-app .card-lead { color: var(--lt-quiet); }
 
@@ -13019,7 +13097,7 @@ html[data-theme="light"] .gt-app.sheet-page .gt-listwrap,
 html[data-theme="light"] .gt-app.sheet-page .gt-board,
 html[data-theme="light"] .gt-app.sheet-page .gt-feed {
   background: var(--lt-surface-2);
-  border: 1px solid var(--lt-line);
+  border: 1px solid var(--lt-line-g);
   box-shadow: var(--lt-lift);
 }
 html[data-theme="light"] .gt-app.sheet-page .gt-board .gb-head {
@@ -13030,6 +13108,51 @@ html[data-theme="light"] .gt-app.sheet-page .gt-post,
 html[data-theme="light"] .gt-app.sheet-page .gt-feed .gt-post,
 html[data-theme="light"] .gt-app.sheet-page .gwh-slot .wr-card,
 html[data-theme="light"] .gt-app.sheet-page .wr-card,
+/* ==========================================================================
+   MESSAGES
+   ==========================================================================
+   "On the messages I cannot see anything." Nothing on this screen had been
+   touched, and every part of it above the inbox list is written for the deep
+   green: the hero is `rgba(255,255,255,.05)` — a translucent white over a
+   dark page — carrying a white h1, a 66%-white paragraph, and a "Private &
+   secure" block in white and lime. On a white page that is white on white,
+   top to bottom, which is precisely what the client saw.
+
+   The panel stops being translucent and becomes a real card, and everything
+   printed on it takes ink. */
+html[data-theme="light"] .gt-app .msg-hero {
+  background: var(--lt-surface-2);
+  border: 1px solid var(--lt-line-g);
+}
+html[data-theme="light"] .gt-app .msg-hero-ic {
+  background: #FFFFFF; border-color: var(--lt-line-g);
+}
+html[data-theme="light"] .gt-app .msg-hero-ic svg { stroke: var(--lt-forest); }
+html[data-theme="light"] .gt-app .msg-hero-body h1 { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .msg-hero-body p { color: var(--lt-quiet); }
+html[data-theme="light"] .gt-app .msg-private svg { stroke: var(--lt-forest); }
+html[data-theme="light"] .gt-app .msg-private b { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .msg-private small { color: var(--lt-quiet); }
+html[data-theme="light"] .gt-app .msg-empty { border-color: var(--lt-line-g); }
+html[data-theme="light"] .gt-app .msg-empty svg { stroke: var(--lt-forest); }
+html[data-theme="light"] .gt-app .msg-empty b { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .msg-empty span { color: var(--lt-quiet); }
+html[data-theme="light"] .gt-app .msg-tally { color: var(--lt-quiet); }
+html[data-theme="light"] .gt-app .msg-item .mi-ic {
+  background: var(--lt-surface-2); color: var(--lt-forest);
+}
+html[data-theme="light"] .gt-app .msg-item .mi-top b { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .msg-item .mi-main small { color: var(--lt-quiet); }
+html[data-theme="light"] .gt-app .msg-item .mi-org {
+  background: var(--lt-surface-2); color: var(--lt-forest); border: 1px solid var(--lt-line-g);
+}
+html[data-theme="light"] .gt-app .msg-item.is-new { border-left-color: var(--lt-forest); }
+html[data-theme="light"] .gt-app .msg-item .mi-dot {
+  background: var(--lt-forest); box-shadow: 0 0 0 3px rgba(23,107,69,.18);
+}
+html[data-theme="light"] .gt-app .msg-form,
+html[data-theme="light"] .gt-app .msg-foot { background: #FFFFFF; }
+
 html[data-theme="light"] .gt-app .msg-item,
 html[data-theme="light"] .gt-app.sheet-page .page-sheet .msg-item {
   background: var(--lt-surface);
@@ -13133,12 +13256,19 @@ html[data-theme="light"] .gt-app .dash-banner {
      up a green that reads on cream. */
   --lime: var(--lt-accent-ink);
 }
+/* The veil is the one translucent thing left in the theme, because it has to
+   be — there is a photograph under it. What matters is that it is SOLID white
+   for the whole width the type occupies and then hands over quickly: a long
+   fade across the panel is the haze the client asked to be rid of, and it
+   made the photograph a grey ghost behind the words rather than a photograph.
+   Clean split, so the type is on white and the picture is a picture. */
 html[data-theme="light"] .gt-app .dash-banner .veil {
   background: linear-gradient(100deg,
-    rgba(247,245,238,.985) 30%,
-    rgba(247,245,238,.94) 52%,
-    rgba(247,245,238,.66) 72%,
-    rgba(247,245,238,.20));
+    #FFFFFF 0%,
+    #FFFFFF 46%,
+    rgba(255,255,255,.72) 58%,
+    rgba(255,255,255,.16) 70%,
+    rgba(255,255,255,0) 78%);
 }
 html[data-theme="light"] .gt-app .dash-banner .db-eyebrow { color: var(--lt-accent-ink); opacity: 1; }
 html[data-theme="light"] .gt-app .dash-banner .db-h1 { color: var(--lt-ink); }
@@ -13206,10 +13336,16 @@ html[data-theme="light"] .gt-app .dash-ctl .dc-pick > select:hover { border-colo
 /* ==========================================================================
    WHICH ROOM YOU ARE TIPPING IN
    ==========================================================================
-   The group tabs sit in a warm beige tray, and the chosen one is pale lime
-   with deep-green type — the same "selected" language as the active nav item,
-   deliberately. The dark theme fills the chosen tab with full-strength lime,
-   which on a white card is a slab of yellow. */
+   This is the control the client could not read: "AquaFlow Water Co /
+   Everyone, Customer Service, Finance, Fleet & Logistics, Operations — make it
+   have a nice infill; that cream, I'm not feeling it, not been able to see
+   it." The tray was warm beige on a white card, which is a 2% difference, and
+   the chosen room was a pale lime wash.
+
+   Now the tray is a soft green with a green edge — it reads as a tray — and
+   the chosen room is the solid deep fill used by the nav and by /manage/. The
+   room decides which ladder your tips land on, so of everything on the
+   dashboard this is the one that has to be unmistakable. */
 html[data-theme="light"] .gt-app .room-switch.on-light .rw-eyebrow,
 html[data-theme="light"] .gt-app .room-switch.on-dark .rw-eyebrow { color: var(--lt-accent-ink); }
 html[data-theme="light"] .gt-app .room-switch.on-light .rw-note,
@@ -13219,17 +13355,21 @@ html[data-theme="light"] .gt-app .room-switch.on-dark .rw-note b { color: var(--
 html[data-theme="light"] .gt-app .room-switch.on-light .rw-seg,
 html[data-theme="light"] .gt-app .room-switch.on-dark .rw-seg {
   background: var(--lt-surface-2);
-  border: 1px solid var(--lt-line);
+  border: 1px solid var(--lt-line-g);
 }
 html[data-theme="light"] .gt-app .room-switch.on-light .rw-opt,
-html[data-theme="light"] .gt-app .room-switch.on-dark .rw-opt { color: #3E4E44; }
+html[data-theme="light"] .gt-app .room-switch.on-dark .rw-opt { color: #33453A; }
+html[data-theme="light"] .gt-app .room-switch.on-light .rw-opt i,
+html[data-theme="light"] .gt-app .room-switch.on-dark .rw-opt i { color: var(--lt-quiet); opacity: 1; }
 html[data-theme="light"] .gt-app .room-switch.on-light .rw-opt:hover,
-html[data-theme="light"] .gt-app .room-switch.on-dark .rw-opt:hover { background: var(--lt-surface); color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .room-switch.on-dark .rw-opt:hover { background: #FFFFFF; color: var(--lt-ink); }
 html[data-theme="light"] .gt-app .room-switch.on-light .rw-opt.on,
 html[data-theme="light"] .gt-app .room-switch.on-dark .rw-opt.on {
-  background: var(--lt-sel); color: var(--lt-ink);
-  box-shadow: inset 0 0 0 1px rgba(23,107,69,.20);
+  background: var(--lt-ink); color: #FFFFFF;
+  box-shadow: 0 6px 16px -8px rgba(15,46,34,.6);
 }
+html[data-theme="light"] .gt-app .room-switch.on-light .rw-opt.on i,
+html[data-theme="light"] .gt-app .room-switch.on-dark .rw-opt.on i { color: var(--lime); opacity: 1; }
 html[data-theme="light"] .gt-app .room-switch.on-light .rw-more,
 html[data-theme="light"] .gt-app .room-switch.on-dark .rw-more { color: var(--lt-forest); }
 
@@ -13294,6 +13434,31 @@ html[data-theme="light"] .gt-app .atable td { background: var(--lt-surface); }
 html[data-theme="light"] .gt-app .atable tbody tr:hover td { box-shadow: inset 0 0 0 999px rgba(196,240,0,.14); }
 html[data-theme="light"] .gt-app .atable tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--lt-forest), inset 0 0 0 999px rgba(196,240,0,.14); }
 html[data-theme="light"] .gt-app .atable tr.me td { background: var(--lt-sel); border-color: rgba(184,230,0,.55); }
+
+/* THE LADDER'S COLUMN STRIPES.
+   "On the ladder and leaderboard, the columns background — let's have
+   something strong but that matches with white, for it to contrast and give a
+   nice feel, and be good for the eyes."
+
+   The stripe is `rgba(15,46,34,.045)`, a grey at 4.5%, chosen to sit on cream.
+   On white it is not a stripe, it is a rumour — and a ladder is read ACROSS,
+   so the stripe is the only thing carrying the eye from a club's name to its
+   points. Green rather than grey, roughly three times the strength, and the
+   Points column — the one the table exists to report — stronger again. Still
+   well short of banding: the figures stay the darkest thing in the row. */
+html[data-theme="light"] .gt-app .gt-board.ladder .lad-head .lad-col::before,
+html[data-theme="light"] .gt-app .gt-board.ladder .lad-row .lad-col::before {
+  background: rgba(23,107,69,.10);
+}
+html[data-theme="light"] .gt-app .gt-board.ladder .lad-col:nth-of-type(even)::before { background: transparent; }
+html[data-theme="light"] .gt-app .gt-board.ladder .lad-pts::before {
+  background: rgba(23,107,69,.20) !important;
+}
+html[data-theme="light"] .gt-app .gt-board.ladder .lad-row .lad-pts { color: var(--lt-ink); }
+/* The leaderboard's own numeric columns, same reasoning. */
+html[data-theme="light"] .gt-app .atable th.num,
+html[data-theme="light"] .gt-app .atable td.num { background: rgba(23,107,69,.07); }
+html[data-theme="light"] .gt-app .atable th.num { background: var(--lt-ink); }
 
 /* ==========================================================================
    LEFTOVERS THAT KNEW THEY WERE ON GREEN
