@@ -43,6 +43,32 @@ def send_admin_invite(invite, code: str) -> bool:
     )
 
 
+def send_access_granted(access_row, by_user=None) -> bool:
+    """For somebody who was already a member: the account you have now opens HQ.
+
+    Deliberately not the invitation. An invitation's whole job is to prove the
+    recipient holds the address by making them exchange a code for a password,
+    and this person proved that when they signed up — sending them a set-up
+    code for an account they already sign into is asking a question that has
+    been answered, and it reads like their password has been reset.
+    """
+    user = access_row.user
+    grants = list(access_row.grants.all())
+    return mail.send_template(
+        "admin_access_granted",
+        subject="You now have access to GoodTip HQ",
+        to=user.email,
+        context={
+            "name": user.display_name or user.email,
+            "inviter": str(by_user) if by_user else "A GoodTip administrator",
+            "is_full_access": access_row.is_full_access,
+            "direct": [capabilities.label(g.capability) for g in grants if not g.requires_approval],
+            "reviewed": [capabilities.label(g.capability) for g in grants if g.requires_approval],
+            "link": _url("admin:hq_my_work"),
+        },
+    )
+
+
 def notify_reviewers_of_new_request(change_request) -> int:
     """Tell everyone who can review that something is waiting.
 

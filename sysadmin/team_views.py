@@ -29,7 +29,7 @@ from . import access, capabilities, review
 from .models import (
     AdminAccess, AdminAuditEvent, AdminGrant, AdminInvite, AdminTask, ChangeRequest,
 )
-from .notify import notify_task_assigned, send_admin_invite
+from .notify import notify_task_assigned, send_access_granted, send_admin_invite
 
 User = get_user_model()
 
@@ -82,12 +82,21 @@ def team_new(request):
 
 @transaction.atomic
 def _create_admin(request):
-    """Make the account, record what it may do, and send the invitation.
+    """Give somebody administrator access. Two ways in, depending on the address.
 
-    The account is created INACTIVE with an unusable password. Nothing about it
-    works until the invited person exchanges their code for a password of their
-    own — so a typo in the address grants nobody anything, and the person doing
-    the granting never holds the credential.
+    A NEW ADDRESS makes an account, INACTIVE and with an unusable password.
+    Nothing about it works until the invited person exchanges their code for a
+    password of their own — so a typo in the address grants nobody anything,
+    and the person doing the granting never holds the credential.
+
+    AN ADDRESS THAT IS ALREADY A MEMBER's is not a mistake to refuse. It is the
+    same person, and what is being asked for is access for the account they
+    already sign in with. This used to be a dead end: the form said to give
+    that account access "from the list", and the list only ever held people who
+    were administrators already, so there was nowhere to go. Their existing
+    account is given the access instead — after one confirmation that names who
+    the address belongs to, because promoting a member is not something to do
+    on a typo either.
     """
     email = (request.POST.get("email") or "").strip().lower()
     name = (request.POST.get("display_name") or "").strip()
@@ -96,31 +105,51 @@ def _create_admin(request):
     picked = capabilities.valid(request.POST.getlist("capability"))
     reviewed = set(capabilities.valid(request.POST.getlist("review"))) & set(picked)
 
+    existing = User.objects.filter(email__iexact=email).first() if email else None
+
     errors = []
     if not email:
         errors.append("Enter the email address to send the invitation to.")
-    elif User.objects.filter(email__iexact=email).exists():
+    elif existing is not None and access.access_for(existing) is not None:
         errors.append(
-            f"{email} already has a GoodTip account. "
-            "Give that account access from the list instead of making a second one."
+            f"{existing} is already an administrator. Open their row on the "
+            "administrators page to change what they can do."
         )
-    if not name:
+        existing = None
+    if existing is None and not name:
         errors.append("Enter the name this person should be known by.")
     if not full and not picked:
         errors.append("Choose at least one thing this administrator can do.")
 
-    if errors:
+    # The first submit that turns up an existing member grants nothing: it
+    # comes back naming the account, and only a submit carrying that account's
+    # id does the work.
+    confirmed = (
+        existing is not None
+        and request.POST.get("confirm_existing") == str(existing.pk)
+    )
+
+    if errors or (existing is not None and not confirmed):
         for e in errors:
             messages.error(request, e)
         return render(request, "hq/team_new.html", {
             "groups": capabilities.GROUPS,
             "reviewable": capabilities.REVIEWABLE,
+            "existing": existing,
             "form": {
-                "email": email, "display_name": name, "note": note,
+                "email": email,
+                # Their own name, not the one typed at them: see _grant_existing.
+                "display_name": existing.display_name if existing else name,
+                "note": note,
                 "access_level": "full" if full else "limited",
                 "capability": picked, "review": list(reviewed),
             },
         })
+
+    if existing is not None:
+        return _grant_existing(
+            request, existing, full=full, picked=picked, reviewed=reviewed, note=note,
+        )
 
     user = User.objects.create_user(
         email=email, password=None, display_name=name,
@@ -132,35 +161,11 @@ def _create_admin(request):
     user.is_active = False
     user.save()
 
-    row = AdminAccess.objects.create(
-        user=user, is_full_access=full, created_by=request.user, note=note,
-    )
-    if not full:
-        AdminGrant.objects.bulk_create([
-            AdminGrant(access=row, capability=key, requires_approval=key in reviewed)
-            for key in picked
-        ])
-
-    AdminAuditEvent.record(
-        actor=request.user,
-        action=AdminAuditEvent.ADMIN_CREATED,
-        subject=user,
+    row = _record_access(
+        request, user, full=full, picked=picked, reviewed=reviewed, note=note,
         summary=f"Created {'a full-access' if full else 'a restricted'} administrator",
-        full_access=full,
-        granted=picked,
-        reviewed=sorted(reviewed),
-        note=note,
     )
-
-    invite, code = AdminInvite.issue(row, by_user=request.user)
-    sent = send_admin_invite(invite, code)
-    AdminAuditEvent.record(
-        actor=request.user,
-        action=AdminAuditEvent.INVITE_SENT,
-        subject=user,
-        summary=f"Invitation emailed to {email}",
-        delivered=bool(sent),
-    )
+    sent = _send_invite(request, row)
 
     if sent:
         messages.success(
@@ -175,6 +180,113 @@ def _create_admin(request):
             "Open their row and choose Resend invitation once mail is working.",
         )
     return redirect("admin:hq_team")
+
+
+def _grant_existing(request, user, *, full, picked, reviewed, note):
+    """Give administrator access to an account that already exists.
+
+    Nothing the person owns is rewritten — not their password, not their name,
+    not whether they are active. They are a member who is now also an
+    administrator, and one who later loses the access should be left exactly
+    where they started. That is also why the name typed into the form is
+    ignored here: it is a label for somebody being created, and using it would
+    quietly rename a member across the whole site.
+    """
+    fields = ["is_staff", "is_superuser"]
+    user.is_staff = True
+    user.is_superuser = full
+    if not user.display_name:
+        user.display_name = (request.POST.get("display_name") or "").strip()
+        fields.append("display_name")
+    user.save(update_fields=fields)
+
+    row = _record_access(
+        request, user, full=full, picked=picked, reviewed=reviewed, note=note,
+        summary=f"Gave {user}'s existing account {'full' if full else 'restricted'} access",
+        existing_account=True,
+    )
+
+    # An account somebody can already sign into does not need an invitation —
+    # it needs telling. One that was never finished (no password, or switched
+    # off) still has only the one way in.
+    if user.is_active and user.has_usable_password():
+        sent = send_access_granted(row, by_user=request.user)
+        AdminAuditEvent.record(
+            actor=request.user,
+            action=AdminAuditEvent.ACCESS_CHANGED,
+            subject=user,
+            summary=f"Told {user.email} about their new access",
+            delivered=bool(sent),
+        )
+        if sent:
+            messages.success(
+                request,
+                f"{user} already had a GoodTip account, so we've given that one "
+                f"access rather than making a second. We've emailed {user.email} "
+                "to say so — they sign in exactly as they do now.",
+            )
+        else:
+            messages.error(
+                request,
+                f"{user}'s existing account now has access, but the email telling "
+                "them could not be sent. They can sign in as they normally do.",
+            )
+        return redirect("admin:hq_team")
+
+    sent = _send_invite(request, row)
+    if sent:
+        messages.success(
+            request,
+            f"{user} already had a GoodTip account, so we've given that one access "
+            f"rather than making a second. It has never been signed into, so "
+            f"we've emailed {user.email} a code to set a password.",
+        )
+    else:
+        messages.error(
+            request,
+            f"{user}'s existing account now has access, but the invitation email "
+            "could not be sent. Open their row and choose Resend invitation once "
+            "mail is working.",
+        )
+    return redirect("admin:hq_team")
+
+
+def _record_access(request, user, *, full, picked, reviewed, note, summary, **detail):
+    """The access row, its grants, and the line in the record — in that order."""
+    row = AdminAccess.objects.create(
+        user=user, is_full_access=full, created_by=request.user, note=note,
+    )
+    if not full:
+        AdminGrant.objects.bulk_create([
+            AdminGrant(access=row, capability=key, requires_approval=key in reviewed)
+            for key in picked
+        ])
+
+    AdminAuditEvent.record(
+        actor=request.user,
+        action=AdminAuditEvent.ADMIN_CREATED,
+        subject=user,
+        summary=summary,
+        full_access=full,
+        granted=picked,
+        reviewed=sorted(reviewed),
+        note=note,
+        **detail,
+    )
+    return row
+
+
+def _send_invite(request, row):
+    invite, code = AdminInvite.issue(row, by_user=request.user)
+    sent = send_admin_invite(invite, code)
+    AdminAuditEvent.record(
+        actor=request.user,
+        action=AdminAuditEvent.INVITE_SENT,
+        subject=row.user,
+        summary=f"Invitation emailed to {row.user.email}",
+        delivered=bool(sent),
+    )
+    return sent
 
 
 @require_POST

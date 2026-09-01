@@ -35,15 +35,45 @@ the same measure without the second track.
         <span class="ad-stepnum">1</span>
         <div>
           <h2>Who is it?</h2>
-          <p>They'll get an email with a code to set their own password. You never see it.</p>
+          <p>{% if existing %}This address is already a member's. Their account gets the access — no second one is made.{% else %}They'll get an email with a code to set their own password. You never see it.{% endif %}</p>
         </div>
       </div>
 
+      {% if existing %}
+      {% comment %}
+      The address turned out to belong to somebody who is already a member.
+      Nothing has happened yet: this panel names whose account it is, and the
+      hidden field below is what turns the next press of the button into
+      "give THAT account access" rather than "make a second one".
+      {% endcomment %}
+      <div class="ad-known">
+        <span class="ad-known-ic" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><use href="#ic-people"/></svg>
+        </span>
+        <div class="ad-known-body">
+          <b>{{ existing }} already has a GoodTip account</b>
+          <p>
+            {{ existing.email }} &middot; a member since {{ existing.date_joined|date:"j F Y" }}.
+            We won't make a second one. Press the button below and this account
+            gets the access you've chosen — they carry on signing in exactly as
+            they do now{% if existing.is_active and existing.has_usable_password %}, with no new password to set{% endif %}.
+          </p>
+        </div>
+        <input type="hidden" name="confirm_existing" value="{{ existing.pk }}">
+      </div>
+      {% endif %}
+
       <div class="ad-fields">
         <div class="fld">
-          <label for="a_name">Their name</label>
+          <label for="a_name">Their name{% if existing.display_name %} <span class="ned-hint">the one on their account</span>{% endif %}</label>
+          {% comment %}
+          Read-only once the address turns out to be a member's. Their name is
+          theirs — typing a different one here would rename them across the
+          whole site, which is not what "add an administrator" means.
+          {% endcomment %}
           <input type="text" name="display_name" id="a_name" maxlength="100" required
-                 value="{{ form.display_name|default:'' }}" placeholder="Jordan Smith">
+                 value="{{ form.display_name|default:'' }}" placeholder="Jordan Smith"
+                 {% if existing.display_name %}readonly{% endif %}>
         </div>
         <div class="fld">
           <label for="a_email">Their email address</label>
@@ -135,7 +165,7 @@ the same measure without the second track.
       <div class="ad-barright">
         <a href="{% url 'admin:hq_team' %}" class="ad-btn is-quiet">Cancel</a>
         <button type="submit" class="ad-btn is-go">
-          Create and send the invitation
+          {% if existing %}Give this account access{% else %}Create and send the invitation{% endif %}
           <svg aria-hidden="true"><use href="#ic-send"/></svg>
         </button>
       </div>

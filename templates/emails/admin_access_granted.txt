@@ -1,0 +1,20 @@
+Hello {{ name }},
+
+{{ inviter }} has given your GoodTip account access to GoodTip HQ.
+
+Nothing about how you sign in has changed — same address, same password.
+Next time you sign in you'll find HQ waiting for you here:
+{{ link }}
+
+WHAT YOU CAN DO
+{% if is_full_access %}Everything. You have full access, including adding other administrators
+and reviewing their work.
+{% else %}{% if direct %}Straight away: {% for item in direct %}{{ item }}{% if not forloop.last %}; {% endif %}{% endfor %}.
+{% endif %}{% if reviewed %}After a review: {% for item in reviewed %}{{ item }}{% if not forloop.last %}; {% endif %}{% endfor %}.
+Work in these areas goes to a full-access administrator to approve before it
+takes effect. You will hear back either way.
+{% endif %}{% endif %}
+If you were not expecting this, tell the GoodTip team — nobody has touched
+your password, and access can be taken away as easily as it was given.
+
+— GoodTip

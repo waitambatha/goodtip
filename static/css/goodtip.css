@@ -11538,6 +11538,29 @@ body.fxh-open { overflow: hidden; }
   font-family: var(--display); font-size: 17px; line-height: 1;
 }
 
+/* ---- Step 1: the address belongs to somebody already -------------------
+   Shown when the email typed in turns out to be a member's. Tinted rather
+   than red: nothing has gone wrong, and the panel is the answer to the
+   question the form just asked, not a complaint about it. */
+.ad-known {
+  display: flex; align-items: flex-start; gap: 14px;
+  margin: 0 0 22px; padding: 16px 18px;
+  border: 1px solid var(--ad-line-2); border-left: 3px solid var(--forest);
+  border-radius: 14px; background: var(--ad-tint-2);
+}
+.ad-known-ic { flex: none; width: 22px; height: 22px; margin-top: 1px; }
+.ad-known-ic svg {
+  width: 22px; height: 22px; fill: none; stroke: var(--forest);
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+.ad-known-body { min-width: 0; }
+.ad-known-body b { display: block; font-family: var(--display); font-size: 15.5px; color: var(--ad-ink); line-height: 1.25; }
+.ad-known-body p { margin: 6px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--ad-quiet); max-width: 62ch; }
+
+/* Their name comes from their account and cannot be typed over here. */
+.ad-fields input[readonly] { background: var(--ad-quiet-bg); color: var(--ad-quiet); cursor: default; }
+.ad-fields input[readonly]:focus { border-color: var(--ad-line-2); box-shadow: none; }
+
 /* ---- Step 1: the fields ---- */
 .ad-fields { display: grid; gap: 18px; }
 @media (min-width: 760px) {

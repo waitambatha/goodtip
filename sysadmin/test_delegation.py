@@ -167,14 +167,15 @@ class CreatingAnAdminTests(DelegationTestCase):
         row = User.objects.get(email="writer@example.com").admin_access
         self.assertEqual([g.capability for g in row.grants.all()], ["news.write"])
 
-    def test_an_address_that_already_has_an_account_is_refused(self):
+    def test_an_address_that_is_already_an_administrator_is_refused(self):
         sign_in(self.client, self.boss)
         res = self.client.post(reverse("admin:hq_team_new"), {
             "display_name": "Boss again", "email": "boss@example.com",
             "access_level": "limited", "capability": ["news.write"],
         })
-        self.assertContains(res, "already has a GoodTip account")
+        self.assertContains(res, "already an administrator")
         self.assertEqual(AdminAccess.objects.count(), 1)
+
 
     def test_a_restricted_admin_cannot_create_administrators(self):
         """The power that would make every other restriction decorative."""
@@ -209,6 +210,108 @@ class CreatingAnAdminTests(DelegationTestCase):
         self.assertEqual(event.actor, self.boss)
         self.assertEqual(event.detail["granted"], ["news.write"])
         self.assertEqual(event.detail["reviewed"], ["news.write"])
+
+
+class PromotingAMemberTests(DelegationTestCase):
+    """An address that belongs to a member is not a mistake to refuse.
+
+    It used to be: the form said to give that account access "from the list",
+    and the list only ever held people who were administrators already, so
+    there was nowhere to go and no way to finish the job.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.member = User.objects.create_user(
+            email="member@example.com", password="pw", display_name="Mem Ber")
+        self.form = {
+            "display_name": "Someone Else", "email": "member@example.com",
+            "access_level": "limited", "capability": ["news.write"],
+        }
+
+    def test_the_first_submit_names_the_account_and_grants_nothing(self):
+        sign_in(self.client, self.boss)
+        res = self.client.post(reverse("admin:hq_team_new"), self.form)
+        self.assertContains(res, "already has a GoodTip account")
+        self.assertContains(res, f'name="confirm_existing" value="{self.member.pk}"')
+        self.assertFalse(AdminAccess.objects.filter(user=self.member).exists())
+
+    def test_confirming_gives_the_account_they_already_have_the_access(self):
+        sign_in(self.client, self.boss)
+        before = User.objects.count()
+        self.client.post(reverse("admin:hq_team_new"),
+                         dict(self.form, confirm_existing=self.member.pk))
+        self.assertEqual(User.objects.count(), before, "a second account was made")
+        row = AdminAccess.objects.get(user=self.member)
+        self.assertEqual([g.capability for g in row.grants.all()], ["news.write"])
+        self.member.refresh_from_db()
+        self.assertTrue(self.member.is_staff)
+
+    def test_their_own_account_is_left_exactly_as_it_was(self):
+        """Not their password, not their name, not whether they are active —
+        a member who later loses the access should be where they started."""
+        sign_in(self.client, self.boss)
+        self.client.post(reverse("admin:hq_team_new"),
+                         dict(self.form, confirm_existing=self.member.pk))
+        self.member.refresh_from_db()
+        self.assertTrue(self.member.is_active)
+        self.assertTrue(self.member.check_password("pw"))
+        self.assertEqual(self.member.display_name, "Mem Ber")
+
+    def test_somebody_who_can_already_sign_in_is_told_not_invited(self):
+        """A set-up code for an account they already use reads like a reset."""
+        sign_in(self.client, self.boss)
+        self.client.post(reverse("admin:hq_team_new"),
+                         dict(self.form, confirm_existing=self.member.pk))
+        self.assertFalse(AdminInvite.objects.exists())
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("access", mail.outbox[0].subject.lower())
+        self.assertIn("Write and edit stories", mail.outbox[0].body)
+
+    def test_a_member_who_never_set_a_password_still_gets_an_invitation(self):
+        """Half-finished signup: the code is the only way into that account."""
+        self.member.set_unusable_password()
+        self.member.is_active = False
+        self.member.save()
+        sign_in(self.client, self.boss)
+        self.client.post(reverse("admin:hq_team_new"),
+                         dict(self.form, confirm_existing=self.member.pk))
+        self.assertEqual(AdminInvite.objects.get().access.user, self.member)
+
+    def test_full_access_given_this_way_carries_the_django_flag(self):
+        sign_in(self.client, self.boss)
+        self.client.post(reverse("admin:hq_team_new"), {
+            "display_name": "x", "email": "member@example.com",
+            "access_level": "full", "confirm_existing": self.member.pk,
+        })
+        self.member.refresh_from_db()
+        self.assertTrue(self.member.is_superuser)
+        self.assertTrue(access.is_full_access(self.member))
+
+    def test_a_confirmation_for_a_different_account_does_not_count(self):
+        """The id in the hidden field is the thing being agreed to."""
+        other = User.objects.create_user(
+            email="other@example.com", password="pw", display_name="Other")
+        sign_in(self.client, self.boss)
+        self.client.post(reverse("admin:hq_team_new"),
+                         dict(self.form, confirm_existing=other.pk))
+        self.assertFalse(AdminAccess.objects.filter(user=self.member).exists())
+        self.assertFalse(AdminAccess.objects.filter(user=other).exists())
+
+    def test_it_is_written_into_the_record_as_an_existing_account(self):
+        sign_in(self.client, self.boss)
+        self.client.post(reverse("admin:hq_team_new"),
+                         dict(self.form, confirm_existing=self.member.pk))
+        event = AdminAuditEvent.objects.get(action=AdminAuditEvent.ADMIN_CREATED)
+        self.assertEqual(event.subject, self.member)
+        self.assertTrue(event.detail["existing_account"])
+
+    def test_a_restricted_admin_cannot_promote_a_member_either(self):
+        writer = make_admin("w@example.com", grants=["news.write"])
+        sign_in(self.client, writer)
+        self.client.post(reverse("admin:hq_team_new"),
+                         dict(self.form, confirm_existing=self.member.pk))
+        self.assertFalse(AdminAccess.objects.filter(user=self.member).exists())
 
 
 class AcceptingAnInvitationTests(DelegationTestCase):
