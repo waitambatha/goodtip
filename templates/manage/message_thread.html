@@ -33,6 +33,22 @@ without reading every name.
   </div>
 
   <div class="card pad-lg chat-card">
+    {% if audience %}
+    <div class="chat-to">
+      <span class="ct-lab">To</span>
+      <span class="ct-who">
+        <b>{{ audience.name }}</b>
+        {% if audience.extra %}<span class="ct-more">and {{ audience.extra }} other{{ audience.extra|pluralize }}</span>{% endif %}
+      </span>
+      <span class="ct-dot" aria-hidden="true">&middot;</span>
+      <span class="ct-count">
+        {% if audience.scope == 'org' %}everyone in this organisation, {{ audience.count }} member{{ audience.count|pluralize }}
+        {% elif audience.scope == 'group' %}{{ audience.count }} member{{ audience.count|pluralize }} in this group
+        {% else %}{{ audience.count }} person{{ audience.count|pluralize:"es" }}{% endif %}
+      </span>
+      {% if audience.scope != 'org' %}<span class="ct-org">in {{ audience.org.name }}</span>{% endif %}
+    </div>
+    {% endif %}
     {% include "partials/_chat.html" with entries=entries thread=thread %}
 
     {% if thread.status == 'closed' %}

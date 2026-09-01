@@ -497,6 +497,29 @@ goodtip.css.
       });
     });
 
+    /* AND THEY GO ON THEIR OWN.
+       "You're now in Waita Realty Group." is a confirmation of something the
+       reader just did on purpose. It has no action attached and nothing is
+       lost by missing it, so making somebody hit an x to clear it is asking
+       them to tidy up after their own click. Three seconds is long enough to
+       read one line and short enough not to sit over the page.
+
+       ERRORS ARE EXEMPT. An error is the one kind that may still be needed
+       after the glance — it names something that did not happen, and often
+       what to do instead — so those stay until dismissed.
+
+       The x stays for every kind: this shortens the life of a message, it
+       does not take away the way to end it early. */
+    document.querySelectorAll('.flash-stack .flash:not(.error)').forEach(function(el){
+      window.setTimeout(function(){
+        if (!el.isConnected) return;
+        el.style.transition = reduce ? '' : 'opacity .35s var(--ease), transform .35s var(--ease)';
+        el.style.opacity = '0';
+        if (!reduce) el.style.transform = 'translateY(-7px)';
+        window.setTimeout(function(){ el.remove(); }, reduce ? 0 : 350);
+      }, 3000);
+    });
+
     /* notifications: bell panel + popup dismiss */
     (function(){
       var csrf = '{{ csrf_token }}';

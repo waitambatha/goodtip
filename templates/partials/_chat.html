@@ -118,7 +118,37 @@ Expects: entries (from orgs.views._thread_entries), thread.
           </div>
           {% endif %}
 
-          <span class="chat-stamp">{{ e.created_at|date:"g:i a" }}</span>
+          {% comment %}
+          THE RECEIPT, ON YOUR OWN MESSAGES ONLY.
+
+          Asked for in as many words: "a single tick that is orange and a
+          small text that will read sent, then when the user reads it turns
+          two ticks that are green and says read" — the convention everybody
+          already knows from WhatsApp, so it needs no explaining.
+
+          The word rides beside the ticks rather than replacing them. Two
+          shapes that differ by one stroke are hard to tell apart at 12px, and
+          impossible if you cannot separate orange from green; the word
+          carries the same state in a second channel, which is also what makes
+          it work for a screen reader without a title attribute nobody hovers.
+
+          It is drawn only on your own bubbles. A receipt on a message you
+          received is telling you that you have read it, which you know.
+          {% endcomment %}
+          <span class="chat-stamp">
+            {{ e.created_at|date:"g:i a" }}
+            {% if e.is_mine %}
+            <span class="chat-tick {% if e.is_read %}read{% else %}sent{% endif %}">
+              {% if e.is_read %}
+              <svg viewBox="0 0 22 16" aria-hidden="true"><path d="m1 8.6 3.4 3.4L11.2 5"/><path d="m9.6 8.6 3.4 3.4L20.4 5"/></svg>
+              <i>{% if thread.is_broadcast and e.read_count > 1 %}Read by {{ e.read_count }}{% else %}Read{% endif %}</i>
+              {% else %}
+              <svg viewBox="0 0 22 16" aria-hidden="true"><path d="m5 8.6 3.4 3.4L15.6 5"/></svg>
+              <i>Sent</i>
+              {% endif %}
+            </span>
+            {% endif %}
+          </span>
         </div>
       </div>
 

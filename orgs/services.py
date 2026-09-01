@@ -1578,6 +1578,58 @@ def quoted_message(thread, raw_id):
     return thread.messages.filter(pk=int(raw)).first()
 
 
+
+def thread_audience(thread):
+    """Who a thread is actually addressed to, as one line the page can print.
+
+    "At the top tells me this is the organisation, this number of users, so
+    this is where I know this message is going" — and until now nothing said
+    it. A thread carries three different audiences in one model (the whole
+    organisation, one group, or named people) and the reader could tell them
+    apart only by guessing from the subject.
+
+    Returns a dict rather than a string so the template can weight the name
+    against the count, and so "and 4 others" is a decision made once here
+    instead of in every template that shows an audience.
+
+    Counting: a broadcast reaches everyone in the organisation INCLUDING
+    people who join tomorrow — that is what storing no recipients means — so
+    the number is the membership as it stands now and is honestly a moving
+    one. A group thread counts that group. Named recipients count themselves.
+    """
+    from .models import GroupMember, OrgMember
+
+    named = list(thread.recipients.all()[:6])
+    if named:
+        total = thread.recipients.count()
+        return {
+            "scope": "people",
+            "name": ", ".join(u.display_name for u in named[:3]),
+            "count": total,
+            "extra": max(0, total - 3),
+            "org": thread.org,
+            "group": thread.group,
+        }
+
+    if thread.group_id is not None:
+        return {
+            "scope": "group",
+            "name": thread.group.name,
+            "count": GroupMember.objects.filter(group_id=thread.group_id).count(),
+            "extra": 0,
+            "org": thread.org,
+            "group": thread.group,
+        }
+
+    return {
+        "scope": "org",
+        "name": thread.org.name,
+        "count": OrgMember.objects.filter(org_id=thread.org_id).count(),
+        "extra": 0,
+        "org": thread.org,
+        "group": None,
+    }
+
 def thread_entries(thread, user):
     """A thread's messages, ready to draw as a conversation.
 
@@ -1601,7 +1653,7 @@ def thread_entries(thread, user):
     entries = list(
         thread.messages
         .select_related("author", "reply_to", "reply_to__author")
-        .prefetch_related("attachments")
+        .prefetch_related("attachments", "read_by")
         .order_by("created_at")
     )
     roles = {
@@ -1613,6 +1665,31 @@ def thread_entries(thread, user):
     }
     previous = None
     for entry in entries:
+        # THE RECEIPT, COMPUTED BEFORE THIS READER IS ADDED BELOW.
+        #
+        # `read_by` already carries who has opened each message — it was there
+        # for the unread count — so the two states the client asked for are a
+        # read of existing data rather than a new column: one tick and "Sent"
+        # while nobody on the other side has opened it, two ticks and "Read"
+        # once somebody has.
+        #
+        # THE AUTHOR IS EXCLUDED, always. Opening your own thread adds you to
+        # `read_by` on your own messages a moment after you send them, so
+        # counting yourself would mark everything read the instant it was
+        # sent, which is the one outcome that makes a receipt worthless.
+        #
+        # ORDER MATTERS: this runs BEFORE `read_by.add(user)` two lines down.
+        # Reversed, opening a thread would mark the other side's newest
+        # message as read by you and then report it back to you as read —
+        # true, but not what the tick is for.
+        #
+        # A thread with no named recipients went to the whole organisation, so
+        # "read" there means at least one person has opened it and the count
+        # is worth showing. In a thread between two people the count is always
+        # one and saying so adds nothing.
+        readers = [u for u in entry.read_by.all() if u.id != entry.author_id]
+        entry.read_count = len(readers)
+        entry.is_read = bool(readers)
         entry.read_by.add(user)
         entry.is_mine = entry.author_id == user.id
         entry.show_head = (

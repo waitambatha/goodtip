@@ -570,6 +570,52 @@ def _readers_for(matches) -> dict:
         return {}
 
 
+def _round_with_my_tips(user, org, rounds, group):
+    """Which round My Tips should open on when the URL does not say.
+
+    THE ROUND IN PLAY IS THE RIGHT ANSWER RIGHT UP UNTIL IT IS EMPTY.
+
+    `current_round` picks the round the competition is in, which is what you
+    want the moment you have tipped it. But an organisation running four codes
+    has four sets of rounds interleaved, and the dashboard's slate deliberately
+    spans every round that still has unplayed games — so a member tips rounds
+    25 and 26 of the AFL and NRL on Tuesday, opens My Tips, and lands on round
+    4 of the AFLW because that is the round "in play". The page then tells them
+    they have not tipped, which is the one thing it should never say to
+    somebody who has: reported as "I made tips on masterclass but on going to
+    my tips I did not find them".
+
+    So: the round in play if there is anything of theirs in it, otherwise the
+    most recent round they actually tipped. Only ever a DEFAULT — `?round=`
+    still wins, and the navigator still reaches every round either way.
+
+    One query, and only when the first choice comes up empty.
+    """
+    played = current_round(rounds)
+    if not rounds:
+        return played
+
+    def _mine_in(rnd):
+        if rnd is None:
+            return False
+        return Tip.objects.filter(
+            user=user, org=org, group=group, match__round=rnd,
+        ).exists()
+
+    if _mine_in(played):
+        return played
+
+    # `rounds` is already newest-first and already narrowed by the competition
+    # filter, so the first one carrying a tip of theirs is the latest one.
+    tipped_ids = set(
+        Tip.objects.filter(
+            user=user, org=org, group=group, match__round__in=rounds,
+        ).values_list("match__round_id", flat=True)
+    )
+    return next((r for r in rounds if r.id in tipped_ids), played)
+
+
+
 @login_required
 def my_tips_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
@@ -598,7 +644,7 @@ def my_tips_view(request, org_id: int):
         except StopIteration:
             selected_round = current_round(rounds)
     else:
-        selected_round = current_round(rounds)
+        selected_round = _round_with_my_tips(request.user, org, rounds, _group(request, org))
     all_rows = []
     round_open, round_lock_note = True, ""
     if selected_round:

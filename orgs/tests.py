@@ -5189,3 +5189,100 @@ class MessageNotificationTests(TestCase):
         self.client.force_login(self.admin)
         self.client.post(reverse("manage:message_thread", args=[thread.id]), {"body": "Reply"})
         self.assertEqual(self._unread(self.member).count(), 0)
+
+
+class MessageReceiptTests(TestCase):
+    """The single orange tick and the double green one.
+
+    Both states are derived from `Message.read_by`, which already existed for
+    the unread count, so what these pin down is the derivation rather than any
+    new storage: who counts as having read a message, and — the part that is
+    easy to get wrong — that the author reading their own thread does not.
+    """
+
+    def setUp(self):
+        from .models import Message, MessageThread
+
+        User = get_user_model()
+        self.season = Season.objects.create(year=2096, label="2096")
+        self.org = Organisation.objects.create(name="Receipt Co", season=self.season)
+        self.member = User.objects.create_user(
+            email="rm@b.com", password="x", display_name="RM",
+        )
+        self.admin = User.objects.create_user(
+            email="ra@b.com", password="x", display_name="RA",
+        )
+        OrgMember.objects.create(user=self.member, org=self.org)
+        OrgMember.objects.create(
+            user=self.admin, org=self.org, role=OrgMember.ROLE_MANAGER,
+        )
+        self.thread = MessageThread.objects.create(
+            org=self.org, kind=MessageThread.KIND_RAISED,
+            subject="Receipts", started_by=self.member,
+        )
+        self.entry = Message.objects.create(
+            thread=self.thread, author=self.member, body="Anyone there?",
+        )
+        self.url = reverse(
+            "orgs:member_message_thread", args=[self.org.id, self.thread.id],
+        )
+
+    def test_unread_message_shows_the_sent_tick(self):
+        """Nobody else has opened it, so it is Sent — even though the author
+        has now opened the thread themselves, which is the trap."""
+        self.client.force_login(self.member)
+        html = self.client.get(self.url).content.decode()
+        self.assertIn("chat-tick sent", html)
+        self.assertNotIn("chat-tick read", html)
+
+    def test_the_author_reading_their_own_thread_does_not_mark_it_read(self):
+        from .services import thread_entries
+
+        # Opening it twice is what a real author does, and the second open is
+        # where a naive implementation reports their own message back to them.
+        thread_entries(self.thread, self.member)
+        entries = thread_entries(self.thread, self.member)
+        self.assertFalse(entries[0].is_read)
+        self.assertEqual(entries[0].read_count, 0)
+
+    def test_once_the_other_side_opens_it_it_reads_as_read(self):
+        from .services import thread_entries
+
+        thread_entries(self.thread, self.admin)
+        entries = thread_entries(self.thread, self.member)
+        self.assertTrue(entries[0].is_read)
+        self.assertEqual(entries[0].read_count, 1)
+
+        self.client.force_login(self.member)
+        html = self.client.get(self.url).content.decode()
+        self.assertIn("chat-tick read", html)
+        self.assertNotIn("chat-tick sent", html)
+
+    def test_a_receipt_is_only_drawn_on_your_own_messages(self):
+        """A tick on something you received tells you that you read it."""
+        from .models import Message
+
+        Message.objects.create(
+            thread=self.thread, author=self.admin, body="Here.",
+        )
+        self.client.force_login(self.member)
+        html = self.client.get(self.url).content.decode()
+        # One receipt for the member's own message, none for the admin's.
+        self.assertEqual(html.count("chat-tick"), 1)
+
+    def test_the_audience_names_the_whole_organisation_and_counts_it(self):
+        from .services import thread_audience
+
+        audience = thread_audience(self.thread)
+        self.assertEqual(audience["scope"], "org")
+        self.assertEqual(audience["name"], "Receipt Co")
+        self.assertEqual(audience["count"], 2)
+
+    def test_the_audience_narrows_to_named_recipients(self):
+        from .services import thread_audience
+
+        self.thread.recipients.add(self.admin)
+        audience = thread_audience(self.thread)
+        self.assertEqual(audience["scope"], "people")
+        self.assertEqual(audience["count"], 1)
+        self.assertIn("RA", audience["name"])

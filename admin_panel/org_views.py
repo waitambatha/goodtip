@@ -18,7 +18,9 @@ from orgs.notifications import notify_new_message
 # The two ends of a thread read and write it the same way, so the logic lives
 # in orgs.services rather than in either view module — there is one
 # conversation here, seen from two chairs.
-from orgs.services import attach_files, quoted_message, thread_entries
+from orgs.services import (
+    attach_files, quoted_message, thread_audience, thread_entries,
+)
 
 from .perms import get_managed_org_or_404, managed_orgs, org_admin_required
 
@@ -204,6 +206,9 @@ def message_thread(request, thread_id: int):
     return render(request, "manage/message_thread.html", {
         "org": thread.org, "orgs": mine, "thread": thread, "entries": entries,
         "recipients": thread.recipients.all(),
+        # Same strip as the member's end. An admin about to reply to what
+        # looks like one person needs to know when it is going to 148 of them.
+        "audience": thread_audience(thread),
     })
 
 

@@ -12273,6 +12273,53 @@ tr.is-off { opacity: .55; }
 
 .chat-text { margin: 0; font-size: 14.5px; line-height: 1.55; overflow-wrap: anywhere; }
 .chat-stamp { display: block; margin-top: 3px; font-size: 10.5px; text-align: right; opacity: .6; }
+/* The stamp holds the receipt now, so it stops being a plain block of text
+   and becomes a row: time, then ticks, then the word. */
+.chat-row.mine .chat-stamp {
+  display: flex; align-items: center; justify-content: flex-end; gap: 7px;
+  opacity: 1; color: inherit;
+}
+.chat-row.mine .chat-stamp > :first-child { opacity: .6; }
+
+/* ---- Sent / read ----------------------------------------------------------
+   ORANGE FOR SENT, GREEN FOR READ, and neither of them is this product's
+   lime. Lime is the approval colour everywhere else in the app — a saved tip,
+   a correct pick, the current nav item — so a lime tick on a message nobody
+   has opened would read as "done" at the exact moment it means "waiting".
+   Orange is not spent on anything else in the chat, and the green is the
+   forest already used for status rather than the accent used for actions.
+
+   The tick is a stroke, not a glyph: two paths at the same weight as the rest
+   of the interface, so one tick and two are plainly the same mark repeated.
+   The word beside it is what makes the pair legible to anyone who cannot
+   separate the two hues, and to a screen reader reading the line straight
+   through — which is why it is real text rather than a title attribute. */
+.chat-tick { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; line-height: 1; }
+.chat-tick svg {
+  width: 15px; height: 11px; flex: none;
+  fill: none; stroke: currentColor; stroke-width: 2.1;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.chat-tick i { font-style: normal; font-weight: 700; letter-spacing: .02em; }
+.chat-tick.sent { color: var(--tick-sent, #E08A1E); }
+.chat-tick.read { color: var(--tick-read, #3FBF6A); }
+
+/* THE TWO COLOURS ARE TOKENS BECAUSE THE BUBBLE UNDER THEM IS NOT ONE COLOUR.
+   The defaults above are drawn for a DARK sent-bubble, which is what the
+   light theme gives you (--ch-mine: #14382A) and what a first pass assumed
+   was true everywhere. It is not: on the green theme the sides deliberately
+   swap so they stay told apart on a dark ground, which makes your own bubble
+   full-strength LIME — and a mid-green tick on lime is a shape you can find
+   only if you already know it is there.
+
+   So the same two states get a second pair of values, mixed for lime rather
+   than for forest: a burnt amber and a deep green, both dark enough to read
+   against #C8F135 at the weight these strokes are drawn. Same meanings, same
+   words beside them; only the ink changes with the paper. */
+.page-deep .chat-row.mine, .gt-dark .chat-row.mine {
+  --tick-sent: #8A4B00;
+  --tick-read: #0E5E33;
+}
 
 /* The quote of the message being answered. A left bar and a tint, the shape
    every chat app uses for this — recognised before it is read. */
@@ -13724,3 +13771,52 @@ html[data-theme="light"] .an-bell.has-new .bell-badge { box-shadow: 0 0 0 2px #f
      goes is the movement, which is the part the setting is about. */
   .an-bell.has-new .bell-badge::after { animation: none; opacity: 0; }
 }
+
+/* ==========================================================================
+   WHO A THREAD IS ADDRESSED TO
+   ==========================================================================
+   Sits between the subject and the first bubble, because that is where the
+   question gets asked: you have opened a conversation and the next thing you
+   do is write into it. A strip rather than a card — it is a label on the
+   thread, not a panel of its own — and it carries the count as plain words
+   rather than a badge, since "148 members" is the part that changes how you
+   write and a number in a pill reads as decoration. */
+.chat-to {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  margin: 0 0 12px; padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--gt-card, #fff);
+  border: 1px solid var(--gt-hair, rgba(15,46,34,.10));
+  font-size: 13px; line-height: 1.4;
+}
+.chat-to .ct-lab {
+  font-family: var(--mark); font-weight: 700; font-size: 11px;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--muted); flex: none;
+}
+.chat-to .ct-who b { font-size: 14px; color: var(--ink); }
+.chat-to .ct-more,
+.chat-to .ct-count,
+.chat-to .ct-org { color: var(--muted); }
+.chat-to .ct-dot { color: var(--muted); opacity: .6; }
+/* On the green theme the strip is on the dark sheet, so it takes the same
+   translucent-panel treatment every other block up there uses. */
+.page-deep .chat-to {
+  background: rgba(255,255,255,.05);
+  border-color: rgba(255,255,255,.10);
+}
+.page-deep .chat-to .ct-who b { color: #fff; }
+.page-deep .chat-to .ct-lab,
+.page-deep .chat-to .ct-more,
+.page-deep .chat-to .ct-count,
+.page-deep .chat-to .ct-org { color: rgba(232,228,213,.66); }
+/* And on light it is a white card on a white page, so it needs the edge. */
+html[data-theme="light"] .gt-app.page-deep .chat-to {
+  background: var(--lt-surface-2);
+  border-color: var(--lt-line-g);
+}
+html[data-theme="light"] .gt-app.page-deep .chat-to .ct-who b { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app.page-deep .chat-to .ct-lab,
+html[data-theme="light"] .gt-app.page-deep .chat-to .ct-more,
+html[data-theme="light"] .gt-app.page-deep .chat-to .ct-count,
+html[data-theme="light"] .gt-app.page-deep .chat-to .ct-org { color: var(--lt-quiet); }

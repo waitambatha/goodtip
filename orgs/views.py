@@ -3063,7 +3063,7 @@ def member_messages_view(request, org_id: int):
 @login_required
 def member_message_thread_view(request, org_id: int, thread_id: int):
     from orgs.models import Message, MessageThread
-    from orgs.services import attach_files
+    from orgs.services import attach_files, thread_audience
 
     org = get_object_or_404(Organisation, pk=org_id)
     thread = get_object_or_404(MessageThread, pk=thread_id, org=org)
@@ -3090,6 +3090,7 @@ def member_message_thread_view(request, org_id: int, thread_id: int):
     entries = thread_entries(thread, request.user)
     return render(request, "orgs/member_message_thread.html", {
         "org": org, "thread": thread, "entries": entries,
+        "audience": thread_audience(thread),
     })
 
 
