@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.db.models import Count, Q, Sum, Value
+from django.db.models import Count, Exists, OuterRef, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
@@ -494,10 +494,36 @@ def _leaderboard(org_ids, tip_filter):
     opened the app could finish a round on a perfect record, and the member who
     actually studied the form and got seven would rank below them on it. Points
     are what the default is for; a strike rate is not.
+
+    WHO IS ON THE BOARD IS A SUBQUERY, NOT A JOIN, AND IT HAS TO BE.
+
+    This selected the members with `filter(memberships__org_id__in=org_ids)`,
+    which joins OrgMember into the very query that sums Tip. Two joins to two
+    multi-valued relations in one statement means the database aggregates over
+    their CROSS PRODUCT: one membership in scope and each tip is summed once;
+    two memberships and every tip is summed twice. `.distinct()` looked like
+    the guard against that and is not — SELECT DISTINCT de-duplicates the rows
+    coming out of the aggregate, long after the sum was taken over the
+    duplicated ones.
+
+    A local board scopes to one organisation and OrgMember is unique per
+    (user, org), so it could never bite there. The national board scopes to the
+    whole family, and anyone belonging to the parent as well as to a store —
+    an owner who also works in one — had their score multiplied by how many of
+    the family's organisations they were in. Reported as "the points on the
+    leaderboard are not real".
+
+    EXISTS asks the same question without bringing rows back to be multiplied,
+    so the aggregate sees each tip exactly once. It also makes the .distinct()
+    unnecessary, which is worth saying out loud: it was never doing this job.
     """
     from accounts.models import User
+    from orgs.models import OrgMember
+
     real = Q(tips__is_auto=False)
-    qs = User.objects.filter(memberships__org_id__in=org_ids).distinct()
+    qs = User.objects.filter(
+        Exists(OrgMember.objects.filter(user=OuterRef("pk"), org_id__in=org_ids))
+    )
     return qs.annotate(
         # Weighted score: sum of points_awarded (finals and Origin count for more).
         points=Coalesce(Sum("tips__points_awarded", filter=tip_filter), Value(0)),
@@ -523,8 +549,14 @@ def leaderboard_for_org(org, round_id: int | None = None, group=None):
     board = _leaderboard([org.id], tip_filter)
     if group is not None:
         # A group's ladder is its own members, not the whole organisation with
-        # most of them on nothing.
-        board = board.filter(group_memberships__group=group)
+        # most of them on nothing. EXISTS rather than a join for the same
+        # reason as _leaderboard: this lands on a queryset that has already
+        # been annotated, and a filter across a multi-valued relation there is
+        # a second join into the aggregate.
+        from orgs.models import GroupMember
+        board = board.filter(
+            Exists(GroupMember.objects.filter(user=OuterRef("pk"), group=group))
+        )
     return apply_tiebreakers(board, [org.id], round_id=round_id, group=group)
 
 

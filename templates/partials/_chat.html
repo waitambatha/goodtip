@@ -108,6 +108,20 @@ Expects: entries (from orgs.views._thread_entries), thread.
               <a class="chat-shot" href="{% url 'orgs:message_file' thread.id a.id %}" target="_blank" rel="noopener">
                 <img src="{% url 'orgs:message_file' thread.id a.id %}" alt="{{ a.original_name }}" loading="lazy">
               </a>
+              {% elif a.is_video %}
+              {% comment %}
+              Played where it was sent, for the same reason a screenshot is
+              shown rather than listed: a clip somebody has to download to
+              find out what it is has stopped being part of the conversation.
+
+              preload="metadata" so the poster frame and the duration arrive
+              without pulling the whole file down for every clip in a thread
+              somebody is only scrolling past.
+              {% endcomment %}
+              <video class="chat-clip" controls preload="metadata" playsinline>
+                <source src="{% url 'orgs:message_file' thread.id a.id %}" type="{{ a.video_type }}">
+                <a href="{% url 'orgs:message_file' thread.id a.id %}?download=1">{{ a.original_name }}</a>
+              </video>
               {% else %}
               <a class="chat-file" href="{% url 'orgs:message_file' thread.id a.id %}?download=1">
                 <span class="cf-ic" aria-hidden="true"><svg><use href="#ic-doc"/></svg></span>

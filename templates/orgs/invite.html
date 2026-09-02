@@ -44,11 +44,11 @@
   <div class="card pad-lg">
     <div class="card-h" style="margin-bottom:12px;">People you've brought in</div>
     {% if invitees %}
-    <table class="atable"><tbody>
+    <div class="tbl-scroll"><table class="atable"><tbody>
       {% for m in invitees %}
       <tr><td>{{ m.user.display_name }}</td><td class="r-num" style="color:var(--muted);font-weight:400;">Joined {{ m.joined_at|date:"j M Y" }}</td></tr>
       {% endfor %}
-    </tbody></table>
+    </tbody></table></div>
     {% else %}
     <p class="app-sub" style="margin:0;">No one has joined via your link yet, share it to get started.</p>
     {% endif %}

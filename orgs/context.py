@@ -114,20 +114,57 @@ def current_group(request, org=None):
 
     None is a real answer, not a missing one — it is the context in which tips
     belong to the organisation rather than to a group.
+
+    THE FORGETTING IS SCOPED, AND THAT IS THE WHOLE SUBTLETY HERE.
+
+    This answers two different questions depending on how it is called:
+
+        current_group(request)            "which group am I standing in?"
+        current_group(request, some_org)  "which group applies to some_org?"
+
+    The self-heal below — drop the id when it no longer resolves — is right for
+    the first and wrong for the second. dashboard_view asks the second, once per
+    membership, to label each organisation's card. For a member of two
+    organisations one of those calls is necessarily about the org they are NOT
+    in, the id does not resolve there, and an unscoped pop threw away a
+    perfectly good choice as a side effect of drawing a picker.
+
+    What that cost: tips belong to a (user, org, group) triple, so the next
+    confirm wrote group=None and the picks landed on the organisation's ladder
+    instead of the group's — reported as "I selected tips, went to My Tips, and
+    only found one". They were saved. They were in the other room. Whether it
+    bit depended on the order memberships came back in, which is by org name,
+    so it reproduced for one member and not the next and read as random.
+
+    So the id is only forgotten when the question was about where the member
+    actually stands. Asking about any other organisation is now a read.
     """
     user = request.user
     if not user.is_authenticated:
         return None
 
+    asked_about = org
     org = org if org is not None else current_org(request)
     chosen_id = request.session.get(GROUP_KEY)
     if chosen_id is None:
         # The common case by far, and it must not touch the session: groups are
         # off for most organisations, and every page view runs this.
         return None
+
+    def _forget_if_this_is_where_they_stand():
+        """Only self-heal a choice that has genuinely gone stale.
+
+        `asked_about is None` is the "where am I" call. Otherwise the pop is
+        allowed only when the caller named the very organisation the session
+        says the member is in — anything else is a question about somewhere
+        they are not, and must not be able to move them.
+        """
+        if asked_about is None or asked_about.pk == request.session.get(ORG_KEY):
+            request.session.pop(GROUP_KEY, None)
+
     if org is None or not org.groups_enabled:
         # Groups switched off underneath someone standing in one.
-        request.session.pop(GROUP_KEY, None)
+        _forget_if_this_is_where_they_stand()
         return None
 
     group = (
@@ -143,7 +180,7 @@ def current_group(request, org=None):
     if group is None:
         # Left the group, or it was declined, or it belongs to a different
         # organisation than the one now current.
-        request.session.pop(GROUP_KEY, None)
+        _forget_if_this_is_where_they_stand()
     return group
 
 

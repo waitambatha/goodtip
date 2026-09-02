@@ -1,0 +1,132 @@
+{% comment %}
+WHERE THESE TIPS GO — the organisations, and the groups inside them.
+
+Shared by the confirm sheet (partials/carry_step.html) and the standalone
+review page (tip_carry.html), which had grown two copies of the same list.
+
+WHAT CHANGED AND WHY. This was a flat list of rooms: "Acme", "Acme · IT",
+"Acme · Marketing", "Zenith", "Zenith · Sales". Five peers, the organisation's
+name repeated through every one of them, and nothing on the screen saying that
+three of those five were the same company. The client's note was that
+unchecking one made the section fall apart, and that what it should be is:
+organisations you tick, each with a dropdown of its groups, all of them ticked
+when the organisation is.
+
+So the ORGANISATION is the unit you decide about. Its rooms — the organisation
+itself, then each group — sit inside a disclosure under it. Ticking the
+organisation ticks all of them; a group can still be untucked on its own, and
+the organisation's control goes half-lit to show that it is now partly in.
+
+WHAT DID NOT CHANGE: the form. Every room still posts its own
+`room` checkbox carrying the same `orgid:groupid` key, and the organisation's
+master checkbox is unnamed — a convenience over those inputs, not a value.
+apply_plan on the other side never learns any of this happened, which is what
+makes it safe.
+
+An organisation with exactly ONE room to offer is not a choice about an
+organisation, it IS the room — so it renders as a single plain card, the way
+every room used to, rather than as a disclosure hiding one line.
+
+Nothing here is a form of its own: these inputs live inside the caller's form
+so their values post alongside the slate. Adding a <form> would nest one form
+in another, which browsers silently discard.
+
+Expects: org_plans (a list of tipping.carry.OrgCarry).
+{% endcomment %}
+{% for entry in org_plans %}
+
+{% if entry.has_rooms_to_choose_between %}
+<div class="cs-org{% if entry.conflict_count %} has-conflict{% endif %}" data-cs-org>
+  {% comment %}
+  The master. No `name`, so it posts nothing — gt-ui.js mirrors it onto the
+  room checkboxes below, and those are what the server reads. With JS off it
+  is inert and every room is already ticked, which is the same answer it
+  would have given.
+  {% endcomment %}
+  <label class="cs-head">
+    <input type="checkbox" data-cs-master checked aria-label="Carry to all of {{ entry.org.name }}">
+    <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
+    <span class="cs-head-body">
+      <span class="cs-room-name">{{ entry.org.name }}</span>
+      <span class="cs-room-meta">
+        <b>{{ entry.change_count }}</b> to carry across
+        {{ entry.room_count }} place{{ entry.room_count|pluralize }}
+        {% if entry.conflict_count %} &middot; <b>{{ entry.conflict_count }}</b> tipped differently{% endif %}
+      </span>
+    </span>
+    {% if entry.conflict_count %}
+    <span class="cs-flag"><svg aria-hidden="true"><use href="#ic-flag"/></svg>Needs your decision</span>
+    {% endif %}
+  </label>
+
+  {% comment %}
+  Open by default. The client asked for a dropdown so the groups are
+  ATTACHED to their organisation rather than loose beside it — not so they
+  are hidden. Somebody who wants to uncheck IT should not have to discover a
+  disclosure first; somebody who does not can fold it away.
+  {% endcomment %}
+  <details class="cs-rooms" open>
+    <summary>
+      <span>{{ entry.room_count }} place{{ entry.room_count|pluralize }} in {{ entry.org.name }}</span>
+      <svg class="cs-chev" aria-hidden="true"><use href="#ic-chev-down"/></svg>
+    </summary>
+
+    {% for plan in entry.plans %}
+    <div class="cs-subroom{% if plan.conflicts %} has-conflict{% endif %}">
+      <label class="cs-sub">
+        <input type="checkbox" name="room" value="{{ plan.room.key }}" data-cs-child checked>
+        <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
+        <span class="cs-head-body">
+          {% comment %}
+          Named for what it is INSIDE this organisation, because the
+          organisation is already the heading above. "Acme · Marketing" under
+          a card titled "Acme" says Acme twice and buries the word that
+          distinguishes this row from the one above it.
+          {% endcomment %}
+          <span class="cs-room-name">
+            {% if plan.room.group %}{{ plan.room.group.name }}{% else %}The organisation itself{% endif %}
+          </span>
+          <span class="cs-room-meta">
+            {% if plan.writes %}<b>{{ plan.writes|length }}</b> to add{% endif %}
+            {% if plan.writes and plan.conflicts %} &middot; {% endif %}
+            {% if plan.conflicts %}<b>{{ plan.conflicts|length }}</b> tipped differently{% endif %}
+            {% if plan.unchanged %} &middot; {{ plan.unchanged|length }} already match{% endif %}
+          </span>
+        </span>
+      </label>
+      {% include "partials/_carry_conflicts.html" with plan=plan %}
+    </div>
+    {% endfor %}
+  </details>
+</div>
+
+{% else %}
+{% for plan in entry.plans %}
+<div class="cs-room{% if plan.conflicts %} has-conflict{% endif %}">
+  {% comment %}
+  Ticked by default: carrying is the helpful answer and the one most people
+  want. The rows that are NOT safe to assume are the conflicting games below,
+  and those start unticked.
+  {% endcomment %}
+  <label class="cs-head">
+    <input type="checkbox" name="room" value="{{ plan.room.key }}" checked>
+    <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
+    <span class="cs-head-body">
+      <span class="cs-room-name">{{ plan.room.label }}</span>
+      <span class="cs-room-meta">
+        {% if plan.writes %}<b>{{ plan.writes|length }}</b> to add{% endif %}
+        {% if plan.writes and plan.conflicts %} &middot; {% endif %}
+        {% if plan.conflicts %}<b>{{ plan.conflicts|length }}</b> tipped differently{% endif %}
+        {% if plan.unchanged %} &middot; {{ plan.unchanged|length }} already match{% endif %}
+      </span>
+    </span>
+    {% if plan.conflicts %}
+    <span class="cs-flag"><svg aria-hidden="true"><use href="#ic-flag"/></svg>Needs your decision</span>
+    {% endif %}
+  </label>
+  {% include "partials/_carry_conflicts.html" with plan=plan %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% endfor %}

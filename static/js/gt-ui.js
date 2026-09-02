@@ -224,3 +224,70 @@
     box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   });
 })();
+
+/* ---------------------------------------------------------------------------
+ * CARRY: AN ORGANISATION AND THE GROUPS INSIDE IT
+ *
+ * partials/_carry_rooms.html renders each organisation as one master checkbox
+ * over a disclosure of its rooms. The master carries no `name` — the rooms are
+ * what post — so this is the whole of the connection between them:
+ *
+ *   master toggled   → every room in that organisation follows it
+ *   a room toggled   → the master shows all / none / some
+ *
+ * "Some" is the indeterminate state rather than a third class, because that is
+ * what the property is for and it is what a screen reader announces as "mixed".
+ *
+ * Delegated from the document, and it has to be: this markup is injected into
+ * the confirm sheet with innerHTML after a fetch, so nothing bound at load
+ * would ever see it. The same handler serves the standalone review page, where
+ * the markup is there from the start.
+ * ------------------------------------------------------------------------- */
+(function () {
+  'use strict';
+
+  function children(org) {
+    return Array.prototype.slice.call(org.querySelectorAll('[data-cs-child]'));
+  }
+
+  function paintMaster(org) {
+    var master = org.querySelector('[data-cs-master]');
+    if (!master) return;
+    var kids = children(org);
+    if (!kids.length) return;
+    var on = kids.filter(function (k) { return k.checked; }).length;
+    master.checked = on === kids.length;
+    master.indeterminate = on > 0 && on < kids.length;
+    /* The card dims when nothing under it is going anywhere, so "off" reads
+       as a state of the organisation rather than only of a small box. */
+    org.classList.toggle('is-off', on === 0);
+  }
+
+  document.addEventListener('change', function (e) {
+    var box = e.target;
+    if (!box || box.type !== 'checkbox') return;
+    var org = box.closest ? box.closest('[data-cs-org]') : null;
+    if (!org) return;
+
+    if (box.hasAttribute('data-cs-master')) {
+      /* Clicking a mixed master means "all of it" — the alternative is a
+         control whose next state you cannot predict from looking at it. */
+      var want = box.indeterminate ? true : box.checked;
+      box.indeterminate = false;
+      box.checked = want;
+      children(org).forEach(function (k) { k.checked = want; });
+      org.classList.toggle('is-off', !want);
+    } else if (box.hasAttribute('data-cs-child')) {
+      paintMaster(org);
+    }
+  });
+
+  /* Every organisation on screen starts consistent, including ones that
+     arrive later inside the sheet. */
+  function paintAll(root) {
+    (root || document).querySelectorAll('[data-cs-org]').forEach(paintMaster);
+  }
+  document.addEventListener('DOMContentLoaded', function () { paintAll(); });
+  document.body && paintAll();
+  document.addEventListener('gt:carry-rendered', function () { paintAll(); });
+})();

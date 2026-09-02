@@ -408,7 +408,7 @@ html[data-theme="dark"] .gta-area { color: var(--gt-lime); }
   flex: none;
   font-family: var(--gt-body);
   font-size: 11px;
-  color: var(--body-quiet-color);
+  color: var(--body-medium-color);
   border: 1px solid var(--border-color);
   border-radius: 5px;
   padding: 1px 6px;
@@ -570,9 +570,15 @@ html[data-theme="dark"] .gta-acct-menu button:hover { color: #F08A8A; background
   display: inline-flex; align-items: center; gap: 5px; margin-top: 7px;
   padding: 2px 8px 2px 6px; border-radius: 999px;
   font-size: 11px; font-weight: 700; letter-spacing: .04em;
-  background: var(--gt-surface-3); color: var(--body-quiet-color);
+  background: var(--gt-surface-3); color: var(--body-medium-color);
 }
-.gta-acct-role.is-super { background: var(--gt-gold-soft); color: var(--gt-gold); }
+/* --gt-gold is the FILL weight of the second brand colour, and this badge
+   uses it as ink on a 14%-opacity wash of itself: 1.7:1 on white, which is a
+   gold shape where a word should be. The dark theme was given a lighter gold
+   for the same reason and got it right; light needs the move in the other
+   direction. #8A5A08 is the same darkened gold `.gta-queue-n.hot` already uses
+   on this exact fill. */
+.gta-acct-role.is-super { background: var(--gt-gold-soft); color: #8A5A08; }
 html[data-theme="dark"] .gta-acct-role.is-super { color: var(--gt-gold-hi); }
 .gta-acct-role svg { width: 12px; height: 12px; fill: currentColor; stroke: none; opacity: 1; }
 
@@ -724,17 +730,20 @@ html[data-theme="dark"] .gta-rail-title { color: var(--gt-lime); }
 html[data-theme="dark"] .gta-nav-a.on { background: var(--gt-gold); color: var(--gt-deep); }
 @media (prefers-color-scheme: dark) { html:not([data-theme="light"]) .gta-nav-a.on { background: var(--gt-gold); color: var(--gt-deep); } }
 
+/* These sit on --gt-surface-3, where --body-quiet-color lands at 3.4:1 — under
+   the 4.5:1 a 10px count needs. --body-medium-color is the next step up and is
+   already what the module headings on this same surface use. */
 .gta-sec-n {
   margin-left: auto;
   font-size: 11px;
   font-weight: 600;
-  color: var(--body-quiet-color);
+  color: var(--body-medium-color);
   background: var(--gt-surface-3);
   border-radius: var(--gt-r-pill);
   padding: 1px 7px;
   flex: none;
 }
-.gta-sec-n.alert { background: rgba(199,124,30,.16); color: #A9660F; }
+.gta-sec-n.alert { background: rgba(199,124,30,.16); color: #7A4E06; }
 html[data-theme="dark"] .gta-sec-n.alert { background: rgba(232,180,92,.2); color: var(--gt-c3); }
 
 .gta-sec-chev {
@@ -1357,7 +1366,7 @@ html[data-theme="dark"] .gta-card-link { color: var(--gt-lime); }
   padding: 2px 9px;
   border-radius: var(--gt-r-pill);
   background: var(--gt-surface-3);
-  color: var(--body-quiet-color);
+  color: var(--body-medium-color);
   font-size: 12.5px;
   font-weight: 600;
   text-align: center;
@@ -1448,7 +1457,15 @@ html[data-theme="dark"] .gta-queue-n.hot { background: rgba(232,180,92,.2); colo
   opacity: 0;
 }
 .gta-app-models li:hover .gta-add, .gta-add:focus-visible { opacity: 1; }
+/* --gt-forest is a brand constant and stays #2D7A3A in both themes, so on the
+   green theme's raised surface this hover was 2.8:1 — the "+" went dim on the
+   one interaction that is meant to confirm you are on it. Every other accent
+   on a dark surface in this file takes the lime; so does this. */
 .gta-add:hover { background: var(--gt-surface-3); color: var(--gt-forest); text-decoration: none; }
+html[data-theme="dark"] .gta-add:hover { color: var(--gt-lime); }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .gta-add:hover { color: var(--gt-lime); }
+}
 
 /* ---- Recent actions ------------------------------------------------------ */
 .gta-actions { list-style: none; margin: 0; padding: 0; }
@@ -1829,3 +1846,55 @@ html[data-theme="dark"] .gta-range a.on { background: var(--gt-lime); color: var
 /* "3 waiting" is the one thing on this row anybody acts on. */
 .gta-kpi-hot { color: var(--gt-gold); font-weight: 700; }
 html[data-theme="dark"] .gta-kpi-hot { color: var(--gt-gold-hi); }
+
+/* ==========================================================================
+   FOCUS, ON THE GREEN THEME
+   --------------------------------------------------------------------------
+   --gt-forest is a brand constant: it is the same #2D7A3A in both themes, and
+   on the dark surfaces it lands at 2.8:1 — under the 3:1 a non-text indicator
+   needs. That is fine for a hover tint, which is a nicety, and not fine for a
+   focus ring, which is the only thing telling a keyboard user where they are.
+
+   The rail's own links were given the lime for this reason already
+   (html[data-theme="dark"] .gta-nav-a:focus-visible, above). The form fields,
+   the jump box and the rich-text editor were not, so on the green theme the
+   ring on every field in the admin was nearly invisible. Same colour, same
+   reason, stated once for all of them.
+   ========================================================================== */
+html[data-theme="dark"] input[type=text]:focus,
+html[data-theme="dark"] input[type=password]:focus,
+html[data-theme="dark"] input[type=email]:focus,
+html[data-theme="dark"] input[type=url]:focus,
+html[data-theme="dark"] input[type=number]:focus,
+html[data-theme="dark"] input[type=tel]:focus,
+html[data-theme="dark"] textarea:focus,
+html[data-theme="dark"] select:focus,
+html[data-theme="dark"] .vTextField:focus,
+html[data-theme="dark"] .gtc-rich:focus-within,
+html[data-theme="dark"] .gta-search:focus-within {
+  border-color: var(--gt-lime);
+  box-shadow: 0 0 0 3px rgba(200,241,53,.22);
+}
+html[data-theme="dark"] #toolbar #searchbar:focus,
+html[data-theme="dark"] :focus-visible {
+  outline-color: var(--gt-lime);
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) input[type=text]:focus,
+  html:not([data-theme="light"]) input[type=password]:focus,
+  html:not([data-theme="light"]) input[type=email]:focus,
+  html:not([data-theme="light"]) input[type=url]:focus,
+  html:not([data-theme="light"]) input[type=number]:focus,
+  html:not([data-theme="light"]) input[type=tel]:focus,
+  html:not([data-theme="light"]) textarea:focus,
+  html:not([data-theme="light"]) select:focus,
+  html:not([data-theme="light"]) .vTextField:focus,
+  html:not([data-theme="light"]) .gtc-rich:focus-within,
+  html:not([data-theme="light"]) .gta-search:focus-within {
+    border-color: var(--gt-lime);
+    box-shadow: 0 0 0 3px rgba(200,241,53,.22);
+  }
+  html:not([data-theme="light"]) #toolbar #searchbar:focus,
+  html:not([data-theme="light"]) :focus-visible { outline-color: var(--gt-lime); }
+}

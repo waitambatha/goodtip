@@ -75,9 +75,20 @@
   .gt-theme-opt { padding: 6px 9px; }
 }
 
-/* Django renders this control a second time on the login screen, where there
-   is no header colour to inherit from. */
-body.login .gt-theme,
-.gt-theme:not(#user-tools *) {
+/* The switch is rendered twice: in #user-tools on the staff pages, and in
+   #branding for a signed-out visitor — which is the login screen.
+
+   This used to fall back to --body-fg for anything outside #user-tools, on the
+   grounds that there was "no header colour to inherit from". There is: the
+   masthead on every page without the rail is deep forest, and admin.css now
+   says so by restating --header-* for `body:not(.gta-shell)`. Taking the body
+   ink instead put a near-black control on that dark green bar, which on the
+   login screen is the only control there is.
+
+   So the fallback is narrowed to what it was actually for — a copy of the
+   switch somewhere in the PAGE rather than in the masthead, where the body's
+   own ink is the right colour and the header's would be invisible. Inside
+   #header, either copy inherits the bar's own. */
+.gt-theme:not(#header *) {
   --header-link-color: var(--body-fg, #333);
 }

@@ -1591,10 +1591,33 @@ class MessageAttachment(models.Model):
     # comp" does.
     ALLOWED_SUFFIXES = {
         ".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic",
+        # Video, added Sep 2026: "the chat box having that pip that makes you
+        # attach images and videos". Three containers rather than every format
+        # that exists — these are what a phone camera produces and what a
+        # browser will play back without a plugin, and an allowlist whose
+        # entries cannot be rendered is not doing anybody a favour.
+        ".mp4", ".mov", ".webm",
         ".pdf", ".txt", ".csv", ".doc", ".docx", ".xls", ".xlsx",
     }
+    #: Suffixes the bubble plays inline rather than offering as a download.
+    VIDEO_SUFFIXES = {".mp4", ".mov", ".webm"}
+    IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
     MAX_BYTES = 8 * 1024 * 1024      # 8 MB per file
+    #: Video is the one thing here that is routinely bigger than a document and
+    #: is also the thing people most want to send from a phone. 8 MB is about
+    #: six seconds of 1080p, which is not a clip of anything. Its own ceiling
+    #: rather than raising the general one, because nothing else needs it.
+    MAX_VIDEO_BYTES = 40 * 1024 * 1024
     MAX_PER_MESSAGE = 4
+
+    @classmethod
+    def limit_for(cls, filename: str) -> int:
+        """The size ceiling that applies to one file, by suffix."""
+        return (
+            cls.MAX_VIDEO_BYTES
+            if Path(filename).suffix.lower() in cls.VIDEO_SUFFIXES
+            else cls.MAX_BYTES
+        )
 
     message = models.ForeignKey(
         Message, on_delete=models.CASCADE, related_name="attachments",
@@ -1622,9 +1645,24 @@ class MessageAttachment(models.Model):
         `<img src>` on a file that turns out not to be an image is a broken
         icon in the middle of a conversation.
         """
-        return Path(self.original_name).suffix.lower() in {
-            ".png", ".jpg", ".jpeg", ".gif", ".webp",
-        }
+        return Path(self.original_name).suffix.lower() in self.IMAGE_SUFFIXES
+
+    @property
+    def is_video(self) -> bool:
+        """Same question, same reasoning, for the <video> element."""
+        return Path(self.original_name).suffix.lower() in self.VIDEO_SUFFIXES
+
+    @property
+    def video_type(self) -> str:
+        """The MIME type to hand <source>, derived from the suffix we trust.
+
+        .mov is served as video/mp4 on purpose: QuickTime files off an iPhone
+        are almost always H.264 in an MP4-compatible container, and browsers
+        that would play the same bytes labelled video/mp4 refuse them labelled
+        video/quicktime.
+        """
+        suffix = Path(self.original_name).suffix.lower()
+        return "video/webm" if suffix == ".webm" else "video/mp4"
 
     @property
     def size_label(self) -> str:

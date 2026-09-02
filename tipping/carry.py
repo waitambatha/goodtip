@@ -242,3 +242,77 @@ def apply_plan(user, plans, *, rooms: set, overrides: set) -> dict:
         "carried": carried, "overwritten": overwritten,
         "kept": kept, "rooms": touched,
     }
+
+
+@dataclass
+class OrgCarry:
+    """One organisation's rooms, gathered under it.
+
+    WHY THE FLAT LIST WAS NOT ENOUGH. build_plan returns one RoomPlan per
+    destination, and a destination is an org-or-group. Rendered flat that is a
+    list of "Acme", "Acme · Marketing", "Acme · IT", "Zenith", "Zenith · Sales"
+    — five peers with the organisation's name repeated through them, and no
+    way to say "all of Acme, but not IT". The client's note: "the organisations
+    should have a dropdown that shows groups, so if I was to uncheck the group
+    in an organisation … it cleans things up and makes me know this group is
+    for this organisation."
+
+    So the org is the unit you decide about and its rooms are the detail
+    underneath. Nothing about what gets WRITTEN changes: every room still posts
+    its own `room` checkbox with the same key, and the org-level control is a
+    convenience over those. apply_plan never learns this type exists.
+    """
+
+    org: object
+    #: The organisation's own room, when carrying there does anything.
+    own: object = None
+    #: Its group rooms, in the order rooms_for produced them (by group name).
+    groups: list = field(default_factory=list)
+
+    @property
+    def plans(self) -> list:
+        """Every room under this org, the organisation's own first."""
+        return ([self.own] if self.own else []) + list(self.groups)
+
+    @property
+    def room_count(self) -> int:
+        return len(self.plans)
+
+    @property
+    def has_rooms_to_choose_between(self) -> bool:
+        """Whether the org needs a master control at all.
+
+        One room is not a choice about an organisation, it IS the room — and
+        wrapping it in a disclosure to reveal a single line is a click that
+        buys nothing. Those render exactly as they did before.
+        """
+        return self.room_count > 1
+
+    @property
+    def change_count(self) -> int:
+        return sum(p.change_count for p in self.plans)
+
+    @property
+    def conflict_count(self) -> int:
+        return sum(len(p.conflicts) for p in self.plans)
+
+
+def group_by_org(plans: list) -> list[OrgCarry]:
+    """Gather RoomPlans under their organisation, keeping the incoming order.
+
+    build_plan already walks rooms_for, which is ordered by org name and then
+    by group name, so an ordered gather preserves both without re-sorting.
+    """
+    by_org: dict = {}
+    order: list = []
+    for plan in plans:
+        org = plan.room.org
+        entry = by_org.get(org.id)
+        if entry is None:
+            entry = by_org[org.id] = OrgCarry(org=org)
+            order.append(entry)
+        if plan.room.group is None:
+            entry.own = plan
+        else:
+            entry.groups.append(plan)
+    return order

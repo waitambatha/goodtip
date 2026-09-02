@@ -5286,3 +5286,145 @@ class MessageReceiptTests(TestCase):
         self.assertEqual(audience["scope"], "people")
         self.assertEqual(audience["count"], 1)
         self.assertIn("RA", audience["name"])
+
+
+class MessageVideoTests(TestCase):
+    """Sending a clip, and being able to watch it.
+
+    ASKED FOR AS: "the chat box having that pip that makes you attach images
+    and videos". Two halves, and the second is the one with teeth — accepting
+    an .mp4 is a line in an allowlist; playing it back is a byte-range server.
+    """
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        from .models import Message, MessageThread
+
+        User = get_user_model()
+        season = Season.objects.create(year=2095, label="2095")
+        self.org = Organisation.objects.create(name="Clip Co", season=season)
+        self.member = User.objects.create_user(
+            email="clip@b.com", password="x", display_name="Clipper",
+        )
+        OrgMember.objects.create(user=self.member, org=self.org)
+        self.thread = MessageThread.objects.create(
+            org=self.org, kind=MessageThread.KIND_RAISED,
+            subject="Here's the clip", started_by=self.member,
+        )
+        self.message = Message.objects.create(
+            thread=self.thread, author=self.member, body="Look at this",
+        )
+        self.client.force_login(self.member)
+
+    def _clip(self, name="goal.mp4", size=5000):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        # Not real MP4 — nothing here decodes it, and the code under test
+        # decides everything from the suffix on purpose.
+        return SimpleUploadedFile(name, bytes(range(256)) * (size // 256 + 1), "video/mp4")
+
+    def _attach(self, name="goal.mp4"):
+        from .models import MessageAttachment
+        from .services import attach_files
+
+        upload = self._clip(name)
+        problems = attach_files(self.message, [upload])
+        self.assertEqual(problems, [])
+        return MessageAttachment.objects.get(message=self.message), upload
+
+    def test_a_video_is_accepted_and_knows_it_is_one(self):
+        attachment, _ = self._attach()
+        self.assertTrue(attachment.is_video)
+        self.assertFalse(attachment.is_image)
+        self.assertEqual(attachment.video_type, "video/mp4")
+
+    def test_quicktime_is_served_as_mp4(self):
+        """Browsers that play the same bytes as video/mp4 refuse them as
+        video/quicktime, and .mov off a phone is H.264 either way."""
+        attachment, _ = self._attach("clip.mov")
+        self.assertEqual(attachment.video_type, "video/mp4")
+
+    def test_video_gets_a_bigger_ceiling_than_a_document(self):
+        from .models import MessageAttachment
+
+        self.assertGreater(
+            MessageAttachment.limit_for("goal.mp4"),
+            MessageAttachment.limit_for("notes.pdf"),
+        )
+
+    def test_a_range_request_gets_a_206_with_the_right_slice(self):
+        """Seeking IS byte-ranging, and Safari will not start a <video> at all
+        without a 206."""
+        attachment, upload = self._attach()
+        url = reverse("orgs:message_file", args=[self.thread.id, attachment.id])
+        resp = self.client.get(url, headers={"range": "bytes=10-19"})
+        self.assertEqual(resp.status_code, 206)
+        self.assertEqual(resp["Content-Range"], f"bytes 10-19/{attachment.file.size}")
+        self.assertEqual(resp["Accept-Ranges"], "bytes")
+        upload.seek(10)
+        self.assertEqual(resp.content, upload.read(10))
+
+    def test_a_plain_request_advertises_that_ranging_is_allowed(self):
+        """Without Accept-Ranges the element never asks for a range at all."""
+        attachment, _ = self._attach()
+        url = reverse("orgs:message_file", args=[self.thread.id, attachment.id])
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Accept-Ranges"], "bytes")
+
+    def test_an_open_ended_range_is_capped_rather_than_sending_everything(self):
+        """A <video> opens with "bytes=0-"; answering it with the whole file
+        is a 200 wearing a 206's clothes."""
+        from orgs.views import RANGE_CHUNK
+
+        attachment, _ = self._attach(name="long.mp4")
+        url = reverse("orgs:message_file", args=[self.thread.id, attachment.id])
+        resp = self.client.get(url, headers={"range": "bytes=0-"})
+        self.assertEqual(resp.status_code, 206)
+        self.assertLessEqual(len(resp.content), RANGE_CHUNK)
+
+    def test_an_unsatisfiable_range_is_416_and_says_how_big_the_file_is(self):
+        attachment, _ = self._attach()
+        url = reverse("orgs:message_file", args=[self.thread.id, attachment.id])
+        resp = self.client.get(url, headers={"range": "bytes=999999-"})
+        self.assertEqual(resp.status_code, 416)
+        self.assertEqual(resp["Content-Range"], f"bytes */{attachment.file.size}")
+
+    def test_a_nonsense_range_falls_back_to_the_whole_file(self):
+        """A Range header is a request, not a contract."""
+        attachment, _ = self._attach()
+        url = reverse("orgs:message_file", args=[self.thread.id, attachment.id])
+        resp = self.client.get(url, headers={"range": "rows=1-2"})
+        self.assertEqual(resp.status_code, 200)
+
+    def test_the_content_type_is_never_the_one_the_uploader_claimed(self):
+        """attachment.content_type is attacker-controlled; echoing it back is
+        how a .txt uploaded as text/html gets rendered in the member's origin."""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from .models import MessageAttachment
+        from .services import attach_files
+
+        attach_files(self.message, [
+            SimpleUploadedFile("notes.txt", b"<script>alert(1)</script>", "text/html"),
+        ])
+        attachment = MessageAttachment.objects.get(
+            message=self.message, original_name="notes.txt",
+        )
+        self.assertEqual(attachment.content_type, "text/html")   # as claimed
+        url = reverse("orgs:message_file", args=[self.thread.id, attachment.id])
+        resp = self.client.get(url, headers={"range": "bytes=0-5"})
+        self.assertEqual(resp.status_code, 206)
+        self.assertNotIn("text/html", resp["Content-Type"])
+
+    def test_a_video_bubble_plays_in_place(self):
+        attachment, _ = self._attach()
+        resp = self.client.get(
+            reverse("orgs:member_message_thread", args=[self.org.id, self.thread.id])
+        )
+        self.assertContains(resp, "chat-clip")
+        self.assertContains(resp, 'type="video/mp4"')

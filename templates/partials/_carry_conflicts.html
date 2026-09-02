@@ -1,0 +1,46 @@
+{% comment %}
+The games in ONE room that already carry a different pick, plus the note that
+says they will be left alone unless ticked.
+
+Split out of the room row so the flat card and the nested one can both use it
+without a second copy — the two lists had already drifted once.
+
+Conflicts stay opt-in and unticked. Somebody who deliberately tipped their own
+club at home and against it at work meant both, and carrying that away without
+asking destroys a decision they cannot get back.
+
+Expects: plan (a tipping.carry.RoomPlan).
+{% endcomment %}
+{% if plan.conflicts %}
+<div class="cs-conflicts">
+  <p class="cs-warn">
+    <svg aria-hidden="true"><use href="#ic-flag"/></svg>
+    <span>You tipped {% if plan.conflicts|length == 1 %}this one{% else %}these{% endif %}
+    differently here. We'll leave {% if plan.conflicts|length == 1 %}it{% else %}them{% endif %}
+    as {% if plan.conflicts|length == 1 %}it is{% else %}they are{% endif %} unless you tick
+    {% if plan.conflicts|length == 1 %}it{% else %}them{% endif %}.</span>
+  </p>
+  {% for row in plan.conflicts %}
+  <label class="cs-conflict">
+    <input type="checkbox" name="override" value="{{ plan.room.key }}:{{ row.match.id }}">
+    <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
+    <span class="cc-body">
+      <span class="cc-teams">{{ row.match.home_team.name }} v {{ row.match.away_team.name }}</span>
+      <span class="cc-swap">
+        <span class="cc-was">{% if row.existing == 'home' %}{{ row.match.home_team.name }}{% else %}{{ row.match.away_team.name }}{% endif %}</span>
+        <svg aria-hidden="true"><use href="#ic-arrow-right"/></svg>
+        <span class="cc-now">{% if row.selection == 'home' %}{{ row.match.home_team.name }}{% else %}{{ row.match.away_team.name }}{% endif %}</span>
+      </span>
+    </span>
+  </label>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if plan.blocked %}
+<p class="cs-note">
+  {{ plan.blocked|length }} game{{ plan.blocked|length|pluralize }} can't carry here —
+  {% if plan.blocked|length == 1 %}it's{% else %}they're{% endif %} already started,
+  or that round isn't open there yet.
+</p>
+{% endif %}

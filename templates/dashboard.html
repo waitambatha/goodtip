@@ -564,6 +564,13 @@ any one card.
         r.forEach(function(row){ if (row.querySelector('input:checked')) n++; });
         if (count) count.textContent = n;
         if (bar && r.length) bar.style.width = Math.round(n / r.length * 100) + '%';
+        /* "If I have not tipped, why am I seeing Confirm your tip?" — offering
+           a confirm before there is anything to confirm reads as a step you
+           have already missed. It arrives with the first pick and leaves again
+           if every pick is taken back. Re-read each time rather than held: the
+           bar lives inside #slipPanel, which htmx replaces whole. */
+        var review = document.getElementById('slipReview');
+        if (review) review.hidden = n === 0;
       }
       slipRefresh();
       /* Recount after a swap: the new round arrives with its own saved picks,
@@ -585,11 +592,24 @@ any one card.
         /* The sheet's own elements are safe to hold: #tipSheet sits outside
            #slipPanel precisely so a swap cannot detach them. Only the FIXTURE
            rows are re-read, because those are what changes. */
+        /* WHAT A CONFIRMATION IS FOR.
+
+           This listed every fixture on screen and stamped "No tip" on the ones
+           without a pick, so a member who tipped three games out of nine was
+           shown nine rows, six of them telling them off. Reported as: "just
+           show what I have picked, stop showing me games and saying not
+           tipped — let me confirm what is currently there."
+
+           Right. A confirmation screen is for checking the thing you are about
+           to do. What is still untipped is not part of that decision, and the
+           count of it is already carried by the strip underneath — one line,
+           phrased as time you still have rather than as a list of omissions. */
         function buildSheet(){
           tsList.innerHTML = '';
           var picked = 0, missing = 0;
           rows().forEach(function(row){
             var chosen = row.querySelector('input:checked');
+            if (!chosen) { missing++; return; }
             var teams = row.querySelectorAll('.fxc-team');
             /* :not(.crest) matters, the crest tag emits its own <span> before
                the name, and plain querySelector('span') returns that one (which
@@ -606,15 +626,10 @@ any one card.
             var venue = row.querySelector('.fxc-venue');
 
             var item = document.createElement('div');
-            item.className = 'ts-item' + (chosen ? '' : ' none');
+            item.className = 'ts-item';
 
-            var pickName = '';
-            if (chosen) {
-              picked++;
-              pickName = chosen.value === 'home' ? homeName : awayName;
-            } else {
-              missing++;
-            }
+            picked++;
+            var pickName = chosen.value === 'home' ? homeName : awayName;
 
             var vsLine = homeName + ' v ' + awayName;
             var when = meta ? meta.textContent.trim() : '';
@@ -626,8 +641,8 @@ any one card.
             item.querySelector('.tsi-match b').textContent = vsLine;
             item.querySelector('.tsi-match small').textContent = when;
             var badge = item.querySelector('.tsi-pick span');
-            if (chosen) { badge.className = 'tsi-yes'; badge.textContent = pickName; }
-            else { badge.className = 'tsi-no'; badge.textContent = 'No tip'; }
+            badge.className = 'tsi-yes';
+            badge.textContent = pickName;
             tsList.appendChild(item);
           });
 
@@ -722,6 +737,10 @@ any one card.
             if (sheet.hidden) return;          /* they closed it meanwhile */
             if (!html) return;
             tsCarry.innerHTML = html;
+            /* The organisation/groups tree in there wires itself up from a
+               delegated handler in gt-ui.js, which cannot see markup that
+               arrives by innerHTML until something tells it to. */
+            document.dispatchEvent(new CustomEvent('gt:carry-rendered'));
             hasCarry = true;
             if (tsSteps) tsSteps.hidden = false;
             showStep('carry');

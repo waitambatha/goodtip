@@ -3120,11 +3120,114 @@ def message_file(request, thread_id: int, attachment_id: int):
     attachment = get_object_or_404(
         MessageAttachment, pk=attachment_id, message__thread=thread,
     )
-    return FileResponse(
+    as_attachment = bool(request.GET.get("download"))
+    # A single byte range, when the client asked for one. See _range_response.
+    ranged = _range_response(request, attachment)
+    if ranged is not None:
+        return ranged
+    response = FileResponse(
         attachment.file.open("rb"),
         # Inline so an image can be shown in the conversation rather than
         # downloaded to look at. as_attachment is what a "Download" link on
         # the chip asks for, via ?download=1.
-        as_attachment=bool(request.GET.get("download")),
+        as_attachment=as_attachment,
         filename=attachment.original_name,
     )
+    # Advertised even on a full response: it is how a <video> element learns it
+    # is allowed to ask for the middle of the file at all.
+    response["Accept-Ranges"] = "bytes"
+    return response
+
+
+#: How much of a file one ranged request may hand back. A <video> asks for
+#: "bytes=0-" and will happily take the whole clip in one response, which
+#: defeats the point of ranging at all — this keeps a seek to a chunk.
+RANGE_CHUNK = 2 * 1024 * 1024
+
+
+def _range_response(request, attachment):
+    """A 206 for a single byte range, or None to serve the file whole.
+
+    WHY THIS HAD TO BE WRITTEN. Django's FileResponse does not implement HTTP
+    range requests — it has no Accept-Ranges, and a `Range:` header is ignored
+    and answered with the entire body and a 200. For an image or a PDF that is
+    only wasteful. For the video the composer now accepts it is the difference
+    between working and not:
+
+      * seeking is byte-ranging. Without it the scrubber cannot move, so a clip
+        can only ever be watched from the beginning;
+      * Safari, on both macOS and iOS, REFUSES to start a <video> at all
+        unless the server answers a range request with a 206. It is not a
+        degraded experience there, it is a black rectangle.
+
+    Deliberately narrow: one range, and a malformed or unsatisfiable header
+    falls back to the whole file rather than erroring. A Range header is a
+    request, not a contract — RFC 9110 lets a server answer any of them with
+    the complete representation — so the safe direction on anything unexpected
+    is the response that always works.
+    """
+    import mimetypes
+
+    from django.http import HttpResponse
+    from django.utils.encoding import escape_uri_path
+
+    header = request.headers.get("Range", "")
+    if not header.startswith("bytes="):
+        return None
+    spec = header[len("bytes="):].split(",")[0].strip()
+    if "-" not in spec:
+        return None
+
+    size = attachment.file.size
+    if not size:
+        return None
+    first, _, last = spec.partition("-")
+    try:
+        if first == "":
+            # "bytes=-500" — the final 500 bytes.
+            length = int(last)
+            if length <= 0:
+                return None
+            start, end = max(0, size - length), size - 1
+        else:
+            start = int(first)
+            end = int(last) if last else size - 1
+    except ValueError:
+        return None
+
+    end = min(end, size - 1, start + RANGE_CHUNK - 1)
+    if start > end or start >= size:
+        # Unsatisfiable. 416 carries the real size so the client can retry
+        # sensibly instead of guessing again.
+        response = HttpResponse(status=416)
+        response["Content-Range"] = f"bytes */{size}"
+        response["Accept-Ranges"] = "bytes"
+        return response
+
+    # Read the slice rather than streaming from an offset. FileResponse would
+    # keep going to the end of the file, so the body would not match the
+    # Content-Length promised above — correct only by accident, and only on a
+    # server that truncates. RANGE_CHUNK bounds this at 2 MB.
+    with attachment.file.open("rb") as handle:
+        handle.seek(start)
+        payload = handle.read(end - start + 1)
+
+    # Type guessed from the FILENAME, never from attachment.content_type.
+    # That column holds whatever the uploading browser claimed, and echoing it
+    # back is how a .txt uploaded as "text/html" gets rendered as a page in
+    # the member's own origin. Same reasoning as is_image, which decides on
+    # the suffix for the same reason, and the same thing Django's own
+    # FileResponse does on the 200 path.
+    guessed, _ = mimetypes.guess_type(attachment.original_name)
+    response = HttpResponse(
+        payload, status=206,
+        content_type=guessed or "application/octet-stream",
+    )
+    # Kept so a download resumed by range still lands under its own name.
+    disposition = "attachment" if request.GET.get("download") else "inline"
+    response["Content-Disposition"] = (
+        f'{disposition}; filename="{escape_uri_path(attachment.original_name)}"'
+    )
+    response["Content-Range"] = f"bytes {start}-{end}/{size}"
+    response["Accept-Ranges"] = "bytes"
+    return response

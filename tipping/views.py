@@ -393,7 +393,7 @@ def carry_preview(request, org_id: int):
     """
     from accounts.models import User
 
-    from .carry import Room, build_plan
+    from .carry import Room, build_plan, group_by_org
 
     org = get_object_or_404(Organisation, pk=org_id)
     if not _require_member(request.user, org):
@@ -415,8 +415,13 @@ def carry_preview(request, org_id: int):
     return render(request, "partials/carry_step.html", {
         "org": org,
         "source": source,
+        # Rooms gathered under their organisation, so the sheet can offer one
+        # decision per org with its groups underneath. `plans` stays as it was
+        # for anything still counting rooms; nothing about the POST changes.
+        "org_plans": group_by_org(plans),
         "plans": plans,
         "total_rooms": len(plans),
+        "total_orgs": len({p.room.org.id for p in plans}),
         "total_changes": sum(p.change_count for p in plans),
         "conflict_count": sum(len(p.conflicts) for p in plans),
         # "Yes, always" is offered here rather than only on the profile,
@@ -484,7 +489,7 @@ def tip_carry_view(request, org_id: int):
     """
     from accounts.models import User
 
-    from .carry import Room, apply_plan, build_plan
+    from .carry import Room, apply_plan, build_plan, group_by_org
 
     org = get_object_or_404(Organisation, pk=org_id)
     if not _require_member(request.user, org):
@@ -537,8 +542,13 @@ def tip_carry_view(request, org_id: int):
     return render(request, "tip_carry.html", {
         "org": org,
         "source": source,
+        # Same shape as the sheet's, so the two render the same partial and
+        # cannot drift apart again — this page and partials/carry_step.html
+        # had already grown two separate copies of the same room list.
+        "org_plans": group_by_org(plans),
         "plans": plans,
         "total_rooms": len(plans),
+        "total_orgs": len({p.room.org.id for p in plans}),
         "total_changes": sum(p.change_count for p in plans),
         "conflict_count": sum(len(p.conflicts) for p in plans),
     })

@@ -124,62 +124,79 @@ div.breadcrumbs {
 
 /* ---- Modules ---------------------------------------------------------------
    A card, not a boxed table. The rounded corner and the hairline do the
-   separating that the old grey caption bar did with colour. */
+   separating that the old grey caption bar did with colour.
+
+   Painted from the shared surface tokens rather than from a literal, because
+   this skin is worn by a screen that can be green as well as cream. A `#fff`
+   here is not "the card colour", it is "the card colour in one of the two
+   themes" — and on the other one it is a white panel under light text. */
 .module {
-  background: #fff;
-  border: 1px solid var(--gt-line);
+  background: var(--gt-surface, #fff);
+  border: 1px solid var(--hairline-color, rgba(15,46,34,.13));
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 1px 2px rgba(15,46,34,.04);
   margin-bottom: 18px;
 }
 .module h2, .module caption, .inline-group h2 {
-  background: var(--gt-cream-2);
-  color: var(--gt-ink);
+  background: var(--gt-surface-3, #F2EFE6);
+  color: var(--body-medium-color, var(--gt-ink));
   font-family: var(--gt-body);
   font-size: 11.5px;
   font-weight: 800;
   letter-spacing: .07em;
   text-transform: uppercase;
   padding: 11px 14px;
-  border-bottom: 1px solid var(--gt-line);
+  border-bottom: 1px solid var(--hairline-color, rgba(15,46,34,.13));
 }
-.module caption a, .module h2 a { color: var(--gt-forest); }
+.module caption a, .module h2 a { color: var(--link-fg, var(--gt-forest)); }
 
 /* App list on the index: the app name is the thing being scanned, so it gets
    the weight, and the row is the target rather than just the link text. */
 .dashboard .module table th { font-weight: 600; }
 .dashboard .module table td a, .dashboard .module table th a { display: block; padding: 9px 14px; }
-.dashboard .module table tr:hover { background: var(--gt-cream-2); }
+.dashboard .module table tr:hover { background: var(--gt-surface-2, #F2EFE6); }
 
 /* ---- Tables ----------------------------------------------------------------
    Density preserved on purpose — see the note at the top. The only changes are
    a quieter header, a real hover, and tabular numerals so columns of ids and
    money line up instead of shimmering. */
 #changelist table thead th {
-  background: var(--gt-cream-2);
-  border-bottom: 1px solid var(--gt-line);
+  background: var(--gt-surface-3, #F2EFE6);
+  border-bottom: 1px solid var(--hairline-color, rgba(15,46,34,.13));
   font-size: 11px;
   font-weight: 800;
   letter-spacing: .05em;
   text-transform: uppercase;
-  color: var(--gt-muted);
+  color: var(--body-medium-color, var(--gt-muted));
 }
-#changelist table thead th a { color: var(--gt-ink); }
-#changelist tbody tr:hover { background: #FAFBF7; }
-#changelist tbody td, #changelist tbody th { border-bottom: 1px solid var(--gt-line); }
+#changelist table thead th a { color: var(--body-medium-color, var(--gt-ink)); }
+#changelist tbody tr:hover { background: var(--gt-surface-2, #FAFBF7); }
+#changelist tbody td, #changelist tbody th { border-bottom: 1px solid var(--hairline-color, rgba(15,46,34,.13)); }
 #changelist td.field-id, #changelist td[class*="field-"] time,
 .field-amount_aud, .field-total_disbursed_aud {
   font-variant-numeric: tabular-nums;
 }
-#changelist-filter { background: #fff; border-left: 1px solid var(--gt-line); }
+#changelist-filter {
+  background: var(--gt-surface, #fff);
+  border-left: 1px solid var(--hairline-color, rgba(15,46,34,.13));
+}
 #changelist-filter h2 {
-  background: var(--gt-cream-2); color: var(--gt-ink);
+  background: var(--gt-surface-3, #F2EFE6);
+  color: var(--body-medium-color, var(--gt-ink));
   font-size: 11px; letter-spacing: .07em;
 }
-#changelist-filter li.selected a { color: var(--gt-forest); font-weight: 700; }
-#toolbar { background: var(--gt-cream-2); border-bottom: 1px solid var(--gt-line); padding: 9px 12px; }
-#toolbar input[type="text"] { border-radius: 7px; border: 1px solid var(--gt-line); padding: 6px 9px; }
+#changelist-filter li.selected a { color: var(--link-selected-fg, var(--gt-forest)); font-weight: 700; }
+#toolbar {
+  background: var(--gt-surface-3, #F2EFE6);
+  border-bottom: 1px solid var(--hairline-color, rgba(15,46,34,.13));
+  padding: 9px 12px;
+}
+#toolbar input[type="text"] {
+  border-radius: 7px;
+  border: 1px solid var(--border-color, rgba(15,46,34,.13));
+  padding: 6px 9px;
+}
 
 /* ---- Buttons ---------------------------------------------------------------
    Rounded to match the product's own, and given a real pressed state. Delete
@@ -193,14 +210,18 @@ div.breadcrumbs {
   transition: background .15s ease, transform .06s ease;
 }
 .button:active, input[type=submit]:active, .submit-row input:active { transform: translateY(1px); }
-.submit-row { background: var(--gt-cream-2); border-top: 1px solid var(--gt-line); border-radius: 0 0 12px 12px; }
+.submit-row {
+  background: var(--gt-surface-3, #F2EFE6);
+  border-top: 1px solid var(--hairline-color, rgba(15,46,34,.13));
+  border-radius: 0 0 12px 12px;
+}
 .object-tools a { border-radius: 100px; font-weight: 700; letter-spacing: .02em; }
 
 /* ---- Forms ---------------------------------------------------------------- */
-.form-row { border-bottom: 1px solid var(--gt-line); }
+.form-row { border-bottom: 1px solid var(--hairline-color, rgba(15,46,34,.13)); }
 input[type=text], input[type=password], input[type=email], input[type=url],
 input[type=number], textarea, select, .vTextField {
-  border: 1px solid var(--gt-line);
+  border: 1px solid var(--border-color, rgba(15,46,34,.13));
   border-radius: 8px;
   padding: 7px 9px;
 }
@@ -209,15 +230,23 @@ input:focus, textarea:focus, select:focus {
   outline-offset: 1px;
   border-color: var(--gt-forest);
 }
-.help, .form-row .help { color: var(--gt-muted); font-size: 12px; }
-fieldset.collapsed h2 { background: var(--gt-cream-2); }
+.help, .form-row .help { color: var(--body-quiet-color, var(--gt-muted)); font-size: 12px; }
+/* A collapsed fieldset's heading is the one strip on the page that is drawn on
+   a surface but takes its ink from the module heading above it. Welding the
+   surface to cream while the ink follows the theme is how it came out as pale
+   grey on pale cream — the heading was there, and unreadable. */
+fieldset.collapsed h2 { background: var(--gt-surface-3, #F2EFE6); }
 
 /* ---- Messages -------------------------------------------------------------- */
+/* The message backgrounds are Django's own theme variables and they DO follow
+   the theme; the ink was a literal, so a success banner came out deep-forest
+   text on deep-forest green. It follows the same variable the banner's own
+   background does. */
 ul.messagelist li {
   border-radius: 9px;
   font-size: 13.5px;
   font-weight: 600;
-  color: var(--gt-ink);
+  color: var(--body-fg, var(--gt-ink));
   padding: 11px 14px 11px 40px;
 }
 
@@ -232,7 +261,10 @@ body.login .submit-row { border-radius: 0; }
 body.login #content { padding: 22px; }
 
 /* ---- Sidebar --------------------------------------------------------------- */
-#nav-sidebar { background: #fff; border-right: 1px solid var(--gt-line); }
+#nav-sidebar {
+  background: var(--gt-rail, var(--gt-surface, #fff));
+  border-right: 1px solid var(--hairline-color, rgba(15,46,34,.13));
+}
 #nav-sidebar .current-model { background: var(--gt-forest); }
 #nav-sidebar .current-model a:link, #nav-sidebar .current-model a:visited { color: #fff; }
 .sticky { background: transparent; }
@@ -329,4 +361,43 @@ body.gtv {
   background: var(--gt-lime); color: var(--gt-deep);
   font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
   padding: 3px 8px; border-radius: 100px;
+}
+
+/* ============================================================================
+   THE PAGES THAT KEEP THE DEEP-GREEN MASTHEAD
+   ----------------------------------------------------------------------------
+   Two admin chromes coexist. On the staff pages the shell takes over: the rail
+   carries identity and `body.gta-shell #header` repaints the bar white (or, in
+   the green theme, near-black) with `--body-fg` ink over it. Everywhere the
+   shell is not — the login screen, and every related-object pop-up, neither of
+   which renders a rail — the masthead above stays deep forest.
+
+   The header's own colour VARIABLES do not know that. gtadmin.css sets them for
+   the shell's bar, so on light they read `--header-link-color: <deep forest>`
+   and `--header-bg: #FFFFFF`. Anything in the masthead that paints from them —
+   the theme switch in gt-admin.css, and Django's own `#header` colour — came
+   out deep forest ON deep forest: present, correctly placed, and invisible.
+
+   Restating the three variables for exactly the pages that keep the dark bar
+   fixes every one of those at once, and keeps working for anything added to
+   the masthead later, which is the reason to do it here rather than to name
+   the two controls that showed it. `body:not(.gta-shell)` is the same test the
+   template uses to decide whether to render the rail at all.
+   ========================================================================= */
+body:not(.gta-shell) {
+  --header-bg:          var(--gt-deep);
+  --header-color:       var(--gt-cream);
+  --header-link-color:  #FFFFFF;
+  --header-branding-color: var(--gt-lime);
+}
+
+/* "Control plane" and the environment chip sit in that same bar and had the
+   same fault: `.gta-area` is forest green, which is a legible accent on the
+   shell's pale bar and 2.2:1 on the dark one. On the dark bar it wears the
+   lime, which is what every other GoodTip surface uses for a label on deep
+   forest. */
+body:not(.gta-shell) .gta-area { color: var(--gt-lime); }
+body:not(.gta-shell) .gta-env {
+  background: var(--gt-lime);
+  color: var(--gt-deep);
 }

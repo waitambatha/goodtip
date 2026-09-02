@@ -8,7 +8,7 @@
   <div class="copy-field"><input id="orgJoin" type="text" readonly value="{{ join_url }}"><button type="button" class="abtn abtn-dark" data-copy="#orgJoin">Copy</button></div>
 </div>
 <div class="card"><div class="card-h" style="margin-bottom:10px;">Members</div>
-  <table class="atable compact"><thead><tr><th>Member</th><th>Role</th><th style="text-align:right;">Actions</th></tr></thead><tbody>
+  <div class="tbl-scroll"><table class="atable compact"><thead><tr><th>Member</th><th>Role</th><th style="text-align:right;">Actions</th></tr></thead><tbody>
   {% for m in members %}
     <tr>
       <td><b>{{ m.user.display_name }}</b><br><small style="color:var(--muted);">{{ m.user.email }}</small></td>
@@ -23,6 +23,6 @@
   {% empty %}
     <tr><td colspan="3" style="text-align:center;color:var(--muted);">No members yet. Share the join link above.</td></tr>
   {% endfor %}
-  </tbody></table>
+  </tbody></table></div>
 </div>
 {% endblock %}

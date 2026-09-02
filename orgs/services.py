@@ -1429,13 +1429,16 @@ def attach_files(message, files) -> list:
         if suffix not in MessageAttachment.ALLOWED_SUFFIXES:
             problems.append(
                 f"“{upload.name}” isn't a kind of file we accept "
-                "(images, PDFs, documents and spreadsheets)."
+                "(images, video, PDFs, documents and spreadsheets)."
             )
             continue
-        if upload.size > MessageAttachment.MAX_BYTES:
+        # Video gets its own ceiling: 8 MB is about six seconds of phone
+        # footage, so the general limit would have made the paperclip accept
+        # .mp4 and then reject every real clip anybody tried to send.
+        limit = MessageAttachment.limit_for(upload.name)
+        if upload.size > limit:
             problems.append(
-                f"“{upload.name}” is bigger than "
-                f"{MessageAttachment.MAX_BYTES // (1024 * 1024)} MB."
+                f"“{upload.name}” is bigger than {limit // (1024 * 1024)} MB."
             )
             continue
         MessageAttachment.objects.create(

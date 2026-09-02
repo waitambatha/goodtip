@@ -26,7 +26,7 @@
   --gts-line: rgba(15,46,34,.09);
   --gts-line-2: rgba(15,46,34,.15);
   --gts-fg: #23302A;
-  --gts-quiet: #75847A;
+  --gts-quiet: #5F6E63;
   --gts-head-h: 64px;
 }
 html.gts-collapsed { --gts-rail-w: 72px; }
@@ -268,7 +268,7 @@ html[data-theme="light"] {
   --ad-row-h:       rgba(15,46,34,.028);
 
   --ad-ink:         #17342A;
-  --ad-quiet:       #6B7A6E;
+  --ad-quiet:       #5A6A5D;
   --ad-faint:       #9BA79D;
 
   --ad-line:        rgba(15,46,34,.09);

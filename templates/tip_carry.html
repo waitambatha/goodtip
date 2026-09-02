@@ -22,8 +22,9 @@ is listed game by game, unticked, and stays as it is unless it is ticked.
     <div class="app-eyebrow">{{ source.label }}</div>
     <h1 class="app-h1">Carry these tips across?</h1>
     <p class="app-sub">
-      Your picks are locked in for {{ source.label }}. You're in
-      {{ total_rooms }} other {% if total_rooms == 1 %}group{% else %}groups{% endif %} —
+      Your picks are locked in for {{ source.label }}. You also tip in
+      {{ total_rooms }} other {% if total_rooms == 1 %}place{% else %}places{% endif %}{% if total_orgs > 1 %},
+      across {{ total_orgs }} organisations{% endif %} —
       we can put the same picks there so you don't have to tip twice.
     </p>
   </div>
@@ -32,63 +33,13 @@ is listed game by game, unticked, and stays as it is unless it is ticked.
 <form method="post" style="max-width:720px;">
   {% csrf_token %}
 
-  {% for plan in plans %}
-  <div class="card pad-lg carry-room" data-coach="carry-choice" style="margin-bottom:14px;">
-    <label class="carry-head">
-      {% comment %}
-      Ticked by default, because carrying is what the member asked for by
-      arriving here. The rooms that are NOT safe to assume — the ones with a
-      contradicting pick — are the individual games below, and those start
-      unticked.
-      {% endcomment %}
-      <input type="checkbox" name="room" value="{{ plan.room.key }}" checked>
-      <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
-      <span class="carry-head-body">
-        <span class="oc-title">{{ plan.room.label }}</span>
-        <span class="oc-sub">
-          {% if plan.writes %}{{ plan.writes|length }} tip{{ plan.writes|length|pluralize }} to add{% endif %}
-          {% if plan.writes and plan.conflicts %} · {% endif %}
-          {% if plan.conflicts %}{{ plan.conflicts|length }} already tipped differently{% endif %}
-          {% if plan.unchanged %} · {{ plan.unchanged|length }} already the same{% endif %}
-        </span>
-      </span>
-    </label>
-
-    {% if plan.conflicts %}
-    <div class="carry-conflicts">
-      <p class="carry-warn">
-        <svg aria-hidden="true"><use href="#ic-flag"/></svg>
-        You've already tipped {{ plan.conflicts|length }}
-        {% if plan.conflicts|length == 1 %}of these games{% else %}of these games{% endif %}
-        differently here. We'll leave {% if plan.conflicts|length == 1 %}it{% else %}them{% endif %}
-        alone unless you say otherwise.
-      </p>
-      {% for row in plan.conflicts %}
-      <label class="carry-conflict">
-        <input type="checkbox" name="override" value="{{ plan.room.key }}:{{ row.match.id }}">
-        <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
-        <span class="cc-body">
-          <span class="cc-teams">{{ row.match.home_team.name }} v {{ row.match.away_team.name }}</span>
-          <span class="cc-swap">
-            <span class="cc-was">{% if row.existing == 'home' %}{{ row.match.home_team.name }}{% else %}{{ row.match.away_team.name }}{% endif %}</span>
-            <svg aria-hidden="true"><use href="#ic-arrow-right"/></svg>
-            <span class="cc-now">{% if row.selection == 'home' %}{{ row.match.home_team.name }}{% else %}{{ row.match.away_team.name }}{% endif %}</span>
-          </span>
-        </span>
-      </label>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    {% if plan.blocked %}
-    <p class="carry-note">
-      {{ plan.blocked|length }} game{{ plan.blocked|length|pluralize }} can't carry here —
-      {% if plan.blocked|length == 1 %}it's{% else %}they're{% endif %} already
-      started, or that round isn't open in this group yet.
-    </p>
-    {% endif %}
-  </div>
-  {% endfor %}
+  {% comment %}
+  The same room list the confirm sheet shows, from the same partial — this page
+  and partials/carry_step.html had grown two copies of it, styled differently,
+  and only one of them got the organisation/groups tree the client asked for.
+  One list, so they cannot disagree again.
+  {% endcomment %}
+  {% include "partials/_carry_rooms.html" %}
 
   {% comment %}
   "Never ask me again" in both directions. The client asked for the yes-forever
