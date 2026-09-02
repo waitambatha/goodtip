@@ -1,17 +1,37 @@
 {% comment %}
 Open Graph / Twitter card tags for a shared story link.
-Shared into both news_detail templates (member + public) so a link pasted
-into Facebook, LinkedIn, Slack, iMessage etc always resolves an image and
-a headline instead of coming through as a bare URL — that's what makes a
-shared blog link read as trustworthy rather than as spam.
+
+Shared into both news_detail templates (member + public) so a link pasted into
+Facebook, LinkedIn, Slack, iMessage etc always resolves an image and a headline
+instead of coming through as a bare URL — that's what makes a shared blog link
+read as trustworthy rather than as spam.
+
+EVERY VALUE FALLS BACK. The SEO team's own og_title wins; failing that the meta
+title; failing that the headline. Same shape for the description. So a story
+nobody has touched in the SEO fields still shares correctly, which is what
+makes those fields optional rather than a checklist to get through before
+publishing.
 {% endcomment %}
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="GoodTip">
-<meta property="og:title" content="{{ post.title }}">
-<meta property="og:description" content="{{ post.excerpt|default:post.title|truncatechars:200 }}">
+<meta property="og:title" content="{{ post.og_title|default:post.meta_title|default:post.title }}">
+<meta property="og:description" content="{{ post.og_description|default:post.meta_description|default:post.excerpt|default:post.title|truncatechars:200 }}">
 <meta property="og:url" content="{{ share_url }}">
-{% if share_image_url %}<meta property="og:image" content="{{ share_image_url }}">{% endif %}
+{% if share_image_url %}<meta property="og:image" content="{{ share_image_url }}">
+{% if post.image_alt %}<meta property="og:image:alt" content="{{ post.image_alt }}">{% endif %}{% endif %}
+<meta property="article:published_time" content="{{ post.published_at|date:'c' }}">
+{% for t in post.tag_labels %}<meta property="article:tag" content="{{ t }}">
+{% endfor %}
 <meta name="twitter:card" content="{% if share_image_url %}summary_large_image{% else %}summary{% endif %}">
-<meta name="twitter:title" content="{{ post.title }}">
-<meta name="twitter:description" content="{{ post.excerpt|default:post.title|truncatechars:200 }}">
-{% if share_image_url %}<meta name="twitter:image" content="{{ share_image_url }}">{% endif %}
+<meta name="twitter:title" content="{{ post.og_title|default:post.meta_title|default:post.title }}">
+<meta name="twitter:description" content="{{ post.og_description|default:post.meta_description|default:post.excerpt|default:post.title|truncatechars:200 }}">
+{% if share_image_url %}<meta name="twitter:image" content="{{ share_image_url }}">
+{% if post.image_alt %}<meta name="twitter:image:alt" content="{{ post.image_alt }}">{% endif %}{% endif %}
+{% comment %}
+Robots and canonical for a STORY. The page middleware does this for the
+registered pages, but a story is not one of them — there is one news_detail
+route serving thousands of different posts, so the setting has to come off the
+post itself rather than off a row keyed on the view.
+{% endcomment %}
+<meta name="robots" content="{{ post.robots_directive }}">
+<link rel="canonical" href="{{ post.canonical_url|default:share_url }}">

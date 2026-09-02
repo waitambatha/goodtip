@@ -9,7 +9,9 @@ from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.utils.html import linebreaks, strip_tags
+from django.utils.text import slugify
 
 from catalog.models import Charity, Competition, Season, Series, Sport
 from django.views.decorators.http import require_POST
@@ -382,18 +384,99 @@ def _parse_sources(post_data) -> list:
     return sources
 
 
+def _parse_tags(post_data) -> list:
+    """The codes ticked on the editor, in the order the choices are listed.
+
+    Order is taken from TAG_CHOICES rather than from the checkboxes, so the
+    primary tag — the one `NewsPost.save` writes back to the old `tag` column,
+    and the one the card shows — does not depend on the order a browser
+    happened to submit the boxes in.
+    """
+    chosen = set(post_data.getlist("tags"))
+    return [value for value, _label in NewsPost.TAG_CHOICES if value in chosen]
+
+
+def _parse_published_at(post_data, fallback):
+    """The date typed into the editor, or `fallback` if there isn't one.
+
+    Comes off a `datetime-local` input, which sends wall-clock time with no
+    zone, so it is read in the site's own timezone rather than UTC — a story
+    scheduled for "Friday 9am" means 9am in Melbourne, and treating that as UTC
+    would publish it at 7pm.
+    """
+    raw = (post_data.get("published_at") or "").strip()
+    if not raw:
+        return fallback
+    parsed = parse_datetime(raw)
+    if parsed is None:
+        return fallback
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+    return parsed
+
+
+# The SEO partial always emits this. Its absence means the form did not carry
+# the SEO block at all, which is not the same as an admin clearing every box.
+SEO_BLOCK_MARKER = "seo_fields"
+
+
+def _fill_seo(request, obj):
+    """Copy the shared SEO boxes off a form onto anything with the mixin.
+
+    One function for the story editor and the page editor, for the same reason
+    `SeoFieldsMixin` is one model: the two forms carry identical fields, and a
+    second copy of this is a second place for "we added og:image but only to
+    posts" to happen.
+
+    A FORM WITHOUT THE BLOCK CHANGES NOTHING.
+
+    `robots_index` and `robots_follow` are checkboxes, and an unticked checkbox
+    is simply absent from a POST — indistinguishable, field by field, from a
+    form that never had the block on it. Reading them blindly would mean any
+    other caller that saves a story (a script, a future quick-edit, an old
+    cached page) silently takes it out of Google. So the partial posts a marker
+    alongside them, and without it this returns having touched nothing.
+    """
+    if not request.POST.get(SEO_BLOCK_MARKER):
+        return obj
+    obj.meta_title = request.POST.get("meta_title", "").strip()[:200]
+    obj.meta_description = request.POST.get("meta_description", "").strip()[:320]
+    obj.og_title = request.POST.get("og_title", "").strip()[:200]
+    obj.og_description = request.POST.get("og_description", "").strip()[:320]
+    obj.canonical_url = request.POST.get("canonical_url", "").strip()
+    # Checkboxes are "index unless told otherwise", which is the direction that
+    # fails safe: a form posted without them (an old cached page, a script)
+    # leaves a page indexed rather than silently removing it from Google.
+    obj.robots_index = bool(request.POST.get("robots_index"))
+    obj.robots_follow = bool(request.POST.get("robots_follow"))
+    if request.FILES.get("og_image"):
+        obj.og_image = request.FILES["og_image"]
+    elif request.POST.get("og_image_clear"):
+        obj.og_image = None
+    return obj
+
+
 def _fill_news_post(request, post: NewsPost) -> NewsPost:
     """Populate `post` from POST data. Caller decides whether to save it."""
     title_html = sanitize_editor_html(request.POST.get("title_html", "").strip())
     post.title_html = title_html
     post.title = _plain_text(title_html)
-    post.tag = request.POST.get("tag", "NEWS")
+    tags = _parse_tags(request.POST)
+    # A story with nothing ticked is filed under News rather than under
+    # nothing: an untagged post falls out of every tag filter on the news list,
+    # which is a story nobody can find rather than a story with no label.
+    post.tags = tags or ["NEWS"]
     excerpt_html = sanitize_editor_html(request.POST.get("excerpt_html", "").strip())
     post.excerpt_html = excerpt_html
     post.excerpt = _plain_text(excerpt_html)
     post.body = sanitize_editor_html(request.POST.get("body", "").strip())
     post.sources = _parse_sources(request.POST)
     post.is_published = bool(request.POST.get("is_published"))
+    post.published_at = _parse_published_at(
+        request.POST, post.published_at or timezone.now()
+    )
+    post.image_alt = request.POST.get("image_alt", "").strip()[:200]
+    _fill_seo(request, post)
     if request.FILES.get("image"):
         post.image = request.FILES["image"]
     elif request.POST.get("image_clear"):
@@ -404,9 +487,53 @@ def _fill_news_post(request, post: NewsPost) -> NewsPost:
     return post
 
 
+def _apply_news_slug(request, post: NewsPost) -> str:
+    """Take the slug off the form, and leave a redirect where the old one was.
+
+    A story's address is editable now, which means a story's address can be
+    WRONG — every link already sent out, every share on LinkedIn, every crawl
+    Google has done points at the old one. So a rename is never just a rename:
+    the old path is written into the redirect table pointing at the new one, and
+    the reader who follows a two-month-old link still lands on the story.
+
+    Returns a message for the admin, or "" if nothing moved.
+    """
+    from .models import Redirect
+
+    typed = slugify(request.POST.get("slug", "").strip())[:200]
+    if not typed or post.pk is None or typed == post.slug:
+        return ""
+    old_slug = post.slug
+    post.slug = typed
+    if NewsPost.objects.filter(slug=typed).exclude(pk=post.pk).exists():
+        post.slug = old_slug
+        return "That address is already taken by another story, so the old one was kept."
+    if old_slug:
+        old_path = f"/news/{old_slug}/"
+        Redirect.objects.update_or_create(
+            old_path=old_path,
+            defaults={
+                "new_path": f"/news/{typed}/",
+                "is_permanent": True,
+                "note": f"Story renamed from {old_slug}",
+                "created_by": request.user if request.user.is_authenticated else None,
+            },
+        )
+        # A chain — a story renamed twice — is flattened rather than left to be
+        # followed one hop at a time. Browsers cap redirect chains, search
+        # engines discount them, and the second rename is exactly when nobody
+        # is thinking about the first.
+        Redirect.objects.filter(new_path=old_path).update(new_path=f"/news/{typed}/")
+        return f"Address changed. {old_path} now redirects here."
+    return ""
+
+
 def _apply_news_form(request, post: NewsPost) -> NewsPost:
     _fill_news_post(request, post)
+    note = _apply_news_slug(request, post)
     post.save()
+    if note:
+        messages.info(request, note)
     return post
 
 
@@ -433,7 +560,45 @@ def news_list(request):
     posts = list(NewsPost.objects.all())
     for post in posts:
         post.share_url = request.build_absolute_uri(post.get_absolute_url())
-    return render(request, "manage/news.html", {"posts": posts})
+    return render(request, "manage/news.html", {
+        "posts": posts,
+        # Counted here rather than in the template so the banner can be shown
+        # once at the top: a queued story is invisible on the site, and the
+        # list is the only place anyone would find out it is coming.
+        "scheduled_count": sum(1 for p in posts if p.is_scheduled),
+    })
+
+
+def _editor_context(post, *, is_new: bool) -> dict:
+    """What every render of the story editor needs, however it got there.
+
+    There are four of them — new, new-with-an-error, edit, edit-with-an-error —
+    and the error paths are the ones that get forgotten. A field added to the
+    editor and to two of the four comes back as "it cleared my tags when I
+    forgot the headline", which is a worse bug than the missing headline.
+    """
+    # An UNSAVED NewsPost for a blank editor, never None.
+    #
+    # The SEO block reads its checkboxes off this object, and `None.robots_index`
+    # is falsy in a template exactly the way `False` is — so a blank editor
+    # rendered from None would show "show this in Google" unticked, and every
+    # story written from it would publish noindex. An empty instance carries
+    # the model's real defaults instead.
+    post = post if post is not None else NewsPost()
+    return {
+        "post": post,
+        "is_new": is_new,
+        "tag_choices": NewsPost.TAG_CHOICES,
+        # A set, so `{% if val in selected_tags %}` is a membership test rather
+        # than a list scan per checkbox.
+        "selected_tags": set(post.tag_list) or {"NEWS"},
+        # `datetime-local` wants exactly "YYYY-MM-DDTHH:MM" in LOCAL time. UTC
+        # here would show an admin in Melbourne a time ten hours off their own
+        # publishing schedule.
+        "published_at_value": timezone.localtime(
+            post.published_at or timezone.now()
+        ).strftime("%Y-%m-%dT%H:%M"),
+    }
 
 
 @requires("news.write", lambda r: f"New story: {_headline_text(r) or 'untitled'}")
@@ -443,16 +608,22 @@ def news_new(request):
             messages.error(request, "Give the story a headline before saving.")
             draft = _fill_news_post(request, NewsPost())
             return render(request, "manage/news_editor.html", {
-                "post": draft, "tag_choices": NewsPost.TAG_CHOICES, "is_new": True,
+                **_editor_context(draft, is_new=True),
                 "initial_body": draft.body,
             })
         post = NewsPost(created_by=request.user, published_at=timezone.now())
         _apply_news_form(request, post)
-        messages.success(request, "Post published." if post.is_published else "Post saved as a draft.")
+        if post.is_scheduled:
+            stamp = timezone.localtime(post.published_at)
+            messages.success(
+                request, f"Scheduled for {stamp:%d %b %Y at %H:%M}. It will appear on its own.",
+            )
+        else:
+            messages.success(
+                request, "Post published." if post.is_published else "Post saved as a draft.",
+            )
         return redirect("admin:hq_news")
-    return render(request, "manage/news_editor.html", {
-        "tag_choices": NewsPost.TAG_CHOICES, "is_new": True,
-    })
+    return render(request, "manage/news_editor.html", _editor_context(None, is_new=True))
 
 
 @requires("news.write", lambda r: f"Edit story: {_headline_text(r) or 'untitled'}")
@@ -463,14 +634,19 @@ def news_edit(request, post_id: int):
             messages.error(request, "Give the story a headline before saving.")
             draft = _fill_news_post(request, post)
             return render(request, "manage/news_editor.html", {
-                "post": draft, "tag_choices": NewsPost.TAG_CHOICES, "is_new": False,
+                **_editor_context(draft, is_new=False),
                 "initial_body": draft.body,
+                "share_url": request.build_absolute_uri(post.get_absolute_url()),
             })
         _apply_news_form(request, post)
-        messages.success(request, "Post updated.")
+        if post.is_scheduled:
+            stamp = timezone.localtime(post.published_at)
+            messages.success(request, f"Saved. Scheduled for {stamp:%d %b %Y at %H:%M}.")
+        else:
+            messages.success(request, "Post updated.")
         return redirect("admin:hq_news")
     return render(request, "manage/news_editor.html", {
-        "post": post, "tag_choices": NewsPost.TAG_CHOICES, "is_new": False,
+        **_editor_context(post, is_new=False),
         "initial_body": _editor_body_html(post.body),
         "share_url": request.build_absolute_uri(post.get_absolute_url()),
     })
@@ -512,6 +688,16 @@ def news_announce(request, post_id: int):
 
     if not post.is_published:
         messages.error(request, "Publish the post before emailing it out.")
+    elif post.is_scheduled:
+        # Emailing is once-only and cannot be recalled, so it must not run
+        # ahead of the thing it announces: the link in the mail would 404 for
+        # every member until the publish time came round.
+        stamp = timezone.localtime(post.published_at)
+        messages.error(
+            request,
+            f"This story is scheduled for {stamp:%d %b %Y at %H:%M} and isn't "
+            "live yet. Email it once it has published.",
+        )
     elif post.announced_at:
         stamp = timezone.localtime(post.announced_at)
         messages.info(request, f"Already emailed to members on {stamp:%d %b %Y at %H:%M}.")
@@ -550,13 +736,20 @@ def news_index(request):
     """All published posts. Public page (client site structure) — anonymous
     visitors get the marketing design, members the in-app feed. The staging
     gate still fronts it until launch.
+
+    `NewsPost.live`, not `filter(is_published=True)`: a story scheduled for
+    next week is published and must not be here yet.
     """
-    posts = NewsPost.objects.filter(is_published=True)
+    posts = NewsPost.live.all()
     # ?code=AFL filters by tag; anything unknown falls back to all stories.
     valid_tags = {t for t, _ in NewsPost.TAG_CHOICES}
     active_tag = (request.GET.get("code") or "").upper()
     if active_tag in valid_tags:
-        posts = posts.filter(tag=active_tag)
+        # `tags` first, `tag` as well: a story written before multi-tagging —
+        # or by anything that still only sets the old column — has to keep
+        # appearing under its code. The two are kept in step by
+        # NewsPost.save, so this is the same story counted once, not twice.
+        posts = posts.filter(Q(tags__contains=[active_tag]) | Q(tag=active_tag))
     else:
         active_tag = ""
     tpl = "news_index.html" if request.user.is_authenticated else "public/news_index.html"
@@ -576,13 +769,22 @@ def news_detail(request, slug: str):
     absolute image/URL built here for the Open Graph tags need to be right on
     the public template every time, not just for logged-in members.
     """
-    post = get_object_or_404(NewsPost, slug=slug, is_published=True)
-    more = NewsPost.objects.filter(is_published=True).exclude(pk=post.pk)[:5]
+    # A SCHEDULED STORY 404s, it does not serve.
+    #
+    # `live` rather than `is_published=True`, and this is the half that would
+    # have been missed by adding the date filter to the list alone: the address
+    # of a story is its headline slugified, so a queued announcement is
+    # guessable, and "hidden from the list" is not the same as unpublished.
+    post = get_object_or_404(NewsPost.live.all(), slug=slug)
+    more = NewsPost.live.exclude(pk=post.pk)[:5]
+    # The share card's picture: the SEO team's own og:image if they set one,
+    # otherwise the story's featured image, which is right nearly every time.
+    share_image = post.og_image or post.image
     tpl = "news_detail.html" if request.user.is_authenticated else "public/news_detail.html"
     return render(request, tpl, {
         "post": post, "more": more, "active": "news",
-        "share_url": request.build_absolute_uri(),
-        "share_image_url": request.build_absolute_uri(post.image.url) if post.image else "",
+        "share_url": post.canonical_url or request.build_absolute_uri(),
+        "share_image_url": request.build_absolute_uri(share_image.url) if share_image else "",
     })
 
 
@@ -712,7 +914,7 @@ from django.views.decorators.http import require_POST  # noqa: E402
 
 from . import pages as page_registry  # noqa: E402
 from .middleware import EDIT_PARAM  # noqa: E402
-from .models import PageEdit  # noqa: E402
+from .models import PageEdit, PageSeo, Redirect  # noqa: E402
 
 
 def _sample_org_id(request):
@@ -783,6 +985,184 @@ def _page_rows(request, group):
             "has_stale": page.key in stale,
         })
     return rows
+
+
+# ---------------------------------------------------------------------------
+# SEO — the fields an SEO team edits without a developer
+# ---------------------------------------------------------------------------
+
+def _seo_row_for(page_key: str):
+    """The PageSeo for one page, unsaved if it does not exist yet.
+
+    Rows are created on save, not on view: opening the index would otherwise
+    write a row for every page in the registry the first time anybody looked at
+    it, and "has settings" would stop meaning anything.
+    """
+    row = PageSeo.objects.filter(page=page_key).first()
+    return row if row is not None else PageSeo(page=page_key)
+
+
+@requires("seo.edit")
+def seo_list(request):
+    """Every page and story, and what has been set on each.
+
+    ONE SCREEN FOR BOTH. The brief asks for these fields "per page", and a blog
+    post is a page — it has a title, a description, a share card and an address
+    like any other. Splitting them would mean an SEO team checking two lists to
+    answer "is anything on this site set to noindex".
+    """
+    rows = {r.page: r for r in PageSeo.objects.all()}
+    pages = []
+    for page in page_registry.PAGES:
+        row = rows.get(page.key)
+        try:
+            default_path = reverse(page.view_name) if not page.needs else ""
+        except NoReverseMatch:
+            default_path = ""
+        pages.append({
+            "page": page,
+            "seo": row,
+            "path": (row.path_override if row and row.path_override else default_path),
+            "moved": bool(row and row.path_override),
+            "noindex": bool(row and not row.robots_index),
+            "customised": bool(row and row.is_customised),
+        })
+    posts = list(NewsPost.objects.all()[:200])
+    return render(request, "manage/seo.html", {
+        "pages": pages,
+        "posts": posts,
+        "public_count": sum(1 for p in pages if p["page"].is_public),
+        "noindex_count": sum(1 for p in pages if p["noindex"]),
+        "customised_count": sum(1 for p in pages if p["customised"]),
+        "redirect_count": Redirect.objects.count(),
+    })
+
+
+@requires("seo.edit", lambda r: f"SEO settings: {r.resolver_match.kwargs.get('page_key', '')}")
+def seo_edit(request, page_key: str):
+    """The seven fields, for one page."""
+    page = page_registry.BY_KEY.get(page_key)
+    if page is None:
+        raise Http404("No such page.")
+    row = _seo_row_for(page_key)
+    try:
+        default_path = reverse(page.view_name) if not page.needs else ""
+    except NoReverseMatch:
+        default_path = ""
+
+    if request.method == "POST":
+        _fill_seo(request, row)
+        note = _apply_path_override(request, row, default_path)
+        row.updated_by = request.user
+        row.save()
+        messages.success(request, note or "SEO settings saved.")
+        return redirect("admin:hq_seo")
+
+    return render(request, "manage/seo_edit.html", {
+        "page": page,
+        "seo": row,
+        "default_path": default_path,
+        # What the page says for itself right now, so the boxes can show what
+        # they are overriding instead of being seven empty fields with no
+        # indication of what happens if they stay empty.
+        "preview_url": default_path,
+    })
+
+
+def _apply_path_override(request, row, default_path: str) -> str:
+    """Read the new address off the form, and point the old one at it.
+
+    Same bargain as a story's slug: moving a page is only safe if what was
+    there before still leads somewhere, so the built-in address redirects (in
+    the middleware, permanently) and any address this page previously occupied
+    is written into the redirect table.
+    """
+    typed = Redirect.normalise(request.POST.get("path_override", ""))
+    if typed:
+        typed = "/" + typed.strip("/") + "/"
+    was = row.path_override
+    if typed == default_path:
+        # Typing the built-in address back in is how a move is undone. Storing
+        # it as an override would leave the middleware redirecting a page to
+        # itself for ever.
+        typed = ""
+    row.path_override = typed
+    if typed == was:
+        return ""
+    if typed and was and was != default_path:
+        Redirect.objects.update_or_create(
+            old_path=was,
+            defaults={
+                "new_path": typed, "is_permanent": True,
+                "note": f"Page {row.page} moved",
+                "created_by": request.user if request.user.is_authenticated else None,
+            },
+        )
+        return f"Moved to {typed}. {was} redirects here."
+    if typed:
+        return f"Moved to {typed}. {default_path} redirects here."
+    return f"Back at its built-in address, {default_path}."
+
+
+# ---------------------------------------------------------------------------
+# Redirects
+# ---------------------------------------------------------------------------
+
+@requires("seo.redirects")
+def redirects_list(request):
+    """Old addresses and where they go now, plus how often they are used."""
+    rows = list(Redirect.objects.all())
+    return render(request, "manage/redirects.html", {
+        "rows": rows,
+        "used": sum(1 for r in rows if r.hits),
+        # A redirect nothing has followed since it was made is the one that can
+        # be deleted; one with hits is load-bearing. Saying so is the whole
+        # reason the counter exists.
+        "unused": sum(1 for r in rows if not r.hits),
+    })
+
+
+@requires("seo.redirects", "Add or change a redirect")
+@require_POST
+def redirect_save(request):
+    old_path = Redirect.normalise(request.POST.get("old_path", ""))
+    new_path = (request.POST.get("new_path", "") or "").strip()
+    if "://" not in new_path:
+        new_path = Redirect.normalise(new_path)
+    row_id = request.POST.get("id")
+
+    if not old_path or not new_path:
+        messages.error(request, "Both addresses are needed.")
+        return redirect("admin:hq_redirects")
+    if old_path == new_path:
+        # The one mistake in this table a browser will not let an admin undo:
+        # a 301 to itself is a loop, and it is cached hard at both ends.
+        messages.error(request, "That would send the address to itself.")
+        return redirect("admin:hq_redirects")
+
+    defaults = {
+        "new_path": new_path,
+        "is_permanent": bool(request.POST.get("is_permanent")),
+        "note": request.POST.get("note", "").strip()[:200],
+    }
+    if row_id:
+        Redirect.objects.filter(pk=row_id).update(old_path=old_path, **defaults)
+        messages.success(request, "Redirect updated.")
+    else:
+        defaults["created_by"] = request.user
+        _, created = Redirect.objects.update_or_create(old_path=old_path, defaults=defaults)
+        messages.success(
+            request, "Redirect added." if created else "That address already had a redirect; it now points here.",
+        )
+    return redirect("admin:hq_redirects")
+
+
+@requires("seo.redirects", "Delete a redirect")
+@require_POST
+def redirect_delete(request, redirect_id: int):
+    Redirect.objects.filter(pk=redirect_id).delete()
+    messages.success(request, "Redirect removed.")
+    return redirect("admin:hq_redirects")
 
 
 @requires("pages.edit")
@@ -910,13 +1290,60 @@ def page_upload_image(request):
             "kind": PageEdit.KIND_IMAGE,
             "html": "",
             "original_html": str(request.POST.get("original") or "")[:2000],
+            # What the NEW picture shows. Without it a swapped photograph kept
+            # the alt of the one it replaced — a description that is wrong and
+            # sounds right, which is worse than none.
+            "image_alt": str(request.POST.get("alt") or "").strip()[:200],
             "updated_by": request.user,
             "last_applied_at": None,
         },
     )
     row.image = f
     row.save(update_fields=["image"])
-    return JsonResponse({"url": row.image.url})
+    return JsonResponse({"url": row.image.url, "alt": row.image_alt})
+
+
+@requires("pages.images", "Describe a picture on a page")
+@require_POST
+def page_image_alt(request):
+    """Set one picture's alt text without replacing the picture.
+
+    The other half of "image alt text, per image, editable without a
+    developer". Swapping a photograph already asks for a description; most
+    pictures on the site do not need swapping — their descriptions were written
+    into the templates by whoever put them there, and until now correcting one
+    meant a code change or a pointless re-upload.
+
+    Stored as a KIND_IMAGE PageEdit with no file, which the rewriter applies as
+    an alt-only change. Keyed the same way as every other edit, so it goes
+    stale the same way if the picture itself is changed in the template.
+    """
+    page_key = request.POST.get("page") or ""
+    key = str(request.POST.get("key") or "")[:64]
+    if page_key not in page_registry.BY_KEY or not key:
+        return JsonResponse({"error": "Missing picture."}, status=400)
+
+    alt = str(request.POST.get("alt") or "").strip()[:200]
+    row = PageEdit.objects.filter(page=page_key, block_key=key).first()
+    if row is not None and row.kind == PageEdit.KIND_IMAGE and not row.image and not alt:
+        # Cleared, with no file behind it: the row was only ever the alt text,
+        # so removing it puts the template's own description back rather than
+        # leaving an empty override in place for ever.
+        row.delete()
+        return JsonResponse({"alt": ""})
+
+    PageEdit.objects.update_or_create(
+        page=page_key, block_key=key,
+        defaults={
+            "kind": PageEdit.KIND_IMAGE,
+            "html": "",
+            "original_html": str(request.POST.get("original") or "")[:2000],
+            "image_alt": alt,
+            "updated_by": request.user,
+            "last_applied_at": None,
+        },
+    )
+    return JsonResponse({"alt": alt})
 
 
 @requires("pages.revert", "Put a page back to its original wording")

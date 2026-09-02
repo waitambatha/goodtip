@@ -413,6 +413,62 @@ def _ordinal_suffix(n: int) -> str:
 UPCOMING_LIMIT = 40
 
 
+def _parse_round_param(raw, numbers_by_code, numbers):
+    """Read `?round=` into (code slug or None, round number or None).
+
+    Two spellings, because both have to keep working:
+
+      "4"       a plain number — every link shared before the navigator became
+                code-aware, and still the normal form in a one-code league.
+      "aflw-4"  a code and a number, which is what a multi-code league emits.
+
+    Anything unparseable, or naming a round that does not exist, comes back as
+    (None, None) and the caller falls back to this week. A hand-edited or stale
+    URL should land somewhere useful, never on an error.
+
+    Split on the LAST hyphen: a slug can contain one (state-of-origin), a round
+    number cannot.
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return None, None
+    if raw.isdigit():
+        n = int(raw)
+        return (None, n) if n in numbers else (None, None)
+    code, _, tail = raw.rpartition("-")
+    if code in numbers_by_code and tail.isdigit() and int(tail) in numbers_by_code[code]:
+        return code, int(tail)
+    return None, None
+
+
+def _nearest_code_for(org_rounds, number, numbers_by_code, week_round_ids):
+    """Which code's round `number` a bare `?round=<number>` means.
+
+    Only reached in a league tipping several codes, where the number alone is
+    ambiguous — AFL round 4 was played in April and AFLW round 4 is this
+    weekend, and one of those is what somebody following the link wants.
+
+    A round that is open to tip right now wins. Failing that, the one whose
+    lockout is closest to now in either direction: for a number every code has
+    long finished, that is the most recent, and for one still ahead it is the
+    next one up.
+    """
+    candidates = list(
+        org_rounds.filter(round_number=number)
+        .select_related("series")
+        .only("id", "lockout_at", "series__slug")
+    )
+    if not candidates:
+        return None
+    open_ids = set(week_round_ids)
+    live = [r for r in candidates if r.id in open_ids]
+    if live:
+        return live[0].series.slug
+    now = timezone.now()
+    nearest = min(candidates, key=lambda r: abs(r.lockout_at - now))
+    return nearest.series.slug
+
+
 @login_required
 def dashboard_view(request):
     from orgs.context import current_group, current_org, set_current_org
@@ -626,9 +682,24 @@ def dashboard_view(request):
         # week" means the current open round FOR EACH COMPETITION — AFLW 3 and
         # NRL 26 side by side, each one genuinely tippable. Picking a number
         # from the dropdown or stepping with the arrows switches to number
-        # mode, which still shows every round sharing that number, because
-        # that is the honest answer to "show me round 3" when four codes have
-        # one.
+        # mode.
+        #
+        # AND A NUMBER ON ITS OWN IS NOT A ROUND EITHER.
+        #
+        # Number mode used to show every round carrying that number, on the
+        # reasoning that it was the honest answer when four codes have one. The
+        # client hit the other end of that: opening AFLW round 4 to tip this
+        # weekend and finding AFL round 4 — played in April, eight dead
+        # fixtures — stacked underneath it. Honest is not the same as useful,
+        # and nobody has ever meant "every code's round 4 at once".
+        #
+        # So in a league tipping more than one code the navigator moves inside
+        # ONE code: the dropdown groups its rounds under AFL, AFLW, NRL, NRLW,
+        # and the arrows step through that code's numbers. `?round=` carries
+        # the code with it — `aflw-4` — and a bare `?round=4` from an old link
+        # is resolved to whichever code's round 4 is nearest to now rather than
+        # to all of them. A single-code league is untouched: there is nothing
+        # to disambiguate, so the value stays a plain number.
         week_round_ids = []
         if numbers:
             # The tipping window names the rounds open to tip right now, per
@@ -660,27 +731,91 @@ def dashboard_view(request):
                 in_play = selected["round"].round_number
             else:
                 in_play = numbers[-1]
-            try:
-                wanted = int(request.GET.get("round", ""))
-            except (TypeError, ValueError):
-                wanted = None
+
+            # ---- what the navigator can move between ----------------------
+            #
+            # Every (code, number) in view, and the codes in a stable order, so
+            # the dropdown's groups and the arrows' step both come from one
+            # list rather than from two queries that could disagree.
+            rows = list(
+                org_rounds.select_related("series")
+                .order_by("series__name", "round_number")
+                .values_list("series__slug", "series__name", "round_number")
+            )
+            series_order, numbers_by_code, code_names = [], {}, {}
+            for slug, name, number in rows:
+                if slug not in numbers_by_code:
+                    series_order.append(slug)
+                    numbers_by_code[slug] = []
+                    code_names[slug] = name
+                numbers_by_code[slug].append(number)
+            for slug in numbers_by_code:
+                numbers_by_code[slug] = sorted(set(numbers_by_code[slug]))
+            # One code in view — either the league only tips one, or the chips
+            # have narrowed it to one — means a number is unambiguous, so the
+            # navigator stays exactly as it was and the URLs stay plain.
+            multi = len(series_order) > 1
+
+            wanted_code, wanted_no = _parse_round_param(
+                request.GET.get("round", ""), numbers_by_code, numbers,
+            )
+            if multi and wanted_no is not None and wanted_code is None:
+                # A bare `?round=4` in a multi-code league — an old bookmark,
+                # or a link shared before this existed. Resolve it to the code
+                # whose round 4 is nearest to now, which is the one somebody
+                # following that link almost certainly meant, instead of
+                # showing every code's round 4 at once.
+                wanted_code = _nearest_code_for(
+                    org_rounds, wanted_no, numbers_by_code, week_round_ids,
+                )
+
             # Week mode is the default: no ?round= at all, or one that is out
             # of range or hand-edited. A stale bookmark should land somewhere
             # useful rather than 404, and "somewhere useful" is this week.
-            is_week = wanted not in numbers
+            is_week = wanted_no is None
             # With nothing open anywhere — end of season — there is no week to
             # show, so fall back to a real number rather than an empty panel.
             if is_week and not week_round_ids:
                 is_week = False
-            current_no = wanted if wanted in numbers else (
-                in_play if in_play in numbers else numbers[-1]
-            )
-            i = numbers.index(current_no)
+
+            current_code = wanted_code
+            current_no = wanted_no
+            if current_no is None:
+                current_no = in_play if in_play in numbers else numbers[-1]
+            if multi and current_code is None:
+                current_code = _nearest_code_for(
+                    org_rounds, current_no, numbers_by_code, week_round_ids,
+                )
+            # The list the arrows step along: this code's rounds when there is
+            # a code, every number otherwise. Stepping across codes was the
+            # other half of the client's report — the arrows walked out of AFLW
+            # and into last April's AFL without saying so.
+            steps = numbers_by_code.get(current_code) or numbers
+            if current_no not in steps:
+                current_no = steps[-1]
+            i = steps.index(current_no)
+
+            def _value(code, number):
+                """What goes in ?round=. Plain in a one-code league."""
+                return f"{code}-{number}" if (multi and code) else str(number)
+
             round_nav = {
+                # Flat numbers, still, for a single-code league — the template
+                # renders these as bare options.
                 "numbers": numbers,
-                "current": current_no,
-                "prev": numbers[i - 1] if i > 0 else None,
-                "next": numbers[i + 1] if i < len(numbers) - 1 else None,
+                "multi": multi,
+                # [(code label, [(value, number), ...]), ...] for the grouped
+                # dropdown a multi-code league gets.
+                "groups": [
+                    (code_names[slug], [(_value(slug, n), n) for n in numbers_by_code[slug]])
+                    for slug in series_order
+                ] if multi else [],
+                "current": _value(current_code, current_no),
+                "current_number": current_no,
+                "current_code": current_code,
+                "current_code_label": code_names.get(current_code, ""),
+                "prev": _value(current_code, steps[i - 1]) if i > 0 else None,
+                "next": _value(current_code, steps[i + 1]) if i < len(steps) - 1 else None,
                 "in_play": in_play,
                 # Week mode, as opposed to a numbered round. Drives both the
                 # dropdown's selected option and the "back to this week" link.
@@ -696,7 +831,12 @@ def dashboard_view(request):
         if round_nav and round_nav["is_week"]:
             upcoming = upcoming.filter(round_id__in=week_round_ids)
         elif round_nav:
-            upcoming = upcoming.filter(round__round_number=round_nav["current"])
+            upcoming = upcoming.filter(round__round_number=round_nav["current_number"])
+            # THE LINE THAT FIXES THE CLIENT'S SCREEN. Without it, "round 4" in
+            # a league tipping four codes is four rounds, three of them months
+            # dead, all rendered one under the other.
+            if round_nav["current_code"]:
+                upcoming = upcoming.filter(round__series__slug=round_nav["current_code"])
         else:
             upcoming = upcoming.filter(kickoff_at__gt=now)
         upcoming = (
@@ -907,7 +1047,9 @@ def dashboard_view(request):
     # News & blog — posted by the super admin from /manage/news/.
     from admin_panel.models import NewsPost
 
-    news_posts = list(NewsPost.objects.filter(is_published=True)[:9])
+    # `live`, not `is_published=True` — a story queued for next Friday is
+    # published and is not due. See admin_panel.models.LivePostManager.
+    news_posts = list(NewsPost.live.all()[:9])
 
     return render(request, "dashboard.html", {
         "cards": cards,

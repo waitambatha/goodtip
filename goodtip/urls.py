@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
+from django.contrib.sitemaps.views import sitemap
 from django.urls import include, path
 from django.views.generic import TemplateView
 from django.views.static import serve as static_serve
@@ -11,6 +12,7 @@ from accounts.views import (
     tell_the_boss_view,
 )
 from admin_panel.views import news_detail, news_index
+from goodtip.sitemaps import SITEMAPS
 from billing.views import good_list_view, stripe_webhook
 from goodtip.staging_gate import gate_view, robots_view
 from orgs.views import join_view, public_wall_reply, public_wall_view
@@ -98,6 +100,9 @@ urlpatterns = [
     # User uploads (profile photos). Served by Django regardless of DEBUG —
     # fine at avatar scale; move behind nginx/S3 if uploads ever grow.
     path("media/<path:path>", static_serve, {"document_root": settings.MEDIA_ROOT}, name="media"),
+    # Generated from admin_panel.pages and the published stories — nothing to
+    # keep in step by hand. See goodtip/sitemaps.py.
+    path("sitemap.xml", sitemap, {"sitemaps": SITEMAPS}, name="sitemap"),
 ]
 
 

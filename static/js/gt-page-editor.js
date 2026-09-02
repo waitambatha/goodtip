@@ -24,6 +24,7 @@
     page: bar.getAttribute('data-gte-page'),
     save: bar.getAttribute('data-gte-save'),
     upload: bar.getAttribute('data-gte-upload'),
+    alt: bar.getAttribute('data-gte-alt'),
     csrf: bar.getAttribute('data-gte-csrf'),
   };
 
@@ -35,11 +36,16 @@
   var saveLabel = bar.querySelector('[data-gte-save-label]');
   var cancelBtn = bar.querySelector('[data-gte-cancel]');
   var resetBtn = bar.querySelector('[data-gte-revert-block]');
+  var altBtn = bar.querySelector('[data-gte-alt-mode]');
   var imageInput = document.querySelector('[data-gte-image-input]');
 
   var editing = false;
   var active = null;          // the block the toolbar is pointed at
   var pendingImage = null;    // the <img> waiting on a file picker
+  // While on, clicking a picture edits what it SAYS rather than which file it
+  // is. See the button's comment in manage/_page_editor.html for why this is a
+  // mode and not a second gesture on the image.
+  var altMode = false;
   // What each block said when editing began. Used for three things: knowing
   // which blocks actually changed, sending the original alongside the edit so
   // the manage page can show the before and after, and Discard.
@@ -223,8 +229,50 @@
     if (!editing) return;
     e.preventDefault();
     e.stopPropagation();
+    if (altMode) {
+      describeImage(e.currentTarget);
+      return;
+    }
     pendingImage = e.currentTarget;
     if (imageInput) imageInput.click();
+  }
+
+  /* Alt text without touching the file.
+   *
+   * Most photographs on the site do not need replacing — their descriptions
+   * came from whoever wrote the template, and correcting one used to mean a
+   * code change or a pointless re-upload. Saved on its own, immediately, for
+   * the same reason a picture is: there is no local state to discard. */
+  function describeImage(img) {
+    var before = img.getAttribute('alt') || '';
+    var next = window.prompt(
+      'What does this picture show?\n' +
+      'This is what a screen reader reads out and what a search engine sees.\n' +
+      'Leave it empty if the picture is purely decorative.',
+      before
+    );
+    if (next === null) return;
+    next = next.trim();
+    img.setAttribute('alt', next);
+    setState('Saving description…', 'is-editing');
+
+    var data = new FormData();
+    data.append('page', CFG.page);
+    data.append('key', img.getAttribute('data-gte-img'));
+    data.append('original', before);
+    data.append('alt', next);
+
+    fetch(CFG.alt, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CFG.csrf },
+      body: data,
+    }).then(function (r) {
+      if (!r.ok) throw new Error('save failed');
+      setState('Description saved', 'is-saved');
+    }).catch(function () {
+      img.setAttribute('alt', before);
+      setState("Couldn't save that description", 'is-error');
+    });
   }
 
   if (imageInput) imageInput.addEventListener('change', function () {
@@ -241,10 +289,25 @@
     img.src = preview;
     setState('Uploading…', 'is-editing');
 
+    /* ALT TEXT COMES WITH THE PICTURE.
+     *
+     * A swapped photograph used to inherit the alt attribute of the one it
+     * replaced, so every replaced picture on the site was described as
+     * whatever the previous picture showed — which reads as correct to a
+     * screen reader and is not. Asked once, here, with the existing
+     * description prefilled so leaving it alone is a keypress. */
+    var alt = window.prompt(
+      'Describe this picture for screen readers and search engines.\n' +
+      'Leave it empty if the picture is purely decorative.',
+      img.getAttribute('alt') || ''
+    );
+    if (alt !== null) img.setAttribute('alt', alt.trim());
+
     var data = new FormData();
     data.append('page', CFG.page);
     data.append('key', img.getAttribute('data-gte-img'));
     data.append('original', before || '');
+    data.append('alt', alt === null ? (img.getAttribute('alt') || '') : alt.trim());
     data.append('file', file);
 
     fetch(CFG.upload, {
@@ -279,6 +342,19 @@
     el.addEventListener('mouseup', function () { if (editing) setActive(el); });
   });
   images.forEach(function (img) { img.addEventListener('click', pickImage); });
+
+  if (altBtn) altBtn.addEventListener('click', function () {
+    altMode = !altMode;
+    altBtn.classList.toggle('is-on', altMode);
+    altBtn.setAttribute('aria-pressed', altMode ? 'true' : 'false');
+    // The pictures themselves say which mode they are in, because the button
+    // is up in the bar and the click happens down the page.
+    document.body.classList.toggle('gte-alt-mode', altMode);
+    setState(
+      altMode ? 'Click a picture to describe it' : 'Editing',
+      'is-editing'
+    );
+  });
 
   startBtn.addEventListener('click', startEditing);
   saveBtn.addEventListener('click', save);

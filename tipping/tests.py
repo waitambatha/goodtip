@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import User
-from catalog.models import Season, Series, Sport
+from catalog.models import Competition, Season, Series, Sport
 from orgs.models import OrgMember, Organisation
 from tipping.models import Match, Round, Team, Tip
 from tipping.services import (
@@ -1357,3 +1357,459 @@ class TakingATipBackTests(TestCase):
             {f"match_{other_match.id}": "none"},
         )
         self.assertTrue(Tip.objects.filter(match=other_match).exists())
+
+
+class GroupContextSurvivesTheDashboardTests(TestCase):
+    """A member of two organisations must not lose the group they stand in.
+
+    REPORTED AS: "I entered and selected tips, then went to My Tips and it only
+    had one." Which is what it looks like from the outside. Underneath, the
+    tips were written — into the wrong room.
+
+    THE MECHANISM. Tips belong to a (user, org, GROUP) triple, and which group
+    is read from the session by orgs.context.current_group. That function
+    self-heals a stale choice: if the id in the session does not resolve to a
+    group of the organisation it is asked about, it forgets it. Correct, for
+    the question it was written to answer — "which group am I standing in".
+
+    dashboard_view asks it a different question. It loops over EVERY membership
+    to build the org picker and calls current_group(request, org) once per
+    organisation, meaning "which group applies to this card". For a member in
+    two organisations, one of those calls is always about the org they are not
+    in — and the self-heal fires and wipes the session.
+
+    After that the confirm posts with group=None and the tips land on the
+    organisation's ladder, invisible from inside the group. Whether it bites at
+    all depends on the order memberships come back in, which is by org name —
+    so it reproduces for one member and not for the next, and looked random.
+    """
+
+    def setUp(self):
+        from orgs.models import Group
+
+        sport = Sport.objects.create(name="Ctx Footy", slug="ctx-footy")
+        self.series = Series.objects.create(sport=sport, name="Ctx", slug="ctx-series")
+        season = Season.objects.create(year=2099, label="2099")
+        # Named so "Acme" sorts BEFORE "Zenith" under memberships_for's
+        # order_by("org__name") — the loop therefore reaches the org the member
+        # is NOT standing in first, which is the order that loses the group.
+        self.other = Organisation.objects.create(name="Acme", season=season)
+        self.home_org = Organisation.objects.create(
+            name="Zenith", season=season, groups_enabled=True,
+        )
+        self.user = User.objects.create_user(
+            email="ctx@x.com", password="Str0ng!pass", display_name="Ctx",
+        )
+        OrgMember.objects.create(user=self.user, org=self.other)
+        OrgMember.objects.create(user=self.user, org=self.home_org)
+        self.group = Group.objects.create(
+            org=self.home_org, name="Marketing",
+            approval_status=Group.APPROVAL_APPROVED,
+        )
+        self.group.memberships.create(user=self.user)
+        self.client.force_login(self.user)
+
+    def _stand_in_the_group(self):
+        from orgs.context import GROUP_KEY, ORG_KEY
+        s = self.client.session
+        s[ORG_KEY] = self.home_org.pk
+        s[GROUP_KEY] = self.group.pk
+        s.save()
+
+    def test_the_dashboard_does_not_forget_which_group_you_are_in(self):
+        from orgs.context import GROUP_KEY
+
+        self._stand_in_the_group()
+        self.client.get(f"/dashboard/?org={self.home_org.id}")
+        self.assertEqual(
+            self.client.session.get(GROUP_KEY), self.group.pk,
+            "the dashboard's per-membership current_group() calls dropped the "
+            "group from the session",
+        )
+
+    def test_tips_confirmed_from_the_dashboard_land_in_the_group(self):
+        """The consequence, end to end: pick, confirm, and find it in My Tips."""
+        rnd = Round.objects.create(
+            org=self.home_org, round_number=1, series=self.series,
+            lockout_at=timezone.now() + timedelta(days=2),
+        )
+        home = Team.objects.create(name="H", slug="ctx-h", series=self.series)
+        away = Team.objects.create(name="A", slug="ctx-a", series=self.series)
+        match = Match.objects.create(
+            round=rnd, home_team=home, away_team=away,
+            kickoff_at=timezone.now() + timedelta(days=2),
+        )
+
+        self._stand_in_the_group()
+        self.client.get(f"/dashboard/?org={self.home_org.id}")   # the trigger
+        self.client.post(
+            reverse("tipping:tip_confirm_upcoming", args=[self.home_org.id]),
+            {f"match_{match.id}": "home"},
+        )
+
+        tip = Tip.objects.get(user=self.user, match=match)
+        self.assertEqual(
+            tip.group_id, self.group.pk,
+            "the tip was written to the organisation instead of the group the "
+            "member was standing in",
+        )
+
+
+class LeaderboardCountsEachTipOnceTests(TestCase):
+    """Points on the board have to be points somebody actually scored.
+
+    REPORTED AS: "points in the leaderboard were not real — I don't know
+    someone's 227 or some figure like that."
+
+    THE MECHANISM. _leaderboard starts from
+
+        User.objects.filter(memberships__org_id__in=org_ids).distinct()
+
+    and then annotates Sum("tips__points_awarded") onto it. That is one query
+    with two joins to multi-valued relations — OrgMember and Tip — so the rows
+    the database sums over are the CROSS PRODUCT of the two. A member with one
+    membership in scope gets each tip once. A member with two gets every tip
+    twice, and their score doubles.
+
+    `.distinct()` does not save it: SELECT DISTINCT de-duplicates the rows
+    coming OUT of the aggregate, long after the sum was taken over the
+    duplicated ones.
+
+    On a local board org_ids is a single org and OrgMember is unique per
+    (user, org), so it cannot bite. On the NATIONAL board org_ids is the whole
+    family, and anybody who belongs to the parent as well as to a store — an
+    owner who also works in one, which is the ordinary case, not the exotic
+    one — is counted once per membership. Their real total is multiplied by
+    how many of the family's organisations they are in.
+    """
+
+    def setUp(self):
+        sport = Sport.objects.create(name="Dbl Footy", slug="dbl-footy")
+        self.series = Series.objects.create(sport=sport, name="Dbl", slug="dbl-series")
+        season = Season.objects.create(year=2099, label="2099")
+        self.parent = Organisation.objects.create(name="Tiles Group", season=season)
+        self.store = Organisation.objects.create(
+            name="Tiles Mitcham", season=season, parent=self.parent,
+        )
+        self.home = Team.objects.create(name="DH", slug="dbl-h", series=self.series)
+        self.away = Team.objects.create(name="DA", slug="dbl-a", series=self.series)
+
+        # The owner works in the store as well as running the group — two
+        # memberships inside one family, which is all it takes.
+        self.owner = User.objects.create_user(
+            email="owner@x.com", password="x", display_name="Owner",
+        )
+        OrgMember.objects.create(user=self.owner, org=self.parent)
+        OrgMember.objects.create(user=self.owner, org=self.store)
+        # Somebody in exactly one, as the control.
+        self.staff = User.objects.create_user(
+            email="staff@x.com", password="x", display_name="Staff",
+        )
+        OrgMember.objects.create(user=self.staff, org=self.store)
+
+    def _graded_tip(self, user, org, rnd, *, correct):
+        match = Match.objects.create(
+            round=rnd, home_team=self.home, away_team=self.away,
+            kickoff_at=timezone.now(),
+        )
+        Tip.objects.create(
+            user=user, match=match, org=org,
+            selection="home" if correct else "away",
+        )
+        record_match_result(match, 30, 10)  # home wins
+        return match
+
+    def _round_for(self, org, number=1):
+        return Round.objects.create(
+            org=org, round_number=number, series=self.series,
+            stage=Round.STAGE_REGULAR, lockout_at=timezone.now(),
+        )
+
+    def test_a_member_of_two_family_orgs_is_not_double_counted(self):
+        rnd = self._round_for(self.store)
+        self._graded_tip(self.owner, self.store, rnd, correct=True)
+        self._graded_tip(self.owner, self.store, rnd, correct=True)
+        self._graded_tip(self.staff, self.store, rnd, correct=True)
+
+        board = {u.display_name: u.points for u in leaderboard_for_family(self.parent)}
+        self.assertEqual(board["Staff"], 1)
+        self.assertEqual(
+            board["Owner"], 2,
+            "two correct tips is two points; a membership is not a multiplier",
+        )
+
+    def test_the_record_is_not_double_counted_either(self):
+        """"4 of 2 correct" is the shape this bug takes in the accuracy column."""
+        rnd = self._round_for(self.store)
+        self._graded_tip(self.owner, self.store, rnd, correct=True)
+        self._graded_tip(self.owner, self.store, rnd, correct=False)
+
+        row = next(
+            u for u in leaderboard_for_family(self.parent)
+            if u.display_name == "Owner"
+        )
+        self.assertEqual(row.tips_total, 2)
+        self.assertEqual(row.tips_correct, 1)
+
+
+class CarryRoomsAreGroupedUnderTheirOrgTests(TestCase):
+    """The carry step lists organisations, with their groups inside them.
+
+    REPORTED AS: "I did see the list of organisations and groups, I unchecked
+    one and that part got distorted … the organisations should have a dropdown
+    that shows groups, so if I was to uncheck the group in an organisation —
+    because by default if I check an organisation the groups in it are all
+    checked — it cleans things up and makes me know this group is for this
+    organisation."
+
+    What matters on the server side is narrow and worth pinning: the grouping
+    is presentational, and the POST is not allowed to change with it. Every
+    room still posts its own `room` checkbox under the same orgid:groupid key,
+    so apply_plan is reached exactly as before. The master checkbox carries no
+    name at all — if it ever gained one it would arrive in request.POST as a
+    room that does not exist.
+    """
+
+    def setUp(self):
+        from catalog.models import Competition
+        from orgs.models import Group, GroupMember
+
+        self.user = User.objects.create_user(
+            email="tree@example.com", password="x", display_name="Tree",
+        )
+        season = Season.objects.create(year=2094, label="2094")
+        sport = Sport.objects.create(name="Tree Footy", slug="tree-footy")
+        self.series = Series.objects.create(
+            sport=sport, name="Tree Series", slug="tree-series",
+        )
+        comp = Competition.objects.create(
+            sport=sport, season=season, name="Tree Comp", slug="tree-comp",
+        )
+        comp.series.add(self.series)
+        home = Team.objects.create(name="TH", slug="tree-h", series=self.series)
+        away = Team.objects.create(name="TA", slug="tree-a", series=self.series)
+        now = timezone.now()
+
+        self.orgs = {}
+        for name, groups_on in (("Acme", True), ("Zenith", False)):
+            org = Organisation.objects.create(
+                name=name, season=season, groups_enabled=groups_on,
+            )
+            org.competitions.add(comp)
+            OrgMember.objects.create(user=self.user, org=org)
+            rnd = Round.objects.create(
+                org=org, round_number=1, series=self.series, competition=comp,
+                lockout_at=now + timedelta(days=2),
+            )
+            for ext in ("TREE-1", "TREE-2"):
+                Match.objects.create(
+                    round=rnd, home_team=home, away_team=away,
+                    kickoff_at=now + timedelta(days=2), external_id=ext,
+                )
+            self.orgs[name] = org
+
+        # Two groups inside Acme, so Acme has three rooms: itself plus both.
+        for gname in ("IT", "Marketing"):
+            g = Group.objects.create(org=self.orgs["Acme"], name=gname)
+            GroupMember.objects.create(group=g, user=self.user)
+        self.client.force_login(self.user)
+
+    def _preview(self):
+        """The carry fragment, as the sheet fetches it, tipping from Zenith."""
+        match = Match.objects.get(round__org=self.orgs["Zenith"], external_id="TREE-1")
+        return self.client.post(
+            reverse("tipping:carry_preview", args=[self.orgs["Zenith"].id]),
+            {f"match_{match.id}": "home"},
+        )
+
+    def test_an_org_with_several_rooms_gets_a_master_and_a_disclosure(self):
+        html = self._preview().content.decode()
+        self.assertIn("data-cs-org", html)
+        self.assertIn("data-cs-master", html)
+        self.assertEqual(html.count("data-cs-child"), 3, "Acme's own room + IT + Marketing")
+        self.assertIn("<details class=\"cs-rooms\"", html)
+        # The organisation is named once, as the heading — not repeated into
+        # every row as "Acme · IT".
+        self.assertIn("Marketing", html)
+        self.assertNotIn("Acme &middot; Marketing", html)
+        self.assertNotIn("Acme · Marketing", html)
+
+    def test_every_room_still_posts_its_own_key(self):
+        html = self._preview().content.decode()
+        acme = self.orgs["Acme"]
+        from orgs.models import Group
+
+        keys = [f'value="{acme.id}:0"'] + [
+            f'value="{acme.id}:{g.id}"'
+            for g in Group.objects.filter(org=acme).order_by("name")
+        ]
+        for key in keys:
+            self.assertIn(key, html, f"room {key} lost its checkbox")
+
+    def test_the_master_posts_nothing_of_its_own(self):
+        """It is a control over the room boxes, never a value the server reads."""
+        html = self._preview().content.decode()
+        head, _, _ = html.partition("cs-rooms")
+        master = head[head.index("data-cs-master") - 200:head.index("data-cs-master") + 60]
+        self.assertNotIn('name="room"', master)
+
+    def test_grouping_does_not_change_what_carrying_writes(self):
+        """End to end: tick everything, and every room ends up with the tip."""
+        from orgs.models import Group
+
+        zenith = self.orgs["Zenith"]
+        acme = self.orgs["Acme"]
+        match = Match.objects.get(round__org=zenith, external_id="TREE-1")
+        rooms = [f"{acme.id}:0"] + [
+            f"{acme.id}:{g.id}" for g in Group.objects.filter(org=acme)
+        ]
+        self.client.post(
+            reverse("tipping:tip_confirm_upcoming", args=[zenith.id]),
+            {f"match_{match.id}": "home", "carry_answered": "1", "room": rooms},
+        )
+        landed = set(
+            Tip.objects.filter(user=self.user, match__external_id="TREE-1")
+            .values_list("org_id", "group_id")
+        )
+        expected = {(zenith.id, None), (acme.id, None)} | {
+            (acme.id, g.id) for g in Group.objects.filter(org=acme)
+        }
+        self.assertEqual(landed, expected)
+
+
+class RoundNumberIsNotARoundTests(TestCase):
+    """The client's 1 Sept 2026 report, in full:
+
+        "When I was looking at Round 4 womens to tip this weekend, the mens
+         from round 4 back in April was still below it?"
+
+    A Round row is per (org, series), so in a league tipping AFL and AFLW the
+    number 4 names TWO rounds — AFLW's, on this weekend, and AFL's, played out
+    in April. The navigator moved by number, so picking 4 showed both: one live
+    round with eight dead fixtures stacked underneath it.
+
+    "This week" — the default view — was already correct and is asserted here
+    too, because that is the half the client refreshed into and reported as
+    possibly fixed. The half that was still wrong is every numbered round.
+    """
+
+    def setUp(self):
+        self.sport = Sport.objects.create(name="Two Code Footy", slug="tc-footy")
+        self.mens = Series.objects.create(
+            sport=self.sport, name="TC Mens", slug="tc-mens",
+        )
+        self.womens = Series.objects.create(
+            sport=self.sport, name="TC Womens", slug="tc-womens", is_womens=True,
+            category=Series.CATEGORY_WOMENS,
+        )
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.comp = Competition.objects.create(
+            sport=self.sport, season=self.season, name="Two Code", slug="two-code",
+        )
+        self.comp.series.set([self.mens, self.womens])
+        self.org = Organisation.objects.create(name="Two Code FC", season=self.season)
+        self.org.competitions.set([self.comp])
+        self.user = User.objects.create_user(
+            email="ian@goodtip.test", password="x", display_name="Ian",
+        )
+        OrgMember.objects.create(user=self.user, org=self.org)
+        self.now = timezone.now()
+
+        self.teams = {}
+        for series in (self.mens, self.womens):
+            self.teams[series.id] = [
+                Team.objects.create(name=f"{series.slug} {i}", slug=f"{series.slug}-{i}",
+                                    series=series)
+                for i in range(4)
+            ]
+
+        # AFL round 4, played in April. Every fixture graded and long gone.
+        self.mens_r4 = self._round(self.mens, 4, self.now - timedelta(days=150))
+        for _ in range(2):
+            self._match(self.mens_r4, self.now - timedelta(days=150), complete=True)
+        # And a men's round that IS on this weekend, so the league is not
+        # simply finished on that side.
+        self.mens_r26 = self._round(self.mens, 26, self.now + timedelta(days=1))
+        self._match(self.mens_r26, self.now + timedelta(days=1), complete=False)
+
+        # AFLW round 4, on this weekend.
+        self.womens_r4 = self._round(self.womens, 4, self.now + timedelta(days=2))
+        for _ in range(3):
+            self._match(self.womens_r4, self.now + timedelta(days=2), complete=False)
+
+        self.client.force_login(self.user)
+
+    def _round(self, series, number, lockout):
+        return Round.objects.create(
+            org=self.org, round_number=number, series=series,
+            competition=self.comp, lockout_at=lockout,
+        )
+
+    def _match(self, rnd, kickoff, *, complete):
+        pair = self.teams[rnd.series_id]
+        return Match.objects.create(
+            round=rnd, home_team=pair[0], away_team=pair[1], kickoff_at=kickoff,
+            status=Match.STATUS_COMPLETE if complete else Match.STATUS_SCHEDULED,
+            home_score=30 if complete else None,
+            away_score=10 if complete else None,
+        )
+
+    def _games(self, **params):
+        params.setdefault("org", self.org.id)
+        resp = self.client.get(reverse("dashboard"), params)
+        return list(resp.context["games"]), resp
+
+    def test_this_week_shows_only_the_rounds_actually_on(self):
+        games, _ = self._games()
+        numbers = {(g.round.series.slug, g.round.round_number) for g in games}
+        self.assertNotIn(("tc-mens", 4), numbers)
+        self.assertIn(("tc-womens", 4), numbers)
+        self.assertIn(("tc-mens", 26), numbers)
+
+    def test_a_numbered_round_no_longer_stacks_another_codes_dead_round(self):
+        """THE BUG. `?round=tc-womens-4` is AFLW round 4 and nothing else."""
+        games, _ = self._games(round="tc-womens-4")
+        self.assertTrue(games)
+        self.assertEqual({g.round.series.slug for g in games}, {"tc-womens"})
+        self.assertEqual({g.round_id for g in games}, {self.womens_r4.id})
+
+    def test_the_mens_round_four_is_still_reachable_on_its_own(self):
+        """Nothing is hidden — it is separated. "How did I go in men's round 4"
+        is a real question and still has an answer."""
+        games, _ = self._games(round="tc-mens-4")
+        self.assertEqual({g.round_id for g in games}, {self.mens_r4.id})
+
+    def test_a_bare_number_from_an_old_link_lands_on_the_live_code(self):
+        """Every URL shared before the navigator carried a code — and the
+        client's own bookmark. It resolves to the code whose round 4 is nearest
+        to now rather than to all of them at once."""
+        games, _ = self._games(round="4")
+        self.assertEqual({g.round.series.slug for g in games}, {"tc-womens"})
+
+    def test_the_dropdown_groups_its_rounds_by_code(self):
+        _, resp = self._games()
+        nav = resp.context["round_nav"]
+        self.assertTrue(nav["multi"])
+        labels = [label for label, _ in nav["groups"]]
+        self.assertEqual(sorted(labels), ["TC Mens", "TC Womens"])
+
+    def test_the_arrows_step_inside_one_code(self):
+        """The other half of the report: stepping back from AFLW round 4 walked
+        out of the women's season and into last April's men's round without
+        saying so."""
+        _, resp = self._games(round="tc-mens-26")
+        nav = resp.context["round_nav"]
+        self.assertEqual(nav["prev"], "tc-mens-4")
+        self.assertIsNone(nav["next"])
+
+    def test_a_hand_edited_round_falls_back_to_this_week(self):
+        _, resp = self._games(round="tc-womens-99")
+        self.assertTrue(resp.context["round_nav"]["is_week"])
+
+    def test_a_one_code_league_keeps_plain_numbers(self):
+        """There is nothing to disambiguate, so the URLs and the dropdown stay
+        exactly as they were."""
+        _, resp = self._games(series=self.womens.slug)
+        nav = resp.context["round_nav"]
+        self.assertFalse(nav["multi"])
+        self.assertEqual(nav["current"], "4")

@@ -44,8 +44,10 @@
     <div class="pnews-grid reveal">
       {% for p in posts %}
       <a class="pnews-card {% if forloop.first and not active_tag %}lead{% endif %}" href="{% url 'news_detail' p.slug %}">
-        {% if p.image %}<div class="pn-thumb" style="background-image:url('{{ p.image.url }}')"><span class="pn-tag">{{ p.get_tag_display }}</span></div>
-        {% else %}<div class="pn-thumb noimg"><span class="pn-tag">{{ p.get_tag_display }}</span></div>{% endif %}
+        {% comment %} Every code the story carries — see the member list. {% endcomment %}
+        {% if p.image %}<div class="pn-thumb" style="background-image:url('{{ p.image.url }}')"
+             {% if p.image_alt %}role="img" aria-label="{{ p.image_alt }}"{% endif %}>{% for t in p.tag_labels %}<span class="pn-tag">{{ t }}</span>{% endfor %}</div>
+        {% else %}<div class="pn-thumb noimg">{% for t in p.tag_labels %}<span class="pn-tag">{{ t }}</span>{% endfor %}</div>{% endif %}
         <div class="pn-body">
           {% if forloop.first and not active_tag %}<span class="pn-lead-flag">Latest story</span>{% endif %}
           <h3>{{ p.title }}</h3>

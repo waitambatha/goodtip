@@ -134,3 +134,20 @@ body.gte-editing .gte-img:hover { outline-style: solid; }
   .gte-which b { display: none; }
   .gte-btn { padding: 7px 10px; }
 }
+
+/* "Describe pictures" mode. The button is in the bar at the top and the click
+   it changes happens anywhere down the page, so the pictures have to say which
+   mode they are in themselves — otherwise the only feedback is a file picker
+   that does not open. */
+/* !important on the colour, because .gte-revert-one sets its own with one —
+   the two buttons share a class and this is the on-state of the second. */
+.gte-revert-one.is-on {
+  background: var(--lime, #C8F135);
+  border-color: transparent;
+  color: #0F2E22 !important;
+}
+body.gte-alt-mode [data-gte-img] {
+  outline: 2px dashed rgba(200, 241, 53, .95);
+  outline-offset: 2px;
+  cursor: help;
+}

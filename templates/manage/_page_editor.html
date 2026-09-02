@@ -14,6 +14,7 @@ so the editor's own buttons never turn up as blocks you can edit.
      data-gte-page="{{ page.key }}"
      data-gte-save="{% url 'admin:hq_page_save' %}"
      data-gte-upload="{% url 'admin:hq_page_upload_image' %}"
+     data-gte-alt="{% url 'admin:hq_page_image_alt' %}"
      data-gte-back="{% url 'admin:hq_pages' %}"
      data-gte-csrf="{{ csrf_token }}">
 
@@ -90,14 +91,30 @@ so the editor's own buttons never turn up as blocks you can edit.
       <svg viewBox="0 0 20 20" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;"><path d="M7.5 15.5h8"/><path d="m5.5 12.5 6-8 3.5 2.5-5 7z"/><path d="m3.5 15.5 2.5-3"/></svg>
     </button>
     <span class="ned-sep"></span>
+    {% comment %}
+    A MODE, not another click target on the picture.
+
+    Clicking a picture replaces it, which is what you want nearly every time.
+    But "the picture is right and its description is wrong" is the common case
+    for the photographs that came with the templates, and there is no second
+    gesture on an image that means something different without being a guess.
+    So this arms the click: while it is on, clicking a picture edits what it
+    says rather than which file it is.
+    {% endcomment %}
+    <button type="button" class="gte-revert-one" data-gte-alt-mode
+            title="Edit what a picture says to a screen reader, instead of replacing it">
+      Describe pictures
+    </button>
+    <span class="ned-sep"></span>
     <button type="button" class="gte-revert-one" data-gte-revert-block title="Put this block back to its original wording">
       Reset block
     </button>
   </div>
 
   <p class="gte-hint" data-gte-hint hidden>
-    Click any words to change them. Click a picture to swap it. Ctrl+Z undoes.
-    Nothing is live until you press Save.
+    Click any words to change them. Click a picture to swap it, or turn on
+    <b>Describe pictures</b> to edit what one says to a screen reader instead.
+    Ctrl+Z undoes. Nothing is live until you press Save.
   </p>
 </div>
 

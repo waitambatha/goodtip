@@ -6,12 +6,14 @@ article then shows. A broken template here is a runtime error, not an import
 error, so `manage.py check` never sees it.
 """
 import re
+from datetime import timedelta
 from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from sysadmin.models import AdminAccess
 
@@ -89,7 +91,9 @@ class NewsEditorTests(TestCase):
             "title_html": "<b>Finals race tightens</b>",
             "excerpt_html": "<b>Two</b> games separate fourth from ninth.",
             "body": "<p>Three rounds to play.</p>",
-            "tag": "AFL",
+            # A list, because tags are multi-select now — the test client sends
+            # one `tags` value per entry, which is what the browser does.
+            "tags": ["AFL"],
             "is_published": "on",
         }
         data.update(overrides)
@@ -202,12 +206,19 @@ class NewsEditorTests(TestCase):
         self.assertIn("/news/finals-race-tightens/", html)
         self.assertIn("data-copy-link", html)
 
-    def test_the_edit_page_shows_the_live_url_with_copy_and_view(self):
+    def test_the_edit_page_shows_the_url_with_copy_and_view(self):
+        """The address is editable now, so it is an input rather than a label.
+
+        It used to be frozen and rendered as text with `data-slug-fixed`. The
+        client asked to be able to change it; the old address is kept working
+        by a redirect instead of by refusing the edit — see
+        RenamingAStoryTests.
+        """
         self.client.post(reverse("admin:hq_news_new"), self._post())
         post = NewsPost.objects.get()
         html = self.client.get(reverse("admin:hq_news_edit", args=[post.id])).content.decode()
-        self.assertIn("Live at", html)
-        self.assertIn("data-slug-fixed=\"finals-race-tightens\"", html)
+        self.assertIn('name="slug"', html)
+        self.assertIn('value="finals-race-tightens"', html)
         self.assertIn("http://testserver/news/finals-race-tightens/", html)
 
     def test_a_new_post_previews_the_url_it_will_get(self):
@@ -255,11 +266,20 @@ class NewsEditorTests(TestCase):
         self.assertNotIn("fontSizeCustom", html)
 
     def test_every_writing_surface_has_a_toolbar(self):
-        """The teaser used to be the one plain textarea left on the page."""
+        """The teaser used to be the one plain textarea left on the page.
+
+        The check is that none of the three WRITING surfaces is a textarea, not
+        that the page contains no textarea at all: the SEO block below them has
+        two, for the meta and share-card descriptions, and those are plain text
+        by definition — a meta description with bold in it is a meta
+        description with `<b>` in the search result.
+        """
         html = self.client.get(reverse("admin:hq_news_new")).content.decode()
         for surface in ("headline", "teaser", "body"):
             self.assertIn(f'data-editor="{surface}"', html)
-        self.assertNotIn("<textarea", html)
+        writing_surfaces, _, seo_block = html.partition("seo-block")
+        self.assertTrue(seo_block, "the SEO block should be on the editor")
+        self.assertNotIn("<textarea", writing_surfaces)
 
     # ---- featured image -----------------------------------------------------
 
@@ -377,11 +397,33 @@ class PageTextTests(TestCase):
         self.assertIn("<p>Some <b>bold</b> copy.</p>", out)
         self.assertEqual(applied, {key})
 
-    def test_an_image_edit_swaps_the_src_and_keeps_the_rest(self):
+    def test_an_image_edit_swaps_the_src_and_the_alt_with_it(self):
+        """Alt is the one attribute that must NOT survive a swap.
+
+        Everything else on the tag describes the slot — how big it is, when to
+        load it — and is still true after the picture changes. `alt` describes
+        the picture, so keeping it meant every replaced photograph on the site
+        was announced to a screen reader as the one it replaced: a description
+        that is wrong and sounds right.
+        """
         _, _, blocks = find_blocks(self.SAMPLE)
         key = next(k for _, _, k, kind in blocks if kind == "image")
-        out, _ = rewrite(self.SAMPLE, {key: ("image", "/media/new.png")})
-        self.assertIn('<img src="/media/new.png" alt="A">', out)
+        out, _ = rewrite(self.SAMPLE, {key: ("image", "/media/new.png", "A crowd at dusk")})
+        self.assertIn('src="/media/new.png"', out)
+        self.assertIn('alt="A crowd at dusk"', out)
+        self.assertNotIn('alt="A"', out)
+
+    def test_an_image_edit_with_no_alt_given_empties_the_old_one(self):
+        """Empty alt is correct markup for a decorative picture, and honest.
+
+        The alternative — leaving the previous picture's description in place
+        because nobody typed a new one — is the exact failure above.
+        """
+        _, _, blocks = find_blocks(self.SAMPLE)
+        key = next(k for _, _, k, kind in blocks if kind == "image")
+        out, _ = rewrite(self.SAMPLE, {key: ("image", "/media/new.png", "")})
+        self.assertIn('alt=""', out)
+        self.assertNotIn('alt="A"', out)
 
     def test_the_key_follows_the_wording_not_the_position(self):
         """An edit has to survive a paragraph being added above it.
@@ -853,3 +895,237 @@ class SystemReportTilesTests(TestCase):
             broken.count.side_effect = RuntimeError("mid-migration")
             r = self.client.get(reverse("admin:system_report"))
         self.assertEqual(r.status_code, 200)
+
+
+# ---------------------------------------------------------------------------
+# The client's blog asks: more than one tag, and a date you choose
+# ---------------------------------------------------------------------------
+
+class TaggingAStoryWithSeveralCodesTests(TestCase):
+    """"You can't put more than one tag. Ideally if something is about AFL and
+    NRL or AFLW and NRLW we should be able to tag it with both?" — the client,
+    1 Sept 2026."""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            email="tagger@goodtip.test", password="Str0ng!pass", display_name="Tagger",
+        )
+        sign_in_to_hq(self.client, self.admin)
+
+    def _post(self, **overrides):
+        data = {
+            "title_html": "Womens weekend",
+            "excerpt_html": "Both codes on at once.",
+            "body": "<p>Story.</p>",
+            "tags": ["AFLW", "NRLW"],
+            "is_published": "on",
+        }
+        data.update(overrides)
+        return data
+
+    def test_a_story_can_carry_two_codes(self):
+        self.client.post(reverse("admin:hq_news_new"), self._post())
+        post = NewsPost.objects.get()
+        self.assertEqual(post.tag_list, ["AFLW", "NRLW"])
+        self.assertEqual(post.tag_labels, ["AFLW", "NRLW"])
+
+    def test_the_retired_single_tag_column_tracks_the_first_one(self):
+        """`tag` is kept in step rather than dropped.
+
+        It is a NOT NULL column with data in it and several templates still
+        read `get_tag_display`. Keeping it pointed at the primary tag means
+        nothing had to be found and changed in the same breath as this feature
+        — and means a row written by anything that still only knows about `tag`
+        is still readable.
+        """
+        self.client.post(reverse("admin:hq_news_new"), self._post())
+        post = NewsPost.objects.get()
+        self.assertEqual(post.tag, "AFLW")
+        self.assertEqual(post.get_tag_display(), "AFLW")
+
+    def test_the_order_is_the_choice_list_not_the_browser(self):
+        """Which tag is primary must not depend on checkbox submission order."""
+        self.client.post(reverse("admin:hq_news_new"), self._post(tags=["NRLW", "AFLW"]))
+        post = NewsPost.objects.get()
+        self.assertEqual(post.tag_list, ["AFLW", "NRLW"])
+
+    def test_a_story_with_nothing_ticked_is_filed_under_news(self):
+        """Untagged means missing from every filter, which is worse than
+        mislabelled — there would be no way to find it on the list at all."""
+        self.client.post(reverse("admin:hq_news_new"), self._post(tags=[]))
+        post = NewsPost.objects.get()
+        self.assertEqual(post.tag_list, ["NEWS"])
+
+    def test_the_news_list_finds_a_story_under_either_of_its_codes(self):
+        self.client.post(reverse("admin:hq_news_new"), self._post())
+        for code in ("AFLW", "NRLW"):
+            with self.subTest(code=code):
+                html = self.client.get(reverse("news_index"), {"code": code}).content.decode()
+                self.assertIn("Womens weekend", html)
+
+    def test_a_story_does_not_show_under_a_code_it_is_not_tagged_with(self):
+        self.client.post(reverse("admin:hq_news_new"), self._post())
+        html = self.client.get(reverse("news_index"), {"code": "NRL"}).content.decode()
+        self.assertNotIn("Womens weekend", html)
+
+    def test_a_pre_migration_story_still_appears_under_its_old_tag(self):
+        """`tags` empty, `tag` set — the shape every row had before today.
+
+        The migration backfills these, but the fallback matters anyway: nothing
+        should depend on a data migration having run for a story to be findable.
+        """
+        NewsPost.objects.create(title="Old one", tag="NRL", tags=[])
+        html = self.client.get(reverse("news_index"), {"code": "NRL"}).content.decode()
+        self.assertIn("Old one", html)
+
+
+class SchedulingAndBackdatingTests(TestCase):
+    """"Ideally it would be good if you can back date or schedule a blog in the
+    future as opposed to just being able to publish today." — the client."""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            email="sched@goodtip.test", password="Str0ng!pass", display_name="Sched",
+        )
+        sign_in_to_hq(self.client, self.admin)
+
+    def _post(self, when, **overrides):
+        data = {
+            "title_html": "Queued story",
+            "excerpt_html": "Teaser.",
+            "body": "<p>Body.</p>",
+            "tags": ["NEWS"],
+            "is_published": "on",
+            "published_at": when,
+        }
+        data.update(overrides)
+        return data
+
+    def _local(self, delta):
+        return timezone.localtime(timezone.now() + delta).strftime("%Y-%m-%dT%H:%M")
+
+    def test_a_future_date_holds_the_story_back(self):
+        self.client.post(reverse("admin:hq_news_new"), self._post(self._local(timedelta(days=3))))
+        post = NewsPost.objects.get()
+        self.assertTrue(post.is_published)
+        self.assertTrue(post.is_scheduled)
+        self.assertFalse(post.is_live)
+
+    def test_a_scheduled_story_is_not_on_the_public_list(self):
+        self.client.post(reverse("admin:hq_news_new"), self._post(self._local(timedelta(days=3))))
+        html = self.client.get(reverse("news_index")).content.decode()
+        self.assertNotIn("Queued story", html)
+
+    def test_a_scheduled_story_404s_at_its_own_address(self):
+        """The half that would be missed by filtering the list alone.
+
+        A story's address is its headline slugified, so a queued announcement
+        is guessable — "hidden from the list" is not the same as unpublished.
+        """
+        self.client.post(reverse("admin:hq_news_new"), self._post(self._local(timedelta(days=3))))
+        post = NewsPost.objects.get()
+        self.client.logout()
+        self.assertEqual(self.client.get(post.get_absolute_url()).status_code, 404)
+
+    def test_it_appears_on_its_own_once_the_time_passes(self):
+        """No cron: every reader-facing query asks for published_at <= now, so
+        the moment simply arrives."""
+        self.client.post(reverse("admin:hq_news_new"), self._post(self._local(timedelta(hours=2))))
+        post = NewsPost.objects.get()
+        self.assertNotIn("Queued story", self.client.get(reverse("news_index")).content.decode())
+
+        post.published_at = timezone.now() - timedelta(minutes=1)
+        post.save(update_fields=["published_at"])
+        self.assertIn("Queued story", self.client.get(reverse("news_index")).content.decode())
+
+    def test_a_past_date_backdates_the_story(self):
+        self.client.post(reverse("admin:hq_news_new"), self._post(self._local(timedelta(days=-30))))
+        post = NewsPost.objects.get()
+        self.assertTrue(post.is_live)
+        self.assertLess(post.published_at, timezone.now() - timedelta(days=29))
+
+    def test_the_date_is_read_in_the_sites_timezone_not_utc(self):
+        """`datetime-local` sends wall-clock time with no zone. Reading it as
+        UTC would publish a story scheduled for 9am Melbourne at 7pm."""
+        wanted = timezone.localtime(timezone.now()).replace(
+            hour=9, minute=0, second=0, microsecond=0,
+        ) + timedelta(days=1)
+        self.client.post(
+            reverse("admin:hq_news_new"),
+            self._post(wanted.strftime("%Y-%m-%dT%H:%M")),
+        )
+        post = NewsPost.objects.get()
+        self.assertEqual(timezone.localtime(post.published_at).hour, 9)
+
+    def test_a_scheduled_story_cannot_be_emailed_out_yet(self):
+        """Emailing cannot be recalled, so it must not run ahead of the thing
+        it announces — every member would get a link that 404s."""
+        self.client.post(reverse("admin:hq_news_new"), self._post(self._local(timedelta(days=2))))
+        post = NewsPost.objects.get()
+        self.client.post(reverse("admin:hq_news_announce", args=[post.id]))
+        post.refresh_from_db()
+        self.assertIsNone(post.announced_at)
+
+
+class RenamingAStoryTests(TestCase):
+    """The address is editable, and the old one keeps working."""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            email="renamer@goodtip.test", password="Str0ng!pass", display_name="Renamer",
+        )
+        sign_in_to_hq(self.client, self.admin)
+        self.client.post(reverse("admin:hq_news_new"), {
+            "title_html": "Finals race tightens",
+            "excerpt_html": "Teaser.", "body": "<p>Body.</p>",
+            "tags": ["AFL"], "is_published": "on",
+        })
+        self.post = NewsPost.objects.get()
+
+    def _edit(self, **overrides):
+        data = {
+            "title_html": "Finals race tightens",
+            "excerpt_html": "Teaser.", "body": "<p>Body.</p>",
+            "tags": ["AFL"], "is_published": "on",
+            "slug": self.post.slug,
+        }
+        data.update(overrides)
+        return self.client.post(reverse("admin:hq_news_edit", args=[self.post.id]), data)
+
+    def test_the_slug_can_be_changed(self):
+        self._edit(slug="finals-race")
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.slug, "finals-race")
+
+    def test_the_old_address_redirects_to_the_new_one(self):
+        old_url = self.post.get_absolute_url()
+        self._edit(slug="finals-race")
+        self.client.logout()
+        resp = self.client.get(old_url)
+        self.assertEqual(resp.status_code, 301)
+        self.assertEqual(resp["Location"], "/news/finals-race/")
+
+    def test_renaming_twice_does_not_leave_a_chain(self):
+        """Browsers cap redirect chains and search engines discount them, and
+        the second rename is exactly when nobody is thinking about the first."""
+        first = self.post.get_absolute_url()
+        self._edit(slug="second-name")
+        self.post.refresh_from_db()
+        self._edit(slug="third-name")
+        self.client.logout()
+        resp = self.client.get(first)
+        self.assertEqual(resp["Location"], "/news/third-name/")
+
+    def test_a_slug_already_taken_is_refused_and_the_old_one_kept(self):
+        NewsPost.objects.create(title="Other", slug="taken")
+        self._edit(slug="taken")
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.slug, "finals-race-tightens")
+
+    def test_editing_a_headline_does_not_move_the_address(self):
+        """The reason it was frozen in the first place still holds: a slug that
+        followed every tweak of a headline would break every link already
+        shared, silently, the moment somebody fixed a typo."""
+        self._edit(title_html="Finals race tightens further")
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.slug, "finals-race-tightens")

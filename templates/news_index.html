@@ -16,8 +16,14 @@ drawn over them is the whole point of the look.
 <div class="grid-app g-3">
   {% for p in posts %}
   <a class="news-lead news-link" href="{% url 'news_detail' p.slug %}">
-    {% if p.image %}<div class="thumb" style="background-image:url('{{ p.image.url }}')"><span class="sport-tag">{{ p.get_tag_display }}</span></div>
-    {% else %}<div class="thumb noimg"><span class="sport-tag">{{ p.get_tag_display }}</span><span class="noimg-mark">GOOD<span>TIP</span></span></div>{% endif %}
+    {% comment %}
+    Every code on the card, not just the first: with the list filtered to NRLW,
+    a story tagged AFLW and NRLW showing only "AFLW" reads as the filter having
+    gone wrong.
+    {% endcomment %}
+    {% if p.image %}<div class="thumb" style="background-image:url('{{ p.image.url }}')"
+         {% if p.image_alt %}role="img" aria-label="{{ p.image_alt }}"{% endif %}>{% for t in p.tag_labels %}<span class="sport-tag">{{ t }}</span>{% endfor %}</div>
+    {% else %}<div class="thumb noimg">{% for t in p.tag_labels %}<span class="sport-tag">{{ t }}</span>{% endfor %}<span class="noimg-mark">GOOD<span>TIP</span></span></div>{% endif %}
     <div class="body">
       <h4>{{ p.title }}</h4>
       {% if p.excerpt %}<p>{{ p.excerpt|truncatechars:140 }}</p>{% endif %}

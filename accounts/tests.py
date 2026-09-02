@@ -412,14 +412,44 @@ class DashboardThisWeekTests(TestCase):
         headings = self._round_headings(body)
         self.assertEqual(len(headings), len(set(headings)))
 
-    def test_asking_for_a_number_still_shows_every_round_with_it(self):
-        """Explicitly navigating to round 3 is a history question, and both
-        codes genuinely have one — that is not the bug."""
+    def test_a_numbered_round_belongs_to_one_code(self):
+        """THIS TEST USED TO ASSERT THE OPPOSITE, and the client overruled it.
+
+        It read: "explicitly navigating to round 3 is a history question, and
+        both codes genuinely have one — that is not the bug", and it showed
+        Early's live round 3 with Late's long-played round 3 underneath. That
+        reasoning is defensible right up until somebody uses the screen. On
+        1 Sept 2026 Ian reported it from the other end: "when I was looking at
+        Round 4 womens to tip this weekend, the mens from round 4 back in April
+        was still below it?"
+
+        Nobody asks for every code's round 3 at once. So a numbered round is
+        scoped to one code, and the code travels in the URL with the number.
+        Nothing is hidden — see the test below, which asks for the other one.
+        """
+        body = self.client.get(
+            f"/dashboard/?org={self.org.id}&round=early-3"
+        ).content.decode()
+        shown = {s.strip() for _n, s in self._round_headings(body)}
+        self.assertEqual(shown, {"Early"})
+
+    def test_the_other_codes_round_of_that_number_is_still_reachable(self):
+        """Separated, not removed: "how did Late's round 3 go" is a real
+        question and still has an answer."""
+        body = self.client.get(
+            f"/dashboard/?org={self.org.id}&round=late-3"
+        ).content.decode()
+        shown = {(n, s.strip()) for n, s in self._round_headings(body)}
+        self.assertEqual(shown, {("3", "Late")})
+
+    def test_a_bare_number_lands_on_the_code_whose_round_is_live(self):
+        """Every link shared before the code travelled in the URL. It resolves
+        to one code rather than to all of them."""
         body = self.client.get(
             f"/dashboard/?org={self.org.id}&round=3"
         ).content.decode()
         shown = {s.strip() for _n, s in self._round_headings(body)}
-        self.assertEqual(shown, {"Early", "Late"})
+        self.assertEqual(shown, {"Early"})
 
     def test_the_dropdown_offers_this_week_as_its_own_destination(self):
         body = self.client.get(f"/dashboard/?org={self.org.id}").content.decode()

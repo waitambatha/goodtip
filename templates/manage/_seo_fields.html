@@ -1,0 +1,107 @@
+{% comment %}
+The seven SEO boxes, for anything carrying admin_panel.models.SeoFieldsMixin.
+
+ONE PARTIAL FOR A STORY AND A PAGE. The fields are identical because the model
+is (see SeoFieldsMixin), and `admin_panel.views._fill_seo` reads them back by
+these exact names — so a field added here is added in both places or in
+neither, which is the only way the two stay the same.
+
+Expects: seo (the object), and optionally
+  default_title / default_description — what the page or story falls back to
+  when the box is left empty. Shown as the placeholder, so an empty box reads
+  as "this is what you'll get" instead of as something missing.
+  default_image_url — the picture the share card uses if no og:image is set.
+{% endcomment %}
+{% comment %}
+Posted with the block, and read by `admin_panel.views._fill_seo` before it
+touches anything. Two of the fields below are checkboxes, and an unticked
+checkbox is absent from a POST in exactly the same way a whole missing block
+is — so without this marker, any form that saves a story without rendering
+these fields would read "unticked" and quietly take it out of Google.
+{% endcomment %}
+<input type="hidden" name="seo_fields" value="1">
+<details class="seo-block"{% if seo.meta_title or seo.meta_description or seo.canonical_url or not seo.robots_index or open_seo %} open{% endif %}>
+  <summary>
+    <span class="seo-sum-ic"><svg><use href="#ic-search"/></svg></span>
+    <span class="seo-sum-txt">
+      <b>Search &amp; social</b>
+      <small>Title and description in Google, the share card, the canonical address, and whether this is indexed.</small>
+    </span>
+    {% if not seo.robots_index %}<span class="gt-chip draft">Not indexed</span>{% endif %}
+  </summary>
+
+  <div class="seo-grid">
+    <div class="fld">
+      <label for="seo_meta_title">Meta title</label>
+      <input type="text" name="meta_title" id="seo_meta_title" maxlength="200"
+             value="{{ seo.meta_title }}" data-seo-count="60"
+             placeholder="{{ default_title|default:'Leave blank to use the headline' }}">
+      <small class="fld-hint">The browser tab and the blue line in Google. Around 60 characters before Google cuts it off.</small>
+    </div>
+
+    <div class="fld">
+      <label for="seo_meta_description">Meta description</label>
+      <textarea name="meta_description" id="seo_meta_description" rows="2" maxlength="320"
+                data-seo-count="155"
+                placeholder="{{ default_description|default:'Leave blank to use the teaser' }}">{{ seo.meta_description }}</textarea>
+      <small class="fld-hint">The grey summary under the link. Around 155 characters before it is cut off.</small>
+    </div>
+
+    <div class="fld">
+      <label for="seo_og_title">Share card title</label>
+      <input type="text" name="og_title" id="seo_og_title" maxlength="200"
+             value="{{ seo.og_title }}" placeholder="Leave blank to use the meta title">
+      <small class="fld-hint">What Facebook and LinkedIn show when this is shared.</small>
+    </div>
+
+    <div class="fld">
+      <label for="seo_og_description">Share card description</label>
+      <textarea name="og_description" id="seo_og_description" rows="2" maxlength="320"
+                placeholder="Leave blank to use the meta description">{{ seo.og_description }}</textarea>
+    </div>
+
+    <div class="fld seo-wide">
+      <label for="seo_og_image">Share card image</label>
+      {% if seo.og_image %}
+      <div class="seo-og-now">
+        <img src="{{ seo.og_image.url }}" alt="Current share card image">
+        <label class="seo-og-clear">
+          <input type="checkbox" name="og_image_clear" value="1"> Remove it and go back to the page's own picture
+        </label>
+      </div>
+      {% endif %}
+      <input type="file" name="og_image" id="seo_og_image" accept="image/*">
+      <small class="fld-hint">1200&times;630 reads best.{% if default_image_url %} Leave blank to use this page's own picture.{% endif %}</small>
+    </div>
+
+    <div class="fld seo-wide">
+      <label for="seo_canonical_url">Canonical address</label>
+      <input type="url" name="canonical_url" id="seo_canonical_url"
+             value="{{ seo.canonical_url }}" placeholder="https://goodtip.com.au/the-real-page/">
+      <small class="fld-hint">
+        Only when this duplicates another page. It tells Google to credit that
+        address instead of this one &mdash; which also takes this page out of the
+        sitemap, because asking to be crawled and asking not to be indexed are
+        the same request twice.
+      </small>
+    </div>
+
+    {% comment %}
+    Two checkboxes rather than a dropdown of "index,follow / noindex,follow /
+    …". The two questions are independent and the combined strings are a
+    well-known source of typos that fail silently — see the field comment on
+    SeoFieldsMixin.
+    {% endcomment %}
+    <div class="fld seo-wide">
+      <label class="fld-label-plain">Search engines</label>
+      <label class="seo-check">
+        <input type="checkbox" name="robots_index" value="1" {% if seo.robots_index %}checked{% endif %}>
+        <span><b>Show this in Google</b><small>Uncheck for a page like "Tell the boss" that should not be indexed.</small></span>
+      </label>
+      <label class="seo-check">
+        <input type="checkbox" name="robots_follow" value="1" {% if seo.robots_follow %}checked{% endif %}>
+        <span><b>Pass ranking to links on this page</b><small>Uncheck to stop links here carrying credit onwards.</small></span>
+      </label>
+    </div>
+  </div>
+</details>

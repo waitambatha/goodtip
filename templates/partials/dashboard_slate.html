@@ -42,8 +42,22 @@ Expects: c (the selected org card), games, open_games, org_series,
       <div class="slip-bar" data-coach="tips">
         <div class="slip-info"><b>Make your tips right here</b><span>Tap the team you think wins each match, then confirm. You can change any pick until the round locks.</span></div>
         <div class="slip-meter"><b id="slipCount">{{ slate_done }}</b> of {{ slate_total }} picked</div>
-        {# opens the review sheet; the sheet's own button does the real submit #}
-        <button type="button" class="abtn abtn-primary abtn-lg" id="slipReview">Confirm my tips</button>
+        {% comment %}
+        Opens the review sheet; the sheet's own button does the real submit.
+
+        HIDDEN UNTIL THERE IS SOMETHING TO CONFIRM. Reported by a tester: "if I
+        have not tipped, why am I seeing Confirm your tip?" — and they are
+        right, a confirm offered before there is anything to confirm reads as a
+        step you have already missed. It appears on the first pick and goes
+        again if every pick is taken back; slipRefresh() in dashboard.html owns
+        that, and starts from the server's own count so the button is right on
+        the first paint rather than after the script runs.
+
+        Safe to render hidden with no JS: this is type="button" and the sheet
+        it opens is script-driven, so with JS off it never did anything anyway.
+        {% endcomment %}
+        <button type="button" class="abtn abtn-primary abtn-lg" id="slipReview"
+                {% if not slate_done %}hidden{% endif %}>Confirm my tips</button>
       </div>
       <div class="pbar slim" style="margin-bottom:14px;"><i id="slipBar" style="width:{% widthratio slate_done slate_total|default:1 100 %}%"></i></div>
       {% endif %}
@@ -88,7 +102,7 @@ Expects: c (the selected org card), games, open_games, org_series,
            hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}&amp;round={{ round_nav.prev }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
            hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
            hx-push-url="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.prev }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-           aria-label="Round {{ round_nav.prev }}" title="Round {{ round_nav.prev }}">
+           aria-label="Previous round" title="The round before this one">
           <svg><use href="#ic-arrow-left"/></svg>
         </a>
         {% else %}
@@ -133,11 +147,37 @@ Expects: c (the selected org card), games, open_games, org_series,
             lands on the default view.
             {% endcomment %}
             <option value="" {% if round_nav.is_week %}selected{% endif %}>This week</option>
+            {% comment %}
+            GROUPED BY CODE IN A MULTI-CODE LEAGUE.
+
+            A round number is not a round: "round 4" in a league tipping four
+            codes names up to four of them, one live and the rest played out
+            months ago. The list used to be bare numbers and picking one showed
+            every code's round at once — the client opened AFLW round 4 to tip
+            and found April's AFL round 4 stacked underneath it.
+
+            So the options carry the code, and the value carries it too
+            ("aflw-4"), which is what lets the view narrow the fixtures to the
+            one code. A league tipping one code has nothing to disambiguate and
+            keeps plain numbers.
+            {% endcomment %}
+            {% if round_nav.multi %}
+            {% for label, opts in round_nav.groups %}
+            <optgroup label="{{ label }}">
+              {% for value, n in opts %}
+              <option value="{{ value }}" {% if not round_nav.is_week and value == round_nav.current %}selected{% endif %}>
+                {{ label }} round {{ n }}
+              </option>
+              {% endfor %}
+            </optgroup>
+            {% endfor %}
+            {% else %}
             {% for n in round_nav.numbers %}
-            <option value="{{ n }}" {% if not round_nav.is_week and n == round_nav.current %}selected{% endif %}>
+            <option value="{{ n }}" {% if not round_nav.is_week and n|stringformat:"s" == round_nav.current %}selected{% endif %}>
               Round {{ n }}
             </option>
             {% endfor %}
+            {% endif %}
           </select>
         </span>
 
@@ -147,7 +187,7 @@ Expects: c (the selected org card), games, open_games, org_series,
            hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}&amp;round={{ round_nav.next }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
            hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
            hx-push-url="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.next }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-           aria-label="Round {{ round_nav.next }}" title="Round {{ round_nav.next }}">
+           aria-label="Next round" title="The round after this one">
           <svg><use href="#ic-arrow-right"/></svg>
         </a>
         {% else %}

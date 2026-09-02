@@ -101,6 +101,20 @@ PAGES = Group("pages", "Pages", "The words and pictures on the site itself.", [
     ),
 ])
 
+SEO = Group("seo", "SEO", "How the site appears in Google and on social.", [
+    Capability(
+        "seo.edit", "Edit SEO settings",
+        "Set the title, description, share preview, canonical address and "
+        "whether a page or story is indexed by Google.",
+        "seo",
+    ),
+    Capability(
+        "seo.redirects", "Manage redirects",
+        "Point an address that no longer exists at the page that replaced it.",
+        "seo",
+    ),
+])
+
 ENQUIRIES = Group("enquiries", "Enquiries", "Messages from the public contact form.", [
     Capability(
         "enquiries.read", "Read enquiries",
@@ -176,7 +190,7 @@ DATA = Group("data", "Fixtures & reports", "Where the sport data comes from.", [
     ),
 ])
 
-GROUPS = [NEWS, PAGES, ENQUIRIES, ORGS, PEOPLE, CHARITIES, DATA]
+GROUPS = [NEWS, PAGES, SEO, ENQUIRIES, ORGS, PEOPLE, CHARITIES, DATA]
 
 ALL = {c.key: c for g in GROUPS for c in g.capabilities}
 KEYS = list(ALL)

@@ -1,0 +1,115 @@
+{% extends "hq_base.html" %}
+{% load static %}
+{% block title %}SEO &middot; Manage{% endblock %}
+{% block nav_seo %}on{% endblock %}
+{% block hero_title %}How the site shows up in Google{% endblock %}
+{% block hero_lead %}Titles, descriptions, share previews, addresses and what gets indexed. Every one of them editable here, with no developer in the loop.{% endblock %}
+{% block hero_shot %}{% static 'img/scenes/aussie-crowd-flag.jpg' %}{% endblock %}
+{% block admin_content %}
+
+<div class="gt-shell gt-shell-single">
+
+  {% comment %}
+  The two facts an SEO team checks first, before anything else on the screen:
+  is anything hidden from Google that should not be, and is the sitemap the one
+  a crawler will actually fetch. Both are one click from here.
+  {% endcomment %}
+  <div class="seo-stats">
+    <div class="seo-stat">
+      <b>{{ pages|length }}</b><span>pages</span>
+      <small>{{ customised_count }} with settings of their own</small>
+    </div>
+    <div class="seo-stat{% if noindex_count %} is-warn{% endif %}">
+      <b>{{ noindex_count }}</b><span>kept out of Google</span>
+      <small>Deliberate for pages like &ldquo;Tell the boss&rdquo;</small>
+    </div>
+    <div class="seo-stat">
+      <b>{{ posts|length }}</b><span>stories</span>
+      <small>Edited on the story itself, under Search &amp; social</small>
+    </div>
+    <div class="seo-stat">
+      <b>{{ redirect_count }}</b><span>redirects</span>
+      <small><a href="{% url 'admin:hq_redirects' %}">Manage them &rarr;</a></small>
+    </div>
+  </div>
+
+  <div class="gt-note" style="margin:0 0 16px;">
+    <b>The sitemap looks after itself.</b>
+    <a href="/sitemap.xml" target="_blank" rel="noopener">/sitemap.xml</a> is
+    generated from this list and the published stories every time it is asked
+    for, so a page or a story added tomorrow is in it tomorrow. Anything set to
+    &ldquo;not indexed&rdquo;, and anything with a canonical pointing elsewhere,
+    is left out of it.
+  </div>
+
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-globe"/></svg></span>
+      <div>
+        <h2>Pages</h2>
+        <div class="gp-sub">Every page of the site. Public ones first &mdash; those are the ones Google sees.</div>
+      </div>
+    </div>
+
+    <div class="seo-list">
+      {% for row in pages %}
+      <a class="seo-row{% if row.noindex %} is-noindex{% endif %}" href="{% url 'admin:hq_seo_edit' row.page.key %}">
+        <span class="seo-row-main">
+          <b>{{ row.page.label }}</b>
+          <small>{{ row.page.blurb }}</small>
+        </span>
+        <span class="seo-row-path">
+          {% if row.path %}<code>{{ row.path }}</code>{% else %}<em>inside a group</em>{% endif %}
+          {% if row.moved %}<span class="gt-chip">moved</span>{% endif %}
+        </span>
+        <span class="seo-row-state">
+          {% if not row.page.is_public %}<span class="gt-chip draft">signed in</span>{% endif %}
+          {% if row.noindex %}<span class="gt-chip draft">not indexed</span>
+          {% elif row.customised %}<span class="gt-chip live">set</span>
+          {% else %}<span class="gt-chip">defaults</span>{% endif %}
+        </span>
+        <span class="seo-row-go"><svg><use href="#ic-arrow-right"/></svg></span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="gt-panel" style="margin-top:18px;">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-doc"/></svg></span>
+      <div>
+        <h2>Stories</h2>
+        {% comment %}
+        Linked to the story editor rather than given their own SEO form. A
+        story's meta title falls back to its headline and its description to
+        its teaser, so editing them anywhere but next to the headline and the
+        teaser would mean guessing what you are overriding.
+        {% endcomment %}
+        <div class="gp-sub">Each story's search and social settings live in its own editor, under <b>Search &amp; social</b>.</div>
+      </div>
+    </div>
+
+    <div class="seo-list">
+      {% for p in posts %}
+      <a class="seo-row{% if not p.robots_index %} is-noindex{% endif %}" href="{% url 'admin:hq_news_edit' p.id %}">
+        <span class="seo-row-main">
+          <b>{{ p.title }}</b>
+          <small>{% if p.meta_description %}{{ p.meta_description|truncatechars:110 }}{% elif p.excerpt %}{{ p.excerpt|truncatechars:110 }}{% else %}No description &mdash; Google will pick its own.{% endif %}</small>
+        </span>
+        <span class="seo-row-path"><code>/news/{{ p.slug }}/</code></span>
+        <span class="seo-row-state">
+          {% if p.is_scheduled %}<span class="gt-chip draft">scheduled</span>
+          {% elif not p.is_published %}<span class="gt-chip draft">draft</span>{% endif %}
+          {% if not p.robots_index %}<span class="gt-chip draft">not indexed</span>
+          {% elif p.meta_title or p.meta_description %}<span class="gt-chip live">set</span>
+          {% else %}<span class="gt-chip">defaults</span>{% endif %}
+        </span>
+        <span class="seo-row-go"><svg><use href="#ic-arrow-right"/></svg></span>
+      </a>
+      {% empty %}
+      <div class="gt-empty" style="padding:28px 20px;text-align:center;">No stories yet.</div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

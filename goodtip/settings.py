@@ -28,6 +28,12 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.humanize",
+    # For the XML sitemap's templates only. The Sites framework is NOT
+    # installed with it on purpose: sitemaps falls back to RequestSite, which
+    # reads the host off the request — so staging writes staging URLs and
+    # production writes production ones, with no SITE_ID to get wrong in an
+    # .env. See goodtip/sitemaps.py.
+    "django.contrib.sitemaps",
     "accounts",
     "catalog",
     "orgs",
@@ -60,6 +66,10 @@ MIDDLEWARE = [
     # Last, so it sees the finished HTML. Passes everything straight through
     # except the handful of pages named in admin_panel.pages.
     "admin_panel.middleware.PageEditMiddleware",
+    # Last, which on the way back out means FIRST: it sees the view's 404
+    # before anything else has a chance to dress it up as a page. Everything
+    # above it passes a 404 straight through, so nothing is lost by that.
+    "admin_panel.middleware.RedirectFallbackMiddleware",
 ]
 
 # Syncing runs on the server's clock via goodtip-matchsync.timer, NOT on site

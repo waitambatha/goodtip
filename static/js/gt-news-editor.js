@@ -628,6 +628,24 @@
     return el ? el.value : '';
   }
 
+  /* ALT TEXT IS ASKED FOR AT INSERT, NOT LEFT TO BE ADDED LATER.
+   *
+   * Every picture the editor put in a story used to go in as alt="" — invisible
+   * to a screen reader and worth nothing to a search engine — and there was no
+   * way to fix that afterwards without editing HTML. Asked here, at the one
+   * moment the author knows what the picture shows and is already looking at
+   * it. Skipping is allowed and stores alt="", which is the correct markup for
+   * a decorative image; what is not allowed is having no way to say. */
+  function askAlt(existing) {
+    var answer = window.prompt(
+      'Describe this picture for screen readers and search engines.\n' +
+      'Leave it empty if the picture is purely decorative.',
+      existing || ''
+    );
+    // null means Cancel, which for an existing image must leave it alone.
+    return answer === null ? null : answer.trim();
+  }
+
   function insertImage(editor, surface, file) {
     var uploadUrl = editor.getAttribute('data-upload-url');
     if (!uploadUrl || !file) return;
@@ -640,14 +658,29 @@
       body: data,
     }).then(function (r) { return r.json(); }).then(function (json) {
       if (!json.url) return;
+      var alt = askAlt('');
       restoreSelection(surface);
       document.execCommand(
         'insertHTML', false,
-        '<img src="' + escapeAttr(json.url) + '" alt="">'
+        '<img src="' + escapeAttr(json.url) + '" alt="' + escapeAttr(alt || '') + '">'
       );
       syncHidden(surface);
     }).catch(function () {
       window.alert("Couldn't upload that image, try again.");
+    });
+  }
+
+  /* And afterwards: click a picture already in the story to change its
+   * description. Without this the only chance to get alt text right is the
+   * half-second the file finishes uploading, which is not a chance. */
+  function wireImageAltEditing(surface) {
+    surface.addEventListener('click', function (e) {
+      var img = e.target;
+      if (!img || img.tagName !== 'IMG') return;
+      var next = askAlt(img.getAttribute('alt') || '');
+      if (next === null) return;
+      img.setAttribute('alt', next);
+      syncHidden(surface);
     });
   }
 
@@ -808,6 +841,11 @@
       if (fn) syncSwatches.push(fn);
     });
     var syncHistoryButtons = wireHistoryButtons(editor, surfaceNow);
+    // Only the body surface takes pictures; the headline and teaser have no
+    // image button, so there is nothing there to click.
+    if (editor.getAttribute('data-upload-url')) {
+      editor.querySelectorAll('.ned-surface').forEach(wireImageAltEditing);
+    }
 
     function sync() {
       var surface = surfaceNow();

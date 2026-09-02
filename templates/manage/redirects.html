@@ -1,0 +1,98 @@
+{% extends "hq_base.html" %}
+{% load static %}
+{% block title %}Redirects &middot; Manage{% endblock %}
+{% block nav_redirects %}on{% endblock %}
+{% block hero_title %}Redirects{% endblock %}
+{% block hero_lead %}When an address changes, point the old one here so the links already out in the world keep working.{% endblock %}
+{% block hero_shot %}{% static 'img/scenes/aussie-crowd-flag.jpg' %}{% endblock %}
+{% block admin_content %}
+
+<div class="gt-shell gt-shell-wide">
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-arrow-right"/></svg></span>
+      <div>
+        <h2>{{ rows|length }} redirect{{ rows|length|pluralize }}</h2>
+        <div class="gp-sub">{{ used }} in use &middot; {{ unused }} never followed</div>
+      </div>
+    </div>
+
+    {% comment %}
+    A redirect is only ever consulted when routing has already failed — see
+    RedirectFallbackMiddleware. Worth saying on the screen, because the first
+    question anybody asks about a redirect table is whether putting a row in it
+    can break a page that works.
+    {% endcomment %}
+    <div class="gt-note" style="margin:0 0 14px;">
+      <b>These only fire on an address that does not exist.</b>
+      A redirect can never shadow a real page: if the address later becomes a
+      live page, the live page wins and the row simply stops being used.
+    </div>
+
+    <div class="rd-list">
+      {% for r in rows %}
+      <form method="post" action="{% url 'admin:hq_redirect_save' %}" class="rd-row" data-busy="Saving">
+        {% csrf_token %}
+        <input type="hidden" name="id" value="{{ r.id }}">
+        <div class="rd-paths">
+          <input type="text" name="old_path" value="{{ r.old_path }}" spellcheck="false" aria-label="Old address">
+          <span class="rd-arrow" aria-hidden="true"><svg><use href="#ic-arrow-right"/></svg></span>
+          <input type="text" name="new_path" value="{{ r.new_path }}" spellcheck="false" aria-label="New address">
+        </div>
+        <input type="text" name="note" value="{{ r.note }}" placeholder="Why this exists" class="rd-note" aria-label="Note">
+        <label class="rd-perm" title="Permanent (301) moves the search ranking. Temporary (302) does not.">
+          <input type="checkbox" name="is_permanent" value="1" {% if r.is_permanent %}checked{% endif %}>
+          <span>301</span>
+        </label>
+        <span class="rd-hits" title="{% if r.last_hit_at %}Last followed {{ r.last_hit_at|date:'j M Y, g:i a' }}{% else %}Never followed{% endif %}">
+          {{ r.hits }} hit{{ r.hits|pluralize }}
+        </span>
+        <button type="submit" class="np-btn">Save</button>
+        <button type="submit" class="np-btn np-btn-danger"
+                formaction="{% url 'admin:hq_redirect_delete' r.id %}"
+                data-confirm="Anyone following the old address will get a 404 again."
+                data-confirm-title="Delete this redirect?" data-confirm-ok="Delete" data-confirm-danger>
+          Delete
+        </button>
+      </form>
+      {% empty %}
+      <div class="gt-empty" style="padding:28px 20px;text-align:center;">
+        Nothing redirected yet. Renaming a page or a story adds one here on its own.
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="gt-panel">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-check"/></svg></span>
+      <div>
+        <h2>Add one</h2>
+        <div class="gp-sub">Paste a whole URL if it is easier &mdash; the domain is stripped.</div>
+      </div>
+    </div>
+    <form method="post" action="{% url 'admin:hq_redirect_save' %}" data-busy="Saving">
+      {% csrf_token %}
+      <div class="fld">
+        <label for="rd_old">Old address</label>
+        <input type="text" name="old_path" id="rd_old" placeholder="/old-pricing/" spellcheck="false" required>
+        <small class="fld-hint">The address that no longer works. Both spellings are matched, with and without the trailing slash.</small>
+      </div>
+      <div class="fld">
+        <label for="rd_new">Goes to</label>
+        <input type="text" name="new_path" id="rd_new" placeholder="/pricing/" spellcheck="false" required>
+        <small class="fld-hint">A path on this site, or a full <code>https://</code> address for somewhere else.</small>
+      </div>
+      <div class="fld">
+        <label for="rd_note">Note</label>
+        <input type="text" name="note" id="rd_note" placeholder="Pricing page renamed, Sept 2026">
+      </div>
+      <label class="seo-check">
+        <input type="checkbox" name="is_permanent" value="1" checked>
+        <span><b>Permanent (301)</b><small>Moves the search ranking to the new address. Uncheck for a temporary move.</small></span>
+      </label>
+      <button type="submit" class="gt-go-btn" style="width:auto;margin-top:14px;">Add redirect <svg><use href="#ic-check"/></svg></button>
+    </form>
+  </section>
+</div>
+{% endblock %}

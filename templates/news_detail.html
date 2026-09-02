@@ -1,7 +1,7 @@
 {% extends "app_base.html" %}
 {% load static %}
 {% load humanize %}
-{% block title %}{{ post.title }} &middot; GoodTip{% endblock %}
+{% block title %}{{ post.meta_title|default:post.title }} &middot; GoodTip{% endblock %}
 {% block loader_task %}Opening the story{% endblock %}
 {% comment %}
 The deep-green stage every other member page stands on, so the rotating side
@@ -35,7 +35,12 @@ on a flat backdrop was the odd one out.
   the photograph follows as the thing that illustrates them.
   {% endcomment %}
   <header class="art-head">
-    <span class="art-kicker">{{ post.get_tag_display }}</span>
+    {% comment %}
+    Every code the story is filed under. A piece about AFLW and NRLW carries
+    both now — see NewsPost.tags — and showing only the first would put it back
+    to looking like a story about one of them.
+    {% endcomment %}
+    <span class="art-kicker">{{ post.tag_labels|join:" &middot; " }}</span>
     <h1 class="art-title">{% if post.title_html %}{{ post.title_html|safe }}{% else %}{{ post.title }}{% endif %}</h1>
     {% if post.excerpt_html %}<p class="art-lead">{{ post.excerpt_html|safe }}</p>
     {% elif post.excerpt %}<p class="art-lead">{{ post.excerpt }}</p>{% endif %}
@@ -55,7 +60,15 @@ on a flat backdrop was the odd one out.
     </div>
   </header>
 
-  {% if post.image %}<div class="art-hero" style="background-image:url('{{ post.image.url }}')"><span class="sport-tag">{{ post.get_tag_display }}</span></div>
+  {% comment %}
+  A CSS background cannot carry an `alt`, so the description an admin typed is
+  given to a screen reader the way a background image has to be: role="img"
+  plus aria-label. With no alt text set it stays undescribed and out of the
+  accessibility tree, which is the right answer for a decorative photograph and
+  much better than reading the file name out.
+  {% endcomment %}
+  {% if post.image %}<div class="art-hero" style="background-image:url('{{ post.image.url }}')"
+       {% if post.image_alt %}role="img" aria-label="{{ post.image_alt }}"{% endif %}><span class="sport-tag">{{ post.tag_labels.0 }}</span></div>
   {% else %}
   {% comment %}
   No picture on the post, so the slot rotates through the site's own match-day
@@ -66,7 +79,7 @@ on a flat backdrop was the odd one out.
     <div class="shot on" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
     <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
     <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
-    <span class="sport-tag">{{ post.get_tag_display }}</span>
+    <span class="sport-tag">{{ post.tag_labels.0 }}</span>
   </div>
   {% endif %}
 
@@ -81,7 +94,7 @@ on a flat backdrop was the odd one out.
   <div class="news-list">
     {% for p in more %}
     <a class="news-item news-link" href="{% url 'news_detail' p.slug %}">
-      <span class="ntag {{ p.tag|lower }}">{{ p.get_tag_display }}</span>
+      <span class="ntag {{ p.tag|lower }}">{{ p.tag_labels.0 }}</span>
       <div><div class="nt">{{ p.title }}</div><div class="nd">{{ p.published_at|naturaltime }}</div></div>
     </a>
     {% endfor %}

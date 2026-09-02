@@ -452,10 +452,22 @@ def _get_urls():
         # editable sentence marked up in advance, and their own note said which
         # of the two to keep was an open question. The client answered it: one
         # editor, every public page and every private one, nothing to mark up.
+        path("seo/", admin.site.admin_view(manage_views.seo_list), name="hq_seo"),
+        path("seo/page/<str:page_key>/", admin.site.admin_view(manage_views.seo_edit),
+             name="hq_seo_edit"),
+        path("redirects/", admin.site.admin_view(manage_views.redirects_list),
+             name="hq_redirects"),
+        path("redirects/save/", admin.site.admin_view(manage_views.redirect_save),
+             name="hq_redirect_save"),
+        path("redirects/<int:redirect_id>/delete/",
+             admin.site.admin_view(manage_views.redirect_delete),
+             name="hq_redirect_delete"),
         path("pages/", admin.site.admin_view(manage_views.pages_list), name="hq_pages"),
         path("pages/save/", admin.site.admin_view(manage_views.page_save), name="hq_page_save"),
         path("pages/upload-image/", admin.site.admin_view(manage_views.page_upload_image),
              name="hq_page_upload_image"),
+        path("pages/image-alt/", admin.site.admin_view(manage_views.page_image_alt),
+             name="hq_page_image_alt"),
         path("pages/<str:page_key>/", admin.site.admin_view(manage_views.page_edits),
              name="hq_page_edits"),
         path("pages/<str:page_key>/revert/", admin.site.admin_view(manage_views.page_revert),

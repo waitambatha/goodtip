@@ -29,7 +29,14 @@
   --cream-2: #F2EFE6;   /* lighter paper */
   --white:   #FFFFFF;
   --ink:     #0F2E22;   /* body text on light */
-  --muted:   #6B7A6E;   /* sage grey */
+  /* Sage grey, darkened Sep 2026. At #6B7A6E this cleared 4.5:1 on a white
+     card and nothing else: 4.04:1 on the cream sheet and 3.56:1 on the cream
+     page, which is most of the public site and every supporting line under a
+     heading on it. It is only ever used on a light ground — 279 rules, not one
+     of them on a dark panel, because dark panels use cream at an opacity
+     instead — so darkening it has no other side. Now 4.5:1 on the cream page,
+     5.1 on the sheet, 5.7 on a card. */
+  --muted:   #5C6A5A;   /* sage grey */
   --line:    rgba(15,46,34,0.12);
   --line-d:  rgba(255,255,255,0.12);
 
@@ -2299,11 +2306,11 @@ a.news-item.news-link:hover .nt { color: var(--forest); }
 /* ---------- generated club crests (monogram badges in club colours) ---------- */
 .crest { width: 30px; height: 30px; border-radius: 8px; display: inline-grid; place-items: center;
   font-family: var(--mark); font-weight: 700; font-size: 12px; letter-spacing: .01em; flex: none;
-  background: var(--crest-bg, var(--card-1)); color: var(--crest-fg, #fff); }
+  background: var(--crest-bg, var(--card-1)); color: var(--crest-fg, var(--forest)); }
 .team-cell { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; }
 /* let picks use each team's colours, but keep the selected-state override winning */
 .pick .team .crest { width: 34px; height: 34px; border-radius: 9px; font-size: 13px;
-  background: var(--crest-bg, var(--card-1)); color: var(--crest-fg, #fff); }
+  background: var(--crest-bg, var(--card-1)); color: var(--crest-fg, var(--forest)); }
 .pick .team.sel .crest { background: var(--lime); color: var(--deep); }
 /* real club logos: white plate so dark marks read on any row colour */
 .crest.has-logo { background: #fff; border: 1px solid rgba(15,46,34,.12); padding: 3px; overflow: hidden; }
@@ -12324,8 +12331,15 @@ tr.is-off { opacity: .55; }
   stroke-linecap: round; stroke-linejoin: round;
 }
 .chat-tick i { font-style: normal; font-weight: 700; letter-spacing: .02em; }
-.chat-tick.sent { color: var(--tick-sent, #E08A1E); }
-.chat-tick.read { color: var(--tick-read, #3FBF6A); }
+/* Blue for read, not green. The first brief said green; the client's latest
+   is "a single tick that is yellow that reads sent, if seen turns two ticks
+   that are blue and means read" — which is also the convention people arrive
+   already knowing, and it stops "read" sharing a hue with the brand's own
+   green, where a receipt reads as decoration rather than as state. The
+   yellow moves off orange at the same time. 5.9:1 and 6.4:1 on the bubble
+   under them. */
+.chat-tick.sent { color: var(--tick-sent, #E8A317); }
+.chat-tick.read { color: var(--tick-read, #4FC3F7); }
 
 /* THE TWO COLOURS ARE TOKENS BECAUSE THE BUBBLE UNDER THEM IS NOT ONE COLOUR.
    The defaults above are drawn for a DARK sent-bubble, which is what the
@@ -12336,12 +12350,12 @@ tr.is-off { opacity: .55; }
    only if you already know it is there.
 
    So the same two states get a second pair of values, mixed for lime rather
-   than for forest: a burnt amber and a deep green, both dark enough to read
+   than for forest: a burnt amber and a deep blue, both dark enough to read
    against #C8F135 at the weight these strokes are drawn. Same meanings, same
-   words beside them; only the ink changes with the paper. */
+   words beside them; only the ink changes with the paper. 5.2:1 and 6.7:1. */
 .page-deep .chat-row.mine, .gt-dark .chat-row.mine {
   --tick-sent: #8A4B00;
-  --tick-read: #0E5E33;
+  --tick-read: #0B4A8F;
 }
 
 /* The quote of the message being answered. A left bar and a tint, the shape
@@ -12885,7 +12899,7 @@ html[data-theme="light"] body.gt-app {
   /* ---- Ink ---- */
   --lt-ink:    #0F2E22;      /* deep forest — headings and body */
   --lt-forest: #176B45;      /* rich green — secondary action, status */
-  --lt-quiet:  #737A72;      /* warm grey — supporting copy */
+  --lt-quiet:  #686F67;      /* warm grey — supporting copy, 5.2:1 on white */
 
   /* ---- The accent, in its two jobs ----
      A fill wants the bright end; text wants the dark end. Treating them as
@@ -13763,7 +13777,10 @@ html[data-theme="light"] .an-theme button.on { background: var(--forest); color:
    Fixed in app_base.html — this is the state the ring leaves behind.
    ========================================================================== */
 .an-bell.has-new .bell-badge {
-  background: #E5372B;
+  /* #E5372B put white at 4.27:1, and this is a 10px numeral — the one place
+     on the bar where the exact figure matters. A shade deeper clears 4.9:1
+     and reads as the same red. */
+  background: #D62D22;
   color: #fff;
   box-shadow: 0 0 0 2px var(--gt-deep, #0C2417);
 }
@@ -13775,7 +13792,7 @@ html[data-theme="light"] .an-bell.has-new .bell-badge { box-shadow: 0 0 0 2px #f
    an indicator that pulses forever stops being an indicator. */
 .an-bell.has-new .bell-badge::after {
   content: ""; position: absolute; inset: -3px;
-  border-radius: 100px; border: 2px solid #E5372B;
+  border-radius: 100px; border: 2px solid #D62D22;
   animation: gt-bell-halo 1.8s var(--ease) 4;
   pointer-events: none;
 }
@@ -13843,3 +13860,483 @@ html[data-theme="light"] .gt-app.page-deep .chat-to .ct-lab,
 html[data-theme="light"] .gt-app.page-deep .chat-to .ct-more,
 html[data-theme="light"] .gt-app.page-deep .chat-to .ct-count,
 html[data-theme="light"] .gt-app.page-deep .chat-to .ct-org { color: var(--lt-quiet); }
+
+/* ==========================================================================
+   ============ v50 — THE CONTAINER HOLDS ==================================
+   ==========================================================================
+
+   From a round of testing on other people's machines: on several screens
+   "things overflowed", "the containers did not hold", and on one large, older
+   display things overlapped. Four separate faults produced that, and none of
+   them is a missing breakpoint — the grids in this file collapse properly
+   nearly everywhere. What they share is that each one puts something in a box
+   that CANNOT shrink, and then relies on the box being big enough.
+
+   `html, body { overflow-x: clip }` (v7) is why this was reported as things
+   being cut off rather than as a sideways scrollbar. Clip was the right call —
+   it keeps the sticky nav working and kills stray side-space on a phone — but
+   it also means every one of these faults fails silently: the content is not
+   pushed off the side where you would see it, it is simply gone. So the fixes
+   below are all about making the content FIT, not about hiding the evidence.
+   ========================================================================== */
+
+/* ---------- 1. THE NAV ROW ON A WIDE SCREEN -------------------------------
+   The reported symptom was on a big monitor, which is the opposite of where
+   you look for a layout fault, and the reason is that this row's width does
+   not grow with the screen: `.an-inner` is capped at --gt-wide (1300px) and
+   loses ~82px to its gutters, so from about 1360px upwards the row always has
+   the same ~1218px to work in no matter how wide the display gets.
+
+   v34 measured what goes in it — brand 74 + links 781 + right cluster 259 +
+   gaps 66 = 1180 — and made all four of those `flex: none` so the link row
+   could never be squeezed. That leaves ~38px, and the context chip beside
+   them is `flex: none` too, at up to 460px. Two organisation names is more
+   than 38px, so the row simply ran past the end of the bar and the clip took
+   whatever was on the right — on a staff account, the account cluster.
+
+   Something in that row has to yield, and the chip is the right thing: it is
+   the only item that already knows how to give way gracefully. `.an-ctx-org`
+   carries a 4.5em floor so the organisation can never truncate to nothing,
+   and `.an-ctx-group` ellipsises before it — which is the order the rules
+   above already state they want ("the group half is allowed to give way
+   first"). Making the chip shrinkable is what lets those two rules do the job
+   they were written for; until now nothing ever asked them to.
+
+   `min-width: 0` on both is the load-bearing half. A flex item's automatic
+   minimum size is its content, so `flex: 0 1 auto` alone shrinks nothing —
+   which is the same trap `.gt-v2 .an-org` already has a note about. */
+.an-ctx,
+.gt-v2 .an-ctx { flex: 0 1 auto; min-width: 0; }
+.an-ctx-btn { min-width: 0; }
+
+/* ---------- 2. THE ORGANISATION MENU FELL OUT OF THE BAR -------------------
+   Reported directly: the organisation/groups dropdown "is falling outside the
+   container … it should be left zero so that it starts from the right of that
+   container". That is exactly right, and here is why it happens.
+
+   `.an-menu-panel` is written for the menus at the RIGHT-HAND end of the bar,
+   so it anchors `right: 0` — the panel's right edge meets the button's right
+   edge and it grows leftwards. The context chip is the one menu at the LEFT
+   end, second item after the brand, and its panel is the widest one there is
+   (two columns, min-width 480px). Anchored right, a 480px panel hung off a
+   button whose right edge is ~400px from the start of the bar begins about
+   80px to the LEFT of the bar — off the container, and then clipped away by
+   overflow-x: clip, which is why the organisation column was the half that
+   went missing.
+
+   Anchoring it left is the whole fix: the panel now starts at the chip's own
+   left edge and grows the way there is room to grow. The viewport cap is the
+   belt to that brace — the chip is on screen down to 900px, where 480px of
+   panel plus the chip's offset is more than the window has. */
+.an-menu-panel.an-ctx-panel {
+  left: 0;
+  right: auto;
+  max-width: calc(100vw - 24px);
+}
+
+/* Every floating panel gets the same guarantee, for the same reason: each of
+   these is positioned against a button whose place in the row moves with the
+   width of everything beside it, so any of them can be pushed to an edge. A
+   panel that is wider than the window cannot be read whatever it is anchored
+   to. */
+.an-menu-panel,
+.ddx-menu,
+.ac-panel,
+.bell-panel {
+  max-width: calc(100vw - 24px);
+}
+
+/* …and the floors have to move with it, because a max-width does NOT cap a
+   min-width — min-width is applied last and wins outright. `.an-menu-panel`
+   asks for 330px and the context panel for 480px, so on a 320px handset the
+   cap above was inert and the left edge of an account menu still sat ~10px
+   off the screen. Folding the same expression into the floor is what makes
+   the cap bind, and it needs no breakpoint to do it: the panel keeps the
+   width it wants at every size that has the room, and only ever gives up what
+   the window does not have. */
+.an-menu-panel { min-width: min(330px, calc(100vw - 24px)); }
+.an-menu-panel.an-ctx-panel { min-width: min(480px, calc(100vw - 24px)); }
+/* Same fault one level in: the two columns are `min-width: 220px` each, so the
+   panel had a 440px floor of its own however narrow the window was. */
+.an-ctx-col { min-width: min(220px, calc(50vw - 24px)); }
+
+/* ---------- 3. LONG WORDS: ADDRESSES, ORG NAMES, LINKS --------------------
+   The largest single cause, and the least obvious. An email address is one
+   word to a browser. `christopher.vandenberg@wellingtoncityfc.org.nz` is 46
+   unbreakable characters, and it appears in a table cell on Members, on
+   Approvals, in the enquiry detail and in half the admin lists. A cell can
+   never be narrower than the longest word in it, so that one address sets the
+   width of the column, the column sets the width of the table, and the table
+   runs past the card — which is precisely "the containers did not hold".
+
+   `overflow-wrap: anywhere` rather than `break-word` is deliberate and is the
+   difference between fixing this and only appearing to. Both break an
+   over-long word at the edge; only `anywhere` also lets the browser count the
+   smaller size when working out how narrow the box is ALLOWED to be. With
+   `break-word` the cell still asks for 46 characters of width and the table
+   still overflows — the word just wraps once it gets there.
+
+   So: `anywhere` on the places that carry identifiers, `break-word` as the
+   quiet floor everywhere else, where it only ever acts on a word that would
+   otherwise leave the box. */
+body { overflow-wrap: break-word; }
+
+.atable td, .atable th,
+.gt-table td, .gt-table th,
+.atable small, .gt-table small,
+.gt-namecell small,
+dd, .gt-dl dd,
+.card-lead, .app-sub, .gp-sub, .gt-sub,
+.bl-meta, .ac-opt .ac-meta,
+.mi-txt b, .mi-txt i,
+.an-ctx-row, .an-ctx-head,
+.gwp-meta small, .gt-post .gpt-meta small,
+.enq-meta dd {
+  overflow-wrap: anywhere;
+}
+
+/* ---------- 4. TABLES SCROLL RATHER THAN GET CUT ---------------------------
+   Wrapping helps a long address; it does not help a table that genuinely has
+   more columns than a phone has width. `.gt-table` has had `.gt-tablewrap`
+   around it from the start. `.atable` — Members, Approvals, the org lists, the
+   profile's comps — never got one, so on a narrow screen its right-hand
+   columns went past the edge and the clip removed them: on Members that is the
+   "Set role" control, which was not merely ugly but unreachable.
+
+   Named rather than inlined because two templates already did this with
+   `style="overflow-x:auto"`, and a class is the thing to reach for next time. */
+.tbl-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ---------- 5. THE FIXTURE CELL ON A PHONE ---------------------------------
+   `.match-cell` is `minmax(215px,1fr) 26px minmax(215px,1fr)` with 12px gaps —
+   a 480px floor — and its team names are `white-space: nowrap`. Inside a table
+   that is 480px of one cell before the rank and result columns are counted, so
+   My Tips could not fit on any phone. The two-track floor is there so club
+   names line up down the round, which is worth having on a screen wide enough
+   to line anything up and worth nothing on one that is not. */
+@media (max-width: 700px) {
+  .match-cell { grid-template-columns: minmax(0,1fr) 26px minmax(0,1fr); gap: 8px; }
+  .match-cell .team-cell { white-space: normal; }
+}
+
+/* ---------- 6. NOTHING IS WIDER THAN ITS PAGE -----------------------------
+   The last line of defence, and only a defence: media that arrives without
+   dimensions, an <iframe> in a news article, a code block in the page editor.
+   These are the elements that can carry an intrinsic width from outside the
+   stylesheet's control, so they are the ones worth naming.
+
+   Tables are deliberately NOT in that list. `.gt-table` carries a 640px
+   min-width on purpose and lives in a scroller that is meant to be scrolled;
+   capping it at 100% of that scroller would quietly turn the scroller off. A
+   table's width is handled a rule up, by letting its cells wrap. */
+img, svg, video, iframe, canvas { max-width: 100%; }
+pre { overflow-x: auto; max-width: 100%; }
+
+/* ==========================================================================
+   ============ v51 — WHERE THESE TIPS GO, AS A TREE =======================
+   ==========================================================================
+
+   Two faults, reported together: "I did uncheck one and that part got
+   distorted", and "the organisations should have a dropdown that shows
+   groups".
+
+   THE DISTORTION was contrast, not layout. A room card is drawn by
+   `.cs-room:has(input:checked)` — forest border on a pale green wash — and
+   UNCHECKED it fell back to a 1.5px --gt-hair border, which is
+   rgba(15,46,34,.10) on a near-white sheet. So unticking a room did not put it
+   in an "off" state; it made the card stop existing, and the rows either side
+   of it ran together. An off state has to be a state you can see.
+
+   THE TREE is `.cs-org` — one organisation, its master, and a disclosure of
+   the rooms inside it. The rooms keep the same names and the same posted
+   values as before; what is new is the indent, the rail down the left that
+   ties them to the organisation above, and the master's mixed state.
+   ========================================================================== */
+
+/* ---------- the off state, on every card that can be turned off ----------- */
+.cs-room,
+.cs-org,
+.cs-subroom {
+  transition: border-color .16s var(--ease), background .16s var(--ease),
+              opacity .16s var(--ease);
+}
+/* A visible edge whatever the state. Checked still reads louder — it gains the
+   forest and the wash — but unchecked is now a card that is off rather than a
+   card that has vanished. */
+.cs-room:not(:has(input[name="room"]:checked)),
+.cs-org.is-off {
+  border-color: rgba(15,46,34,.22);
+  background: transparent;
+}
+/* Dimmed, not hidden: you still need to read what you have just switched off
+   to know whether you meant to. */
+.cs-org.is-off .cs-rooms,
+.cs-org.is-off .cs-head-body { opacity: .62; }
+
+/* An unticked box needs an edge too — it was a white square inside a
+   rgba(…,.10) border on a white sheet, which is the same disappearing act one
+   level down. */
+.cs-head .oc-box,
+.cs-sub .oc-box,
+.cs-conflict .oc-box { border-color: rgba(15,46,34,.22); }
+
+/* ---------- the organisation card ---------------------------------------- */
+.cs-org {
+  border: 1.5px solid var(--gt-hair);
+  border-radius: 14px;
+  padding: 13px 15px;
+  margin-bottom: 10px;
+}
+.cs-org:has([data-cs-master]:checked),
+.cs-org:has([data-cs-master]:indeterminate) {
+  border-color: var(--forest);
+  background: rgba(45,122,58,.045);
+}
+.cs-org.has-conflict:has([data-cs-master]:checked),
+.cs-org.has-conflict:has([data-cs-master]:indeterminate) {
+  border-color: #C8901F;
+  background: rgba(200,144,31,.05);
+}
+/* Mixed is its own mark — a dash, not a tick, because "some of Acme" is not
+   "all of Acme" and the two must not look alike at a glance. */
+.cs-head:has([data-cs-master]:indeterminate) .oc-box {
+  background: var(--deep);
+  border-color: var(--deep);
+}
+.cs-head:has([data-cs-master]:indeterminate) .oc-box svg { opacity: 0; }
+.cs-head:has([data-cs-master]:indeterminate) .oc-box::after {
+  content: "";
+  width: 13px; height: 3px; border-radius: 2px;
+  background: var(--white);
+}
+
+/* ---------- the rooms inside it ------------------------------------------ */
+.cs-rooms { margin: 10px 0 0; }
+.cs-rooms > summary {
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer; list-style: none;
+  padding: 7px 0 7px 46px;         /* clears the master's 34px box + its gap */
+  font-family: var(--mark); font-weight: 700;
+  font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted);
+}
+.cs-rooms > summary::-webkit-details-marker { display: none; }
+.cs-rooms > summary .cs-chev {
+  width: 15px; height: 15px; flex: none;
+  stroke: currentColor; fill: none; stroke-width: 2.2;
+  transition: transform .16s var(--ease);
+}
+.cs-rooms[open] > summary .cs-chev { transform: rotate(180deg); }
+
+/* The rail is what says "these belong to the organisation above" — the indent
+   alone reads as a margin, which is not a relationship. */
+.cs-subroom {
+  margin-left: 46px;
+  padding: 10px 0 10px 14px;
+  border-left: 2px solid var(--gt-hair);
+}
+.cs-subroom:has(input[name="room"]:checked) { border-left-color: var(--forest); }
+.cs-subroom.has-conflict:has(input[name="room"]:checked) { border-left-color: #C8901F; }
+.cs-subroom:not(:has(input[name="room"]:checked)) { opacity: .62; }
+
+.cs-sub { display: flex; align-items: flex-start; gap: 11px; cursor: pointer; }
+.cs-sub input { position: absolute; opacity: 0; pointer-events: none; }
+/* Smaller than the organisation's, so the hierarchy is legible from the
+   control sizes alone rather than only from the indent. */
+.cs-sub .oc-box {
+  flex: none;
+  width: 26px; height: 26px;
+  border-radius: 8px;
+  border: 2px solid var(--gt-hair);
+  background: var(--white);
+  display: grid; place-items: center;
+  transition: background .15s var(--ease), border-color .15s var(--ease);
+}
+.cs-sub .oc-box svg { width: 14px; height: 14px; stroke: #fff; fill: none; stroke-width: 3.2; opacity: 0; }
+.cs-sub:has(input:checked) .oc-box { background: var(--forest); border-color: var(--forest); }
+.cs-sub:has(input:checked) .oc-box svg { opacity: 1; }
+.cs-sub .cs-room-name { font-size: 14px; }
+
+/* The conflict list is a step further in again, under the room it belongs to. */
+.cs-subroom .cs-conflicts { margin-left: 37px; }
+
+/* Keyboard users get the same outline the rest of the app uses; the real
+   checkbox is off-screen, so the ring has to be put on what is on screen. */
+.cs-head:has(input:focus-visible) .oc-box,
+.cs-sub:has(input:focus-visible) .oc-box,
+.cs-conflict:has(input:focus-visible) .oc-box {
+  outline: 2px solid var(--forest);
+  outline-offset: 2px;
+}
+
+/* A clip in a bubble. Sized like the screenshot beside it rather than like a
+   media player: the thread is the thing being read, and a video that takes the
+   width of the panel turns a conversation into a feed. Tapping it plays it
+   where it is; the controls are the browser's own, which is what people
+   already know how to work. */
+.chat-clip {
+  display: block;
+  width: 240px; max-width: 100%;
+  border-radius: 12px;
+  background: #000;
+  border: 1px solid var(--app-line, rgba(15,46,34,.12));
+}
+@media (max-width: 560px) {
+  .chat-clip { width: 100%; }
+}
+
+/* ==========================================================================
+   SEO, redirects, and the story editor's new fields
+   ==========================================================================
+   All of it lives in the HQ shell, so it borrows that shell's tokens rather
+   than naming colours: --ink, --muted, --gt-hair, --gt-bg, --forest, --lime.
+   Anything hard-coded here would come back as the dark-theme bug the manage
+   screens have already been through once. */
+
+/* `.fld-hint` is `.hint` under a different name, because these forms put the
+   sentence UNDER the input and `.hint` is used beside a label elsewhere. */
+.fld-hint { display: block; font-size: 12px; line-height: 1.5; color: var(--muted); margin-top: 6px; }
+.fld-hint code { font-size: 11.5px; background: rgba(15,46,34,.07); padding: 1px 5px; border-radius: 5px; }
+.fld-label-plain { display: block; font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 7px; }
+
+/* ---- the folded "Search & social" block, shared by both editors ---- */
+.seo-block {
+  border: 1px solid var(--gt-hair); border-radius: 14px;
+  background: var(--gt-bg); overflow: hidden;
+}
+.seo-block > summary {
+  display: flex; align-items: center; gap: 12px; cursor: pointer;
+  padding: 14px 16px; list-style: none; user-select: none;
+}
+.seo-block > summary::-webkit-details-marker { display: none; }
+/* The disclosure triangle, drawn rather than inherited: the native one sits at
+   a different offset in every browser and this row has an icon of its own. */
+.seo-block > summary::after {
+  content: ""; margin-left: auto; width: 8px; height: 8px; flex: none;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform .16s var(--ease);
+}
+.seo-block[open] > summary::after { transform: rotate(225deg) translate(-1px, -1px); }
+.seo-block > summary:hover { background: rgba(15,46,34,.03); }
+.seo-sum-ic {
+  width: 32px; height: 32px; flex: none; border-radius: 9px;
+  display: grid; place-items: center;
+  background: rgba(45,122,58,.12); color: var(--forest);
+}
+.seo-sum-ic svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+.seo-sum-txt { min-width: 0; }
+.seo-sum-txt b { display: block; font-size: 14px; color: var(--ink); }
+.seo-sum-txt small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.seo-sum-txt + .gt-chip { flex: none; }
+
+.seo-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px;
+  padding: 4px 16px 16px; border-top: 1px solid var(--gt-hair);
+}
+.seo-grid .seo-wide { grid-column: 1 / -1; }
+@media (max-width: 720px) { .seo-grid { grid-template-columns: 1fr; } }
+
+.seo-check {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+  padding: 10px 12px; border: 1px solid var(--gt-hair); border-radius: 11px;
+  background: var(--gt-bg); margin-bottom: 8px;
+}
+.seo-check input { width: auto; margin-top: 2px; flex: none; }
+.seo-check b { display: block; font-size: 13.5px; color: var(--ink); }
+.seo-check small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+.seo-og-now { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; flex-wrap: wrap; }
+.seo-og-now img { width: 148px; height: 78px; object-fit: cover; border-radius: 9px; border: 1px solid var(--gt-hair); }
+.seo-og-clear { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.seo-og-clear input { width: auto; }
+
+/* ---- the SEO index ---- */
+.seo-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+@media (max-width: 780px) { .seo-stats { grid-template-columns: repeat(2, 1fr); } }
+.seo-stat {
+  border: 1px solid var(--gt-hair); border-radius: 14px; background: var(--gt-bg);
+  padding: 14px 16px;
+}
+.seo-stat b { display: block; font-family: var(--display); font-size: 26px; line-height: 1; color: var(--ink); }
+.seo-stat span { display: block; font-size: 12.5px; font-weight: 700; color: var(--ink); margin-top: 6px; }
+.seo-stat small { display: block; font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+.seo-stat.is-warn b { color: var(--gold, #7a5410); }
+
+.seo-list { display: flex; flex-direction: column; }
+.seo-row {
+  display: grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr) auto 18px;
+  align-items: center; gap: 14px;
+  padding: 13px 12px; border-bottom: 1px solid var(--gt-hair);
+  text-decoration: none; color: inherit;
+  transition: background .14s var(--ease);
+}
+.seo-row:last-child { border-bottom: 0; }
+.seo-row:hover { background: rgba(15,46,34,.04); }
+.seo-row-main { min-width: 0; }
+.seo-row-main b { display: block; font-size: 14.5px; color: var(--ink); }
+.seo-row-main small { display: block; font-size: 12px; color: var(--muted); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seo-row-path { min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.seo-row-path code { font-size: 12px; color: var(--muted); background: rgba(15,46,34,.06); padding: 3px 8px; border-radius: 6px; }
+.seo-row-state { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.seo-row-go svg { width: 16px; height: 16px; stroke: var(--muted); fill: none; stroke-width: 2; }
+/* A page kept out of Google is the one thing on this screen somebody might not
+   have meant, so the row says so at a glance rather than only in its chip. */
+.seo-row.is-noindex { background: rgba(212,160,48,.06); }
+@media (max-width: 780px) {
+  .seo-row { grid-template-columns: minmax(0,1fr) auto; }
+  .seo-row-path, .seo-row-go { display: none; }
+}
+
+/* ---- redirects ---- */
+.rd-list { display: flex; flex-direction: column; }
+.rd-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 11px 4px; border-bottom: 1px solid var(--gt-hair); margin: 0;
+}
+.rd-row:last-child { border-bottom: 0; }
+.rd-paths { display: flex; align-items: center; gap: 8px; flex: 1 1 380px; min-width: 0; }
+.rd-paths input {
+  flex: 1 1 0; min-width: 0; padding: 8px 11px; font-size: 13px;
+  border: 1px solid var(--app-line); border-radius: 9px; background: #fff;
+  color: var(--ink); font-family: var(--body);
+}
+.rd-arrow svg { width: 15px; height: 15px; stroke: var(--muted); fill: none; stroke-width: 2; }
+.rd-note {
+  flex: 1 1 170px; min-width: 0; padding: 8px 11px; font-size: 12.5px;
+  border: 1px solid var(--app-line); border-radius: 9px; background: #fff; color: var(--muted);
+}
+.rd-perm { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.rd-perm input { width: auto; }
+.rd-hits { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+/* ---- story editor: tags, publish date, address, alt text ---- */
+.ned-meta-row { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 18px; }
+.ned-tags { flex: 1 1 340px; margin-bottom: 0; }
+.ned-when { flex: 0 1 260px; margin-bottom: 0; }
+.ned-alt { margin-top: 14px; }
+.ned-tagbox { display: flex; flex-wrap: wrap; gap: 8px; }
+.ned-tag-check { position: relative; }
+/* The box itself is hidden but still focusable and still the thing a screen
+   reader announces — the chip is its label, not a replacement for it. */
+.ned-tag-check input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.ned-tag-check span {
+  display: inline-block; padding: 7px 15px; border-radius: 100px;
+  border: 1px solid var(--gt-hair); background: var(--gt-bg);
+  font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer;
+  transition: background .14s var(--ease), color .14s var(--ease), border-color .14s var(--ease);
+}
+.ned-tag-check input:checked + span { background: var(--forest); border-color: var(--forest); color: #fff; }
+.ned-tag-check input:focus-visible + span { box-shadow: 0 0 0 3px rgba(45,122,58,.25); }
+.ned-tag-check span:hover { border-color: rgba(15,46,34,.28); }
+
+.ned-url-fix { font-size: 13px; color: var(--muted); font-weight: 600; }
+.ned-url-in {
+  min-width: 140px; max-width: 320px; padding: 5px 10px; font-size: 13px;
+  border: 1px solid var(--app-line); border-radius: 8px; background: #fff;
+  color: var(--ink); font-family: var(--body);
+}
+.ned-url-in:focus { outline: none; border-color: var(--forest); box-shadow: 0 0 0 3px rgba(45,122,58,.12); }

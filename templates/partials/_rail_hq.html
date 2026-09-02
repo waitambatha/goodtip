@@ -11,6 +11,8 @@ job. Full access holds everything, so the owner sees exactly what they always
 did.
 {% endcomment %}
 {% gta_can 'pages.edit' as may_pages %}
+{% gta_can 'seo.edit' as may_seo %}
+{% gta_can 'seo.redirects' as may_redirects %}
 {% gta_can 'news.write' as may_news %}
 {% gta_can 'enquiries.read' as may_enq %}
 {% gta_can 'data.sync' as may_sync %}
@@ -38,7 +40,7 @@ did.
     {% endif %}
   </div>
 
-  {% if may_pages or may_news or may_enq %}
+  {% if may_pages or may_news or may_enq or may_seo or may_redirects %}
   <div class="gts-group">
     <div class="gts-group-title">The site's own words</div>
     {% if may_pages %}
@@ -48,6 +50,19 @@ did.
     {% if may_news %}
     <a href="{% url 'admin:hq_news' %}" class="{% block nav_news %}{% endblock %}" title="News &amp; blog">
       <svg><use href="#ic-doc"/></svg><span class="lbl">News &amp; blog</span></a>
+    {% endif %}
+    {% comment %}
+    SEO sits with the site's own words rather than under Platform: the person
+    who edits a meta description is the person who edits the page it describes,
+    and putting it next to fixture syncs would hide it from them.
+    {% endcomment %}
+    {% if may_seo %}
+    <a href="{% url 'admin:hq_seo' %}" class="{% block nav_seo %}{% endblock %}" title="SEO">
+      <svg><use href="#ic-search"/></svg><span class="lbl">SEO</span></a>
+    {% endif %}
+    {% if may_redirects %}
+    <a href="{% url 'admin:hq_redirects' %}" class="{% block nav_redirects %}{% endblock %}" title="Redirects">
+      <svg><use href="#ic-arrow-right"/></svg><span class="lbl">Redirects</span></a>
     {% endif %}
     {% if may_enq %}
     <a href="{% url 'admin:hq_enquiries' %}" class="{% block nav_enquiries %}{% endblock %}" title="Enquiries">

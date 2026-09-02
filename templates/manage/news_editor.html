@@ -18,17 +18,30 @@
     {% comment %}
     THE STORY'S OWN ADDRESS.
 
-    Nothing here is typed. The URL is built from the headline when the post is
-    first saved and then frozen, so a link already sent to someone keeps
-    working after the headline is edited. Before the first save this is a live
-    preview of what the address is going to be; after it, the real thing with
-    the two buttons you actually want at that moment — copy it, or go look at
-    it.
+    Built from the headline on the first save, and EDITABLE after that. It used
+    to be frozen, on the reasoning that a link already sent to somebody must
+    keep working — which was right about the risk and wrong about the fix. The
+    address is the one piece of a story an SEO team most wants control of, and
+    freezing it meant a headline typed in a hurry became a permanent URL.
+
+    So it moves, and the old address is written into the redirect table
+    pointing here (`admin_panel.views._apply_news_slug`). Every link already
+    shared still lands on the story; it just arrives via a 301.
+
+    Before the first save this is still a live preview of what the address is
+    going to be — there is nothing to rename yet.
     {% endcomment %}
     <div class="ned-url">
-      <span class="ned-url-k">{% if is_new %}Will publish at{% else %}Live at{% endif %}</span>
-      <b class="ned-url-v" data-slug-preview="/news/" {% if not is_new %}data-slug-fixed="{{ post.slug }}"{% endif %}>/news/&hellip;</b>
-      {% if not is_new %}
+      <span class="ned-url-k">{% if is_new %}Will publish at{% else %}Address{% endif %}</span>
+      {% if is_new %}
+      <b class="ned-url-v" data-slug-preview="/news/">/news/&hellip;</b>
+      {% else %}
+      <span class="ned-url-fix">/news/</span>
+      <input type="text" name="slug" form="newsForm" class="ned-url-in" value="{{ post.slug }}"
+             pattern="[a-z0-9\-]+" spellcheck="false"
+             aria-label="The story's address"
+             title="Lower case letters, numbers and hyphens. Changing this leaves a redirect behind.">
+      <span class="ned-url-fix">/</span>
       <button type="button" class="ned-url-btn" data-copy-link="{{ share_url }}" data-label="Copy link" title="Copy the link to this story">
         <svg><use href="#ic-link"/></svg> <span data-copy-label>Copy link</span>
       </button>
@@ -39,19 +52,60 @@
     </div>
   </div>
 
-  <form method="post"
+  {% comment %}
+  Named, because the address field above sits OUTSIDE this form — it belongs
+  visually with the link it edits, in the top bar — and `form="newsForm"` is
+  how an input submits with a form it is not inside.
+  {% endcomment %}
+  <form method="post" id="newsForm"
         action="{% if is_new %}{% url 'admin:hq_news_new' %}{% else %}{% url 'admin:hq_news_edit' post.id %}{% endif %}"
         enctype="multipart/form-data" data-busy="Saving">
     {% csrf_token %}
 
     <div class="ned-meta-row">
-      <div class="fld" style="margin-bottom:0;">
-        <label for="np_tag">Tag</label>
-        <select name="tag" id="np_tag">
+      {% comment %}
+      TAGS, PLURAL.
+
+      This was a single <select>, so a piece about both AFLW and NRLW had to
+      pick one code and be wrong about the other — and, worse, was missing from
+      one of the two filters readers use on the news list to find it. Tick as
+      many as apply. The first one ticked, in the order listed, is the one the
+      card and the article header show.
+      {% endcomment %}
+      <div class="fld ned-tags">
+        <label class="fld-label-plain">Tags <span class="ned-hint">tick every code this story is about</span></label>
+        <div class="ned-tagbox">
           {% for val, label in tag_choices %}
-          <option value="{{ val }}" {% if post.tag == val %}selected{% endif %}>{{ label }}</option>
+          <label class="ned-tag-check">
+            <input type="checkbox" name="tags" value="{{ val }}"
+                   {% if val in selected_tags %}checked{% endif %}>
+            <span>{{ label }}</span>
+          </label>
           {% endfor %}
-        </select>
+        </div>
+      </div>
+
+      {% comment %}
+      PUBLISH DATE — BACKDATING AND SCHEDULING IN ONE FIELD.
+
+      It was set to "now" at creation and never shown, so a write-up of last
+      weekend's games was dated today and sorted above this weekend's. A date
+      in the past puts the story where it belongs; a date in the future holds
+      it back until then, with no cron and nobody having to be at a keyboard —
+      every reader-facing query asks for `published_at <= now`, so the moment
+      simply arrives. See admin_panel.models.LivePostManager.
+
+      `datetime-local` sends wall-clock time with no zone; the view reads it in
+      the site's timezone, so "Friday 9am" means 9am here.
+      {% endcomment %}
+      <div class="fld ned-when">
+        <label for="np_published_at">Publish date</label>
+        <input type="datetime-local" name="published_at" id="np_published_at"
+               value="{{ published_at_value }}">
+        <small class="fld-hint">
+          {% if post.is_scheduled %}Scheduled &mdash; this will appear on the site on its own at that time.
+          {% else %}A past date backdates the story. A future date schedules it.{% endif %}
+        </small>
       </div>
     </div>
 
@@ -144,6 +198,18 @@
       {% endcomment %}
       <input type="file" name="image" accept="image/*" data-image-input class="ned-drop-file">
       <input type="hidden" name="image_clear" value="" data-image-clear-flag>
+    </div>
+    {% comment %}
+    Alt text for the featured image. Its own field rather than reusing the
+    headline: "what this picture shows" and "what this story is called" are
+    different sentences, and a search engine reads the first as a description
+    of the image itself. It is also the only thing a screen reader gets.
+    {% endcomment %}
+    <div class="fld ned-alt">
+      <label for="np_image_alt">Image alt text <span class="ned-hint">what the picture shows &mdash; for screen readers and search engines</span></label>
+      <input type="text" name="image_alt" id="np_image_alt" maxlength="200"
+             value="{{ post.image_alt }}"
+             placeholder="Crowd at the MCG holding club flags at dusk">
     </div>
 
     <label class="ned-field-label" style="margin-top:26px;">Full story</label>
@@ -243,10 +309,19 @@
       </div>
     </template>
 
+    {% comment %}
+    The SEO fields, shared with the page editor — same partial, same field
+    names, same model mixin. Folded away by default because a story does not
+    need any of it filled in: every box falls back to what the reader sees.
+    {% endcomment %}
+    <div style="margin-top:26px;">
+      {% include "manage/_seo_fields.html" with seo=post default_title=post.title default_description=post.excerpt default_image_url=post.image %}
+    </div>
+
     <div class="ned-publish-row" style="margin-top:28px;">
       <label for="np_pub">
         <input type="checkbox" name="is_published" id="np_pub" {% if post %}{% if post.is_published %}checked{% endif %}{% else %}checked{% endif %}>
-        Published (visible on every member's dashboard)
+        Published &mdash; visible on the site from its publish date above
       </label>
       <div class="ned-actions">
         <button type="submit" class="gt-go-btn" style="width:auto;">{% if is_new %}Save post{% else %}Save changes{% endif %} <svg><use href="#ic-check"/></svg></button>

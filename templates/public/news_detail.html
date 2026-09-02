@@ -2,9 +2,9 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}{{ post.title }} &middot; GoodTip{% endblock %}
+{% block title %}{{ post.meta_title|default:post.title }} &middot; GoodTip{% endblock %}
 {% block loader_task %}Opening the story{% endblock %}
-{% block meta_description %}{{ post.excerpt|default:post.title|truncatechars:150 }}{% endblock %}
+{% block meta_description %}{{ post.meta_description|default:post.excerpt|default:post.title|truncatechars:150 }}{% endblock %}
 {% block body_class %}page-news{% endblock %}
 {% block extra_head %}
 {% include "partials/_news_og.html" %}
@@ -16,7 +16,12 @@
   <div class="wrap">
     <div class="pnews-article">
       <a href="{% url 'news_index' %}" class="pn-back">&larr; All news</a>
-      {% if post.image %}<div class="pn-hero" style="background-image:url('{{ post.image.url }}')"><span class="pn-tag">{{ post.get_tag_display }}</span></div>{% endif %}
+      {% comment %}
+      A CSS background takes role="img" + aria-label rather than an alt — see
+      the member template for the reasoning. No alt text, no announcement.
+      {% endcomment %}
+      {% if post.image %}<div class="pn-hero" style="background-image:url('{{ post.image.url }}')"
+           {% if post.image_alt %}role="img" aria-label="{{ post.image_alt }}"{% endif %}>{% for t in post.tag_labels %}<span class="pn-tag">{{ t }}</span>{% endfor %}</div>{% endif %}
       <h1>{% if post.title_html %}{{ post.title_html|safe }}{% else %}{{ post.title }}{% endif %}</h1>
       <div class="pn-meta">{{ post.published_at|date:"l j F Y" }} &middot; {{ post.published_at|naturaltime }}</div>
       {% if post.excerpt_html %}<p class="pn-lead">{{ post.excerpt_html|safe }}</p>
@@ -32,8 +37,8 @@
       <div class="pnews-grid">
         {% for p in more|slice:":3" %}
         <a class="pnews-card" href="{% url 'news_detail' p.slug %}">
-          {% if p.image %}<div class="pn-thumb" style="background-image:url('{{ p.image.url }}')"><span class="pn-tag">{{ p.get_tag_display }}</span></div>
-          {% else %}<div class="pn-thumb noimg"><span class="pn-tag">{{ p.get_tag_display }}</span></div>{% endif %}
+          {% if p.image %}<div class="pn-thumb" style="background-image:url('{{ p.image.url }}')"><span class="pn-tag">{{ p.tag_labels.0 }}</span></div>
+          {% else %}<div class="pn-thumb noimg"><span class="pn-tag">{{ p.tag_labels.0 }}</span></div>{% endif %}
           <div class="pn-body"><h3>{{ p.title }}</h3><span class="pn-date">{{ p.published_at|naturaltime }}</span></div>
         </a>
         {% endfor %}

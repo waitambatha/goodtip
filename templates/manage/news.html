@@ -38,6 +38,20 @@
     is a chip on the right where the eye ends, and the actions are grouped with
     delete separated and coloured as the exception it is.
     {% endcomment %}
+    {% if scheduled_count %}
+    {% comment %}
+    A scheduled story is not on the site and not in the list of live ones, so
+    the only way anybody would learn one is coming is by opening it. Said once,
+    at the top, rather than left to be inferred from a row's date.
+    {% endcomment %}
+    <div class="gt-note" style="margin:0 0 14px;">
+      <b>{{ scheduled_count }} stor{{ scheduled_count|pluralize:"y,ies" }} scheduled.</b>
+      {{ scheduled_count|pluralize:"It is,They are" }} written and published, and
+      will appear on the site {{ scheduled_count|pluralize:"at its,at their" }}
+      publish time without anybody having to come back.
+    </div>
+    {% endif %}
+
     <div class="np-list">
       {% for p in posts %}
       <article class="np-row{% if not p.is_published %} is-draft{% endif %}">
@@ -49,13 +63,24 @@
         <div class="np-body">
           <div class="np-top">
             <h3 class="np-title">{{ p.title }}</h3>
-            {% if p.is_published %}<span class="gt-chip live">Live</span>
+            {% comment %}
+            THREE STATES, NOT TWO. "Published" used to mean "on the site", and
+            with scheduling it does not: a story can be published and not yet
+            due. A green Live chip against something no reader can reach is the
+            one label here that would be a lie.
+            {% endcomment %}
+            {% if p.is_scheduled %}<span class="gt-chip draft">Scheduled</span>
+            {% elif p.is_published %}<span class="gt-chip live">Live</span>
             {% else %}<span class="gt-chip draft">Draft</span>{% endif %}
           </div>
           <p class="np-meta">
-            <span class="np-tag"><svg aria-hidden="true"><use href="#ic-flag"/></svg>{{ p.get_tag_display }}</span>
+            {% comment %}
+            Every code the story is filed under, not just the first — that is
+            the point of tagging it with both.
+            {% endcomment %}
+            <span class="np-tag"><svg aria-hidden="true"><use href="#ic-flag"/></svg>{{ p.tag_labels|join:", " }}</span>
             <span class="np-sep" aria-hidden="true">&middot;</span>
-            <span>{{ p.published_at|date:"j M Y, g:i a" }}</span>
+            <span>{% if p.is_scheduled %}Publishes {% endif %}{{ p.published_at|date:"j M Y, g:i a" }}</span>
             {% if p.created_by %}
             <span class="np-sep" aria-hidden="true">&middot;</span>
             <span>{{ p.created_by.display_name }}</span>
@@ -76,7 +101,7 @@
             posts because that URL 404s until the post is live — offering a
             link that does not resolve yet is worse than not offering one.
             {% endcomment %}
-            {% if p.is_published %}
+            {% if p.is_live %}
             <button type="button" class="np-btn" data-copy-link="{{ p.share_url }}" title="{{ p.share_url }}">
               <span data-copy-label>Copy link</span>
             </button>
@@ -91,7 +116,7 @@
             Emailing is offered once. After that the row says so above rather
             than showing a button that would send a duplicate to every member.
             {% endcomment %}
-            {% if p.is_published and not p.announced_at %}
+            {% if p.is_live and not p.announced_at %}
             <form method="post" action="{% url 'admin:hq_news_announce' p.id %}" data-busy="Sending"
                   data-confirm="Every member with email notifications on will receive this post. This cannot be recalled."
                   data-confirm-title="Email this to all members?" data-confirm-ok="Send email">

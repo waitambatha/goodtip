@@ -286,11 +286,23 @@ def _attr(value: str) -> str:
     )
 
 
+def _with_alt(raw: str, alt: str) -> str:
+    """Set the alt attribute on one <img> tag, adding it if it has none."""
+    if re.search(r'\salt\s*=', raw, re.IGNORECASE):
+        return re.sub(
+            r'(\salt\s*=\s*)("[^"]*"|\'[^\']*\'|[^\s>]+)',
+            lambda m: m.group(1) + '"' + _attr(alt) + '"',
+            raw, count=1, flags=re.IGNORECASE,
+        )
+    return _tag_with(raw, f'alt="{_attr(alt)}"')
+
+
 def rewrite(html: str, edits: dict, *, edit_mode: bool = False):
     """Apply `edits` to `html`, optionally tagging the blocks for the editor.
 
-    `edits` is {block_key: (kind, replacement)} — replacement being the new
-    inner HTML for a text block, or the new src for an image.
+    `edits` is {block_key: (kind, replacement, alt)} — replacement being the
+    new inner HTML for a text block, or the new src for an image; `alt` is used
+    only for images and may be absent on an older caller.
 
     Returns (html, applied_keys). With no edits and edit_mode off, the HTML
     comes back exactly as it went in.
@@ -325,13 +337,33 @@ def rewrite(html: str, edits: dict, *, edit_mode: bool = False):
         if kind == "image":
             raw = tok.raw
             if edit is not None and edit[1]:
-                # Swap the src, keep every other attribute — alt text, sizes,
-                # loading, the lot.
+                # Swap the src, keep every other attribute — sizes, loading,
+                # the lot.
                 raw = re.sub(
                     r'(\ssrc\s*=\s*)("[^"]*"|\'[^\']*\'|[^\s>]+)',
                     lambda m: m.group(1) + '"' + _attr(edit[1]) + '"',
                     raw, count=1, flags=re.IGNORECASE,
                 )
+                # ALT IS NOT ONE OF THE ATTRIBUTES THAT SURVIVES A SWAP.
+                #
+                # Everything else on the tag still describes the slot: how big
+                # it is, when to load it. `alt` describes the PICTURE, and the
+                # picture has just been replaced — so keeping the old one meant
+                # every swapped photograph on the site was announced as the one
+                # it replaced. An admin who typed a description gets it; one who
+                # left it empty gets alt="", which is correct markup for a
+                # decorative image and honest about saying nothing.
+                raw = _with_alt(raw, edit[2] if len(edit) > 2 else "")
+            elif edit is not None and len(edit) > 2 and edit[2]:
+                # ALT ON ITS OWN, no new file.
+                #
+                # The picture on the page is the right picture and its
+                # description is wrong or missing — which is most of them,
+                # because the descriptions were written into the templates by
+                # whoever put the photograph there. Without this the only way to
+                # fix one from the admin was to replace a picture that did not
+                # need replacing.
+                raw = _with_alt(raw, edit[2])
             if edit_mode:
                 raw = _tag_with(raw, f'data-gte-img="{_attr(key)}"')
             out.append(raw)

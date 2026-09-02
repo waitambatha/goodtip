@@ -1,0 +1,91 @@
+{% extends "hq_base.html" %}
+{% load static %}
+{% block title %}SEO: {{ page.label }} &middot; Manage{% endblock %}
+{% block nav_seo %}on{% endblock %}
+{% block hero_title %}{{ page.label }}{% endblock %}
+{% block hero_lead %}{{ page.blurb }}{% endblock %}
+{% block hero_shot %}{% static 'img/scenes/aussie-crowd-flag.jpg' %}{% endblock %}
+{% block admin_content %}
+
+<div class="gt-shell gt-shell-single">
+  <div class="ned-topbar">
+    <a href="{% url 'admin:hq_seo' %}" class="ned-back">&larr; All pages</a>
+    {% if default_path %}
+    <div class="ned-url">
+      <span class="ned-url-k">Currently at</span>
+      <b class="ned-url-v">{{ seo.path_override|default:default_path }}</b>
+      <a class="ned-url-btn" href="{{ seo.path_override|default:default_path }}" target="_blank" rel="noopener">
+        <svg><use href="#ic-eye"/></svg> View
+      </a>
+      {% comment %}
+      Opens the page with the wording editor already on. The two screens edit
+      different halves of the same page — what it says, and how it is described
+      to a search engine — and having found one an admin should not have to go
+      looking for the other.
+      {% endcomment %}
+      <a class="ned-url-btn" href="{{ seo.path_override|default:default_path }}?gt_edit=1" target="_blank" rel="noopener">
+        <svg><use href="#ic-doc"/></svg> Edit wording
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  <form method="post" enctype="multipart/form-data" data-busy="Saving">
+    {% csrf_token %}
+
+    <section class="gt-panel">
+      <div class="gt-panel-head">
+        <span class="gp-ic"><svg><use href="#ic-link"/></svg></span>
+        <div>
+          <h2>Address</h2>
+          <div class="gp-sub">Where this page lives. Changing it leaves a permanent redirect behind.</div>
+        </div>
+      </div>
+
+      {% if page.needs %}
+      {% comment %}
+      A page that needs an organisation id has no single address to move — it
+      is one page per group. Saying so beats showing a box that cannot work.
+      {% endcomment %}
+      <p class="fld-hint" style="padding:4px 2px 10px;">
+        This page exists once per group, so it has no single address to change.
+        Everything below still applies to all of them.
+      </p>
+      {% else %}
+      <div class="fld">
+        <label for="seo_path">Address</label>
+        <input type="text" name="path_override" id="seo_path"
+               value="{{ seo.path_override }}" placeholder="{{ default_path }}"
+               spellcheck="false">
+        <small class="fld-hint">
+          Built in as <code>{{ default_path }}</code>. Type a different one &mdash;
+          <code>/why-goodtip/</code> &mdash; to move the page there. The old
+          address redirects to the new one permanently, so nothing already
+          shared or indexed breaks. Clear the box to move it back.
+        </small>
+      </div>
+      {% endif %}
+    </section>
+
+    <section class="gt-panel" style="margin-top:16px;">
+      <div class="gt-panel-head">
+        <span class="gp-ic"><svg><use href="#ic-search"/></svg></span>
+        <div>
+          <h2>Search &amp; social</h2>
+          <div class="gp-sub">Every box is an override. Leave one blank and the page keeps saying what it says now.</div>
+        </div>
+      </div>
+      {% include "manage/_seo_fields.html" with seo=seo open_seo=1 %}
+    </section>
+
+    <div class="ned-publish-row" style="margin-top:22px;">
+      <span class="fld-hint">
+        {% if seo.updated_at and seo.pk %}Last changed {{ seo.updated_at|date:"j M Y, g:i a" }}{% if seo.updated_by %} by {{ seo.updated_by.display_name }}{% endif %}.{% endif %}
+      </span>
+      <div class="ned-actions">
+        <button type="submit" class="gt-go-btn" style="width:auto;">Save settings <svg><use href="#ic-check"/></svg></button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
