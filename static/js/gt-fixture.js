@@ -133,6 +133,23 @@
     var bar = document.getElementById('slipBar');
     if (count) count.textContent = picked;
     if (bar && cards.length) bar.style.width = Math.round(picked / cards.length * 100) + '%';
+
+    /* THE CONFIRM BUTTON FOLLOWS THE COUNT.
+     *
+     * "Why am I seeing Confirm my tips when I have not picked anything?" —
+     * and the answer was that two different places were deciding. The server
+     * renders the button hidden on an untipped slate and dashboard.html's
+     * slipRefresh() re-decides on load and after an htmx swap; neither of
+     * those runs when you press a team, which is the only moment the answer
+     * can actually change. So the first pick left the button hidden until
+     * something else happened to re-render, and taking every pick back left
+     * it on screen offering to confirm nothing.
+     *
+     * This function already recounts on every press. It owns the button too
+     * now, using the SAME count — the one that excludes the hidden "no tip"
+     * radio — so the button cannot disagree with the number beside it. */
+    var review = document.getElementById('slipReview');
+    if (review) review.hidden = picked === 0;
   }
 
   /* Draw a card as picked or not. One function for both directions, because

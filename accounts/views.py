@@ -1049,7 +1049,24 @@ def dashboard_view(request):
 
     # `live`, not `is_published=True` — a story queued for next Friday is
     # published and is not due. See admin_panel.models.LivePostManager.
-    news_posts = list(NewsPost.live.all()[:9])
+    #
+    # SIX AT A TIME, IN SLIDES (Sep 2026, client). The dashboard used to show
+    # three cards and then repeat the rest as a flat list of headlines under
+    # them — the same stories twice, in two shapes, taking a screenful for six
+    # links. The list is gone; the cards now carry six and the deck turns
+    # itself over every few seconds, so the space holds a rotating window onto
+    # everything published rather than a fixed three.
+    #
+    # 18 rather than 9: three full turns of the deck. Enough that the rotation
+    # is worth having, bounded so a busy news week does not put eighty cards
+    # into every dashboard's HTML.
+    news_posts = list(NewsPost.live.all()[:18])
+    # Chunked here rather than in the template, because Django's template
+    # language cannot slice by a computed index and the alternative is a
+    # custom filter doing exactly this. A deck of one slide is the ordinary
+    # case for a new organisation and the template turns the rotation off for
+    # it — see the news block in dashboard.html.
+    news_slides = [news_posts[i:i + 6] for i in range(0, len(news_posts), 6)]
 
     return render(request, "dashboard.html", {
         "cards": cards,
@@ -1077,8 +1094,10 @@ def dashboard_view(request):
         "round_nav": round_nav,
         "preview_round": preview_round,
         "create_url": reverse("orgs:create"),
-        "news_leads": news_posts[:3],
-        "news_more": news_posts[3:],
+        "news_slides": news_slides,
+        # Kept so the first slide can be named in the markup without indexing
+        # into the deck twice.
+        "news_any": bool(news_posts),
         "prompts": _dashboard_prompts(request.user, selected, games),
     })
 

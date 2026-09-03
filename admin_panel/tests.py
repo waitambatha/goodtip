@@ -1129,3 +1129,95 @@ class RenamingAStoryTests(TestCase):
         self._edit(title_html="Finals race tightens further")
         self.post.refresh_from_db()
         self.assertEqual(self.post.slug, "finals-race-tightens")
+
+
+class StoryReaderTests(TestCase):
+    """One story page, for everyone, with the opening third free.
+
+    Two client notes in one screen:
+
+      "I clicked it while I was at the public page news, and I was taken to
+      the blog itself in my page ... it should be a page in itself."
+
+      "Let them see like 1/3 of the blog, and if they want to read our blogs
+      in full they will have to sign in, and if not a member they will sign
+      up."
+    """
+
+    def setUp(self):
+        self.member = User.objects.create_user(
+            email="reader@goodtip.test", password="Str0ng!pass", display_name="Reader",
+        )
+        # Long enough to be worth gating: _story_preview leaves a short story
+        # whole, because a three-line piece cut to one line is a tease with no
+        # article behind it.
+        self.body = "".join(
+            f"<p>Paragraph {n} about the finals race and what it means.</p>"
+            for n in range(1, 21)
+        )
+        self.post = NewsPost.objects.create(
+            title="The finals race", slug="the-finals-race",
+            excerpt="Where it stands.", body=self.body,
+            is_published=True, published_at=timezone.now(),
+        )
+        self.url = reverse("news_detail", args=[self.post.slug])
+
+    def test_a_member_does_not_get_the_app_nav_on_a_story(self):
+        """The bug as reported: a signed-in member pressing a story on the
+        public news page landed inside their own dashboard."""
+        self.client.force_login(self.member)
+        html = self.client.get(self.url).content.decode()
+        self.assertTemplateUsed(self.client.get(self.url), "news_reader.html")
+        # The member nav's own markers, none of which belong on a story page.
+        self.assertNotIn("app-nav", html)
+        self.assertNotIn("charity-strip", html)
+
+    def test_a_member_reads_the_whole_story(self):
+        self.client.force_login(self.member)
+        html = self.client.get(self.url).content.decode()
+        self.assertIn("Paragraph 20", html)
+        self.assertNotIn("rd-gate", html)
+
+    def test_a_visitor_gets_the_opening_and_an_invitation(self):
+        html = self.client.get(self.url).content.decode()
+        self.assertIn("Paragraph 1 about", html)
+        self.assertIn("Create a free account", html)
+
+    def test_the_rest_of_the_story_is_not_in_the_response(self):
+        """THE POINT OF THE WHOLE THING. A gate that ships the article and
+        covers two-thirds of it with a gradient is not a gate — it is in View
+        Source, in reader mode, and in what a crawler indexes."""
+        html = self.client.get(self.url).content.decode()
+        self.assertNotIn("Paragraph 20", html)
+
+    def test_the_log_in_link_comes_back_to_the_story(self):
+        """Somebody who already has an account should land back on what they
+        were reading, not on a dashboard having forgotten what it was."""
+        html = self.client.get(self.url).content.decode()
+        self.assertIn("next=", html)
+        self.assertIn(self.post.slug, html)
+
+    def test_a_short_story_is_not_gated(self):
+        short = NewsPost.objects.create(
+            title="Quick one", slug="quick-one", body="<p>Two lines, that's it.</p>",
+            is_published=True, published_at=timezone.now(),
+        )
+        html = self.client.get(reverse("news_detail", args=[short.slug])).content.decode()
+        self.assertIn("Two lines", html)
+        self.assertNotIn("Create a free account", html)
+
+    def test_the_preview_is_still_valid_html(self):
+        """Truncator walks the tree rather than slicing the string, so what
+        comes back closes every tag it opened. Cutting markup at an arbitrary
+        character leaves a half-written tag and the browser closes it wherever
+        it likes, taking the rest of the page with it."""
+        html = self.client.get(self.url).content.decode()
+        opened = html.count("<p>Paragraph")
+        closed = len(re.findall(r"Paragraph \d+ about[^<]*</p>", html))
+        self.assertEqual(opened, closed)
+        self.assertGreater(opened, 0)
+
+    def test_a_scheduled_story_still_404s(self):
+        self.post.published_at = timezone.now() + timedelta(days=3)
+        self.post.save(update_fields=["published_at"])
+        self.assertEqual(self.client.get(self.url).status_code, 404)

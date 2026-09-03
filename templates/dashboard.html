@@ -453,38 +453,88 @@ is the part members care about and the part that is still true.
   {% endcomment %}
 </div>
 
-<!-- news & blog — cards click through to the full story -->
-{% if news_leads %}
+<!-- news & blog — a rotating deck of six, cards click through to the full story -->
+{% if news_any %}
+{% comment %}
+SIX CARDS THAT TURN OVER, NOT THREE PLUS A LIST.
+
+What was here: three picture cards, and then every other story repeated
+underneath as a bare list of headline + timestamp. Two shapes for one thing,
+the same stories twice, and a screenful spent on six links — which is what the
+client was looking at when they said "let it not be static, it should have a
+slick way of changing".
+
+So the list is gone and the cards do the work. Six at a time in a 3×2 grid;
+if there are more than six published, the deck turns over every five seconds
+and the dots below say how many turns there are.
+
+The rotation is CSS opacity between absolutely-stacked slides rather than a
+transform track, because the slides are different heights (a story with no
+excerpt is shorter than one with) and a sliding track would jump the page
+under the reader every turn. Stacked, the block is as tall as its tallest
+slide and never moves.
+
+Everything is a real link in the markup from the first paint — no slide is
+built by script — so with JavaScript off this is simply the six most recent
+stories, which is a perfectly good answer.
+{% endcomment %}
 <div class="hub-h" style="margin-bottom:14px;"><span class="k">News &amp; blog</span><a href="{% url 'news_index' %}">All news &amp; blog &rarr;</a></div>
-<div class="grid-app g-3" style="margin-bottom:16px;">
-  {% for p in news_leads %}
-  <a class="news-lead news-link" href="{% url 'news_detail' p.slug %}">
-    {% if p.image %}
-    <div class="thumb" style="background-image:url('{{ p.image.url }}')"><span class="sport-tag">{{ p.get_tag_display }}</span></div>
-    {% else %}
-    <div class="thumb noimg"><span class="sport-tag">{{ p.get_tag_display }}</span><span class="noimg-mark">GOOD<span>TIP</span></span></div>
-    {% endif %}
-    <div class="body">
-      <h4>{{ p.title }}</h4>
-      {% if p.excerpt %}<p>{{ p.excerpt|truncatechars:140 }}</p>{% endif %}
-      <div class="date">{{ p.published_at|naturaltime }} &middot; <span class="read-on">Read the full story &rarr;</span></div>
+<div class="news-deck{% if news_slides|length > 1 %} is-live{% endif %}" data-news-deck data-interval="5000">
+  <div class="nd-stage">
+    {% for slide in news_slides %}
+    {% comment %}
+    aria-hidden on the slides that are not showing, so a screen reader is not
+    read eighteen headlines when six are on screen. The first slide keeps
+    focusable content; the rest are inert until their turn.
+    {% endcomment %}
+    <div class="nd-slide{% if forloop.first %} on{% endif %}" data-news-slide
+         {% if not forloop.first %}aria-hidden="true"{% endif %}>
+      {% for p in slide %}
+      <a class="news-lead news-link" href="{% url 'news_detail' p.slug %}"
+         {% if not forloop.parentloop.first %}tabindex="-1"{% endif %}>
+        {% if p.image %}
+        <div class="thumb" style="background-image:url('{{ p.image.url }}')"><span class="sport-tag">{{ p.tag_labels.0 }}</span></div>
+        {% else %}
+        <div class="thumb noimg"><span class="sport-tag">{{ p.tag_labels.0 }}</span><span class="noimg-mark">GOOD<span>TIP</span></span></div>
+        {% endif %}
+        <div class="body">
+          <h4>{{ p.title }}</h4>
+          {% if p.excerpt %}<p>{{ p.excerpt|truncatechars:120 }}</p>{% endif %}
+          <div class="date">{{ p.published_at|naturaltime }} &middot; <span class="read-on">Read the full story &rarr;</span></div>
+        </div>
+      </a>
+      {% endfor %}
     </div>
-  </a>
-  {% endfor %}
-</div>
-{% if news_more %}
-<div class="news-list" style="margin-bottom:22px;">
-  {% for p in news_more %}
-  <a class="news-item news-link" href="{% url 'news_detail' p.slug %}">
-    <span class="ntag {{ p.tag|lower }}">{{ p.get_tag_display }}</span>
-    <div>
-      <div class="nt">{{ p.title }}</div>
-      <div class="nd">{{ p.published_at|naturaltime }}</div>
+    {% endfor %}
+  </div>
+
+  {% comment %}
+  The controls only exist when there is more than one turn. A deck of one with
+  a pause button and a single dot under it is a control that does nothing,
+  which is worse than no control.
+  {% endcomment %}
+  {% if news_slides|length > 1 %}
+  <div class="nd-foot">
+    <div class="nd-dots" role="tablist" aria-label="News pages">
+      {% for slide in news_slides %}
+      <button type="button" class="nd-dot{% if forloop.first %} on{% endif %}" data-news-dot="{{ forloop.counter0 }}"
+              role="tab" aria-selected="{% if forloop.first %}true{% else %}false{% endif %}"
+              aria-label="Stories {{ forloop.counter }} of {{ news_slides|length }}"></button>
+      {% endfor %}
     </div>
-  </a>
-  {% endfor %}
+    {% comment %}
+    A pause that is a real control, not a hover behaviour only. Someone
+    reading a headline with a keyboard, or on a touch screen where there is no
+    hover at all, has to be able to stop the thing moving.
+    {% endcomment %}
+    <button type="button" class="nd-pause" data-news-pause aria-pressed="false">
+      <svg class="ndp-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="3.4" height="14" rx="1.2"/><rect x="13.6" y="5" width="3.4" height="14" rx="1.2"/></svg>
+      <svg class="ndp-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.4v13.2L19 12z"/></svg>
+      <span data-news-pause-label>Pause</span>
+    </button>
+  </div>
+  {% endif %}
 </div>
-{% endif %}
 {% endif %}
 
 {% endwith %}
@@ -499,6 +549,101 @@ any one card.
 {% endblock %}
 
 {% block app_js %}
+/* ---- NEWS DECK ----------------------------------------------------------
+   Six story cards that turn over every five seconds.
+
+   Three things it has to get right, and each is a bug somebody has shipped in
+   a carousel before:
+
+   * IT MUST STOP WHEN SOMEBODY IS READING IT. Hover and keyboard focus both
+     pause; so does the explicit button, which is the only one that works on a
+     touch screen. Hover resuming a deck the reader deliberately paused would
+     make the button a suggestion, so `manual` outranks `hover`.
+
+   * IT MUST NOT MOVE WHEN THE TAB IS HIDDEN. Left running in a background
+     tab, a five-second timer turns the deck a few hundred times and the
+     reader comes back to slide 47 of 3 — plus it is work nobody asked for.
+
+   * IT MUST RESPECT prefers-reduced-motion. Somebody who has asked their
+     machine to stop things moving has asked this to stop moving too, so it
+     never starts at all and the dots become the way through.
+
+   The slides are stacked and cross-faded by CSS class; nothing here measures
+   or positions anything, so a slide whose cards wrap to a different height
+   cannot shift the page. */
+(function(){
+  var deck = document.querySelector('[data-news-deck]');
+  if (!deck) return;
+  var slides = Array.prototype.slice.call(deck.querySelectorAll('[data-news-slide]'));
+  if (slides.length < 2) return;
+  var dots = Array.prototype.slice.call(deck.querySelectorAll('[data-news-dot]'));
+  var pauseBtn = deck.querySelector('[data-news-pause]');
+  var pauseLabel = deck.querySelector('[data-news-pause-label]');
+  var every = parseInt(deck.getAttribute('data-interval'), 10) || 5000;
+  var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var i = 0, timer = null, manual = still, hovering = false;
+
+  function show(n){
+    i = (n + slides.length) % slides.length;
+    slides.forEach(function(s, k){
+      var on = k === i;
+      s.classList.toggle('on', on);
+      /* Out-of-view cards are taken out of the accessibility tree AND out of
+         the tab order. Left focusable, tabbing through the dashboard walks
+         eighteen invisible links. */
+      if (on) s.removeAttribute('aria-hidden'); else s.setAttribute('aria-hidden', 'true');
+      s.querySelectorAll('a').forEach(function(a){
+        if (on) a.removeAttribute('tabindex'); else a.setAttribute('tabindex', '-1');
+      });
+    });
+    dots.forEach(function(d, k){
+      d.classList.toggle('on', k === i);
+      d.setAttribute('aria-selected', k === i ? 'true' : 'false');
+    });
+  }
+  function stop(){ if (timer) { clearInterval(timer); timer = null; } }
+  function start(){
+    stop();
+    if (manual || hovering || document.hidden) return;
+    timer = setInterval(function(){ show(i + 1); }, every);
+  }
+
+  dots.forEach(function(d){
+    d.addEventListener('click', function(){
+      show(parseInt(d.getAttribute('data-news-dot'), 10) || 0);
+      /* Stepping by hand restarts the clock rather than leaving the next turn
+         a few hundred milliseconds away — otherwise picking a slide can flick
+         straight past it. */
+      start();
+    });
+  });
+  if (pauseBtn) {
+    pauseBtn.addEventListener('click', function(){
+      manual = !manual;
+      pauseBtn.setAttribute('aria-pressed', manual ? 'true' : 'false');
+      deck.classList.toggle('is-paused', manual);
+      if (pauseLabel) pauseLabel.textContent = manual ? 'Play' : 'Pause';
+      start();
+    });
+    if (still) {
+      /* Started paused because the reader asked for no motion. The button
+         still says so, so the state on screen is the truth. */
+      pauseBtn.setAttribute('aria-pressed', 'true');
+      deck.classList.add('is-paused');
+      if (pauseLabel) pauseLabel.textContent = 'Play';
+    }
+  }
+  ['mouseenter', 'focusin'].forEach(function(ev){
+    deck.addEventListener(ev, function(){ hovering = true; stop(); });
+  });
+  ['mouseleave', 'focusout'].forEach(function(ev){
+    deck.addEventListener(ev, function(){ hovering = false; start(); });
+  });
+  document.addEventListener('visibilitychange', start);
+  show(0);
+  start();
+})();
+
 /* Welcome banner ticker, the prompts cycle so the banner is a message
    channel, not a static greeting. Pauses on hover; dots let you step. */
 (function(){
@@ -561,7 +706,12 @@ any one card.
         var r = rows(), n = 0;
         var count = document.getElementById('slipCount');
         var bar = document.getElementById('slipBar');
-        r.forEach(function(row){ if (row.querySelector('input:checked')) n++; });
+        /* `:not([data-no-tip])`, or the hidden "no tip" member of each radio
+           group is counted as a pick — un-picking a match checks it, so a
+           slate somebody had emptied reported itself full and kept the
+           Confirm button on screen. Same test gt-fixture.js uses; the two
+           have to agree or the button and the number disagree. */
+        r.forEach(function(row){ if (row.querySelector('input[type="radio"]:checked:not([data-no-tip])')) n++; });
         if (count) count.textContent = n;
         if (bar && r.length) bar.style.width = Math.round(n / r.length * 100) + '%';
         /* "If I have not tipped, why am I seeing Confirm your tip?" — offering

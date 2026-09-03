@@ -1401,7 +1401,7 @@ def apply_verification_to_org(org, row) -> None:
 # Message attachments
 # ---------------------------------------------------------------------------
 
-def attach_files(message, files) -> list:
+def attach_files(message, files, *, voice=False, duration_s=0) -> list:
     """Hang uploaded files off a message. Returns the problems, not raises.
 
     A partial send is the right outcome here and an exception cannot express
@@ -1426,6 +1426,12 @@ def attach_files(message, files) -> list:
             )
             continue
         suffix = Path(upload.name).suffix.lower()
+        if voice and suffix not in MessageAttachment.ALLOWED_SUFFIXES:
+            # A recording whose container this build does not list. Nothing
+            # the sender can do about it, so say what happened rather than
+            # accusing them of attaching the wrong kind of file.
+            problems.append("That recording didn\u2019t come through in a format we can play.")
+            continue
         if suffix not in MessageAttachment.ALLOWED_SUFFIXES:
             problems.append(
                 f"“{upload.name}” isn't a kind of file we accept "
@@ -1449,6 +1455,17 @@ def attach_files(message, files) -> list:
             original_name=upload.name[:200],
             content_type=(getattr(upload, "content_type", "") or "")[:100],
             size=upload.size or 0,
+            # A voice note is a recording the page just made, not a file
+            # anybody chose, and the two arrive in the same containers — a
+            # .webm is either. Only the caller knows which this is.
+            is_voice=voice,
+            # Clamped, because the number arrives from the page and the page
+            # is not a source of truth about anything. The recorder stops at
+            # the ceiling; this is what happens when something else does not.
+            duration_s=(
+                min(int(duration_s or 0), MessageAttachment.MAX_VOICE_SECONDS)
+                if voice else 0
+            ),
         )
         kept += 1
     return problems
@@ -1460,6 +1477,9 @@ def attach_files(message, files) -> list:
 
 def member_threads(user, *, org=None) -> list:
     """Every message thread this member can read, newest activity first.
+
+    `keep` names one conversation that must appear whatever else is true —
+    see the empty-direct-message case below.
 
     ACROSS ALL THEIR ORGANISATIONS, and that is the point of it. The screen
     this feeds used to be scoped to one organisation — whichever one the nav
@@ -1490,8 +1510,7 @@ def member_threads(user, *, org=None) -> list:
         return []
 
     threads = (
-        MessageThread.objects
-        .filter(org_id__in=memberships)
+        plausible_threads(user, list(memberships))
         .select_related("started_by", "org", "group")
         .prefetch_related("recipients")
         .order_by("-last_message_at")
@@ -1535,9 +1554,14 @@ def unread_message_count(user) -> int:
     if not org_ids:
         return 0
 
+    # Narrowed to threads this person could plausibly be in BEFORE the unread
+    # messages in them are counted. Without it, every direct message between
+    # two other members of a large organisation is a candidate — none of them
+    # have been read by this user, because none of them are theirs — and the
+    # badge on every page view walks the lot to discard them.
     candidates = set(
         Message.objects
-        .filter(thread__org_id__in=org_ids)
+        .filter(thread__in=plausible_threads(user, org_ids))
         .exclude(author=user)
         .exclude(read_by=user)
         .values_list("thread_id", flat=True)
@@ -1633,6 +1657,14 @@ def thread_audience(thread):
         "group": None,
     }
 
+#: How much of a room is drawn at once. A support ticket is a dozen messages
+#: and this never mattered; an organisation room is open-ended, and rendering
+#: three years of it into every page load — and into every twelve-second
+#: refresh — is the difference between a screen that opens and one that does
+#: not. The newest 200, oldest first, which is what a conversation is.
+ROOM_PAGE = 200
+
+
 def thread_entries(thread, user):
     """A thread's messages, ready to draw as a conversation.
 
@@ -1651,13 +1683,21 @@ def thread_entries(thread, user):
     message. Threads are short, but a query per bubble is the kind of thing
     that is invisible until a thread is fifty bubbles long.
     """
-    from .models import OrgMember
+    from .models import Message, OrgMember
 
+    # NEWEST 200, THEN TURNED BACK ROUND. Slicing from the end is the only way
+    # to say "the most recent" in SQL; the list is then reversed so the
+    # conversation still reads oldest-first, which is what a conversation is.
     entries = list(
-        thread.messages
-        .select_related("author", "reply_to", "reply_to__author")
-        .prefetch_related("attachments", "read_by")
-        .order_by("created_at")
+        reversed(
+            thread.messages
+            .select_related("author", "reply_to", "reply_to__author")
+            # `reactions` prefetched with the rest, so a thread with a
+            # reaction on every bubble still costs the same few queries as one
+            # with none.
+            .prefetch_related("attachments", "read_by", "reactions")
+            .order_by("-created_at")[:ROOM_PAGE]
+        )
     )
     roles = {
         m.user_id: m
@@ -1667,6 +1707,7 @@ def thread_entries(thread, user):
         )
     }
     previous = None
+    to_mark = []
     for entry in entries:
         # THE RECEIPT, COMPUTED BEFORE THIS READER IS ADDED BELOW.
         #
@@ -1693,7 +1734,13 @@ def thread_entries(thread, user):
         readers = [u for u in entry.read_by.all() if u.id != entry.author_id]
         entry.read_count = len(readers)
         entry.is_read = bool(readers)
-        entry.read_by.add(user)
+        # COLLECTED, NOT WRITTEN HERE. `entry.read_by.add(user)` is one query
+        # per message, which for a support ticket was invisible and for a room
+        # of two hundred messages refreshed every twelve seconds is two
+        # hundred writes per viewer per refresh. They go up in one statement
+        # after the loop instead — see below.
+        if not any(u.id == user.id for u in entry.read_by.all()):
+            to_mark.append(entry.id)
         entry.is_mine = entry.author_id == user.id
         entry.show_head = (
             previous is None
@@ -1703,6 +1750,19 @@ def thread_entries(thread, user):
             # morning is a new turn even from the same person.
             or (entry.created_at - previous.created_at).total_seconds() > 900
         )
+        # One chip per distinct emoji: the emoji, how many people, and whether
+        # you are one of them — which is what lets pressing a chip take you
+        # back out of it. Built here from the prefetched rows rather than
+        # counted in SQL per message, because it is three fields off a list
+        # that is already in memory.
+        chips = {}
+        for row in entry.reactions.all():
+            chip = chips.setdefault(row.emoji, {"emoji": row.emoji, "count": 0, "mine": False})
+            chip["count"] += 1
+            if row.user_id == user.id:
+                chip["mine"] = True
+        entry.reaction_chips = list(chips.values())
+
         member = roles.get(entry.author_id)
         entry.author_role = (
             "Organisation admin" if (member and member.can_manage)
@@ -1710,4 +1770,434 @@ def thread_entries(thread, user):
             else "No longer a member"
         )
         previous = entry
+
+    if to_mark:
+        # One INSERT for the lot. ignore_conflicts because two tabs open on
+        # the same room will both decide the same message is unread, and the
+        # unique index on the through table is what makes that safe rather
+        # than a crash.
+        through = Message.read_by.through
+        through.objects.bulk_create(
+            [through(message_id=mid, user_id=user.id) for mid in to_mark],
+            ignore_conflicts=True,
+        )
     return entries
+
+
+# ---------------------------------------------------------------------------
+# THE ROOMS (Sep 2026)
+#
+# "Someone joins, creates an organisation … within those organisations they
+# might want groups … so basically the messages is where I can chat."
+#
+# Three rooms, one model. An organisation room every member of the
+# organisation is in; a group room every member of that group is in; and a
+# direct message between two people. All three are MessageThread rows with a
+# different `kind`, so everything already built around a thread — bubbles,
+# attachments, quoting, read receipts, notifications, the unread badge — works
+# on them without being written a second time.
+#
+# Every one of these is get-or-create rather than a row made up front. There
+# is no migration that walks every organisation and every group creating empty
+# threads: a room comes into existence the first time somebody opens it, which
+# means a comp that never uses chat carries no rows for it, and a group created
+# tomorrow needs nothing doing to it.
+# ---------------------------------------------------------------------------
+
+def org_room(org):
+    """The organisation-wide room. Everyone in the organisation is in it."""
+    from .models import MessageThread
+
+    thread, _ = MessageThread.objects.get_or_create(
+        org=org, kind=MessageThread.KIND_ORG, group=None,
+        defaults={
+            "subject": org.name,
+            # The room belongs to the organisation, not to whoever happened to
+            # open it first — but `started_by` is not nullable and the row has
+            # to name somebody. The organisation's earliest admin is the least
+            # arbitrary answer, and nothing reads it for a room.
+            "started_by": _room_owner(org),
+        },
+    )
+    return thread
+
+
+def group_room(group):
+    """One group's room. Its members, and nobody else — see can_read."""
+    from .models import MessageThread
+
+    thread, _ = MessageThread.objects.get_or_create(
+        org_id=group.org_id, kind=MessageThread.KIND_GROUP, group=group,
+        defaults={"subject": group.name, "started_by": _room_owner(group.org)},
+    )
+    return thread
+
+
+def _room_owner(org):
+    """Somebody to hang a room on. See org_room for why this is arbitrary."""
+    from .models import OrgMember
+
+    member = (
+        OrgMember.objects.filter(org=org, is_league_owner=True).first()
+        or OrgMember.objects.filter(org=org).order_by("joined_at").first()
+    )
+    if member is None:
+        raise ValueError("An organisation with no members has no rooms.")
+    return member.user
+
+
+def direct_thread(user, other, org):
+    """The conversation between two people, made if it is not there yet.
+
+    LOOKED UP IN BOTH DIRECTIONS. Who started it is an accident of who pressed
+    first, and a lookup that only matched `started_by=me` would hand each
+    person their own half of the conversation — two threads, each showing one
+    side of it, which is the classic way to get this wrong.
+
+    Scoped to an organisation, because that is what gives two people the right
+    to write to each other at all: `can_read` requires membership, and a
+    thread has to hang off one organisation to be found by the inbox. Two
+    people in three shared organisations get three conversations, which is the
+    honest answer — writing to somebody about the Marketing comp is not the
+    same conversation as writing to them about the McDonald's one.
+    """
+    from django.db.models import Q
+
+    from .models import MessageThread
+
+    if other.id == user.id:
+        raise ValueError("You cannot start a conversation with yourself.")
+    existing = (
+        MessageThread.objects
+        .filter(org=org, kind=MessageThread.KIND_DIRECT)
+        .filter(
+            Q(started_by=user, recipients=other)
+            | Q(started_by=other, recipients=user)
+        )
+        .distinct()
+        .first()
+    )
+    if existing is not None:
+        return existing
+    thread = MessageThread.objects.create(
+        org=org, kind=MessageThread.KIND_DIRECT,
+        # The subject is never printed for a direct message — the person's
+        # name is the title — but the column is not nullable and a blank one
+        # makes every admin listing unreadable.
+        subject=f"{user.display_name} & {other.display_name}"[:160],
+        started_by=user,
+    )
+    thread.recipients.add(other)
+    return thread
+
+
+def room_audience_ids(thread) -> list:
+    """Every user id that can read this room, for notifications.
+
+    Rooms do not use `recipients` for their audience — an organisation room
+    with a row per member would need maintaining every time somebody joins —
+    so who is in one is a query, and this is the one place that asks it.
+    """
+    from .models import GroupMember, MessageThread, OrgMember
+
+    if thread.kind == MessageThread.KIND_ORG:
+        return list(
+            OrgMember.objects.filter(org_id=thread.org_id)
+            .values_list("user_id", flat=True)
+        )
+    if thread.kind == MessageThread.KIND_GROUP:
+        return list(
+            GroupMember.objects.filter(group_id=thread.group_id)
+            .values_list("user_id", flat=True)
+        )
+    if thread.kind == MessageThread.KIND_DIRECT:
+        return [thread.started_by_id] + list(
+            thread.recipients.values_list("id", flat=True)
+        )
+    return []
+
+
+# ---------------------------------------------------------------------------
+# The sidebar
+# ---------------------------------------------------------------------------
+
+def plausible_threads(user, org_ids):
+    """The threads worth asking `can_read` about, narrowed in SQL first.
+
+    WHY THIS EXISTS, and it is not premature optimisation.
+
+    Before the rooms, every thread in an organisation was addressed to its
+    admins, so "load them all and ask can_read" cost one row per support
+    ticket — a handful. Direct messages change the arithmetic completely: two
+    members writing to each other creates a MessageThread hanging off THEIR
+    organisation, so an organisation of five hundred people accumulates as
+    many direct threads as its members care to start, and every one of them
+    is in `filter(org_id__in=...)`. Loading all of them to hand the reader
+    the four they are in is work that grows with other people's conversations.
+
+    So the obvious exclusions happen in the database, and `can_read` still
+    decides. That ordering matters: this is a NARROWING, not a second
+    expression of the rule. Anything this lets through is still asked, so a
+    filter drifting out of step with can_read can only cost a wasted row —
+    never leak one.
+    """
+    from django.db.models import Q
+
+    from .models import MessageThread
+
+    return (
+        MessageThread.objects
+        .filter(org_id__in=org_ids)
+        .filter(
+            # Support threads: readable by the admins and by whoever raised
+            # it, plus notices, all of which can_read works out from rows this
+            # query has already fetched.
+            Q(kind__in=(MessageThread.KIND_RAISED, MessageThread.KIND_NOTICE))
+            # The organisation room: membership is the whole test, and
+            # org_id__in is already that.
+            | Q(kind=MessageThread.KIND_ORG)
+            # A group room, only for the groups this person is in.
+            | Q(kind=MessageThread.KIND_GROUP, group__memberships__user=user)
+            # A direct message, only from one of its two ends.
+            | Q(kind=MessageThread.KIND_DIRECT, started_by=user)
+            | Q(kind=MessageThread.KIND_DIRECT, recipients=user)
+        )
+        # The joins above (group__memberships, recipients) multiply rows.
+        .distinct()
+    )
+
+
+def conversations_for(user, *, keep=None) -> list:
+    """Every conversation this person can open, newest activity first.
+
+    ONE LIST, EVERY ORGANISATION — the same decision `member_threads` made and
+    for the same reason: a member of seven organisations has one inbox, and
+    scoping it to whichever room the nav happens to be pointing at is how
+    somebody presses Messages and is told there is nothing there.
+
+    Each row is a dict rather than the model, because what the sidebar has to
+    print — the title, the subtitle, the avatar letter, whether it is a person
+    or a room — is four different derivations depending on the kind, and doing
+    them in the template means four nested {% if %}s repeated in three places.
+
+    COST. One query for the threads, one for the last message of each (in
+    bulk), one for the unread set, one for direct-message partners. It does
+    not grow with the number of conversations in the way a per-row lookup
+    would, which matters because this list is the page.
+    """
+    from django.db.models import Max
+
+    from .models import Message, MessageThread, OrgMember
+
+    if not (user and user.is_authenticated):
+        return []
+    memberships = {
+        m.org_id: m for m in OrgMember.objects.filter(user=user).select_related("org")
+    }
+    if not memberships:
+        return []
+
+    threads = list(
+        plausible_threads(user, list(memberships))
+        .select_related("started_by", "org", "group")
+        .prefetch_related("recipients")
+        .order_by("-last_message_at")
+    )
+    threads = [
+        t for t in threads
+        if t.can_read(user, membership=memberships.get(t.org_id))
+    ]
+    if not threads:
+        return []
+
+    ids = [t.id for t in threads]
+    # The last line of each conversation, in one query. Two steps rather than
+    # one because "the newest row per group" is not something the ORM will
+    # express portably — the ids come back first, then the rows themselves.
+    last_ids = [
+        row["last"] for row in
+        Message.objects.filter(thread_id__in=ids)
+        .values("thread_id").annotate(last=Max("id"))
+    ]
+    last = {
+        m.thread_id: m for m in
+        Message.objects.filter(pk__in=last_ids)
+        .select_related("author").prefetch_related("attachments")
+    }
+    unread = set(
+        Message.objects.filter(thread_id__in=ids)
+        .exclude(author=user).exclude(read_by=user)
+        .values_list("thread_id", flat=True)
+    )
+    unread_counts = {}
+    for tid in (
+        Message.objects.filter(thread_id__in=unread)
+        .exclude(author=user).exclude(read_by=user)
+        .values_list("thread_id", flat=True)
+    ):
+        unread_counts[tid] = unread_counts.get(tid, 0) + 1
+
+    rows = []
+    for thread in threads:
+        newest = last.get(thread.id)
+        # AN EMPTY DIRECT MESSAGE IS NOT A CONVERSATION.
+        #
+        # Opening a DM is a GET that creates the thread, so that a room has
+        # one address however you arrived at it — which also means a browser
+        # prefetching the link, or somebody pressing a name and changing their
+        # mind, leaves a thread with nothing in it. Listing those puts a ghost
+        # row in TWO people's sidebars for a conversation neither of them had.
+        #
+        # The row is dropped, not the thread: it is still readable at its own
+        # URL, and it becomes a real conversation the moment either of them
+        # writes in it.
+        # `keep` is the conversation currently open: a DM you have just
+        # started is empty by definition, and dropping it would leave the
+        # chat pane showing a conversation with no row selected beside it.
+        if (
+            newest is None
+            and thread.kind == MessageThread.KIND_DIRECT
+            and thread.id != keep
+        ):
+            continue
+        rows.append(_conversation_row(thread, user, newest, unread_counts))
+    return rows
+
+
+def _conversation_row(thread, user, last_message, unread_counts) -> dict:
+    """One sidebar row. See conversations_for for why this is not a template."""
+    from .models import MessageThread
+
+    other = thread.other_party(user) if thread.kind == MessageThread.KIND_DIRECT else None
+    if thread.kind == MessageThread.KIND_DIRECT:
+        title = other.display_name if other else "Direct message"
+        subtitle = "Direct message"
+        avatar_user, letter, face = other, (title or "?")[:1].upper(), "person"
+    elif thread.kind == MessageThread.KIND_GROUP:
+        title = thread.group.name if thread.group else thread.subject
+        subtitle = thread.org.name
+        avatar_user, letter, face = None, (title or "?")[:1].upper(), "group"
+    elif thread.kind == MessageThread.KIND_ORG:
+        title = thread.org.name
+        subtitle = "Everyone in this organisation"
+        avatar_user, letter, face = None, (title or "?")[:1].upper(), "org"
+    else:
+        # A support thread — raised with the admins, or a notice from them.
+        title = thread.subject
+        subtitle = (
+            f"From the admins · {thread.org.name}"
+            if thread.kind == MessageThread.KIND_NOTICE
+            else f"With the admins · {thread.org.name}"
+        )
+        avatar_user, letter, face = None, "!", "admins"
+
+    # The preview line. A message that is only a photograph or a voice note has
+    # no words to show, and printing an empty line for it makes the row look
+    # broken — so it is described instead, the way every messaging app does it.
+    preview, who = "", ""
+    if last_message is not None:
+        who = "You" if last_message.author_id == user.id else last_message.author.display_name.split(" ")[0]
+        body = (last_message.body or "").strip()
+        if body:
+            preview = body
+        else:
+            files = list(last_message.attachments.all())
+            if any(f.is_voice for f in files):
+                preview = "\U0001F3A4 Voice note"
+            elif any(f.is_image for f in files):
+                preview = "\U0001F4F7 Photo"
+            elif any(f.is_video for f in files):
+                preview = "\U0001F3AC Video"
+            elif files:
+                preview = f"\U0001F4CE {files[0].original_name}"
+
+    return {
+        "thread": thread,
+        "id": thread.id,
+        "org": thread.org,
+        "group": thread.group,
+        "kind": thread.kind,
+        "face": face,
+        "title": title,
+        "subtitle": subtitle,
+        "letter": letter,
+        "avatar_user": avatar_user,
+        "other": other,
+        "preview": preview,
+        "preview_who": who,
+        "when": thread.last_message_at,
+        "unread": unread_counts.get(thread.id, 0),
+    }
+
+
+def room_members(thread, *, search="", limit=60, offset=0):
+    """Who is in a room, as a page of rows the member panel can print.
+
+    PAGED AND SEARCHABLE, because the client's own worst case is the reason
+    this panel exists: "take a look at an organisation that has about 1000
+    people". Rendering a thousand rows into every page load is the difference
+    between a panel that opens instantly and one that does not open at all, so
+    the list arrives sixty at a time and the search runs in the database.
+
+    Returns (rows, total, has_more). Each row carries the badges the panel
+    draws — Admin, Captain, You — resolved here rather than per row in the
+    template, where each one would be a query.
+    """
+    from django.contrib.auth import get_user_model
+    from django.db.models import Q
+
+    from .models import GroupMember, MessageThread, OrgMember
+
+    User = get_user_model()
+    if thread.kind == MessageThread.KIND_GROUP:
+        user_ids = GroupMember.objects.filter(
+            group_id=thread.group_id,
+        ).values_list("user_id", flat=True)
+    elif thread.kind == MessageThread.KIND_DIRECT:
+        user_ids = [thread.started_by_id] + list(
+            thread.recipients.values_list("id", flat=True)
+        )
+    else:
+        user_ids = OrgMember.objects.filter(
+            org_id=thread.org_id,
+        ).values_list("user_id", flat=True)
+
+    people = User.objects.filter(id__in=list(user_ids))
+    term = (search or "").strip()
+    if term:
+        people = people.filter(
+            Q(display_name__icontains=term) | Q(email__icontains=term)
+        )
+    people = people.order_by("display_name", "id")
+    total = people.count()
+    page = list(people[offset:offset + limit])
+
+    # The organisation roles for exactly the people on this page — one query,
+    # not one per row. `can_manage` is the tag the client asked for: "the guy
+    # knows he is the admin, even in the list of members we will have the tag
+    # admin, so no reason to have write-to-admin — I'll shoot them a DM."
+    roles = {
+        m.user_id: m for m in
+        OrgMember.objects.filter(org_id=thread.org_id, user_id__in=[p.id for p in page])
+    }
+    group_admins = set()
+    if thread.kind == MessageThread.KIND_GROUP:
+        group_admins = set(
+            GroupMember.objects.filter(
+                group_id=thread.group_id, is_admin=True,
+                user_id__in=[p.id for p in page],
+            ).values_list("user_id", flat=True)
+        )
+
+    rows = []
+    for person in page:
+        member = roles.get(person.id)
+        badges = []
+        if member is not None and member.can_manage:
+            badges.append("Admin")
+        elif person.id in group_admins:
+            badges.append("Group admin")
+        if member is not None and member.is_captain:
+            badges.append("Captain")
+        rows.append({"user": person, "badges": badges, "member": member})
+    return rows, total, (offset + len(page)) < total

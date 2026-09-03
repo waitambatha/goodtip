@@ -4,16 +4,29 @@ at the page you are reading is a dead control, and the wordmark to its left
 already goes there. Everywhere else it stays, because that is where it is
 actually useful.
 
+SIX ITEMS, NOT TEN (Sep 2026, client).
+The bar carried every public page there is, which is a site map rather than a
+menu: at ten items nothing in it stood out, and the row wrapped at the widths
+most people read the site on. What is left is the six a visitor is actually
+trying to reach — what this is, what it costs, what is happening, and the two
+rooms they can look into before joining.
+
+The four that came off (Charities, The Good List, About Us, Privacy) are not
+gone; they are in the footer, which is where a reader goes looking for them.
+Privacy in particular belongs there — it is the one item nobody navigates to
+mid-visit and everybody expects to find at the bottom of the page. See
+_footer.html, where it now has its own legal row.
+
 The two auth actions sit in their own group with a divider. They are the only
 items that change your state rather than move you around, so grouping them by
 what they DO is more honest than leaving them as the last two of ten links.
 
-Each item carries a glyph. Four of these labels are near-neighbours at a
-glance — News, The Wall, The Good List, Charities are all "somewhere with a
-list of stuff on it" until you have read them — and the glyph is what tells
-them apart before you finish. The stylesheet drops the glyphs at the widths
-where the row has no room for them, so this markup is the full design and the
-narrow layouts are unchanged.
+Each item carries a glyph. Several of these labels are near-neighbours at a
+glance — News and The Wall are both "somewhere with a list of stuff on it"
+until you have read them — and the glyph is what tells them apart before you
+finish. The stylesheet drops the glyphs at the widths where the row has no
+room for them, so this markup is the full design and the narrow layouts are
+unchanged.
 {% endcomment %}
 <nav class="nav" data-open="false">
   <div class="nav-inner">
@@ -26,14 +39,22 @@ narrow layouts are unchanged.
       <li><a href="/"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-home"/></svg><span>Home</span></a></li>
       {% endif %}
       <li><a href="/how-it-works/" {% if active == 'how' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-lifebuoy"/></svg><span>How It Works</span></a></li>
-      <li><a href="/tell-the-boss/" {% if active == 'boss' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-send"/></svg><span>Tell the Boss</span></a></li>
+      <li><a href="/pricing/" {% if active == 'pricing' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-coins"/></svg><span>Pricing</span></a></li>
       <li><a href="/news/" {% if active == 'news' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-doc"/></svg><span>News</span></a></li>
       <li><a href="/wall/" {% if active == 'wall' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-msg"/></svg><span>The Wall</span></a></li>
-      <li><a href="/leaderboard/" {% if active == 'leaderboard' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>The Good List</span></a></li>
-      <li><a href="/#charities" {% if active == 'charities' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-heart"/></svg><span>Charities</span></a></li>
-      <li><a href="/pricing/" {% if active == 'pricing' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-coins"/></svg><span>Pricing</span></a></li>
-      <li><a href="/about/" {% if active == 'about' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-spark"/></svg><span>About Us</span></a></li>
-      <li><a href="/privacy/" {% if active == 'privacy' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Privacy</span></a></li>
+      <li><a href="/tell-the-boss/" {% if active == 'boss' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-send"/></svg><span>Tell the Boss</span></a></li>
+
+      {% comment %}
+      The four that left the row still have to be reachable from a phone,
+      where the footer is a long scroll away and the drawer IS the site. The
+      stylesheet shows this group only in the open drawer — see
+      .nav-links .nav-tuck — so the desktop bar keeps its six.
+      {% endcomment %}
+      <li class="nav-sep nav-tuck" aria-hidden="true"></li>
+      <li class="nav-tuck"><a href="/leaderboard/" {% if active == 'leaderboard' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>The Good List</span></a></li>
+      <li class="nav-tuck"><a href="/#charities" {% if active == 'charities' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-heart"/></svg><span>Charities</span></a></li>
+      <li class="nav-tuck"><a href="/about/" {% if active == 'about' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-spark"/></svg><span>About Us</span></a></li>
+      <li class="nav-tuck"><a href="/privacy/" {% if active == 'privacy' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Privacy</span></a></li>
 
       <li class="nav-sep" aria-hidden="true"></li>
       <li class="nav-auth"><a href="/login/" class="nav-login"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-login"/></svg><span>Log in</span></a></li>

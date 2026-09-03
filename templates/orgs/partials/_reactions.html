@@ -1,0 +1,67 @@
+{% comment %}
+THE REACTION STRIP UNDER ONE BUBBLE.
+
+Its own file because the endpoint swaps exactly this back — reacting must not
+re-render the conversation, or every reaction jumps the reader to the bottom
+of a room they were scrolling through.
+
+Each chip is a real form posting to a toggling endpoint: pressing one you are
+already part of takes you back out. That is what `mine` draws, and it is why
+there is no separate "unreact" route to keep in step with this one.
+
+htmx swaps the response into #rx-<id> — the wrapper in _chat.html — so with
+JavaScript this never leaves the page, and without it the form posts and the
+page reloads, which still works.
+
+Expects: reactions (chips from services.thread_entries), entry, thread, org.
+{% endcomment %}
+{% if reactions or entry %}
+{% comment %}
+hx-post AND hx-vals go on each BUTTON, not on the form. htmx's handling of
+which submit button sent a form has moved between versions, and "the emoji
+that was pressed" is the entire payload here — if it does not arrive, every
+chip toggles whichever reaction happens to be first. Naming the value on the
+button that carries the request removes the question.
+
+The plain `action` + name/value stay for the no-JavaScript path, which is a
+real one: this partial is also drawn on the organisation admin's support
+thread page.
+{% endcomment %}
+<form class="rx" method="post"
+      action="{% url 'orgs:message_react' thread.org_id thread.id entry.id %}">
+  {% csrf_token %}
+  {% for chip in reactions %}
+  <button type="submit" name="emoji" value="{{ chip.emoji }}"
+          class="rx-chip{% if chip.mine %} mine{% endif %}"
+          hx-post="{% url 'orgs:message_react' thread.org_id thread.id entry.id %}"
+          hx-vals='{"emoji": "{{ chip.emoji }}"}'
+          hx-target="#rx-{{ entry.id }}" hx-swap="innerHTML"
+          aria-pressed="{% if chip.mine %}true{% else %}false{% endif %}"
+          aria-label="{{ chip.emoji }} {{ chip.count }}{% if chip.mine %}, including you{% endif %}">
+    <span class="rx-e" aria-hidden="true">{{ chip.emoji }}</span><span class="rx-n">{{ chip.count }}</span>
+  </button>
+  {% endfor %}
+
+  {% comment %}
+  The picker. A <details> rather than a script-driven popover: it opens, it
+  closes on Escape, it is keyboard reachable and it needs no JavaScript at
+  all. The six faces are the fixed set — see MessageReaction.CHOICES, which
+  the endpoint also checks against, because an allowlist the browser knows
+  about is a convenience and not a control.
+  {% endcomment %}
+  <details class="rx-add">
+    <summary aria-label="Add a reaction">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.2 4.2 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg>
+    </summary>
+    <div class="rx-menu">
+      {% for e in reaction_choices %}
+      <button type="submit" name="emoji" value="{{ e }}" class="rx-opt"
+              hx-post="{% url 'orgs:message_react' thread.org_id thread.id entry.id %}"
+              hx-vals='{"emoji": "{{ e }}"}'
+              hx-target="#rx-{{ entry.id }}" hx-swap="innerHTML"
+              aria-label="React with {{ e }}">{{ e }}</button>
+      {% endfor %}
+    </div>
+  </details>
+</form>
+{% endif %}

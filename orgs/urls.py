@@ -49,8 +49,26 @@ urlpatterns = [
     # Member <-> admin messages. The admin's end of the same threads is in
     # /manage/messages/.
     path("<int:org_id>/messages/", views.member_messages_view, name="member_messages"),
+    # The three rooms. Each of these OPENS a conversation and redirects to it
+    # rather than rendering one, so a room has exactly one address however you
+    # arrived at it — which is what makes the thread URL below shareable, and
+    # what stops "the organisation room" being a different page from the room
+    # a notification links to.
+    #
+    # Ahead of the <int:thread_id> route, or "room" and "dm" would be tried as
+    # thread ids first and 404.
+    path("<int:org_id>/messages/room/", views.message_room_view, name="message_room"),
+    path("<int:org_id>/messages/room/<int:group_id>/", views.message_group_room_view,
+         name="message_group_room"),
+    path("<int:org_id>/messages/dm/<int:user_id>/", views.message_direct_view,
+         name="message_direct"),
     path("<int:org_id>/messages/<int:thread_id>/", views.member_message_thread_view,
          name="member_message_thread"),
+    path("<int:org_id>/messages/<int:thread_id>/people/", views.message_people_view,
+         name="message_people"),
+    path("<int:org_id>/messages/<int:thread_id>/pin/", views.message_pin, name="message_pin"),
+    path("<int:org_id>/messages/<int:thread_id>/react/<int:message_id>/",
+         views.message_react, name="message_react"),
     # Attachments, served by a view rather than from /media/ so the same
     # can_read check the thread page makes is made again on every fetch. Not
     # org-scoped: the thread id already decides who may read it, and the org

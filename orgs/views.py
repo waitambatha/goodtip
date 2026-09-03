@@ -2961,109 +2961,176 @@ def group_captains_call(request, org_id: int, group_id: int):
 # wrong place to raise a problem with your own participation.
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# THE MESSAGES SCREEN (rebuilt Sep 2026)
+#
+# What was here: a list of support tickets with a "Write to the admins" button
+# over it. The client's note was blunt — "when I click Messages I want a
+# chatting interface from the word go. I do not want to see this."
+#
+# What it is now: three panels. Conversations on the left, the room's people in
+# the middle, the conversation itself on the right — organisations, the groups
+# inside them, the members inside those, and a direct message to any one of
+# them. The shape people already know, in GoodTip's colours.
+#
+# THE SUPPORT THREADS DID NOT GO ANYWHERE. They are conversations in the same
+# list now, under their own heading, because they are the same thing: an
+# exchange between a member and the people who run their comp. The admin's end
+# (/manage/messages/) is untouched, the POST below still creates one, and the
+# member's private line to the admins still exists — it simply is not the
+# entire screen any more. The client's point stands on its own terms: with
+# admins tagged in every member list, a direct message is the obvious way to
+# reach one.
+# ---------------------------------------------------------------------------
+
 @login_required
 def member_messages_view(request, org_id: int):
-    """The member's inbox — every organisation they are in, on one page.
+    """The messages hub with nothing selected yet, and the composer's POST.
 
-    It used to be scoped to the organisation in the URL, which is where the
-    client hit it: a member of seven organisations raised something in one of
-    them, pressed Messages in the nav, and was told "Nothing yet" by the page
-    for a DIFFERENT organisation. The nav points at whichever organisation you
-    are currently standing in, the message was in another, and nothing on the
-    screen said either of those things.
-
-    Scoping the inbox to a room was the mistake. Mail does not work that way —
-    you have one inbox and each item says who it is from — so the list is now
-    everything readable across every membership, each row naming its
-    organisation. The org in the URL survives as the composer's default, which
-    is the one place it was doing useful work.
+    The URL keeps its organisation because the nav points at it and because
+    the composer writes into one — but the LIST is every organisation this
+    person is in. That was the previous fix and it still holds: a member of
+    seven organisations has one inbox, and scoping it to whichever room the
+    nav happens to be pointing at is how somebody presses Messages and is told
+    there is nothing there.
     """
-    from orgs.models import Message, MessageThread
-    from orgs.services import attach_files, member_threads
-
     org = get_object_or_404(Organisation, pk=org_id)
     me = _membership(request.user, org)
     if me is None:
         raise Http404("No organisation matches the given query.")
 
     if request.method == "POST":
-        # Which organisation this is being raised with. Posted rather than
-        # taken from the URL because the composer offers the choice, and
-        # re-checked against this member's own memberships — a posted id is
-        # not permission to write into somebody else's organisation.
-        target = org
-        posted = (request.POST.get("org") or "").strip()
-        if posted.isdigit() and int(posted) != org.id:
-            candidate = Organisation.objects.filter(pk=int(posted)).first()
-            if candidate is not None and _membership(request.user, candidate) is not None:
-                target = candidate
+        return _raise_with_admins(request, org)
 
-        # The composer offers a short list of subjects with "Something else"
-        # as the escape hatch, so the subject arrives in one of two fields.
-        # `subject` is still read first: the plain field is what the no-JS
-        # path and the old form post, and neither should break.
-        choice = (request.POST.get("subject_choice") or "").strip()
-        if choice == "__other" or not choice:
-            subject = (request.POST.get("subject_other")
-                       or request.POST.get("subject") or "").strip()
-        else:
-            subject = choice
-        body = (request.POST.get("body") or "").strip()
-        uploads = request.FILES.getlist("files")
-        # A message can be a screenshot with nothing typed — that is often the
-        # clearest bug report anyone sends — so body is required only when
-        # nothing is attached.
-        if not subject or not (body or uploads):
-            messages.error(request, "Pick what it's about and say what's up.")
-        else:
-            thread = MessageThread.objects.create(
-                org=target, kind=MessageThread.KIND_RAISED, subject=subject,
-                started_by=request.user, status=MessageThread.STATUS_OPEN,
-            )
-            entry = Message.objects.create(
-                thread=thread, author=request.user, body=body,
-            )
-            for problem in attach_files(entry, uploads):
-                messages.error(request, problem)
-            # Ring the admins' bells. Raising something and hearing nothing
-            # back for a day because nobody happened to open the inbox is the
-            # failure this whole screen exists to fix.
-            notify_new_message(entry)
-            messages.success(request, f"Sent to the admins of {target.name}.")
-            return redirect("orgs:member_message_thread",
-                            org_id=target.id, thread_id=thread.id)
+    return render(request, "orgs/messages.html", _messages_context(request, org, None))
 
-    threads = member_threads(request.user)
-    # Which of them have something new in them. Counted once here rather than
-    # asked per row in the template, where it would be a query per thread.
-    unread_ids = set(
-        Message.objects
-        .filter(thread_id__in=[t.id for t in threads])
-        .exclude(author=request.user)
-        .exclude(read_by=request.user)
-        .values_list("thread_id", flat=True)
+
+def _raise_with_admins(request, org):
+    """Create a support thread from the composer. Unchanged behaviour.
+
+    Kept exactly as it was — including taking the organisation from the POST
+    and re-checking it against this member's own memberships, because a posted
+    id is not permission to write into somebody else's organisation.
+    """
+    from orgs.models import Message, MessageThread
+    from orgs.services import attach_files
+
+    target = org
+    posted = (request.POST.get("org") or "").strip()
+    if posted.isdigit() and int(posted) != org.id:
+        candidate = Organisation.objects.filter(pk=int(posted)).first()
+        if candidate is not None and _membership(request.user, candidate) is not None:
+            target = candidate
+
+    # The composer offers a short list of subjects with "Something else" as
+    # the escape hatch, so the subject arrives in one of two fields. `subject`
+    # is still read first: the plain field is what the no-JS path and the old
+    # form post, and neither should break.
+    choice = (request.POST.get("subject_choice") or "").strip()
+    if choice == "__other" or not choice:
+        subject = (request.POST.get("subject_other")
+                   or request.POST.get("subject") or "").strip()
+    else:
+        subject = choice
+    body = (request.POST.get("body") or "").strip()
+    uploads = request.FILES.getlist("files")
+    # A message can be a screenshot with nothing typed — often the clearest
+    # bug report anyone sends — so body is required only when nothing is
+    # attached.
+    if not subject or not (body or uploads):
+        messages.error(request, "Pick what it's about and say what's up.")
+        return redirect("orgs:member_messages", org_id=org.id)
+
+    thread = MessageThread.objects.create(
+        org=target, kind=MessageThread.KIND_RAISED, subject=subject,
+        started_by=request.user, status=MessageThread.STATUS_OPEN,
     )
-    for thread in threads:
-        thread.is_unread = thread.id in unread_ids
+    entry = Message.objects.create(thread=thread, author=request.user, body=body)
+    for problem in attach_files(entry, uploads):
+        messages.error(request, problem)
+    # Ring the admins' bells. Raising something and hearing nothing back for a
+    # day because nobody happened to open the inbox is the failure this whole
+    # screen exists to fix.
+    notify_new_message(entry)
+    messages.success(request, f"Sent to the admins of {target.name}.")
+    return redirect("orgs:member_message_thread", org_id=target.id, thread_id=thread.id)
 
-    return render(request, "orgs/member_messages.html", {
+
+def _messages_context(request, org, thread):
+    """Everything the three panels need, for both entry points."""
+    from orgs.services import conversations_for, room_members
+
+    rows = conversations_for(request.user, keep=thread.id if thread else None)
+    ctx = {
         "org": org,
-        "threads": threads,
-        "can_manage": me.can_manage,
-        # The composer's organisation picker. One membership means there is no
-        # choice to make and the picker does not render.
+        "conversations": rows,
+        # The tab counts, worked out once here — the template cannot count a
+        # filtered list without looping it four times.
+        "count_all": len(rows),
+        "count_rooms": sum(1 for r in rows if r["face"] == "org"),
+        "count_groups": sum(1 for r in rows if r["face"] == "group"),
+        "count_people": sum(1 for r in rows if r["face"] == "person"),
+        "total_unread": sum(r["unread"] for r in rows),
+        "thread": thread,
+        # The organisation → groups tree in the left panel's "Organisations"
+        # tab. nav_orgs already carries each org with the groups THIS member
+        # is in attached (orgs.context_processors), in one query, so there is
+        # nothing to fetch here.
         "my_orgs": [
             m.org for m in
             OrgMember.objects.filter(user=request.user)
             .select_related("org").order_by("org__name")
         ],
-    })
+    }
+    if thread is None:
+        return ctx
+
+    from orgs.models import MessageThread
+    from orgs.services import thread_entries
+
+    ctx["entries"] = thread_entries(thread, request.user)
+    ctx["other"] = thread.other_party(request.user)
+    ctx["thread_org"] = thread.org
+    membership = _membership(request.user, thread.org)
+    ctx["can_manage"] = bool(membership and membership.can_manage)
+    # Whoever may pin a message here. A group's own admin can pin in their
+    # group even when they do not run the organisation; a direct message has
+    # no pinning at all, because a pin is a notice to a room.
+    ctx["can_pin"] = thread.kind != MessageThread.KIND_DIRECT and (
+        ctx["can_manage"]
+        or (
+            thread.kind == MessageThread.KIND_GROUP
+            and GroupMember.objects.filter(
+                group_id=thread.group_id, user=request.user, is_admin=True,
+            ).exists()
+        )
+    )
+    if thread.kind != MessageThread.KIND_DIRECT:
+        people, total, has_more = room_members(thread)
+        ctx["people"] = people
+        ctx["people_total"] = total
+        ctx["people_more"] = has_more
+        # Where the next page starts. Passed rather than derived in the
+        # template, because "how many are already on screen" is not something
+        # a template can count into a URL without a filter chain that reads
+        # like a puzzle.
+        ctx["people_offset"] = len(people)
+        ctx["people_q"] = ""
+    return ctx
 
 
 @login_required
 def member_message_thread_view(request, org_id: int, thread_id: int):
+    """One conversation, inside the same three-panel screen.
+
+    THE URL IS UNCHANGED and has to stay that way: every message notification
+    ever sent points at /leagues/<org>/messages/<thread>/, and those links sit
+    in people's inboxes. What changed is that it renders the whole screen with
+    this conversation selected, rather than a page of its own — pressing a
+    conversation must not throw the list away.
+    """
     from orgs.models import Message, MessageThread
-    from orgs.services import attach_files, thread_audience
+    from orgs.services import attach_files
 
     org = get_object_or_404(Organisation, pk=org_id)
     thread = get_object_or_404(MessageThread, pk=thread_id, org=org)
@@ -3073,25 +3140,215 @@ def member_message_thread_view(request, org_id: int, thread_id: int):
     if request.method == "POST":
         body = (request.POST.get("body") or "").strip()
         uploads = request.FILES.getlist("files")
-        if body or uploads:
+        # A voice note comes up its own field, not among `files`. It has to:
+        # a recording off Chrome is a .webm, which is also what a video clip
+        # is, and only the composer that made it knows which this is.
+        voice = request.FILES.getlist("voice")
+        if body or uploads or voice:
             entry = Message.objects.create(
                 thread=thread, author=request.user, body=body,
                 reply_to=quoted_message(thread, request.POST.get("reply_to")),
             )
             for problem in attach_files(entry, uploads):
                 messages.error(request, problem)
+            if voice:
+                seconds = (request.POST.get("voice_seconds") or "0").strip()
+                for problem in attach_files(
+                    entry, voice[:1], voice=True,
+                    duration_s=int(seconds) if seconds.isdigit() else 0,
+                ):
+                    messages.error(request, problem)
             notify_new_message(entry)
             if thread.status == MessageThread.STATUS_CLOSED:
                 thread.status = MessageThread.STATUS_OPEN
                 thread.save(update_fields=["status"])
-            messages.success(request, "Sent.")
         return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
 
-    entries = thread_entries(thread, request.user)
-    return render(request, "orgs/member_message_thread.html", {
-        "org": org, "thread": thread, "entries": entries,
-        "audience": thread_audience(thread),
+    ctx = _messages_context(request, org, thread)
+    # THE MESSAGES ALONE, for the poll that keeps an open conversation up to
+    # date. Deliberately not the whole pane: the composer is in that, and a
+    # swap every twelve seconds would throw away whatever somebody was in the
+    # middle of typing. Same view and same context as the first paint, so the
+    # markup that arrives cannot drift from the markup it replaces.
+    if request.GET.get("pane") == "chat":
+        return render(request, "orgs/partials/_room_stream.html", ctx)
+    return render(request, "orgs/messages.html", ctx)
+
+
+@login_required
+def message_room_view(request, org_id: int):
+    """Open the organisation's room, making it if this is the first time."""
+    from orgs.services import org_room
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if _membership(request.user, org) is None:
+        raise Http404("No organisation matches the given query.")
+    thread = org_room(org)
+    return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
+
+
+@login_required
+def message_group_room_view(request, org_id: int, group_id: int):
+    """Open a group's room. Members of the group only — see can_read."""
+    from orgs.services import group_room
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    group = _group_or_404(org, group_id)
+    if not _in_group(request.user, group):
+        # Not 403: an organisation with a private group should not confirm
+        # that the group exists to somebody who is not in it.
+        raise Http404("No group matches the given query.")
+    thread = group_room(group)
+    return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
+
+
+@login_required
+def message_direct_view(request, org_id: int, user_id: int):
+    """Open (or start) a direct message with one member of this organisation.
+
+    BOTH PEOPLE HAVE TO BE IN THE ORGANISATION. That is what gives them the
+    right to write to each other at all — this is a workplace tipping comp,
+    not an open network, and a user id in a URL must not be a way to reach
+    somebody you have never shared a room with.
+    """
+    from orgs.services import direct_thread
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if _membership(request.user, org) is None:
+        raise Http404("No organisation matches the given query.")
+    target = OrgMember.objects.filter(org=org, user_id=user_id).select_related("user").first()
+    if target is None:
+        raise Http404("No member matches the given query.")
+    if target.user_id == request.user.id:
+        return redirect("orgs:member_messages", org_id=org.id)
+    thread = direct_thread(request.user, target.user, org)
+    return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
+
+
+@login_required
+def message_people_view(request, org_id: int, thread_id: int):
+    """A page of a room's member list, searched and paged.
+
+    Its own endpoint because of the client's own worst case: "an organisation
+    that has about 1000 people". The panel asks for sixty at a time and the
+    search runs in the database, so opening a room never renders a thousand
+    rows and typing a name never walks them in the browser.
+    """
+    from orgs.models import MessageThread
+    from orgs.services import room_members
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    thread = get_object_or_404(MessageThread, pk=thread_id, org=org)
+    if not thread.can_read(request.user):
+        raise Http404("No thread matches the given query.")
+    offset = (request.GET.get("offset") or "0").strip()
+    people, total, has_more = room_members(
+        thread,
+        search=request.GET.get("q", ""),
+        offset=int(offset) if offset.isdigit() else 0,
+    )
+    return render(request, "orgs/partials/_room_people.html", {
+        "org": org, "thread": thread, "people": people,
+        "people_total": total, "people_more": has_more,
+        "people_offset": (int(offset) if offset.isdigit() else 0) + len(people),
+        "people_q": request.GET.get("q", ""),
     })
+
+
+@login_required
+@require_POST
+def message_react(request, org_id: int, thread_id: int, message_id: int):
+    """Toggle one emoji on one message.
+
+    A TOGGLE, not an add. Pressing a chip you are already part of takes you
+    back out of it, which is what every reaction anybody has used does — and
+    the unique constraint makes a double-press impossible to record twice
+    rather than merely unlikely.
+    """
+    from orgs.models import Message, MessageReaction, MessageThread
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    thread = get_object_or_404(MessageThread, pk=thread_id, org=org)
+    if not thread.can_read(request.user):
+        raise Http404("No thread matches the given query.")
+    entry = get_object_or_404(Message, pk=message_id, thread=thread)
+    emoji = (request.POST.get("emoji") or "").strip()
+    # An allowlist, not "whatever was posted". The field is 8 characters and
+    # the chips have to stay scannable; an open one turns a row of reactions
+    # into a second conversation.
+    if emoji not in MessageReaction.CHOICES:
+        return HttpResponseForbidden("Not one of the reactions.")
+    existing = MessageReaction.objects.filter(
+        message=entry, user=request.user, emoji=emoji,
+    ).first()
+    if existing is not None:
+        existing.delete()
+    else:
+        MessageReaction.objects.create(message=entry, user=request.user, emoji=emoji)
+
+    # htmx asked for the strip and swaps it back in place, so reacting never
+    # re-renders the conversation or moves the reader's scroll.
+    if request.headers.get("HX-Request"):
+        return render(request, "orgs/partials/_reactions.html", {
+            "org": org, "thread": thread,
+            "reactions": _reaction_chips(entry, request.user),
+            "entry": entry,
+        })
+    # WITHOUT JAVASCRIPT it is an ordinary form post, and an ordinary form
+    # post must end in a redirect — handing back a bare fragment would leave
+    # the reader on a page consisting of six emoji. Back where they were,
+    # which for the admin's end of a support thread is a different page from
+    # the member's, hence the referer rather than a hard-coded route. Checked
+    # against this host, or the header is an open redirect.
+    back = request.META.get("HTTP_REFERER") or ""
+    if back and url_has_allowed_host_and_scheme(
+        back, allowed_hosts={request.get_host()}, require_https=request.is_secure(),
+    ):
+        return redirect(back)
+    return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
+
+
+def _reaction_chips(entry, user) -> list:
+    """One chip per distinct emoji: the emoji, the count, and whether you are in it."""
+    chips = {}
+    for row in entry.reactions.all():
+        chip = chips.setdefault(row.emoji, {"emoji": row.emoji, "count": 0, "mine": False})
+        chip["count"] += 1
+        if row.user_id == user.id:
+            chip["mine"] = True
+    return list(chips.values())
+
+
+@login_required
+@require_POST
+def message_pin(request, org_id: int, thread_id: int):
+    """Hold one message at the top of a room, or take the pin down.
+
+    Posting the id of the message that is already pinned unpins it, so one
+    control does both and there is no separate "unpin" route to keep in step.
+    """
+    from orgs.models import Message, MessageThread
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    thread = get_object_or_404(MessageThread, pk=thread_id, org=org)
+    if not thread.can_read(request.user):
+        raise Http404("No thread matches the given query.")
+    membership = _membership(request.user, org)
+    may_pin = bool(membership and membership.can_manage) or (
+        thread.kind == MessageThread.KIND_GROUP
+        and GroupMember.objects.filter(
+            group_id=thread.group_id, user=request.user, is_admin=True,
+        ).exists()
+    )
+    # A pin is a notice to a room; a two-person conversation has no room to
+    # notice it.
+    if not may_pin or thread.kind == MessageThread.KIND_DIRECT:
+        return HttpResponseForbidden()
+    raw = (request.POST.get("message") or "").strip()
+    entry = Message.objects.filter(pk=raw, thread=thread).first() if raw.isdigit() else None
+    thread.pinned_message = None if (entry is None or thread.pinned_message_id == entry.id) else entry
+    thread.save(update_fields=["pinned_message"])
+    return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
 
 
 @login_required

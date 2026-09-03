@@ -1782,9 +1782,58 @@ img, svg, video { max-width: 100%; }
    target, so it neither submits a form nor takes the hover a real option gets. */
 .an-ctx-row-static { cursor: default; }
 .an-ctx-row-static:hover { background: linear-gradient(90deg, rgba(200,241,53,.26), rgba(200,241,53,.07)); }
+/* ---- WHERE THE CONTEXT PANEL OPENS -------------------------------------
+   Reported by the client: the organisation/group dropdown "is messed up and
+   overlaps with the dashboard".
+
+   Two separate faults, both from this panel inheriting .an-menu-panel, which
+   was written for the Manage menu at the RIGHT-HAND end of the bar:
+
+   1. `right: 0` anchors the panel's right edge to the button's right edge and
+      lets it grow leftwards. That is correct for a control sitting at the end
+      of the row and wrong for one sitting at the start — a 480px-wide panel
+      hanging off a chip 150px from the left edge runs off the side of the
+      window, so the organisation column was half off-screen and the page had
+      to be scrolled sideways to read it.
+
+   2. Nothing capped its height. An account in a dozen organisations, each with
+      groups, produced a panel taller than the viewport with no way to scroll
+      it — it simply ran down over the dashboard beneath.
+
+   So this one opens LEFT-anchored, is capped to what is actually on screen,
+   and scrolls inside itself. `right: auto` has to be said explicitly: `left`
+   alone does not unset the inherited `right`, and an element with both is
+   stretched between them. */
+.an-ctx .an-menu-panel { left: 0; right: auto; }
+/* Never wider than the window it opens into, whatever the org names are. */
+.an-menu-panel.an-ctx-panel {
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 84px);
+  overflow: auto; overscroll-behavior: contain;
+}
+/* Above the page, not merely above the bar. The nav is a stacking context of
+   its own (position:sticky + z-index), so this number only competes with the
+   bar's own children — but sheets, veils and the charity strip all paint into
+   the same layer as the page, and the panel has to win against them. */
+.an-ctx .an-menu-panel { z-index: 120; }
+
+/* The chip itself. 460px was set when it was the only thing beside the
+   wordmark; with the full link row next to it, a long organisation name took
+   enough of the bar that the links had nowhere to go and ran under the
+   right-hand controls. It gives way now — but never below a width the name is
+   readable at, which is what `clamp` is for. */
+.an-ctx-btn { max-width: clamp(160px, 24vw, 360px); }
+
 @media (max-width: 1100px) {
   .an-ctx-panel { min-width: 0; }
   .an-ctx-col { max-width: none; }
+}
+/* Below ~1000px the two columns cannot both fit inside the capped width, so
+   they stack — with the groups column's left border becoming a top one, or
+   the divider ends up running across the panel in the wrong direction. */
+@media (max-width: 1000px) {
+  .an-menu-panel.an-ctx-panel { flex-direction: column; }
+  .an-ctx-col-groups { border-left: 0; border-top: 1px solid rgba(255,255,255,.10); }
 }
 
 .an-org { font-size: 13px; color: var(--cream); opacity: .7; padding-left: 14px; border-left: 1px solid rgba(255,255,255,.15); white-space: nowrap; }
@@ -6678,6 +6727,25 @@ body.gtc-open { overflow: hidden; }
   .nav-sep { margin: 0 6px; }
 }
 
+/* ---- the four that moved to the footer (Sep 2026) ------------------------
+   The Good List, Charities, About Us and Privacy came off the desktop row so
+   the bar reads as six destinations rather than a site map, and they now live
+   in the footer where a reader goes looking for them.
+
+   They stay in the DRAWER, though. Below 1120px the drawer is not a condensed
+   version of the bar, it is the whole site — the footer is a long scroll away
+   on a phone, and "Privacy is in the footer" is a desktop answer. So the
+   markup carries all ten items and this hides four of them at the widths
+   where the footer is genuinely within reach. */
+@media (min-width: 1121px) {
+  .nav-links .nav-tuck { display: none; }
+}
+/* In the drawer the group gets a rule above it instead of a vertical divider —
+   .nav-sep is a 1px column, which stacked is invisible. */
+@media (max-width: 1120px) {
+  .nav-links .nav-sep { width: auto; height: 1px; margin: 10px 0 2px; background: rgba(255,255,255,.14); }
+}
+
 /* ==========================================================================
    ============ v22 — flow wave · card expand ===============================
    ========================================================================== */
@@ -7220,6 +7288,25 @@ body.gtc-open { overflow: hidden; }
    copyright and a disclaimer are genuinely secondary — but 12px at .6 was
    under the readable floor, so both come up a step. */
 .footer-legal { font-size: 13.5px; opacity: .78; }
+
+/* The legal row's own links. Privacy came off the nav bar and landed here, so
+   this line has to look like a place to press rather than small print — lime
+   on hover, the same tell every other link on the site uses, and a rule under
+   it so it does not read as part of the copyright sentence beside it. */
+.footer-legal-nav {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  font-size: 13.5px; font-weight: 700;
+}
+.footer-legal-nav a {
+  color: var(--cream); opacity: .82; text-decoration: none;
+  border-bottom: 1px solid rgba(232,228,213,.28); padding-bottom: 1px;
+  transition: color .15s var(--ease), opacity .15s var(--ease), border-color .15s var(--ease);
+}
+.footer-legal-nav a:hover { color: var(--lime); opacity: 1; border-bottom-color: var(--lime); }
+.footer-legal-nav span { opacity: .35; }
+@media (max-width: 640px) {
+  .footer-bottom { flex-direction: column; align-items: flex-start; }
+}
 .footer-disclaimer { font-size: 13.5px; opacity: .85; font-weight: 600; }
 
 /* ==========================================================================
@@ -13102,6 +13189,8 @@ html[data-theme="light"] .gt-app .an-ctx-head {
   text-transform: uppercase; letter-spacing: .1em;
 }
 html[data-theme="light"] .gt-app .an-ctx-col-groups { border-left-color: var(--lt-line); }
+/* the same divider, once it has become a top border on narrow screens */
+html[data-theme="light"] .gt-app .an-ctx-col-groups { border-top-color: var(--lt-line); }
 html[data-theme="light"] .gt-app .an-ctx-row:hover,
 html[data-theme="light"] .gt-app .an-ctx-row-static:hover { background: var(--lt-tint); }
 
@@ -14340,3 +14429,465 @@ pre { overflow-x: auto; max-width: 100%; }
   color: var(--ink); font-family: var(--body);
 }
 .ned-url-in:focus { outline: none; border-color: var(--forest); box-shadow: 0 0 0 3px rgba(45,122,58,.12); }
+
+/* ==========================================================================
+   ============ NEWS DECK — six stories that turn over =======================
+   Sep 2026, client: "let it not be static, it should have a slick way of
+   changing after like 5 seconds". Replaces three cards plus a repeated list
+   of headlines with one rotating deck of six.
+   ========================================================================== */
+
+/* THE SLIDES ARE STACKED, NOT TRACKED.
+   A horizontal track is the usual way to build this and it is the wrong one
+   here: the slides are different heights (a story with no excerpt is a
+   shorter card than one with) so a track that scrolls sideways still resizes
+   the block on every turn and shoves the rest of the dashboard up and down.
+   Stacked in a grid cell, the stage is as tall as the tallest slide and never
+   moves again — and the turn becomes a cross-fade, which is the calmer motion
+   for something nobody asked to have move. */
+.news-deck { margin-bottom: 22px; }
+.nd-stage { display: grid; }
+.nd-slide {
+  grid-area: 1 / 1;                 /* every slide in the same cell */
+  display: grid; gap: 16px; grid-template-columns: repeat(3, 1fr);
+  opacity: 0; visibility: hidden;
+  transform: translateY(6px);
+  transition: opacity .5s var(--ease), transform .5s var(--ease), visibility 0s .5s;
+  pointer-events: none;
+}
+.nd-slide.on {
+  opacity: 1; visibility: visible; transform: none;
+  transition: opacity .5s var(--ease), transform .5s var(--ease), visibility 0s;
+  pointer-events: auto;
+}
+@media (max-width: 1000px) { .nd-slide { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 620px)  { .nd-slide { grid-template-columns: 1fr; } }
+
+/* The controls. Dots on the left because that is where the reading eye
+   already is after the bottom row of cards; the pause on the right, apart
+   from them, because it does something categorically different. */
+.nd-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  margin-top: 14px;
+}
+.nd-dots { display: flex; align-items: center; gap: 8px; }
+.nd-dot {
+  width: 9px; height: 9px; padding: 0; border: 0; border-radius: 100px;
+  background: rgba(15,46,34,.22); cursor: pointer;
+  transition: background .2s var(--ease), width .25s var(--ease);
+}
+.nd-dot:hover { background: rgba(15,46,34,.42); }
+/* The one you are on is a lozenge rather than a bigger circle — it reads as
+   "you are here, and here is how far along" at a glance, and it survives
+   being the only distinguishing mark for someone who cannot separate the two
+   greens. */
+.nd-dot.on { width: 26px; background: var(--forest); }
+.nd-pause {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: none; border: 0; cursor: pointer; padding: 6px 10px; border-radius: 100px;
+  font-family: var(--body); font-size: 12.5px; font-weight: 700; color: var(--muted);
+  transition: color .15s var(--ease), background .15s var(--ease);
+}
+.nd-pause:hover { color: var(--forest); background: rgba(15,46,34,.06); }
+.nd-pause svg { width: 13px; height: 13px; fill: currentColor; }
+/* One button, two glyphs, whichever matches what pressing it will do. */
+.nd-pause .ndp-play { display: none; }
+.news-deck.is-paused .nd-pause .ndp-pause { display: none; }
+.news-deck.is-paused .nd-pause .ndp-play { display: block; }
+
+/* On the deep-green member pages the controls sit on dark ground. */
+.page-deep .nd-dot { background: rgba(232,228,213,.26); }
+.page-deep .nd-dot:hover { background: rgba(232,228,213,.5); }
+.page-deep .nd-dot.on { background: var(--lime); }
+.page-deep .nd-pause { color: rgba(232,228,213,.66); }
+.page-deep .nd-pause:hover { color: var(--lime); background: rgba(200,241,53,.1); }
+
+/* Asked not to have things move: the deck still works, it simply does not
+   turn on its own. The script starts it paused for the same reason; this is
+   the belt to that pair of braces, and covers the fade itself. */
+@media (prefers-reduced-motion: reduce) {
+  .nd-slide { transition: none; }
+}
+
+/* ==========================================================================
+   ============ THE READER — one story, as a page of its own =================
+   Sep 2026, client: a story opened from the public news page dropped a
+   signed-in member into their own dashboard. It is now one template for
+   everyone (news_reader.html) with no app nav on it at all, and a visitor who
+   is not signed in reads the opening third.
+
+   The layout is the app's sheet idea without the app: deep-green ground, the
+   two rotating photograph strips down the sides, and the story on a cream
+   sheet between them. Everything here is scoped to `.reader`, so none of it
+   can reach the member pages that share these class prefixes.
+   ========================================================================== */
+.reader {
+  min-height: 100vh;
+  background:
+    radial-gradient(900px 560px at 78% -10%, rgba(200,241,53,.12), transparent 60%),
+    radial-gradient(720px 520px at -10% 112%, rgba(45,122,58,.4), transparent 62%),
+    var(--deep);
+  color: var(--ink);
+  font-family: var(--body);
+}
+/* The strips get the same green glass the member pages give them, so the
+   photographs sit behind the page rather than beside it. */
+.reader .page-scenes .scene.left::after,
+.reader .page-scenes .scene.right::after {
+  content: ""; position: absolute; inset: 0;
+}
+.reader .page-scenes .scene.left::after { background: linear-gradient(90deg, rgba(15,46,34,.06), rgba(15,46,34,.32) 55%, rgba(15,46,34,.85)); }
+.reader .page-scenes .scene.right::after { background: linear-gradient(270deg, rgba(15,46,34,.06), rgba(15,46,34,.32) 55%, rgba(15,46,34,.85)); }
+.reader .page-scenes .scene { width: clamp(120px, 12vw, 230px); }
+
+/* ---- the bar ------------------------------------------------------------
+   Four items, no menu. See the template for why. Sticky, because the way back
+   to the list is the one control a reader wants half way down a long story. */
+.rd-bar {
+  position: sticky; top: 0; z-index: 40;
+  background: rgba(11,33,24,.86);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.rd-bar-in {
+  max-width: 1300px; margin: 0 auto;
+  display: flex; align-items: center; gap: 18px;
+  height: 64px; padding: 0 clamp(16px, 3vw, 44px);
+}
+.rd-mark {
+  font-family: var(--mark); font-weight: 900; font-size: 21px; letter-spacing: .01em;
+  color: #fff; text-transform: uppercase; text-decoration: none; flex: none;
+}
+.rd-mark span { color: var(--lime); }
+.rd-mark .dot { color: var(--lime); }
+.rd-back {
+  display: inline-flex; align-items: center; gap: 8px;
+  color: var(--cream); opacity: .72; text-decoration: none;
+  font-size: 14px; font-weight: 600; padding: 8px 12px; border-radius: 9px;
+  transition: opacity .15s var(--ease), background .15s var(--ease);
+}
+.rd-back:hover { opacity: 1; background: rgba(255,255,255,.07); }
+.rd-back svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.rd-bar-end { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.rd-ghost {
+  border: 1.5px solid rgba(255,255,255,.26); border-radius: 100px;
+  padding: 8px 16px; font-size: 13.5px; font-weight: 700;
+  color: var(--cream); text-decoration: none; white-space: nowrap;
+  transition: border-color .15s var(--ease), color .15s var(--ease);
+}
+.rd-ghost:hover { border-color: var(--lime); color: var(--lime); }
+.rd-cta {
+  background: var(--lime); color: var(--deep); border-radius: 100px;
+  padding: 9px 18px; font-size: 13.5px; font-weight: 800;
+  text-decoration: none; white-space: nowrap;
+  transition: filter .15s var(--ease), transform .15s var(--ease);
+}
+.rd-cta:hover { filter: brightness(1.06); transform: translateY(-1px); }
+@media (max-width: 560px) {
+  .rd-back span { display: none; }
+  .rd-bar-in { gap: 10px; }
+}
+
+/* ---- the sheet ----------------------------------------------------------
+   The centre container the client asked to be right: one column, measured for
+   reading, sitting on cream with the photographs showing at both margins. */
+.rd-main {
+  position: relative; z-index: 1;
+  max-width: 1180px; margin: 0 auto;
+  background: var(--gt-sheet, #F7F5EE);
+  padding: clamp(28px, 5vw, 60px) clamp(18px, 4vw, 64px) 72px;
+  box-shadow: 0 0 90px -20px rgba(0,0,0,.55);
+}
+/* 68ch, not the container width. A line of body text past about 75 characters
+   is measurably harder to come back to at the start of the next one, and the
+   whole point of this page is that it is for reading. */
+.rd-art { max-width: 68ch; margin: 0 auto; }
+
+.rd-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 16px; }
+.rd-tag {
+  background: var(--lime); color: var(--deep);
+  font-family: var(--mark); font-weight: 700; font-size: 11px;
+  letter-spacing: .06em; text-transform: uppercase;
+  padding: 4px 11px; border-radius: 100px;
+}
+.rd-title {
+  font-family: var(--display);
+  font-size: clamp(30px, 4.6vw, 50px); line-height: 1.06;
+  letter-spacing: -.015em; color: var(--ink);
+}
+.rd-lead {
+  margin-top: 16px; font-size: clamp(17px, 1.7vw, 20px); line-height: 1.55;
+  color: var(--muted); font-weight: 500;
+}
+.rd-byline {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px;
+  margin-top: 22px; padding-bottom: 22px;
+  border-bottom: 1px solid rgba(15,46,34,.12);
+  font-size: 13.5px; color: var(--muted);
+}
+.rd-who { display: inline-flex; align-items: center; gap: 9px; }
+.rd-who b { color: var(--ink); font-size: 14px; }
+.rd-av {
+  width: 32px; height: 32px; border-radius: 50%; flex: none;
+  background: var(--forest); color: #fff; overflow: hidden;
+  display: grid; place-items: center;
+  font-family: var(--mark); font-weight: 800; font-size: 13px;
+}
+.rd-av img { width: 100%; height: 100%; object-fit: cover; }
+
+.rd-hero {
+  position: relative; overflow: hidden;
+  margin: 28px 0 32px; border-radius: 18px;
+  aspect-ratio: 16 / 9;
+  background-size: cover; background-position: center 32%;
+  background-color: var(--deep);
+  box-shadow: 0 30px 60px -34px rgba(15,46,34,.55);
+}
+.rd-hero-shots .shot {
+  position: absolute; inset: 0; background-size: cover; background-position: center;
+  opacity: 0; transition: opacity 1.6s var(--ease);
+}
+.rd-hero-shots .shot.on { opacity: 1; }
+
+/* ---- the story ---------------------------------------------------------- */
+.rd-prose { font-size: 17.5px; line-height: 1.72; color: var(--ink); }
+.rd-prose > * + * { margin-top: 1.15em; }
+.rd-prose p { color: rgba(15,46,34,.86); }
+.rd-prose h2 {
+  font-family: var(--display); font-size: clamp(22px, 2.6vw, 30px);
+  line-height: 1.15; color: var(--ink); margin-top: 1.7em;
+}
+.rd-prose h3 { font-family: var(--display); font-size: 21px; color: var(--ink); margin-top: 1.5em; }
+.rd-prose a { color: var(--forest); font-weight: 600; text-underline-offset: 3px; }
+.rd-prose a:hover { color: var(--deep); }
+.rd-prose ul, .rd-prose ol { padding-left: 1.35em; }
+.rd-prose li + li { margin-top: .45em; }
+.rd-prose img { border-radius: 14px; display: block; }
+.rd-prose blockquote {
+  border-left: 3px solid var(--lime); padding: 4px 0 4px 20px;
+  font-family: var(--display); font-size: 21px; line-height: 1.4; color: var(--forest);
+}
+.rd-prose hr { border: 0; border-top: 1px solid rgba(15,46,34,.14); margin: 2em 0; }
+
+/* THE CUT. Decoration over the LAST paragraph that was served, not a cover
+   over the rest of the article — the rest is not in the document. Which means
+   the fade has to be short and sit at the very bottom of what is there, or it
+   reads as a bug (text going pale for no reason). */
+.rd-prose.is-cut { position: relative; }
+.rd-prose.is-cut::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 7em;
+  background: linear-gradient(180deg, transparent, var(--gt-sheet, #F7F5EE) 88%);
+  pointer-events: none;
+}
+
+/* ---- the gate ----------------------------------------------------------- */
+.rd-gate {
+  margin-top: 8px; text-align: center;
+  border-radius: 20px; padding: clamp(28px, 4vw, 40px) clamp(20px, 4vw, 44px);
+  background: linear-gradient(165deg, var(--deep), var(--deep-2));
+  border: 1px solid rgba(200,241,53,.28);
+  box-shadow: 0 40px 80px -40px rgba(15,46,34,.7);
+  color: var(--cream);
+}
+.rdg-ic {
+  display: inline-grid; place-items: center; width: 52px; height: 52px;
+  border-radius: 16px; margin-bottom: 16px;
+  background: rgba(200,241,53,.14); border: 1px solid rgba(200,241,53,.4);
+}
+.rdg-ic svg { width: 24px; height: 24px; fill: var(--lime); }
+.rd-gate h2 {
+  font-family: var(--display); font-size: clamp(24px, 3.2vw, 32px);
+  line-height: 1.1; color: #fff;
+}
+.rd-gate > p { margin-top: 12px; font-size: 16px; line-height: 1.6; color: rgba(232,228,213,.82); max-width: 46ch; margin-inline: auto; }
+.rdg-actions {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 12px; margin-top: 24px;
+}
+.rdg-primary {
+  background: var(--lime); color: var(--deep); border-radius: 100px;
+  padding: 14px 28px; font-size: 15px; font-weight: 800; text-decoration: none;
+  transition: filter .15s var(--ease), transform .15s var(--ease);
+}
+.rdg-primary:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.rdg-ghost {
+  color: var(--lime); font-weight: 700; font-size: 14.5px;
+  text-decoration: none; padding: 13px 18px; border-radius: 100px;
+  border: 1.5px solid rgba(200,241,53,.34);
+  transition: border-color .15s var(--ease), background .15s var(--ease);
+}
+.rdg-ghost:hover { border-color: var(--lime); background: rgba(200,241,53,.1); }
+.rdg-fine { margin-top: 18px; font-size: 12.5px; line-height: 1.55; color: rgba(232,228,213,.55); max-width: 52ch; margin-inline: auto; }
+
+/* ---- share bar, using the shared partial's {{ prefix }}-share names ------ */
+.rd-share {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  margin-top: 36px; padding-top: 24px;
+  border-top: 1px solid rgba(15,46,34,.12);
+}
+.rd-share .as-label {
+  font-family: var(--mark); font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; font-size: 11.5px; color: var(--muted); margin-right: 4px;
+}
+.rd-share .as-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid rgba(15,46,34,.16); background: #fff; cursor: pointer;
+  border-radius: 100px; padding: 9px 14px;
+  font-family: var(--body); font-size: 13px; font-weight: 700; color: var(--ink);
+  text-decoration: none;
+  transition: border-color .15s var(--ease), background .15s var(--ease), color .15s var(--ease);
+}
+.rd-share .as-btn svg { width: 15px; height: 15px; fill: currentColor; }
+.rd-share .as-btn:hover { border-color: var(--forest); color: var(--forest); background: rgba(15,46,34,.04); }
+.rd-sources { margin-top: 28px; font-size: 14px; color: var(--muted); }
+.rd-sources h4 { font-family: var(--mark); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--forest); margin-bottom: 8px; }
+.rd-sources ol { padding-left: 1.3em; }
+.rd-sources a { color: var(--forest); }
+
+/* ---- more stories -------------------------------------------------------
+   Full sheet width, not the 68ch column: the article is over, and a row of
+   three cards squeezed into a reading measure looks like a mistake. */
+.rd-more { margin-top: 56px; padding-top: 36px; border-top: 1px solid rgba(15,46,34,.12); }
+.rd-more-h { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.rd-more-h h2 { font-family: var(--display); font-size: clamp(20px, 2.4vw, 26px); color: var(--ink); }
+.rd-more-h a { font-size: 13.5px; font-weight: 700; color: var(--forest); text-decoration: none; white-space: nowrap; }
+.rd-more-h a:hover { text-decoration: underline; }
+.rd-more-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+@media (max-width: 900px) { .rd-more-grid { grid-template-columns: 1fr; } }
+.rd-card {
+  display: block; border-radius: 16px; overflow: hidden; text-decoration: none;
+  background: #fff; border: 1px solid rgba(15,46,34,.12);
+  transition: transform .2s var(--ease), border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+.rd-card:hover { transform: translateY(-3px); border-color: rgba(169,209,28,.75); box-shadow: 0 22px 44px -26px rgba(15,46,34,.45); }
+.rdc-thumb { position: relative; height: 160px; background-size: cover; background-position: center 30%; }
+.rdc-thumb .rd-tag { position: absolute; top: 11px; left: 11px; }
+.rdc-thumb.noimg {
+  background: radial-gradient(420px 200px at 82% -20%, rgba(200,241,53,.35), transparent 60%), var(--deep);
+  display: grid; place-items: center;
+}
+.rdc-mark { font-family: var(--display); font-size: 24px; color: rgba(242,239,230,.5); }
+.rdc-mark span { color: rgba(200,241,53,.6); }
+.rdc-body { padding: 16px 18px 18px; }
+.rdc-body h3 { font-family: var(--display); font-size: 18px; line-height: 1.15; color: var(--ink); }
+.rdc-body p { margin-top: 8px; font-size: 13.5px; line-height: 1.5; color: var(--muted); }
+.rdc-date { display: block; margin-top: 12px; font-size: 12px; font-weight: 700; color: var(--forest); }
+
+/* ---- the footer, on the deep ground below the sheet --------------------- */
+.reader .footer { position: relative; z-index: 1; }
+
+/* THE READER'S LIGHT THEME.
+   The sheet is already cream-on-green in both themes — that IS the design,
+   and it is the one page where the member app's light palette would fight the
+   photographs rather than help them. What light mode changes is the ground
+   behind the sheet: a softer green, so the page does not sit as a bright
+   panel in a dark hole for somebody who has asked for light. */
+html[data-theme="light"] .reader {
+  background:
+    radial-gradient(900px 560px at 78% -10%, rgba(200,241,53,.16), transparent 60%),
+    radial-gradient(720px 520px at -10% 112%, rgba(45,122,58,.28), transparent 62%),
+    #12362A;
+}
+
+/* ==========================================================================
+   ============ CHAT: reactions, voice notes, and the row's controls ========
+   ==========================================================================
+   These belong to partials/_chat.html, which is shared by the member's
+   messages screen and the organisation admin's support-thread page. The
+   messages screen loads gt-messages.css and restates them for its dark
+   panels; this is the base, painted for the cream card the admin's page
+   draws them on. Without it the admin's end of a thread renders unstyled
+   reaction chips and a bare audio player.
+   ========================================================================== */
+
+/* ---- the row's hover controls ---- */
+.chat-rowacts { display: flex; align-items: center; gap: 2px; }
+.chat-pinform { display: flex; }
+.chat-pinbtn {
+  width: 30px; height: 30px; display: grid; place-items: center;
+  background: none; border: 0; cursor: pointer; border-radius: 8px;
+  color: var(--muted); opacity: 0;
+  transition: opacity .15s var(--ease), color .15s var(--ease);
+}
+.chat-pinbtn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chat-row:hover .chat-pinbtn, .chat-pinbtn:focus-visible { opacity: 1; }
+.chat-pinbtn:hover { color: var(--forest); }
+/* The pinned one stays visible: its button now means "unpin", and a control
+   that only appears on hover cannot say so. */
+.chat-pinbtn.on { opacity: 1; color: var(--forest); }
+
+/* ---- reactions ---- */
+.chat-reacts { margin-top: 5px; }
+.rx { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.rx-chip {
+  display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+  background: var(--app-card-2, #F4F1E6); border: 1px solid var(--app-line, rgba(15,46,34,.12));
+  border-radius: 100px; padding: 3px 9px;
+  font-family: var(--body); font-size: 12px; color: var(--muted);
+  transition: border-color .15s var(--ease), background .15s var(--ease);
+}
+.rx-chip:hover { border-color: rgba(15,46,34,.28); }
+/* The one you are in is drawn as pressed, because pressing it again takes you
+   back out — a chip that looks the same either way makes the toggle invisible. */
+.rx-chip.mine { background: #EEF8C8; border-color: rgba(23,107,69,.34); color: #3F6208; }
+.rx-e { font-size: 13px; line-height: 1; }
+.rx-n { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.rx-add { position: relative; }
+.rx-add summary {
+  list-style: none; cursor: pointer; width: 26px; height: 26px;
+  display: grid; place-items: center; border-radius: 100px;
+  color: var(--muted); opacity: 0; transition: opacity .15s var(--ease);
+}
+.rx-add summary::-webkit-details-marker { display: none; }
+.rx-add summary svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; }
+.chat-row:hover .rx-add summary, .rx-add[open] summary, .rx-add summary:focus-visible { opacity: 1; }
+.rx-add summary:hover { color: var(--forest); background: rgba(15,46,34,.06); }
+.rx-menu {
+  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 20;
+  display: flex; gap: 2px; padding: 5px; border-radius: 12px;
+  background: var(--app-card, #FCFBF5); border: 1px solid var(--app-line, rgba(15,46,34,.14));
+  box-shadow: 0 20px 40px -22px rgba(15,46,34,.5);
+}
+/* Your own bubbles sit on the right, so a menu anchored left opens off the
+   edge of the conversation. */
+.chat-row.mine .rx-menu { left: auto; right: 0; }
+.rx-opt {
+  width: 32px; height: 32px; display: grid; place-items: center; cursor: pointer;
+  background: none; border: 0; border-radius: 9px; font-size: 17px; line-height: 1;
+  transition: transform .12s var(--ease), background .12s var(--ease);
+}
+.rx-opt:hover { background: rgba(15,46,34,.07); transform: scale(1.15); }
+
+/* ---- voice notes ----
+   A player of our own rather than <audio controls>, which is a different grey
+   box in every browser and looks like nothing else on the page. */
+.chat-vn { display: flex; align-items: center; gap: 11px; min-width: 220px; max-width: 300px; padding: 4px 2px; }
+.cvn-play {
+  width: 36px; height: 36px; flex: none; display: grid; place-items: center;
+  cursor: pointer; border: 0; border-radius: 50%;
+  background: var(--forest); color: #fff;
+}
+.cvn-play svg { width: 15px; height: 15px; fill: currentColor; }
+.cvn-i-pause { display: none; }
+.chat-vn.is-playing .cvn-i-play { display: none; }
+.chat-vn.is-playing .cvn-i-pause { display: block; }
+.cvn-wave { position: relative; flex: 1; height: 26px; cursor: pointer; overflow: hidden; }
+/* A repeating gradient, not the real waveform: drawing the real one means
+   downloading and decoding every clip in a thread on load, which is exactly
+   what preload="metadata" exists to avoid. It reads as a voice note, which is
+   the whole job. */
+.cvn-bars {
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(90deg, rgba(15,46,34,.24) 0 2px, transparent 2px 6px);
+  -webkit-mask-image: linear-gradient(180deg, transparent 18%, #000 18%, #000 82%, transparent 82%);
+  mask-image: linear-gradient(180deg, transparent 18%, #000 18%, #000 82%, transparent 82%);
+}
+.cvn-fill {
+  position: absolute; inset: 0 auto 0 0; width: 0;
+  background: repeating-linear-gradient(90deg, var(--forest) 0 2px, transparent 2px 6px);
+  -webkit-mask-image: linear-gradient(180deg, transparent 18%, #000 18%, #000 82%, transparent 82%);
+  mask-image: linear-gradient(180deg, transparent 18%, #000 18%, #000 82%, transparent 82%);
+  transition: width .1s linear;
+}
+.cvn-time { flex: none; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted); }

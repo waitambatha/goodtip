@@ -1,0 +1,149 @@
+{% comment %}
+THE COMPOSER, for a room.
+
+Not partials/_chat_composer.html: that one is the support thread's, it has no
+voice note and no emoji, and bolting both onto it would change the admin's end
+of a support ticket too. This is the rich one — emoji, attachments, a
+recorder — and the two share their class names where the behaviour is shared
+(cc-quote, cc-files, data-chat-form) so gt-chat.js drives both without knowing
+which it is looking at.
+
+enctype is not optional. Without multipart the files silently do not arrive:
+request.FILES is empty, the message saves with only its text, and nothing
+anywhere reports a problem.
+
+Expects: thread, thread_org, other.
+{% endcomment %}
+<form method="post" action="{% url 'orgs:member_message_thread' thread_org.id thread.id %}"
+      class="chat-composer gtm-composer" enctype="multipart/form-data"
+      data-chat-form data-gtm-composer data-busy="Sending">
+  {% csrf_token %}
+
+  {# Filled in by gt-chat.js when a message is picked; posted as reply_to. #}
+  <div class="cc-quote" data-reply-banner hidden>
+    <span class="ccq-bar" aria-hidden="true"></span>
+    <span class="ccq-txt"><b data-reply-who></b><small data-reply-quote></small></span>
+    <button type="button" class="ccq-x" data-reply-cancel aria-label="Don't reply to that message">&times;</button>
+  </div>
+  <input type="hidden" name="reply_to" value="" data-reply-id>
+
+  {# One chip per chosen file, each removable before sending. #}
+  <div class="cc-files" data-file-tray hidden></div>
+
+  {% comment %}
+  THE RECORDING BAR. Replaces the whole row while a recording is running, so
+  the two states cannot be confused — there is no moment where a text box and
+  a live microphone are both offered. Hidden until the recorder starts, and
+  removed from the form's data when it is cancelled.
+  {% endcomment %}
+  <div class="cc-rec" data-rec-bar hidden>
+    <span class="ccr-dot" aria-hidden="true"></span>
+    <span class="ccr-time" data-rec-time>0:00</span>
+    <span class="ccr-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+    <span class="ccr-max">Max 1:30</span>
+    <button type="button" class="ccr-x" data-rec-cancel aria-label="Discard this recording">Discard</button>
+    <button type="button" class="ccr-send" data-rec-stop>
+      <svg aria-hidden="true"><use href="#ic-send"/></svg> Send
+    </button>
+  </div>
+
+  {% comment %}
+  THE READY BAR: a finished recording, not yet sent. It is playable before it
+  goes — the single most useful thing a voice-note composer can do, and the
+  one most of them leave out.
+  {% endcomment %}
+  <div class="cc-ready" data-rec-ready hidden>
+    <button type="button" class="ccy-play" data-rec-play aria-label="Play back your recording">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.4v13.2L19 12z"/></svg>
+    </button>
+    <span class="ccy-txt"><b>Voice note</b><small data-rec-ready-time>0:00</small></span>
+    <button type="button" class="ccy-x" data-rec-discard>Discard</button>
+    <button type="submit" class="ccy-send"><svg aria-hidden="true"><use href="#ic-send"/></svg> Send</button>
+  </div>
+  {% comment %}
+  The recording itself rides in its own field, never among `files`. It has to:
+  a recording off Chrome is a .webm, which is also what a video clip is, and
+  only this composer knows which of the two it just made. The seconds go up
+  beside it because the file's own metadata does not carry a duration until it
+  has been fully decoded — see MessageAttachment.duration_s.
+  {% endcomment %}
+  <input type="file" name="voice" hidden data-rec-file>
+  <input type="hidden" name="voice_seconds" value="0" data-rec-seconds>
+
+  <div class="cc-row" data-rec-idle>
+    {% comment %}
+    EMOJI. A <details> rather than a scripted popover: it opens and closes on
+    its own, it is keyboard reachable, and it needs no JavaScript to be
+    dismissible. The characters are inserted at the caret by gt-messages.js —
+    appending to the end would put a face in the middle of a sentence somebody
+    was still editing.
+    {% endcomment %}
+    <details class="cc-emoji" data-emoji>
+      <summary aria-label="Insert an emoji">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.2 4.2 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg>
+      </summary>
+      <div class="cc-emoji-menu">
+        {% comment %}
+        Written out rather than looped: the list is fixed, and putting it in a
+        template variable to loop over it would mean a context processor
+        shipping thirty characters into every page on the site.
+        {% endcomment %}
+        <button type="button">😀</button><button type="button">😄</button><button type="button">😂</button>
+        <button type="button">🙂</button><button type="button">😉</button><button type="button">😍</button>
+        <button type="button">😎</button><button type="button">🤔</button><button type="button">😬</button>
+        <button type="button">😢</button><button type="button">😡</button><button type="button">🤝</button>
+        <button type="button">👍</button><button type="button">👎</button><button type="button">👏</button>
+        <button type="button">🙏</button><button type="button">💪</button><button type="button">🔥</button>
+        <button type="button">💚</button><button type="button">🏆</button><button type="button">🏉</button>
+        <button type="button">🏈</button><button type="button">⚽</button><button type="button">🎯</button>
+        <button type="button">✅</button><button type="button">❌</button><button type="button">⚡</button>
+        <button type="button">🎉</button><button type="button">👀</button><button type="button">😴</button>
+      </div>
+    </details>
+
+    <label class="cc-clip" title="Attach a photo, video or file">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.2-9.19a3.66 3.66 0 1 1 5.18 5.18l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.5-8.48"/></svg>
+      <input type="file" name="files" multiple data-files
+             accept=".png,.jpg,.jpeg,.gif,.webp,.heic,.mp4,.mov,.webm,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx">
+      <span class="sr-only">Attach a file</span>
+    </label>
+
+    <textarea name="body" rows="1" maxlength="2000" data-chat-body
+              placeholder="{% if other %}Message {{ other.display_name|truncatechars:22 }}&hellip;{% elif thread.kind == 'group' %}Message {{ thread.group.name|truncatechars:22 }}&hellip;{% elif thread.kind == 'org' %}Message everyone in {{ thread_org.name|truncatechars:20 }}&hellip;{% else %}Write to the admins&hellip;{% endif %}"
+              aria-label="Write a message"></textarea>
+
+    {% comment %}
+    THE MICROPHONE, and the send button in the same slot.
+
+    One control, two jobs, decided by whether there is anything to send:
+    empty box shows the mic, a typed character shows Send. That is the
+    arrangement everybody already knows, and it is what stops the row
+    carrying two primary buttons that mean different things.
+
+    Rendered with the mic visible and no `hidden` on the send button, because
+    with JavaScript off there is no recorder at all and Send must be the one
+    that is there. gt-messages.js swaps them the moment it runs.
+    {% endcomment %}
+    <button type="button" class="cc-mic" data-rec-start hidden
+            aria-label="Record a voice note, up to one minute thirty">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21"/></svg>
+    </button>
+    <button type="submit" class="cc-send" aria-label="Send">
+      <svg aria-hidden="true"><use href="#ic-send"/></svg>
+      <span>Send</span>
+    </button>
+  </div>
+
+  <p class="cc-hint" data-rec-idle-hint>
+    Enter sends &middot; Shift+Enter for a new line &middot;
+    {% comment %}
+    PRESS, not hold. Hold-to-record is what the brief described, and it is the
+    wrong gesture on a desktop: it means keeping a mouse button down for up to
+    ninety seconds, and a finger slipping loses the recording. Press to start,
+    press Send to finish, Discard to throw it away — which is also the one
+    that works identically with a keyboard.
+    {% endcomment %}
+    <span data-mic-hint hidden>press the mic for a voice note, max 1:30 &middot; </span>
+    photos, video and files up to 8&nbsp;MB
+  </p>
+</form>

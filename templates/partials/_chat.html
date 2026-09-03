@@ -108,6 +108,44 @@ Expects: entries (from orgs.views._thread_entries), thread.
               <a class="chat-shot" href="{% url 'orgs:message_file' thread.id a.id %}" target="_blank" rel="noopener">
                 <img src="{% url 'orgs:message_file' thread.id a.id %}" alt="{{ a.original_name }}" loading="lazy">
               </a>
+              {% elif a.is_audio %}
+              {% comment %}
+              A VOICE NOTE, drawn as a voice note.
+
+              The browser's own <audio controls> is a grey bar that looks
+              like nothing else here and is a different grey bar in every
+              browser, so the player is ours: a round play button, a bar that
+              fills as it goes, and the length beside it. The <audio> element
+              underneath does the actual work and carries `preload="metadata"`
+              so a room full of clips does not download all of them to draw
+              the timeline — gt-voice.js wires the three together.
+
+              The duration is printed from what the recorder measured, not
+              read off the file: a clip whose metadata has not arrived yet
+              reports Infinity for its length, which is how a row of voice
+              notes ends up all saying "0:00" until you press them.
+              {% endcomment %}
+              <div class="chat-vn" data-voice>
+                <button type="button" class="cvn-play" aria-label="Play voice note">
+                  <svg class="cvn-i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.4v13.2L19 12z"/></svg>
+                  <svg class="cvn-i-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="3.4" height="14" rx="1.2"/><rect x="13.6" y="5" width="3.4" height="14" rx="1.2"/></svg>
+                </button>
+                <div class="cvn-wave" data-voice-seek>
+                  {% comment %}
+                  Twenty-eight bars of a fixed pseudo-random pattern rather
+                  than the real waveform: decoding the audio to draw one means
+                  fetching every clip in the room on load, which is exactly
+                  what preload="metadata" exists to avoid. It reads as a voice
+                  note, which is the whole job of it.
+                  {% endcomment %}
+                  <span class="cvn-bars" aria-hidden="true"></span>
+                  <span class="cvn-fill" data-voice-fill></span>
+                </div>
+                <span class="cvn-time" data-voice-time>{{ a.duration_label }}</span>
+                <audio preload="metadata" data-voice-audio>
+                  <source src="{% url 'orgs:message_file' thread.id a.id %}" type="{{ a.audio_type }}">
+                </audio>
+              </div>
               {% elif a.is_video %}
               {% comment %}
               Played where it was sent, for the same reason a screenshot is
@@ -164,12 +202,52 @@ Expects: entries (from orgs.views._thread_entries), thread.
             {% endif %}
           </span>
         </div>
+
+        {% comment %}
+        REACTIONS.
+
+        Outside the bubble, under it — a chip inside the bubble competes with
+        the message for the same background and the same corner radius, and
+        the reaction is a thing about the message rather than part of it.
+
+        Each chip is a form that posts to the same endpoint, and the endpoint
+        toggles: pressing one you are already in takes you out of it. htmx
+        swaps just this strip back, so reacting never moves the conversation
+        or loses the scroll position. Without JavaScript they are ordinary
+        form posts that reload the page, which still works.
+
+        The picker is one more button on the end, so adding a reaction that is
+        not already there is the same gesture as joining one that is.
+        {% endcomment %}
+        <div class="chat-reacts" id="rx-{{ e.id }}">
+          {% include "orgs/partials/_reactions.html" with reactions=e.reaction_chips entry=e thread=thread org=thread.org %}
+        </div>
       </div>
 
-      <button type="button" class="chat-replybtn" data-reply-to="{{ e.id }}"
-              aria-label="Reply to this message">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 7 7v4"/></svg>
-      </button>
+      <div class="chat-rowacts">
+        <button type="button" class="chat-replybtn" data-reply-to="{{ e.id }}"
+                aria-label="Reply to this message">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 7 7v4"/></svg>
+        </button>
+        {% comment %}
+        PIN, for whoever runs the room. `can_pin` is only set by the messages
+        screen — the admin's support-thread page never defines it, so this is
+        absent there, which is right: a two-party ticket has no room to pin
+        anything to. Posting the id that is already pinned takes the pin down,
+        so one control does both.
+        {% endcomment %}
+        {% if can_pin %}
+        <form method="post" action="{% url 'orgs:message_pin' thread.org_id thread.id %}" class="chat-pinform">
+          {% csrf_token %}
+          <input type="hidden" name="message" value="{{ e.id }}">
+          <button type="submit" class="chat-pinbtn{% if thread.pinned_message_id == e.id %} on{% endif %}"
+                  aria-label="{% if thread.pinned_message_id == e.id %}Unpin this message{% else %}Pin this message{% endif %}"
+                  title="{% if thread.pinned_message_id == e.id %}Unpin{% else %}Pin to the top{% endif %}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/></svg>
+          </button>
+        </form>
+        {% endif %}
+      </div>
     </li>
     {% empty %}
     <li class="chat-none">Nothing in this conversation yet.</li>

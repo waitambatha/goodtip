@@ -1421,10 +1421,32 @@ class MessageThread(models.Model):
 
     KIND_RAISED = "raised"
     KIND_NOTICE = "notice"
+    # THE THREE ROOMS (Sep 2026, client). The model above describes a support
+    # channel: a member raises something, the admins answer. What the client
+    # asked for is a messaging product — "the way you see in WhatsApp … I can
+    # be in a group, see the list of members, be able to text" — organisation
+    # rooms, group rooms, and a direct message to one person.
+    #
+    # Same table, because they are the same conversation with a different
+    # audience, and every piece of machinery already built around a thread
+    # (bubbles, attachments, quoting, read receipts, notifications, the
+    # unread badge) then works on all five kinds without being written twice.
+    # What separates them is who may read one, which is `can_read` and nothing
+    # else.
+    KIND_ORG = "org"
+    KIND_GROUP = "group"
+    KIND_DIRECT = "direct"
     KIND_CHOICES = [
         (KIND_RAISED, "Raised by a member"),
         (KIND_NOTICE, "Sent by an admin"),
+        (KIND_ORG, "Organisation room"),
+        (KIND_GROUP, "Group room"),
+        (KIND_DIRECT, "Direct message"),
     ]
+    #: The kinds that are ordinary chat rather than an admin support ticket.
+    #: Used everywhere the two need telling apart — the status chips, the
+    #: composer's placeholder, whether "Answered/Closed" means anything.
+    ROOM_KINDS = (KIND_ORG, KIND_GROUP, KIND_DIRECT)
 
     STATUS_OPEN = "open"
     STATUS_ANSWERED = "answered"
@@ -1457,6 +1479,18 @@ class MessageThread(models.Model):
     # Denormalised so the inbox can sort by activity without joining and
     # aggregating over every message on every page load.
     last_message_at = models.DateTimeField(default=timezone.now)
+    # The one message held at the top of the room. A pin is a property of the
+    # ROOM, not of the message — "which message is currently pinned here" is a
+    # question with one answer, and a flag on Message would let a careless
+    # write produce two.
+    #
+    # SET_NULL, not CASCADE: deleting the pinned message must unpin the room,
+    # not delete the room. related_name="+" because nothing ever needs to ask
+    # a message which threads pin it.
+    pinned_message = models.ForeignKey(
+        "orgs.Message", on_delete=models.SET_NULL,
+        related_name="+", null=True, blank=True,
+    )
 
     class Meta:
         ordering = ["-last_message_at"]
@@ -1467,6 +1501,23 @@ class MessageThread(models.Model):
     @property
     def is_broadcast(self) -> bool:
         return self.kind == self.KIND_NOTICE and not self.recipients.exists()
+
+    @property
+    def is_room(self) -> bool:
+        """Ordinary chat, as opposed to a member/admin support thread."""
+        return self.kind in self.ROOM_KINDS
+
+    def other_party(self, user):
+        """In a direct message, the person who is not you.
+
+        Returns None for every other kind, because "the other party" is only a
+        question a two-person conversation has an answer to.
+        """
+        if self.kind != self.KIND_DIRECT:
+            return None
+        if self.started_by_id != getattr(user, "id", None):
+            return self.started_by
+        return self.recipients.first()
 
     def can_read(self, user, *, membership=...) -> bool:
         """Admins of the org see everything in it; a member sees their own.
@@ -1488,6 +1539,28 @@ class MessageThread(models.Model):
             membership = OrgMember.objects.filter(org_id=self.org_id, user=user).first()
         if membership is None:
             return False
+
+        # ---- the three rooms ------------------------------------------------
+        # Checked BEFORE the admin shortcut below, on purpose. An organisation
+        # admin can read every support thread in their organisation because
+        # that is what those threads are for — they are addressed to the
+        # admins. A group's chat and two members' direct messages are not
+        # addressed to them, and "I run the comp" is not a reason to be able
+        # to read a conversation nobody sent you. An admin who needs to be in
+        # a group's room joins the group, which is visible to everyone in it.
+        if self.kind == self.KIND_ORG:
+            # Everyone in the organisation. Membership is already proven.
+            return True
+        if self.kind == self.KIND_GROUP:
+            return GroupMember.objects.filter(
+                group_id=self.group_id, user_id=user.id,
+            ).exists()
+        if self.kind == self.KIND_DIRECT:
+            return (
+                self.started_by_id == user.id
+                or self.recipients.filter(pk=user.pk).exists()
+            )
+
         if membership.can_manage:
             return True
         if self.started_by_id == user.id:
@@ -1597,11 +1670,22 @@ class MessageAttachment(models.Model):
         # browser will play back without a plugin, and an allowlist whose
         # entries cannot be rendered is not doing anybody a favour.
         ".mp4", ".mov", ".webm",
+        # Audio, added Sep 2026 for voice notes. A browser's MediaRecorder
+        # produces webm/opus on Chrome and Firefox and mp4/aac on Safari, and
+        # nothing lets you choose — so both have to be accepted, along with
+        # the ordinary audio files somebody might attach by hand.
+        ".m4a", ".mp3", ".ogg", ".oga", ".wav",
         ".pdf", ".txt", ".csv", ".doc", ".docx", ".xls", ".xlsx",
     }
     #: Suffixes the bubble plays inline rather than offering as a download.
     VIDEO_SUFFIXES = {".mp4", ".mov", ".webm"}
     IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+    #: Suffixes that get an audio player. `.webm` and `.mp4` are deliberately
+    #: NOT here even though a voice note may arrive in one of them: the same
+    #: container carries video, and a suffix cannot tell them apart. What
+    #: decides for a voice note is `is_voice`, set by the composer that
+    #: recorded it — see `is_audio`.
+    AUDIO_SUFFIXES = {".m4a", ".mp3", ".ogg", ".oga", ".wav"}
     MAX_BYTES = 8 * 1024 * 1024      # 8 MB per file
     #: Video is the one thing here that is routinely bigger than a document and
     #: is also the thing people most want to send from a phone. 8 MB is about
@@ -1609,6 +1693,10 @@ class MessageAttachment(models.Model):
     #: rather than raising the general one, because nothing else needs it.
     MAX_VIDEO_BYTES = 40 * 1024 * 1024
     MAX_PER_MESSAGE = 4
+    #: The ceiling the client set on a voice note: "max of 1 and half of a
+    #: minute". Enforced in the recorder, which stops at it, and again here,
+    #: because a limit only the browser knows is a convenience and not a rule.
+    MAX_VOICE_SECONDS = 90
 
     @classmethod
     def limit_for(cls, filename: str) -> int:
@@ -1628,6 +1716,16 @@ class MessageAttachment(models.Model):
     original_name = models.CharField(max_length=200)
     content_type = models.CharField(max_length=100, blank=True)
     size = models.PositiveIntegerField(default=0)
+    # RECORDED IN THE PAGE, not picked from a disk. Stored as a flag rather
+    # than inferred from the suffix because it cannot be inferred: a voice
+    # note off Chrome is a .webm, which is also what a video clip is, and the
+    # two want completely different bubbles. The composer knows which one it
+    # just made, so it is the composer that says so.
+    is_voice = models.BooleanField(default=False)
+    # How long it runs, in whole seconds, as the recorder measured it. Kept so
+    # the player can print "0:47" before the file has been fetched — a row of
+    # voice notes that all say "0:00" until you press them is not a playlist.
+    duration_s = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -1649,8 +1747,46 @@ class MessageAttachment(models.Model):
 
     @property
     def is_video(self) -> bool:
-        """Same question, same reasoning, for the <video> element."""
+        """Same question, same reasoning, for the <video> element.
+
+        A voice note recorded in Chrome is a .webm and in Safari an .mp4, so
+        the suffix alone would draw a black 16:9 video player around a piece of
+        audio. `is_voice` wins.
+        """
+        if self.is_voice:
+            return False
         return Path(self.original_name).suffix.lower() in self.VIDEO_SUFFIXES
+
+    @property
+    def is_audio(self) -> bool:
+        """Whether the bubble draws a player rather than a file chip."""
+        return self.is_voice or (
+            Path(self.original_name).suffix.lower() in self.AUDIO_SUFFIXES
+        )
+
+    @property
+    def audio_type(self) -> str:
+        """The MIME type to hand <audio>, from what we actually know.
+
+        For a recording that is the content type the browser reported when it
+        made the blob, which is the only reliable description of it — the
+        suffix was chosen by us from that same string. For a file somebody
+        attached, the suffix.
+        """
+        if self.is_voice and self.content_type:
+            # "audio/webm;codecs=opus" — the parameters are correct but some
+            # players are fussier about them than about the type itself.
+            return self.content_type.split(";")[0].strip()
+        return {
+            ".m4a": "audio/mp4", ".mp3": "audio/mpeg", ".wav": "audio/wav",
+            ".ogg": "audio/ogg", ".oga": "audio/ogg",
+        }.get(Path(self.original_name).suffix.lower(), "audio/mpeg")
+
+    @property
+    def duration_label(self) -> str:
+        """m:ss, the way every voice note anybody has seen is labelled."""
+        total = self.duration_s or 0
+        return f"{total // 60}:{total % 60:02d}"
 
     @property
     def video_type(self) -> str:
@@ -1672,3 +1808,47 @@ class MessageAttachment(models.Model):
         if n < 1024 * 1024:
             return f"{n / 1024:.0f} KB"
         return f"{n / (1024 * 1024):.1f} MB"
+
+
+class MessageReaction(models.Model):
+    """One person's one emoji on one message.
+
+    A ROW PER PERSON, not a counter on the message. A count cannot answer the
+    two questions the interface actually asks — "have I already reacted with
+    this?" (so the chip can be drawn as pressed, and pressing it again takes
+    it back) and "who reacted?" — and a counter has no way to be undone
+    correctly when two people press at once.
+
+    Same shape as WallReaction, deliberately: they are the same gesture in two
+    rooms, and a reader who has used one should find the other behaves
+    identically.
+    """
+
+    #: What the picker offers. A short, fixed set rather than every emoji
+    #: there is: the chips sit under a message and have to stay scannable, and
+    #: an open field turns a row of reactions into a second conversation.
+    CHOICES = ["\U0001F525", "\U0001F49A", "\U0001F44D", "\U0001F602", "\U0001F62E", "\U0001F622"]
+
+    message = models.ForeignKey(
+        Message, on_delete=models.CASCADE, related_name="reactions",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name="message_reactions",
+    )
+    emoji = models.CharField(max_length=8)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["created_at"]
+        constraints = [
+            # One of each emoji per person per message. Pressing a chip twice
+            # is a toggle, and without this a double-click posts two rows and
+            # the count reads 2 for one person.
+            models.UniqueConstraint(
+                fields=["message", "user", "emoji"], name="uniq_message_reaction",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user} {self.emoji} #{self.message_id}"

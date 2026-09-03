@@ -1,0 +1,34 @@
+{% comment %}
+THE SCROLLING HALF OF A CONVERSATION — and the only part the poll replaces.
+
+WHY THIS IS ITS OWN FILE, and it is not a tidiness argument.
+
+The first version polled the whole conversation pane, composer included. That
+works right up until somebody is halfway through typing when the twelve
+seconds are up: the swap replaces the textarea they are typing into with a
+fresh empty one, and their message is gone with no way to get it back. Same
+for a chosen attachment, a reply they had picked, and a voice note recorded
+but not yet sent.
+
+So the poll's target is exactly this: the messages, and nothing that holds
+state the reader has created. The header, the composer and the recorder sit
+outside it and are never touched.
+
+It carries its own hx-* attributes because hx-swap="outerHTML" replaces this
+element with the response — so the response has to BE this element, poll and
+all, or the conversation updates once and then stops.
+
+Expects: entries, thread, thread_org, can_pin.
+{% endcomment %}
+<div class="gtm-scroll gt-scroll" id="gtmChatList" data-gtm-scroll
+     hx-get="{% url 'orgs:member_message_thread' thread_org.id thread.id %}?pane=chat"
+     {% comment %}
+     Twelve seconds, and nothing at all while the tab is in the background —
+     otherwise a laptop left open overnight makes several thousand requests to
+     look at a conversation nobody is reading. This is a workplace tipping
+     comp, not a trading floor.
+     {% endcomment %}
+     hx-trigger="every 12s[document.visibilityState==='visible']"
+     hx-target="this" hx-swap="outerHTML">
+  {% include "partials/_chat.html" with entries=entries thread=thread %}
+</div>

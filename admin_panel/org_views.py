@@ -53,7 +53,17 @@ def message_list(request):
         return render(request, "manage/messages.html", {"org": None, "orgs": mine})
 
     threads = (
+        # THE CHAT ROOMS ARE NOT ADMIN BUSINESS.
+        #
+        # This area is one thing: the support conversations between a member
+        # and the people who run their organisation. Since Sep 2026 the same
+        # table also holds the organisation's chat room, its groups' rooms and
+        # every direct message between two of its members — none of which are
+        # addressed to the admins, and none of which they may read (see
+        # MessageThread.can_read, which refuses an admin a group room they are
+        # not in). Excluded here so they cannot appear in a listing either.
         MessageThread.objects.filter(org=org)
+        .exclude(kind__in=MessageThread.ROOM_KINDS)
         .select_related("started_by", "group")
         .annotate(reply_count=Count("messages"), last_at=Max("messages__created_at"))
         .order_by("-last_message_at")
@@ -163,8 +173,14 @@ def _notify_notice(thread, entry, picked):
 @org_admin_required
 def message_thread(request, thread_id: int):
     mine = managed_orgs(request.user)
+    # Running the organisation is not permission to read its members' chat.
+    # `org__in=mine` alone would have opened every group room and every direct
+    # message in an organisation to whoever manages it — the exact thing
+    # MessageThread.can_read refuses. Excluded rather than 403'd: a 404 does
+    # not confirm that a private conversation exists.
     thread = get_object_or_404(
-        MessageThread.objects.select_related("org", "started_by"),
+        MessageThread.objects.select_related("org", "started_by")
+        .exclude(kind__in=MessageThread.ROOM_KINDS),
         pk=thread_id, org__in=mine,
     )
 

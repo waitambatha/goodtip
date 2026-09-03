@@ -1,0 +1,68 @@
+{% comment %}
+THE MEMBER LIST, one page of it.
+
+Its own file because it is swapped on its own three ways: by the search box
+above it, by "Show more" at the bottom, and by the first paint of the messages
+screen. All three go through orgs.views.message_people, so what a search
+returns cannot drift from what the page rendered.
+
+EVERY ROW IS A LINK INTO A DIRECT MESSAGE. That was the client's point about
+removing "write to the admins": with the admins tagged here, reaching one is
+the same gesture as reaching anybody else, and there is no separate escalation
+control to explain.
+
+Expects: thread, org, people (rows from services.room_members), people_total,
+         people_more, and — on a swapped page — people_offset, people_q.
+{% endcomment %}
+{% for row in people %}
+{% comment %}
+Yourself is a row and not a link: a conversation with yourself is not a thing,
+and the endpoint refuses it. Left as a link it is a control that bounces you
+back to where you were with no explanation.
+{% endcomment %}
+{% if row.user.id == user.id %}
+<div class="gtm-mem is-you">
+  <span class="gtm-av person sm" aria-hidden="true">
+    {% if row.user.avatar %}<img src="{{ row.user.avatar.url }}" alt="">{% else %}{{ row.user.display_name|slice:":1"|upper }}{% endif %}
+  </span>
+  <span class="gtm-mem-txt"><b>{{ row.user.display_name }}</b><i>You</i></span>
+  {% for badge in row.badges %}<span class="gtm-tagchip {% if badge == 'Admin' %}is-admin{% endif %}">{{ badge }}</span>{% endfor %}
+</div>
+{% else %}
+<a class="gtm-mem" href="{% url 'orgs:message_direct' thread.org_id row.user.id %}"
+   title="Message {{ row.user.display_name }}">
+  <span class="gtm-av person sm" aria-hidden="true">
+    {% if row.user.avatar %}<img src="{{ row.user.avatar.url }}" alt="">{% else %}{{ row.user.display_name|slice:":1"|upper }}{% endif %}
+  </span>
+  <span class="gtm-mem-txt">
+    <b>{{ row.user.display_name }}</b>
+    <i>Message directly</i>
+  </span>
+  {% comment %}
+  THE ADMIN TAG. "The guy knows he is the admin, even in the list of members
+  we will have the tag admin — so no reason to have write-to-admin. If I'm in
+  an organisation and I see the tag, I'll shoot a DM to them."
+  {% endcomment %}
+  {% for badge in row.badges %}<span class="gtm-tagchip {% if badge == 'Admin' %}is-admin{% endif %}">{{ badge }}</span>{% endfor %}
+  <svg class="gtm-mem-go" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+</a>
+{% endif %}
+{% empty %}
+<p class="gtm-people-none">
+  {% if people_q %}Nobody here matches &ldquo;{{ people_q }}&rdquo;.{% else %}Nobody in here yet.{% endif %}
+</p>
+{% endfor %}
+
+{% if people_more %}
+{% comment %}
+PAGED, NOT INFINITE-SCROLLED. A press is a decision; a scroll listener that
+fetches is a surprise, and in a panel this short it fires constantly. The
+button swaps the NEXT page in after this one (hx-swap="beforeend" targeting
+its own wrapper), so what is already on screen is not re-fetched and re-drawn.
+{% endcomment %}
+<button type="button" class="gtm-more"
+        hx-get="{% url 'orgs:message_people' thread.org_id thread.id %}?offset={{ people_offset }}{% if people_q %}&amp;q={{ people_q|urlencode }}{% endif %}"
+        hx-target="this" hx-swap="outerHTML">
+  Show more members
+</button>
+{% endif %}

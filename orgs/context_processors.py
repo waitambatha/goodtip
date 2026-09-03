@@ -18,7 +18,7 @@ def user_orgs(request):
     # onto each Organisation instance (o.nav_groups) rather than a separate
     # dict, so the template can just loop `o.nav_groups` — Django templates
     # have no built-in "look this dict up by a variable key" syntax.
-    from .models import Group
+    from .models import Group, MessageReaction
 
     nav_any_groups_enabled = any(o.groups_enabled for o in orgs)
     for o in orgs:
@@ -143,6 +143,12 @@ def user_orgs(request):
     return {
         "nav_orgs": orgs,
         "nav_any_groups_enabled": nav_any_groups_enabled,
+        # The reaction picker's fixed set. Here rather than passed by each of
+        # the three views that render a conversation, because it is a constant
+        # and the alternative is three places to forget it in — the chat
+        # partial is shared between the member's screen, the admin's, and the
+        # fragment the reaction endpoint swaps back.
+        "reaction_choices": MessageReaction.CHOICES,
         "primary_org": primary,
         "current_org": primary,
         "current_group": group,

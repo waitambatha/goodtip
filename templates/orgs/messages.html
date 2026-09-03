@@ -1,0 +1,454 @@
+{% extends "app_base.html" %}
+{% load static humanize %}
+{% block title %}{% if thread %}{% if other %}{{ other.display_name }}{% elif thread.group %}{{ thread.group.name }}{% elif thread.kind == 'org' %}{{ thread_org.name }}{% else %}{{ thread.subject }}{% endif %} &middot; {% endif %}Messages{% endblock %}
+{% block loader_task %}Opening your messages{% endblock %}
+{% block nav_msgs %}on{% endblock %}
+{% comment %}
+No `sheet-page`. Every other member screen is a cream card floating on the
+deep green with generous padding; this one is a three-panel application that
+has to fill the window, and a sheet with 60px of padding round it leaves the
+conversation about as tall as a business card.
+{% endcomment %}
+{% block body_class %}page-deep gtm-page{% endblock %}
+{% comment %}
+NO SIDE STRIPS HERE, and this is the one screen that should not have them.
+They are the frame the rest of the product is recognised by, and they frame a
+sheet floating on a photograph. This page is an opaque application filling the
+window edge to edge — there is nothing for them to show through, so the block
+is deliberately left empty rather than inherited.
+{% endcomment %}
+{% block page_backdrop %}{% endblock %}
+{% block extra_head %}
+{% comment %}
+Its own stylesheet, loaded here and nowhere else. This is the only screen in
+the product with a full-height application layout, every selector in that file
+is scoped to .gtm, and 700 lines on the end of goodtip.css would be carried by
+every page on the site to serve one.
+{% endcomment %}
+<link rel="stylesheet" href="{% static 'css/gt-messages.css' %}">
+<script src="{% static 'js/gt-chat.js' %}" defer></script>
+<script src="{% static 'js/gt-messages.js' %}" defer></script>
+<script src="{% static 'js/gt-voice.js' %}" defer></script>
+{% endblock %}
+
+{% block app_content %}
+{% comment %}
+=============================================================================
+MESSAGES — three panels.
+=============================================================================
+
+What was here was a support inbox: a hero explaining that admins could read
+what you raised, a "Write to the admins" button, and a list of tickets. The
+client's note: "when I click Messages I do not want to see this. I want a
+chatting interface from the word go."
+
+So: conversations on the left, the room's people in the middle, the
+conversation on the right — organisations, the groups inside them, the members
+inside those, and a direct message to any one of them.
+
+WHY THE SUPPORT THREADS ARE STILL IN THE LIST. They are the same thing as
+everything else in it: an exchange between a member and the people who run
+their comp. They keep their own row style and their own status chips, the
+admin's end of them (/manage/messages/) is untouched, and the member's private
+line to the admins still exists. What went is the idea that it was the whole
+screen. The client's own reasoning holds: every member list now tags who the
+admins are, so a direct message is the obvious way to reach one.
+
+ONE PAGE, THREE VIEWS ON A PHONE. There is no separate mobile template. The
+same markup is a three-column desktop layout, a two-column tablet one, and on
+a phone a WhatsApp-style stack — list, then room, then conversation — where
+`data-view` on the wrapper says which level you are on and the back button
+walks out of it. See gt-messages.js and the .gtm-page media queries.
+=============================================================================
+{% endcomment %}
+<div class="gtm" data-gtm data-view="{% if thread %}chat{% else %}list{% endif %}">
+
+  {# ==================== LEFT: conversations ==================== #}
+  <aside class="gtm-nav" data-gtm-pane="list">
+    <header class="gtm-nav-head">
+      <div class="gtm-title">
+        <span class="gtm-title-ic" aria-hidden="true"><svg><use href="#ic-msg"/></svg></span>
+        <div>
+          <h1>Messages</h1>
+          <p>Your organisations, groups and people</p>
+        </div>
+      </div>
+
+      {% comment %}
+      NEW MESSAGE opens the picker sheet at the bottom of this file rather
+      than starting a blank compose screen. "New message" in a product like
+      this means "who to", and the answer is one of three concrete lists —
+      organisations, groups, people — not an empty To: field.
+      {% endcomment %}
+      <button type="button" class="gtm-new" data-gtm-new>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        New message
+      </button>
+
+      <div class="gtm-search">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        {% comment %}
+        Filters the list that is already on the page rather than asking the
+        server. The whole list is here — it is one row per conversation, not
+        one per member — so a round trip to hide a few rows would be slower
+        than the keystroke that asked for it.
+        {% endcomment %}
+        <input type="search" placeholder="Search messages, groups or people&hellip;"
+               aria-label="Search your conversations" data-gtm-filter>
+      </div>
+
+      {% comment %}
+      Tabs, not a dropdown. Four is few enough to show, and the counts are the
+      point of them: "Groups 4" answers "do I have any" without pressing
+      anything.
+      {% endcomment %}
+      <div class="gtm-tabs" role="tablist" aria-label="Filter conversations">
+        <button type="button" class="gtm-tab on" role="tab" aria-selected="true" data-gtm-tab="all">
+          All {% if count_all %}<i>{{ count_all }}</i>{% endif %}
+        </button>
+        <button type="button" class="gtm-tab" role="tab" aria-selected="false" data-gtm-tab="org">
+          Organisations {% if count_rooms %}<i>{{ count_rooms }}</i>{% endif %}
+        </button>
+        <button type="button" class="gtm-tab" role="tab" aria-selected="false" data-gtm-tab="group">
+          Groups {% if count_groups %}<i>{{ count_groups }}</i>{% endif %}
+        </button>
+        <button type="button" class="gtm-tab" role="tab" aria-selected="false" data-gtm-tab="person">
+          People {% if count_people %}<i>{{ count_people }}</i>{% endif %}
+        </button>
+      </div>
+    </header>
+
+    <div class="gtm-nav-body gt-scroll">
+      {% comment %}
+      ---- YOUR ORGANISATIONS -------------------------------------------
+      The tree the client described: organisation → groups → members → chat.
+      It is above the conversation list, not inside it, because it answers a
+      different question — "where can I write" rather than "what have I been
+      writing" — and because a brand-new member has no conversations at all
+      and would otherwise land on an empty page.
+
+      nav_orgs comes from the context processor with each organisation's own
+      groups (the ones THIS member is in) already attached, in one query, so
+      the whole tree costs nothing here.
+      {% endcomment %}
+      <section class="gtm-sec" data-gtm-sec="tree">
+        <h2 class="gtm-sec-h">My organisations</h2>
+        {% for o in nav_orgs %}
+        <details class="gtm-org" {% if o.id == org.id or nav_orgs|length == 1 %}open{% endif %}>
+          <summary class="gtm-org-row">
+            <span class="gtm-av org" aria-hidden="true">{{ o.name|slice:":1"|upper }}</span>
+            <span class="gtm-org-txt">
+              <b>{{ o.name }}</b>
+              <i>{% if o.nav_groups %}{{ o.nav_groups|length }} group{{ o.nav_groups|length|pluralize }} &middot; {% endif %}{{ o.members.count }} member{{ o.members.count|pluralize }}</i>
+            </span>
+            <svg class="gtm-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+          </summary>
+          <div class="gtm-org-kids">
+            {% comment %}
+            The whole organisation first, always — the same order the nav's
+            own switcher uses, so "everyone" is in a consistent place rather
+            than being the last item of a group list.
+            {% endcomment %}
+            <a class="gtm-kid" href="{% url 'orgs:message_room' o.id %}">
+              <span class="gtm-av org sm" aria-hidden="true"><svg><use href="#ic-f-org"/></svg></span>
+              <span class="gtm-kid-txt"><b>Everyone in {{ o.name }}</b><i>Organisation room</i></span>
+            </a>
+            {% for g in o.nav_groups %}
+            <a class="gtm-kid" href="{% url 'orgs:message_group_room' o.id g.id %}">
+              <span class="gtm-av group sm" aria-hidden="true">{{ g.name|slice:":1"|upper }}</span>
+              <span class="gtm-kid-txt"><b>{{ g.name }}</b><i>{{ g.memberships.count }} member{{ g.memberships.count|pluralize }}</i></span>
+            </a>
+            {% endfor %}
+            {% if o.groups_enabled %}
+            <a class="gtm-kid gtm-kid-more" href="{% url 'orgs:groups' o.id %}">All groups &rarr;</a>
+            {% endif %}
+          </div>
+        </details>
+        {% endfor %}
+      </section>
+
+      {# ---- RECENT CONVERSATIONS ---- #}
+      <section class="gtm-sec" data-gtm-sec="chats">
+        <h2 class="gtm-sec-h">Recent chats{% if total_unread %} <span class="gtm-sec-n">{{ total_unread }} new</span>{% endif %}</h2>
+        <ul class="gtm-list" data-gtm-list>
+          {% for c in conversations %}
+          {% comment %}
+          data-face is what the tabs filter on and data-find is what the
+          search box matches — both put here rather than derived in script, so
+          the browser never has to reason about what kind of row this is.
+          {% endcomment %}
+          <li class="gtm-conv{% if thread and thread.id == c.id %} on{% endif %}{% if c.unread %} is-new{% endif %}"
+              data-face="{{ c.face }}"
+              data-find="{{ c.title|lower }} {{ c.subtitle|lower }} {{ c.preview|lower }}">
+            <a href="{% url 'orgs:member_message_thread' c.org.id c.id %}">
+              <span class="gtm-av {{ c.face }}" aria-hidden="true">
+                {% if c.avatar_user and c.avatar_user.avatar %}<img src="{{ c.avatar_user.avatar.url }}" alt="">
+                {% elif c.face == 'admins' %}<svg><use href="#ic-shield-check"/></svg>
+                {% elif c.face == 'org' %}<svg><use href="#ic-f-org"/></svg>
+                {% else %}{{ c.letter }}{% endif %}
+              </span>
+              <span class="gtm-conv-txt">
+                <span class="gtm-conv-top">
+                  <b>{{ c.title }}</b>
+                  <span class="gtm-when">{{ c.when|naturaltime }}</span>
+                </span>
+                <span class="gtm-conv-bot">
+                  {% if c.preview %}
+                  <span class="gtm-prev">{% if c.preview_who %}<i>{{ c.preview_who }}:</i> {% endif %}{{ c.preview|truncatechars:64 }}</span>
+                  {% else %}
+                  <span class="gtm-prev quiet">{{ c.subtitle }}</span>
+                  {% endif %}
+                  {% if c.unread %}<span class="gtm-badge">{{ c.unread }}</span>{% endif %}
+                </span>
+              </span>
+            </a>
+          </li>
+          {% empty %}
+          <li class="gtm-none">
+            Nothing yet. Open your organisation above and say something &mdash;
+            or press <b>New message</b> to write to one person.
+          </li>
+          {% endfor %}
+        </ul>
+        {# shown by the script when a filter or a tab matches nothing #}
+        <p class="gtm-nomatch" data-gtm-nomatch hidden>Nothing here matches that.</p>
+      </section>
+    </div>
+  </aside>
+
+  {# ==================== MIDDLE: who is in here ==================== #}
+  {% comment %}
+  The middle panel is the room, not the conversation: who is in it, what is
+  pinned, and — the client's own emphasis — every member clickable straight
+  into a direct message with them, with the admins tagged so you can tell who
+  to ask.
+
+  For a direct message there is no room, so it becomes the other person's
+  card instead of an empty member list.
+  {% endcomment %}
+  <section class="gtm-mid" data-gtm-pane="room">
+    {% if thread %}
+    <header class="gtm-mid-head">
+      <button type="button" class="gtm-back" data-gtm-back="list" aria-label="Back to conversations">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+      </button>
+      <span class="gtm-av lg {% if other %}person{% elif thread.kind == 'group' %}group{% elif thread.kind == 'org' %}org{% else %}admins{% endif %}" aria-hidden="true">
+        {% if other and other.avatar %}<img src="{{ other.avatar.url }}" alt="">
+        {% elif other %}{{ other.display_name|slice:":1"|upper }}
+        {% elif thread.kind == 'group' %}{{ thread.group.name|slice:":1"|upper }}
+        {% elif thread.kind == 'org' %}<svg><use href="#ic-f-org"/></svg>
+        {% else %}<svg><use href="#ic-shield-check"/></svg>{% endif %}
+      </span>
+      <div class="gtm-mid-txt">
+        <b>{% if other %}{{ other.display_name }}{% elif thread.kind == 'group' %}{{ thread.group.name }}{% elif thread.kind == 'org' %}{{ thread_org.name }}{% else %}{{ thread.subject }}{% endif %}</b>
+        {% comment %}
+        THE CONTEXT LINE, always. "The user should never be confused about
+        whether they are chatting with an organisation, a group or a person."
+        Four different sentences, one per kind, rather than one generic one.
+        {% endcomment %}
+        <i>
+          {% if other %}Direct message &middot; {{ thread_org.name }}
+          {% elif thread.kind == 'group' %}{{ thread_org.name }} &middot; {{ people_total }} member{{ people_total|pluralize }}
+          {% elif thread.kind == 'org' %}Everyone &middot; {{ people_total }} member{{ people_total|pluralize }}
+          {% else %}With the admins &middot; {{ thread_org.name }}{% endif %}
+        </i>
+      </div>
+    </header>
+
+    {% if thread.pinned_message %}
+    {% comment %}
+    THE PINNED MESSAGE lives in this panel and not over the conversation. A
+    banner pinned above a scrolling chat costs the same twenty vertical pixels
+    on every message you read for the rest of the session; here it is beside
+    the conversation, permanently visible and permanently out of the way.
+    {% endcomment %}
+    <div class="gtm-pin">
+      <span class="gtm-pin-lab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/></svg> Pinned</span>
+      <a class="gtm-pin-body" href="#msg-{{ thread.pinned_message.id }}" data-jump="{{ thread.pinned_message.id }}">
+        <b>{{ thread.pinned_message.author.display_name }}</b>
+        <span>{{ thread.pinned_message.quote }}</span>
+      </a>
+      {% if can_pin %}
+      <form method="post" action="{% url 'orgs:message_pin' thread_org.id thread.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="message" value="{{ thread.pinned_message.id }}">
+        <button type="submit" class="gtm-pin-x" aria-label="Unpin this message">&times;</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if other %}
+    {% comment %}
+    A direct message has no member list to show, so the panel becomes the card
+    for the person you are talking to — which is the thing you would otherwise
+    have gone looking for.
+    {% endcomment %}
+    <div class="gtm-person">
+      <span class="gtm-av xl person" aria-hidden="true">
+        {% if other.avatar %}<img src="{{ other.avatar.url }}" alt="">{% else %}{{ other.display_name|slice:":1"|upper }}{% endif %}
+      </span>
+      <b>{{ other.display_name }}</b>
+      <span class="gtm-person-sub">{{ thread_org.name }}</span>
+      <p class="gtm-person-note">
+        This conversation is between the two of you. Nobody else in
+        {{ thread_org.name }} can read it &mdash; not even the admins.
+      </p>
+    </div>
+    {% else %}
+    <div class="gtm-mid-body">
+      <div class="gtm-people-head">
+        <h2>Members <span>{{ people_total }}</span></h2>
+        {% comment %}
+        Adding people is done where people are already managed — the members
+        screen for an organisation, the groups screen for a group. This is a
+        link to those, not a second way of doing it: two places that add a
+        member is two sets of rules to keep in step, and the client's brief
+        was explicit that the existing organisation and group logic is not to
+        be touched.
+        {% endcomment %}
+        {% if thread.kind == 'group' and can_pin %}
+        <a class="gtm-addbtn" href="{% url 'orgs:groups' thread_org.id %}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Add
+        </a>
+        {% elif can_manage %}
+        <a class="gtm-addbtn" href="{% url 'orgs:members' thread_org.id %}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Add
+        </a>
+        {% endif %}
+      </div>
+      {% comment %}
+      SEARCH RUNS ON THE SERVER, and the list arrives sixty at a time. The
+      client's own worst case is the reason: "an organisation that has about
+      1000 people". Rendering a thousand rows into every page load is the
+      difference between a panel that opens instantly and one that does not.
+
+      A real GET form with htmx over the top, so it degrades to an ordinary
+      search that reloads the page.
+      {% endcomment %}
+      <form class="gtm-people-search" method="get"
+            action="{% url 'orgs:message_people' thread_org.id thread.id %}">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        {% comment %}
+        The htmx attributes are on the INPUT, not on the form. An input that
+        carries its own hx-get sends its own name and value, which is exactly
+        the one parameter this needs — no reasoning about which element htmx
+        considers the trigger, and no dependence on how a particular version
+        handles a form's submitter.
+
+        `delay:280ms` debounces: without it every keystroke is a request, and
+        a name typed at speed fires eight searches whose answers can arrive in
+        any order. The form around it is the no-JavaScript path and posts to
+        the same place.
+        {% endcomment %}
+        <input type="search" name="q" placeholder="Search members&hellip;" aria-label="Search members"
+               hx-get="{% url 'orgs:message_people' thread_org.id thread.id %}"
+               hx-trigger="input changed delay:280ms, search"
+               hx-target="#gtmPeople" hx-swap="innerHTML">
+      </form>
+      <div id="gtmPeople" class="gtm-people gt-scroll">
+        {% include "orgs/partials/_room_people.html" %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    {# nothing selected — the middle panel has nothing to describe #}
+    <div class="gtm-mid-idle" aria-hidden="true"></div>
+    {% endif %}
+  </section>
+
+  {# ==================== RIGHT: the conversation ==================== #}
+  <section class="gtm-chat" data-gtm-pane="chat">
+    {% if thread %}
+    {% include "orgs/partials/_room_chat.html" %}
+    {% else %}
+    {% comment %}
+    THE EMPTY STATE. Not a shrug — the two things somebody who has just
+    arrived actually wants are here as buttons, so "nothing selected" is a
+    starting point rather than a dead end.
+    {% endcomment %}
+    <div class="gtm-empty">
+      <span class="gtm-empty-ic" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.6-4.6A8.3 8.3 0 0 1 3.5 11 8.4 8.4 0 0 1 12 2.6a8.4 8.4 0 0 1 9 8.4z"/></svg>
+      </span>
+      <h2>Pick somewhere to start.</h2>
+      <p>
+        Your organisations and their groups are on the left &mdash; open one and
+        everyone in it is there. Or write to one person directly.
+      </p>
+      <div class="gtm-empty-acts">
+        <a class="gtm-empty-primary" href="{% url 'orgs:message_room' org.id %}">Open {{ org.name }}</a>
+        <button type="button" class="gtm-empty-ghost" data-gtm-new>Message one person &rarr;</button>
+      </div>
+    </div>
+    {% endif %}
+  </section>
+</div>
+
+{% comment %}
+=============================================================================
+THE "NEW MESSAGE" PICKER.
+=============================================================================
+Three lists, one sheet: an organisation room, a group room, or a person.
+Rendered from what is already in the context — nav_orgs carries the groups,
+and the people list is fetched per organisation only when that tab is opened,
+because an organisation of a thousand does not belong in a sheet that opens on
+every page load.
+=============================================================================
+{% endcomment %}
+<div class="tipsheet gtm-sheet" id="gtmNew" hidden aria-hidden="true">
+  <div class="ts-veil" data-gtm-new-close></div>
+  <div class="ts-panel" role="dialog" aria-modal="true" aria-labelledby="gtmNewTitle">
+    <header class="ts-head">
+      <div>
+        <h3 id="gtmNewTitle">New message</h3>
+        <p class="ts-sub">Who are you writing to?</p>
+      </div>
+      <button type="button" class="ts-x" data-gtm-new-close aria-label="Close">&times;</button>
+    </header>
+    <div class="ts-body gtm-sheet-body">
+      {% for o in my_orgs %}
+      <div class="gtm-sheet-org">
+        <h4>{{ o.name }}</h4>
+        <a class="gtm-sheet-row" href="{% url 'orgs:message_room' o.id %}">
+          <span class="gtm-av org sm" aria-hidden="true"><svg><use href="#ic-f-org"/></svg></span>
+          <span class="gtm-kid-txt"><b>Everyone in {{ o.name }}</b><i>Organisation room</i></span>
+        </a>
+        {% for g in o.nav_groups %}
+        <a class="gtm-sheet-row" href="{% url 'orgs:message_group_room' o.id g.id %}">
+          <span class="gtm-av group sm" aria-hidden="true">{{ g.name|slice:":1"|upper }}</span>
+          <span class="gtm-kid-txt"><b>{{ g.name }}</b><i>Group room</i></span>
+        </a>
+        {% endfor %}
+        {% comment %}
+        People are NOT listed here. An organisation of a thousand cannot be
+        put into a sheet, and a partial list is worse than none — you cannot
+        tell whether the person you want is missing or simply further down.
+        The member panel next to an open room is where people are picked, and
+        it searches the database.
+        {% endcomment %}
+        <a class="gtm-sheet-row gtm-sheet-people" href="{% url 'orgs:message_room' o.id %}">
+          <span class="gtm-av sm" aria-hidden="true"><svg><use href="#ic-f-users"/></svg></span>
+          <span class="gtm-kid-txt"><b>Someone in {{ o.name }}</b><i>Open the room and pick them from the member list</i></span>
+        </a>
+      </div>
+      {% endfor %}
+      {% comment %}
+      WHERE "WRITE TO THE ADMINS" WENT.
+
+      It was a button of its own at the top of this screen. The client's
+      reasoning for taking it off: the member lists now tag who the admins
+      are, so reaching one is the same gesture as reaching anybody else, and a
+      separate escalation control is a second thing to explain. This line says
+      that in one sentence rather than leaving people to work it out.
+      {% endcomment %}
+      <p class="gtm-sheet-note">
+        Need one of the people who run your comp? They're tagged
+        <span class="gtm-tagchip is-admin">Admin</span> in every member list &mdash;
+        open a room and message them directly.
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

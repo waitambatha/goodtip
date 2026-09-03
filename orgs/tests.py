@@ -5428,3 +5428,412 @@ class MessageVideoTests(TestCase):
         )
         self.assertContains(resp, "chat-clip")
         self.assertContains(resp, 'type="video/mp4"')
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="gt-rooms-"))
+class ChatRoomTests(TestCase):
+    """The three rooms, and who may read each.
+
+    This is the security surface of the messaging rebuild. Adding organisation
+    rooms, group rooms and direct messages to the table that held support
+    tickets means one method — MessageThread.can_read — now decides four
+    different questions, and getting any of them wrong exposes a private
+    conversation to a whole organisation.
+    """
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        User = get_user_model()
+        season = Season.objects.create(year=2094, label="2094")
+        self.org = Organisation.objects.create(
+            name="Masterclass", season=season, groups_enabled=True,
+        )
+        self.other_org = Organisation.objects.create(name="Net Providers", season=season)
+
+        self.admin = User.objects.create_user(email="ad@x.com", password="x", display_name="Ada")
+        self.ann = User.objects.create_user(email="ann@x.com", password="x", display_name="Ann")
+        self.bob = User.objects.create_user(email="bob@x.com", password="x", display_name="Bob")
+        self.cat = User.objects.create_user(email="cat@x.com", password="x", display_name="Cat")
+        self.outsider = User.objects.create_user(email="out@x.com", password="x", display_name="Otto")
+
+        OrgMember.objects.create(user=self.admin, org=self.org, role=OrgMember.ROLE_MANAGER)
+        for person in (self.ann, self.bob, self.cat):
+            OrgMember.objects.create(user=person, org=self.org)
+        OrgMember.objects.create(user=self.outsider, org=self.other_org)
+
+        self.group = Group.objects.create(
+            org=self.org, name="AFLW Tippers",
+            approval_status=Group.APPROVAL_APPROVED,
+        )
+        GroupMember.objects.create(group=self.group, user=self.ann, is_admin=True)
+        GroupMember.objects.create(group=self.group, user=self.bob)
+
+    # ---- the organisation room -----------------------------------------
+
+    def test_the_organisation_room_is_readable_by_every_member(self):
+        from .services import org_room
+
+        room = org_room(self.org)
+        for person in (self.admin, self.ann, self.bob, self.cat):
+            self.assertTrue(room.can_read(person), person.display_name)
+
+    def test_the_organisation_room_is_not_readable_from_another_organisation(self):
+        from .services import org_room
+
+        self.assertFalse(org_room(self.org).can_read(self.outsider))
+
+    def test_opening_the_room_twice_does_not_make_two(self):
+        """A room is created lazily, so the guard against duplicates is the
+        get_or_create and not a migration that made one up front."""
+        from .models import MessageThread
+        from .services import org_room
+
+        first, second = org_room(self.org), org_room(self.org)
+        self.assertEqual(first.id, second.id)
+        self.assertEqual(
+            MessageThread.objects.filter(
+                org=self.org, kind=MessageThread.KIND_ORG,
+            ).count(), 1,
+        )
+
+    # ---- a group's room -------------------------------------------------
+
+    def test_a_group_room_is_readable_only_by_the_group(self):
+        from .services import group_room
+
+        room = group_room(self.group)
+        self.assertTrue(room.can_read(self.ann))
+        self.assertTrue(room.can_read(self.bob))
+        # In the organisation, not in the group.
+        self.assertFalse(room.can_read(self.cat))
+
+    def test_running_the_organisation_does_not_open_its_groups_rooms(self):
+        """The one rule most likely to be got wrong, and the most expensive.
+
+        An admin CAN read every support thread in their organisation, because
+        those are addressed to the admins. A group's chat is not addressed to
+        them, and "I run the comp" is not a reason to read a conversation
+        nobody sent you. An admin who needs to be in a room joins the group,
+        which everyone in it can see.
+        """
+        from .services import group_room
+
+        self.assertFalse(group_room(self.group).can_read(self.admin))
+
+    def test_a_group_room_404s_for_somebody_not_in_the_group(self):
+        self.client.force_login(self.cat)
+        resp = self.client.get(
+            reverse("orgs:message_group_room", args=[self.org.id, self.group.id])
+        )
+        # Not 403: an organisation with a private group should not confirm to
+        # a non-member that the group exists.
+        self.assertEqual(resp.status_code, 404)
+
+    # ---- direct messages -------------------------------------------------
+
+    def test_a_direct_message_is_readable_by_exactly_two_people(self):
+        from .services import direct_thread
+
+        dm = direct_thread(self.ann, self.bob, self.org)
+        self.assertTrue(dm.can_read(self.ann))
+        self.assertTrue(dm.can_read(self.bob))
+        self.assertFalse(dm.can_read(self.cat))
+        # Including the person who runs the organisation.
+        self.assertFalse(dm.can_read(self.admin))
+
+    def test_a_direct_message_is_found_from_either_end(self):
+        """Who started it is an accident of who pressed first. A lookup that
+        only matched started_by would hand each person their own half of the
+        conversation — two threads, each showing one side of it."""
+        from .services import direct_thread
+
+        first = direct_thread(self.ann, self.bob, self.org)
+        second = direct_thread(self.bob, self.ann, self.org)
+        self.assertEqual(first.id, second.id)
+
+    def test_you_cannot_message_somebody_in_another_organisation(self):
+        """Membership is what gives two people the right to write to each
+        other. A user id in a URL must not be a way to reach a stranger."""
+        self.client.force_login(self.ann)
+        resp = self.client.get(
+            reverse("orgs:message_direct", args=[self.org.id, self.outsider.id])
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    def test_messaging_yourself_goes_nowhere(self):
+        from .models import MessageThread
+
+        self.client.force_login(self.ann)
+        resp = self.client.get(
+            reverse("orgs:message_direct", args=[self.org.id, self.ann.id])
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(
+            MessageThread.objects.filter(kind=MessageThread.KIND_DIRECT).exists()
+        )
+
+    # ---- the admin area cannot be walked into these ----------------------
+
+    def test_the_manage_inbox_cannot_open_a_group_room(self):
+        """orgs.views guards these with can_read; /manage/ used to guard only
+        on `org__in=the ones I manage`, which would have opened every group
+        room and every direct message in an organisation to whoever runs it."""
+        from .services import direct_thread, group_room
+
+        self.admin.is_staff = True
+        self.admin.save(update_fields=["is_staff"])
+        self.client.force_login(self.admin)
+        for thread in (group_room(self.group), direct_thread(self.ann, self.bob, self.org)):
+            resp = self.client.get(reverse("manage:message_thread", args=[thread.id]))
+            self.assertEqual(resp.status_code, 404, thread.kind)
+
+    # ---- the screen itself ------------------------------------------------
+
+    def test_the_messages_screen_lists_the_rooms_you_are_in(self):
+        from .models import Message
+        from .services import group_room, org_room
+
+        Message.objects.create(
+            thread=org_room(self.org), author=self.admin, body="Round 5 locks Friday",
+        )
+        Message.objects.create(
+            thread=group_room(self.group), author=self.ann, body="Lions all the way",
+        )
+        self.client.force_login(self.bob)
+        html = self.client.get(
+            reverse("orgs:member_messages", args=[self.org.id])
+        ).content.decode()
+        self.assertIn("Round 5 locks Friday", html)
+        self.assertIn("Lions all the way", html)
+
+    def test_the_messages_screen_does_not_leak_a_room_you_are_not_in(self):
+        from .models import Message
+        from .services import group_room
+
+        Message.objects.create(
+            thread=group_room(self.group), author=self.ann, body="Lions all the way",
+        )
+        self.client.force_login(self.cat)      # in the org, not in the group
+        html = self.client.get(
+            reverse("orgs:member_messages", args=[self.org.id])
+        ).content.decode()
+        self.assertNotIn("Lions all the way", html)
+
+    def test_the_member_list_tags_the_admins(self):
+        """The reason "write to the admins" could come off the screen: if you
+        can see who they are, a direct message is the obvious way to reach
+        one."""
+        from .services import org_room
+
+        room = org_room(self.org)
+        self.client.force_login(self.ann)
+        html = self.client.get(
+            reverse("orgs:message_people", args=[self.org.id, room.id])
+        ).content.decode()
+        self.assertIn("Ada", html)
+        self.assertIn("Admin", html)
+
+    def test_the_member_list_searches_in_the_database(self):
+        from .services import org_room
+
+        room = org_room(self.org)
+        self.client.force_login(self.ann)
+        html = self.client.get(
+            reverse("orgs:message_people", args=[self.org.id, room.id]), {"q": "Bob"},
+        ).content.decode()
+        self.assertIn("Bob", html)
+        self.assertNotIn("Cat", html)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="gt-react-"))
+class MessageReactionTests(TestCase):
+    """Reactions, and the toggle that is the whole point of them."""
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        from .models import Message
+        from .services import org_room
+
+        User = get_user_model()
+        season = Season.objects.create(year=2093, label="2093")
+        self.org = Organisation.objects.create(name="Reactors", season=season)
+        self.ann = User.objects.create_user(email="a@r.com", password="x", display_name="Ann")
+        self.bob = User.objects.create_user(email="b@r.com", password="x", display_name="Bob")
+        OrgMember.objects.create(user=self.ann, org=self.org)
+        OrgMember.objects.create(user=self.bob, org=self.org)
+        self.room = org_room(self.org)
+        self.message = Message.objects.create(
+            thread=self.room, author=self.ann, body="Big weekend",
+        )
+        self.url = reverse(
+            "orgs:message_react", args=[self.org.id, self.room.id, self.message.id],
+        )
+
+    def test_pressing_a_reaction_twice_takes_it_back(self):
+        from .models import MessageReaction
+
+        self.client.force_login(self.bob)
+        self.client.post(self.url, {"emoji": "\U0001F525"})
+        self.assertEqual(MessageReaction.objects.count(), 1)
+        self.client.post(self.url, {"emoji": "\U0001F525"})
+        self.assertEqual(MessageReaction.objects.count(), 0)
+
+    def test_two_people_on_one_emoji_count_as_two(self):
+        for person in (self.ann, self.bob):
+            self.client.force_login(person)
+            self.client.post(self.url, {"emoji": "\U0001F44D"})
+        self.assertEqual(self.message.reactions.count(), 2)
+
+    def test_an_emoji_that_is_not_offered_is_refused(self):
+        """An allowlist, not "whatever was posted" — the column is eight
+        characters and the chips have to stay scannable."""
+        from .models import MessageReaction
+
+        self.client.force_login(self.bob)
+        resp = self.client.post(self.url, {"emoji": "\U0001F4A9"})
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(MessageReaction.objects.count(), 0)
+
+    def test_you_cannot_react_in_a_room_you_cannot_read(self):
+        User = get_user_model()
+        stranger = User.objects.create_user(email="s@r.com", password="x", display_name="Sid")
+        other = Organisation.objects.create(
+            name="Elsewhere", season=Season.objects.get(year=2093),
+        )
+        OrgMember.objects.create(user=stranger, org=other)
+        self.client.force_login(stranger)
+        self.assertEqual(self.client.post(self.url, {"emoji": "\U0001F525"}).status_code, 404)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="gt-voice-"))
+class VoiceNoteTests(TestCase):
+    """A recording is not a video clip, even when it is a .webm.
+
+    Which is the whole reason `is_voice` is a stored flag rather than
+    something worked out from the filename: Chrome's MediaRecorder produces
+    audio/webm and so does a video camera, and the two want completely
+    different bubbles.
+    """
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        from .models import Message
+        from .services import org_room
+
+        User = get_user_model()
+        season = Season.objects.create(year=2092, label="2092")
+        self.org = Organisation.objects.create(name="Talkers", season=season)
+        self.ann = User.objects.create_user(email="a@t.com", password="x", display_name="Ann")
+        OrgMember.objects.create(user=self.ann, org=self.org)
+        self.room = org_room(self.org)
+        self.message = Message.objects.create(thread=self.room, author=self.ann, body="")
+        self.client.force_login(self.ann)
+
+    def _blob(self, name="voice-note.webm"):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return SimpleUploadedFile(name, b"\x1aE\xdf\xa3" + b"\0" * 2000, "audio/webm")
+
+    def test_a_recording_is_audio_and_not_video(self):
+        from .models import MessageAttachment
+        from .services import attach_files
+
+        self.assertEqual(attach_files(self.message, [self._blob()], voice=True, duration_s=47), [])
+        clip = MessageAttachment.objects.get(message=self.message)
+        self.assertTrue(clip.is_voice)
+        self.assertTrue(clip.is_audio)
+        self.assertFalse(clip.is_video)
+        self.assertEqual(clip.duration_label, "0:47")
+        self.assertEqual(clip.audio_type, "audio/webm")
+
+    def test_the_same_container_attached_as_a_file_is_still_a_video(self):
+        from .models import MessageAttachment
+        from .services import attach_files
+
+        attach_files(self.message, [self._blob("goal.webm")])
+        clip = MessageAttachment.objects.get(message=self.message)
+        self.assertTrue(clip.is_video)
+        self.assertFalse(clip.is_audio)
+
+    def test_a_duration_from_the_page_is_clamped(self):
+        """The number arrives from the browser, and the browser is not a
+        source of truth. The recorder stops at the ceiling; this is what
+        happens when something else does not."""
+        from .models import MessageAttachment
+        from .services import attach_files
+
+        attach_files(self.message, [self._blob()], voice=True, duration_s=9999)
+        clip = MessageAttachment.objects.get(message=self.message)
+        self.assertEqual(clip.duration_s, MessageAttachment.MAX_VOICE_SECONDS)
+
+    def test_sending_a_voice_note_through_the_composer(self):
+        from .models import MessageAttachment
+
+        self.client.post(
+            reverse("orgs:member_message_thread", args=[self.org.id, self.room.id]),
+            {"body": "", "voice": self._blob(), "voice_seconds": "12"},
+        )
+        clip = MessageAttachment.objects.filter(is_voice=True).first()
+        self.assertIsNotNone(clip)
+        self.assertEqual(clip.duration_s, 12)
+
+
+class MessagePinTests(TestCase):
+    """One message held at the top of a room."""
+
+    def setUp(self):
+        from .models import Message
+        from .services import org_room
+
+        User = get_user_model()
+        season = Season.objects.create(year=2091, label="2091")
+        self.org = Organisation.objects.create(name="Pinners", season=season)
+        self.admin = User.objects.create_user(email="ad@p.com", password="x", display_name="Ada")
+        self.ann = User.objects.create_user(email="a@p.com", password="x", display_name="Ann")
+        OrgMember.objects.create(user=self.admin, org=self.org, role=OrgMember.ROLE_MANAGER)
+        OrgMember.objects.create(user=self.ann, org=self.org)
+        self.room = org_room(self.org)
+        self.message = Message.objects.create(
+            thread=self.room, author=self.admin, body="Round 5 locks at 7:30pm",
+        )
+        self.url = reverse("orgs:message_pin", args=[self.org.id, self.room.id])
+
+    def test_an_admin_pins_and_unpins_with_the_same_control(self):
+        self.client.force_login(self.admin)
+        self.client.post(self.url, {"message": str(self.message.id)})
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.pinned_message_id, self.message.id)
+        # Posting the same id again takes it down — one control, both jobs.
+        self.client.post(self.url, {"message": str(self.message.id)})
+        self.room.refresh_from_db()
+        self.assertIsNone(self.room.pinned_message_id)
+
+    def test_an_ordinary_member_cannot_pin(self):
+        self.client.force_login(self.ann)
+        self.assertEqual(
+            self.client.post(self.url, {"message": str(self.message.id)}).status_code, 403,
+        )
+        self.room.refresh_from_db()
+        self.assertIsNone(self.room.pinned_message_id)
+
+    def test_deleting_a_pinned_message_unpins_rather_than_deleting_the_room(self):
+        from .models import MessageThread
+
+        self.client.force_login(self.admin)
+        self.client.post(self.url, {"message": str(self.message.id)})
+        self.message.delete()
+        self.assertTrue(MessageThread.objects.filter(pk=self.room.pk).exists())
+        self.room.refresh_from_db()
+        self.assertIsNone(self.room.pinned_message_id)

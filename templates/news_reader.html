@@ -1,0 +1,218 @@
+{% load static humanize %}<!DOCTYPE html>
+<html lang="en" class="no-js">
+{% comment %}
+ONE STORY, AS A PAGE OF ITS OWN.
+
+This replaces two templates that were doing the same job differently:
+news_detail.html, which wrapped a story in the whole member app (dashboard
+nav, organisation chip, theme switch, charity strip), and
+public/news_detail.html, which wrapped it in the marketing site. Which one you
+got depended on whether you happened to be signed in — so the client pressed a
+story on the PUBLIC news page, was signed in, and landed inside their own
+dashboard. "I clicked it while I was at the public page. It should be a page
+itself, not leaked into my page."
+
+So it is a page in itself, and deliberately not extending either base: this
+file owns its <head> and its chrome. What it keeps from the app is the thing
+the client asked to keep — the two rotating photograph strips down the sides,
+with the story reading on a cream sheet between them — and what it keeps from
+the marketing site is the footer, because the bottom of a story is exactly
+where somebody goes looking for who wrote it and where else to find them.
+
+THE GATE. A visitor who is not signed in gets the opening third and then an
+invitation to sign in or join. The other two-thirds are not in this response
+at all (admin_panel.views._story_preview), so it is a gate rather than a
+gradient over the whole article.
+{% endcomment %}
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ post.meta_title|default:post.title }} &middot; GoodTip</title>
+  <meta name="description" content="{{ post.meta_description|default:post.excerpt|default:post.title|truncatechars:150 }}">
+  <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
+  {% include "partials/_favicon.html" %}
+  {% include "partials/_fonts.html" %}
+  <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
+  <script>
+    /* The theme before the first paint, same key as everywhere else, so a
+       member who reads in light mode does not get a flash of the deep green
+       on their way into a story. */
+    try { document.documentElement.dataset.theme = localStorage.getItem("theme") || "auto"; } catch (e) {}
+  </script>
+  <script src="{% static 'js/gt-ui.js' %}" defer></script>
+  <script src="{% static 'js/gt-scenes.js' %}" defer></script>
+  <script src="{% static 'js/gt-share.js' %}" defer></script>
+  {% include "partials/_news_og.html" %}
+  {% include "partials/_analytics.html" %}
+</head>
+<body class="reader gt-v2{% if gated %} is-gated{% endif %}">
+  {% include "public/partials/_icons.html" %}
+
+  {% comment %}
+  The side strips, kept per the client's note. Same markup gt-scenes.js drives
+  everywhere else, so the rotation is the site's and not a second copy of it.
+  {% endcomment %}
+  {% include "partials/page_scenes.html" %}
+
+  {% comment %}
+  THE BAR IS FOUR THINGS, AND NOT ONE MORE.
+
+  Where you are (the wordmark, which goes home), the way back to the list, and
+  the one action that suits whoever is reading — sign in, or return to the
+  dashboard. No navigation menu of any kind: the whole complaint was that a
+  story arrived wearing somebody's app. The full site is in the footer at the
+  bottom of the page, where a reader who has finished the story will look for
+  it.
+  {% endcomment %}
+  <header class="rd-bar">
+    <div class="rd-bar-in">
+      <a href="/" class="rd-mark">GOOD<span>TIP</span><span class="dot">.</span></a>
+      <a href="{% url 'news_index' %}" class="rd-back">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        <span>All news &amp; blog</span>
+      </a>
+      <div class="rd-bar-end">
+        {% if user.is_authenticated %}
+        <a href="{% url 'dashboard' %}" class="rd-ghost">Back to my dashboard</a>
+        {% else %}
+        <a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}" class="rd-ghost">Log in</a>
+        <a href="{% url 'accounts:signup' %}" class="rd-cta">Sign up free</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <main class="rd-main">
+    <article class="rd-art">
+      <header class="rd-head">
+        {% comment %}
+        Every code the story is filed under. A piece about AFLW and NRLW
+        carries both — see NewsPost.tags — and showing only the first would
+        put it back to looking like a story about one of them.
+        {% endcomment %}
+        <div class="rd-tags">
+          {% for t in post.tag_labels %}<span class="rd-tag">{{ t }}</span>{% endfor %}
+        </div>
+        {% comment %}
+        HEADLINE ABOVE THE PICTURE. On a phone, picture-first means the first
+        two-thirds of the screen is a stock photograph and you scroll to find
+        out what the story is — the picture doing the job of a headline, which
+        is a job it cannot do.
+        {% endcomment %}
+        <h1 class="rd-title">{% if post.title_html %}{{ post.title_html|safe }}{% else %}{{ post.title }}{% endif %}</h1>
+        {% if post.excerpt_html %}<p class="rd-lead">{{ post.excerpt_html|safe }}</p>
+        {% elif post.excerpt %}<p class="rd-lead">{{ post.excerpt }}</p>{% endif %}
+        <div class="rd-byline">
+          {% if post.created_by %}
+          <span class="rd-who">
+            <span class="rd-av">
+              {% if post.created_by.avatar %}<img src="{{ post.created_by.avatar.url }}" alt="">
+              {% else %}{{ post.created_by.display_name|slice:":1"|upper }}{% endif %}
+            </span>
+            <b>{{ post.created_by.display_name }}</b>
+          </span>
+          {% endif %}
+          <span class="rd-when" title="{{ post.published_at|date:'l j F Y, g:i a' }}">
+            {{ post.published_at|date:"j F Y" }} &middot; {{ post.published_at|naturaltime }}
+          </span>
+        </div>
+      </header>
+
+      {% comment %}
+      A CSS background cannot carry an `alt`, so the description an admin typed
+      is given to a screen reader the way a background image has to be:
+      role="img" plus aria-label. With no alt text set it stays undescribed and
+      out of the accessibility tree, which is right for a decorative
+      photograph and much better than reading a filename out.
+      {% endcomment %}
+      {% if post.image %}
+      <figure class="rd-hero" style="background-image:url('{{ post.image.url }}')"
+              {% if post.image_alt %}role="img" aria-label="{{ post.image_alt }}"{% endif %}></figure>
+      {% else %}
+      {% comment %}
+      No picture on the post, so the slot rotates through the site's own
+      match-day shots rather than sitting as a flat green panel. Same markup
+      the heroes use, so gt-scenes.js drives it without extra wiring.
+      {% endcomment %}
+      <figure class="rd-hero rd-hero-shots" data-shots>
+        <div class="shot on" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
+        <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
+        <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
+      </figure>
+      {% endif %}
+
+      <div class="rd-prose{% if gated %} is-cut{% endif %}">{{ body_html|safe }}</div>
+
+      {% if gated %}
+      {% comment %}
+      THE GATE.
+
+      Sits in the flow rather than floating over the text, so the story ends
+      where the gate begins and nothing is hidden underneath it. The fade
+      above it belongs to .rd-prose.is-cut and is decoration only — the words
+      it appears to be covering are genuinely not on the page.
+
+      Two doors, weighted. Signing up is the primary action because most
+      people who reach a gate do not have an account; logging in is the ghost
+      beside it and carries ?next, so somebody who does have one lands back on
+      this story rather than on a dashboard, having forgotten what they came
+      to read.
+      {% endcomment %}
+      <aside class="rd-gate">
+        <span class="rdg-ic" aria-hidden="true"><svg><use href="#ic-f-doc"/></svg></span>
+        <h2>There's more to this one.</h2>
+        <p>
+          You've read the first part of &ldquo;{{ post.title|truncatechars:70 }}&rdquo;.
+          The rest, and every other story we publish, is free once you're in.
+        </p>
+        <div class="rdg-actions">
+          <a href="{% url 'accounts:signup' %}?next={{ request.path|urlencode }}" class="rdg-primary">Create a free account</a>
+          <a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}" class="rdg-ghost">I already have one &rarr;</a>
+        </div>
+        <p class="rdg-fine">
+          Free to read. Free to tip. Your organisation pays the platform fee, and
+          GoodTip gives a share of it to the charity they pick.
+        </p>
+      </aside>
+      {% endif %}
+
+      {% comment %}
+      Sharing sits below the gate as well as below a full story: a headline
+      and a lead are a perfectly good thing to send someone, and the person
+      who receives it gets the same first third.
+      {% endcomment %}
+      {% include "partials/_news_share.html" with prefix="rd" %}
+    </article>
+
+    {% if more %}
+    <section class="rd-more">
+      <div class="rd-more-h">
+        <h2>More from GoodTip</h2>
+        <a href="{% url 'news_index' %}">All news &amp; blog &rarr;</a>
+      </div>
+      <div class="rd-more-grid">
+        {% for p in more|slice:":3" %}
+        <a class="rd-card" href="{% url 'news_detail' p.slug %}">
+          {% if p.image %}<div class="rdc-thumb" style="background-image:url('{{ p.image.url }}')"><span class="rd-tag">{{ p.tag_labels.0 }}</span></div>
+          {% else %}<div class="rdc-thumb noimg"><span class="rd-tag">{{ p.tag_labels.0 }}</span><span class="rdc-mark">GOOD<span>TIP</span></span></div>{% endif %}
+          <div class="rdc-body">
+            <h3>{{ p.title }}</h3>
+            {% if p.excerpt %}<p>{{ p.excerpt|truncatechars:110 }}</p>{% endif %}
+            <span class="rdc-date">{{ p.published_at|naturaltime }} &middot; Read the story &rarr;</span>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+  </main>
+
+  {% comment %}
+  The site's own footer, socials and all — the client asked for it here
+  specifically, and it is what makes this feel like a page on a site rather
+  than a document that ends. Same include the marketing pages use, so it
+  cannot drift from them.
+  {% endcomment %}
+  {% include "public/partials/_footer.html" %}
+</body>
+</html>

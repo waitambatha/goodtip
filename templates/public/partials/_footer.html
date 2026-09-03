@@ -1,4 +1,18 @@
 {% load static %}
+{% comment %}
+THE FOOTER IS NOW THE OTHER HALF OF THE MENU (Sep 2026, client).
+
+The nav used to carry all ten public pages. Four of them came off it — The
+Good List, Charities, About Us and Privacy — on the grounds that a bar with
+ten equal items is a site map, not a menu. That only works if the footer
+actually holds them, so it does: the columns cover everything the bar dropped,
+and Privacy gets its own line at the very bottom rather than being the fourth
+item of a "Company" list.
+
+Privacy at the bottom is not a demotion. It is the one link nobody navigates
+to mid-visit and everybody expects to find under the copyright, next to the
+company name — which is exactly where it now is.
+{% endcomment %}
 <footer class="footer">
   <div class="footer-top">
     <div class="footer-brand">
@@ -18,11 +32,12 @@
         <h4>Platform</h4>
         <ul>
           <li><a href="/how-it-works/">How It Works</a></li>
-          <li><a href="/tell-the-boss/">Tell the Boss</a></li>
-          <li><a href="/news/">News</a></li>
-          <li><a href="/wall/">The Wall</a></li>
           <li><a href="/pricing/">Pricing</a></li>
-          <li><a href="/#founding">Founding Partners</a></li>
+          <li><a href="/tell-the-boss/">Tell the Boss</a></li>
+          <li><a href="/news/">News &amp; blog</a></li>
+          <li><a href="/wall/">The Wall</a></li>
+          {# off the nav bar, so this is where it has to be findable #}
+          <li><a href="/leaderboard/">The Good List</a></li>
         </ul>
       </div>
       <div class="footer-col">
@@ -33,22 +48,34 @@
           <li><a href="/#charities">ReachOut</a></li>
           <li><a href="/#charities">Movember</a></li>
           <li><a href="/#charities">McGrath Foundation</a></li>
-          <li><a href="/#charities">The Smith Family</a></li>
+          <li><a href="/#charities">All charities</a></li>
         </ul>
       </div>
       <div class="footer-col">
         <h4>Company</h4>
         <ul>
           <li><a href="/about/">About Us</a></li>
+          <li><a href="/#founding">Founding Partners</a></li>
           <li><a href="/#start">For firms</a></li>
           <li><a href="/#start">Contact</a></li>
-          {# was href="/#" — a dead link, because the page did not exist yet #}
-          <li><a href="/privacy/">Privacy</a></li>
+          <li><a href="mailto:hello@goodtip.com.au">hello@goodtip.com.au</a></li>
         </ul>
       </div>
     </div>
   </div>
+  {% comment %}
+  The legal row. Copyright on one side, the things a reader comes to the bottom
+  of a page specifically to find on the other — which is why Privacy is here
+  and not buried as the fourth bullet of a column.
+  {% endcomment %}
   <div class="footer-bottom">
     <p class="footer-legal">&copy; 2026 GoodTip Pty Ltd &middot; goodtip.com.au &middot; &ldquo;Good Tip, Mate.&rdquo;<br>Not affiliated with the AFL or NRL.</p>
+    <nav class="footer-legal-nav" aria-label="Legal and company">
+      <a href="/privacy/">Privacy</a>
+      <span aria-hidden="true">&middot;</span>
+      <a href="/about/">About Us</a>
+      <span aria-hidden="true">&middot;</span>
+      <a href="/#start">Contact</a>
+    </nav>
   </div>
 </footer>

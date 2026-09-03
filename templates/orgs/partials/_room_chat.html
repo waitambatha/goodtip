@@ -1,0 +1,85 @@
+{% load humanize %}
+{% comment %}
+THE CONVERSATION PANE.
+
+Its own file because the same view returns it alone for the poll that keeps an
+open room up to date (?pane=chat) — same view, same context, so what arrives on
+a refresh cannot drift from what was rendered first.
+
+Expects everything orgs.views._messages_context builds for a selected thread.
+{% endcomment %}
+{% comment %}
+LIVE-ISH, WITHOUT WEBSOCKETS — but only the messages are refreshed.
+
+The poll lives on the scrolling list inside this pane (_room_stream.html), not
+on the pane itself, and that separation is load-bearing rather than tidy: a
+swap that replaced this whole element would replace the composer with it, and
+anything half-typed, half-attached or half-recorded would vanish every twelve
+seconds. gt-messages.js keeps the scroll pinned to the bottom across the swap
+unless the reader has scrolled up, which is what makes a poll feel like an
+update rather than a page jumping under you.
+{% endcomment %}
+<div class="gtm-chat-in" id="gtmChat" data-gtm-chat>
+
+  {# ---- who this is, above the conversation ---- #}
+  <header class="gtm-chat-head">
+    <button type="button" class="gtm-back" data-gtm-back="room" aria-label="Back">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+    </button>
+    <span class="gtm-av {% if other %}person{% elif thread.kind == 'group' %}group{% elif thread.kind == 'org' %}org{% else %}admins{% endif %}" aria-hidden="true">
+      {% if other and other.avatar %}<img src="{{ other.avatar.url }}" alt="">
+      {% elif other %}{{ other.display_name|slice:":1"|upper }}
+      {% elif thread.kind == 'group' %}{{ thread.group.name|slice:":1"|upper }}
+      {% elif thread.kind == 'org' %}<svg><use href="#ic-f-org"/></svg>
+      {% else %}<svg><use href="#ic-shield-check"/></svg>{% endif %}
+    </span>
+    <div class="gtm-chat-who">
+      <b>{% if other %}{{ other.display_name }}{% elif thread.kind == 'group' %}{{ thread.group.name }}{% elif thread.kind == 'org' %}{{ thread_org.name }}{% else %}{{ thread.subject }}{% endif %}</b>
+      {% comment %}
+      Always says what kind of room this is, never just the name. "AFLW
+      Tippers" and a colleague called "AFLW Tippers" would read identically
+      otherwise, and the difference is whether forty-eight people are about to
+      see what you type.
+      {% endcomment %}
+      <i>
+        {% if other %}Direct message &middot; only the two of you
+        {% elif thread.kind == 'group' %}{{ thread_org.name }} &middot; {{ people_total }} member{{ people_total|pluralize }}
+        {% elif thread.kind == 'org' %}{{ thread_org.name }} &middot; everyone, {{ people_total }} member{{ people_total|pluralize }}
+        {% else %}{{ thread_org.name }} &middot; only the admins can see this{% endif %}
+      </i>
+    </div>
+    <div class="gtm-chat-acts">
+      {% comment %}
+      A support thread keeps its status chip — "Answered", "Waiting" — because
+      for that kind of conversation the state is the point. A room has no
+      status and showing one would invent a workflow that does not exist.
+      {% endcomment %}
+      {% if not thread.is_room %}
+        {% if thread.status == 'answered' %}<span class="gts-status ok">Answered</span>
+        {% elif thread.status == 'closed' %}<span class="gts-status">Closed</span>
+        {% else %}<span class="gts-status warn">Waiting</span>{% endif %}
+      {% endif %}
+      <button type="button" class="gtm-icbtn" data-gtm-showroom aria-label="Show members and details">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M2.8 19a6.2 6.2 0 0 1 12.4 0"/><path d="M16.5 5.6a3.2 3.2 0 0 1 0 6.2"/><path d="M18 13.6a5.6 5.6 0 0 1 3.4 5.4"/></svg>
+      </button>
+    </div>
+  </header>
+
+  {% comment %}
+  data-chat-scope is what gt-chat.js binds to — reply swipes, the quote
+  banner, the peek cards. Same contract as the support-thread page, so the
+  behaviour a member learned in one is the behaviour they get in the other.
+  {% endcomment %}
+  <div class="gtm-chat-body" data-chat-scope>
+    {% include "orgs/partials/_room_stream.html" %}
+
+    {% if thread.status == 'closed' and not thread.is_room %}
+    <div class="chat-shut">
+      <svg aria-hidden="true"><use href="#ic-lock"/></svg>
+      <span>The admins marked this closed. Writing here opens it again.</span>
+    </div>
+    {% endif %}
+
+    {% include "orgs/partials/_room_composer.html" %}
+  </div>
+</div>

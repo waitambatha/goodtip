@@ -348,9 +348,45 @@ def notify_new_message(entry) -> int:
     handled where notices are sent rather than here: that one really is
     addressed to everybody.
     """
-    from .models import Notification, OrgMember
+    from .models import MessageThread, Notification, OrgMember
 
     thread = entry.thread
+
+    # ---- the chat rooms -------------------------------------------------
+    # A room is not a support thread and the rule above does not fit it: the
+    # people to tell are the people in the room, and there are no "admins whose
+    # job it is to answer" because nobody raised anything.
+    #
+    # A DIRECT MESSAGE ALWAYS RINGS. It is addressed to one person by name and
+    # is the single most notification-worthy thing on the platform.
+    #
+    # A GROUP OR ORGANISATION ROOM DOES NOT, on purpose. Ringing a bell for
+    # every line in a room of two hundred people is how a member turns
+    # notifications off altogether, and then never hears the one that mattered.
+    # The room carries its own unread count in the sidebar and on the nav item,
+    # which is where a busy room belongs.
+    if thread.is_room:
+        if thread.kind != MessageThread.KIND_DIRECT:
+            return 0
+        from .services import room_audience_ids
+
+        targets = set(room_audience_ids(thread)) - {entry.author_id}
+        if not targets:
+            return 0
+        who = getattr(entry.author, "display_name", None) or "Someone"
+        Notification.objects.bulk_create([
+            Notification(
+                user_id=uid,
+                org_id=thread.org_id,
+                kind=Notification.KIND_MESSAGE,
+                title=f"{who} messaged you",
+                message=(entry.body or "").strip()[:140] or "Sent you something.",
+                link_url=f"/leagues/{thread.org_id}/messages/{thread.id}/",
+            )
+            for uid in targets
+        ])
+        return len(targets)
+
     audience = set(
         OrgMember.objects
         .filter(org_id=thread.org_id, role__in=(OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH))

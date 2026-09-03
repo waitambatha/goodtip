@@ -761,13 +761,64 @@ def news_index(request):
     })
 
 
+#: How much of a story a visitor who is not signed in gets to read. A third,
+#: per the client: "let them see like 1/3 of the blog, and if they want to read
+#: our blogs in full they will have to sign in, and if not a member they will
+#: sign up."
+PREVIEW_SHARE = 1 / 3
+
+
+def _story_preview(body: str) -> tuple[str, bool]:
+    """The opening third of a story, and whether anything was held back.
+
+    TRUNCATED ON THE SERVER, NOT HIDDEN WITH CSS. A gate that ships the whole
+    article and then covers two-thirds of it with a gradient is not a gate —
+    it is in View Source, it is in the reader-mode button, and it is in the
+    page a crawler indexes. The rest of the story simply is not in the
+    response.
+
+    `Truncator.words(html=True)` rather than a slice: the body is HTML, and
+    cutting a string of markup at an arbitrary character leaves an unbalanced
+    <p> or a half-written tag, which the browser then closes wherever it likes
+    and takes the rest of the page with it. Truncator walks the tree and shuts
+    what it opened.
+
+    Returns the body unchanged when there is nothing worth gating — a
+    three-line story cut to one line is a tease with no article behind it.
+    """
+    from django.utils.text import Truncator
+
+    text = (body or "").strip()
+    if not text:
+        return "", False
+    words = len(strip_tags(text).split())
+    if words < 80:
+        return text, False
+    keep = max(40, int(words * PREVIEW_SHARE))
+    # Truncator appends its own ellipsis; the fade and the gate below say
+    # "there is more" far better than three dots do.
+    return Truncator(text).words(keep, html=True, truncate=""), True
+
+
 def news_detail(request, slug: str):
-    """Full story page. Public, same split as the index.
+    """Full story page. One template, signed in or not.
+
+    IT USED TO BE TWO, and that was the bug the client hit: pressing a story
+    on the public news page while signed in dropped them into the member app,
+    complete with the dashboard nav, their organisation chip and the theme
+    switch — "I clicked it while I was at the public page, and I was taken to
+    the blog inside my app". A story is not part of anybody's dashboard. It is
+    a page in its own right, and it is now the same page for everyone.
+
+    What differs is how much of it you get. A visitor who is not signed in
+    reads the opening third and is then asked to sign in or join; a member
+    reads the lot. See _story_preview — the rest is not in the response at
+    all, so this is a real gate rather than a covered-up one.
 
     Also the page link-preview crawlers (Facebook, LinkedIn, Slack…) hit when
     a story is shared, since those requests are always anonymous — so the
-    absolute image/URL built here for the Open Graph tags need to be right on
-    the public template every time, not just for logged-in members.
+    absolute image/URL built here for the Open Graph tags have to be right for
+    an anonymous request, which is the one this now always serves.
     """
     # A SCHEDULED STORY 404s, it does not serve.
     #
@@ -776,13 +827,25 @@ def news_detail(request, slug: str):
     # of a story is its headline slugified, so a queued announcement is
     # guessable, and "hidden from the list" is not the same as unpublished.
     post = get_object_or_404(NewsPost.live.all(), slug=slug)
-    more = NewsPost.live.exclude(pk=post.pk)[:5]
+    more = NewsPost.live.exclude(pk=post.pk)[:6]
     # The share card's picture: the SEO team's own og:image if they set one,
     # otherwise the story's featured image, which is right nearly every time.
     share_image = post.og_image or post.image
-    tpl = "news_detail.html" if request.user.is_authenticated else "public/news_detail.html"
-    return render(request, tpl, {
+
+    body = post.body or ""
+    if "<" not in body:
+        # A story typed as plain text. Made into paragraphs first, so the
+        # truncator has structure to cut on and the preview is not one wall.
+        body = linebreaks(body)
+    if request.user.is_authenticated:
+        shown, gated = body, False
+    else:
+        shown, gated = _story_preview(body)
+
+    return render(request, "news_reader.html", {
         "post": post, "more": more, "active": "news",
+        "body_html": shown,
+        "gated": gated,
         "share_url": post.canonical_url or request.build_absolute_uri(),
         "share_image_url": request.build_absolute_uri(share_image.url) if share_image else "",
     })
