@@ -1,3 +1,5 @@
+import re
+from pathlib import Path
 from unittest import mock
 
 from django.conf import settings
@@ -233,3 +235,82 @@ class StagingRobotsTests(SimpleTestCase):
         else:
             with self.assertRaises(NoReverseMatch):
                 reverse("robots")
+
+
+class NoTestMayDeleteRealUploadsTests(SimpleTestCase):
+    """No test class may remove MEDIA_ROOT without first replacing it.
+
+    This is a scan of the source, not a behavioural test, and it is here
+    because the failure it prevents is invisible and unrecoverable.
+
+    What happened: `MessageVideoTests` called
+    `shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)` in tearDownClass
+    with no MEDIA_ROOT override, so it deleted the real uploads directory of
+    whatever checkout ran the suite. Staging's deploy gate runs the suite on
+    every deploy — so every deploy silently destroyed every file anybody had
+    uploaded since the last one, and `ignore_errors=True` meant nothing ever
+    reported it. Blog images, avatars, charity logos, organisation logos.
+
+    `goodtip.testing.drop_temp_media` now refuses to delete a path outside the
+    system temp directory, which stops it at runtime. This stops it at review
+    time, and names the two things that are actually forbidden: a raw rmtree
+    of MEDIA_ROOT anywhere, and a class that drops its media without having
+    overridden it.
+    """
+
+    #: The two files that STATE the rule, which a scan for the rule will
+    #: always match on. A rule cannot police the file that defines it.
+    EXEMPT = {"goodtip/testing.py", "goodtip/tests.py"}
+
+    def _test_sources(self):
+        root = Path(settings.BASE_DIR)
+        for path in sorted(root.rglob("test*.py")):
+            rel = str(path.relative_to(root))
+            if "venv" in path.parts or "site-packages" in path.parts:
+                continue
+            # testing.py is the helper, not a suite.
+            if path.name == "testing.py" or rel in self.EXEMPT:
+                continue
+            yield path, path.read_text(encoding="utf-8")
+
+    def test_nothing_rmtrees_media_root_directly(self):
+        """Use goodtip.testing.drop_temp_media, which checks where it is
+        pointed before it deletes anything."""
+        offenders = [
+            str(p.relative_to(settings.BASE_DIR))
+            for p, src in self._test_sources()
+            if "rmtree(settings.MEDIA_ROOT" in src
+        ]
+        self.assertEqual(offenders, [], "raw rmtree of the real MEDIA_ROOT")
+
+    def test_every_class_that_drops_media_has_replaced_it_first(self):
+        """Walked line by line rather than split with a regex.
+
+        The first attempt split the file on a lookahead for optional
+        decorators followed by `class`, which also matches at the newline
+        BETWEEN a decorator and its class — so every decorated class was split
+        away from its own decorator and reported as an offender. A scan that
+        cries wolf on the correct code is worse than no scan.
+        """
+        offenders = []
+        for path, src in self._test_sources():
+            lines = src.split("\n")
+            # Where each top-level class starts, and the decorators above it.
+            starts = [i for i, ln in enumerate(lines) if ln.startswith("class ")]
+            for n, start in enumerate(starts):
+                end = starts[n + 1] if n + 1 < len(starts) else len(lines)
+                body = "\n".join(lines[start:end])
+                if "drop_temp_media()" not in body:
+                    continue
+                # Decorators are the unbroken run of @-lines directly above.
+                head, i = [], start - 1
+                while i >= 0 and (lines[i].startswith("@") or lines[i].startswith(")")):
+                    head.append(lines[i])
+                    i -= 1
+                if "MEDIA_ROOT" not in "\n".join(head):
+                    name = lines[start].split("(")[0].replace("class ", "")
+                    offenders.append(f"{path.relative_to(settings.BASE_DIR)}::{name}")
+        self.assertEqual(
+            offenders, [],
+            "these delete MEDIA_ROOT without @override_settings(MEDIA_ROOT=temp_media())",
+        )

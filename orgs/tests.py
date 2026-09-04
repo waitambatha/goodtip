@@ -12,6 +12,7 @@ from django.conf import settings
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
+from goodtip.testing import drop_temp_media, temp_media
 from catalog.models import Charity, Season, Series, Sport
 
 from .models import (
@@ -4804,7 +4805,7 @@ class MessageReplyAndAttachmentTests(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        drop_temp_media()
         super().tearDownClass()
 
     def setUp(self):
@@ -5288,8 +5289,15 @@ class MessageReceiptTests(TestCase):
         self.assertIn("RA", audience["name"])
 
 
+@override_settings(MEDIA_ROOT=temp_media("gt-video-"))
 class MessageVideoTests(TestCase):
     """Sending a clip, and being able to watch it.
+
+    THE DECORATOR ABOVE IS LOAD-BEARING. Without it this class deleted the
+    REAL uploads directory of whatever checkout ran the suite — and staging's
+    deploy gate runs the suite on every deploy, so every deploy wiped every
+    file anybody had uploaded since the last one. That is where the client's
+    blog images went. See goodtip/testing.py.
 
     ASKED FOR AS: "the chat box having that pip that makes you attach images
     and videos". Two halves, and the second is the one with teeth — accepting
@@ -5298,7 +5306,7 @@ class MessageVideoTests(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        drop_temp_media()
         super().tearDownClass()
 
     def setUp(self):
@@ -5443,7 +5451,7 @@ class ChatRoomTests(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        drop_temp_media()
         super().tearDownClass()
 
     def setUp(self):
@@ -5655,7 +5663,7 @@ class MessageReactionTests(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        drop_temp_media()
         super().tearDownClass()
 
     def setUp(self):
@@ -5725,7 +5733,7 @@ class VoiceNoteTests(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        drop_temp_media()
         super().tearDownClass()
 
     def setUp(self):

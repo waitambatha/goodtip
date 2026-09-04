@@ -22,6 +22,8 @@ from django.utils import timezone
 
 from sysadmin.models import AdminAccess
 
+from goodtip.testing import drop_temp_media, temp_media
+
 from .models import NewsPost
 
 User = get_user_model()
@@ -1448,7 +1450,7 @@ class PruneMissingMediaTests(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        drop_temp_media()
         super().tearDownClass()
 
     def setUp(self):
