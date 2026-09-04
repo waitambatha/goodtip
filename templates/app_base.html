@@ -105,6 +105,21 @@ goodtip.css.
                 title="{{ current_org.name }}{% if current_group %} &rsaquo; {{ current_group.name }}{% endif %}">
           <span class="an-ctx-org">{{ current_org.name }}</span>
           {% if current_group %}<span class="an-ctx-sep" aria-hidden="true">&rsaquo;</span><span class="an-ctx-group">{{ current_group.name }}</span>{% endif %}
+          {% comment %}
+          WHAT YOU ARE HERE, not only where you are.
+
+          The nav already changes when you switch into an organisation you do
+          not run — the Manage menu is gated on primary_org_is_admin, which
+          follows the switch. What was missing is anything that says so: the
+          client was invited into someone else's league as a member and read
+          the quieter nav as a page that had failed to finish loading rather
+          than as a different role. A badge makes the same fact legible before
+          anybody goes looking for a menu that is not there.
+          {% endcomment %}
+          <span class="an-ctx-role {% if primary_org_is_admin %}is-admin{% else %}is-member{% endif %}">
+            <svg aria-hidden="true"><use href="{% if primary_org_is_admin %}#ic-f-shield{% else %}#ic-f-users{% endif %}"/></svg>
+            {% if primary_org_is_admin %}Admin{% else %}Member{% endif %}
+          </span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="an-menu-panel an-ctx-panel" hidden>
@@ -131,12 +146,18 @@ goodtip.css.
                 {% if o.id == current_org.id %}
                 <div class="an-ctx-row on an-ctx-row-static" data-anctx-org-row data-org-id="{{ o.id }}">
                   <span class="mi-txt"><b>{{ o.name }}</b><i>Current</i></span>
+                  {% include "partials/_role_badge.html" with org=o %}
                 </div>
                 {% else %}
                 <form method="post" action="{% url 'orgs:switch_org' o.id %}" data-anctx-row-form>
                   {% csrf_token %}
                   <input type="hidden" name="next" value="{{ request.path }}">
-                  <button type="submit" class="an-ctx-row" data-anctx-org-row data-org-id="{{ o.id }}"><span class="mi-txt"><b>{{ o.name }}</b></span></button>
+                  {% comment %}
+                  The role rides on the row you are about to press, which is
+                  the only place it can be read BEFORE the switch — the whole
+                  point being to know what you are walking into.
+                  {% endcomment %}
+                  <button type="submit" class="an-ctx-row" data-anctx-org-row data-org-id="{{ o.id }}"><span class="mi-txt"><b>{{ o.name }}</b><i>{% if o.nav_is_admin %}You run this one{% else %}You're a member here{% endif %}</i></span>{% include "partials/_role_badge.html" with org=o %}</button>
                 </form>
                 {% endif %}
                 {% endfor %}
@@ -161,7 +182,7 @@ goodtip.css.
           <div class="an-ctx-col an-ctx-col-groups" data-anctx-groups-col>
             {% for o in nav_orgs %}
             <div class="an-ctx-groups-block{% if o.id == current_org.id %} on{% endif %}" data-org-groups="{{ o.id }}"{% if o.id != current_org.id %} hidden{% endif %}>
-              <div class="an-ctx-head">Groups in {{ o.name }}</div>
+              <div class="an-ctx-head">Groups in {{ o.name }} {% include "partials/_role_badge.html" with org=o %}</div>
               {% if o.groups_enabled %}
               <div class="an-ctx-listwrap">
                 <div class="an-ctx-scroll">

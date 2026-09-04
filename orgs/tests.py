@@ -5918,3 +5918,91 @@ class MessagesFollowContextTests(TestCase):
             reverse("orgs:member_message_thread", args=[self.a.id, room.id]) + "?pane=chat"
         )
         self.assertEqual(self._where()[0], self.b.id)
+
+
+class RoleIsVisibleWhereYouSwitchTests(TestCase):
+    """What you are in each organisation, said out loud.
+
+    ASKED FOR BY THE CLIENT, who was invited into somebody else's league as an
+    ordinary member and "did not feel the distinction". The nav was already
+    correct — primary_org_is_admin follows the switch, so the Manage menu is
+    gone in an org you do not run. Being correct was not the problem: nothing
+    on screen said which of your organisations you were about to walk into, so
+    a nav that had quietly lost three items read as a page that had failed to
+    finish loading.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.user = User.objects.create_user(
+            email="two-hats@example.com", password="x", display_name="Two Hats",
+        )
+        self.boss = User.objects.create_user(
+            email="theirs@example.com", password="x", display_name="Theirs",
+        )
+        # One they created, one they were invited into. created_by is what
+        # is_creator_admin keys on — a managing row in somebody else's org
+        # is deliberately not enough.
+        self.mine = Organisation.objects.create(
+            name="Mine Co", season=self.season, created_by=self.user,
+        )
+        self.theirs = Organisation.objects.create(
+            name="Theirs Co", season=self.season, created_by=self.boss,
+        )
+        # can_manage is derived from role/ownership, not a column.
+        OrgMember.objects.create(user=self.user, org=self.mine, is_league_owner=True)
+        OrgMember.objects.create(user=self.user, org=self.theirs)
+        OrgMember.objects.create(user=self.boss, org=self.theirs, is_league_owner=True)
+        self.client.force_login(self.user)
+
+    def _dash(self):
+        return self.client.get(reverse("dashboard")).content.decode()
+
+    def test_every_organisation_in_the_switcher_carries_its_own_role(self):
+        body = self._dash()
+        self.assertIn("gt-role is-admin", body)
+        self.assertIn("gt-role is-member", body)
+
+    def test_the_role_is_readable_before_the_switch_not_after(self):
+        """The badge is on the row you are about to press. Reading it only
+        after arriving is reading it too late — the point is to know what you
+        are walking into."""
+        body = self._dash()
+        row = body[body.index("Theirs Co"):]
+        self.assertIn("gt-role is-member", row[:600])
+        self.assertIn("You're a member here", body)
+
+    def test_the_chip_says_admin_in_the_org_you_run(self):
+        body = self._dash()
+        self.assertIn("an-ctx-role is-admin", body)
+
+    def test_the_chip_says_member_once_you_switch_into_theirs(self):
+        self.client.post(reverse("orgs:switch_org", args=[self.theirs.id]))
+        body = self._dash()
+        self.assertIn("an-ctx-role is-member", body)
+        self.assertNotIn("an-ctx-role is-admin", body)
+
+    def test_switching_into_theirs_really_does_take_the_admin_menu_away(self):
+        """The behaviour the badge describes. Pinned here because a badge that
+        says Member over a nav still offering Manage would be worse than no
+        badge at all."""
+        admin_body = self._dash()
+        self.assertIn(reverse("orgs:members", args=[self.mine.id]), admin_body)
+
+        self.client.post(reverse("orgs:switch_org", args=[self.theirs.id]))
+        member_body = self._dash()
+        self.assertNotIn(reverse("orgs:members", args=[self.theirs.id]), member_body)
+
+    def test_the_context_processor_answers_for_every_membership(self):
+        """Computed from the memberships already fetched, so this must stay a
+        no-extra-query answer as the list grows."""
+        from .context_processors import user_orgs
+        from django.test import RequestFactory
+
+        r = RequestFactory().get("/")
+        r.user = self.user
+        r.session = self.client.session
+        ctx = user_orgs(r)
+        roles = {o.name: o.nav_role for o in ctx["nav_orgs"]}
+        self.assertEqual(roles, {"Mine Co": "Admin", "Theirs Co": "Member"})

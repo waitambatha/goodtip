@@ -6,6 +6,23 @@ def user_orgs(request):
     memberships = list(request.user.memberships.select_related("org").all())
     orgs = [m.org for m in memberships]
 
+    # WHAT YOU ARE IN EACH ONE, on the org itself, so the switcher can say so
+    # without a lookup per row.
+    #
+    # ASKED FOR AS: the client was invited into somebody else's organisation as
+    # an ordinary member and "did not feel the distinction" — the nav already
+    # drops the Manage menu when you switch into an org you do not run (see
+    # primary_org_is_admin below), but nothing on the way IN says which of your
+    # organisations that will be. A list of names cannot tell you that; a list
+    # of names with roles on them can.
+    #
+    # The membership is already in hand, so is_creator_admin costs no query.
+    from .services import is_creator_admin as _is_creator_admin
+
+    for m in memberships:
+        m.org.nav_is_admin = _is_creator_admin(request.user, m.org, membership=m)
+        m.org.nav_role = "Admin" if m.org.nav_is_admin else "Member"
+
     # Scheduled charity elections open lazily on any app page view, so members
     # get their popup/email even before the cron command is wired up.
     from .services import open_due_elections

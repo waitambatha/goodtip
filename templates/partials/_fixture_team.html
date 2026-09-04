@@ -62,6 +62,30 @@ Expects: team, form (a reader row, optional), pick ("home"|"away"),
   {% endif %}
 
   {% comment %}
+  HOW IT FINISHED, on the side it happened to.
+
+  ASKED FOR AS: "the previous games — I should be able to see the results even
+  if I did not tip, the scores, and who won." The score line was already on the
+  card (components/_match_state.html renders "12–8"), but a bare pair of numbers
+  does not say which club they belong to, and on a card where the two sides sit
+  left and right of a versus the reader has to guess which number is theirs.
+
+  So the score goes on the club, and the club that won is marked as having won.
+  Independent of whether anybody tipped it: a result is a fact about the game,
+  not about the reader's slate.
+
+  `result` is set only once a match is graded, which is what keeps this off
+  fixtures still in play — those carry the running score in the state strip,
+  where a number that is still moving belongs.
+  {% endcomment %}
+  {% if match.result %}
+  <span class="fxc-outcome{% if match.result == pick %} is-won{% elif match.result == 'draw' %} is-drew{% else %} is-lost{% endif %}">
+    <b class="fxc-pts">{% if pick == 'home' %}{{ match.home_score|default_if_none:"–" }}{% else %}{{ match.away_score|default_if_none:"–" }}{% endif %}</b>
+    <i>{% if match.result == 'draw' %}Drew{% elif match.result == pick %}Won{% else %}Lost{% endif %}</i>
+  </span>
+  {% endif %}
+
+  {% comment %}
   form.of, not form. The reader dict is always truthy, so testing it alone
   drew an empty dot strip reading "0 of 0" for a side with no history yet —
   which is every side in round one of a newly backfilled series.

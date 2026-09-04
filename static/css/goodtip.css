@@ -15206,3 +15206,234 @@ html[data-theme="dark"] .sched { --sched-pick: invert(1) brightness(1.6); }
    beside it and the scheduler card in the editor, so "waiting on a clock" is
    one colour wherever it appears. */
 .np-in { font-weight: 700; color: var(--ad-gold-fg, #7a5410); white-space: nowrap; }
+
+/* ============================================================================
+   COMPETITION COLOURS
+   ----------------------------------------------------------------------------
+   ASKED FOR BY THE CLIENT: four competitions rendered as four identical grey
+   chips over four identical grey fixtures. On a league tipping two codes the
+   slate interleaves them by kickoff, so AFL and AFLW arrive alternating down
+   one list — one letter apart in the heading, and that letter decides which
+   ladder the round counts toward. Colour is the only difference that survives
+   being read at a glance.
+
+   THE SPLIT IS BY CODE, NOT BY SEX. Each women's competition gets a shade of
+   its own and each men's competition gets its own — AFLW is not "AFL, but
+   pink", it is its own competition with its own colour, and the two women's
+   codes are as different from each other as the two men's are. What the
+   categories do is provide the FALLBACK, so a competition we do not name here
+   (Super League, Super Netball) is coloured from the day it appears rather
+   than rendering grey until somebody writes a rule for it.
+
+   THREE TOKENS PER CODE, because these appear on two very different beds:
+     --code      vivid. For the deep-green round-header bar.
+     --code-ink  darkened. For text and fills on a cream or white card, where
+                 the vivid version fails contrast.
+     --code-on   what sits ON a --code-ink fill.
+   The cards are cream in the green theme and white in the light one, so
+   --code-ink serves both and only the deep bar needs the vivid one.
+
+   Category rules come first and code rules after, deliberately: same
+   specificity, so the specific code wins by being later. Do not reorder.
+   ========================================================================= */
+[data-cat="mens"]           { --code: #5FD8C4; --code-ink: #0E6E5E; --code-on: #FFFFFF; }
+[data-cat="womens"]         { --code: #FF9E7A; --code-ink: #B34418; --code-on: #FFFFFF; }
+[data-cat="representative"] { --code: #F4C64E; --code-ink: #8A6206; --code-on: #FFFFFF; }
+
+/* Aussie Rules: the men's blue, the women's rose. */
+[data-code="afl"]   { --code: #5AA9FF; --code-ink: #12558F; --code-on: #FFFFFF; }
+[data-code="aflw"]  { --code: #FF8FB4; --code-ink: #B01F55; --code-on: #FFFFFF; }
+/* Rugby League: the men's amber, the women's orchid. Deliberately far from
+   the AFL pair — a member tipping all four sees four colours, not two pairs. */
+[data-code="nrl"]   { --code: #FFB25C; --code-ink: #9A5A05; --code-on: #FFFFFF; }
+[data-code="nrlw"]  { --code: #C79BFF; --code-ink: #6B34B8; --code-on: #FFFFFF; }
+
+/* ---- the filter chips --------------------------------------------------
+   Unselected: the code's colour on the rim and in the word, so the row reads
+   as four competitions before anything is pressed. Selected: filled, which is
+   what the client asked for — "those colours should also be the infill".
+
+   "All competitions" has no code and keeps the lime it always had. It is not
+   a competition, and giving it one of these colours would make it look like a
+   fifth one. */
+.sfilter-chip[data-code] { color: var(--code-ink); border-color: color-mix(in srgb, var(--code-ink) 38%, transparent); }
+.sfilter-chip[data-code]:hover { border-color: var(--code-ink); background: #fff; }
+.sfilter-chip[data-code].on {
+  background: var(--code-ink); border-color: var(--code-ink);
+  color: var(--code-on); font-weight: 700;
+}
+.sfilter-chip[data-code]:focus-visible { outline-color: var(--code-ink); }
+
+/* ---- the round heading -------------------------------------------------
+   This bar is --deep in both themes, so it takes the vivid token. The round
+   NUMBER keeps the lime: it is the product's colour and the code's colour
+   answering two different questions, and swapping the number to the code's
+   shade as well would leave the bar with nothing on it that is GoodTip. */
+.fxr-series.is-code {
+  color: var(--code, rgba(232,228,213,.8));
+  font-weight: 800; letter-spacing: .02em;
+}
+.fx-roundhead[data-code] { box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--code) 55%, transparent); }
+
+/* ---- the card ----------------------------------------------------------
+   A tag in the meta row, and the leading edge.
+
+   The left border already carries two meanings that outrank the competition —
+   lime for a fixture you have picked, red for one in play — so those are
+   restated here at a specificity that beats [data-code] rather than left to
+   win on source order. Which competition a fixture belongs to matters less
+   than whether it is live or whether you have tipped it. */
+.fxc-code {
+  font-family: var(--mark); font-weight: 800; font-size: 10px;
+  letter-spacing: .09em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 100px;
+  color: var(--code-ink, var(--forest));
+  background: color-mix(in srgb, var(--code-ink, var(--forest)) 13%, transparent);
+}
+.fxc[data-code] { border-left-color: color-mix(in srgb, var(--code-ink) 45%, transparent); }
+.fxc[data-code].is-picked { border-left-color: var(--lime); }
+.fxc[data-code].phase-live { border-left-color: #c0392b; }
+
+/* Light theme: the bar under the round heading stays deep green, so the vivid
+   token still applies there. The chips and tags sit on white instead of cream,
+   where the same --code-ink reads slightly hotter than it should; nothing else
+   changes, so this is a tint adjustment rather than a second palette. */
+html[data-theme="light"] .sfilter-chip[data-code] { background: rgba(255,255,255,.96); }
+html[data-theme="light"] .fxc-code { background: color-mix(in srgb, var(--code-ink) 10%, #fff); }
+
+/* ============================================================================
+   HOW IT FINISHED — the score on the club, and who won
+   ----------------------------------------------------------------------------
+   ASKED FOR: results on a past round, readable whether or not you tipped it.
+   The score line in the state strip says "12–8"; this says which of the two
+   clubs those numbers belong to and which one won.
+   ========================================================================= */
+.fxc-outcome {
+  display: flex; align-items: baseline; gap: 7px; margin-top: 6px;
+  padding: 4px 9px; border-radius: 9px; width: fit-content;
+  background: rgba(15,46,34,.055);
+}
+.fxc-outcome .fxc-pts {
+  font-family: var(--score, var(--mark)); font-weight: 900; font-size: 17px;
+  line-height: 1; color: var(--forest);
+}
+.fxc-outcome i {
+  font-style: normal; font-family: var(--mark); font-weight: 800; font-size: 9.5px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+}
+.fxc-outcome.is-won { background: rgba(46,125,50,.12); }
+.fxc-outcome.is-won .fxc-pts { color: #1f6b28; }
+.fxc-outcome.is-won i { color: #1f6b28; }
+.fxc-outcome.is-drew i { color: #8a6206; }
+.fxc-outcome.is-lost { opacity: .72; }
+/* The side that lost is dimmed by .is-dim already; this keeps its score
+   legible anyway — a result nobody can read is not a result. */
+.fxc-team.is-dim + .fxc-outcome { opacity: 1; }
+
+/* ============================================================================
+   ROLE BADGES — what you are in this organisation
+   ----------------------------------------------------------------------------
+   The nav already drops the Manage menu when you switch into an organisation
+   you do not run. Nothing said so on the way in, and a quieter nav reads as a
+   page that failed to load rather than as a different role. See
+   partials/_role_badge.html.
+   ========================================================================= */
+.gt-role, .an-ctx-role {
+  display: inline-flex; align-items: center; gap: 4px; flex: none;
+  font-family: var(--mark); font-weight: 800; font-size: 9.5px;
+  letter-spacing: .09em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 100px; white-space: nowrap;
+}
+.gt-role svg, .an-ctx-role svg { width: 10px; height: 10px; fill: currentColor; }
+/* Admin wears the product's own colour; member wears the quiet one. Not two
+   shades of the same thing — the point is that they are distinguishable
+   without reading them. */
+.gt-role.is-admin, .an-ctx-role.is-admin { background: var(--lime); color: var(--deep); }
+.gt-role.is-member, .an-ctx-role.is-member {
+  background: rgba(232,228,213,.16); color: rgba(232,228,213,.9);
+}
+/* On a cream list bed (the switcher rows are dark; the dashboard header is
+   not) the member badge needs ink rather than cream. */
+.gt-app .card .gt-role.is-member, .gt-app .app-head .gt-role.is-member {
+  background: rgba(15,46,34,.09); color: var(--forest);
+}
+.an-ctx-row .gt-role { margin-left: auto; }
+.an-ctx-head .gt-role { margin-left: 6px; vertical-align: middle; }
+
+/* ============================================================================
+   THE NAV CHIP AT NARROW WIDTHS
+   ----------------------------------------------------------------------------
+   It used to be `display: none` below 900px. Which organisation you are in and
+   what you are in it are the two things the chip exists to say, and hiding it
+   is hiding the answer on exactly the screens where the rest of the nav has
+   already collapsed into a burger and there is nothing else left to say it.
+
+   The client's instruction was explicit — "even if it means we push the GOODTIP
+   logo at the left to make sure that is captured". So the wordmark gives way
+   instead: below 900px it renders as GT, and below 560px the chip drops the
+   organisation's name and keeps the group's, which is the half that decides
+   which ladder a tip lands on.
+   ========================================================================= */
+@media (max-width: 900px) {
+  .an-ctx { display: inline-flex; margin-left: 6px; min-width: 0; }
+  .an-ctx-btn { max-width: min(62vw, 340px); padding: 6px 10px; font-size: 13.5px; }
+  /* .gt-v2 in every selector below, not decoration: the app shell sets
+     `.gt-v2 .an-brand` and `.gt-v2 .app-nav .an-inner` outside any media
+     query, and those beat a bare `.an-brand` here however late in the file it
+     appears. A rule that loses to the one it is meant to replace is the
+     failure mode this whole block exists to fix. */
+  .gt-v2 .an-brand, .an-brand { font-size: 0; letter-spacing: 0; }
+  /* The mark, rebuilt from nothing: font-size:0 above collapses the element's
+     own text, and these two pseudo-elements draw "GT" in its place — same two
+     colours, same order, a quarter of the width. */
+  .gt-v2 .an-brand::before, .an-brand::before { content: "G"; font-size: 19px; color: #fff; }
+  .gt-v2 .an-brand::after,  .an-brand::after  { content: "T"; font-size: 19px; color: var(--lime); }
+  .gt-v2 .app-nav .an-inner, .app-nav .an-inner { gap: 10px; padding: 0 14px; }
+}
+@media (max-width: 560px) {
+  .an-ctx-btn .an-ctx-org { display: none; }
+  .an-ctx-btn .an-ctx-sep { display: none; }
+  .an-ctx-role { padding: 3px 6px; }
+}
+
+/* ============================================================================
+   THE DOCKED CONFIRM
+   ----------------------------------------------------------------------------
+   ASKED FOR: "after I scroll down and I have been making tips, I have to
+   scroll up again to confirm." The real button stays where it is — beside the
+   count it describes — and this follows you down. It presses the real one, so
+   there is still exactly one way to submit a slate.
+   ========================================================================= */
+.slip-dock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, rgba(11,32,23,0), rgba(11,32,23,.92) 42%);
+  pointer-events: none;
+}
+.slip-dock-in {
+  max-width: 640px; margin: 0 auto; pointer-events: auto;
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 10px 12px 10px 18px; border-radius: 100px;
+  background: var(--deep); border: 1px solid rgba(200,241,53,.28);
+  box-shadow: 0 18px 40px -20px rgba(0,0,0,.75);
+}
+.slip-dock .sd-count {
+  font-family: var(--mark); font-weight: 700; font-size: 12px;
+  letter-spacing: .1em; text-transform: uppercase; color: rgba(232,228,213,.75);
+}
+.slip-dock .sd-count b { font-size: 17px; color: var(--lime); margin-right: 5px; letter-spacing: 0; }
+.slip-dock .abtn { flex: none; }
+/* Nothing behind it is reachable through the gradient, but the gradient itself
+   must not eat clicks on the fixtures under it — hence pointer-events on the
+   pill only. Printing drops it with the rest of the furniture. */
+@media print { .slip-dock { display: none !important; } }
+
+/* Light theme, nav only. The bar is pale here, so the member badge's cream-on
+   translucent-cream becomes invisible — the exact failure this codebase keeps
+   hitting when one set of colours is asked to serve a dark bar and a light one.
+   Admin keeps the lime pill: it reads on both. */
+html[data-theme="light"] .gt-app .an-ctx-role.is-member {
+  background: rgba(15,46,34,.08); color: #2C4C3B;
+}
+html[data-theme="light"] .gt-app .an-ctx-btn { border-color: rgba(15,46,34,.14); background: rgba(15,46,34,.03); }
+html[data-theme="light"] .gt-app .an-ctx-org { color: #46554B; opacity: 1; }

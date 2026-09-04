@@ -44,8 +44,24 @@ new slate is fetched — see gt-veil.js.
        hx-push-url="{{ base }}{% if keep %}?{{ keep }}{% endif %}"
        {% endif %}
        {% if not active_slugs %}aria-current="true"{% endif %}>All competitions</a>
+    {% comment %}
+    THE CODE'S OWN COLOUR, carried as data rather than as a class.
+
+    Asked for by the client: the four codes are four different competitions and
+    on a mixed slate they were four identical grey chips over four identical
+    grey fixtures. The women's competitions each get a shade of their own and
+    the men's each get theirs, so AFLW is never mistaken for AFL at a glance —
+    which on a two-code league is the mistake that costs somebody a round.
+
+    data-code carries the slug for the four we ship, data-cat the mens/womens
+    category as the fallback, so a competition added later (Super League, Super
+    Netball) is coloured by its category from the day it appears instead of
+    rendering grey until somebody remembers to add a rule. The colours
+    themselves live in one block in goodtip.css — see "competition colours".
+    {% endcomment %}
     {% for s in org_series %}
     <a class="sfilter-chip{% if s.slug in active_slugs %} on{% endif %}"
+       data-code="{{ s.slug }}" data-cat="{{ s.category }}"
        href="{{ base }}?series={{ s.slug }}{% if keep %}&amp;{{ keep }}{% endif %}"
        {% if swap_target %}
        hx-get="{{ base }}?slate=1&amp;series={{ s.slug }}{% if keep %}&amp;{{ keep }}{% endif %}"

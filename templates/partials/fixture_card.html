@@ -26,10 +26,17 @@ The dots are decorative and hidden from screen readers: the record beside them
 ("4 of 5") says the same thing in words, and the detail button carries the
 rest.
 {% endcomment %}
+{% comment %}
+data-code/data-cat put the competition's colour on the card — the tag below,
+and the hairline down its leading edge. See "competition colours" in
+goodtip.css. Both callers select_related round__series, so this costs no query.
+{% endcomment %}
 <article class="fxc phase-{{ match.phase }}{% if selection %} is-picked{% endif %}{% if not editable %} is-locked{% endif %}"
+         data-code="{{ match.round.series.slug }}" data-cat="{{ match.round.series.category }}"
          id="fxc-{{ match.id }}">
 
   <div class="fxc-meta">
+    <span class="fxc-code">{{ match.round.series.name }}</span>
     <span class="fxc-when">{{ match.kickoff_at|date:"D j M · g:i A" }}</span>
     {% if match.venue %}<span class="fxc-venue"><svg><use href="#ic-pin"/></svg>{{ match.venue }}</span>{% endif %}
     {% comment %}
@@ -54,7 +61,13 @@ rest.
       {% endif %}
     {% elif selection %}<span class="fxc-state is-tipped">Tipped</span>
     {% elif round_locked or lock_note %}<span class="fxc-state is-shut">Locked</span>
-    {% elif not editable %}<span class="fxc-state is-missed">No tip</span>
+    {% comment %}
+    "Not tipped", not "No tip". The client read the two-word version as a label
+    for the fixture rather than as a statement about their own slate — and on a
+    past round, which is where it mostly appears, what it has to say is "you
+    did not tip this one", not "this game has no tips".
+    {% endcomment %}
+    {% elif not editable %}<span class="fxc-state is-missed">Not tipped</span>
     {% else %}<span class="fxc-state is-open">Open</span>{% endif %}
   </div>
 

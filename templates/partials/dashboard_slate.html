@@ -245,9 +245,16 @@ Expects: c (the selected org card), games, open_games, org_series,
         open yet, rather than offering controls that would be refused on
         submit.
         {% endcomment %}
-        <div class="fx-roundhead{% if not grp.list.0.round_open %} is-shut{% endif %}">
+        <div class="fx-roundhead{% if not grp.list.0.round_open %} is-shut{% endif %}"
+             data-code="{{ grp.grouper.series.slug }}" data-cat="{{ grp.grouper.series.category }}">
           <span class="fxr-n">Round {{ grp.grouper.round_number }}</span>
-          <span class="fxr-series">{{ grp.grouper.series }}</span>
+          {% comment %}
+          The code wears its own colour here too, not only on the filter chip.
+          A slate of AFL and AFLW interleaved by kickoff is the case this is
+          for: the two headings are one letter apart, and the letter is the
+          part that decides which ladder the round below it counts toward.
+          {% endcomment %}
+          <span class="fxr-series is-code">{{ grp.grouper.series }}</span>
           {% if grp.list.0.round_open %}
           {% comment %}
           A round whose games have all been played must not advertise a lock

@@ -1,3 +1,4 @@
+import re
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -626,3 +627,260 @@ class VerifyPageTests(TestCase):
         form = VerifyCodeForm({"code": "12345"})
         self.assertFalse(form.is_valid())
         self.assertIn(f"{LoginCode.CODE_LENGTH}-digit", str(form.errors))
+
+
+class CompetitionColourTests(TestCase):
+    """Four competitions must not arrive as four identical grey rows.
+
+    ASKED FOR BY THE CLIENT. On a league tipping two codes the slate
+    interleaves them by kickoff, so AFL and AFLW come down one list
+    alternating — one letter apart in the heading, and that letter decides
+    which ladder the round counts toward.
+
+    The colours themselves are CSS. What is testable, and what actually breaks,
+    is whether the markup still carries the hooks they hang off: a template
+    that stops emitting data-code renders every competition grey and nothing
+    fails.
+    """
+
+    def setUp(self):
+        from catalog.models import Competition, Season, Series, Sport
+        from orgs.models import OrgMember, Organisation
+        from tipping.models import Match, Round, Team
+
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            email="colour@example.com", password="x", display_name="Colour",
+        )
+        # THE REAL CODES, fetched rather than created. Series.name is unique
+        # site-wide and the migrations seed AFL/AFLW/NRL/NRLW, so a test that
+        # makes its own "AFL" collides — and a test that invents "Colour
+        # Series" would prove the template emits SOME slug while saying nothing
+        # about the four this feature is about.
+        afl = Series.objects.get(slug="afl")
+        aflw = Series.objects.get(slug="aflw")
+        sport = afl.sport
+        season = Season.objects.create(year=2099, label="2099")
+        self.comp = Competition.objects.create(
+            sport=sport, season=season, name="Colour Comp", slug="colour-comp",
+        )
+        self.org = Organisation.objects.create(name="Colour League", season=season)
+        self.org.competitions.add(self.comp)
+        OrgMember.objects.create(user=self.user, org=self.org)
+
+        now = timezone.now()
+        # The men's and the women's code of the same sport, which is the pair
+        # the client actually confuses on screen.
+        for series in (afl, aflw):
+            slug, name = series.slug, series.name
+            self.comp.series.add(series)
+            rnd = Round.objects.create(
+                org=self.org, round_number=2, series=series, competition=self.comp,
+                lockout_at=now + timedelta(days=3),
+            )
+            Match.objects.create(
+                round=rnd,
+                home_team=Team.objects.create(name=f"{name} Reds", slug=f"{slug}-r", series=series),
+                away_team=Team.objects.create(name=f"{name} Blues", slug=f"{slug}-b", series=series),
+                kickoff_at=now + timedelta(days=3),
+            )
+        self.client.force_login(self.user)
+
+    def _body(self):
+        return self.client.get(f"/dashboard/?org={self.org.id}").content.decode()
+
+    def test_the_filter_chips_name_their_code_and_category(self):
+        body = self._body()
+        self.assertIn('data-code="afl" data-cat="mens"', body)
+        self.assertIn('data-code="aflw" data-cat="womens"', body)
+
+    def test_the_round_heading_and_the_cards_carry_it_too(self):
+        """Not just the filter. The colour has to reach the fixtures — the
+        filter is where you choose a code, the slate is where you confuse
+        two."""
+        body = self._body()
+        self.assertIn("fxr-series is-code", body)
+        self.assertIn('class="fxc-code"', body)
+        # One card per code, each labelled with its own competition.
+        self.assertIn(">AFLW</span>", body)
+
+    def test_the_stylesheet_gives_each_code_its_own_shade(self):
+        """The women's competitions are not one colour between them, and
+        neither are the men's — the client asked for a shade EACH.
+
+        Read out of the stylesheet because that is where the decision lives.
+        The alternative is four screenshots and a person to look at them.
+        """
+        from pathlib import Path
+
+        from django.conf import settings
+
+        css = Path(settings.BASE_DIR, "static/css/goodtip.css").read_text()
+        shades = {}
+        for code in ("afl", "aflw", "nrl", "nrlw"):
+            match = re.search(
+                r'\[data-code="%s"\][^{]*\{([^}]*)\}' % code, css,
+            )
+            self.assertIsNotNone(match, f"{code} has no colour rule")
+            ink = re.search(r"--code-ink:\s*([^;]+);", match.group(1))
+            self.assertIsNotNone(ink, f"{code} has no --code-ink")
+            shades[code] = ink.group(1).strip()
+        self.assertEqual(
+            len(set(shades.values())), 4,
+            f"each code needs its own shade, got {shades}",
+        )
+
+
+class PastRoundResultsTests(TestCase):
+    """A round already played, read by somebody who did not tip it.
+
+    ASKED FOR AS: "the previous games — I should be able to see the results
+    even if I did not tip, the scores, and who won." The score line was already
+    on the card; what it did not say is which club the numbers belong to, which
+    on a card with two clubs either side of a versus is most of the question.
+    """
+
+    def setUp(self):
+        from catalog.models import Competition, Season, Series, Sport
+        from orgs.models import OrgMember, Organisation
+        from tipping.models import Match, Round, Team
+
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            email="past@example.com", password="x", display_name="Past",
+        )
+        self.series = Series.objects.get(slug="nrl")
+        sport = self.series.sport
+        season = Season.objects.create(year=2099, label="2099")
+        comp = Competition.objects.create(
+            sport=sport, season=season, name="Past Comp", slug="past-comp",
+        )
+        comp.series.add(self.series)
+        self.org = Organisation.objects.create(name="Past League", season=season)
+        self.org.competitions.add(comp)
+        OrgMember.objects.create(user=self.user, org=self.org)
+
+        now = timezone.now()
+        self.played = Round.objects.create(
+            org=self.org, round_number=1, series=self.series, competition=comp,
+            lockout_at=now - timedelta(days=14), status="complete",
+        )
+        # A round still to come, so the played one is genuinely in the past
+        # rather than being the only thing the dashboard could show.
+        Round.objects.create(
+            org=self.org, round_number=2, series=self.series, competition=comp,
+            lockout_at=now + timedelta(days=3),
+        )
+        self.home = Team.objects.create(name="Storm", slug="past-storm", series=self.series)
+        self.away = Team.objects.create(name="Eels", slug="past-eels", series=self.series)
+        self.match = Match.objects.create(
+            round=self.played, home_team=self.home, away_team=self.away,
+            kickoff_at=now - timedelta(days=14),
+            status="complete", result="home", home_score=24, away_score=12,
+        )
+        self.client.force_login(self.user)
+
+    def _past_round(self):
+        return self.client.get(
+            f"/dashboard/?slate=1&org={self.org.id}&round=1", HTTP_HX_REQUEST="true",
+        ).content.decode()
+
+    def test_the_scores_are_there_without_a_tip_on_the_game(self):
+        body = self._past_round()
+        self.assertIn("fxc-outcome", body)
+        self.assertIn("24", body)
+        self.assertIn("12", body)
+
+    def test_the_winner_is_named_as_the_winner(self):
+        """"Who won" is not the same question as "what were the scores" — a
+        reader who does not follow the code cannot answer the first from the
+        second."""
+        body = self._past_round()
+        self.assertIn("fxc-outcome is-won", body)
+        self.assertIn("fxc-outcome is-lost", body)
+        self.assertIn(">Won</i>", body)
+
+    def test_a_game_you_left_alone_says_so_in_words(self):
+        """"No tip" was read as a fact about the fixture. On a past round what
+        it has to say is what YOU did, which is nothing."""
+        self.assertIn("Not tipped", self._past_round())
+
+    def test_a_drawn_game_is_neither_won_nor_lost(self):
+        self.match.result = "draw"
+        self.match.away_score = 24
+        self.match.save(update_fields=["result", "away_score"])
+        body = self._past_round()
+        self.assertIn("fxc-outcome is-drew", body)
+        self.assertNotIn("fxc-outcome is-won", body)
+
+
+class DockedConfirmTests(TestCase):
+    """Confirm has to be reachable from wherever you are in the slate.
+
+    ASKED FOR AS: "after I scroll down and I have been making tips, I have to
+    scroll up again to confirm."
+
+    Whether it is on screen is a scroll position and belongs to the browser.
+    What belongs here is that it is RENDERED, that it lives outside the panel
+    htmx replaces, and that it presses the real button rather than being a
+    second way to submit a slate.
+    """
+
+    def setUp(self):
+        from catalog.models import Competition, Season, Series, Sport
+        from orgs.models import OrgMember, Organisation
+        from tipping.models import Match, Round, Team
+
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            email="dock@example.com", password="x", display_name="Dock",
+        )
+        series = Series.objects.get(slug="afl")
+        sport = series.sport
+        season = Season.objects.create(year=2099, label="2099")
+        comp = Competition.objects.create(
+            sport=sport, season=season, name="Dock Comp", slug="dock-comp",
+        )
+        comp.series.add(series)
+        self.org = Organisation.objects.create(name="Dock League", season=season)
+        self.org.competitions.add(comp)
+        OrgMember.objects.create(user=self.user, org=self.org)
+
+        now = timezone.now()
+        rnd = Round.objects.create(
+            org=self.org, round_number=1, series=series, competition=comp,
+            lockout_at=now + timedelta(days=3),
+        )
+        for i in range(3):
+            Match.objects.create(
+                round=rnd,
+                home_team=Team.objects.create(name=f"H{i}", slug=f"dock-h{i}", series=series),
+                away_team=Team.objects.create(name=f"A{i}", slug=f"dock-a{i}", series=series),
+                kickoff_at=now + timedelta(days=3),
+            )
+        self.client.force_login(self.user)
+
+    def test_it_is_rendered_and_starts_hidden(self):
+        body = self.client.get(f"/dashboard/?org={self.org.id}").content.decode()
+        self.assertIn('id="slipDock"', body)
+        # Hidden on arrival: at the top of the page the real button is right
+        # there, and two confirms on one screen is a question, not a shortcut.
+        self.assertRegex(body, r'id="slipDock"[^>]*hidden')
+
+    def test_it_sits_outside_the_panel_htmx_replaces(self):
+        """#slipPanel is swapped whole by the filter and the round navigator.
+        Anything captured inside it is detached the moment either is used —
+        which for a fixed-position dock means one that sticks on screen and
+        stops working."""
+        r = self.client.get(
+            f"/dashboard/?slate=1&org={self.org.id}", HTTP_HX_REQUEST="true",
+        )
+        self.assertNotIn("slipDock", r.content.decode())
+
+    def test_it_presses_the_real_button_rather_than_submitting(self):
+        """One path to the review sheet. A dock that posted the form itself
+        would be a second submit route to keep in step with the first."""
+        body = self.client.get(f"/dashboard/?org={self.org.id}").content.decode()
+        dock = body[body.index('id="slipDock"'):body.index('id="tipSheet"')]
+        self.assertNotIn('type="submit"', dock)
+        self.assertIn("real.click()", body)

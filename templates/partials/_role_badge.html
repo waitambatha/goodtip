@@ -1,0 +1,19 @@
+{% comment %}
+What you are in one organisation, as a badge. Expects `org` carrying the
+nav_is_admin / nav_role pair that orgs.context_processors.user_orgs puts on
+every membership's organisation.
+
+ONE PARTIAL, because the badge appears in four places — the nav chip's
+neighbour, each row of the organisation list, the group column's heading, and
+the dashboard's own header — and four hand-written copies of a two-state chip
+is four chances for "Admin" to be lime in one place and grey in another. The
+distinction is the whole point of it; it cannot look accidental.
+
+Deliberately NOT gated on anything: an organisation you are a member of always
+says Member. A badge that appears only for admins reads as a decoration on the
+admin's screen rather than as an answer to "what am I here".
+{% endcomment %}
+<span class="gt-role {% if org.nav_is_admin %}is-admin{% else %}is-member{% endif %}">
+  <svg aria-hidden="true"><use href="{% if org.nav_is_admin %}#ic-f-shield{% else %}#ic-f-users{% endif %}"/></svg>
+  {{ org.nav_role|default:"Member" }}
+</span>

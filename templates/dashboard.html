@@ -314,6 +314,33 @@ dashboard render. The form is inside the loop and already knows its org.
       {% include "partials/dashboard_slate.html" %}
 
       {% comment %}
+      CONFIRM, WHERE YOU ARE.
+
+      ASKED FOR AS: "after I scroll down and I have been making tips, I have to
+      scroll up again to confirm." The real Confirm sits in the slip bar above
+      the fixtures, which is the right place for it on arrival — it is next to
+      the count it describes — and the wrong place by the fourth fixture, when
+      it is a screen and a half behind you.
+
+      So this follows. It is not a second confirm: pressing it clicks the real
+      button, which opens the same review sheet the real one does, so there is
+      exactly one path to submitting a slate and nothing new to keep in step.
+
+      OUTSIDE #slipPanel on purpose, like the review sheet and for the same
+      reason — the filter and the round navigator swap that panel out, and an
+      element captured inside it is detached the moment either is used.
+
+      It shows only when there is something to confirm AND the real bar has
+      left the screen, so on a short round nobody ever sees it.
+      {% endcomment %}
+      <div class="slip-dock" id="slipDock" hidden>
+        <div class="slip-dock-in">
+          <span class="sd-count"><b id="slipDockCount">0</b> picked</span>
+          <button type="button" class="abtn abtn-primary" id="slipDockBtn">Confirm my tips</button>
+        </div>
+      </div>
+
+      {% comment %}
       Review sheet. Lives inside the form so its confirm button is a plain
       submit — no JS re-submission, and it still works if the script fails.
       The list of picks is built from the form's own radios when it opens, so it
@@ -721,7 +748,49 @@ any one card.
            bar lives inside #slipPanel, which htmx replaces whole. */
         var review = document.getElementById('slipReview');
         if (review) review.hidden = n === 0;
+        dockRefresh(n);
       }
+
+      /* The docked confirm. Two conditions, and both have to be re-tested on
+         every scroll: there is something to confirm, and the real bar is not
+         on screen. Reading the bar's position rather than observing it with an
+         IntersectionObserver because the bar is inside #slipPanel and is
+         replaced wholesale by the filter and the round navigator — an observer
+         would go on watching a detached node and the dock would stick. */
+      var dockPicked = 0;
+      function dockRefresh(n){
+        if (typeof n === 'number') dockPicked = n;
+        var dock = document.getElementById('slipDock');
+        if (!dock) return;
+        var num = document.getElementById('slipDockCount');
+        if (num) num.textContent = dockPicked;
+        var real = document.getElementById('slipReview');
+        /* No real button means a locked round: nothing to confirm, and the
+           dock must not offer one. */
+        var away = false;
+        if (real && !real.hidden) {
+          var box = real.getBoundingClientRect();
+          away = box.bottom < 0 || box.top > (window.innerHeight || 0);
+        }
+        dock.hidden = !(dockPicked > 0 && real && !real.hidden && away);
+      }
+      /* rAF-throttled: scroll fires far more often than the answer changes. */
+      var dockTick = false;
+      window.addEventListener('scroll', function(){
+        if (dockTick) return;
+        dockTick = true;
+        window.requestAnimationFrame(function(){ dockTick = false; dockRefresh(); });
+      }, { passive: true });
+      window.addEventListener('resize', function(){ dockRefresh(); }, { passive: true });
+
+      /* One path to the sheet: the dock presses the real button rather than
+         opening it itself, so the two can never come to mean different things. */
+      document.addEventListener('click', function(e){
+        if (!e.target.closest || !e.target.closest('#slipDockBtn')) return;
+        var real = document.getElementById('slipReview');
+        if (real) real.click();
+      });
+
       slipRefresh();
       /* Recount after a swap: the new round arrives with its own saved picks,
          and the bar would otherwise still be showing the previous round's. */
