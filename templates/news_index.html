@@ -1,4 +1,5 @@
 {% extends "app_base.html" %}
+{% load static %}
 {% load humanize %}
 {% block title %}News &amp; blog &middot; GoodTip{% endblock %}
 {% block loader_task %}Fetching the latest stories{% endblock %}
@@ -23,7 +24,7 @@ drawn over them is the whole point of the look.
     {% endcomment %}
     {% if p.image %}<div class="thumb" style="background-image:url('{{ p.image.url }}')"
          {% if p.image_alt %}role="img" aria-label="{{ p.image_alt }}"{% endif %}>{% for t in p.tag_labels %}<span class="sport-tag">{{ t }}</span>{% endfor %}</div>
-    {% else %}<div class="thumb noimg">{% for t in p.tag_labels %}<span class="sport-tag">{{ t }}</span>{% endfor %}<span class="noimg-mark">GOOD<span>TIP</span></span></div>{% endif %}
+    {% else %}<div class="thumb" style="background-image:url('{% static p.fallback_scene %}')">{% for t in p.tag_labels %}<span class="sport-tag">{{ t }}</span>{% endfor %}</div>{% endif %}
     <div class="body">
       <h4>{{ p.title }}</h4>
       {% if p.excerpt %}<p>{{ p.excerpt|truncatechars:140 }}</p>{% endif %}

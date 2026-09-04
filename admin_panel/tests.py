@@ -1497,3 +1497,61 @@ class PruneMissingMediaTests(TestCase):
         out = self._run(model="admin_panel.NewsPost")
         self.assertIn("admin_panel.NewsPost.image", out)
         self.assertNotIn("accounts.User.avatar", out)
+
+
+class StoryFallbackImageTests(TestCase):
+    """A story with no picture of its own still looks like a story.
+
+    The reader page has always done this — a pictureless story got the site's
+    own match-day photographs rather than a flat green panel. The CARDS did
+    not, so a list of pictureless stories read as a page that had failed to
+    load. That is what the client was looking at after their uploads were
+    destroyed.
+    """
+
+    def _post(self, pk, tags):
+        return NewsPost.objects.create(
+            pk=pk, title=f"Story {pk}", slug=f"story-{pk}", tags=tags,
+            is_published=True, published_at=timezone.now(),
+        )
+
+    def test_the_photograph_matches_the_code(self):
+        """An NRL piece must not be illustrated with the MCG.
+
+        Asserted against the POOLS rather than the filenames: mcg-match.jpg is
+        an AFL ground and does not say "afl", so a substring check on the name
+        both fails on a correct answer and would pass on a wrong one.
+        """
+        afl = set(NewsPost._SCENES["AFL"])
+        nrl = set(NewsPost._SCENES["NRL"])
+
+        def scene_of(pk, tags):
+            return self._post(pk, tags).fallback_scene.rsplit("/", 1)[-1]
+
+        self.assertIn(scene_of(101, ["NRL"]), nrl)
+        self.assertIn(scene_of(102, ["NRLW"]), nrl)
+        self.assertIn(scene_of(103, ["AFL"]), afl)
+        self.assertIn(scene_of(104, ["AFLW"]), afl)
+
+    def test_a_story_filed_under_news_gets_a_neutral_stadium(self):
+        scene = self._post(105, ["NEWS"]).fallback_scene.rsplit("/", 1)[-1]
+        self.assertIn(scene, set(NewsPost._SCENES[None]))
+
+    def test_it_is_the_same_photograph_every_time(self):
+        """A card that changed picture on every load reads as broken in a
+        different way — and the same story appears on the list, the dashboard
+        and the foot of another story."""
+        post = self._post(106, ["AFL"])
+        self.assertEqual(post.fallback_scene, NewsPost.objects.get(pk=106).fallback_scene)
+
+    def test_the_news_list_shows_a_photograph_not_an_empty_panel(self):
+        self._post(107, ["NRL"])
+        html = self.client.get(reverse("news_index")).content.decode()
+        self.assertIn("img/scenes/nrl-", html)
+        self.assertNotIn("pn-thumb noimg", html)
+
+    def test_a_story_with_its_own_picture_keeps_it(self):
+        post = self._post(108, ["AFL"])
+        post.image.save("real.png", ContentFile(b"x"), save=True)
+        html = self.client.get(reverse("news_index")).content.decode()
+        self.assertIn("real", html)

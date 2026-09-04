@@ -495,7 +495,7 @@ stories, which is a perfectly good answer.
         {% if p.image %}
         <div class="thumb" style="background-image:url('{{ p.image.url }}')"><span class="sport-tag">{{ p.tag_labels.0 }}</span></div>
         {% else %}
-        <div class="thumb noimg"><span class="sport-tag">{{ p.tag_labels.0 }}</span><span class="noimg-mark">GOOD<span>TIP</span></span></div>
+        <div class="thumb" style="background-image:url('{% static p.fallback_scene %}')"><span class="sport-tag">{{ p.tag_labels.0 }}</span></div>
         {% endif %}
         <div class="body">
           <h4>{{ p.title }}</h4>

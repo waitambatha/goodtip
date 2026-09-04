@@ -256,7 +256,7 @@ gradient over the whole article.
         {% for p in more|slice:":3" %}
         <a class="rd-card" href="{% url 'news_detail' p.slug %}">
           {% if p.image %}<div class="rdc-thumb" style="background-image:url('{{ p.image.url }}')"><span class="rd-tag">{{ p.tag_labels.0 }}</span></div>
-          {% else %}<div class="rdc-thumb noimg"><span class="rd-tag">{{ p.tag_labels.0 }}</span><span class="rdc-mark">GOOD<span>TIP</span></span></div>{% endif %}
+          {% else %}<div class="rdc-thumb" style="background-image:url('{% static p.fallback_scene %}')"><span class="rd-tag">{{ p.tag_labels.0 }}</span></div>{% endif %}
           <div class="rdc-body">
             <h3>{{ p.title }}</h3>
             {% if p.excerpt %}<p>{{ p.excerpt|truncatechars:110 }}</p>{% endif %}

@@ -47,7 +47,15 @@
         {% comment %} Every code the story carries — see the member list. {% endcomment %}
         {% if p.image %}<div class="pn-thumb" style="background-image:url('{{ p.image.url }}')"
              {% if p.image_alt %}role="img" aria-label="{{ p.image_alt }}"{% endif %}>{% for t in p.tag_labels %}<span class="pn-tag">{{ t }}</span>{% endfor %}</div>
-        {% else %}<div class="pn-thumb noimg">{% for t in p.tag_labels %}<span class="pn-tag">{{ t }}</span>{% endfor %}</div>{% endif %}
+        {% else %}{% comment %}
+          A story with no picture of its own gets one of the site's own
+          match-day photographs, chosen by its code and stable per story — see
+          NewsPost.fallback_scene. The story READER has always done this; the
+          cards drew a flat panel instead, so a list of pictureless stories
+          read as a page that had failed to load rather than as a list of
+          stories.
+          {% endcomment %}
+          <div class="pn-thumb" style="background-image:url('{% static p.fallback_scene %}')">{% for t in p.tag_labels %}<span class="pn-tag">{{ t }}</span>{% endfor %}</div>{% endif %}
         <div class="pn-body">
           {% if forloop.first and not active_tag %}<span class="pn-lead-flag">Latest story</span>{% endif %}
           <h3>{{ p.title }}</h3>

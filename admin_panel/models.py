@@ -252,6 +252,45 @@ class NewsPost(SeoFieldsMixin, models.Model):
     def is_live(self) -> bool:
         return self.is_published and self.published_at <= timezone.now()
 
+    #: Match-day photographs the site already ships, split by code. Used when a
+    #: story has no picture of its own — see `fallback_scene`.
+    _SCENES = {
+        "AFL":  ["afl-goal-posts.jpg", "afl-training.jpg", "afl-posts-mcg.jpg",
+                 "mcg-match.jpg", "afl-ground.jpg"],
+        "NRL":  ["nrl-ground-dusk.jpg", "nrl-player-fence.jpg", "nrl-goal-posts.jpg",
+                 "nrl-players-fans.jpg", "nrl-scoreboard.jpg"],
+        None:   ["stadium-lights-grass.jpg", "aussie-crowd-flag.jpg",
+                 "mcg-stadium.jpg", "stadium-panorama.jpg"],
+    }
+
+    @property
+    def fallback_scene(self) -> str:
+        """A photograph to stand in when the story has none of its own.
+
+        The reader page has always done this — a story with no picture gets the
+        site's own match-day shots rather than a flat green panel. The cards on
+        the news list did not, so a list of pictureless stories read as a page
+        that had failed to load rather than as a list of stories.
+
+        PICKED BY CODE, so an NRL piece does not get a photograph of the MCG:
+        AFL and AFLW draw from the AFL set, NRL and NRLW from the league set,
+        and anything filed under News alone gets a neutral stadium.
+
+        STABLE PER STORY, because it keys off the primary key rather than
+        random. A card that showed a different photograph on every page load
+        would read as broken in a different way — and the same story has to
+        look the same on the list, on the dashboard and in the "more from
+        GoodTip" row at the foot of another story.
+        """
+        code = (self.tag_list or [None])[0]
+        if code in ("AFL", "AFLW"):
+            pool = self._SCENES["AFL"]
+        elif code in ("NRL", "NRLW"):
+            pool = self._SCENES["NRL"]
+        else:
+            pool = self._SCENES[None]
+        return f"img/scenes/{pool[(self.pk or 0) % len(pool)]}"
+
     def save(self, *args, **kwargs):
         # The slug is generated from the headline only when there isn't one —
         # it is editable after that, but it does not MOVE on its own. A slug
