@@ -390,9 +390,13 @@ class DashboardThisWeekTests(TestCase):
     def _round_headings(self, body):
         import re
 
+        # `fxr-series[^"]*`, not `fxr-series` exactly: the competition's colour
+        # is carried by an `is-code` modifier on that same span (see
+        # "competition colours" in goodtip.css), so pinning the full class
+        # attribute made a styling change look like four broken rounds.
         return re.findall(
             r'<span class="fxr-n">Round (\d+)</span>\s*'
-            r'<span class="fxr-series">([^<]+)</span>',
+            r'<span class="fxr-series[^"]*">([^<]+)</span>',
             body,
         )
 
