@@ -21,6 +21,7 @@ from .models import (
     MembershipRequest,
     Group,
     GroupMember,
+    Notification,
     OrgCharitySelection,
     OrgDraft,
     OrgMember,
@@ -6006,3 +6007,162 @@ class RoleIsVisibleWhereYouSwitchTests(TestCase):
         ctx = user_orgs(r)
         roles = {o.name: o.nav_role for o in ctx["nav_orgs"]}
         self.assertEqual(roles, {"Mine Co": "Admin", "Theirs Co": "Member"})
+
+
+class ANotificationPopsOnceTests(TestCase):
+    """One turn at the bell, then the count carries it.
+
+    REPORTED BY THE CLIENT: "he keeps getting the notification pop-up on things
+    he already opened... let the pop-up be once. After it pops up once — and
+    let's say the user views or even does not view — it will auto clear, and let
+    it not pop out again; instead have the notification bell have like 1 or 2 or
+    3 the way it counts notifications that have not been read."
+
+    The ticker used to loop the undismissed ones forever, so anything opened but
+    never explicitly closed with the ✕ came back on the next page load.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.user = User.objects.create_user(
+            email="bell@example.com", password="x", display_name="Bell",
+        )
+        self.org = Organisation.objects.create(
+            name="Bell Co", season=self.season, created_by=self.user,
+        )
+        OrgMember.objects.create(user=self.user, org=self.org, is_league_owner=True)
+        self.notes = [
+            Notification.objects.create(
+                user=self.user, org=self.org, title=f"Something {i}",
+            )
+            for i in range(3)
+        ]
+        self.client.force_login(self.user)
+
+    def _queue(self):
+        from .context_processors import user_orgs
+        from django.test import RequestFactory
+
+        r = RequestFactory().get("/")
+        r.user = self.user
+        r.session = self.client.session
+        return user_orgs(r)["ticker_notifications"]
+
+    def test_a_fresh_notification_is_queued(self):
+        self.assertEqual(len(self._queue()), 3)
+
+    def test_one_that_has_had_its_turn_is_not_queued_again(self):
+        self.client.post(
+            reverse("orgs:notifications_announced"), {"ids": [self.notes[0].id]},
+        )
+        titles = {n["title"] for n in self._queue()}
+        self.assertNotIn("Something 0", titles)
+        self.assertEqual(len(titles), 2)
+
+    def test_having_had_its_turn_does_not_mark_it_read(self):
+        """The distinction the whole change rests on. A teaser that flashed past
+        while somebody was looking at the fixtures has been announced and has
+        NOT been read — and the bell's count is what has to go on saying so."""
+        self.client.post(
+            reverse("orgs:notifications_announced"),
+            {"ids": [n.id for n in self.notes]},
+        )
+        self.notes[0].refresh_from_db()
+        self.assertIsNotNone(self.notes[0].announced_at)
+        self.assertIsNone(self.notes[0].read_at)
+
+        from .context_processors import user_orgs
+        from django.test import RequestFactory
+
+        r = RequestFactory().get("/")
+        r.user = self.user
+        r.session = self.client.session
+        ctx = user_orgs(r)
+        self.assertEqual(ctx["ticker_notifications"], [])
+        self.assertEqual(ctx["unread_notification_count"], 3)
+
+    def test_opening_one_stops_it_coming_back(self):
+        """The client's actual symptom, end to end: open it, reload, and it must
+        not be waiting for you again."""
+        self.client.post(
+            reverse("orgs:notification_open", args=[self.notes[1].id]),
+        )
+        self.client.post(
+            reverse("orgs:notifications_announced"), {"ids": [self.notes[1].id]},
+        )
+        self.assertNotIn("Something 1", {n["title"] for n in self._queue()})
+
+    def test_it_will_not_announce_somebody_elses_notification(self):
+        User = get_user_model()
+        other = User.objects.create_user(
+            email="nosy@example.com", password="x", display_name="Nosy",
+        )
+        theirs = Notification.objects.create(user=other, title="Not yours")
+        r = self.client.post(
+            reverse("orgs:notifications_announced"), {"ids": [theirs.id]},
+        )
+        self.assertEqual(r.status_code, 200)
+        theirs.refresh_from_db()
+        self.assertIsNone(theirs.announced_at)
+
+
+class ARoleInTheOrgIsWhatMakesYouItsAdminTests(TestCase):
+    """Appointed Team Manager of a league, and treated as one.
+
+    THE RULE CHANGED HERE. It used to also require being the organisation's own
+    `created_by`, so somebody the league had deliberately appointed through its
+    own members screen got a member's nav and a 403 on the screens they had just
+    been given the role for. Three live memberships on staging were in that
+    state.
+
+    The client, twice: "if I pick the organisation that I am an admin, I see
+    what the admin should see... if I get into an organisation that I am not an
+    admin then I see the menu and all as a member."
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.founder = User.objects.create_user(
+            email="founder@example.com", password="x", display_name="Founder",
+        )
+        self.manager = User.objects.create_user(
+            email="manager@example.com", password="x", display_name="Manager",
+        )
+        self.org = Organisation.objects.create(
+            name="Someone Else's Co", season=self.season, created_by=self.founder,
+        )
+        OrgMember.objects.create(user=self.founder, org=self.org, is_league_owner=True)
+        self.appointed = OrgMember.objects.create(
+            user=self.manager, org=self.org, role=OrgMember.ROLE_MANAGER,
+        )
+
+    def test_an_appointed_manager_manages_the_org_that_appointed_them(self):
+        from .services import is_creator_admin
+
+        self.assertTrue(
+            is_creator_admin(self.manager, self.org, membership=self.appointed)
+        )
+
+    def test_a_participant_does_not(self):
+        User = get_user_model()
+        plain = User.objects.create_user(
+            email="plain@example.com", password="x", display_name="Plain",
+        )
+        m = OrgMember.objects.create(user=plain, org=self.org)
+        from .services import is_creator_admin
+
+        self.assertFalse(is_creator_admin(plain, self.org, membership=m))
+
+    def test_the_manage_menu_is_on_the_bar_for_them(self):
+        self.client.force_login(self.manager)
+        body = self.client.get(reverse("dashboard")).content.decode()
+        self.assertIn(reverse("orgs:members", args=[self.org.id]), body)
+
+    def test_the_bill_still_belongs_to_the_owner_alone(self):
+        """What this widened, and what it deliberately did not. Billing is
+        gated on is_league_owner, not on can_manage."""
+        self.client.force_login(self.manager)
+        body = self.client.get(reverse("dashboard")).content.decode()
+        self.assertNotIn(reverse("billing:plans", args=[self.org.id]), body)

@@ -89,6 +89,7 @@ urlpatterns = [
     path("groups/leave-context/", views.leave_group_view, name="leave_group_context"),
     path("notifications/<int:note_id>/dismiss/", views.dismiss_notification, name="dismiss_notification"),
     path("notifications/<int:note_id>/open/", views.notification_open, name="notification_open"),
+    path("notifications/announced/", views.announce_notifications, name="notifications_announced"),
     path("notifications/read-all/", views.notifications_read_all, name="notifications_read_all"),
     path("notifications/feed.json", views.notifications_feed, name="notifications_feed"),
 ]

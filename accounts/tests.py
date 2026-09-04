@@ -943,25 +943,29 @@ class NavRowFitsTests(TestCase):
     def test_every_item_in_the_row_may_shrink(self):
         self.assertIn(".app-nav .an-inner > * { min-width: 0; }", self.css)
 
-    def test_the_links_give_way_before_the_switcher_does(self):
-        """The link row has a burger to fall back on. The switcher has
-        nothing — there is no other place on the screen that names which
-        organisation you are in."""
-        links = re.search(r"^\.gt-v2 \.an-links, \.an-links \{([^}]*)\}", self.css, re.M)
-        self.assertIsNotNone(links, "the link row has no shrink rule")
-        self.assertIn("flex: 0 1 auto", links.group(1))
+    def test_the_chip_has_a_floor_it_cannot_be_squeezed_below(self):
+        """It absorbs the row's pressure, so it needs a width below which it
+        stops being a control at all."""
+        ctx = re.search(r"^\.gt-v2 \.an-ctx, \.an-ctx \{([^}]*)\}", self.css, re.M)
+        self.assertIsNotNone(ctx, "the switcher has no shrink rule")
+        self.assertIn("min-width: 118px", ctx.group(1))
+
+    def test_the_links_are_never_hidden_to_buy_the_chip_its_width(self):
+        """The first fix collapsed the whole row into the burger at 1320px,
+        which took Manage and Admin off the bar on every laptop under that —
+        "I have picked an organisation that I am an admin, I cannot see the
+        admin and the manage."
+
+        Links are destinations and their absence is unexplainable. A name can
+        ellipsise and still be read, and carries the full one in its title. So
+        the chip is what gives.
+        """
+        self.assertNotIn("@media (max-width: 1320px)", self.css)
         ctx = re.search(r"^\.gt-v2 \.an-ctx, \.an-ctx \{([^}]*)\}", self.css, re.M)
         self.assertIsNotNone(ctx)
-        self.assertIn("min-width: 0", ctx.group(1))
-
-    def test_the_links_collapse_at_a_width_the_bar_can_hold(self):
-        """1180px was measured against a chip half the current width. A
-        breakpoint that lies is how the overlap came back."""
-        self.assertIn("@media (max-width: 1320px)", self.css)
-        band = self.css[self.css.index("@media (max-width: 1320px)"):]
-        band = band[:band.index("}\n\n")]
-        self.assertIn(".an-links { display: none; }", band)
-        self.assertIn(".an-burger { display: inline-grid; }", band)
+        self.assertIn("flex: 1 1 auto", ctx.group(1))
+        links = re.search(r"^\.gt-v2 \.an-links, \.an-links \{([^}]*)\}", self.css, re.M)
+        self.assertIn("flex: none", links.group(1))
 
 
 class OrganisationIsLeftZeroTests(TestCase):
@@ -992,20 +996,21 @@ class OrganisationIsLeftZeroTests(TestCase):
     def _nav(self, body):
         return body[body.index('class="an-inner"'):body.index('class="an-links"')]
 
-    def test_the_organisation_comes_before_everything_else_in_the_bar(self):
+    def test_the_mark_leads_and_the_organisation_follows_it(self):
+        """Both instructions, in order: the league at the start of the bar, and
+        "a logo, the GoodTip, on the left of where we have that organisation or
+        group drop-down"."""
         nav = self._nav(self.client.get(reverse("dashboard")).content.decode())
+        self.assertLess(nav.index("an-brand"), nav.index("an-ctx"))
         self.assertIn("Masterclass", nav)
-        # And the wordmark is not sitting in front of it.
-        self.assertNotIn("an-brand", nav)
 
-    def test_the_wordmark_returns_for_somebody_with_no_organisation(self):
-        """Nothing to name in that position, and a bar that starts with a gap
-        is worse than one that starts with the product."""
-        from orgs.models import OrgMember
-
-        OrgMember.objects.filter(user=self.user).delete()
-        body = self.client.get(reverse("dashboard")).content.decode()
-        self.assertIn("an-brand", body)
+    def test_the_league_is_the_first_thing_after_it(self):
+        """Nothing else may get between them — the mark is a badge, and what
+        the reader needs at the start of the bar is which league they are in."""
+        nav = self._nav(self.client.get(reverse("dashboard")).content.decode())
+        between = nav[nav.index("an-brand"):nav.index("an-ctx")]
+        self.assertNotIn("an-links", between)
+        self.assertNotIn("<a href", between[between.index(">"):])
 
     def test_the_role_marker_never_replaces_the_name(self):
         """It said "Admin" beside a truncated name, and on a narrow bar instead

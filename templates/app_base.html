@@ -85,25 +85,20 @@ goodtip.css.
   <nav class="app-nav">
     <div class="an-inner">
       {% comment %}
-      LEFT ZERO IS THE ORGANISATION, not the wordmark.
+      THE MARK, THEN THE ORGANISATION.
 
-      ASKED FOR: "where we have that GOODTIP is where we can have that
-      masterclass, or the name of the organisation or group that we will be in."
+      Two instructions, a day apart, and they are not in conflict once both are
+      on screen: "where we have that GOODTIP is where we can have that
+      masterclass" put the league at the start of the bar, and "we should have a
+      logo, the GoodTip, that should be on the left of where now we have that
+      organisation or group drop-down" puts the mark back in front of it.
 
-      Which league you are standing in decides what every other item in this bar
-      means — My Tips, Leaderboard, Ladder and the Wall all belong to it — so it
-      is the first thing read and it holds the first position. The wordmark is
-      not gone from the product: it is the loader on every page load, the
-      favicon, the footer and the whole public site. Repeating it in the corner
-      of an app the member has already signed in to bought nothing and cost the
-      one control that had something to say.
-
-      It stays for somebody with no organisation yet, who has no name to put
-      here and would otherwise get a bar starting with a gap.
+      So the order is mark, then league. The mark is a link home and stays
+      narrow — it is a badge for the product, not a headline — and the league
+      keeps the width, because which one you are standing in decides what every
+      other item in this bar means.
       {% endcomment %}
-      {% if not current_org %}
-      <a href="{% url 'dashboard' %}" class="an-brand">GOOD<span>TIP</span></a>
-      {% endif %}
+      <a href="{% url 'dashboard' %}" class="an-brand" aria-label="GoodTip, back to the dashboard">GOOD<span>TIP</span></a>
       {% comment %}
       WHERE YOU ARE, on every page.
 
@@ -580,6 +575,13 @@ goodtip.css.
           if (opening) {
             var badge = bell.querySelector('.bell-badge');
             if (badge) { post('{% url "orgs:notifications_read_all" %}'); badge.remove(); }
+            /* Opening the panel ends every turn still waiting. The list is on
+               screen and being read properly; a teaser that interrupts it
+               afterwards is announcing something the reader is already looking
+               at, and would be back again on the next page load. Fired here
+               rather than left to the ticker because the reader may well
+               navigate away from this panel before the queue would have run. */
+            if (window.gtTickerDone) window.gtTickerDone();
           }
         });
         document.addEventListener('click', function(e){ if (!panel.contains(e.target)) panel.classList.remove('open'); });
@@ -587,9 +589,20 @@ goodtip.css.
       /* ---- bell ticker -------------------------------------------------
          Notifications take turns at the bell rather than one card sitting on
          the page waiting to be closed. A turn is: buzz the bell (~2s), slide
-         a one-line teaser out beside it (~3s), clear it. A beat, then the
-         next one goes; after the last it starts again at the top, so missing
-         a turn costs nothing — it comes round again.
+         a one-line teaser out beside it (5s), clear it. A beat, then the next
+         one goes. When the last has been through, the ticker is done.
+
+         ONE TURN EACH, EVER. It used to wrap back to the top — "missing a
+         turn costs nothing, it comes round again" — and the cost of that was
+         paid on every page load after: anything the reader had opened but
+         never explicitly closed was still in the queue and interrupted them
+         again. The client's words: "he keeps getting the notification pop-up
+         on things he already opened... let the pop-up be once."
+
+         So a turn is recorded on the server the moment the teaser is shown
+         (announced_at, which is NOT read_at — see orgs/views.announce), and
+         what carries the notification afterwards is the bell's unread count.
+         A number that waits, instead of a card that interrupts.
 
          Only the title is in the teaser. It is a hook: enough to decide
          whether to look, and clicking it opens the real thing. The message
@@ -606,8 +619,21 @@ goodtip.css.
         try { queue = JSON.parse(tickData.textContent) || []; } catch (e) { queue = []; }
         if (!queue.length) return;
 
-        var FIRST = 5000, BUZZ = 2000, SHOW = 3000, GAP = 1500;
+        var FIRST = 5000, BUZZ = 2000, SHOW = 5000, GAP = 1500;
         var at = 0, timer = null, paused = false, current = null;
+
+        /* A turn taken is a turn recorded, immediately — not batched to the
+           end of the queue. Somebody who reads the first teaser and clicks
+           away has still seen it, and it must not be waiting for them on the
+           page they land on. */
+        function announce(id){
+          var body = new FormData();
+          body.append('ids', id);
+          fetch('{% url "orgs:notifications_announced" %}', {
+            method: 'POST', body: body, credentials: 'same-origin',
+            headers: { 'X-CSRFToken': csrf },
+          }).catch(function(){});
+        }
         var icon = tick.querySelector('.bt-ic use');
         var eyebrow = tick.querySelector('.bt-eyebrow');
         var title = tick.querySelector('.bt-title');
@@ -629,9 +655,11 @@ goodtip.css.
             wait(1000, turn);
             return;
           }
-          if (!queue.length) return;
-          current = queue[at % queue.length];
-          at = (at + 1) % queue.length;
+          /* Past the end is the end. No modulo, no wrap. */
+          if (at >= queue.length) { current = null; return; }
+          current = queue[at];
+          at += 1;
+          announce(current.id);
 
           if (!reduce) {
             bellWrap.classList.add('buzz');
@@ -652,6 +680,9 @@ goodtip.css.
           requestAnimationFrame(function(){
             requestAnimationFrame(function(){ tick.classList.add('in'); });
           });
+          /* Clears itself whether or not anybody looked — "the user views or
+             even does not view, it will auto clear, I do not want that pop-up
+             to stay there". */
           wait(SHOW, function(){ hide(function(){ wait(GAP, turn); }); });
         }
 
@@ -678,10 +709,30 @@ goodtip.css.
           var gone = current.id;
           post('/leagues/notifications/' + gone + '/dismiss/');
           queue = queue.filter(function(n){ return n.id !== gone; });
-          at = 0;
+          /* `at` is an index into a list that just got shorter, and the item
+             removed is the one already shown — so it stays where it is rather
+             than being reset to 0, which would replay the queue from the top:
+             the exact behaviour this ticker no longer has. */
+          at = Math.max(0, at - 1);
           paused = false;
           hide(function(){ if (queue.length) wait(GAP, turn); });
         });
+
+        /* Opening the bell panel calls this: every turn not yet taken is taken
+           now, on the server as well, so nothing is left queued to interrupt. */
+        window.gtTickerDone = function(){
+          var rest = queue.slice(at).map(function(n){ return n.id; });
+          at = queue.length;
+          clearTimeout(timer);
+          if (!tick.hidden) hide();
+          if (!rest.length) return;
+          var body = new FormData();
+          rest.forEach(function(id){ body.append('ids', id); });
+          fetch('{% url "orgs:notifications_announced" %}', {
+            method: 'POST', body: body, credentials: 'same-origin',
+            headers: { 'X-CSRFToken': csrf },
+          }).catch(function(){});
+        };
 
         wait(FIRST, turn);
       })();
@@ -722,6 +773,18 @@ goodtip.css.
           e.preventDefault(); e.stopPropagation(); dropIt();
         });
         if (n.url) el.addEventListener('click', function(){ post('/leagues/notifications/' + n.id + '/open/'); });
+        /* A toast IS the pop-up, so it spends this notification's one turn.
+           Without this the arrival is toasted now and queued again by the
+           ticker on the next page load — the same thing said twice, which is
+           what the client asked us to stop doing. */
+        (function(){
+          var body = new FormData();
+          body.append('ids', n.id);
+          fetch('{% url "orgs:notifications_announced" %}', {
+            method: 'POST', body: body, credentials: 'same-origin',
+            headers: { 'X-CSRFToken': csrf },
+          }).catch(function(){});
+        })();
         toasts.appendChild(el);
         requestAnimationFrame(function(){ el.classList.add('in'); });
         var timer = setTimeout(dropIt, 7000);

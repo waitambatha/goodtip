@@ -634,24 +634,37 @@ def can_lock_fundraising(org) -> bool:
 
 
 def is_creator_admin(user, org, *, membership=None) -> bool:
-    """Whether `user` may use org's owner-only Manage surfaces (Members,
-    Settings, Groups-admin, Season summary, Charity election).
+    """Whether `user` may use org's Manage surfaces (Members, Settings,
+    Groups-admin, Season summary, Charity election).
 
-    Scoped to Organisation.created_by rather than OrgMember.can_manage's
-    per-membership role: a manager invited into someone else's org should
-    not gain control of *that org's* admin surfaces — only the org's own
-    creator should. Orgs recorded before `created_by` existed (created_by is
-    None) grandfather every existing can_manage member, so nobody running a
-    legacy org is locked out by a field that was never set on their row.
+    THE RULE IS THE MEMBERSHIP'S ROLE IN THIS ORGANISATION, and nothing else.
+
+    It used to be narrower: `can_manage` AND being the organisation's own
+    `created_by`, on the reasoning that "a manager invited into someone else's
+    org should not gain control of that org's admin surfaces". The effect on
+    real data was that somebody appointed Team Manager of a league — appointed
+    BY that league, deliberately, through its own members screen — got a member's
+    nav and a 403 on the screens they had just been given the role for. Three
+    live memberships on staging were in exactly that state.
+
+    The client's instruction, twice: "if I pick the organisation that I am an
+    admin, I see what the admin should see... if I get into an organisation that
+    I am not an admin then I see the menu and all as a member."
+
+    So the question this answers is now the same question the members screen
+    asks when it hands the role out. WORTH BEING PLAIN ABOUT WHAT THAT WIDENS:
+    a Team Manager can now reach Members, Settings, Groups and the charity
+    election of an organisation they did not create. Billing is NOT in that set
+    and never was — the Plan link is gated on `is_league_owner` separately, so
+    the bill still belongs to the owner alone.
+
+    The name is kept because it is referenced from a dozen call sites and one
+    rename is not worth the diff; what it means is documented here.
     """
     if org is None or not user.is_authenticated:
         return False
     m = membership if membership is not None else OrgMember.objects.filter(user=user, org=org).first()
-    if m is None or not m.can_manage:
-        return False
-    if org.created_by_id is None:
-        return True
-    return org.created_by_id == user.id
+    return bool(m and m.can_manage)
 
 
 @transaction.atomic

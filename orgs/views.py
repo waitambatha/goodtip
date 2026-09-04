@@ -1730,6 +1730,41 @@ def dismiss_notification(request, note_id: int):
 
 @login_required
 @require_POST
+def announce_notifications(request):
+    """These have had their turn at the bell. They do not get another.
+
+    ASKED FOR AS: "let the pop-up be once — after it pops up once, and let's
+    say the user views or even does not view, it will auto clear, and let it
+    not pop out again; instead have the notification bell have like 1 or 2 or 3
+    the way it counts notifications that have not been read."
+
+    DELIBERATELY NOT `read`. A notification that flashed past while somebody was
+    looking at the fixtures has been announced and has not been read, and the
+    bell's count is the thing that has to go on saying so — marking these read
+    here would empty the badge that this whole change exists to lean on.
+
+    Takes a list, because the interface has two moments that end a turn for
+    several at once: the last teaser in the queue finishing, and the panel being
+    opened (everything in it has now been seen properly, so nothing left in the
+    queue should still be waiting to interrupt).
+
+    Silent about ids that are not this user's — it is a bookkeeping call fired
+    from a page that is already leaving, not a place to report anything.
+    """
+    from django.utils import timezone as tz
+
+    ids = [int(v) for v in request.POST.getlist("ids") if str(v).lstrip("-").isdigit()]
+    if ids:
+        Notification.objects.filter(
+            pk__in=ids, user=request.user, announced_at__isnull=True,
+        ).update(announced_at=tz.now())
+    from django.http import HttpResponse
+
+    return HttpResponse("")
+
+
+@login_required
+@require_POST
 def notifications_read_all(request):
     """Opening the bell panel marks everything read (badge clears)."""
     from django.utils import timezone as tz

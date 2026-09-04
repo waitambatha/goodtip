@@ -964,6 +964,22 @@ class Notification(models.Model):
     read_at = models.DateTimeField(null=True, blank=True)
     # Dismissed = the popup was cleared; the row stays visible in the panel.
     dismissed_at = models.DateTimeField(null=True, blank=True)
+    # ANNOUNCED = this one has had its turn at the bell, and will not get
+    # another. Its own field rather than reusing read_at or dismissed_at,
+    # because it is a third, genuinely different question:
+    #
+    #   read_at       did they look at it
+    #   dismissed_at  did they push it away
+    #   announced_at  has the interface already said it out loud
+    #
+    # The ticker used to loop the undismissed ones forever, so anything you
+    # opened but never explicitly closed came round again on the next page
+    # load — the client's report was "he keeps getting the notification pop-up
+    # on things he already opened". Marking a turn as taken is what stops it,
+    # and it must not imply the other two: a notification that popped while
+    # you were looking elsewhere is still unread, and the bell's count is the
+    # thing that has to go on saying so.
+    announced_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-created_at"]

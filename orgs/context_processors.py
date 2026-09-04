@@ -68,10 +68,16 @@ def user_orgs(request):
     # is one notification: the second and third waited behind it, unseen, and
     # the first sat over the page as a thing to clear before you could work.
     #
-    # Now every undismissed notification takes a turn at the bell instead: the
-    # bell buzzes, a one-line teaser appears next to it for a few seconds, and
-    # the loop moves on. Nothing has to be closed, and being away from the
-    # screen for one turn costs nothing because it comes round again.
+    # Now each notification takes ONE turn at the bell: the bell buzzes, a
+    # one-line teaser appears beside it for five seconds, and it clears itself
+    # whether or not anybody looked. Nothing has to be closed.
+    #
+    # ONE TURN, NOT A LOOP. It used to come round again — "being away for one
+    # turn costs nothing" — which meant anything you opened but never explicitly
+    # closed was still queued on the next page load, and the client reported
+    # exactly that: pop-ups for things he had already opened. What carries a
+    # notification after its turn is the bell's unread count, which is a number
+    # that waits instead of a card that interrupts. See Notification.announced_at.
     #
     # Only the title travels — the teaser is a hook, not the message. The
     # message, the timestamp and the full list stay in the bell panel, which is
@@ -87,7 +93,7 @@ def user_orgs(request):
             "url": n.link_url or "",
             "icon": n.icon,
         }
-        for n in notes if n.dismissed_at is None
+        for n in notes if n.dismissed_at is None and n.announced_at is None
     ][:5]
     # Nav badges for the organisation admin. Scoped to the organisations this
     # person actually runs — the counts used to be platform-wide and gated on

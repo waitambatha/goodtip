@@ -15296,12 +15296,21 @@ html[data-theme="dark"] .sched { --sched-pick: invert(1) brightness(1.6); }
    restated here at a specificity that beats [data-code] rather than left to
    win on source order. Which competition a fixture belongs to matters less
    than whether it is live or whether you have tipped it. */
+/* BIG ENOUGH TO READ ACROSS THE ROOM. "This part I feel this is too small for
+   a user to know the competition... I want to see that it's NRL, have a nice
+   share of that colour; if it's NRLW the same."
+
+   10px uppercase on a 13% tint was a footnote about the single most
+   consequential fact on the card — which competition's ladder this fixture
+   counts toward, and in a two-code league that is the difference between the
+   men's round and the women's. So: filled with the code's own colour rather
+   than a wash of it, and sized to be read rather than found. */
 .fxc-code {
-  font-family: var(--mark); font-weight: 800; font-size: 10px;
-  letter-spacing: .09em; text-transform: uppercase;
-  padding: 3px 8px; border-radius: 100px;
-  color: var(--code-ink, var(--forest));
-  background: color-mix(in srgb, var(--code-ink, var(--forest)) 13%, transparent);
+  font-family: var(--mark); font-weight: 900; font-size: 13px;
+  letter-spacing: .08em; text-transform: uppercase; line-height: 1;
+  padding: 6px 12px; border-radius: 100px; flex: none;
+  color: var(--code-on, #fff);
+  background: var(--code-ink, var(--forest));
 }
 .fxc[data-code] { border-left-color: color-mix(in srgb, var(--code-ink) 45%, transparent); }
 /* THE SIDE YOU PRESSED WEARS THE COMPETITION'S COLOUR, at 70%. Asked for
@@ -15331,7 +15340,8 @@ html[data-theme="dark"] .sched { --sched-pick: invert(1) brightness(1.6); }
    where the same --code-ink reads slightly hotter than it should; nothing else
    changes, so this is a tint adjustment rather than a second palette. */
 html[data-theme="light"] .sfilter-chip[data-code] { background: rgba(255,255,255,.96); }
-html[data-theme="light"] .fxc-code { background: color-mix(in srgb, var(--code-ink) 10%, #fff); }
+/* The tag is a solid fill in both themes now, so there is nothing here to
+   soften — it was a tint that needed a different bed and no longer is one. */
 
 /* ============================================================================
    HOW IT FINISHED — the score on the club, and who won
@@ -15426,20 +15436,32 @@ html[data-theme="light"] .fxc-code { background: color-mix(in srgb, var(--code-i
    group are what every other item in the bar is relative to.
    ========================================================================= */
 .app-nav .an-inner > * { min-width: 0; }
-.gt-v2 .an-ctx, .an-ctx { flex: 0 1 auto; min-width: 0; margin-left: 0; }
+.an-ctx { margin-left: 0; }
 /* Roomier than the 460px it was given as a squeezed middle child, and a floor
    so it cannot be compressed to an ellipsis by the row around it. */
 .gt-v2 .an-ctx-btn, .an-ctx-btn { max-width: 520px; min-width: 0; }
 .an-ctx-org { min-width: 0; }
-/* The link row gives way before the chip does — it has a burger to fall back
-   on and the chip has nothing. */
-.gt-v2 .an-links, .an-links { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+/* THE CHIP GIVES WAY, NOT THE LINKS. Reversed from the first attempt, which
+   collapsed the whole link row into the burger at 1320px to buy the chip its
+   width — and took Manage and Admin off the bar with it on every laptop under
+   that. Reported straight back: "I have picked an organisation that I am an
+   admin, I cannot see the admin and the manage."
+
+   The links are destinations and their absence is unexplainable; the chip is a
+   name that can ellipsise and still be read, and it carries the full one in its
+   title attribute either way. So the chip absorbs the pressure, down to a floor
+   wide enough to stay a control, and the row collapses at 1180px exactly where
+   it always did. */
+.gt-v2 .an-ctx, .an-ctx { flex: 1 1 auto; min-width: 118px; }
+.gt-v2 .an-links, .an-links { flex: none; }
 .an-right { flex: none; }
-/* The bar cannot hold eight items, a wide chip and the account cluster below
-   this. It was 1180px, measured against a chip half this width. */
-@media (max-width: 1320px) {
-  .an-links { display: none; }
-  .an-burger { display: inline-grid; }
+/* Between 1180 and 1400 the row is at its tightest — every link, the account
+   cluster and the chip. The wordmark shortens to its mark there so the two
+   things that cannot shorten do not have to. */
+@media (min-width: 1181px) and (max-width: 1400px) {
+  .gt-v2 .an-brand, .an-brand { font-size: 0; letter-spacing: 0; }
+  .gt-v2 .an-brand::before, .an-brand::before { content: "G"; font-size: 20px; color: #fff; }
+  .gt-v2 .an-brand::after,  .an-brand::after  { content: "T"; font-size: 20px; color: var(--lime); }
 }
 
 /* ============================================================================
@@ -15459,10 +15481,10 @@ html[data-theme="light"] .fxc-code { background: color-mix(in srgb, var(--code-i
 @media (max-width: 900px) {
   .an-ctx { display: inline-flex; margin-left: 6px; min-width: 0; }
   .an-ctx-btn { max-width: min(62vw, 340px); padding: 6px 10px; font-size: 13.5px; }
-  /* The wordmark only renders here for somebody with no organisation yet —
-     everyone else has the switcher in this position — so it is shortened to
-     the mark rather than shrunk. .gt-v2 in the selector because the app shell
-     sets `.gt-v2 .an-brand` outside any media query, and that beats a bare
+  /* The mark, not the wordmark, on a phone: the league name beside it is what
+     the reader needs and GOODTIP is six characters of a product they have
+     already signed in to. .gt-v2 in the selector because the app shell sets
+     `.gt-v2 .an-brand` outside any media query, and that beats a bare
      `.an-brand` however late in the file it appears. */
   .gt-v2 .an-brand, .an-brand { font-size: 0; letter-spacing: 0; }
   .gt-v2 .an-brand::before, .an-brand::before { content: "G"; font-size: 19px; color: #fff; }
@@ -15522,3 +15544,58 @@ html[data-theme="light"] .gt-app .an-ctx-role.is-member {
 }
 html[data-theme="light"] .gt-app .an-ctx-btn { border-color: rgba(15,46,34,.14); background: rgba(15,46,34,.03); }
 html[data-theme="light"] .gt-app .an-ctx-org { color: #46554B; opacity: 1; }
+
+/* ============================================================================
+   THE FIXTURE'S META ROW, READ AT A GLANCE
+   ----------------------------------------------------------------------------
+   "That place is too tiny... even that Open and Closed and I think Ongoing, too
+   small for one to see."
+
+   The row carries four facts and every one of them was set below body size: the
+   competition, when and where the game is, and whether it is open to tip. Those
+   are the things somebody scanning a round is scanning FOR — the club names
+   below them are already 15px and bold, so the card was loudest about the part
+   the reader already knows and quietest about the parts they came to find.
+
+   The state chip gets the same treatment as the code tag: filled rather than
+   tinted, and sized to be legible. Three states that must never be mistaken for
+   one another, so they are three colours and not three shades — open is the
+   product's lime, in play is the live red the card's edge already uses, and
+   finished is a settled grey.
+   ========================================================================= */
+.fxc-meta { gap: 10px 12px; font-size: 13.5px; }
+.fxc-when { font-size: 13.5px; font-weight: 700; }
+.fxc-venue { font-size: 13px; }
+.fxc-venue svg { width: 14px; height: 14px; }
+
+.fxc-state {
+  font-size: 11.5px; font-weight: 900; letter-spacing: .07em;
+  padding: 5px 11px; line-height: 1;
+}
+/* Open is an invitation and wears the colour the product uses for "do this".
+   It was ink on a 7% wash, which beside a filled competition tag read as the
+   disabled one of the two. */
+.fxc-state.is-open   { background: var(--lime); color: var(--deep); }
+.fxc-state.is-tipped { background: var(--deep); color: var(--lime); }
+.fxc-state.is-missed { background: #9a2b2b; color: #fff; }
+.fxc-state.is-shut   { background: rgba(15,46,34,.16); color: #41523f; }
+.fxc-state.is-hit    { background: #1f6b28; color: #fff; }
+.fxc-state.is-miss   { background: rgba(154,43,43,.16); color: #8f2626; }
+/* A game in play is the one state that should catch the eye unprompted, so it
+   is the only one that moves. Held still for anybody who has asked for that. */
+.fxc.phase-live .fxc-state { background: #c0392b; color: #fff; animation: fxcLivePulse 2.2s var(--ease) infinite; }
+@keyframes fxcLivePulse { 0%, 100% { opacity: 1; } 50% { opacity: .62; } }
+@media (prefers-reduced-motion: reduce) {
+  .fxc.phase-live .fxc-state { animation: none; }
+}
+
+/* The state chip is pushed right by margin-left:auto and the code tag now leads
+   the row; on a narrow card the two would collide over the date, so the row
+   wraps with the tag and the chip holding the ends of the first line. */
+@media (max-width: 560px) {
+  .fxc-meta { row-gap: 8px; }
+  .fxc-when { width: 100%; order: 3; }
+  .fxc-venue { width: 100%; order: 4; }
+  .fxc-code { order: 1; }
+  .fxc-state { order: 2; }
+}
