@@ -3702,6 +3702,10 @@ a.gt-stat:hover .gs-go { opacity: 1; color: var(--lime); }
 .gt-chip.needs { background: rgba(212,160,48,.22); color: var(--ad-gold-fg, #7a5410); }
 .gt-chip.live  { background: rgba(45,122,58,.15); color: var(--ad-ok-fg, #1c5e30); }
 .gt-chip.draft { background: var(--ad-quiet-bg, rgba(15,46,34,.09)); color: var(--muted); }
+/* Scheduled wore the draft chip, so "nobody has published this" and "this is
+   published and waiting on a clock" were the same grey pill. Amber, matching
+   the scheduler card in the editor, so the two states read as two states. */
+.gt-chip.sched { background: var(--ad-tint-gold, rgba(244,196,48,.18)); color: var(--ad-gold-fg, #7a5410); }
 
 /* ==========================================================================
    MEMBER PAGES — My Tips, Leaderboard, The Wall
@@ -14418,9 +14422,36 @@ pre { overflow-x: auto; max-width: 100%; }
   font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer;
   transition: background .14s var(--ease), color .14s var(--ease), border-color .14s var(--ease);
 }
-.ned-tag-check input:checked + span { background: var(--forest); border-color: var(--forest); color: #fff; }
-.ned-tag-check input:focus-visible + span { box-shadow: 0 0 0 3px rgba(45,122,58,.25); }
-.ned-tag-check span:hover { border-color: rgba(15,46,34,.28); }
+.ned-tag-check input:focus-visible + span { box-shadow: 0 0 0 3px var(--ad-ring, rgba(45,122,58,.25)); }
+.ned-tag-check span:hover { border-color: var(--ad-line-3, rgba(15,46,34,.28)); }
+
+/* A CHIP PER CODE, IN THE CODE'S OWN COLOUR.
+   All four turned the same forest green when ticked, so a row of them was
+   four identical pills you had to read one at a time. The colour makes the
+   row scannable; the tick, which only appears when it is on, carries the same
+   state in a second channel for anybody who cannot use the colour. */
+.ned-tag-check span {
+  display: inline-flex; align-items: center; gap: 0;
+  --ntc: var(--forest);
+}
+.ntc-tick {
+  width: 0; height: 14px; margin-right: 0; flex: none; overflow: hidden;
+  fill: none; stroke: currentColor; stroke-width: 2.4;
+  stroke-linecap: round; stroke-linejoin: round;
+  opacity: 0;
+  transition: width .14s var(--ease), margin .14s var(--ease), opacity .14s var(--ease);
+}
+.ned-tag-check input:checked + span {
+  background: var(--ntc); border-color: var(--ntc); color: #fff;
+}
+.ned-tag-check input:checked + span .ntc-tick { width: 14px; margin-right: 7px; opacity: 1; }
+/* The four codes, each its own. AFL and AFLW are the two greens, NRL and NRLW
+   the two blues — the pairing readers already know from the ladders. */
+.ned-tag-check.t-afl  span { --ntc: #1C6B3A; }
+.ned-tag-check.t-aflw span { --ntc: #4E9A34; }
+.ned-tag-check.t-nrl  span { --ntc: #1D5C8C; }
+.ned-tag-check.t-nrlw span { --ntc: #3D82B8; }
+.ned-tag-check.t-news span { --ntc: #4A5750; }
 
 .ned-url-fix { font-size: 13px; color: var(--muted); font-weight: 600; }
 .ned-url-in {
@@ -14669,20 +14700,45 @@ pre { overflow-x: auto; max-width: 100%; }
 }
 .rd-prose hr { border: 0; border-top: 1px solid rgba(15,46,34,.14); margin: 2em 0; }
 
-/* THE CUT. Decoration over the LAST paragraph that was served, not a cover
-   over the rest of the article — the rest is not in the document. Which means
-   the fade has to be short and sit at the very bottom of what is there, or it
-   reads as a bug (text going pale for no reason). */
-.rd-prose.is-cut { position: relative; }
-.rd-prose.is-cut::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 7em;
-  background: linear-gradient(180deg, transparent, var(--gt-sheet, #F7F5EE) 88%);
-  pointer-events: none;
-}
+/* WHAT YOU CAN SEE BUT NOT READ.
+   Real text, blurred and faded — so the page reads as an article carrying on
+   rather than as grey placeholder bars, which is the difference between
+   "there is more here" and "this is still loading".
 
-/* ---- the gate ----------------------------------------------------------- */
+   Three things make it a tease rather than an inconvenience:
+   the blur, the fade-out towards the gate, and being unselectable — dragging
+   across it to copy the words out is the one interaction that would make the
+   whole thing pointless. (It is also aria-hidden in the markup: a screen
+   reader must not be handed two paragraphs that stop mid-sentence.)
+
+   The mask is the fade. A ::after gradient in the sheet's colour would work
+   on cream and be wrong the moment anything else is behind it; a mask fades
+   the element itself, whatever it is sitting on. */
+.rd-tease {
+  position: relative;
+  margin-top: 1.15em;
+  font-size: 17.5px; line-height: 1.72; color: var(--ink);
+  filter: blur(4.5px);
+  opacity: .5;
+  user-select: none; -webkit-user-select: none;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, rgba(0,0,0,.35) 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, rgba(0,0,0,.35) 55%, transparent 100%);
+  /* Capped so a long teased run cannot push the gate off the first screen —
+     the point is to see that there IS more, not to scroll through a blur. */
+  max-height: 30vh; overflow: hidden;
+}
+.rd-tease > * + * { margin-top: 1.15em; }
+.rd-tease p { color: rgba(15,46,34,.86); }
+/* Headings inside the teased run would be blurred bold text, which reads as a
+   rendering fault rather than as an article. Flattened to body weight. */
+.rd-tease h2, .rd-tease h3 { font-family: var(--body); font-size: 17.5px; font-weight: 600; }
+
+/* ---- the gate -----------------------------------------------------------
+   Pulled up under the blurred run so the two read as one moment: the story
+   goes out of focus and this is why. */
 .rd-gate {
-  margin-top: 8px; text-align: center;
+  margin-top: -6px; text-align: center;
   border-radius: 20px; padding: clamp(28px, 4vw, 40px) clamp(20px, 4vw, 44px);
   background: linear-gradient(165deg, var(--deep), var(--deep-2));
   border: 1px solid rgba(200,241,53,.28);
@@ -14772,6 +14828,55 @@ pre { overflow-x: auto; max-width: 100%; }
 .rdc-body h3 { font-family: var(--display); font-size: 18px; line-height: 1.15; color: var(--ink); }
 .rdc-body p { margin-top: 8px; font-size: 13.5px; line-height: 1.5; color: var(--muted); }
 .rdc-date { display: block; margin-top: 12px; font-size: 12px; font-weight: 700; color: var(--forest); }
+
+/* ---- the social band ----------------------------------------------------
+   "A row at the bottom with a cream feel, then we have those icons, make them
+   huge, all in one row."
+
+   Full sheet width, not the reading column: it is a destination rather than
+   part of the article. Each tile keeps its network's own colour on hover and
+   is a plain warm cream at rest, so the row reads as one band rather than as
+   five brand badges shouting at each other under a story.
+
+   The row wraps rather than scrolls. Five tiles at a legible size do not fit
+   a phone in one line, and a horizontal scroller hides two of them behind an
+   edge — which for a "make sure all the socials are there" request is exactly
+   the wrong failure. */
+.rd-socials {
+  margin-top: 48px; padding: 36px clamp(18px, 4vw, 40px) 40px;
+  border-radius: 22px; text-align: center;
+  background: linear-gradient(180deg, #F2EFE3, #EAE6D6);
+  border: 1px solid rgba(15,46,34,.10);
+}
+.rd-socials h2 { font-family: var(--display); font-size: clamp(20px, 2.4vw, 27px); color: var(--ink); }
+.rd-socials > p { margin-top: 6px; font-size: 14.5px; color: var(--muted); }
+.rd-social-row {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: clamp(10px, 2vw, 20px); margin-top: 26px;
+}
+.rd-social {
+  display: flex; flex-direction: column; align-items: center; gap: 9px;
+  text-decoration: none; color: var(--ink);
+  min-width: 92px;
+}
+.rds-ic {
+  display: grid; place-items: center;
+  width: clamp(56px, 7vw, 76px); height: clamp(56px, 7vw, 76px);
+  border-radius: 22px;
+  background: #FFFFFF; border: 1px solid rgba(15,46,34,.12);
+  box-shadow: 0 1px 2px rgba(15,46,34,.05), 0 16px 30px -22px rgba(15,46,34,.5);
+  transition: transform .18s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease);
+}
+.rds-ic svg { width: clamp(24px, 3vw, 32px); height: clamp(24px, 3vw, 32px); fill: var(--forest); transition: fill .18s var(--ease); }
+.rds-lab { font-size: 13px; font-weight: 700; color: var(--muted); transition: color .18s var(--ease); }
+.rd-social:hover .rds-ic { transform: translateY(-4px); box-shadow: 0 1px 2px rgba(15,46,34,.05), 0 24px 40px -22px rgba(15,46,34,.6); }
+.rd-social:hover .rds-lab { color: var(--ink); }
+/* Each network's own colour, on hover only. At rest they are one set. */
+.rd-social.s-email:hover     .rds-ic { background: #0F2E22; } .rd-social.s-email:hover     .rds-ic svg { fill: var(--lime); }
+.rd-social.s-linkedin:hover  .rds-ic { background: #0A66C2; } .rd-social.s-linkedin:hover  .rds-ic svg { fill: #fff; }
+.rd-social.s-facebook:hover  .rds-ic { background: #1877F2; } .rd-social.s-facebook:hover  .rds-ic svg { fill: #fff; }
+.rd-social.s-instagram:hover .rds-ic { background: linear-gradient(45deg, #F58529, #DD2A7B 50%, #8134AF); } .rd-social.s-instagram:hover .rds-ic svg { fill: #fff; }
+.rd-social.s-youtube:hover   .rds-ic { background: #FF0000; } .rd-social.s-youtube:hover   .rds-ic svg { fill: #fff; }
 
 /* ---- the footer, on the deep ground below the sheet --------------------- */
 .reader .footer { position: relative; z-index: 1; }
@@ -14891,3 +14996,213 @@ html[data-theme="light"] .reader {
   transition: width .1s linear;
 }
 .cvn-time { flex: none; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+/* ==========================================================================
+   ============ THE APP BAR ACTUALLY FITS ===================================
+   ==========================================================================
+   Reported: "the AquaFlow organisation is overtaken and overlapped by the
+   word Dashboard — let every item on the menu fit properly."
+
+   IT IS NOT A POSITIONING BUG, IT IS ARITHMETIC. v34 sized this row for seven
+   items and a plain text label for the organisation. It now carries eight
+   (Dashboard, My Tips, Leaderboard, Ladder, The Wall, Messages, Manage,
+   Admin) plus a CHIP for the organisation — a bordered control with padding,
+   a chevron and a group name — and the chip was `flex: none`, so it could not
+   give way. Measured at the 1300px cap: brand 110 + links ~880 + right
+   cluster ~230 + gaps ~34 leaves the chip about nothing, and a flex item that
+   cannot shrink and has no room left simply overlaps its neighbour.
+
+   Two changes, and the second is the one that matters.
+
+   1. The chip becomes the row's shrinkable item, the way `.an-org` was before
+      it. Everything else stays immovable, so the deficit lands on the one
+      thing that can ellipsise and stay useful.
+
+   2. Below 1300px the chip stops competing for the row at all and takes its
+      own strip underneath. Shrinking it further was the alternative and it is
+      a worse answer: the name of the organisation you are tipping in is the
+      whole point of the control, and "AquaF…" is not that. There is no room
+      for both on a 1280px laptop, so they stop sharing.
+   ========================================================================== */
+
+/* HOW TALL THE BAR IS, as a number anything below it can read.
+
+   The Messages screen is sized to fill the window exactly (it does not
+   scroll; its panels do), so it has to subtract the bar's height — and with
+   the chip taking its own strip at mid widths that height is no longer one
+   number. Published here rather than restated in gt-messages.css, so the two
+   cannot drift and a future change to the bar does not silently leave a
+   40px gap at the bottom of a conversation. */
+.gt-v2 { --gt-navh: 68px; }
+
+/* 1. The chip gives way first. `min-width: 0` is not optional — a flex item
+      will not shrink below its own content without it, ellipsis or no. */
+.gt-v2 .an-ctx { flex: 0 1 auto; min-width: 0; }
+.gt-v2 .an-ctx-btn { max-width: 100%; min-width: 0; }
+/* The floor moves off the org name and onto the button. A 4.5em floor on the
+   name meant the chip could not shrink past ~72px of text however tight the
+   row was, which is exactly the pixels that were coming out of Dashboard. */
+.gt-v2 .an-ctx-org { min-width: 0; }
+.gt-v2 .an-ctx-btn > svg { flex: none; }
+
+/* 2. Its own strip, below 1300px.
+      `order` plus a full-width basis on a wrapping row: brand, links and the
+      account cluster keep row one in source order, and the chip is pushed to
+      row two. The nav is sticky, so the strip sticks with it — it is a
+      permanent "where am I", which is what the control is for. */
+@media (max-width: 1300px) {
+  .gt-v2 { --gt-navh: 112px; }        /* 68 row one + 44 strip */
+  .gt-v2 .app-nav .an-inner {
+    flex-wrap: wrap;
+    height: auto;
+    row-gap: 0;
+    padding-bottom: 0;
+  }
+  /* Row one keeps its own height, or the bar collapses to the text height. */
+  .gt-v2 .app-nav .an-inner > :not(.an-ctx) { align-self: center; }
+  .gt-v2 .an-brand,
+  .gt-v2 .an-links,
+  .gt-v2 .an-right { min-height: 68px; display: flex; align-items: center; }
+  /* A FIXED 44px, not "whatever the chip happens to measure". --gt-navh
+     above is an exact subtraction, and a strip that grows with a long
+     organisation name would put the composer that many pixels off the bottom
+     of the Messages screen. */
+  .gt-v2 .an-ctx {
+    order: 9;
+    flex: 1 0 100%;
+    height: 44px;
+    margin: 0 0 0 -4px;
+    padding-bottom: 8px;
+  }
+  .gt-v2 .an-ctx-btn { max-width: min(100%, 520px); }
+  /* Anchored to the strip's own left edge, not to the row above it. */
+  .gt-v2 .an-ctx .an-menu-panel { top: calc(100% + 4px); }
+}
+
+/* Below 900px the chip was already hidden (the drawer's header names the
+   organisation instead), so the strip does not apply and the bar is one row
+   again. Restated because the block above sets flex-wrap on a wider query. */
+@media (max-width: 900px) {
+  .gt-v2 { --gt-navh: 68px; }
+  .gt-v2 .app-nav .an-inner { flex-wrap: nowrap; height: 68px; }
+  .gt-v2 .an-brand,
+  .gt-v2 .an-links,
+  .gt-v2 .an-right { min-height: 0; }
+}
+@media (max-width: 760px) {
+  .gt-v2 { --gt-navh: 60px; }
+  .gt-v2 .app-nav .an-inner { height: 60px; }
+}
+
+/* The "Profile" word next to the avatar, at every width rather than only
+   above 1361px. The argument for hiding it there holds everywhere: a ringed
+   avatar in the corner of an app bar is the most legible profile control
+   there is, it carries a title and an aria-label, and the phone drawer spells
+   it out in full under the user's own name. It was ~51px of the deficit. */
+.gt-v2 .an-plabel { display: none; }
+
+/* ==========================================================================
+   ============ THE STORY SCHEDULER =========================================
+   ==========================================================================
+   Asked for as: "a new look and design on the blog timers where we schedule
+   uploads — make that look modern, neat and cool."
+
+   It was a `datetime-local` with a caption. The redesign is not decoration:
+   the field could only ever tell you the moment somebody typed, and the thing
+   an editor needs to know is the STATE — published here means `is_published
+   AND published_at <= now`, so a date in the future is a schedule and looks
+   identical to a mistake. The card says which, in words, in colour, and with
+   a countdown; the presets exist because the four times anybody actually
+   picks are now, this evening, tomorrow morning and next Monday.
+   ========================================================================== */
+.ned-when { flex: 0 1 320px; }
+.sched {
+  --sc: var(--muted);
+  --sc-bg: var(--ad-quiet-bg, rgba(15,46,34,.06));
+  padding: 14px 16px 15px; border-radius: 14px;
+  background: var(--gt-card, #fff);
+  border: 1px solid var(--gt-hair, rgba(15,46,34,.10));
+  box-shadow: 0 1px 2px rgba(15,46,34,.04);
+}
+/* One variable per state, so every part of the card follows in step and there
+   is no rule that can be updated for one state and forgotten for another. */
+.sched[data-state="live"]      { --sc: var(--ad-ok-fg, #1C5E30); --sc-bg: rgba(45,122,58,.10); }
+.sched[data-state="scheduled"] { --sc: var(--ad-gold-fg, #8A6508); --sc-bg: var(--ad-tint-gold, rgba(244,196,48,.12)); }
+.sched[data-state="draft"]     { --sc: var(--muted); --sc-bg: var(--ad-quiet-bg, rgba(15,46,34,.06)); }
+.sched[data-state="new"]       { --sc: var(--muted); --sc-bg: var(--ad-quiet-bg, rgba(15,46,34,.06)); }
+
+.sched-head {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 13px; padding: 6px 10px; border-radius: 100px;
+  background: var(--sc-bg);
+}
+.sched-dot {
+  width: 8px; height: 8px; flex: none; border-radius: 50%;
+  background: var(--sc);
+}
+/* Only a story that is waiting gets the pulse. A live one is not doing
+   anything and a draft is not either; motion on all three would be noise
+   rather than a signal. */
+.sched[data-state="scheduled"] .sched-dot { animation: schedPulse 1.8s ease-in-out infinite; }
+@keyframes schedPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.8); } }
+@media (prefers-reduced-motion: reduce) { .sched-dot { animation: none !important; } }
+.sched-state {
+  font-family: var(--mark); font-size: 11px; font-weight: 800;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--sc);
+}
+.sched-count {
+  margin-left: auto; font-size: 11.5px; font-weight: 700; color: var(--sc);
+  font-variant-numeric: tabular-nums; opacity: .85;
+}
+.sched-label {
+  display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+}
+.sched-input { position: relative; }
+.sched-input > svg {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  width: 17px; height: 17px; pointer-events: none;
+  fill: none; stroke: var(--muted); stroke-width: 1.7; stroke-linecap: round;
+}
+.sched-input input {
+  width: 100%; font-family: var(--body); font-size: 14px; color: var(--ink);
+  background: var(--ad-field, #fff);
+  border: 1px solid var(--gt-hair, rgba(15,46,34,.14)); border-radius: 10px;
+  padding: 11px 12px 11px 38px;
+}
+.sched-input input:focus {
+  outline: none; border-color: var(--sc);
+  box-shadow: 0 0 0 3px var(--sc-bg);
+}
+/* The native picker glyph is a black square on the dark theme and sits under
+   our own calendar icon on the light one. */
+.sched-input input::-webkit-calendar-picker-indicator {
+  opacity: .55; cursor: pointer; filter: var(--sched-pick, none);
+}
+.sched-input input:hover::-webkit-calendar-picker-indicator { opacity: 1; }
+
+.sched-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.sched-presets button {
+  cursor: pointer; border-radius: 100px; padding: 6px 12px;
+  font-family: var(--body); font-size: 12px; font-weight: 700;
+  color: var(--muted); background: transparent;
+  border: 1px solid var(--gt-hair, rgba(15,46,34,.14));
+  transition: color .14s var(--ease), border-color .14s var(--ease), background .14s var(--ease);
+}
+.sched-presets button:hover {
+  color: var(--sc); border-color: var(--sc); background: var(--sc-bg);
+}
+.sched-hint {
+  display: block; margin-top: 11px; font-size: 12px; line-height: 1.5;
+  color: var(--muted);
+}
+/* The picker glyph inverts on the green theme, where it is drawn black. */
+html[data-theme="dark"] .sched { --sched-pick: invert(1) brightness(1.6); }
+@media (prefers-color-scheme: dark) {
+  html[data-theme="auto"] .sched, html:not([data-theme]) .sched { --sched-pick: invert(1) brightness(1.6); }
+}
+
+/* The countdown on a scheduled story's row in the list. Amber, like the chip
+   beside it and the scheduler card in the editor, so "waiting on a clock" is
+   one colour wherever it appears. */
+.np-in { font-weight: 700; color: var(--ad-gold-fg, #7a5410); white-space: nowrap; }

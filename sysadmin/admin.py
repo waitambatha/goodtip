@@ -422,6 +422,11 @@ def _get_urls():
 
         # Delegated administration: who the admins are, what they may do,
         # the queue of work waiting on approval, and the record of all of it.
+        # ONE ENTRY IN THE RAIL, four rooms behind it. The hub is what the
+        # menu points at; hq_team, hq_reviews, hq_my_work and hq_activity keep
+        # their own addresses because every link, bookmark and redirect in the
+        # area already names them.
+        path("team/hub/", admin.site.admin_view(team_views.team_hub), name="hq_team_hub"),
         path("team/", admin.site.admin_view(team_views.team), name="hq_team"),
         path("team/new/", admin.site.admin_view(team_views.team_new), name="hq_team_new"),
         path("team/<int:access_id>/", admin.site.admin_view(team_views.team_edit),

@@ -4,18 +4,18 @@ at the page you are reading is a dead control, and the wordmark to its left
 already goes there. Everywhere else it stays, because that is where it is
 actually useful.
 
-SIX ITEMS, NOT TEN (Sep 2026, client).
-The bar carried every public page there is, which is a site map rather than a
-menu: at ten items nothing in it stood out, and the row wrapped at the widths
-most people read the site on. What is left is the six a visitor is actually
-trying to reach — what this is, what it costs, what is happening, and the two
-rooms they can look into before joining.
+PRIVACY IS THE ONLY ONE THAT LEFT (Sep 2026, client).
 
-The four that came off (Charities, The Good List, About Us, Privacy) are not
-gone; they are in the footer, which is where a reader goes looking for them.
-Privacy in particular belongs there — it is the one item nobody navigates to
-mid-visit and everybody expects to find at the bottom of the page. See
-_footer.html, where it now has its own legal row.
+A first pass moved four items to the footer. The client wanted three of them
+back — The Good List, Charities and About Us are things a visitor goes looking
+for mid-visit, and the bar is where you look. Privacy is not: it is the one
+item nobody navigates to while reading, and everybody expects to find it under
+the copyright. So it stays out of the desktop row and lives in the footer's
+legal line.
+
+It keeps its place in the DRAWER, though. Below 1120px the drawer is not a
+condensed bar, it is the whole site, and "it's in the footer" is a desktop
+answer — on a phone that is a long scroll past everything else on the page.
 
 The two auth actions sit in their own group with a divider. They are the only
 items that change your state rather than move you around, so grouping them by
@@ -45,15 +45,13 @@ unchanged.
       <li><a href="/tell-the-boss/" {% if active == 'boss' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-send"/></svg><span>Tell the Boss</span></a></li>
 
       {% comment %}
-      The four that left the row still have to be reachable from a phone,
-      where the footer is a long scroll away and the drawer IS the site. The
-      stylesheet shows this group only in the open drawer — see
-      .nav-links .nav-tuck — so the desktop bar keeps its six.
+      Privacy, and only Privacy. Hidden from the desktop row by
+      .nav-links .nav-tuck and shown in the drawer, where the footer is not a
+      realistic destination.
       {% endcomment %}
-      <li class="nav-sep nav-tuck" aria-hidden="true"></li>
-      <li class="nav-tuck"><a href="/leaderboard/" {% if active == 'leaderboard' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>The Good List</span></a></li>
-      <li class="nav-tuck"><a href="/#charities" {% if active == 'charities' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-heart"/></svg><span>Charities</span></a></li>
-      <li class="nav-tuck"><a href="/about/" {% if active == 'about' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-spark"/></svg><span>About Us</span></a></li>
+      <li><a href="/leaderboard/" {% if active == 'leaderboard' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>The Good List</span></a></li>
+      <li><a href="/#charities" {% if active == 'charities' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-heart"/></svg><span>Charities</span></a></li>
+      <li><a href="/about/" {% if active == 'about' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-spark"/></svg><span>About Us</span></a></li>
       <li class="nav-tuck"><a href="/privacy/" {% if active == 'privacy' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Privacy</span></a></li>
 
       <li class="nav-sep" aria-hidden="true"></li>

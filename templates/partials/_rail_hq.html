@@ -29,9 +29,17 @@ did.
 
   <div class="gts-group">
     <div class="gts-group-title">Overview</div>
+    {% comment %}
+    Your work is a top-level item ONLY for an administrator who does not run
+    the team. For everyone else it is a card on the team hub, and having it in
+    both places is the redundancy the client asked to be rid of — "if it's news
+    and blogs, it's only in one place, things like that".
+    {% endcomment %}
+    {% if not is_full_access %}
     <a href="{% url 'admin:hq_my_work' %}" class="{% block nav_mywork %}{% endblock %}" title="Your work">
       <svg><use href="#ic-f-home"/></svg><span class="lbl">Your work</span>
       {% if waiting.tasks %}<span class="n">{{ waiting.tasks }}</span>{% endif %}</a>
+    {% endif %}
     {% if is_full_access %}
     <a href="/admin/" title="Dashboard"><svg><use href="#ic-home"/></svg><span class="lbl">Dashboard</span></a>
     {% endif %}
@@ -87,15 +95,35 @@ did.
   {% endif %}
 
   {% if is_full_access %}
+  {% comment %}
+  ONE ENTRY, NOT FOUR.
+
+  This group listed Your work, Waiting for review, Administrators and Activity
+  as peers, which cost four lines of the rail on every screen in HQ and told
+  you nothing until you had opened all four. The client's note: "instead of
+  dropdowns we just have a nice, well-detailed dashboard of it ... it's like
+  grouped dashboards, so it gives me a nice user experience."
+
+  So the rail carries the door and the hub carries the rooms, each card
+  already answering what is behind it. The four pages keep their own
+  addresses — every bookmark and every redirect in the area names them — and
+  their `nav_*` blocks still light this row, because from the reader's point
+  of view they ARE this section.
+  {% endcomment %}
   <div class="gts-group">
     <div class="gts-group-title">Your team</div>
-    <a href="{% url 'admin:hq_reviews' %}" class="{% block nav_reviews %}{% endblock %}" title="Waiting for review">
-      <svg><use href="#ic-clock"/></svg><span class="lbl">Waiting for review</span>
-      {% if waiting.to_review %}<span class="n">{{ waiting.to_review }}</span>{% endif %}</a>
-    <a href="{% url 'admin:hq_team' %}" class="{% block nav_team %}{% endblock %}" title="Administrators">
-      <svg><use href="#ic-shield-star"/></svg><span class="lbl">Administrators</span></a>
-    <a href="{% url 'admin:hq_activity' %}" class="{% block nav_activity %}{% endblock %}" title="Activity">
-      <svg><use href="#ic-doc"/></svg><span class="lbl">Activity</span></a>
+    {% comment %}
+    ONE block name, not four. A template may only define a block once, and
+    nav_mywork is already defined above for the administrator who does not run
+    the team. So the four pages behind this door all set `nav_team` instead —
+    from the reader's point of view they ARE this section, whichever of them
+    they are standing on.
+    {% endcomment %}
+    <a href="{% url 'admin:hq_team_hub' %}" class="{% block nav_team %}{% endblock %}"
+       title="Your team">
+      <svg><use href="#ic-shield-star"/></svg><span class="lbl">Your team</span>
+      {% if waiting.to_review %}<span class="n">{{ waiting.to_review }}</span>
+      {% elif waiting.tasks %}<span class="n">{{ waiting.tasks }}</span>{% endif %}</a>
   </div>
   {% endif %}
 </nav>

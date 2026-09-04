@@ -141,7 +141,33 @@ gradient over the whole article.
       </figure>
       {% endif %}
 
-      <div class="rd-prose{% if gated %} is-cut{% endif %}">{{ body_html|safe }}</div>
+      <div class="rd-prose">{{ body_html|safe }}</div>
+
+      {% if tease_html %}
+      {% comment %}
+      WHAT YOU CAN SEE BUT NOT READ.
+
+      "Make the part that is the 2/3 visible but translucent, so someone can
+      know we have data there — something that they see but cannot see."
+
+      Real text, blurred and faded out, so the page reads as an article that
+      carries on rather than as grey placeholder bars — which is the whole
+      difference between "there is more here" and "this is a skeleton
+      loader".
+
+      It is a SCREENFUL, not the whole remainder. Anything sent to a browser
+      can be read by anyone who looks, so serving the rest of the story under
+      a blur would publish it to everybody and to every crawler while merely
+      inconveniencing a reader. The effect does not need it: nobody can read
+      blurred text either way and the gate sits immediately underneath. See
+      TEASE_SHARE in admin_panel/views.py.
+
+      aria-hidden and inert to selection: a screen reader must not be handed
+      two paragraphs that stop mid-sentence, and dragging across a blur to
+      copy the text out is the one interaction that would make it pointless.
+      {% endcomment %}
+      <div class="rd-tease" aria-hidden="true">{{ tease_html|safe }}</div>
+      {% endif %}
 
       {% if gated %}
       {% comment %}
@@ -183,6 +209,42 @@ gradient over the whole article.
       {% endcomment %}
       {% include "partials/_news_share.html" with prefix="rd" %}
     </article>
+
+    {% comment %}
+    THE SOCIAL BAND.
+
+    Asked for in as many words: "on that blog where we have socials, make sure
+    all the socials we have are there ... have a row at the bottom with a
+    cream feel, then we have those icons, make them huge, all in one row."
+
+    The same five accounts and the same URLs as the footer — Email, LinkedIn,
+    Facebook, Instagram, YouTube. Not an include of the footer's own markup,
+    because that one is a compact chip row that has to sit in a column
+    alongside two lists; this is a full-width band where the icon IS the
+    control. The addresses are the thing that must not drift, and they are one
+    edit apart in the same repository.
+    {% endcomment %}
+    <section class="rd-socials" aria-labelledby="rdSocialsH">
+      <h2 id="rdSocialsH">Follow GoodTip</h2>
+      <p>Every code, every round, and where the money goes.</p>
+      <div class="rd-social-row">
+        <a class="rd-social s-email" href="mailto:hello@goodtip.com.au" aria-label="Email GoodTip">
+          <span class="rds-ic"><svg><use href="#s-mail"/></svg></span><span class="rds-lab">Email</span>
+        </a>
+        <a class="rd-social s-linkedin" href="https://www.linkedin.com/company/good-tip-australia/" target="_blank" rel="noopener" aria-label="GoodTip on LinkedIn">
+          <span class="rds-ic"><svg><use href="#s-linkedin"/></svg></span><span class="rds-lab">LinkedIn</span>
+        </a>
+        <a class="rd-social s-facebook" href="https://www.facebook.com/profile.php?id=61593478288209" target="_blank" rel="noopener" aria-label="GoodTip on Facebook">
+          <span class="rds-ic"><svg><use href="#s-facebook"/></svg></span><span class="rds-lab">Facebook</span>
+        </a>
+        <a class="rd-social s-instagram" href="https://www.instagram.com/goodtip_mate?igsh=MTZibnM2YWtyM3lrcg%3D%3D&amp;utm_source=qr" target="_blank" rel="noopener" aria-label="GoodTip on Instagram">
+          <span class="rds-ic"><svg><use href="#s-instagram"/></svg></span><span class="rds-lab">Instagram</span>
+        </a>
+        <a class="rd-social s-youtube" href="https://www.youtube.com/@GoodTip_Australia" target="_blank" rel="noopener" aria-label="GoodTip on YouTube">
+          <span class="rds-ic"><svg><use href="#s-youtube"/></svg></span><span class="rds-lab">YouTube</span>
+        </a>
+      </div>
+    </section>
 
     {% if more %}
     <section class="rd-more">

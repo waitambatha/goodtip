@@ -11,13 +11,14 @@ conversation about as tall as a business card.
 {% endcomment %}
 {% block body_class %}page-deep gtm-page{% endblock %}
 {% comment %}
-NO SIDE STRIPS HERE, and this is the one screen that should not have them.
-They are the frame the rest of the product is recognised by, and they frame a
-sheet floating on a photograph. This page is an opaque application filling the
-window edge to edge — there is nothing for them to show through, so the block
-is deliberately left empty rather than inherited.
+The side strips, like every other member screen. They were left off when this
+was a full-bleed application; the client's note is that they are the standard
+frame — "those 2 images that keep on changing on each side ... is something
+standard since all pages have it" — so the application is capped and centred
+instead, and the photographs show either side of it. See .gtm in
+gt-messages.css.
 {% endcomment %}
-{% block page_backdrop %}{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% block extra_head %}
 {% comment %}
 Its own stylesheet, loaded here and nowhere else. This is the only screen in

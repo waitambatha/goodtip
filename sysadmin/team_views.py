@@ -15,6 +15,7 @@ in a session and reconciling it if they wander off.
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -46,6 +47,55 @@ def _require_full(request):
 # ---------------------------------------------------------------------------
 # The team
 # ---------------------------------------------------------------------------
+
+def team_hub(request):
+    """ONE DOOR INTO THE TEAM AREA, instead of four items in the menu.
+
+    The rail used to list Your work, Waiting for review, Administrators and
+    Activity as four peers under a "Your team" heading. The client's note:
+    "instead of dropdowns we just have a nice, well-detailed dashboard of it —
+    so I click Your work and everything to do with my work is there ... it's
+    like grouped dashboards, so it gives me a nice user experience."
+
+    So the menu carries one entry and this is what it opens: a card per area,
+    each already answering the question you would have opened it to ask —
+    how many are waiting, how many administrators there are, what happened
+    last. A hub whose cards are only labels is a menu with more clicks, which
+    would be worse than the thing it replaced.
+
+    EVERY NUMBER HERE IS A COUNT, not a list. This page is a summary and the
+    lists live one press away on the pages that own them; pulling the rows in
+    to display three of them would put the same query on two screens and make
+    this one slow to open.
+    """
+    guard = _require_full(request)
+    if guard:
+        return guard
+
+    access.ensure_access(request.user, full=True)
+    waiting = ChangeRequest.objects.filter(status=ChangeRequest.PENDING)
+    return render(request, "hq/team_hub.html", {
+        # Waiting for review
+        "review_waiting": waiting.count(),
+        "review_failed": ChangeRequest.objects.exclude(apply_error="").count(),
+        "review_recent": waiting.select_related("requested_by")[:3],
+        # Administrators
+        "admin_count": AdminAccess.objects.filter(is_active=True).count(),
+        "admin_full": AdminAccess.objects.filter(is_active=True, is_full_access=True).count(),
+        "invites_open": AdminInvite.objects.filter(
+            consumed_at__isnull=True, expires_at__gt=timezone.now()).count(),
+        # Your work
+        "my_tasks": AdminTask.objects.filter(
+            assigned_to=request.user, status=AdminTask.OPEN).count(),
+        "my_waiting": ChangeRequest.objects.filter(
+            requested_by=request.user, status=ChangeRequest.PENDING).count(),
+        # Activity
+        "events_today": AdminAuditEvent.objects.filter(
+            created_at__gte=timezone.now() - timedelta(days=1)).count(),
+        "events_recent": AdminAuditEvent.objects.select_related(
+            "actor", "subject")[:5],
+    })
+
 
 def team(request):
     guard = _require_full(request)

@@ -55,6 +55,19 @@
       /* A button can opt out — Back and Start again are navigation, and
          labelling them "Saving" would describe the wrong thing. */
       if (btn.hasAttribute('data-busy-skip')) return;
+      /* A FORM STILL WEARING ITS GUARD HAS NOT BEEN SUBMITTED YET.
+       *
+       * gt-confirm.js cancels the submit and asks the question; it re-fires
+       * with the attribute removed once somebody says yes. Marking the form
+       * busy on the cancelled one leaves a button reading "Sending" for a
+       * request nobody has made — and the is-busy guard below then blocks the
+       * real submit when it comes, so the form sticks there forever.
+       *
+       * gt-confirm now stops that event reaching this listener at all, so
+       * this is the second lock on the same door: whichever script is loaded,
+       * changed or missing, a guarded form cannot be marked busy before the
+       * question has been answered. */
+      if (form.hasAttribute('data-confirm')) return;
       /* The button pressed can name its own label and veil treatment —
          "Sending your code" reads as what is actually happening where the
          form's one blanket "Saving" does not, on a form whose dozen actions

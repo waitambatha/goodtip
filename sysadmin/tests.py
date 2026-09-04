@@ -134,3 +134,80 @@ class AdminOTPGateTests(TestCase):
         _, code = LoginCode.issue(self.admin, purpose=LoginCode.PURPOSE_ADMIN)
         resp = self.client.post(reverse("sysadmin:admin_verify"), {"code": code})
         self.assertEqual(resp["Location"], "/admin/")
+
+
+class TeamHubTests(TestCase):
+    """One door in the rail, four rooms behind it.
+
+    "Instead of dropdowns we just have a nice, well-detailed dashboard of it
+    ... it's like grouped dashboards, so it gives me a nice user experience."
+    """
+
+    def setUp(self):
+        from admin_panel.tests import sign_in_to_hq
+
+        from .models import AdminAccess
+
+        self.owner = User.objects.create_user(
+            email="owner@goodtip.test", password="x", display_name="Olive",
+        )
+        self.owner.is_staff = self.owner.is_superuser = True
+        self.owner.save(update_fields=["is_staff", "is_superuser"])
+        AdminAccess.objects.update_or_create(
+            user=self.owner, defaults={"is_full_access": True, "is_active": True},
+        )
+        self.helper = User.objects.create_user(
+            email="helper@goodtip.test", password="x", display_name="Hal",
+        )
+        self.helper.is_staff = True
+        self.helper.save(update_fields=["is_staff"])
+        AdminAccess.objects.update_or_create(
+            user=self.helper, defaults={"is_full_access": False, "is_active": True},
+        )
+        self._sign_in = sign_in_to_hq
+
+    def test_the_hub_opens_for_somebody_who_runs_the_team(self):
+        self._sign_in(self.client, self.owner)
+        resp = self.client.get(reverse("admin:hq_team_hub"))
+        self.assertEqual(resp.status_code, 200)
+        html = resp.content.decode()
+        # Every room is reachable from the one page.
+        for url in ("hq_reviews", "hq_team", "hq_my_work", "hq_activity"):
+            self.assertIn(reverse(f"admin:{url}"), html, url)
+
+    def test_the_hub_is_full_access_only(self):
+        self._sign_in(self.client, self.helper)
+        self.assertEqual(self.client.get(reverse("admin:hq_team_hub")).status_code, 403)
+
+    def test_the_rail_carries_one_team_entry_and_not_four(self):
+        """The point of the change. Four peers cost four lines of the rail on
+        every screen in HQ and told you nothing until you had opened them."""
+        self._sign_in(self.client, self.owner)
+        html = self.client.get(reverse("admin:hq_team_hub")).content.decode()
+        rail = html[html.index('class="gts-rail"'):html.index("</nav>")]
+        self.assertIn(reverse("admin:hq_team_hub"), rail)
+        for gone in ("hq_reviews", "hq_activity"):
+            self.assertNotIn(reverse(f"admin:{gone}"), rail, gone)
+
+    def test_an_administrator_without_the_team_keeps_your_work_in_the_rail(self):
+        """It is a card on the hub for everyone else — but somebody who cannot
+        open the hub must still be able to reach their own work."""
+        self._sign_in(self.client, self.helper)
+        html = self.client.get(reverse("admin:hq_my_work")).content.decode()
+        rail = html[html.index('class="gts-rail"'):html.index("</nav>")]
+        self.assertIn(reverse("admin:hq_my_work"), rail)
+
+    def test_the_hub_counts_what_is_waiting(self):
+        from .models import ChangeRequest
+
+        ChangeRequest.objects.create(
+            requested_by=self.helper, capability="news.write",
+            summary="A new story", path="/admin/news/new/",
+            status=ChangeRequest.PENDING,
+        )
+        self._sign_in(self.client, self.owner)
+        html = self.client.get(reverse("admin:hq_team_hub")).content.decode()
+        # A hub whose cards are only labels is a menu with an extra click in
+        # front of it — the number is what earns the page.
+        self.assertIn("A new story", html)
+        self.assertIn("waiting on you", html)

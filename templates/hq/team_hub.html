@@ -1,0 +1,108 @@
+{% extends "hq_base.html" %}
+{% block title %}Your team. GoodTip HQ{% endblock %}
+{% block nav_team %}on{% endblock %}
+{% block hero_title %}Your team{% endblock %}
+{% block hero_lead %}Who runs GoodTip, what they are waiting on, and what they have done.{% endblock %}
+{% block admin_content %}
+{% comment %}
+ONE DOOR, FOUR ROOMS.
+
+The rail used to carry Your work, Waiting for review, Administrators and
+Activity as four peers under a heading. That is a menu pretending to be a
+structure: it costs four lines of the rail on every screen in HQ, and it tells
+you nothing until you have opened all four.
+
+This is the one entry they collapse into. Every card answers, on the card, the
+question you would have clicked through to ask — how many are waiting, how
+many administrators there are, what happened in the last day. A hub whose
+cards are only labels is a menu with an extra click in front of it, which
+would be worse than what it replaced.
+
+The card IS the link. No "Open →" button in the corner: a card with one
+destination should be pressable anywhere on it, and a small link inside a big
+clickable area is two targets for one action.
+{% endcomment %}
+<div class="ad-page is-wide">
+
+  {% comment %}
+  The one thing on this page that is not a card: work that is actually
+  blocked. A review nobody has looked at is somebody else unable to finish,
+  and it should not need a card to be read.
+  {% endcomment %}
+  {% if review_waiting %}
+  <div class="gt-note is-warn hub-alert">
+    <b>{{ review_waiting }} change{{ review_waiting|pluralize }} waiting on you.</b>
+    Nothing in that queue has touched the site yet &mdash; it is somebody else's
+    work, stopped until you look at it.
+    <a href="{% url 'admin:hq_reviews' %}">Review them &rarr;</a>
+  </div>
+  {% endif %}
+
+  <div class="hub-grid">
+
+    {# ---- Waiting for review ---- #}
+    <a class="hub-card{% if review_waiting %} is-live{% endif %}" href="{% url 'admin:hq_reviews' %}">
+      <span class="hub-ic"><svg><use href="#ic-clock"/></svg></span>
+      <h2>Waiting for review</h2>
+      <p>Changes from administrators whose work comes past you before it goes live.</p>
+      <div class="hub-nums">
+        <span class="hub-num"><b>{{ review_waiting }}</b><i>waiting</i></span>
+        {% if review_failed %}<span class="hub-num is-bad"><b>{{ review_failed }}</b><i>failed to apply</i></span>{% endif %}
+      </div>
+      {% if review_recent %}
+      <ul class="hub-list">
+        {% for cr in review_recent %}
+        <li><b>{{ cr.summary|truncatechars:52 }}</b><span>{{ cr.requested_by.display_name }}</span></li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="hub-clear">Nothing waiting. All clear.</p>
+      {% endif %}
+    </a>
+
+    {# ---- Administrators ---- #}
+    <a class="hub-card" href="{% url 'admin:hq_team' %}">
+      <span class="hub-ic"><svg><use href="#ic-shield-star"/></svg></span>
+      <h2>Administrators</h2>
+      <p>Who has access, what each of them may do, and the invitations still out.</p>
+      <div class="hub-nums">
+        <span class="hub-num"><b>{{ admin_count }}</b><i>with access</i></span>
+        <span class="hub-num"><b>{{ admin_full }}</b><i>full access</i></span>
+        {% if invites_open %}<span class="hub-num is-warn"><b>{{ invites_open }}</b><i>invite{{ invites_open|pluralize }} open</i></span>{% endif %}
+      </div>
+      <p class="hub-clear">Add someone, change what they can reach, or switch them off.</p>
+    </a>
+
+    {# ---- Your work ---- #}
+    <a class="hub-card" href="{% url 'admin:hq_my_work' %}">
+      <span class="hub-ic"><svg><use href="#ic-f-home"/></svg></span>
+      <h2>Your work</h2>
+      <p>What has been assigned to you, and the changes you have sent for approval.</p>
+      <div class="hub-nums">
+        <span class="hub-num{% if my_tasks %} is-live{% endif %}"><b>{{ my_tasks }}</b><i>task{{ my_tasks|pluralize }} open</i></span>
+        <span class="hub-num"><b>{{ my_waiting }}</b><i>of yours waiting</i></span>
+      </div>
+      <p class="hub-clear">Everything with your name on it, in one place.</p>
+    </a>
+
+    {# ---- Activity ---- #}
+    <a class="hub-card" href="{% url 'admin:hq_activity' %}">
+      <span class="hub-ic"><svg><use href="#ic-doc"/></svg></span>
+      <h2>Activity</h2>
+      <p>The record: who did what, to whom, and when.</p>
+      <div class="hub-nums">
+        <span class="hub-num"><b>{{ events_today }}</b><i>in the last day</i></span>
+      </div>
+      {% if events_recent %}
+      <ul class="hub-list">
+        {% for e in events_recent|slice:":3" %}
+        <li><b>{{ e.get_action_display }}</b><span>{{ e.actor.display_name|default:"System" }} &middot; {{ e.created_at|date:"j M, g:i A" }}</span></li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="hub-clear">Nothing recorded yet.</p>
+      {% endif %}
+    </a>
+  </div>
+</div>
+{% endblock %}

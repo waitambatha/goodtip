@@ -1,4 +1,5 @@
 import html
+import re
 
 from django.conf import settings
 from django.contrib import messages
@@ -761,43 +762,86 @@ def news_index(request):
     })
 
 
-#: How much of a story a visitor who is not signed in gets to read. A third,
+#: How much of a story a visitor who is not signed in gets to READ. A third,
 #: per the client: "let them see like 1/3 of the blog, and if they want to read
-#: our blogs in full they will have to sign in, and if not a member they will
-#: sign up."
+#: our blogs in full they will have to sign in."
 PREVIEW_SHARE = 1 / 3
 
+#: How much MORE of it they get to see without being able to read it. The
+#: client's follow-up: "make the part that is the 2/3 visible but translucent,
+#: so someone can know we have data there — something they see but cannot
+#: see."
+#:
+#: A SCREENFUL, NOT THE WHOLE REMAINDER, and that is a deliberate trim of the
+#: instruction rather than an oversight. Anything sent to the browser is
+#: readable by anyone who cares to look — blur is a CSS filter over real text,
+#: not encryption — so serving the entire rest of the article would publish it
+#: to everybody while merely inconveniencing them, and hand a crawler the full
+#: piece too. This is enough that the fade runs off the bottom of the screen,
+#: which is all the effect needs: nobody can read blurred text either way, and
+#: the gate card sits immediately under it. Raise it if the client wants the
+#: literal two thirds — it is one number and nothing else changes.
+TEASE_SHARE = 1 / 6
 
-def _story_preview(body: str) -> tuple[str, bool]:
-    """The opening third of a story, and whether anything was held back.
+
+def _tidy(html_fragment: str) -> str:
+    """Drop the empty element Truncator leaves at the end of a cut.
+
+    `Truncator.words(html=True)` opens the block its word limit lands inside
+    and closes it again with nothing in it, so every cut ends `<p></p>`. It is
+    invisible on the page and it breaks the prefix comparison in
+    _story_preview, which is the only reason this exists.
+    """
+    return re.sub(r"(?:\s*<(\w+)[^>]*>\s*</\1>)+\s*$", "", html_fragment or "")
+
+
+def _story_preview(body: str):
+    """The opening third of a story to read, a blurred taste of what follows,
+    and whether anything was held back.
 
     TRUNCATED ON THE SERVER, NOT HIDDEN WITH CSS. A gate that ships the whole
-    article and then covers two-thirds of it with a gradient is not a gate —
-    it is in View Source, it is in the reader-mode button, and it is in the
-    page a crawler indexes. The rest of the story simply is not in the
-    response.
+    article and then covers it with a gradient is not a gate — it is in View
+    Source, in the reader-mode button, and in the page a crawler indexes. What
+    is returned here is all that reaches the browser.
 
     `Truncator.words(html=True)` rather than a slice: the body is HTML, and
     cutting a string of markup at an arbitrary character leaves an unbalanced
     <p> or a half-written tag, which the browser then closes wherever it likes
     and takes the rest of the page with it. Truncator walks the tree and shuts
-    what it opened.
+    what it opened. Both cuts are made from the START of the body and the
+    second has the first removed by string difference, because there is no
+    "give me words 40 to 60 of this markup" that keeps the tags balanced.
 
-    Returns the body unchanged when there is nothing worth gating — a
-    three-line story cut to one line is a tease with no article behind it.
+    Returns (readable, teased, gated). Leaves a short story whole — a
+    three-line piece cut to one line is a tease with no article behind it.
     """
     from django.utils.text import Truncator
 
     text = (body or "").strip()
     if not text:
-        return "", False
+        return "", "", False
     words = len(strip_tags(text).split())
     if words < 80:
-        return text, False
+        return text, "", False
+
     keep = max(40, int(words * PREVIEW_SHARE))
     # Truncator appends its own ellipsis; the fade and the gate below say
     # "there is more" far better than three dots do.
-    return Truncator(text).words(keep, html=True, truncate=""), True
+    readable = _tidy(Truncator(text).words(keep, html=True, truncate=""))
+    through_tease = _tidy(Truncator(text).words(
+        keep + max(20, int(words * TEASE_SHARE)), html=True, truncate="",
+    ))
+    # The teased part is what the longer cut has and the shorter one does not.
+    # Both are balanced fragments of the same tree, so the difference is too —
+    # but only after _tidy: Truncator opens the element the cut lands in and
+    # then closes it empty, so the two cuts end `…</p><p></p>` with DIFFERENT
+    # content in the paragraph before it, and the shorter is not a prefix of
+    # the longer. That is a silent failure — the tease simply never rendered —
+    # which is why it is stripped rather than tolerated.
+    teased = ""
+    if through_tease.startswith(readable):
+        teased = through_tease[len(readable):]
+    return readable, teased, True
 
 
 def news_detail(request, slug: str):
@@ -838,13 +882,17 @@ def news_detail(request, slug: str):
         # truncator has structure to cut on and the preview is not one wall.
         body = linebreaks(body)
     if request.user.is_authenticated:
-        shown, gated = body, False
+        shown, teased, gated = body, "", False
     else:
-        shown, gated = _story_preview(body)
+        shown, teased, gated = _story_preview(body)
 
     return render(request, "news_reader.html", {
         "post": post, "more": more, "active": "news",
         "body_html": shown,
+        # Rendered blurred and unselectable — see .rd-tease. Real text, so it
+        # reads as an article going on rather than as grey placeholder bars,
+        # which is what the client asked for.
+        "tease_html": teased,
         "gated": gated,
         "share_url": post.canonical_url or request.build_absolute_uri(),
         "share_image_url": request.build_absolute_uri(share_image.url) if share_image else "",
@@ -1098,7 +1146,104 @@ def seo_list(request):
         "noindex_count": sum(1 for p in pages if p["noindex"]),
         "customised_count": sum(1 for p in pages if p["customised"]),
         "redirect_count": Redirect.objects.count(),
+        "health": _seo_health(pages, posts),
     })
+
+
+#: What Google will actually print. Past these it truncates with an ellipsis,
+#: so a longer one is not "more detail" — it is detail nobody sees, and a
+#: sentence cut mid-word in a search result reads as a broken site.
+TITLE_MAX = 60
+DESC_MIN, DESC_MAX = 70, 160
+
+
+def _seo_health(pages, posts) -> list:
+    """The checks an SEO dashboard exists to run, as rows the page can print.
+
+    A COUNT IS NOT A DASHBOARD. The screen already said how many pages there
+    are and how many have settings — true, and neither tells anybody what to
+    do next. These are the four things that are actually wrong often enough to
+    be worth a screen, each with the list of what to fix attached, so the page
+    answers "what should I do" rather than "how many are there".
+
+    Public pages only. Something behind a login is not in a search result, and
+    counting it as a problem is how a health check becomes noise that people
+    learn to ignore.
+
+    Ordered worst-first at the end, so the row that needs doing is the row at
+    the top. Everything here reads objects already in memory — this adds no
+    queries to a view that has done its fetching.
+    """
+    public = [p for p in pages if p["page"].is_public and not p["noindex"]]
+
+    def page_name(row):
+        return row["page"].label
+
+    missing_desc = [
+        page_name(p) for p in public
+        if not (p["seo"] and (p["seo"].meta_description or "").strip())
+    ]
+    long_titles = [
+        f"{page_name(p)} ({len(p['seo'].meta_title)})" for p in public
+        if p["seo"] and len(p["seo"].meta_title or "") > TITLE_MAX
+    ]
+    # A share card with no picture is a grey box with a URL in it, which is the
+    # difference between a link that looks like a story and one that looks like
+    # spam. Checked on stories rather than pages: a story is the thing people
+    # actually paste into Slack and LinkedIn.
+    live_posts = [p for p in posts if p.is_live]
+    no_share_image = [p.title for p in live_posts if not (p.og_image or p.image)]
+    short_desc = [
+        p.title for p in live_posts
+        if 0 < len((p.meta_description or p.excerpt or "").strip()) < DESC_MIN
+    ]
+
+    rows = [
+        {
+            "key": "desc",
+            "title": "Pages with no description",
+            "why": "Google writes its own from whatever it finds on the page. "
+                   "It is the one line you get to choose in a search result.",
+            "items": missing_desc,
+            "fix": "Open the page and fill in Meta description.",
+            "level": "bad",
+        },
+        {
+            "key": "share",
+            "title": "Stories with no share picture",
+            "why": "Pasted into Slack, LinkedIn or a message, these come through "
+                   "as a grey box with a URL — which reads as spam, not as a story.",
+            "items": no_share_image,
+            "fix": "Add a featured image, or an og:image under Search & social.",
+            "level": "bad",
+        },
+        {
+            "key": "title",
+            "title": f"Titles longer than {TITLE_MAX} characters",
+            "why": "Google truncates past this, so the end of the sentence is "
+                   "detail nobody sees and the result reads as cut off.",
+            "items": long_titles,
+            "fix": "Shorten the Meta title. The page's own heading is unaffected.",
+            "level": "warn",
+        },
+        {
+            "key": "thin",
+            "title": f"Descriptions under {DESC_MIN} characters",
+            "why": "Long enough to be used, short enough to say nothing. "
+                   "Google often replaces these with its own text anyway.",
+            "items": short_desc,
+            "fix": "Say what the story is about in a sentence.",
+            "level": "warn",
+        },
+    ]
+    for row in rows:
+        row["count"] = len(row["items"])
+        row["shown"] = row["items"][:6]
+        row["more"] = max(0, row["count"] - 6)
+    # Worst first: anything failing, hardest first; everything clean below it.
+    rank = {"bad": 0, "warn": 1}
+    rows.sort(key=lambda r: (r["count"] == 0, rank[r["level"]], -r["count"]))
+    return rows
 
 
 @requires("seo.edit", lambda r: f"SEO settings: {r.resolver_match.kwargs.get('page_key', '')}")

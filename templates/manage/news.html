@@ -69,7 +69,13 @@
             due. A green Live chip against something no reader can reach is the
             one label here that would be a lie.
             {% endcomment %}
-            {% if p.is_scheduled %}<span class="gt-chip draft">Scheduled</span>
+            {% comment %}
+            Scheduled had the DRAFT chip, so the two states that mean opposite
+            things — "nobody has published this" and "this is published and on
+            a timer" — were the same grey pill. Its own colour now, matching
+            the scheduler card in the editor.
+            {% endcomment %}
+            {% if p.is_scheduled %}<span class="gt-chip sched">Scheduled</span>
             {% elif p.is_published %}<span class="gt-chip live">Live</span>
             {% else %}<span class="gt-chip draft">Draft</span>{% endif %}
           </div>
@@ -81,6 +87,16 @@
             <span class="np-tag"><svg aria-hidden="true"><use href="#ic-flag"/></svg>{{ p.tag_labels|join:", " }}</span>
             <span class="np-sep" aria-hidden="true">&middot;</span>
             <span>{% if p.is_scheduled %}Publishes {% endif %}{{ p.published_at|date:"j M Y, g:i a" }}</span>
+            {% comment %}
+            The countdown, on a scheduled row only. "5 Sep, 9:00 am" is a date
+            you have to do arithmetic on; "in 2 days" is the thing you were
+            actually asking. Nothing else on this list is waiting for a clock,
+            so nothing else gets one.
+            {% endcomment %}
+            {% if p.is_scheduled %}
+            <span class="np-sep" aria-hidden="true">&middot;</span>
+            <span class="np-in">in {{ p.published_at|timeuntil }}</span>
+            {% endif %}
             {% if p.created_by %}
             <span class="np-sep" aria-hidden="true">&middot;</span>
             <span>{{ p.created_by.display_name }}</span>

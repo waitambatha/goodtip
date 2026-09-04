@@ -1,17 +1,19 @@
 {% load static %}
 {% comment %}
-THE FOOTER IS NOW THE OTHER HALF OF THE MENU (Sep 2026, client).
+THE FOOTER CARRIES THE WHOLE SITE, AND ONE LEGAL LINE.
 
-The nav used to carry all ten public pages. Four of them came off it — The
-Good List, Charities, About Us and Privacy — on the grounds that a bar with
-ten equal items is a site map, not a menu. That only works if the footer
-actually holds them, so it does: the columns cover everything the bar dropped,
-and Privacy gets its own line at the very bottom rather than being the fourth
-item of a "Company" list.
+A first pass moved four items off the nav and leaned on this file to hold them.
+The client wanted three back on the bar — The Good List, Charities and About Us
+are things a visitor goes looking for mid-visit, and the bar is where you look.
+Privacy is the one that stays here.
 
-Privacy at the bottom is not a demotion. It is the one link nobody navigates
-to mid-visit and everybody expects to find under the copyright, next to the
-company name — which is exactly where it now is.
+It gets its own line at the very bottom rather than being the fourth item of a
+"Company" list, and that line holds nothing else: "for the footer the only
+thing I want is the privacy page for now". It is the one link nobody navigates
+to mid-visit and everybody expects to find under the copyright.
+
+The columns are untouched by any of that. They are the site map, and a page
+being on the bar is not a reason to leave it out of the footer.
 {% endcomment %}
 <footer class="footer">
   <div class="footer-top">
@@ -70,12 +72,8 @@ company name — which is exactly where it now is.
   {% endcomment %}
   <div class="footer-bottom">
     <p class="footer-legal">&copy; 2026 GoodTip Pty Ltd &middot; goodtip.com.au &middot; &ldquo;Good Tip, Mate.&rdquo;<br>Not affiliated with the AFL or NRL.</p>
-    <nav class="footer-legal-nav" aria-label="Legal and company">
+    <nav class="footer-legal-nav" aria-label="Legal">
       <a href="/privacy/">Privacy</a>
-      <span aria-hidden="true">&middot;</span>
-      <a href="/about/">About Us</a>
-      <span aria-hidden="true">&middot;</span>
-      <a href="/#start">Contact</a>
     </nav>
   </div>
 </footer>

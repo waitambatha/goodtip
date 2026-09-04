@@ -1220,3 +1220,146 @@
     wireFeaturedImage();
   });
 })();
+
+/* ---------------------------------------------------------------------------
+ * THE SCHEDULER
+ * ---------------------------------------------------------------------------
+ * The publish field was a bare `datetime-local`: it tells you the moment you
+ * typed and nothing else. What an editor wants to know is the STATE — is this
+ * out, is it being held, how long until it goes — and none of that is legible
+ * from a date, because "published" here means `is_published AND published_at
+ * <= now` and a future date is a schedule rather than a mistake.
+ *
+ * Three jobs, all of them client-side on purpose:
+ *
+ *   THE STATE follows the input as it is edited, not only the saved value.
+ *   Typing next Friday into a live story should say "will be held until
+ *   Friday" before you press Save, because that is the moment you can still
+ *   change your mind.
+ *
+ *   THE COUNTDOWN is computed here rather than rendered server-side. "In 2
+ *   days" written into the HTML is wrong the moment the page has been open for
+ *   an hour, and the story editor is a page people leave open.
+ *
+ *   THE PRESETS are built from the browser's own clock. `datetime-local`
+ *   carries no timezone and the view reads it in the site's, so a "tomorrow"
+ *   worked out on the server would be a different tomorrow for an editor
+ *   sitting anywhere else.
+ *
+ * No cron is involved in any of this. Every reader-facing query asks for
+ * `published_at <= now` (admin_panel.models.LivePostManager), so the moment
+ * arrives on its own; this is a description of a fact the database already
+ * enforces, not a mechanism.
+ */
+(function () {
+  'use strict';
+
+  var box = document.querySelector('[data-sched]');
+  if (!box) return;
+  var input = box.querySelector('[data-sched-input]');
+  var stateEl = box.querySelector('[data-sched-state]');
+  var countEl = box.querySelector('[data-sched-count]');
+  var hintEl = box.querySelector('[data-sched-hint]');
+  if (!input) return;
+
+  var savedState = box.getAttribute('data-state') || 'draft';
+
+  /* `datetime-local` wants "YYYY-MM-DDTHH:MM" in LOCAL time. toISOString is
+     UTC and would shift the value by the offset — the classic way a scheduler
+     ends up publishing things eleven hours early. */
+  function toField(d) {
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+           'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function parse() {
+    var v = input.value;
+    if (!v) return null;
+    var d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  /* Whole units, largest that fits. "in 34 hours" is worse than "in 1 day" for
+     a thing being scheduled — nobody plans a publish to the hour three days
+     out — and "in 2 minutes" matters when it is 2 minutes. */
+  function until(ms) {
+    var s = Math.round(ms / 1000);
+    if (s < 60) return 'in under a minute';
+    var m = Math.round(s / 60);
+    if (m < 60) return 'in ' + m + ' minute' + (m === 1 ? '' : 's');
+    var h = Math.round(m / 60);
+    if (h < 36) return 'in ' + h + ' hour' + (h === 1 ? '' : 's');
+    var d = Math.round(h / 24);
+    if (d < 14) return 'in ' + d + ' day' + (d === 1 ? '' : 's');
+    return 'in ' + Math.round(d / 7) + ' weeks';
+  }
+
+  function paint() {
+    var when = parse();
+    var now = new Date();
+    var state, label, hint;
+
+    if (savedState === 'new') {
+      state = 'new';
+      label = 'Not saved yet';
+      hint = when && when > now
+        ? 'Saving with Published ticked will hold it until then.'
+        : 'A past date backdates the story. A future date holds it back until then.';
+    } else if (!when) {
+      state = 'draft';
+      label = 'No date set';
+      hint = 'Pick a moment, or leave it and it publishes when you save.';
+    } else if (when > now) {
+      state = 'scheduled';
+      /* The saved state is what it IS; this is what it WILL be once saved, and
+         saying so is the whole point of following the input rather than the
+         stored value. */
+      label = savedState === 'live' ? 'Will be held back' : 'Scheduled';
+      hint = 'It appears on the site on its own at that time. Nothing to run, nobody to be at a keyboard.';
+    } else {
+      state = savedState === 'draft' || savedState === 'new' ? 'draft' : 'live';
+      label = state === 'live' ? 'Live on the site' : 'Draft';
+      hint = state === 'live'
+        ? 'Readers can see this now.'
+        : 'Tick Published to put it on the site.';
+    }
+
+    box.setAttribute('data-state', state);
+    if (stateEl) stateEl.textContent = label;
+    if (hintEl) hintEl.textContent = hint;
+    if (countEl) countEl.textContent = (state === 'scheduled' && when) ? until(when - now) : '';
+  }
+
+  input.addEventListener('input', paint);
+  input.addEventListener('change', paint);
+
+  box.querySelectorAll('[data-sched-set]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var d = new Date();
+      var which = btn.getAttribute('data-sched-set');
+      if (which === 'evening') {
+        d.setHours(18, 0, 0, 0);
+        /* Already past six: "tonight" has gone, so it means tomorrow night
+           rather than a time in the past nobody asked for. */
+        if (d <= new Date()) d.setDate(d.getDate() + 1);
+      } else if (which === 'tomorrow') {
+        d.setDate(d.getDate() + 1);
+        d.setHours(9, 0, 0, 0);
+      } else if (which === 'monday') {
+        /* The NEXT Monday, never today — pressing "next Monday" on a Monday
+           and getting nine o'clock this morning is a date in the past. */
+        d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
+        d.setHours(9, 0, 0, 0);
+      }
+      input.value = toField(d);
+      paint();
+      input.focus();
+    });
+  });
+
+  paint();
+  /* The countdown goes stale on its own, so it is re-drawn on a slow tick —
+     a minute is well inside the resolution anything here is expressed in. */
+  setInterval(paint, 60000);
+})();

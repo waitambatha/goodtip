@@ -115,6 +115,26 @@
     var form = e.target;
     if (!form.hasAttribute || !form.hasAttribute('data-confirm')) return;
     e.preventDefault();
+    /* AND STOP IT GOING ANY FURTHER.
+     *
+     * preventDefault alone cancels the navigation but the event carries on to
+     * every other listener, and gt-busy.js has one on the form. So a guarded
+     * form was marked busy by the submit this dialog had just cancelled: the
+     * button became "Sending…", disabled, with a running strip under it — for
+     * a request that had not been made and would not be until somebody
+     * pressed Confirm.
+     *
+     * Then it never could be. gt-busy's own re-entry guard reads
+     * `if (form.classList.contains('is-busy')) { e.preventDefault(); return; }`
+     * so when this dialog re-fired the submit, gt-busy cancelled it as a
+     * double-click. The form was stuck saying "Sending" and nothing was ever
+     * posted — which is exactly what "Email members" on a story did, and what
+     * every other confirm-guarded form in the product did too.
+     *
+     * The guarded submit is not a submission. Nothing else should see it.
+     */
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
     pending = {el: form, kind: 'submit', submitter: e.submitter};
     open(form);
   }, true);
@@ -125,6 +145,8 @@
     // A submit button inside a guarded form is handled by the submit listener.
     if (el.form && el.form.hasAttribute('data-confirm')) return;
     e.preventDefault();
+    e.stopPropagation();               /* same reasoning as the submit guard */
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
     pending = {el: el, kind: 'click'};
     open(el);
   }, true);

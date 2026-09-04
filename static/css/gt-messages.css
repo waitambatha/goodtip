@@ -60,6 +60,19 @@
    not scroll, so it would sit permanently across the top eating the height
    the conversation needs. */
 .gtm-page .charity-strip { display: none; }
+/* The strips are narrower here than on a reading page: this is an
+   application, and the three panels want the width more than the photographs
+   do. Same markup and the same rotation everywhere else uses. */
+/* Exactly the margin the capped application leaves, so the strips meet its
+   edge and never run under it. A fixed clamp guesses; this measures. */
+.gtm-page .page-scenes .scene { width: min(150px, calc((100vw - var(--gt-wide, 1300px)) / 2)); }
+.gtm-page .page-scenes .scene.left::after,
+.gtm-page .page-scenes .scene.right::after { content: ""; position: absolute; inset: 0; }
+.gtm-page .page-scenes .scene.left::after { background: linear-gradient(90deg, rgba(15,46,34,.10), rgba(15,46,34,.38) 55%, rgba(15,46,34,.88)); }
+.gtm-page .page-scenes .scene.right::after { background: linear-gradient(270deg, rgba(15,46,34,.10), rgba(15,46,34,.38) 55%, rgba(15,46,34,.88)); }
+/* Below the width where the sheet would touch them there is nothing to show,
+   and a 40px sliver of photograph reads as a rendering fault. */
+@media (max-width: 1500px) { .gtm-page .page-scenes { display: none; } }
 /* Flash messages sit in the flow above the page, which on a screen sized to
    exactly the window pushes the composer off the bottom of it. Here they
    float instead — the same message, over the conversation rather than
@@ -72,10 +85,25 @@
 .gtm {
   display: grid;
   grid-template-columns: minmax(280px, 340px) minmax(260px, 320px) minmax(0, 1fr);
-  height: calc(100dvh - 68px);        /* the nav is 68px on .gt-v2 */
+  /* --gt-navh is published by goodtip.css and changes with the bar — the
+     organisation chip takes its own strip below 1300px, so "the nav is 68px"
+     stopped being true and a hard-coded number left the composer that far
+     off the bottom of the window. */
+  height: calc(100dvh - var(--gt-navh, 68px));
+  /* THE SHEET. Every other member screen is a panel floating on the deep
+     green with the rotating photographs showing at both margins, and the
+     client's note is that this is standard — "those 2 images that keep on
+     changing on each side, I think is something standard since all pages
+     have it". So the application is capped and centred rather than
+     full-bleed, and the strips show either side of it. */
+  max-width: var(--gt-wide, 1300px);
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
   background: var(--m-ground);
   color: var(--m-ink);
   overflow: hidden;
+  box-shadow: 0 0 90px -20px rgba(0,0,0,.55);
 }
 /* Each panel scrolls in its own right, and none of them may push the grid
    wider than its column — min-height/min-width:0 is what stops a grid item

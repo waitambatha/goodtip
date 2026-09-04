@@ -3056,6 +3056,44 @@ def _raise_with_admins(request, org):
     return redirect("orgs:member_message_thread", org_id=target.id, thread_id=thread.id)
 
 
+def _follow_context(request, thread) -> None:
+    """Standing in a conversation puts you in the organisation it belongs to.
+
+    THE CLIENT'S NOTE: "when I click, let's say, Masterclass, the message
+    should change now for me to be into Masterclass — or an organisation and
+    group — irrespective of where I am currently."
+
+    Opening a conversation always WORKED from anywhere: every link carries its
+    own organisation id, and nothing about reading a message depended on the
+    nav. What did not happen is the other half of it — the bar went on naming
+    whichever organisation you happened to be in last, so you could be reading
+    the Masterclass room with "Net Providers" written above it. That is the
+    same confusion the chip exists to prevent, and on this screen it is worse
+    than elsewhere: the next thing you do is type into a room, and which room
+    is the whole question.
+
+    So opening one moves you. A group room steps into the group as well, since
+    a group room and the group's ladder are the same context.
+
+    NEVER FROM THE POLL. The conversation refreshes itself every twelve
+    seconds, and writing the session on each of those is a database write per
+    viewer per tick to record something that has not changed.
+    """
+    from orgs.models import MessageThread
+
+    if thread.kind == MessageThread.KIND_GROUP and thread.group_id:
+        # Guarded rather than assumed: set_current_group is a write, and a
+        # write that trusts what it was handed is how somebody ends up
+        # standing in a group they were removed from last week.
+        if ctx.is_group_member(request.user, thread.group) and thread.org.groups_enabled:
+            ctx.set_current_group(request, thread.group)
+            return
+    # Already in it: moving would drop the current group for no reason, and a
+    # direct message is not a reason to step out of a group you are tipping in.
+    if ctx.current_org(request) != thread.org:
+        ctx.set_current_org(request, thread.org)
+
+
 def _messages_context(request, org, thread):
     """Everything the three panels need, for both entry points."""
     from orgs.services import conversations_for, room_members
@@ -3164,15 +3202,21 @@ def member_message_thread_view(request, org_id: int, thread_id: int):
                 thread.save(update_fields=["status"])
         return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
 
-    ctx = _messages_context(request, org, thread)
     # THE MESSAGES ALONE, for the poll that keeps an open conversation up to
     # date. Deliberately not the whole pane: the composer is in that, and a
     # swap every twelve seconds would throw away whatever somebody was in the
     # middle of typing. Same view and same context as the first paint, so the
     # markup that arrives cannot drift from the markup it replaces.
     if request.GET.get("pane") == "chat":
-        return render(request, "orgs/partials/_room_stream.html", ctx)
-    return render(request, "orgs/messages.html", ctx)
+        return render(request, "orgs/partials/_room_stream.html",
+                      _messages_context(request, org, thread))
+
+    # Reading a conversation moves you into its organisation — see
+    # _follow_context. Before the context is built, so the sidebar, the chip
+    # and the page all describe the same place on this very render rather than
+    # on the next one.
+    _follow_context(request, thread)
+    return render(request, "orgs/messages.html", _messages_context(request, org, thread))
 
 
 @login_required
@@ -3184,6 +3228,7 @@ def message_room_view(request, org_id: int):
     if _membership(request.user, org) is None:
         raise Http404("No organisation matches the given query.")
     thread = org_room(org)
+    _follow_context(request, thread)
     return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
 
 
@@ -3199,6 +3244,7 @@ def message_group_room_view(request, org_id: int, group_id: int):
         # that the group exists to somebody who is not in it.
         raise Http404("No group matches the given query.")
     thread = group_room(group)
+    _follow_context(request, thread)
     return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
 
 
@@ -3222,6 +3268,7 @@ def message_direct_view(request, org_id: int, user_id: int):
     if target.user_id == request.user.id:
         return redirect("orgs:member_messages", org_id=org.id)
     thread = direct_thread(request.user, target.user, org)
+    _follow_context(request, thread)
     return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
 
 

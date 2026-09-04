@@ -5837,3 +5837,76 @@ class MessagePinTests(TestCase):
         self.assertTrue(MessageThread.objects.filter(pk=self.room.pk).exists())
         self.room.refresh_from_db()
         self.assertIsNone(self.room.pinned_message_id)
+
+
+class MessagesFollowContextTests(TestCase):
+    """Opening a conversation moves you into its organisation.
+
+    "When I click, let's say, Masterclass, the message should change now for
+    me to be into Masterclass — or an organisation and group — irrespective of
+    where I am currently."
+
+    Opening one always WORKED from anywhere; what did not happen is the bar
+    following you, so you could be reading the Masterclass room with "Net
+    Providers" written above it. On this screen that matters more than
+    elsewhere: the next thing you do is type into a room.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        season = Season.objects.create(year=2090, label="2090")
+        self.a = Organisation.objects.create(name="Masterclass", season=season, groups_enabled=True)
+        self.b = Organisation.objects.create(name="Net Providers", season=season)
+        self.me = User.objects.create_user(email="me@f.com", password="x", display_name="Mo")
+        self.mate = User.objects.create_user(email="mate@f.com", password="x", display_name="Mate")
+        for org in (self.a, self.b):
+            OrgMember.objects.create(user=self.me, org=org)
+        OrgMember.objects.create(user=self.mate, org=self.a)
+        self.group = Group.objects.create(
+            org=self.a, name="AFLW Tippers", approval_status=Group.APPROVAL_APPROVED,
+        )
+        GroupMember.objects.create(group=self.group, user=self.me)
+        self.client.force_login(self.me)
+
+    def _where(self):
+        from .context import GROUP_KEY, ORG_KEY
+
+        return (self.client.session.get(ORG_KEY), self.client.session.get(GROUP_KEY))
+
+    def test_opening_an_organisation_room_moves_you_into_it(self):
+        self.client.post(reverse("orgs:switch_org", args=[self.b.id]))
+        self.assertEqual(self._where()[0], self.b.id)
+        self.client.get(reverse("orgs:message_room", args=[self.a.id]), follow=True)
+        self.assertEqual(self._where()[0], self.a.id)
+
+    def test_opening_a_group_room_steps_into_the_group(self):
+        self.client.post(reverse("orgs:switch_org", args=[self.b.id]))
+        self.client.get(
+            reverse("orgs:message_group_room", args=[self.a.id, self.group.id]), follow=True,
+        )
+        self.assertEqual(self._where(), (self.a.id, self.group.id))
+
+    def test_a_direct_message_moves_the_organisation_but_not_the_group(self):
+        """A direct message is not a reason to step out of a group you are
+        tipping in — you are already in the right organisation."""
+        from .context import set_current_group
+
+        self.client.get(
+            reverse("orgs:message_group_room", args=[self.a.id, self.group.id]), follow=True,
+        )
+        self.assertEqual(self._where(), (self.a.id, self.group.id))
+        self.client.get(reverse("orgs:message_direct", args=[self.a.id, self.mate.id]), follow=True)
+        self.assertEqual(self._where(), (self.a.id, self.group.id))
+
+    def test_the_poll_does_not_write_the_session(self):
+        """The conversation refreshes every twelve seconds. Writing where you
+        are on each of those is a database write per viewer per tick to record
+        something that has not changed."""
+        from .services import org_room
+
+        room = org_room(self.a)
+        self.client.post(reverse("orgs:switch_org", args=[self.b.id]))
+        self.client.get(
+            reverse("orgs:member_message_thread", args=[self.a.id, room.id]) + "?pane=chat"
+        )
+        self.assertEqual(self._where()[0], self.b.id)

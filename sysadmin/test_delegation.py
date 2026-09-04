@@ -656,10 +656,26 @@ class WhatTheMenuShowsTests(DelegationTestCase):
         self.assertNotIn(reverse("admin:hq_team"), html)
 
     def test_full_access_sees_the_team_screens(self):
+        """Reachable, not necessarily in the menu.
+
+        This used to assert all three team screens were links in the rail. As
+        of Sep 2026 they are not: the rail carries one "Your team" entry and
+        the three live as cards on the hub behind it, because four peers cost
+        four lines of the menu on every screen in HQ and said nothing until
+        you had opened them.
+
+        The property worth pinning was never "these are in the rail" — it is
+        that somebody with full access can GET to them, and that somebody
+        without it cannot see them at all (the test above). So that is what
+        this checks now, one hop further along.
+        """
         sign_in(self.client, self.boss)
         html = self.client.get(reverse("admin:hq_my_work")).content.decode()
-        for name in ("hq_team", "hq_reviews", "hq_activity"):
-            self.assertIn(reverse(f"admin:{name}"), html)
+        self.assertIn(reverse("admin:hq_team_hub"), html)
+
+        hub = self.client.get(reverse("admin:hq_team_hub")).content.decode()
+        for name in ("hq_team", "hq_reviews", "hq_activity", "hq_my_work"):
+            self.assertIn(reverse(f"admin:{name}"), hub, name)
 
     def test_your_own_page_says_what_you_may_do_and_what_waits(self):
         writer = make_admin(

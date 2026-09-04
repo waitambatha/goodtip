@@ -62,7 +62,26 @@
         enctype="multipart/form-data" data-busy="Saving">
     {% csrf_token %}
 
+    {% comment %}
+    ===================================================================
+    THE STORY'S CONTROLS: what it is about, and when it goes out.
+    ===================================================================
+    These were two bare form fields in a row — a strip of grey checkbox chips
+    and a naked `datetime-local` box — sitting above a rich editor with a
+    typographic toolbar. The client's note: "a new look and design on the blog
+    timers where we schedule uploads; make that look modern, neat and cool,
+    same with the tags."
+
+    So they are one panel now, with the scheduler as its own card. The
+    scheduler is the half that earns the redesign: a datetime input tells you
+    the moment you typed, and nothing else. What an editor actually wants to
+    know is the STATE — is this out, is it held, how long until it goes — and
+    the states are not obvious from a date alone, because "published" here
+    means `is_published AND published_at <= now` and a date in the future is a
+    schedule rather than a mistake.
+    {% endcomment %}
     <div class="ned-meta-row">
+
       {% comment %}
       TAGS, PLURAL.
 
@@ -71,41 +90,97 @@
       one of the two filters readers use on the news list to find it. Tick as
       many as apply. The first one ticked, in the order listed, is the one the
       card and the article header show.
+
+      The chips carry the code's own colour now rather than all turning the
+      same forest green. Four codes that look identical when ticked is four
+      chips you have to read; coloured, the row is scannable, and the tick
+      keeps the state legible for anyone who cannot use the colour.
       {% endcomment %}
       <div class="fld ned-tags">
         <label class="fld-label-plain">Tags <span class="ned-hint">tick every code this story is about</span></label>
         <div class="ned-tagbox">
           {% for val, label in tag_choices %}
-          <label class="ned-tag-check">
+          <label class="ned-tag-check t-{{ val|lower }}">
             <input type="checkbox" name="tags" value="{{ val }}"
                    {% if val in selected_tags %}checked{% endif %}>
-            <span>{{ label }}</span>
+            <span>
+              <svg class="ntc-tick" viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8"/></svg>
+              {{ label }}
+            </span>
           </label>
           {% endfor %}
         </div>
+        <small class="fld-hint">The first one ticked is the code shown on the card and above the story.</small>
       </div>
 
       {% comment %}
-      PUBLISH DATE — BACKDATING AND SCHEDULING IN ONE FIELD.
+      THE SCHEDULER.
 
-      It was set to "now" at creation and never shown, so a write-up of last
-      weekend's games was dated today and sorted above this weekend's. A date
-      in the past puts the story where it belongs; a date in the future holds
-      it back until then, with no cron and nobody having to be at a keyboard —
-      every reader-facing query asks for `published_at <= now`, so the moment
-      simply arrives. See admin_panel.models.LivePostManager.
+      One field still — `published_at` — because that is genuinely all the
+      model has, and adding a second control that means the same thing is how
+      two sources of truth start. What is new is everything around it:
 
-      `datetime-local` sends wall-clock time with no zone; the view reads it in
-      the site's timezone, so "Friday 9am" means 9am here.
+        * the STATE, said in words and colour, because "published" is not the
+          same as "live" here and the difference had no representation at all;
+        * a countdown on a scheduled story, so "Friday 09:00" is also "in 2
+          days" without the reader doing calendar arithmetic;
+        * presets, because the four times anybody actually picks are now, this
+          evening, tomorrow morning and next Monday — and typing those into a
+          datetime-local is eight keystrokes and a chance to get the month
+          wrong.
+
+      No cron anywhere. Every reader-facing query asks for
+      `published_at <= now`, so the moment simply arrives — see
+      admin_panel.models.LivePostManager. The countdown is decoration over a
+      fact the database already enforces.
       {% endcomment %}
       <div class="fld ned-when">
-        <label for="np_published_at">Publish date</label>
-        <input type="datetime-local" name="published_at" id="np_published_at"
-               value="{{ published_at_value }}">
-        <small class="fld-hint">
-          {% if post.is_scheduled %}Scheduled &mdash; this will appear on the site on its own at that time.
-          {% else %}A past date backdates the story. A future date schedules it.{% endif %}
-        </small>
+        <div class="sched" data-sched
+             data-state="{% if is_new %}new{% elif post.is_scheduled %}scheduled{% elif post.is_live %}live{% else %}draft{% endif %}"
+             {% if post.published_at %}data-at="{{ post.published_at|date:'c' }}"{% endif %}>
+
+          <div class="sched-head">
+            <span class="sched-dot" aria-hidden="true"></span>
+            <span class="sched-state" data-sched-state>
+              {% if is_new %}Not saved yet
+              {% elif post.is_scheduled %}Scheduled
+              {% elif post.is_live %}Live on the site
+              {% else %}Draft{% endif %}
+            </span>
+            {% comment %}
+            Filled in by the script from data-at, and only for a story that is
+            actually waiting. Rendered empty rather than server-side: "in 2
+            days" written into the HTML is wrong the moment the page has been
+            open for an hour, and this is a page people leave open.
+            {% endcomment %}
+            <span class="sched-count" data-sched-count aria-live="polite"></span>
+          </div>
+
+          <label class="sched-label" for="np_published_at">Publish date &amp; time</label>
+          <div class="sched-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg>
+            <input type="datetime-local" name="published_at" id="np_published_at"
+                   value="{{ published_at_value }}" data-sched-input>
+          </div>
+
+          {% comment %}
+          The four an editor actually reaches for. Computed in the browser from
+          the reader's own clock, which is the same clock the field is in —
+          `datetime-local` carries no zone, and the view reads it in the site's
+          timezone, so anything worked out server-side would be a different
+          "tomorrow" for an editor sitting somewhere else.
+          {% endcomment %}
+          <div class="sched-presets">
+            <button type="button" data-sched-set="now">Now</button>
+            <button type="button" data-sched-set="evening">Tonight 6pm</button>
+            <button type="button" data-sched-set="tomorrow">Tomorrow 9am</button>
+            <button type="button" data-sched-set="monday">Next Mon 9am</button>
+          </div>
+
+          <small class="sched-hint" data-sched-hint>
+            A past date backdates the story. A future date holds it back until then.
+          </small>
+        </div>
       </div>
     </div>
 

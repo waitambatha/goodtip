@@ -1221,3 +1221,209 @@ class StoryReaderTests(TestCase):
         self.post.published_at = timezone.now() + timedelta(days=3)
         self.post.save(update_fields=["published_at"])
         self.assertEqual(self.client.get(self.url).status_code, 404)
+
+    def test_a_visitor_sees_a_blurred_taste_of_what_follows(self):
+        """"Make the part that is the 2/3 visible but translucent, so someone
+        can know we have data there — something that they see but cannot see."
+        """
+        html = self.client.get(self.url).content.decode()
+        self.assertIn("rd-tease", html)
+        # Real text, not placeholder bars — that is the difference between
+        # "there is more here" and "this is still loading".
+        self.assertRegex(html, r'rd-tease"[^>]*>\s*<p>Paragraph \d+ about')
+
+    def test_the_blurred_run_is_bounded_not_the_whole_article(self):
+        """A deliberate trim of the instruction. Anything sent to a browser is
+        readable by anyone who looks — blur is a CSS filter over real text, not
+        encryption — so serving the rest of the story under one would publish
+        it to everybody and to every crawler while merely inconveniencing a
+        reader."""
+        html = self.client.get(self.url).content.decode()
+        served = len(re.findall(r"<p>Paragraph \d+ about", html))
+        self.assertGreater(served, 6)     # a third, plus a taste of the next
+        self.assertLess(served, 20)       # never the lot
+
+    def test_the_blurred_run_is_hidden_from_screen_readers(self):
+        """Two paragraphs that stop mid-sentence are not something to read
+        out. It is decoration, and it is marked as such."""
+        html = self.client.get(self.url).content.decode()
+        self.assertIn('class="rd-tease" aria-hidden="true"', html)
+
+    def test_a_member_gets_no_blurred_run(self):
+        self.client.force_login(self.member)
+        self.assertNotIn("rd-tease", self.client.get(self.url).content.decode())
+
+    def test_the_story_page_carries_every_social_account(self):
+        """"Make sure all the socials we have are there" — the same five, and
+        the same addresses, as the footer."""
+        html = self.client.get(self.url).content.decode()
+        for needle in (
+            "mailto:hello@goodtip.com.au",
+            "linkedin.com/company/good-tip-australia",
+            "facebook.com/profile.php?id=61593478288209",
+            "instagram.com/goodtip_mate",
+            "youtube.com/@GoodTip_Australia",
+        ):
+            self.assertIn(needle, html, needle)
+        self.assertIn("rd-social-row", html)
+
+
+class ConfirmAndBusyContractTests(TestCase):
+    """The guarded-submit contract between gt-confirm.js and gt-busy.js.
+
+    A static check, and it earns its place. The two scripts broke every
+    confirm-guarded form in the product and there is no server-side symptom at
+    all: gt-confirm cancelled the submit to ask its question, gt-busy — whose
+    listener still ran, because preventDefault does not stop propagation —
+    marked the form busy for a request nobody had made, and gt-busy's own
+    "already submitting" guard then blocked the real submit when the dialog
+    fired it. The button sat reading "Sending" forever and nothing was ever
+    posted.
+
+    That is what "Email members" on a story did, which the client read as the
+    feature never having been built. It was built; it could not be reached.
+
+    Nothing in the Django test client executes JavaScript, so the only way to
+    stop this coming back is to pin the two lines that fix it.
+    """
+
+    def _js(self, name):
+        return (Path(settings.BASE_DIR) / "static" / "js" / name).read_text(encoding="utf-8")
+
+    def test_the_confirm_dialog_stops_the_submit_it_cancelled(self):
+        js = self._js("gt-confirm.js")
+        head = js[js.index("addEventListener('submit'"):]
+        head = head[:head.index("}, true);")]
+        self.assertIn("preventDefault", head)
+        self.assertIn("stopPropagation", head)
+
+    def test_the_busy_indicator_ignores_a_form_still_carrying_its_guard(self):
+        """The second lock on the same door: whichever script changes, a form
+        that has not been confirmed yet cannot be marked as submitting."""
+        js = self._js("gt-busy.js")
+        self.assertIn("hasAttribute('data-confirm')", js)
+
+    def test_email_members_is_a_guarded_form_and_so_is_delete(self):
+        """If either loses its guard this contract stops mattering — and if
+        either keeps it, the two rules above are what make it work."""
+        html = (Path(settings.BASE_DIR) / "templates" / "manage" / "news.html").read_text(
+            encoding="utf-8",
+        )
+        self.assertIn("hq_news_announce", html)
+        self.assertIn("data-confirm", html)
+
+
+class SeoHealthTests(TestCase):
+    """The SEO screen answers "what should I do", not "how many are there".
+
+    "For the SEO we should have a whole dashboard for that to help with
+    everything." It had a strip of counts, which is not the same thing.
+    """
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            email="seo@goodtip.test", password="Str0ng!pass", display_name="Sea",
+        )
+        sign_in_to_hq(self.client, self.admin)
+
+    def _health(self):
+        from admin_panel.views import _seo_health, page_registry
+
+        pages = [{"page": p, "seo": None, "noindex": False, "customised": False}
+                 for p in page_registry.PAGES]
+        return {r["key"]: r for r in _seo_health(pages, list(NewsPost.objects.all()))}
+
+    def test_a_live_story_with_no_picture_is_flagged(self):
+        """Pasted into Slack or LinkedIn it comes through as a grey box with a
+        URL, which reads as spam rather than as a story."""
+        NewsPost.objects.create(
+            title="No picture here", slug="no-picture-here",
+            is_published=True, published_at=timezone.now(),
+        )
+        row = self._health()["share"]
+        self.assertEqual(row["count"], 1)
+        self.assertIn("No picture here", row["items"])
+
+    def test_a_scheduled_story_is_not_flagged_yet(self):
+        """It is not in a search result and not shareable, so counting it is
+        noise — and noise is how a health check gets ignored."""
+        NewsPost.objects.create(
+            title="Next week", slug="next-week", is_published=True,
+            published_at=timezone.now() + timedelta(days=3),
+        )
+        self.assertEqual(self._health()["share"]["count"], 0)
+
+    def test_a_passing_check_still_reports(self):
+        """A dashboard that hides its passing checks makes you wonder whether
+        it ran them."""
+        rows = self._health()
+        self.assertEqual(rows["share"]["count"], 0)
+        self.assertIn("share", rows)
+
+    def test_the_failing_checks_sort_above_the_clean_ones(self):
+        from admin_panel.views import _seo_health, page_registry
+
+        NewsPost.objects.create(
+            title="Needs a picture", slug="needs-a-picture",
+            is_published=True, published_at=timezone.now(),
+        )
+        pages = [{"page": p, "seo": None, "noindex": False, "customised": False}
+                 for p in page_registry.PAGES]
+        rows = _seo_health(pages, list(NewsPost.objects.all()))
+        self.assertGreater(rows[0]["count"], 0, "the row that needs doing is not first")
+        self.assertEqual(rows[-1]["count"], 0)
+
+    def test_the_page_renders_the_checks(self):
+        html = self.client.get(reverse("admin:hq_seo")).content.decode()
+        self.assertIn("What needs doing", html)
+        self.assertIn("sh-card", html)
+
+
+class SchedulerLookTests(TestCase):
+    """The story scheduler, and the two states that used to look identical.
+
+    "A new look and design on the blog timers where we schedule uploads."
+    The redesign is not decoration: `published` here means `is_published AND
+    published_at <= now`, so a future date is a schedule and looked exactly
+    like a mistake — and on the list a scheduled story wore the DRAFT chip,
+    which is the opposite state.
+    """
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            email="sched@goodtip.test", password="Str0ng!pass", display_name="Skedd",
+        )
+        sign_in_to_hq(self.client, self.admin)
+
+    def _post(self, when):
+        return NewsPost.objects.create(
+            title="Finals preview", slug="finals-preview",
+            is_published=True, published_at=when,
+        )
+
+    def test_the_editor_says_which_state_a_scheduled_story_is_in(self):
+        post = self._post(timezone.now() + timedelta(days=2))
+        html = self.client.get(reverse("admin:hq_news_edit", args=[post.id])).content.decode()
+        self.assertIn('data-state="scheduled"', html)
+        # The countdown is drawn from this, in the browser: "in 2 days" baked
+        # into the HTML is wrong the moment the page has been open an hour.
+        self.assertIn("data-at=", html)
+
+    def test_a_live_story_is_not_dressed_as_scheduled(self):
+        post = self._post(timezone.now() - timedelta(days=1))
+        html = self.client.get(reverse("admin:hq_news_edit", args=[post.id])).content.decode()
+        self.assertIn('data-state="live"', html)
+
+    def test_the_list_gives_scheduled_its_own_chip(self):
+        """It had the draft one, so "nobody published this" and "this is
+        published and waiting on a clock" were the same grey pill."""
+        self._post(timezone.now() + timedelta(days=2))
+        html = self.client.get(reverse("admin:hq_news")).content.decode()
+        self.assertIn('gt-chip sched', html)
+        self.assertNotIn('gt-chip draft">Scheduled', html)
+
+    def test_the_editor_offers_the_times_people_actually_pick(self):
+        post = self._post(timezone.now())
+        html = self.client.get(reverse("admin:hq_news_edit", args=[post.id])).content.decode()
+        for preset in ("now", "evening", "tomorrow", "monday"):
+            self.assertIn(f'data-sched-set="{preset}"', html)

@@ -33,6 +33,57 @@
     </div>
   </div>
 
+  {% comment %}
+  =====================================================================
+  THE HEALTH CHECKS.
+  =====================================================================
+  A COUNT IS NOT A DASHBOARD. The strip above says how many pages there are
+  and how many carry their own settings — both true, and neither tells anybody
+  what to do next. These four are the things that are actually wrong often
+  enough to be worth a screen, each carrying the list of what to fix, so this
+  page answers "what should I do" rather than "how many are there".
+
+  Ordered worst-first in the view, so the row that needs doing is the row at
+  the top and a clean site is four green rows in a column. A check that has
+  nothing to report still renders: "no pages are missing a description" is
+  information, and a dashboard that hides its passing checks makes you wonder
+  whether it ran them.
+  {% endcomment %}
+  <section class="gt-panel seo-health">
+    <div class="gt-panel-head">
+      <span class="gp-ic"><svg><use href="#ic-shield-check"/></svg></span>
+      <div>
+        <h2>What needs doing</h2>
+        <div class="gp-sub">Checked against every public page and every published story, each time this page is opened.</div>
+      </div>
+    </div>
+    <div class="sh-grid">
+      {% for row in health %}
+      <div class="sh-card is-{% if row.count %}{{ row.level }}{% else %}ok{% endif %}">
+        <div class="sh-top">
+          <span class="sh-n">{{ row.count }}</span>
+          <div>
+            <b>{{ row.title }}</b>
+            <span class="sh-why">{{ row.why }}</span>
+          </div>
+        </div>
+        {% if row.count %}
+        <ul class="sh-items">
+          {% for item in row.shown %}<li>{{ item }}</li>{% endfor %}
+          {% if row.more %}<li class="sh-more">and {{ row.more }} more</li>{% endif %}
+        </ul>
+        <p class="sh-fix">{{ row.fix }}</p>
+        {% else %}
+        <p class="sh-clear">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.4 3.2 3.2L13 4.8"/></svg>
+          Nothing to do here.
+        </p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
   <div class="gt-note" style="margin:0 0 16px;">
     <b>The sitemap looks after itself.</b>
     <a href="/sitemap.xml" target="_blank" rel="noopener">/sitemap.xml</a> is
