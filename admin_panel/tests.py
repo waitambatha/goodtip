@@ -1443,9 +1443,9 @@ class PruneMissingMediaTests(TestCase):
     Found 4 Sep 2026: MEDIA_ROOT had gone from the production checkout
     entirely, the database still named 15 files, and the client's console was
     a wall of 404s. Every template already handles "no image" properly — the
-    news cards draw a branded panel, the reader rotates match-day shots, an
-    avatar falls back to an initial — and none of it ran, because `{% if
-    p.image %}` is true for a dangling reference.
+    cards and the reader both draw one of the site's own match-day shots (see
+    StoryFallbackImageTests), an avatar falls back to an initial — and none of
+    it ran, because `{% if p.image %}` is true for a dangling reference.
     """
 
     @classmethod
@@ -1487,10 +1487,18 @@ class PruneMissingMediaTests(TestCase):
 
     def test_a_cleared_row_renders_the_designed_empty_state(self):
         """The whole point: not "no broken image", but the fallback that was
-        already written for this case actually running."""
+        already written for this case actually running.
+
+        The empty state itself changed after this test was written — the
+        branded panel became one of the site's own photographs — so this
+        asserts on the card carrying SOME fallback scene rather than on the
+        markup of any particular one. Which photograph, and why that one, is
+        StoryFallbackImageTests' job.
+        """
         self._run(apply=True)
+        self.gone.refresh_from_db()
         html = self.client.get(reverse("news_index")).content.decode()
-        self.assertIn("pn-thumb noimg", html)
+        self.assertIn(self.gone.fallback_scene.rsplit(".", 1)[0], html)
         self.assertNotIn("news/vanished.png", html)
 
     def test_it_can_be_pointed_at_one_model(self):
