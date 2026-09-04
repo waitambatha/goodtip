@@ -6,7 +6,7 @@ article then shows. A broken template here is a runtime error, not an import
 error, so `manage.py check` never sees it.
 """
 import re
-from io import StringIO
+from io import BytesIO, StringIO
 import tempfile
 import shutil
 from datetime import timedelta
@@ -15,6 +15,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management import call_command
 from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -1507,6 +1508,11 @@ class PruneMissingMediaTests(TestCase):
         self.assertNotIn("accounts.User.avatar", out)
 
 
+# Writes an upload (test_a_story_with_its_own_picture_keeps_it), so it needs a
+# MEDIA_ROOT of its own like every other class here — without one it leaves a
+# real.png in the running instance's uploads directory on every run, which is
+# where staging's came from.
+@override_settings(MEDIA_ROOT=temp_media())
 class StoryFallbackImageTests(TestCase):
     """A story with no picture of its own still looks like a story.
 
@@ -1516,6 +1522,11 @@ class StoryFallbackImageTests(TestCase):
     load. That is what the client was looking at after their uploads were
     destroyed.
     """
+
+    @classmethod
+    def tearDownClass(cls):
+        drop_temp_media()
+        super().tearDownClass()
 
     def _post(self, pk, tags):
         return NewsPost.objects.create(
@@ -1563,3 +1574,88 @@ class StoryFallbackImageTests(TestCase):
         post.image.save("real.png", ContentFile(b"x"), save=True)
         html = self.client.get(reverse("news_index")).content.decode()
         self.assertIn("real", html)
+
+
+@override_settings(MEDIA_ROOT=temp_media())
+class AttachingAPictureInTheEditorTests(TestCase):
+    """A picture attached in the story editor is saved, and shows on the story.
+
+    NOTHING COVERED THIS. Every other image test in this file assigns
+    `post.image = "news/hero.jpg"` directly — a name in a column, with no file
+    behind it and no upload ever performed. So the suite could stay green
+    through a broken file field, a missing enctype, or a view that never looks
+    at `request.FILES`, and did stay green through four weeks in which the
+    uploads themselves were being deleted.
+
+    This posts a real PNG at the real editor and follows it all the way to the
+    published page.
+    """
+
+    @classmethod
+    def tearDownClass(cls):
+        drop_temp_media()
+        super().tearDownClass()
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            email="shooter@goodtip.test", password="Str0ng!pass", display_name="Shooter",
+        )
+        sign_in_to_hq(self.client, self.admin)
+
+    def _png(self, name="hero.png"):
+        """A real PNG, because ImageField opens it and a stub is rejected."""
+        from PIL import Image
+
+        buf = BytesIO()
+        Image.new("RGB", (8, 8), (10, 90, 60)).save(buf, format="PNG")
+        return SimpleUploadedFile(name, buf.getvalue(), content_type="image/png")
+
+    def _post(self, **overrides):
+        data = {
+            "title_html": "<b>A picture on it</b>",
+            "excerpt_html": "With a photograph.",
+            "body": "<p>Words.</p>",
+            "tags": ["AFL"],
+            "is_published": "on",
+        }
+        data.update(overrides)
+        return data
+
+    def test_the_file_is_written_and_the_story_shows_it(self):
+        self.client.post(
+            reverse("admin:hq_news_new"), self._post(image=self._png()),
+        )
+        post = NewsPost.objects.get()
+
+        # The row names a file...
+        self.assertTrue(post.image.name.startswith("news/"), post.image.name)
+        # ...and the file is behind it. This is the assertion the incident on
+        # 4 Sep 2026 turned on: the column was right and the file was gone.
+        self.assertTrue(
+            Path(settings.MEDIA_ROOT, post.image.name).exists(),
+            "the upload was accepted but no file was written",
+        )
+
+        html = self.client.get(post.get_absolute_url()).content.decode()
+        self.assertIn(post.image.url, html)
+
+    def test_a_story_that_has_one_does_not_fall_back_to_a_stock_photograph(self):
+        """The fallback is for stories with no picture. A story WITH one must
+        show the picture that was chosen for it.
+
+        Read out of the CARD rather than looked for in the page. The news list
+        already draws stock photographs of its own — `page_scenes.html` rotates
+        them behind the whole page — so "img/scenes/ appears in the HTML" is
+        true whatever the cards are doing, and a bare assertNotIn passes and
+        fails for the wrong reasons.
+        """
+        self.client.post(
+            reverse("admin:hq_news_new"), self._post(image=self._png()),
+        )
+        post = NewsPost.objects.get()
+
+        html = self.client.get(reverse("news_index")).content.decode()
+        thumbs = re.findall(
+            r"""class="thumb"[^>]*background-image:url\('([^']+)'\)""", html,
+        )
+        self.assertEqual(thumbs, [post.image.url])

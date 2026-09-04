@@ -314,3 +314,42 @@ class NoTestMayDeleteRealUploadsTests(SimpleTestCase):
             offenders, [],
             "these delete MEDIA_ROOT without @override_settings(MEDIA_ROOT=temp_media())",
         )
+
+    #: How a test says "write a file through a model field". Not exhaustive by
+    #: construction — it is the set that appears in this codebase, and a new
+    #: field name is a line here.
+    WRITES = (".image.save(", ".avatar.save(", ".logo.save(", ".file.save(",
+              "SimpleUploadedFile")
+
+    def test_every_class_that_writes_an_upload_has_replaced_media_root_first(self):
+        """Deleting the real MEDIA_ROOT is the loud version of this mistake.
+
+        The quiet version is writing to it: `StoryFallbackImageTests` saved a
+        `real.png` through an ImageField with no override, so every run of the
+        suite left one more file in the running instance's own uploads
+        directory — staging's `media/news/real.png`, and a `real_nOSIpc3.png`
+        beside it from the second run. Nothing breaks, which is why it would
+        have gone on indefinitely; a test's files belong in a temporary
+        directory whether or not it cleans them up.
+        """
+        offenders = []
+        for path, src in self._test_sources():
+            lines = src.split("\n")
+            starts = [i for i, ln in enumerate(lines) if ln.startswith("class ")]
+            for n, start in enumerate(starts):
+                end = starts[n + 1] if n + 1 < len(starts) else len(lines)
+                body = "\n".join(lines[start:end])
+                if not any(mark in body for mark in self.WRITES):
+                    continue
+                head, i = [], start - 1
+                while i >= 0 and (lines[i].startswith("@") or lines[i].startswith(")")):
+                    head.append(lines[i])
+                    i -= 1
+                if "MEDIA_ROOT" not in "\n".join(head):
+                    name = lines[start].split("(")[0].replace("class ", "")
+                    offenders.append(f"{path.relative_to(settings.BASE_DIR)}::{name}")
+        self.assertEqual(
+            offenders, [],
+            "these write uploads into the real MEDIA_ROOT; add "
+            "@override_settings(MEDIA_ROOT=temp_media())",
+        )
