@@ -6,12 +6,17 @@ article then shows. A broken template here is a runtime error, not an import
 error, so `manage.py check` never sees it.
 """
 import re
+from io import StringIO
+import tempfile
+import shutil
 from datetime import timedelta
 from pathlib import Path
 
 from django.conf import settings
+from django.core.management import call_command
+from django.core.files.base import ContentFile
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -1427,3 +1432,66 @@ class SchedulerLookTests(TestCase):
         html = self.client.get(reverse("admin:hq_news_edit", args=[post.id])).content.decode()
         for preset in ("now", "evening", "tomorrow", "monday"):
             self.assertIn(f'data-sched-set="{preset}"', html)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="gt-prune-"))
+class PruneMissingMediaTests(TestCase):
+    """A reference to a file that is not there is not information.
+
+    Found 4 Sep 2026: MEDIA_ROOT had gone from the production checkout
+    entirely, the database still named 15 files, and the client's console was
+    a wall of 404s. Every template already handles "no image" properly — the
+    news cards draw a branded panel, the reader rotates match-day shots, an
+    avatar falls back to an initial — and none of it ran, because `{% if
+    p.image %}` is true for a dangling reference.
+    """
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        self.gone = NewsPost.objects.create(
+            title="No file behind it", slug="no-file-behind-it",
+            image="news/vanished.png",
+            is_published=True, published_at=timezone.now(),
+        )
+        self.kept = NewsPost.objects.create(
+            title="This one is real", slug="this-one-is-real",
+            is_published=True, published_at=timezone.now(),
+        )
+        self.kept.image.save("real.png", ContentFile(b"not really a png"), save=True)
+
+    def _run(self, **opts):
+        out = StringIO()
+        call_command("prune_missing_media", stdout=out, **opts)
+        return out.getvalue()
+
+    def test_it_reports_and_changes_nothing_by_default(self):
+        """It edits whatever database the environment points at, and on
+        production that is member avatars."""
+        out = self._run()
+        self.assertIn("Dry run", out)
+        self.gone.refresh_from_db()
+        self.assertEqual(self.gone.image.name, "news/vanished.png")
+
+    def test_apply_clears_only_the_dangling_one(self):
+        self._run(apply=True)
+        self.gone.refresh_from_db()
+        self.kept.refresh_from_db()
+        self.assertEqual(self.gone.image.name, "")
+        self.assertTrue(self.kept.image.name, "a file that exists must be left alone")
+
+    def test_a_cleared_row_renders_the_designed_empty_state(self):
+        """The whole point: not "no broken image", but the fallback that was
+        already written for this case actually running."""
+        self._run(apply=True)
+        html = self.client.get(reverse("news_index")).content.decode()
+        self.assertIn("pn-thumb noimg", html)
+        self.assertNotIn("news/vanished.png", html)
+
+    def test_it_can_be_pointed_at_one_model(self):
+        out = self._run(model="admin_panel.NewsPost")
+        self.assertIn("admin_panel.NewsPost.image", out)
+        self.assertNotIn("accounts.User.avatar", out)
