@@ -84,7 +84,26 @@ goodtip.css.
   {# ---- nav is the only sticky element; the charity strip sits under it and scrolls away with the page ---- #}
   <nav class="app-nav">
     <div class="an-inner">
+      {% comment %}
+      LEFT ZERO IS THE ORGANISATION, not the wordmark.
+
+      ASKED FOR: "where we have that GOODTIP is where we can have that
+      masterclass, or the name of the organisation or group that we will be in."
+
+      Which league you are standing in decides what every other item in this bar
+      means — My Tips, Leaderboard, Ladder and the Wall all belong to it — so it
+      is the first thing read and it holds the first position. The wordmark is
+      not gone from the product: it is the loader on every page load, the
+      favicon, the footer and the whole public site. Repeating it in the corner
+      of an app the member has already signed in to bought nothing and cost the
+      one control that had something to say.
+
+      It stays for somebody with no organisation yet, who has no name to put
+      here and would otherwise get a bar starting with a gap.
+      {% endcomment %}
+      {% if not current_org %}
       <a href="{% url 'dashboard' %}" class="an-brand">GOOD<span>TIP</span></a>
+      {% endif %}
       {% comment %}
       WHERE YOU ARE, on every page.
 
@@ -106,19 +125,25 @@ goodtip.css.
           <span class="an-ctx-org">{{ current_org.name }}</span>
           {% if current_group %}<span class="an-ctx-sep" aria-hidden="true">&rsaquo;</span><span class="an-ctx-group">{{ current_group.name }}</span>{% endif %}
           {% comment %}
-          WHAT YOU ARE HERE, not only where you are.
+          WHAT YOU ARE HERE — as a glyph, never as a word.
 
-          The nav already changes when you switch into an organisation you do
-          not run — the Manage menu is gated on primary_org_is_admin, which
-          follows the switch. What was missing is anything that says so: the
-          client was invited into someone else's league as a member and read
-          the quieter nav as a page that had failed to finish loading rather
-          than as a different role. A badge makes the same fact legible before
-          anybody goes looking for a menu that is not there.
+          The word version of this badge read "Admin" beside a truncated name
+          and, on a narrow bar, instead of one: "it should not say admin on
+          that menu, it should read the name of the organisation that it is
+          in." Right. The name is what the control is for, and a badge that can
+          crowd it out is a badge that has taken the place of the thing it was
+          meant to annotate.
+
+          So the role keeps a shield or a pair of figures and gives up its
+          label. The distinction still carries — the shield is lime and the
+          member glyph is not — and the full word is on every row of the panel
+          below, where there is room for it and where it is read BEFORE a
+          switch, which is where it does its work.
           {% endcomment %}
-          <span class="an-ctx-role {% if primary_org_is_admin %}is-admin{% else %}is-member{% endif %}">
+          <span class="an-ctx-role {% if primary_org_is_admin %}is-admin{% else %}is-member{% endif %}"
+                title="{% if primary_org_is_admin %}You run this organisation{% else %}You're a member of this organisation{% endif %}">
             <svg aria-hidden="true"><use href="{% if primary_org_is_admin %}#ic-f-shield{% else %}#ic-f-users{% endif %}"/></svg>
-            {% if primary_org_is_admin %}Admin{% else %}Member{% endif %}
+            <span class="sr-only">{% if primary_org_is_admin %}Admin{% else %}Member{% endif %}</span>
           </span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
         </button>

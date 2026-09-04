@@ -795,6 +795,18 @@ class PastRoundResultsTests(TestCase):
         self.assertIn("24", body)
         self.assertIn("12", body)
 
+    def test_the_score_sits_inside_the_side_it_belongs_to(self):
+        """Asked for: "that info should be inside that tip button, not
+        outside." As a sibling underneath it read as a caption about the card,
+        which on a card holding two clubs is the one thing it must not be."""
+        body = self._past_round()
+        side = body[body.index('class="fxc-side fxc-side-home'):]
+        side = side[:side.index("fxc-side-away")]
+        team_open = side.index('class="fxc-team')
+        team_close = side.index("</div>", team_open)
+        self.assertIn("fxc-outcome", side[team_open:team_close])
+        self.assertIn("has-outcome", side[team_open:team_open + 120])
+
     def test_the_winner_is_named_as_the_winner(self):
         """"Who won" is not the same question as "what were the scores" — a
         reader who does not follow the code cannot answer the first from the
@@ -864,12 +876,26 @@ class DockedConfirmTests(TestCase):
             )
         self.client.force_login(self.user)
 
-    def test_it_is_rendered_and_starts_hidden(self):
+    def test_it_is_rendered_and_starts_hidden_with_nothing_picked(self):
+        """Hidden until there is something to confirm — and only that.
+
+        It used to also wait for the real bar to scroll off screen, which on a
+        long round never happened: the fixtures have their own scroll container,
+        so the page itself barely moves while you tip and the dock stayed away
+        for exactly the round it was built for.
+        """
         body = self.client.get(f"/dashboard/?org={self.org.id}").content.decode()
         self.assertIn('id="slipDock"', body)
-        # Hidden on arrival: at the top of the page the real button is right
-        # there, and two confirms on one screen is a question, not a shortcut.
         self.assertRegex(body, r'id="slipDock"[^>]*hidden')
+
+    def test_nothing_about_it_depends_on_a_scroll_position(self):
+        """The condition is the count, full stop. A scroll listener here would
+        be one per scrolling container — and there are two, one of which htmx
+        replaces."""
+        body = self.client.get(f"/dashboard/?org={self.org.id}").content.decode()
+        script = body[body.index("function dockRefresh"):body.index("slipRefresh();")]
+        self.assertNotIn("getBoundingClientRect", script)
+        self.assertNotIn("addEventListener('scroll'", script)
 
     def test_it_sits_outside_the_panel_htmx_replaces(self):
         """#slipPanel is swapped whole by the filter and the round navigator.
@@ -888,3 +914,106 @@ class DockedConfirmTests(TestCase):
         dock = body[body.index('id="slipDock"'):body.index('id="tipSheet"')]
         self.assertNotIn('type="submit"', dock)
         self.assertIn("real.click()", body)
+
+
+class NavRowFitsTests(TestCase):
+    """The bar must not overflow into itself.
+
+    REPORTED AS: "these two are still overlapping, Admin / Dashboard." The row
+    is flex, .an-right takes margin-left:auto, and every item was pinned to its
+    own content — a flex item's default min-width is `auto`, which means "never
+    smaller than what is in me". With nothing allowed to give, a row too wide
+    for the bar overflows instead of compressing, and the right-hand cluster
+    paints over the last link.
+
+    What is testable from here is the stylesheet's side of that contract. The
+    pixels are a browser's business; the rules that let the row shrink at all
+    are ours, and they are what regressed.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from pathlib import Path
+
+        from django.conf import settings
+
+        cls.css = Path(settings.BASE_DIR, "static/css/goodtip.css").read_text()
+
+    def test_every_item_in_the_row_may_shrink(self):
+        self.assertIn(".app-nav .an-inner > * { min-width: 0; }", self.css)
+
+    def test_the_links_give_way_before_the_switcher_does(self):
+        """The link row has a burger to fall back on. The switcher has
+        nothing — there is no other place on the screen that names which
+        organisation you are in."""
+        links = re.search(r"^\.gt-v2 \.an-links, \.an-links \{([^}]*)\}", self.css, re.M)
+        self.assertIsNotNone(links, "the link row has no shrink rule")
+        self.assertIn("flex: 0 1 auto", links.group(1))
+        ctx = re.search(r"^\.gt-v2 \.an-ctx, \.an-ctx \{([^}]*)\}", self.css, re.M)
+        self.assertIsNotNone(ctx)
+        self.assertIn("min-width: 0", ctx.group(1))
+
+    def test_the_links_collapse_at_a_width_the_bar_can_hold(self):
+        """1180px was measured against a chip half the current width. A
+        breakpoint that lies is how the overlap came back."""
+        self.assertIn("@media (max-width: 1320px)", self.css)
+        band = self.css[self.css.index("@media (max-width: 1320px)"):]
+        band = band[:band.index("}\n\n")]
+        self.assertIn(".an-links { display: none; }", band)
+        self.assertIn(".an-burger { display: inline-grid; }", band)
+
+
+class OrganisationIsLeftZeroTests(TestCase):
+    """The first thing in the bar names the league you are standing in.
+
+    ASKED FOR: "where we have that GOODTIP is where we can have that
+    masterclass, or the name of the organisation or group that we will be in."
+
+    Which league you are in decides what My Tips, Leaderboard, Ladder and the
+    Wall all mean, so it is read first and holds the first position.
+    """
+
+    def setUp(self):
+        from orgs.models import OrgMember, Organisation
+        from catalog.models import Season
+
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            email="leftzero@example.com", password="x", display_name="Left Zero",
+        )
+        season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(
+            name="Masterclass", season=season, created_by=self.user,
+        )
+        OrgMember.objects.create(user=self.user, org=self.org, is_league_owner=True)
+        self.client.force_login(self.user)
+
+    def _nav(self, body):
+        return body[body.index('class="an-inner"'):body.index('class="an-links"')]
+
+    def test_the_organisation_comes_before_everything_else_in_the_bar(self):
+        nav = self._nav(self.client.get(reverse("dashboard")).content.decode())
+        self.assertIn("Masterclass", nav)
+        # And the wordmark is not sitting in front of it.
+        self.assertNotIn("an-brand", nav)
+
+    def test_the_wordmark_returns_for_somebody_with_no_organisation(self):
+        """Nothing to name in that position, and a bar that starts with a gap
+        is worse than one that starts with the product."""
+        from orgs.models import OrgMember
+
+        OrgMember.objects.filter(user=self.user).delete()
+        body = self.client.get(reverse("dashboard")).content.decode()
+        self.assertIn("an-brand", body)
+
+    def test_the_role_marker_never_replaces_the_name(self):
+        """It said "Admin" beside a truncated name, and on a narrow bar instead
+        of one. A glyph annotates the name; a word competes with it."""
+        nav = self._nav(self.client.get(reverse("dashboard")).content.decode())
+        chip = nav[nav.index("an-ctx-btn"):nav.index("an-ctx-panel")]
+        self.assertIn("an-ctx-role", chip)
+        # The word survives for a screen reader and nowhere else.
+        self.assertIn('<span class="sr-only">Admin</span>', chip)
+        visible = re.sub(r'<span class="sr-only">.*?</span>', "", chip, flags=re.S)
+        self.assertNotIn("Admin", visible)

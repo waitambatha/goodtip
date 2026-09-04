@@ -15256,11 +15256,24 @@ html[data-theme="dark"] .sched { --sched-pick: invert(1) brightness(1.6); }
    "All competitions" has no code and keeps the lime it always had. It is not
    a competition, and giving it one of these colours would make it look like a
    fifth one. */
-.sfilter-chip[data-code] { color: var(--code-ink); border-color: color-mix(in srgb, var(--code-ink) 38%, transparent); }
-.sfilter-chip[data-code]:hover { border-color: var(--code-ink); background: #fff; }
-.sfilter-chip[data-code].on {
+/* FILLED, ALL OF THEM. "On the filter let it be infill — with that button we
+   should have that colour and let it be 100%." A tinted rim on a white pill is
+   a hint that a colour exists; a filled pill IS the colour, and the row reads
+   as four competitions before anything is pressed.
+
+   Which one is selected then has to be carried by something other than fill,
+   since fill is now spent: the chosen chip gets a ring drawn outside its own
+   edge and the rest step back a little. Selection stays the loudest thing in
+   the row without any chip going grey. */
+.sfilter-chip[data-code] {
   background: var(--code-ink); border-color: var(--code-ink);
   color: var(--code-on); font-weight: 700;
+}
+.sfilter-chip[data-code]:hover { background: var(--code-ink); border-color: var(--code-ink); filter: brightness(1.12); }
+.sfilter-chip[data-code]:not(.on) { opacity: .74; }
+.sfilter-chip[data-code].on {
+  opacity: 1;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--code) 60%, transparent);
 }
 .sfilter-chip[data-code]:focus-visible { outline-color: var(--code-ink); }
 
@@ -15291,6 +15304,25 @@ html[data-theme="dark"] .sched { --sched-pick: invert(1) brightness(1.6); }
   background: color-mix(in srgb, var(--code-ink, var(--forest)) 13%, transparent);
 }
 .fxc[data-code] { border-left-color: color-mix(in srgb, var(--code-ink) 45%, transparent); }
+/* THE SIDE YOU PRESSED WEARS THE COMPETITION'S COLOUR, at 70%. Asked for
+   exactly that way — "on the fixtures where we say this vs this let it be 70%
+   infill, that button that I press should have that colour."
+
+   70% and not 100% on purpose, and not only because it was asked for: the club
+   name and crest sit on this fill, and a solid AFL blue behind dark ink is the
+   point at which a pick stops being readable. Mixed toward white rather than
+   dropped in opacity, so the tick in the corner keeps its own contrast.
+
+   Lime was the old fill and stays as the fallback for a card with no
+   competition on it — the confirmation screen renders some of these without
+   a round attached. */
+.fxc[data-code] .fxc-team.sel {
+  background: color-mix(in srgb, var(--code) 70%, #fff);
+  border-color: color-mix(in srgb, var(--code-ink) 55%, transparent);
+}
+.fxc[data-code] .fxc-team.sel .fxc-name { color: var(--ink); }
+.fxc[data-code] .fxc-team.sel .fxc-tick { background: var(--code-ink); }
+.fxc[data-code] .fxc-team.sel .fxc-tick svg { stroke: #fff; }
 .fxc[data-code].is-picked { border-left-color: var(--lime); }
 .fxc[data-code].phase-live { border-left-color: #c0392b; }
 
@@ -15308,9 +15340,14 @@ html[data-theme="light"] .fxc-code { background: color-mix(in srgb, var(--code-i
    The score line in the state strip says "12–8"; this says which of the two
    clubs those numbers belong to and which one won.
    ========================================================================= */
+/* Inside the side now, not under it — so it is placed in the button's own
+   grid rather than floated below the card. Column 2, under the club name,
+   which is where the eye already is once it has read who this side is. */
+.fxc-team.has-outcome { grid-template-rows: auto auto; align-items: start; }
+.fxc-team.has-outcome .fxc-crest { grid-row: 1 / 3; align-self: center; }
 .fxc-outcome {
-  display: flex; align-items: baseline; gap: 7px; margin-top: 6px;
-  padding: 4px 9px; border-radius: 9px; width: fit-content;
+  grid-column: 2; display: flex; align-items: baseline; gap: 7px; margin-top: 5px;
+  padding: 3px 9px; border-radius: 9px; width: fit-content;
   background: rgba(15,46,34,.055);
 }
 .fxc-outcome .fxc-pts {
@@ -15326,9 +15363,11 @@ html[data-theme="light"] .fxc-code { background: color-mix(in srgb, var(--code-i
 .fxc-outcome.is-won i { color: #1f6b28; }
 .fxc-outcome.is-drew i { color: #8a6206; }
 .fxc-outcome.is-lost { opacity: .72; }
-/* The side that lost is dimmed by .is-dim already; this keeps its score
-   legible anyway — a result nobody can read is not a result. */
-.fxc-team.is-dim + .fxc-outcome { opacity: 1; }
+/* .is-dim fades the whole side, including the score that is now inside it.
+   A result nobody can read is not a result, so the losing side is dimmed
+   less than it was and its outcome pulls back to full. */
+.fxc-team.is-dim.has-outcome { opacity: .78; }
+.fxc-team.is-dim.has-outcome .fxc-outcome { opacity: 1; }
 
 /* ============================================================================
    ROLE BADGES — what you are in this organisation
@@ -15338,6 +15377,11 @@ html[data-theme="light"] .fxc-code { background: color-mix(in srgb, var(--code-i
    page that failed to load rather than as a different role. See
    partials/_role_badge.html.
    ========================================================================= */
+/* The chip's marker is icon-only at every width (see app_base.html: the word
+   crowded out the name it was annotating). The panel's badges keep theirs —
+   there is room in a list row, and "Admin" read before a switch is the whole
+   value of it. */
+.an-ctx-role { gap: 0; padding: 4px 6px; }
 .gt-role, .an-ctx-role {
   display: inline-flex; align-items: center; gap: 4px; flex: none;
   font-family: var(--mark); font-weight: 800; font-size: 9.5px;
@@ -15361,6 +15405,44 @@ html[data-theme="light"] .fxc-code { background: color-mix(in srgb, var(--code-i
 .an-ctx-head .gt-role { margin-left: 6px; vertical-align: middle; }
 
 /* ============================================================================
+   THE NAV, WITH THE ORGANISATION AT LEFT ZERO
+   ----------------------------------------------------------------------------
+   Two faults reported together: "these two are still overlapping, Admin /
+   Dashboard", and "this part feels a little bit squeezed, make it wider".
+
+   THE OVERLAP WAS A FLEX ROW THAT COULD NOT SHRINK. .an-ctx was flex:none, the
+   link row is nowrap by design, and .an-right takes margin-left:auto — so once
+   the content exceeded the bar there was nothing allowed to give, and the row
+   overflowed instead of compressing. The cluster on the right then painted over
+   the last link, which is the "Admin" sitting on top of "Dashboard". Two fixes,
+   because either alone leaves a band where it still happens: everything in the
+   row may now shrink (min-width:0 is the part that actually enables it — a flex
+   item's default min-width:auto is what pins it to its content), and the links
+   collapse into the burger at a width the bar can honestly hold rather than one
+   that assumed a narrower chip.
+
+   AND THE CHIP IS THE FIRST THING IN THE ROW, holding the position the wordmark
+   used to. It gets the width that was being rationed: the organisation and the
+   group are what every other item in the bar is relative to.
+   ========================================================================= */
+.app-nav .an-inner > * { min-width: 0; }
+.gt-v2 .an-ctx, .an-ctx { flex: 0 1 auto; min-width: 0; margin-left: 0; }
+/* Roomier than the 460px it was given as a squeezed middle child, and a floor
+   so it cannot be compressed to an ellipsis by the row around it. */
+.gt-v2 .an-ctx-btn, .an-ctx-btn { max-width: 520px; min-width: 0; }
+.an-ctx-org { min-width: 0; }
+/* The link row gives way before the chip does — it has a burger to fall back
+   on and the chip has nothing. */
+.gt-v2 .an-links, .an-links { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.an-right { flex: none; }
+/* The bar cannot hold eight items, a wide chip and the account cluster below
+   this. It was 1180px, measured against a chip half this width. */
+@media (max-width: 1320px) {
+  .an-links { display: none; }
+  .an-burger { display: inline-grid; }
+}
+
+/* ============================================================================
    THE NAV CHIP AT NARROW WIDTHS
    ----------------------------------------------------------------------------
    It used to be `display: none` below 900px. Which organisation you are in and
@@ -15377,15 +15459,12 @@ html[data-theme="light"] .fxc-code { background: color-mix(in srgb, var(--code-i
 @media (max-width: 900px) {
   .an-ctx { display: inline-flex; margin-left: 6px; min-width: 0; }
   .an-ctx-btn { max-width: min(62vw, 340px); padding: 6px 10px; font-size: 13.5px; }
-  /* .gt-v2 in every selector below, not decoration: the app shell sets
-     `.gt-v2 .an-brand` and `.gt-v2 .app-nav .an-inner` outside any media
-     query, and those beat a bare `.an-brand` here however late in the file it
-     appears. A rule that loses to the one it is meant to replace is the
-     failure mode this whole block exists to fix. */
+  /* The wordmark only renders here for somebody with no organisation yet —
+     everyone else has the switcher in this position — so it is shortened to
+     the mark rather than shrunk. .gt-v2 in the selector because the app shell
+     sets `.gt-v2 .an-brand` outside any media query, and that beats a bare
+     `.an-brand` however late in the file it appears. */
   .gt-v2 .an-brand, .an-brand { font-size: 0; letter-spacing: 0; }
-  /* The mark, rebuilt from nothing: font-size:0 above collapses the element's
-     own text, and these two pseudo-elements draw "GT" in its place — same two
-     colours, same order, a quarter of the width. */
   .gt-v2 .an-brand::before, .an-brand::before { content: "G"; font-size: 19px; color: #fff; }
   .gt-v2 .an-brand::after,  .an-brand::after  { content: "T"; font-size: 19px; color: var(--lime); }
   .gt-v2 .app-nav .an-inner, .app-nav .an-inner { gap: 10px; padding: 0 14px; }
@@ -15399,11 +15478,7 @@ html[data-theme="light"] .fxc-code { background: color-mix(in srgb, var(--code-i
      the group is already naming where you are. */
   .an-ctx-btn:has(.an-ctx-group) .an-ctx-org,
   .an-ctx-btn:has(.an-ctx-group) .an-ctx-sep { display: none; }
-  .an-ctx-role { padding: 3px 6px; }
-  /* Last resort on the narrowest screens: the badge keeps its icon and loses
-     its word. Which organisation beats what you are in it. */
-  .an-ctx-role { font-size: 0; gap: 0; }
-  .an-ctx-role svg { width: 12px; height: 12px; }
+  .an-ctx-role { padding: 3px 5px; }
 }
 
 /* ============================================================================

@@ -330,8 +330,11 @@ dashboard render. The form is inside the loop and already knows its org.
       reason — the filter and the round navigator swap that panel out, and an
       element captured inside it is detached the moment either is used.
 
-      It shows only when there is something to confirm AND the real bar has
-      left the screen, so on a short round nobody ever sees it.
+      It shows the moment there is something to confirm and stays until there
+      is not — deliberately not gated on the real bar having scrolled away.
+      The fixtures scroll inside their own container, so on a long round the
+      page barely moves and "the real button is off screen" is false the whole
+      time you are tipping. See the script for the full reasoning.
       {% endcomment %}
       <div class="slip-dock" id="slipDock" hidden>
         <div class="slip-dock-in">
@@ -751,12 +754,26 @@ any one card.
         dockRefresh(n);
       }
 
-      /* The docked confirm. Two conditions, and both have to be re-tested on
-         every scroll: there is something to confirm, and the real bar is not
-         on screen. Reading the bar's position rather than observing it with an
-         IntersectionObserver because the bar is inside #slipPanel and is
-         replaced wholesale by the filter and the round navigator — an observer
-         would go on watching a detached node and the dock would stick. */
+      /* The docked confirm. ONE condition: you have picked something.
+   
+         It was two — picked something, AND the real bar has scrolled off — and
+         that second test is what put it back out of reach. The fixtures have
+         their own scroll container (.fixtures.gt-scroll), so on the round the
+         client was tipping the page itself barely moves: you scroll INSIDE the
+         list, the slip bar above it never leaves the viewport, the dock
+         therefore never appears, and you are back to scrolling up to confirm.
+         Chasing that with a second scroll listener on the inner element is a
+         listener per swapped container and a bug waiting on the next one.
+
+         "The confirm tip must be floating provided I have picked something to
+         tip, regardless of whether I am scrolling the inside scroll bar on the
+         fixtures or of the whole website." So: picks > 0, and nothing else. No
+         scroll listener at all — the only input is the count this already
+         recomputes on every pick and every swap.
+
+         The redundancy at the top of the page, where both are visible at once,
+         is the price and it is small: they are plainly the same button, one of
+         them is a floating pill, and pressing either opens the same sheet. */
       var dockPicked = 0;
       function dockRefresh(n){
         if (typeof n === 'number') dockPicked = n;
@@ -764,24 +781,11 @@ any one card.
         if (!dock) return;
         var num = document.getElementById('slipDockCount');
         if (num) num.textContent = dockPicked;
+        /* No real button means a locked or finished round: there is nothing to
+           confirm and the dock must not offer one. */
         var real = document.getElementById('slipReview');
-        /* No real button means a locked round: nothing to confirm, and the
-           dock must not offer one. */
-        var away = false;
-        if (real && !real.hidden) {
-          var box = real.getBoundingClientRect();
-          away = box.bottom < 0 || box.top > (window.innerHeight || 0);
-        }
-        dock.hidden = !(dockPicked > 0 && real && !real.hidden && away);
+        dock.hidden = !(dockPicked > 0 && real && !real.hidden);
       }
-      /* rAF-throttled: scroll fires far more often than the answer changes. */
-      var dockTick = false;
-      window.addEventListener('scroll', function(){
-        if (dockTick) return;
-        dockTick = true;
-        window.requestAnimationFrame(function(){ dockTick = false; dockRefresh(); });
-      }, { passive: true });
-      window.addEventListener('resize', function(){ dockRefresh(); }, { passive: true });
 
       /* One path to the sheet: the dock presses the real button rather than
          opening it itself, so the two can never come to mean different things. */

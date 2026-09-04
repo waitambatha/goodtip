@@ -54,35 +54,30 @@ Expects: team, form (a reader row, optional), pick ("home"|"away"),
 
   {% else %}
   {# Locked or graded: still a side, no longer a control. #}
-  <div class="fxc-team{% if selection == pick %} sel{% else %} is-dim{% endif %}">
+  <div class="fxc-team{% if selection == pick %} sel{% else %} is-dim{% endif %}{% if match.result %} has-outcome{% endif %}">
     <span class="fxc-crest">{% crest team %}</span>
     <span class="fxc-name">{{ team.name }}</span>
+    {% comment %}
+    HOW IT FINISHED, INSIDE THE SIDE IT HAPPENED TO.
+
+    ASKED FOR: "this info where it shows the scores and outcome, whether won or
+    lost, should be inside that tip button, not outside." It sat underneath as
+    a sibling, which made it read as a caption about the card rather than as
+    this club's own line — and on a card with two clubs either side of a versus,
+    whose 24 it is was the whole question.
+
+    Only rendered here, on the branch that is no longer a control, because a
+    result and a live pick cannot coexist: `result` is written when the match is
+    graded, and a graded match is never editable.
+    {% endcomment %}
+    {% if match.result %}
+    <span class="fxc-outcome{% if match.result == pick %} is-won{% elif match.result == 'draw' %} is-drew{% else %} is-lost{% endif %}">
+      <b class="fxc-pts">{% if pick == 'home' %}{{ match.home_score|default_if_none:"–" }}{% else %}{{ match.away_score|default_if_none:"–" }}{% endif %}</b>
+      <i>{% if match.result == 'draw' %}Drew{% elif match.result == pick %}Won{% else %}Lost{% endif %}</i>
+    </span>
+    {% endif %}
     <span class="fxc-tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7"/></svg></span>
   </div>
-  {% endif %}
-
-  {% comment %}
-  HOW IT FINISHED, on the side it happened to.
-
-  ASKED FOR AS: "the previous games — I should be able to see the results even
-  if I did not tip, the scores, and who won." The score line was already on the
-  card (components/_match_state.html renders "12–8"), but a bare pair of numbers
-  does not say which club they belong to, and on a card where the two sides sit
-  left and right of a versus the reader has to guess which number is theirs.
-
-  So the score goes on the club, and the club that won is marked as having won.
-  Independent of whether anybody tipped it: a result is a fact about the game,
-  not about the reader's slate.
-
-  `result` is set only once a match is graded, which is what keeps this off
-  fixtures still in play — those carry the running score in the state strip,
-  where a number that is still moving belongs.
-  {% endcomment %}
-  {% if match.result %}
-  <span class="fxc-outcome{% if match.result == pick %} is-won{% elif match.result == 'draw' %} is-drew{% else %} is-lost{% endif %}">
-    <b class="fxc-pts">{% if pick == 'home' %}{{ match.home_score|default_if_none:"–" }}{% else %}{{ match.away_score|default_if_none:"–" }}{% endif %}</b>
-    <i>{% if match.result == 'draw' %}Drew{% elif match.result == pick %}Won{% else %}Lost{% endif %}</i>
-  </span>
   {% endif %}
 
   {% comment %}
