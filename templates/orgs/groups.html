@@ -16,32 +16,61 @@ admins who must decide on them and to the member who asked, so nobody else sees
 a half-built thing in the list.
 {% endcomment %}
 
-<div class="dept-hero">
+{% comment %}
+=============================================================================
+HIERARCHY, AND THEN THE TWO THINGS AN ADMIN CAN DO.
+=============================================================================
+"Hierarchy must be there, so first have them all centred, and have this AquaFlow
+Water Co to be larger than the Groups. Then under this [lead sentence] is when
+we will bring the create group, and this button that you will redesign to make
+it huge a little — Switch groups off."
+
+The organisation outranks the word, the same swap the leaderboard and the
+members screen make: the comp's name is the only line that differs between one
+organisation and the next, and "Groups" labels a screen you already navigated
+to.
+
+BOTH ACTIONS SIT TOGETHER, UNDER THE SENTENCE. Switch-groups-off was a small
+ghost button at the very foot of the page, below the list and below the create
+sheet — an admin looking for it had to scroll past every group to find out it
+existed. It is a decision about this whole screen, so it belongs where the other
+decision about this whole screen is, at the same size, and phrased so the
+destructive-sounding one is visibly the quieter of the two.
+=============================================================================
+{% endcomment %}
+<div class="dept-hero is-centred">
   <div class="dh-copy">
-    <div class="gh-eyebrow">{{ org.name }}</div>
-    <h1>Groups</h1>
+    <div class="gh-eyebrow is-title">{{ org.name }}</div>
+    <h1 class="dh-word">Groups</h1>
     {% if org.groups_enabled %}
     <p class="dh-lead">Find your team inside {{ org.name }}, or start it if it isn't here yet. A group has its own ladder and its own wall — everyone still tips the same fixtures.</p>
     {% else %}
     <p class="dh-lead">Split {{ org.name }} into teams — Marketing, IT, Sales — each with its own ladder.</p>
     {% endif %}
+
+    {% if org.groups_enabled %}
+    <div class="dh-acts">
+      {% comment %}
+      Opens the picker rather than jumping to a form further down the page. The
+      form that used to live down there asked for a name, a kind and a
+      description as three separate optional-looking fields, which is three
+      decisions before you have made the one that matters.
+      {% endcomment %}
+      <button type="button" data-coach="groups-create" class="abtn abtn-primary abtn-lg dh-cta" data-group-open>
+        <svg class="cic" aria-hidden="true" viewBox="0 0 24 24"><path d="M11 5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5Z"/></svg>
+        Create group
+      </button>
+      {% if is_admin %}
+      <form method="post" action="{% url 'orgs:groups_toggle' org.id %}" data-busy="Switching off"
+            data-confirm="Every group and every tip in them stays exactly where it is. This only takes groups out of the nav."
+            data-confirm-title="Switch groups off?" data-confirm-ok="Switch off">
+        {% csrf_token %}
+        <button type="submit" class="abtn abtn-ghost abtn-lg dh-cta">Switch groups off for {{ org.name }}</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
   </div>
-  {% if org.groups_enabled %}
-  <div class="dh-side">
-    {% comment %}
-    Opens the picker rather than jumping to a form further down the page. The
-    form that used to live down there asked for a name, a kind and a
-    description as three separate optional-looking fields, which is three
-    decisions before you have made the one that matters — and it sat below the
-    list permanently, so the page ended on a form whether or not anyone wanted
-    one. The sheet asks the real question instead: which team is this?
-    {% endcomment %}
-    <button type="button" data-coach="groups-create" class="abtn abtn-primary abtn-lg dh-cta" data-group-open>
-      <svg class="cic" aria-hidden="true" viewBox="0 0 24 24"><path d="M11 5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5Z"/></svg>
-      Create group
-    </button>
-  </div>
-  {% endif %}
 </div>
 
 {% if not org.groups_enabled %}
@@ -289,15 +318,6 @@ the view already expects (name, kind, label), so nothing behind this changed.
     </form>
   </div>
 </div>
-
-{% if is_admin %}
-<form method="post" action="{% url 'orgs:groups_toggle' org.id %}" style="margin-top:22px;" data-busy="Switching off"
-      data-confirm="Every group and every tip in them stays exactly where it is. This only takes groups out of the nav."
-      data-confirm-title="Switch groups off?" data-confirm-ok="Switch off">
-  {% csrf_token %}
-  <button type="submit" class="abtn abtn-ghost abtn-sm">Switch groups off for {{ org.name }}</button>
-</form>
-{% endif %}
 
 {% endif %}
 {% endblock %}

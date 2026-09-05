@@ -1646,11 +1646,28 @@ def members_view(request, org_id: int):
             child_groups = [
                 {"org": c, "admins": admins_by_org.get(c.id, [])} for c in children
             ]
+    # THE TWO COUNTS THE PAGE NOW LEADS WITH.
+    #
+    # ASKED FOR: "it should not be at the bottom — what if we had 200 members,
+    # will I scroll down to know we have that? It should be at the top, but as a
+    # card ... have it numbered, so for our case it should read zero, and have a
+    # click to open."
+    #
+    # Two cards, because they are two different things and the client has been
+    # bitten by the difference: "KFC might have many branches — that is not a
+    # group." A group is a team inside this organisation (Marketing, IT) sharing
+    # its ladder; a child organisation is a branch with its own members, its own
+    # charity and its own ladder that rolls up into this one.
+    group_count = Group.objects.filter(
+        org=org, approval_status=Group.APPROVAL_APPROVED,
+    ).count()
     return render(request, "orgs/members.html", {
         "org": org,
         "members": members,
         "pending_requests": pending_requests,
         "child_groups": child_groups,
+        "group_count": group_count,
+        "child_org_count": len(child_groups or []),
         "role_choices": OrgMember.ROLE_CHOICES,
         "is_owner": me.is_league_owner,
     })

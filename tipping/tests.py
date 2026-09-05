@@ -2933,3 +2933,93 @@ class DeepSheetContrastTests(TestCase):
         )
         self.assertTrue(block)
         self.assertIn("#FFFFFF", block[-1])
+
+
+class MyTipsAcrossEveryCompetitionTests(TestCase):
+    """"When I pick them I see the respective tips of, let's say, NRL — but when
+    I pick all competitions I only see AFLW."
+
+    Exactly right, and it was not the filter. A Round belongs to ONE Series, so
+    an organisation running two codes has two separate "round 4" rows; the page
+    chose a single Round and listed its matches, so the filter promising every
+    code delivered whichever one happened to be picked.
+    """
+
+    def setUp(self):
+        self.sport = Sport.objects.create(name="Footy", slug="mt-footy")
+        self.afl = Series.objects.create(sport=self.sport, name="MT Aussie Rules", slug="mt-afl")
+        self.nrl = Series.objects.create(sport=self.sport, name="MT Rugby League", slug="mt-nrl")
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(name="Two Code Co", season=self.season)
+        self.user = User.objects.create_user(
+            email="mt@example.com", password="x", display_name="Mo",
+        )
+        OrgMember.objects.create(user=self.user, org=self.org)
+        # The filter derives its chips from the series that actually have
+        # rounds in this org (services.competition_filter), so creating the
+        # rounds below is what puts both codes on the page.
+        self.client.force_login(self.user)
+
+        self.afl_match = self._tipped_match(self.afl, "Swans", "Blues", 4)
+        self.nrl_match = self._tipped_match(self.nrl, "Eels", "Sharks", 4)
+
+    def _tipped_match(self, series, home_name, away_name, number):
+        home = Team.objects.create(name=home_name, slug=home_name.lower(), series=series)
+        away = Team.objects.create(name=away_name, slug=away_name.lower(), series=series)
+        rnd = Round.objects.create(
+            org=self.org, round_number=number, series=series,
+            stage=Round.STAGE_REGULAR,
+            lockout_at=timezone.now() + timedelta(days=2),
+        )
+        match = Match.objects.create(
+            round=rnd, home_team=home, away_team=away,
+            kickoff_at=timezone.now() + timedelta(days=2),
+        )
+        Tip.objects.create(user=self.user, match=match, org=self.org, selection="home")
+        return match
+
+    def _body(self, **params):
+        return self.client.get(
+            reverse("tipping:my_tips", args=[self.org.id]), params,
+        ).content.decode()
+
+    def test_all_competitions_shows_every_code(self):
+        body = self._body()
+        self.assertIn("Swans", body)
+        self.assertIn("Eels", body, "the other code's round 4 was dropped")
+
+    def test_one_competition_still_shows_only_that_one(self):
+        """The fix must not turn the filter into no filter."""
+        body = self._body(series=self.nrl.slug)
+        self.assertIn("Eels", body)
+        self.assertNotIn("Swans", body)
+
+    def test_a_round_number_names_the_same_round_in_both_codes(self):
+        """Round 4 is round 4 in every code, so both round-4 rows are on screen
+        together and round 3 is one step away — not two codes' round 4 first."""
+        Round.objects.create(
+            org=self.org, round_number=3, series=self.afl,
+            stage=Round.STAGE_REGULAR, lockout_at=timezone.now(),
+        )
+        r = self.client.get(reverse("tipping:my_tips", args=[self.org.id]))
+        self.assertEqual(r.context["round_total"], 2, "rounds counted as rows, not numbers")
+        self.assertEqual([n for n in r.context["round_numbers"]], [4, 3])
+
+    def test_the_stepper_offers_eight_rounds(self):
+        """"Have the numbers to be up to like 8, the latest being the default."""
+        for n in range(1, 12):
+            if n == 4:
+                continue
+            Round.objects.create(
+                org=self.org, round_number=n, series=self.afl,
+                stage=Round.STAGE_REGULAR, lockout_at=timezone.now(),
+            )
+        r = self.client.get(reverse("tipping:my_tips", args=[self.org.id]))
+        strip = r.context["round_strip"]
+        self.assertEqual(len(strip["window"]), 8)
+        self.assertEqual(max(strip["numbers"]), 11, "the window is anchored on the newest")
+
+    def test_the_round_links_carry_the_competition_filter(self):
+        """Stepping a round must not silently widen the page back to every code."""
+        body = self._body(series=self.nrl.slug)
+        self.assertIn(f"series={self.nrl.slug}", body)

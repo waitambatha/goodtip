@@ -15902,8 +15902,16 @@ html[data-theme="light"] .gt-app .bb-arrow { background: rgba(15,46,34,.06); bor
 .sheet-page .gt-head.is-orgfirst .gh-eyebrow,
 .gt-head.is-orgfirst .gh-eyebrow {
   font-family: var(--display); font-weight: 400;
-  font-size: clamp(28px, 4.2vw, 44px);
-  letter-spacing: -.02em; text-transform: none; line-height: 1.05;
+  /* SMALLER THAN THE FIRST ATTEMPT, TO KEEP IT ON ONE LINE — "this should only
+     be one line, to make it neat, so reduce the size a little bit."
+
+     At 44px, "AquaFlow Water Co · AFL + NRL 2026" ran past the 62ch cap that
+     .gt-head.is-centred puts on the title column and broke over two lines,
+     which is exactly what an eyebrow must not do: it is one fact, and a fact
+     split across two lines reads as two. Thirty is where a name of that length
+     and four codes still fit the column on a laptop. */
+  font-size: clamp(19px, 2.6vw, 30px);
+  letter-spacing: -.015em; text-transform: none; line-height: 1.15;
   color: #fff; opacity: 1;
 }
 .sheet-page .gt-head.is-orgfirst h1,
@@ -15924,6 +15932,19 @@ html[data-theme="light"] .gt-app.sheet-page .gt-head.is-orgfirst h1 { color: var
    first option off the left edge with nothing to scroll back with. */
 .room-switch.is-centred .rw-top {
   justify-content: center; text-align: center;
+}
+
+/* THE PAGE'S ACTION, between the sentence and the rooms, hard right.
+   "At the furthest right, not centre." Its own row rather than a corner of
+   .rw-top, so the sentence keeps the full width to wrap in and the button
+   cannot be pushed under it on a narrow screen. */
+.room-switch .rw-action {
+  display: flex; justify-content: flex-end; margin: 0 0 10px;
+}
+/* On a phone the far right of a 320px column is nowhere useful, and a button
+   with empty space either side of it reads as something that failed. */
+@media (max-width: 620px) {
+  .room-switch .rw-action > .abtn { flex: 1; justify-content: center; }
 }
 
 /* ---- AN ACTION AFTER THE ROOM, NOT INSIDE THE HEADER ---------------------
@@ -16652,3 +16673,205 @@ a.pf-row:hover { border-color: rgba(45,122,58,.4); }
 .chat-row:hover .chat-repbtn, .chat-repbtn:focus-visible { opacity: .8; }
 .chat-repbtn:hover { color: #9a2b2b; opacity: 1; }
 .chat-repbtn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ==========================================================================
+   THE BAR MAKES ROOM FOR THE ORGANISATION'S NAME
+   ==========================================================================
+   "We can move the GOODTIP more to the left, because I want to have AquaFlow
+   Water Co at least be seen in full."
+
+   Two things were taking the width the name needed: the bar's own outer
+   padding, which grew to 44px on a wide screen, and a chip capped at 24vw that
+   truncated anything longer than about fifteen characters.
+
+   The mark moves left by giving the bar a smaller left inset than right — it is
+   a badge, and a badge sitting nearer the edge still reads as one — and the
+   chip is allowed a third of the bar before it starts to ellipsis. Both are
+   caps rather than fixed widths, so a short name still leaves the links where
+   they were. */
+.gt-v2 .app-nav .an-inner { padding-left: clamp(12px, 1.2vw, 20px); }
+.an-ctx-btn { max-width: clamp(190px, 33vw, 480px); }
+/* The name is the point of the control, so it gets the room inside it: the
+   role glyph and the chevron are fixed-width and the name takes the rest. */
+.an-ctx-org { min-width: 0; flex: 1 1 auto; }
+
+/* ---- THE ORGANISATION PANEL, WIDER --------------------------------------
+   "Up to down it's good, that does not need change, but the sideways left to
+   right we can increase it a little, because it kinda looks squeezed."
+
+   Only the horizontal measure moves. The rows keep their heights, their
+   padding and their order — what changes is that an organisation name and its
+   "You run this one" no longer have to share 220px with a role badge. */
+.an-menu-panel.an-ctx-panel { min-width: 640px; }
+.an-ctx-col { min-width: 290px; max-width: 360px; padding: 9px; }
+@media (max-width: 1100px) {
+  .an-menu-panel.an-ctx-panel { min-width: 0; }
+  .an-ctx-col { min-width: 0; max-width: none; }
+}
+
+/* ==========================================================================
+   MY TIPS — the split, and the two full-width bars above it
+   ========================================================================== */
+
+/* "The table that showcases the results ... then this one which will take like
+   1/3, Your season."
+
+   .gt-shell alone gives the sidebar a fixed 320px, so on a 1300px sheet the
+   fixtures get 74% and on a 1000px one they get 66% — the proportion moves with
+   the window instead of being the proportion that was asked for. Two thirds and
+   one third, stated. */
+.gt-shell.gt-shell-thirds { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+@media (max-width: 1080px) { .gt-shell.gt-shell-thirds { grid-template-columns: 1fr; } }
+
+/* ---- the round bar --------------------------------------------------------
+   The stepper takes its own row across the page and the picker takes the next,
+   because eight numbers, two arrows, a dropdown and a lock time do not fit one
+   line at any width worth designing for — and wrapped, they wrap in a different
+   place on every screen. */
+.boardbar-round .bb-round-pick {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.bb-form { display: flex; align-items: center; gap: 6px; margin: 0; }
+/* The Go button is the no-JavaScript path. Once the script that submits on
+   change is running it has nothing to do, so it takes itself off the row
+   rather than sitting there as a second way to do what already happened. */
+.bb-form.is-live .bb-go { display: none; }
+.bb-go {
+  font-family: var(--mark); font-size: 12px; font-weight: 800;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: 9px 14px; border-radius: 10px; cursor: pointer;
+  background: var(--lime); color: var(--deep); border: 0;
+}
+.bb-when {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; color: rgba(232,228,213,.72); margin-left: auto;
+}
+.bb-when svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; }
+html[data-theme="light"] .gt-app .bb-when { color: var(--lt-quiet); }
+
+/* Eight buttons rather than five, so the strip takes the bar's whole first line
+   and the picker takes the second. Two rows beat one that wraps in a different
+   place on every screen. */
+.boardbar-round { flex-direction: column; align-items: stretch; }
+.boardbar-round .rstrip { width: 100%; }
+.boardbar-round .rs-nums { flex-wrap: wrap; }
+.boardbar-round .bb-round-pick { flex: 1 1 100%; }
+
+/* THE ORGANISATION OUTRANKS THE WORD on the groups hero too. `.gh-eyebrow
+   .is-title` is scoped to .gt-head, which this hero is not, so the size has to
+   be stated here or the line stays 12px capitals under a 44px "Groups". */
+.dept-hero .gh-eyebrow.is-title {
+  font-family: var(--display); font-weight: 400; text-transform: none;
+  font-size: clamp(24px, 3.4vw, 38px); letter-spacing: -.015em; line-height: 1.12;
+  color: #fff; opacity: 1;
+}
+html[data-theme="light"] .gt-app .dept-hero .gh-eyebrow.is-title { color: var(--lt-ink); }
+
+/* ==========================================================================
+   MEMBERS — the header, and the two cards that lead it
+   ========================================================================== */
+
+/* THE ORGANISATION OUTRANKS THE WORD, centred. Same swap as the leaderboard's
+   .gt-head.is-orgfirst, on the other header component: "there is no way this
+   can be smaller than Members — have this AquaFlow Water Co larger." */
+.app-head.is-centred { flex-direction: column; align-items: center; text-align: center; }
+.app-head.is-centred .app-sub { max-width: 58ch; margin-left: auto; margin-right: auto; }
+.app-head.is-orgfirst .app-eyebrow {
+  font-family: var(--display); font-weight: 400; text-transform: none;
+  font-size: clamp(22px, 3.2vw, 36px); letter-spacing: -.015em; line-height: 1.12;
+  color: #fff;
+}
+.app-head.is-orgfirst .app-h1 {
+  font-family: var(--mark); font-weight: 700; text-transform: uppercase;
+  font-size: clamp(13px, 1.5vw, 17px); letter-spacing: .16em;
+  color: var(--lime); margin-top: 10px;
+}
+.app.page-deep .app-head.is-orgfirst .app-eyebrow { color: #fff; }
+.app.page-deep .app-head.is-orgfirst .app-h1 { color: var(--lime); }
+html[data-theme="light"] .gt-app .app-head.is-orgfirst .app-eyebrow { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .app-head.is-orgfirst .app-h1 { color: var(--lt-accent-ink); }
+.app-head-act { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+
+/* ---- WHAT IS UNDER THIS ORGANISATION -------------------------------------
+   Two cards, side by side, each a link with its own count. They lead the page
+   because "what if we had 200 members — will I scroll down to know we have
+   that?" A count at the top answers it without a scroll, and reads zero just
+   as usefully as it reads seven. */
+.ocards {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px; margin-bottom: 22px;
+}
+.ocard {
+  display: flex; align-items: center; gap: 14px; text-decoration: none;
+  padding: 16px 18px; border-radius: var(--gt-r);
+  background: var(--gt-card); border: 1px solid var(--gt-hair);
+  color: var(--ink); transition: border-color .15s var(--ease), transform .15s var(--ease);
+}
+.ocard:hover { border-color: rgba(45,122,58,.4); transform: translateY(-1px); }
+.ocard-ic {
+  width: 40px; height: 40px; flex: none; display: grid; place-items: center;
+  border-radius: 12px; background: rgba(45,122,58,.1); color: var(--forest);
+}
+.ocard-ic svg { width: 19px; height: 19px; fill: currentColor; }
+.ocard-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ocard-txt b { font-size: 15px; font-weight: 800; }
+.ocard-txt i { font-style: normal; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+/* The number is the point of the card, so it is the biggest thing on it. */
+.ocard-n {
+  flex: none; font-family: var(--display); font-size: 30px; line-height: 1;
+  color: var(--forest);
+}
+.ocard-go { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--muted); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---- TEAM MANAGEMENT: the card IS the control ----------------------------
+   Closed it is a card like the two above; open it is the panel. Everything
+   that CHANGES somebody lives in here, so the members table above can be the
+   list of facts it was always trying to be. */
+.tmcard {
+  margin-top: 22px; border-radius: var(--gt-r);
+  background: var(--gt-card); border: 1px solid var(--gt-hair); overflow: hidden;
+}
+.tmcard-head {
+  display: flex; align-items: center; gap: 14px; cursor: pointer;
+  padding: 16px 18px; list-style: none;
+}
+.tmcard-head::-webkit-details-marker { display: none; }
+.tmcard-head:hover { background: rgba(45,122,58,.05); }
+.tmcard-chev {
+  width: 16px; height: 16px; flex: none; fill: none; stroke: var(--muted);
+  stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
+  transition: transform .18s var(--ease);
+}
+.tmcard[open] .tmcard-chev { transform: rotate(90deg); }
+.tmcard-body { padding: 4px 18px 20px; border-top: 1px solid var(--gt-hair); }
+.tmcard-body .card-lead { margin: 14px 0 16px; }
+.tm-nominate { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--gt-hair); max-width: 560px; }
+
+/* ==========================================================================
+   GROUPS — a centred hero with both of its decisions under the sentence
+   ========================================================================== */
+.dept-hero.is-centred { grid-template-columns: 1fr; text-align: center; justify-items: center; }
+.dept-hero.is-centred .dh-lead { margin-left: auto; margin-right: auto; }
+/* The organisation outranks the word here too. .gh-eyebrow.is-title already
+   sets the display face at title size for the ladder; the word underneath
+   steps down to the small lime capitals. */
+.dept-hero.is-centred .dh-word {
+  font-family: var(--mark); font-weight: 700; text-transform: uppercase;
+  font-size: clamp(13px, 1.5vw, 17px); letter-spacing: .16em;
+  color: var(--lime); margin: 10px 0 12px;
+}
+html[data-theme="light"] .gt-app .dept-hero.is-centred .dh-word { color: var(--lt-accent-ink); }
+/* BOTH DECISIONS, SAME SIZE, UNDER THE SENTENCE. Switch-groups-off was a small
+   ghost button at the very foot of the page, under the list and under the
+   create sheet — an admin had to scroll past every group to learn it existed.
+   It is a decision about this screen, so it sits where the other decision about
+   this screen is. Ghost against solid still says which one is the quiet one. */
+.dept-hero .dh-acts {
+  display: flex; align-items: center; justify-content: center;
+  gap: 14px; flex-wrap: wrap; margin-top: 22px;
+}
+.dept-hero .dh-acts form { margin: 0; }
+@media (max-width: 620px) {
+  .dept-hero .dh-acts { flex-direction: column; align-items: stretch; }
+  .dept-hero .dh-acts .abtn { width: 100%; justify-content: center; }
+}

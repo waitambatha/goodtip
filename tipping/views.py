@@ -656,11 +656,33 @@ def my_tips_view(request, org_id: int):
             selected_round = current_round(rounds)
     else:
         selected_round = _round_with_my_tips(request.user, org, rounds, _group(request, org))
+
+    # ---- ALL COMPETITIONS MEANS ALL COMPETITIONS.
+    #
+    # REPORTED AS: "when I pick them I see the respective tips of, let's say,
+    # NRL — but when I pick all competitions I only see AFLW."
+    #
+    # Exactly right, and it was not the filter. A Round belongs to ONE series,
+    # so with four codes running there are four separate "round 4" rows. The
+    # page picked a single Round and listed its matches, so "all competitions"
+    # showed whichever one of the four happened to be chosen — one code's tips,
+    # under a filter promising every code's.
+    #
+    # A round NUMBER is the thing the reader means. Round 4 is round 4 in all
+    # four codes, so the page now shows every round carrying the selected
+    # number across the selected competitions, and `selected_round` is only the
+    # anchor that names it. With one competition filtered the group is one
+    # round and nothing about the page changes.
+    round_group = [
+        r for r in rounds
+        if selected_round is not None and r.round_number == selected_round.round_number
+    ]
     all_rows = []
     round_open, round_lock_note = True, ""
-    if selected_round:
+    if round_group:
         matches = list(
-            selected_round.matches
+            Match.objects
+            .filter(round__in=round_group)
             .select_related("home_team", "away_team", "round__series")
         )
         tips = {
@@ -669,25 +691,34 @@ def my_tips_view(request, org_id: int):
         }
         # One batched read for the round rather than three queries per fixture.
         readers = _readers_for(matches)
-        # This screen shows a single round, so the window verdict is the same
-        # for every fixture on it — resolved once and reported once, above the
-        # list, rather than repeated on every card.
-        state = tip_window(org).get(selected_round.id, {"open": True, "waits_for": None})
-        round_open = state["open"]
-        if not round_open and state["waits_for"] is not None:
+        # THE WINDOW IS PER ROUND, and there can now be several on screen —
+        # AFL's round 4 may be open while NRL's is still waiting on round 3.
+        # So the verdict is looked up per fixture, and the banner above the
+        # list reports the anchor's, which is the one the round picker names.
+        windows = tip_window(org)
+        states = {
+            r.id: windows.get(r.id, {"open": True, "waits_for": None})
+            for r in round_group
+        }
+        anchor_state = states.get(selected_round.id, {"open": True, "waits_for": None})
+        # Open if ANY of them is: the composer is per fixture, and telling a
+        # member the round is shut while three of its games still take a tip
+        # would be the same bug in the other direction.
+        round_open = any(st["open"] for st in states.values())
+        if not anchor_state["open"] and anchor_state["waits_for"] is not None:
             round_lock_note = (
                 f"Locked. You can tip round {selected_round.round_number} once "
-                f"round {state['waits_for'].round_number} is over."
+                f"round {anchor_state['waits_for'].round_number} is over."
             )
         for m in matches:
             all_rows.append({
                 "match": m,
                 "tip": tips.get(m.id),
                 # A pick can change until THIS match kicks off, and only while
-                # its round is inside the tipping window. The round's own
+                # its OWN round is inside the tipping window. The round's own
                 # lockout is its first kickoff, so gating on it closed games
                 # that had not started yet.
-                "editable": not m.is_locked and round_open,
+                "editable": not m.is_locked and states.get(m.round_id, {}).get("open", True),
                 # upcoming / live / complete — drives the state filter below
                 "phase": m.phase,
                 # MatchReader's read. None whenever there is no fitted model
@@ -768,13 +799,39 @@ def my_tips_view(request, org_id: int):
             "round_open": round_open, "round_lock_note": round_lock_note,
         })
 
-    # ---- sidebar: where this member sits, and what's left to do this round.
-    # `rounds` is newest-first, so "previous round" is the next item along.
+    # ---- the round picker, counted in ROUND NUMBERS rather than Round rows.
+    #
+    # With four codes running, `rounds` holds four rows per number, so stepping
+    # through it walked AFL round 4 → AFLW round 4 → NRL round 4 before ever
+    # reaching round 3, and "of 80" counted rows rather than rounds. Numbers
+    # are what the reader means and what the strip shows.
+    #
+    # `anchor_for` maps a number back to the Round the links carry, because the
+    # URL has always been ?round=<id> and every notification ever sent uses it.
+    # Newest-first, so the first row for a number is the anchor.
+    numbers_desc, anchor_for = [], {}
+    for r in rounds:
+        if r.round_number not in anchor_for:
+            anchor_for[r.round_number] = r
+            numbers_desc.append(r.round_number)
+    # round_strip walks a window backwards from the END of the list, so it
+    # wants them ascending.
+    numbers_asc = list(reversed(numbers_desc))
+    selected_number = selected_round.round_number if selected_round else None
+    # EIGHT, NOT FIVE — "have the numbers to be up to like 8, the latest being
+    # the one that will be default, so I can see the 25, 24, going downwards."
+    # The strip is anchored on the newest round and the selected one is always
+    # inside the window, so a link to round 3 in August opens with round 3 on
+    # screen rather than showing the last eight and leaving the reader to hunt.
+    tips_strip = round_strip(
+        numbers_asc, selected_number, request.GET.get("back"),
+        size=8, values={n: anchor_for[n].id for n in numbers_asc},
+    )
     prev_round = next_round = None
-    if selected_round:
-        idx = rounds.index(selected_round)
-        prev_round = rounds[idx + 1] if idx + 1 < len(rounds) else None
-        next_round = rounds[idx - 1] if idx > 0 else None
+    if selected_number is not None:
+        at = numbers_desc.index(selected_number)
+        prev_round = anchor_for[numbers_desc[at + 1]] if at + 1 < len(numbers_desc) else None
+        next_round = anchor_for[numbers_desc[at - 1]] if at > 0 else None
 
     # Round-level stats describe the whole round, not the filtered view.
     total_matches = round_match_count
@@ -795,8 +852,15 @@ def my_tips_view(request, org_id: int):
         "round_open": round_open, "round_lock_note": round_lock_note,
         "state": state, "phase_counts": phase_counts, "total_all": len(all_rows),
         "prev_round": prev_round, "next_round": next_round,
-        "round_position": len(rounds) - rounds.index(selected_round) if selected_round else 0,
-        "round_total": len(rounds),
+        # Counted in numbers, not rows: with four codes on the page "of 80" was
+        # four times the length of the season.
+        # What the round links must carry so stepping a round never silently
+        # widens the page back to every competition.
+        "tips_keep": "&".join(f"series={sl}" for sl in active_slugs),
+        "round_strip": tips_strip, "round_numbers": numbers_desc,
+        "round_anchors": [anchor_for[n] for n in numbers_desc],
+        "round_position": len(numbers_desc) - numbers_desc.index(selected_number) if selected_number is not None else 0,
+        "round_total": len(numbers_desc),
         "total_matches": total_matches,
         "tips_this_round": tips_this_round,
         "tips_remaining": total_matches - tips_this_round,
@@ -1292,6 +1356,15 @@ def leaderboard_view(request, org_id: int):
     }
     return render(request, "leaderboard.html", {
         "org": org, "rounds": rounds, "selected_round_id": selected_round_id or "all",
+        # Built here rather than in the template. The button now rides inside
+        # the room switcher, which takes its href as an `action_url` argument —
+        # and a Django template can neither concatenate a {% url %} with a
+        # conditional query string on one line nor pass an {% if %} into an
+        # {% include %}. One string out of the view, one argument in.
+        "my_stats_url": (
+            reverse("tipping:my_stats", args=[org.id])
+            + (f"?comp={selected_comp.slug}" if selected_comp is not None else "")
+        ),
         "comp_options": comp_options, "selected_comp": selected_comp,
         "comp_keep": comp_keep, "comp_keep_pairs": comp_keep_pairs,
         "comp_keep_round": comp_keep_round,

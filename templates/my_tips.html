@@ -7,68 +7,141 @@
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 
 {% block app_content %}
-{% include "partials/room_switch.html" with noun="round" surface="dark" %}
+{% comment %}
+=============================================================================
+HIERARCHY OF INFORMATION, top to bottom.
+=============================================================================
+Asked for in this order, and it is the order somebody actually reads in:
 
-<div class="gt-head">
+  1. which comp        AquaFlow Water Co · AFL + NRL 2026 — "this should have
+                       similar size or larger than the My tips"
+  2. which screen      My tips, and what it is for
+  3. which room        the room switcher: whose round this is
+  4. how you are going the three numbers
+  5. which codes       the competition filter, full width
+  6. which round       the round stepper, full width
+  7. the round itself  the fixtures, two thirds, with your season beside them
+
+Everything above the split is a decision about what the page shows; everything
+below it is the page. They used to be interleaved — the round picker was a
+corner of the header, the competition filter was inside the two-thirds column
+with the fixtures, and the room switcher opened the page above its own title.
+=============================================================================
+{% endcomment %}
+<div class="gt-head is-orgfirst">
   <div>
     <div class="gh-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div>
     <h1>My tips</h1>
     <p class="gh-lead">Make your picks, earn points, support a cause.</p>
   </div>
-  {% if selected_round %}
-  <div class="gh-actions">
-    <div class="gt-rounder" data-coach="tips-current">
-      <a href="?round={{ prev_round.id }}" class="rnd-btn {% if not prev_round %}off{% endif %}" aria-label="Previous round"><svg><use href="#ic-chev-left"/></svg></a>
-      <div>
-        <div class="rnd-now">
-          <b>Round {{ selected_round.round_number }}</b>
-          <small>of {{ round_total }}</small>
-        </div>
-        <div class="rnd-when"><svg><use href="#ic-clock"/></svg> Locks {{ selected_round.lockout_at|date:"j M, g:i A" }}</div>
-      </div>
-      <a href="?round={{ next_round.id }}" class="rnd-btn solid {% if not next_round %}off{% endif %}" aria-label="Next round"><svg><use href="#ic-arrow-right"/></svg></a>
-    </div>
-  </div>
-  {% endif %}
 </div>
 
-<div class="gt-shell">
-  <div>
-    <div class="gt-strip">
-      <div class="gsp">
-        <span class="gsp-ic"><svg><use href="#ic-trophy"/></svg></span>
-        <div>
-          <div class="gsp-lab">Season points</div>
-          <div class="gsp-num">{{ points }}</div>
-          <div class="gsp-sub">{% if points %}Banked so far{% else %}Keep tipping!{% endif %}</div>
-        </div>
-      </div>
-      <div class="gsp">
-        <span class="gsp-ic"><svg><use href="#ic-doc"/></svg></span>
-        <div>
-          <div class="gsp-lab">Tips made</div>
-          <div class="gsp-num">{{ tips_this_round }} / {{ total_matches }}</div>
-          <div class="gsp-sub">This round</div>
-        </div>
-      </div>
-      <div class="gsp">
-        <span class="gsp-ic"><svg><use href="#ic-target"/></svg></span>
-        <div>
-          <div class="gsp-lab">Completion</div>
-          <div class="gsp-num">{{ round_pct }}%</div>
-          <div class="gsp-sub">{% if round_pct == 100 %}All done{% elif round_pct >= 75 %}Almost there!{% else %}Round in progress{% endif %}</div>
-        </div>
-      </div>
+{% include "partials/room_switch.html" with noun="round" surface="dark" %}
+
+<div class="gt-strip">
+  <div class="gsp">
+    <span class="gsp-ic"><svg><use href="#ic-trophy"/></svg></span>
+    <div>
+      <div class="gsp-lab">Season points</div>
+      <div class="gsp-num">{{ points }}</div>
+      <div class="gsp-sub">{% if points %}Banked so far{% else %}Keep tipping!{% endif %}</div>
     </div>
+  </div>
+  <div class="gsp">
+    <span class="gsp-ic"><svg><use href="#ic-doc"/></svg></span>
+    <div>
+      <div class="gsp-lab">Tips made</div>
+      <div class="gsp-num">{{ tips_this_round }} / {{ total_matches }}</div>
+      <div class="gsp-sub">This round</div>
+    </div>
+  </div>
+  <div class="gsp">
+    <span class="gsp-ic"><svg><use href="#ic-target"/></svg></span>
+    <div>
+      <div class="gsp-lab">Completion</div>
+      <div class="gsp-num">{{ round_pct }}%</div>
+      <div class="gsp-sub">{% if round_pct == 100 %}All done{% elif round_pct >= 75 %}Almost there!{% else %}Round in progress{% endif %}</div>
+    </div>
+  </div>
+</div>
 
+{% url 'tipping:my_tips' org.id as tips_url %}
+{% comment %}
+THE COMPETITION FILTER, ACROSS THE PAGE. "It should be long, that is 3/3 of the
+size." It was inside the two-thirds column with the fixtures, which made a
+control that decides what the whole page is about look like a heading for one
+part of it.
+
+It scopes WHICH ROUNDS EXIST as well as which fixtures: an org on AFL and NRL
+has two round 3s, and the stepper below follows whichever codes are selected.
+{% endcomment %}
+<div class="boardbar">
+  {% include "partials/series_filter.html" with base=tips_url %}
+</div>
+
+{% comment %}
+THE ROUND STEPPER, ACROSS THE PAGE — "just like what we did with rounds, but for
+this have the numbers to be up to like 8, the latest being the one that will be
+default, so I can see the 25, 24, going downwards, and that option of dropdown
+again to be there."
+
+Eight numbers rather than the leaderboard's five, anchored on the newest round
+and walking backwards, with the dropdown beside them for a jump of any distance.
+The buttons carry round IDs, not numbers: with four codes running, "round 4" is
+four different Round rows and the URL has always named one. See
+tipping.views.my_tips_view, where the numbers and their anchors are worked out.
+{% endcomment %}
+{% if round_strip %}
+<div class="boardbar boardbar-round">
+  {% include "partials/round_strip.html" with strip=round_strip base=tips_url param="round" keep=tips_keep all_label="Latest round" %}
+
+  <div class="bb-round bb-round-pick">
+    <span class="bb-lab">Jump to</span>
+    <a href="?round={{ prev_round.id }}{% if tips_keep %}&amp;{{ tips_keep }}{% endif %}"
+       class="bb-arrow {% if not prev_round %}is-off{% endif %}" aria-label="Previous round">
+      <svg><use href="#ic-arrow-left"/></svg>
+    </a>
     {% comment %}
-    Competition filter above the round list, because it scopes WHICH rounds
-    exist here: an org on AFL and NRL has two round 3s, and the prev/next
-    arrows follow whichever code is selected.
+    A real form, so the dropdown works with no JavaScript at all: choosing a
+    round and pressing enter submits it. The script at the foot of this file
+    only saves the reader that second press.
     {% endcomment %}
-    {% url 'tipping:my_tips' org.id as tips_url %}
-    {% include "partials/series_filter.html" with base=tips_url %}
+    <form method="get" class="bb-form" data-round-form>
+      {% for sl in active_slugs %}<input type="hidden" name="series" value="{{ sl }}">{% endfor %}
+      <select name="round" class="gt-select bb-select" aria-label="Choose a round">
+        {% for r in round_anchors %}
+        <option value="{{ r.id }}" {% if selected_round and r.round_number == selected_round.round_number %}selected{% endif %}>Round {{ r.round_number }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="bb-go">Go</button>
+    </form>
+    <a href="?round={{ next_round.id }}{% if tips_keep %}&amp;{{ tips_keep }}{% endif %}"
+       class="bb-arrow {% if not next_round %}is-off{% endif %}" aria-label="Next round">
+      <svg><use href="#ic-arrow-right"/></svg>
+    </a>
+    {% if selected_round %}
+    <span class="bb-when">
+      <svg><use href="#ic-clock"/></svg>
+      {% if selected_round.is_locked %}Locked {{ selected_round.lockout_at|date:"j M, g:i A" }}
+      {% else %}Locks {{ selected_round.lockout_at|date:"j M, g:i A" }}{% endif %}
+    </span>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
+{% comment %}
+TWO THIRDS AND ONE THIRD — "the current split that we should have is the table
+that showcases the results ... then this one which will take like 1/3, Your
+season."
+
+The fixtures are what the page is for and they carry match cards, team names and
+a reader's verdict; the column beside them is four short cards that are read
+once. `.gt-shell` alone gives the sidebar a fixed 320px, which on a wide screen
+leaves the fixtures more than two thirds and on a narrow one leaves them less.
+{% endcomment %}
+<div class="gt-shell gt-shell-thirds">
+  <div>
     <div data-coach="tips-rounds">
     {% include "partials/my_tips_round.html" with round=selected_round rows=rows state=state phase_counts=phase_counts total_all=total_all %}
     </div>
@@ -133,4 +206,20 @@
     </section>
   </aside>
 </div>
+
+<script>
+/* The round dropdown submits itself on change. The form works without this —
+   choose and press enter — so this is the convenience and not the mechanism,
+   and the Go button is hidden only once the script that replaces it is running.
+   Delegated, because the bar is re-rendered whenever the competition filter
+   swaps the page. */
+(function () {
+  var form = document.querySelector("[data-round-form]");
+  if (!form) return;
+  form.classList.add("is-live");
+  form.addEventListener("change", function (e) {
+    if (e.target.name === "round") form.submit();
+  });
+})();
+</script>
 {% endblock %}

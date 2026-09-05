@@ -7171,3 +7171,123 @@ class MessagesDetailsPanelTests(TestCase):
         ).content.decode()
         self.assertNotIn("<!DOCTYPE", html)
         self.assertIn("data-gtm-details-panel", html)
+
+
+class MembersPageLeadsWithItsCountsTests(TestCase):
+    """"It should not be at the bottom. What if we had 200 members — will I
+    scroll down to know we have that? It should be at the top, but as a card ...
+    have it numbered."
+
+    And the role picker comes off the list: "we should not have the dropdown to
+    make updates ... so it will be read only, then another card that will have
+    is the team management."
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(
+            name="Counts Co", season=self.season, groups_enabled=True,
+        )
+        self.owner = User.objects.create_user(
+            email="counts-own@example.com", password="x", display_name="Owner",
+        )
+        self.member = User.objects.create_user(
+            email="counts-mem@example.com", password="x", display_name="Member",
+        )
+        OrgMember.objects.create(
+            user=self.owner, org=self.org, role=OrgMember.ROLE_MANAGER,
+            is_league_owner=True,
+        )
+        OrgMember.objects.create(user=self.member, org=self.org)
+        self.client.force_login(self.owner)
+
+    def _body(self):
+        return self.client.get(
+            reverse("orgs:members", args=[self.org.id])
+        ).content.decode()
+
+    def test_both_counts_lead_the_page(self):
+        Group.objects.create(
+            org=self.org, name="Ops", approval_status=Group.APPROVAL_APPROVED,
+        )
+        body = self._body()
+        self.assertIn("ocards", body)
+        # Groups and child organisations are two different things — "KFC might
+        # have many branches, that is not a group" — so they are two cards.
+        self.assertIn("Groups", body)
+        self.assertIn(f"Organisations under {self.org.name}", body)
+        self.assertLess(
+            body.index("ocards"), body.index('data-coach="members-list"'),
+            "the counts should be above the member list, not under it",
+        )
+
+    def test_a_zero_still_gets_a_card(self):
+        """A card saying 0 is the answer to "do we have any", which is the
+        question somebody scrolling to the bottom was asking."""
+        r = self.client.get(reverse("orgs:members", args=[self.org.id]))
+        self.assertEqual(r.context["group_count"], 0)
+        self.assertEqual(r.context["child_org_count"], 0)
+
+    def test_the_member_list_is_read_only(self):
+        """The role picker moved into Team management; the list is facts."""
+        body = self._body()
+        head, _, rest = body.partition('<details class="tmcard"')
+        self.assertNotIn('name="role"', head, "a role picker is still in the list")
+        self.assertIn('name="role"', rest, "the picker did not arrive in the card")
+
+    def test_team_management_holds_everything_that_changes_somebody(self):
+        body = self._body()
+        _, _, card = body.partition('<details class="tmcard"')
+        self.assertIn("nominate_manager", card)
+        self.assertIn("set_role", card)
+
+    def test_setting_a_role_still_works_from_the_card(self):
+        """Nothing was removed from the product — same action, same endpoint."""
+        me = OrgMember.objects.get(user=self.member, org=self.org)
+        self.client.post(reverse("orgs:members", args=[self.org.id]), {
+            "action": "set_role", "member_id": me.id, "role": OrgMember.ROLE_CAPTAIN,
+        })
+        me.refresh_from_db()
+        self.assertEqual(me.role, OrgMember.ROLE_CAPTAIN)
+
+
+class GroupsPageHierarchyTests(TestCase):
+    """"Have them all centred, and have this AquaFlow Water Co to be larger than
+    the Groups. Then under this is when we will bring the create group, and this
+    button that you will redesign — Switch groups off."
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(
+            name="Hier Co", season=self.season, groups_enabled=True,
+        )
+        self.admin = User.objects.create_user(
+            email="hier@example.com", password="x", display_name="Admin",
+        )
+        OrgMember.objects.create(
+            user=self.admin, org=self.org, role=OrgMember.ROLE_MANAGER,
+            is_league_owner=True,
+        )
+        self.client.force_login(self.admin)
+
+    def test_switch_groups_off_sits_with_create_rather_than_at_the_foot(self):
+        """It was a small ghost button below the list and below the create
+        sheet: an admin had to scroll past every group to learn it existed."""
+        body = self.client.get(
+            reverse("orgs:groups", args=[self.org.id])
+        ).content.decode()
+        self.assertIn("dh-acts", body)
+        self.assertLess(
+            body.index("Switch groups off"), body.index("gmSubmit"),
+            "the switch is still below the create sheet",
+        )
+
+    def test_the_hero_is_centred_and_leads_with_the_organisation(self):
+        body = self.client.get(
+            reverse("orgs:groups", args=[self.org.id])
+        ).content.decode()
+        self.assertIn("dept-hero is-centred", body)
+        self.assertIn("gh-eyebrow is-title", body)

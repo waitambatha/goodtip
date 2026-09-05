@@ -23,6 +23,10 @@ AquaFlow Water Co" — and never the segmented control under it. That track
 scrolls sideways when an organisation has a dozen groups, and centring a
 scrolling track puts its first option off the left edge with no way back to it.
 
+`action_url` / `action_label` / `action_icon` put the page's one action in the
+gap between the sentence and the rooms, at the right-hand end. Optional: a page
+that passes none renders none.
+
 `surface` is explicit rather than inherited on purpose. Every invisible-text
 bug in this codebase came from one set of colours being asked to work on both
 a cream card and the dark sheet; making the caller state which one it is means
@@ -41,6 +45,28 @@ the mistake has to be typed rather than merely forgotten.
       {% endif %}
     </p>
   </div>
+
+  {% comment %}
+  THE PAGE'S ONE ACTION, between the sentence and the rooms — "this button My
+  statistics should be above this AquaFlow Water Co / Everyone / ... / All
+  groups, at the furthest right, not centre."
+
+  It belongs here rather than above or below the whole block because it is read
+  in the same breath as the sentence: this board is all of AquaFlow Water Co —
+  and here is yours. Far right, so it never competes with the sentence it
+  follows, and so the row of rooms underneath still starts at the left edge
+  where the eye expects a list to start.
+
+  A caller with no action passes nothing and this renders nothing.
+  {% endcomment %}
+  {% if action_url %}
+  <div class="rw-action">
+    <a class="abtn abtn-primary" href="{{ action_url }}">
+      {% if action_icon %}<svg class="abtn-ic" aria-hidden="true"><use href="#{{ action_icon }}"/></svg>{% endif %}
+      {{ action_label }}
+    </a>
+  </div>
+  {% endif %}
 
   <div class="rw-seg" role="group" aria-label="Choose which room to tip in">
     {% comment %} The organisation is always the first segment — it is the room you are
