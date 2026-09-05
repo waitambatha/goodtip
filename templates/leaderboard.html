@@ -23,7 +23,13 @@ the reasoning that you should know which ladder you are looking at before you
 read it; that was right about the fact and wrong about the position, because it
 put a five-option control above the title on every visit.
 {% endcomment %}
-<div class="gt-head">
+{% comment %}
+Centred, because there is nothing beside it any more. The header used to be a
+two-column row with the round picker in its right-hand corner; with both filters
+moved to their own bar below, a left-aligned title with empty space to its right
+reads as a layout that lost something.
+{% endcomment %}
+<div class="gt-head is-centred">
   <div>
     <div class="gh-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div>
     <h1>Leaderboard</h1>
@@ -52,7 +58,22 @@ still drawn as selected.
 {% endcomment %}
 {% url 'tipping:leaderboard' org.id as lb_url %}
 {% with cq=selected_comp.slug|default:"" %}
+{% comment %}
+TWO ROWS, COMPETITION FIRST. Asked for in exactly that order — "do not do that,
+have the round and competition in a separate row, so this will come first in
+their own row, All competition... and in that row beside it we can have the
+dropdown."
+
+It is the right order for a second reason: the competition decides which rounds
+exist. Round 26 of the NRL and round 26 of the AFLW are different rounds and one
+of them may not have been played, so choosing the code first and the round
+second is the sequence the data itself is in.
+{% endcomment %}
 <div class="boardbar">
+  {% include "partials/comp_filter.html" with options=comp_options selected=selected_comp param="comp" base=lb_url keep=comp_keep keep_pairs=comp_keep_pairs all_label="All competitions" veil_for="#lbtable" %}
+</div>
+
+<div class="boardbar boardbar-round">
   <div class="bb-round" role="group" aria-label="Choose a round">
     <span class="bb-lab">Round</span>
     {% if round_nav.prev %}
@@ -83,7 +104,12 @@ still drawn as selected.
     {% else %}<span class="bb-arrow is-off" aria-hidden="true"><svg><use href="#ic-arrow-right"/></svg></span>{% endif %}
   </div>
 
-  {% include "partials/comp_filter.html" with options=comp_options selected=selected_comp param="comp" base=lb_url keep=comp_keep keep_pairs=comp_keep_pairs all_label="All competitions" veil_for="#lbtable" %}
+  {% comment %}
+  The five most recent rounds, beside the dropdown that says "all". Clicking
+  one shows that round's ranking; the window walks backwards through the season
+  a page at a time.
+  {% endcomment %}
+  {% include "partials/round_strip.html" with strip=round_strip base=lb_url param="round" keep=comp_keep_round all_label="All rounds" veil_for="#lbtable" %}
 </div>
 {% endwith %}
 

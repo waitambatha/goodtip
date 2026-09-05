@@ -13,13 +13,22 @@ stacking context, so a strip rendered inside it paints over the sheet.
 
 {% block app_content %}
 {% comment %}
-Same order as the leaderboard, and for the same reason: what the page is,
-then the control that decides what it shows, then the table. Which room you
-are standing in is context and follows at the foot.
+ORDER OF THE PAGE. Title, then which room, then which competition, then the
+table. The room switcher was moved to the foot with the leaderboard's and sent
+straight back — "on the ladder, this should not be at the bottom" — and that is
+right for a reason the leaderboard does not share: the ladder's own subtitle
+says "this ladder is all of Waita Realty Group", so the control that changes
+which room it means has to be next to the sentence making the claim, not eight
+hundred pixels below it.
+
+The eyebrow is set at the title's own size. "Waita Realty Group · 2026" in
+10-point capitals over a 40-point Ladder made the league look like a footnote to
+the word, when the league is the whole point of the page — "that should be the
+same size as the Ladder, otherwise it is not making sense".
 {% endcomment %}
-<div class="gt-head">
+<div class="gt-head is-centred">
   <div>
-    <div class="gh-eyebrow">{{ org.name }} &middot; {{ org.season }}</div>
+    <div class="gh-eyebrow is-title">{{ org.name }} &middot; {{ org.season }}</div>
     <h1 class="gh-title">Ladder</h1>
     {% comment %}
     Said plainly, because "the table" means both things in conversation and the
@@ -30,6 +39,11 @@ are standing in is context and follows at the foot.
   </div>
 
 </div>
+
+{% comment %}
+Which room this ladder is, directly under the sentence that says so.
+{% endcomment %}
+{% include "partials/room_switch.html" with noun="ladder" surface="dark" %}
 
 {% comment %}
 WHICH COMPETITION'S LADDER. It was a bare <select> tucked into the top-right of
@@ -48,6 +62,23 @@ current.
 {% endcomment %}
 {% url 'tipping:ladder' org.id as ladder_url %}
 {% include "partials/comp_filter.html" with options=series_options selected=selected_series param="series" base=ladder_url veil_for="#ladderTable" centred=1 %}
+
+{% comment %}
+THE LADDER AT A PAST ROUND. "Users might want to see, let's say last month,
+round 10 — who was on top." A ladder is a running total, so that is a question
+it can answer; the standing table only ever knew today.
+
+Same control as the leaderboard's, and the same five-at-a-time window. It
+carries ?series= so stepping through rounds cannot silently change which
+competition's ladder is on screen.
+{% endcomment %}
+<div class="boardbar boardbar-round is-centred">
+  {% include "partials/round_strip.html" with strip=round_strip base=ladder_url param="round" keep=ladder_keep all_label="Latest" veil_for="#ladderTable" %}
+</div>
+{% if at_round %}
+<p class="ladder-asat">Showing the ladder as it stood after <b>round {{ at_round }}</b>.
+  <a href="{{ ladder_url }}{% if ladder_keep %}?{{ ladder_keep }}{% endif %}">Back to the latest &rarr;</a></p>
+{% endif %}
 
 {% if entries %}
 {% comment %}
@@ -75,6 +106,13 @@ sitting bright above a blank space.
       <span class="lad-num lad-col lad-d">D</span>
       <span class="lad-num lad-col lad-pct">%</span>
       <span class="lad-num lad-col lad-pts">Pts</span>
+      {% comment %}
+      What is still to come. Honest about its source: this is what the SYSTEM
+      knows is scheduled and unplayed, de-duplicated across leagues — a dash
+      where no fixtures have been loaded yet, rather than a nought that would
+      read as "their season is over".
+      {% endcomment %}
+      <span class="lad-num lad-col lad-left">Left</span>
     </div>
 
     <div class="gt-scroll gb-rows">
@@ -103,6 +141,7 @@ sitting bright above a blank space.
         <span class="lad-num lad-col lad-d">{{ e.draws }}</span>
         <span class="lad-num lad-col lad-pct">{{ e.percentage|floatformat:1 }}</span>
         <span class="lad-num lad-col lad-pts">{{ e.points }}</span>
+        <span class="lad-num lad-col lad-left">{% if e.games_left %}{{ e.games_left }}{% else %}<i>&ndash;</i>{% endif %}</span>
       </div>
       {% endfor %}
     </div>
@@ -124,9 +163,4 @@ sitting bright above a blank space.
 </div>
 {% endif %}
 
-{% comment %}
-The room, at the foot. See the leaderboard for why it is no longer the first
-thing on the page.
-{% endcomment %}
-{% include "partials/room_switch.html" with noun="ladder" surface="dark" %}
 {% endblock %}

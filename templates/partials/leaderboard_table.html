@@ -12,8 +12,24 @@ table in one code's colour would be claiming to be that code's table.
 {% endcomment %}
 <div class="gt-board gt-listwrap" id="lbtable"
      {% if selected_comp %}data-code="{{ selected_comp.slug }}" data-cat="{{ selected_comp.category }}"{% endif %}>
+  {% comment %}
+  MORE THAN FOUR COLUMNS. "I think we can have more details than that."
+
+  Accuracy is the column people argue about — 8 from 9 and 80 from 90 are the
+  same rate and a very different season, and neither of the numbers that were
+  here says so. Behind is the gap to the leader, the second thing anybody looks
+  for after their own position, and it was arithmetic every reader was doing in
+  their head off two other columns.
+
+  Both drop out first on a narrow screen (see the media query): rank, name and
+  points are the table, the rest is the detail.
+  {% endcomment %}
   <div class="gb-head">
-    <span>Rank</span><span>Tipper</span><span class="h-correct" style="text-align:right;">Correct</span><span style="text-align:right;">Points</span>
+    <span>Rank</span><span>Tipper</span>
+    <span class="h-correct num">Correct</span>
+    <span class="h-acc num">Accuracy</span>
+    <span class="h-behind num">Behind</span>
+    <span class="num">Points</span>
   </div>
   <div class="gt-scroll gb-rows">
   {% for row in ranked %}
@@ -24,6 +40,13 @@ table in one code's colour would be claiming to be that code's table.
         <span class="gb-name">{{ row.user.display_name }}{% if row.user.id == me.id %} <span class="pill-role">You</span>{% endif %}</span>
       </span>
       <span class="gb-correct">{{ row.tips_correct }} <span>/ {{ row.tips_total }}</span></span>
+      {% comment %}
+      A dash, not a nought. Nobody with no graded tips has an accuracy of zero
+      per cent — they have no accuracy yet, and printing 0% beside a new
+      member's name is a scoreline they never earned.
+      {% endcomment %}
+      <span class="gb-acc">{% if row.accuracy is not None %}{{ row.accuracy }}%{% else %}<i>&ndash;</i>{% endif %}</span>
+      <span class="gb-behind">{% if row.behind %}&minus;{{ row.behind }}{% else %}<i>&ndash;</i>{% endif %}</span>
       <span class="gb-pts">{{ row.points }}</span>
     </div>
   {% empty %}

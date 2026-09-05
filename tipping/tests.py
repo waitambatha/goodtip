@@ -2166,3 +2166,149 @@ class EveryCodeHasItsOwnShadeTests(TestCase):
 
         css = Path(settings.BASE_DIR, "static/css/goodtip.css").read_text()
         self.assertIn(".gt-board.ladder .lad-head .lad-num { color: inherit;", css)
+
+
+class RoundStripTests(TestCase):
+    """Five rounds at a time, and the window that walks back through a season.
+
+    ASKED FOR: "the dropdown will show All by default; beside it let's have the
+    last 5 rounds, with a button to keep on moving backward... and on the round
+    like 26 it must be highlighted so I know I am there, and be able to click
+    the 25 and see the ranking of that round."
+    """
+
+    def test_it_shows_the_five_newest_by_default(self):
+        from tipping.views import round_strip
+
+        strip = round_strip(list(range(1, 28)), None)
+        self.assertEqual([b["n"] for b in strip["window"]], [23, 24, 25, 26, 27])
+        self.assertEqual(strip["showing"], "Rounds 23–27")
+
+    def test_stepping_back_moves_a_page_at_a_time(self):
+        """A page, not a round — one at a time is the arrows, which is a
+        different gesture for a different distance."""
+        from tipping.views import round_strip
+
+        strip = round_strip(list(range(1, 28)), None, back=1)
+        self.assertEqual([b["n"] for b in strip["window"]], [18, 19, 20, 21, 22])
+
+    def test_it_cannot_be_walked_off_the_start_of_the_season(self):
+        from tipping.views import round_strip
+
+        strip = round_strip(list(range(1, 12)), None, back=99)
+        # A full page, not the one round the arithmetic leaves at the far end.
+        self.assertEqual([b["n"] for b in strip["window"]], [1, 2, 3, 4, 5])
+        self.assertIsNone(strip["older"])
+
+    def test_a_chosen_round_is_always_in_the_window(self):
+        """A link to round 3 in August must open with round 3 on screen, not
+        show the last five and leave the reader to hunt for it."""
+        from tipping.views import round_strip
+
+        strip = round_strip(list(range(1, 28)), 3)
+        self.assertIn(3, [b["n"] for b in strip["window"]])
+        self.assertTrue(next(b for b in strip["window"] if b["n"] == 3)["on"])
+
+    def test_only_the_current_round_is_marked(self):
+        from tipping.views import round_strip
+
+        strip = round_strip(list(range(1, 28)), 26)
+        marked = [b["n"] for b in strip["window"] if b["on"]]
+        self.assertEqual(marked, [26])
+
+    def test_a_button_carries_whatever_its_link_needs(self):
+        """The leaderboard posts round IDs — a round number names one round PER
+        competition, so on an unfiltered board the number 4 is up to five
+        different rounds and only the id says which."""
+        from tipping.views import round_strip
+
+        strip = round_strip([1, 2, 3], 2, values={1: 101, 2: 102, 3: 103})
+        self.assertEqual([b["value"] for b in strip["window"]], [101, 102, 103])
+
+    def test_a_season_with_no_rounds_has_no_strip(self):
+        from tipping.views import round_strip
+
+        self.assertIsNone(round_strip([], None))
+
+
+class LadderAtAPastRoundTests(TestCase):
+    """"Users might want to see, let's say the last month, round 10 — who was
+    on top."
+
+    A ladder is a running total, so that is a question it can answer. The stored
+    table only ever knew today, so a past round is computed — by the SAME
+    arithmetic, lifted out of rebuild_ladder rather than written again.
+    """
+
+    def setUp(self):
+        from matchreader.models import HistoricalMatch
+
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.series = Series.objects.get(slug="afl")
+        self.a = Team.objects.create(name="Alpha", slug="l-alpha", series=self.series)
+        self.b = Team.objects.create(name="Bravo", slug="l-bravo", series=self.series)
+        # Bravo wins round 1, Alpha wins rounds 2 and 3. So after round 1 Bravo
+        # leads; after round 3 Alpha does. One table, two answers, and the round
+        # is the only thing that changed.
+        for rnd, (home, away, hs, aws) in enumerate(
+            [(self.b, self.a, 100, 50), (self.a, self.b, 90, 40), (self.a, self.b, 80, 30)],
+            start=1,
+        ):
+            HistoricalMatch.objects.create(
+                series=self.series, season=self.season.year, round_number=rnd,
+                stage=HistoricalMatch.STAGE_REGULAR,
+                # Unique per row: (series, external_id) is a unique key and a
+                # blank default makes the second fixture a duplicate of the first.
+                external_id=f"ladder-test-{rnd}",
+                home_team=home, away_team=away, home_score=hs, away_score=aws,
+                kickoff_at=timezone.now() - timedelta(days=30 - rnd),
+            )
+
+    def test_after_round_one_the_early_winner_is_top(self):
+        from data_sync.ladder import ladder_standings
+
+        rows = ladder_standings(series=self.series, season=self.season, up_to_round=1)
+        self.assertEqual(rows[0]["team_id"], self.b.id)
+        self.assertEqual(rows[0]["played"], 1)
+
+    def test_by_round_three_it_has_turned_over(self):
+        from data_sync.ladder import ladder_standings
+
+        rows = ladder_standings(series=self.series, season=self.season, up_to_round=3)
+        self.assertEqual(rows[0]["team_id"], self.a.id)
+        self.assertEqual(rows[0]["played"], 3)
+
+    def test_no_round_means_the_whole_season(self):
+        from data_sync.ladder import ladder_standings
+
+        whole = ladder_standings(series=self.series, season=self.season)
+        at_three = ladder_standings(series=self.series, season=self.season, up_to_round=3)
+        self.assertEqual(whole, at_three)
+
+    def test_it_agrees_with_what_the_sync_writes(self):
+        """The point of lifting it out rather than writing it again: the stored
+        table and the computed one cannot drift, because they are one function.
+        """
+        from data_sync.ladder import ladder_standings, rebuild_ladder
+        from tipping.models import LadderEntry
+
+        rebuild_ladder(series=self.series, season=self.season)
+        stored = list(
+            LadderEntry.objects.filter(series=self.series, season=self.season)
+            .order_by("rank")
+            .values("rank", "team_id", "played", "wins", "losses", "points")
+        )
+        computed = [
+            {k: r[k] for k in ("rank", "team_id", "played", "wins", "losses", "points")}
+            for r in ladder_standings(series=self.series, season=self.season)
+        ]
+        self.assertEqual(stored, computed)
+
+    def test_the_rounds_offered_are_the_rounds_that_were_played(self):
+        """Read from the same table the standings come from, so the stepper can
+        never offer a round the ladder cannot draw."""
+        from data_sync.ladder import season_rounds
+
+        self.assertEqual(
+            season_rounds(series=self.series, season=self.season), [1, 2, 3],
+        )

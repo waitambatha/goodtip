@@ -1,0 +1,66 @@
+{% comment %}
+The round stepper: five rounds at a time, the one you are on highlighted, and a
+button that walks the window backwards through the season.
+
+ASKED FOR: "the dropdown will show All by default; beside it let's have the last
+5 rounds, with a button to keep on moving backward, and display what round it's
+showing — and on the round like 26 it must be highlighted so I know I am there,
+and be able to click the 25 and see the ranking of that round."
+
+WHY A WINDOW AND NOT A LIST. A league that has been running has eighty rounds.
+Five is enough to hold a month and short enough that each one is a target rather
+than something to read; the window walks a page at a time, which is a different
+gesture from the arrows either side of the dropdown and covers a different
+distance.
+
+The window is anchored on the newest round because that is the direction people
+look — this week, then last week — and a chosen round is always inside it, so a
+link to round 3 in August opens with round 3 on screen rather than showing the
+last five and leaving the reader to hunt. See tipping.views.round_strip.
+
+Expects: strip (from round_strip), base, param, keep, all_label.
+Each button arrives carrying what its own link should say — the leaderboard
+posts round IDs, because a round number names one round per competition and on
+an unfiltered board the number 4 is up to five different rounds. Resolved in
+the view because a Django template cannot look a dict up by a variable key.
+{% endcomment %}
+{% if strip %}
+<div class="rstrip" data-veil-for="{{ veil_for }}">
+  <span class="rs-showing">{{ strip.showing }}</span>
+
+  {% if strip.older %}
+  <a class="rs-step" href="{{ base }}?back={{ strip.older }}{% if keep %}&amp;{{ keep }}{% endif %}"
+     aria-label="Five rounds earlier" title="Five rounds earlier">
+    <svg><use href="#ic-arrow-left"/></svg><span>Earlier</span>
+  </a>
+  {% else %}
+  <span class="rs-step is-off" aria-hidden="true"><svg><use href="#ic-arrow-left"/></svg><span>Earlier</span></span>
+  {% endif %}
+
+  <div class="rs-nums" role="group" aria-label="Jump to a round">
+    {% for b in strip.window %}
+    <a class="rs-num{% if b.on %} on{% endif %}"
+       href="{{ base }}?{{ param }}={{ b.value }}{% if keep %}&amp;{{ keep }}{% endif %}"
+       {% if b.on %}aria-current="true"{% endif %}>{{ b.n }}</a>
+    {% endfor %}
+  </div>
+
+  {% if strip.newer is not None %}
+  <a class="rs-step" href="{{ base }}?back={{ strip.newer }}{% if keep %}&amp;{{ keep }}{% endif %}"
+     aria-label="Five rounds later" title="Five rounds later">
+    <span>Later</span><svg><use href="#ic-arrow-right"/></svg>
+  </a>
+  {% else %}
+  <span class="rs-step is-off" aria-hidden="true"><span>Later</span><svg><use href="#ic-arrow-right"/></svg></span>
+  {% endif %}
+
+  {% comment %}
+  The way back to the whole season. Shown only when a round is actually
+  selected, so it is an escape from somewhere rather than a permanent extra
+  button that does nothing most of the time.
+  {% endcomment %}
+  {% if strip.current %}
+  <a class="rs-all" href="{{ base }}{% if keep %}?{{ keep }}{% endif %}">{{ all_label|default:"Whole season" }}</a>
+  {% endif %}
+</div>
+{% endif %}

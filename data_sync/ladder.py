@@ -120,6 +120,123 @@ class _Row:
         return self.points_for - self.points_against
 
 
+def ladder_standings(*, series, season, up_to_round: int | None = None):
+    """The table as it stood, computed and not stored.
+
+    THE SAME ARITHMETIC AS rebuild_ladder, LIFTED OUT OF IT rather than written
+    again. The ladder page can now be asked for a past round — "users might want
+    to see, let's say the last month, round 10, who was on top" — and a second
+    implementation of four-points-a-win and percentage would be two tables that
+    disagree the first time a rule changed.
+
+    Returns an ordered list of dicts shaped like LadderEntry's own fields, so a
+    template cannot tell whether it was handed stored rows or computed ones.
+
+    `up_to_round=None` is the whole season, which is what rebuild_ladder writes
+    to LadderEntry. A number means "as at the end of that round", counting every
+    completed regular-season game up to and including it.
+
+    Returns [] where there is no ladder for the code (see NO_LADDER) or no rules
+    for it, which is the same answer rebuild_ladder gives by writing nothing.
+    """
+    from matchreader.models import HistoricalMatch
+
+    name = (series.name or "").strip().upper()
+    if name in NO_LADDER:
+        return []
+    rules = RULES.get(name)
+    if rules is None:
+        return []
+
+    matches = HistoricalMatch.objects.filter(
+        series=series,
+        season=season.year if hasattr(season, "year") else season,
+        stage=HistoricalMatch.STAGE_REGULAR,
+    ).only("round_number", "home_team_id", "away_team_id", "home_score", "away_score")
+    if up_to_round is not None:
+        matches = matches.filter(round_number__lte=up_to_round)
+
+    rows: dict[int, _Row] = {}
+    played_in_round: dict[int, set[int]] = {}
+
+    def row_for(team_id: int) -> _Row:
+        if team_id not in rows:
+            rows[team_id] = _Row(team_id=team_id)
+        return rows[team_id]
+
+    for match in matches:
+        home, away = row_for(match.home_team_id), row_for(match.away_team_id)
+        played_in_round.setdefault(match.round_number, set()).update(
+            (home.team_id, away.team_id)
+        )
+        home.played += 1
+        away.played += 1
+        home.points_for += match.home_score
+        home.points_against += match.away_score
+        away.points_for += match.away_score
+        away.points_against += match.home_score
+        if match.home_score > match.away_score:
+            home.wins += 1
+            away.losses += 1
+        elif match.away_score > match.home_score:
+            away.wins += 1
+            home.losses += 1
+        else:
+            home.draws += 1
+            away.draws += 1
+
+    if not rows:
+        return []
+
+    if rules.bye:
+        _apply_byes(rows, played_in_round)
+    _apply_adjustments(rows, series=series, season=season)
+
+    ordered = sorted(
+        rows.values(),
+        key=lambda r: (
+            -r.points(rules),
+            -(r.percentage if rules.separator == "percentage" else r.differential),
+            -r.points_for,
+        ),
+    )
+    return [
+        {
+            "rank": rank,
+            "team_id": r.team_id,
+            "played": r.played,
+            "wins": r.wins,
+            "losses": r.losses,
+            "draws": r.draws,
+            "byes": r.byes,
+            "points": r.points(rules),
+            "percentage": round(r.percentage, 2),
+            "points_for": r.points_for,
+            "points_against": r.points_against,
+        }
+        for rank, r in enumerate(ordered, start=1)
+    ]
+
+
+def season_rounds(*, series, season) -> list[int]:
+    """Round numbers with a completed regular-season game, oldest first.
+
+    What the ladder's round stepper can offer. Read from the same table the
+    standings come from, so it can never list a round the ladder cannot draw.
+    """
+    from matchreader.models import HistoricalMatch
+
+    return sorted(
+        HistoricalMatch.objects.filter(
+            series=series,
+            season=season.year if hasattr(season, "year") else season,
+            stage=HistoricalMatch.STAGE_REGULAR,
+        )
+        .values_list("round_number", flat=True)
+        .distinct()
+    )
+
+
 def rebuild_ladder(*, series, season) -> int:
     """Recompute one series' ladder for one season. Returns rows written.
 

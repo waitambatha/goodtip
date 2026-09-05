@@ -1,4 +1,5 @@
 import logging
+from types import SimpleNamespace
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -9,7 +10,7 @@ from django.views.decorators.http import require_POST
 
 from billing.donations import donation_summary
 from orgs.models import Group, OrgMember, Organisation
-from .models import LadderEntry, Match, Round, Tip
+from .models import LadderEntry, Match, Round, Team, Tip
 from .services import (
     annotate_play_state, clear_tip, competition_filter, current_round,
     leaderboard_for_family, leaderboard_for_org, submit_tip, tip_window,
@@ -805,6 +806,83 @@ def my_tips_view(request, org_id: int):
     })
 
 
+#: How many rounds the strip shows at once. Five, as asked for: enough to hold
+#: the run of a month, short enough that every one of them is a target rather
+#: than a list to read.
+STRIP_SIZE = 5
+
+
+def round_strip(numbers, current, back=None, *, size=STRIP_SIZE, values=None):
+    """A window of round buttons, and the way to move it.
+
+    ASKED FOR: "the dropdown will show All by default; beside it let's have the
+    last 5 rounds, with a button to keep on moving backward, and display what
+    round it's showing — and the round you are on highlighted, so I can click
+    25 and see the ranking of that round."
+
+    `numbers`   every round that exists, ascending.
+    `current`   the round being shown, or None for "all"/latest.
+    `back`      how many windows back the reader has stepped, from ?back=.
+
+    The window is anchored on the NEWEST round and walks backwards, because
+    that is the direction people look: this week, then last week. Stepping back
+    is a page of five at a time rather than one at a time — one at a time is
+    the arrows, which is a different gesture for a different distance.
+
+    The selected round is always IN the window even if it is far in the past,
+    so a link to round 3 in August opens with round 3 on screen and highlighted
+    rather than showing the last five and leaving the reader to hunt.
+    """
+    numbers = list(numbers)
+    if not numbers:
+        return None
+    try:
+        steps = max(0, int(back or 0))
+    except (TypeError, ValueError):
+        steps = 0
+
+    # Windows are counted from the end: 0 is the newest `size`, 1 the `size`
+    # before that, and so on.
+    max_steps = max(0, (len(numbers) - 1) // size)
+    if current in numbers:
+        # A chosen round wins over ?back= — a URL naming a round must show it.
+        pos_from_end = len(numbers) - 1 - numbers.index(current)
+        steps = pos_from_end // size
+    steps = min(steps, max_steps)
+
+    end = len(numbers) - steps * size
+    start = max(0, end - size)
+    # A FULL PAGE AT THE FAR END. Walking back through eleven rounds otherwise
+    # lands on a window of one — the arithmetic is right and the result is a
+    # single lonely button where five were promised. Where there is room, the
+    # oldest page is the first `size` rounds; the small overlap with the page
+    # before it is worth more than a ragged end.
+    if start == 0:
+        end = min(len(numbers), size)
+    window = numbers[start:end]
+    # Each button carries what its LINK should say, resolved here rather than
+    # in the template: Django templates cannot look a dict up by a variable
+    # key, and the leaderboard's buttons post round IDs while the ladder's post
+    # round numbers. One shape out of here, one loop in the partial.
+    values = values or {}
+    return {
+        "window": [
+            {"n": n, "value": values.get(n, n), "on": n == current} for n in window
+        ],
+        "numbers": window,
+        "current": current,
+        # "Older" walks toward round 1; "newer" comes back toward today.
+        "older": steps + 1 if steps < max_steps else None,
+        "newer": steps - 1 if steps > 0 else None,
+        "back": steps,
+        "showing": (
+            f"Rounds {window[0]}\u2013{window[-1]}" if len(window) > 1
+            else f"Round {window[0]}" if window else ""
+        ),
+        "latest": numbers[-1],
+    }
+
+
 def org_series(org):
     """The competitions this organisation tips, in its own order, no repeats.
 
@@ -861,13 +939,72 @@ def ladder_view(request, org_id: int):
     ordered = org_series(org)
     selected = pick_series(ordered, request.GET.get("series"), default_to_first=True)
 
-    entries = []
+    # THE LADDER AS IT STOOD, for any round of the season.
+    #
+    # ASKED FOR: "users might want to see, let's say the last month, round 10 —
+    # who was on top." A ladder is a running total, so "where were we in round
+    # 10" is a question it can answer and a stored current-standings table
+    # cannot.
+    #
+    # The current view still reads the stored LadderEntry rows: they carry
+    # updated_at, they are what the sync maintains, and there is no reason to
+    # recompute the answer that is already written down. A past round is
+    # computed by data_sync.ladder.ladder_standings — the SAME arithmetic,
+    # lifted out of rebuild_ladder rather than written a second time.
+    from data_sync.ladder import ladder_standings, season_rounds
+
+    entries, rounds_available, at_round = [], [], None
     if selected:
-        entries = list(
-            LadderEntry.objects.filter(series=selected, season=org.season)
-            .select_related("team")
-            .order_by("rank")
-        )
+        rounds_available = season_rounds(series=selected, season=org.season)
+        wanted = request.GET.get("round")
+        if wanted and wanted.isdigit() and int(wanted) in rounds_available:
+            at_round = int(wanted)
+
+        if at_round is None:
+            entries = list(
+                LadderEntry.objects.filter(series=selected, season=org.season)
+                .select_related("team")
+                .order_by("rank")
+            )
+        else:
+            rows = ladder_standings(
+                series=selected, season=org.season, up_to_round=at_round,
+            )
+            teams = Team.objects.in_bulk([r["team_id"] for r in rows])
+            # Shaped exactly like a LadderEntry so the template cannot tell
+            # which of the two it was handed.
+            entries = [
+                SimpleNamespace(team=teams.get(r["team_id"]), updated_at=None, **r)
+                for r in rows
+                if teams.get(r["team_id"]) is not None
+            ]
+
+    # HOW MANY GAMES ARE STILL TO COME, per club.
+    #
+    # Honest about its source: this is what THIS SYSTEM knows is still to be
+    # played — scheduled tipping.Match rows for the series, de-duplicated across
+    # leagues by (round, home, away), because that table holds one row per
+    # fixture PER ORGANISATION and a naive count multiplies every game by the
+    # number of leagues tipping it. Where nothing is scheduled it is left out
+    # rather than guessed at, and the column shows a dash.
+    left_by_team = {}
+    if selected:
+        seen_fixtures = set()
+        for m in (
+            Match.objects.filter(
+                round__series=selected, round__org__season=org.season,
+            )
+            .exclude(status=Match.STATUS_COMPLETE)
+            .filter(result__isnull=True)
+            .values_list("round__round_number", "home_team_id", "away_team_id")
+        ):
+            if m in seen_fixtures:
+                continue
+            seen_fixtures.add(m)
+            for team_id in (m[1], m[2]):
+                left_by_team[team_id] = left_by_team.get(team_id, 0) + 1
+    for e in entries:
+        e.games_left = left_by_team.get(e.team.id)
 
     # Which teams this member has tipped most, so the ladder connects to their
     # own season rather than being a bare table.
@@ -883,6 +1020,13 @@ def ladder_view(request, org_id: int):
         "entries": entries,
         "my_team_ids": my_team_ids,
         "updated_at": entries[0].updated_at if entries else None,
+        "round_strip": round_strip(
+            rounds_available, at_round, request.GET.get("back"),
+        ),
+        "at_round": at_round,
+        # Stepping through rounds must not silently change which competition's
+        # ladder is on screen.
+        "ladder_keep": f"series={selected.slug}" if selected else "",
     })
 
 
@@ -936,10 +1080,25 @@ def leaderboard_view(request, org_id: int):
     # tiebreakers. Recomputing "equal points means equal rank" here would
     # undo that: two tippers separated on the paired comp would be reported
     # level again, and the leaderboard would disagree with the dashboard.
+    # MORE THAN RANK, TIPPER, CORRECT, POINTS. "I think we can have more detail
+    # than that."
+    #
+    # Accuracy is the column people actually argue about — 8 from 9 and 80 from
+    # 90 are the same rate and a very different season, and neither of the two
+    # numbers already here says so. Behind is the gap to the leader, which is
+    # the second thing anybody looks for after their own position and was
+    # arithmetic every reader was doing in their head.
+    #
+    # Both are derived here rather than in the template: a percentage computed
+    # with `widthratio` is unreadable, and "points behind" needs the top score,
+    # which a row does not have.
+    top_points = board[0].points if board else 0
     ranked = [
         {"rank": u.rank, "user": u, "points": u.points,
          "tips_correct": u.tips_correct, "tips_total": u.tips_total,
-         "is_tied": u.is_tied}
+         "is_tied": u.is_tied,
+         "accuracy": round(u.tips_correct / u.tips_total * 100) if u.tips_total else None,
+         "behind": top_points - u.points}
         for u in board
     ]
     if request.headers.get("HX-Request"):
@@ -962,6 +1121,13 @@ def leaderboard_view(request, org_id: int):
     # Changing code resets to all rounds, which is the only honest default.
     comp_keep_pairs = [("scope", scope)] if (is_family and scope == "national") else []
     comp_keep = "&amp;".join(f"{k}={v}" for k, v in comp_keep_pairs)
+    # The ROUND buttons carry the comp as well as the scope — they are inside
+    # the competition, not beside it, so a round link that dropped ?comp would
+    # widen the board back to every code while its chip still read as selected.
+    round_keep_pairs = comp_keep_pairs + (
+        [("comp", selected_comp.slug)] if selected_comp is not None else []
+    )
+    comp_keep_round = "&amp;".join(f"{k}={v}" for k, v in round_keep_pairs)
 
     # ARROWS EITHER SIDE OF THE ROUND, like the dashboard's navigator — "it
     # should not only be a dropdown, but a nice way I can press arrow left and
@@ -979,6 +1145,22 @@ def leaderboard_view(request, org_id: int):
     labels = {"all": "All rounds"}
     for r in rounds:
         labels[str(r.id)] = f"Round {r.round_number}"
+    # The strip of round buttons, on the same design as the ladder's — five at
+    # a time, the current one highlighted, stepping backwards a page at a time.
+    numbers = [r.round_number for r in reversed(list(rounds))]
+    here_number = next(
+        (r.round_number for r in rounds if str(r.id) == selected_round_id), None,
+    )
+    # The buttons post round IDs, not numbers: a round number names one round
+    # PER COMPETITION, so on an unfiltered board the number 4 is up to five
+    # different rounds and only the id says which.
+    id_for_number = {}
+    for r in rounds:
+        id_for_number.setdefault(r.round_number, r.id)
+    strip = round_strip(
+        numbers, here_number, request.GET.get("back"), values=id_for_number,
+    )
+
     round_nav = {
         "prev": steps[at - 1] if at > 0 else "",
         "next": steps[at + 1] if at < len(steps) - 1 else "",
@@ -991,7 +1173,8 @@ def leaderboard_view(request, org_id: int):
         "org": org, "rounds": rounds, "selected_round_id": selected_round_id or "all",
         "comp_options": comp_options, "selected_comp": selected_comp,
         "comp_keep": comp_keep, "comp_keep_pairs": comp_keep_pairs,
-        "round_nav": round_nav,
+        "comp_keep_round": comp_keep_round,
+        "round_nav": round_nav, "round_strip": strip,
         "ranked": ranked, "me": request.user,
         "scope": scope, "is_family": is_family,
         "total_tippers": len(ranked),
