@@ -2734,3 +2734,178 @@ class LadderPresentationTests(TestCase):
         ).content.decode()
         for word in ("RANK", "TIPPER", "POINTS", "ACCURACY"):
             self.assertIn(f">{word}<", body, word)
+
+
+class CompetitionStatsTests(TestCase):
+    """The whole competition at once — every club, not one of them.
+
+    ASKED FOR: "let's add STATISTICS, where now we will see not individual but
+    overall statistics of all the teams." Every figure here is a comparison,
+    which is exactly what a single club's page cannot show.
+    """
+
+    def setUp(self):
+        from matchreader.models import HistoricalMatch
+
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.series = Series.objects.get(slug="nrl")
+        comp = Competition.objects.create(
+            sport=self.series.sport, season=self.season, name="CS Comp", slug="cs-comp",
+        )
+        comp.series.add(self.series)
+        self.org = Organisation.objects.create(name="CS League", season=self.season)
+        self.org.competitions.add(comp)
+        self.user = User.objects.create_user(
+            email="cs@example.com", password="x", display_name="CS",
+        )
+        OrgMember.objects.create(user=self.user, org=self.org)
+        self.a = Team.objects.create(name="Ayes", slug="cs-a", series=self.series)
+        self.b = Team.objects.create(name="Bees", slug="cs-b", series=self.series)
+        self.c = Team.objects.create(name="Seas", slug="cs-c", series=self.series)
+        # Every game a home win, so home advantage is unambiguous; Ayes score
+        # heavily, Seas concede heavily.
+        rows = [
+            (1, self.a, self.b, 40, 10),
+            (2, self.a, self.c, 50, 6),
+            (3, self.b, self.c, 20, 12),
+        ]
+        for n, home, away, hs, aws in rows:
+            HistoricalMatch.objects.create(
+                series=self.series, season=self.season.year, round_number=n,
+                stage=HistoricalMatch.STAGE_REGULAR, external_id=f"cs-{n}",
+                home_team=home, away_team=away, home_score=hs, away_score=aws,
+                kickoff_at=timezone.now() - timedelta(days=20 - n),
+            )
+        self.client.force_login(self.user)
+
+    def test_it_counts_every_club_from_one_pass(self):
+        from tipping.stats import competition_season
+
+        st = competition_season(self.series, self.season)
+        self.assertEqual(st["teams"], 3)
+        self.assertEqual(st["games"], 3)
+        by_name = {c["team"].name: c for c in st["clubs"]}
+        self.assertEqual(by_name["Ayes"]["played"], 2)
+        self.assertEqual(by_name["Seas"]["played"], 2)
+
+    def test_home_advantage_is_measured_not_assumed(self):
+        """A fact about this season, and draws are left out rather than counted
+        as half a win — a draw is a result neither ground produced."""
+        from tipping.stats import competition_season
+
+        st = competition_season(self.series, self.season)
+        self.assertEqual(st["home_win_pct"], 100)
+        self.assertEqual((st["home_wins"], st["away_wins"]), (3, 0))
+
+    def test_the_best_attack_and_defence_are_found(self):
+        from tipping.stats import competition_season
+
+        st = competition_season(self.series, self.season)
+        self.assertEqual(st["best_attack"]["team"].name, "Ayes")
+        self.assertEqual(st["best_defence"]["team"].name, "Ayes")
+
+    def test_the_biggest_win_of_the_season_is_named(self):
+        from tipping.stats import competition_season
+
+        st = competition_season(self.series, self.season)
+        self.assertEqual(st["biggest_win"]["margin"], 44)
+        self.assertEqual(st["biggest_win"]["winner"].name, "Ayes")
+
+    def test_the_page_renders_a_row_per_club(self):
+        body = self.client.get(
+            reverse("tipping:comp_stats", args=[self.org.id])
+            + f"?series={self.series.slug}"
+        ).content.decode()
+        self.assertEqual(body.count('class="gb-row cs-row"'), 3)
+        self.assertIn("Home advantage", body)
+
+    def test_it_is_reachable_from_the_ladder(self):
+        """"I did not see the stats button" — the competition-wide one has to
+        be as findable as the per-club one."""
+        body = self.client.get(
+            reverse("tipping:ladder", args=[self.org.id])
+            + f"?series={self.series.slug}"
+        ).content.decode()
+        self.assertIn(reverse("tipping:comp_stats", args=[self.org.id]), body)
+
+    def test_the_leaderboard_offers_my_statistics_as_a_button(self):
+        body = self.client.get(
+            reverse("tipping:leaderboard", args=[self.org.id])
+        ).content.decode()
+        self.assertIn("My statistics", body)
+        self.assertNotIn("My stats &rarr;", body)
+
+    def test_a_stranger_cannot_read_it(self):
+        outsider = User.objects.create_user(
+            email="csout@example.com", password="x", display_name="Out",
+        )
+        self.client.force_login(outsider)
+        r = self.client.get(reverse("tipping:comp_stats", args=[self.org.id]))
+        self.assertEqual(r.status_code, 403)
+
+
+class DeepSheetContrastTests(TestCase):
+    """Two things reported as "in a green so it's not visible", both literally.
+
+    The title-sized eyebrow set --forest — a dark green — and landed after the
+    sheet-page rule that paints eyebrows lime, so "Waita Realty Group · 2026"
+    and "AFL · 2026" were dark green on dark green. The form run's cells were
+    tinted-transparent greens and reds with dark ink, designed for a cream card
+    and drawn on the deep sheet.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from pathlib import Path
+
+        from django.conf import settings
+
+        cls.css = Path(settings.BASE_DIR, "static/css/goodtip.css").read_text()
+
+    def test_the_title_eyebrow_is_not_dark_green_on_the_deep_sheet(self):
+        """Two rules, and both have to be right: white on the deep sheet, ink
+        again under the light theme where white would vanish. Matched
+        separately because a naive search for the selector finds the light-theme
+        override too — which SHOULD say forest, and made the first version of
+        this test fail on correct code."""
+        import re
+
+        deep = re.search(
+            r"\.sheet-page \.gt-head \.gh-eyebrow\.is-title,\s*"
+            r"\.gt-head \.gh-eyebrow\.is-title \{([^}]*)\}",
+            self.css,
+        )
+        self.assertIsNotNone(deep, "no deep-sheet rule for the title eyebrow")
+        self.assertNotIn("var(--forest)", deep.group(1))
+        self.assertIn("255,255,255", deep.group(1))
+
+        light = re.search(
+            r'html\[data-theme="light"\] \.gt-app \.gt-head \.gh-eyebrow\.is-title'
+            r"\s*\{([^}]*)\}",
+            self.css,
+        )
+        self.assertIsNotNone(light, "the light theme needs it back in ink")
+        self.assertIn("var(--forest)", light.group(1))
+
+    def test_the_form_run_cells_are_solid_rather_than_tinted(self):
+        """A translucent wash of the outcome colour over a dark green sheet is
+        the same near-black whichever outcome it is."""
+        import re
+
+        for cls_ in ("w", "l", "d"):
+            block = re.findall(
+                r"\.formrun \.fr-g\." + cls_ + r"\s*\{([^}]*)\}", self.css,
+            )
+            self.assertTrue(block, cls_)
+            self.assertNotIn("rgba(", block[-1], f".fr-g.{cls_} is still a tint")
+
+    def test_the_form_run_letters_are_white(self):
+        import re
+
+        block = re.findall(
+            r"\.formrun \.fr-g\.w b, \.formrun \.fr-g\.l b, \.formrun \.fr-g\.d b \{([^}]*)\}",
+            self.css,
+        )
+        self.assertTrue(block)
+        self.assertIn("#FFFFFF", block[-1])

@@ -1,0 +1,147 @@
+{% extends "app_base.html" %}
+{% load team_extras %}
+{% block title %}{{ selected_series.name }} statistics{% endblock %}
+{% block loader_task %}Working out the {{ selected_series.name }} season{% endblock %}
+{% block nav_ladder %}on{% endblock %}
+{% block body_class %}page-deep sheet-page{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+
+{% block app_content %}
+{% comment %}
+THE WHOLE COMPETITION AT ONCE.
+
+ASKED FOR: "let's add STATISTICS, where now we will see not individual but
+overall statistics of all the teams."
+
+Everything on this page is a comparison, which is precisely what a single club's
+page cannot show: who scores, who concedes, whether home advantage is real this
+season. One pass over the season's completed games builds all of it — eighteen
+clubs would otherwise be eighteen queries over the same rows, since every game
+belongs to two of them.
+{% endcomment %}
+<div class="gt-head is-centred"{% if selected_series %} data-code="{{ selected_series.slug }}" data-cat="{{ selected_series.category }}"{% endif %}>
+  <div>
+    <div class="gh-eyebrow is-title">{{ selected_series.name }} &middot; {{ org.season }}</div>
+    <h1 class="gh-title">Statistics</h1>
+    <p class="gh-sub">Every club in the competition, side by side.
+      <a href="{% url 'tipping:ladder' org.id %}?series={{ selected_series.slug }}">Back to the ladder &rarr;</a></p>
+  </div>
+</div>
+
+{% url 'tipping:comp_stats' org.id as cs_url %}
+{% include "partials/comp_filter.html" with options=series_options selected=selected_series param="series" base=cs_url centred=1 %}
+
+{% if stats and stats.games %}
+<div class="statcards"{% if selected_series %} data-code="{{ selected_series.slug }}" data-cat="{{ selected_series.category }}"{% endif %}>
+  <div class="statcard">
+    <span class="sc-lab">Games played</span>
+    <b class="sc-fig">{{ stats.games }}</b>
+    <span class="sc-note">across {{ stats.teams }} clubs</span>
+  </div>
+  <div class="statcard">
+    <span class="sc-lab">Average game</span>
+    <b class="sc-fig">{{ stats.avg_points }}</b>
+    <span class="sc-note">points scored, both sides</span>
+  </div>
+  <div class="statcard">
+    {% comment %}
+    Home advantage as a fact about THIS season rather than as folklore. Draws
+    are left out of the percentage rather than counted as half a win — a draw is
+    a result neither ground produced.
+    {% endcomment %}
+    <span class="sc-lab">Home advantage</span>
+    <b class="sc-fig">{{ stats.home_win_pct }}<small>%</small></b>
+    <span class="sc-note">{{ stats.home_wins }} home wins, {{ stats.away_wins }} away{% if stats.draws %}, {{ stats.draws }} drawn{% endif %}</span>
+  </div>
+  <div class="statcard">
+    <span class="sc-lab">Biggest win</span>
+    <b class="sc-fig">{% if stats.biggest_win %}{{ stats.biggest_win.margin }}{% else %}&ndash;{% endif %}</b>
+    <span class="sc-note">{% if stats.biggest_win %}{{ stats.biggest_win.winner.name }}, round {{ stats.biggest_win.round }}{% else %}no results yet{% endif %}</span>
+  </div>
+</div>
+
+<div class="statgrid"{% if selected_series %} data-code="{{ selected_series.slug }}" data-cat="{{ selected_series.category }}"{% endif %}>
+  <section class="statpanel">
+    <h2>Who scores</h2>
+    <p class="sp-sub">Average points scored per game.{% if stats.best_attack %} Best: <b>{{ stats.best_attack.team.name }}</b>.{% endif %}</p>
+    <div class="sp-rows">
+      {% for c in chart_attack %}
+      <div class="spr">
+        <span class="spr-lab">{{ c.team.name|truncatechars:16 }}</span>
+        <span class="spr-track"><i style="width:{{ c.bar_pct }}%"></i></span>
+        <span class="spr-val">{{ c.avg_for }}</span>
+        <span class="spr-n">{{ c.scored }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="statpanel">
+    <h2>Who concedes</h2>
+    {% comment %}
+    Shortest bar is best here, and that inverts the reading of every other chart
+    on the page — so the panel says so rather than leaving it to be worked out
+    from the fact that the order looks upside down.
+    {% endcomment %}
+    <p class="sp-sub">Average points conceded. Shorter is better.{% if stats.best_defence %} Best: <b>{{ stats.best_defence.team.name }}</b>.{% endif %}</p>
+    <div class="sp-rows">
+      {% for c in chart_defence %}
+      <div class="spr">
+        <span class="spr-lab">{{ c.team.name|truncatechars:16 }}</span>
+        <span class="spr-track"><i style="width:{{ c.bar_pct }}%"></i></span>
+        <span class="spr-val">{{ c.avg_against }}</span>
+        <span class="spr-n">{{ c.conceded }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+{% comment %}
+The whole competition as one table, ordered by win rate rather than by ladder
+points — the ladder is next door and says that; this is the same clubs read a
+different way, which is the reason to have both.
+{% endcomment %}
+<div class="gt-board gt-listwrap compstats"{% if selected_series %} data-code="{{ selected_series.slug }}" data-cat="{{ selected_series.category }}"{% endif %}>
+  <div class="gb-head cs-head">
+    <span>CLUB</span>
+    <span class="num">PLAYED</span>
+    <span class="num">WON</span>
+    <span class="num">WIN&nbsp;%</span>
+    <span class="num">FOR</span>
+    <span class="num">AGAINST</span>
+    <span class="num">DIFF</span>
+    <span class="cs-form-h">LAST {{ stats.form_rounds }}</span>
+    <span class="cs-stats-h">STATISTICS</span>
+  </div>
+  <div class="gt-scroll gb-rows">
+    {% for c in stats.clubs %}
+    <div class="gb-row cs-row">
+      <span class="gb-who">
+        <span class="lad-crest">{% crest c.team %}</span>
+        <a class="gb-name lad-link" href="{% url 'tipping:team_stats' org.id c.team.id %}">{{ c.team.name }}</a>
+      </span>
+      <span class="num">{{ c.played }}</span>
+      <span class="num">{{ c.won }}</span>
+      <span class="num strong">{{ c.win_pct }}%</span>
+      <span class="num">{{ c.scored }}</span>
+      <span class="num">{{ c.conceded }}</span>
+      <span class="num {% if c.differential > 0 %}pos{% elif c.differential < 0 %}neg{% endif %}">{% if c.differential > 0 %}+{% endif %}{{ c.differential }}</span>
+      <span class="cs-form">
+        {% for f in c.form %}<i class="{{ f|lower }}">{{ f }}</i>{% endfor %}
+      </span>
+      <a class="lad-stats" href="{% url 'tipping:team_stats' org.id c.team.id %}" aria-label="{{ c.team.name }} statistics">
+        <svg aria-hidden="true"><use href="#ic-f-chart"/></svg><span>Stats</span>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% else %}
+<div class="card pad-lg" style="text-align:center;">
+  <div class="card-h">No results yet for {{ selected_series.name }}</div>
+  <p class="card-lead">Statistics fill in as the season's games are played.</p>
+</div>
+{% endif %}
+{% endblock %}

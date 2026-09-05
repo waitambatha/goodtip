@@ -16398,3 +16398,92 @@ html[data-theme="light"] .gt-app .room-switch.on-dark .rw-eyebrow { color: var(-
 html[data-theme="light"] .gt-app .lad-foot .lad-key,
 html[data-theme="light"] .gt-app .lad-foot .lad-when { color: var(--muted); }
 html[data-theme="light"] .gt-app .lad-stats-h { color: #FFFFFF; }
+
+/* ============================================================================
+   THE EYEBROW ON THE DEEP SHEET, AND THE FORM RUN
+   ----------------------------------------------------------------------------
+   Two things reported as "in a green so it's not visible", and both were
+   literally that.
+
+   THE TITLE-SIZED EYEBROW. `.gt-head .gh-eyebrow.is-title` set --forest, which
+   is a dark green, and it landed AFTER the sheet-page rule that paints the
+   eyebrow lime — so on the deep sheet "Waita Realty Group · 2026" and "AFL ·
+   2026" were dark green on dark green. Near-white here, with the title itself
+   pure white above it, so the two read as a hierarchy rather than as one line
+   that failed.
+
+   THE FORM RUN. Its cells were tinted-transparent greens and reds with dark
+   ink on them — designed for a cream card, drawn on the deep sheet, so W was
+   #1f6b28 over a translucent green over dark green. Solid grounds and bright
+   ink instead. A row of results nobody can read is not a form guide.
+   ========================================================================= */
+.sheet-page .gt-head .gh-eyebrow.is-title,
+.gt-head .gh-eyebrow.is-title {
+  color: rgba(255,255,255,.88); opacity: 1;
+}
+html[data-theme="light"] .gt-app .gt-head .gh-eyebrow.is-title { color: var(--forest); }
+
+.formrun .fr-g {
+  background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.2);
+  width: 46px; padding: 8px 0 6px;
+}
+.formrun .fr-g b { font-size: 15px; color: #FFFFFF; }
+.formrun .fr-g i { color: rgba(255,255,255,.7); font-size: 10px; }
+/* Solid, not a tint: a translucent wash of the outcome colour over a dark green
+   sheet is the same near-black whichever outcome it is. */
+.formrun .fr-g.w { background: #1f6b28; border-color: #2c8a37; }
+.formrun .fr-g.l { background: #8f2626; border-color: #ad3333; }
+.formrun .fr-g.d { background: #7a5410; border-color: #9a6d18; }
+.formrun .fr-g.w b, .formrun .fr-g.l b, .formrun .fr-g.d b { color: #FFFFFF; }
+.formrun .fr-g.w i, .formrun .fr-g.l i, .formrun .fr-g.d i { color: rgba(255,255,255,.8); }
+
+/* ============================================================================
+   THE COMPETITION STATISTICS PAGE
+   ========================================================================= */
+.compfilter-wrap {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  flex-wrap: wrap; margin-bottom: 20px;
+}
+.compfilter-wrap .compfilter { margin: 0; }
+.comp-stats-btn { flex: none; }
+.abtn-ic { width: 16px; height: 16px; fill: currentColor; margin-right: 7px; vertical-align: -3px; }
+
+.gt-board.compstats .gb-head,
+.gt-board.compstats .gb-row {
+  grid-template-columns: minmax(0,1.6fr) repeat(6, minmax(54px, 72px)) 132px 84px;
+}
+.gt-board.compstats .num { text-align: right; font-family: var(--score); font-variant-numeric: tabular-nums; font-size: 15px; color: var(--ink); }
+.gt-board.compstats .num.strong { font-weight: 800; color: var(--code-ink, var(--forest)); }
+.gt-board.compstats .num.pos { color: #1f6b28; font-weight: 700; }
+.gt-board.compstats .num.neg { color: #9a2b2b; }
+.cs-form-h, .cs-stats-h {
+  font-family: var(--mark); font-weight: 800; font-size: 10.5px;
+  letter-spacing: .06em; color: #FFFFFF; text-align: right;
+}
+/* The last five, as five letters — the same shorthand the fixture card's form
+   strip uses, so a reader learns it once. */
+.cs-form { display: flex; gap: 3px; justify-content: flex-end; }
+.cs-form i {
+  font-style: normal; width: 21px; height: 21px; border-radius: 6px;
+  display: grid; place-items: center; color: #fff;
+  font-family: var(--mark); font-weight: 800; font-size: 10.5px;
+}
+.cs-form i.w { background: #1f6b28; }
+.cs-form i.l { background: #9a2b2b; }
+.cs-form i.d { background: #8a6206; }
+@media (max-width: 1100px) {
+  .gt-board.compstats .gb-head,
+  .gt-board.compstats .gb-row { grid-template-columns: minmax(0,1.4fr) repeat(6, minmax(46px, 60px)) 44px; }
+  .cs-form, .cs-form-h { display: none; }
+  .gt-board.compstats .lad-stats span { display: none; }
+}
+@media (max-width: 780px) {
+  .gt-board.compstats .gb-head,
+  .gt-board.compstats .gb-row { grid-template-columns: minmax(0,1fr) 52px 52px 58px 44px; }
+  .gt-board.compstats .gb-head span:nth-child(5),
+  .gt-board.compstats .gb-head span:nth-child(6),
+  .gt-board.compstats .gb-head span:nth-child(7),
+  .gt-board.compstats .cs-row .num:nth-of-type(4),
+  .gt-board.compstats .cs-row .num:nth-of-type(5),
+  .gt-board.compstats .cs-row .num:nth-of-type(6) { display: none; }
+}

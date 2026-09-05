@@ -1115,6 +1115,40 @@ def team_stats_view(request, org_id: int, team_id: int):
 
 
 @login_required
+def comp_stats_view(request, org_id: int):
+    """The whole competition at once — every club, not one of them.
+
+    ASKED FOR: "let's add STATISTICS, where now we will see not individual but
+    overall statistics of all the teams."
+
+    The team page answers "how is this club going"; this answers the questions
+    that need every club in front of you, because each of them is a comparison:
+    who scores, who concedes, whether home advantage is real this season.
+    """
+    from .stats import bars, competition_season
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_member(request.user, org):
+        return HttpResponseForbidden()
+
+    options = org_series(org)
+    selected = pick_series(options, request.GET.get("series"), default_to_first=True)
+    st = competition_season(selected, org.season) if selected else None
+    return render(request, "comp_stats.html", {
+        "org": org,
+        "series_options": options,
+        "selected_series": selected,
+        "stats": st,
+        "chart_attack": bars(
+            sorted(st["clubs"], key=lambda c: -(c["avg_for"] or 0)), key="avg_for",
+        ) if st and st["clubs"] else [],
+        "chart_defence": bars(
+            sorted(st["clubs"], key=lambda c: (c["avg_against"] or 9999)), key="avg_against",
+        ) if st and st["clubs"] else [],
+    })
+
+
+@login_required
 def leaderboard_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _require_member(request.user, org):

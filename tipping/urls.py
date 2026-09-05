@@ -28,4 +28,5 @@ urlpatterns = [
     # The detail behind each board: a member's own season, and a club's.
     path("<int:org_id>/leaderboard/me/", views.my_stats_view, name="my_stats"),
     path("<int:org_id>/ladder/team/<int:team_id>/", views.team_stats_view, name="team_stats"),
+    path("<int:org_id>/ladder/statistics/", views.comp_stats_view, name="comp_stats"),
 ]

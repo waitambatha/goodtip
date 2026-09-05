@@ -61,7 +61,19 @@ veil would land on a picker while the stale table below carried on looking
 current.
 {% endcomment %}
 {% url 'tipping:ladder' org.id as ladder_url %}
-{% include "partials/comp_filter.html" with options=series_options selected=selected_series param="series" base=ladder_url veil_for="#ladderTable" centred=1 %}
+<div class="compfilter-wrap">
+  {% include "partials/comp_filter.html" with options=series_options selected=selected_series param="series" base=ladder_url veil_for="#ladderTable" centred=1 %}
+  {% comment %}
+  THE WHOLE COMPETITION, not one club of it. The ladder rows lead to a single
+  club's season; this leads to all of them at once — who scores, who concedes,
+  whether home advantage is real this year. Each of those is a comparison and
+  none of them fits on a club's own page.
+  {% endcomment %}
+  <a class="abtn abtn-primary comp-stats-btn"
+     href="{% url 'tipping:comp_stats' org.id %}?series={{ selected_series.slug }}">
+    <svg class="abtn-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg> Statistics
+  </a>
+</div>
 
 {% comment %}
 THE LADDER AT A PAST ROUND. "Users might want to see, let's say last month,

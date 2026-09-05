@@ -35,6 +35,17 @@ reads as a layout that lost something.
     <h1>Leaderboard</h1>
     <p class="gh-lead">Compete. Climb. Make an impact.</p>
   </div>
+  {% comment %}
+  MY STATISTICS, beside the line that introduces the page rather than floating
+  above the table as a small link. It is not a filter and it is not a footnote —
+  it is the other half of this screen, and it should look like one of the two
+  things you can do here.
+  {% endcomment %}
+  <div class="gh-actions">
+    <a class="abtn abtn-primary" href="{% url 'tipping:my_stats' org.id %}{% if selected_comp %}?comp={{ selected_comp.slug }}{% endif %}">
+      <svg class="abtn-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg> My statistics
+    </a>
+  </div>
 </div>
 
 {% comment %}
@@ -188,12 +199,6 @@ The sidebar is not deleted, it is moved: summary, cause and quote become a row
 of cards under the board, where they are still read and no longer compete with
 it.
 {% endcomment %}
-{% comment %}
-The way into the detail behind this board. Beside the table rather than in the
-filter bar: it is not a filter, it changes page.
-{% endcomment %}
-<p class="board-more"><a class="abtn abtn-ghost" href="{% url 'tipping:my_stats' org.id %}{% if selected_comp %}?comp={{ selected_comp.slug }}{% endif %}">My stats &rarr;</a></p>
-
 <div data-coach="board-table">
   <div>
     {% include "partials/leaderboard_table.html" with ranked=ranked me=request.user %}

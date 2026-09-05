@@ -326,3 +326,114 @@ def donut(part, whole, *, size=120, thickness=14):
         "dash": f"{round(filled, 2)} {round(circumference - filled, 2)}",
         "pct": _pct(part, whole),
     }
+
+
+def competition_season(series, season, up_to_round=None):
+    """The whole competition at once: every club, and what the season looks like.
+
+    ASKED FOR: "let's add STATISTICS, where now we will see not individual but
+    overall statistics of all the teams."
+
+    The team page answers "how is this club going". This answers the questions
+    that need every club in front of you at once — who scores, who concedes,
+    whether home advantage is real in this competition this year — none of which
+    a single club's page can say, because each of them is a comparison.
+
+    Built from one pass over the season's completed games rather than a call to
+    team_season per club: eighteen clubs would otherwise be eighteen queries
+    returning the same rows, since every game belongs to two of them.
+    """
+    from matchreader.models import HistoricalMatch
+
+    year = season.year if hasattr(season, "year") else season
+    games = HistoricalMatch.objects.filter(
+        series=series, season=year, stage=HistoricalMatch.STAGE_REGULAR,
+    ).select_related("home_team", "away_team")
+    if up_to_round is not None:
+        games = games.filter(round_number__lte=up_to_round)
+    games = list(games.order_by("round_number", "kickoff_at"))
+
+    clubs: dict[int, dict] = {}
+
+    def club(team):
+        if team.id not in clubs:
+            clubs[team.id] = {
+                "team": team, "played": 0, "won": 0, "drawn": 0,
+                "scored": 0, "conceded": 0, "form": [],
+                "home_played": 0, "home_won": 0,
+            }
+        return clubs[team.id]
+
+    home_wins = away_wins = draws = 0
+    biggest = None
+    for g in games:
+        h, a = club(g.home_team), club(g.away_team)
+        h["played"] += 1
+        a["played"] += 1
+        h["home_played"] += 1
+        h["scored"] += g.home_score
+        h["conceded"] += g.away_score
+        a["scored"] += g.away_score
+        a["conceded"] += g.home_score
+
+        if g.home_score > g.away_score:
+            h["won"] += 1
+            h["home_won"] += 1
+            home_wins += 1
+            h["form"].append("W")
+            a["form"].append("L")
+            margin, winner, loser = g.home_score - g.away_score, g.home_team, g.away_team
+        elif g.away_score > g.home_score:
+            a["won"] += 1
+            away_wins += 1
+            h["form"].append("L")
+            a["form"].append("W")
+            margin, winner, loser = g.away_score - g.home_score, g.away_team, g.home_team
+        else:
+            h["drawn"] += 1
+            a["drawn"] += 1
+            draws += 1
+            h["form"].append("D")
+            a["form"].append("D")
+            margin = 0
+            winner = loser = None
+        if winner is not None and (biggest is None or margin > biggest["margin"]):
+            biggest = {
+                "margin": margin, "winner": winner, "loser": loser,
+                "round": g.round_number, "score": f"{max(g.home_score, g.away_score)}–{min(g.home_score, g.away_score)}",
+            }
+
+    rows = []
+    for c in clubs.values():
+        rows.append(dict(
+            c,
+            form=c["form"][-FORM_ROUNDS:],
+            differential=c["scored"] - c["conceded"],
+            win_pct=_pct(c["won"], c["played"]),
+            avg_for=round(c["scored"] / c["played"], 1) if c["played"] else None,
+            avg_against=round(c["conceded"] / c["played"], 1) if c["played"] else None,
+            home_win_pct=_pct(c["home_won"], c["home_played"]),
+        ))
+    rows.sort(key=lambda r: (-(r["win_pct"] or 0), -r["differential"]))
+
+    total = len(games)
+    return {
+        "clubs": rows,
+        "games": total,
+        "teams": len(rows),
+        "total_points": sum(g.home_score + g.away_score for g in games),
+        "avg_points": round(
+            sum(g.home_score + g.away_score for g in games) / total, 1
+        ) if total else None,
+        # Home advantage as a fact about THIS season, not folklore. Draws are
+        # left out of the percentage rather than counted as half a win: a draw
+        # is a result neither side's ground produced.
+        "home_win_pct": _pct(home_wins, home_wins + away_wins),
+        "home_wins": home_wins,
+        "away_wins": away_wins,
+        "draws": draws,
+        "biggest_win": biggest,
+        "best_attack": max(rows, key=lambda r: r["avg_for"] or 0, default=None),
+        "best_defence": min(rows, key=lambda r: r["avg_against"] or 9999, default=None),
+        "form_rounds": FORM_ROUNDS,
+    }
