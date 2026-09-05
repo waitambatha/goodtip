@@ -1813,3 +1813,203 @@ class RoundNumberIsNotARoundTests(TestCase):
         nav = resp.context["round_nav"]
         self.assertFalse(nav["multi"])
         self.assertEqual(nav["current"], "4")
+
+
+class LeaderboardByCompetitionTests(TestCase):
+    """"So I can filter, let's say NRL, and see where I am and who is leading."
+
+    A member tipping four codes has one total made of four seasons going
+    differently, and the combined number cannot say which of them they are any
+    good at. This is the arithmetic behind that filter — the part that would be
+    wrong silently, since a board that quietly sums the wrong tips still looks
+    like a leaderboard.
+    """
+
+    def setUp(self):
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.nrl = Series.objects.get(slug="nrl")
+        self.nrlw = Series.objects.get(slug="nrlw")
+        sport = self.nrl.sport
+        comp = Competition.objects.create(
+            sport=sport, season=self.season, name="Board Comp", slug="board-comp",
+        )
+        comp.series.add(self.nrl, self.nrlw)
+        self.org = Organisation.objects.create(name="Board League", season=self.season)
+        self.org.competitions.add(comp)
+
+        self.mens_specialist = User.objects.create_user(
+            email="mens@example.com", password="x", display_name="Mens Specialist",
+        )
+        self.womens_specialist = User.objects.create_user(
+            email="womens@example.com", password="x", display_name="Womens Specialist",
+        )
+        for u in (self.mens_specialist, self.womens_specialist):
+            OrgMember.objects.create(user=u, org=self.org)
+
+        now = timezone.now()
+        self.rounds = {}
+        for series in (self.nrl, self.nrlw):
+            rnd = Round.objects.create(
+                org=self.org, round_number=1, series=series, competition=comp,
+                lockout_at=now - timedelta(days=7), status="complete",
+            )
+            self.rounds[series.slug] = rnd
+            home = Team.objects.create(
+                name=f"{series.slug} H", slug=f"board-{series.slug}-h", series=series,
+            )
+            away = Team.objects.create(
+                name=f"{series.slug} A", slug=f"board-{series.slug}-a", series=series,
+            )
+            for i in range(3):
+                Match.objects.create(
+                    round=rnd, home_team=home, away_team=away,
+                    kickoff_at=now - timedelta(days=7, hours=i),
+                    status="complete", result="home", home_score=20, away_score=10,
+                )
+
+        # Three right in the men's and none in the women's, and the mirror
+        # image. Level overall; opposite ends of either code's board.
+        self._tip(self.mens_specialist, self.nrl, correct=3)
+        self._tip(self.mens_specialist, self.nrlw, correct=0)
+        self._tip(self.womens_specialist, self.nrl, correct=0)
+        self._tip(self.womens_specialist, self.nrlw, correct=3)
+
+    def _tip(self, user, series, *, correct):
+        matches = list(self.rounds[series.slug].matches.order_by("id"))
+        for i, m in enumerate(matches):
+            right = i < correct
+            Tip.objects.create(
+                user=user, match=m, org=self.org,
+                selection="home" if right else "away",
+                is_correct=right, points_awarded=1 if right else 0,
+            )
+
+    def _points(self, board):
+        return {u.display_name: u.points for u in board}
+
+    def test_unfiltered_the_two_are_level(self):
+        """The premise. If they were not level overall, filtering could look
+        like it worked while doing nothing."""
+        self.assertEqual(
+            self._points(leaderboard_for_org(self.org)),
+            {"Mens Specialist": 3, "Womens Specialist": 3},
+        )
+
+    def test_filtering_to_one_code_ranks_on_that_code_alone(self):
+        board = leaderboard_for_org(self.org, series=self.nrl)
+        self.assertEqual(
+            self._points(board), {"Mens Specialist": 3, "Womens Specialist": 0},
+        )
+        self.assertEqual(board[0].display_name, "Mens Specialist")
+
+    def test_and_the_other_code_reverses_it(self):
+        board = leaderboard_for_org(self.org, series=self.nrlw)
+        self.assertEqual(
+            self._points(board), {"Mens Specialist": 0, "Womens Specialist": 3},
+        )
+        self.assertEqual(board[0].display_name, "Womens Specialist")
+
+    def test_the_accuracy_record_narrows_with_the_points(self):
+        """Points and "3 of 3 correct" sit in the same row. One filtered and
+        the other not would be two answers to one question."""
+        board = leaderboard_for_org(self.org, series=self.nrl)
+        mens = next(u for u in board if u.display_name == "Mens Specialist")
+        self.assertEqual((mens.tips_correct, mens.tips_total), (3, 3))
+
+    def test_a_filtered_board_breaks_ties_on_the_paired_comp(self):
+        """The addendum's cross-code rule applies to a board scoped to one
+        code — which a comp filter now produces, exactly as a round filter
+        always did. Two tippers level in the NRL are separated by the NRLW.
+        """
+        board = leaderboard_for_org(self.org, series=self.nrl)
+        # Level in the NRL at 0; the women's specialist has the paired score.
+        levels = [u for u in board if u.points == 0]
+        self.assertTrue(levels)
+        self.assertEqual(levels[0].display_name, "Womens Specialist")
+        self.assertEqual(levels[0].paired_points, 3)
+
+    def test_an_all_comps_board_does_not_apply_the_cross_code_step(self):
+        """It would be double counting: the paired score is already inside the
+        total. The docstring on apply_tiebreakers has the reasoning."""
+        board = leaderboard_for_org(self.org)
+        self.assertTrue(all(u.paired_points == 0 for u in board))
+
+
+class LeaderboardCompetitionFilterPageTests(TestCase):
+    """The control itself: chips and a select, both real, on both pages."""
+
+    def setUp(self):
+        self.season = Season.objects.create(year=2099, label="2099")
+        nrl = Series.objects.get(slug="nrl")
+        nrlw = Series.objects.get(slug="nrlw")
+        comp = Competition.objects.create(
+            sport=nrl.sport, season=self.season, name="Page Comp", slug="page-comp",
+        )
+        comp.series.add(nrl, nrlw)
+        self.org = Organisation.objects.create(name="Page League", season=self.season)
+        self.org.competitions.add(comp)
+        self.user = User.objects.create_user(
+            email="page@example.com", password="x", display_name="Page",
+        )
+        OrgMember.objects.create(user=self.user, org=self.org)
+        self.nrl, self.nrlw = nrl, nrlw
+        self.client.force_login(self.user)
+
+    def _board(self, qs=""):
+        return self.client.get(
+            reverse("tipping:leaderboard", args=[self.org.id]) + qs
+        ).content.decode()
+
+    def test_the_leaderboard_offers_both_a_chip_row_and_a_select(self):
+        """"Let it be like both a dropdown and the button filter." Both, and
+        both posting the same URL — neither is a fallback for the other."""
+        body = self._board()
+        self.assertIn("cf-chips", body)
+        self.assertIn('name="comp"', body)
+        self.assertIn('data-code="nrlw"', body)
+
+    def test_all_competitions_is_the_arrival_state(self):
+        body = self._board()
+        self.assertIn("cf-chip cf-all on", body)
+
+    def test_choosing_a_code_colours_the_table_with_it(self):
+        """"Let the table also pick the colour of that competition." Absent on
+        an all-comps board, which would otherwise be claiming to be one code's
+        table."""
+        self.assertIn('id="lbtable"\n     data-code="nrl"', self._board("?comp=nrl"))
+        self.assertNotIn("data-code=", self._board().split('id="lbtable"')[1][:120])
+
+    def test_the_round_list_narrows_to_the_chosen_code(self):
+        """A round number names one round per code. Offering AFLW round 4 while
+        the board shows the NRL is offering a filter that empties the table."""
+        now = timezone.now()
+        for series, n in ((self.nrl, 7), (self.nrlw, 19)):
+            Round.objects.create(
+                org=self.org, round_number=n, series=series,
+                lockout_at=now + timedelta(days=3),
+            )
+        body = self._board("?comp=nrl")
+        self.assertIn("Round 7", body)
+        self.assertNotIn("Round 19", body)
+
+    def test_the_ladder_takes_a_slug_as_well_as_an_id(self):
+        """The chips post a slug because "?series=nrlw" is a URL somebody can
+        read and share; the old picker posted an id and those links are in the
+        wild. Both resolve."""
+        by_slug = self.client.get(
+            reverse("tipping:ladder", args=[self.org.id]) + "?series=nrlw"
+        ).content.decode()
+        by_id = self.client.get(
+            reverse("tipping:ladder", args=[self.org.id]) + f"?series={self.nrlw.id}"
+        ).content.decode()
+        for body in (by_slug, by_id):
+            self.assertIn('data-code="nrlw"', body)
+
+    def test_the_ladder_offers_no_all_option(self):
+        """A ladder is a table OF one competition — clubs from four codes
+        ranked in one column would be a list, not a ladder."""
+        body = self.client.get(
+            reverse("tipping:ladder", args=[self.org.id])
+        ).content.decode()
+        self.assertIn("cf-chips", body)
+        self.assertNotIn("cf-all", body)

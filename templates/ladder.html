@@ -25,25 +25,25 @@ stacking context, so a strip rendered inside it paints over the sheet.
       <a href="{% url 'tipping:leaderboard' org.id %}">That's the leaderboard &rarr;</a></p>
   </div>
 
-  {% if series_options|length > 1 %}
-  <div class="gh-actions">
-    {% comment %}
-    data-veil-for points at the table rather than at this picker: the control
-    lives in the page header and the thing it rebuilds is further down, so
-    without it the veil would land on a dropdown while the stale table below
-    carried on looking current.
-    {% endcomment %}
-    <form method="get" class="dc-pick" data-veil-for="#ladderTable" data-veil-label="Loading the ladder">
-      <span class="dc-lab">Competition</span>
-      <select name="series" data-coach="ladder-series" onchange="this.form.submit()">
-        {% for s in series_options %}
-        <option value="{{ s.id }}" {% if s.id == selected_series.id %}selected{% endif %}>{{ s.name }}</option>
-        {% endfor %}
-      </select>
-    </form>
-  </div>
-  {% endif %}
 </div>
+
+{% comment %}
+WHICH COMPETITION'S LADDER. It was a bare <select> tucked into the top-right of
+the header — "that button is too small and far end" — for the control that
+decides what the entire table below is about. It is a row of chips now, across
+the page, each in its competition's own colour, with the select kept beside them
+for anyone who would rather pick from a list.
+
+No "all" chip: a ladder is a table OF one competition. Clubs from four codes
+ranked in one column would be a list, not a ladder.
+
+data-veil-for points at the TABLE rather than at the control, because the
+control sits up here and the thing it rebuilds is further down — without it the
+veil would land on a picker while the stale table below carried on looking
+current.
+{% endcomment %}
+{% url 'tipping:ladder' org.id as ladder_url %}
+{% include "partials/comp_filter.html" with options=series_options selected=selected_series param="series" base=ladder_url veil_for="#ladderTable" %}
 
 {% if entries %}
 {% comment %}
@@ -53,7 +53,9 @@ a reader watches is the table, so veiling only the rows would leave the header
 sitting bright above a blank space.
 {% endcomment %}
 <div class="gt-listwrap" id="ladderTable" data-veil data-veil-label="Loading the ladder">
-  <div class="gt-board ladder" data-coach="ladder-table">
+  {# The competition's colour, on the table that is about it. #}
+  <div class="gt-board ladder" data-coach="ladder-table"
+       data-code="{{ selected_series.slug }}" data-cat="{{ selected_series.category }}">
     {% comment %}
     Column heads carry .lad-col so they stripe with the cells beneath them —
     the numeric columns share a tint that runs the height of the table, which

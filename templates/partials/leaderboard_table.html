@@ -4,7 +4,14 @@ The ladder can run to hundreds of rows, so the rows scroll inside .gt-scroll
 while the header row stays put above them — scrolling the whole page would take
 the column headings with it and you'd lose track of which number is which.
 {% endcomment %}
-<div class="gt-board gt-listwrap" id="lbtable">
+{% comment %}
+data-code puts the chosen competition's colour on the whole table — the header
+band, the rank discs, the row that is yours. Absent when the board is showing
+every comp, and the table keeps the product's own green: an "all competitions"
+table in one code's colour would be claiming to be that code's table.
+{% endcomment %}
+<div class="gt-board gt-listwrap" id="lbtable"
+     {% if selected_comp %}data-code="{{ selected_comp.slug }}" data-cat="{{ selected_comp.category }}"{% endif %}>
   <div class="gb-head">
     <span>Rank</span><span>Tipper</span><span class="h-correct" style="text-align:right;">Correct</span><span style="text-align:right;">Points</span>
   </div>

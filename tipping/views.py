@@ -805,6 +805,45 @@ def my_tips_view(request, org_id: int):
     })
 
 
+def org_series(org):
+    """The competitions this organisation tips, in its own order, no repeats.
+
+    Lifted out of ladder_view because the leaderboard now asks the same
+    question, and two copies of "which comps does this league run" is how the
+    two pages come to offer different chips for the same league.
+    """
+    ordered, seen = [], set()
+    for comp in org.competitions.select_related().prefetch_related("series"):
+        for sr in comp.series.all():
+            if sr.id not in seen:
+                seen.add(sr.id)
+                ordered.append(sr)
+    return ordered
+
+
+def pick_series(options, wanted, *, default_to_first=False):
+    """Resolve ?series= / ?comp= against a list of Series.
+
+    ACCEPTS A SLUG OR AN ID. The ladder's picker has always posted the id and
+    there are links in the wild carrying one; the chips post the slug, because
+    "?comp=nrlw" is a URL somebody can read, share and type. Both resolve here
+    so neither has to know about the other.
+
+    `default_to_first` is the ladder, which is a table OF one competition and
+    has nothing to show without one. The leaderboard defaults to None instead —
+    there, no competition means every competition, which is a real answer and
+    the one most people want first.
+    """
+    if wanted:
+        by_slug = next((s for s in options if s.slug == wanted), None)
+        if by_slug is not None:
+            return by_slug
+        by_id = next((s for s in options if str(s.id) == str(wanted)), None)
+        if by_id is not None:
+            return by_id
+    return options[0] if (default_to_first and options) else None
+
+
 @login_required
 def ladder_view(request, org_id: int):
     """The competition ladder — where the TEAMS sit, not the members.
@@ -819,20 +858,8 @@ def ladder_view(request, org_id: int):
     if not _require_member(request.user, org):
         return HttpResponseForbidden()
 
-    series_list = [
-        s
-        for comp in org.competitions.select_related().prefetch_related("series")
-        for s in comp.series.all()
-    ]
-    # De-duplicate while keeping the org's own ordering.
-    seen, ordered = set(), []
-    for s in series_list:
-        if s.id not in seen:
-            seen.add(s.id)
-            ordered.append(s)
-
-    wanted = request.GET.get("series")
-    selected = next((s for s in ordered if str(s.id) == wanted), None) or (ordered[0] if ordered else None)
+    ordered = org_series(org)
+    selected = pick_series(ordered, request.GET.get("series"), default_to_first=True)
 
     entries = []
     if selected:
@@ -864,7 +891,24 @@ def leaderboard_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _require_member(request.user, org):
         return HttpResponseForbidden()
+    # WHICH COMPETITION, and the rounds that belong to it.
+    #
+    # ASKED FOR: "let's say I tip in all competitions — I can filter, say NRL,
+    # and see the points, see where I am and who is leading in the NRL." A
+    # member tipping four codes has one total made of four seasons going
+    # differently, and the combined number cannot say which of them they are
+    # any good at.
+    #
+    # No comp means every comp, which is a real answer and the one most people
+    # want on arrival — so unlike the ladder this does not fall back to the
+    # first one.
+    comp_options = org_series(org)
+    selected_comp = pick_series(comp_options, request.GET.get("comp"))
     rounds = Round.objects.filter(org=org).order_by("-round_number")
+    if selected_comp is not None:
+        # Or the round list offers AFLW round 4 while the board is showing the
+        # NRL, and choosing it silently empties the table.
+        rounds = rounds.filter(series=selected_comp)
     selected_round_id = request.GET.get("round")
     round_filter = None
     if selected_round_id and selected_round_id != "all":
@@ -882,10 +926,12 @@ def leaderboard_view(request, org_id: int):
     # the organisation's, and excludes every tip made inside a group.
     group = _group(request, org)
     if scope == "national" and is_family and group is None:
-        board = leaderboard_for_family(org, round_id=round_filter)
+        board = leaderboard_for_family(org, round_id=round_filter, series=selected_comp)
     else:
         scope = "local"
-        board = leaderboard_for_org(org, round_id=round_filter, group=group)
+        board = leaderboard_for_org(
+            org, round_id=round_filter, group=group, series=selected_comp,
+        )
     # Ranks come from the board, which resolved them under the addendum's
     # tiebreakers. Recomputing "equal points means equal rank" here would
     # undo that: two tippers separated on the paired comp would be reported
@@ -898,7 +944,7 @@ def leaderboard_view(request, org_id: int):
     ]
     if request.headers.get("HX-Request"):
         return render(request, "partials/leaderboard_table.html", {
-            "ranked": ranked, "me": request.user,
+            "ranked": ranked, "me": request.user, "selected_comp": selected_comp,
         })
     # ---- sidebar summary. "Perfect scores" counts tippers who got every
     # graded tip right in the view being shown, so it tracks the round filter.
@@ -906,8 +952,20 @@ def leaderboard_view(request, org_id: int):
         1 for r in ranked if r["tips_total"] and r["tips_correct"] == r["tips_total"]
     )
     current_round = rounds.first()
+    # What the competition filter must carry through, and what it must not.
+    #
+    # Scope: yes — "the national board, for the NRL" is a sentence, and losing
+    # the scope every time somebody changed code would be maddening.
+    #
+    # Round: NO. A round id belongs to one competition, so carrying it into
+    # another one names a round that comp does not have and empties the table.
+    # Changing code resets to all rounds, which is the only honest default.
+    comp_keep_pairs = [("scope", scope)] if (is_family and scope == "national") else []
+    comp_keep = "&amp;".join(f"{k}={v}" for k, v in comp_keep_pairs)
     return render(request, "leaderboard.html", {
         "org": org, "rounds": rounds, "selected_round_id": selected_round_id or "all",
+        "comp_options": comp_options, "selected_comp": selected_comp,
+        "comp_keep": comp_keep, "comp_keep_pairs": comp_keep_pairs,
         "ranked": ranked, "me": request.user,
         "scope": scope, "is_family": is_family,
         "total_tippers": len(ranked),

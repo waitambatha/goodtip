@@ -15641,3 +15641,91 @@ html[data-theme="light"] .gt-app .an-ctx-org { color: #46554B; opacity: 1; }
 .page-deep .slip-allin b, html[data-theme="dark"] .gt-app .slip-allin b { color: var(--lime); }
 .page-deep .slip-allin svg, html[data-theme="dark"] .gt-app .slip-allin svg { stroke: var(--lime); }
 .page-deep .slip-allin i, html[data-theme="dark"] .gt-app .slip-allin i { color: rgba(232,228,213,.66); }
+
+/* ============================================================================
+   THE COMPETITION FILTER on the ranking pages, and the tables it colours
+   ----------------------------------------------------------------------------
+   "Even on the leaderboard, let's say I tip in all competitions — a nice way to
+   filter, so I can see who is leading in the NRL... and on the ladder we have
+   the dropdown, which that button is too small and far end. Let the table also
+   pick the colour of that competition; that would give a vibe of distinction."
+
+   Chips and a select, both real and both posting the same URL — see
+   partials/comp_filter.html. The chips are the control: full width, in the
+   code's own colour, pressable without aiming. The select sits beside them for
+   a list-picker and for narrow screens, where a row of chips would wrap into a
+   block taller than the thing it filters.
+   ========================================================================= */
+.compfilter {
+  display: flex; align-items: center; gap: 14px 18px; flex-wrap: wrap;
+  margin: 0 0 20px;
+}
+.cf-chips { display: flex; gap: 9px; flex-wrap: wrap; flex: 1 1 auto; }
+.cf-chip {
+  font-family: var(--mark); font-weight: 800; font-size: 13.5px;
+  letter-spacing: .05em; text-transform: uppercase;
+  padding: 10px 18px; border-radius: 100px; text-decoration: none;
+  white-space: nowrap; border: 1.5px solid transparent;
+  transition: box-shadow .15s var(--ease), filter .15s var(--ease), opacity .15s var(--ease);
+}
+/* Filled, like the dashboard's filter and for the same reason: a tinted rim is
+   a hint that a colour exists, a filled pill is the colour. Selection is a ring
+   drawn outside the edge, because fill is already spent saying which code this
+   is. */
+.cf-chip[data-code] {
+  background: var(--code-ink); border-color: var(--code-ink); color: var(--code-on, #fff);
+}
+.cf-chip[data-code]:not(.on) { opacity: .72; }
+.cf-chip[data-code]:hover { opacity: 1; filter: brightness(1.12); }
+.cf-chip[data-code].on {
+  opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, var(--code) 60%, transparent);
+}
+/* "All competitions" is not a competition and must not look like a fifth one,
+   so it keeps the product's own colours rather than borrowing a code's. */
+.cf-chip.cf-all { background: rgba(232,228,213,.12); color: var(--cream); border-color: rgba(232,228,213,.2); }
+.cf-chip.cf-all:hover { background: rgba(232,228,213,.2); }
+.cf-chip.cf-all.on { background: var(--lime); color: var(--deep); border-color: var(--lime); box-shadow: none; }
+.cf-chip:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+
+.cf-pick { display: flex; align-items: center; gap: 9px; flex: none; }
+.cf-lab {
+  font-family: var(--mark); font-weight: 700; font-size: 11px;
+  letter-spacing: .12em; text-transform: uppercase; color: rgba(232,228,213,.6);
+}
+/* Below this the chips would wrap into a block taller than the table they
+   filter, so the select becomes the whole control. */
+@media (max-width: 720px) {
+  .compfilter .cf-chips { display: none; }
+  .cf-pick { flex: 1 1 auto; }
+  .cf-pick .gt-select { flex: 1 1 auto; }
+}
+/* And above it the select is the alternate, not the headline — the chips say
+   what the choices ARE, which a closed dropdown cannot. */
+@media (min-width: 721px) {
+  .cf-lab { display: none; }
+}
+/* These pages are the deep sheet; on the light theme the "all" chip and the
+   label need ink rather than cream. */
+html[data-theme="light"] .gt-app .cf-chip.cf-all { background: rgba(15,46,34,.07); color: #2C4C3B; border-color: rgba(15,46,34,.14); }
+html[data-theme="light"] .gt-app .cf-chip.cf-all.on { background: var(--forest); color: #fff; border-color: var(--forest); }
+html[data-theme="light"] .gt-app .cf-lab { color: var(--muted); }
+
+/* ---- the table wears the competition ------------------------------------
+   Restrained on purpose. The header band and the rank discs are the two places
+   the eye lands first and neither carries data of its own, so colouring them
+   says which competition this is without competing with the numbers. The rows
+   stay cream: a table of coloured rows is a table you cannot read down. */
+.gt-board[data-code] .gb-head { background: var(--code-ink); }
+.gt-board[data-code] .gb-rank { background: var(--code-ink); }
+.gt-board[data-code] .gb-row:hover { border-color: color-mix(in srgb, var(--code-ink) 45%, transparent); }
+/* Your own row keeps its lime edge — where you are outranks which comp it is —
+   but the tint under it follows the code so the row belongs to this table. */
+.gt-board[data-code] .gb-row.me {
+  background: color-mix(in srgb, var(--code) 16%, #fff);
+  border-color: color-mix(in srgb, var(--code-ink) 50%, transparent);
+  box-shadow: inset 4px 0 0 var(--code-ink);
+}
+.gt-board[data-code] .gb-row.me .gb-rank { background: var(--code-ink); }
+.gt-board[data-code] .gb-correct { color: var(--code-ink); }
+/* The ladder's own numeric column stripe, keyed the same way. */
+.gt-board.ladder[data-code] .lad-col { background: color-mix(in srgb, var(--code) 9%, transparent); }

@@ -532,7 +532,7 @@ def _leaderboard(org_ids, tip_filter):
     ).order_by("-points", "display_name")
 
 
-def leaderboard_for_org(org, round_id: int | None = None, group=None):
+def leaderboard_for_org(org, round_id: int | None = None, group=None, series=None):
     """The ladder for one context.
 
     `group=None` is the organisation's own ladder and must exclude every tip
@@ -540,11 +540,18 @@ def leaderboard_for_org(org, round_id: int | None = None, group=None):
     organisation's and everyone who tips in both would be counted twice. The
     isnull filter is the whole reason `group` is a column rather than a
     separate table.
+
+    `series` narrows it to one competition: "so I can filter, let's say NRL,
+    and see the points, see where I am and who is leading in the NRL". A member
+    who tips four codes has one total made of four seasons going differently,
+    and the combined number cannot answer which of them they are good at.
     """
     tip_filter = Q(tips__org=org)
     tip_filter &= Q(tips__group=group) if group is not None else Q(tips__group__isnull=True)
     if round_id is not None:
         tip_filter &= Q(tips__match__round_id=round_id)
+    if series is not None:
+        tip_filter &= Q(tips__match__round__series=series)
 
     board = _leaderboard([org.id], tip_filter)
     if group is not None:
@@ -557,7 +564,7 @@ def leaderboard_for_org(org, round_id: int | None = None, group=None):
         board = board.filter(
             Exists(GroupMember.objects.filter(user=OuterRef("pk"), group=group))
         )
-    return apply_tiebreakers(board, [org.id], round_id=round_id, group=group)
+    return apply_tiebreakers(board, [org.id], round_id=round_id, group=group, series=series)
 
 
 # ---------------------------------------------------------------------------
@@ -607,13 +614,19 @@ def _paired_scores(org_ids, series_name: str, user_ids, round_id=None, group=Non
     return dict(rows)
 
 
-def _reached_score_at(org_ids, user_ids, points_by_user, round_id=None, group=None) -> dict:
+def _reached_score_at(org_ids, user_ids, points_by_user, round_id=None, group=None,
+                      series=None) -> dict:
     """When each user first reached their final total — the countback.
 
     "Whoever reached the tied score first ranks higher." Walking each tipper's
     graded tips in time order and stopping at the moment their running total
     hits the tied figure is what that sentence means: the earlier that moment,
     the longer they have held the score.
+
+    `series` narrows the walk to the comp the board is showing. It has to: the
+    totals being tied were summed over one competition, and a running total
+    that counts every code would cross the tied figure at a moment neither
+    tipper's NRL season had anything to do with.
     """
     from collections import defaultdict
 
@@ -621,6 +634,7 @@ def _reached_score_at(org_ids, user_ids, points_by_user, round_id=None, group=No
         Tip.objects.filter(
             org_id__in=org_ids, user_id__in=user_ids, is_correct__isnull=False,
             **({"group": group} if group is not None else {"group__isnull": True}),
+            **({"match__round__series": series} if series is not None else {}),
         )
         .values_list("user_id", "points_awarded", "match__kickoff_at")
         .order_by("match__kickoff_at", "id")
@@ -636,7 +650,7 @@ def _reached_score_at(org_ids, user_ids, points_by_user, round_id=None, group=No
     return reached
 
 
-def apply_tiebreakers(board, org_ids, round_id=None, group=None):
+def apply_tiebreakers(board, org_ids, round_id=None, group=None, series=None):
     """Order a leaderboard, resolving ties on performance rather than on a name.
 
     Returns a list, not a queryset — the second and third steps need data the
@@ -669,8 +683,16 @@ def apply_tiebreakers(board, org_ids, round_id=None, group=None):
     #
     # A tie on an all-comps board is a tie on everything, so it goes straight
     # to the countback.
+    #
+    # A COMP FILTER SCOPES IT JUST AS A ROUND DOES. The leaderboard can now be
+    # narrowed to one competition, and a board showing only the NRL is exactly
+    # the "ranking scoped to one code" the addendum is describing — so the
+    # paired step applies there for the same reason it applies to a single
+    # round, and for the same reason it must not apply to an all-comps board.
     series_name = ""
-    if round_id is not None:
+    if series is not None:
+        series_name = series.name
+    elif round_id is not None:
         rnd = Round.objects.filter(pk=round_id).select_related("series").first()
         if rnd:
             series_name = rnd.series.name
@@ -680,7 +702,7 @@ def apply_tiebreakers(board, org_ids, round_id=None, group=None):
     # its members by tips that never counted towards the score being tied.
     paired = _paired_scores(org_ids, series_name, user_ids, round_id=round_id, group=group)
     reached = _reached_score_at(
-        org_ids, user_ids, points_by_user, round_id=round_id, group=group,
+        org_ids, user_ids, points_by_user, round_id=round_id, group=group, series=series,
     )
 
     from datetime import datetime, timezone as _tz
@@ -710,13 +732,18 @@ def apply_tiebreakers(board, org_ids, round_id=None, group=None):
     return rows
 
 
-def leaderboard_for_family(org, round_id: int | None = None):
+def leaderboard_for_family(org, round_id: int | None = None, series=None):
     """The §8 national board: every member across the top-level parent and
     all its children, ranked together. Same underlying competition as the
     local board — each member's points come from their own org's tips.
 
     Rounds are per-org rows, so a round filter is aligned across the family
     by (round_number, series) rather than by the id of one org's round.
+
+    `series` narrows to one competition, as on the local board. It filters by
+    the Series itself rather than by anything per-org, because a Series row is
+    shared by every organisation — so the national board needs no alignment
+    step for this the way it does for rounds.
     """
     family_ids = org.family_ids()
     # Organisation-level tips only. A group's tips belong to that group's
@@ -731,8 +758,11 @@ def leaderboard_for_family(org, round_id: int | None = None):
                 tips__match__round__round_number=rnd.round_number,
                 tips__match__round__series_id=rnd.series_id,
             )
+    if series is not None:
+        tip_filter &= Q(tips__match__round__series=series)
     return apply_tiebreakers(
         _leaderboard(family_ids, tip_filter), family_ids, round_id=round_id,
+        series=series,
     )
 
 

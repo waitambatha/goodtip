@@ -17,8 +17,13 @@
   </div>
   <div class="gh-actions">
     <span class="lbl">Round</span>
+    {% comment %}
+    The comp rides on the round's hx-get, or swapping round would silently
+    widen the board back to every competition — the table would change under a
+    filter still drawn as selected.
+    {% endcomment %}
     <select name="round" class="gt-select"
-            hx-get="{% url 'tipping:leaderboard' org.id %}?scope={{ scope }}"
+            hx-get="{% url 'tipping:leaderboard' org.id %}?scope={{ scope }}{% if selected_comp %}&amp;comp={{ selected_comp.slug }}{% endif %}"
             {# show:none stops htmx scrolling the swapped table into view #}
             hx-target="#lbtable" hx-swap="outerHTML show:none" hx-trigger="change">
       <option value="all" {% if selected_round_id == 'all' %}selected{% endif %}>All rounds</option>
@@ -26,6 +31,13 @@
     </select>
   </div>
 </div>
+
+{% comment %}
+WHICH COMPETITION. Above the podium, because it changes who is ON the podium —
+a filter that lives below the thing it rewrites reads as a footnote.
+{% endcomment %}
+{% url 'tipping:leaderboard' org.id as lb_url %}
+{% include "partials/comp_filter.html" with options=comp_options selected=selected_comp param="comp" base=lb_url keep=comp_keep keep_pairs=comp_keep_pairs all_label="All competitions" veil_for="#lbtable" %}
 
 {% if is_family %}
 {# §8: same competition, two views — local standings and the national board #}

@@ -1,0 +1,71 @@
+{% comment %}
+The competition filter, for the pages that rank things: the leaderboard and the
+ladder.
+
+ASKED FOR AS: "let it be like both a dropdown and the button filter" — and on
+the ladder, where a dropdown was already the only control, "that button is too
+small and far end". So both are here and both are real: the chips are the
+control, sitting across the page where they can be read and pressed without
+aiming, and the select is beside them for anyone who prefers a list or is on a
+narrow screen. Neither is a fallback for the other; they post the same URL.
+
+Each chip wears its competition's own colour — the same tokens the fixtures and
+the filter on the dashboard use, keyed off data-code/data-cat, so a code is one
+colour everywhere in the product. See "competition colours" in goodtip.css.
+
+NOT partials/series_filter.html, which does this for the dashboard. That one
+takes a repeatable ?series= of SLUGS, swaps a panel over htmx and has an "all"
+that means "every code interleaved by kickoff". This one is single-select,
+navigates, and its "all" is a different question on each page — every comp
+pooled on the leaderboard, and nothing at all on the ladder, which is a table OF
+one competition and has none to show without one. Merging them would mean one
+partial with two contradictory contracts.
+
+Expects:
+  options   the Series to offer
+  selected  the chosen Series, or nothing
+  param     query parameter name — "comp" on the leaderboard, "series" on the ladder
+  base      the URL to link to
+  keep      extra query string to carry through (scope, round…), no leading &
+  all_label shown on the everything chip; omit the chip entirely without it
+{% endcomment %}
+{% if options|length > 1 %}
+<div class="compfilter" data-veil-for="{{ veil_for }}">
+  <div class="cf-chips" role="group" aria-label="Filter by competition">
+    {% if all_label %}
+    <a class="cf-chip cf-all{% if not selected %} on{% endif %}"
+       href="{{ base }}{% if keep %}?{{ keep }}{% endif %}"
+       {% if not selected %}aria-current="true"{% endif %}>{{ all_label }}</a>
+    {% endif %}
+    {% for s in options %}
+    <a class="cf-chip{% if selected.id == s.id %} on{% endif %}"
+       data-code="{{ s.slug }}" data-cat="{{ s.category }}"
+       href="{{ base }}?{{ param }}={{ s.slug }}{% if keep %}&amp;{{ keep }}{% endif %}"
+       {% if selected.id == s.id %}aria-current="true"{% endif %}>{{ s.name }}</a>
+    {% endfor %}
+  </div>
+
+  {% comment %}
+  A real <select> in its own form, not a script that rewrites location. With no
+  JavaScript the chips already work and this submits; with it, gt-veil dims the
+  table while the page loads either way.
+
+  `keep` is carried as hidden inputs rather than left on the action URL: a GET
+  form REPLACES the query string with its own fields, so a scope or round left
+  only in the action would be dropped the moment somebody used the select.
+  {% endcomment %}
+  <form method="get" action="{{ base }}" class="cf-pick">
+    {% for pair in keep_pairs %}
+    <input type="hidden" name="{{ pair.0 }}" value="{{ pair.1 }}">
+    {% endfor %}
+    <label class="cf-lab" for="cf-{{ param }}">Competition</label>
+    <select name="{{ param }}" id="cf-{{ param }}" class="gt-select" onchange="this.form.submit()">
+      {% if all_label %}<option value="" {% if not selected %}selected{% endif %}>{{ all_label }}</option>{% endif %}
+      {% for s in options %}
+      <option value="{{ s.slug }}" {% if selected.id == s.id %}selected{% endif %}>{{ s.name }}</option>
+      {% endfor %}
+    </select>
+    <noscript><button type="submit" class="abtn abtn-ghost">Show</button></noscript>
+  </form>
+</div>
+{% endif %}
