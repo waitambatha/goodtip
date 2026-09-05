@@ -28,23 +28,24 @@ Centred, because there is nothing beside it any more. The header used to be a
 two-column row with the round picker in its right-hand corner; with both filters
 moved to their own bar below, a left-aligned title with empty space to its right
 reads as a layout that lost something.
+
+THE ORGANISATION IS THE BIG LINE, NOT THE WORD "LEADERBOARD" — "this AquaFlow
+Water Co · AFL + NRL 2026 should be bigger than the bottom text, that is
+Leaderboard."
+
+The two have swapped jobs rather than swapped places. The comp's name is what a
+member came to look at and it is the only line on the page that differs between
+one organisation and the next; "Leaderboard" is a label for the screen, and the
+nav already says which screen you are on. So the organisation takes the display
+face at title size, and the word takes the small lime capitals the organisation
+used to have. Nothing new in the palette, and the same two lines in the same
+order — the emphasis is the only thing that moved. See .gt-head.is-orgfirst.
 {% endcomment %}
-<div class="gt-head is-centred">
+<div class="gt-head is-centred is-orgfirst">
   <div>
     <div class="gh-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div>
     <h1>Leaderboard</h1>
     <p class="gh-lead">Compete. Climb. Make an impact.</p>
-  </div>
-  {% comment %}
-  MY STATISTICS, beside the line that introduces the page rather than floating
-  above the table as a small link. It is not a filter and it is not a footnote —
-  it is the other half of this screen, and it should look like one of the two
-  things you can do here.
-  {% endcomment %}
-  <div class="gh-actions">
-    <a class="abtn abtn-primary" href="{% url 'tipping:my_stats' org.id %}{% if selected_comp %}?comp={{ selected_comp.slug }}{% endif %}">
-      <svg class="abtn-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg> My statistics
-    </a>
   </div>
 </div>
 
@@ -78,7 +79,28 @@ correction as the ladder's, and right for the same reason: the board is OF a
 room, so which room has to be settled before the filters that narrow it mean
 anything. Above the title it was worse; below the standings it was too late.
 {% endcomment %}
-{% include "partials/room_switch.html" with noun="leaderboard" surface="dark" %}
+{% include "partials/room_switch.html" with noun="leaderboard" surface="dark" align="centre" %}
+
+{% comment %}
+MY STATISTICS, AFTER THE SENTENCE THAT SAYS WHOSE BOARD THIS IS, centred.
+
+"That button should come after that line that I have said — have it centred."
+
+It has been three places in three passes, and the reason this one holds is that
+the button is a way OUT of this board and into your own numbers. Read in order
+the page now says: which comp, which screen, what it is for, which room you are
+standing in — and then offers you the other view of it. Beside the title it
+competed with the page's own name; at the right-hand end it sat over a corner of
+a centred column with nothing under it.
+
+Its own row rather than a child of .gt-head, because it is no longer part of the
+header: the room switcher stands between them.
+{% endcomment %}
+<div class="gh-actions gh-after-room">
+  <a class="abtn abtn-primary" href="{% url 'tipping:my_stats' org.id %}{% if selected_comp %}?comp={{ selected_comp.slug }}{% endif %}">
+    <svg class="abtn-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg> My statistics
+  </a>
+</div>
 
 {% comment %}
 TWO ROWS, COMPETITION FIRST. Asked for in exactly that order — "do not do that,

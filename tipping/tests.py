@@ -2835,6 +2835,30 @@ class CompetitionStatsTests(TestCase):
         self.assertIn("My statistics", body)
         self.assertNotIn("My stats &rarr;", body)
 
+    def test_the_button_comes_after_the_line_that_says_whose_board_this_is(self):
+        """"That button should come after that line that I have said — have it
+        centred." It has been beside the title and at the right-hand end of the
+        row under it; both put it above the sentence it should follow."""
+        body = self.client.get(
+            reverse("tipping:leaderboard", args=[self.org.id])
+        ).content.decode()
+        self.assertIn("gh-after-room", body)
+        self.assertLess(
+            body.index("Compete. Climb. Make an impact."),
+            body.index("gh-after-room"),
+            "the button should follow the header, not sit inside it",
+        )
+
+    def test_the_organisation_outranks_the_word_leaderboard(self):
+        """"This AquaFlow Water Co · AFL + NRL 2026 should be bigger than the
+        bottom text, that is Leaderboard." The two lines swap emphasis; the
+        class is what does it, so the class is what this pins."""
+        body = self.client.get(
+            reverse("tipping:leaderboard", args=[self.org.id])
+        ).content.decode()
+        self.assertIn("is-orgfirst", body)
+        self.assertIn(self.org.name, body)
+
     def test_a_stranger_cannot_read_it(self):
         outsider = User.objects.create_user(
             email="csout@example.com", password="x", display_name="Out",

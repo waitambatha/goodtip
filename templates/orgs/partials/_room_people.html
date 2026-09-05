@@ -60,7 +60,7 @@ fetches is a surprise, and in a panel this short it fires constantly. The
 button swaps the NEXT page in after this one (hx-swap="beforeend" targeting
 its own wrapper), so what is already on screen is not re-fetched and re-drawn.
 {% endcomment %}
-<button type="button" class="gtm-more"
+<button type="button" class="gtm-showmore"
         hx-get="{% url 'orgs:message_people' thread.org_id thread.id %}?offset={{ people_offset }}{% if people_q %}&amp;q={{ people_q|urlencode }}{% endif %}"
         hx-target="this" hx-swap="outerHTML">
   Show more members

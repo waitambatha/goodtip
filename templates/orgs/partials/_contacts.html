@@ -1,0 +1,67 @@
+{% comment %}
+THE PEOPLE TAB, one page of it.
+
+Its own file because it is swapped on its own two ways: by the search box above
+the tabs when People is the tab you are on, and by "Show more" at the foot of
+it. Both go through orgs.views.message_contacts_view, so what a search returns
+cannot drift from what the page first rendered.
+
+EVERY ROW OPENS A DIRECT MESSAGE, which is the whole point of the tab — "same
+with the people, I click and now a DM for one person is here". The row names
+the organisation the message goes through, because that is what gives the two
+of you the right to write to each other at all.
+
+Expects: contacts (rows from services.contacts_for), contacts_total,
+         contacts_more, contacts_offset, and on a search contacts_q.
+{% endcomment %}
+{% for row in contacts %}
+{% comment %}
+`data-chat-row` is what the right click and the long press bind to — the same
+attribute the recent-chat rows carry, so "hold a person down and mute them"
+works here exactly as it does over there.
+{% endcomment %}
+<div class="gtm-dirrow" data-chat-row
+     data-find="{{ row.user.display_name|lower }} {{ row.org.name|lower }}">
+<a class="gtm-mem" data-gtm-open
+   href="{% url 'orgs:message_direct' row.org.id row.user.id %}"
+   hx-get="{% url 'orgs:message_direct' row.org.id row.user.id %}?pane=room"
+   hx-target=".gtm-chat" hx-swap="innerHTML"
+   hx-push-url="{% url 'orgs:message_direct' row.org.id row.user.id %}">
+  <span class="gtm-av person sm" aria-hidden="true">
+    {% if row.user.avatar %}<img src="{{ row.user.avatar.url }}" alt="">{% else %}{{ row.user.display_name|slice:":1"|upper }}{% endif %}
+  </span>
+  <span class="gtm-mem-txt">
+    <b>{{ row.user.display_name }}</b>
+    <i>{{ row.org.name }}</i>
+  </span>
+  {% for badge in row.badges %}<span class="gtm-tagchip {% if badge == 'Admin' %}is-admin{% endif %}">{{ badge }}</span>{% endfor %}
+  <svg class="gtm-mem-go" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+</a>
+{% comment %}
+row.chat is set by services.attach_chat_state, and is empty until the two of you
+have actually said something — there is nothing to pin, mute or clear about a
+conversation that does not exist yet.
+{% endcomment %}
+{% if row.chat %}{% include "orgs/partials/_chat_menu.html" with chat=row.chat %}{% endif %}
+</div>
+{% empty %}
+<p class="gtm-people-none">
+  {% if contacts_q %}Nobody in your organisations matches &ldquo;{{ contacts_q }}&rdquo;.
+  {% else %}Nobody else in your organisations yet.{% endif %}
+</p>
+{% endfor %}
+
+{% if contacts_more %}
+{% comment %}
+PAGED, NOT INFINITE-SCROLLED — the same decision the room's member list makes,
+and for the same reason: an organisation of a thousand cannot be rendered into
+a sidebar, and a scroll listener that fetches fires constantly in a panel this
+short. The button swaps the next page in AFTER itself, so what is already on
+screen is not re-fetched and re-drawn.
+{% endcomment %}
+<button type="button" class="gtm-showmore"
+        hx-get="{% url 'orgs:message_contacts' org.id %}?offset={{ contacts_offset }}{% if contacts_q %}&amp;q={{ contacts_q|urlencode }}{% endif %}"
+        hx-target="this" hx-swap="outerHTML">
+  Show more people
+</button>
+{% endif %}

@@ -3130,30 +3130,72 @@ def _follow_context(request, thread) -> None:
 
 
 def _messages_context(request, org, thread):
-    """Everything the three panels need, for both entry points."""
-    from orgs.services import conversations_for, room_members
+    """Everything the two panels need, for both entry points."""
+    from orgs.services import (
+        attach_chat_state, contacts_for, conversations_for, room_members,
+    )
 
-    rows = conversations_for(request.user, keep=thread.id if thread else None)
+    show = "archived" if request.GET.get("show") == "archived" else "active"
+    rows = conversations_for(
+        request.user, keep=thread.id if thread else None, show=show,
+    )
+    my_orgs = [
+        m.org for m in
+        OrgMember.objects.filter(user=request.user)
+        .select_related("org").order_by("org__name")
+    ]
+    # THE THREE TABS ARE DIRECTORIES, NOT FILTERS.
+    #
+    # ASKED FOR: "when I click Organisations I see the organisations that I am
+    # in, without the dropdown ... then we have groups: when I click it I should
+    # see all the groups, click it and it opens ... same with the people, I
+    # click and now a DM for one person is here."
+    #
+    # They used to narrow the recent-conversation list, which answers a
+    # different question — an organisation you have never written in was not in
+    # its own tab, because there was no conversation to filter. So each tab now
+    # lists the THINGS, and the conversations you have had are the All tab.
+    #
+    # Fetched here rather than read off nav_orgs (the context processor's
+    # organisation → groups tree): the tab needs a flat list across every
+    # organisation and a count of it, and a view that reaches into another
+    # layer's cache breaks the moment that layer stops filling it.
+    my_groups = list(
+        Group.objects.filter(
+            approval_status=Group.APPROVAL_APPROVED,
+            memberships__user=request.user,
+            org__groups_enabled=True,
+        )
+        .select_related("org")
+        .distinct()
+        .order_by("org__name", "name")
+    )
+    contacts, contacts_total, contacts_more = contacts_for(request.user)
+    # The right-click / long-press menu belongs to a conversation, and the tabs
+    # list things — so each row is matched to the conversation it would open, if
+    # there is one already. Nothing is created; a row with nothing said in it
+    # yet has nothing to pin, mute or clear. See services.attach_chat_state.
+    attach_chat_state(
+        request.user, orgs=my_orgs, groups=my_groups, contacts=contacts,
+    )
     ctx = {
         "org": org,
         "conversations": rows,
+        "show": show,
         # The tab counts, worked out once here — the template cannot count a
         # filtered list without looping it four times.
         "count_all": len(rows),
-        "count_rooms": sum(1 for r in rows if r["face"] == "org"),
-        "count_groups": sum(1 for r in rows if r["face"] == "group"),
-        "count_people": sum(1 for r in rows if r["face"] == "person"),
+        "count_rooms": len(my_orgs),
+        "count_groups": len(my_groups),
+        "count_people": contacts_total,
         "total_unread": sum(r["unread"] for r in rows),
         "thread": thread,
-        # The organisation → groups tree in the left panel's "Organisations"
-        # tab. nav_orgs already carries each org with the groups THIS member
-        # is in attached (orgs.context_processors), in one query, so there is
-        # nothing to fetch here.
-        "my_orgs": [
-            m.org for m in
-            OrgMember.objects.filter(user=request.user)
-            .select_related("org").order_by("org__name")
-        ],
+        "my_orgs": my_orgs,
+        "my_groups": my_groups,
+        "contacts": contacts,
+        "contacts_total": contacts_total,
+        "contacts_more": contacts_more,
+        "contacts_offset": len(contacts),
     }
     if thread is None:
         return ctx
@@ -3164,6 +3206,14 @@ def _messages_context(request, org, thread):
     ctx["entries"] = thread_entries(thread, request.user)
     ctx["other"] = thread.other_party(request.user)
     ctx["thread_org"] = thread.org
+    # GROUPS IN COMMON, for the details panel of a direct message — "I get that
+    # person's details, like groups in common and name and a profile pic, the
+    # way we have in WhatsApp". Only asked for when there is a person to ask it
+    # about; a room's details are its member list.
+    if ctx["other"] is not None:
+        from orgs.services import shared_groups
+
+        ctx["common_groups"] = shared_groups(request.user, ctx["other"], thread.org)
     membership = _membership(request.user, thread.org)
     ctx["can_manage"] = bool(membership and membership.can_manage)
     # Whoever may pin a message here. A group's own admin can pin in their
@@ -3219,6 +3269,16 @@ def member_message_thread_view(request, org_id: int, thread_id: int):
         allowed, why = may_post(request.user, thread)
         if not allowed:
             messages.error(request, why)
+            return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
+
+        # A BLOCK HAS TO STOP THE MESSAGE, not just hide the row. Hiding it
+        # would leave the blocked person writing into a conversation nobody is
+        # reading, which is the cruellest possible version of this feature.
+        from .chatprefs import blocked_between
+
+        other = thread.other_party(request.user)
+        if other is not None and blocked_between(request.user, other, org):
+            messages.error(request, "You can't message this person.")
             return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
 
         body = (request.POST.get("body") or "").strip()
@@ -3379,6 +3439,62 @@ def message_direct_view(request, org_id: int, user_id: int):
 
 @login_required
 @require_POST
+def chat_action_view(request, thread_id: int):
+    """Pin, favourite, mute, archive, clear, delete or block — for one reader.
+
+    ONE ENDPOINT for the whole menu, because they are one gesture: right-click a
+    conversation and choose. Seven endpoints would be seven permission checks to
+    keep identical, and the check is the only part that must not drift.
+
+    Everything here is private to the person doing it. Nothing changes what
+    anybody else sees, which is what makes "delete" honest — see
+    orgs/chatprefs.py.
+    """
+    from .chatprefs import TOGGLES, block, clear, delete_for_me, toggle, unblock
+    from .models import MessageThread
+
+    thread = get_object_or_404(MessageThread, pk=thread_id)
+    if not thread.can_read(request.user):
+        raise Http404("No thread matches the given query.")
+
+    action = request.POST.get("action", "")
+    if action in TOGGLES:
+        toggle(request.user, thread, action)
+    elif action == "clear":
+        clear(request.user, thread)
+    elif action == "delete":
+        delete_for_me(request.user, thread)
+        messages.success(
+            request,
+            "Off your list. Everyone else still has it, and it comes back if "
+            "somebody writes in it again.",
+        )
+    elif action in {"block", "unblock"}:
+        # BLOCKING IS BETWEEN TWO PEOPLE, so it only means anything on a direct
+        # message. Blocking somebody "in" the organisation room would be asking
+        # to stop hearing a colleague in a room forty people share, which this
+        # deliberately does not do.
+        other = thread.other_party(request.user)
+        if other is None or thread.kind != MessageThread.KIND_DIRECT:
+            messages.error(request, "You can only block someone in a direct message.")
+        elif action == "block":
+            block(request.user, other, thread.org)
+            delete_for_me(request.user, thread)
+            messages.success(request, f"{other.display_name} can't message you here.")
+        else:
+            unblock(request.user, other, thread.org)
+            messages.success(request, f"{other.display_name} can message you again.")
+    else:
+        messages.error(request, "That's not something you can do to a chat.")
+
+    nxt = request.POST.get("next") or ""
+    if nxt.startswith("/"):
+        return redirect(nxt)
+    return redirect("orgs:member_messages", org_id=thread.org_id)
+
+
+@login_required
+@require_POST
 def report_message_view(request, org_id: int, message_id: int):
     """A member reporting somebody else's message to their admins.
 
@@ -3437,6 +3553,41 @@ def message_people_view(request, org_id: int, thread_id: int):
         "people_total": total, "people_more": has_more,
         "people_offset": (int(offset) if offset.isdigit() else 0) + len(people),
         "people_q": request.GET.get("q", ""),
+    })
+
+
+@login_required
+def message_contacts_view(request, org_id: int):
+    """A page of the People tab, searched and paged.
+
+    The sidebar's own endpoint, and separate from the room's member list
+    (message_people) even though both print people: that one is "who is in this
+    room", this one is "everybody I could write to", and they answer to
+    different permission questions. Sharing an endpoint would mean one of the
+    two checks had to be conditional, which is how the wrong list eventually
+    gets returned to somebody.
+    """
+    from orgs.services import attach_chat_state, contacts_for
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if _membership(request.user, org) is None:
+        raise Http404("No organisation matches the given query.")
+    offset = (request.GET.get("offset") or "0").strip()
+    offset = int(offset) if offset.isdigit() else 0
+    rows, total, has_more = contacts_for(
+        request.user, search=request.GET.get("q", ""), offset=offset,
+    )
+    # The same menu the first page was rendered with — a searched page that
+    # quietly dropped it would make the gesture work on some rows and not on
+    # others, with nothing on screen saying which.
+    attach_chat_state(request.user, contacts=rows)
+    return render(request, "orgs/partials/_contacts.html", {
+        "org": org,
+        "contacts": rows,
+        "contacts_total": total,
+        "contacts_more": has_more,
+        "contacts_offset": offset + len(rows),
+        "contacts_q": request.GET.get("q", ""),
     })
 
 

@@ -66,6 +66,10 @@ urlpatterns = [
          name="member_message_thread"),
     path("<int:org_id>/messages/<int:thread_id>/people/", views.message_people_view,
          name="message_people"),
+    # The People tab in the sidebar — everybody you could write to, not the
+    # members of one room. See views.message_contacts_view.
+    path("<int:org_id>/messages/contacts/", views.message_contacts_view,
+         name="message_contacts"),
     path("<int:org_id>/messages/<int:thread_id>/pin/", views.message_pin, name="message_pin"),
     path("<int:org_id>/messages/<int:thread_id>/react/<int:message_id>/",
          views.message_react, name="message_react"),
@@ -90,6 +94,8 @@ urlpatterns = [
     path("notifications/<int:note_id>/dismiss/", views.dismiss_notification, name="dismiss_notification"),
     path("notifications/<int:note_id>/open/", views.notification_open, name="notification_open"),
     path("<int:org_id>/messages/report/<int:message_id>/", views.report_message_view, name="report_message"),
+    # The whole right-click menu, one endpoint — see views.chat_action_view.
+    path("messages/<int:thread_id>/chat-action/", views.chat_action_view, name="chat_action"),
     path("notifications/announced/", views.announce_notifications, name="notifications_announced"),
     path("notifications/read-all/", views.notifications_read_all, name="notifications_read_all"),
     path("notifications/feed.json", views.notifications_feed, name="notifications_feed"),

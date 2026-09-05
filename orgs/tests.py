@@ -6737,3 +6737,437 @@ class PrefectDecisionsTests(TestCase):
         ).content.decode()
         self.assertIn("haha get in here", body)
         self.assertIn("pf-msg is-it", body)
+
+
+class ChatActionsAreOnePersonsBusinessTests(TestCase):
+    """Pin, favourite, mute, archive, clear, delete and block.
+
+    THE RULE THAT HOLDS THE WHOLE FEATURE TOGETHER: every one of these is
+    private to the person who set it. A workplace room has forty people in it —
+    one of them muting it must not silence it for the other thirty-nine, and one
+    of them clearing it must not erase the room's history for anybody.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(name="Prefs Co", season=self.season)
+        self.me = User.objects.create_user(
+            email="pref-me@example.com", password="x", display_name="Me",
+        )
+        self.mate = User.objects.create_user(
+            email="pref-mate@example.com", password="x", display_name="Mate",
+        )
+        OrgMember.objects.create(user=self.me, org=self.org)
+        OrgMember.objects.create(user=self.mate, org=self.org)
+        from .services import direct_thread, org_room
+
+        self.room = org_room(self.org)
+        self.dm = direct_thread(self.me, self.mate, self.org)
+        from .models import Message
+
+        Message.objects.create(thread=self.room, author=self.mate, body="morning all")
+        Message.objects.create(thread=self.dm, author=self.mate, body="you around?")
+        self.client.force_login(self.me)
+
+    def _do(self, thread, action):
+        return self.client.post(
+            reverse("orgs:chat_action", args=[thread.id]), {"action": action},
+        )
+
+    def _rows(self, user=None, show="active"):
+        from .services import conversations_for
+
+        return {r["id"]: r for r in conversations_for(user or self.me, show=show)}
+
+    def test_pinning_lifts_it_to_the_top(self):
+        self._do(self.dm, "pin")
+        rows = list(self._rows().values())
+        self.assertTrue(rows[0]["pinned"])
+        self.assertEqual(rows[0]["id"], self.dm.id)
+
+    def test_a_pin_is_only_mine(self):
+        self._do(self.room, "pin")
+        self.assertFalse(self._rows(self.mate)[self.room.id]["pinned"])
+
+    def test_the_menu_label_reads_the_current_state(self):
+        """A menu saying "Pin" over an already-pinned chat is offering to do
+        what it would actually undo."""
+        self.assertIn(("pin", "Pin chat"), self._rows()[self.dm.id]["menu"])
+        self._do(self.dm, "pin")
+        self.assertIn(("pin", "Unpin chat"), self._rows()[self.dm.id]["menu"])
+
+    def test_muting_stops_the_bell_and_not_the_message(self):
+        """Mute is about the bell. A muted room still collects unread and still
+        moves up the list; dropping the count as well would make mute mean
+        "ignore", which is what archive is for."""
+        from .models import Message, Notification
+        from .notifications import notify_new_message
+
+        self._do(self.room, "mute")
+        Notification.objects.all().delete()
+        entry = Message.objects.create(
+            thread=self.room, author=self.mate, body="anyone about",
+        )
+        notify_new_message(entry)
+        self.assertFalse(Notification.objects.filter(user=self.me).exists())
+        self.assertTrue(self._rows()[self.room.id]["unread"])
+
+    def test_archiving_takes_it_off_the_list_and_new_activity_brings_it_back(self):
+        """Otherwise archiving a live room is indistinguishable from leaving it,
+        and people lose conversations they meant to tidy away."""
+        from .models import Message
+
+        # Read it first, so it is not being kept by an unread count.
+        self.client.get(
+            reverse("orgs:member_message_thread", args=[self.org.id, self.room.id])
+        )
+        self._do(self.room, "archive")
+        self.assertNotIn(self.room.id, self._rows())
+        self.assertIn(self.room.id, self._rows(show="archived"))
+
+        Message.objects.create(thread=self.room, author=self.mate, body="new thing")
+        self.assertIn(self.room.id, self._rows())
+
+    def test_clearing_empties_it_for_me_and_for_nobody_else(self):
+        from .services import thread_entries
+
+        self._do(self.room, "clear")
+        self.assertEqual(len(thread_entries(self.room, self.me)), 0)
+        self.assertEqual(len(thread_entries(self.room, self.mate)), 1)
+
+    def test_a_cleared_conversation_starts_again_from_the_next_message(self):
+        from .models import Message
+        from .services import thread_entries
+
+        self._do(self.room, "clear")
+        Message.objects.create(thread=self.room, author=self.mate, body="after")
+        entries = thread_entries(self.room, self.me)
+        self.assertEqual([e.body for e in entries], ["after"])
+
+    def test_delete_is_archive_and_clear_and_destroys_nothing(self):
+        """You cannot delete a room you share with forty colleagues. Delete is
+        "off my list and empty for me"; the messages stay for everyone else."""
+        from .models import Message
+        from .services import thread_entries
+
+        self._do(self.room, "delete")
+        self.assertEqual(len(thread_entries(self.room, self.me)), 0)
+        self.assertEqual(len(thread_entries(self.room, self.mate)), 1)
+        self.assertTrue(Message.objects.filter(thread=self.room).exists())
+
+    def test_blocking_hides_the_direct_message_for_both_of_them(self):
+        """A block that only worked one way would let the blocked person keep
+        writing into a conversation the other can no longer answer."""
+        self._do(self.dm, "block")
+        self.assertNotIn(self.dm.id, self._rows())
+        self.assertNotIn(self.dm.id, self._rows(self.mate))
+
+    def test_a_blocked_person_cannot_send(self):
+        from .models import Message
+
+        self._do(self.dm, "block")
+        before = Message.objects.filter(thread=self.dm).count()
+        self.client.force_login(self.mate)
+        self.client.post(
+            reverse("orgs:member_message_thread", args=[self.org.id, self.dm.id]),
+            {"body": "still here"},
+        )
+        self.assertEqual(Message.objects.filter(thread=self.dm).count(), before)
+
+    def test_blocking_does_not_remove_anybody_from_a_shared_room(self):
+        """A falling-out between two people must not quietly edit the league's
+        own chat for one of them."""
+        self._do(self.dm, "block")
+        self.assertIn(self.room.id, self._rows())
+        self.assertIn(self.room.id, self._rows(self.mate))
+
+    def test_block_is_only_offered_on_a_direct_message(self):
+        self.assertNotIn("block", [a for a, _ in self._rows()[self.room.id]["menu"]])
+        self.assertIn("block", [a for a, _ in self._rows()[self.dm.id]["menu"]])
+
+    def test_unblocking_puts_it_back(self):
+        self._do(self.dm, "block")
+        self._do(self.dm, "unblock")
+        self.assertIn(self.dm.id, self._rows(self.mate))
+
+    def test_you_cannot_act_on_a_conversation_you_cannot_read(self):
+        """A thread id is not permission to archive somebody else's chat."""
+        User = get_user_model()
+        outsider = User.objects.create_user(
+            email="pref-out@example.com", password="x", display_name="Out",
+        )
+        self.client.force_login(outsider)
+        r = self.client.post(
+            reverse("orgs:chat_action", args=[self.dm.id]), {"action": "pin"},
+        )
+        self.assertEqual(r.status_code, 404)
+
+    def test_an_unknown_action_changes_nothing(self):
+        from .models import ThreadPreference
+
+        self._do(self.room, "explode")
+        self.assertFalse(
+            ThreadPreference.objects.filter(user=self.me, pinned_at__isnull=False).exists()
+        )
+
+    def test_the_menu_is_in_the_page_as_real_forms(self):
+        """So it works from the keyboard and with scripting off, and cannot be
+        triggered by getting somebody to click a link."""
+        body = self.client.get(
+            reverse("orgs:member_messages", args=[self.org.id])
+        ).content.decode()
+        self.assertIn("data-conv-menu", body)
+        self.assertIn("csrfmiddlewaretoken", body)
+        self.assertIn(reverse("orgs:chat_action", args=[self.room.id]), body)
+
+
+class MessagesSidebarIsADirectoryTests(TestCase):
+    """"When I click Organisations I see the organisations that I am in, without
+    the dropdown ... then we have groups: when I click it I should see all the
+    groups, click it and it opens ... same with the people, I click and now a DM
+    for one person is here."
+
+    The tabs used to FILTER the recent-conversation list, which answers a
+    different question: an organisation you had never written in had no
+    conversation to filter, so it was missing from the tab named after it.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(
+            name="Dir Co", season=self.season, groups_enabled=True,
+        )
+        self.other_org = Organisation.objects.create(
+            name="Second Co", season=self.season, groups_enabled=True,
+        )
+        self.me = User.objects.create_user(
+            email="dir-me@example.com", password="x", display_name="Dir Me",
+        )
+        self.mate = User.objects.create_user(
+            email="dir-mate@example.com", password="x", display_name="Dir Mate",
+        )
+        self.stranger = User.objects.create_user(
+            email="dir-far@example.com", password="x", display_name="Dir Stranger",
+        )
+        OrgMember.objects.create(user=self.me, org=self.org)
+        OrgMember.objects.create(user=self.mate, org=self.org)
+        OrgMember.objects.create(user=self.me, org=self.other_org)
+        OrgMember.objects.create(user=self.stranger, org=Organisation.objects.create(
+            name="Nowhere Co", season=self.season,
+        ))
+        self.group = Group.objects.create(
+            org=self.org, name="Ops Crew", approval_status=Group.APPROVAL_APPROVED,
+        )
+        self.not_mine = Group.objects.create(
+            org=self.org, name="Legal Crew", approval_status=Group.APPROVAL_APPROVED,
+        )
+        GroupMember.objects.create(group=self.group, user=self.me)
+        self.client.force_login(self.me)
+
+    def _body(self):
+        return self.client.get(
+            reverse("orgs:member_messages", args=[self.org.id])
+        ).content.decode()
+
+    def test_every_organisation_you_are_in_is_listed_even_unused_ones(self):
+        """The point of the change: nothing has ever been said in either of
+        these, and both are still there to be opened."""
+        body = self._body()
+        self.assertIn("Dir Co", body)
+        self.assertIn("Second Co", body)
+        self.assertIn(reverse("orgs:message_room", args=[self.other_org.id]), body)
+
+    def test_the_groups_tab_lists_only_the_groups_you_are_in(self):
+        body = self._body()
+        self.assertIn("Ops Crew", body)
+        self.assertNotIn("Legal Crew", body)
+
+    def test_a_group_row_opens_the_group_room_in_one_press(self):
+        """No accordion to unfold first — "without the dropdown"."""
+        body = self._body()
+        self.assertIn(
+            reverse("orgs:message_group_room", args=[self.org.id, self.group.id]), body,
+        )
+        self.assertNotIn("gtm-org-row", body)
+
+    def test_the_people_tab_lists_everybody_you_share_an_organisation_with(self):
+        body = self._body()
+        self.assertIn("Dir Mate", body)
+        self.assertNotIn("Dir Stranger", body)
+
+    def test_you_are_not_in_your_own_people_list(self):
+        """A conversation with yourself is not a thing, and the endpoint that
+        would open it refuses."""
+        from .services import contacts_for
+
+        rows, _total, _more = contacts_for(self.me)
+        self.assertNotIn(self.me.id, [r["user"].id for r in rows])
+
+    def test_a_person_appears_once_however_many_comps_you_share(self):
+        OrgMember.objects.create(user=self.mate, org=self.other_org)
+        from .services import contacts_for
+
+        rows, total, _more = contacts_for(self.me)
+        self.assertEqual([r["user"].id for r in rows].count(self.mate.id), 1)
+        self.assertEqual(total, 1)
+
+    def test_the_people_tab_searches_in_the_database(self):
+        html = self.client.get(
+            reverse("orgs:message_contacts", args=[self.org.id]), {"q": "Mate"},
+        ).content.decode()
+        self.assertIn("Dir Mate", html)
+        html = self.client.get(
+            reverse("orgs:message_contacts", args=[self.org.id]), {"q": "zzz"},
+        ).content.decode()
+        self.assertNotIn("Dir Mate", html)
+
+    def test_somebody_you_blocked_is_not_in_the_directory_either(self):
+        """A block that hid the conversation but left the person one press away
+        from starting a new one would be a setting, not a block."""
+        from .chatprefs import block
+        from .services import contacts_for
+
+        block(self.me, self.mate, self.org)
+        rows, _total, _more = contacts_for(self.me)
+        self.assertNotIn(self.mate.id, [r["user"].id for r in rows])
+
+    def test_the_contacts_endpoint_needs_a_membership(self):
+        self.client.force_login(self.stranger)
+        r = self.client.get(reverse("orgs:message_contacts", args=[self.org.id]))
+        self.assertEqual(r.status_code, 404)
+
+    def test_holding_a_directory_row_offers_the_same_menu(self):
+        """"The right click and holding the organisation, or group, or people —
+        what should happen is the same like in WhatsApp." The menu used to exist
+        only on the recent-chat rows."""
+        from .services import org_room
+
+        room = org_room(self.org)
+        body = self._body()
+        self.assertIn(reverse("orgs:chat_action", args=[room.id]), body)
+        self.assertIn("data-chat-row", body)
+
+    def test_a_row_with_no_conversation_yet_has_no_menu(self):
+        """Nothing to pin, mute, clear or archive until something has been said
+        — and drawing the menu anyway would mean creating an empty room for
+        every organisation on every page load, just to have something to
+        point it at."""
+        from .services import attach_chat_state
+
+        orgs = list(Organisation.objects.filter(id=self.other_org.id))
+        attach_chat_state(self.me, orgs=orgs)
+        self.assertIsNone(orgs[0].chat)
+
+    def test_the_menu_reads_the_state_it_is_in(self):
+        """"Unpin" over a pinned chat, because the endpoint is a toggle."""
+        from .chatprefs import toggle
+        from .services import attach_chat_state, org_room
+
+        room = org_room(self.org)
+        toggle(self.me, room, "pin")
+        orgs = list(Organisation.objects.filter(id=self.org.id))
+        attach_chat_state(self.me, orgs=orgs)
+        self.assertIn("Unpin chat", [label for _a, label in orgs[0].chat["menu"]])
+
+    def test_a_persons_row_carries_the_direct_conversation_not_a_room(self):
+        from .services import attach_chat_state, contacts_for, direct_thread
+
+        dm = direct_thread(self.me, self.mate, self.org)
+        rows, _t, _m = contacts_for(self.me)
+        attach_chat_state(self.me, contacts=rows)
+        self.assertEqual(rows[0]["chat"]["id"], dm.id)
+        self.assertIn("block", [a for a, _l in rows[0]["chat"]["menu"]])
+
+
+class MessagesDetailsPanelTests(TestCase):
+    """"Make it clickable, even the name of the group; at the end add the three
+    dots as well, all for the details ... I get that person's details, like
+    groups in common and name and a profile pic."
+
+    The member list used to be a permanent third column. It is now a panel
+    behind the conversation's own title, which is what freed the width the
+    client asked for: "one be 1/3, then the chat place be 2/3".
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(
+            name="Panel Co", season=self.season, groups_enabled=True,
+        )
+        self.me = User.objects.create_user(
+            email="pan-me@example.com", password="x", display_name="Pan Me",
+        )
+        self.mate = User.objects.create_user(
+            email="pan-mate@example.com", password="x", display_name="Pan Mate",
+        )
+        self.boss = User.objects.create_user(
+            email="pan-boss@example.com", password="x", display_name="Pan Boss",
+        )
+        OrgMember.objects.create(user=self.me, org=self.org)
+        OrgMember.objects.create(user=self.mate, org=self.org)
+        OrgMember.objects.create(
+            user=self.boss, org=self.org, role=OrgMember.ROLE_MANAGER,
+        )
+        self.group = Group.objects.create(
+            org=self.org, name="Shared Crew", approval_status=Group.APPROVAL_APPROVED,
+        )
+        GroupMember.objects.create(group=self.group, user=self.me)
+        GroupMember.objects.create(group=self.group, user=self.mate)
+        self.client.force_login(self.me)
+
+    def test_the_middle_column_is_gone(self):
+        """Two panels, a third and two thirds."""
+        body = self.client.get(
+            reverse("orgs:member_messages", args=[self.org.id])
+        ).content.decode()
+        self.assertNotIn('data-gtm-pane="room"', body)
+
+    def test_the_title_and_the_three_dots_both_open_the_details(self):
+        html = self.client.get(
+            reverse("orgs:message_room", args=[self.org.id]) + "?pane=room",
+        ).content.decode()
+        self.assertIn("gtm-chat-id", html)
+        self.assertIn("gtm-dots", html)
+        self.assertIn("data-gtm-details-panel", html)
+
+    def test_a_rooms_details_are_its_members_admins_first(self):
+        html = self.client.get(
+            reverse("orgs:message_room", args=[self.org.id]) + "?pane=room",
+        ).content.decode()
+        self.assertIn("Pan Boss", html)
+        self.assertIn("Pan Mate", html)
+        self.assertLess(
+            html.index("Pan Boss"), html.index("Pan Mate"),
+            "the admin should lead the member list, as WhatsApp's does",
+        )
+
+    def test_a_direct_messages_details_are_groups_in_common(self):
+        html = self.client.get(
+            reverse("orgs:message_direct", args=[self.org.id, self.mate.id])
+            + "?pane=room",
+        ).content.decode()
+        self.assertIn("Groups in common", html)
+        self.assertIn("Shared Crew", html)
+
+    def test_a_group_you_do_not_share_is_not_in_common(self):
+        from .services import shared_groups
+
+        mine_only = Group.objects.create(
+            org=self.org, name="Solo Crew", approval_status=Group.APPROVAL_APPROVED,
+        )
+        GroupMember.objects.create(group=mine_only, user=self.me)
+        names = [g.name for g in shared_groups(self.me, self.mate, self.org)]
+        self.assertIn("Shared Crew", names)
+        self.assertNotIn("Solo Crew", names)
+
+    def test_the_details_travel_with_the_conversation_they_describe(self):
+        """The panel is inside the fragment the sidebar swaps, so it can never
+        be left behind describing the room you just left."""
+        html = self.client.get(
+            reverse("orgs:message_room", args=[self.org.id]) + "?pane=room",
+        ).content.decode()
+        self.assertNotIn("<!DOCTYPE", html)
+        self.assertIn("data-gtm-details-panel", html)

@@ -1,0 +1,32 @@
+{% comment %}
+THE RIGHT-CLICK / LONG-PRESS MENU FOR ONE ROW.
+
+"The right click and holding the organisation, or group, or people — one,
+someone — what should happen is the same like in WhatsApp: archive chat, mute
+notification, pin chat ... add to favourite ... delete chat and clear chat."
+
+One file, so the recent-chats rows and the three directory tabs cannot end up
+with different menus, different labels or different confirmations.
+
+Rendered as REAL FORMS, each with a CSRF token — so it works from the keyboard,
+works with scripting off (the ⋮ reveals the same markup), and cannot be fired by
+getting somebody to follow a link. gt-messages.js only decides where it appears
+and when it goes away.
+
+Expects `chat`: the state dict from services.attach_chat_state, or the
+conversation row itself — both carry `id` and `menu`. Included only where there
+is one: a row nothing has been said in has nothing to pin, mute or clear.
+{% endcomment %}
+<button type="button" class="gtm-kebab" data-conv-more
+        aria-label="What to do with this chat" aria-haspopup="true">⋮</button>
+<div class="gtm-menu" data-conv-menu hidden role="menu">
+  {% for act, label in chat.menu %}
+  <form method="post" action="{% url 'orgs:chat_action' chat.id %}"
+        {% if act == 'delete' or act == 'clear' or act == 'block' %}data-confirm="{{ label }}? This only affects your own list."{% endif %}>
+    {% csrf_token %}
+    <input type="hidden" name="action" value="{{ act }}">
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <button type="submit" role="menuitem" class="gtm-menu-item{% if act == 'delete' or act == 'block' %} is-danger{% endif %}">{{ label }}</button>
+  </form>
+  {% endfor %}
+</div>

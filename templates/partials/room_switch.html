@@ -12,9 +12,16 @@ dashboard card. Three mechanisms for one idea, and none of them answered
 A segmented control answers both at once: every room on screen, the current
 one filled. Nothing to open, nothing to read twice.
 
-Usage — noun names what the page shows, surface says what it is drawn on:
+Usage — noun names what the page shows, surface says what it is drawn on, and
+align centres the sentence for a page whose header is centred:
     {% include "partials/room_switch.html" with noun="ladder" surface="dark" %}
     {% include "partials/room_switch.html" with noun="round" surface="light" %}
+    {% include "partials/room_switch.html" with noun="leaderboard" surface="dark" align="centre" %}
+
+`align` centres the LINE ONLY — "Tipping in / This leaderboard is all of
+AquaFlow Water Co" — and never the segmented control under it. That track
+scrolls sideways when an organisation has a dozen groups, and centring a
+scrolling track puts its first option off the left edge with no way back to it.
 
 `surface` is explicit rather than inherited on purpose. Every invisible-text
 bug in this codebase came from one set of colours being asked to work on both
@@ -22,7 +29,7 @@ a cream card and the dark sheet; making the caller state which one it is means
 the mistake has to be typed rather than merely forgotten.
 {% endcomment %}
 {% if current_org.groups_enabled %}
-<div class="room-switch {% if surface == 'light' %}on-light{% else %}on-dark{% endif %}{% if current_group %} in-group{% endif %}">
+<div class="room-switch {% if surface == 'light' %}on-light{% else %}on-dark{% endif %}{% if current_group %} in-group{% endif %}{% if align == 'centre' %} is-centred{% endif %}">
 
   <div class="rw-top">
     <span class="rw-eyebrow">Tipping in</span>

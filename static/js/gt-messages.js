@@ -3,8 +3,9 @@
  * Everything on this page that is not a link, a form or an htmx attribute.
  * Five jobs, and they are separate on purpose:
  *
- *   1. FILTER      the conversation list, by tab and by typed text
- *   2. LEVELS      the phone flow: list -> room -> conversation, and back
+ *   1. LISTS       the four sidebar lists, the tabs that switch them, and the
+ *                  one search box over the top
+ *   2. LEVELS      the phone flow: list -> conversation, and back
  *   3. SCROLL      keep an open conversation pinned to its newest message,
  *                  including across the twelve-second poll
  *   4. COMPOSE     emoji at the caret, mic-or-send, Enter to send
@@ -24,78 +25,125 @@
   if (!root) return;
 
   /* ======================================================================
-     1. FILTERING THE CONVERSATION LIST
+     1. THE FOUR LISTS, AND THE ONE SEARCH BOX OVER THEM
      ======================================================================
-     Both filters are applied by one function rather than each hiding rows on
-     its own — with two independent hiders, typing a name and then pressing a
-     tab shows rows the search had already excluded. */
+     The tabs used to filter one list. They now SWITCH BETWEEN FOUR — recent
+     chats, your organisations, your groups, and everybody you could write to —
+     because an organisation you have never messaged has no conversation to
+     filter and was therefore in none of them.
+
+     The search box still sits above all four and belongs to whichever one is
+     showing. For three of them that is a filter over rows already on the page:
+     they are lists of things you belong to, so they are short by definition and
+     a round trip to hide a few rows would be slower than the keystroke that
+     asked for it.
+
+     PEOPLE IS THE EXCEPTION and asks the server, because it is every member of
+     every organisation you are in — the client's own worst case is "an
+     organisation that has about 1000 people", and forty of them are on the page
+     at a time. Debounced, or a name typed at speed fires eight searches whose
+     answers can arrive in any order. */
 
   var tabs = Array.prototype.slice.call(root.querySelectorAll('[data-gtm-tab]'));
+  var panes = Array.prototype.slice.call(root.querySelectorAll('[data-gtm-list-pane]'));
   var box = root.querySelector('[data-gtm-filter]');
-  var list = root.querySelector('[data-gtm-list]');
   var nomatch = root.querySelector('[data-gtm-nomatch]');
-  var tree = root.querySelector('[data-gtm-sec="tree"]');
+  var contacts = document.getElementById('gtmContacts');
   var face = 'all';
+  var contactsUrl = contacts && contacts.getAttribute('data-url');
+  var typing = null;
 
+  function currentPane() {
+    for (var i = 0; i < panes.length; i++) {
+      if (panes[i].getAttribute('data-gtm-list-pane') === face) return panes[i];
+    }
+    return null;
+  }
+
+  /* Every row in every pane carries data-find, so one function filters all
+     four and there is no per-pane knowledge here to keep in step. */
   function applyFilter() {
-    if (!list) return;
     var term = (box && box.value || '').trim().toLowerCase();
-    var rows = list.querySelectorAll('.gtm-conv');
+    var pane = currentPane();
+    if (!pane) return;
+    var rows = pane.querySelectorAll('[data-find]');
     var shown = 0;
     Array.prototype.forEach.call(rows, function (row) {
-      var okFace = face === 'all' || row.getAttribute('data-face') === face;
-      var okTerm = !term || (row.getAttribute('data-find') || '').indexOf(term) !== -1;
-      var on = okFace && okTerm;
+      var on = !term || (row.getAttribute('data-find') || '').indexOf(term) !== -1;
+      /* The conversation rows are <li> wrappers round a link; the directory
+         rows are the link itself. Hiding whichever one carries data-find is
+         right in both cases. */
       row.hidden = !on;
       if (on) shown++;
     });
-    /* "Nothing here matches that" only makes sense when there was something
-       to match. With no conversations at all the list already carries its own
-       empty state, and showing both reads as two different problems. */
-    if (nomatch) nomatch.hidden = shown !== 0 || rows.length === 0;
-    /* The organisation tree is "where can I write", which is a different
-       question from "what have I been writing". Searching or narrowing to one
-       kind is asking the second question, so the tree gets out of the way. */
-    if (tree) tree.hidden = !!term || face !== 'all';
+    /* "Nothing here matches that" only makes sense when there was something to
+       match. An empty list already carries its own empty state, and showing
+       both reads as two different problems. */
+    if (nomatch) nomatch.hidden = shown !== 0 || rows.length === 0 || !term;
+  }
+
+  /* The People tab's rows come from the server, so its search does too. The
+     term goes with the request rather than filtering what happens to be
+     loaded — otherwise searching a thousand-member organisation would only
+     ever look at the first forty. */
+  function searchContacts() {
+    if (!contacts || !contactsUrl || !window.htmx) return;
+    var term = (box && box.value || '').trim();
+    window.htmx.ajax('GET', contactsUrl + (term ? '?q=' + encodeURIComponent(term) : ''), {
+      target: '#gtmContacts', swap: 'innerHTML',
+    });
+  }
+
+  function onSearchInput() {
+    applyFilter();
+    if (face !== 'person') return;
+    clearTimeout(typing);
+    typing = setTimeout(searchContacts, 280);
+  }
+
+  function showPane(next) {
+    face = next;
+    panes.forEach(function (p) {
+      p.hidden = p.getAttribute('data-gtm-list-pane') !== face;
+    });
+    tabs.forEach(function (t) {
+      var on = t.getAttribute('data-gtm-tab') === face;
+      t.classList.toggle('on', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    applyFilter();
+    /* Coming back to People with something still typed: the rows on screen are
+       the answer to a different question until this asks again. */
+    if (face === 'person') searchContacts();
   }
 
   tabs.forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      face = tab.getAttribute('data-gtm-tab');
-      tabs.forEach(function (t) {
-        var on = t === tab;
-        t.classList.toggle('on', on);
-        t.setAttribute('aria-selected', on ? 'true' : 'false');
-      });
-      applyFilter();
-    });
+    tab.addEventListener('click', function () { showPane(tab.getAttribute('data-gtm-tab')); });
   });
   if (box) {
-    box.addEventListener('input', applyFilter);
-    /* Escape clears rather than blurs. In a search box that is filtering
-       what is on screen, "get me back to everything" is the thing you want,
-       and losing focus does not do it. */
+    box.addEventListener('input', onSearchInput);
+    /* Escape clears rather than blurs. In a search box that is filtering what
+       is on screen, "get me back to everything" is the thing you want, and
+       losing focus does not do it. */
     box.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && box.value) { box.value = ''; applyFilter(); e.stopPropagation(); }
+      if (e.key === 'Escape' && box.value) { box.value = ''; onSearchInput(); e.stopPropagation(); }
     });
   }
 
   /* ======================================================================
      2. LEVELS — the phone flow
      ======================================================================
-     One attribute on the wrapper says which of the three panels is on screen;
-     the stylesheet does the rest, so there is no measuring here and nothing
-     to recompute on resize. On a desktop all three are visible and the
-     attribute is inert. */
+     One attribute on the wrapper says which of the two panels is on screen; the
+     stylesheet does the rest, so there is no measuring here and nothing to
+     recompute on resize. On a desktop both are visible and the attribute is
+     inert. The details panel is not a third level — it covers the conversation
+     wherever it is opened, and its own close button is the way out. */
 
   function setView(v) { root.setAttribute('data-view', v); }
 
   document.addEventListener('click', function (e) {
     var back = e.target.closest && e.target.closest('[data-gtm-back]');
     if (back) { setView(back.getAttribute('data-gtm-back')); return; }
-    /* The people button in the conversation header, which on a phone is the
-       only way back to the member list without leaving the conversation. */
-    if (e.target.closest && e.target.closest('[data-gtm-showroom]')) { setView('room'); return; }
   });
 
   /* ======================================================================
@@ -326,10 +374,10 @@
     });
     var row = link.closest('.gtm-conv');
     if (row) row.classList.add('on');
-    document.querySelectorAll('.gtm-kid.on').forEach(function (el) {
+    document.querySelectorAll('.gtm-dir.on').forEach(function (el) {
       el.classList.remove('on');
     });
-    if (link.classList.contains('gtm-kid')) link.classList.add('on');
+    if (link.classList.contains('gtm-dir')) link.classList.add('on');
   }
 
   document.addEventListener('click', function (e) {
@@ -359,37 +407,58 @@
 })();
 
 /* ---------------------------------------------------------------------------
- * A SECOND PRESS ON AN ORGANISATION OPENS ITS ROOM
+ * THE DETAILS PANEL
  *
- * ASKED FOR: "when I click AquaFlow Water Co a dropdown comes; now when I double
- * tab it should now open the chats under that organisation."
+ * "Make it clickable, even the name of the group. At the end add the three dots
+ * as well, all for the details ... and when I click on it, and it's three dots
+ * at the top — that is in the 2/3 where we have the chats — I get that person's
+ * details, like groups in common and name and a profile pic."
  *
- * The first press expands the tree — that is what <summary> does and it should
- * keep doing it, because seeing the groups is most of why anybody opens an
- * organisation. The second press, while it is already open, means "and take me
- * in". Anything faster than a real double-click is left alone: <details> is a
- * keyboard control too, and a space bar should not navigate.
+ * The panel is already in the page, rendered with the conversation it describes
+ * (_room_details.html). This is only what opens and closes it, which is why the
+ * whole thing still says the right things with scripting off — it is simply
+ * always visible then, at the end of the conversation's own column.
+ *
+ * Two ways in and they are the same panel: the name block in the header, where
+ * anybody who has used a messaging app will press, and the ⋮ beside it, where
+ * anybody who has not will look.
  * ------------------------------------------------------------------------- */
 (function () {
   'use strict';
 
-  document.addEventListener('dblclick', function (e) {
-    var row = e.target.closest('.gtm-org-row');
-    if (!row) return;
-    var details = row.closest('.gtm-org');
-    if (!details) return;
-    /* The organisation's own room is always the first child link — see the
-       tree in messages.html, where "Everyone in ..." leads the list for
-       exactly this reason. */
-    var room = details.querySelector('.gtm-org-kids .gtm-kid');
-    if (!room) return;
-    e.preventDefault();
-    /* Keep it open: a double click on a <summary> toggles twice and lands back
-       where it started, which would collapse the tree under the room that just
-       opened. */
-    details.open = true;
-    room.click();
+  function panel() { return document.querySelector('[data-gtm-details-panel]'); }
+
+  function setOpen(on) {
+    var el = panel();
+    if (!el) return;
+    el.hidden = !on;
+    document.querySelectorAll('[data-gtm-details]').forEach(function (b) {
+      b.setAttribute('aria-expanded', on ? 'true' : 'false');
+    });
+    if (on) {
+      var close = el.querySelector('[data-gtm-details-close]');
+      if (close) close.focus();
+    }
+  }
+
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('[data-gtm-details-close]')) { setOpen(false); return; }
+    if (e.target.closest('[data-gtm-details]')) {
+      var el = panel();
+      setOpen(!el || el.hidden);
+    }
   });
+
+  document.addEventListener('keydown', function (e) {
+    var el = panel();
+    if (e.key === 'Escape' && el && !el.hidden) setOpen(false);
+  });
+
+  /* Opening another room replaces the panel along with the conversation, and
+     the replacement arrives closed. That is deliberate: the details of the room
+     you just left are not the details of the one you just opened, and leaving
+     it open would show the new room's members over a conversation somebody
+     pressed in order to read. */
 })();
 
 /* ---------------------------------------------------------------------------
@@ -509,4 +578,143 @@
     apply(folded);
     try { localStorage.setItem(KEY, folded ? '1' : '0'); } catch (e) { /* not fatal */ }
   });
+})();
+
+/* ---------------------------------------------------------------------------
+ * THE RIGHT-CLICK MENU ON A CONVERSATION
+ *
+ * "Just as WhatsApp, I should be able to right click and have options like
+ * archive chat, mute notifications, pin chat, add favourite, clear chat, delete
+ * chat, block a user."
+ *
+ * The menu is already in the page as real forms — see messages.html. This only
+ * decides where it appears and when it goes away, which means the whole feature
+ * still works with scripting off (the ⋮ button reveals the same markup) and
+ * from the keyboard.
+ * ------------------------------------------------------------------------- */
+(function () {
+  'use strict';
+
+  var open = null;
+
+  function close() {
+    if (!open) return;
+    open.hidden = true;
+    open.style.removeProperty('left');
+    open.style.removeProperty('top');
+    open = null;
+  }
+
+  function show(menu, x, y) {
+    close();
+    menu.hidden = false;
+    open = menu;
+    if (x == null) return;
+    /* Positioned in viewport coordinates because the menu is fixed — a menu
+       placed relative to a row inside a scrolling list drifts away from the
+       pointer the moment anything scrolls. Clamped so it cannot open with half
+       of itself past the bottom or right edge, which on the last row of a full
+       list is otherwise where it always opens. */
+    var box = menu.getBoundingClientRect();
+    var left = Math.min(x, window.innerWidth - box.width - 8);
+    var top = Math.min(y, window.innerHeight - box.height - 8);
+    menu.style.left = Math.max(8, left) + 'px';
+    menu.style.top = Math.max(8, top) + 'px';
+  }
+
+  document.addEventListener('contextmenu', function (e) {
+    var row = e.target.closest('[data-chat-row]');
+    if (!row) return;
+    var menu = row.querySelector('[data-conv-menu]');
+    if (!menu) return;
+    /* Only inside the conversation list: the browser's own menu is the right
+       one everywhere else, including on the message text somebody wants to
+       copy. */
+    e.preventDefault();
+    show(menu, e.clientX, e.clientY);
+  });
+
+  /* ---- HOLDING A ROW DOWN ------------------------------------------------
+     "The right click and hard press or holding it should now give me the option
+     to archive chat, mute notification, pin chat..."
+
+     A phone has no right click, so the hold is the gesture — the same one every
+     messaging app uses, and the reason the ⋮ is not the only way in on touch.
+
+     500ms, which is roughly where a browser's own long-press callout fires; and
+     a press that MOVES is a scroll, not a hold, so any movement past a few
+     pixels cancels it. Without that check every flick down the list would open
+     a menu under the thumb. */
+  var HOLD = 500, MOVE = 10;
+  var timer = null, held = null, from = null;
+
+  function cancelHold() {
+    clearTimeout(timer);
+    timer = null;
+    if (held) held.classList.remove('is-pressing');
+    held = null;
+    from = null;
+  }
+
+  document.addEventListener('touchstart', function (e) {
+    var row = e.target.closest && e.target.closest('[data-chat-row]');
+    if (!row || !row.querySelector('[data-conv-menu]')) return;
+    var t = e.touches[0];
+    held = row;
+    from = { x: t.clientX, y: t.clientY };
+    row.classList.add('is-pressing');
+    timer = setTimeout(function () {
+      var menu = row.querySelector('[data-conv-menu]');
+      row.classList.remove('is-pressing');
+      /* Centred on the row rather than on the finger, which is under it. */
+      var at = row.getBoundingClientRect();
+      show(menu, at.left + 12, at.bottom - 8);
+      /* The press has become a menu, so the tap it would otherwise have been
+         must not also open the conversation behind it. */
+      suppressNextTap = true;
+    }, HOLD);
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function (e) {
+    if (!from) return;
+    var t = e.touches[0];
+    if (Math.abs(t.clientX - from.x) > MOVE || Math.abs(t.clientY - from.y) > MOVE) cancelHold();
+  }, { passive: true });
+
+  document.addEventListener('touchend', cancelHold);
+  document.addEventListener('touchcancel', cancelHold);
+
+  /* Set by the hold above and read by the capture listener below, which runs
+     before the link's own handler and before gt-messages' open-a-room one. */
+  var suppressNextTap = false;
+  document.addEventListener('click', function (e) {
+    if (!suppressNextTap) return;
+    suppressNextTap = false;
+    if (!e.target.closest('[data-chat-row]') || e.target.closest('[data-conv-menu]')) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-conv-more]');
+    if (btn) {
+      e.preventDefault();
+      e.stopPropagation();
+      var menu = btn.parentElement.querySelector('[data-conv-menu]');
+      if (menu === open) { close(); return; }
+      var at = btn.getBoundingClientRect();
+      show(menu, at.left - 150, at.bottom + 4);
+      return;
+    }
+    /* A press inside the menu is a submit; anything else closes it. */
+    if (!e.target.closest('[data-conv-menu]')) close();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') close();
+  });
+  /* Fixed positioning and a scrolling list: without this the menu stays put
+     while the row it belongs to slides away underneath it. */
+  document.addEventListener('scroll', close, true);
+  window.addEventListener('resize', close);
 })();

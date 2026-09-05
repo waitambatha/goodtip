@@ -84,7 +84,14 @@
 
 .gtm {
   display: grid;
-  grid-template-columns: minmax(280px, 340px) minmax(260px, 320px) minmax(0, 1fr);
+  /* TWO COLUMNS, A THIRD AND TWO THIRDS — "because I am seeing three columns, I
+     want it to be two: so one be 1/3, then the chat place be 2/3."
+
+     Literally 1fr and 2fr, with a floor and a ceiling on the list so it stays
+     usable on a laptop and does not become a 700px column of avatars on a wide
+     monitor. The member list that held the third column now slides over the
+     conversation instead — see .gtm-details. */
+  grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr);
   /* --gt-navh is published by goodtip.css and changes with the bar — the
      organisation chip takes its own strip below 1300px, so "the nav is 68px"
      stopped being true and a hard-coded number left the composer that far
@@ -210,36 +217,13 @@
 .gtm-av.xl.person { border-radius: 50%; }
 
 /* ---- the organisation tree ---- */
-.gtm-org { border-radius: var(--m-r2); }
-.gtm-org + .gtm-org { margin-top: 2px; }
-.gtm-org-row {
-  display: flex; align-items: center; gap: 11px; cursor: pointer;
-  padding: 9px 8px; border-radius: var(--m-r2); list-style: none;
-}
-.gtm-org-row::-webkit-details-marker { display: none; }
-.gtm-org-row:hover { background: var(--m-panel-2); }
-.gtm-org-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.gtm-org-txt b { font-size: 14px; font-weight: 700; color: var(--m-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gtm-org-txt i { font-style: normal; font-size: 11.5px; color: var(--m-ink-3); }
-.gtm-chev {
-  width: 15px; height: 15px; flex: none; fill: none; stroke: var(--m-ink-3);
-  stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
-  transition: transform .18s var(--ease);
-}
-.gtm-org[open] .gtm-chev { transform: rotate(90deg); }
-/* Indented, with a rule down the left — the tree structure the client drew
-   (organisation → groups → members) has to be visible as a structure, not
-   inferred from four rows that look the same. */
-.gtm-org-kids { margin: 2px 0 6px 21px; padding-left: 12px; border-left: 1px solid var(--m-line); }
-.gtm-kid {
-  display: flex; align-items: center; gap: 10px; text-decoration: none;
-  padding: 8px; border-radius: 10px; color: var(--m-ink);
-}
-.gtm-kid:hover { background: var(--m-panel-2); }
-.gtm-kid-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.gtm-kid-txt b { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gtm-kid-txt i { font-style: normal; font-size: 11.5px; color: var(--m-ink-3); }
-.gtm-kid-more { font-size: 12.5px; font-weight: 700; color: var(--m-accent-ink); padding-left: 8px; }
+/* ---- WHERE THE ORGANISATION TREE WAS ------------------------------------
+   A <details> accordion — press an organisation, its groups unfold, press
+   again to go in — took the top of this panel. "Without the dropdown": an
+   organisation row now opens the organisation, and its groups are a tab of
+   their own, so the styles for the accordion, its chevron and its indented
+   children have gone with it. The rows those tabs draw are .gtm-dir, at the
+   foot of this file. */
 
 /* ---- the conversation rows ---- */
 .gtm-list { list-style: none; }
@@ -283,23 +267,84 @@
 .gtm-none b { color: var(--m-ink-2); }
 
 /* ==========================================================================
-   MIDDLE — the room
-   ========================================================================== */
-.gtm-mid { background: var(--m-panel); border-right: 1px solid var(--m-line); }
-.gtm-mid-head {
-  display: flex; align-items: center; gap: 12px; flex: none;
-  padding: 16px; border-bottom: 1px solid var(--m-line);
+   THE DETAILS PANEL — what used to be the middle column
+   ==========================================================================
+   It slides over the conversation from the right rather than taking a column
+   of its own. Two reasons, and the second is the one that matters:
+
+   1. The client asked for two columns, a third and two thirds. A permanent
+      member list is a third of the screen spent on something you consult and
+      never read.
+   2. A panel that NARROWS the chat re-wraps every bubble in it, so opening the
+      members list reflows the conversation you were reading and loses your
+      place. Over the top, nothing moves.
+
+   Absolutely positioned inside .gtm-chat-in, which is the conversation's own
+   full-height box — so "the details are inside the 2/3 where we have the
+   chats", which is where the client put them. */
+.gtm-details {
+  position: absolute; z-index: 8; top: 0; right: 0; bottom: 0;
+  width: min(360px, 100%);
+  display: flex; flex-direction: column;
+  background: var(--m-panel); border-left: 1px solid var(--m-line);
+  box-shadow: -24px 0 48px -24px rgba(0,0,0,.55);
+  /* Slid rather than dropped in, and only when the reader has not asked for
+     less movement. hidden is still what hides it, so with no JavaScript at all
+     the panel is simply absent rather than parked off screen where a screen
+     reader would still find it. */
+  animation: gtmSlideIn .18s var(--ease, ease);
 }
-.gtm-mid-txt { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.gtm-mid-txt b { font-family: var(--display); font-size: 17px; color: var(--m-ink); line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gtm-mid-txt i { font-style: normal; font-size: 12px; color: var(--m-ink-3); }
-.gtm-mid-idle { flex: 1; }
+/* `display: flex` above beats the browser's own [hidden] { display: none },
+   which is a user-agent rule and loses to any author one. Without this line the
+   panel is open from the moment the page loads and the close button is the only
+   thing that has ever shut it. */
+.gtm-details[hidden] { display: none; }
+@keyframes gtmSlideIn { from { transform: translateX(14px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .gtm-details { animation: none; } }
+.gtm-details-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  flex: none; padding: 12px 10px 12px 18px; border-bottom: 1px solid var(--m-line);
+}
+.gtm-details-head h2 {
+  font-family: var(--mark); font-size: 11px; font-weight: 800;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--m-ink-2);
+}
+.gtm-details-body { flex: 1; min-height: 0; overflow-y: auto; }
+
+/* The card at the top: face, name, and what kind of conversation this is. */
+.gtm-card {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: 5px; padding: 26px 20px 22px; border-bottom: 1px solid var(--m-line);
+}
+.gtm-card-name { font-family: var(--display); font-size: 21px; color: var(--m-ink); margin-top: 12px; line-height: 1.15; }
+.gtm-card-sub { font-size: 12.5px; color: var(--m-ink-3); }
+
+.gtm-details-sec { padding: 16px 18px; border-bottom: 1px solid var(--m-line); }
+/* The member list is the one section that scrolls to the bottom of the panel
+   rather than ending where its rows do. */
+.gtm-details-sec.is-people { padding: 0 0 16px; border-bottom: 0; }
+.gtm-details-sec h3 {
+  font-family: var(--mark); font-size: 10.5px; font-weight: 800;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--m-ink-3);
+  margin-bottom: 10px;
+}
+.gtm-quiet { font-size: 12.5px; line-height: 1.6; color: var(--m-ink-2); }
+
+/* Groups in common, as chips: they are links into those rooms, and a stack of
+   full-width rows for two names reads as a list that is missing something. */
+.gtm-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.gtm-chip {
+  display: inline-block; text-decoration: none; font-size: 12.5px; font-weight: 600;
+  padding: 6px 11px; border-radius: 100px; color: var(--m-ink);
+  background: var(--m-panel-2); border: 1px solid var(--m-line);
+}
+.gtm-chip:hover { border-color: var(--m-accent-line); color: var(--m-accent-ink); }
 
 /* THE BACK ARROW is drawn here and only SHOWN where there is a level to go
-   back to. On a desktop all three panels are on screen and there is nothing
-   to go back from; the widths that fold a panel away turn it on below. Its
-   look lives here rather than in the media queries so the two places that
-   reveal it cannot end up styling it differently. */
+   back to. On a desktop both panels are on screen and there is nothing to go
+   back from; the phone width, where they are two screens, turns it on. Its look
+   lives here rather than in the media query so it cannot end up styled twice
+   and differently. */
 .gtm-back {
   display: none; place-items: center; width: 34px; height: 34px; flex: none;
   background: none; border: 0; cursor: pointer; border-radius: 9px; color: var(--m-ink-2);
@@ -328,16 +373,15 @@
 .gtm-pin-x { background: none; border: 0; cursor: pointer; color: var(--m-ink-3); font-size: 20px; line-height: 1; padding: 0 2px; }
 .gtm-pin-x:hover { color: var(--m-ink); }
 
-.gtm-mid-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .gtm-people-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px 8px; flex: none;
+  padding: 14px 16px 8px;
 }
-.gtm-people-head h2 {
+.gtm-people-head h3 {
   font-family: var(--mark); font-size: 11px; font-weight: 800;
   letter-spacing: .12em; text-transform: uppercase; color: var(--m-ink-3);
 }
-.gtm-people-head h2 span { color: var(--m-accent-ink); margin-left: 4px; }
+.gtm-people-head h3 span { color: var(--m-accent-ink); margin-left: 4px; }
 .gtm-addbtn {
   display: inline-flex; align-items: center; gap: 5px; text-decoration: none;
   font-size: 12px; font-weight: 700; color: var(--m-accent-ink);
@@ -346,7 +390,7 @@
 .gtm-addbtn:hover { background: var(--m-accent-bg); }
 .gtm-addbtn svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
 
-.gtm-people-search { position: relative; margin: 0 12px 8px; flex: none; }
+.gtm-people-search { position: relative; margin: 0 12px 8px; }
 .gtm-people-search svg {
   position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
   width: 15px; height: 15px; fill: none; stroke: var(--m-ink-3); stroke-width: 2; stroke-linecap: round;
@@ -360,7 +404,7 @@
 .gtm-people-search input::placeholder { color: var(--m-ink-3); }
 .gtm-people-search input:focus { outline: none; border-color: var(--m-accent-line); }
 
-.gtm-people { flex: 1; overflow-y: auto; padding: 0 10px 16px; }
+.gtm-people { padding: 0 10px 16px; }
 .gtm-mem {
   display: flex; align-items: center; gap: 10px; text-decoration: none;
   padding: 8px; border-radius: 10px; color: var(--m-ink);
@@ -396,23 +440,13 @@
 }
 .gtm-tagchip.is-admin { background: var(--m-accent); color: #0F2E22; }
 .gtm-people-none { padding: 16px 8px; font-size: 13px; color: var(--m-ink-3); }
-.gtm-more {
+.gtm-showmore {
   display: block; width: calc(100% - 16px); margin: 8px; cursor: pointer;
   background: var(--m-panel-2); border: 1px solid var(--m-line); border-radius: 10px;
   padding: 10px; font-family: var(--body); font-size: 12.5px; font-weight: 700;
   color: var(--m-ink-2);
 }
-.gtm-more:hover { border-color: var(--m-accent-line); color: var(--m-accent-ink); }
-
-/* ---- a direct message's card instead of a member list ---- */
-.gtm-person { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 34px 24px; gap: 4px; }
-.gtm-person > b { font-family: var(--display); font-size: 21px; color: var(--m-ink); margin-top: 16px; }
-.gtm-person-sub { font-size: 12.5px; color: var(--m-ink-3); }
-.gtm-person-note {
-  margin-top: 20px; padding: 13px 15px; border-radius: var(--m-r2);
-  background: var(--m-panel-2); border: 1px solid var(--m-line);
-  font-size: 12.5px; line-height: 1.55; color: var(--m-ink-2);
-}
+.gtm-showmore:hover { border-color: var(--m-accent-line); color: var(--m-accent-ink); }
 
 /* ==========================================================================
    RIGHT — the conversation
@@ -434,8 +468,21 @@
 }
 .gtm-icbtn:hover { background: var(--m-panel-2); color: var(--m-ink); }
 .gtm-icbtn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-/* On a desktop the member panel is already on screen beside this. */
-.gtm-icbtn[data-gtm-showroom] { display: none; }
+/* THE THREE DOTS. Filled circles, not rings: .gtm-icbtn svg draws strokes,
+   which at r=1.6 turns each dot into a tiny hollow O. */
+.gtm-dots svg circle { fill: currentColor; stroke: none; }
+
+/* THE WHOLE NAME BLOCK IS THE OTHER WAY IN — "make it clickable, even the name
+   of the group". A button, so it works from the keyboard; drawn as the header
+   text it replaced, so nothing about the header looks like a control until you
+   are on it. */
+.gtm-chat-id {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px;
+  background: none; border: 0; padding: 4px 6px; margin: -4px -6px;
+  border-radius: 10px; cursor: pointer; text-align: left; font: inherit;
+  color: inherit;
+}
+.gtm-chat-id:hover { background: var(--m-panel-2); }
 
 .gtm-chat-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .gtm-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 20px 8px; }
@@ -713,8 +760,8 @@
   padding: 9px; border-radius: 11px; color: var(--ink);
 }
 .gtm-sheet-row:hover { background: rgba(15,46,34,.06); }
-.gtm-sheet-row .gtm-kid-txt b { color: var(--ink); }
-.gtm-sheet-row .gtm-kid-txt i { color: var(--muted); }
+.gtm-sheet-row .gtm-dir-txt b { color: var(--ink); }
+.gtm-sheet-row .gtm-dir-txt i { color: var(--muted); }
 .gtm-sheet-row .gtm-av { background: rgba(15,46,34,.08); color: var(--forest); }
 .gtm-sheet-row .gtm-av.org { background: rgba(196,240,0,.3); color: #3F6208; }
 .gtm-sheet-row .gtm-av.group { background: rgba(23,107,69,.16); color: var(--forest); }
@@ -727,32 +774,24 @@
    current width, so a resize needs no recomputation and the desktop layout is
    never a stack of three overlapping panels. */
 
-/* Tablet: the member panel folds away and the conversation takes its width.
-   It is still reachable — the people button in the conversation header sets
-   data-view="room", which is what the second rule here draws. */
+/* Tablet: a third and two thirds is too narrow a chat once the window is this
+   small, so the list takes a fixed strip and everything else goes to the
+   conversation. */
 @media (max-width: 1100px) {
   .gtm { grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); }
-  .gtm-mid { display: none; }
-  .gtm-icbtn[data-gtm-showroom] { display: grid; }
-  /* Asked for the members: the middle panel takes the conversation's column
-     and the conversation steps aside, rather than a third column appearing in
-     a layout that has no room for one. */
-  .gtm[data-view="room"] .gtm-mid { display: flex; grid-column: 2; }
-  .gtm[data-view="room"] .gtm-chat { display: none; }
-  .gtm-mid .gtm-back { display: grid; }
 }
 
-/* Phone: one panel at a time, in the order WhatsApp settled on — chats, then
-   the room, then the conversation — with the back arrow walking out one level
-   at a time. */
+/* Phone: one panel at a time — the list, then the conversation — with the back
+   arrow walking out of it. The details panel is not a third level: it covers
+   the conversation and its own close button is the way out, which is what it
+   does at every other width too. */
 @media (max-width: 760px) {
   .gtm { grid-template-columns: 1fr; height: calc(100dvh - 60px); }
   .gtm > * { display: none; }
   .gtm[data-view="list"] .gtm-nav { display: flex; }
-  .gtm[data-view="room"] .gtm-mid { display: flex; }
-  .gtm[data-view="chat"] .gtm-chat { display: flex; }
+  .gtm[data-view="chat"] .gtm-chat, .gtm[data-view="room"] .gtm-chat { display: flex; }
   .gtm-back { display: grid; }
-  .gtm-nav, .gtm-mid { border-right: 0; }
+  .gtm-nav { border-right: 0; }
   .gtm-scroll { padding: 14px 12px 6px; }
   .gtm-composer { padding: 10px 12px 12px; }
   .gtm-chat-head { padding: 12px; }
@@ -809,7 +848,7 @@ html[data-theme="light"] .gtm-conv.is-new .gtm-conv-top b { color: #0F2E22; }
 /* A white panel on a cream ground needs the shadow that a dark one did not:
    the border alone is not enough separation at this contrast. */
 html[data-theme="light"] .gtm-nav,
-html[data-theme="light"] .gtm-mid,
+html[data-theme="light"] .gtm-details,
 html[data-theme="light"] .gtm-chat-head,
 html[data-theme="light"] .gtm-composer { box-shadow: 0 1px 2px rgba(15,46,34,.04); }
 /* Somebody else's bubble is white on cream, which needs an edge; your own is
@@ -851,13 +890,12 @@ html[data-theme="light"] .gtm-tagchip.is-admin { background: var(--m-accent); co
    content and not for this: a chat client is a room you are IN, and putting a
    picture frame round it makes the room look like a screenshot of itself.
 
-   Full width, no shadow, no cap. The photographs stay on every other screen
-   where they are the standard frame; here the application IS the page. */
+   No shadow, no border, no radius. (The CAP came back with the photographs in
+   the third pass below — the frame and the photographs were taken off together
+   and only the frame was the thing that looked wrong.) */
 .gtm {
-  max-width: none; margin: 0; box-shadow: none;
-  border-radius: 0; border: 0; background: transparent;
+  box-shadow: none; border-radius: 0; border: 0;
 }
-.gtm-page .page-scenes { display: none; }
 .gtm-nav { background: var(--m-panel); }
 
 /* ---- BUBBLES THAT ARE NOT BOTH GREEN -----------------------------------
@@ -922,7 +960,7 @@ html[data-theme="light"] .gtm-tagchip.is-admin { background: var(--m-accent); co
 .gtm-fold:hover { background: rgba(255,255,255,.2); }
 .gtm-fold svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .gtm { position: relative; transition: grid-template-columns .22s var(--ease, ease); }
-.gtm.is-folded { grid-template-columns: 54px minmax(260px, 320px) minmax(0, 1fr); }
+.gtm.is-folded { grid-template-columns: 54px minmax(0, 1fr); }
 .gtm.is-folded .gtm-nav-head .gtm-title div,
 .gtm.is-folded .gtm-nav-head .gtm-search,
 .gtm.is-folded .gtm-nav-head .gtm-tabs,
@@ -966,9 +1004,9 @@ html[data-theme="light"] .gtm-tagchip.is-admin { background: var(--m-accent); co
 @keyframes gtmSpin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .gtm-chat.is-loading::before { animation: none; } }
 
-/* The selected room in the tree, so pressing one looks like it did something
-   even before the panel arrives. */
-.gtm-kid.on { background: var(--m-accent-bg, rgba(200,241,53,.14)); }
+/* The selected room, so pressing one looks like it did something even before
+   the panel arrives. */
+.gtm-dir.on { background: var(--m-accent-bg, rgba(200,241,53,.14)); }
 
 /* Light theme: theirs stays white on cream and needs its edge; yours keeps the
    blue, which reads on both grounds. */
@@ -976,3 +1014,159 @@ html[data-theme="light"] .gtm-page { --m-bubble: #FFFFFF; --m-bubble-ink: #16202
 html[data-theme="light"] .gtm-chat .chat-bubble { border: 1px solid rgba(15,46,34,.13); }
 html[data-theme="light"] .gtm-chat .chat-row.mine .chat-bubble { border-color: rgba(47,93,168,.4); color: #FFFFFF; }
 html[data-theme="light"] .gtm-fold { background: rgba(15,46,34,.06); border-color: rgba(15,46,34,.14); color: #2C4C3B; }
+
+/* ---- the right-click menu on a conversation ----------------------------
+   Fixed rather than absolute: the list scrolls inside its own panel, and an
+   absolutely-positioned menu drifts away from the pointer the moment it does. */
+/* Any row that carries a menu, on any of the four lists. `.gtm-conv` was the
+   selector when only the recent-chat rows had one; the directory rows carry the
+   same gesture now, so the anchor is the attribute the menu itself keys on. */
+[data-chat-row] { position: relative; }
+.gtm-menu {
+  position: fixed; z-index: 200; min-width: 210px; padding: 6px;
+  background: var(--m-panel-2); border: 1px solid var(--m-line-2);
+  border-radius: 12px; box-shadow: 0 22px 44px -18px rgba(0,0,0,.7);
+}
+.gtm-menu form { margin: 0; }
+.gtm-menu-item {
+  display: block; width: 100%; text-align: left; background: none; border: 0;
+  padding: 9px 12px; border-radius: 8px; cursor: pointer;
+  font: inherit; font-size: 13.5px; color: var(--m-ink);
+}
+.gtm-menu-item:hover, .gtm-menu-item:focus-visible { background: rgba(255,255,255,.12); }
+.gtm-menu-item.is-danger { color: #FF9C9C; }
+.gtm-menu-item.is-danger:hover { background: rgba(154,43,43,.28); }
+
+/* The ⋮ is the touch version of a right click, not a fallback for it — nobody
+   right-clicks on a phone. Shown on hover with a pointer, always without one.
+
+   `.gtm-kebab`, not `.gtm-more`: that name was already the "Show more members"
+   button at the foot of the member list, and this block's absolute positioning
+   and opacity:0 were silently turning it into an invisible 26px square in the
+   corner of the panel. Two controls, two names. */
+.gtm-kebab {
+  position: absolute; top: 8px; right: 8px; z-index: 2;
+  width: 26px; height: 26px; border-radius: 8px; cursor: pointer;
+  background: none; border: 0; color: var(--m-ink-2); font-size: 16px; line-height: 1;
+  opacity: 0; transition: opacity .14s var(--ease, ease);
+}
+[data-chat-row]:hover .gtm-kebab, .gtm-kebab:focus-visible { opacity: 1; }
+.gtm-kebab:hover { background: rgba(255,255,255,.12); color: var(--m-ink); }
+@media (hover: none) { .gtm-kebab { opacity: .75; } }
+
+/* The state marks. Small, at the end of the row, and never in place of the
+   unread badge — a muted room still counts. */
+.gtm-mark { flex: none; font-size: 11px; opacity: .75; margin-left: 4px; }
+.gtm-conv.is-pinned { background: rgba(255,255,255,.045); }
+.gtm-conv.is-muted .gtm-conv-top b { opacity: .82; }
+/* Archived is a navigation, not a filter of what is already on screen, so it
+   does not look like the four tabs beside it. */
+.gtm-tab-link { text-decoration: none; display: inline-flex; align-items: center; }
+
+/* ==========================================================================
+   THIRD PASS — two columns, the details panel, the directories, the frame
+   ========================================================================== */
+
+/* The details panel is positioned against the conversation's own box, so that
+   box has to be the containing block. Without this it would anchor to the
+   viewport and cover the sidebar as well. */
+.gtm-chat-in { position: relative; }
+
+/* .gtm-details-sec h3 gives every heading in the panel a gap under it; the
+   member list's heading is in a flex row with the Add button, where that gap
+   pushes the two out of line. */
+.gtm-people-head h3 { margin-bottom: 0; }
+
+/* ---- THE PHOTOGRAPHS COME BACK ----------------------------------------
+   "Then we need to add the images on the both ends — the images that change."
+
+   They were taken off when the outer frame went ("that outer box frame should
+   not be there"), because the two were one change: the application was a
+   capped slab with a heavy drop shadow, and the strips showed past it.
+
+   Both things are true and they are not the same thing. What was wrong was the
+   FRAME — the shadow and the border that made the room look like a screenshot
+   of itself. So the cap comes back and the frame does not: the application is
+   centred with the rotating photographs at both margins, and its edges meet
+   them flat, with no shadow and nothing drawn round it.
+
+   The strips are the standard page_scenes partial every other member screen
+   uses, so they rotate on the same timer and show the same photographs. They
+   were never removed from the markup — the second pass hid them, and that one
+   line is what came out. */
+.gtm {
+  max-width: var(--gt-wide, 1300px);
+  margin: 0 auto;
+  background: var(--m-ground);
+  box-shadow: none; border: 0; border-radius: 0;
+}
+/* Only where there is room for a photograph rather than a sliver of one: below
+   this the application takes the width and the strips are hidden by the rule
+   further up this file. */
+@media (max-width: 1500px) { .gtm { max-width: none; } }
+
+/* ---- THE DIRECTORY ROWS ------------------------------------------------
+   The Organisations, Groups and People tabs. One row shape for all three, and
+   deliberately not the conversation row's: a conversation carries a preview, a
+   time and an unread count, and a directory row carries a name and a way in.
+   Making them look identical would promise the one the row is not. */
+.gtm-dir {
+  display: flex; align-items: center; gap: 11px; text-decoration: none;
+  padding: 9px 10px; border-radius: var(--m-r2); color: var(--m-ink);
+}
+.gtm-dir:hover { background: var(--m-panel-2); }
+.gtm-dir.on { background: var(--m-accent-bg); box-shadow: inset 3px 0 0 var(--m-accent); }
+.gtm-dir-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gtm-dir-txt b { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gtm-dir-txt i { font-style: normal; font-size: 11.5px; color: var(--m-ink-3); }
+.gtm-dir .gtm-mem-go { opacity: 0; }
+.gtm-dir:hover .gtm-mem-go, .gtm-dir:focus-visible .gtm-mem-go { opacity: 1; }
+/* A directory row is a press target, and on touch there is no hover to reveal
+   the arrow with — so it is simply always there. */
+@media (hover: none) { .gtm-dir .gtm-mem-go, .gtm-mem-go { opacity: 1; } }
+
+/* People rows in the sidebar are the same component as the room's member list,
+   which was built to sit in a panel with its own padding. */
+.gtm-sec #gtmContacts { padding: 0 2px; }
+
+/* ---- A GOLD STAR ------------------------------------------------------
+   "The favourite we can add a star, a golden star, I think that is the
+   standard practice."
+
+   Drawn as an SVG rather than typed as ★: the character is painted by whichever
+   emoji font the reader's machine has, which is orange on one, flat black on
+   another, and a different size on all of them. */
+.gtm-mark.is-fav svg { width: 12px; height: 12px; display: block; fill: #F5C518; }
+.gtm-mark.is-fav { opacity: 1; }
+
+/* ---- LONG PRESS -------------------------------------------------------
+   The touch version of a right click. Holding a row must not also start the
+   browser's own text selection or its "copy link" callout, or the menu opens
+   behind a native one. */
+[data-chat-row] { -webkit-touch-callout: none; }
+[data-chat-row].is-pressing { background: var(--m-panel-2); border-radius: var(--m-r2); }
+[data-chat-row].is-pressing a { user-select: none; -webkit-user-select: none; }
+
+/* A directory row and its menu share a box, so the ⋮ has something to be
+   positioned against and the whole row is one right-click target. The row
+   itself is still the link inside it. */
+.gtm-dirrow { position: relative; }
+/* A directory row is one line, so the ⋮ is centred in it rather than pinned to
+   a corner the way it is on a two-line conversation row. */
+.gtm-dirrow .gtm-kebab { top: 50%; transform: translateY(-50%); right: 4px; }
+/* Room for both. Only on the rows that actually have a menu — the ones that do
+   not keep the full width, which is most of them on a new account. Where :has()
+   is not supported the chevron simply sits under the ⋮, and the chevron is a
+   hover decoration either way. */
+.gtm-dirrow:has(.gtm-kebab) .gtm-dir,
+.gtm-dirrow:has(.gtm-kebab) .gtm-mem { padding-right: 32px; }
+/* In the room's member panel the second line is the hint "Message directly",
+   which only wants to be there when you are about to press. In the People tab
+   the same slot holds the organisation the message would go through, which is
+   information and has to be readable without hovering anything. */
+.gtm-dirrow .gtm-mem-txt i { opacity: 1; }
+
+/* ---- LIGHT THEME, for the parts this pass added ---------------------- */
+html[data-theme="light"] .gtm-details { box-shadow: -24px 0 48px -24px rgba(15,46,34,.18); }
+html[data-theme="light"] .gtm-chat-id:hover { background: rgba(15,46,34,.05); }
+html[data-theme="light"] .gtm-chip { background: #FFFFFF; }

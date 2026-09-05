@@ -2064,3 +2064,102 @@ class MemberSanction(models.Model):
         if self.ends_at is None:
             return "until lifted"
         return f"until {self.ends_at:%-d %b %Y}"
+
+
+class ThreadPreference(models.Model):
+    """What ONE person has decided about one conversation.
+
+    ASKED FOR: "just as WhatsApp, I should be able to right click and have
+    options like archive chat, mute notifications, pin chat, add favourite,
+    clear chat, delete chat, block a user."
+
+    EVERY ONE OF THESE IS PRIVATE TO THE PERSON WHO SET IT, which is the whole
+    reason this is a row per (user, thread) rather than fields on the thread. A
+    workplace organisation room has forty people in it: one of them muting it
+    must not silence it for the other thirty-nine, and one of them clearing it
+    must not erase the room's history for anybody.
+
+    That constraint is what makes "delete" honest here. You cannot delete a room
+    you share with forty colleagues — nobody in a group chat can, in any product
+    that tells the truth — so delete means "take it off my list and forget what
+    was in it for me", which is archive and clear together. The messages stay
+    where they are for everyone else, and the room comes back to your list the
+    moment somebody writes in it again.
+
+    TIMESTAMPS RATHER THAN BOOLEANS, because "when did you pin this" is the
+    thing that orders the pinned ones, and `cleared_at` has to be a moment
+    anyway — it is the line below which this reader sees nothing.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="thread_prefs",
+    )
+    thread = models.ForeignKey(
+        "orgs.MessageThread", on_delete=models.CASCADE, related_name="prefs",
+    )
+    pinned_at = models.DateTimeField(null=True, blank=True)
+    favourite_at = models.DateTimeField(null=True, blank=True)
+    muted_at = models.DateTimeField(null=True, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    # Everything at or before this moment is not shown to THIS reader. It is
+    # not a delete: the messages are untouched and everybody else still has
+    # them.
+    cleared_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user", "thread")
+        indexes = [models.Index(fields=["user", "archived_at"])]
+
+    def __str__(self):
+        return f"{self.user} · thread {self.thread_id}"
+
+    @property
+    def is_pinned(self) -> bool:
+        return self.pinned_at is not None
+
+    @property
+    def is_muted(self) -> bool:
+        return self.muted_at is not None
+
+    @property
+    def is_archived(self) -> bool:
+        return self.archived_at is not None
+
+    @property
+    def is_favourite(self) -> bool:
+        return self.favourite_at is not None
+
+
+class MemberBlock(models.Model):
+    """One member declining to hear from another.
+
+    SCOPED TO AN ORGANISATION, like the right to message somebody in the first
+    place: two people can write to each other because they share a workplace
+    comp, so declining that is a decision about the same room rather than about
+    the whole product.
+
+    WHAT IT DOES AND WHAT IT DELIBERATELY DOES NOT. It stops direct messages
+    between the two — in both directions, because a block that only worked one
+    way would let the blocked person keep writing into a conversation the other
+    can no longer answer. It does NOT remove either of them from the shared
+    rooms: a member cannot silence a colleague in the organisation's own room by
+    blocking them, or a falling-out between two people would quietly edit the
+    league's chat for one of them.
+    """
+
+    org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name="blocks")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="blocks_made",
+    )
+    blocked = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="blocked_by",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("org", "user", "blocked")
+        indexes = [models.Index(fields=["org", "user"])]
+
+    def __str__(self):
+        return f"{self.user} blocked {self.blocked} in {self.org}"

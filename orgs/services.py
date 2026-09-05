@@ -5,7 +5,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Case, Count, IntegerField, Q, Value, When
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
@@ -1695,16 +1695,33 @@ def thread_entries(thread, user):
     Roles are fetched in ONE query for the whole thread rather than per
     message. Threads are short, but a query per bubble is the kind of thing
     that is invisible until a thread is fifty bubbles long.
+
+    A CLEARED CONVERSATION STARTS FROM WHERE IT WAS CLEARED. "Clear chat" moves
+    a line for one reader; everything at or before it stops being shown to them
+    and nothing is deleted, so the other forty people in an organisation room
+    still have every word of it.
     """
-    from .models import Message, OrgMember
+    from .models import Message, OrgMember, ThreadPreference
 
     # NEWEST 200, THEN TURNED BACK ROUND. Slicing from the end is the only way
     # to say "the most recent" in SQL; the list is then reversed so the
     # conversation still reads oldest-first, which is what a conversation is.
+    qs = thread.messages.select_related("author", "reply_to", "reply_to__author")
+    # The reader's own line, if they have cleared this conversation. Applied to
+    # the QUERY rather than to the list, so a cleared thread costs nothing to
+    # open — and applied before the slice, or "the newest 200" would count
+    # messages this reader cannot see and hand back an empty page.
+    cleared = (
+        ThreadPreference.objects
+        .filter(user=user, thread=thread, cleared_at__isnull=False)
+        .values_list("cleared_at", flat=True)
+        .first()
+    ) if user and user.is_authenticated else None
+    if cleared is not None:
+        qs = qs.filter(created_at__gt=cleared)
     entries = list(
         reversed(
-            thread.messages
-            .select_related("author", "reply_to", "reply_to__author")
+            qs
             # `reactions` prefetched with the rest, so a thread with a
             # reaction on every bubble still costs the same few queries as one
             # with none.
@@ -1980,7 +1997,7 @@ def plausible_threads(user, org_ids):
     )
 
 
-def conversations_for(user, *, keep=None) -> list:
+def conversations_for(user, *, keep=None, show="active") -> list:
     """Every conversation this person can open, newest activity first.
 
     ONE LIST, EVERY ORGANISATION — the same decision `member_threads` made and
@@ -2074,7 +2091,78 @@ def conversations_for(user, *, keep=None) -> list:
         ):
             continue
         rows.append(_conversation_row(thread, user, newest, unread_counts))
-    return rows
+
+    # ---- what this reader has decided about their own list -----------------
+    #
+    # Applied here rather than in the query, because the state lives in a table
+    # keyed on (user, thread) and joining it into `plausible_threads` would make
+    # a permission query answer a preference question as well. One extra query
+    # for the whole sidebar; see chatprefs.prefs_by_thread.
+    from .chatprefs import blocked_user_ids, prefs_by_thread
+
+    prefs = prefs_by_thread(user, [r["id"] for r in rows])
+    blocked = blocked_user_ids(user)
+    kept = []
+    for row in rows:
+        pref = prefs.get(row["id"])
+        # A DIRECT MESSAGE WITH SOMEBODY BLOCKED IS NOT LISTED — in either
+        # direction. Rooms are untouched: a falling-out between two people must
+        # not quietly edit the organisation's own chat for one of them.
+        other = row.get("avatar_user")
+        if row["face"] == "person" and other is not None and other.id in blocked:
+            continue
+        row["pinned"] = bool(pref and pref.is_pinned)
+        row["favourite"] = bool(pref and pref.is_favourite)
+        row["muted"] = bool(pref and pref.is_muted)
+        row["archived"] = bool(pref and pref.is_archived)
+        row["menu"] = _chat_menu(row)
+        # A muted room still counts its unread; it simply does not interrupt.
+        # Hiding the number as well would make mute mean "ignore", which is a
+        # different thing somebody would have chosen archive for.
+        if row["archived"] and show != "archived" and row["id"] != keep:
+            # Archived comes BACK on new activity — otherwise archiving a live
+            # room is indistinguishable from leaving it, and people lose
+            # conversations they meant to tidy away.
+            if not row["unread"]:
+                continue
+        if show == "archived" and not row["archived"]:
+            continue
+        kept.append(row)
+
+    # Pinned first, everything else in the order it already had.
+    #
+    # ONE STABLE SORT, on one key. The rows arrive newest-activity-first from
+    # the query, and Python's sort is stable — so sorting on "is it pinned"
+    # alone lifts the pinned ones to the top and leaves both groups in
+    # activity order. Sorting on a compound key here would mean re-deriving the
+    # ordering the database already did, and getting it subtly wrong for the
+    # rows where last_message_at is null.
+    kept.sort(key=lambda r: 0 if r["pinned"] else 1)
+    return kept
+
+
+def _chat_menu(row) -> list:
+    """The right-click menu for one row, labelled for its current state.
+
+    LABELS READ THE STATE — "Unpin" when it is pinned — because the endpoint is
+    a toggle and a menu saying "Pin" over an already-pinned chat would be
+    offering to do what it would actually undo.
+
+    Block is only on a direct message. Blocking somebody "in" the organisation
+    room would be asking to stop hearing a colleague in a room forty people
+    share, which is a different request and not one this grants.
+    """
+    items = [
+        ("pin", "Unpin chat" if row["pinned"] else "Pin chat"),
+        ("favourite", "Remove from favourites" if row["favourite"] else "Add to favourites"),
+        ("mute", "Unmute notifications" if row["muted"] else "Mute notifications"),
+        ("archive", "Unarchive chat" if row["archived"] else "Archive chat"),
+        ("clear", "Clear messages"),
+        ("delete", "Delete chat"),
+    ]
+    if row["face"] == "person":
+        items.append(("block", "Block this person"))
+    return items
 
 
 def _conversation_row(thread, user, last_message, unread_counts) -> dict:
@@ -2128,6 +2216,11 @@ def _conversation_row(thread, user, last_message, unread_counts) -> dict:
         "thread": thread,
         "id": thread.id,
         "org": thread.org,
+        # Defaults, overwritten in conversations_for once the reader's own
+        # preferences are in hand. Present here so a row is always the same
+        # shape — a template that has to guard every one of these reads like a
+        # list of apologies.
+        "pinned": False, "favourite": False, "muted": False, "archived": False,
         "group": thread.group,
         "kind": thread.kind,
         "face": face,
@@ -2181,7 +2274,25 @@ def room_members(thread, *, search="", limit=60, offset=0):
         people = people.filter(
             Q(display_name__icontains=term) | Q(email__icontains=term)
         )
-    people = people.order_by("display_name", "id")
+
+    # ADMINS FIRST — "the details will include members, starting with admin,
+    # name of the group and all, just like WhatsApp."
+    #
+    # Ordered in SQL rather than sorted after the slice, because the slice is
+    # the paging: sorting sixty rows in Python would put the admins at the top
+    # of page one and of page two, and leave an admin on page seventeen exactly
+    # where they were.
+    #
+    # A group room ranks its own admins above the organisation's, because in a
+    # group the person who runs the group is the one you are looking for.
+    ranks = _member_rank_ids(thread)
+    people = people.annotate(
+        _rank=Case(
+            *[When(id__in=ids, then=Value(n)) for n, ids in enumerate(ranks)],
+            default=Value(len(ranks)),
+            output_field=IntegerField(),
+        )
+    ).order_by("_rank", "display_name", "id")
     total = people.count()
     page = list(people[offset:offset + limit])
 
@@ -2214,3 +2325,212 @@ def room_members(thread, *, search="", limit=60, offset=0):
             badges.append("Captain")
         rows.append({"user": person, "badges": badges, "member": member})
     return rows, total, (offset + len(page)) < total
+
+
+def _member_rank_ids(thread) -> list:
+    """The id sets that put a member list in WhatsApp's order, best first.
+
+    Returned as a LIST OF SETS rather than a dict of ranks so the caller can
+    turn it straight into one CASE expression — the position in the list is the
+    rank, and anybody in none of them sorts last.
+
+    An organisation room has one rank that matters: who runs the comp. A group
+    room has two, and the group's own admins come first — in a group, the person
+    you are looking for is the person who runs the group, not the person who
+    runs the league it sits in.
+    """
+    from .models import GroupMember, MessageThread, OrgMember
+
+    org_admins = set(
+        OrgMember.objects.filter(org_id=thread.org_id)
+        .filter(Q(role__in=[OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH])
+                | Q(is_league_owner=True))
+        .values_list("user_id", flat=True)
+    )
+    if thread.kind != MessageThread.KIND_GROUP:
+        return [org_admins]
+    group_admins = set(
+        GroupMember.objects.filter(group_id=thread.group_id, is_admin=True)
+        .values_list("user_id", flat=True)
+    )
+    return [group_admins, org_admins - group_admins]
+
+
+def contacts_for(user, *, search="", limit=40, offset=0):
+    """Everybody this member can start a direct message with, as printable rows.
+
+    ASKED FOR: "same with the people — I click and now a DM for one person is
+    here." The People tab is a directory, not a filter of conversations you have
+    already had: a member who has never messaged anybody has to be able to find
+    somebody to message.
+
+    ONE ROW PER PERSON, NOT PER MEMBERSHIP. Two people who share three
+    organisations are one contact, and the row names the organisation the
+    message would go through — the first one, alphabetically, because a direct
+    message needs exactly one and any of them would do.
+
+    PAGED AND SEARCHED IN THE DATABASE, for the same reason the room's member
+    panel is: an organisation of a thousand people cannot be rendered into a
+    sidebar, and a name typed into the box must not be matched by walking a
+    thousand rows in the browser.
+
+    Returns (rows, total, has_more).
+    """
+    from django.contrib.auth import get_user_model
+
+    from .chatprefs import blocked_user_ids
+    from .models import OrgMember
+
+    User = get_user_model()
+    my_org_ids = list(
+        OrgMember.objects.filter(user=user).values_list("org_id", flat=True)
+    )
+    if not my_org_ids:
+        return [], 0, False
+
+    # Blocked people are not in the directory either. A block that hid the
+    # conversation but left the person one press away from starting a new one
+    # would be a setting, not a block.
+    hidden = blocked_user_ids(user) | {user.id}
+    people = (
+        User.objects.filter(memberships__org_id__in=my_org_ids)
+        .exclude(id__in=hidden)
+        .distinct()
+    )
+    term = (search or "").strip()
+    if term:
+        people = people.filter(
+            Q(display_name__icontains=term) | Q(email__icontains=term)
+        )
+    people = people.order_by("display_name", "id")
+    total = people.count()
+    page = list(people[offset:offset + limit])
+
+    # Which organisation each row's message would go through, and whether they
+    # run it — both in one query for the whole page rather than one per row.
+    memberships = {}
+    for m in (
+        OrgMember.objects
+        .filter(org_id__in=my_org_ids, user_id__in=[p.id for p in page])
+        .select_related("org")
+        .order_by("org__name")
+    ):
+        memberships.setdefault(m.user_id, m)
+
+    rows = []
+    for person in page:
+        member = memberships.get(person.id)
+        if member is None:      # left the organisation between the two queries
+            continue
+        rows.append({
+            "user": person,
+            "org": member.org,
+            "badges": ["Admin"] if member.can_manage else [],
+        })
+    return rows, total, (offset + len(page)) < total
+
+
+def shared_groups(user, other, org=None):
+    """The groups two people are both in — "groups in common", as WhatsApp says.
+
+    Scoped to an organisation when one is given, which is what the details panel
+    for a direct message wants: the conversation belongs to one comp, and a
+    group they share in a different one is not what "in common" means there.
+    """
+    from .models import Group
+
+    qs = Group.objects.filter(
+        approval_status=Group.APPROVAL_APPROVED,
+        memberships__user=user,
+    ).filter(memberships__user=other)
+    if org is not None:
+        qs = qs.filter(org=org)
+    return list(qs.select_related("org").distinct().order_by("name"))
+
+
+def attach_chat_state(user, *, orgs=(), groups=(), contacts=()):
+    """Hang each row's existing conversation, and its menu, on the row itself.
+
+    WHY THE DIRECTORY ROWS NEED THIS. "The right click and holding the
+    organisation, or group, or people — one, someone — what should happen is the
+    same like in WhatsApp: archive chat, mute notification, pin chat ... add to
+    favourite ... delete chat and clear chat."
+
+    The menu is about a CONVERSATION, and the tabs list things. So each row is
+    matched to the thread it would open — if there already is one — and gets the
+    same menu the recent-chats row would have carried, with its labels reading
+    the state it is actually in.
+
+    NOTHING IS CREATED HERE. A row with no conversation yet gets no menu, which
+    is the honest answer: there is nothing to pin, mute, clear or archive until
+    something has been said. Creating a thread per row per page load, so that a
+    menu could be drawn over it, would fill the table with empty rooms nobody
+    opened.
+
+    Sets `.chat` on each organisation and group, and row["chat"] on each contact
+    dict — attached to the object the template already loops rather than handed
+    over as a dict, because Django templates cannot look a dict up by a variable
+    key.
+    """
+    from django.db.models import Q
+
+    from .chatprefs import prefs_by_thread
+    from .models import MessageThread
+
+    orgs, groups, contacts = list(orgs), list(groups), list(contacts)
+    org_ids = [o.id for o in orgs]
+    group_ids = [g.id for g in groups]
+    people_ids = [r["user"].id for r in contacts]
+
+    wanted = Q(pk__in=[])
+    if org_ids:
+        wanted |= Q(kind=MessageThread.KIND_ORG, org_id__in=org_ids)
+    if group_ids:
+        wanted |= Q(kind=MessageThread.KIND_GROUP, group_id__in=group_ids)
+    if people_ids:
+        # Both directions: who started it is an accident of who pressed first.
+        wanted |= Q(
+            Q(kind=MessageThread.KIND_DIRECT),
+            Q(started_by=user, recipients__in=people_ids)
+            | Q(started_by_id__in=people_ids, recipients=user),
+        )
+    threads = list(
+        MessageThread.objects.filter(wanted).distinct()
+        .prefetch_related("recipients")
+    )
+    prefs = prefs_by_thread(user, [t.id for t in threads])
+
+    def state(thread):
+        pref = prefs.get(thread.id)
+        row = {
+            "id": thread.id,
+            "pinned": bool(pref and pref.is_pinned),
+            "favourite": bool(pref and pref.is_favourite),
+            "muted": bool(pref and pref.is_muted),
+            "archived": bool(pref and pref.is_archived),
+            "face": "person" if thread.kind == MessageThread.KIND_DIRECT else thread.kind,
+        }
+        row["menu"] = _chat_menu(row)
+        return row
+
+    by_org, by_group, by_person = {}, {}, {}
+    for thread in threads:
+        if thread.kind == MessageThread.KIND_ORG:
+            by_org[thread.org_id] = state(thread)
+        elif thread.kind == MessageThread.KIND_GROUP:
+            by_group[thread.group_id] = state(thread)
+        else:
+            other = thread.other_party(user)
+            if other is not None:
+                # Two people in three shared comps have three conversations
+                # (see direct_thread). The contact row is one person, so it
+                # carries the first — pressing it opens that organisation's,
+                # which is the one the row already names.
+                by_person.setdefault(other.id, state(thread))
+
+    for o in orgs:
+        o.chat = by_org.get(o.id)
+    for g in groups:
+        g.chat = by_group.get(g.id)
+    for row in contacts:
+        row["chat"] = by_person.get(row["user"].id)

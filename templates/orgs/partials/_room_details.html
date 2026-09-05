@@ -1,0 +1,170 @@
+{% comment %}
+=============================================================================
+THE DETAILS PANEL — what used to be the middle column.
+=============================================================================
+"Make it clickable, even the name of the group; at the end add the three dots
+as well, all for the details. The details will include members, starting with
+admin, name of the group and all, just like WhatsApp. Group the same. ... and
+when I click on it, and it's three dots at the top — that is in the 2/3 where
+we have the chats — I get that person's details, like groups in common and name
+and a profile pic, the way we have in WhatsApp."
+
+So it is the same panel for all four kinds of conversation, and what it holds
+is the thing you would have gone looking for:
+
+  an organisation room   →  its name, and everybody in it, admins first
+  a group room           →  its name, its organisation, its members
+  a direct message       →  their face, their name, groups in common
+  a support thread       →  who it is with, and what state it is in
+
+IT SLIDES OVER THE CONVERSATION rather than pushing it aside. A panel that
+narrows the chat re-wraps every bubble in it, so opening the members list
+reflows the conversation you were reading; over the top, nothing moves and
+closing it puts you back exactly where you were.
+
+Included from _room_chat.html so it is swapped with the conversation — a panel
+left behind from the previous room would be describing the wrong one.
+=============================================================================
+{% endcomment %}
+<aside class="gtm-details" data-gtm-details-panel hidden aria-label="Details">
+  <header class="gtm-details-head">
+    <h2>{% if other %}Contact info{% elif thread.kind == 'group' %}Group info{% elif thread.kind == 'org' %}Organisation info{% else %}About this conversation{% endif %}</h2>
+    <button type="button" class="gtm-icbtn" data-gtm-details-close aria-label="Close details">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </header>
+
+  <div class="gtm-details-body gt-scroll">
+    {# ---- the card at the top: face, name, and what this is ---- #}
+    <div class="gtm-card">
+      <span class="gtm-av xl {% if other %}person{% elif thread.kind == 'group' %}group{% elif thread.kind == 'org' %}org{% else %}admins{% endif %}" aria-hidden="true">
+        {% if other and other.avatar %}<img src="{{ other.avatar.url }}" alt="">
+        {% elif other %}{{ other.display_name|slice:":1"|upper }}
+        {% elif thread.kind == 'group' %}{{ thread.group.name|slice:":1"|upper }}
+        {% elif thread.kind == 'org' %}<svg><use href="#ic-f-org"/></svg>
+        {% else %}<svg><use href="#ic-shield-check"/></svg>{% endif %}
+      </span>
+      <b class="gtm-card-name">{% if other %}{{ other.display_name }}{% elif thread.kind == 'group' %}{{ thread.group.name }}{% elif thread.kind == 'org' %}{{ thread_org.name }}{% else %}{{ thread.subject }}{% endif %}</b>
+      <span class="gtm-card-sub">
+        {% if other %}Direct message &middot; {{ thread_org.name }}
+        {% elif thread.kind == 'group' %}Group in {{ thread_org.name }}
+        {% elif thread.kind == 'org' %}Everyone in {{ thread_org.name }}
+        {% else %}With the admins of {{ thread_org.name }}{% endif %}
+      </span>
+    </div>
+
+    {% if thread.pinned_message %}
+    {% comment %}
+    THE PINNED MESSAGE lives here and not over the conversation. A banner
+    pinned above a scrolling chat costs the same twenty vertical pixels on
+    every message you read for the rest of the session; in the details panel it
+    is one press away and permanently out of the way.
+    {% endcomment %}
+    <div class="gtm-pin">
+      <span class="gtm-pin-lab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/></svg> Pinned</span>
+      <a class="gtm-pin-body" href="#msg-{{ thread.pinned_message.id }}" data-jump="{{ thread.pinned_message.id }}">
+        <b>{{ thread.pinned_message.author.display_name }}</b>
+        <span>{{ thread.pinned_message.quote }}</span>
+      </a>
+      {% if can_pin %}
+      <form method="post" action="{% url 'orgs:message_pin' thread_org.id thread.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="message" value="{{ thread.pinned_message.id }}">
+        <button type="submit" class="gtm-pin-x" aria-label="Unpin this message">&times;</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if other %}
+    {% comment %}
+    A DIRECT MESSAGE'S DETAILS. No member list — there are two of you and you
+    both know who — so what the panel is for here is the thing WhatsApp puts in
+    the same place: who this person is, and where else you run into them.
+    {% endcomment %}
+    <section class="gtm-details-sec">
+      <h3>Groups in common</h3>
+      {% if common_groups %}
+      <ul class="gtm-chips">
+        {% for g in common_groups %}
+        <li><a class="gtm-chip" href="{% url 'orgs:message_group_room' g.org.id g.id %}">{{ g.name }}</a></li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="gtm-quiet">None &mdash; you share {{ thread_org.name }} itself.</p>
+      {% endif %}
+    </section>
+
+    <section class="gtm-details-sec">
+      <h3>Privacy</h3>
+      <p class="gtm-quiet">
+        This conversation is between the two of you. Nobody else in
+        {{ thread_org.name }} can read it &mdash; not even the admins.
+      </p>
+    </section>
+
+    {% elif not thread.is_room %}
+    {% comment %}
+    A SUPPORT THREAD IS NOT A ROOM, so it does not get a member list. It is
+    between one member and whoever runs the comp, and the member panel it
+    inherited from the middle column answered the question with every member of
+    the organisation — a count of forty on a conversation two people can read.
+    {% endcomment %}
+    <section class="gtm-details-sec">
+      <h3>Who can read this</h3>
+      <p class="gtm-quiet">
+        You and the admins of {{ thread_org.name }}. Nobody else in the
+        organisation can see what you raise here.
+      </p>
+    </section>
+
+    {% else %}
+    {% comment %}
+    A ROOM'S DETAILS: everybody in it, admins first (services.room_members
+    orders them that way in SQL, so an admin on page seventeen is still at the
+    top). Searched on the server and paged sixty at a time, because the client's
+    own worst case is "an organisation that has about 1000 people".
+    {% endcomment %}
+    <section class="gtm-details-sec is-people">
+      <div class="gtm-people-head">
+        <h3>Members <span>{{ people_total }}</span></h3>
+        {% comment %}
+        Adding people is done where people are already managed — the members
+        screen for an organisation, the groups screen for a group. This is a
+        link to those, not a second way of doing it: two places that add a
+        member is two sets of rules to keep in step.
+        {% endcomment %}
+        {% if thread.kind == 'group' and can_pin %}
+        <a class="gtm-addbtn" href="{% url 'orgs:groups' thread_org.id %}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Add
+        </a>
+        {% elif can_manage %}
+        <a class="gtm-addbtn" href="{% url 'orgs:members' thread_org.id %}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Add
+        </a>
+        {% endif %}
+      </div>
+      {% comment %}
+      A real GET form with htmx over the top, so it degrades to an ordinary
+      search that reloads the page. The htmx attributes are on the INPUT, not on
+      the form: an input that carries its own hx-get sends its own name and
+      value, which is exactly the one parameter this needs.
+
+      `delay:280ms` debounces — without it a name typed at speed fires eight
+      searches whose answers can arrive in any order.
+      {% endcomment %}
+      <form class="gtm-people-search" method="get"
+            action="{% url 'orgs:message_people' thread_org.id thread.id %}">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" name="q" placeholder="Search members&hellip;" aria-label="Search members"
+               hx-get="{% url 'orgs:message_people' thread_org.id thread.id %}"
+               hx-trigger="input changed delay:280ms, search"
+               hx-target="#gtmPeople" hx-swap="innerHTML">
+      </form>
+      <div id="gtmPeople" class="gtm-people">
+        {% include "orgs/partials/_room_people.html" %}
+      </div>
+    </section>
+    {% endif %}
+  </div>
+</aside>

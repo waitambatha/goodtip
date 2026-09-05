@@ -324,6 +324,24 @@ def send_news_published(post, recipients) -> int:
     return send_bulk(messages)
 
 
+def _muted_by(thread) -> set:
+    """Who has asked this conversation not to interrupt them.
+
+    MUTE IS ABOUT THE BELL, NOT ABOUT THE MESSAGE. A muted room still collects
+    its unread count and still moves up the list when somebody writes in it —
+    what stops is the notification. Dropping the count as well would make mute
+    mean "ignore", which is a different thing, and the person who wanted that
+    reached for archive.
+    """
+    from .models import ThreadPreference
+
+    return set(
+        ThreadPreference.objects
+        .filter(thread=thread, muted_at__isnull=False)
+        .values_list("user_id", flat=True)
+    )
+
+
 def notify_new_message(entry) -> int:
     """Tell whoever is in this conversation that it just moved.
 
@@ -371,6 +389,7 @@ def notify_new_message(entry) -> int:
         from .services import room_audience_ids
 
         targets = set(room_audience_ids(thread)) - {entry.author_id}
+        targets -= _muted_by(thread)
         if not targets:
             return 0
         who = getattr(entry.author, "display_name", None) or "Someone"
@@ -392,6 +411,7 @@ def notify_new_message(entry) -> int:
         .filter(org_id=thread.org_id, role__in=(OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH))
         .values_list("user_id", flat=True)
     )
+    audience -= _muted_by(thread)
     if thread.started_by_id:
         audience.add(thread.started_by_id)
     audience.discard(entry.author_id)

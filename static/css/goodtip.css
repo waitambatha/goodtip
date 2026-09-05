@@ -15882,6 +15882,65 @@ html[data-theme="light"] .gt-app .bb-arrow { background: rgba(15,46,34,.06); bor
 .gt-head.is-centred { justify-content: center; text-align: center; }
 .gt-head.is-centred > div { max-width: 62ch; }
 .gt-head.is-centred .gh-lead, .gt-head.is-centred .gh-sub { margin-left: auto; margin-right: auto; }
+/* ---- THE ORGANISATION OUTRANKS THE WORD ---------------------------------
+   "This AquaFlow Water Co · AFL + NRL 2026 should be bigger than the bottom
+   text, that is Leaderboard."
+
+   The two lines swap jobs, not places. The organisation and its codes are what
+   the member came to look at and the only line that differs between one comp
+   and the next; "Leaderboard" labels the screen, which the nav has already
+   said. So the organisation takes the display face at title size and the word
+   takes the small lime capitals the organisation used to wear — the same two
+   colours and the same order, with the emphasis reversed.
+
+   Scoped to .is-orgfirst rather than changed on .gt-head, because the Wall, the
+   Ladder and My Tips all use this header and the word IS the subject on those.
+
+   `.sheet-page .gt-head .gh-eyebrow` paints the eyebrow lime at 14px and sits
+   later in this file than the base rules, so these carry .sheet-page too — a
+   three-class selector would lose to it however far down it were written. */
+.sheet-page .gt-head.is-orgfirst .gh-eyebrow,
+.gt-head.is-orgfirst .gh-eyebrow {
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(28px, 4.2vw, 44px);
+  letter-spacing: -.02em; text-transform: none; line-height: 1.05;
+  color: #fff; opacity: 1;
+}
+.sheet-page .gt-head.is-orgfirst h1,
+.gt-head.is-orgfirst h1 {
+  font-family: var(--mark); font-weight: 700;
+  font-size: clamp(14px, 1.7vw, 18px);
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--lime); margin-top: 12px;
+}
+.gt-head.is-orgfirst .gh-lead { margin-top: 8px; }
+/* No green is left under these in the light theme. */
+html[data-theme="light"] .gt-app.sheet-page .gt-head.is-orgfirst .gh-eyebrow { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app.sheet-page .gt-head.is-orgfirst h1 { color: var(--lt-accent-ink); }
+
+/* ---- THE SENTENCE THAT SAYS WHOSE BOARD THIS IS, CENTRED -----------------
+   Only the line. The segmented control below it scrolls sideways when an
+   organisation has a dozen groups, and centring a scrolling track leaves its
+   first option off the left edge with nothing to scroll back with. */
+.room-switch.is-centred .rw-top {
+  justify-content: center; text-align: center;
+}
+
+/* ---- AN ACTION AFTER THE ROOM, NOT INSIDE THE HEADER ---------------------
+   "That button should come after that line that I have said — have it centred."
+
+   Outside .gt-head, so it needs its own row: the room switcher now stands
+   between the header and this, and a child of the header cannot be drawn below
+   something that is not in it. */
+.gh-actions.gh-after-room {
+  display: flex; justify-content: center; align-items: center; gap: 12px;
+  margin: 0 0 24px;
+}
+/* On a phone a button that is 40% of the width with empty space either side of
+   it reads as something that failed to load. */
+@media (max-width: 620px) {
+  .gh-actions.gh-after-room > .abtn { flex: 1; justify-content: center; }
+}
 /* "Waita Realty Group · 2026" in 12.5px capitals over a 40px title made the
    league look like a footnote to the word Ladder, when the league is the whole
    point of the page. Set at the title's own scale, one step down. */
