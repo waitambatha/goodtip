@@ -1022,3 +1022,120 @@ class OrganisationIsLeftZeroTests(TestCase):
         self.assertIn('<span class="sr-only">Admin</span>', chip)
         visible = re.sub(r'<span class="sr-only">.*?</span>', "", chip, flags=re.S)
         self.assertNotIn("Admin", visible)
+
+
+class ConfirmOnlyWhenSomethingIsUnsavedTests(TestCase):
+    """A confirmed round must not go on asking to be confirmed.
+
+    ASKED BY THE CLIENT: "if I have already confirmed my picks and we are into
+    the weekend of games, do I need Confirm my picks still sitting there?"
+
+    The button counted PICKS, and a pick rendered from the database is a pick —
+    so a round finished on Tuesday opened on Saturday with "22 of 22 picked"
+    over a button asking to confirm them all again, which would have done
+    nothing. A call to action that cannot be acted on teaches people to ignore
+    the one that can.
+
+    The comparison itself is in the browser: the server's rendering against
+    what is on screen. What is testable here is that the page ships both
+    states, that they are driven by one comparison, and that the server's own
+    idea of "already saved" is what seeds it.
+    """
+
+    def setUp(self):
+        from catalog.models import Competition, Season, Series, Sport
+        from orgs.models import OrgMember, Organisation
+        from tipping.models import Match, Round, Team, Tip
+
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            email="allin@example.com", password="x", display_name="All In",
+        )
+        series = Series.objects.get(slug="afl")
+        sport = series.sport
+        season = Season.objects.create(year=2099, label="2099")
+        comp = Competition.objects.create(
+            sport=sport, season=season, name="All In Comp", slug="allin-comp",
+        )
+        comp.series.add(series)
+        self.org = Organisation.objects.create(name="All In League", season=season)
+        self.org.competitions.add(comp)
+        OrgMember.objects.create(user=self.user, org=self.org)
+
+        now = timezone.now()
+        rnd = Round.objects.create(
+            org=self.org, round_number=1, series=series, competition=comp,
+            lockout_at=now + timedelta(days=3),
+        )
+        self.matches = [
+            Match.objects.create(
+                round=rnd,
+                home_team=Team.objects.create(name=f"AH{i}", slug=f"allin-h{i}", series=series),
+                away_team=Team.objects.create(name=f"AA{i}", slug=f"allin-a{i}", series=series),
+                kickoff_at=now + timedelta(days=3),
+            )
+            for i in range(3)
+        ]
+        self.Tip = Tip
+        self.client.force_login(self.user)
+
+    def _confirm_everything(self):
+        for m in self.matches:
+            self.Tip.objects.create(
+                user=self.user, match=m, org=self.org, selection="home",
+            )
+
+    def _body(self):
+        return self.client.get(f"/dashboard/?org={self.org.id}").content.decode()
+
+    def test_the_page_carries_a_confirmed_state_as_well_as_a_confirm(self):
+        self._confirm_everything()
+        body = self._body()
+        self.assertIn('id="slipAllIn"', body)
+        self.assertIn("All your tips are in", body)
+
+    def test_a_part_finished_slate_does_not_claim_to_be_finished(self):
+        """Three saved out of twenty-two is a saved slate, not a finished one.
+        A receipt reading "all your tips are in" over nineteen untouched
+        fixtures would be worse than the button it replaced — that one was
+        merely useless."""
+        body = self._body()
+        script = body[body.index("function slipRefresh"):body.index("var dockPicked")]
+        self.assertIn("'All your tips are in' : 'Your picks are saved'", script)
+        self.assertIn("still to tip in this round.", script)
+
+    def test_the_server_renders_the_saved_picks_as_checked(self):
+        """The baseline the comparison starts from. If the server stopped
+        marking saved tips checked, everything would look unsaved and the
+        confirm would be back on a finished round — the original bug, from the
+        other end."""
+        self._confirm_everything()
+        body = self._body()
+        checked = re.findall(
+            r'<input type="radio" name="match_\d+" value="home" hidden\s*checked',
+            body,
+        )
+        self.assertEqual(len(checked), 3)
+
+    def test_the_confirm_is_about_unsaved_changes_not_about_picks(self):
+        """One comparison drives both, so they cannot both be on screen and
+        cannot both be missing."""
+        body = self._body()
+        script = body[body.index("function slipRefresh"):body.index("var dockPicked")]
+        self.assertIn("signature() !== baseline", script)
+        self.assertIn("review.hidden = (n === 0 || !dirty)", script)
+        self.assertIn("allIn.hidden = !(n > 0 && !dirty)", script)
+
+    def test_the_baseline_is_only_retaken_when_the_panel_is_replaced(self):
+        """The match-state poller swaps a block inside every live card every
+        thirty seconds. Re-baselining on each htmx settle would quietly adopt
+        an unsaved change as saved and take the confirm away with it."""
+        body = self._body()
+        self.assertIn("if (panel === panelSeen) return;", body)
+
+    def test_the_dock_goes_with_it(self):
+        """The floating confirm is the same offer in a different place; it must
+        not outlive the button it presses."""
+        body = self._body()
+        script = body[body.index("function dockRefresh"):body.index("One path to the sheet")]
+        self.assertIn("real && !real.hidden", script)

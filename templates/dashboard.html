@@ -750,9 +750,70 @@ any one card.
            if every pick is taken back. Re-read each time rather than held: the
            bar lives inside #slipPanel, which htmx replaces whole. */
         var review = document.getElementById('slipReview');
-        if (review) review.hidden = n === 0;
+        var allIn = document.getElementById('slipAllIn');
+        var dirty = signature() !== baseline;
+        if (review) review.hidden = (n === 0 || !dirty);
+        /* One or the other, never both and never neither-when-there-is-news. */
+        if (allIn) {
+          allIn.hidden = !(n > 0 && !dirty);
+          /* AND IT MUST NOT OVERCLAIM. Three tips saved out of twenty-two is a
+             saved slate, not a finished one, and a receipt reading "all your
+             tips are in" over nineteen untouched fixtures would be worse than
+             the button it replaced — that one was merely useless. Tippable
+             rows, not all rows: a round part-way through its weekend has
+             fixtures that are already locked, and they are not outstanding. */
+          var open = 0;
+          r.forEach(function(row){ if (row.querySelector('input[type="radio"]:not([data-no-tip])')) open++; });
+          var done = n >= open;
+          allIn.querySelector('b').textContent =
+            done ? 'All your tips are in' : 'Your picks are saved';
+          allIn.querySelector('i').textContent =
+            done ? 'Change any pick until the round locks.'
+                 : (open - n) + ' still to tip in this round.';
+        }
         dockRefresh(n);
       }
+
+      /* ---- what is actually unsaved ------------------------------------
+         "If I have already confirmed my picks and we are into the weekend of
+         games, do I need Confirm my picks still sitting there?" — the client,
+         and no, they do not.
+
+         The button counted PICKS, and a pick rendered from the database is a
+         pick, so a round finished on Tuesday opened on Saturday with "22 of 22
+         picked" over a button asking to confirm them all over again. Nothing
+         would have happened if they had. A call to action that cannot be acted
+         on teaches people to ignore the one that can, which on this screen is
+         the one that decides whether a tip counts.
+
+         So the question the button answers is now "is anything here unsaved",
+         and the answer is this comparison: the selection as the SERVER drew it,
+         against the selection as it stands. The server's version is the
+         baseline because the dashboard's slate is a form — a rendered-checked
+         radio is a tip already stored, and until something is clicked the two
+         are identical by construction.
+
+         Re-baselined when the panel is REPLACED, not on every htmx settle: the
+         match-state poller swaps a block inside each card every thirty seconds
+         and would otherwise quietly adopt any unsaved change as saved, taking
+         the confirm away with it. Element identity is the test — hx-swap is
+         outerHTML, so a swapped panel is a different node. */
+      var panelSeen = null, baseline = '';
+      function signature(){
+        var parts = [];
+        rows().forEach(function(row){
+          var on = row.querySelector('input[type="radio"]:checked:not([data-no-tip])');
+          parts.push(row.id + '=' + (on ? on.value : ''));
+        });
+        return parts.join('|');
+      }
+      function rebaseIfPanelReplaced(){
+        var panel = document.getElementById('slipPanel');
+        if (panel === panelSeen) return;
+        panelSeen = panel;
+        baseline = signature();
+      }
+      rebaseIfPanelReplaced();
 
       /* The docked confirm. ONE condition: you have picked something.
    
@@ -798,7 +859,10 @@ any one card.
       slipRefresh();
       /* Recount after a swap: the new round arrives with its own saved picks,
          and the bar would otherwise still be showing the previous round's. */
-      document.body.addEventListener('htmx:afterSettle', slipRefresh);
+      document.body.addEventListener('htmx:afterSettle', function(){
+        rebaseIfPanelReplaced();
+        slipRefresh();
+      });
 
       /* ---- review sheet ----
          Built from the form's own radios each time it opens, so the list shown

@@ -58,6 +58,31 @@ Expects: c (the selected org card), games, open_games, org_series,
         {% endcomment %}
         <button type="button" class="abtn abtn-primary abtn-lg" id="slipReview"
                 {% if not slate_done %}hidden{% endif %}>Confirm my tips</button>
+        {% comment %}
+        ALREADY CONFIRMED, AND NOTHING CHANGED SINCE.
+
+        ASKED BY THE CLIENT: "if I have already confirmed my picks and we are
+        into the weekend of games, do I need Confirm my picks still sitting
+        there?" No. The button counted PICKS, and a pick rendered from the
+        database is a pick — so a round you finished last Tuesday greeted you
+        with "22 of 22 picked" over a button demanding you confirm them again.
+        A call to action that cannot be acted on teaches people to ignore the
+        one that can.
+
+        So the button is about UNSAVED CHANGES now, and this is what stands in
+        its place when there are none. It is not a third state to keep in step:
+        both are driven by the same comparison in dashboard.html, and exactly
+        one of them is ever on screen.
+
+        Rendered hidden and revealed by script, the same way round: with no
+        JavaScript the confirm button is the honest control, because without it
+        nothing can tell whether anything has been touched.
+        {% endcomment %}
+        <span class="slip-allin" id="slipAllIn" hidden>
+          <svg aria-hidden="true"><use href="#ic-check"/></svg>
+          <b>All your tips are in</b>
+          <i>Change any pick until the round locks.</i>
+        </span>
       </div>
       <div class="pbar slim" style="margin-bottom:14px;"><i id="slipBar" style="width:{% widthratio slate_done slate_total|default:1 100 %}%"></i></div>
       {% endif %}

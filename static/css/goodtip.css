@@ -15599,3 +15599,45 @@ html[data-theme="light"] .gt-app .an-ctx-org { color: #46554B; opacity: 1; }
   .fxc-code { order: 1; }
   .fxc-state { order: 2; }
 }
+
+/* ============================================================================
+   ALREADY CONFIRMED — the slip bar with nothing to do
+   ----------------------------------------------------------------------------
+   "If I have already confirmed my picks and we are into the weekend of games,
+   do I need Confirm my picks still sitting there?"
+
+   This stands where the button stood, so the bar keeps its shape and does not
+   jump when a pick is changed and the button comes back. Quiet on purpose: it
+   is a receipt, not a call to action, and the only loud thing in this bar
+   should be a thing worth pressing.
+   ========================================================================= */
+.slip-allin {
+  display: inline-flex; align-items: center; gap: 10px; flex: none;
+  padding: 10px 16px; border-radius: 100px;
+  background: rgba(31,107,40,.10); border: 1px solid rgba(31,107,40,.24);
+}
+.slip-allin svg {
+  width: 17px; height: 17px; flex: none; fill: none; stroke: #1f6b28;
+  stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round;
+}
+.slip-allin b {
+  font-family: var(--mark); font-weight: 800; font-size: 13.5px;
+  letter-spacing: .01em; color: #1f6b28; line-height: 1.2;
+}
+.slip-allin i {
+  font-style: normal; font-size: 12px; color: var(--muted); line-height: 1.2;
+}
+@media (max-width: 700px) {
+  /* The second line is the part that can go: "all your tips are in" is the
+     message, "change any pick until the round locks" is the reassurance, and
+     the bar above it already says so. */
+  .slip-allin i { display: none; }
+}
+/* On the deep sheet the forest green disappears into the background, so the
+   receipt takes the lime the rest of that surface uses for "done". */
+.page-deep .slip-allin, html[data-theme="dark"] .gt-app .slip-allin {
+  background: rgba(200,241,53,.12); border-color: rgba(200,241,53,.3);
+}
+.page-deep .slip-allin b, html[data-theme="dark"] .gt-app .slip-allin b { color: var(--lime); }
+.page-deep .slip-allin svg, html[data-theme="dark"] .gt-app .slip-allin svg { stroke: var(--lime); }
+.page-deep .slip-allin i, html[data-theme="dark"] .gt-app .slip-allin i { color: rgba(232,228,213,.66); }
