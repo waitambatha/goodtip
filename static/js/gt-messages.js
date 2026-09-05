@@ -299,3 +299,214 @@
   initComposers();
   document.body.addEventListener('htmx:afterSettle', initComposers);
 })();
+
+/* ---------------------------------------------------------------------------
+ * OPENING A ROOM WITHOUT RELOADING THE SCREEN AROUND IT
+ *
+ * ASKED FOR: "if I pick a group or an organisation the whole page should not be
+ * loading — it should only load on that centre part where we have the data."
+ *
+ * The links carry the htmx attributes; this is the part htmx cannot know about:
+ * which row should look selected, which pane a phone should be showing, and the
+ * fact that the middle is the only thing that may show a spinner.
+ * ------------------------------------------------------------------------- */
+(function () {
+  'use strict';
+
+  var shell = document.querySelector('[data-gtm]');
+  if (!shell) return;
+  var chat = document.querySelector('.gtm-chat');
+
+  function markSelected(link) {
+    /* The row you pressed, and only that one. Read off the anchor rather than
+       from the response, because the response is the conversation and does not
+       know which list row pointed at it. */
+    document.querySelectorAll('.gtm-conv.on').forEach(function (el) {
+      el.classList.remove('on');
+    });
+    var row = link.closest('.gtm-conv');
+    if (row) row.classList.add('on');
+    document.querySelectorAll('.gtm-kid.on').forEach(function (el) {
+      el.classList.remove('on');
+    });
+    if (link.classList.contains('gtm-kid')) link.classList.add('on');
+  }
+
+  document.addEventListener('click', function (e) {
+    var link = e.target.closest('[data-gtm-open]');
+    if (!link) return;
+    markSelected(link);
+    /* On a phone the three panels are three screens; opening a conversation is
+       a move to the third. Set before the request so the transition starts with
+       the press rather than when the bytes land. */
+    shell.setAttribute('data-view', 'chat');
+  });
+
+  /* The spinner belongs to the panel being replaced. htmx puts .htmx-request on
+     the element that made the request — a list row — so without this the list
+     would flicker and the pane it is fetching would sit still. */
+  document.body.addEventListener('htmx:beforeRequest', function (e) {
+    if (!chat) return;
+    var t = e.detail && e.detail.elt;
+    if (t && t.closest && t.closest('[data-gtm-open]')) chat.classList.add('is-loading');
+  });
+  document.body.addEventListener('htmx:afterSwap', function () {
+    if (chat) chat.classList.remove('is-loading');
+  });
+  document.body.addEventListener('htmx:responseError', function () {
+    if (chat) chat.classList.remove('is-loading');
+  });
+})();
+
+/* ---------------------------------------------------------------------------
+ * A SECOND PRESS ON AN ORGANISATION OPENS ITS ROOM
+ *
+ * ASKED FOR: "when I click AquaFlow Water Co a dropdown comes; now when I double
+ * tab it should now open the chats under that organisation."
+ *
+ * The first press expands the tree — that is what <summary> does and it should
+ * keep doing it, because seeing the groups is most of why anybody opens an
+ * organisation. The second press, while it is already open, means "and take me
+ * in". Anything faster than a real double-click is left alone: <details> is a
+ * keyboard control too, and a space bar should not navigate.
+ * ------------------------------------------------------------------------- */
+(function () {
+  'use strict';
+
+  document.addEventListener('dblclick', function (e) {
+    var row = e.target.closest('.gtm-org-row');
+    if (!row) return;
+    var details = row.closest('.gtm-org');
+    if (!details) return;
+    /* The organisation's own room is always the first child link — see the
+       tree in messages.html, where "Everyone in ..." leads the list for
+       exactly this reason. */
+    var room = details.querySelector('.gtm-org-kids .gtm-kid');
+    if (!room) return;
+    e.preventDefault();
+    /* Keep it open: a double click on a <summary> toggles twice and lands back
+       where it started, which would collapse the tree under the room that just
+       opened. */
+    details.open = true;
+    room.click();
+  });
+})();
+
+/* ---------------------------------------------------------------------------
+ * SENDING: CLEAR THE COMPOSER, AND SHOW THE UPLOAD WHERE THE UPLOAD IS
+ *
+ * "When you type and hit send we should not have a loader. The audio and image
+ * maybe — but in the image and audio itself, the way you see it on WhatsApp:
+ * you upload the image and you see the circle like a status bar, then it goes
+ * round and completes when full and ready. This should be at the bottom, not
+ * where I am seeing it."
+ *
+ * So: text sends with nothing at all. A send carrying a file gets a ring in the
+ * composer — at the bottom, beside the send button, where the file was chosen —
+ * and it reports real bytes rather than animating a guess.
+ * ------------------------------------------------------------------------- */
+(function () {
+  'use strict';
+
+  var RING = 2 * Math.PI * 13;   /* r=13 in the SVG below */
+
+  function ringFor(form) {
+    var ring = form.querySelector('[data-cc-progress]');
+    if (ring) return ring;
+    ring = document.createElement('span');
+    ring.className = 'cc-progress';
+    ring.setAttribute('data-cc-progress', '');
+    ring.hidden = true;
+    ring.innerHTML =
+      '<svg viewBox="0 0 32 32" aria-hidden="true">' +
+      '<circle class="ccp-track" cx="16" cy="16" r="13"></circle>' +
+      '<circle class="ccp-fill" cx="16" cy="16" r="13"' +
+      ' stroke-dasharray="' + RING + '" stroke-dashoffset="' + RING + '"></circle>' +
+      '</svg><b data-cc-pct>0%</b>';
+    /* Beside the send button, which is the bottom-right of the composer — the
+       place the file was attached from and the place the eye already is. */
+    var row = form.querySelector('.cc-row') || form;
+    row.appendChild(ring);
+    return ring;
+  }
+
+  function hasFiles(form) {
+    return Array.prototype.some.call(
+      form.querySelectorAll('input[type="file"]'),
+      function (i) { return i.files && i.files.length; }
+    );
+  }
+
+  document.body.addEventListener('htmx:xhr:progress', function (e) {
+    var form = e.detail && e.detail.elt;
+    if (!form || !form.matches || !form.matches('[data-gtm-composer]')) return;
+    if (!e.detail.lengthComputable || !hasFiles(form)) return;
+    var ring = ringFor(form);
+    ring.hidden = false;
+    var pct = Math.min(100, Math.round(e.detail.loaded / e.detail.total * 100));
+    var fill = ring.querySelector('.ccp-fill');
+    if (fill) fill.setAttribute('stroke-dashoffset', String(RING * (1 - pct / 100)));
+    var label = ring.querySelector('[data-cc-pct]');
+    if (label) label.textContent = pct + '%';
+  });
+
+  document.body.addEventListener('htmx:afterRequest', function (e) {
+    var form = e.detail && e.detail.elt;
+    if (!form || !form.matches || !form.matches('[data-gtm-composer]')) return;
+    var ring = form.querySelector('[data-cc-progress]');
+    if (ring) ring.hidden = true;
+    if (!e.detail.successful) return;
+
+    /* Clear what was sent, and only that. reset() would also clear the reply
+       banner's hidden field while leaving the banner drawn, so the next message
+       would quietly quote something the composer no longer shows. */
+    var box = form.querySelector('textarea');
+    if (box) { box.value = ''; box.style.height = ''; }
+    form.querySelectorAll('input[type="file"]').forEach(function (i) { i.value = ''; });
+    var tray = form.querySelector('[data-file-tray]');
+    if (tray) { tray.innerHTML = ''; tray.hidden = true; }
+    var banner = form.querySelector('[data-reply-banner]');
+    if (banner) banner.hidden = true;
+    var replyId = form.querySelector('[data-reply-id]');
+    if (replyId) replyId.value = '';
+    var ready = form.querySelector('[data-rec-ready]');
+    if (ready) ready.hidden = true;
+  });
+})();
+
+/* ---------------------------------------------------------------------------
+ * FOLDING THE CONVERSATION LIST
+ *
+ * "This column can be made closable and openable."
+ *
+ * Remembered per browser, because whether you want the list beside you is a
+ * working preference and not a per-page decision — re-opening it on every
+ * conversation would be its own annoyance.
+ * ------------------------------------------------------------------------- */
+(function () {
+  'use strict';
+
+  var shell = document.querySelector('[data-gtm]');
+  var btn = document.querySelector('[data-gtm-fold]');
+  if (!shell || !btn) return;
+  var KEY = 'gt-messages-folded';
+
+  function apply(folded) {
+    shell.classList.toggle('is-folded', folded);
+    btn.setAttribute('aria-expanded', folded ? 'false' : 'true');
+    btn.setAttribute('aria-label', folded ? 'Show the conversation list' : 'Hide the conversation list');
+  }
+
+  /* Wrapped: a browser with site data blocked throws on read, and a chat client
+     that will not open because it could not remember a panel width is a poor
+     trade. */
+  var saved = false;
+  try { saved = localStorage.getItem(KEY) === '1'; } catch (e) { saved = false; }
+  apply(saved);
+
+  btn.addEventListener('click', function () {
+    var folded = !shell.classList.contains('is-folded');
+    apply(folded);
+    try { localStorage.setItem(KEY, folded ? '1' : '0'); } catch (e) { /* not fatal */ }
+  });
+})();

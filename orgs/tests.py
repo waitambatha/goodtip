@@ -6166,3 +6166,155 @@ class ARoleInTheOrgIsWhatMakesYouItsAdminTests(TestCase):
         self.client.force_login(self.manager)
         body = self.client.get(reverse("dashboard")).content.decode()
         self.assertNotIn(reverse("billing:plans", args=[self.org.id]), body)
+
+
+class OpeningARoomDoesNotReloadTheScreenTests(TestCase):
+    """"If I pick a group or an organisation the whole page should not be
+    loading — it should only load on that centre part where we have the data."
+
+    Every room in the left-hand tree was a plain link, so choosing one threw
+    away the list, the search box, the tabs and the scroll position, re-fetched
+    all of it, and played the splash on the way — to change one panel that was
+    already on screen.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(
+            name="Room Co", season=self.season, groups_enabled=True,
+        )
+        self.me = User.objects.create_user(
+            email="room-me@example.com", password="x", display_name="Room Me",
+        )
+        self.mate = User.objects.create_user(
+            email="room-mate@example.com", password="x", display_name="Room Mate",
+        )
+        OrgMember.objects.create(user=self.me, org=self.org)
+        OrgMember.objects.create(user=self.mate, org=self.org)
+        self.group = Group.objects.create(
+            org=self.org, name="Ops", approval_status=Group.APPROVAL_APPROVED,
+        )
+        GroupMember.objects.create(group=self.group, user=self.me)
+        self.client.force_login(self.me)
+
+    def test_the_org_room_comes_back_as_a_panel_not_a_page(self):
+        r = self.client.get(
+            reverse("orgs:message_room", args=[self.org.id]) + "?pane=room",
+        )
+        body = r.content.decode()
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("<!DOCTYPE", body)
+        self.assertNotIn("gtm-nav", body)
+        self.assertIn("gtm-chat-in", body)
+
+    def test_a_group_room_does_the_same(self):
+        r = self.client.get(
+            reverse("orgs:message_group_room", args=[self.org.id, self.group.id])
+            + "?pane=room",
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("gtm-chat-in", r.content.decode())
+
+    def test_the_room_openers_do_not_redirect_the_fragment_away(self):
+        """A redirect drops the query string, so ?pane=room would arrive at the
+        thread view as an ordinary request and come back as an entire page —
+        and the swap would put a whole document inside one div."""
+        r = self.client.get(
+            reverse("orgs:message_room", args=[self.org.id]) + "?pane=room",
+        )
+        self.assertEqual(r.status_code, 200, "it redirected instead of rendering")
+
+    def test_the_same_url_without_the_flag_is_still_a_whole_page(self):
+        """The links carry hx-push-url, so these get copied, bookmarked and
+        opened cold."""
+        r = self.client.get(
+            reverse("orgs:message_room", args=[self.org.id]), follow=True,
+        )
+        self.assertIn("<!DOCTYPE", r.content.decode())
+
+    def test_a_direct_message_opens_as_a_panel_too(self):
+        r = self.client.get(
+            reverse("orgs:message_direct", args=[self.org.id, self.mate.id])
+            + "?pane=room",
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("gtm-chat-in", r.content.decode())
+
+    def test_the_links_in_the_tree_ask_for_the_panel(self):
+        body = self.client.get(
+            reverse("orgs:member_messages", args=[self.org.id])
+        ).content.decode()
+        self.assertIn("pane=room", body)
+        self.assertIn('hx-target=".gtm-chat"', body)
+
+    def test_reading_a_room_this_way_still_moves_you_into_it(self):
+        """_follow_context runs on the fragment path as well, or the sidebar
+        and the nav chip would describe a different organisation from the
+        conversation on screen."""
+        from .context import ORG_KEY
+
+        other = Organisation.objects.create(name="Elsewhere", season=self.season)
+        OrgMember.objects.create(user=self.me, org=other)
+        self.client.post(reverse("orgs:switch_org", args=[other.id]))
+        self.client.get(
+            reverse("orgs:message_room", args=[self.org.id]) + "?pane=room",
+        )
+        self.assertEqual(self.client.session.get(ORG_KEY), self.org.id)
+
+
+class SendingAMessageIsNotANavigationTests(TestCase):
+    """"When I type and hit send, why am I getting a loader?"
+
+    It posted the form, followed a redirect, rebuilt the whole three-panel
+    screen and played the splash — for a message that was already written.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(name="Send Co", season=self.season)
+        self.me = User.objects.create_user(
+            email="send-me@example.com", password="x", display_name="Sender",
+        )
+        OrgMember.objects.create(user=self.me, org=self.org)
+        from .services import org_room
+
+        self.thread = org_room(self.org)
+        self.client.force_login(self.me)
+
+    def _send(self, **extra):
+        return self.client.post(
+            reverse("orgs:member_message_thread", args=[self.org.id, self.thread.id]),
+            {"body": "hello there"},
+            **extra,
+        )
+
+    def test_an_htmx_send_gets_the_messages_back_not_a_redirect(self):
+        r = self._send(HTTP_HX_REQUEST="true")
+        body = r.content.decode()
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("<!DOCTYPE", body)
+        self.assertIn('id="gtmChatList"', body)
+        self.assertIn("hello there", body)
+
+    def test_it_saves_the_message_either_way(self):
+        from .models import Message
+
+        self._send(HTTP_HX_REQUEST="true")
+        self.assertEqual(Message.objects.filter(thread=self.thread).count(), 1)
+
+    def test_without_javascript_it_still_posts_and_redirects(self):
+        """The plain form action and enctype are still there, so a browser with
+        no script sends a message and lands back on the conversation."""
+        r = self._send()
+        self.assertEqual(r.status_code, 302)
+
+    def test_the_composer_is_never_the_thing_that_gets_replaced(self):
+        """The reply is the message LIST. Swapping the composer would throw
+        away anything half-typed, half-attached or half-recorded."""
+        body = self.client.get(
+            reverse("orgs:member_message_thread", args=[self.org.id, self.thread.id])
+        ).content.decode()
+        self.assertIn('hx-target="#gtmChatList"', body)
+        self.assertNotIn('data-busy="Sending"', body)

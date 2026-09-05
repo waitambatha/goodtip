@@ -836,3 +836,143 @@ html[data-theme="light"] .gtm-tagchip.is-admin { background: var(--m-accent); co
   background: rgba(15,46,34,.05); border: 1px solid rgba(15,46,34,.10);
   font-size: 13px; line-height: 1.6; color: var(--muted);
 }
+
+/* ==========================================================================
+   SECOND PASS — the frame, the bubbles, the tabs, and a column that folds
+   ========================================================================== */
+
+/* ---- THE OUTER BOX GOES ------------------------------------------------
+   "That outer box frame that we have should not be there. It does not look
+   good — just for the messaging template I think that does not need it."
+
+   It was a capped, centred slab with a heavy drop shadow so the rotating side
+   photographs could show past it, on the reasoning that every other member
+   screen is a panel floating on the green. The reasoning holds for a card of
+   content and not for this: a chat client is a room you are IN, and putting a
+   picture frame round it makes the room look like a screenshot of itself.
+
+   Full width, no shadow, no cap. The photographs stay on every other screen
+   where they are the standard frame; here the application IS the page. */
+.gtm {
+  max-width: none; margin: 0; box-shadow: none;
+  border-radius: 0; border: 0; background: transparent;
+}
+.gtm-page .page-scenes { display: none; }
+.gtm-nav { background: var(--m-panel); }
+
+/* ---- BUBBLES THAT ARE NOT BOTH GREEN -----------------------------------
+   "Both for the sender and receiver make sure the colour is different, and
+   when we are on the green theme none should be green."
+
+   They were #1B4133 and #1F5B3C — two dark greens four percent apart, on a
+   dark green ground. Three greens in a stack is one green.
+
+   Theirs is now light with dark ink and yours is a deep blue with white ink,
+   which is the arrangement with the most contrast BETWEEN the two, and neither
+   of them is the page's own colour. It reads at a glance and it reads in a
+   photograph of the screen, which is how people actually share these. */
+.gtm-page { --m-bubble: #F1F3F6; --m-bubble-ink: #16202B; --m-mine: #2F5DA8; --m-mine-ink: #FFFFFF; }
+.gtm-chat .chat-bubble {
+  background: var(--m-bubble); color: var(--m-bubble-ink);
+  border-color: rgba(15,23,32,.14);
+}
+.gtm-chat .chat-bubble a { color: #16457F; }
+.gtm-chat .chat-row.mine .chat-bubble {
+  background: var(--m-mine); color: var(--m-mine-ink);
+  border-color: rgba(255,255,255,.22);
+}
+.gtm-chat .chat-row.mine .chat-bubble a { color: #DCE9FF; }
+/* Everything that rides inside a bubble has to follow it, or the timestamps
+   and the "Sent" tick stay tuned for the dark bubble they used to sit on. */
+.gtm-chat .chat-bubble .chat-when,
+.gtm-chat .chat-bubble .chat-meta,
+.gtm-chat .chat-bubble small { color: rgba(22,32,43,.62); }
+.gtm-chat .chat-row.mine .chat-bubble .chat-when,
+.gtm-chat .chat-row.mine .chat-bubble .chat-meta,
+.gtm-chat .chat-row.mine .chat-bubble small { color: rgba(255,255,255,.75); }
+.gtm-chat .chat-row.mine .chat-bubble .chat-who { color: #FFFFFF; }
+.gtm-chat .chat-bubble .chat-who { color: #16457F; }
+
+/* ---- THE FILTER TABS SCROLL --------------------------------------------
+   Four tabs with counts do not fit a 280px column, so the last one wrapped
+   under the others and the row grew a second line that pushed the list down.
+   One line that scrolls sideways instead — "make this scrollable". */
+.gtm-tabs {
+  display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 6px;
+  scrollbar-width: none; -ms-overflow-style: none;
+  padding-bottom: 2px;
+}
+.gtm-tabs::-webkit-scrollbar { display: none; }
+.gtm-tab { flex: none; white-space: nowrap; }
+
+/* ---- A LEFT COLUMN THAT FOLDS ------------------------------------------
+   "This column can be made closable and openable."
+
+   Folded to a strip rather than removed: a column that vanishes leaves no way
+   back except the browser's, and the strip keeps the button that reopens it
+   exactly where the column was. The chat takes the width, which on a laptop is
+   the whole point of folding it. */
+.gtm-fold {
+  position: absolute; top: 10px; left: 10px; z-index: 6;
+  width: 30px; height: 30px; display: grid; place-items: center;
+  border-radius: 9px; cursor: pointer;
+  background: rgba(255,255,255,.1); border: 1px solid var(--m-line-2);
+  color: var(--m-ink);
+}
+.gtm-fold:hover { background: rgba(255,255,255,.2); }
+.gtm-fold svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.gtm { position: relative; transition: grid-template-columns .22s var(--ease, ease); }
+.gtm.is-folded { grid-template-columns: 54px minmax(260px, 320px) minmax(0, 1fr); }
+.gtm.is-folded .gtm-nav-head .gtm-title div,
+.gtm.is-folded .gtm-nav-head .gtm-search,
+.gtm.is-folded .gtm-nav-head .gtm-tabs,
+.gtm.is-folded .gtm-nav-body { display: none; }
+.gtm.is-folded .gtm-nav { align-items: center; padding-top: 44px; }
+.gtm.is-folded .gtm-nav-head { padding: 10px 6px; border-bottom: 0; }
+.gtm.is-folded .gtm-fold svg { transform: rotate(180deg); }
+@media (max-width: 1080px) { .gtm-fold { display: none; } }
+
+/* ---- THE UPLOAD RING, AT THE BOTTOM ------------------------------------
+   "In the image and audio itself, the way you see it on WhatsApp — you upload
+   and see the circle like a status bar, then it goes round and completes when
+   full and ready. This should be at the bottom, not where I am seeing it."
+
+   In the composer, beside the send button: the place the file was chosen from
+   and the place the eye already is. Real bytes, not an animation — see
+   gt-messages.js. */
+.cc-progress { position: relative; width: 34px; height: 34px; flex: none; display: grid; place-items: center; }
+.cc-progress svg { width: 34px; height: 34px; transform: rotate(-90deg); }
+.cc-progress circle { fill: none; stroke-width: 3; }
+.cc-progress .ccp-track { stroke: rgba(255,255,255,.18); }
+.cc-progress .ccp-fill { stroke: var(--lime, #C8F135); transition: stroke-dashoffset .15s linear; }
+.cc-progress b {
+  position: absolute; font-size: 9px; font-weight: 800; color: var(--m-ink);
+  font-family: var(--mark, inherit);
+}
+
+/* ---- THE PANEL BEING FETCHED IS THE ONE THAT DIMS ----------------------- */
+.gtm-chat.is-loading { position: relative; }
+.gtm-chat.is-loading::after {
+  content: ""; position: absolute; inset: 0; z-index: 5;
+  background: rgba(11,33,24,.45);
+  backdrop-filter: blur(1px);
+}
+.gtm-chat.is-loading::before {
+  content: ""; position: absolute; z-index: 6; top: 50%; left: 50%;
+  width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.25); border-top-color: var(--lime, #C8F135);
+  animation: gtmSpin .7s linear infinite;
+}
+@keyframes gtmSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .gtm-chat.is-loading::before { animation: none; } }
+
+/* The selected room in the tree, so pressing one looks like it did something
+   even before the panel arrives. */
+.gtm-kid.on { background: var(--m-accent-bg, rgba(200,241,53,.14)); }
+
+/* Light theme: theirs stays white on cream and needs its edge; yours keeps the
+   blue, which reads on both grounds. */
+html[data-theme="light"] .gtm-page { --m-bubble: #FFFFFF; --m-bubble-ink: #16202B; --m-mine: #2F5DA8; }
+html[data-theme="light"] .gtm-chat .chat-bubble { border: 1px solid rgba(15,46,34,.13); }
+html[data-theme="light"] .gtm-chat .chat-row.mine .chat-bubble { border-color: rgba(47,93,168,.4); color: #FFFFFF; }
+html[data-theme="light"] .gtm-fold { background: rgba(15,46,34,.06); border-color: rgba(15,46,34,.14); color: #2C4C3B; }

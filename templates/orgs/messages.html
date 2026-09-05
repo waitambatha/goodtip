@@ -64,6 +64,16 @@ walks out of it. See gt-messages.js and the .gtm-page media queries.
 {% endcomment %}
 <div class="gtm" data-gtm data-view="{% if thread %}chat{% else %}list{% endif %}">
 
+  {% comment %}
+  The fold, pinned to the shell rather than to the column, so it stays where it
+  is when the column it collapses is 54px wide. A column that vanished outright
+  would leave no way back except the browser's.
+  {% endcomment %}
+  <button type="button" class="gtm-fold" data-gtm-fold
+          aria-label="Hide the conversation list" aria-expanded="true">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
+  </button>
+
   {# ==================== LEFT: conversations ==================== #}
   <aside class="gtm-nav" data-gtm-pane="list">
     <header class="gtm-nav-head">
@@ -150,12 +160,18 @@ walks out of it. See gt-messages.js and the .gtm-page media queries.
             own switcher uses, so "everyone" is in a consistent place rather
             than being the last item of a group list.
             {% endcomment %}
-            <a class="gtm-kid" href="{% url 'orgs:message_room' o.id %}">
+            <a class="gtm-kid" href="{% url 'orgs:message_room' o.id %}"
+               hx-get="{% url 'orgs:message_room' o.id %}?pane=room"
+               hx-target=".gtm-chat" hx-swap="innerHTML"
+               hx-push-url="{% url 'orgs:message_room' o.id %}" data-gtm-open>
               <span class="gtm-av org sm" aria-hidden="true"><svg><use href="#ic-f-org"/></svg></span>
               <span class="gtm-kid-txt"><b>Everyone in {{ o.name }}</b><i>Organisation room</i></span>
             </a>
             {% for g in o.nav_groups %}
-            <a class="gtm-kid" href="{% url 'orgs:message_group_room' o.id g.id %}">
+            <a class="gtm-kid" href="{% url 'orgs:message_group_room' o.id g.id %}"
+               hx-get="{% url 'orgs:message_group_room' o.id g.id %}?pane=room"
+               hx-target=".gtm-chat" hx-swap="innerHTML"
+               hx-push-url="{% url 'orgs:message_group_room' o.id g.id %}" data-gtm-open>
               <span class="gtm-av group sm" aria-hidden="true">{{ g.name|slice:":1"|upper }}</span>
               <span class="gtm-kid-txt"><b>{{ g.name }}</b><i>{{ g.memberships.count }} member{{ g.memberships.count|pluralize }}</i></span>
             </a>
@@ -181,7 +197,10 @@ walks out of it. See gt-messages.js and the .gtm-page media queries.
           <li class="gtm-conv{% if thread and thread.id == c.id %} on{% endif %}{% if c.unread %} is-new{% endif %}"
               data-face="{{ c.face }}"
               data-find="{{ c.title|lower }} {{ c.subtitle|lower }} {{ c.preview|lower }}">
-            <a href="{% url 'orgs:member_message_thread' c.org.id c.id %}">
+            <a href="{% url 'orgs:member_message_thread' c.org.id c.id %}"
+               hx-get="{% url 'orgs:member_message_thread' c.org.id c.id %}?pane=room"
+               hx-target=".gtm-chat" hx-swap="innerHTML"
+               hx-push-url="{% url 'orgs:member_message_thread' c.org.id c.id %}" data-gtm-open>
               <span class="gtm-av {{ c.face }}" aria-hidden="true">
                 {% if c.avatar_user and c.avatar_user.avatar %}<img src="{{ c.avatar_user.avatar.url }}" alt="">
                 {% elif c.face == 'admins' %}<svg><use href="#ic-shield-check"/></svg>

@@ -14,9 +14,31 @@ anywhere reports a problem.
 
 Expects: thread, thread_org, other.
 {% endcomment %}
+{% comment %}
+NO LOADER ON SEND. "When I type and hit send, why am I getting a loader?"
+
+It posted the form, followed a redirect, rebuilt the whole three-panel screen
+and played the splash — for a message that was already written. It is an htmx
+post now: the reply is the message list, swapped in place, and the composer is
+never replaced so nothing half-typed is lost.
+
+data-busy is gone with it. That veil is for actions where a second press would
+do damage — confirming a slate of tips — and sending a message twice is a
+different problem solved a different way (the composer disables its own send
+button until the reply lands; see gt-chat.js).
+
+`hx-encoding` and not `enctype` alone: htmx serialises the form itself, and
+without being told to use FormData it posts urlencoded — the files silently do
+not arrive, the message saves with only its text, and nothing anywhere reports
+a problem. The plain `enctype` stays for the no-JavaScript path, which still
+posts and still redirects.
+{% endcomment %}
 <form method="post" action="{% url 'orgs:member_message_thread' thread_org.id thread.id %}"
       class="chat-composer gtm-composer" enctype="multipart/form-data"
-      data-chat-form data-gtm-composer data-busy="Sending">
+      hx-post="{% url 'orgs:member_message_thread' thread_org.id thread.id %}"
+      hx-encoding="multipart/form-data"
+      hx-target="#gtmChatList" hx-swap="outerHTML"
+      data-chat-form data-gtm-composer>
   {% csrf_token %}
 
   {# Filled in by gt-chat.js when a message is picked; posted as reply_to. #}

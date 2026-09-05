@@ -3235,6 +3235,23 @@ def member_message_thread_view(request, org_id: int, thread_id: int):
             if thread.status == MessageThread.STATUS_CLOSED:
                 thread.status = MessageThread.STATUS_OPEN
                 thread.save(update_fields=["status"])
+        # SENDING IS NOT A NAVIGATION.
+        #
+        # ASKED FOR: "when I type and hit send, why am I getting a loader? We
+        # should not have a loader."
+        #
+        # Quite right, and it was worse than a spinner: the composer posted the
+        # form, the browser followed a redirect, the whole three-panel screen
+        # was rebuilt and the splash played — for a message that had already
+        # been written. Typing something into a chat is the most ordinary act on
+        # the page and it was the most expensive.
+        #
+        # An htmx send gets the message list back instead. Same view, same
+        # context, same partial the twelve-second poll uses, so what lands after
+        # a send is what would have landed anyway.
+        if request.headers.get("HX-Request"):
+            return render(request, "orgs/partials/_room_stream.html",
+                          _messages_context(request, org, thread))
         return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
 
     # THE MESSAGES ALONE, for the poll that keeps an open conversation up to
@@ -3246,12 +3263,50 @@ def member_message_thread_view(request, org_id: int, thread_id: int):
         return render(request, "orgs/partials/_room_stream.html",
                       _messages_context(request, org, thread))
 
+    # THE CONVERSATION PANE ALONE, for opening a room without reloading the
+    # screen around it.
+    #
+    # ASKED FOR: "if I pick a group or an organisation the whole page should not
+    # be loading — that is in the chat list. It should only load on that centre
+    # part where we have the data."
+    #
+    # Every room in the left-hand tree was a plain link, so choosing one threw
+    # away the list, the search box, the tabs and the scroll position, re-fetched
+    # all of it, and played the splash on the way — to change one panel that was
+    # already on screen. This returns that panel; the links carry hx-push-url so
+    # the address bar, the back button and a copied link all still work exactly
+    # as they did.
+    if request.GET.get("pane") == "room":
+        _follow_context(request, thread)
+        return render(request, "orgs/partials/_room_chat.html",
+                      _messages_context(request, org, thread))
+
     # Reading a conversation moves you into its organisation — see
     # _follow_context. Before the context is built, so the sidebar, the chip
     # and the page all describe the same place on this very render rather than
     # on the next one.
     _follow_context(request, thread)
     return render(request, "orgs/messages.html", _messages_context(request, org, thread))
+
+
+def _open_thread(request, org, thread):
+    """Send the reader to a conversation, as a page or as a panel.
+
+    The room openers exist because a room may not have a thread row yet; they
+    make one and hand over. They did that with a redirect, which is right for a
+    navigation and wrong for a panel swap: a redirect drops the query string, so
+    ?pane=room arrived at the thread view as an ordinary request and came back
+    as an entire page — the swap would then have put a whole document inside one
+    div.
+
+    So the fragment is rendered here instead, and only the full navigation
+    redirects. The URL the address bar ends up with is the same either way,
+    because the links carry hx-push-url.
+    """
+    if request.GET.get("pane") == "room":
+        return render(request, "orgs/partials/_room_chat.html",
+                      _messages_context(request, org, thread))
+    return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
 
 
 @login_required
@@ -3264,7 +3319,7 @@ def message_room_view(request, org_id: int):
         raise Http404("No organisation matches the given query.")
     thread = org_room(org)
     _follow_context(request, thread)
-    return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
+    return _open_thread(request, org, thread)
 
 
 @login_required
@@ -3280,7 +3335,7 @@ def message_group_room_view(request, org_id: int, group_id: int):
         raise Http404("No group matches the given query.")
     thread = group_room(group)
     _follow_context(request, thread)
-    return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
+    return _open_thread(request, org, thread)
 
 
 @login_required
@@ -3304,7 +3359,7 @@ def message_direct_view(request, org_id: int, user_id: int):
         return redirect("orgs:member_messages", org_id=org.id)
     thread = direct_thread(request.user, target.user, org)
     _follow_context(request, thread)
-    return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
+    return _open_thread(request, org, thread)
 
 
 @login_required
