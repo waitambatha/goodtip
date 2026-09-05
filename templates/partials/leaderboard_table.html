@@ -25,11 +25,16 @@ table in one code's colour would be claiming to be that code's table.
   points are the table, the rest is the detail.
   {% endcomment %}
   <div class="gb-head">
-    <span>Rank</span><span>Tipper</span>
-    <span class="h-correct num">Correct</span>
-    <span class="h-acc num">Accuracy</span>
-    <span class="h-behind num">Behind</span>
-    <span class="num">Points</span>
+    {% comment %}
+    Capitals, as on the ladder — "for all the leaderboard and ladder, the names
+    of the title of columns, have them in caps". One convention across both
+    boards, so a column heading looks like a column heading wherever it is.
+    {% endcomment %}
+    <span>RANK</span><span>TIPPER</span>
+    <span class="h-correct num">CORRECT</span>
+    <span class="h-acc num">ACCURACY</span>
+    <span class="h-behind num">BEHIND</span>
+    <span class="num">POINTS</span>
   </div>
   <div class="gt-scroll gb-rows">
   {% for row in ranked %}

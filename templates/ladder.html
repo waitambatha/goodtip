@@ -87,6 +87,18 @@ competition change loads — see gt-veil.js. The filter swaps the rows, but what
 a reader watches is the table, so veiling only the rows would leave the header
 sitting bright above a blank space.
 {% endcomment %}
+{% comment %}
+ABOVE THE TABLE, NOT UNDER IT. "This should be at the top of the table, not at
+the bottom." Both halves are things you need BEFORE reading the rows: what the
+shading on the top eight means, and how old the figures are. Underneath, they
+were an explanation arriving after the thing it explains.
+{% endcomment %}
+<p class="lad-foot lad-head-key">
+  <span class="lad-key"><i class="k-finals"></i> Top 8, finals places</span>
+  {% if updated_at %}<span class="lad-when">Updated {{ updated_at|timesince }} ago</span>
+  {% elif at_round %}<span class="lad-when">As it stood after round {{ at_round }}</span>{% endif %}
+</p>
+
 <div class="gt-listwrap" id="ladderTable" data-veil data-veil-label="Loading the ladder">
   {# The competition's colour, on the table that is about it. #}
   <div class="gt-board ladder" data-coach="ladder-table"
@@ -99,20 +111,28 @@ sitting bright above a blank space.
     {% endcomment %}
     <div class="gb-head lad-head">
       <span>#</span>
-      <span>Club</span>
-      <span class="lad-num lad-col">P</span>
-      <span class="lad-num lad-col">W</span>
-      <span class="lad-num lad-col">L</span>
-      <span class="lad-num lad-col lad-d">D</span>
-      <span class="lad-num lad-col lad-pct">%</span>
-      <span class="lad-num lad-col lad-pts">Pts</span>
+      <span>CLUB</span>
+      {% comment %}
+      FULL WORDS, IN CAPITALS. "The names of the clubs are not that big, so we
+      do have space — I want the other column names in full. Instead of P I want
+      to see POINTS." A single letter is a legend you have to have been taught;
+      the row of them read as a code rather than as a table, and there was room
+      for the words all along.
+      {% endcomment %}
+      <span class="lad-num lad-col">PLAYED</span>
+      <span class="lad-num lad-col">WON</span>
+      <span class="lad-num lad-col">LOST</span>
+      <span class="lad-num lad-col lad-d">DRAWN</span>
+      <span class="lad-num lad-col lad-pct">PCT</span>
+      <span class="lad-num lad-col lad-pts">POINTS</span>
       {% comment %}
       What is still to come. Honest about its source: this is what the SYSTEM
       knows is scheduled and unplayed, de-duplicated across leagues — a dash
       where no fixtures have been loaded yet, rather than a nought that would
       read as "their season is over".
       {% endcomment %}
-      <span class="lad-num lad-col lad-left">Left</span>
+      <span class="lad-num lad-col lad-left">GAMES LEFT</span>
+      <span class="lad-stats-h">STATISTICS</span>
     </div>
 
     <div class="gt-scroll gb-rows">
@@ -148,16 +168,25 @@ sitting bright above a blank space.
         <span class="lad-num lad-col lad-pct">{{ e.percentage|floatformat:1 }}</span>
         <span class="lad-num lad-col lad-pts">{{ e.points }}</span>
         <span class="lad-num lad-col lad-left">{% if e.games_left %}{{ e.games_left }}{% else %}<i>&ndash;</i>{% endif %}</span>
+        {% comment %}
+        A BUTTON, SAYING WHAT IT IS. The club's name was already a link to its
+        season and that was not enough — "I did not see the stats button, and I
+        want it in full for the ladder: statistics, be able to see stats, click
+        a team, see the stats of its performance." A name that happens to be
+        underlined is not an offer; a button in a column headed STATISTICS is.
+
+        The name stays a link as well, because that is where a reader's hand
+        goes first.
+        {% endcomment %}
+        <a class="lad-stats" href="{% url 'tipping:team_stats' org.id e.team.id %}"
+           aria-label="{{ e.team.name }} statistics">
+          <svg aria-hidden="true"><use href="#ic-f-chart"/></svg><span>Stats</span>
+        </a>
       </div>
       {% endfor %}
     </div>
   </div>
 </div>
-
-<p class="lad-foot">
-  <span class="lad-key"><i class="k-finals"></i> Top 8, finals places</span>
-  {% if updated_at %}<span class="lad-when">Updated {{ updated_at|timesince }} ago</span>{% endif %}
-</p>
 
 {% else %}
 <div class="card pad-lg" style="text-align:center;">

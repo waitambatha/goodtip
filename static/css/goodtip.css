@@ -16189,3 +16189,212 @@ html[data-theme="light"] .gt-app .sp-foot b { color: var(--forest); }
 /* The club's name on the ladder is a link into its season. */
 .lad-link { text-decoration: none; color: var(--ink); }
 .lad-link:hover { color: var(--code-ink, var(--forest)); text-decoration: underline; }
+
+/* ============================================================================
+   THE LOADER COVERS THE CONTENT, NOT THE WINDOW
+   ----------------------------------------------------------------------------
+   "It should not be the whole page, it should be that innermost section that
+   has our content — because it looks like the whole page is loading."
+
+   It was fixed to the viewport, so fetching one board withdrew the nav, the
+   organisation switcher, the bell and the charity strip as well. None of those
+   were loading. Absolute inside the sheet instead: the furniture stays usable
+   and what is covered is exactly what is being replaced.
+
+   Scoped to .loader-inset so the public site and the sign-in page keep the
+   full-screen splash, where there IS no furniture to preserve.
+   ========================================================================= */
+.app-main .page-sheet { position: relative; }
+.loader.loader-inset {
+  position: absolute; inset: 0; z-index: 40;
+  border-radius: inherit; overflow: hidden;
+  /* Slightly transparent, so the shape of the page shows through and it reads
+     as this panel working rather than as a different screen. */
+  background:
+    radial-gradient(700px 380px at 50% 18%, rgba(200,241,53,.12), transparent 60%),
+    color-mix(in srgb, var(--deep-2) 94%, transparent);
+  /* Tall enough to be a panel, short enough not to push the page around on a
+     screen where the content is shorter than the splash used to be. */
+  min-height: 380px;
+}
+.loader.loader-inset .loader-inner { transform: none; }
+.loader.loader-inset .pitch { width: 180px; height: 112px; margin-bottom: 18px; }
+.loader.loader-inset .loader-word { font-size: 26px; }
+/* The line that says what is being fetched. It was the smallest thing in the
+   splash; it is the only part that carries information. */
+.loader.loader-inset .loader-task {
+  font-size: 15px; font-weight: 700; color: #FFFFFF; margin-top: 10px;
+}
+.loader.loader-inset .loader-sport { color: rgba(255,255,255,.72); }
+/* The page no longer has to be frozen: nothing outside the sheet is covered,
+   so scrolling to the nav or the charity strip is legitimate while it loads. */
+body.loading:has(.loader-inset) { overflow: visible; }
+
+/* ============================================================================
+   WHITE THAT IS ACTUALLY WHITE, on the green
+   ----------------------------------------------------------------------------
+   "The text that are white — to me some are not even bright enough. The white
+   has to be strong so that in the green theme I am not struggling to see it."
+
+   Right, and it was systematic rather than a few stray rules: the deep sheet's
+   secondary text was set in cream at .6-.72 alpha, which is a mid-grey once it
+   is over a dark green and drops under the 4.5:1 contrast floor at the sizes it
+   was used at. Cream at full strength is a warm off-white and reads fine; cream
+   at 60% does not.
+
+   Two changes together, because either alone leaves it hard to read: the alphas
+   go up to near-solid white, and the sizes go up a step. Applied to the labels,
+   the steppers and the notes — the small print of these pages, which is where
+   all of it was.
+   ========================================================================= */
+.rs-showing, .bb-lab, .cf-lab {
+  color: rgba(255,255,255,.92); font-size: 12px;
+}
+.rs-step { color: #FFFFFF; font-size: 13px; background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.26); }
+.rs-step:hover { background: rgba(255,255,255,.26); }
+.rs-num {
+  color: #FFFFFF; font-size: 16px;
+  background: rgba(255,255,255,.13); border-color: rgba(255,255,255,.24);
+}
+.rs-num:hover { background: rgba(255,255,255,.26); }
+.rs-all { font-size: 13.5px; }
+.ladder-asat { color: rgba(255,255,255,.9); font-size: 14.5px; }
+.trendline { color: #FFFFFF; font-size: 15.5px; border-color: rgba(255,255,255,.2); }
+.sp-foot { color: #FFFFFF; font-size: 14px; border-color: rgba(255,255,255,.18); }
+.gt-head .gh-sub, .gt-head .gh-lead { color: rgba(255,255,255,.86); font-size: 15.5px; }
+.page-deep .gt-note, .sheet-page .gt-note { color: rgba(255,255,255,.9); font-size: 14px; }
+.boardbar { border-color: rgba(255,255,255,.16); }
+.bb-arrow { color: #FFFFFF; background: rgba(255,255,255,.13); border-color: rgba(255,255,255,.24); }
+.cf-chip.cf-all { color: #FFFFFF; background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.26); }
+.cf-chip.cf-all:hover { background: rgba(255,255,255,.26); }
+/* The room switcher sits on the same sheet and had the same problem. */
+.room-switch.on-dark .rw-eyebrow { color: rgba(255,255,255,.9); }
+.room-switch.on-dark .rw-note { color: rgba(255,255,255,.9); font-size: 14.5px; }
+/* These are all deep-sheet rules; the light theme repaints the same surfaces
+   pale, where solid white would vanish. Put back to ink there. */
+html[data-theme="light"] .gt-app .rs-showing,
+html[data-theme="light"] .gt-app .bb-lab,
+html[data-theme="light"] .gt-app .cf-lab { color: var(--muted); }
+html[data-theme="light"] .gt-app .rs-step,
+html[data-theme="light"] .gt-app .rs-num,
+html[data-theme="light"] .gt-app .bb-arrow,
+html[data-theme="light"] .gt-app .cf-chip.cf-all { color: #2C4C3B; background: rgba(15,46,34,.06); border-color: rgba(15,46,34,.13); }
+html[data-theme="light"] .gt-app .ladder-asat,
+html[data-theme="light"] .gt-app .trendline,
+html[data-theme="light"] .gt-app .sp-foot,
+html[data-theme="light"] .gt-app .gt-head .gh-sub,
+html[data-theme="light"] .gt-app .gt-head .gh-lead,
+html[data-theme="light"] .gt-app .gt-note,
+html[data-theme="light"] .gt-app .room-switch.on-dark .rw-note,
+html[data-theme="light"] .gt-app .room-switch.on-dark .rw-eyebrow { color: var(--ink); }
+
+/* ============================================================================
+   THE WINNER'S CARD IS GOLD
+   ----------------------------------------------------------------------------
+   "The colour of number 1 is green instead of gold — why?" Because it was:
+   .gt-pod.p1 was a deep-green gradient from before the podium had medals at
+   all, and when silver and bronze were given their metals first place kept the
+   product's colour and became the odd one out. A podium where second and third
+   are metallic and first is not reads as first place being a different kind of
+   thing.
+
+   Gold, and still the loudest card: it is the only one with a dark ground
+   underneath the metal, which is what keeps the lime crown and the white name
+   readable at the size this card is drawn at.
+   ========================================================================= */
+.gt-pod.p1 {
+  background:
+    linear-gradient(165deg, #FFF0B8 0%, #F0CE62 38%, #C9992C 72%, #A87B18 100%);
+  border-color: rgba(168,123,24,.85);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.75), 0 16px 34px -22px rgba(120,86,10,.85);
+}
+/* The ink on gold is dark, not the cream this card used when it was green —
+   cream on gold is the same brightness twice and reads as a smudge. */
+.gt-pod.p1 .gp-name { color: #3F2E06; }
+.gt-pod.p1 .gp-pts { color: #4A3608; }
+.gt-pod.p1 .gp-pts small { color: #6B5111; }
+.gt-pod.p1 .gp-chip { background: rgba(63,46,6,.14); color: #3F2E06; border-color: rgba(63,46,6,.24); }
+.gt-pod.p1 .gp-medal { color: #6B5111; }
+.gt-pod.p1 .crown svg { stroke: #4A3608; }
+.gt-pod.p1 .gp-av { background: rgba(63,46,6,.12); color: #3F2E06; border-color: rgba(63,46,6,.35); }
+/* The disc was the one gold thing on a green card. Now that the card is gold it
+   has to invert, or it disappears into its own background. */
+.gt-pod.p1 .gp-rank { background: linear-gradient(145deg,#3F2E06,#241A03); color: #F0CE62; border-color: rgba(255,255,255,.5); }
+.gt-pod.p1::after { display: none; }
+
+/* THIRD, SMALLER AGAIN. "Make number 3 a little bit smaller than that, so we
+   can see the difference more easily." The step from second to third was there
+   and was too fine to read at a glance. */
+.gt-podium { grid-template-columns: 1fr 1.28fr .8fr; }
+.gt-pod.p3 { padding: 20px 15px 17px; }
+.gt-pod.p3 .gp-avwrap { width: 44px; height: 44px; }
+.gt-pod.p3 .gp-name { font-size: 14px; }
+.gt-pod.p3 .gp-pts { font-size: 23px; }
+.gt-pod.p3 .gp-medal { font-size: 9px; }
+@media (max-width: 820px) {
+  /* Stacked, a size ladder means nothing; the medal word and colour carry it. */
+  .gt-podium { grid-template-columns: 1fr; }
+  .gt-pod.p3 { padding: 26px 20px 22px; }
+  .gt-pod.p3 .gp-avwrap { width: 58px; height: 58px; }
+  .gt-pod.p3 .gp-name { font-size: 17px; }
+  .gt-pod.p3 .gp-pts { font-size: 30px; }
+}
+
+/* ============================================================================
+   THE LADDER'S FULL-WORD HEADINGS AND ITS STATISTICS COLUMN
+   ----------------------------------------------------------------------------
+   "The names of the clubs are not that big, so we do have space — I want the
+   other column names in full. Instead of P I want to see POINTS."
+
+   Words need width that single letters did not, so the numeric columns widen
+   and the headings drop a size and wrap rather than clipping. GAMES LEFT is two
+   words on two lines on purpose: one long column would have taken the room the
+   other six needed.
+   ========================================================================= */
+.gt-board.ladder .lad-head,
+.gt-board.ladder .lad-row {
+  grid-template-columns: 46px minmax(0,1fr) repeat(7, minmax(58px, 74px)) 84px;
+}
+.gt-board.ladder .lad-head .lad-num {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .06em;
+  line-height: 1.15; white-space: normal; word-break: normal;
+  text-align: right;
+}
+.lad-stats-h {
+  font-family: var(--mark); font-weight: 800; font-size: 10.5px;
+  letter-spacing: .06em; text-align: right; color: #FFFFFF;
+}
+/* The button, in a column that says what it is. A club name that happens to be
+   underlined is not an offer. */
+.lad-stats {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px 11px; border-radius: 100px; text-decoration: none;
+  font-family: var(--mark); font-weight: 800; font-size: 11px;
+  letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
+  color: var(--code-ink, var(--forest));
+  background: color-mix(in srgb, var(--code-ink, var(--forest)) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--code-ink, var(--forest)) 32%, transparent);
+  justify-self: end;
+}
+.lad-stats:hover { background: var(--code-ink, var(--forest)); color: #fff; }
+.lad-stats svg { width: 13px; height: 13px; fill: currentColor; }
+@media (max-width: 1080px) {
+  /* The word goes before the button does — the glyph in a column headed
+     STATISTICS still says what it is. */
+  .lad-stats span { display: none; }
+  .lad-stats { padding: 8px; }
+  .gt-board.ladder .lad-head,
+  .gt-board.ladder .lad-row { grid-template-columns: 42px minmax(0,1fr) repeat(7, minmax(50px, 64px)) 44px; }
+}
+@media (max-width: 900px) {
+  .gt-board.ladder .lad-head,
+  .gt-board.ladder .lad-row { grid-template-columns: 42px minmax(0,1fr) repeat(6, minmax(48px, 60px)) 44px; }
+  .gt-board.ladder .lad-left { display: none; }
+}
+
+/* The key, now above the table. */
+.lad-head-key { margin: 0 0 10px; }
+.lad-foot .lad-key, .lad-foot .lad-when { color: rgba(255,255,255,.9); font-size: 13.5px; }
+html[data-theme="light"] .gt-app .lad-foot .lad-key,
+html[data-theme="light"] .gt-app .lad-foot .lad-when { color: var(--muted); }
+html[data-theme="light"] .gt-app .lad-stats-h { color: #FFFFFF; }

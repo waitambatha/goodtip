@@ -2054,15 +2054,24 @@ class BoardHierarchyTests(TestCase):
             reverse("tipping:leaderboard", args=[self.org.id]) + qs
         ).content.decode()
 
-    def test_the_filters_come_before_the_table_and_the_room_after_it(self):
+    def test_the_page_reads_title_room_filters_table(self):
+        """The order was title → filters → table → room, and the room came
+        back up: "this should not be at the bottom, it should come after
+        Leaderboard, Compete Climb Make an impact."
+
+        Right, and for a reason the first arrangement missed — the board is OF
+        a room, so which room has to be settled before the filters that narrow
+        it mean anything. Above the title it was worse; below the standings it
+        was too late.
+        """
         body = self._board()
         title = body.index("Compete. Climb.")
+        room = body.index("room-switch")
         filters = body.index('class="boardbar"')
         table = body.index('id="lbtable"')
-        room = body.index("room-switch")
-        self.assertLess(title, filters, "the filters must follow the title")
+        self.assertLess(title, room, "the room switcher must follow the title")
+        self.assertLess(room, filters, "the room is settled before the filters")
         self.assertLess(filters, table, "the filters must precede the table")
-        self.assertLess(table, room, "the room switcher belongs at the foot")
 
     def test_the_summary_cards_no_longer_flank_the_table(self):
         """They were a 320px sticky sidebar taking a third of the width from
@@ -2589,3 +2598,139 @@ class ChartHelperTests(TestCase):
 
         out = bars([{"value": 5}, {"value": 10}, {"value": 0}])
         self.assertEqual([b["bar_pct"] for b in out], [50, 100, 0])
+
+
+class BoardLegibilityTests(TestCase):
+    """The small print of the deep sheet, and the loader that covered the page.
+
+    "The text that are white — some are not even bright enough. The white has to
+    be strong so that in the green theme I am not struggling to see it." It was
+    systematic rather than a few stray rules: secondary text on the dark sheet
+    was cream at .6–.72 alpha, which is a mid-grey over dark green.
+
+    Asserted against the stylesheet, because that is where the decision lives
+    and the alternative is a person squinting at a screenshot.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from pathlib import Path
+
+        from django.conf import settings
+
+        cls.css = Path(settings.BASE_DIR, "static/css/goodtip.css").read_text()
+
+    def _rule(self, selector):
+        """Every declaration written for exactly this selector, joined.
+
+        `selector` followed by optional whitespace and a brace — not by
+        anything at all, which also matched `.rs-num:hover` and made the
+        assertions read the hover state instead of the rule. Joined rather than
+        taking one, because a property set in a later block is the one that
+        wins and either might hold it.
+        """
+        import re
+
+        matches = re.findall(
+            re.escape(selector) + r"\s*\{([^}]*)\}", self.css,
+        )
+        self.assertTrue(matches, f"{selector} has no rule")
+        return " ".join(matches)
+
+    def test_the_round_stepper_is_white_not_faded_cream(self):
+        for sel in (".rs-num", ".rs-step"):
+            self.assertIn("#FFFFFF", self._rule(sel), sel)
+
+    def test_the_labels_are_near_solid_white(self):
+        import re
+
+        rule = self._rule(".rs-showing, .bb-lab, .cf-lab")
+        alpha = re.search(r"rgba\(255,255,255,\.(\d+)\)", rule)
+        self.assertIsNotNone(alpha, rule)
+        self.assertGreaterEqual(int(alpha.group(1)), 9, "still too faint")
+
+    def test_the_light_theme_puts_them_back_to_ink(self):
+        """These are all deep-sheet rules and the light theme repaints the same
+        surfaces pale, where solid white would vanish — the same dark-on-dark
+        mistake in a mirror."""
+        self.assertIn(
+            'html[data-theme="light"] .gt-app .rs-showing', self.css,
+        )
+
+    def test_the_loader_covers_the_content_and_not_the_window(self):
+        """"It should not be the whole page, it should be that innermost
+        section." Fixed to the viewport it withdrew the nav, the switcher, the
+        bell and the charity strip to report that one region was being fetched.
+        """
+        rule = self._rule(".loader.loader-inset")
+        self.assertIn("position: absolute", rule)
+        self.assertIn(".app-main .page-sheet { position: relative; }", self.css)
+
+    def test_the_public_splash_is_left_alone(self):
+        """Scoped to .loader-inset, because the public site and the sign-in page
+        have no furniture worth preserving behind the splash."""
+        base = self._rule(".loader")
+        self.assertIn("position: fixed", base)
+
+
+class LadderPresentationTests(TestCase):
+    """Full words in capitals, the key above the table, and a stats button."""
+
+    def setUp(self):
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.series = Series.objects.get(slug="afl")
+        comp = Competition.objects.create(
+            sport=self.series.sport, season=self.season, name="LP Comp", slug="lp-comp",
+        )
+        comp.series.add(self.series)
+        self.org = Organisation.objects.create(name="LP League", season=self.season)
+        self.org.competitions.add(comp)
+        self.user = User.objects.create_user(
+            email="lp@example.com", password="x", display_name="LP",
+        )
+        OrgMember.objects.create(user=self.user, org=self.org)
+        from tipping.models import LadderEntry
+
+        self.team = Team.objects.create(name="Lions", slug="lp-lions", series=self.series)
+        LadderEntry.objects.create(
+            series=self.series, season=self.season, team=self.team,
+            rank=1, played=10, wins=8, losses=2, points=32, percentage=120.5,
+        )
+        self.client.force_login(self.user)
+
+    def _body(self):
+        return self.client.get(
+            reverse("tipping:ladder", args=[self.org.id]) + f"?series={self.series.slug}"
+        ).content.decode()
+
+    def test_the_columns_are_named_in_full_and_in_capitals(self):
+        """A single letter is a legend you have to have been taught."""
+        body = self._body()
+        for word in ("PLAYED", "WON", "LOST", "DRAWN", "POINTS", "GAMES LEFT", "CLUB"):
+            self.assertIn(f">{word}<", body, word)
+
+    def test_the_finals_key_sits_above_the_table(self):
+        """Both halves are things you need BEFORE reading the rows. Underneath,
+        they were an explanation arriving after the thing it explains."""
+        body = self._body()
+        self.assertLess(body.index("Top 8, finals places"), body.index('id="ladderTable"'))
+
+    def test_every_club_has_a_statistics_button(self):
+        """"I did not see the stats button." The name was already a link and
+        that was not enough — a name that happens to be underlined is not an
+        offer."""
+        body = self._body()
+        self.assertIn("STATISTICS", body)
+        self.assertIn(
+            reverse("tipping:team_stats", args=[self.org.id, self.team.id]), body,
+        )
+        self.assertIn("lad-stats", body)
+
+    def test_the_leaderboards_columns_are_capitalised_too(self):
+        """One convention across both boards."""
+        body = self.client.get(
+            reverse("tipping:leaderboard", args=[self.org.id])
+        ).content.decode()
+        for word in ("RANK", "TIPPER", "POINTS", "ACCURACY"):
+            self.assertIn(f">{word}<", body, word)

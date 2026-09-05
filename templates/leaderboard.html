@@ -59,6 +59,17 @@ still drawn as selected.
 {% url 'tipping:leaderboard' org.id as lb_url %}
 {% with cq=selected_comp.slug|default:"" %}
 {% comment %}
+WHICH ROOM THIS BOARD IS, straight after the title and before the filters.
+
+It was moved to the foot and sent back — "this should not be at the bottom, it
+should come after Leaderboard, Compete Climb Make an impact" — the same
+correction as the ladder's, and right for the same reason: the board is OF a
+room, so which room has to be settled before the filters that narrow it mean
+anything. Above the title it was worse; below the standings it was too late.
+{% endcomment %}
+{% include "partials/room_switch.html" with noun="leaderboard" surface="dark" %}
+
+{% comment %}
 TWO ROWS, COMPETITION FIRST. Asked for in exactly that order — "do not do that,
 have the round and competition in a separate row, so this will come first in
 their own row, All competition... and in that row beside it we can have the
@@ -220,11 +231,4 @@ filter bar: it is not a filter, it changes page.
   </aside>
 </div>
 
-{% comment %}
-WHICH ROOM THIS BOARD IS. Last, because it is context rather than content —
-and because it is a five-option control that was opening the page above its
-own title. Still on every board, still one click, just no longer the first
-thing read on the way to the standings.
-{% endcomment %}
-{% include "partials/room_switch.html" with noun="leaderboard" surface="dark" %}
 {% endblock %}

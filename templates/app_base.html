@@ -49,38 +49,6 @@ goodtip.css.
 <body class="app gt-app gt-v2 {% block body_class %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   {% include "public/partials/_icons.html" %}
 
-  {# ---- sport loader — post shape follows the code (AFL: four posts, no crossbar · NRL: one H frame). Never one shape recoloured for both. ---- #}
-  <div class="loader" id="loader" role="status" aria-label="Loading" data-min="400">
-    <div class="loader-inner">
-      <div class="pitch">
-        {% if primary_sport == "Rugby League" %}
-        <svg class="posts" viewBox="0 0 240 150" aria-hidden="true">
-          <g stroke="#C8F135" stroke-width="4" fill="none" stroke-linecap="round">
-            <line x1="84" y1="22" x2="84" y2="128"/><line x1="156" y1="22" x2="156" y2="128"/><line x1="84" y1="52" x2="156" y2="52"/>
-          </g>
-        </svg>
-        {% elif primary_sport == "Netball" %}
-        <svg class="posts" viewBox="0 0 240 150" aria-hidden="true">
-          <g stroke="#C8F135" stroke-width="4" fill="none" stroke-linecap="round">
-            <line x1="120" y1="42" x2="120" y2="128"/><ellipse cx="120" cy="34" rx="16" ry="6"/>
-          </g>
-        </svg>
-        {% else %}
-        <svg class="posts" viewBox="0 0 240 150" aria-hidden="true">
-          <g stroke="#C8F135" stroke-width="4" fill="none" stroke-linecap="round">
-            <line x1="48" y1="62" x2="48" y2="128"/><line x1="96" y1="18" x2="96" y2="128"/><line x1="144" y1="18" x2="144" y2="128"/><line x1="192" y1="62" x2="192" y2="128"/>
-          </g>
-        </svg>
-        {% endif %}
-        <span class="ball {% if primary_sport == 'Netball' %}round{% else %}oval{% endif %}" aria-hidden="true"></span><span class="ground"></span>
-      </div>
-      <div class="loader-word">GOOD<span>TIP</span><span class="dot" style="color:var(--lime)">.</span></div>
-      <div class="loader-sport" id="loaderSport">{% if primary_sport == "Rugby League" %}Rugby League{% elif primary_sport == "Netball" %}Netball{% else %}Aussie Rules{% endif %}</div>
-      <div class="loader-task">{% block loader_task %}Getting things ready{% endblock %}</div>
-      <div class="loader-bar"><i></i></div>
-    </div>
-  </div>
-
   {# ---- nav is the only sticky element; the charity strip sits under it and scrolls away with the page ---- #}
   <nav class="app-nav">
     <div class="an-inner">
@@ -516,7 +484,57 @@ goodtip.css.
         {% endfor %}
       </div>
     {% endif %}
+    {% comment %}
+    THE LOADER COVERS THE CONTENT, NOT THE WINDOW.
+
+    ASKED FOR: "it should not be the whole page, it should be that innermost
+    section that has our content — because it looks like the whole page is
+    loading — and as it loads I should be told what is happening."
+
+    It was `position: fixed; inset: 0`, so signing in to look at the ladder
+    blanked the nav, the organisation switcher, the bell and the charity strip
+    as well: everything on screen was withdrawn to report that one region was
+    being fetched. The furniture is not loading. It is already there, it is
+    already correct, and hiding it makes a fast page feel like a cold start.
+
+    Absolute inside the sheet instead. The nav stays usable while a board is
+    fetched, and what is covered is exactly what is being replaced — which is
+    also what makes the "what is happening" line honest, because it now labels
+    a region rather than the whole application. Each page fills in that line
+    through {% block loader_task %}.
+    {% endcomment %}
     <div class="page-sheet">
+  {# ---- sport loader — post shape follows the code (AFL: four posts, no crossbar · NRL: one H frame). Never one shape recoloured for both. ---- #}
+  <div class="loader loader-inset" id="loader" role="status" aria-live="polite" aria-label="Loading" data-min="400">
+    <div class="loader-inner">
+      <div class="pitch">
+        {% if primary_sport == "Rugby League" %}
+        <svg class="posts" viewBox="0 0 240 150" aria-hidden="true">
+          <g stroke="#C8F135" stroke-width="4" fill="none" stroke-linecap="round">
+            <line x1="84" y1="22" x2="84" y2="128"/><line x1="156" y1="22" x2="156" y2="128"/><line x1="84" y1="52" x2="156" y2="52"/>
+          </g>
+        </svg>
+        {% elif primary_sport == "Netball" %}
+        <svg class="posts" viewBox="0 0 240 150" aria-hidden="true">
+          <g stroke="#C8F135" stroke-width="4" fill="none" stroke-linecap="round">
+            <line x1="120" y1="42" x2="120" y2="128"/><ellipse cx="120" cy="34" rx="16" ry="6"/>
+          </g>
+        </svg>
+        {% else %}
+        <svg class="posts" viewBox="0 0 240 150" aria-hidden="true">
+          <g stroke="#C8F135" stroke-width="4" fill="none" stroke-linecap="round">
+            <line x1="48" y1="62" x2="48" y2="128"/><line x1="96" y1="18" x2="96" y2="128"/><line x1="144" y1="18" x2="144" y2="128"/><line x1="192" y1="62" x2="192" y2="128"/>
+          </g>
+        </svg>
+        {% endif %}
+        <span class="ball {% if primary_sport == 'Netball' %}round{% else %}oval{% endif %}" aria-hidden="true"></span><span class="ground"></span>
+      </div>
+      <div class="loader-word">GOOD<span>TIP</span><span class="dot" style="color:var(--lime)">.</span></div>
+      <div class="loader-sport" id="loaderSport">{% if primary_sport == "Rugby League" %}Rugby League{% elif primary_sport == "Netball" %}Netball{% else %}Aussie Rules{% endif %}</div>
+      <div class="loader-task">{% block loader_task %}Getting things ready{% endblock %}</div>
+      <div class="loader-bar"><i></i></div>
+    </div>
+  </div>
       {% block app_content %}{% endblock %}
     </div>
   </main>
