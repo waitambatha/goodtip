@@ -1,0 +1,157 @@
+{% extends "app_base.html" %}
+{% load team_extras %}
+{% block title %}{{ team.name }} stats, {{ series.name }}{% endblock %}
+{% block loader_task %}Working out {{ team.name }}'s season{% endblock %}
+{% block nav_ladder %}on{% endblock %}
+{% block body_class %}page-deep sheet-page{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+
+{% block app_content %}
+{% comment %}
+ONE CLUB'S SEASON, reached by pressing its row on the ladder.
+
+ASKED FOR: "for the ladder it will be for the teams — be able to click a team,
+see its stats, how has it been performing, for people who are more detailed with
+stats."
+
+The numbers are a fact about the competition, not about the league reading them,
+so they are the same whichever organisation you arrive from. Read from
+HistoricalMatch for the same reason the ladder is: tipping.Match is org-scoped
+and partial, so a tally taken from it multiplies every result by the number of
+leagues tipping the game.
+{% endcomment %}
+<div class="gt-head is-centred" data-code="{{ series.slug }}" data-cat="{{ series.category }}">
+  <div>
+    <div class="gh-eyebrow is-title">{{ series.name }} &middot; {{ org.season }}</div>
+    <h1 class="gh-title">{{ team.name }}</h1>
+    <p class="gh-sub">
+      {% if entry %}Ladder position {{ entry.rank }} &middot; {% endif %}
+      <a href="{% url 'tipping:ladder' org.id %}?series={{ series.slug }}">Back to the ladder &rarr;</a>
+    </p>
+  </div>
+</div>
+
+{% if stats.played %}
+<div class="statcards" data-code="{{ series.slug }}" data-cat="{{ series.category }}">
+  <div class="statcard">
+    <span class="sc-lab">Played</span>
+    <b class="sc-fig">{{ stats.played }}</b>
+    <span class="sc-note">{{ stats.won }}W &middot; {{ stats.lost }}L{% if stats.drawn %} &middot; {{ stats.drawn }}D{% endif %}</span>
+  </div>
+  <div class="statcard">
+    <span class="sc-lab">Win rate</span>
+    <b class="sc-fig">{{ stats.win_pct }}<small>%</small></b>
+    <span class="sc-note">{{ stats.won }} from {{ stats.played }}</span>
+  </div>
+  <div class="statcard">
+    <span class="sc-lab">Differential</span>
+    <b class="sc-fig">{% if stats.differential > 0 %}+{% endif %}{{ stats.differential }}</b>
+    <span class="sc-note">{{ stats.scored }} for, {{ stats.conceded }} against</span>
+  </div>
+  <div class="statcard">
+    <span class="sc-lab">Ladder</span>
+    <b class="sc-fig">{% if entry %}{{ entry.rank }}{% else %}&ndash;{% endif %}</b>
+    <span class="sc-note">{% if entry %}{{ entry.points }} competition points{% else %}not on the table yet{% endif %}</span>
+  </div>
+</div>
+
+{% if stats.trend %}
+<p class="trendline {% if stats.trend.delta > 0 %}is-up{% elif stats.trend.delta < 0 %}is-down{% else %}is-level{% endif %}">
+  {% if stats.trend.delta > 0 %}
+    Improving &mdash; winning <b>{{ stats.trend.recent }}%</b> over the last {{ stats.form_rounds }} against {{ stats.trend.earlier }}% before that.
+  {% elif stats.trend.delta < 0 %}
+    Falling away &mdash; winning <b>{{ stats.trend.recent }}%</b> over the last {{ stats.form_rounds }} against {{ stats.trend.earlier }}% before that.
+  {% else %}
+    Holding steady at <b>{{ stats.trend.recent }}%</b> over the last {{ stats.form_rounds }}.
+  {% endif %}
+</p>
+{% endif %}
+
+{% comment %}
+The season as a strip of results, newest on the right — the same reading order
+as the form strip on a fixture card, because they are the same fact.
+{% endcomment %}
+<div class="formrun" data-code="{{ series.slug }}" data-cat="{{ series.category }}">
+  {% for g in stats.run %}
+  <span class="fr-g {{ g.outcome|lower }}"
+        title="Round {{ g.round }}: {{ g.for }}&ndash;{{ g.against }} {% if g.at_home %}v{% else %}at{% endif %} {{ g.opponent.name }}">
+    <b>{{ g.outcome }}</b><i>{{ g.round }}</i>
+  </span>
+  {% endfor %}
+</div>
+
+<div class="statgrid" data-code="{{ series.slug }}" data-cat="{{ series.category }}">
+  <section class="statpanel">
+    <h2>Margin, round by round</h2>
+    <p class="sp-sub">Above the line is a win. How far above is how comfortable.</p>
+    {% if chart_margin %}
+    <div class="sp-chart">{% include "partials/_spark.html" with path=chart_margin.path fill_path=chart_margin.fill_path last=chart_margin.last uid="margin" label="Margin by round" %}</div>
+    <div class="sp-scale"><span>{{ chart_margin.low }}</span><span>{{ chart_margin.high }}</span></div>
+    {% else %}<p class="sp-empty">Fills in from the second game of the season.</p>{% endif %}
+  </section>
+
+  <section class="statpanel">
+    <h2>Scored and conceded</h2>
+    <p class="sp-sub">Averaging {{ stats.avg_for }} for and {{ stats.avg_against }} against.</p>
+    {% if chart_scored %}
+    <div class="sp-chart sp-two">
+      <span class="sp-for">{% include "partials/_spark.html" with path=chart_scored.path last=chart_scored.last uid="for" label="Points scored by round" %}</span>
+      <span class="sp-against">{% include "partials/_spark.html" with path=chart_conceded.path last=chart_conceded.last uid="against" label="Points conceded by round" %}</span>
+    </div>
+    <p class="sp-key"><span class="k-for">Scored</span><span class="k-against">Conceded</span></p>
+    {% else %}<p class="sp-empty">Fills in from the second game of the season.</p>{% endif %}
+  </section>
+
+  <section class="statpanel">
+    <h2>Home and away</h2>
+    <p class="sp-sub">Whether the ground makes a difference to this side.</p>
+    <div class="sp-rows">
+      {% for v in chart_venue %}
+      <div class="spr">
+        <span class="spr-lab">{{ v.name }}</span>
+        <span class="spr-track"><i style="width:{{ v.bar_pct }}%"></i></span>
+        <span class="spr-val">{% if v.win_pct is not None %}{{ v.win_pct }}%{% else %}&ndash;{% endif %}</span>
+        <span class="spr-n">{{ v.won }}/{{ v.played }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="statpanel">
+    <h2>Won and lost</h2>
+    <p class="sp-sub">Every completed game this season.</p>
+    {% if chart_split %}
+    <div class="sp-donut">
+      <svg viewBox="0 0 {{ chart_split.size }} {{ chart_split.size }}" role="img" aria-label="{{ chart_split.pct }} per cent won">
+        <circle cx="{{ chart_split.cx }}" cy="{{ chart_split.cy }}" r="{{ chart_split.r }}" fill="none"
+                stroke="currentColor" stroke-opacity=".16" stroke-width="{{ chart_split.thickness }}"/>
+        <circle cx="{{ chart_split.cx }}" cy="{{ chart_split.cy }}" r="{{ chart_split.r }}" fill="none"
+                stroke="currentColor" stroke-width="{{ chart_split.thickness }}" stroke-linecap="round"
+                stroke-dasharray="{{ chart_split.dash }}"
+                transform="rotate(-90 {{ chart_split.cx }} {{ chart_split.cy }})"/>
+      </svg>
+      <div class="sp-donut-mid"><b>{{ chart_split.pct }}%</b><span>won</span></div>
+    </div>
+    {% endif %}
+  </section>
+</div>
+
+<div class="sp-foot-grid">
+  {% if stats.biggest_win %}
+  <p class="sp-foot">Biggest win: <b>{{ stats.biggest_win.margin }}</b> in round {{ stats.biggest_win.round }},
+    {{ stats.biggest_win.for }}&ndash;{{ stats.biggest_win.against }} {% if stats.biggest_win.at_home %}v{% else %}at{% endif %} {{ stats.biggest_win.opponent.name }}.</p>
+  {% endif %}
+  {% if stats.heaviest_loss %}
+  <p class="sp-foot">Heaviest loss: <b>{{ stats.heaviest_loss.margin|cut:"-" }}</b> in round {{ stats.heaviest_loss.round }},
+    {{ stats.heaviest_loss.for }}&ndash;{{ stats.heaviest_loss.against }} {% if stats.heaviest_loss.at_home %}v{% else %}at{% endif %} {{ stats.heaviest_loss.opponent.name }}.</p>
+  {% endif %}
+</div>
+
+{% else %}
+<div class="card pad-lg" style="text-align:center;">
+  <div class="card-h">No completed games yet</div>
+  <p class="card-lead">{{ team.name }}'s season fills in here as results arrive.</p>
+  <a href="{% url 'tipping:ladder' org.id %}?series={{ series.slug }}" class="abtn abtn-primary" style="margin-top:14px;">Back to the ladder &rarr;</a>
+</div>
+{% endif %}
+{% endblock %}

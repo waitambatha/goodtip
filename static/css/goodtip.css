@@ -16034,3 +16034,158 @@ html[data-theme="light"] .gt-app .gt-board.ladder[data-code] .lad-head .lad-num 
   .gt-board.ladder .lad-row { grid-template-columns: 46px minmax(0,1fr) repeat(6, 50px); }
   .gt-board.ladder .lad-left { display: none; }
 }
+
+/* ============================================================================
+   STATS — a member's season, and a club's
+   ----------------------------------------------------------------------------
+   "I should have stats... some small visualisation, some charts and cards, that
+   shows my performance generally: have I grown or have I dropped, what is my
+   strongest competition, my weakness."
+
+   Everything here is drawn from markup and inline SVG rather than a charting
+   library: four small pictures of at most a season of rounds do not justify
+   60-90KB, a second palette for the dark theme, and a render that happens after
+   the page instead of with it. It also means every one of these prints, is
+   readable to a screen reader, and takes the competition's colour from the same
+   --code tokens as everything else.
+   ========================================================================= */
+
+/* ---- the four cards ------------------------------------------------------ */
+.statcards {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px; margin: 0 0 22px;
+}
+.statcard {
+  background: var(--gt-card); border: 1px solid var(--gt-hair);
+  border-radius: var(--gt-r-sm); padding: 18px 20px 16px;
+  border-top: 3px solid var(--code-ink, var(--forest));
+}
+.sc-lab {
+  display: block; font-family: var(--mark); font-weight: 800; font-size: 10.5px;
+  letter-spacing: .13em; text-transform: uppercase; color: var(--muted);
+}
+.sc-fig {
+  display: block; margin: 6px 0 4px; font-family: var(--score); font-weight: 900;
+  font-size: 38px; line-height: 1; color: var(--code-ink, var(--ink));
+  font-variant-numeric: tabular-nums;
+}
+.sc-fig small { font-size: 20px; margin-left: 1px; }
+.sc-note { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+
+/* ---- the sentence version of the trend -----------------------------------
+   Said in words as well as drawn. A line going up is a shape; this is the
+   claim, with the arithmetic behind it stated rather than left to be inferred
+   from a slope. */
+.trendline {
+  margin: 0 0 22px; padding: 14px 18px; border-radius: 14px; font-size: 15px;
+  background: rgba(232,228,213,.08); border: 1px solid rgba(232,228,213,.14);
+  color: var(--cream);
+}
+.trendline b { font-weight: 800; }
+.trendline.is-up { background: rgba(31,107,40,.16); border-color: rgba(31,107,40,.4); }
+.trendline.is-down { background: rgba(154,43,43,.14); border-color: rgba(154,43,43,.34); }
+html[data-theme="light"] .gt-app .trendline { color: var(--ink); background: rgba(15,46,34,.05); border-color: rgba(15,46,34,.12); }
+
+/* ---- the panels ---------------------------------------------------------- */
+.statgrid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px; margin-bottom: 20px;
+}
+.statpanel {
+  background: var(--gt-card); border: 1px solid var(--gt-hair);
+  border-radius: var(--gt-r-sm); padding: 20px 22px 22px;
+  color: var(--code-ink, var(--forest));
+}
+.statpanel h2 {
+  font-family: var(--display); font-size: 20px; color: var(--ink);
+  margin: 0; line-height: 1.15;
+}
+.sp-sub { margin: 5px 0 16px; font-size: 13px; color: var(--muted); }
+.sp-empty { font-size: 13.5px; color: var(--muted); font-style: italic; }
+.sp-verdict { margin: 14px 0 0; font-size: 13.5px; color: var(--ink); }
+.sp-verdict b { color: var(--code-ink, var(--forest)); }
+.sp-foot {
+  margin: 0; padding: 13px 18px; border-radius: 12px; font-size: 13.5px;
+  background: rgba(232,228,213,.07); border: 1px solid rgba(232,228,213,.13);
+  color: var(--cream);
+}
+.sp-foot b { color: var(--lime); }
+.sp-foot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+html[data-theme="light"] .gt-app .sp-foot { color: var(--ink); background: rgba(15,46,34,.05); border-color: rgba(15,46,34,.12); }
+html[data-theme="light"] .gt-app .sp-foot b { color: var(--forest); }
+.board-more { margin: 0 0 14px; text-align: right; }
+
+/* ---- the line chart ------------------------------------------------------
+   currentColor throughout, so the line, its fill and its end point all take
+   the panel's competition colour without a single hard-coded hex. */
+.sp-chart { position: relative; }
+.gt-spark { display: block; width: 100%; height: 120px; overflow: visible; }
+.sp-scale {
+  display: flex; justify-content: space-between; margin-top: 6px;
+  font-family: var(--score); font-size: 11.5px; color: var(--muted);
+}
+.sp-two { display: grid; }
+.sp-two > span { grid-area: 1 / 1; display: block; }
+.sp-two .sp-against { opacity: .42; }
+.sp-key { display: flex; gap: 16px; margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+.sp-key span::before {
+  content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 3px;
+  background: currentColor; margin-right: 6px; vertical-align: middle;
+}
+.sp-key .k-for { color: var(--code-ink, var(--forest)); }
+.sp-key .k-against { opacity: .55; }
+
+/* ---- bars, in markup rather than on a canvas ---------------------------- */
+.sp-bars {
+  display: flex; align-items: flex-end; gap: 4px; height: 130px;
+  padding-top: 6px;
+}
+.spb { flex: 1 1 0; display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; height: 100%; }
+.spb i {
+  display: block; background: var(--code-ink, var(--forest)); border-radius: 4px 4px 0 0;
+  min-height: 2px; opacity: .85; transition: opacity .14s var(--ease);
+}
+.spb:hover i { opacity: 1; }
+.spb span {
+  font-size: 9.5px; color: var(--muted); text-align: center; margin-top: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.sp-rows { display: grid; gap: 10px; }
+.spr { display: grid; grid-template-columns: 88px minmax(0,1fr) 46px 54px; align-items: center; gap: 10px; }
+.spr-lab { font-size: 13.5px; font-weight: 700; color: var(--code-ink, var(--ink)); }
+.spr-track { height: 10px; border-radius: 100px; background: rgba(15,46,34,.09); overflow: hidden; }
+.spr-track i { display: block; height: 100%; background: var(--code-ink, var(--forest)); border-radius: 100px; }
+.spr-val { font-family: var(--score); font-weight: 800; font-size: 14px; text-align: right; color: var(--ink); }
+.spr-n { font-size: 11.5px; color: var(--muted); text-align: right; }
+@media (max-width: 520px) { .spr { grid-template-columns: 74px minmax(0,1fr) 42px; } .spr-n { display: none; } }
+
+/* ---- the ring ------------------------------------------------------------ */
+.sp-donut { position: relative; width: 120px; margin: 6px auto 0; }
+.sp-donut svg { display: block; width: 120px; height: 120px; }
+.sp-donut-mid {
+  position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
+}
+.sp-donut-mid b {
+  display: block; font-family: var(--score); font-weight: 900; font-size: 25px;
+  color: var(--code-ink, var(--ink)); line-height: 1;
+}
+.sp-donut-mid span { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+
+/* ---- the season as a strip of results ------------------------------------ */
+.formrun { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 22px; }
+.fr-g {
+  width: 42px; padding: 7px 0 5px; border-radius: 10px; text-align: center;
+  background: var(--gt-card); border: 1px solid var(--gt-hair);
+}
+.fr-g b { display: block; font-family: var(--mark); font-weight: 900; font-size: 14px; line-height: 1; }
+.fr-g i { display: block; font-style: normal; font-size: 9.5px; color: var(--muted); margin-top: 3px; }
+.fr-g.w { background: rgba(31,107,40,.14); border-color: rgba(31,107,40,.4); }
+.fr-g.w b { color: #1f6b28; }
+.fr-g.l { background: rgba(154,43,43,.12); border-color: rgba(154,43,43,.32); }
+.fr-g.l b { color: #9a2b2b; }
+.fr-g.d b { color: #8a6206; }
+
+/* The club's name on the ladder is a link into its season. */
+.lad-link { text-decoration: none; color: var(--ink); }
+.lad-link:hover { color: var(--code-ink, var(--forest)); text-decoration: underline; }

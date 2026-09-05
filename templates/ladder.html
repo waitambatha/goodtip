@@ -133,7 +133,13 @@ sitting bright above a blank space.
           the app instead of a spreadsheet.
           {% endcomment %}
           {% crest e.team %}
-          <span class="gb-name">{{ e.team.name }}</span>
+          {% comment %}
+          THE CLUB IS A LINK NOW. "Be able to click a team, see its stats, how
+          has it been performing." The row itself stays a row — making the whole
+          thing clickable would swallow the crest and the numbers, and a table
+          where every cell navigates is a table you cannot select text in.
+          {% endcomment %}
+          <a class="gb-name lad-link" href="{% url 'tipping:team_stats' org.id e.team.id %}">{{ e.team.name }}</a>
         </span>
         <span class="lad-num lad-col">{{ e.played }}</span>
         <span class="lad-num lad-col lad-w">{{ e.wins }}</span>

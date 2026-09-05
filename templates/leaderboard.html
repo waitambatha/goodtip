@@ -177,6 +177,12 @@ The sidebar is not deleted, it is moved: summary, cause and quote become a row
 of cards under the board, where they are still read and no longer compete with
 it.
 {% endcomment %}
+{% comment %}
+The way into the detail behind this board. Beside the table rather than in the
+filter bar: it is not a filter, it changes page.
+{% endcomment %}
+<p class="board-more"><a class="abtn abtn-ghost" href="{% url 'tipping:my_stats' org.id %}{% if selected_comp %}?comp={{ selected_comp.slug }}{% endif %}">My stats &rarr;</a></p>
+
 <div data-coach="board-table">
   <div>
     {% include "partials/leaderboard_table.html" with ranked=ranked me=request.user %}

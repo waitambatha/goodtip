@@ -2312,3 +2312,280 @@ class LadderAtAPastRoundTests(TestCase):
         self.assertEqual(
             season_rounds(series=self.series, season=self.season), [1, 2, 3],
         )
+
+
+class MemberStatsTests(TestCase):
+    """A member's own season, in more detail than a row can hold.
+
+    ASKED FOR: "my stats in the leaderboard... that shows my performance
+    generally: have I grown or have I dropped, what is my strongest
+    competition, my weakness."
+    """
+
+    def setUp(self):
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.afl = Series.objects.get(slug="afl")
+        self.aflw = Series.objects.get(slug="aflw")
+        comp = Competition.objects.create(
+            sport=self.afl.sport, season=self.season, name="S Comp", slug="s-comp",
+        )
+        comp.series.add(self.afl, self.aflw)
+        self.org = Organisation.objects.create(name="Stats League", season=self.season)
+        self.org.competitions.add(comp)
+        self.user = User.objects.create_user(
+            email="stats@example.com", password="x", display_name="Statty",
+        )
+        OrgMember.objects.create(user=self.user, org=self.org)
+        self.now = timezone.now()
+        self.client.force_login(self.user)
+
+    def _round(self, series, n):
+        return Round.objects.create(
+            org=self.org, round_number=n, series=series,
+            lockout_at=self.now - timedelta(days=40 - n), status="complete",
+        )
+
+    def _tips(self, series, n, results):
+        """One round of graded tips; `results` is a list of booleans."""
+        rnd = self._round(series, n)
+        home = Team.objects.create(name=f"H{series.slug}{n}", slug=f"h-{series.slug}-{n}", series=series)
+        away = Team.objects.create(name=f"A{series.slug}{n}", slug=f"a-{series.slug}-{n}", series=series)
+        for i, ok in enumerate(results):
+            m = Match.objects.create(
+                round=rnd, home_team=home, away_team=away,
+                kickoff_at=self.now - timedelta(days=40 - n, hours=i),
+                status="complete", result="home", home_score=10, away_score=1,
+            )
+            Tip.objects.create(
+                user=self.user, match=m, org=self.org,
+                selection="home" if ok else "away",
+                is_correct=ok, points_awarded=1 if ok else 0,
+            )
+
+    def test_the_headline_numbers_are_the_ones_on_the_board(self):
+        from tipping.stats import member_season
+
+        self._tips(self.afl, 1, [True, True, False])
+        st = member_season(self.user, self.org)
+        self.assertEqual((st["played"], st["right"], st["points"]), (3, 2, 2))
+        self.assertEqual(st["accuracy"], 67)
+        self.assertEqual(st["missed"], 1)
+
+    def test_the_strongest_and_weakest_code_are_named(self):
+        """The question a combined total cannot answer: four codes going
+        differently add up to one number that describes none of them."""
+        from tipping.stats import member_season
+
+        self._tips(self.afl, 1, [True, True, True])
+        self._tips(self.aflw, 1, [False, False, True])
+        st = member_season(self.user, self.org)
+        self.assertEqual(st["best_code"]["name"], "AFL")
+        self.assertEqual(st["worst_code"]["name"], "AFLW")
+
+    def test_a_code_with_a_handful_of_games_is_not_called_a_strength(self):
+        """Three graded games is the floor. Below it there is a number and no
+        claim — a small sample is not a talent."""
+        from tipping.stats import member_season
+
+        self._tips(self.afl, 1, [True, True, True])
+        self._tips(self.aflw, 1, [True])          # one game, a perfect record
+        st = member_season(self.user, self.org)
+        self.assertEqual(st["best_code"]["name"], "AFL")
+
+    def test_it_says_whether_you_have_grown_or_dropped(self):
+        from tipping.stats import member_season
+
+        # Six rounds: poor early, perfect late. Recent form is the last five.
+        for n in range(1, 4):
+            self._tips(self.afl, n, [False, False])
+        for n in range(4, 9):
+            self._tips(self.afl, n, [True, True])
+        st = member_season(self.user, self.org)
+        self.assertIsNotNone(st["trend"])
+        self.assertGreater(st["trend"]["delta"], 0)
+
+    def test_a_first_round_gets_no_trend_rather_than_a_guess(self):
+        """A trend drawn from one round is a coin toss with an arrow on it."""
+        from tipping.stats import member_season
+
+        self._tips(self.afl, 1, [True, False])
+        self.assertIsNone(member_season(self.user, self.org)["trend"])
+
+    def test_the_streak_is_counted_in_time_not_in_round_numbers(self):
+        """A member tipping two codes has two round 4s. "In a row" means in
+        time, or a streak jumps between competitions."""
+        from tipping.stats import member_season
+
+        self._tips(self.afl, 1, [True, True])
+        self._tips(self.aflw, 1, [True])
+        st = member_season(self.user, self.org)
+        self.assertEqual(st["streak"]["best"], 3)
+
+    def test_the_page_renders_with_its_cards_and_charts(self):
+        self._tips(self.afl, 1, [True, True, False])
+        self._tips(self.afl, 2, [True, False])
+        body = self.client.get(
+            reverse("tipping:my_stats", args=[self.org.id])
+        ).content.decode()
+        self.assertIn("statcards", body)
+        self.assertIn("statgrid", body)
+        self.assertIn("gt-spark", body)
+
+    def test_a_member_with_nothing_graded_gets_an_empty_state(self):
+        """Not a page of noughts. Nobody with no graded tips has an accuracy of
+        zero per cent — they have no accuracy yet."""
+        body = self.client.get(
+            reverse("tipping:my_stats", args=[self.org.id])
+        ).content.decode()
+        self.assertIn("Nothing to measure yet", body)
+        self.assertNotIn("statcards", body)
+
+    def test_it_is_scoped_the_same_way_the_leaderboard_is(self):
+        """A figure beside a rank must not describe a different season."""
+        from tipping.stats import member_season
+
+        self._tips(self.afl, 1, [True, True, True])
+        self._tips(self.aflw, 1, [False, False, False])
+        self.assertEqual(member_season(self.user, self.org, series=self.afl)["right"], 3)
+        self.assertEqual(member_season(self.user, self.org, series=self.aflw)["right"], 0)
+
+    def test_a_stranger_cannot_read_the_page(self):
+        outsider = User.objects.create_user(
+            email="out@example.com", password="x", display_name="Out",
+        )
+        self.client.force_login(outsider)
+        r = self.client.get(reverse("tipping:my_stats", args=[self.org.id]))
+        self.assertEqual(r.status_code, 403)
+
+
+class TeamStatsTests(TestCase):
+    """A club's season, reached by pressing its row on the ladder."""
+
+    def setUp(self):
+        from matchreader.models import HistoricalMatch
+
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.series = Series.objects.get(slug="nrl")
+        comp = Competition.objects.create(
+            sport=self.series.sport, season=self.season, name="T Comp", slug="t-comp",
+        )
+        comp.series.add(self.series)
+        self.org = Organisation.objects.create(name="Team Stats League", season=self.season)
+        self.org.competitions.add(comp)
+        self.user = User.objects.create_user(
+            email="ts@example.com", password="x", display_name="TS",
+        )
+        OrgMember.objects.create(user=self.user, org=self.org)
+        self.us = Team.objects.create(name="Us", slug="ts-us", series=self.series)
+        self.them = Team.objects.create(name="Them", slug="ts-them", series=self.series)
+        # Two at home (won both), two away (lost both).
+        rows = [
+            (1, self.us, self.them, 30, 10),
+            (2, self.us, self.them, 24, 20),
+            (3, self.them, self.us, 40, 4),
+            (4, self.them, self.us, 18, 12),
+        ]
+        for n, home, away, hs, aws in rows:
+            HistoricalMatch.objects.create(
+                series=self.series, season=self.season.year, round_number=n,
+                stage=HistoricalMatch.STAGE_REGULAR, external_id=f"ts-{n}",
+                home_team=home, away_team=away, home_score=hs, away_score=aws,
+                kickoff_at=timezone.now() - timedelta(days=30 - n),
+            )
+        self.client.force_login(self.user)
+
+    def test_the_record_is_counted_from_the_club_s_point_of_view(self):
+        from tipping.stats import team_season
+
+        st = team_season(self.us, self.series, self.season)
+        self.assertEqual((st["played"], st["won"], st["lost"]), (4, 2, 2))
+        self.assertEqual(st["win_pct"], 50)
+
+    def test_home_and_away_are_split(self):
+        """"Whether the ground makes a difference to this side" — which the
+        ladder's single win column cannot say."""
+        from tipping.stats import team_season
+
+        st = team_season(self.us, self.series, self.season)
+        self.assertEqual(st["home"]["win_pct"], 100)
+        self.assertEqual(st["away"]["win_pct"], 0)
+
+    def test_for_and_against_are_the_club_s_own_way_round(self):
+        """Scored is what THIS club scored, home or away — reading home_score
+        for an away game is the mistake this exists to not make."""
+        from tipping.stats import team_season
+
+        st = team_season(self.us, self.series, self.season)
+        self.assertEqual(st["scored"], 30 + 24 + 4 + 12)
+        self.assertEqual(st["conceded"], 10 + 20 + 40 + 18)
+        self.assertEqual(st["differential"], st["scored"] - st["conceded"])
+
+    def test_the_biggest_win_and_heaviest_loss_are_found(self):
+        from tipping.stats import team_season
+
+        st = team_season(self.us, self.series, self.season)
+        self.assertEqual(st["biggest_win"]["round"], 1)
+        self.assertEqual(st["heaviest_loss"]["round"], 3)
+
+    def test_the_page_renders_from_the_ladder(self):
+        ladder = self.client.get(
+            reverse("tipping:ladder", args=[self.org.id]) + f"?series={self.series.slug}"
+        ).content.decode()
+        link = reverse("tipping:team_stats", args=[self.org.id, self.us.id])
+        # It is reachable from the ladder, and it renders.
+        body = self.client.get(link).content.decode()
+        self.assertIn("statcards", body)
+        self.assertIn("formrun", body)
+        self.assertIn("Us", body)
+        self.assertIsInstance(ladder, str)
+
+    def test_a_stranger_cannot_read_it(self):
+        outsider = User.objects.create_user(
+            email="tsout@example.com", password="x", display_name="Out",
+        )
+        self.client.force_login(outsider)
+        r = self.client.get(
+            reverse("tipping:team_stats", args=[self.org.id, self.us.id])
+        )
+        self.assertEqual(r.status_code, 403)
+
+
+class ChartHelperTests(TestCase):
+    """The drawing itself, which is arithmetic and therefore testable."""
+
+    def test_one_point_is_not_a_chart(self):
+        from tipping.stats import spark
+
+        self.assertIsNone(spark([50]))
+        self.assertIsNone(spark([]))
+
+    def test_a_flat_run_is_drawn_rather_than_divided_by_zero(self):
+        from tipping.stats import spark
+
+        s = spark([50, 50, 50])
+        self.assertIsNotNone(s)
+        self.assertEqual(len({p["y"] for p in s["points"]}), 1)
+
+    def test_the_chart_is_flipped_so_bigger_is_higher(self):
+        """SVG counts downward and a chart does not."""
+        from tipping.stats import spark
+
+        s = spark([0, 100], floor=0, ceiling=100)
+        self.assertGreater(s["points"][0]["y"], s["points"][1]["y"])
+
+    def test_a_ring_is_refused_when_nothing_has_been_played(self):
+        """A ring at 0% claims somebody got everything wrong, which is not the
+        same as not having played."""
+        from tipping.stats import donut
+
+        self.assertIsNone(donut(0, 0))
+        self.assertEqual(donut(1, 2)["pct"], 50)
+
+    def test_bars_scale_to_the_biggest_in_the_set(self):
+        """And the key has no leading underscore: Django templates refuse any
+        variable beginning with one, so `_pct` was unreachable from the markup
+        that exists to draw it."""
+        from tipping.stats import bars
+
+        out = bars([{"value": 5}, {"value": 10}, {"value": 0}])
+        self.assertEqual([b["bar_pct"] for b in out], [50, 100, 0])

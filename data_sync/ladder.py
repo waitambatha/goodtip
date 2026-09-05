@@ -226,12 +226,18 @@ def season_rounds(*, series, season) -> list[int]:
     """
     from matchreader.models import HistoricalMatch
 
+    # .order_by() BEFORE .distinct(), and it is not optional. HistoricalMatch
+    # orders by kickoff_at, and Django adds every ordering field to the SELECT
+    # so the database can sort — which means DISTINCT is applied to
+    # (round_number, kickoff_at) and returns one row per GAME. The list came
+    # back as [1, 1, 1, 1, 1, 1]: six matches in round one, not six rounds.
     return sorted(
         HistoricalMatch.objects.filter(
             series=series,
             season=season.year if hasattr(season, "year") else season,
             stage=HistoricalMatch.STAGE_REGULAR,
         )
+        .order_by()
         .values_list("round_number", flat=True)
         .distinct()
     )

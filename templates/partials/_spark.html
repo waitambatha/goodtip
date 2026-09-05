@@ -1,0 +1,24 @@
+{% comment %}
+A run of rounds as a line, with the last point marked.
+
+Expects: points (list of {x, y, label, value}), plus `w`/`h` if the default
+440x120 box is wrong for the slot. Values are already scaled to 0-100 on y by
+the caller; y is flipped here because SVG counts downward and a chart does not.
+
+No axis. At this size an axis is four more lines competing with the one line
+that carries the information, and the numbers either side of the chart say what
+the range is.
+{% endcomment %}
+<svg class="gt-spark" viewBox="0 0 440 120" preserveAspectRatio="none" role="img"
+     aria-label="{{ label|default:'Trend by round' }}">
+  <defs>
+    <linearGradient id="sparkfill-{{ uid }}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="currentColor" stop-opacity=".28"/>
+      <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  {% if fill_path %}<path d="{{ fill_path }}" fill="url(#sparkfill-{{ uid }})"/>{% endif %}
+  <path d="{{ path }}" fill="none" stroke="currentColor" stroke-width="3"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  {% if last %}<circle cx="{{ last.x }}" cy="{{ last.y }}" r="6" fill="currentColor"/>{% endif %}
+</svg>

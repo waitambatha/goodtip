@@ -1031,6 +1031,90 @@ def ladder_view(request, org_id: int):
 
 
 @login_required
+def my_stats_view(request, org_id: int):
+    """A member's own season, in more detail than a row of a table can hold.
+
+    ASKED FOR: "I should have stats — my stats in the leaderboard, with some
+    small visualisation, some charts and cards, that shows my performance
+    generally: have I grown or have I dropped, what is my strongest competition,
+    my weakness."
+
+    Scoped exactly like the leaderboard it hangs off — same org, same room, same
+    optional competition — so a figure here can never describe a different
+    season from the rank it sits behind.
+    """
+    from .stats import bars, donut, member_season, spark
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_member(request.user, org):
+        return HttpResponseForbidden()
+
+    options = org_series(org)
+    selected = pick_series(options, request.GET.get("comp"))
+    group = _group(request, org)
+    st = member_season(request.user, org, group=group, series=selected)
+    return render(request, "my_stats.html", {
+        "org": org,
+        "comp_options": options,
+        "selected_comp": selected,
+        "stats": st,
+        "rank": user_rank_in_org(request.user, org, group=group),
+        # Four pictures, and each one answers a question the table cannot.
+        "chart_accuracy": spark(
+            [r["accuracy"] for r in st["run"]], floor=0, ceiling=100,
+        ),
+        "chart_points": bars(st["run"], key="points"),
+        "chart_codes": bars(st["codes"], key="accuracy"),
+        "chart_split": donut(st["right"], st["played"]),
+    })
+
+
+@login_required
+def team_stats_view(request, org_id: int, team_id: int):
+    """One club's season, reached by pressing its row on the ladder.
+
+    ASKED FOR: "for the ladder it will be for the teams — be able to click a
+    team, see its stats, how has it been performing, for people who are more
+    detailed with stats."
+
+    The club's season is a fact about the competition, not about the league
+    reading it, so the numbers are the same whichever organisation you come
+    from. The org in the URL is there for the permission check and for the way
+    back to the right ladder.
+    """
+    from .stats import bars, donut, spark, team_season
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_member(request.user, org):
+        return HttpResponseForbidden()
+    team = get_object_or_404(Team, pk=team_id)
+
+    entry = (
+        LadderEntry.objects.filter(series=team.series, season=org.season, team=team)
+        .select_related("team")
+        .first()
+    )
+    st = team_season(team, team.series, org.season)
+    return render(request, "team_stats.html", {
+        "org": org,
+        "team": team,
+        "series": team.series,
+        "entry": entry,
+        "stats": st,
+        "chart_margin": spark([r["margin"] for r in st["run"]]),
+        "chart_scored": spark([r["for"] for r in st["run"]], floor=0),
+        "chart_conceded": spark([r["against"] for r in st["run"]], floor=0),
+        "chart_split": donut(st["won"], st["played"]),
+        "chart_venue": bars(
+            [
+                {"name": "At home", **st["home"], "value": st["home"]["win_pct"] or 0},
+                {"name": "Away", **st["away"], "value": st["away"]["win_pct"] or 0},
+            ],
+        ),
+    })
+
+
+@login_required
 def leaderboard_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _require_member(request.user, org):
@@ -1147,7 +1231,10 @@ def leaderboard_view(request, org_id: int):
         labels[str(r.id)] = f"Round {r.round_number}"
     # The strip of round buttons, on the same design as the ladder's — five at
     # a time, the current one highlighted, stepping backwards a page at a time.
-    numbers = [r.round_number for r in reversed(list(rounds))]
+    # DE-DUPLICATED. A Round row is per (org, round_number, series), so a league
+    # tipping four codes has four round 1s — the strip showed "26 26 27 27" and
+    # a window of five held three distinct rounds.
+    numbers = sorted({r.round_number for r in rounds})
     here_number = next(
         (r.round_number for r in rounds if str(r.id) == selected_round_id), None,
     )
