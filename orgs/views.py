@@ -1661,7 +1661,43 @@ def members_view(request, org_id: int):
     group_count = Group.objects.filter(
         org=org, approval_status=Group.APPROVAL_APPROVED,
     ).count()
+
+    # ---- WHICH PANEL IS UNDER THE CARDS.
+    #
+    # ASKED FOR: "if I click an item, let it carry the colour — so if it's
+    # invite, whatever place we have the table, it should load and show me the
+    # invitation, either via email or link ... the cards will remain and help us
+    # navigate from one to the other."
+    #
+    # A query parameter and not a tab widget: every panel is then bookmarkable,
+    # the back button walks between them, and the whole thing works with no
+    # JavaScript. The cards are links that look pressed when their panel is on.
+    panel = request.GET.get("panel", "members")
+    if panel not in {"members", "groups", "orgs", "team", "invite"}:
+        panel = "members"
+
+    # The groups panel is a two-row navigator: your organisations, then the
+    # groups inside whichever one you pressed. ?porg= says which — defaulting to
+    # this one, so the panel opens on the organisation you are already in.
+    panel_orgs = [
+        m.org for m in
+        OrgMember.objects.filter(user=request.user).select_related("org").order_by("org__name")
+    ]
+    porg_id = request.GET.get("porg")
+    panel_org = next((o for o in panel_orgs if str(o.id) == porg_id), org)
+    panel_groups = list(
+        Group.objects.filter(
+            org=panel_org, approval_status=Group.APPROVAL_APPROVED,
+        ).order_by("name")
+    ) if panel == "groups" else []
+
     return render(request, "orgs/members.html", {
+        "panel": panel,
+        "panel_orgs": panel_orgs,
+        "panel_org": panel_org,
+        "panel_groups": panel_groups,
+        "invite_url": _invite_url(request, org) if panel == "invite" else "",
+        "email_form": InviteByEmailForm() if panel == "invite" else None,
         "org": org,
         "members": members,
         "pending_requests": pending_requests,

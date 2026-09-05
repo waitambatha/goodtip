@@ -1170,3 +1170,60 @@ html[data-theme="light"] .gtm-fold { background: rgba(15,46,34,.06); border-colo
 html[data-theme="light"] .gtm-details { box-shadow: -24px 0 48px -24px rgba(15,46,34,.18); }
 html[data-theme="light"] .gtm-chat-id:hover { background: rgba(15,46,34,.05); }
 html[data-theme="light"] .gtm-chip { background: #FFFFFF; }
+
+/* ==========================================================================
+   FOURTH PASS — the composer sits on the floor, and the emoji get categories
+   ========================================================================== */
+
+/* ---- THE COMPOSER IS THE LAST THING ------------------------------------
+   "Where I type messages it should be at the bottom, because currently under it
+   we have space — I do not want to see that space under it."
+
+   Sixteen pixels of padding under the row, plus eight of margin above a line of
+   hint text, plus that line itself. The words are worth keeping (Enter sends,
+   the mic, the size limit) so they stay and the GAP goes: the hint tucks up
+   against the row and the composer ends where the panel does. */
+.gtm-composer { padding: 10px 20px 10px; }
+.gtm-composer .cc-hint { margin-top: 6px; margin-bottom: 0; line-height: 1.35; }
+@media (max-width: 760px) { .gtm-composer { padding: 8px 12px 8px; } }
+
+/* ---- THE EMOJI PANEL, SORTED --------------------------------------------
+   "Let me be able to sort the way I see in WhatsApp, where we have emoji: one
+   for cars, the other for sports, more for signs, cups, sports, flags."
+
+   Eight tabs across the top, one grid under them, and the grid scrolls. Fixed
+   height rather than growing with the category, or the panel would be three
+   rows tall on Flags and forty on Symbols and the tabs would move every time
+   you pressed one. */
+.cc-emoji-menu {
+  display: block; width: min(340px, calc(100vw - 40px));
+  padding: 6px; max-height: 320px;
+}
+.cc-emoji-tabs {
+  display: flex; gap: 2px; padding: 2px 2px 6px;
+  border-bottom: 1px solid var(--m-line); margin-bottom: 6px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.cc-emoji-tabs::-webkit-scrollbar { display: none; }
+.cc-emoji-tab {
+  flex: none; width: 32px; height: 30px; display: grid; place-items: center;
+  background: none; border: 0; cursor: pointer; border-radius: 8px;
+  font-size: 16px; line-height: 1; opacity: .55;
+}
+.cc-emoji-tab:hover { background: rgba(255,255,255,.08); opacity: 1; }
+.cc-emoji-tab.on { background: var(--m-accent-bg); opacity: 1; }
+.cc-emoji-grid {
+  display: grid; grid-template-columns: repeat(8, 1fr); gap: 1px;
+  max-height: 264px; overflow-y: auto; overscroll-behavior: contain;
+}
+.cc-emoji-grid button {
+  background: none; border: 0; cursor: pointer; border-radius: 7px;
+  font-size: 19px; line-height: 1; padding: 5px 0;
+}
+.cc-emoji-grid button:hover { background: rgba(255,255,255,.12); }
+html[data-theme="light"] .cc-emoji-grid button:hover,
+html[data-theme="light"] .cc-emoji-tab:hover { background: rgba(15,46,34,.07); }
+
+/* The second attach button. Same shape as the paperclip, different job: that
+   one opens on documents, this one on photos and short video. */
+.gtm-composer .cc-shot svg { stroke-width: 1.8; }

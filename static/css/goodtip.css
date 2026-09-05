@@ -16749,13 +16749,29 @@ a.pf-row:hover { border-color: rgba(45,122,58,.4); }
 .bb-when svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; }
 html[data-theme="light"] .gt-app .bb-when { color: var(--lt-quiet); }
 
-/* Eight buttons rather than five, so the strip takes the bar's whole first line
-   and the picker takes the second. Two rows beat one that wraps in a different
-   place on every screen. */
-.boardbar-round { flex-direction: column; align-items: stretch; }
-.boardbar-round .rstrip { width: 100%; }
-.boardbar-round .rs-nums { flex-wrap: wrap; }
-.boardbar-round .bb-round-pick { flex: 1 1 100%; }
+/* MY TIPS ONLY. Eight buttons rather than the leaderboard's five, so the strip
+   takes the bar's whole first line and the picker takes the second. Two rows
+   beat one that wraps in a different place on every screen — and this must NOT
+   reach .boardbar-round on the leaderboard and the ladder, which are asked to
+   be one line and are narrow enough to be one. */
+.boardbar-tips { flex-direction: column; align-items: stretch; }
+/* All-competitions mode: what you are looking at, and the two steps either
+   side of it. */
+.bb-multi { font-size: 14px; color: var(--cream); }
+html[data-theme="light"] .gt-app .bb-multi { color: var(--lt-ink); }
+.bb-chip {
+  display: inline-block; font-family: var(--mark); font-size: 10.5px;
+  font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  padding: 4px 9px; border-radius: 100px; margin-left: 6px;
+  background: rgba(255,255,255,.09); color: rgba(232,228,213,.8);
+}
+html[data-theme="light"] .gt-app .bb-chip { background: rgba(15,46,34,.07); color: var(--lt-quiet); }
+/* The competition filter is a card in its own right and needs the full measure
+   under it, not the sliver a flex row gives its content. */
+.sfilter { width: 100%; }
+.boardbar-tips .rstrip { width: 100%; }
+.boardbar-tips .rs-nums { flex-wrap: wrap; }
+.boardbar-tips .bb-round-pick { flex: 1 1 100%; }
 
 /* THE ORGANISATION OUTRANKS THE WORD on the groups hero too. `.gh-eyebrow
    .is-title` is scoped to .gt-head, which this hero is not, so the size has to
@@ -16792,59 +16808,98 @@ html[data-theme="light"] .gt-app .app-head.is-orgfirst .app-eyebrow { color: var
 html[data-theme="light"] .gt-app .app-head.is-orgfirst .app-h1 { color: var(--lt-accent-ink); }
 .app-head-act { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
 
-/* ---- WHAT IS UNDER THIS ORGANISATION -------------------------------------
-   Two cards, side by side, each a link with its own count. They lead the page
-   because "what if we had 200 members — will I scroll down to know we have
-   that?" A count at the top answers it without a scroll, and reads zero just
-   as usefully as it reads seven. */
-.ocards {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 14px; margin-bottom: 22px;
-}
-.ocard {
-  display: flex; align-items: center; gap: 14px; text-decoration: none;
-  padding: 16px 18px; border-radius: var(--gt-r);
-  background: var(--gt-card); border: 1px solid var(--gt-hair);
-  color: var(--ink); transition: border-color .15s var(--ease), transform .15s var(--ease);
-}
-.ocard:hover { border-color: rgba(45,122,58,.4); transform: translateY(-1px); }
-.ocard-ic {
-  width: 40px; height: 40px; flex: none; display: grid; place-items: center;
-  border-radius: 12px; background: rgba(45,122,58,.1); color: var(--forest);
-}
-.ocard-ic svg { width: 19px; height: 19px; fill: currentColor; }
-.ocard-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.ocard-txt b { font-size: 15px; font-weight: 800; }
-.ocard-txt i { font-style: normal; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
-/* The number is the point of the card, so it is the biggest thing on it. */
-.ocard-n {
-  flex: none; font-family: var(--display); font-size: 30px; line-height: 1;
-  color: var(--forest);
-}
-.ocard-go { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--muted); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+/* ---- FOUR SMALL SQUARE CARDS, ONE COLOUR EACH ---------------------------
+   "I need a card that is small, a square card — not this big thing with all
+   these details ... all should be the same size, different colours ... if I
+   click an item let it carry the colour."
 
-/* ---- TEAM MANAGEMENT: the card IS the control ----------------------------
-   Closed it is a card like the two above; open it is the panel. Everything
-   that CHANGES somebody lives in here, so the members table above can be the
-   list of facts it was always trying to be. */
-.tmcard {
-  margin-top: 22px; border-radius: var(--gt-r);
-  background: var(--gt-card); border: 1px solid var(--gt-hair); overflow: hidden;
+   A fixed square rather than a stretched row: four equal targets read as one
+   control, and the count inside each is the whole reason the strip is at the
+   top — "what if we had 200 members, will I scroll down to know we have that?"
+
+   The colour is per card and lives on --pc. Off, it tints the icon and the
+   border; on, it fills the card. One custom property, five cards. */
+.pcards {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 12px; margin-bottom: 22px;
 }
-.tmcard-head {
-  display: flex; align-items: center; gap: 14px; cursor: pointer;
-  padding: 16px 18px; list-style: none;
+.pcard {
+  --pc: var(--forest);
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between;
+  gap: 8px; text-decoration: none; aspect-ratio: 1 / .82; padding: 14px;
+  border-radius: var(--gt-r-sm); color: var(--ink);
+  background: var(--gt-card); border: 1.5px solid var(--gt-hair);
+  transition: transform .14s var(--ease), border-color .14s var(--ease);
 }
-.tmcard-head::-webkit-details-marker { display: none; }
-.tmcard-head:hover { background: rgba(45,122,58,.05); }
-.tmcard-chev {
-  width: 16px; height: 16px; flex: none; fill: none; stroke: var(--muted);
-  stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
-  transition: transform .18s var(--ease);
+.pcard:hover { transform: translateY(-2px); border-color: var(--pc); }
+.pcard-ic {
+  width: 34px; height: 34px; display: grid; place-items: center;
+  border-radius: 10px; background: color-mix(in srgb, var(--pc) 14%, transparent);
+  color: var(--pc);
 }
-.tmcard[open] .tmcard-chev { transform: rotate(90deg); }
-.tmcard-body { padding: 4px 18px 20px; border-top: 1px solid var(--gt-hair); }
-.tmcard-body .card-lead { margin: 14px 0 16px; }
+.pcard-ic svg { width: 17px; height: 17px; fill: currentColor; }
+.pcard b { font-size: 14px; font-weight: 800; line-height: 1.2; }
+/* The number is the point of the card, so it is the biggest thing on it. */
+.pcard i {
+  font-style: normal; font-family: var(--display); font-size: 24px;
+  line-height: 1; color: var(--pc);
+}
+/* THE ONE YOU ARE ON WEARS ITS COLOUR. "Let it carry the colour." */
+.pcard.on {
+  background: var(--pc); border-color: var(--pc); color: #fff;
+}
+.pcard.on .pcard-ic { background: rgba(255,255,255,.2); color: #fff; }
+.pcard.on i { color: rgba(255,255,255,.9); }
+.pcard.c-members { --pc: #2D7A3A; }
+.pcard.c-groups  { --pc: #1F6FA8; }
+.pcard.c-orgs    { --pc: #8A5A17; }
+.pcard.c-team    { --pc: #6B3FA0; }
+.pcard.c-invite  { --pc: #A83254; }
+
+/* ---- THE PANEL UNDER THEM ------------------------------------------------
+   One box, whatever the cards point at. It keeps its own frame so the strip
+   above always reads as a switch attached to something. */
+.ppanel {
+  background: var(--gt-card); border: 1px solid var(--gt-hair);
+  border-radius: var(--gt-r); padding: 18px 20px 22px; margin-bottom: 22px;
+}
+.ppanel-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; margin-bottom: 16px;
+}
+/* The ladder's board, inside a card that already has padding and a frame. */
+.ppanel .mb-board { border: 0; background: none; }
+.mb-board .gb-head, .mb-board .gb-row { grid-template-columns: minmax(0,1fr) auto 120px; }
+.mb-roles { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+.mb-when { text-align: right; color: var(--muted); font-size: 13px; white-space: nowrap; }
+.mb-board .gb-name small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
+
+/* ---- THE ORGANISATION → GROUPS NAVIGATOR --------------------------------
+   "The first one been the organisations I have, then if I click that
+   organisation, under it is the groups." Two rows, the second following the
+   first — the same shape as the room switcher, so the gesture is learned. */
+.pnav-row + .pnav-row { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--gt-hair); }
+.pnav-lab {
+  display: block; margin-bottom: 10px;
+  font-family: var(--mark); font-weight: 800; font-size: 10.5px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+}
+.pnav-opts { display: flex; gap: 8px; flex-wrap: wrap; }
+.pnav-opt {
+  display: inline-flex; align-items: center; gap: 7px; text-decoration: none;
+  padding: 9px 15px; border-radius: 100px; font-size: 13.5px; font-weight: 600;
+  color: var(--ink); background: rgba(45,122,58,.06); border: 1px solid var(--gt-hair);
+}
+.pnav-opt:hover { border-color: var(--forest); }
+.pnav-opt.on { background: var(--forest); border-color: var(--forest); color: #fff; }
+.pnav-opt i { font-style: normal; font-size: 11.5px; opacity: .65; }
+.pnav-opt.is-add { background: none; color: var(--forest); font-weight: 700; }
+.pnav-none { font-size: 13px; color: var(--muted); }
+
+/* ---- THE INVITE PANEL ---------------------------------------------------- */
+.pinvite { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 26px; }
+.pinvite-link { padding-left: 26px; border-left: 1px solid var(--gt-hair); }
+@media (max-width: 700px) { .pinvite-link { padding-left: 0; border-left: 0; } }
 .tm-nominate { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--gt-hair); max-width: 560px; }
 
 /* ==========================================================================
@@ -16875,3 +16930,46 @@ html[data-theme="light"] .gt-app .dept-hero.is-centred .dh-word { color: var(--l
   .dept-hero .dh-acts { flex-direction: column; align-items: stretch; }
   .dept-hero .dh-acts .abtn { width: 100%; justify-content: center; }
 }
+
+/* ==========================================================================
+   THE BOARD BARS STAY ON ONE LINE
+   ==========================================================================
+   "Round / All rounds / Rounds 23–27 / Earlier 23 24 25 26 27 Later — this must
+   be in one line", and the same for the row of competition chips.
+
+   They were a wrapping flex row, so on anything narrower than about 1200px the
+   strip dropped under the dropdown and the bar grew a second line — which moved
+   the table under it every time the window changed. One line that SCROLLS
+   sideways instead: the row keeps its shape at every width, and the few pixels
+   past the edge are reachable by the same gesture people already use on the
+   filter tabs in Messages.
+
+   Not applied to .boardbar-tips, which is deliberately two rows: eight round
+   buttons plus a dropdown plus a lock time do not belong on one line at any
+   width worth designing for. */
+.boardbar-round:not(.boardbar-tips),
+.boardbar:not(.boardbar-round) {
+  flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+}
+.boardbar-round:not(.boardbar-tips)::-webkit-scrollbar,
+.boardbar:not(.boardbar-round)::-webkit-scrollbar { display: none; }
+.boardbar-round:not(.boardbar-tips) .rstrip,
+.boardbar-round:not(.boardbar-tips) .rs-nums { flex-wrap: nowrap; }
+.boardbar-round:not(.boardbar-tips) .bb-round { flex: none; }
+/* The chips are the whole content of the competition bar, so they carry the
+   nowrap too or the row inside the row wraps instead. */
+.boardbar:not(.boardbar-round) .cf-chips { flex-wrap: nowrap; }
+
+/* THE LADDER'S ROUND STRIP, CENTRED. `.boardbar-round.is-centred` centres the
+   bar's own children; the strip is one child and centres its contents
+   separately, so without this the numbers sat left inside a centred box. */
+.boardbar-round.is-centred .rstrip { justify-content: center; flex: 1 1 auto; }
+
+/* ==========================================================================
+   GROUPS — the lead sentence in light mode
+   ==========================================================================
+   ".dh-lead" is rgba(232,228,213,.76) — a near-white tuned for the deep green
+   sheet. In light mode there is no green left under it and the sentence was
+   near-white on cream: "when it's in light mode they cannot be seen." */
+html[data-theme="light"] .gt-app .dept-hero .dh-lead { color: var(--lt-quiet); }
+html[data-theme="light"] .gt-app .dept-hero .dh-copy h1 { color: var(--lt-ink); }

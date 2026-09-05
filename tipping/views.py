@@ -648,35 +648,78 @@ def my_tips_view(request, org_id: int):
     if active_series:
         round_qs = round_qs.filter(series__in=active_series)
     rounds = list(annotate_play_state(round_qs).order_by("-round_number"))
-    selected_round_id = request.GET.get("round")
-    if selected_round_id:
-        try:
-            selected_round = next(r for r in rounds if str(r.id) == selected_round_id)
-        except StopIteration:
-            selected_round = current_round(rounds)
-    else:
-        selected_round = _round_with_my_tips(request.user, org, rounds, _group(request, org))
 
-    # ---- ALL COMPETITIONS MEANS ALL COMPETITIONS.
+    # ---- WHICH ROUNDS ARE ON SCREEN.
     #
-    # REPORTED AS: "when I pick them I see the respective tips of, let's say,
-    # NRL — but when I pick all competitions I only see AFLW."
+    # REPORTED TWICE. First: "when I pick them I see the respective tips of,
+    # let's say, NRL — but when I pick all competitions I only see AFLW." Then,
+    # after a fix that matched on round NUMBER: "all are AFLW, why am I not
+    # getting all, from AFL to NRL to NRLW?"
     #
-    # Exactly right, and it was not the filter. A Round belongs to ONE series,
-    # so with four codes running there are four separate "round 4" rows. The
-    # page picked a single Round and listed its matches, so "all competitions"
-    # showed whichever one of the four happened to be chosen — one code's tips,
-    # under a filter promising every code's.
+    # The number was the wrong axis, and this organisation says why in one line:
     #
-    # A round NUMBER is the thing the reader means. Round 4 is round 4 in all
-    # four codes, so the page now shows every round carrying the selected
-    # number across the selected competitions, and `selected_round` is only the
-    # anchor that names it. With one competition filtered the group is one
-    # round and nothing about the page changes.
-    round_group = [
-        r for r in rounds
-        if selected_round is not None and r.round_number == selected_round.round_number
-    ]
+    #     AFL 1-27   NRL 1-27   AFLW 1-12   NRLW 1-11
+    #
+    # Four codes, four different lengths, all being played in the same week. AFL
+    # is at round 26 while AFLW is at round 4 — so "round 4 in every code" means
+    # this weekend's AFLW alongside an AFL round from four months ago, which
+    # nobody tipped, which the "my tips means my tips" filter then dropped. One
+    # code on screen again, for a new reason.
+    #
+    # THERE IS NO SHARED NUMBER. There is a shared position: the round each code
+    # is UP TO. So the two modes are genuinely different questions and are
+    # answered differently.
+    #
+    #   one competition   a round of that code. ?round=<id>, and the eight-wide
+    #                     number stepper, because 26 and 25 mean something here.
+    #   all competitions  the same position in every code — the current round of
+    #                     each, then the one before that in each. ?step=<n>,
+    #                     counted back from each code's own latest, because a
+    #                     number stepper across four seasons of different
+    #                     lengths is a control that cannot be right.
+    by_series = {}
+    for r in rounds:
+        by_series.setdefault(r.series_id, []).append(r)   # already newest-first
+    multi = len(by_series) > 1
+
+    selected_round_id = request.GET.get("round")
+    round_step = 0
+    if multi:
+        # WHERE STEP 0 IS, PER CODE. Not "the newest round that exists" — the
+        # newest round YOU TIPPED, which is the same rule the single-code page
+        # has always used to choose its opening round (_round_with_my_tips) and
+        # for the same reason: this member's tips are at AFL 26 while the AFL
+        # fixture list runs to 27, so anchoring on the last round in the table
+        # opens on a round nobody has touched and reports no tips to somebody
+        # who has plenty.
+        #
+        # Worked out once per code, then stepped within that code's own list.
+        anchors = {}
+        for sid, rs in by_series.items():
+            pick = _round_with_my_tips(request.user, org, rs, _group(request, org))
+            anchors[sid] = rs.index(pick) if pick in rs else 0
+        # HOW MANY ROUNDS BACK, in every code at once. Clamped so no code runs
+        # off the end of its own season: stepping past the start of AFLW would
+        # drop it and leave the reader looking at three codes wondering where
+        # the fourth went.
+        raw = (request.GET.get("step") or "0").strip()
+        round_step = int(raw) if raw.isdigit() else 0
+        deepest = min(len(rs) - 1 - anchors[sid] for sid, rs in by_series.items())
+        round_step = min(round_step, max(0, deepest))
+        round_group = [rs[anchors[sid] + round_step] for sid, rs in by_series.items()]
+        # The anchor is only for the things that need ONE round: the lock time
+        # and the round-summary card. The one that locks last, because that is
+        # the one still open to be tipped.
+        selected_round = max(round_group, key=lambda r: r.lockout_at) if round_group else None
+    else:
+        if selected_round_id:
+            try:
+                selected_round = next(r for r in rounds if str(r.id) == selected_round_id)
+            except StopIteration:
+                selected_round = current_round(rounds)
+        else:
+            selected_round = _round_with_my_tips(request.user, org, rounds, _group(request, org))
+        round_group = [selected_round] if selected_round is not None else []
     all_rows = []
     round_open, round_lock_note = True, ""
     if round_group:
@@ -799,39 +842,45 @@ def my_tips_view(request, org_id: int):
             "round_open": round_open, "round_lock_note": round_lock_note,
         })
 
-    # ---- the round picker, counted in ROUND NUMBERS rather than Round rows.
+    # ---- the round picker, in whichever of its two shapes applies.
     #
-    # With four codes running, `rounds` holds four rows per number, so stepping
-    # through it walked AFL round 4 → AFLW round 4 → NRL round 4 before ever
-    # reaching round 3, and "of 80" counted rows rather than rounds. Numbers
-    # are what the reader means and what the strip shows.
+    # ONE CODE: an eight-wide strip of round NUMBERS — "have the numbers to be
+    # up to like 8, the latest being the one that will be default, so I can see
+    # the 25, 24, going downwards." Anchored on the newest round, and the chosen
+    # one is always inside the window, so a link to round 3 in August opens with
+    # round 3 on screen rather than leaving the reader to hunt for it.
     #
-    # `anchor_for` maps a number back to the Round the links carry, because the
-    # URL has always been ?round=<id> and every notification ever sent uses it.
-    # Newest-first, so the first row for a number is the anchor.
+    # EVERY CODE: no numbers at all, because no number means the same thing in
+    # all of them. Just how far back you are, in rounds, from what each code is
+    # up to. Every fixture card names its own code and round, so nothing on
+    # screen is ambiguous.
+    #
+    # `anchor_for` maps a number to the Round its link carries: the URL has
+    # always been ?round=<id> and every notification ever sent uses it.
+    tips_strip = None
     numbers_desc, anchor_for = [], {}
-    for r in rounds:
-        if r.round_number not in anchor_for:
-            anchor_for[r.round_number] = r
-            numbers_desc.append(r.round_number)
-    # round_strip walks a window backwards from the END of the list, so it
-    # wants them ascending.
-    numbers_asc = list(reversed(numbers_desc))
-    selected_number = selected_round.round_number if selected_round else None
-    # EIGHT, NOT FIVE — "have the numbers to be up to like 8, the latest being
-    # the one that will be default, so I can see the 25, 24, going downwards."
-    # The strip is anchored on the newest round and the selected one is always
-    # inside the window, so a link to round 3 in August opens with round 3 on
-    # screen rather than showing the last eight and leaving the reader to hunt.
-    tips_strip = round_strip(
-        numbers_asc, selected_number, request.GET.get("back"),
-        size=8, values={n: anchor_for[n].id for n in numbers_asc},
-    )
     prev_round = next_round = None
-    if selected_number is not None:
-        at = numbers_desc.index(selected_number)
-        prev_round = anchor_for[numbers_desc[at + 1]] if at + 1 < len(numbers_desc) else None
-        next_round = anchor_for[numbers_desc[at - 1]] if at > 0 else None
+    prev_step = next_step = None
+    if multi:
+        prev_step = round_step + 1 if round_step < deepest else None
+        next_step = round_step - 1 if round_step > 0 else None
+    else:
+        for r in rounds:
+            if r.round_number not in anchor_for:
+                anchor_for[r.round_number] = r
+                numbers_desc.append(r.round_number)
+        # round_strip walks its window backwards from the END of the list, so
+        # it wants them ascending.
+        numbers_asc = list(reversed(numbers_desc))
+        selected_number = selected_round.round_number if selected_round else None
+        tips_strip = round_strip(
+            numbers_asc, selected_number, request.GET.get("back"),
+            size=8, values={n: anchor_for[n].id for n in numbers_asc},
+        )
+        if selected_number is not None:
+            at = numbers_desc.index(selected_number)
+            prev_round = anchor_for[numbers_desc[at + 1]] if at + 1 < len(numbers_desc) else None
+            next_round = anchor_for[numbers_desc[at - 1]] if at > 0 else None
 
     # Round-level stats describe the whole round, not the filtered view.
     total_matches = round_match_count
@@ -852,14 +901,22 @@ def my_tips_view(request, org_id: int):
         "round_open": round_open, "round_lock_note": round_lock_note,
         "state": state, "phase_counts": phase_counts, "total_all": len(all_rows),
         "prev_round": prev_round, "next_round": next_round,
-        # Counted in numbers, not rows: with four codes on the page "of 80" was
-        # four times the length of the season.
+        # Which shape the round picker is in, and what that shape needs.
+        "multi_comp": multi,
+        "round_step": round_step, "prev_step": prev_step, "next_step": next_step,
+        "round_group": round_group,
         # What the round links must carry so stepping a round never silently
         # widens the page back to every competition.
         "tips_keep": "&".join(f"series={sl}" for sl in active_slugs),
+        # Counted in numbers, not rows: with four codes on the page "of 80" was
+        # four times the length of the season. Both are empty in
+        # all-competitions mode, where there is no single number to count.
         "round_strip": tips_strip, "round_numbers": numbers_desc,
         "round_anchors": [anchor_for[n] for n in numbers_desc],
-        "round_position": len(numbers_desc) - numbers_desc.index(selected_number) if selected_number is not None else 0,
+        "round_position": (
+            len(numbers_desc) - numbers_desc.index(selected_round.round_number)
+            if not multi and selected_round is not None else 0
+        ),
         "round_total": len(numbers_desc),
         "total_matches": total_matches,
         "tips_this_round": tips_this_round,

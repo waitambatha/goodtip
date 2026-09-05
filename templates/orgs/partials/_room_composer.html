@@ -100,34 +100,249 @@ posts and still redirects.
     appending to the end would put a face in the middle of a sentence somebody
     was still editing.
     {% endcomment %}
+    {% comment %}
+    EMOJI, IN CATEGORIES — "add all emoji, let me be able to sort the way I see
+    in WhatsApp, where we have emoji: one for cars, the other for sports, more
+    for signs, cups, sports, flags, things like that."
+
+    Eight categories and about thirteen hundred characters, in the order every
+    keyboard people already use puts them: faces and people, animals and nature,
+    food, sport, travel, objects, symbols, flags. The tabs are the sort.
+
+    Still a <details> rather than a scripted popover: it opens and closes on its
+    own, it is keyboard reachable, and it needs no JavaScript to be dismissible.
+    The characters go in AT THE CARET (gt-messages.js) — appending to the end
+    would put a face in the middle of a sentence somebody was still editing.
+
+    Written out rather than looped from a context variable: the list is fixed,
+    and a context processor shipping thirteen hundred characters into every page
+    on the site to serve one panel is the wrong trade.
+    {% endcomment %}
     <details class="cc-emoji" data-emoji>
       <summary aria-label="Insert an emoji">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.2 4.2 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg>
       </summary>
       <div class="cc-emoji-menu">
-        {% comment %}
-        Written out rather than looped: the list is fixed, and putting it in a
-        template variable to loop over it would mean a context processor
-        shipping thirty characters into every page on the site.
-        {% endcomment %}
-        <button type="button">😀</button><button type="button">😄</button><button type="button">😂</button>
-        <button type="button">🙂</button><button type="button">😉</button><button type="button">😍</button>
-        <button type="button">😎</button><button type="button">🤔</button><button type="button">😬</button>
-        <button type="button">😢</button><button type="button">😡</button><button type="button">🤝</button>
-        <button type="button">👍</button><button type="button">👎</button><button type="button">👏</button>
-        <button type="button">🙏</button><button type="button">💪</button><button type="button">🔥</button>
-        <button type="button">💚</button><button type="button">🏆</button><button type="button">🏉</button>
-        <button type="button">🏈</button><button type="button">⚽</button><button type="button">🎯</button>
-        <button type="button">✅</button><button type="button">❌</button><button type="button">⚡</button>
-        <button type="button">🎉</button><button type="button">👀</button><button type="button">😴</button>
+      <div class="cc-emoji-tabs" role="tablist" aria-label="Emoji categories">
+        <button type="button" class="cc-emoji-tab on" data-emoji-tab="smileys" title="Smileys & people" aria-label="Smileys & people">🙂</button>
+        <button type="button" class="cc-emoji-tab" data-emoji-tab="nature" title="Animals & nature" aria-label="Animals & nature">🐶</button>
+        <button type="button" class="cc-emoji-tab" data-emoji-tab="food" title="Food & drink" aria-label="Food & drink">🍔</button>
+        <button type="button" class="cc-emoji-tab" data-emoji-tab="activity" title="Sports & activity" aria-label="Sports & activity">⚽</button>
+        <button type="button" class="cc-emoji-tab" data-emoji-tab="travel" title="Travel & places" aria-label="Travel & places">🚗</button>
+        <button type="button" class="cc-emoji-tab" data-emoji-tab="objects" title="Objects" aria-label="Objects">💡</button>
+        <button type="button" class="cc-emoji-tab" data-emoji-tab="symbols" title="Symbols" aria-label="Symbols">❤️</button>
+        <button type="button" class="cc-emoji-tab" data-emoji-tab="flags" title="Flags" aria-label="Flags">🏳️</button>
+      </div>
+      <div class="cc-emoji-grid" data-emoji-panel="smileys" role="group" aria-label="Smileys & people">
+        <button type="button">😀</button><button type="button">😃</button><button type="button">😄</button><button type="button">😁</button><button type="button">😆</button><button type="button">😅</button><button type="button">🤣</button><button type="button">😂</button>
+        <button type="button">🙂</button><button type="button">🙃</button><button type="button">😉</button><button type="button">😊</button><button type="button">😇</button><button type="button">🥰</button><button type="button">😍</button><button type="button">🤩</button>
+        <button type="button">😘</button><button type="button">😗</button><button type="button">😚</button><button type="button">😙</button><button type="button">😋</button><button type="button">😛</button><button type="button">😜</button><button type="button">🤪</button>
+        <button type="button">😝</button><button type="button">🤑</button><button type="button">🤗</button><button type="button">🤭</button><button type="button">🤫</button><button type="button">🤔</button><button type="button">🤐</button><button type="button">🤨</button>
+        <button type="button">😐</button><button type="button">😑</button><button type="button">😶</button><button type="button">😏</button><button type="button">😒</button><button type="button">🙄</button><button type="button">😬</button><button type="button">😮‍💨</button>
+        <button type="button">🤥</button><button type="button">😌</button><button type="button">😔</button><button type="button">😪</button><button type="button">🤤</button><button type="button">😴</button><button type="button">😷</button><button type="button">🤒</button>
+        <button type="button">🤕</button><button type="button">🤢</button><button type="button">🤮</button><button type="button">🤧</button><button type="button">🥵</button><button type="button">🥶</button><button type="button">🥴</button><button type="button">😵</button>
+        <button type="button">🤯</button><button type="button">🤠</button><button type="button">🥳</button><button type="button">😎</button><button type="button">🤓</button><button type="button">🧐</button><button type="button">😕</button><button type="button">😟</button>
+        <button type="button">🙁</button><button type="button">😮</button><button type="button">😯</button><button type="button">😲</button><button type="button">😳</button><button type="button">🥺</button><button type="button">😦</button><button type="button">😧</button>
+        <button type="button">😨</button><button type="button">😰</button><button type="button">😥</button><button type="button">😢</button><button type="button">😭</button><button type="button">😱</button><button type="button">😖</button><button type="button">😣</button>
+        <button type="button">😞</button><button type="button">😓</button><button type="button">😩</button><button type="button">😫</button><button type="button">🥱</button><button type="button">😤</button><button type="button">😡</button><button type="button">😠</button>
+        <button type="button">🤬</button><button type="button">😈</button><button type="button">💀</button><button type="button">💩</button><button type="button">🤡</button><button type="button">👻</button><button type="button">👽</button><button type="button">🤖</button>
+        <button type="button">🎃</button><button type="button">😺</button><button type="button">😹</button><button type="button">😻</button><button type="button">😼</button><button type="button">😽</button><button type="button">🙀</button><button type="button">😿</button>
+        <button type="button">😾</button><button type="button">🙈</button><button type="button">🙉</button><button type="button">🙊</button><button type="button">👋</button><button type="button">🤚</button><button type="button">✋</button><button type="button">🖖</button>
+        <button type="button">👌</button><button type="button">🤌</button><button type="button">🤏</button><button type="button">✌️</button><button type="button">🤞</button><button type="button">🤟</button><button type="button">🤘</button><button type="button">🤙</button>
+        <button type="button">👈</button><button type="button">👉</button><button type="button">👆</button><button type="button">👇</button><button type="button">☝️</button><button type="button">👍</button><button type="button">👎</button><button type="button">✊</button>
+        <button type="button">👊</button><button type="button">🤛</button><button type="button">🤜</button><button type="button">👏</button><button type="button">🙌</button><button type="button">👐</button><button type="button">🤲</button><button type="button">🤝</button>
+        <button type="button">🙏</button><button type="button">💪</button><button type="button">🦾</button><button type="button">🦵</button><button type="button">🦶</button><button type="button">👂</button><button type="button">👃</button><button type="button">🧠</button>
+        <button type="button">🫀</button><button type="button">👀</button><button type="button">👁️</button><button type="button">👅</button><button type="button">👄</button><button type="button">👶</button><button type="button">🧒</button><button type="button">👦</button>
+        <button type="button">👧</button><button type="button">🧑</button><button type="button">👨</button><button type="button">👩</button><button type="button">🧔</button><button type="button">👴</button><button type="button">👵</button><button type="button">🙍</button>
+        <button type="button">🙎</button><button type="button">🙅</button><button type="button">🙆</button><button type="button">💁</button><button type="button">🙋</button><button type="button">🧏</button><button type="button">🙇</button><button type="button">🤦</button>
+        <button type="button">🤷</button><button type="button">👮</button><button type="button">🕵️</button><button type="button">💂</button><button type="button">👷</button><button type="button">🤴</button><button type="button">👸</button><button type="button">👳</button>
+        <button type="button">👲</button><button type="button">🧕</button><button type="button">🤵</button><button type="button">👰</button><button type="button">🤰</button><button type="button">🍼</button><button type="button">👼</button><button type="button">🎅</button>
+        <button type="button">🤶</button><button type="button">🦸</button><button type="button">🦹</button><button type="button">🧙</button><button type="button">🧚</button><button type="button">🧛</button><button type="button">🧜</button><button type="button">🧝</button>
+        <button type="button">🧞</button><button type="button">🧟</button><button type="button">💆</button><button type="button">💇</button><button type="button">🚶</button><button type="button">🧍</button><button type="button">🧎</button><button type="button">🏃</button>
+        <button type="button">💃</button><button type="button">🕺</button><button type="button">🕴️</button><button type="button">👯</button><button type="button">🧖</button><button type="button">🧗</button><button type="button">🤺</button><button type="button">🏇</button>
+        <button type="button">⛷️</button><button type="button">🏂</button><button type="button">🏌️</button><button type="button">🏄</button><button type="button">🚣</button><button type="button">🏊</button><button type="button">⛹️</button><button type="button">🏋️</button>
+        <button type="button">🚴</button><button type="button">🚵</button><button type="button">🤸</button><button type="button">🤼</button><button type="button">🤽</button><button type="button">🤾</button><button type="button">🤹</button><button type="button">🧘</button>
+        <button type="button">🛀</button><button type="button">🛌</button><button type="button">👭</button><button type="button">👫</button><button type="button">👬</button><button type="button">💏</button><button type="button">💑</button><button type="button">👪</button>
+        <button type="button">🗣️</button><button type="button">👤</button><button type="button">👥</button><button type="button">👣</button>
+      </div>
+      <div class="cc-emoji-grid" data-emoji-panel="nature" hidden role="group" aria-label="Animals & nature">
+        <button type="button">🐶</button><button type="button">🐱</button><button type="button">🐭</button><button type="button">🐹</button><button type="button">🐰</button><button type="button">🦊</button><button type="button">🐻</button><button type="button">🐼</button>
+        <button type="button">🐻‍❄️</button><button type="button">🐨</button><button type="button">🐯</button><button type="button">🦁</button><button type="button">🐮</button><button type="button">🐷</button><button type="button">🐽</button><button type="button">🐸</button>
+        <button type="button">🐵</button><button type="button">🙈</button><button type="button">🙉</button><button type="button">🙊</button><button type="button">🐒</button><button type="button">🐔</button><button type="button">🐧</button><button type="button">🐦</button>
+        <button type="button">🐤</button><button type="button">🐣</button><button type="button">🐥</button><button type="button">🦆</button><button type="button">🦅</button><button type="button">🦉</button><button type="button">🦇</button><button type="button">🐺</button>
+        <button type="button">🐗</button><button type="button">🐴</button><button type="button">🦄</button><button type="button">🐝</button><button type="button">🪱</button><button type="button">🐛</button><button type="button">🦋</button><button type="button">🐌</button>
+        <button type="button">🐞</button><button type="button">🐜</button><button type="button">🪰</button><button type="button">🪲</button><button type="button">🦟</button><button type="button">🦗</button><button type="button">🕷️</button><button type="button">🕸️</button>
+        <button type="button">🦂</button><button type="button">🐢</button><button type="button">🐍</button><button type="button">🦎</button><button type="button">🦖</button><button type="button">🦕</button><button type="button">🐙</button><button type="button">🦑</button>
+        <button type="button">🦐</button><button type="button">🦞</button><button type="button">🦀</button><button type="button">🐡</button><button type="button">🐠</button><button type="button">🐟</button><button type="button">🐬</button><button type="button">🐳</button>
+        <button type="button">🐋</button><button type="button">🦈</button><button type="button">🐊</button><button type="button">🐅</button><button type="button">🐆</button><button type="button">🦓</button><button type="button">🦍</button><button type="button">🦧</button>
+        <button type="button">🐘</button><button type="button">🦛</button><button type="button">🦏</button><button type="button">🐪</button><button type="button">🐫</button><button type="button">🦒</button><button type="button">🦘</button><button type="button">🐃</button>
+        <button type="button">🐂</button><button type="button">🐄</button><button type="button">🐎</button><button type="button">🐖</button><button type="button">🐏</button><button type="button">🐑</button><button type="button">🦙</button><button type="button">🐐</button>
+        <button type="button">🦌</button><button type="button">🐕</button><button type="button">🐩</button><button type="button">🦮</button><button type="button">🐈</button><button type="button">🐓</button><button type="button">🦃</button><button type="button">🦚</button>
+        <button type="button">🦜</button><button type="button">🦢</button><button type="button">🦩</button><button type="button">🕊️</button><button type="button">🐇</button><button type="button">🦝</button><button type="button">🦨</button><button type="button">🦡</button>
+        <button type="button">🦫</button><button type="button">🦦</button><button type="button">🦥</button><button type="button">🐁</button><button type="button">🐀</button><button type="button">🐿️</button><button type="button">🦔</button><button type="button">🐾</button>
+        <button type="button">🐉</button><button type="button">🐲</button><button type="button">🌵</button><button type="button">🎄</button><button type="button">🌲</button><button type="button">🌳</button><button type="button">🌴</button><button type="button">🪵</button>
+        <button type="button">🌱</button><button type="button">🌿</button><button type="button">☘️</button><button type="button">🍀</button><button type="button">🎍</button><button type="button">🪴</button><button type="button">🎋</button><button type="button">🍃</button>
+        <button type="button">🍂</button><button type="button">🍁</button><button type="button">🍄</button><button type="button">🐚</button><button type="button">🪨</button><button type="button">🌾</button><button type="button">💐</button><button type="button">🌷</button>
+        <button type="button">🌹</button><button type="button">🥀</button><button type="button">🌺</button><button type="button">🌸</button><button type="button">🌼</button><button type="button">🌻</button><button type="button">🌞</button><button type="button">🌝</button>
+        <button type="button">🌛</button><button type="button">🌜</button><button type="button">🌚</button><button type="button">🌕</button><button type="button">🌖</button><button type="button">🌗</button><button type="button">🌘</button><button type="button">🌑</button>
+        <button type="button">🌒</button><button type="button">🌓</button><button type="button">🌔</button><button type="button">🌙</button><button type="button">🌎</button><button type="button">🌍</button><button type="button">🌏</button><button type="button">🪐</button>
+        <button type="button">💫</button><button type="button">⭐</button><button type="button">🌟</button><button type="button">✨</button><button type="button">⚡</button><button type="button">☄️</button><button type="button">💥</button><button type="button">🔥</button>
+        <button type="button">🌪️</button><button type="button">🌈</button><button type="button">☀️</button><button type="button">🌤️</button><button type="button">⛅</button><button type="button">🌥️</button><button type="button">☁️</button><button type="button">🌦️</button>
+        <button type="button">🌧️</button><button type="button">⛈️</button><button type="button">🌩️</button><button type="button">🌨️</button><button type="button">❄️</button><button type="button">☃️</button><button type="button">⛄</button><button type="button">🌬️</button>
+        <button type="button">💨</button><button type="button">💧</button><button type="button">💦</button><button type="button">☔</button><button type="button">☂️</button><button type="button">🌊</button><button type="button">🌫️</button>
+      </div>
+      <div class="cc-emoji-grid" data-emoji-panel="food" hidden role="group" aria-label="Food & drink">
+        <button type="button">🍏</button><button type="button">🍎</button><button type="button">🍐</button><button type="button">🍊</button><button type="button">🍋</button><button type="button">🍌</button><button type="button">🍉</button><button type="button">🍇</button>
+        <button type="button">🍓</button><button type="button">🫐</button><button type="button">🍈</button><button type="button">🍒</button><button type="button">🍑</button><button type="button">🥭</button><button type="button">🍍</button><button type="button">🥥</button>
+        <button type="button">🥝</button><button type="button">🍅</button><button type="button">🍆</button><button type="button">🥑</button><button type="button">🥦</button><button type="button">🥬</button><button type="button">🥒</button><button type="button">🌶️</button>
+        <button type="button">🫑</button><button type="button">🌽</button><button type="button">🥕</button><button type="button">🫒</button><button type="button">🧄</button><button type="button">🧅</button><button type="button">🥔</button><button type="button">🍠</button>
+        <button type="button">🥐</button><button type="button">🥯</button><button type="button">🍞</button><button type="button">🥖</button><button type="button">🥨</button><button type="button">🧀</button><button type="button">🥚</button><button type="button">🍳</button>
+        <button type="button">🧈</button><button type="button">🥞</button><button type="button">🧇</button><button type="button">🥓</button><button type="button">🥩</button><button type="button">🍗</button><button type="button">🍖</button><button type="button">🦴</button>
+        <button type="button">🌭</button><button type="button">🍔</button><button type="button">🍟</button><button type="button">🍕</button><button type="button">🫓</button><button type="button">🥪</button><button type="button">🥙</button><button type="button">🧆</button>
+        <button type="button">🌮</button><button type="button">🌯</button><button type="button">🫔</button><button type="button">🥗</button><button type="button">🥘</button><button type="button">🫕</button><button type="button">🥫</button><button type="button">🍝</button>
+        <button type="button">🍜</button><button type="button">🍲</button><button type="button">🍛</button><button type="button">🍣</button><button type="button">🍱</button><button type="button">🥟</button><button type="button">🦪</button><button type="button">🍤</button>
+        <button type="button">🍙</button><button type="button">🍚</button><button type="button">🍘</button><button type="button">🍥</button><button type="button">🥠</button><button type="button">🥮</button><button type="button">🍢</button><button type="button">🍡</button>
+        <button type="button">🍧</button><button type="button">🍨</button><button type="button">🍦</button><button type="button">🥧</button><button type="button">🧁</button><button type="button">🍰</button><button type="button">🎂</button><button type="button">🍮</button>
+        <button type="button">🍭</button><button type="button">🍬</button><button type="button">🍫</button><button type="button">🍿</button><button type="button">🍩</button><button type="button">🍪</button><button type="button">🌰</button><button type="button">🥜</button>
+        <button type="button">🍯</button><button type="button">🥛</button><button type="button">🍼</button><button type="button">🫖</button><button type="button">☕</button><button type="button">🍵</button><button type="button">🧃</button><button type="button">🥤</button>
+        <button type="button">🧋</button><button type="button">🍶</button><button type="button">🍺</button><button type="button">🍻</button><button type="button">🥂</button><button type="button">🍷</button><button type="button">🥃</button><button type="button">🍸</button>
+        <button type="button">🍹</button><button type="button">🧉</button><button type="button">🍾</button><button type="button">🧊</button><button type="button">🥄</button><button type="button">🍴</button><button type="button">🍽️</button><button type="button">🥣</button>
+        <button type="button">🥡</button><button type="button">🥢</button><button type="button">🧂</button>
+      </div>
+      <div class="cc-emoji-grid" data-emoji-panel="activity" hidden role="group" aria-label="Sports & activity">
+        <button type="button">⚽</button><button type="button">🏀</button><button type="button">🏈</button><button type="button">⚾</button><button type="button">🥎</button><button type="button">🎾</button><button type="button">🏐</button><button type="button">🏉</button>
+        <button type="button">🥏</button><button type="button">🎱</button><button type="button">🪀</button><button type="button">🏓</button><button type="button">🏸</button><button type="button">🏒</button><button type="button">🏑</button><button type="button">🥍</button>
+        <button type="button">🏏</button><button type="button">🪃</button><button type="button">🥅</button><button type="button">⛳</button><button type="button">🪁</button><button type="button">🏹</button><button type="button">🎣</button><button type="button">🤿</button>
+        <button type="button">🥊</button><button type="button">🥋</button><button type="button">🎽</button><button type="button">🛹</button><button type="button">🛼</button><button type="button">🛷</button><button type="button">⛸️</button><button type="button">🥌</button>
+        <button type="button">🎿</button><button type="button">⛷️</button><button type="button">🏂</button><button type="button">🪂</button><button type="button">🏋️</button><button type="button">🤼</button><button type="button">🤸</button><button type="button">⛹️</button>
+        <button type="button">🤺</button><button type="button">🤾</button><button type="button">🏌️</button><button type="button">🏇</button><button type="button">🧘</button><button type="button">🏄</button><button type="button">🏊</button><button type="button">🤽</button>
+        <button type="button">🚣</button><button type="button">🧗</button><button type="button">🚵</button><button type="button">🚴</button><button type="button">🏆</button><button type="button">🥇</button><button type="button">🥈</button><button type="button">🥉</button>
+        <button type="button">🏅</button><button type="button">🎖️</button><button type="button">🏵️</button><button type="button">🎗️</button><button type="button">🎫</button><button type="button">🎟️</button><button type="button">🎪</button><button type="button">🤹</button>
+        <button type="button">🎭</button><button type="button">🩰</button><button type="button">🎨</button><button type="button">🎬</button><button type="button">🎤</button><button type="button">🎧</button><button type="button">🎼</button><button type="button">🎹</button>
+        <button type="button">🥁</button><button type="button">🪘</button><button type="button">🎷</button><button type="button">🎺</button><button type="button">🪗</button><button type="button">🎸</button><button type="button">🪕</button><button type="button">🎻</button>
+        <button type="button">🎲</button><button type="button">♟️</button><button type="button">🎯</button><button type="button">🎳</button><button type="button">🎮</button><button type="button">🎰</button><button type="button">🧩</button>
+      </div>
+      <div class="cc-emoji-grid" data-emoji-panel="travel" hidden role="group" aria-label="Travel & places">
+        <button type="button">🚗</button><button type="button">🚕</button><button type="button">🚙</button><button type="button">🚌</button><button type="button">🚎</button><button type="button">🏎️</button><button type="button">🚓</button><button type="button">🚑</button>
+        <button type="button">🚒</button><button type="button">🚐</button><button type="button">🛻</button><button type="button">🚚</button><button type="button">🚛</button><button type="button">🚜</button><button type="button">🦯</button><button type="button">🦽</button>
+        <button type="button">🦼</button><button type="button">🛴</button><button type="button">🚲</button><button type="button">🛵</button><button type="button">🏍️</button><button type="button">🛺</button><button type="button">🚨</button><button type="button">🚔</button>
+        <button type="button">🚍</button><button type="button">🚘</button><button type="button">🚖</button><button type="button">🚡</button><button type="button">🚠</button><button type="button">🚟</button><button type="button">🚃</button><button type="button">🚋</button>
+        <button type="button">🚞</button><button type="button">🚝</button><button type="button">🚄</button><button type="button">🚅</button><button type="button">🚈</button><button type="button">🚂</button><button type="button">🚆</button><button type="button">🚇</button>
+        <button type="button">🚊</button><button type="button">🚉</button><button type="button">✈️</button><button type="button">🛫</button><button type="button">🛬</button><button type="button">🛩️</button><button type="button">💺</button><button type="button">🛰️</button>
+        <button type="button">🚀</button><button type="button">🛸</button><button type="button">🚁</button><button type="button">🛶</button><button type="button">⛵</button><button type="button">🚤</button><button type="button">🛥️</button><button type="button">🛳️</button>
+        <button type="button">⛴️</button><button type="button">🚢</button><button type="button">⚓</button><button type="button">🪝</button><button type="button">⛽</button><button type="button">🚧</button><button type="button">🚦</button><button type="button">🚥</button>
+        <button type="button">🚏</button><button type="button">🗺️</button><button type="button">🗿</button><button type="button">🗽</button><button type="button">🗼</button><button type="button">🏰</button><button type="button">🏯</button><button type="button">🏟️</button>
+        <button type="button">🎡</button><button type="button">🎢</button><button type="button">🎠</button><button type="button">⛲</button><button type="button">⛱️</button><button type="button">🏖️</button><button type="button">🏝️</button><button type="button">🏜️</button>
+        <button type="button">🌋</button><button type="button">⛰️</button><button type="button">🏔️</button><button type="button">🗻</button><button type="button">🏕️</button><button type="button">⛺</button><button type="button">🛖</button><button type="button">🏠</button>
+        <button type="button">🏡</button><button type="button">🏘️</button><button type="button">🏚️</button><button type="button">🏗️</button><button type="button">🏭</button><button type="button">🏢</button><button type="button">🏬</button><button type="button">🏣</button>
+        <button type="button">🏤</button><button type="button">🏥</button><button type="button">🏦</button><button type="button">🏨</button><button type="button">🏪</button><button type="button">🏫</button><button type="button">🏩</button><button type="button">💒</button>
+        <button type="button">🏛️</button><button type="button">⛪</button><button type="button">🕌</button><button type="button">🕍</button><button type="button">🛕</button><button type="button">🕋</button><button type="button">⛩️</button><button type="button">🛤️</button>
+        <button type="button">🛣️</button><button type="button">🗾</button><button type="button">🎑</button><button type="button">🏞️</button><button type="button">🌅</button><button type="button">🌄</button><button type="button">🌠</button><button type="button">🎇</button>
+        <button type="button">🎆</button><button type="button">🌇</button><button type="button">🌆</button><button type="button">🏙️</button><button type="button">🌃</button><button type="button">🌌</button><button type="button">🌉</button><button type="button">🌁</button>
+      </div>
+      <div class="cc-emoji-grid" data-emoji-panel="objects" hidden role="group" aria-label="Objects">
+        <button type="button">⌚</button><button type="button">📱</button><button type="button">💻</button><button type="button">⌨️</button><button type="button">🖥️</button><button type="button">🖨️</button><button type="button">🖱️</button><button type="button">💽</button>
+        <button type="button">💾</button><button type="button">💿</button><button type="button">📀</button><button type="button">📼</button><button type="button">📷</button><button type="button">📸</button><button type="button">📹</button><button type="button">🎥</button>
+        <button type="button">📽️</button><button type="button">📞</button><button type="button">☎️</button><button type="button">📟</button><button type="button">📠</button><button type="button">📺</button><button type="button">📻</button><button type="button">🎙️</button>
+        <button type="button">⏱️</button><button type="button">⏲️</button><button type="button">⏰</button><button type="button">🕰️</button><button type="button">⌛</button><button type="button">⏳</button><button type="button">📡</button><button type="button">🔋</button>
+        <button type="button">🔌</button><button type="button">💡</button><button type="button">🔦</button><button type="button">🕯️</button><button type="button">🪔</button><button type="button">🧯</button><button type="button">🛢️</button><button type="button">💸</button>
+        <button type="button">💵</button><button type="button">💴</button><button type="button">💶</button><button type="button">💷</button><button type="button">🪙</button><button type="button">💰</button><button type="button">💳</button><button type="button">💎</button>
+        <button type="button">⚖️</button><button type="button">🪜</button><button type="button">🧰</button><button type="button">🪛</button><button type="button">🔧</button><button type="button">🔨</button><button type="button">⚒️</button><button type="button">🛠️</button>
+        <button type="button">⛏️</button><button type="button">🪚</button><button type="button">🔩</button><button type="button">⚙️</button><button type="button">🪤</button><button type="button">🧱</button><button type="button">⛓️</button><button type="button">🧲</button>
+        <button type="button">🔫</button><button type="button">💣</button><button type="button">🧨</button><button type="button">🪓</button><button type="button">🔪</button><button type="button">🗡️</button><button type="button">⚔️</button><button type="button">🛡️</button>
+        <button type="button">🚬</button><button type="button">⚰️</button><button type="button">🪦</button><button type="button">⚱️</button><button type="button">🏺</button><button type="button">🔮</button><button type="button">📿</button><button type="button">🧿</button>
+        <button type="button">💈</button><button type="button">⚗️</button><button type="button">🔭</button><button type="button">🔬</button><button type="button">🕳️</button><button type="button">🩹</button><button type="button">🩺</button><button type="button">💊</button>
+        <button type="button">💉</button><button type="button">🩸</button><button type="button">🧬</button><button type="button">🦠</button><button type="button">🧫</button><button type="button">🧪</button><button type="button">🌡️</button><button type="button">🧹</button>
+        <button type="button">🪠</button><button type="button">🧺</button><button type="button">🧻</button><button type="button">🚽</button><button type="button">🚰</button><button type="button">🚿</button><button type="button">🛁</button><button type="button">🧼</button>
+        <button type="button">🪥</button><button type="button">🪒</button><button type="button">🧽</button><button type="button">🪣</button><button type="button">🧴</button><button type="button">🛎️</button><button type="button">🔑</button><button type="button">🗝️</button>
+        <button type="button">🚪</button><button type="button">🪑</button><button type="button">🛋️</button><button type="button">🛏️</button><button type="button">🧸</button><button type="button">🖼️</button><button type="button">🪞</button><button type="button">🪟</button>
+        <button type="button">🛍️</button><button type="button">🛒</button><button type="button">🎁</button><button type="button">🎈</button><button type="button">🎏</button><button type="button">🎀</button><button type="button">🪄</button><button type="button">🎊</button>
+        <button type="button">🎉</button><button type="button">🪅</button><button type="button">🎎</button><button type="button">🏮</button><button type="button">🎐</button><button type="button">✉️</button><button type="button">📩</button><button type="button">📨</button>
+        <button type="button">📧</button><button type="button">💌</button><button type="button">📥</button><button type="button">📤</button><button type="button">📦</button><button type="button">🏷️</button><button type="button">📪</button><button type="button">📫</button>
+        <button type="button">📬</button><button type="button">📭</button><button type="button">📮</button><button type="button">📯</button><button type="button">📜</button><button type="button">📃</button><button type="button">📄</button><button type="button">📑</button>
+        <button type="button">📊</button><button type="button">📈</button><button type="button">📉</button><button type="button">🗒️</button><button type="button">🗓️</button><button type="button">📆</button><button type="button">📅</button><button type="button">🗑️</button>
+        <button type="button">📇</button><button type="button">🗃️</button><button type="button">🗳️</button><button type="button">🗄️</button><button type="button">📋</button><button type="button">📁</button><button type="button">📂</button><button type="button">🗂️</button>
+        <button type="button">🗞️</button><button type="button">📰</button><button type="button">📓</button><button type="button">📔</button><button type="button">📒</button><button type="button">📕</button><button type="button">📗</button><button type="button">📘</button>
+        <button type="button">📙</button><button type="button">📚</button><button type="button">📖</button><button type="button">🔖</button><button type="button">🧷</button><button type="button">🔗</button><button type="button">📎</button><button type="button">🖇️</button>
+        <button type="button">📐</button><button type="button">📏</button><button type="button">🧮</button><button type="button">📌</button><button type="button">📍</button><button type="button">✂️</button><button type="button">🖊️</button><button type="button">🖋️</button>
+        <button type="button">✒️</button><button type="button">🖌️</button><button type="button">🖍️</button><button type="button">📝</button><button type="button">✏️</button><button type="button">🔍</button><button type="button">🔎</button><button type="button">🔏</button>
+        <button type="button">🔐</button><button type="button">🔒</button><button type="button">🔓</button>
+      </div>
+      <div class="cc-emoji-grid" data-emoji-panel="symbols" hidden role="group" aria-label="Symbols">
+        <button type="button">❤️</button><button type="button">🧡</button><button type="button">💛</button><button type="button">💚</button><button type="button">💙</button><button type="button">💜</button><button type="button">🖤</button><button type="button">🤍</button>
+        <button type="button">🤎</button><button type="button">💔</button><button type="button">❣️</button><button type="button">💕</button><button type="button">💞</button><button type="button">💓</button><button type="button">💗</button><button type="button">💖</button>
+        <button type="button">💘</button><button type="button">💝</button><button type="button">💟</button><button type="button">☮️</button><button type="button">✝️</button><button type="button">☪️</button><button type="button">🕉️</button><button type="button">☸️</button>
+        <button type="button">✡️</button><button type="button">🔯</button><button type="button">🕎</button><button type="button">☯️</button><button type="button">☦️</button><button type="button">🛐</button><button type="button">⛎</button><button type="button">♈</button>
+        <button type="button">♉</button><button type="button">♊</button><button type="button">♋</button><button type="button">♌</button><button type="button">♍</button><button type="button">♎</button><button type="button">♏</button><button type="button">♐</button>
+        <button type="button">♑</button><button type="button">♒</button><button type="button">♓</button><button type="button">🆔</button><button type="button">⚛️</button><button type="button">🉑</button><button type="button">☢️</button><button type="button">☣️</button>
+        <button type="button">📴</button><button type="button">📳</button><button type="button">🈶</button><button type="button">🈚</button><button type="button">🈸</button><button type="button">🈺</button><button type="button">🈷️</button><button type="button">✴️</button>
+        <button type="button">🆚</button><button type="button">💮</button><button type="button">🉐</button><button type="button">㊙️</button><button type="button">㊗️</button><button type="button">🈴</button><button type="button">🈵</button><button type="button">🈹</button>
+        <button type="button">🈲</button><button type="button">🅰️</button><button type="button">🅱️</button><button type="button">🆎</button><button type="button">🆑</button><button type="button">🅾️</button><button type="button">🆘</button><button type="button">❌</button>
+        <button type="button">⭕</button><button type="button">🛑</button><button type="button">⛔</button><button type="button">📛</button><button type="button">🚫</button><button type="button">💯</button><button type="button">💢</button><button type="button">♨️</button>
+        <button type="button">🚷</button><button type="button">🚯</button><button type="button">🚳</button><button type="button">🚱</button><button type="button">🔞</button><button type="button">📵</button><button type="button">🚭</button><button type="button">❗</button>
+        <button type="button">❕</button><button type="button">❓</button><button type="button">❔</button><button type="button">‼️</button><button type="button">⁉️</button><button type="button">🔅</button><button type="button">🔆</button><button type="button">〽️</button>
+        <button type="button">⚠️</button><button type="button">🚸</button><button type="button">🔱</button><button type="button">⚜️</button><button type="button">🔰</button><button type="button">♻️</button><button type="button">✅</button><button type="button">🈯</button>
+        <button type="button">💹</button><button type="button">❇️</button><button type="button">✳️</button><button type="button">❎</button><button type="button">🌐</button><button type="button">💠</button><button type="button">Ⓜ️</button><button type="button">🌀</button>
+        <button type="button">💤</button><button type="button">🏧</button><button type="button">🚾</button><button type="button">♿</button><button type="button">🅿️</button><button type="button">🛗</button><button type="button">🈳</button><button type="button">🈂️</button>
+        <button type="button">🛂</button><button type="button">🛃</button><button type="button">🛄</button><button type="button">🛅</button><button type="button">🚹</button><button type="button">🚺</button><button type="button">🚼</button><button type="button">⚧️</button>
+        <button type="button">🚻</button><button type="button">🚮</button><button type="button">🎦</button><button type="button">📶</button><button type="button">🈁</button><button type="button">🔣</button><button type="button">ℹ️</button><button type="button">🔤</button>
+        <button type="button">🔡</button><button type="button">🔠</button><button type="button">🆖</button><button type="button">🆗</button><button type="button">🆙</button><button type="button">🆒</button><button type="button">🆕</button><button type="button">🆓</button>
+        <button type="button">0️⃣</button><button type="button">1️⃣</button><button type="button">2️⃣</button><button type="button">3️⃣</button><button type="button">4️⃣</button><button type="button">5️⃣</button><button type="button">6️⃣</button><button type="button">7️⃣</button>
+        <button type="button">8️⃣</button><button type="button">9️⃣</button><button type="button">🔟</button><button type="button">🔢</button><button type="button">#️⃣</button><button type="button">*️⃣</button><button type="button">⏏️</button><button type="button">▶️</button>
+        <button type="button">⏸️</button><button type="button">⏯️</button><button type="button">⏹️</button><button type="button">⏺️</button><button type="button">⏭️</button><button type="button">⏮️</button><button type="button">⏩</button><button type="button">⏪</button>
+        <button type="button">🔀</button><button type="button">🔁</button><button type="button">🔂</button><button type="button">◀️</button><button type="button">🔼</button><button type="button">🔽</button><button type="button">⏫</button><button type="button">⏬</button>
+        <button type="button">➡️</button><button type="button">⬅️</button><button type="button">⬆️</button><button type="button">⬇️</button><button type="button">↗️</button><button type="button">↘️</button><button type="button">↙️</button><button type="button">↖️</button>
+        <button type="button">↕️</button><button type="button">↔️</button><button type="button">↪️</button><button type="button">↩️</button><button type="button">⤴️</button><button type="button">⤵️</button><button type="button">🔃</button><button type="button">🔄</button>
+        <button type="button">🔚</button><button type="button">🔙</button><button type="button">🔛</button><button type="button">🔝</button><button type="button">🔜</button><button type="button">✔️</button><button type="button">☑️</button><button type="button">🔘</button>
+        <button type="button">🔴</button><button type="button">🟠</button><button type="button">🟡</button><button type="button">🟢</button><button type="button">🔵</button><button type="button">🟣</button><button type="button">⚫</button><button type="button">⚪</button>
+        <button type="button">🟤</button><button type="button">🔺</button><button type="button">🔻</button><button type="button">🔸</button><button type="button">🔹</button><button type="button">🔶</button><button type="button">🔷</button><button type="button">🔳</button>
+        <button type="button">🔲</button><button type="button">▪️</button><button type="button">▫️</button><button type="button">◾</button><button type="button">◽</button><button type="button">◼️</button><button type="button">◻️</button><button type="button">🟥</button>
+        <button type="button">🟧</button><button type="button">🟨</button><button type="button">🟩</button><button type="button">🟦</button><button type="button">🟪</button><button type="button">⬛</button><button type="button">⬜</button><button type="button">🟫</button>
+        <button type="button">🔈</button><button type="button">🔇</button><button type="button">🔉</button><button type="button">🔊</button><button type="button">🔔</button><button type="button">🔕</button><button type="button">📣</button><button type="button">📢</button>
+        <button type="button">💬</button><button type="button">💭</button><button type="button">🗯️</button><button type="button">♠️</button><button type="button">♣️</button><button type="button">♥️</button><button type="button">♦️</button><button type="button">🃏</button>
+        <button type="button">🎴</button><button type="button">🀄</button><button type="button">🕐</button><button type="button">🕑</button><button type="button">🕒</button><button type="button">🕓</button><button type="button">🕔</button><button type="button">🕕</button>
+        <button type="button">🕖</button><button type="button">🕗</button><button type="button">🕘</button><button type="button">🕙</button><button type="button">🕚</button><button type="button">🕛</button>
+      </div>
+      <div class="cc-emoji-grid" data-emoji-panel="flags" hidden role="group" aria-label="Flags">
+        <button type="button">🏳️</button><button type="button">🏴</button><button type="button">🏁</button><button type="button">🚩</button><button type="button">🏳️‍🌈</button><button type="button">🏳️‍⚧️</button><button type="button">🏴‍☠️</button><button type="button">🇦🇺</button>
+        <button type="button">🇳🇿</button><button type="button">🇬🇧</button><button type="button">🇮🇪</button><button type="button">🇺🇸</button><button type="button">🇨🇦</button><button type="button">🇿🇦</button><button type="button">🇫🇯</button><button type="button">🇵🇬</button>
+        <button type="button">🇹🇴</button><button type="button">🇼🇸</button><button type="button">🇫🇷</button><button type="button">🇩🇪</button><button type="button">🇮🇹</button><button type="button">🇪🇸</button><button type="button">🇵🇹</button><button type="button">🇳🇱</button>
+        <button type="button">🇧🇪</button><button type="button">🇨🇭</button><button type="button">🇦🇹</button><button type="button">🇸🇪</button><button type="button">🇳🇴</button><button type="button">🇩🇰</button><button type="button">🇫🇮</button><button type="button">🇵🇱</button>
+        <button type="button">🇬🇷</button><button type="button">🇹🇷</button><button type="button">🇷🇺</button><button type="button">🇺🇦</button><button type="button">🇮🇳</button><button type="button">🇵🇰</button><button type="button">🇧🇩</button><button type="button">🇱🇰</button>
+        <button type="button">🇨🇳</button><button type="button">🇯🇵</button><button type="button">🇰🇷</button><button type="button">🇹🇭</button><button type="button">🇻🇳</button><button type="button">🇵🇭</button><button type="button">🇮🇩</button><button type="button">🇲🇾</button>
+        <button type="button">🇸🇬</button><button type="button">🇧🇷</button><button type="button">🇦🇷</button><button type="button">🇲🇽</button><button type="button">🇨🇱</button><button type="button">🇨🇴</button><button type="button">🇵🇪</button><button type="button">🇳🇬</button>
+        <button type="button">🇬🇭</button><button type="button">🇰🇪</button><button type="button">🇹🇿</button><button type="button">🇺🇬</button><button type="button">🇿🇼</button><button type="button">🇪🇬</button><button type="button">🇲🇦</button><button type="button">🇦🇪</button>
+        <button type="button">🇸🇦</button><button type="button">🇮🇱</button><button type="button">🇶🇦</button>
+      </div>
       </div>
     </details>
 
-    <label class="cc-clip" title="Attach a photo, video or file">
+    {% comment %}
+    TWO ATTACH BUTTONS, NOT ONE — "the pin we have, let it be for docs and
+    files ... then something that looks like an image for images and very short
+    videos."
+
+    One paperclip that took everything meant the file picker opened on every
+    kind of file at once, so choosing a photo on a phone meant wading through a
+    document browser. Split, each button opens the picker already filtered to
+    what it is for, and the icons say which is which before you press.
+
+    Both post into the same `files` field, because the server has never cared
+    which button a file came from — it sorts images, video and documents by what
+    they are (see MessageAttachment.is_image / is_video).
+    {% endcomment %}
+    <label class="cc-clip" title="Attach a document or file">
       <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.2-9.19a3.66 3.66 0 1 1 5.18 5.18l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.5-8.48"/></svg>
       <input type="file" name="files" multiple data-files
-             accept=".png,.jpg,.jpeg,.gif,.webp,.heic,.mp4,.mov,.webm,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx">
-      <span class="sr-only">Attach a file</span>
+             accept=".pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.rtf,.odt,.ods,.zip">
+      <span class="sr-only">Attach a document or file</span>
+    </label>
+
+    <label class="cc-clip cc-shot" title="Send a photo or a short video">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10.5" r="1.8"/><path d="m4 17 4.5-4.5a1.8 1.8 0 0 1 2.5 0L16 17"/><path d="m14 14.5 1.6-1.6a1.8 1.8 0 0 1 2.5 0L20 15"/></svg>
+      <input type="file" name="files" multiple data-files
+             accept=".png,.jpg,.jpeg,.gif,.webp,.heic,.mp4,.mov,.webm">
+      <span class="sr-only">Send a photo or a short video</span>
     </label>
 
     <textarea name="body" rows="1" maxlength="2000" data-chat-body
@@ -156,6 +371,13 @@ posts and still redirects.
     </button>
   </div>
 
+  {% comment %}
+  THE LAST THING ON THE PAGE. "Where I type messages it should be at the bottom,
+  because currently under it we have space — I do not want to see that space
+  under it." The hint is what was sitting in it: one line of grey type with the
+  composer's own bottom padding under that again. It keeps its words and gives
+  up the gap.
+  {% endcomment %}
   <p class="cc-hint" data-rec-idle-hint>
     Enter sends &middot; Shift+Enter for a new line &middot;
     {% comment %}

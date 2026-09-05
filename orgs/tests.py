@@ -7207,20 +7207,68 @@ class MembersPageLeadsWithItsCountsTests(TestCase):
             reverse("orgs:members", args=[self.org.id])
         ).content.decode()
 
-    def test_both_counts_lead_the_page(self):
+    def test_the_cards_lead_the_page(self):
         Group.objects.create(
             org=self.org, name="Ops", approval_status=Group.APPROVAL_APPROVED,
         )
         body = self._body()
-        self.assertIn("ocards", body)
+        self.assertIn("pcards", body)
         # Groups and child organisations are two different things — "KFC might
         # have many branches, that is not a group" — so they are two cards.
-        self.assertIn("Groups", body)
-        self.assertIn(f"Organisations under {self.org.name}", body)
+        self.assertIn("c-groups", body)
+        self.assertIn("c-orgs", body)
+        self.assertIn("c-team", body)
+        self.assertIn("c-invite", body)
         self.assertLess(
-            body.index("ocards"), body.index('data-coach="members-list"'),
-            "the counts should be above the member list, not under it",
+            body.index("pcards"), body.index('data-coach="members-list"'),
+            "the cards should be above the panel, not under it",
         )
+
+    def test_the_card_you_are_on_carries_its_colour(self):
+        """"If I click an item, let it carry the colour." The class is what
+        paints it, so the class is what this pins."""
+        body = self.client.get(
+            reverse("orgs:members", args=[self.org.id]), {"panel": "invite"},
+        ).content.decode()
+        self.assertIn("c-invite on", body)
+        self.assertNotIn("c-team on", body)
+
+    def test_each_card_loads_its_own_panel_where_the_table_was(self):
+        for panel, marker in [
+            ("groups", "pnav"),
+            ("orgs", f"Organisations under {self.org.name}"),
+            ("team", "nominate_manager"),
+            ("invite", "Or share the link"),
+        ]:
+            with self.subTest(panel=panel):
+                body = self.client.get(
+                    reverse("orgs:members", args=[self.org.id]), {"panel": panel},
+                ).content.decode()
+                self.assertIn(marker, body)
+
+    def test_the_groups_panel_follows_the_organisation_you_press(self):
+        """"If I click that organisation, under it is the groups — another row
+        that will auto display the groups that belong where I have clicked."""
+        other = Organisation.objects.create(name="Other Co", season=self.season)
+        OrgMember.objects.create(user=self.owner, org=other)
+        Group.objects.create(
+            org=other, name="Their Crew", approval_status=Group.APPROVAL_APPROVED,
+        )
+        Group.objects.create(
+            org=self.org, name="Our Crew", approval_status=Group.APPROVAL_APPROVED,
+        )
+        body = self.client.get(reverse("orgs:members", args=[self.org.id]), {
+            "panel": "groups", "porg": other.id,
+        }).content.decode()
+        self.assertIn("Their Crew", body)
+        self.assertNotIn("Our Crew", body)
+
+    def test_an_unknown_panel_falls_back_to_the_members_list(self):
+        """A stale bookmark should show the page, not an error."""
+        body = self.client.get(
+            reverse("orgs:members", args=[self.org.id]), {"panel": "nope"},
+        ).content.decode()
+        self.assertIn('data-coach="members-list"', body)
 
     def test_a_zero_still_gets_a_card(self):
         """A card saying 0 is the answer to "do we have any", which is the
@@ -7232,15 +7280,15 @@ class MembersPageLeadsWithItsCountsTests(TestCase):
     def test_the_member_list_is_read_only(self):
         """The role picker moved into Team management; the list is facts."""
         body = self._body()
-        head, _, rest = body.partition('<details class="tmcard"')
-        self.assertNotIn('name="role"', head, "a role picker is still in the list")
-        self.assertIn('name="role"', rest, "the picker did not arrive in the card")
+        self.assertNotIn('name="role"', body, "a role picker is still in the list")
+        self.assertNotIn("nominate_manager", body)
 
     def test_team_management_holds_everything_that_changes_somebody(self):
-        body = self._body()
-        _, _, card = body.partition('<details class="tmcard"')
-        self.assertIn("nominate_manager", card)
-        self.assertIn("set_role", card)
+        body = self.client.get(
+            reverse("orgs:members", args=[self.org.id]), {"panel": "team"},
+        ).content.decode()
+        self.assertIn("nominate_manager", body)
+        self.assertIn("set_role", body)
 
     def test_setting_a_role_still_works_from_the_card(self):
         """Nothing was removed from the product — same action, same endpoint."""

@@ -271,12 +271,34 @@
     else form.submit();
   });
 
+  /* THE CATEGORY TABS. Eight categories, one grid on screen at a time — the
+     sort the client asked for ("one for cars, the other for sports, more for
+     signs, cups, flags"). Handled before the insert below, because a tab is
+     also a BUTTON inside .cc-emoji-menu and would otherwise type its own glyph
+     into the message. */
+  document.addEventListener('click', function (e) {
+    var tab = e.target.closest && e.target.closest('[data-emoji-tab]');
+    if (!tab) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var menu = tab.closest('.cc-emoji-menu');
+    if (!menu) return;
+    var want = tab.getAttribute('data-emoji-tab');
+    menu.querySelectorAll('[data-emoji-tab]').forEach(function (t) {
+      t.classList.toggle('on', t === tab);
+    });
+    menu.querySelectorAll('[data-emoji-panel]').forEach(function (p) {
+      p.hidden = p.getAttribute('data-emoji-panel') !== want;
+    });
+  }, true);
+
   /* Emoji go in at the CARET. Appending to the end puts a face in the middle
      of a sentence somebody was still editing, which is the kind of thing that
      makes people stop using a picker. */
   document.addEventListener('click', function (e) {
     var menu = e.target.closest && e.target.closest('.cc-emoji-menu');
     if (!menu || e.target.tagName !== 'BUTTON') return;
+    if (e.target.hasAttribute('data-emoji-tab')) return;
     var form = menu.closest('[data-gtm-composer]');
     var box = bodyOf(form);
     if (!box) return;
