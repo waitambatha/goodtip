@@ -8,7 +8,7 @@ admin_panel.perms.managed_orgs().
 """
 from django.urls import path
 
-from . import org_views, views
+from . import org_views, prefect_views, views
 
 
 app_name = "manage"
@@ -27,4 +27,13 @@ urlpatterns = [
     path("messages/new/", org_views.message_new, name="message_new"),
     path("messages/<int:thread_id>/", org_views.message_thread, name="message_thread"),
     path("charity/", org_views.charity_redirect, name="charity"),
+    # PREFECT — the review desk. Everything the chat moderator and the members
+    # raise arrives here, and every consequence in the feature is applied from
+    # here by a person.
+    path("prefect/", prefect_views.prefect_queue, name="prefect"),
+    path("prefect/<int:flag_id>/", prefect_views.prefect_flag, name="prefect_flag"),
+    path("prefect/<int:flag_id>/clear/", prefect_views.prefect_clear, name="prefect_clear"),
+    path("prefect/<int:flag_id>/act/", prefect_views.prefect_act, name="prefect_act"),
+    path("prefect/lift/<int:sanction_id>/", prefect_views.prefect_lift, name="prefect_lift"),
+    path("prefect/allow/<int:allowance_id>/remove/", prefect_views.prefect_unlearn, name="prefect_unlearn"),
 ]

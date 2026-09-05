@@ -1,0 +1,113 @@
+{% extends "admin_base.html" %}
+{% block nav_prefect %}on{% endblock %}
+{% block hero_title %}Prefect{% endblock %}
+{% block hero_lead %}Messages Prefect or your members have asked someone to look at.{% endblock %}
+{% block admin_content %}
+{% comment %}
+THE REVIEW DESK.
+
+Prefect reads the rooms so nobody has to read all of them, and everything it
+finds stops here, in front of a person. Nothing on this page has already
+happened: a flag is a request for review, not an accusation and not a
+punishment. Every consequence in the feature is applied from the screen behind
+these rows, by an admin, deliberately.
+{% endcomment %}
+{% if not org %}
+  {% include "manage/_no_org_body.html" %}
+{% else %}
+
+{% include "manage/_org_switch.html" %}
+
+<div class="pf-tabs">
+  <a class="pf-tab{% if show == 'open' %} on{% endif %}" href="?show=open{% if orgs|length > 1 %}&amp;org={{ org.id }}{% endif %}">
+    Waiting{% if open_count %} <i>{{ open_count }}</i>{% endif %}
+  </a>
+  <a class="pf-tab{% if show == 'cleared' %} on{% endif %}" href="?show=cleared{% if orgs|length > 1 %}&amp;org={{ org.id }}{% endif %}">Not an issue</a>
+  <a class="pf-tab{% if show == 'actioned' %} on{% endif %}" href="?show=actioned{% if orgs|length > 1 %}&amp;org={{ org.id }}{% endif %}">Actioned</a>
+  <a class="pf-tab{% if show == 'all' %} on{% endif %}" href="?show=all{% if orgs|length > 1 %}&amp;org={{ org.id }}{% endif %}">Everything</a>
+</div>
+
+<div class="pf-list">
+  {% for f in flags %}
+  {% comment %}
+  The row says WHO raised it, HOW BAD it was thought to be and WHAT MATCHED —
+  and never quotes the message. Putting the reported words in a list that an
+  admin scrolls past is publishing them further, which is the opposite of
+  handling them. They are on the review screen, in the conversation they were
+  said in, where they can actually be judged.
+  {% endcomment %}
+  <a class="pf-row is-{{ f.status }}" href="{% url 'manage:prefect_flag' f.id %}">
+    <span class="pf-src {% if f.raised_by %}is-member{% else %}is-prefect{% endif %}">
+      {% if f.raised_by %}<svg><use href="#ic-f-users"/></svg> Member{% else %}<svg><use href="#ic-f-shield"/></svg> Prefect{% endif %}
+    </span>
+    <span class="pf-txt">
+      <b>{{ f.author.display_name }}</b>
+      <i>
+        {% if f.raised_by %}Reported by {{ f.raised_by.display_name }}{% else %}{{ f.category|capfirst }}{% endif %}
+        &middot; {{ f.message.thread.group.name|default:org.name }}
+        &middot; {{ f.created_at|timesince }} ago
+      </i>
+    </span>
+    {% if f.terms %}<span class="pf-terms">{% for t in f.terms|slice:":3" %}<i>{{ t }}</i>{% endfor %}</span>{% endif %}
+    {% if not f.raised_by %}<span class="pf-score" title="How strongly Prefect reacted. A rank, not a probability.">{{ f.score }}</span>{% endif %}
+    <span class="pf-go">Review &rarr;</span>
+  </a>
+  {% empty %}
+  <p class="pf-none">
+    {% if show == 'open' %}Nothing waiting. Prefect is reading; it only speaks up when it thinks somebody should look.
+    {% else %}Nothing here yet.{% endif %}
+  </p>
+  {% endfor %}
+</div>
+
+{% if sanctions %}
+<h2 class="pf-h">Warnings and suspensions</h2>
+<div class="pf-list">
+  {% for s in sanctions %}
+  <div class="pf-row pf-sanction">
+    <span class="pf-src {% if s.kind == 'suspension' %}is-susp{% else %}is-warn{% endif %}">{{ s.get_kind_display }}</span>
+    <span class="pf-txt">
+      <b>{{ s.user.display_name }}</b>
+      <i>
+        {% if s.group %}{{ s.group.name }}{% else %}{{ org.name }}{% endif %}
+        &middot; {{ s.until_label }}
+        {% if s.issued_by %}&middot; by {{ s.issued_by.display_name }}{% endif %}
+      </i>
+    </span>
+    {% if s.is_active %}
+    {% comment %}
+    "Be able to uplift the suspension even if the time set is not met." Only
+    shown while one is actually running — a lift button beside a suspension that
+    expired last month is a control that does nothing.
+    {% endcomment %}
+    <form method="post" action="{% url 'manage:prefect_lift' s.id %}" data-confirm="Let {{ s.user.display_name }} post again?">
+      {% csrf_token %}
+      <button type="submit" class="abtn abtn-ghost abtn-sm">Lift it</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if allowances %}
+<h2 class="pf-h">What Prefect has been told is fine here</h2>
+{% comment %}
+The one thing Prefect learns, kept visible. An allowance list that could only be
+added to, and never seen, would be a moderator quietly going deaf with no way to
+find out why.
+{% endcomment %}
+<div class="pf-allow">
+  {% for a in allowances %}
+  <span class="pf-allowchip">
+    “{{ a.phrase }}”
+    <form method="post" action="{% url 'manage:prefect_unlearn' a.id %}">
+      {% csrf_token %}<button type="submit" aria-label="Have Prefect raise “{{ a.phrase }}” again">&times;</button>
+    </form>
+  </span>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

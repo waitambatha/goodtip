@@ -59,6 +59,12 @@
         addressed to GoodTip rather than to anybody's league.
         {% endcomment %}
         <a href="{% url 'manage:messages' %}" class="{% block nav_messages %}{% endblock %}">Messages{% if unread_thread_count %} <span class="an-count">{{ unread_thread_count }}</span>{% endif %}</a>
+        {% comment %}
+        Prefect sits beside Messages because it is about the same rooms — and it
+        carries its own count, since a queue nobody knows is waiting is a queue
+        that is not being reviewed.
+        {% endcomment %}
+        <a href="{% url 'manage:prefect' %}" class="{% block nav_prefect %}{% endblock %}">Prefect{% if prefect_open_count %} <span class="an-count">{{ prefect_open_count }}</span>{% endif %}</a>
         <a href="{% url 'manage:charity' %}" class="{% block nav_charity %}{% endblock %}">Charity</a>
       </div>
       <div class="an-right">
@@ -106,6 +112,7 @@
       <a href="{% url 'manage:approvals' %}">Approvals{% if pending_approval_count %} ({{ pending_approval_count }}){% endif %}</a>
       <a href="{% url 'manage:orgs_list' %}">Orgs</a>
       <a href="{% url 'manage:messages' %}">Messages{% if unread_thread_count %} ({{ unread_thread_count }}){% endif %}</a>
+      <a href="{% url 'manage:prefect' %}">Prefect{% if prefect_open_count %} ({{ prefect_open_count }}){% endif %}</a>
       <a href="{% url 'manage:charity' %}">Charity</a>
       {% if user.is_superuser %}<a href="/admin/">GoodTip HQ &rarr;</a>{% endif %}
       <a href="{% url 'profile' %}">Profile</a>

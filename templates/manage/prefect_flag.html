@@ -1,0 +1,147 @@
+{% extends "admin_base.html" %}
+{% block nav_prefect %}on{% endblock %}
+{% block hero_title %}Review{% endblock %}
+{% block hero_lead %}Read it in context, then decide.{% endblock %}
+{% block admin_content %}
+{% comment %}
+ONE FLAG, IN THE CONVERSATION IT CAME FROM.
+
+The client's own example is why this screen shows what came before and after:
+"sometimes friends talk like 'what's up you crazy fool' — their friendship is at
+that level, but when you read it plainly you might think it's an abuse."
+
+Those are the same words and different events, and the only thing that separates
+them is the room around them. A review screen showing one line in isolation asks
+a person to make exactly the mistake Prefect is not trusted to make.
+{% endcomment %}
+<p class="pf-back"><a href="{% url 'manage:prefect' %}">&larr; Back to Prefect</a></p>
+
+<div class="pf-case">
+  <div class="pf-case-head">
+    <span class="pf-src {% if flag.raised_by %}is-member{% else %}is-prefect{% endif %}">
+      {% if flag.raised_by %}Reported by {{ flag.raised_by.display_name }}{% else %}Found by Prefect{% endif %}
+    </span>
+    <div>
+      <h2>{{ flag.author.display_name }}</h2>
+      <p>
+        in {% if thread.group %}{{ thread.group.name }}{% else %}{{ org.name }}{% endif %}
+        &middot; {{ flag.created_at|date:"j M Y, g:i a" }}
+        {% if flag.status != 'open' %}&middot; <b>{{ flag.get_status_display }}</b>{% endif %}
+      </p>
+    </div>
+  </div>
+
+  {% if not flag.raised_by %}
+  <p class="pf-why">
+    {% comment %}
+    Prefect says why, in words, every time. A score with no explanation is a
+    machine asking to be trusted; this feature is built on the opposite.
+    {% endcomment %}
+    Prefect reacted to
+    {% for t in flag.terms %}<b>“{{ t }}”</b>{% if not forloop.last %}, {% endif %}{% endfor %}
+    &mdash; {{ flag.category }}, strength {{ flag.score }}.
+    {% if flag.reason %}It also noted: {{ flag.reason }}.{% endif %}
+  </p>
+  {% elif flag.note %}
+  <p class="pf-why">{{ flag.raised_by.display_name }} said: “{{ flag.note }}”</p>
+  {% endif %}
+
+  {% if prior_flags %}
+  <p class="pf-prior">{{ flag.author.display_name }} has had {{ prior_flags }} earlier flag{{ prior_flags|pluralize }} actioned in this organisation.</p>
+  {% endif %}
+
+  <div class="pf-thread">
+    {% for m in before %}
+    <div class="pf-msg{% if m.id == flag.message.id %} is-it{% endif %}">
+      <b>{{ m.author.display_name }}</b>
+      <span>{{ m.body|default:"(an attachment)" }}</span>
+      <i>{{ m.created_at|date:"j M, g:i a" }}</i>
+    </div>
+    {% endfor %}
+    {% for m in after %}
+    <div class="pf-msg is-after">
+      <b>{{ m.author.display_name }}</b>
+      <span>{{ m.body|default:"(an attachment)" }}</span>
+      <i>{{ m.created_at|date:"j M, g:i a" }}</i>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% if flag.is_open %}
+<div class="pf-actions">
+  {% comment %}
+  NOT AN ISSUE IS FIRST, and it is the only one that is a single press. The most
+  likely correct answer to a flag from a word list is "that was fine", and the
+  screen should make the likely answer the easy one — otherwise a reviewer in a
+  hurry reaches for a consequence because it was nearer.
+  {% endcomment %}
+  <form method="post" action="{% url 'manage:prefect_clear' flag.id %}" class="pf-act pf-act-clear">
+    {% csrf_token %}
+    <h3>Not an issue</h3>
+    <p>Nothing happens to anyone. The flag is closed.</p>
+    {% if flag.terms %}
+    <label class="pf-learn">
+      <input type="checkbox" name="learn" value="1">
+      Teach Prefect that {% for t in flag.terms %}“{{ t }}”{% if not forloop.last %}, {% endif %}{% endfor %}
+      {{ flag.terms|pluralize:"is,are" }} fine in {{ org.name }}
+    </label>
+    <p class="pf-learn-note">
+      Only tick this if the WORDS are ordinary here &mdash; not just because
+      these two are friends. One is a fact about your organisation; the other is
+      a fact about two people, and Prefect can only learn the first.
+    </p>
+    {% endif %}
+    <button type="submit" class="abtn abtn-primary">Clear it</button>
+  </form>
+
+  <form method="post" action="{% url 'manage:prefect_act' flag.id %}" class="pf-act">
+    {% csrf_token %}
+    <h3>Or do something about it</h3>
+    <label class="pf-field">
+      <span>What should they be told?</span>
+      <textarea name="reason" rows="3" placeholder="They see this. Keep it plain."></textarea>
+    </label>
+
+    <fieldset class="pf-field">
+      <legend>Where does it apply?</legend>
+      <label><input type="radio" name="scope" value="org" checked> All of {{ org.name }}</label>
+      {% if thread.group %}
+      <label><input type="radio" name="scope" value="group"> {{ thread.group.name }} only</label>
+      {% endif %}
+    </fieldset>
+
+    <fieldset class="pf-field">
+      <legend>How long, if you're suspending?</legend>
+      <label><input type="radio" name="span" value="week" checked> A week</label>
+      <label><input type="radio" name="span" value="month"> A month</label>
+      {% comment %}
+      "Or just till he feels." A real state, not a date a long way off — the two
+      are identical in a database and read very differently to the person
+      serving them.
+      {% endcomment %}
+      <label><input type="radio" name="span" value="open"> Until I lift it</label>
+    </fieldset>
+
+    <div class="pf-buttons">
+      <button type="submit" name="action" value="warn" class="abtn abtn-ghost">Send a warning</button>
+      <button type="submit" name="action" value="suspend" class="abtn abtn-dark">Suspend from posting</button>
+      <button type="submit" name="action" value="remove" class="abtn abtn-danger"
+              data-confirm="Remove {{ flag.author.display_name }}? This takes them out of the room entirely.">
+        Remove them
+      </button>
+    </div>
+    <p class="pf-learn-note">
+      Whatever you choose, {{ flag.author.display_name }} is told what happened and
+      why. Being managed out of a workplace comp without being told is not
+      something this product will do.
+    </p>
+  </form>
+</div>
+{% else %}
+<p class="pf-done">
+  {{ flag.get_status_display }}{% if flag.reviewed_by %} by {{ flag.reviewed_by.display_name }}{% endif %}
+  {% if flag.reviewed_at %}on {{ flag.reviewed_at|date:"j M Y" }}{% endif %}.
+</p>
+{% endif %}
+{% endblock %}

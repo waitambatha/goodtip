@@ -6318,3 +6318,422 @@ class SendingAMessageIsNotANavigationTests(TestCase):
         ).content.decode()
         self.assertIn('hx-target="#gtmChatList"', body)
         self.assertNotIn('data-busy="Sending"', body)
+
+
+class PrefectReadsTheRoomTests(TestCase):
+    """What Prefect flags, and — more importantly — what it leaves alone.
+
+    THE CLIENT'S OWN EXAMPLE IS THE HARD CASE: "sometimes friends talk like
+    'what's up you crazy fool' — their friendship is at that level, but when you
+    read it plainly you might think it's an abuse. So the prefect has to be
+    smart."
+
+    A word list cannot be smart about tone; what it can be is quiet. Every rule
+    here is biased toward saying nothing, because a moderator that cries wolf
+    trains people to ignore it — and the misses are invisible while the noise
+    is not.
+    """
+
+    def _look(self, text, **ctx):
+        from .prefect import classify
+
+        return classify(text, ctx or None)
+
+    def test_it_says_nothing_about_an_ordinary_message(self):
+        self.assertFalse(self._look("good luck this round everyone").reportable)
+
+    def test_banter_between_mates_is_not_reported(self):
+        """The example, verbatim. Aimed at somebody, on the abuse list, and
+        carrying every mark of a joke."""
+        v = self._look("what's up you crazy fool 😂 lol mate")
+        self.assertFalse(v.reportable, f"scored {v.score}: {v.reason}")
+
+    def test_a_slur_is_reported_even_wrapped_in_laughing(self):
+        """Three laughing emoji are not a defence.
+
+        This failed first time round: the banter discount applied to every
+        category, so "haha you faggot lol 😂" lost 45 points and fell under the
+        reporting floor. Tone explains an INSULT, which is the client's own
+        example, and explains nothing about a slur.
+        """
+        v = self._look("haha you faggot lol 😂")
+        self.assertTrue(v.reportable)
+        self.assertEqual(v.category, "hate")
+
+    def test_pornography_in_a_workplace_room_is_reported(self):
+        """Also failed first time: the "not aimed at anyone" discount halved it
+        because the sentence pointed at nobody. A pornographic link addressed to
+        nobody is still in the room."""
+        v = self._look("check this out pornhub.com/watch")
+        self.assertTrue(v.reportable)
+        self.assertEqual(v.category, "sexual")
+
+    def test_a_threat_aimed_at_somebody_is_reported(self):
+        self.assertTrue(self._look("i will find you and kill you").reportable)
+
+    def test_an_opinion_about_a_fixture_is_not_an_attack_on_a_person(self):
+        """"This is stupid" is about the fixture. Only "you are stupid" is
+        Prefect's business."""
+        self.assertFalse(self._look("that fixture list is stupid").reportable)
+
+    def test_the_room_laughing_is_still_reported_to_the_reviewer(self):
+        """Recorded even where it is not applied. A reviewer is allowed to weigh
+        what Prefect may not."""
+        v = self._look("haha you faggot lol")
+        self.assertTrue(v.reportable)
+        self.assertIn("laughing", v.reason)
+
+    def test_ordinary_abuse_alone_does_not_reach_the_floor(self):
+        """The lowest-weighted list on purpose: this is where the client's
+        example lives, and on its own it is banter far more often than it is
+        anything else."""
+        self.assertFalse(self._look("you idiot").reportable)
+
+    def test_a_word_inside_another_word_is_not_a_match(self):
+        """Matched on boundaries, so "classic" is not "ass" and Scunthorpe is
+        nobody's problem."""
+        for innocent in ("that was a classic finish", "assumption", "analysis"):
+            self.assertFalse(self._look(innocent).reportable, innocent)
+
+    def test_an_allowed_phrase_is_ignored_in_that_organisation(self):
+        """The one thing Prefect learns, and it only learns to say less."""
+        loud = "you faggot"
+        self.assertTrue(self._look(loud).reportable)
+        self.assertFalse(self._look(loud, allowed_phrases={"faggot"}).reportable)
+
+    def test_a_classifier_that_breaks_lets_the_message_through(self):
+        """A chat that cannot accept a message because the moderator fell over
+        is a worse product than one that missed something."""
+        from unittest.mock import patch
+
+        from .prefect import classify
+
+        with patch("orgs.prefect.get_classifier", side_effect=RuntimeError("boom")):
+            self.assertFalse(classify("anything at all").reportable)
+
+    def test_the_seam_is_a_setting(self):
+        """One setting, one class, a .look() method — so a language model can
+        replace this without touching anything that calls it."""
+        from django.test import override_settings
+
+        from .prefect import get_classifier
+
+        with override_settings(PREFECT_CLASSIFIER="orgs.prefect.KeywordPrefect"):
+            self.assertEqual(type(get_classifier()).__name__, "KeywordPrefect")
+
+
+class PrefectRaisesAndReviewsTests(TestCase):
+    """From a message to a decision, and everything that must not happen on the
+    way.
+
+    A flag is a REQUEST FOR REVIEW. Nothing is hidden, nobody is suspended and no
+    message is touched by raising one — every consequence is applied by a person.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.boss = User.objects.create_user(
+            email="pf-boss@example.com", password="x", display_name="Boss",
+        )
+        self.rude = User.objects.create_user(
+            email="pf-rude@example.com", password="x", display_name="Rude",
+        )
+        self.bystander = User.objects.create_user(
+            email="pf-by@example.com", password="x", display_name="Bystander",
+        )
+        self.org = Organisation.objects.create(
+            name="Prefect Co", season=self.season, created_by=self.boss,
+        )
+        OrgMember.objects.create(user=self.boss, org=self.org, is_league_owner=True)
+        OrgMember.objects.create(user=self.rude, org=self.org)
+        OrgMember.objects.create(user=self.bystander, org=self.org)
+        from .services import org_room
+
+        self.thread = org_room(self.org)
+
+    def _say(self, user, text):
+        from .models import Message
+
+        return Message.objects.create(thread=self.thread, author=user, body=text)
+
+    def test_a_bad_message_raises_a_flag_and_tells_the_admins(self):
+        from .models import ChatFlag, Notification
+        from .moderation import review_message
+
+        entry = self._say(self.rude, "you faggot")
+        flag = review_message(entry)
+        self.assertIsNotNone(flag)
+        self.assertEqual(flag.status, ChatFlag.STATUS_OPEN)
+        self.assertIsNone(flag.raised_by, "Prefect raised it, so raised_by is empty")
+        self.assertTrue(
+            Notification.objects.filter(user=self.boss, org=self.org).exists()
+        )
+
+    def test_the_notification_does_not_quote_the_message(self):
+        """A teaser of the exact words would put them on the bell of everybody
+        who runs the organisation — publishing them further, not handling them."""
+        from .models import Notification
+        from .moderation import review_message
+
+        review_message(self._say(self.rude, "you faggot"))
+        note = Notification.objects.filter(user=self.boss).first()
+        self.assertNotIn("faggot", note.title + note.message)
+
+    def test_the_author_is_not_told_prefect_flagged_them(self):
+        """Before any human has looked, that is an accusation from a word list."""
+        from .models import Notification
+        from .moderation import review_message
+
+        review_message(self._say(self.rude, "you faggot"))
+        self.assertFalse(Notification.objects.filter(user=self.rude).exists())
+
+    def test_nothing_is_hidden_or_deleted_by_a_flag(self):
+        from .models import Message
+        from .moderation import review_message
+
+        entry = self._say(self.rude, "you faggot")
+        review_message(entry)
+        self.assertTrue(Message.objects.filter(pk=entry.pk).exists())
+
+    def test_an_ordinary_message_raises_nothing(self):
+        from .models import ChatFlag
+        from .moderation import review_message
+
+        review_message(self._say(self.rude, "good luck everyone"))
+        self.assertEqual(ChatFlag.objects.count(), 0)
+
+    def test_a_member_can_report_somebody_else(self):
+        """"Apart from the prefect, the member can also report a member." Same
+        queue, and raised_by is what tells the reviewer which it was."""
+        from .models import ChatFlag
+        from .moderation import report_message
+
+        entry = self._say(self.rude, "something a person objects to")
+        flag = report_message(entry, self.bystander, "not on")
+        self.assertEqual(flag.raised_by, self.bystander)
+        self.assertEqual(flag.source, ChatFlag.SOURCE_MEMBER)
+        self.assertEqual(flag.note, "not on")
+
+    def test_reporting_twice_does_not_make_two_flags(self):
+        """A report button that can be pressed ten times is a way to make a
+        queue useless."""
+        from .models import ChatFlag
+        from .moderation import report_message
+
+        entry = self._say(self.rude, "whatever")
+        report_message(entry, self.bystander)
+        report_message(entry, self.bystander)
+        self.assertEqual(ChatFlag.objects.filter(message=entry).count(), 1)
+
+    def test_you_cannot_report_your_own_message(self):
+        entry = self._say(self.rude, "hello")
+        self.client.force_login(self.rude)
+        self.client.post(
+            reverse("orgs:report_message", args=[self.org.id, entry.id])
+        )
+        from .models import ChatFlag
+
+        self.assertEqual(ChatFlag.objects.count(), 0)
+
+    def test_you_cannot_report_a_conversation_you_are_not_in(self):
+        """A message id is not a licence to report a room you were never in."""
+        User = get_user_model()
+        outsider = User.objects.create_user(
+            email="pf-out@example.com", password="x", display_name="Out",
+        )
+        entry = self._say(self.rude, "hello")
+        self.client.force_login(outsider)
+        r = self.client.post(
+            reverse("orgs:report_message", args=[self.org.id, entry.id])
+        )
+        self.assertEqual(r.status_code, 404)
+
+
+class PrefectDecisionsTests(TestCase):
+    """Clearing, learning, warning, suspending, removing and lifting."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.boss = User.objects.create_user(
+            email="d-boss@example.com", password="x", display_name="Boss",
+        )
+        self.rude = User.objects.create_user(
+            email="d-rude@example.com", password="x", display_name="Rude",
+        )
+        self.org = Organisation.objects.create(
+            name="Decide Co", season=self.season, created_by=self.boss,
+        )
+        OrgMember.objects.create(user=self.boss, org=self.org, is_league_owner=True)
+        OrgMember.objects.create(user=self.rude, org=self.org)
+        from .services import org_room
+
+        self.thread = org_room(self.org)
+        from .models import Message
+        from .moderation import review_message
+
+        self.entry = Message.objects.create(
+            thread=self.thread, author=self.rude, body="you faggot",
+        )
+        self.flag = review_message(self.entry)
+        self.client.force_login(self.boss)
+
+    def test_clearing_does_nothing_to_anybody(self):
+        from .models import ChatFlag, MemberSanction
+
+        self.client.post(reverse("manage:prefect_clear", args=[self.flag.id]))
+        self.flag.refresh_from_db()
+        self.assertEqual(self.flag.status, ChatFlag.STATUS_CLEARED)
+        self.assertEqual(MemberSanction.objects.count(), 0)
+
+    def test_clearing_with_learn_teaches_prefect_to_stay_quiet_here(self):
+        from .models import PrefectAllowance
+        from .prefect import classify
+        from .moderation import allowed_phrases
+
+        self.client.post(
+            reverse("manage:prefect_clear", args=[self.flag.id]), {"learn": "1"},
+        )
+        self.assertTrue(PrefectAllowance.objects.filter(org=self.org).exists())
+        v = classify("you faggot", {"allowed_phrases": allowed_phrases(self.org)})
+        self.assertFalse(v.reportable)
+
+    def test_what_one_organisation_allows_does_not_leak_to_another(self):
+        """A shared list would let the loosest room set the standard for every
+        other."""
+        from .moderation import allowed_phrases
+
+        other = Organisation.objects.create(name="Elsewhere", season=self.season)
+        self.client.post(
+            reverse("manage:prefect_clear", args=[self.flag.id]), {"learn": "1"},
+        )
+        self.assertEqual(allowed_phrases(other), set())
+
+    def test_a_warning_is_recorded_and_the_person_is_told(self):
+        from .models import MemberSanction, Notification
+
+        self.client.post(
+            reverse("manage:prefect_act", args=[self.flag.id]),
+            {"action": "warn", "reason": "Keep it civil."},
+        )
+        s = MemberSanction.objects.get()
+        self.assertEqual(s.kind, MemberSanction.KIND_WARNING)
+        self.assertFalse(s.is_active, "a warning is a message, not a state")
+        self.assertTrue(Notification.objects.filter(user=self.rude).exists())
+
+    def test_a_suspension_stops_them_posting_and_says_why(self):
+        from .moderation import may_post
+
+        self.client.post(
+            reverse("manage:prefect_act", args=[self.flag.id]),
+            {"action": "suspend", "span": "week", "reason": "That's not on."},
+        )
+        allowed, why = may_post(self.rude, self.thread)
+        self.assertFalse(allowed)
+        self.assertIn("Decide Co", why)
+
+    def test_until_lifted_is_a_real_state_not_a_distant_date(self):
+        from .models import MemberSanction
+
+        self.client.post(
+            reverse("manage:prefect_act", args=[self.flag.id]),
+            {"action": "suspend", "span": "open"},
+        )
+        s = MemberSanction.objects.get()
+        self.assertIsNone(s.ends_at)
+        self.assertTrue(s.is_active)
+        self.assertEqual(s.until_label, "until lifted")
+
+    def test_lifting_early_lets_them_back_and_keeps_the_record(self):
+        from .models import MemberSanction
+        from .moderation import may_post
+
+        self.client.post(
+            reverse("manage:prefect_act", args=[self.flag.id]),
+            {"action": "suspend", "span": "month"},
+        )
+        s = MemberSanction.objects.get()
+        self.client.post(reverse("manage:prefect_lift", args=[s.id]))
+        s.refresh_from_db()
+        self.assertIsNotNone(s.lifted_at)
+        self.assertTrue(may_post(self.rude, self.thread)[0])
+        self.assertTrue(
+            MemberSanction.objects.filter(pk=s.pk).exists(),
+            "a lift must not delete the history",
+        )
+
+    def test_a_suspended_member_cannot_post_even_by_posting_the_form(self):
+        """Hiding the composer is a courtesy; refusing the post is the rule."""
+        from .models import Message
+
+        self.client.post(
+            reverse("manage:prefect_act", args=[self.flag.id]),
+            {"action": "suspend", "span": "week"},
+        )
+        before = Message.objects.filter(thread=self.thread).count()
+        self.client.force_login(self.rude)
+        self.client.post(
+            reverse("orgs:member_message_thread", args=[self.org.id, self.thread.id]),
+            {"body": "let me back in"},
+        )
+        self.assertEqual(Message.objects.filter(thread=self.thread).count(), before)
+
+    def test_removing_takes_them_out_of_the_organisation(self):
+        self.client.post(
+            reverse("manage:prefect_act", args=[self.flag.id]), {"action": "remove"},
+        )
+        self.assertFalse(
+            OrgMember.objects.filter(org=self.org, user=self.rude).exists()
+        )
+
+    def test_the_creator_cannot_be_removed_from_their_own_organisation(self):
+        """There is no undo for taking a league away from the person who made
+        it."""
+        from .models import Message
+        from .moderation import review_message
+
+        entry = Message.objects.create(
+            thread=self.thread, author=self.boss, body="you faggot",
+        )
+        flag = review_message(entry)
+        self.client.post(
+            reverse("manage:prefect_act", args=[flag.id]), {"action": "remove"},
+        )
+        self.assertTrue(
+            OrgMember.objects.filter(org=self.org, user=self.boss).exists()
+        )
+
+    def test_an_admin_of_another_organisation_cannot_touch_this_flag(self):
+        User = get_user_model()
+        stranger = User.objects.create_user(
+            email="d-str@example.com", password="x", display_name="Stranger",
+        )
+        theirs = Organisation.objects.create(
+            name="Theirs", season=self.season, created_by=stranger,
+        )
+        OrgMember.objects.create(user=stranger, org=theirs, is_league_owner=True)
+        self.client.force_login(stranger)
+        r = self.client.post(
+            reverse("manage:prefect_act", args=[self.flag.id]), {"action": "warn"},
+        )
+        self.assertEqual(r.status_code, 404)
+
+    def test_the_queue_lists_what_is_waiting(self):
+        body = self.client.get(reverse("manage:prefect")).content.decode()
+        self.assertIn("Rude", body)
+        self.assertIn("Review", body)
+
+    def test_the_review_screen_shows_the_conversation_around_it(self):
+        """The client's example turns entirely on context: the same words
+        between friends and from a stranger are different events."""
+        from .models import Message
+
+        Message.objects.create(
+            thread=self.thread, author=self.boss, body="haha get in here",
+        )
+        body = self.client.get(
+            reverse("manage:prefect_flag", args=[self.flag.id])
+        ).content.decode()
+        self.assertIn("haha get in here", body)
+        self.assertIn("pf-msg is-it", body)

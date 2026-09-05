@@ -1868,3 +1868,199 @@ class MessageReaction(models.Model):
 
     def __str__(self):
         return f"{self.user} {self.emoji} #{self.message_id}"
+
+
+class ChatFlag(models.Model):
+    """A message somebody — or something — thinks needs a human's eye.
+
+    TWO SOURCES, ONE QUEUE. Prefect raises most of these; a member can raise one
+    too ("apart from the prefect, the member can also report a member to the
+    group admin or organisation admin — so the difference is this is now raised
+    by the member and not the prefect AI"). They share a queue because the
+    reviewer's job is identical, and `raised_by` is what tells them apart: NULL
+    is Prefect, a user is a person who was in the room.
+
+    A flag is a REQUEST FOR REVIEW and nothing else. Nothing is hidden, nobody is
+    suspended and no message is touched by raising one. Every consequence in this
+    feature is applied by a person, on purpose: a moderator that acts on its own
+    reading would be accusing people in front of the people who run their
+    workplace comp, on the strength of a word list.
+    """
+
+    SOURCE_PREFECT = "prefect"
+    SOURCE_MEMBER = "member"
+
+    STATUS_OPEN = "open"
+    STATUS_CLEARED = "cleared"      # looked at, nothing wrong
+    STATUS_ACTIONED = "actioned"    # looked at, something was done
+    STATUS_CHOICES = [
+        (STATUS_OPEN, "Waiting for review"),
+        (STATUS_CLEARED, "Not an issue"),
+        (STATUS_ACTIONED, "Actioned"),
+    ]
+
+    org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name="chat_flags")
+    message = models.ForeignKey("orgs.Message", on_delete=models.CASCADE, related_name="flags")
+    # Denormalised from the message so the queue can be listed, filtered and
+    # counted without walking to the thread and its author on every row.
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="flagged_messages",
+    )
+    raised_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="raised_flags",
+        help_text="The member who reported it. Empty means Prefect found it.",
+    )
+    category = models.CharField(max_length=20, blank=True)
+    score = models.PositiveSmallIntegerField(default=0)
+    # What matched, shown to the reviewer verbatim. A queue that says "this
+    # looks bad" without saying why is asking somebody to take its word.
+    terms = models.JSONField(default=list, blank=True)
+    reason = models.TextField(blank=True)
+    note = models.TextField(blank=True, help_text="What the reporter said, or the reviewer's note.")
+
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_OPEN)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="reviewed_flags",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["org", "status"])]
+
+    def __str__(self):
+        who = self.raised_by.display_name if self.raised_by else "Prefect"
+        return f"{who} flagged {self.author} in {self.org} ({self.status})"
+
+    @property
+    def source(self) -> str:
+        return self.SOURCE_MEMBER if self.raised_by_id else self.SOURCE_PREFECT
+
+    @property
+    def is_open(self) -> bool:
+        return self.status == self.STATUS_OPEN
+
+
+class PrefectAllowance(models.Model):
+    """A phrase this organisation has said is fine here.
+
+    THE ONE THING PREFECT LEARNS, and it only ever learns to say less.
+
+    "Be able to learn that that is not an issue, because sometimes friends talk
+    like 'what's up you crazy fool' — their friendship is at that level." So when
+    a reviewer clears a flag they can add the words that set it off to their
+    organisation's allowance, and Prefect stops raising them there.
+
+    SCOPED TO THE ORGANISATION, never globally. One workplace deciding a word is
+    ordinary between them says nothing about another, and a shared list would let
+    the loosest room set the standard for every other.
+
+    Slurs and sexual terms can be allowed too, because refusing would be us
+    overruling an organisation about its own room from outside it — but the queue
+    shows what has been allowed, so it is a visible decision rather than a
+    silent one.
+    """
+
+    org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name="prefect_allowances")
+    phrase = models.CharField(max_length=80)
+    added_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="prefect_allowances",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["phrase"]
+        unique_together = ("org", "phrase")
+
+    def __str__(self):
+        return f"{self.org}: “{self.phrase}” is fine"
+
+
+class MemberSanction(models.Model):
+    """A warning, or a period during which somebody may not post.
+
+    "Either sends a warning, can suspend a user for a week, or a month, or just
+    till he feels — be also able to uplift the suspension even if the time set is
+    not met, and even remove a member from the group or organisation."
+
+    ENDS_AT NULL MEANS UNTIL LIFTED, which is the "till he feels" case and has to
+    be a real state rather than a suspension with a date far in the future: the
+    two look identical in a database and read very differently to the person
+    serving them.
+
+    A LIFT DOES NOT DELETE THE ROW. It stamps lifted_at. An organisation asking
+    "has this happened before" needs the answer to survive the moment somebody
+    was let back in, and a deleted record answers "no" forever.
+    """
+
+    KIND_WARNING = "warning"
+    KIND_SUSPENSION = "suspension"
+    KIND_CHOICES = [
+        (KIND_WARNING, "Warning"),
+        (KIND_SUSPENSION, "Suspended from posting"),
+    ]
+
+    org = models.ForeignKey(Organisation, on_delete=models.CASCADE, related_name="sanctions")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sanctions",
+    )
+    # A suspension can be from one group rather than from the whole
+    # organisation — the room where it happened is often the right scope, and
+    # locking somebody out of their workplace comp entirely for one bad night is
+    # not a proportionate first move.
+    group = models.ForeignKey(
+        Group, on_delete=models.CASCADE, null=True, blank=True, related_name="sanctions",
+    )
+    kind = models.CharField(max_length=12, choices=KIND_CHOICES, default=KIND_WARNING)
+    reason = models.TextField(blank=True)
+    flag = models.ForeignKey(
+        ChatFlag, on_delete=models.SET_NULL, null=True, blank=True, related_name="sanctions",
+    )
+    issued_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="issued_sanctions",
+    )
+    starts_at = models.DateTimeField(default=timezone.now)
+    ends_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Empty means it runs until somebody lifts it.",
+    )
+    lifted_at = models.DateTimeField(null=True, blank=True)
+    lifted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="lifted_sanctions",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["org", "user", "kind"])]
+
+    def __str__(self):
+        return f"{self.get_kind_display()} — {self.user} in {self.org}"
+
+    @property
+    def is_active(self) -> bool:
+        """Whether this is silencing anybody right now.
+
+        A warning is a message, not a state — it is never active, which is what
+        makes "warn" a safe first move.
+        """
+        if self.kind != self.KIND_SUSPENSION or self.lifted_at is not None:
+            return False
+        now = timezone.now()
+        if self.starts_at and self.starts_at > now:
+            return False
+        return self.ends_at is None or self.ends_at > now
+
+    @property
+    def until_label(self) -> str:
+        if self.lifted_at:
+            return "lifted"
+        if self.ends_at is None:
+            return "until lifted"
+        return f"until {self.ends_at:%-d %b %Y}"

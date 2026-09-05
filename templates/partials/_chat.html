@@ -247,6 +247,29 @@ Expects: entries (from orgs.views._thread_entries), thread.
           </button>
         </form>
         {% endif %}
+        {% comment %}
+        REPORT, on somebody else's message only.
+
+        "Apart from the prefect, the member can also report a member to the group
+        admin or organisation admin." It goes to the same review queue Prefect
+        feeds, and the reviewer is shown which of the two raised it.
+
+        Never on your own message: reporting yourself is not a thing anybody
+        means to do, and offering it is one more control to read past.
+
+        A plain form, so it works with no JavaScript, and it confirms first —
+        this puts a colleague's name in front of the people who run their comp
+        and should not be a stray click.
+        {% endcomment %}
+        {% if thread.org_id and e.author_id != request.user.id %}
+        <form method="post" action="{% url 'orgs:report_message' thread.org_id e.id %}" class="chat-repform"
+              data-confirm="Report this message to the people who run {{ thread.org.name }}?">
+          {% csrf_token %}
+          <button type="submit" class="chat-repbtn" aria-label="Report this message" title="Report to your admins">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V4h11l-1 3h6l-2 4 2 4h-9l-1-3H6"/></svg>
+          </button>
+        </form>
+        {% endif %}
       </div>
     </li>
     {% empty %}

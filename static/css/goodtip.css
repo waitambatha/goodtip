@@ -16487,3 +16487,109 @@ html[data-theme="light"] .gt-app .gt-head .gh-eyebrow.is-title { color: var(--fo
   .gt-board.compstats .cs-row .num:nth-of-type(5),
   .gt-board.compstats .cs-row .num:nth-of-type(6) { display: none; }
 }
+
+/* ============================================================================
+   PREFECT — the review desk
+   ----------------------------------------------------------------------------
+   Deliberately plain. This is a screen where somebody decides whether a
+   colleague gets a warning, and it should read like a form rather than like a
+   dashboard: no scores in large type, no red until an actual consequence, and
+   the least severe option first and easiest.
+   ========================================================================= */
+.pf-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 18px; }
+.pf-tab {
+  padding: 9px 16px; border-radius: 100px; text-decoration: none;
+  font-weight: 700; font-size: 13.5px; color: var(--forest);
+  background: rgba(15,46,34,.06); border: 1px solid rgba(15,46,34,.12);
+}
+.pf-tab.on { background: var(--forest); color: #fff; border-color: var(--forest); }
+.pf-tab i { font-style: normal; margin-left: 5px; font-weight: 800; }
+
+.pf-list { display: grid; gap: 9px; margin-bottom: 26px; }
+.pf-row {
+  display: flex; align-items: center; gap: 14px; padding: 14px 18px;
+  background: var(--gt-card); border: 1px solid var(--gt-hair);
+  border-radius: 14px; text-decoration: none; color: inherit;
+}
+a.pf-row:hover { border-color: rgba(45,122,58,.4); }
+.pf-row.is-cleared, .pf-row.is-actioned { opacity: .72; }
+.pf-src {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  font-family: var(--mark); font-weight: 800; font-size: 10.5px;
+  letter-spacing: .07em; text-transform: uppercase;
+  padding: 6px 11px; border-radius: 100px;
+}
+.pf-src svg { width: 12px; height: 12px; fill: currentColor; }
+.pf-src.is-prefect { background: rgba(45,122,58,.12); color: var(--forest); }
+.pf-src.is-member  { background: rgba(47,93,168,.12); color: #2F5DA8; }
+.pf-src.is-warn    { background: rgba(138,98,6,.14); color: #7a5410; }
+.pf-src.is-susp    { background: rgba(154,43,43,.12); color: #9a2b2b; }
+.pf-txt { flex: 1 1 auto; min-width: 0; }
+.pf-txt b { display: block; font-size: 15.5px; color: var(--ink); }
+.pf-txt i { font-style: normal; font-size: 12.5px; color: var(--muted); }
+.pf-terms { display: flex; gap: 5px; flex: none; }
+.pf-terms i {
+  font-style: normal; font-size: 11px; padding: 3px 8px; border-radius: 6px;
+  background: rgba(15,46,34,.07); color: var(--muted);
+}
+/* Small on purpose. It is a rank so the worst sorts first, not a verdict, and
+   a big number invites somebody to act on it without reading. */
+.pf-score { font-family: var(--score); font-weight: 700; font-size: 13px; color: var(--muted); flex: none; }
+.pf-go { flex: none; font-weight: 700; font-size: 13px; color: var(--forest); }
+.pf-none { padding: 26px; text-align: center; color: var(--muted); background: var(--gt-card); border: 1px solid var(--gt-hair); border-radius: 14px; }
+.pf-h { font-family: var(--display); font-size: 22px; margin: 26px 0 12px; color: var(--ink); }
+.pf-sanction { cursor: default; }
+.pf-allow { display: flex; flex-wrap: wrap; gap: 8px; }
+.pf-allowchip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px;
+  border-radius: 100px; background: rgba(15,46,34,.06);
+  border: 1px solid rgba(15,46,34,.12); font-size: 13px;
+}
+.pf-allowchip button { background: none; border: 0; cursor: pointer; font-size: 15px; color: var(--muted); line-height: 1; }
+
+/* ---- one case ---- */
+.pf-back { margin: 0 0 14px; }
+.pf-back a { color: var(--forest); font-weight: 700; text-decoration: none; }
+.pf-case { background: var(--gt-card); border: 1px solid var(--gt-hair); border-radius: 18px; padding: 22px 24px; margin-bottom: 18px; }
+.pf-case-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 14px; }
+.pf-case-head h2 { font-family: var(--display); font-size: 24px; margin: 0; color: var(--ink); }
+.pf-case-head p { margin: 3px 0 0; font-size: 13px; color: var(--muted); }
+.pf-why { font-size: 14px; color: var(--ink); background: rgba(15,46,34,.05); padding: 12px 14px; border-radius: 12px; }
+.pf-prior { font-size: 13.5px; color: #7a5410; background: rgba(138,98,6,.1); padding: 10px 14px; border-radius: 12px; }
+/* The conversation around it, which is the whole point of this screen. */
+.pf-thread { display: grid; gap: 6px; margin-top: 16px; }
+.pf-msg {
+  padding: 10px 14px; border-radius: 12px; background: rgba(15,46,34,.04);
+  border: 1px solid transparent; font-size: 14px;
+}
+.pf-msg b { display: block; font-size: 12.5px; color: var(--forest); }
+.pf-msg span { display: block; color: var(--ink); margin: 2px 0; word-break: break-word; }
+.pf-msg i { font-style: normal; font-size: 11px; color: var(--muted); }
+.pf-msg.is-it { background: rgba(138,98,6,.12); border-color: rgba(138,98,6,.35); }
+.pf-msg.is-after { opacity: .75; }
+
+.pf-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.pf-act { background: var(--gt-card); border: 1px solid var(--gt-hair); border-radius: 18px; padding: 20px 22px; }
+.pf-act-clear { border-color: rgba(31,107,40,.35); }
+.pf-act h3 { font-family: var(--display); font-size: 19px; margin: 0 0 4px; color: var(--ink); }
+.pf-act p { font-size: 13.5px; color: var(--muted); margin: 0 0 14px; }
+.pf-field { display: block; margin-bottom: 14px; border: 0; padding: 0; }
+.pf-field > span, .pf-field legend { display: block; font-weight: 700; font-size: 13px; margin-bottom: 6px; color: var(--ink); }
+.pf-field label { display: block; font-size: 13.5px; margin: 4px 0; }
+.pf-field textarea { width: 100%; border-radius: 12px; border: 1px solid var(--gt-hair); padding: 10px 12px; font: inherit; }
+.pf-learn { display: block; font-size: 13.5px; margin: 10px 0 6px; }
+.pf-learn-note { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 0 0 12px; }
+.pf-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.abtn-danger { background: #9a2b2b; color: #fff; border-color: #9a2b2b; }
+.abtn-sm { padding: 7px 13px; font-size: 12.5px; }
+.pf-done { padding: 16px 18px; border-radius: 14px; background: rgba(15,46,34,.05); color: var(--muted); }
+
+/* The member's own report control, beside reply and pin. */
+.chat-repform { display: inline-flex; }
+.chat-repbtn {
+  background: none; border: 0; cursor: pointer; padding: 4px; opacity: 0;
+  color: var(--muted); transition: opacity .14s var(--ease), color .14s var(--ease);
+}
+.chat-row:hover .chat-repbtn, .chat-repbtn:focus-visible { opacity: .8; }
+.chat-repbtn:hover { color: #9a2b2b; opacity: 1; }
+.chat-repbtn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }

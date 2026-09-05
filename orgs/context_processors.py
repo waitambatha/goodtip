@@ -105,6 +105,7 @@ def user_orgs(request):
     # organisation. It belongs to the super admin and lives in /admin/ now.
     pending_approval_count = 0
     unread_thread_count = 0
+    prefect_open_count = 0
     if request.user.is_authenticated:
         from admin_panel.perms import managed_orgs
 
@@ -119,6 +120,13 @@ def user_orgs(request):
                 org_id__in=mine,
                 kind=MessageThread.KIND_RAISED,
                 status=MessageThread.STATUS_OPEN,
+            ).count()
+            # Prefect's queue, on the bar beside Messages. A review queue
+            # nobody knows is waiting is a queue that is not being reviewed.
+            from .models import ChatFlag
+
+            prefect_open_count = ChatFlag.objects.filter(
+                org_id__in=mine, status=ChatFlag.STATUS_OPEN,
             ).count()
 
     # The member's own count, which is a different question from the admin's
@@ -189,6 +197,7 @@ def user_orgs(request):
         "unread_notification_count": unread,
         "pending_approval_count": pending_approval_count,
         "unread_thread_count": unread_thread_count,
+        "prefect_open_count": prefect_open_count,
         "unread_message_count": unread_message_count,
         "ticker_notifications": ticker,
         # Watermark for the live poll: the page only toasts things that

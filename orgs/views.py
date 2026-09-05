@@ -3211,6 +3211,16 @@ def member_message_thread_view(request, org_id: int, thread_id: int):
         raise Http404("No thread matches the given query.")
 
     if request.method == "POST":
+        # A SUSPENSION IS CHECKED HERE, not in the composer's markup. Hiding the
+        # box is a courtesy; refusing the post is the rule, and a rule that only
+        # exists in a template is not a rule.
+        from .moderation import may_post
+
+        allowed, why = may_post(request.user, thread)
+        if not allowed:
+            messages.error(request, why)
+            return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
+
         body = (request.POST.get("body") or "").strip()
         uploads = request.FILES.getlist("files")
         # A voice note comes up its own field, not among `files`. It has to:
@@ -3232,6 +3242,11 @@ def member_message_thread_view(request, org_id: int, thread_id: int):
                 ):
                     messages.error(request, problem)
             notify_new_message(entry)
+            # AFTER delivery, never before it. Prefect asks a person to look; it
+            # does not stand between somebody and the room they are typing into.
+            from .moderation import review_message
+
+            review_message(entry)
             if thread.status == MessageThread.STATUS_CLOSED:
                 thread.status = MessageThread.STATUS_OPEN
                 thread.save(update_fields=["status"])
@@ -3360,6 +3375,39 @@ def message_direct_view(request, org_id: int, user_id: int):
     thread = direct_thread(request.user, target.user, org)
     _follow_context(request, thread)
     return _open_thread(request, org, thread)
+
+
+@login_required
+@require_POST
+def report_message_view(request, org_id: int, message_id: int):
+    """A member reporting somebody else's message to their admins.
+
+    "Apart from the prefect, the member can also report a member to the group
+    admin or organisation admin — so the difference is this is now raised by the
+    member and not the prefect AI."
+
+    Same queue, and the reviewer is shown which of the two it was.
+
+    You have to be able to READ the thread to report anything in it, which is
+    the only permission this needs: a message id is not a licence to report a
+    conversation you were never in.
+    """
+    from .models import Message
+    from .moderation import report_message
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    entry = get_object_or_404(Message.objects.select_related("thread"), pk=message_id)
+    if entry.thread.org_id != org.id or not entry.thread.can_read(request.user):
+        raise Http404("No message matches the given query.")
+    if entry.author_id == request.user.id:
+        messages.error(request, "You can't report your own message.")
+    else:
+        report_message(entry, request.user, request.POST.get("note", ""))
+        messages.success(
+            request,
+            "Reported. Someone who runs this organisation will take a look.",
+        )
+    return redirect("orgs:member_message_thread", org_id=org.id, thread_id=entry.thread_id)
 
 
 @login_required
