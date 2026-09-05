@@ -12,7 +12,11 @@ stacking context, so a strip rendered inside it paints over the sheet.
 {% endblock %}
 
 {% block app_content %}
-{% include "partials/room_switch.html" with noun="ladder" surface="dark" %}
+{% comment %}
+Same order as the leaderboard, and for the same reason: what the page is,
+then the control that decides what it shows, then the table. Which room you
+are standing in is context and follows at the foot.
+{% endcomment %}
 <div class="gt-head">
   <div>
     <div class="gh-eyebrow">{{ org.name }} &middot; {{ org.season }}</div>
@@ -43,7 +47,7 @@ veil would land on a picker while the stale table below carried on looking
 current.
 {% endcomment %}
 {% url 'tipping:ladder' org.id as ladder_url %}
-{% include "partials/comp_filter.html" with options=series_options selected=selected_series param="series" base=ladder_url veil_for="#ladderTable" %}
+{% include "partials/comp_filter.html" with options=series_options selected=selected_series param="series" base=ladder_url veil_for="#ladderTable" centred=1 %}
 
 {% if entries %}
 {% comment %}
@@ -119,4 +123,10 @@ sitting bright above a blank space.
   </p>
 </div>
 {% endif %}
+
+{% comment %}
+The room, at the foot. See the leaderboard for why it is no longer the first
+thing on the page.
+{% endcomment %}
+{% include "partials/room_switch.html" with noun="ladder" surface="dark" %}
 {% endblock %}

@@ -28,9 +28,12 @@ Expects:
   base      the URL to link to
   keep      extra query string to carry through (scope, round…), no leading &
   all_label shown on the everything chip; omit the chip entirely without it
+  centred   truthy to centre the row — the ladder, where the chips are the only
+            control on the page and a left-aligned row under a centred table
+            reads as though it had come loose from it
 {% endcomment %}
 {% if options|length > 1 %}
-<div class="compfilter" data-veil-for="{{ veil_for }}">
+<div class="compfilter{% if centred %} is-centred{% endif %}" data-veil-for="{{ veil_for }}">
   <div class="cf-chips" role="group" aria-label="Filter by competition">
     {% if all_label %}
     <a class="cf-chip cf-all{% if not selected %} on{% endif %}"

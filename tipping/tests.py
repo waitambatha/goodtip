@@ -2013,3 +2013,156 @@ class LeaderboardCompetitionFilterPageTests(TestCase):
         ).content.decode()
         self.assertIn("cf-chips", body)
         self.assertNotIn("cf-all", body)
+
+
+class BoardHierarchyTests(TestCase):
+    """The order of the page, and the size of the things on it.
+
+    "I think this should be at the top — Leaderboard, the lead, Round, All
+    competitions... hierarchy of information. Then the group and organisation
+    filter, these two can be at the bottom, so the table is not squeezed."
+    """
+
+    def setUp(self):
+        self.season = Season.objects.create(year=2099, label="2099")
+        nrl = Series.objects.get(slug="nrl")
+        origin = Series.objects.get(slug="state-of-origin")
+        comp = Competition.objects.create(
+            sport=nrl.sport, season=self.season, name="H Comp", slug="h-comp",
+        )
+        comp.series.add(nrl, origin)
+        # groups_enabled, because room_switch.html renders nothing without it
+        # and the position of that block is what this class is about.
+        self.org = Organisation.objects.create(
+            name="H League", season=self.season, groups_enabled=True,
+        )
+        self.org.competitions.add(comp)
+        self.user = User.objects.create_user(
+            email="h@example.com", password="x", display_name="H",
+        )
+        OrgMember.objects.create(user=self.user, org=self.org)
+        now = timezone.now()
+        for n in (1, 2, 3):
+            Round.objects.create(
+                org=self.org, round_number=n, series=nrl,
+                lockout_at=now + timedelta(days=n),
+            )
+        self.client.force_login(self.user)
+
+    def _board(self, qs=""):
+        return self.client.get(
+            reverse("tipping:leaderboard", args=[self.org.id]) + qs
+        ).content.decode()
+
+    def test_the_filters_come_before_the_table_and_the_room_after_it(self):
+        body = self._board()
+        title = body.index("Compete. Climb.")
+        filters = body.index('class="boardbar"')
+        table = body.index('id="lbtable"')
+        room = body.index("room-switch")
+        self.assertLess(title, filters, "the filters must follow the title")
+        self.assertLess(filters, table, "the filters must precede the table")
+        self.assertLess(table, room, "the room switcher belongs at the foot")
+
+    def test_the_summary_cards_no_longer_flank_the_table(self):
+        """They were a 320px sticky sidebar taking a third of the width from
+        the four columns the page exists to show."""
+        body = self._board()
+        self.assertNotIn('class="gt-shell" data-coach="board-table"', body)
+        self.assertIn("gt-side board-foot", body)
+        self.assertLess(body.index('id="lbtable"'), body.index("gt-side board-foot"))
+
+    def test_the_round_can_be_stepped_as_well_as_chosen(self):
+        """"Not only a dropdown, but a nice way I can press arrow left and
+        right the way we have it on the fixtures on the dashboard"."""
+        body = self._board()
+        self.assertIn("bb-arrow", body)
+        self.assertIn('name="round"', body)
+
+    def test_at_the_start_of_the_sequence_the_arrow_is_shown_but_dead(self):
+        """A control that vanishes at the edges makes the row jump and leaves
+        you wondering what you pressed."""
+        body = self._board()          # "all rounds" is the first stop
+        self.assertIn("bb-arrow is-off", body)
+
+    def test_stepping_carries_the_competition(self):
+        """Or changing round silently widens the board back to every comp —
+        the table changing under a filter still drawn as selected."""
+        body = self._board("?comp=nrl")
+        # The live arrows only — the dead one at the end of the sequence is a
+        # <span>, and the `href` in its <use> is an icon reference, not a link.
+        arrows = [ln for ln in body.splitlines() if '<a class="bb-arrow"' in ln]
+        self.assertTrue(arrows)
+        self.assertTrue(all("comp=nrl" in a for a in arrows), arrows)
+
+    def test_the_podium_names_its_medals(self):
+        """"Number 2 and 3 have the same shade of colour, why?" They were two
+        greens a couple of percent apart. Naming them as well as colouring
+        them keeps the distinction in a screenshot and in greyscale."""
+        User.objects.create_user(
+            email="h2@example.com", password="x", display_name="H2",
+        )
+        for e in ("h2@example.com",):
+            OrgMember.objects.create(user=User.objects.get(email=e), org=self.org)
+        body = self._board()
+        for word in ("Gold", "Silver"):
+            self.assertIn(f'class="gp-medal">{word}<', body)
+
+
+class EveryCodeHasItsOwnShadeTests(TestCase):
+    """Five competitions, five hues.
+
+    "Why do the NRL and State of Origin have the same shade of colour? That
+    should not be it." Because Origin had no rule of its own and fell through
+    to the representative category's gold, which sits a few degrees from the
+    NRL's amber — and they are the two most likely to appear in the same list,
+    since Origin rounds belong to the NRL competition.
+    """
+
+    def _tokens(self, css, selector):
+        import re
+
+        m = re.search(re.escape(selector) + r"[^{]*\{([^}]*)\}", css)
+        self.assertIsNotNone(m, f"{selector} has no rule")
+        return dict(
+            re.findall(r"(--code(?:-ink|-on)?):\s*([^;]+);", m.group(1))
+        )
+
+    def test_no_two_competitions_share_an_ink(self):
+        from pathlib import Path
+
+        from django.conf import settings
+
+        css = Path(settings.BASE_DIR, "static/css/goodtip.css").read_text()
+        inks = {}
+        for slug in ("afl", "aflw", "nrl", "nrlw", "state-of-origin"):
+            inks[slug] = self._tokens(css, f'[data-code="{slug}"]')["--code-ink"].strip()
+        self.assertEqual(
+            len(set(inks.values())), 5, f"a code is sharing a shade: {inks}",
+        )
+
+    def test_origin_does_not_fall_through_to_a_category(self):
+        from pathlib import Path
+
+        from django.conf import settings
+
+        css = Path(settings.BASE_DIR, "static/css/goodtip.css").read_text()
+        origin = self._tokens(css, '[data-code="state-of-origin"]')["--code-ink"].strip()
+        rep = self._tokens(css, '[data-cat="representative"]')["--code-ink"].strip()
+        mens = self._tokens(css, '[data-cat="mens"]')["--code-ink"].strip()
+        self.assertNotEqual(origin, rep)
+        # And the men's fallback must not have inherited Origin's teal, or
+        # Super League would arrive wearing it.
+        self.assertNotEqual(origin, mens)
+
+    def test_the_ladders_column_heads_are_not_dark_on_dark(self):
+        """.lad-num sets `color: var(--ink)` and beats the cream .gb-head sets,
+        so P W L D % Pts were painted near-black on a near-black bar — since
+        the header band went green, long before it took a competition's
+        colour. "The titles are not being seen with the colour background"."""
+        from pathlib import Path
+
+        from django.conf import settings
+
+        css = Path(settings.BASE_DIR, "static/css/goodtip.css").read_text()
+        self.assertIn(".gt-board.ladder .lad-head .lad-num { color: inherit;", css)

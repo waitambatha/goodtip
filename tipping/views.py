@@ -962,10 +962,36 @@ def leaderboard_view(request, org_id: int):
     # Changing code resets to all rounds, which is the only honest default.
     comp_keep_pairs = [("scope", scope)] if (is_family and scope == "national") else []
     comp_keep = "&amp;".join(f"{k}={v}" for k, v in comp_keep_pairs)
+
+    # ARROWS EITHER SIDE OF THE ROUND, like the dashboard's navigator — "it
+    # should not only be a dropdown, but a nice way I can press arrow left and
+    # right the way we have it on the fixtures on the dashboard".
+    #
+    # Stepping is what people actually do with this control: last round, the one
+    # before, back again. A dropdown makes each of those a click, a read and an
+    # aim, and the list is eighty rounds long on a league that has been running.
+    #
+    # "All rounds" is the first stop rather than a separate control, so stepping
+    # back from round 1 lands on the season and the sequence has one shape.
+    steps = ["all"] + [str(r.id) for r in reversed(list(rounds))]
+    here = selected_round_id if selected_round_id in steps else "all"
+    at = steps.index(here)
+    labels = {"all": "All rounds"}
+    for r in rounds:
+        labels[str(r.id)] = f"Round {r.round_number}"
+    round_nav = {
+        "prev": steps[at - 1] if at > 0 else "",
+        "next": steps[at + 1] if at < len(steps) - 1 else "",
+        "current": here,
+        "label": labels.get(here, "All rounds"),
+        "prev_label": labels.get(steps[at - 1]) if at > 0 else "",
+        "next_label": labels.get(steps[at + 1]) if at < len(steps) - 1 else "",
+    }
     return render(request, "leaderboard.html", {
         "org": org, "rounds": rounds, "selected_round_id": selected_round_id or "all",
         "comp_options": comp_options, "selected_comp": selected_comp,
         "comp_keep": comp_keep, "comp_keep_pairs": comp_keep_pairs,
+        "round_nav": round_nav,
         "ranked": ranked, "me": request.user,
         "scope": scope, "is_family": is_family,
         "total_tippers": len(ranked),

@@ -15236,7 +15236,7 @@ html[data-theme="dark"] .sched { --sched-pick: invert(1) brightness(1.6); }
    Category rules come first and code rules after, deliberately: same
    specificity, so the specific code wins by being later. Do not reorder.
    ========================================================================= */
-[data-cat="mens"]           { --code: #5FD8C4; --code-ink: #0E6E5E; --code-on: #FFFFFF; }
+[data-cat="mens"]           { --code: #8FA3B8; --code-ink: #3E5468; --code-on: #FFFFFF; }
 [data-cat="womens"]         { --code: #FF9E7A; --code-ink: #B34418; --code-on: #FFFFFF; }
 [data-cat="representative"] { --code: #F4C64E; --code-ink: #8A6206; --code-on: #FFFFFF; }
 
@@ -15247,6 +15247,17 @@ html[data-theme="dark"] .sched { --sched-pick: invert(1) brightness(1.6); }
    the AFL pair — a member tipping all four sees four colours, not two pairs. */
 [data-code="nrl"]   { --code: #FFB25C; --code-ink: #9A5A05; --code-on: #FFFFFF; }
 [data-code="nrlw"]  { --code: #C79BFF; --code-ink: #6B34B8; --code-on: #FFFFFF; }
+/* STATE OF ORIGIN GETS ITS OWN, and had to. It was falling through to the
+   representative category's gold, which sits a few degrees from the NRL's
+   amber — "why do the NRL and State of Origin have the same shade of colour,
+   that should not be it". They are also the two most likely to appear in the
+   same list, since Origin rounds belong to the NRL competition. Teal is the
+   furthest thing on the wheel from the other four. */
+[data-code="state-of-origin"] { --code: #3FD0C9; --code-ink: #0B6E70; --code-on: #FFFFFF; }
+/* And the men's fallback moved off teal in the same breath, or Super League
+   would have arrived wearing Origin's colour. Five codes, five hues: AFL sky,
+   AFLW rose, NRL amber, NRLW orchid, Origin teal — with slate and coral held
+   back for anything we have not named. */
 
 /* ---- the filter chips --------------------------------------------------
    Unselected: the code's colour on the rim and in the word, so the row reads
@@ -15729,3 +15740,133 @@ html[data-theme="light"] .gt-app .cf-lab { color: var(--muted); }
 .gt-board[data-code] .gb-correct { color: var(--code-ink); }
 /* The ladder's own numeric column stripe, keyed the same way. */
 .gt-board.ladder[data-code] .lad-col { background: color-mix(in srgb, var(--code) 9%, transparent); }
+
+/* ============================================================================
+   THE RANKING PAGES: hierarchy, a readable table, and a real podium
+   ----------------------------------------------------------------------------
+   Four reports, all on the leaderboard and the ladder.
+   ========================================================================= */
+
+/* ---- the filter bar ------------------------------------------------------
+   Round and competition, side by side and the same weight, because they are
+   the same kind of decision: which slice of the season, and which competition.
+   They sat as a small select in the header's top-right corner and a chip row
+   further down, which read as one control and one decoration. */
+.boardbar {
+  display: flex; align-items: center; gap: 14px 22px; flex-wrap: wrap;
+  margin: 0 0 22px; padding: 14px 16px;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(232,228,213,.12);
+  border-radius: 16px;
+}
+.boardbar .compfilter { margin: 0; flex: 1 1 340px; }
+.bb-round { display: flex; align-items: center; gap: 8px; flex: none; }
+.bb-lab {
+  font-family: var(--mark); font-weight: 700; font-size: 11px;
+  letter-spacing: .12em; text-transform: uppercase; color: rgba(232,228,213,.6);
+  margin-right: 2px;
+}
+/* Big enough to hit without aiming — the whole point of arrows over a
+   dropdown is that stepping costs one press and no reading. */
+.bb-arrow {
+  width: 38px; height: 38px; flex: none; display: grid; place-items: center;
+  border-radius: 11px; background: rgba(232,228,213,.1);
+  border: 1px solid rgba(232,228,213,.16); color: var(--cream);
+  text-decoration: none; transition: background .14s var(--ease), border-color .14s var(--ease);
+}
+.bb-arrow:hover { background: var(--lime); border-color: var(--lime); color: var(--deep); }
+.bb-arrow svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+/* The end of the sequence is shown, not removed: a control that disappears at
+   the edges makes the row jump and leaves you wondering what you pressed. */
+.bb-arrow.is-off { opacity: .3; pointer-events: none; }
+.bb-select { min-width: 148px; }
+@media (max-width: 720px) {
+  .boardbar { padding: 12px 13px; }
+  .bb-round { flex: 1 1 100%; }
+  .bb-select { flex: 1 1 auto; }
+}
+html[data-theme="light"] .gt-app .boardbar { background: rgba(15,46,34,.04); border-color: rgba(15,46,34,.1); }
+html[data-theme="light"] .gt-app .bb-lab { color: var(--muted); }
+html[data-theme="light"] .gt-app .bb-arrow { background: rgba(15,46,34,.06); border-color: rgba(15,46,34,.12); color: #2C4C3B; }
+
+/* The ladder's chips are the only control on that page, so they sit centred
+   under a centred title rather than hugging an edge nothing else uses. */
+.compfilter.is-centred { justify-content: center; }
+.compfilter.is-centred .cf-chips { flex: 0 1 auto; justify-content: center; }
+
+/* ---- the context that used to flank the table ---------------------------
+   Was a 320px sticky sidebar, which took a third of the width from the four
+   columns the page exists to show. Under the board it is a row of cards. */
+.gt-side.board-foot {
+  position: static; margin-top: 26px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+/* ---- the table, at a size it can be read at -----------------------------
+   "Make them bold, and a little bit larger for me to be able to read it."
+   Column heads were 11.5px at weight 700 and the names 15px, on a table that
+   is now the full width of the page. */
+.gt-board .gb-head {
+  font-size: 13px; font-weight: 800; letter-spacing: .1em;
+  padding: 16px 22px;
+}
+.gt-board .gb-row { padding: 15px 22px; }
+.gt-board .gb-name { font-size: 16.5px; font-weight: 700; }
+.gt-board .gb-correct { font-size: 16px; }
+.gt-board .gb-pts { font-size: 19px; }
+.gt-board .gb-rank { width: 38px; height: 38px; font-size: 15px; }
+.gt-board .gb-av { width: 38px; height: 38px; font-size: 14px; }
+
+/* THE LADDER'S COLUMN HEADS WERE DARK ON DARK, and have been since the header
+   band went green — .lad-num sets `color: var(--ink)` and it beats the cream
+   .gb-head sets, so P W L D % Pts were painted in near-black on a near-black
+   bar. Reported as "the titles are not being seen with the colour background",
+   which is exactly what it is; the competition colour only made it easier to
+   notice. They inherit now, so they follow whatever the band is. */
+.gt-board.ladder .lad-head .lad-num { color: inherit; font-size: 13px; font-weight: 800; }
+.gt-board.ladder .lad-num { font-size: 15.5px; }
+.gt-board.ladder .lad-pts { font-size: 17px; }
+/* The numeric columns widen with the figures in them — 46px was set for
+   14.5px text and clips a three-digit percentage at 15.5px. The club name
+   column is minmax(0,1fr) and absorbs the difference. */
+.gt-board.ladder .lad-head,
+.gt-board.ladder .lad-row { grid-template-columns: 46px minmax(0,1fr) repeat(6, 54px); }
+/* The column stripe belongs to the ROWS. Over the header band it was a wash of
+   tint across a colour that is already carrying meaning, which is what made
+   the headings muddy on top of being the wrong colour. */
+.gt-board.ladder[data-code] .lad-col { background: transparent; }
+.gt-board.ladder[data-code] .gb-rows .lad-col::before {
+  background: color-mix(in srgb, var(--code) 11%, transparent);
+}
+.gt-board.ladder[data-code] .lad-head .lad-col::before { background: rgba(255,255,255,.07); }
+
+/* ---- gold, silver, bronze ------------------------------------------------
+   "Number 2 and 3 have the same shade of colour, why?" Because the cards were
+   #E4EDE6 and #E7EFD8 — two greens a couple of percent apart, with the medal
+   colours confined to the little rank disc. The metals now run the whole card:
+   its ground, its border and its glow. Second and third are a cool grey and a
+   warm copper, which are opposite in temperature and cannot be confused at a
+   glance or by anyone reading them in greyscale. */
+.gt-pod.p2 {
+  background: linear-gradient(165deg, #FBFCFD, #DDE2E8 70%, #C6CCD4);
+  border-color: rgba(154,160,168,.7);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 12px 26px -22px rgba(60,68,78,.7);
+}
+.gt-pod.p3 {
+  background: linear-gradient(165deg, #FDF3EA, #F0D6BE 70%, #DDB68E);
+  border-color: rgba(178,126,78,.65);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 12px 26px -22px rgba(120,78,40,.7);
+}
+.gt-pod.p2 .gp-name { color: #2F3740; }
+.gt-pod.p3 .gp-name { color: #4A3220; }
+.gt-pod.p2 .gp-pts { color: #3D454E; }
+.gt-pod.p3 .gp-pts { color: #6B4726; }
+/* The medal is named as well as coloured, for the same reason the state chips
+   on a fixture are three colours and not three shades — and so the distinction
+   survives a screenshot, a printout and colour blindness. */
+.gt-pod .gp-medal {
+  display: block; font-family: var(--mark); font-weight: 800; font-size: 10px;
+  letter-spacing: .16em; text-transform: uppercase; margin-bottom: 8px;
+}
+.gt-pod.p1 .gp-medal { color: #E4B33C; }
+.gt-pod.p2 .gp-medal { color: #6C757F; }
+.gt-pod.p3 .gp-medal { color: #9A6B3E; }

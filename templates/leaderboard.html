@@ -7,37 +7,85 @@
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 
 {% block app_content %}
-{% include "partials/room_switch.html" with noun="leaderboard" surface="dark" %}
+{% comment %}
+ORDER OF THE PAGE, and it is not the order it was in.
 
+"I think this should be at the top — Leaderboard, Compete Climb Make an impact,
+Round, All competitions... hierarchy of information. Then the group and
+organisation filter, these two can be at the bottom, so the table is not
+squeezed."
+
+What the page is, then the two controls that decide what it shows, then the
+board itself at full width. Everything that is context rather than content —
+which room you are standing in, the season summary, the charity — follows the
+table instead of flanking it. The room switcher opened the page for months on
+the reasoning that you should know which ladder you are looking at before you
+read it; that was right about the fact and wrong about the position, because it
+put a five-option control above the title on every visit.
+{% endcomment %}
 <div class="gt-head">
   <div>
     <div class="gh-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div>
     <h1>Leaderboard</h1>
     <p class="gh-lead">Compete. Climb. Make an impact.</p>
   </div>
-  <div class="gh-actions">
-    <span class="lbl">Round</span>
-    {% comment %}
-    The comp rides on the round's hx-get, or swapping round would silently
-    widen the board back to every competition — the table would change under a
-    filter still drawn as selected.
-    {% endcomment %}
-    <select name="round" class="gt-select"
-            hx-get="{% url 'tipping:leaderboard' org.id %}?scope={{ scope }}{% if selected_comp %}&amp;comp={{ selected_comp.slug }}{% endif %}"
-            {# show:none stops htmx scrolling the swapped table into view #}
-            hx-target="#lbtable" hx-swap="outerHTML show:none" hx-trigger="change">
-      <option value="all" {% if selected_round_id == 'all' %}selected{% endif %}>All rounds</option>
-      {% for r in rounds %}<option value="{{ r.id }}" {% if selected_round_id == r.id|stringformat:'s' %}selected{% endif %}>Round {{ r.round_number }}</option>{% endfor %}
-    </select>
-  </div>
 </div>
 
 {% comment %}
-WHICH COMPETITION. Above the podium, because it changes who is ON the podium —
-a filter that lives below the thing it rewrites reads as a footnote.
+THE TWO FILTERS, side by side and the same size, because they are the same kind
+of decision: which slice of the season, and which competition.
+
+ROUND STEPS AS WELL AS DROPS. "It should not only be a dropdown, but a nice way
+I can press arrow left and right the way we have it on the fixtures on the
+dashboard." Stepping is what people do with this — last round, the one before,
+back again — and a dropdown makes each of those a click, a read and an aim, on
+a list eighty rounds long in a league that has been running a while.
+
+The arrows are real links (bookmarkable, shareable, work with JavaScript off)
+with htmx layered on to swap the table in place; the select keeps the same
+htmx it always had. "All rounds" is the first stop rather than a separate
+control, so stepping back from round 1 lands on the season.
+
+The comp rides on every one of these URLs, or changing round would silently
+widen the board back to every competition — the table changing under a filter
+still drawn as selected.
 {% endcomment %}
 {% url 'tipping:leaderboard' org.id as lb_url %}
-{% include "partials/comp_filter.html" with options=comp_options selected=selected_comp param="comp" base=lb_url keep=comp_keep keep_pairs=comp_keep_pairs all_label="All competitions" veil_for="#lbtable" %}
+{% with cq=selected_comp.slug|default:"" %}
+<div class="boardbar">
+  <div class="bb-round" role="group" aria-label="Choose a round">
+    <span class="bb-lab">Round</span>
+    {% if round_nav.prev %}
+    <a class="bb-arrow" href="{{ lb_url }}?round={{ round_nav.prev }}&amp;scope={{ scope }}{% if cq %}&amp;comp={{ cq }}{% endif %}"
+       hx-get="{{ lb_url }}?round={{ round_nav.prev }}&amp;scope={{ scope }}{% if cq %}&amp;comp={{ cq }}{% endif %}"
+       hx-target="#lbtable" hx-swap="outerHTML show:none" data-veil-for="#lbtable"
+       hx-push-url="true" aria-label="{{ round_nav.prev_label }}" title="{{ round_nav.prev_label }}">
+      <svg><use href="#ic-arrow-left"/></svg>
+    </a>
+    {% else %}<span class="bb-arrow is-off" aria-hidden="true"><svg><use href="#ic-arrow-left"/></svg></span>{% endif %}
+
+    <select name="round" class="gt-select bb-select"
+            hx-get="{{ lb_url }}?scope={{ scope }}{% if cq %}&amp;comp={{ cq }}{% endif %}"
+            {# show:none stops htmx scrolling the swapped table into view #}
+            hx-target="#lbtable" hx-swap="outerHTML show:none" hx-trigger="change"
+            hx-push-url="true" aria-label="Choose a round">
+      <option value="all" {% if selected_round_id == 'all' %}selected{% endif %}>All rounds</option>
+      {% for r in rounds %}<option value="{{ r.id }}" {% if selected_round_id == r.id|stringformat:'s' %}selected{% endif %}>Round {{ r.round_number }}</option>{% endfor %}
+    </select>
+
+    {% if round_nav.next %}
+    <a class="bb-arrow" href="{{ lb_url }}?round={{ round_nav.next }}&amp;scope={{ scope }}{% if cq %}&amp;comp={{ cq }}{% endif %}"
+       hx-get="{{ lb_url }}?round={{ round_nav.next }}&amp;scope={{ scope }}{% if cq %}&amp;comp={{ cq }}{% endif %}"
+       hx-target="#lbtable" hx-swap="outerHTML show:none" data-veil-for="#lbtable"
+       hx-push-url="true" aria-label="{{ round_nav.next_label }}" title="{{ round_nav.next_label }}">
+      <svg><use href="#ic-arrow-right"/></svg>
+    </a>
+    {% else %}<span class="bb-arrow is-off" aria-hidden="true"><svg><use href="#ic-arrow-right"/></svg></span>{% endif %}
+  </div>
+
+  {% include "partials/comp_filter.html" with options=comp_options selected=selected_comp param="comp" base=lb_url keep=comp_keep keep_pairs=comp_keep_pairs all_label="All competitions" veil_for="#lbtable" %}
+</div>
+{% endwith %}
 
 {% if is_family %}
 {# §8: same competition, two views — local standings and the national board #}
@@ -53,6 +101,7 @@ a filter that lives below the thing it rewrites reads as a footnote.
   {% with a=ranked.0 b=ranked.1 c=ranked.2 %}
   {% if b %}
   <div class="gt-pod p2">
+    <span class="gp-medal">Silver</span>
     <div class="gp-avwrap">
       <span class="gp-av">{% if b.user.avatar %}<img src="{{ b.user.avatar.url }}" alt="">{% else %}{{ b.user.display_name|slice:":1"|upper }}{% endif %}</span>
       <span class="gp-rank">2</span>
@@ -64,6 +113,7 @@ a filter that lives below the thing it rewrites reads as a footnote.
   {% else %}<div></div>{% endif %}
   {% if a %}
   <div class="gt-pod p1">
+    <span class="gp-medal">Gold</span>
     <span class="crown"><svg><use href="#ic-trophy"/></svg></span>
     <div class="gp-avwrap">
       <span class="gp-av">{% if a.user.avatar %}<img src="{{ a.user.avatar.url }}" alt="">{% else %}{{ a.user.display_name|slice:":1"|upper }}{% endif %}</span>
@@ -76,6 +126,7 @@ a filter that lives below the thing it rewrites reads as a footnote.
   {% endif %}
   {% if c %}
   <div class="gt-pod p3">
+    <span class="gp-medal">Bronze</span>
     <div class="gp-avwrap">
       <span class="gp-av">{% if c.user.avatar %}<img src="{{ c.user.avatar.url }}" alt="">{% else %}{{ c.user.display_name|slice:":1"|upper }}{% endif %}</span>
       <span class="gp-rank">3</span>
@@ -89,7 +140,18 @@ a filter that lives below the thing it rewrites reads as a footnote.
 </div>
 {% endif %}
 
-<div class="gt-shell" data-coach="board-table">
+{% comment %}
+THE TABLE GETS THE PAGE. It sat in the left column of a two-column shell with
+a 320px sidebar beside it, so the four columns that matter — rank, tipper,
+correct, points — were squeezed into two thirds of the width while a charity
+card and a pull quote held the rest on every visit. "So the table is not
+squeezed."
+
+The sidebar is not deleted, it is moved: summary, cause and quote become a row
+of cards under the board, where they are still read and no longer compete with
+it.
+{% endcomment %}
+<div data-coach="board-table">
   <div>
     {% include "partials/leaderboard_table.html" with ranked=ranked me=request.user %}
     <div class="gt-note">
@@ -98,7 +160,7 @@ a filter that lives below the thing it rewrites reads as a footnote.
     </div>
   </div>
 
-  <aside class="gt-side">
+  <aside class="gt-side board-foot">
     <section class="gt-scard dark">
       <div class="gsc-head"><svg><use href="#ic-chart"/></svg><span>Leaderboard summary</span></div>
       <div class="gsc-row"><span>Total tippers</span><b>{{ total_tippers }}</b></div>
@@ -125,4 +187,12 @@ a filter that lives below the thing it rewrites reads as a footnote.
     </section>
   </aside>
 </div>
+
+{% comment %}
+WHICH ROOM THIS BOARD IS. Last, because it is context rather than content —
+and because it is a five-option control that was opening the page above its
+own title. Still on every board, still one click, just no longer the first
+thing read on the way to the standings.
+{% endcomment %}
+{% include "partials/room_switch.html" with noun="leaderboard" surface="dark" %}
 {% endblock %}
