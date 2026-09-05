@@ -1675,6 +1675,13 @@ def members_view(request, org_id: int):
     panel = request.GET.get("panel", "members")
     if panel not in {"members", "groups", "orgs", "team", "invite"}:
         panel = "members"
+    # TWO LEVELS ONLY. A child organisation cannot have children of its own, so
+    # it gets no card for them — and no panel either, however the URL is typed.
+    # Guarded here rather than in the template: a rule the model enforces should
+    # not be re-stated in markup, where the next person to move the block will
+    # not know it was doing the work.
+    if panel == "orgs" and org.parent_id:
+        panel = "members"
 
     # The groups panel is a two-row navigator: your organisations, then the
     # groups inside whichever one you pressed. ?porg= says which — defaulting to

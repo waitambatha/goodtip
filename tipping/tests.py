@@ -2963,17 +2963,24 @@ class MyTipsAcrossEveryCompetitionTests(TestCase):
         self.afl_match = self._tipped_match(self.afl, "Swans", "Blues", 4)
         self.nrl_match = self._tipped_match(self.nrl, "Eels", "Sharks", 4)
 
-    def _tipped_match(self, series, home_name, away_name, number):
+    def _tipped_match(self, series, home_name, away_name, number, days=2):
+        """One tipped fixture in its own round.
+
+        `days` places it either side of now: a positive number is a round still
+        to be played, a negative one a round already gone. Which matters,
+        because the round each code opens on is the round IN PLAY — so a test
+        about stepping backwards needs the earlier rounds to actually be
+        earlier, or every code opens on the oldest one and has nowhere to step.
+        """
         home = Team.objects.create(name=home_name, slug=home_name.lower(), series=series)
         away = Team.objects.create(name=away_name, slug=away_name.lower(), series=series)
+        when = timezone.now() + timedelta(days=days)
         rnd = Round.objects.create(
             org=self.org, round_number=number, series=series,
-            stage=Round.STAGE_REGULAR,
-            lockout_at=timezone.now() + timedelta(days=2),
+            stage=Round.STAGE_REGULAR, lockout_at=when,
         )
         match = Match.objects.create(
-            round=rnd, home_team=home, away_team=away,
-            kickoff_at=timezone.now() + timedelta(days=2),
+            round=rnd, home_team=home, away_team=away, kickoff_at=when,
         )
         Tip.objects.create(user=self.user, match=match, org=self.org, selection="home")
         return match
@@ -2994,19 +3001,44 @@ class MyTipsAcrossEveryCompetitionTests(TestCase):
         self.assertIn("Eels", body)
         self.assertNotIn("Swans", body)
 
-    def test_a_round_number_names_the_same_round_in_both_codes(self):
-        """Round 4 is round 4 in every code, so both round-4 rows are on screen
-        together and round 3 is one step away — not two codes' round 4 first."""
-        Round.objects.create(
-            org=self.org, round_number=3, series=self.afl,
-            stage=Round.STAGE_REGULAR, lockout_at=timezone.now(),
-        )
-        r = self.client.get(reverse("tipping:my_tips", args=[self.org.id]))
-        self.assertEqual(r.context["round_total"], 2, "rounds counted as rows, not numbers")
-        self.assertEqual([n for n in r.context["round_numbers"]], [4, 3])
+    def test_across_codes_the_step_is_a_position_not_a_number(self):
+        """THE SECOND REPORT, and the reason there is no shared number:
 
-    def test_the_stepper_offers_eight_rounds(self):
-        """"Have the numbers to be up to like 8, the latest being the default."""
+            AFL 1-27   NRL 1-27   AFLW 1-12   NRLW 1-11
+
+        Four codes, four season lengths, played the same weekend. Stepping back
+        has to move each code back one round of ITS OWN, not to a number they
+        happen to share — which for AFL and AFLW would be four months apart.
+        """
+        # Three rounds per code, so whichever one each opens on there is always
+        # a round behind it to step to. With only two, the code that opens on
+        # the older one has nowhere to go and the clamp — correctly — refuses
+        # to move it.
+        self._tipped_match(self.afl, "Pies", "Dons", 3, days=-7)
+        self._tipped_match(self.nrl, "Storm", "Broncos", 3, days=-7)
+        self._tipped_match(self.afl, "Saints", "Suns", 2, days=-14)
+        self._tipped_match(self.nrl, "Titans", "Knights", 2, days=-14)
+
+        def group(**params):
+            r = self.client.get(reverse("tipping:my_tips", args=[self.org.id]), params)
+            self.assertTrue(r.context["multi_comp"])
+            return {x.series.slug: x.round_number for x in r.context["round_group"]}
+
+        # Asserted as a RELATIONSHIP rather than as two round numbers: which
+        # round each code opens on is _round_with_my_tips's business and depends
+        # on what has been played. What this is about is that one step back
+        # moves every code back one of its own.
+        here, back = group(), group(step=1)
+        self.assertEqual(set(here), {"mt-afl", "mt-nrl"})
+        for slug, number in here.items():
+            self.assertEqual(back[slug], number - 1, f"{slug} did not step back one")
+
+    def test_the_stepper_offers_eight_rounds_inside_one_code(self):
+        """"Have the numbers to be up to like 8, the latest being the default."
+
+        Inside ONE competition, where a round number means something. Across
+        four it does not, and the strip is deliberately not drawn.
+        """
         for n in range(1, 12):
             if n == 4:
                 continue
@@ -3014,10 +3046,32 @@ class MyTipsAcrossEveryCompetitionTests(TestCase):
                 org=self.org, round_number=n, series=self.afl,
                 stage=Round.STAGE_REGULAR, lockout_at=timezone.now(),
             )
-        r = self.client.get(reverse("tipping:my_tips", args=[self.org.id]))
+        r = self.client.get(
+            reverse("tipping:my_tips", args=[self.org.id]), {"series": self.afl.slug},
+        )
         strip = r.context["round_strip"]
+        self.assertFalse(r.context["multi_comp"])
         self.assertEqual(len(strip["window"]), 8)
         self.assertEqual(max(strip["numbers"]), 11, "the window is anchored on the newest")
+
+    def test_the_number_strip_is_not_drawn_across_codes(self):
+        """A number stepper over four seasons of different lengths is a control
+        that cannot be right, so it is absent rather than wrong."""
+        r = self.client.get(reverse("tipping:my_tips", args=[self.org.id]))
+        self.assertTrue(r.context["multi_comp"])
+        self.assertIsNone(r.context["round_strip"])
+
+    def test_each_code_opens_on_the_round_you_last_tipped(self):
+        """Not the last round that EXISTS. This member's tips stop at round 4
+        while the fixture list runs to 6, and anchoring on the table's end opens
+        a round nobody has touched and reports no tips to somebody who has."""
+        Round.objects.create(
+            org=self.org, round_number=6, series=self.afl,
+            stage=Round.STAGE_REGULAR, lockout_at=timezone.now(),
+        )
+        r = self.client.get(reverse("tipping:my_tips", args=[self.org.id]))
+        afl = next(x for x in r.context["round_group"] if x.series_id == self.afl.id)
+        self.assertEqual(afl.round_number, 4)
 
     def test_the_round_links_carry_the_competition_filter(self):
         """Stepping a round must not silently widen the page back to every code."""

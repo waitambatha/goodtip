@@ -765,16 +765,34 @@ class ChildAdminManagementTests(TestCase):
     PANEL = 'id="child-orgs"'
 
     def test_parent_admin_sees_the_sub_org_panel(self):
+        """The panel moved behind its own card (?panel=orgs) rather than sitting
+        at the foot of the page — "it should be a card, and where we have the
+        table is where we will have that when we click." Who may see it did not
+        change, which is what these two are about."""
         self.client.force_login(self.parent_admin)
-        resp = self.client.get(f"/leagues/{self.parent.id}/members/")
+        resp = self.client.get(f"/leagues/{self.parent.id}/members/?panel=orgs")
         self.assertContains(resp, self.PANEL)
         self.assertContains(resp, "National Tiles Mitcham")
         self.assertContains(resp, "Mitcham Boss")
+
+    def test_parent_admin_is_offered_the_card(self):
+        """The way in has to be on the page, or the panel might as well not be."""
+        self.client.force_login(self.parent_admin)
+        resp = self.client.get(f"/leagues/{self.parent.id}/members/")
+        self.assertContains(resp, "c-orgs")
 
     def test_child_admin_page_has_no_sub_org_panel(self):
         """Two levels only: a child cannot have children, so it gets no panel."""
         self.client.force_login(self.child_admin)
         resp = self.client.get(f"/leagues/{self.child.id}/members/")
+        self.assertNotContains(resp, self.PANEL)
+        self.assertNotContains(resp, "c-orgs")
+
+    def test_a_child_cannot_reach_the_panel_by_typing_the_url(self):
+        """A rule the model enforces must not be enforceable only by not
+        rendering a link to it."""
+        self.client.force_login(self.child_admin)
+        resp = self.client.get(f"/leagues/{self.child.id}/members/?panel=orgs")
         self.assertNotContains(resp, self.PANEL)
 
     def test_parent_admin_can_demote_child_admin(self):

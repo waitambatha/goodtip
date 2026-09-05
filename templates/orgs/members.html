@@ -169,6 +169,10 @@ point: the gesture is already learned.
 
 {% elif panel == "orgs" %}
 {% comment %}
+The anchor is kept: it is what the child-admin tests assert on, deliberately —
+"the heading has already been renamed once and is about to be renamed again;
+what the tests are actually about is who sees the panel at all."
+
 Child organisations only exist under a top-level org — two levels, so a child
 cannot have children of its own.
 
@@ -176,7 +180,7 @@ cannot have children of its own.
 site, branch or franchise with its own members, its own charity and its own
 ladder, whose totals roll up into this one.
 {% endcomment %}
-<div class="ppanel-head">
+<div class="ppanel-head" id="child-orgs">
   <div>
     <div class="card-h">Organisations under {{ org.name }}</div>
     <p class="card-lead" style="margin:4px 0 0;">A site, branch or franchise with its own members, its own charity and its own ladder. For teams inside one organisation — Marketing, IT — use groups instead.</p>
