@@ -79,18 +79,36 @@ gt-messages.js and the .gtm-page media queries.
 {% endcomment %}
 <div class="gtm" data-gtm data-view="{% if thread %}chat{% else %}list{% endif %}">
 
+  {# ==================== LEFT: conversations ==================== #}
+  <aside class="gtm-nav" data-gtm-pane="list">
   {% comment %}
-  The fold, pinned to the shell rather than to the column, so it stays where it
-  is when the column it collapses is 54px wide. A column that vanished outright
+  THE FOLD, at the column's own inner edge — "have that button on the right and
+  not on the left."
+
+  Inside the column rather than pinned to the shell, because "the right-hand end
+  of the list" is a position the column knows and the shell does not: the two
+  tracks are 1fr and 2fr, so the edge moves with the window and any sum written
+  against the shell is wrong at every width but one.
+
+  Folded, the column becomes a 54px strip and the button rides in on it — which
+  is the one moment it has to be findable, since a column that vanished outright
   would leave no way back except the browser's.
   {% endcomment %}
   <button type="button" class="gtm-fold" data-gtm-fold
           aria-label="Hide the conversation list" aria-expanded="true">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
-  </button>
+    {% comment %}
+    THREE LINES, AT THE RIGHT-HAND END OF THE COLUMN — "have that button on the
+    right and not on the left, and let it be the three lines that suggests
+    menu."
 
-  {# ==================== LEFT: conversations ==================== #}
-  <aside class="gtm-nav" data-gtm-pane="list">
+    A chevron says which way something will move, which is only useful once you
+    know there is a panel to move; the hamburger says "this is the list" in a
+    shape everybody already reads, and it means the same thing in both states
+    rather than needing to flip. On the column's own inner edge, where the
+    column meets the conversation, so it is beside the thing it hides.
+    {% endcomment %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
+  </button>
     <header class="gtm-nav-head">
       <div class="gtm-title">
         <span class="gtm-title-ic" aria-hidden="true"><svg><use href="#ic-msg"/></svg></span>
@@ -151,17 +169,32 @@ gt-messages.js and the .gtm-page media queries.
         <button type="button" class="gtm-tab" role="tab" aria-selected="false" data-gtm-tab="person">
           People {% if count_people %}<i>{{ count_people }}</i>{% endif %}
         </button>
-        {% comment %}
-        Archived is a LINK, not a tab: the other four switch between lists that
-        are already on the page, and this one asks the server for a different
-        set of conversations. Making it look identical to them would promise a
-        switch and deliver a navigation.
-        {% endcomment %}
-        <a class="gtm-tab gtm-tab-link{% if show == 'archived' %} on{% endif %}"
-           href="{% url 'orgs:member_messages' org.id %}{% if show != 'archived' %}?show=archived{% endif %}">
-          {% if show == 'archived' %}&larr; Back{% else %}Archived{% endif %}
-        </a>
       </div>
+
+      {% comment %}
+      ARCHIVED, ON ITS OWN LINE — "I have archived a chat and I do not see it."
+
+      It was the fifth item in a row that scrolls sideways in a 280px column, so
+      on most screens it was off the edge: the chat had gone somewhere the
+      reader had no way of finding. A row of its own cannot be scrolled out of
+      sight, and the count answers "did that work" without pressing anything.
+
+      Still a link and not a tab, because the other four switch between lists
+      already on the page and this one asks the server for a different set.
+      Hidden when there is nothing in it: a permanent door to an empty room is
+      furniture.
+      {% endcomment %}
+      {% if show == 'archived' %}
+      <a class="gtm-arch on" href="{% url 'orgs:member_messages' org.id %}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        Back to your chats
+      </a>
+      {% elif archived_count %}
+      <a class="gtm-arch" href="{% url 'orgs:member_messages' org.id %}?show=archived">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v3H3z"/><path d="M5 10v9h14v-9"/><path d="M10 14h4"/></svg>
+        Archived <i>{{ archived_count }}</i>
+      </a>
+      {% endif %}
     </header>
 
     <div class="gtm-nav-body gt-scroll">
@@ -190,7 +223,18 @@ gt-messages.js and the .gtm-page media queries.
 
       {# ---- ALL — the conversations you have had ---- #}
       <section class="gtm-sec" data-gtm-list-pane="all">
-        <h2 class="gtm-sec-h">Recent chats{% if total_unread %} <span class="gtm-sec-n">{{ total_unread }} new</span>{% endif %}</h2>
+        <h2 class="gtm-sec-h">
+          {% if show == 'archived' %}Archived chats{% else %}Recent chats{% endif %}
+          {% if total_unread %} <span class="gtm-sec-n">{{ total_unread }} new</span>{% endif %}
+        </h2>
+        {% if show == 'archived' %}
+        {% comment %}
+        Said plainly, because "archive" means different things in different
+        products and the menu item that put it here is the one that takes it
+        back out.
+        {% endcomment %}
+        <p class="gtm-arch-note">Right-click one (or press &#8942;) and choose <b>Unarchive chat</b> to put it back.</p>
+        {% endif %}
         <ul class="gtm-list" data-gtm-list>
           {% for c in conversations %}
           {% comment %}
@@ -343,7 +387,31 @@ gt-messages.js and the .gtm-page media queries.
   </aside>
 
   {# ==================== RIGHT: the conversation ==================== #}
+  {% comment %}
+  THE WALLPAPER, behind the conversation.
+
+  "The chat area, one can have a wallpaper ... we will utilise our own, so the
+  images that we have in our system will be changing in like 10 seconds. Give
+  the user the ability to set a wallpaper — just one image — then we display the
+  images we have, and then the option of no image; the default is the images we
+  have changing every 10 seconds."
+
+  Three settings, one layer. Default rotates; a chosen image holds still; "none"
+  draws nothing. The choice is per BROWSER (localStorage) rather than per
+  account: it is a preference about how one screen looks on one machine, and a
+  column on the user table would make it a thing that syncs, needs a migration
+  and has to be got right on every device. See gt-messages.js.
+
+  aria-hidden throughout: it is decoration, and a screen reader announcing a
+  photograph of a stadium between two messages is noise.
+  {% endcomment %}
   <section class="gtm-chat" data-gtm-pane="chat">
+    <div class="gtm-paper" data-gtm-paper aria-hidden="true">
+      {% for shot in wallpapers %}
+      <div class="gtm-paper-shot{% if forloop.first %} on{% endif %}"
+           data-paper="{{ shot.key }}" style="background-image:url('{{ shot.url }}')"></div>
+      {% endfor %}
+    </div>
     {% if thread %}
     {% include "orgs/partials/_room_chat.html" %}
     {% else %}
@@ -389,6 +457,47 @@ person you want is missing or simply further down. The People tab is the place
 that searches the database, so this points at it.
 =============================================================================
 {% endcomment %}
+{% comment %}
+=============================================================================
+WALLPAPER SETTINGS.
+=============================================================================
+Our own photographs rather than an upload: "there will be not like WhatsApp
+where we're given the opportunity to keep ours, but we will utilise our own."
+That also means no upload endpoint, no storage and no moderation question for a
+decorative background.
+=============================================================================
+{% endcomment %}
+<div class="tipsheet gtm-sheet" id="gtmPaper" hidden aria-hidden="true">
+  <div class="ts-veil" data-paper-close></div>
+  <div class="ts-panel" role="dialog" aria-modal="true" aria-labelledby="gtmPaperTitle">
+    <header class="ts-head">
+      <div>
+        <h3 id="gtmPaperTitle">Chat wallpaper</h3>
+        <p class="ts-sub">Behind your conversations, on this device</p>
+      </div>
+      <button type="button" class="ts-x" data-paper-close aria-label="Close">&times;</button>
+    </header>
+    <div class="ts-body">
+      <div class="paper-grid">
+        <button type="button" class="paper-opt is-auto" data-paper-pick="auto">
+          <span class="paper-thumb paper-thumb-auto" aria-hidden="true"></span>
+          <b>Rotating</b><i>Our photographs, changing every 10 seconds</i>
+        </button>
+        <button type="button" class="paper-opt" data-paper-pick="none">
+          <span class="paper-thumb paper-thumb-none" aria-hidden="true"></span>
+          <b>No image</b><i>Just the plain background</i>
+        </button>
+        {% for shot in wallpapers %}
+        <button type="button" class="paper-opt" data-paper-pick="{{ shot.key }}">
+          <span class="paper-thumb" style="background-image:url('{{ shot.url }}')" aria-hidden="true"></span>
+          <b>{{ shot.label }}</b><i>Hold this one</i>
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="tipsheet gtm-sheet" id="gtmNew" hidden aria-hidden="true">
   <div class="ts-veil" data-gtm-new-close></div>
   <div class="ts-panel" role="dialog" aria-modal="true" aria-labelledby="gtmNewTitle">

@@ -2534,3 +2534,128 @@ def attach_chat_state(user, *, orgs=(), groups=(), contacts=()):
         g.chat = by_group.get(g.id)
     for row in contacts:
         row["chat"] = by_person.get(row["user"].id)
+
+
+def charity_votes_for_room(user, org, group=None, *, ballot_context):
+    """Every election this room has held, newest first, ready to draw.
+
+    ASKED FOR: "let's say in an organisation we did an election, we should also
+    have a card for that — when I click it I will see the votes, when the
+    election was started, ended, a bar and pie chart of the results and all, and
+    if it was a tie and the admin had to select, that also should be captured."
+
+    So each row carries the whole history of one ballot, not just its winner:
+    when it opened, when it closed, how many of the electorate voted, the tally
+    per option, and — where the count did not decide it — who broke the tie and
+    when. A charity chosen by one person rather than by the count is a different
+    kind of decision, and a results screen that hides that is telling a story
+    the numbers do not support.
+
+    `ballot_context` is handed in rather than imported: it lives in orgs.views
+    with the screens that render a single ballot, and importing a view into a
+    service is the wrong direction. Passing it keeps the tally maths in ONE
+    place — the blind-vote rule (counts while open, tallies only once closed) is
+    a promise to members, and a promise implemented twice is a promise kept
+    once.
+    """
+    from .models import CharityVote, GroupMember, OrgMember
+
+    votes = (
+        CharityVote.objects
+        .filter(org=org, group=group)
+        .select_related("winning_charity", "tie_broken_by", "group")
+        .order_by("-opened_at")
+    )
+    if group is not None:
+        eligible = GroupMember.objects.filter(group=group).count()
+    else:
+        eligible = OrgMember.objects.filter(org=org).count()
+
+    rows = []
+    for vote in votes:
+        ctx = ballot_context(vote, user, eligible)
+        # THE BAR AND ITS SLICE ARE THE SAME COLOUR. Two charts of one tally
+        # that colour their series differently are two charts the reader has to
+        # reconcile by name, which is the work the colour was supposed to save.
+        for i, option in enumerate(ctx["results"] or []):
+            option.colour = PIE_COLOURS[i % len(PIE_COLOURS)]
+        rows.append({
+            "vote": vote,
+            "results": ctx["results"],
+            "stats": ctx["stats"],
+            "ballot_count": ctx["ballot_count"],
+            "eligible_count": ctx["eligible_count"],
+            "turnout_pct": ctx["turnout_pct"],
+            "tied_options": ctx["tied_options"],
+            # A PIE NEEDS ITS SLICES PRE-ADDED. conic-gradient takes absolute
+            # stops rather than widths, so each slice has to know where the one
+            # before it ended — which a Django template cannot accumulate.
+            "pie": _pie_stops(ctx["results"]),
+        })
+    return rows
+
+
+#: The wheel's colours, in order. Deliberately not the competition palette:
+#: these are charities, and borrowing the codes' colours would suggest a
+#: relationship between a cause and a football code that does not exist.
+PIE_COLOURS = [
+    "#2D7A3A", "#5AA9FF", "#C79BFF", "#FFB25C", "#FF8FB4",
+    "#3FD0C9", "#9A5A05", "#6B34B8", "#B01F55", "#12558F",
+]
+
+
+def _pie_stops(results) -> str:
+    """A conic-gradient value for one vote's tallies, or "" when there are none.
+
+    Built here rather than in the template because each stop is the running
+    total of everything before it, and a template cannot carry a sum across a
+    loop. Returns the whole gradient so the markup is one style attribute.
+    """
+    if not results:
+        return ""
+    total = sum(o.n for o in results)
+    if not total:
+        return ""
+    stops, at = [], 0.0
+    for i, option in enumerate(results):
+        share = option.n * 360.0 / total
+        colour = PIE_COLOURS[i % len(PIE_COLOURS)]
+        stops.append(f"{colour} {at:.2f}deg {at + share:.2f}deg")
+        at += share
+    return "conic-gradient(" + ", ".join(stops) + ")"
+
+
+#: The photographs offered as a chat wallpaper, and what to call them.
+#:
+#: Our own rather than an upload — "we will not, like WhatsApp, be given the
+#: opportunity to keep ours, but we will utilise our own." Which also means no
+#: upload endpoint, no storage and no moderation question for what is only ever
+#: decoration behind a conversation.
+#:
+#: Landscapes only: a wallpaper is a wide, mostly-empty field behind text, and
+#: the portrait crops that suit the narrow side strips put a player's head in
+#: the middle of the messages.
+WALLPAPERS = [
+    ("stadium-panorama", "Stadium panorama", "img/scenes/stadium-panorama.jpg"),
+    ("mcg-stadium",      "The 'G",           "img/scenes/mcg-stadium.jpg"),
+    ("stadium-night",    "Under lights",     "img/stadium-night.jpg"),
+    ("afl-ground",       "Match day",        "img/scenes/afl-ground.jpg"),
+    ("nrl-ground-dusk",  "Ground at dusk",   "img/scenes/nrl-ground-dusk.jpg"),
+    ("aussie-crowd-flag", "The crowd",       "img/scenes/aussie-crowd-flag.jpg"),
+]
+
+
+def chat_wallpapers():
+    """The wallpaper options, with their hashed URLs resolved once.
+
+    `static()` is called here rather than in the template so the list is one
+    thing with one shape — the template loops it for the layer AND for the
+    picker, and resolving the URL twice in two loops is how the two end up
+    disagreeing after somebody edits one of them.
+    """
+    from django.templatetags.static import static
+
+    return [
+        {"key": key, "label": label, "url": static(path)}
+        for key, label, path in WALLPAPERS
+    ]

@@ -291,3 +291,45 @@
   document.body && paintAll();
   document.addEventListener('gt:carry-rendered', function () { paintAll(); });
 })();
+
+/* ---------------------------------------------------------------------------
+ * THE CARD STRIP THAT SWITCHES A PANEL
+ *
+ * Members and Charities are a row of cards over one box: pressing a card swaps
+ * the box (hx-target=".ppanel") rather than reloading the screen, so the
+ * sheet's loader never plays for a change to one region of a page already on
+ * screen — "it should not be the whole page loading when it's an action where
+ * we have a loading loader".
+ *
+ * htmx swaps the panel; it cannot know which card should now look pressed,
+ * because the response is the panel and the panel does not know what pointed at
+ * it. That is this. Read off the anchor, set before the request, so the card
+ * lights the moment it is pressed rather than when the bytes land.
+ * ------------------------------------------------------------------------- */
+(function () {
+  'use strict';
+
+  document.addEventListener('click', function (e) {
+    var card = e.target.closest && e.target.closest('[data-panel-link]');
+    if (!card) return;
+    var strip = card.closest('.pcards');
+    if (!strip) return;
+    strip.querySelectorAll('.pcard').forEach(function (c) {
+      c.classList.toggle('on', c === card);
+    });
+  });
+
+  /* The panel being fetched is the one that dims — htmx puts .htmx-request on
+     the element that MADE the request, which is a card, so without this the
+     card would flicker and the box it is fetching would sit still. */
+  document.body.addEventListener('htmx:beforeRequest', function (e) {
+    var t = e.detail && e.detail.elt;
+    if (!t || !t.closest || !t.closest('[data-panel-link]')) return;
+    var panel = document.querySelector('.ppanel');
+    if (panel) panel.classList.add('is-swapping');
+  });
+  document.body.addEventListener('htmx:afterSwap', function () {
+    var panel = document.querySelector('.ppanel');
+    if (panel) panel.classList.remove('is-swapping');
+  });
+})();

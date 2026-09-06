@@ -31,7 +31,7 @@ appears in every organisation's picker, and one org admin renaming it would
 change what everyone else sees.
 {% endcomment %}
 
-<div class="app-head">
+<div class="app-head is-centred is-orgfirst">
   <div>
     <div class="app-eyebrow">{{ org.name }}</div>
     <h1 class="app-h1">Charities</h1>
@@ -42,79 +42,76 @@ change what everyone else sees.
   </div>
 </div>
 
-<div class="ch-add-row" data-coach="charity-add">
-  <div>
-    <h2 class="sec-h" style="margin:0;">Can't see your cause?</h2>
-    <p class="app-sub" style="margin:2px 0 0;">Add it, and we'll fetch their logo for you.</p>
-  </div>
-  <button type="button" class="abtn abtn-primary" data-ch-open>
-    <svg aria-hidden="true"><use href="#ic-heart"/></svg>
-    Add a charity
-  </button>
-</div>
-
-{% if org.charity %}
-<div class="card pad-lg ch-current">
-  <div class="ch-current-label">{{ org.name }} is backing</div>
-  {% include "components/_charity_card.html" with charity=org.charity %}
-</div>
-{% endif %}
-
-{% if ours %}
-<h2 class="sec-h">Added by {{ org.name }}</h2>
-<p class="hint" style="margin:-4px 0 12px;">
-  Yours to use straight away. We review each one before it appears for other
-  organisations — that review changes nothing for you.
-</p>
-<div class="ch-grid">
-  {% for ch in ours %}
-  {% url 'orgs:charity_edit' org.id ch.id as ch_edit %}
-  {% include "components/_charity_tile.html" with charity=ch chip=ch.is_approved|yesno:"Approved,In review" edit_url=ch_edit %}
-  {% endfor %}
-</div>
-{% endif %}
-
-{% if groups_enabled and groups %}
-<h2 class="sec-h">What each group backs</h2>
-<div class="card pad-lg">
-  {% for g in groups %}
-  <div class="gcr">
-    <span class="gcr-name">{{ g.name }}</span>
-    <span class="gcr-ch">
-      {% if g.charity %}
-        {{ g.charity.name }} <span class="pill-role">their own</span>
-      {% elif org.charity %}
-        {{ org.charity.name }} <span class="pill-role">inherited</span>
-      {% else %}
-        <span class="app-sub">Not chosen yet</span>
-      {% endif %}
-    </span>
-    <a class="abtn abtn-ghost abtn-sm" href="{% url 'orgs:group_charity_vote' org.id g.id %}">Election &rarr;</a>
-  </div>
-  {% endfor %}
-</div>
-{% endif %}
-
-<h2 class="sec-h" data-coach="charity-list">On GoodTip's list</h2>
-<p class="hint" style="margin:-4px 0 12px;">
-  Vetted by GoodTip and available to every organisation.
-  {% if user.is_staff %}You can edit these because you're GoodTip staff — a change here shows up for everyone.{% endif %}
-</p>
-<div class="ch-grid">
-  {% for ch in vetted %}
-  {% url 'orgs:charity_edit' org.id ch.id as ch_edit %}
-  {% include "components/_charity_tile.html" with charity=ch edit_url=ch_edit %}
-  {% empty %}
-  <p class="app-sub">Nothing here yet.</p>
-  {% endfor %}
-</div>
-
 {% comment %}
-The form is a sheet now. It used to sit open at the bottom under both lists,
-which put a writing task below everything a reader had to scroll past — and the
-order of this screen is the point: you see what already exists before you add
-to it. A button keeps that order and still makes adding one click away.
+=============================================================================
+THE ROOM, THEN THE CARDS, THEN ONE PANEL.
+=============================================================================
+"The same way we have done to the members page is what we will do to the
+charities page — have the cards ... so when I click the charities card it loads
+not the whole page, just the part of display."
+
+And above them, the navigator the leaderboard and the ladder carry: "have the
+section where we have the organisation and under it we have groups being
+displayed depending on the organisation I clicked, so I can click an
+organisation while in the charity page and see the charity, and be able to move
+from organisation to group that I am an admin."
+
+Which is a real distinction on this screen and not decoration: a group elects
+its own cause from the same list, so "the charities" and "who is backing what"
+are different answers depending on which room you are standing in.
+=============================================================================
 {% endcomment %}
+{% url 'orgs:charities' org.id as ch_url %}
+{% with keep=panel|add:"" %}
+<div class="pnav pnav-rooms">
+  <div class="pnav-row">
+    <span class="pnav-lab">Organisation</span>
+    <div class="pnav-opts">
+      {% for o in panel_orgs %}
+      <a class="pnav-opt{% if o.id == panel_org.id and not panel_group %} on{% endif %}"
+         href="{{ ch_url }}?panel={{ panel }}&amp;porg={{ o.id }}">{{ o.name }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% if panel_groups %}
+  <div class="pnav-row">
+    <span class="pnav-lab">Groups in {{ panel_org.name }}</span>
+    <div class="pnav-opts">
+      <a class="pnav-opt{% if not panel_group %} on{% endif %}"
+         href="{{ ch_url }}?panel={{ panel }}&amp;porg={{ panel_org.id }}">Everyone</a>
+      {% for g in panel_groups %}
+      <a class="pnav-opt{% if panel_group.id == g.id %} on{% endif %}"
+         href="{{ ch_url }}?panel={{ panel }}&amp;porg={{ panel_org.id }}&amp;pgroup={{ g.id }}">{{ g.name }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="pcards">
+  <a class="pcard c-members{% if panel == 'list' %} on{% endif %}" href="{{ ch_url }}" hx-get="{{ ch_url }}?pane=panel" hx-target=".ppanel" hx-swap="outerHTML show:none" hx-push-url="true" data-panel-link>
+    <span class="pcard-ic" aria-hidden="true"><svg><use href="#ic-f-heart"/></svg></span>
+    <b>Charities</b><i>{{ charity_count }}</i>
+  </a>
+  <a class="pcard c-invite{% if panel == 'add' %} on{% endif %}" href="{{ ch_url }}?panel=add" hx-get="{{ ch_url }}?panel=add&amp;pane=panel" hx-target=".ppanel" hx-swap="outerHTML show:none" hx-push-url="true" data-panel-link data-coach="charity-add">
+    <span class="pcard-ic" aria-hidden="true"><svg><use href="#ic-heart"/></svg></span>
+    <b>Add a charity</b><i>Yours</i>
+  </a>
+  {% if groups_enabled %}
+  <a class="pcard c-groups{% if panel == 'groups' %} on{% endif %}" href="{{ ch_url }}?panel=groups" hx-get="{{ ch_url }}?panel=groups&amp;pane=panel" hx-target=".ppanel" hx-swap="outerHTML show:none" hx-push-url="true" data-panel-link>
+    <span class="pcard-ic" aria-hidden="true"><svg><use href="#ic-f-users"/></svg></span>
+    <b>What groups back</b><i>{{ groups|length }}</i>
+  </a>
+  {% endif %}
+  <a class="pcard c-team{% if panel == 'elections' %} on{% endif %}" href="{{ ch_url }}?panel=elections&amp;porg={{ panel_org.id }}{% if panel_group %}&amp;pgroup={{ panel_group.id }}{% endif %}" hx-get="{{ ch_url }}?panel=elections&amp;porg={{ panel_org.id }}{% if panel_group %}&amp;pgroup={{ panel_group.id }}{% endif %}&amp;pane=panel" hx-target=".ppanel" hx-swap="outerHTML show:none" hx-push-url="true" data-panel-link>
+    <span class="pcard-ic" aria-hidden="true"><svg><use href="#ic-f-shield"/></svg></span>
+    <b>Elections</b><i>Results</i>
+  </a>
+</div>
+
+{% include "orgs/partials/_charity_panel.html" %}
+{% endwith %}
+
 <div class="tipsheet ch-sheet" id="chSheet" hidden aria-hidden="true">
   <div class="ts-veil" data-ch-close></div>
   <form method="post" class="ts-panel" role="dialog" aria-modal="true" aria-labelledby="chTitle">

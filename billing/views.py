@@ -182,8 +182,25 @@ def season_summary_view(request, org_id: int):
     board = list(leaderboard_for_org(org)[:3])
     winner = board[0] if board else None
     disbursement = org.disbursements.filter(season=org.season).first()
+    # THE ROOM NAVIGATOR, the one the leaderboard, the ladder and the charities
+    # screen carry — "have the section that we have been using where we have all
+    # the organisations and groups ... so I can be able to move from one
+    # organisation and group summary without using the main menu."
+    #
+    # Only the organisations this person actually runs: a season summary is an
+    # admin's screen (the guard above is is_creator_admin), so listing the ones
+    # they merely play in would offer doors that answer 403.
+    from orgs.services import is_creator_admin as _admin_of
+
+    my_orgs = [
+        m.org for m in
+        OrgMember.objects.filter(user=request.user).select_related("org").order_by("org__name")
+        if _admin_of(request.user, m.org, membership=m)
+    ]
     return render(request, "billing/season_summary.html", {
         "org": org,
+        "panel_orgs": my_orgs,
+        "panel_org": org,
         "summary": donations.donation_summary(org),
         "winner": winner,
         "podium": board,

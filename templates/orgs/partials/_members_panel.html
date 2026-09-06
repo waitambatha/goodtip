@@ -1,0 +1,220 @@
+{% comment %}
+THE MEMBERS PANEL, on its own.
+
+Its own file because the same view returns it alone when a card is pressed
+(?pane=panel), so switching between Members, Groups, Organisations, Team and
+Invite swaps this box rather than reloading the screen around it — and the
+sheet's loader never plays for a change to one region of it.
+
+Same view, same context: what arrives on a swap cannot drift from what was
+rendered first.
+{% endcomment %}
+<div class="ppanel">
+{% if panel == "members" %}
+{% comment %}
+THE LIST IS A LIST, drawn as the ladder's board — "I do not like the way it is,
+so we will have it be a table that we have in the ladder."
+
+Read-only on purpose: a role picker on every row makes a column of controls out
+of a column of facts. Everything that changes somebody is one card along.
+{% endcomment %}
+<div class="gt-board gt-listwrap mb-board" data-coach="members-list">
+  <div class="gb-head">
+    <span>Member</span><span>Roles</span><span style="text-align:right;">Joined</span>
+  </div>
+  <div class="gt-scroll gb-rows">
+  {% for m in members %}
+    <div class="gb-row">
+      <span class="gb-who">
+        <span class="gb-av">{% if m.user.avatar %}<img src="{{ m.user.avatar.url }}" alt="" loading="lazy">{% else %}{{ m.user.display_name|slice:":1"|upper }}{% endif %}</span>
+        <span class="gb-name">{{ m.user.display_name }}<small>{{ m.user.email }}</small></span>
+      </span>
+      <span class="mb-roles">{% for label in m.role_labels %}<span class="pill-role {{ label|lower }}">{{ label }}</span> {% endfor %}</span>
+      <span class="mb-when">{{ m.joined_at|date:"j M Y" }}</span>
+    </div>
+  {% empty %}
+    <div class="gb-empty">No members yet. Press <b>Invite</b> above to bring people in.</div>
+  {% endfor %}
+  </div>
+</div>
+
+{% elif panel == "groups" %}
+{% comment %}
+TWO ROWS, ORGANISATIONS THEN THEIR GROUPS — "so it should have the first one
+been the organisations I have, then if I click that organisation, under it is
+the groups, so another row that will auto display the groups that belong where
+I have clicked."
+
+The same shape as the room switcher every member page carries, which is the
+point: the gesture is already learned.
+{% endcomment %}
+<div class="pnav">
+  <div class="pnav-row">
+    <span class="pnav-lab">Organisation</span>
+    <div class="pnav-opts">
+      {% for o in panel_orgs %}
+      <a class="pnav-opt{% if o.id == panel_org.id %} on{% endif %}"
+         href="{{ members_url }}?panel=groups&amp;porg={{ o.id }}">{{ o.name }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="pnav-row">
+    <span class="pnav-lab">Groups in {{ panel_org.name }}</span>
+    <div class="pnav-opts">
+      {% for g in panel_groups %}
+      <a class="pnav-opt" href="{% url 'orgs:groups' panel_org.id %}">{{ g.name }} <i>{{ g.memberships.count }}</i></a>
+      {% empty %}
+      <span class="pnav-none">No groups in {{ panel_org.name }} yet.</span>
+      {% endfor %}
+      <a class="pnav-opt is-add" href="{% url 'orgs:groups' panel_org.id %}">Manage groups &rarr;</a>
+    </div>
+  </div>
+</div>
+
+{% elif panel == "orgs" %}
+{% comment %}
+The anchor is kept: it is what the child-admin tests assert on, deliberately —
+"the heading has already been renamed once and is about to be renamed again;
+what the tests are actually about is who sees the panel at all."
+
+Child organisations only exist under a top-level org — two levels, so a child
+cannot have children of its own.
+
+"KFC might have many branches; that is not a group." A child organisation is a
+site, branch or franchise with its own members, its own charity and its own
+ladder, whose totals roll up into this one.
+{% endcomment %}
+<div class="ppanel-head" id="child-orgs">
+  <div>
+    <div class="card-h">Organisations under {{ org.name }}</div>
+    <p class="card-lead" style="margin:4px 0 0;">A site, branch or franchise with its own members, its own charity and its own ladder. For teams inside one organisation — Marketing, IT — use groups instead.</p>
+  </div>
+  <a href="{% url 'orgs:create' %}?parent={{ org.id }}" class="abtn abtn-primary" style="flex:none;">+ Add one</a>
+</div>
+{% if child_groups %}
+<div class="tbl-scroll">
+<table class="atable">
+  <tbody>
+  {% for g in child_groups %}
+    <tr>
+      <td><b>{{ g.org.name }}</b></td>
+      <td>
+        {% for a in g.admins %}
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:2px 0;">
+            <span>{{ a.user.display_name }} <small style="color:var(--muted);">{{ a.user.email }}</small></span>
+            <form method="post" action="{% url 'orgs:members' org.id %}" style="display:inline;">
+              {% csrf_token %}<input type="hidden" name="action" value="demote_child_admin"><input type="hidden" name="member_id" value="{{ a.id }}">
+              <button type="submit" class="abtn abtn-ghost abtn-sm">Remove admin</button>
+            </form>
+          </div>
+        {% empty %}
+          <span style="color:var(--muted);">No admin</span>
+        {% endfor %}
+      </td>
+      <td style="text-align:right;">
+        <form method="post" action="{% url 'orgs:members' org.id %}" style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+          {% csrf_token %}<input type="hidden" name="action" value="assign_child_admin"><input type="hidden" name="child_id" value="{{ g.org.id }}">
+          <input type="email" name="email" required placeholder="new-admin@email.com" style="min-width:200px;padding:8px 10px;border:1px solid var(--app-line);border-radius:10px;font-family:var(--body);font-size:14px;">
+          <button type="submit" class="abtn abtn-ghost abtn-sm">Make admin</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="card-lead" style="margin:16px 0 0;color:var(--muted);">None yet. Add one for a site, branch or franchise that wants its own ladder and its own cause.</p>
+{% endif %}
+
+{% elif panel == "team" %}
+{% comment %}
+EVERYTHING THAT CHANGES SOMEBODY, in one place. Same forms, same endpoints and
+the same permissions as before — owner-only items stay owner-only, and opening
+this panel is not permission to do anything: the view still decides.
+{% endcomment %}
+<div class="ppanel-head">
+  <div>
+    <div class="card-h">Team management</div>
+    <p class="card-lead" style="margin:4px 0 0;">A Manager configures the league, invites and runs the charity vote. A Captain leads a side. Changes take effect straight away.</p>
+  </div>
+</div>
+<div class="tbl-scroll">
+<table class="atable">
+  <thead><tr><th>Member</th><th>Now</th><th style="text-align:right;">Set role</th></tr></thead>
+  <tbody>
+  {% for m in members %}
+    <tr>
+      <td><b>{{ m.user.display_name }}</b><br><small style="color:var(--muted);">{{ m.user.email }}</small></td>
+      <td>{% for label in m.role_labels %}<span class="pill-role {{ label|lower }}">{{ label }}</span> {% endfor %}</td>
+      <td style="text-align:right;">
+        <form method="post" action="{% url 'orgs:members' org.id %}" style="display:flex;gap:8px;justify-content:flex-end;">
+          {% csrf_token %}<input type="hidden" name="action" value="set_role"><input type="hidden" name="member_id" value="{{ m.id }}">
+          <select name="role" style="min-width:150px;width:auto;">
+            {% for value, label in role_choices %}<option value="{{ value }}" {% if m.role == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+          <button type="submit" class="abtn abtn-ghost abtn-sm">Save</button>
+        </form>
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="3" style="text-align:center;color:var(--muted);">No members yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if is_owner %}
+<div class="tm-nominate">
+  <div class="card-h">Nominate a Team Manager <span class="pill-role owner" style="vertical-align:middle;">Owner only</span></div>
+  <p class="card-lead" style="margin:4px 0 14px;">Enter the email of a member to make them a Team Manager alongside you.</p>
+  <form method="post" action="{% url 'orgs:members' org.id %}" style="display:flex;gap:8px;flex-wrap:wrap;">
+    {% csrf_token %}<input type="hidden" name="action" value="nominate_manager">
+    <input type="email" name="email" required placeholder="their@email.com" style="flex:1;min-width:220px;padding:12px 14px;border:1px solid var(--app-line);border-radius:10px;font-family:var(--body);font-size:15px;">
+    <button type="submit" class="abtn abtn-primary">Nominate</button>
+  </form>
+</div>
+{% endif %}
+
+{% elif panel == "invite" %}
+{% comment %}
+BOTH WAYS IN, where the table was — "it should load and show me the invitation,
+either via email or link."
+
+The email form posts to the invite screen, which is where that POST has always
+been handled and where its errors and flash messages already live. One place
+that sends invitations, reached from two.
+{% endcomment %}
+<div class="ppanel-head">
+  <div>
+    <div class="card-h">Invite people to {{ org.name }}</div>
+    <p class="card-lead" style="margin:4px 0 0;">Send it from you, or share the link with anyone.</p>
+  </div>
+</div>
+<div class="pinvite">
+  <form method="post" action="{% url 'orgs:invite' org.id %}" class="pinvite-form">
+    {% csrf_token %}
+    <div class="fld">
+      <label for="id_emails">Email addresses</label>
+      {{ email_form.emails }}
+      <p class="app-sub" style="margin:6px 0 0;font-size:12.5px;">{{ email_form.emails.help_text }}</p>
+    </div>
+    <div class="fld">
+      <label for="id_message">Add a note <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      {{ email_form.message }}
+    </div>
+    <button type="submit" class="abtn abtn-primary">
+      <svg class="abtn-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-send"/></svg>
+      Send invitations
+    </button>
+  </form>
+  <div class="pinvite-link">
+    <div class="card-h">Or share the link</div>
+    <p class="card-lead" style="margin:4px 0 14px;">Anyone with this link can join your comp.</p>
+    <div class="copy-field">
+      <input id="inviteLink" type="text" readonly value="{{ invite_url }}">
+      <button type="button" class="abtn abtn-dark" data-copy="#inviteLink">Copy</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+</div>

@@ -79,6 +79,14 @@ update rather than a page jumping under you.
         {% elif thread.status == 'closed' %}<span class="gts-status">Closed</span>
         {% else %}<span class="gts-status warn">Waiting</span>{% endif %}
       {% endif %}
+      {% comment %}
+      The wallpaper picker, beside the details. A room's decoration is a setting
+      about the screen you are looking at, so it is reached from the screen you
+      are looking at rather than from a preferences page two clicks away.
+      {% endcomment %}
+      <button type="button" class="gtm-icbtn" data-paper-open aria-label="Chat wallpaper">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="m4 17 5-5a1.8 1.8 0 0 1 2.5 0L16 17"/><path d="m14 14 1.5-1.5a1.8 1.8 0 0 1 2.5 0L20 15"/></svg>
+      </button>
       <button type="button" class="gtm-icbtn gtm-dots" data-gtm-details
               aria-haspopup="dialog" aria-expanded="false" aria-label="Details">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>

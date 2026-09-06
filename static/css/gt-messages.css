@@ -951,7 +951,10 @@ html[data-theme="light"] .gtm-tagchip.is-admin { background: var(--m-accent); co
    exactly where the column was. The chat takes the width, which on a laptop is
    the whole point of folding it. */
 .gtm-fold {
-  position: absolute; top: 10px; left: 10px; z-index: 6;
+  /* At the RIGHT-hand end of the list column — its inner edge, where the column
+     meets the conversation, so the control is beside the thing it hides rather
+     than out at the window's margin. */
+  position: absolute; top: 10px; z-index: 6;
   width: 30px; height: 30px; display: grid; place-items: center;
   border-radius: 9px; cursor: pointer;
   background: rgba(255,255,255,.1); border: 1px solid var(--m-line-2);
@@ -967,7 +970,8 @@ html[data-theme="light"] .gtm-tagchip.is-admin { background: var(--m-accent); co
 .gtm.is-folded .gtm-nav-body { display: none; }
 .gtm.is-folded .gtm-nav { align-items: center; padding-top: 44px; }
 .gtm.is-folded .gtm-nav-head { padding: 10px 6px; border-bottom: 0; }
-.gtm.is-folded .gtm-fold svg { transform: rotate(180deg); }
+/* The hamburger means "the list" in both states, so it does not turn. A
+   chevron had to, and a control that flips is one more thing to read. */
 @media (max-width: 1080px) { .gtm-fold { display: none; } }
 
 /* ---- THE UPLOAD RING, AT THE BOTTOM ------------------------------------
@@ -1239,3 +1243,153 @@ html[data-theme="light"] .cc-emoji-tab:hover { background: rgba(15,46,34,.07); }
 /* The second attach button. Same shape as the paperclip, different job: that
    one opens on documents, this one on photos and short video. */
 .gtm-composer .cc-shot svg { stroke-width: 1.8; }
+
+/* ==========================================================================
+   FIFTH PASS — the composer on the floor, and a picker that stays in its box
+   ========================================================================== */
+
+/* ---- WHY THE COMPOSER WAS NOT AT THE BOTTOM -----------------------------
+   Reported as a large empty space underneath it, and it was one inherited
+   rule rather than anything about the flex chain.
+
+   The message list carries two classes: `gtm-scroll gt-scroll`. The second is
+   the shared self-scrolling utility used by lists on ORDINARY pages — the
+   fixtures, the ladder — where a list must not run away with the page, and it
+   caps itself at `max-height: max(320px, 62vh)`.
+
+   On this screen that cap is exactly wrong. The panel is already bounded (.gtm
+   is 100dvh minus the nav), so the conversation stopped growing at 62% of the
+   window, the composer sat directly under it, and the remaining third of the
+   panel was the empty space that got reported.
+
+   The flex chain was right the whole way down and still is — header fixed,
+   messages flexible, composer fixed — which is why this is a cap being lifted
+   and not a layout being rebuilt. Every scrolling region inside this
+   application is bounded by its own panel, so the cap is lifted for all of
+   them: the conversation, the sidebar and the member list in the details
+   panel. */
+.gtm .gt-scroll { max-height: none; }
+
+/* Stated rather than inherited, so the three parts of the column cannot be
+   re-ordered by a later rule: the messages take what is left and scroll inside
+   themselves, and the composer takes only what it needs, against the floor. */
+.gtm-chat-in { min-height: 0; }
+.gtm-chat-body { flex: 1 1 auto; min-height: 0; }
+.gtm-chat-body .gtm-scroll { flex: 1 1 auto; min-height: 0; }
+.gtm-chat-body .gtm-composer { flex: 0 0 auto; margin-top: auto; }
+/* An empty room still puts its composer on the floor, with the line sitting in
+   the space above rather than the two of them huddled at the top. */
+.gtm-chat-body .chat-none { margin: auto 0; }
+
+/* ---- WHY THE EMOJI PANEL SPILLED OVER THE CHAT BOX ----------------------
+   "When I click the emoji, it's overlapping at the bottom of the emoji box with
+   the chat box."
+
+   Arithmetic. The panel was capped at 320px, and its contents are a search box
+   (~40), a row of tabs (~37) and a grid capped at 264 — 341 plus padding. With
+   no overflow rule on the panel itself, the excess simply drew past its own
+   bottom edge, which is where the composer is.
+
+   So the panel stops declaring a height it cannot keep: it sizes to its parts,
+   the GRID carries the cap, and `overflow: hidden` means nothing can ever draw
+   outside the box again whatever is added to it later. */
+.cc-emoji-menu { max-height: none; overflow: hidden; }
+.cc-emoji-grid { max-height: min(240px, 34vh); }
+/* Clear of the row rather than touching it, and never taller than the space
+   above it — on a short window the picker scrolls instead of running off the
+   top of a panel that clips. */
+.cc-emoji-menu { bottom: calc(100% + 10px); }
+
+/* Positioned against the COLUMN, which is the only thing that knows where its
+   own right-hand edge is: the tracks are 1fr and 2fr, so any width written
+   against the shell is wrong at every window size but one. */
+.gtm-nav { position: relative; }
+.gtm-fold { left: auto; right: 10px; }
+/* Folded to a 54px strip, the button centres on it — there is no right-hand
+   edge to speak of at that width, and it is the only control left. */
+.gtm.is-folded .gtm-fold { right: 50%; transform: translateX(50%); }
+
+/* ---- ARCHIVED, ON ITS OWN LINE ------------------------------------------
+   Not in the row of tabs: that row scrolls sideways in a 280px column, and the
+   fifth item in it was off the edge on most screens — so a chat somebody had
+   archived had gone somewhere with no visible way back. */
+.gtm-arch {
+  display: flex; align-items: center; gap: 8px; margin-top: 8px;
+  padding: 8px 10px; border-radius: 10px; text-decoration: none;
+  font-size: 12.5px; font-weight: 700; color: var(--m-ink-2);
+  background: var(--m-panel-2); border: 1px solid var(--m-line);
+}
+.gtm-arch:hover { color: var(--m-ink); border-color: var(--m-line-2); }
+.gtm-arch.on { color: var(--m-accent-ink); border-color: var(--m-accent-line); }
+.gtm-arch svg {
+  width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.gtm-arch i {
+  margin-left: auto; font-style: normal; font-size: 11px;
+  padding: 1px 7px; border-radius: 100px; background: rgba(255,255,255,.12);
+}
+html[data-theme="light"] .gtm-arch i { background: rgba(15,46,34,.08); }
+.gtm-arch-note { padding: 0 10px 10px; font-size: 12px; line-height: 1.5; color: var(--m-ink-3); }
+.gtm-arch-note b { color: var(--m-ink-2); }
+
+/* ==========================================================================
+   THE CHAT WALLPAPER
+   ==========================================================================
+   Behind the conversation, never over it. The layer sits at the bottom of the
+   chat panel's stacking order and everything else — bubbles, header, composer,
+   the details panel — is drawn on top with its own background, so a photograph
+   can never come between the reader and the words.
+
+   The veil is what makes that true at any brightness: a stadium at noon and one
+   under lights are very different backgrounds for the same white text, and the
+   wash flattens both to something a bubble reads against. */
+.gtm-chat { position: relative; }
+.gtm-paper { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+.gtm-paper.is-off { display: none; }
+.gtm-paper-shot {
+  position: absolute; inset: 0; opacity: 0;
+  background-size: cover; background-position: center;
+  transition: opacity 1.4s var(--ease, ease);
+}
+.gtm-paper-shot.on { opacity: 1; }
+/* The wash. Heavier than the side strips' because text sits on this one. */
+.gtm-paper::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(rgba(11,33,24,.86), rgba(11,33,24,.92));
+}
+html[data-theme="light"] .gtm-paper::after {
+  background: linear-gradient(rgba(247,245,238,.90), rgba(247,245,238,.94));
+}
+@media (prefers-reduced-motion: reduce) { .gtm-paper-shot { transition: none; } }
+/* Everything above the paper. The conversation keeps its own ground colour
+   only where it must — the header and the composer — so the photograph shows
+   through the message area, which is the part a wallpaper is for. */
+.gtm-chat-in, .gtm-empty { position: relative; z-index: 1; }
+.gtm-chat-body .gtm-scroll { background: transparent; }
+
+/* ---- the picker ---------------------------------------------------------- */
+.paper-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+.paper-opt {
+  display: flex; flex-direction: column; gap: 4px; text-align: left;
+  padding: 8px; border-radius: 12px; cursor: pointer;
+  background: none; border: 2px solid transparent; font: inherit; color: inherit;
+}
+.paper-opt:hover { background: rgba(15,46,34,.05); }
+.paper-opt.on { border-color: var(--forest); background: rgba(45,122,58,.08); }
+.paper-thumb {
+  display: block; aspect-ratio: 16 / 10; border-radius: 8px;
+  background-size: cover; background-position: center;
+  border: 1px solid rgba(15,46,34,.14);
+}
+/* The two that are not a photograph still need to look like the thing they do:
+   a rotation, and nothing at all. */
+.paper-thumb-auto {
+  background: conic-gradient(#1B4A2C, #2D7A3A, #5AA9FF, #C79BFF, #1B4A2C);
+}
+.paper-thumb-none { background: repeating-linear-gradient(45deg, #EDEAE0 0 8px, #F7F5EE 8px 16px); }
+.paper-opt b { font-size: 13px; font-weight: 700; }
+.paper-opt i { font-style: normal; font-size: 11.5px; line-height: 1.4; color: var(--muted); }

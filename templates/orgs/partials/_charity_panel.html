@@ -1,0 +1,200 @@
+{% comment %}
+THE CHARITIES PANEL, on its own.
+
+Its own file because the same view returns it alone when a card or the room
+navigator is pressed (?pane=panel) — "when I click the charities card it loads
+not the whole page, just the part of display", and "it should not be the whole
+page loading when it's an action where we have a loading loader".
+
+Same view, same context, so what arrives on a swap cannot drift from what was
+rendered first. The links carry hx-push-url, so the address bar, the back button
+and a copied link all still work exactly as they did.
+{% endcomment %}
+<div class="ppanel">
+{% if panel == "list" %}
+{% comment %}
+THE LIST, as a table — name, logo and where they are on the web, which is what
+tells two charities of similar name apart.
+{% endcomment %}
+{% if org.charity %}
+<div class="ch-backing">
+  <span class="ch-current-label">{{ org.name }} is backing</span>
+  {% include "components/_charity_card.html" with charity=org.charity %}
+</div>
+{% endif %}
+
+<div class="ppanel-head">
+  <div>
+    <div class="card-h">Every cause {{ panel_org.name }} can pick from</div>
+    <p class="card-lead" style="margin:4px 0 0;">Yours are usable straight away. We review each before it appears for other organisations, which changes nothing for you.</p>
+  </div>
+</div>
+<div class="tbl-scroll">
+<table class="atable chtable">
+  <thead><tr><th>Charity</th><th>Website</th><th>Where from</th><th style="text-align:right;"></th></tr></thead>
+  <tbody>
+  {% for ch in ours %}
+  <tr>
+    <td class="cht-name">{% if ch.logo %}<img class="cht-logo" src="{{ ch.logo.url }}" alt="" loading="lazy" width="30" height="30">{% else %}<span class="cht-logo cht-initials" style="--ch-hue:{{ ch.tile_hue }};" aria-hidden="true">{{ ch.initials }}</span>{% endif %}<b>{{ ch.name }}</b></td>
+    <td class="cht-web">{% if ch.website %}<a href="{{ ch.website }}" target="_blank" rel="noopener">{{ ch.domain|default:ch.website }}</a>{% else %}<span class="app-sub">&mdash;</span>{% endif %}</td>
+    <td><span class="pill-role">{{ ch.is_approved|yesno:"Approved,In review" }}</span></td>
+    <td style="text-align:right;">{% if ch.can_edit %}<a class="abtn abtn-ghost abtn-sm" href="{% url 'orgs:charity_edit' org.id ch.id %}">Edit</a>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  {% for ch in vetted %}
+  <tr>
+    <td class="cht-name">{% if ch.logo %}<img class="cht-logo" src="{{ ch.logo.url }}" alt="" loading="lazy" width="30" height="30">{% else %}<span class="cht-logo cht-initials" style="--ch-hue:{{ ch.tile_hue }};" aria-hidden="true">{{ ch.initials }}</span>{% endif %}<b>{{ ch.name }}</b></td>
+    <td class="cht-web">{% if ch.website %}<a href="{{ ch.website }}" target="_blank" rel="noopener">{{ ch.domain|default:ch.website }}</a>{% else %}<span class="app-sub">&mdash;</span>{% endif %}</td>
+    <td><span class="app-sub">GoodTip's list</span></td>
+    <td style="text-align:right;">{% if ch.can_edit %}<a class="abtn abtn-ghost abtn-sm" href="{% url 'orgs:charity_edit' org.id ch.id %}">Edit</a>{% endif %}</td>
+  </tr>
+  {% empty %}
+  {% if not ours %}<tr><td colspan="4" style="text-align:center;color:var(--muted);">Nothing here yet.</td></tr>{% endif %}
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% elif panel == "add" %}
+<div class="ppanel-head">
+  <div>
+    <div class="card-h">Add a charity for {{ org.name }}</div>
+    <p class="card-lead" style="margin:4px 0 0;">Check the list first — a second row for the same cause splits its total in two. We'll fetch their logo for you.</p>
+  </div>
+</div>
+<form method="post" class="ch-inline-form">
+  {% csrf_token %}
+  <div class="msg-fld">
+    <label for="id_name"><svg aria-hidden="true"><use href="#ic-heart"/></svg>{{ form.name.label }}</label>
+    {{ form.name }}
+    {% if form.name.errors %}<div class="fld-err">{{ form.name.errors|join:" " }}</div>{% endif %}
+  </div>
+  <div class="msg-fld">
+    <label for="id_website"><svg aria-hidden="true"><use href="#ic-globe"/></svg>{{ form.website.label }}</label>
+    {{ form.website }}
+    <div class="hint">We'll guess one from the name — change it if it's not right.</div>
+    {% if form.website.errors %}<div class="fld-err">{{ form.website.errors|join:" " }}</div>{% endif %}
+  </div>
+  <button type="submit" class="abtn abtn-primary">Add charity</button>
+</form>
+
+{% elif panel == "groups" %}
+<div class="ppanel-head">
+  <div>
+    <div class="card-h">What each group backs</div>
+    <p class="card-lead" style="margin:4px 0 0;">A group that has not chosen inherits {{ org.name }}'s cause.</p>
+  </div>
+</div>
+<div class="tbl-scroll">
+<table class="atable">
+  <thead><tr><th>Group</th><th>Backing</th><th style="text-align:right;">Election</th></tr></thead>
+  <tbody>
+  {% for g in groups %}
+  <tr>
+    <td><b>{{ g.name }}</b></td>
+    <td>
+      {% if g.charity %}{{ g.charity.name }} <span class="pill-role">their own</span>
+      {% elif org.charity %}{{ org.charity.name }} <span class="pill-role">inherited</span>
+      {% else %}<span class="app-sub">Not chosen yet</span>{% endif %}
+    </td>
+    <td style="text-align:right;"><a class="abtn abtn-ghost abtn-sm" href="{% url 'orgs:group_charity_vote' org.id g.id %}">Election &rarr;</a></td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="3" style="text-align:center;color:var(--muted);">No groups yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% elif panel == "elections" %}
+{% comment %}
+EVERY BALLOT THIS ROOM HAS HELD — "when I click it I will see the votes, when
+the election was started, ended, a bar and pie chart of the results and all, and
+if it was a tie and the admin had to select, that also should be captured."
+
+The blind-vote rule still holds: an OPEN ballot shows its turnout and nothing
+else. Tallies appear once it closes, which is a promise made to members and not
+a display preference.
+{% endcomment %}
+<div class="ppanel-head">
+  <div>
+    <div class="card-h">Elections {% if panel_group %}in {{ panel_group.name }}{% else %}for {{ panel_org.name }}{% endif %}</div>
+    <p class="card-lead" style="margin:4px 0 0;">Every ballot this room has held, newest first.</p>
+  </div>
+  <a class="abtn abtn-primary" href="{% if panel_group %}{% url 'orgs:group_charity_vote' panel_org.id panel_group.id %}{% else %}{% url 'orgs:charity_vote' panel_org.id %}{% endif %}">Open the election &rarr;</a>
+</div>
+
+{% for e in elections %}
+<div class="elec">
+  <div class="elec-head">
+    <span class="elec-when">
+      Opened {{ e.vote.opened_at|date:"j M Y" }}
+      {% if e.vote.closed_at %}&middot; closed {{ e.vote.closed_at|date:"j M Y" }}{% endif %}
+    </span>
+    <span class="gts-status {% if e.vote.status == 'closed' %}ok{% elif e.vote.status == 'tied' %}warn{% endif %}">{{ e.vote.get_status_display }}</span>
+  </div>
+
+  {% if e.results %}
+  <div class="elec-body">
+    {% comment %}
+    THE WHEEL. Built as one conic-gradient in services._pie_stops, because each
+    slice has to start where the last one ended and a template cannot carry a
+    running total across a loop.
+    {% endcomment %}
+    <div class="elec-pie" style="background: {{ e.pie }};" role="img"
+         aria-label="Share of the vote by charity"></div>
+    <div class="elec-bars">
+      {% for o in e.results %}
+      <div class="elec-bar">
+        <span class="eb-name">{{ o.charity.name }}</span>
+        <span class="eb-track"><i style="width: {{ o.bar }}%; background: {{ o.colour }};"></i></span>
+        <span class="eb-n">{{ o.n }} <small>{{ o.pct }}%</small></span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="elec-facts">
+    <span><b>{{ e.stats.ballots }}</b> of {{ e.stats.eligible }} voted</span>
+    <span><b>{{ e.stats.turnout_pct }}%</b> turnout</span>
+    <span><b>{{ e.stats.abstained }}</b> didn't</span>
+    {% if e.vote.winning_charity %}<span>Winner: <b>{{ e.vote.winning_charity.name }}</b> on {{ e.stats.winner_share }}%</span>{% endif %}
+  </div>
+
+  {% else %}
+  <p class="elec-open">
+    {% if e.vote.status == 'open' or e.vote.status == 'scheduled' %}
+      Still open &mdash; <b>{{ e.ballot_count }}</b> of {{ e.eligible_count }} have voted
+      ({{ e.turnout_pct }}%). Tallies appear when it closes.
+    {% else %}
+      No ballots were cast.
+    {% endif %}
+  </p>
+  {% endif %}
+
+  {% if e.vote.tie_broken_by %}
+  {% comment %}
+  SAID PLAINLY, AND OUTSIDE THE CHART. A charity chosen by one person rather
+  than by the count is a different kind of decision, and a bare winner would
+  imply the room picked it.
+
+  Outside the tallies branch on purpose: it was inside, so a ballot with no
+  tallies to draw — no options left, or nobody voted — hid the one line that
+  explains how it was decided. A tie is a fact about the vote, not a detail of
+  its chart.
+  {% endcomment %}
+  <p class="elec-tie">
+    <svg aria-hidden="true"><use href="#ic-shield-check"/></svg>
+    Tied on the count. <b>{{ e.vote.tie_broken_by.display_name }}</b> made the
+    captain's call{% if e.vote.tie_broken_at %} on {{ e.vote.tie_broken_at|date:"j M Y" }}{% endif %}.
+  </p>
+  {% endif %}
+</div>
+{% empty %}
+<p class="card-lead" style="margin:16px 0 0;color:var(--muted);">
+  No elections here yet. Open one and every member of
+  {% if panel_group %}{{ panel_group.name }}{% else %}{{ panel_org.name }}{% endif %} gets a vote.
+</p>
+{% endfor %}
+{% endif %}
+</div>

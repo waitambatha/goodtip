@@ -863,3 +863,125 @@
   document.addEventListener('scroll', close, true);
   window.addEventListener('resize', close);
 })();
+
+/* ---------------------------------------------------------------------------
+ * THE CHAT WALLPAPER
+ *
+ * "The chat area, one can have a wallpaper ... the images that we have in our
+ * system will be changing in like 10 seconds. Give the user the ability to set
+ * a wallpaper — just one image — then the option of no image; the default is
+ * the images we have, changing every 10 seconds."
+ *
+ * Three states, one layer:
+ *
+ *   auto     the default: our photographs, crossfading every ten seconds
+ *   <key>    one photograph, held still
+ *   none     nothing drawn
+ *
+ * REMEMBERED PER BROWSER, not per account. It is a preference about how one
+ * screen looks on one machine; a column on the user table would make it a thing
+ * that syncs, needs a migration, and has to be got right on every device — for
+ * a decorative background. localStorage is wrapped because a browser with site
+ * data blocked throws on read, and a chat client that will not open because it
+ * could not remember a wallpaper is a poor trade.
+ * ------------------------------------------------------------------------- */
+(function () {
+  'use strict';
+
+  var paper = document.querySelector('[data-gtm-paper]');
+  if (!paper) return;
+  var shots = Array.prototype.slice.call(paper.querySelectorAll('[data-paper]'));
+  if (!shots.length) return;
+
+  var KEY = 'gt-chat-wallpaper';
+  var DWELL = 10000;
+  var timer = null;
+  var at = 0;
+
+  function read() {
+    try { return localStorage.getItem(KEY) || 'auto'; } catch (e) { return 'auto'; }
+  }
+  function write(v) {
+    try { localStorage.setItem(KEY, v); } catch (e) { /* not fatal */ }
+  }
+
+  function show(i) {
+    shots.forEach(function (s, n) { s.classList.toggle('on', n === i); });
+  }
+
+  function apply(choice) {
+    clearInterval(timer);
+    timer = null;
+    paper.classList.toggle('is-off', choice === 'none');
+    if (choice === 'none') return;
+
+    if (choice === 'auto') {
+      show(at % shots.length);
+      /* Ten seconds, as asked. The crossfade itself is CSS, so this only ever
+         moves a class — nothing here is animating a frame at a time. */
+      timer = setInterval(function () {
+        at = (at + 1) % shots.length;
+        show(at);
+      }, DWELL);
+      return;
+    }
+    /* A chosen photograph holds still. An unknown key — a wallpaper retired
+       since this browser last stored one — falls back to the rotation rather
+       than leaving the reader with a blank panel and no way to tell why. */
+    var want = shots.map(function (s) { return s.getAttribute('data-paper'); }).indexOf(choice);
+    if (want === -1) { write('auto'); apply('auto'); return; }
+    show(want);
+  }
+
+  function markPicked(choice) {
+    document.querySelectorAll('[data-paper-pick]').forEach(function (b) {
+      b.classList.toggle('on', b.getAttribute('data-paper-pick') === choice);
+    });
+  }
+
+  apply(read());
+  markPicked(read());
+
+  /* The sheet. Same open/close contract as the "new message" one above, so the
+     two behave identically from the keyboard. */
+  var sheet = document.getElementById('gtmPaper');
+  document.addEventListener('click', function (e) {
+    if (!sheet) return;
+    if (e.target.closest('[data-paper-open]')) {
+      sheet.hidden = false;
+      sheet.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('sheet-open');
+      return;
+    }
+    if (e.target.closest('[data-paper-close]')) {
+      sheet.hidden = true;
+      sheet.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('sheet-open');
+      return;
+    }
+    var pick = e.target.closest('[data-paper-pick]');
+    if (!pick) return;
+    var choice = pick.getAttribute('data-paper-pick');
+    write(choice);
+    apply(choice);
+    markPicked(choice);
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && sheet && !sheet.hidden) {
+      sheet.hidden = true;
+      sheet.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('sheet-open');
+    }
+  });
+
+  /* A reader who has asked for less movement gets the first photograph and no
+     rotation — a background that changes every ten seconds is exactly what that
+     setting is about. */
+  var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+  if (still && still.matches && read() === 'auto') {
+    clearInterval(timer);
+    timer = null;
+    show(0);
+  }
+})();

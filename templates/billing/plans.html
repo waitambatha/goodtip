@@ -7,9 +7,16 @@ Aug 2026) — these were the last screens without them. Outside the sheet,
 never inside it: the strips belong to the page background, and a sheet
 drawn over them is the whole point of the look.
 {% endcomment %}
+{% comment %}
+THE GREEN SHEET, like every other member screen. Reported as "I am in green
+theme and I am seeing it be cream": this template simply never declared a body
+class, so it fell through to the default cream page while its neighbours drew
+the deep sheet over the rotating strips.
+{% endcomment %}
+{% block body_class %}page-deep sheet-page{% endblock %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% block app_content %}
-<div class="app-head"><div><div class="app-eyebrow">{{ org.name }} &middot; billing</div><h1 class="app-h1">Choose your plan</h1><p class="app-sub">Priced by organisation size. Every plan includes all four codes and the full platform. GoodTip gives a share of this fee to the charity your organisation picks.</p></div></div>
+<div class="app-head is-centred is-orgfirst"><div><div class="app-eyebrow">{{ org.name }} &middot; billing</div><h1 class="app-h1">Choose your plan</h1><p class="app-sub">Priced by organisation size. Every plan includes all four codes and the full platform. GoodTip gives a share of this fee to the charity your organisation picks.</p></div></div>
 
 {% if not stripe_configured %}
 <div class="flash info" style="margin-bottom:18px;"><svg class="cic" style="width:18px;height:18px;stroke:#245b66;fill:none;flex:none;"><use href="#ic-lock"/></svg><span>Payments aren't switched on yet, your choice is saved and we'll confirm before charging.</span></div>
@@ -17,8 +24,27 @@ drawn over them is the whole point of the look.
 
 <div class="tier-cards" data-coach="plan-tiers">
   {% for t in tiers %}
-  <div class="tier {% if t.popular %}featured{% endif %} {% if current and current.tier == t.key %}current{% endif %}">
-    {% if t.popular %}<span class="tier-flag">Popular</span>{% endif %}
+  {% comment %}
+  ONE COLOUR PER PLAN, and none of them the brand's.
+
+  "The five pricing cards must each have a completely different, tasteful
+  background colour ... do not make any of them green, lime, pure white, cream
+  or beige."
+
+  Five plans in five shades of the same green was five identical cards with
+  different numbers on them, which is the one thing a pricing page must not be:
+  the whole job is to make five options feel like five choices. So each card
+  takes a soft pastel of its own — sky, lavender, peach, mist, rose — and the
+  brand keeps every mark ON them: the tick, the price, the border, the badge,
+  the button.
+
+  `data-tier` carries it rather than a class per plan, so a sixth plan added in
+  the admin gets a colour from the same list instead of rendering grey until
+  somebody remembers this file. The palette is in goodtip.css.
+  {% endcomment %}
+  <div class="tier {% if t.popular %}featured{% endif %} {% if current and current.tier == t.key %}current{% endif %}"
+       data-tier="{{ t.key }}" style="--tier-n: {{ forloop.counter0 }};">
+    {% if t.popular %}<span class="tier-flag">Most popular</span>{% endif %}
     {% if current and current.tier == t.key %}<span class="tier-current" data-coach="plan-current">Current</span>{% endif %}
     <div class="tier-name">{{ t.label }}</div>
     <div class="tier-for">{{ t.seat_label }} &middot; {{ t.audience }}</div>

@@ -8,10 +8,17 @@ Aug 2026) — these were the last screens without them. Outside the sheet,
 never inside it: the strips belong to the page background, and a sheet
 drawn over them is the whole point of the look.
 {% endcomment %}
+{% comment %}
+THE GREEN SHEET, like every other member screen. Reported as "I am in green
+theme and I am seeing it be cream": this template simply never declared a body
+class, so it fell through to the default cream page while its neighbours drew
+the deep sheet over the rotating strips.
+{% endcomment %}
+{% block body_class %}page-deep sheet-page{% endblock %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% block app_content %}
 
-<div class="app-head"><div>
+<div class="app-head is-centred is-orgfirst"><div>
   <div class="app-eyebrow">{{ org.name }}</div>
   <h1 class="app-h1">Settings</h1>
   <p class="app-sub">What {{ org.name }} tips on, and who runs it.</p>

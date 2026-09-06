@@ -7437,3 +7437,126 @@ class EmojiPickerComesFromADataFileTests(TestCase):
         self.assertIn("data-emoji-grid", html)
         # The grid arrives empty and is filled from the file.
         self.assertNotIn("😀", html)
+
+
+class CharitiesPageIsCardsAndPanelsTests(TestCase):
+    """"The same way we have done to the members page is what we will do to the
+    charities page — have the cards ... so when I click the charities card it
+    loads not the whole page, just the part of display."
+
+    And elections move here: "on the manage dropdown remove charity elections;
+    that should be absorbed in the charity."
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(
+            name="Cause Co", season=self.season, groups_enabled=True,
+        )
+        self.admin = User.objects.create_user(
+            email="cause@example.com", password="x", display_name="Admin",
+        )
+        OrgMember.objects.create(
+            user=self.admin, org=self.org, role=OrgMember.ROLE_MANAGER,
+            is_league_owner=True,
+        )
+        self.group = Group.objects.create(
+            org=self.org, name="Ops", approval_status=Group.APPROVAL_APPROVED,
+        )
+        self.client.force_login(self.admin)
+
+    def _get(self, **params):
+        return self.client.get(reverse("orgs:charities", args=[self.org.id]), params)
+
+    def test_the_cards_lead_the_page(self):
+        body = self._get().content.decode()
+        self.assertIn("pcards", body)
+        for card in ("c-members", "c-invite", "c-groups", "c-team"):
+            self.assertIn(card, body)
+
+    def test_each_card_loads_its_own_panel(self):
+        for panel, marker in [
+            ("list", "Every cause"),
+            ("add", "Add a charity for"),
+            ("groups", "What each group backs"),
+            ("elections", "Elections"),
+        ]:
+            with self.subTest(panel=panel):
+                self.assertIn(marker, self._get(panel=panel).content.decode())
+
+    def test_the_panel_can_be_fetched_on_its_own(self):
+        """"It loads not the whole page, just the part of display" — and the
+        sheet's loader is for arriving at a screen, not for changing one region
+        of one already on it."""
+        r = self._get(panel="groups", pane="panel")
+        body = r.content.decode()
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("<!DOCTYPE", body)
+        self.assertIn("What each group backs", body)
+
+    def test_an_unknown_panel_falls_back_to_the_list(self):
+        self.assertIn("Every cause", self._get(panel="nope").content.decode())
+
+    def test_a_failed_add_shows_its_own_errors(self):
+        """A rejected charity must not bounce back to the list with the errors
+        on a form nobody can see."""
+        r = self.client.post(reverse("orgs:charities", args=[self.org.id]), {"name": ""})
+        self.assertIn("Add a charity for", r.content.decode())
+
+    def test_the_room_navigator_is_there(self):
+        body = self._get().content.decode()
+        self.assertIn("pnav-rooms", body)
+        self.assertIn(self.group.name, body)
+
+    def test_elections_show_a_closed_vote_with_its_tallies(self):
+        from catalog.models import Charity
+        from .models import CharityVote, CharityVoteBallot, CharityVoteOption
+
+        a = Charity.objects.create(name="Cause A", slug="cause-a")
+        b = Charity.objects.create(name="Cause B", slug="cause-b")
+        vote = CharityVote.objects.create(
+            org=self.org, status=CharityVote.STATUS_CLOSED,
+            closed_at=timezone.now(), winning_charity=a,
+        )
+        oa = CharityVoteOption.objects.create(vote=vote, charity=a)
+        CharityVoteOption.objects.create(vote=vote, charity=b)
+        CharityVoteBallot.objects.create(vote=vote, option=oa, user=self.admin)
+
+        body = self._get(panel="elections").content.decode()
+        self.assertIn("Cause A", body)
+        self.assertIn("elec-pie", body, "the wheel is not drawn")
+        self.assertIn("conic-gradient", body, "the slices were not pre-added")
+
+    def test_a_tie_broken_by_a_person_is_said_so(self):
+        """"If it was a tie and the admin had to select, that also should be
+        captured." A bare winner would imply the room picked it."""
+        from catalog.models import Charity
+        from .models import CharityVote
+
+        c = Charity.objects.create(name="Cause T", slug="cause-t")
+        CharityVote.objects.create(
+            org=self.org, status=CharityVote.STATUS_CLOSED, closed_at=timezone.now(),
+            winning_charity=c, tie_broken_by=self.admin, tie_broken_at=timezone.now(),
+        )
+        body = self._get(panel="elections").content.decode()
+        self.assertIn("Tied on the count", body)
+        self.assertIn(self.admin.display_name, body)
+
+    def test_an_open_vote_keeps_its_tallies_hidden(self):
+        """The blind-vote rule is a promise to members, not a display choice."""
+        from catalog.models import Charity
+        from .models import CharityVote, CharityVoteBallot, CharityVoteOption
+
+        a = Charity.objects.create(name="Secret Cause", slug="secret-cause")
+        vote = CharityVote.objects.create(org=self.org, status=CharityVote.STATUS_OPEN)
+        oa = CharityVoteOption.objects.create(vote=vote, charity=a)
+        CharityVoteBallot.objects.create(vote=vote, option=oa, user=self.admin)
+        body = self._get(panel="elections").content.decode()
+        self.assertIn("Still open", body)
+        self.assertNotIn("elec-pie", body)
+
+    def test_the_manage_menu_points_at_charities_not_a_second_election_item(self):
+        body = self.client.get(reverse("dashboard")).content.decode()
+        self.assertIn(reverse("orgs:charities", args=[self.org.id]), body)
+        self.assertNotIn(reverse("orgs:charity_vote", args=[self.org.id]), body)

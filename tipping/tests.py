@@ -2712,9 +2712,17 @@ class LadderPresentationTests(TestCase):
 
     def test_the_finals_key_sits_above_the_table(self):
         """Both halves are things you need BEFORE reading the rows. Underneath,
-        they were an explanation arriving after the thing it explains."""
+        they were an explanation arriving after the thing it explains.
+
+        The wording changed and the position did not: "Top 8, finals places" was
+        removed because above a table it read as a description OF the table —
+        "it will give a user the impression we have only displayed 8 teams." It
+        says what the table IS first, and what the shading means second, so this
+        asserts on the shading gloss, which is the half this test is about.
+        """
         body = self._body()
-        self.assertLess(body.index("Top 8, finals places"), body.index('id="ladderTable"'))
+        self.assertLess(body.index("finals places"), body.index('id="ladderTable"'))
+        self.assertNotIn("Top 8, finals places", body)
 
     def test_every_club_has_a_statistics_button(self):
         """"I did not see the stats button." The name was already a link and

@@ -43,7 +43,7 @@ same size as the Ladder, otherwise it is not making sense".
 {% comment %}
 Which room this ladder is, directly under the sentence that says so.
 {% endcomment %}
-{% include "partials/room_switch.html" with noun="ladder" surface="dark" %}
+{% include "partials/room_switch.html" with noun="ladder" surface="dark" align="centre" %}
 
 {% comment %}
 WHICH COMPETITION'S LADDER. It was a bare <select> tucked into the top-right of
@@ -105,8 +105,22 @@ the bottom." Both halves are things you need BEFORE reading the rows: what the
 shading on the top eight means, and how old the figures are. Underneath, they
 were an explanation arriving after the thing it explains.
 {% endcomment %}
-<p class="lad-foot lad-head-key">
-  <span class="lad-key"><i class="k-finals"></i> Top 8, finals places</span>
+{% comment %}
+THE KEY SAYS WHAT THE SHADING IS, NOT HOW MANY ROWS THERE ARE.
+
+"Remove 'Top 8, finals places' — it will give a user the impression we have only
+displayed 8 teams on the list. Find something else that speaks that it's a
+listing of all, let it be short and centred, and it should start with the
+competition, like AFL ………"
+
+Right: a line reading "Top 8" above a table is read as a description OF the
+table. It was only ever labelling the shading on the first eight rows. So it
+names the competition and says the table is all of it, and the shading keeps its
+own short gloss where it cannot be mistaken for a row count.
+{% endcomment %}
+<p class="lad-foot lad-head-key is-centred">
+  <span class="lad-all">{{ selected_series.name }} &middot; every club, this season</span>
+  <span class="lad-key"><i class="k-finals"></i> shaded rows are the finals places</span>
   {% if updated_at %}<span class="lad-when">Updated {{ updated_at|timesince }} ago</span>
   {% elif at_round %}<span class="lad-when">As it stood after round {{ at_round }}</span>{% endif %}
 </p>

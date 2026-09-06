@@ -269,9 +269,21 @@ goodtip.css.
               what already exists, not a free-text field offered to someone
               ninety seconds into their first visit.
               {% endcomment %}
+              {% comment %}
+              ONE ENTRY, NOT TWO — "on the manage dropdown remove charity
+              elections; that should be absorbed in the charity, that makes more
+              sense."
+
+              It does: a ballot is a choice BETWEEN the causes on that page, and
+              two menu items for one subject meant the result of an election and
+              the list it was drawn from were never on screen together. The
+              Charities screen now carries an Elections card holding every
+              ballot the room has held and the way into the next one, so nothing
+              left the product — it moved to where its subject already was.
+              {% endcomment %}
               <a href="{% url 'orgs:charities' primary_org.id %}">
                 <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-heart"/></svg></span>
-                <span class="mi-txt"><b>Charities</b><i>The causes you can pick and vote on</i></span>
+                <span class="mi-txt"><b>Charities</b><i>The causes, who backs what, and elections</i></span>
               </a>
               {% comment %}
               Billing is narrower than the rest of this menu — a Team Manager
@@ -292,10 +304,7 @@ goodtip.css.
                 <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-coins"/></svg></span>
                 <span class="mi-txt"><b>Season summary</b><i>Entries, donations and totals</i></span>
               </a>
-              <a href="{% url 'orgs:charity_vote' primary_org.id %}">
-                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-heart"/></svg></span>
-                <span class="mi-txt"><b>Charity election</b><i>Set it up, or see how the vote is going</i></span>
-              </a>
+
             </div>
           </div>
           {% endif %}
@@ -432,7 +441,7 @@ goodtip.css.
           <span class="sheet-label">Manage</span>
           <a href="{% url 'orgs:members' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-users"/></svg><span>Members</span></a>
           <a href="{% url 'billing:season_summary' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-coins"/></svg><span>Season summary</span></a>
-          <a href="{% url 'orgs:charity_vote' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-heart"/></svg><span>Charity election</span></a>
+          <a href="{% url 'orgs:charities' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-heart"/></svg><span>Charities</span></a>
         {% endif %}
       {% endif %}
       {% if user.is_staff %}<a href="{% url 'manage:overview' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Admin</span></a>{% endif %}

@@ -7,11 +7,42 @@ Aug 2026) — these were the last screens without them. Outside the sheet,
 never inside it: the strips belong to the page background, and a sheet
 drawn over them is the whole point of the look.
 {% endcomment %}
+{% comment %}
+THE GREEN SHEET, like every other member screen. Reported as "I am in green
+theme and I am seeing it be cream": this template simply never declared a body
+class, so it fell through to the default cream page while its neighbours drew
+the deep sheet over the rotating strips.
+{% endcomment %}
+{% block body_class %}page-deep sheet-page{% endblock %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% block nav_manage %}on{% endblock %}
 {% block app_content %}
-<div class="app-head"><div><div class="app-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div><h1 class="app-h1">Season summary</h1></div>
+<div class="app-head is-centred is-orgfirst"><div><div class="app-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div><h1 class="app-h1">Season summary</h1></div>
   {% if subscription %}<a href="{% url 'billing:receipt' org.id %}" class="abtn abtn-ghost abtn-sm">Platform receipt</a>{% endif %}</div>
+
+{% comment %}
+THE ROOM NAVIGATOR — "so I can be able to move from one organisation and group
+summary without using the main menu."
+
+Only the organisations this person runs: the view's own guard is
+is_creator_admin, so a row for one they merely play in would be a door that
+answers 403. There is no per-group season summary — the donation pool is settled
+for the organisation — so this navigator has the one row rather than inventing a
+second that leads nowhere.
+{% endcomment %}
+{% if panel_orgs|length > 1 %}
+<div class="pnav pnav-rooms">
+  <div class="pnav-row">
+    <span class="pnav-lab">Organisation</span>
+    <div class="pnav-opts">
+      {% for o in panel_orgs %}
+      <a class="pnav-opt{% if o.id == panel_org.id %} on{% endif %}"
+         href="{% url 'billing:season_summary' o.id %}">{{ o.name }}</a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
 
 {% if not summary %}
   <div class="card pad-lg" style="text-align:center;"><div class="card-h">Nothing to settle yet</div><p class="card-lead">This league hasn't raised anything for {{ org.charity_display }} yet this season.</p></div>

@@ -1698,7 +1698,7 @@ def members_view(request, org_id: int):
         ).order_by("name")
     ) if panel == "groups" else []
 
-    return render(request, "orgs/members.html", {
+    ctx = {
         "panel": panel,
         "panel_orgs": panel_orgs,
         "panel_org": panel_org,
@@ -1713,7 +1713,12 @@ def members_view(request, org_id: int):
         "child_org_count": len(child_groups or []),
         "role_choices": OrgMember.ROLE_CHOICES,
         "is_owner": me.is_league_owner,
-    })
+    }
+    # THE PANEL ALONE, for a card press. The sheet's loader is for arriving at a
+    # screen, not for changing one region of one that is already on it.
+    if request.GET.get("pane") == "panel":
+        return render(request, "orgs/partials/_members_panel.html", ctx)
+    return render(request, "orgs/members.html", ctx)
 
 
 @login_required
@@ -2804,14 +2809,91 @@ def org_charities_view(request, org_id: int):
         .select_related("charity")
         .order_by("name")
     )
-    return render(request, "orgs/charities.html", {
+    # ---- WHICH PANEL, AND WHOSE.
+    #
+    # ASKED FOR: "the same way we have done to the members page is what we will
+    # do to the charities page — have the cards, like create, charities, what
+    # each group backs. So when I click the charities card it loads not the
+    # whole page, just the part of display."
+    #
+    # Same contract as the members screen: a query parameter, so every panel is
+    # bookmarkable, the back button walks between them, and none of it needs
+    # JavaScript. See orgs/members.html for the pattern.
+    panel = request.GET.get("panel", "list")
+    if panel not in {"list", "add", "groups", "elections"}:
+        panel = "list"
+    # A form that failed validation has something to say, so it wins over the
+    # panel in the URL — otherwise submitting a bad charity bounces you back to
+    # the list with the errors on a form nobody can see.
+    if form.errors:
+        panel = "add"
+
+    # ---- THE ROOM NAVIGATOR, the one the leaderboard and the ladder carry.
+    #
+    # "Have the section where we have the organisation and under it we have
+    # groups being displayed depending on the organisation I clicked ... so I
+    # can click an organisation while in the charity page and see the charity,
+    # and be able to move from organisation to group that I am an admin."
+    from .services import charity_votes_for_room
+
+    panel_orgs = [
+        m.org for m in
+        OrgMember.objects.filter(user=request.user, org__in=_manageable_orgs(request.user))
+        .select_related("org").order_by("org__name")
+    ]
+    if org not in panel_orgs:
+        panel_orgs.insert(0, org)
+    porg_id = request.GET.get("porg")
+    panel_org = next((o for o in panel_orgs if str(o.id) == porg_id), org)
+    nav_groups = list(
+        Group.objects.filter(org=panel_org, approval_status=Group.APPROVAL_APPROVED)
+        .select_related("charity").order_by("name")
+    )
+    pgroup_id = request.GET.get("pgroup")
+    panel_group = next((g for g in nav_groups if str(g.id) == pgroup_id), None)
+
+    elections = []
+    if panel == "elections":
+        elections = charity_votes_for_room(
+            request.user, panel_org, panel_group, ballot_context=_ballot_context,
+        )
+
+    ctx = {
         "org": org,
         "form": form,
         "ours": ours,
         "vetted": vetted,
         "groups": groups,
         "groups_enabled": org.groups_enabled,
-    })
+        "panel": panel,
+        # Counted in the view: a template filter chain cannot add two lengths.
+        "charity_count": len(ours) + len(vetted),
+        "panel_orgs": panel_orgs,
+        "panel_org": panel_org,
+        "panel_groups": nav_groups,
+        "panel_group": panel_group,
+        "elections": elections,
+    }
+    # THE PANEL ALONE, for a card or a room press — "when I click the charities
+    # card it loads not the whole page, just the part of display."
+    if request.GET.get("pane") == "panel":
+        return render(request, "orgs/partials/_charity_panel.html", ctx)
+    return render(request, "orgs/charities.html", ctx)
+
+
+def _manageable_orgs(user):
+    """The organisations this person may look at a charity screen for.
+
+    The navigator is a way ACROSS the organisations you run, not a directory of
+    every one you have ever joined — "move from organisation to group that I am
+    an admin". So it asks the same question the page's own guard does, once,
+    for every row it is about to draw.
+    """
+    return [
+        m.org_id for m in
+        OrgMember.objects.filter(user=user).select_related("org")
+        if _can_manage(user, m.org)
+    ]
 
 
 def _can_edit_charity(user, org, charity) -> bool:
@@ -3192,7 +3274,8 @@ def _follow_context(request, thread) -> None:
 def _messages_context(request, org, thread):
     """Everything the two panels need, for both entry points."""
     from orgs.services import (
-        attach_chat_state, contacts_for, conversations_for, room_members,
+        attach_chat_state, chat_wallpapers, contacts_for, conversations_for,
+        room_members,
     )
 
     show = "archived" if request.GET.get("show") == "archived" else "active"
@@ -3238,10 +3321,19 @@ def _messages_context(request, org, thread):
     attach_chat_state(
         request.user, orgs=my_orgs, groups=my_groups, contacts=contacts,
     )
+    # HOW MANY ARE PUT AWAY. The link to them used to be the last item in a
+    # row of five that scrolls sideways in a 280px column — so on most screens
+    # it was simply off the edge, which is why "I have archived a chat and I do
+    # not see it". It has its own line now, and a count, so it is visible
+    # whether or not anybody thinks to scroll a row of tabs.
+    archived_count = len(
+        conversations_for(request.user, keep=thread.id if thread else None, show="archived")
+    ) if show != "archived" else len(rows)
     ctx = {
         "org": org,
         "conversations": rows,
         "show": show,
+        "archived_count": archived_count,
         # The tab counts, worked out once here — the template cannot count a
         # filtered list without looping it four times.
         "count_all": len(rows),
@@ -3252,6 +3344,12 @@ def _messages_context(request, org, thread):
         "thread": thread,
         "my_orgs": my_orgs,
         "my_groups": my_groups,
+        # THE WALLPAPER CHOICES. Our own photographs, the same ones the side
+        # strips rotate through, so the messages screen borrows the product's
+        # imagery rather than asking anybody to supply their own — no upload
+        # endpoint, no storage, and no moderation question for a decorative
+        # background. See templates/orgs/messages.html.
+        "wallpapers": chat_wallpapers(),
         "contacts": contacts,
         "contacts_total": contacts_total,
         "contacts_more": contacts_more,

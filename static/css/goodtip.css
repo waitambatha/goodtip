@@ -15350,7 +15350,18 @@ html[data-theme="dark"] .sched { --sched-pick: invert(1) brightness(1.6); }
    token still applies there. The chips and tags sit on white instead of cream,
    where the same --code-ink reads slightly hotter than it should; nothing else
    changes, so this is a tint adjustment rather than a second palette. */
-html[data-theme="light"] .sfilter-chip[data-code] { background: rgba(255,255,255,.96); }
+/* THE CHIPS KEEP THEIR CODE'S COLOUR IN LIGHT MODE TOO.
+   Reported as: "the colour is white — let them carry their colours in the white
+   theme; second, the text should be visible, it's not."
+
+   Both halves were one line. This rule repainted the chip near-white and left
+   `color: var(--code-on)`, which is #FFFFFF — white type on a white chip, so
+   AFL / AFLW / NRL / NRLW were four blank pills. The fill was overridden on the
+   reasoning that --code-ink "reads slightly hotter on white than on cream",
+   which is a tint judgement that cost the control its entire legibility.
+
+   So the override goes: the chip is its code's ink in both themes, with white
+   type on it, which is the same contrast the dark theme has always had. */
 /* The tag is a solid fill in both themes now, so there is nothing here to
    soften — it was a tint that needed a different bed and no longer is one. */
 
@@ -16973,3 +16984,213 @@ html[data-theme="light"] .gt-app .dept-hero.is-centred .dh-word { color: var(--l
    near-white on cream: "when it's in light mode they cannot be seen." */
 html[data-theme="light"] .gt-app .dept-hero .dh-lead { color: var(--lt-quiet); }
 html[data-theme="light"] .gt-app .dept-hero .dh-copy h1 { color: var(--lt-ink); }
+
+/* ==========================================================================
+   MY TIPS / LADDER — the headers people asked to have centred
+   ========================================================================== */
+
+/* "That text, let it be centered, and the words My tips you can increase its
+   size a little bit." The org line already outranks it (is-orgfirst); this
+   lifts the word itself so the pair reads as a title and a subtitle rather than
+   a title and a caption. */
+.gt-head.is-orgfirst .gh-lead { margin-left: auto; margin-right: auto; }
+.sheet-page .gt-head.is-orgfirst h1,
+.gt-head.is-orgfirst h1 { font-size: clamp(16px, 2vw, 22px); letter-spacing: .14em; }
+
+/* ---- THE LADDER'S KEY ----------------------------------------------------
+   Centred, and in two short parts: what the table IS, then what the shading
+   means. "Top 8, finals places" sat above the rows and read as a description of
+   them — as though eight were all that had been listed. */
+.lad-head-key.is-centred {
+  display: flex; justify-content: center; align-items: center;
+  gap: 8px 18px; flex-wrap: wrap; text-align: center;
+}
+.lad-all { font-weight: 700; color: var(--cream); }
+html[data-theme="light"] .gt-app .lad-all { color: var(--lt-ink); }
+
+/* ==========================================================================
+   THE PLANS — five plans, five identities
+   ==========================================================================
+   "The five pricing cards must each have a completely different, tasteful
+   background colour ... do NOT make any of them green, lime, pure white, cream
+   or beige."
+
+   They were five shades of the same green, deepening across the row, with the
+   featured one inverted to the deep sheet. Five options that differ only in
+   saturation are five rows of a table wearing card borders — and the one job of
+   a pricing page is to make five choices feel like five choices.
+
+   So each takes a soft pastel of its own, none of them a brand colour, and the
+   brand keeps every MARK on top of them: the tick, the price, the border, the
+   badge and the button. That is also what stops five colours reading as five
+   different products — the ink is the same on all of them.
+
+   THE COLOURS CARRY ACROSS BOTH THEMES, which the client asked for explicitly.
+   They are set once here on the plain selector rather than in a light block and
+   a dark block, so there is nothing to keep in step. */
+.tier[data-tier] {
+  --tier-bg: #EAF1FA; --tier-edge: #9DBBDD; --tier-ink: #123A5E;
+}
+.tier:nth-child(1) { --tier-bg: #E8F1FB; --tier-edge: #9CBEE2; --tier-ink: #12496F; }  /* sky      */
+.tier:nth-child(2) { --tier-bg: #EFEAFA; --tier-edge: #B4A5E0; --tier-ink: #45327D; }  /* lavender */
+.tier:nth-child(3) { --tier-bg: #FCEEE6; --tier-edge: #E6B79C; --tier-ink: #8A4620; }  /* peach    */
+.tier:nth-child(4) { --tier-bg: #E9EEF2; --tier-edge: #A9BCC9; --tier-ink: #2C4655; }  /* mist     */
+.tier:nth-child(5) { --tier-bg: #FBEAEE; --tier-edge: #E3A8B7; --tier-ink: #8A2F47; }  /* rose     */
+
+/* Rewritten rather than patched: the old rules painted the background on
+   :nth-child and the featured card on .featured, and a patch would have left
+   two systems fighting over the same box. */
+.tier[data-tier] {
+  background: var(--tier-bg);
+  border: 1px solid var(--tier-edge);
+  border-top: 4px solid var(--tier-edge);
+  border-radius: 20px; padding: 28px 22px 24px;
+  box-shadow: 0 10px 24px -18px rgba(15,46,34,.5);
+  color: var(--tier-ink);
+}
+.tier[data-tier] .tier-name { color: var(--tier-ink); font-size: 19px; }
+.tier[data-tier] .tier-for { color: var(--tier-ink); opacity: .72; }
+/* The price is the biggest thing on the card, and it is the one place the
+   forest green appears at size — so the row reads as one product however many
+   colours it is wearing. */
+.tier[data-tier] .tier-price { color: var(--forest); font-size: 40px; }
+.tier[data-tier] .tier-price span,
+.tier[data-tier] .tier-per { color: var(--tier-ink); opacity: .66; }
+.tier[data-tier] .tier-feats li { color: var(--tier-ink); }
+.tier[data-tier] .tk { color: var(--forest); font-weight: 800; }
+.tier[data-tier] .tier-cta {
+  background: var(--forest); color: #fff; border-radius: 12px;
+  padding: 13px; font-size: 12.5px;
+}
+.tier[data-tier] .tier-cta:hover { background: var(--deep); }
+
+/* THE FEATURED PLAN KEEPS ITS OWN COLOUR and stands out by weight instead —
+   "make Growth the featured plan, but do NOT give it a green background;
+   instead make it stand out with a stronger dark-green border, subtle shadow,
+   and a MOST POPULAR badge in GoodTip lime." */
+.tier[data-tier].featured {
+  border-color: var(--forest); border-top-color: var(--forest); border-width: 2px;
+  box-shadow: 0 18px 40px -22px rgba(15,46,34,.75);
+  transform: translateY(-6px);
+}
+.tier[data-tier].featured .tier-cta { background: var(--deep); }
+.tier[data-tier] .tier-flag {
+  background: var(--lime); color: var(--deep);
+  font-family: var(--mark); font-weight: 800; font-size: 10px;
+  letter-spacing: .12em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 100px;
+}
+/* Equal heights, and enough air between them that five cards read as five. */
+.tier-cards { align-items: stretch; gap: 18px; }
+.tier[data-tier] .tier-feats { flex: 1 1 auto; }
+@media (max-width: 900px) {
+  .tier[data-tier].featured { transform: none; }
+}
+
+/* On the deep sheet the pastels are the lightest thing on the page, which is
+   what makes them read as cards rather than as panels. Only the shadow needs
+   to change: a dark shadow under a pale card on a dark ground does nothing. */
+.sheet-page .tier[data-tier] { box-shadow: 0 14px 30px -18px rgba(0,0,0,.6); }
+.sheet-page .tier[data-tier].featured { box-shadow: 0 20px 44px -20px rgba(0,0,0,.75); }
+
+/* ==========================================================================
+   CHARITIES — the table, and the elections panel
+   ========================================================================== */
+.pnav-rooms { margin-bottom: 18px; }
+.ch-backing {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 14px 16px; margin-bottom: 18px;
+  border-radius: var(--gt-r-sm); background: rgba(45,122,58,.07);
+  border: 1px solid var(--gt-hair);
+}
+.cht-name { display: flex; align-items: center; gap: 10px; }
+.cht-logo {
+  width: 30px; height: 30px; flex: none; border-radius: 8px; object-fit: contain;
+  background: #fff;
+}
+.cht-initials {
+  display: grid; place-items: center; font-size: 11px; font-weight: 800;
+  background: hsl(var(--ch-hue, 140) 45% 92%); color: hsl(var(--ch-hue, 140) 55% 28%);
+}
+.cht-web a { color: var(--forest); font-size: 13px; }
+.ch-inline-form { max-width: 560px; }
+.ch-inline-form .msg-fld { margin-bottom: 16px; }
+
+/* ---- ONE ELECTION -------------------------------------------------------
+   "When I click it I will see the votes, when the election was started, ended,
+   a bar and pie chart of the results and all." */
+.elec { padding: 18px 0; border-top: 1px solid var(--gt-hair); }
+.elec:first-of-type { border-top: 0; padding-top: 6px; }
+.elec-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.elec-when { font-size: 13px; color: var(--muted); }
+.elec-body {
+  display: grid; grid-template-columns: 148px minmax(0, 1fr);
+  gap: 22px; align-items: center;
+}
+@media (max-width: 640px) { .elec-body { grid-template-columns: 1fr; justify-items: center; } }
+/* The wheel is one conic-gradient built in services._pie_stops — each slice has
+   to begin where the last ended, which a template cannot accumulate. The hole
+   in the middle is a mask rather than a second element on top, so the card's
+   own background shows through whatever it is. */
+.elec-pie {
+  width: 148px; height: 148px; border-radius: 50%;
+  -webkit-mask: radial-gradient(circle, transparent 46%, #000 47%);
+  mask: radial-gradient(circle, transparent 46%, #000 47%);
+}
+.elec-bars { display: grid; gap: 9px; }
+.elec-bar { display: grid; grid-template-columns: minmax(0, 1fr) 3fr auto; gap: 12px; align-items: center; }
+.eb-name { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eb-track { height: 10px; border-radius: 100px; background: rgba(15,46,34,.09); overflow: hidden; }
+.eb-track i { display: block; height: 100%; border-radius: 100px; }
+.eb-n { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.eb-n small { font-weight: 400; color: var(--muted); }
+.elec-facts {
+  display: flex; gap: 8px 22px; flex-wrap: wrap; margin-top: 16px;
+  font-size: 13px; color: var(--muted);
+}
+.elec-facts b { color: var(--ink); font-size: 15px; }
+.elec-tie {
+  display: flex; align-items: center; gap: 9px; margin-top: 14px;
+  padding: 11px 13px; border-radius: 10px; font-size: 13px; line-height: 1.5;
+  background: rgba(200,241,53,.14); border: 1px solid rgba(45,122,58,.24);
+}
+.elec-tie svg { width: 16px; height: 16px; flex: none; fill: currentColor; }
+.elec-open { font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+
+/* ---- THE DEEP SHEET ------------------------------------------------------
+   "Make sure every text in green theme is strong white so I can easily see."
+   These panels are drawn on the green sheet, where the cream-card inks they
+   were written for are the least readable thing on the page. */
+.sheet-page .ppanel { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); }
+.sheet-page .ppanel,
+.sheet-page .ppanel .card-h,
+.sheet-page .ppanel .atable td,
+.sheet-page .ppanel .atable th,
+.sheet-page .eb-name,
+.sheet-page .eb-n,
+.sheet-page .elec-facts b { color: #FFFFFF; }
+.sheet-page .ppanel .card-lead,
+.sheet-page .ppanel .app-sub,
+.sheet-page .elec-when,
+.sheet-page .elec-facts,
+.sheet-page .elec-open,
+.sheet-page .eb-n small { color: rgba(232,228,213,.82); }
+.sheet-page .ppanel .atable tr { border-color: rgba(255,255,255,.12); }
+.sheet-page .eb-track { background: rgba(255,255,255,.14); }
+.sheet-page .cht-web a { color: var(--lime); }
+.sheet-page .ch-backing { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.14); }
+.sheet-page .pnav-opt { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.16); color: #fff; }
+.sheet-page .pnav-opt.on { background: var(--lime); border-color: var(--lime); color: var(--deep); }
+.sheet-page .pnav-lab { color: rgba(232,228,213,.7); }
+.sheet-page .pnav-row + .pnav-row { border-color: rgba(255,255,255,.14); }
+.sheet-page .pcard { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.16); color: #fff; }
+.sheet-page .pcard .ocard-txt i, .sheet-page .pcard i { color: #fff; opacity: .9; }
+.sheet-page .pcard.on { color: #fff; }
+
+/* The panel while its replacement is in flight. A dim rather than a spinner:
+   the box is already the right shape and in the right place, and what is
+   changing is its contents. */
+.ppanel.is-swapping { opacity: .55; transition: opacity .12s var(--ease); }
