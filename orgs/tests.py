@@ -7295,6 +7295,22 @@ class MembersPageLeadsWithItsCountsTests(TestCase):
         self.assertEqual(r.context["group_count"], 0)
         self.assertEqual(r.context["child_org_count"], 0)
 
+    def test_the_member_list_is_drawn_as_the_ladders_board(self):
+        """"I did want it to be like a table, and it was — I do not know why you
+        are displaying it like that, and also its column headers are not
+        visible."
+
+        Both halves were one selector: `.gt-board .gb-head` is two classes, so a
+        plain `.mb-board` override lost to it and the board kept the ladder's
+        four tracks for three cells. Every row landed in the wrong column and the
+        last heading fell off the end.
+        """
+        body = self._body()
+        self.assertIn("gt-board", body)
+        self.assertIn("mb-board", body)
+        for heading in ("Member", "Roles", "Joined"):
+            self.assertIn(f"<span>{heading}</span>", body)
+
     def test_the_member_list_is_read_only(self):
         """The role picker moved into Team management; the list is facts."""
         body = self._body()

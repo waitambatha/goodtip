@@ -29,30 +29,41 @@ tells two charities of similar name apart.
     <p class="card-lead" style="margin:4px 0 0;">Yours are usable straight away. We review each before it appears for other organisations, which changes nothing for you.</p>
   </div>
 </div>
-<div class="tbl-scroll">
-<table class="atable chtable">
-  <thead><tr><th>Charity</th><th>Website</th><th>Where from</th><th style="text-align:right;"></th></tr></thead>
-  <tbody>
+{% comment %}
+THE LADDER'S BOARD, not a bare table — "the table that I see in the ladder, that
+design". Same component the ladder and the members list use, so a table means
+the same thing on every screen in the product.
+{% endcomment %}
+<div class="gt-board gt-listwrap ch-board">
+  <div class="gb-head">
+    <span>Charity</span><span>Website</span><span>Where from</span><span></span>
+  </div>
+  <div class="gt-scroll gb-rows">
   {% for ch in ours %}
-  <tr>
-    <td class="cht-name">{% if ch.logo %}<img class="cht-logo" src="{{ ch.logo.url }}" alt="" loading="lazy" width="30" height="30">{% else %}<span class="cht-logo cht-initials" style="--ch-hue:{{ ch.tile_hue }};" aria-hidden="true">{{ ch.initials }}</span>{% endif %}<b>{{ ch.name }}</b></td>
-    <td class="cht-web">{% if ch.website %}<a href="{{ ch.website }}" target="_blank" rel="noopener">{{ ch.domain|default:ch.website }}</a>{% else %}<span class="app-sub">&mdash;</span>{% endif %}</td>
-    <td><span class="pill-role">{{ ch.is_approved|yesno:"Approved,In review" }}</span></td>
-    <td style="text-align:right;">{% if ch.can_edit %}<a class="abtn abtn-ghost abtn-sm" href="{% url 'orgs:charity_edit' org.id ch.id %}">Edit</a>{% endif %}</td>
-  </tr>
+  <div class="gb-row">
+    <span class="gb-who">
+      <span class="gb-av">{% if ch.logo %}<img src="{{ ch.logo.url }}" alt="" loading="lazy">{% else %}{{ ch.initials }}{% endif %}</span>
+      <span class="gb-name">{{ ch.name }}</span>
+    </span>
+    <span class="cht-web">{% if ch.website %}<a href="{{ ch.website }}" target="_blank" rel="noopener">{{ ch.domain|default:ch.website }}</a>{% else %}&mdash;{% endif %}</span>
+    <span><span class="pill-role">{{ ch.is_approved|yesno:"Approved,In review" }}</span></span>
+    <span class="cht-act">{% if ch.can_edit %}<a class="abtn abtn-ghost abtn-sm" href="{% url 'orgs:charity_edit' org.id ch.id %}">Edit</a>{% endif %}</span>
+  </div>
   {% endfor %}
   {% for ch in vetted %}
-  <tr>
-    <td class="cht-name">{% if ch.logo %}<img class="cht-logo" src="{{ ch.logo.url }}" alt="" loading="lazy" width="30" height="30">{% else %}<span class="cht-logo cht-initials" style="--ch-hue:{{ ch.tile_hue }};" aria-hidden="true">{{ ch.initials }}</span>{% endif %}<b>{{ ch.name }}</b></td>
-    <td class="cht-web">{% if ch.website %}<a href="{{ ch.website }}" target="_blank" rel="noopener">{{ ch.domain|default:ch.website }}</a>{% else %}<span class="app-sub">&mdash;</span>{% endif %}</td>
-    <td><span class="app-sub">GoodTip's list</span></td>
-    <td style="text-align:right;">{% if ch.can_edit %}<a class="abtn abtn-ghost abtn-sm" href="{% url 'orgs:charity_edit' org.id ch.id %}">Edit</a>{% endif %}</td>
-  </tr>
+  <div class="gb-row">
+    <span class="gb-who">
+      <span class="gb-av">{% if ch.logo %}<img src="{{ ch.logo.url }}" alt="" loading="lazy">{% else %}{{ ch.initials }}{% endif %}</span>
+      <span class="gb-name">{{ ch.name }}</span>
+    </span>
+    <span class="cht-web">{% if ch.website %}<a href="{{ ch.website }}" target="_blank" rel="noopener">{{ ch.domain|default:ch.website }}</a>{% else %}&mdash;{% endif %}</span>
+    <span class="cht-from">GoodTip's list</span>
+    <span class="cht-act">{% if ch.can_edit %}<a class="abtn abtn-ghost abtn-sm" href="{% url 'orgs:charity_edit' org.id ch.id %}">Edit</a>{% endif %}</span>
+  </div>
   {% empty %}
-  {% if not ours %}<tr><td colspan="4" style="text-align:center;color:var(--muted);">Nothing here yet.</td></tr>{% endif %}
+  {% if not ours %}<div class="gb-empty">Nothing here yet.</div>{% endif %}
   {% endfor %}
-  </tbody>
-</table>
+  </div>
 </div>
 
 {% elif panel == "add" %}

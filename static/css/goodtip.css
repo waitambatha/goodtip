@@ -16878,12 +16878,32 @@ html[data-theme="light"] .gt-app .app-head.is-orgfirst .app-h1 { color: var(--lt
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 16px; flex-wrap: wrap; margin-bottom: 16px;
 }
-/* The ladder's board, inside a card that already has padding and a frame. */
+/* ---- THE LADDER'S BOARD, WITH THREE COLUMNS INSTEAD OF FOUR --------------
+   `.gt-board .gb-head` is two classes, so a plain `.mb-board .gb-head` lost to
+   it and the members board kept the ladder's `58px 1fr 110px 90px` — four
+   tracks for three cells. Every row landed in the wrong column and the last
+   heading fell off the end, which is why the table did not look like a table
+   and its headings could not be found.
+
+   `.gt-board.mb-board` is three, so it wins. Stated once for the head and the
+   rows together, because a head on a different grid from its rows is the same
+   bug wearing a different hat. */
 .ppanel .mb-board { border: 0; background: none; }
-.mb-board .gb-head, .mb-board .gb-row { grid-template-columns: minmax(0,1fr) auto 120px; }
+.gt-board.mb-board .gb-head,
+.gt-board.mb-board .gb-row { grid-template-columns: minmax(0, 1fr) auto 120px; }
+/* The last column is right-aligned in the head as well as the rows — it was an
+   inline style on the heading alone, so the two disagreed the moment the rows
+   were restyled. */
+.gt-board.mb-board .gb-head > :last-child { text-align: right; }
 .mb-roles { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
-.mb-when { text-align: right; color: var(--muted); font-size: 13px; white-space: nowrap; }
-.mb-board .gb-name small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
+.mb-when { text-align: right; font-size: 13px; white-space: nowrap; }
+.gt-board.mb-board .gb-name { display: flex; flex-direction: column; gap: 1px; }
+.gt-board.mb-board .gb-name small { font-weight: 400; font-size: 12px; opacity: .72; }
+@media (max-width: 700px) {
+  .gt-board.mb-board .gb-head,
+  .gt-board.mb-board .gb-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .gt-board.mb-board .mb-when { display: none; }
+}
 
 /* ---- THE ORGANISATION → GROUPS NAVIGATOR --------------------------------
    "The first one been the organisations I have, then if I click that
@@ -17160,37 +17180,164 @@ html[data-theme="light"] .gt-app .lad-all { color: var(--lt-ink); }
 .elec-tie svg { width: 16px; height: 16px; flex: none; fill: currentColor; }
 .elec-open { font-size: 13.5px; color: var(--muted); line-height: 1.6; }
 
-/* ---- THE DEEP SHEET ------------------------------------------------------
-   "Make sure every text in green theme is strong white so I can easily see."
-   These panels are drawn on the green sheet, where the cream-card inks they
-   were written for are the least readable thing on the page. */
-.sheet-page .ppanel { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); }
-.sheet-page .ppanel,
-.sheet-page .ppanel .card-h,
-.sheet-page .ppanel .atable td,
-.sheet-page .ppanel .atable th,
-.sheet-page .eb-name,
-.sheet-page .eb-n,
-.sheet-page .elec-facts b { color: #FFFFFF; }
-.sheet-page .ppanel .card-lead,
-.sheet-page .ppanel .app-sub,
-.sheet-page .elec-when,
-.sheet-page .elec-facts,
-.sheet-page .elec-open,
-.sheet-page .eb-n small { color: rgba(232,228,213,.82); }
-.sheet-page .ppanel .atable tr { border-color: rgba(255,255,255,.12); }
-.sheet-page .eb-track { background: rgba(255,255,255,.14); }
+/* ---- LEGIBILITY, STATED FOR BOTH THEMES ----------------------------------
+   "When it's green the text should be white and huge; if light theme have black
+   and let them be huge." Reported as 80% unreadable in light and 20% in green,
+   which is what happens when a panel written for a cream card is dropped onto
+   the deep sheet and then half-corrected: some inks were fixed for the green
+   and the light theme inherited the fixes.
+
+   So the panel names its own ink ONCE, as a pair of tokens, and everything
+   inside reads them. One place to change, and neither theme can be left behind
+   when the other is adjusted. */
+.ppanel {
+  --pp-ink: var(--ink);
+  --pp-quiet: var(--muted);
+  --pp-line: var(--gt-hair);
+  color: var(--pp-ink);
+}
+.sheet-page .ppanel {
+  --pp-ink: #FFFFFF;
+  --pp-quiet: rgba(232,228,213,.86);
+  --pp-line: rgba(255,255,255,.16);
+  background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14);
+}
+html[data-theme="light"] .gt-app .ppanel,
+html[data-theme="light"] .gt-app.sheet-page .ppanel {
+  --pp-ink: #10241B;
+  --pp-quiet: #47554D;
+  --pp-line: rgba(15,46,34,.14);
+  background: #FFFFFF; border-color: rgba(15,46,34,.12);
+}
+
+/* Everything that carries words. Bigger as asked — these were 13px captions on
+   a screen people are reading a list from. */
+.ppanel, .ppanel .card-h,
+.ppanel .atable td, .ppanel .atable th,
+.ppanel .gb-row, .ppanel .gb-name,
+.eb-name, .eb-n, .elec-facts b { color: var(--pp-ink); }
+.ppanel .card-h { font-size: 17px; }
+.ppanel .atable td, .ppanel .gb-row { font-size: 14.5px; }
+.ppanel .card-lead, .ppanel .app-sub, .ppanel .hint,
+.elec-when, .elec-facts, .elec-open, .eb-n small,
+.cht-from, .mb-when, .gb-name small { color: var(--pp-quiet); font-size: 13.5px; }
+.ppanel .atable tr, .ppanel .gb-row { border-color: var(--pp-line); }
+.eb-track { background: color-mix(in srgb, var(--pp-ink) 16%, transparent); }
+
+/* The board's rows sit on the panel, not on a cream card of their own. */
+.sheet-page .ppanel .gb-row { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.14); }
+.sheet-page .ppanel .gb-row:hover { border-color: rgba(200,241,53,.5); }
+.sheet-page .ppanel .gb-av { background: rgba(255,255,255,.12); color: #fff; }
 .sheet-page .cht-web a { color: var(--lime); }
-.sheet-page .ch-backing { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.14); }
+html[data-theme="light"] .gt-app .ppanel .gb-row { background: #FBFAF6; }
+html[data-theme="light"] .gt-app .cht-web a { color: var(--forest); }
+
+/* The charity board's own tracks — logo and name, website, where from, and the
+   edit button. `.gt-board .gb-head` is two classes, so this needs three. */
+.gt-board.ch-board .gb-head,
+.gt-board.ch-board .gb-row { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 130px 80px; }
+.cht-web { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.cht-act { text-align: right; }
+.ch-board .gb-av img { width: 100%; height: 100%; object-fit: contain; background: #fff; border-radius: 6px; }
+@media (max-width: 820px) {
+  .gt-board.ch-board .gb-head,
+  .gt-board.ch-board .gb-row { grid-template-columns: minmax(0, 1fr) 80px; }
+  .ch-board .cht-web, .ch-board .cht-from { display: none; }
+}
+
+/* THE ROOM NAVIGATOR AND THE CARDS, on the deep sheet. */
 .sheet-page .pnav-opt { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.16); color: #fff; }
 .sheet-page .pnav-opt.on { background: var(--lime); border-color: var(--lime); color: var(--deep); }
-.sheet-page .pnav-lab { color: rgba(232,228,213,.7); }
+.sheet-page .pnav-lab { color: rgba(232,228,213,.72); }
 .sheet-page .pnav-row + .pnav-row { border-color: rgba(255,255,255,.14); }
-.sheet-page .pcard { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.16); color: #fff; }
-.sheet-page .pcard .ocard-txt i, .sheet-page .pcard i { color: #fff; opacity: .9; }
-.sheet-page .pcard.on { color: #fff; }
+.sheet-page .pnav-none { color: rgba(232,228,213,.7); }
+.sheet-page .ch-backing { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.14); }
 
 /* The panel while its replacement is in flight. A dim rather than a spinner:
    the box is already the right shape and in the right place, and what is
    changing is its contents. */
 .ppanel.is-swapping { opacity: .55; transition: opacity .12s var(--ease); }
+
+/* ---- THE CARDS KEEP THEIR COLOURS ON THE GREEN SHEET ---------------------
+   "Let them be also of different colours, to make it pop up a little bit."
+
+   They already had one each — and a blanket `.sheet-page .pcard` rule painted
+   every one of them the same translucent white, so on the deep sheet all five
+   were identical grey boxes and the colour only appeared on the card you were
+   standing on. The tint is now mixed FROM the card's own colour, so the strip
+   reads as five things at rest and not only once pressed. */
+.sheet-page .pcard {
+  background: color-mix(in srgb, var(--pc) 24%, #0E2018);
+  border-color: color-mix(in srgb, var(--pc) 55%, transparent);
+  color: #FFFFFF;
+}
+.sheet-page .pcard:hover { border-color: color-mix(in srgb, var(--pc) 85%, transparent); }
+.sheet-page .pcard .pcard-ic { background: color-mix(in srgb, var(--pc) 42%, transparent); color: #FFFFFF; }
+.sheet-page .pcard i { color: #FFFFFF; opacity: .92; }
+.sheet-page .pcard.on {
+  background: var(--pc); border-color: #FFFFFF;
+  box-shadow: 0 12px 28px -16px rgba(0,0,0,.8);
+}
+/* On the deep sheet a bright pastel would out-shout the page, so the colours
+   run a shade deeper here than the plan cards' do. */
+.sheet-page .pcard.c-members { --pc: #3E9E52; }
+.sheet-page .pcard.c-groups  { --pc: #3D8FD1; }
+.sheet-page .pcard.c-orgs    { --pc: #C08A2E; }
+.sheet-page .pcard.c-team    { --pc: #9269D6; }
+.sheet-page .pcard.c-invite  { --pc: #D45A7E; }
+
+/* ==========================================================================
+   THE PLANS — three squares, then two across
+   ==========================================================================
+   "Because they are five, we will have three of them be on the first row, all
+   perfect squares, then the last two be rectangles under the three perfect
+   squares."
+
+   Five equal columns gave every plan a tall narrow strip, which is the shape
+   that makes a feature list read as a column of crumbs. Three then two: the
+   first row squares, the second row the two widest cards on the page — and the
+   pair carries the plans with the longest feature lists, which is where the
+   extra width goes to work. */
+/* SIX TRACKS, NOT THREE. Three columns cannot halve a row, so the pair
+   underneath would have come out as a double-width card beside a single — one
+   rectangle and one square, which is not what was asked for. On sixes the top
+   three take two tracks each and the bottom two take three each: three equal
+   squares, then two equal rectangles. */
+.tier-cards {
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 18px;
+}
+.tier-cards .tier[data-tier] { grid-column: span 2; }
+/* A square is a square: the aspect ratio is on the card, and the content is
+   free to run past it rather than being clipped by it — a plan with one more
+   feature grows the row rather than losing a line. */
+.tier-cards .tier[data-tier] { aspect-ratio: 1 / 1; }
+.tier-cards .tier[data-tier]:nth-child(4),
+.tier-cards .tier[data-tier]:nth-child(5) { aspect-ratio: auto; }
+.tier-cards .tier[data-tier]:nth-child(4),
+.tier-cards .tier[data-tier]:nth-child(5) { grid-column: span 3; }
+/* A square stops being a good shape well before a phone. Two across, then one,
+   and nothing is held to a ratio once it is that narrow. */
+@media (max-width: 1000px) {
+  .tier-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tier-cards .tier[data-tier],
+  .tier-cards .tier[data-tier]:nth-child(4),
+  .tier-cards .tier[data-tier]:nth-child(5) { aspect-ratio: auto; grid-column: span 1; }
+}
+@media (max-width: 640px) {
+  .tier-cards { grid-template-columns: 1fr; }
+}
+
+/* ==========================================================================
+   SETTINGS — the cards centre with the header above them
+   ==========================================================================
+   "The container that has this — that box should also be centred; that's why I
+   said have everything centred."
+
+   They were capped at 720px and left-aligned, so a centred title sat over two
+   boxes hugging the left margin. The cap stays (a form line 1200px wide is
+   unreadable); what changes is that the leftover width is split rather than all
+   given to the right. The text inside stays left-aligned: a centred paragraph
+   of body copy is harder to read, and "centre it" is about where the box sits.
+   ========================================================================== */
+.set-card { max-width: 720px; margin-left: auto; margin-right: auto; }
+.set-card + .set-card { margin-top: 20px; }
