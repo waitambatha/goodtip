@@ -271,25 +271,148 @@
     else form.submit();
   });
 
-  /* THE CATEGORY TABS. Eight categories, one grid on screen at a time — the
-     sort the client asked for ("one for cars, the other for sports, more for
-     signs, cups, flags"). Handled before the insert below, because a tab is
-     also a BUTTON inside .cc-emoji-menu and would otherwise type its own glyph
-     into the message. */
+  /* ======================================================================
+     THE EMOJI PICKER
+     ======================================================================
+     All 1,870 of them, from static/data/emoji.json (see scripts/build_emoji.py).
+
+     FETCHED ONCE, ON FIRST OPEN. The list used to be markup inside the
+     composer, which meant it was re-sent on every render of the chat pane —
+     every time a room was opened — whether or not anybody pressed the button.
+     Now a reader who never opens the picker downloads nothing, and one who does
+     gets a file the browser then caches under its hashed name.
+
+     One promise for the whole page, not one per composer: opening the picker in
+     two rooms in a row must not fetch it twice. */
+
+  var emojiData = null;
+
+  function loadEmoji(url) {
+    if (emojiData) return emojiData;
+    emojiData = fetch(url, { credentials: 'same-origin' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .catch(function (err) {
+        /* Cleared so a later press tries again — a dropped connection on the
+           first open should not disable the picker for the session. */
+        emojiData = null;
+        throw err;
+      });
+    return emojiData;
+  }
+
+  /* Built as one HTML string rather than 500 appendChild calls: the grid is
+     replaced whole on every tab press and every keystroke of the search. */
+  function gridHTML(rows) {
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      /* title carries the official name, so hovering answers "what is that
+         one" without a second interface for it. */
+      out.push('<button type="button" title="' + rows[i][1] + '">' + rows[i][0] + '</button>');
+    }
+    return out.join('');
+  }
+
+  function paint(menu, data, key, term) {
+    var grid = menu.querySelector('[data-emoji-grid]');
+    var note = menu.querySelector('[data-emoji-note]');
+    var rows;
+    if (term) {
+      /* Searched across every group, because somebody typing "flag" does not
+         know or care which tab it is filed under. Capped: a one-letter term
+         matches most of the set, and painting 1,900 buttons per keystroke is
+         the one thing that would make this feel slow. */
+      rows = [];
+      for (var g = 0; g < data.groups.length && rows.length < 240; g++) {
+        var list = data.groups[g].emoji;
+        for (var i = 0; i < list.length && rows.length < 240; i++) {
+          if (list[i][1].indexOf(term) !== -1) rows.push(list[i]);
+        }
+      }
+    } else {
+      var group = data.groups.filter(function (x) { return x.key === key; })[0];
+      rows = group ? group.emoji : [];
+    }
+    grid.innerHTML = gridHTML(rows);
+    if (note) {
+      note.hidden = rows.length !== 0;
+      note.textContent = term ? 'Nothing matches that.' : '';
+    }
+    menu.querySelectorAll('[data-emoji-tab]').forEach(function (t) {
+      t.classList.toggle('on', !term && t.getAttribute('data-emoji-tab') === key);
+    });
+  }
+
+  function fillPicker(menu) {
+    if (menu.hasAttribute('data-emoji-ready')) return;
+    menu.setAttribute('data-emoji-ready', '');
+    var note = menu.querySelector('[data-emoji-note]');
+    loadEmoji(menu.getAttribute('data-emoji-src')).then(function (data) {
+      var tabs = menu.querySelector('[data-emoji-tabs]');
+      tabs.innerHTML = data.groups.map(function (g) {
+        return '<button type="button" class="cc-emoji-tab" data-emoji-tab="' + g.key +
+               '" title="' + g.label + '" aria-label="' + g.label + '">' + g.tab + '</button>';
+      }).join('');
+      menu.setAttribute('data-emoji-key', data.groups[0].key);
+      paint(menu, data, data.groups[0].key, '');
+    }).catch(function () {
+      menu.removeAttribute('data-emoji-ready');
+      if (note) { note.hidden = false; note.textContent = 'Could not load the emoji. Try again.'; }
+    });
+  }
+
+  /* Loaded when the picker is opened, not when the page is. <details> fires
+     `toggle`, which is also what a keyboard press on the summary fires. */
+  document.addEventListener('toggle', function (e) {
+    if (!e.target.matches || !e.target.matches('.cc-emoji[open]')) return;
+    var menu = e.target.querySelector('[data-emoji-menu]');
+    if (menu) fillPicker(menu);
+  }, true);
+
+  /* THE CATEGORY TABS — "one for cars, the other for sports, more for signs,
+     cups, flags". Handled before the insert below and with stopPropagation,
+     because a tab is also a BUTTON inside .cc-emoji-menu and would otherwise
+     type its own glyph into the message. */
   document.addEventListener('click', function (e) {
     var tab = e.target.closest && e.target.closest('[data-emoji-tab]');
     if (!tab) return;
     e.preventDefault();
     e.stopPropagation();
     var menu = tab.closest('.cc-emoji-menu');
-    if (!menu) return;
-    var want = tab.getAttribute('data-emoji-tab');
-    menu.querySelectorAll('[data-emoji-tab]').forEach(function (t) {
-      t.classList.toggle('on', t === tab);
+    if (!menu || !emojiData) return;
+    var key = tab.getAttribute('data-emoji-tab');
+    var box = menu.querySelector('[data-emoji-search]');
+    if (box) box.value = '';
+    menu.setAttribute('data-emoji-key', key);
+    emojiData.then(function (data) { paint(menu, data, key, ''); });
+  }, true);
+
+  document.addEventListener('input', function (e) {
+    if (!e.target.matches || !e.target.matches('[data-emoji-search]')) return;
+    var menu = e.target.closest('.cc-emoji-menu');
+    if (!menu || !emojiData) return;
+    var term = e.target.value.trim().toLowerCase();
+    emojiData.then(function (data) {
+      paint(menu, data, menu.getAttribute('data-emoji-key'), term);
     });
-    menu.querySelectorAll('[data-emoji-panel]').forEach(function (p) {
-      p.hidden = p.getAttribute('data-emoji-panel') !== want;
-    });
+  });
+
+  /* Escape inside the search clears it rather than closing the picker, which
+     is what it does in every other search box on this screen. */
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!e.target.matches || !e.target.matches('[data-emoji-search]')) return;
+    if (!e.target.value) return;
+    e.target.value = '';
+    e.stopPropagation();
+    var menu = e.target.closest('.cc-emoji-menu');
+    if (menu && emojiData) {
+      emojiData.then(function (data) {
+        paint(menu, data, menu.getAttribute('data-emoji-key'), '');
+      });
+    }
   }, true);
 
   /* Emoji go in at the CARET. Appending to the end puts a face in the middle

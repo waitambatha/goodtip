@@ -1199,6 +1199,18 @@ html[data-theme="light"] .gtm-chip { background: #FFFFFF; }
   display: block; width: min(340px, calc(100vw - 40px));
   padding: 6px; max-height: 320px;
 }
+/* The search box. Eight tabs over nineteen hundred characters is a lot of
+   scrolling to reach one, and the names arrive with the data — so "aussie"
+   finds the flag and "trophy" finds the cup. */
+.cc-emoji-find { padding: 2px 2px 6px; }
+.cc-emoji-find input {
+  width: 100%; padding: 7px 10px; border-radius: 9px;
+  background: var(--m-ground); border: 1px solid var(--m-line);
+  color: var(--m-ink); font: inherit; font-size: 13px;
+}
+.cc-emoji-find input:focus { outline: none; border-color: var(--m-accent-line); }
+.cc-emoji-find input::-webkit-search-cancel-button { display: none; }
+.cc-emoji-note { padding: 14px 6px; font-size: 12.5px; color: var(--m-ink-3); text-align: center; }
 .cc-emoji-tabs {
   display: flex; gap: 2px; padding: 2px 2px 6px;
   border-bottom: 1px solid var(--m-line); margin-bottom: 6px;
