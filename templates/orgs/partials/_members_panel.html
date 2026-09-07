@@ -9,7 +9,15 @@ sheet's loader never plays for a change to one region of it.
 Same view, same context: what arrives on a swap cannot drift from what was
 rendered first.
 {% endcomment %}
-<div class="ppanel">
+{% comment %}
+THE PANEL CARRIES THE COLOUR OF THE CARD THAT OPENED IT — "the display and shade
+design to be of the colour that the card is."
+
+`panel` is validated against a fixed set in the view, and the five values are
+the five card classes, so the colour token travels in one word rather than a
+five-branch if. See `.ppanel.c-…` in goodtip.css.
+{% endcomment %}
+<div class="ppanel c-{{ panel }}">
 {% if panel == "members" %}
 {% comment %}
 THE LIST IS A LIST, drawn as the ladder's board — "I do not like the way it is,
@@ -101,14 +109,14 @@ ladder, whose totals roll up into this one.
       <td>
         {% for a in g.admins %}
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:2px 0;">
-            <span>{{ a.user.display_name }} <small style="color:var(--muted);">{{ a.user.email }}</small></span>
+            <span>{{ a.user.display_name }} <small class="pp-quiet">{{ a.user.email }}</small></span>
             <form method="post" action="{% url 'orgs:members' org.id %}" style="display:inline;">
               {% csrf_token %}<input type="hidden" name="action" value="demote_child_admin"><input type="hidden" name="member_id" value="{{ a.id }}">
               <button type="submit" class="abtn abtn-ghost abtn-sm">Remove admin</button>
             </form>
           </div>
         {% empty %}
-          <span style="color:var(--muted);">No admin</span>
+          <span class="pp-quiet">No admin</span>
         {% endfor %}
       </td>
       <td style="text-align:right;">
@@ -124,7 +132,7 @@ ladder, whose totals roll up into this one.
 </table>
 </div>
 {% else %}
-<p class="card-lead" style="margin:16px 0 0;color:var(--muted);">None yet. Add one for a site, branch or franchise that wants its own ladder and its own cause.</p>
+<p class="card-lead" style="margin:16px 0 0;">None yet. Add one for a site, branch or franchise that wants its own ladder and its own cause.</p>
 {% endif %}
 
 {% elif panel == "team" %}
@@ -139,29 +147,45 @@ this panel is not permission to do anything: the view still decides.
     <p class="card-lead" style="margin:4px 0 0;">A Manager configures the league, invites and runs the charity vote. A Captain leads a side. Changes take effect straight away.</p>
   </div>
 </div>
-<div class="tbl-scroll">
-<table class="atable">
-  <thead><tr><th>Member</th><th>Now</th><th style="text-align:right;">Set role</th></tr></thead>
-  <tbody>
+{% comment %}
+THE SAME BOARD THE MEMBERS LIST IS DRAWN AS, not a bare table — "lots of things
+are not visible ... and I do not like the design, find a nice design for that
+display."
+
+It was an `.atable`: cream cells carrying white panel ink, so the names, the
+addresses and the role each person holds were all invisible, and the row was a
+line of text with a naked dropdown hanging off the end of it. This is the
+component every other list on the product uses — a face, a name over its
+address, the roles as pills, and the control that changes them at the right-hand
+end where the eye already goes for an action.
+
+The forms, the endpoint and the permissions are untouched: the view still
+decides who may set a role, and opening this panel grants nothing.
+{% endcomment %}
+<div class="gt-board gt-listwrap tm-board">
+  <div class="gb-head">
+    <span>Member</span><span>Roles now</span><span>Set role</span>
+  </div>
+  <div class="gt-scroll gb-rows">
   {% for m in members %}
-    <tr>
-      <td><b>{{ m.user.display_name }}</b><br><small style="color:var(--muted);">{{ m.user.email }}</small></td>
-      <td>{% for label in m.role_labels %}<span class="pill-role {{ label|lower }}">{{ label }}</span> {% endfor %}</td>
-      <td style="text-align:right;">
-        <form method="post" action="{% url 'orgs:members' org.id %}" style="display:flex;gap:8px;justify-content:flex-end;">
-          {% csrf_token %}<input type="hidden" name="action" value="set_role"><input type="hidden" name="member_id" value="{{ m.id }}">
-          <select name="role" style="min-width:150px;width:auto;">
-            {% for value, label in role_choices %}<option value="{{ value }}" {% if m.role == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
-          </select>
-          <button type="submit" class="abtn abtn-ghost abtn-sm">Save</button>
-        </form>
-      </td>
-    </tr>
+    <div class="gb-row">
+      <span class="gb-who">
+        <span class="gb-av">{% if m.user.avatar %}<img src="{{ m.user.avatar.url }}" alt="" loading="lazy">{% else %}{{ m.user.display_name|slice:":1"|upper }}{% endif %}</span>
+        <span class="gb-name">{{ m.user.display_name }}<small>{{ m.user.email }}</small></span>
+      </span>
+      <span class="mb-roles">{% for label in m.role_labels %}<span class="pill-role {{ label|lower }}">{{ label }}</span> {% endfor %}</span>
+      <form class="tm-set" method="post" action="{% url 'orgs:members' org.id %}">
+        {% csrf_token %}<input type="hidden" name="action" value="set_role"><input type="hidden" name="member_id" value="{{ m.id }}">
+        <select name="role" aria-label="Role for {{ m.user.display_name }}">
+          {% for value, label in role_choices %}<option value="{{ value }}" {% if m.role == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        <button type="submit" class="abtn abtn-ghost abtn-sm">Save</button>
+      </form>
+    </div>
   {% empty %}
-    <tr><td colspan="3" style="text-align:center;color:var(--muted);">No members yet.</td></tr>
+    <div class="gb-empty">No members yet.</div>
   {% endfor %}
-  </tbody>
-</table>
+  </div>
 </div>
 {% if is_owner %}
 <div class="tm-nominate">
@@ -199,7 +223,7 @@ that sends invitations, reached from two.
       <p class="app-sub" style="margin:6px 0 0;font-size:12.5px;">{{ email_form.emails.help_text }}</p>
     </div>
     <div class="fld">
-      <label for="id_message">Add a note <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <label for="id_message">Add a note <span class="fld-optional">(optional)</span></label>
       {{ email_form.message }}
     </div>
     <button type="submit" class="abtn abtn-primary">

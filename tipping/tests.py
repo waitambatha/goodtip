@@ -3085,3 +3085,52 @@ class MyTipsAcrossEveryCompetitionTests(TestCase):
         """Stepping a round must not silently widen the page back to every code."""
         body = self._body(series=self.nrl.slug)
         self.assertIn(f"series={self.nrl.slug}", body)
+
+
+class TheWayBackIsAButtonTests(TestCase):
+    """"Back to the leaderboard should be a button on the right side and in the
+    end" — and the same on both statistics pages reached from the ladder.
+
+    It was the tail of the sentence under the title: the only control in the
+    header was a piece of the prose describing the page, in the middle of a
+    centred block where nobody looks for one. Its own row, hard right, after
+    the header.
+    """
+
+    def setUp(self):
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.series = Series.objects.get(slug="nrl")
+        comp = Competition.objects.create(
+            sport=self.series.sport, season=self.season, name="B Comp", slug="b-comp",
+        )
+        comp.series.add(self.series)
+        self.org = Organisation.objects.create(name="Back League", season=self.season)
+        self.org.competitions.add(comp)
+        self.user = User.objects.create_user(
+            email="back@example.com", password="x", display_name="Backy",
+        )
+        OrgMember.objects.create(user=self.user, org=self.org)
+        self.team = Team.objects.create(name="Backs", slug="bk-a", series=self.series)
+        self.client.force_login(self.user)
+
+    def _pages(self):
+        return [
+            ("my stats", reverse("tipping:my_stats", args=[self.org.id])),
+            ("competition stats", reverse("tipping:comp_stats", args=[self.org.id])),
+            ("club stats", reverse("tipping:team_stats", args=[self.org.id, self.team.id])),
+        ]
+
+    def test_every_statistics_page_ends_its_header_with_a_back_button(self):
+        for name, url in self._pages():
+            with self.subTest(page=name):
+                body = self.client.get(url).content.decode()
+                self.assertIn("gh-backrow", body)
+                self.assertIn("gh-back", body)
+
+    def test_the_way_back_is_no_longer_inside_the_subtitle(self):
+        """The sentence describes the page; it does not also navigate."""
+        for name, url in self._pages():
+            with self.subTest(page=name):
+                body = self.client.get(url).content.decode()
+                for sub in body.split('class="gh-sub"')[1:]:
+                    self.assertNotIn("<a ", sub.split("</p>")[0])

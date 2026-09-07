@@ -2578,6 +2578,11 @@ a.news-item.news-link:hover .nt { color: var(--forest); }
   transition: opacity .18s var(--ease), transform .18s var(--ease), visibility .18s;
 }
 .ddx.open .ddx-menu { opacity: 1; visibility: visible; transform: none; }
+/* The open menu, lifted out of a clipping ancestor — see gt-ui.js. Left, top
+   and width are written by the script in viewport coordinates; all this rule
+   does is take the menu out of flow and put it above the page. z-index is the
+   nav's plus one: a dropdown opened under the sticky bar reads as broken. */
+.ddx-menu.is-fixed { position: fixed; z-index: 220; }
 .ddx-opt {
   display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;
   text-align: left; background: none; border: 0; padding: 11px 13px; border-radius: 9px;
@@ -16888,7 +16893,8 @@ html[data-theme="light"] .gt-app .app-head.is-orgfirst .app-h1 { color: var(--lt
    `.gt-board.mb-board` is three, so it wins. Stated once for the head and the
    rows together, because a head on a different grid from its rows is the same
    bug wearing a different hat. */
-.ppanel .mb-board { border: 0; background: none; }
+/* The bed is not stripped any more — see "PANELS WEAR THEIR CARD'S COLOUR" at
+   the end of this file, where every board inside a panel gets a white one. */
 .gt-board.mb-board .gb-head,
 .gt-board.mb-board .gb-row { grid-template-columns: minmax(0, 1fr) auto 120px; }
 /* The last column is right-aligned in the head as well as the rows — it was an
@@ -17224,12 +17230,9 @@ html[data-theme="light"] .gt-app.sheet-page .ppanel {
 .ppanel .atable tr, .ppanel .gb-row { border-color: var(--pp-line); }
 .eb-track { background: color-mix(in srgb, var(--pp-ink) 16%, transparent); }
 
-/* The board's rows sit on the panel, not on a cream card of their own. */
-.sheet-page .ppanel .gb-row { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.14); }
-.sheet-page .ppanel .gb-row:hover { border-color: rgba(200,241,53,.5); }
-.sheet-page .ppanel .gb-av { background: rgba(255,255,255,.12); color: #fff; }
-.sheet-page .cht-web a { color: var(--lime); }
-html[data-theme="light"] .gt-app .ppanel .gb-row { background: #FBFAF6; }
+/* The rows used to be a translucent film on the panel, which put the panel's
+   white ink on a near-white surface. They are paper now — see "PANELS WEAR
+   THEIR CARD'S COLOUR" at the end of this file. */
 html[data-theme="light"] .gt-app .cht-web a { color: var(--forest); }
 
 /* The charity board's own tracks — logo and name, website, where from, and the
@@ -17341,3 +17344,334 @@ html[data-theme="light"] .gt-app .cht-web a { color: var(--forest); }
    ========================================================================== */
 .set-card { max-width: 720px; margin-left: auto; margin-right: auto; }
 .set-card + .set-card { margin-top: 20px; }
+
+/* ==========================================================================
+   PANELS WEAR THEIR CARD'S COLOUR, AND THEIR TABLES GO BACK TO PAPER
+   ==========================================================================
+   "In green we have cream or white rows of the table, so most of the texts are
+   not visible ... have the background of that table be white, and the text a
+   colour that goes with white; then the display and shade design to be of the
+   colour that the card is — like the charities card is green, so the table
+   should have that green feel, the way we did the competition on the ladder.
+   Add a charity, What groups back, Elections should have the feel of the
+   colour we have at the card."
+
+   WHAT WAS BROKEN. The panel is a translucent white box on the deep-green
+   sheet, so it names white as its ink (--pp-ink) and everything inside reads
+   that token. Two surfaces inside it never got the message:
+
+     · `.atable td` paints itself `--app-card`, a cream, and then took white
+       ink from the panel. Members' role table, the child-organisation list and
+       "what each group backs" were white text on cream — invisible.
+     · `.gt-board .gb-head` is recoloured to near-black on a sheet page,
+       because there it sits on a cream bed. Inside a panel there is no cream
+       bed, so "Member / Roles / Joined" and "Charity / Website / Where from"
+       were near-black on green — invisible for the same reason in reverse.
+
+   THE FIX IS ONE DECISION, NOT SIX PATCHES. A table is paper. Wherever a
+   panel holds one, it lays down a white sheet, and inside that sheet the ink
+   goes dark again — the row redefines --pp-ink and --pp-quiet for its own
+   subtree, so `.gb-name`, the addresses, the "joined" dates and the cell text
+   all follow without being listed one by one.
+
+   AND THE COLOUR IS THE CARD'S. Each panel is opened by a card that already
+   has an identity colour; the panel takes it as --pc and spends it exactly
+   where the ladder spends a competition's colour — the heading band, a whisper
+   of tint on alternating rows, the hover, the avatar wells, the rule beside a
+   title. The card you pressed and the thing it opened are then visibly one
+   object rather than a coloured button above a grey box.
+   ========================================================================== */
+
+/* ---- 1. the colour, taken from the card that opened the panel ------------
+   The same five values as `.pcard`, restated rather than shared: a panel is
+   not a card, and a selector that made them one would mean every future tweak
+   to a card's chrome landed on the panel too. */
+.ppanel            { --pc: #2D7A3A; }
+.ppanel.c-members  { --pc: #2D7A3A; }
+.ppanel.c-groups   { --pc: #1F6FA8; }
+.ppanel.c-orgs     { --pc: #8A5A17; }
+.ppanel.c-team     { --pc: #6B3FA0; }
+.ppanel.c-invite   { --pc: #A83254; }
+
+/* The panel's own ink for anything sitting on PAPER rather than on the panel.
+   Stated on .ppanel so both themes inherit one pair of values: paper is white
+   in the green theme and in the light theme alike, so its ink does not need to
+   differ between them. */
+.ppanel {
+  --pp-paper:       #FFFFFF;
+  --pp-paper-ink:   #10241B;
+  --pp-paper-quiet: #55625A;
+}
+/* The accent edge. Both themes already set `border-color` on the panel as a
+   shorthand, which repaints all four sides — so the top is claimed back after
+   them, and at their own specificity, rather than by hoping to be later. */
+.gt-app .ppanel,
+html[data-theme="light"] .gt-app .ppanel { border-top: 3px solid var(--pc); }
+
+/* THE TITLE CARRIES THE COLOUR TOO, as a rule rather than as coloured type:
+   these headings are read at a glance and a mid-blue or a plum heading on
+   green is a harder read than a white one beside a coloured mark. */
+.ppanel .card-h { display: flex; align-items: center; gap: 10px; }
+.ppanel .card-h::before {
+  content: ""; flex: none; width: 4px; align-self: stretch; min-height: 18px;
+  border-radius: 100px; background: var(--pc);
+}
+
+/* ---- 2. the bed every board sits on -------------------------------------
+   The ladder's shape exactly: a bed, white rows lifting off it, a coloured
+   band across the top. What changes is only what the bed is made of — cream
+   there, a wash of the panel's own colour here, so "the table has that green
+   feel" on Charities and a blue one on Groups without a second component.
+
+   Both themes, one rule: the sheet's cream bed and the light theme's beige one
+   are the two this replaces, and either left in place would put a warm surface
+   under a coloured table. */
+.sheet-page .ppanel .gt-board,
+.sheet-page .ppanel .gt-listwrap,
+html[data-theme="light"] .gt-app .ppanel .gt-board,
+html[data-theme="light"] .gt-app .ppanel .gt-listwrap {
+  --pp-bed: color-mix(in srgb, var(--pc) 9%, #FFFFFF);
+  background: var(--pp-bed);
+  border: 1px solid color-mix(in srgb, var(--pc) 26%, transparent);
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 0 18px 44px -30px rgba(15,46,34,.7);
+}
+/* One bed, not two, if a board is ever nested inside a listwrap of its own. */
+.sheet-page .ppanel .gt-listwrap .gt-board,
+html[data-theme="light"] .gt-app .ppanel .gt-listwrap .gt-board {
+  background: none; border: 0; border-radius: 0; padding: 0; box-shadow: none;
+}
+/* The "there is more below" fade has to fade into the bed it is drawn on —
+   it is a hard-coded cream otherwise, which on a blue or plum bed is a smear. */
+.ppanel .gt-listwrap::after {
+  background: linear-gradient(180deg, transparent,
+                              color-mix(in srgb, var(--pc) 9%, #FFFFFF));
+}
+
+/* ---- 3. the heading band ------------------------------------------------
+   Back to a plate, in the panel's colour, with white on it. Beats both the
+   sheet-page rule that flattens it for a cream bed and the light theme's own,
+   which is why the selector names the panel. */
+.sheet-page .ppanel .gt-board .gb-head,
+html[data-theme="light"] .gt-app .ppanel .gt-board .gb-head {
+  background: var(--pc);
+  color: #FFFFFF;
+  border: 0; border-radius: 11px;
+  padding: 13px 18px;
+  font-size: 12.5px; font-weight: 800; letter-spacing: .1em;
+}
+.sheet-page .ppanel .gt-board .gb-head > span,
+html[data-theme="light"] .gt-app .ppanel .gt-board .gb-head > span { color: #FFFFFF; }
+
+/* ---- 4. the rows -------------------------------------------------------
+   White, with the ink redefined FOR THE SUBTREE. Every caption inside a row —
+   the member's address, the date they joined, where a charity came from —
+   reads `--pp-ink` or `--pp-quiet` from wherever it can find them, so
+   restating the pair on the row itself turns all of them dark at once. */
+.sheet-page .ppanel .gb-row,
+html[data-theme="light"] .gt-app .ppanel .gb-row {
+  --pp-ink: var(--pp-paper-ink);
+  --pp-quiet: var(--pp-paper-quiet);
+  background: var(--pp-paper);
+  border-color: color-mix(in srgb, var(--pc) 20%, transparent);
+  color: var(--pp-paper-ink);
+}
+/* The ladder stripes its numeric columns so a row can be tracked across. A
+   member list has no numeric columns to stripe, so the same job is done down
+   the rows instead — at a tint light enough to stay a texture, and lighter
+   than the bed so the rows still read as sitting ON it. */
+.sheet-page .ppanel .gb-rows > .gb-row:nth-child(even),
+html[data-theme="light"] .gt-app .ppanel .gb-rows > .gb-row:nth-child(even) {
+  background: color-mix(in srgb, var(--pc) 4%, var(--pp-paper));
+}
+.sheet-page .ppanel .gb-row:hover,
+html[data-theme="light"] .gt-app .ppanel .gb-row:hover {
+  border-color: var(--pc);
+  box-shadow: 0 12px 26px -20px color-mix(in srgb, var(--pc) 70%, transparent);
+}
+.sheet-page .ppanel .gb-av,
+html[data-theme="light"] .gt-app .ppanel .gb-av {
+  background: color-mix(in srgb, var(--pc) 14%, #FFFFFF);
+  color: var(--pc);
+}
+.ppanel .gb-empty {
+  background: var(--pp-paper);
+  border-color: color-mix(in srgb, var(--pc) 20%, transparent);
+  color: var(--pp-paper-quiet);
+}
+/* A website on white is a link in the panel's colour, not the lime that was
+   picked for it when the row was a translucent film on the green sheet. */
+.sheet-page .ppanel .cht-web a,
+html[data-theme="light"] .gt-app .ppanel .cht-web a { color: var(--pc); }
+
+/* ---- 5. the plain tables, given the same treatment ----------------------
+   `.atable` is still the right component for the two lists that are genuinely
+   a grid of small facts — the child organisations and what each group backs.
+   It gets the colour and the paper, so a table means one thing on this screen
+   whichever panel drew it. */
+.gt-app .ppanel .atable th,
+html[data-theme="light"] .gt-app .ppanel .atable th {
+  background: var(--pc); color: #FFFFFF;
+}
+.gt-app .ppanel .atable td,
+html[data-theme="light"] .gt-app .ppanel .atable td {
+  --pp-ink: var(--pp-paper-ink);
+  --pp-quiet: var(--pp-paper-quiet);
+  background: var(--pp-paper);
+  color: var(--pp-paper-ink);
+  border-color: color-mix(in srgb, var(--pc) 18%, transparent);
+}
+.gt-app .ppanel .atable tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--pc) 6%, var(--pp-paper));
+}
+.gt-app .ppanel .atable td:first-child { box-shadow: inset 3px 0 0 var(--pc); }
+.gt-app .ppanel .atable tbody tr:hover td {
+  box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--pc) 8%, transparent);
+}
+.gt-app .ppanel .atable tbody tr:hover td:first-child {
+  box-shadow: inset 3px 0 0 var(--pc), inset 0 0 0 999px color-mix(in srgb, var(--pc) 8%, transparent);
+}
+/* The captions inside a cell. These were inline `color: var(--muted)` styles
+   aimed at a cream card, which an inline style means no stylesheet could ever
+   correct — so they are classes now (`.pp-quiet`) and this is what they read. */
+.ppanel .atable td small,
+.ppanel .pp-quiet { color: var(--pp-quiet); }
+
+/* ---- 6. the role pills, back on a pale surface --------------------------
+   `.page-deep .pill-role` paints them white-on-translucent-white for the deep
+   sheet. Inside a row that is now white paper, which made Owner / Manager /
+   Captain vanish along with everything else. */
+.ppanel .gb-row .pill-role,
+.ppanel .atable td .pill-role,
+html[data-theme="light"] .gt-app.page-deep .ppanel .gb-row .pill-role,
+html[data-theme="light"] .gt-app.page-deep .ppanel .atable td .pill-role {
+  background: color-mix(in srgb, var(--pc) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pc) 26%, transparent);
+  color: color-mix(in srgb, var(--pc) 78%, #06140D);
+}
+.ppanel .gb-row .pill-role.owner,
+.ppanel .atable td .pill-role.owner,
+html[data-theme="light"] .gt-app.page-deep .ppanel .gb-row .pill-role.owner,
+html[data-theme="light"] .gt-app.page-deep .ppanel .atable td .pill-role.owner {
+  background: var(--lime); border-color: var(--lime); color: var(--deep);
+}
+
+/* ---- 7. form labels on the panel itself ---------------------------------
+   These sit on the panel, not on paper, so they take the panel's ink. Both
+   were written `color: var(--ink)` / `var(--deep)` for a cream card: "Email
+   addresses" and "Add a note (optional)" were dark green on dark green, and
+   the charity form's two labels with them. */
+.ppanel .fld > label,
+.ppanel .msg-fld > label { color: var(--pp-ink); }
+.ppanel .msg-fld > label svg { stroke: var(--pc); }
+.ppanel .fld-optional { color: var(--pp-quiet); font-weight: 400; }
+.ppanel .msg-fld input:focus,
+.ppanel .msg-fld textarea:focus,
+.ppanel .fld input:focus,
+.ppanel .fld textarea:focus {
+  border-color: var(--pc);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pc) 22%, transparent);
+}
+
+/* ---- 7b. the small buttons that live ON the paper -----------------------
+   `.sheet-page .page-sheet .abtn-ghost` is cream type on a hairline, for the
+   deep sheet. Save, Edit, Election and Make admin all sit inside a row, which
+   is now white — so they would have gone the way of the text they sit beside.
+   On paper a ghost button takes the panel's colour, which also makes it the
+   one coloured thing in the row and therefore findable. */
+.sheet-page .page-sheet .ppanel .gb-row .abtn-ghost,
+.sheet-page .page-sheet .ppanel .atable .abtn-ghost,
+html[data-theme="light"] .gt-app .ppanel .gb-row .abtn-ghost,
+html[data-theme="light"] .gt-app .ppanel .atable .abtn-ghost {
+  color: var(--pc);
+  border-color: color-mix(in srgb, var(--pc) 36%, transparent);
+  background: color-mix(in srgb, var(--pc) 7%, transparent);
+}
+.sheet-page .page-sheet .ppanel .gb-row .abtn-ghost:hover,
+.sheet-page .page-sheet .ppanel .atable .abtn-ghost:hover,
+html[data-theme="light"] .gt-app .ppanel .gb-row .abtn-ghost:hover,
+html[data-theme="light"] .gt-app .ppanel .atable .abtn-ghost:hover {
+  color: #FFFFFF; background: var(--pc); border-color: var(--pc);
+}
+/* EVERY FIELD IN A PANEL IS PAPER. A text box is white whatever is behind it,
+   so it needs dark ink — and several of these inherited the panel's white
+   instead, having been written when the panel was a cream card. The "new
+   admin" address on the organisations panel and the "nominate a manager" one
+   were white on white: you could type in them and see nothing. */
+.ppanel input[type="text"],
+.ppanel input[type="email"],
+.ppanel input[type="url"],
+.ppanel input[type="search"],
+.ppanel textarea,
+.ppanel select {
+  background: #FFFFFF; color: var(--pp-paper-ink);
+  border-color: color-mix(in srgb, var(--pc) 30%, transparent);
+}
+.ppanel ::placeholder { color: #8A948D; opacity: 1; }
+
+/* ---- 8. the rest of the panel's chrome, in the same colour -------------- */
+.ppanel .elec { border-color: var(--pp-line); }
+.sheet-page .ppanel .ch-backing {
+  background: color-mix(in srgb, var(--pc) 20%, transparent);
+  border-color: color-mix(in srgb, var(--pc) 40%, transparent);
+}
+.ppanel .pinvite-link { border-color: var(--pp-line); }
+.ppanel .tm-nominate { border-color: var(--pp-line); }
+
+/* ==========================================================================
+   TEAM MANAGEMENT, DRAWN AS A BOARD
+   ==========================================================================
+   "Lots of things are not visible ... and I do not like the design, find a
+   nice design for that display."
+
+   Three tracks: who, what they are now, and the control that changes it. The
+   control keeps the right-hand end, which is where every other action on this
+   product's lists lives. */
+.gt-board.tm-board .gb-head,
+.gt-board.tm-board .gb-row {
+  grid-template-columns: minmax(0, 1fr) auto minmax(240px, 290px);
+  gap: 16px;
+}
+.gt-board.tm-board .gb-head > :last-child { text-align: right; }
+.gt-board.tm-board .gb-name { display: flex; flex-direction: column; gap: 1px; }
+.gt-board.tm-board .gb-name small { font-weight: 400; font-size: 12px; }
+.tm-set { display: flex; align-items: center; gap: 8px; justify-content: flex-end; margin: 0; }
+.tm-set .ddx, .tm-set select { flex: 1 1 auto; min-width: 0; }
+.tm-set .abtn { flex: none; }
+/* NO HOVER NUDGE ON THIS BOARD. Every other row slides 3px under the pointer;
+   this one holds a dropdown, and a transformed ancestor changes what
+   `position: fixed` is measured against — which is how the open menu escapes
+   a scrolling container (see gt-ui.js). A row that moves under the cursor you
+   are aiming at a Save button is not much of a loss. */
+.gt-board.tm-board .gb-row:hover { transform: none; }
+@media (max-width: 820px) {
+  .gt-board.tm-board .gb-head,
+  .gt-board.tm-board .gb-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .gt-board.tm-board .gb-head > span:not(:first-child) { display: none; }
+  .gt-board.tm-board .mb-roles { justify-content: flex-start; }
+  .tm-set { justify-content: flex-start; }
+}
+
+/* ==========================================================================
+   THE WAY BACK, AS A BUTTON AT THE RIGHT-HAND END
+   ==========================================================================
+   "Back to the leaderboard should be a button on the right side and in the
+   end" — and the same on both statistics pages off the ladder.
+
+   Its own row after the header rather than a corner of it: the headers on
+   these three pages are centred blocks, and a control pinned into the corner
+   of a centred block reads as something that fell off the title. */
+.gh-backrow { display: flex; justify-content: flex-end; margin: -6px 0 22px; }
+.abtn.gh-back { gap: 10px; }
+.gh-back-ic {
+  width: 16px; height: 16px; flex: none;
+  fill: none; stroke: currentColor; stroke-width: 2.2;
+  stroke-linecap: round; stroke-linejoin: round;
+  transition: transform .16s var(--ease);
+}
+.abtn.gh-back:hover .gh-back-ic { transform: translateX(3px); }
+@media (max-width: 560px) {
+  .gh-backrow { justify-content: stretch; }
+  .abtn.gh-back { width: 100%; justify-content: center; }
+}

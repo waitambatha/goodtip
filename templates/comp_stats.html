@@ -23,9 +23,20 @@ belongs to two of them.
   <div>
     <div class="gh-eyebrow is-title">{{ selected_series.name }} &middot; {{ org.season }}</div>
     <h1 class="gh-title">Statistics</h1>
-    <p class="gh-sub">Every club in the competition, side by side.
-      <a href="{% url 'tipping:ladder' org.id %}?series={{ selected_series.slug }}">Back to the ladder &rarr;</a></p>
+    <p class="gh-sub">Every club in the competition, side by side.</p>
   </div>
+</div>
+
+{% comment %}
+The way back, as a button at the right-hand end — the same move as My stats
+and for the same reason: it was the tail of the sentence that describes the
+page, so the only control in the header did not read as one.
+{% endcomment %}
+<div class="gh-backrow">
+  <a class="abtn abtn-ghost gh-back" href="{% url 'tipping:ladder' org.id %}?series={{ selected_series.slug }}">
+    Back to the ladder
+    <svg class="gh-back-ic" aria-hidden="true"><use href="#ic-arrow-right"/></svg>
+  </a>
 </div>
 
 {% url 'tipping:comp_stats' org.id as cs_url %}

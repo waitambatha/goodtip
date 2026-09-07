@@ -24,11 +24,19 @@ leagues tipping the game.
   <div>
     <div class="gh-eyebrow is-title">{{ series.name }} &middot; {{ org.season }}</div>
     <h1 class="gh-title">{{ team.name }}</h1>
-    <p class="gh-sub">
-      {% if entry %}Ladder position {{ entry.rank }} &middot; {% endif %}
-      <a href="{% url 'tipping:ladder' org.id %}?series={{ series.slug }}">Back to the ladder &rarr;</a>
-    </p>
+    {% if entry %}<p class="gh-sub">Ladder position {{ entry.rank }}</p>{% endif %}
   </div>
+</div>
+
+{% comment %}
+The way back, as a button at the right-hand end. What is left of the subtitle
+is a fact about the club rather than half a sentence and half a link.
+{% endcomment %}
+<div class="gh-backrow">
+  <a class="abtn abtn-ghost gh-back" href="{% url 'tipping:ladder' org.id %}?series={{ series.slug }}">
+    Back to the ladder
+    <svg class="gh-back-ic" aria-hidden="true"><use href="#ic-arrow-right"/></svg>
+  </a>
 </div>
 
 {% if stats.played %}

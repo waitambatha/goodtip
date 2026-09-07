@@ -7576,3 +7576,114 @@ class CharitiesPageIsCardsAndPanelsTests(TestCase):
         body = self.client.get(reverse("dashboard")).content.decode()
         self.assertIn(reverse("orgs:charities", args=[self.org.id]), body)
         self.assertNotIn(reverse("orgs:charity_vote", args=[self.org.id]), body)
+
+
+class PanelsWearTheirCardsColourTests(TestCase):
+    """"The display and shade design to be of the colour that the card is —
+    like the charities card is green, so the table should have that green feel,
+    the way we did the competition on the ladder. Add a charity, What groups
+    back, Elections should have the feel of the colour we have at the card."
+
+    The colour is a class on the panel and the stylesheet does the rest, so
+    what is worth locking down here is the pairing: pressing a card must open a
+    panel wearing that card's colour, and the two screens name their panels
+    differently — Members' panels ARE the card names, Charities' are not.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(
+            name="Palette Co", season=self.season, groups_enabled=True,
+        )
+        self.owner = User.objects.create_user(
+            email="palette@example.com", password="x", display_name="Owner",
+        )
+        OrgMember.objects.create(
+            user=self.owner, org=self.org, role=OrgMember.ROLE_MANAGER,
+            is_league_owner=True,
+        )
+        self.client.force_login(self.owner)
+
+    def _members(self, panel):
+        return self.client.get(
+            reverse("orgs:members", args=[self.org.id]), {"panel": panel},
+        ).content.decode()
+
+    def _charities(self, panel):
+        return self.client.get(
+            reverse("orgs:charities", args=[self.org.id]), {"panel": panel},
+        ).content.decode()
+
+    def test_each_members_panel_wears_the_colour_of_its_own_card(self):
+        for panel in ("members", "groups", "orgs", "team", "invite"):
+            with self.subTest(panel=panel):
+                self.assertIn(f'class="ppanel c-{panel}"', self._members(panel))
+
+    def test_each_charities_panel_wears_the_colour_of_its_own_card(self):
+        """Not the same word: the list rides on the Charities card, adding one
+        on the Invite card's crimson and Elections on the Team card's purple."""
+        for panel, colour in [
+            ("list", "c-members"),
+            ("add", "c-invite"),
+            ("groups", "c-groups"),
+            ("elections", "c-team"),
+        ]:
+            with self.subTest(panel=panel):
+                self.assertIn(f'class="ppanel {colour}"', self._charities(panel))
+
+
+class TeamManagementIsDrawnAsABoardTests(TestCase):
+    """"Lots of things are not visible ... and I do not like the design, find a
+    nice design for that display."
+
+    It was an `.atable`: cream cells inheriting the panel's white ink, so the
+    names, the addresses and the role each person holds were all invisible, and
+    the control that changes them was a naked select on the end of a line of
+    text. Same component as every other list on the product now.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2099, label="2099")
+        self.org = Organisation.objects.create(name="Board Co", season=self.season)
+        self.owner = User.objects.create_user(
+            email="board-own@example.com", password="x", display_name="Owner",
+        )
+        self.member = User.objects.create_user(
+            email="board-mem@example.com", password="x", display_name="Member",
+        )
+        OrgMember.objects.create(
+            user=self.owner, org=self.org, role=OrgMember.ROLE_MANAGER,
+            is_league_owner=True,
+        )
+        self.membership = OrgMember.objects.create(user=self.member, org=self.org)
+        self.client.force_login(self.owner)
+
+    def _body(self):
+        return self.client.get(
+            reverse("orgs:members", args=[self.org.id]), {"panel": "team"},
+        ).content.decode()
+
+    def test_it_is_the_board_and_not_a_bare_table(self):
+        body = self._body()
+        self.assertIn("tm-board", body)
+        self.assertIn("gt-board", body)
+        self.assertNotIn("atable", body)
+
+    def test_every_member_keeps_a_face_an_address_and_a_role_control(self):
+        body = self._body()
+        self.assertIn(self.member.email, body)
+        self.assertIn('class="tm-set"', body)
+        self.assertIn('name="role"', body)
+
+    def test_setting_a_role_still_works(self):
+        """The design changed; the form, the endpoint and who may use it did
+        not."""
+        self.client.post(reverse("orgs:members", args=[self.org.id]), {
+            "action": "set_role",
+            "member_id": self.membership.id,
+            "role": OrgMember.ROLE_CAPTAIN,
+        })
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.role, OrgMember.ROLE_CAPTAIN)

@@ -24,9 +24,25 @@ making the same kind of claim with none of the same backing.
   <div>
     <div class="gh-eyebrow is-title">{{ org.name }} &middot; {{ org.season }}</div>
     <h1 class="gh-title">My stats</h1>
-    <p class="gh-sub">Your season, round by round.
-      <a href="{% url 'tipping:leaderboard' org.id %}">Back to the leaderboard &rarr;</a></p>
+    <p class="gh-sub">Your season, round by round.</p>
   </div>
+</div>
+
+{% comment %}
+THE WAY BACK IS A BUTTON, AT THE RIGHT-HAND END — "Back to the leaderboard
+should be a button on the right side and in the end."
+
+It was the tail of the subtitle, which made the one control on the header a
+piece of the sentence describing the page: nothing about it looked pressable,
+and it sat in the middle of a centred block where a control is not looked for.
+Its own row, hard right, after the header — the corner a "done here" action is
+expected in, and the last thing in reading order rather than the first.
+{% endcomment %}
+<div class="gh-backrow">
+  <a class="abtn abtn-ghost gh-back" href="{% url 'tipping:leaderboard' org.id %}">
+    Back to the leaderboard
+    <svg class="gh-back-ic" aria-hidden="true"><use href="#ic-arrow-right"/></svg>
+  </a>
 </div>
 
 {% url 'tipping:my_stats' org.id as me_url %}

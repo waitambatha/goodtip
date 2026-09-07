@@ -9,7 +9,11 @@
   /* ---------------- elegant dropdowns ---------------- */
   function closeAll(except) {
     document.querySelectorAll('.ddx.open').forEach(function (d) {
-      if (d !== except) d.classList.remove('open');
+      if (d === except) return;
+      d.classList.remove('open');
+      /* Each dropdown owns the viewport placement of its own menu, so it is
+         told to undo it rather than reached into from here. */
+      d.dispatchEvent(new CustomEvent('gt:ddxclose'));
     });
   }
 
@@ -64,6 +68,7 @@
         b.textContent = o.textContent.trim();
         b.addEventListener('click', function () {
           dd.classList.remove('open');
+          dd.dispatchEvent(new CustomEvent('gt:ddxclose'));
           if (sel.selectedIndex !== o.index) {
             sel.selectedIndex = o.index;
             label();
@@ -74,15 +79,97 @@
       });
     }
 
+    /* ---- THE MENU HAS TO ESCAPE ITS CONTAINER ---------------------------
+       The leaderboard's competition bar is `overflow-x: auto` so the row of
+       chips can scroll sideways on one line. That makes it a clipping box, and
+       the menu — an absolutely positioned child of the control inside it — was
+       cut off at the bar's own height: three options showing as a sliver, the
+       rest unreachable, and the bar stretched by whatever did fit.
+
+       So when an ancestor clips, the open menu switches to `position: fixed`
+       and is measured against the button in viewport coordinates. Fixed is
+       relative to the viewport UNLESS an ancestor is transformed, in which case
+       it is relative to that ancestor and this would place it wrongly — so a
+       transformed ancestor keeps the ordinary absolute menu, which is correct
+       there because a transformed box is not a clipping one.
+
+       The menu stays where it is in the DOM either way. Portalling it to
+       <body> would place it above everything just as well and would silently
+       drop every scoped rule that styles it — .contact-shell's dark menu, the
+       dashboard picker's larger one — which is a worse bug than the one being
+       fixed. */
+    function ancestors() {
+      var out = [], n = dd.parentNode;
+      while (n && n.nodeType === 1 && n !== document.body) { out.push(n); n = n.parentNode; }
+      return out;
+    }
+    function needsFixed() {
+      var clipped = false;
+      return ancestors().every(function (n) {
+        var cs = getComputedStyle(n);
+        if (cs.transform !== 'none' || cs.perspective !== 'none' ||
+            (cs.filter && cs.filter !== 'none')) return false;
+        if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') clipped = true;
+        return true;
+      }) && clipped;
+    }
+
+    function place() {
+      if (!menu.classList.contains('is-fixed')) return;
+      var r = btn.getBoundingClientRect();
+      var gap = 8, edge = 10;
+      var below = window.innerHeight - r.bottom - gap - edge;
+      var above = r.top - gap - edge;
+      var up = below < 180 && above > below;
+      menu.style.width = r.width + 'px';
+      menu.style.left = Math.max(edge, Math.min(r.left, window.innerWidth - r.width - edge)) + 'px';
+      menu.style.maxHeight = Math.max(140, Math.min(300, up ? above : below)) + 'px';
+      if (up) {
+        menu.style.top = 'auto';
+        menu.style.bottom = (window.innerHeight - r.top + gap) + 'px';
+      } else {
+        menu.style.bottom = 'auto';
+        menu.style.top = (r.bottom + gap) + 'px';
+      }
+    }
+    /* The menu fades out rather than vanishing, so the placement is held for
+       the length of that fade — dropped the instant it closed, the menu would
+       snap back into the flow of a clipping box and finish its fade there. */
+    var unplaceT = null;
+    function unplace() {
+      if (unplaceT) clearTimeout(unplaceT);
+      unplaceT = setTimeout(function () {
+        unplaceT = null;
+        if (dd.classList.contains('open')) return;
+        menu.classList.remove('is-fixed');
+        menu.style.cssText = '';
+      }, 220);
+    }
+    /* Capture phase: the bar the control sits in scrolls too, and a scroll
+       inside it does not bubble. */
+    window.addEventListener('scroll', function () {
+      if (dd.classList.contains('open')) place();
+    }, true);
+    window.addEventListener('resize', function () {
+      if (dd.classList.contains('open')) place();
+    });
+    dd.addEventListener('gt:ddxclose', unplace);
+
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
       if (sel.disabled) return;
       closeAll(dd);
       if (!dd.classList.contains('open')) build();
       dd.classList.toggle('open');
+      if (dd.classList.contains('open')) {
+        if (unplaceT) { clearTimeout(unplaceT); unplaceT = null; }
+        if (needsFixed()) { menu.classList.add('is-fixed'); place(); }
+      } else {
+        unplace();
+      }
     });
     btn.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') dd.classList.remove('open');
+      if (e.key === 'Escape') { dd.classList.remove('open'); unplace(); }
     });
     sel.addEventListener('change', label);
     label();
@@ -106,6 +193,14 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
+
+  /* AND AGAIN AFTER ANYTHING htmx BRINGS IN. Members and Charities swap the
+     whole panel when a card is pressed, so Team management's role pickers
+     arrive after this ran once — they were left as raw OS dropdowns sitting in
+     the middle of a designed board. `enhanceSelect` marks what it has already
+     done (data-ddx), so re-running over the page is a no-op for everything
+     that was here before the swap. */
+  document.body && document.body.addEventListener('htmx:afterSettle', init);
 })();
 
 /* Nav "Manage" dropdown. Click to open, click-away / Escape to close. */

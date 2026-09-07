@@ -10,7 +10,17 @@ Same view, same context, so what arrives on a swap cannot drift from what was
 rendered first. The links carry hx-push-url, so the address bar, the back button
 and a copied link all still work exactly as they did.
 {% endcomment %}
-<div class="ppanel">
+{% comment %}
+THE PANEL WEARS THE COLOUR OF THE CARD THAT OPENED IT — "Add a charity, What
+groups back, Elections should have the feel of the colour we have at the card."
+
+Written out rather than interpolated from `panel`, because the four panels here
+are not named after the four cards: the list rides on the Charities card, adding
+one rides on the Invite card's crimson, and Elections on the Team card's purple.
+Spelling the pairing out is what keeps a card and its panel the same colour when
+either is renamed.
+{% endcomment %}
+<div class="ppanel {% if panel == 'add' %}c-invite{% elif panel == 'groups' %}c-groups{% elif panel == 'elections' %}c-team{% else %}c-members{% endif %}">
 {% if panel == "list" %}
 {% comment %}
 THE LIST, as a table — name, logo and where they are on the web, which is what
@@ -111,7 +121,7 @@ the same thing on every screen in the product.
     <td style="text-align:right;"><a class="abtn abtn-ghost abtn-sm" href="{% url 'orgs:group_charity_vote' org.id g.id %}">Election &rarr;</a></td>
   </tr>
   {% empty %}
-  <tr><td colspan="3" style="text-align:center;color:var(--muted);">No groups yet.</td></tr>
+  <tr><td colspan="3" class="pp-quiet" style="text-align:center;">No groups yet.</td></tr>
   {% endfor %}
   </tbody>
 </table>
@@ -202,7 +212,7 @@ a display preference.
   {% endif %}
 </div>
 {% empty %}
-<p class="card-lead" style="margin:16px 0 0;color:var(--muted);">
+<p class="card-lead" style="margin:16px 0 0;">
   No elections here yet. Open one and every member of
   {% if panel_group %}{{ panel_group.name }}{% else %}{{ panel_org.name }}{% endif %} gets a vote.
 </p>
