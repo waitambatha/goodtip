@@ -1,0 +1,40 @@
+{% comment %}
+Who each organisation is actually playing for — and, since Aug 2026, who each
+of its groups is playing for, which can be a different answer and is meant to
+be. See orgs.models.Group.effective_charity.
+{% endcomment %}
+<section class="gt-panel">
+  <div class="gt-panel-head">
+    <span class="gp-ic"><svg><use href="#ic-heart"/></svg></span>
+    <div>
+      <h2>Causes</h2>
+      <div class="gp-sub">What every round you run is raising for.</div>
+    </div>
+  </div>
+
+  <ul class="mp-rows mp-rows-lg">
+    {% for o in charity_orgs %}
+    <li>
+      <span>
+        <b>{{ o.name }}</b>
+        <small>
+          {% if o.charity_id %}<svg class="mp-ic"><use href="#ic-heart"/></svg>{{ o.charity.name }}
+          {% else %}No cause chosen yet{% endif %}
+          {% if o.active_charity_vote %} &middot; <b class="mp-waiting">election open</b>{% endif %}
+        </small>
+        {% if o.groups_enabled %}
+          {% for g in o.groups.all %}{% if g.charity_id %}
+          <small class="mp-nested"><svg class="mp-ic"><use href="#ic-users"/></svg>{{ g.name }} backs {{ g.charity.name }}</small>
+          {% endif %}{% endfor %}
+        {% endif %}
+      </span>
+      <span class="gt-linkstack">
+        <a href="{% url 'orgs:charity_vote' o.id %}">Election <svg><use href="#ic-arrow"/></svg></a>
+        <a href="{% url 'orgs:charities' o.id %}">Charities <svg><use href="#ic-arrow"/></svg></a>
+      </span>
+    </li>
+    {% empty %}
+    <li><span><small>Nothing to show yet.</small></span></li>
+    {% endfor %}
+  </ul>
+</section>

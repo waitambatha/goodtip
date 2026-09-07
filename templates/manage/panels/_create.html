@@ -1,0 +1,45 @@
+{% comment %}
+THE ONE PANEL THAT IS NOT A TABLE.
+
+Creating an organisation is a seven-step resumable wizard with a logo upload
+and an emailed verification code in the middle of it, and it lives at
+orgs:create. Pulling that form in here would mean re-implementing its steps,
+its draft and its code entry in a second place, and the second copy is the one
+that goes wrong.
+
+So the panel carries the CONTEXT instead — what the wizard will ask, and
+whether there is a draft already part-way through it. That is the thing the
+card was missing: the old page put a five-field form here that posted to a
+view which had stopped accepting POST a release earlier, so pressing Create
+organisation silently did nothing at all.
+{% endcomment %}
+<section class="gt-panel">
+  <div class="gt-panel-head">
+    <span class="gp-ic"><svg><use href="#ic-org-add"/></svg></span>
+    <div>
+      <h2>{% if draft %}Pick up where you left off{% else %}Create an organisation{% endif %}</h2>
+      <div class="gp-sub">
+        {% if draft %}"{{ draft.data.name|default:"Your organisation" }}" is saved at step {{ draft.step }}, last touched {{ draft.updated_at|timesince }} ago.
+        {% else %}{{ wizard_steps|length }} steps, and you can stop after any of them — your answers are kept.{% endif %}
+      </div>
+    </div>
+    <div class="gp-right">
+      <a href="{% url 'orgs:create' %}" class="gt-go-btn">{% if draft %}Continue{% else %}Start{% endif %} <svg><use href="#ic-arrow-right"/></svg></a>
+    </div>
+  </div>
+
+  <ol class="mp-steps">
+    {% for s in wizard_steps %}
+    <li{% if draft and draft.step > s.n %} class="done"{% elif draft and draft.step == s.n %} class="now"{% endif %}>
+      <b>{{ s.label }}</b>
+      <small>{{ s.sub }}</small>
+    </li>
+    {% endfor %}
+  </ol>
+
+  <p class="mp-note">
+    An informal group — a family comp, a crew from the pub — skips the
+    verification step. Only an organisation claiming to be a business, a
+    school or a registered charity is asked to prove the domain is theirs.
+  </p>
+</section>

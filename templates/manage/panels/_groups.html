@@ -1,0 +1,71 @@
+{% comment %}
+Groups across every organisation this person runs — the view an org admin
+cannot get anywhere else, because orgs:groups only ever shows one org's.
+
+Two lists, and the second one matters: groups are off by default, so an
+organisation with none is usually an organisation that never switched them on.
+Saying that beats a blank table that reads like a fault.
+{% endcomment %}
+<section class="gt-panel">
+  <div class="gt-panel-head">
+    <span class="gp-ic"><svg><use href="#ic-users"/></svg></span>
+    <div>
+      <h2>Groups</h2>
+      <div class="gp-sub">Departments, teams and sites inside your organisations.</div>
+    </div>
+  </div>
+
+  <div class="gt-tablewrap">
+    <table class="gt-table">
+      <thead><tr><th>Group</th><th>Organisation</th><th>Members</th><th>Raising for</th><th class="fit"></th></tr></thead>
+      <tbody>
+      {% for g in groups %}
+        <tr>
+          <td>
+            <span class="gt-namecell">
+              <span class="gt-rowic"><svg><use href="#ic-users"/></svg></span>
+              <span>
+                <span class="gt-nameline">
+                  <b>{{ g.name }}</b>
+                  {% if g.is_pending_approval %}<span class="gt-chip needs">Waiting on you</span>{% endif %}
+                </span>
+                <small>{{ g.kind_label|default:"Group" }}{% if g.effective_country %} &middot; {{ g.effective_country.name }}{% endif %}</small>
+              </span>
+            </span>
+          </td>
+          <td><span class="gt-with-ic"><svg><use href="#ic-org"/></svg>{{ g.org.name }}</span></td>
+          <td>{{ g.member_count }}</td>
+          <td>
+            {% if g.charity_is_own %}<span class="gt-with-ic"><svg><use href="#ic-heart"/></svg>{{ g.charity.name }}</span>
+            {% elif g.org.charity_id %}<small>{{ g.org.charity.name }} <i>(the organisation's)</i></small>
+            {% else %}<small>Not chosen yet</small>{% endif %}
+          </td>
+          <td class="fit"><a href="{% url 'orgs:groups' g.org_id %}" class="gt-go" aria-label="Open {{ g.name }}"><svg><use href="#ic-arrow-right"/></svg></a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="gt-empty">No groups yet. Turn them on for an organisation and its members can be sorted into departments, sites or teams, each with its own ladder.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if groups_off %}
+<section class="gt-panel mp-side">
+  <div class="gt-panel-head">
+    <span class="gp-ic"><svg><use href="#ic-sliders"/></svg></span>
+    <div>
+      <h2>Groups switched off</h2>
+      <div class="gp-sub">One ladder for everybody. That is the right answer for most organisations.</div>
+    </div>
+  </div>
+  <ul class="mp-rows">
+    {% for o in groups_off %}
+    <li>
+      <span><b>{{ o.name }}</b><small>Everyone tips on one board</small></span>
+      <a href="{% url 'orgs:groups' o.id %}" class="gt-pill">Set up groups <svg><use href="#ic-arrow-right"/></svg></a>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}

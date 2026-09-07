@@ -1,0 +1,47 @@
+{% comment %}
+Every round across every organisation, with the one number that decides
+whether it will work on the day: how many matches are actually in it. A round
+with no fixtures is not a round, and until this panel existed you had to open
+each organisation in turn to find out.
+{% endcomment %}
+<section class="gt-panel">
+  <div class="gt-panel-head">
+    <span class="gp-ic"><svg><use href="#ic-calendar"/></svg></span>
+    <div>
+      <h2>Rounds &amp; fixtures</h2>
+      <div class="gp-sub">When tipping opens, when it locks, and what is in it.</div>
+    </div>
+  </div>
+
+  <div class="gt-tablewrap">
+    <table class="gt-table">
+      <thead><tr><th>Round</th><th>Organisation</th><th>Matches</th><th>Locks</th><th>Status</th><th class="fit"></th></tr></thead>
+      <tbody>
+      {% for r in rounds %}
+        <tr>
+          <td>
+            <span class="gt-namecell">
+              <span class="gt-rowic"><svg><use href="#ic-match"/></svg></span>
+              <span>
+                <b>Round {{ r.round_number }}</b>
+                <small>{{ r.series.name }}{% if r.stage != 'regular' %} &middot; {{ r.get_stage_display }}{% endif %}</small>
+              </span>
+            </span>
+          </td>
+          <td><span class="gt-with-ic"><svg><use href="#ic-org"/></svg>{{ r.org.name }}</span></td>
+          <td>{% if r.match_count %}{{ r.match_count }}{% else %}<span class="gt-chip needs">None yet</span>{% endif %}</td>
+          <td><span class="gt-with-ic"><svg><use href="#ic-clock"/></svg>{{ r.lockout_at|date:"j M, g:i A" }}</span></td>
+          <td>
+            {% if r.status == 'open' %}<span class="gt-chip ready">Open</span>
+            {% elif r.status == 'upcoming' %}<span class="gt-chip draft">Upcoming</span>
+            {% else %}<span class="gt-chip draft">{{ r.get_status_display }}</span>{% endif %}
+          </td>
+          <td class="fit"><a href="{% url 'manage:round_matches' r.org_id r.id %}" class="gt-go" aria-label="Open round {{ r.round_number }}"><svg><use href="#ic-arrow-right"/></svg></a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="gt-empty">No rounds yet. Open an organisation and add its first round, or wait for the fixture sync to fill the season in.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>

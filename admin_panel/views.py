@@ -5,7 +5,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.files.storage import default_storage
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
@@ -20,7 +20,10 @@ from django.views.decorators.http import require_POST
 from data_sync.models import SyncRun, SyncSchedule
 from data_sync.services import get_sync_service, SyncError
 from orgs.services import unique_charity_slug as _unique_charity_slug
-from orgs.models import MembershipRequest, Message, MessageThread, OrgMember, Organisation
+from orgs.models import (
+    Group, MembershipRequest, Message, MessageThread, OrgDraft, OrgMember,
+    Organisation,
+)
 from orgs.services import approve_membership_request, decline_membership_request
 
 from .perms import get_managed_org_or_404, managed_orgs, org_admin_required
@@ -129,39 +132,173 @@ def approvals(request):
     })
 
 
+# ---- the Organisations desk ------------------------------------------------
+# One page, a row of cards, and a panel underneath that is the only part which
+# changes. Each card is a thing running an organisation actually involves —
+# the organisations themselves, their groups, their members, their rounds,
+# their cause, and starting a new one — and clicking one swaps the panel
+# rather than fetching the whole page again.
+#
+# Two rules this is built to keep:
+#
+#   * every panel is a real address (?panel=groups), so a panel can be linked,
+#     bookmarked and reloaded; and
+#   * every panel renders on its own, server-side, with no JavaScript at all.
+#     The fetch in orgs_list.html is a shortcut past re-drawing the shell it
+#     already has, never the thing that makes the page work.
+#
+# `frag=1` is what the fetch adds, and it returns the panel alone.
+ORG_PANELS = ("organisations", "groups", "members", "rounds", "charity", "create")
+
+
+def _orgs_panel_context(request, mine, panel: str) -> dict:
+    """Whatever the chosen panel needs, and nothing the other five need.
+
+    Split out so the page costs one panel's worth of queries rather than six.
+    The counts on the cards are cheap and always run; the tables behind them
+    are not, and four of them are off-screen at any moment.
+    """
+    org_ids = list(mine.values_list("id", flat=True))
+
+    if panel == "organisations":
+        orgs = (
+            mine.select_related("charity", "season")
+            .prefetch_related("competitions__sport")
+            .order_by("-created_at")
+        )
+        # The list doubles as a finder once somebody runs more than a
+        # screenful: free-text over org and charity name, plus a sport filter.
+        q = (request.GET.get("q") or "").strip()
+        if q:
+            orgs = orgs.filter(Q(name__icontains=q) | Q(charity__name__icontains=q))
+        sport = (request.GET.get("sport") or "").strip()
+        if sport:
+            orgs = orgs.filter(competitions__sport__name=sport)
+        sports = list(
+            Sport.objects.filter(competitions__organisations__in=mine)
+            .order_by("name").values_list("name", flat=True).distinct()
+        )
+        return {"orgs": orgs.distinct(), "q": q, "sport": sport, "sports": sports}
+
+    if panel == "groups":
+        return {
+            "groups": (
+                Group.objects.filter(org_id__in=org_ids)
+                .select_related("org", "kind", "charity", "country")
+                .annotate(member_count=Count("memberships", distinct=True))
+                .order_by("org__name", "name")
+            ),
+            # Groups are off by default, and an organisation with the feature
+            # switched off has no groups for a reason rather than by neglect.
+            # Saying so beats an empty table that reads like a fault.
+            "groups_off": mine.filter(groups_enabled=False).order_by("name"),
+        }
+
+    if panel == "members":
+        return {
+            "members": (
+                OrgMember.objects.filter(org_id__in=org_ids)
+                .select_related("user", "org")
+                .order_by("-joined_at")[:60]
+            ),
+            # Counted off a FRESH queryset rather than off `mine`, and that is
+            # not tidiness. managed_orgs() filters across `members` to find the
+            # rows where you are the owner or a manager, and a .annotate() that
+            # follows a .filter() on the same multi-valued relation REUSES that
+            # join — so Count("members") here would have counted the members
+            # matching the permission filter, which is you, and reported every
+            # organisation as having exactly one.
+            "member_orgs": (
+                Organisation.objects.filter(id__in=org_ids)
+                .annotate(
+                    head_count=Count("members", distinct=True),
+                    waiting_count=Count(
+                        "membership_requests",
+                        filter=Q(membership_requests__status=MembershipRequest.STATUS_PENDING),
+                        distinct=True,
+                    ),
+                )
+                .order_by("name")
+            ),
+        }
+
+    if panel == "rounds":
+        return {
+            "rounds": (
+                Round.objects.filter(org_id__in=org_ids)
+                .select_related("org", "series", "competition")
+                .annotate(match_count=Count("matches", distinct=True))
+                .order_by("org__name", "-round_number")[:60]
+            ),
+        }
+
+    if panel == "charity":
+        return {
+            "charity_orgs": (
+                mine.select_related("charity")
+                .prefetch_related("groups__charity")
+                .order_by("name")
+            ),
+        }
+
+    # "create". No table — the wizard owns the form, and it is seven resumable
+    # steps with a file upload and an emailed code in the middle of them, none
+    # of which survives being pulled into a panel. What belongs here is the
+    # context: what it will ask, and whether this person already has a draft
+    # part-way through that they would rather finish than start again.
+    # Imported here rather than at module scope: WIZARD_STEPS is the wizard's
+    # own list of screens, and reading it means this card describes the flow
+    # that exists rather than a copy of it that can drift.
+    from orgs.views import WIZARD_STEPS
+
+    draft = OrgDraft.objects.filter(user=request.user).first()
+    return {
+        "wizard_steps": [
+            {"n": n, "label": label, "sub": sub} for n, label, sub, _f in WIZARD_STEPS
+        ],
+        "draft": draft if (draft and draft.is_started) else None,
+    }
+
+
 @org_admin_required
 def orgs_list(request):
-    """The organisations this person runs.
+    """The organisations this person runs, and everything that hangs off them.
 
     The POST that used to live here built an organisation straight from a form
     — arbitrary season, charity created on the spot, competitions mapped from a
     three-way dropdown. That is a system tool, and it bypassed every rule the
-    signup wizard enforces (categories, verification, duplicate detection). Org
-    admins create organisations through the wizard like everyone else; there is
-    a link to it from the empty state.
+    signup wizard enforces (categories, verification, duplicate detection). The
+    form outlived the POST that answered it by a release, so it sat on this
+    page doing nothing at all. Org admins create organisations through the
+    wizard like everyone else, and the Create card is the door to it.
     """
-    orgs = (
-        managed_orgs(request.user)
-        .select_related("charity", "season")
-        .prefetch_related("competitions__sport")
-        .order_by("-created_at")
-    )
-    # The list doubles as a finder once somebody runs more than a screenful:
-    # free-text over org and charity name, plus a sport filter.
-    q = (request.GET.get("q") or "").strip()
-    if q:
-        orgs = orgs.filter(Q(name__icontains=q) | Q(charity__name__icontains=q))
-    sport = (request.GET.get("sport") or "").strip()
-    if sport:
-        orgs = orgs.filter(competitions__sport__name=sport)
-    orgs = orgs.distinct()
-    sports = list(
-        Sport.objects.filter(competitions__organisations__in=managed_orgs(request.user))
-        .order_by("name").values_list("name", flat=True).distinct()
-    )
-    return render(request, "manage/orgs_list.html", {
-        "orgs": orgs, "q": q, "sport": sport, "sports": sports,
-    })
+    mine = managed_orgs(request.user)
+    org_ids = list(mine.values_list("id", flat=True))
+
+    panel = request.GET.get("panel") or ORG_PANELS[0]
+    if panel not in ORG_PANELS:
+        panel = ORG_PANELS[0]
+
+    ctx = {
+        "panel": panel,
+        # The numbers on the cards. Cheap, and the card is not worth much
+        # without them: "Groups" tells you nothing, "Groups 14" tells you
+        # whether there is anything behind it.
+        "card_counts": {
+            "organisations": len(org_ids),
+            "groups": Group.objects.filter(org_id__in=org_ids).count(),
+            "members": OrgMember.objects.filter(org_id__in=org_ids).count(),
+            "rounds": Round.objects.filter(org_id__in=org_ids).count(),
+            "charity": mine.filter(charity__isnull=False).count(),
+        },
+    }
+    ctx.update(_orgs_panel_context(request, mine, panel))
+
+    # The fetch asks for the panel alone; anything else — a direct link, a
+    # reload, a browser with JavaScript off — gets the whole page around it.
+    if request.GET.get("frag"):
+        return render(request, "manage/_orgs_panel.html", ctx)
+    return render(request, "manage/orgs_list.html", ctx)
 
 
 @org_admin_required

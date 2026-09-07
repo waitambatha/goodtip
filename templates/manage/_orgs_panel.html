@@ -1,0 +1,20 @@
+{% comment %}
+THE PANEL UNDER THE CARDS.
+
+Rendered on its own when the page fetches it (?panel=…&frag=1), and included
+by orgs_list.html otherwise, so the two paths cannot drift: there is one
+template per panel and one place that chooses between them.
+
+The wrapper travels with the panel rather than staying behind in the page,
+because the swap replaces this element's own outerHTML — which is what keeps
+`data-panel` truthful about what is actually on screen.
+{% endcomment %}
+<div class="mpanel" id="mPanel" data-panel="{{ panel }}">
+  {% if panel == "groups" %}{% include "manage/panels/_groups.html" %}
+  {% elif panel == "members" %}{% include "manage/panels/_members.html" %}
+  {% elif panel == "rounds" %}{% include "manage/panels/_rounds.html" %}
+  {% elif panel == "charity" %}{% include "manage/panels/_charity.html" %}
+  {% elif panel == "create" %}{% include "manage/panels/_create.html" %}
+  {% else %}{% include "manage/panels/_organisations.html" %}
+  {% endif %}
+</div>

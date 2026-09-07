@@ -218,3 +218,63 @@ class MemberSideTests(Fixture):
         self.assertEqual(
             self.client.get(f"/leagues/{self.mine.id}/messages/{thread.id}/").status_code, 404,
         )
+
+
+class OrgsDeskTests(Fixture):
+    """The cards-over-a-panel page at /manage/orgs/.
+
+    The isolation rule is the one that matters here: five of the six panels
+    were new queries written at once, and a panel that forgot to scope itself
+    would leak another organisation's groups, members or rounds while the
+    organisations panel above it looked perfectly correct. So every panel is
+    asked the same question — does "Theirs" appear — rather than only the
+    default one.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.owner)
+
+    def test_every_panel_renders(self):
+        for panel in ("organisations", "groups", "members", "rounds", "charity", "create"):
+            with self.subTest(panel=panel):
+                r = self.client.get("/manage/orgs/", {"panel": panel})
+                self.assertEqual(r.status_code, 200)
+                self.assertContains(r, 'data-panel="%s"' % panel)
+
+    def test_no_panel_shows_another_organisation(self):
+        for panel in ("organisations", "groups", "members", "rounds", "charity", "create"):
+            with self.subTest(panel=panel):
+                body = self.client.get("/manage/orgs/", {"panel": panel}).content
+                self.assertNotIn(b"Theirs", body)
+
+    def test_the_fragment_is_the_panel_and_not_the_page(self):
+        """What the card click actually fetches.
+
+        If frag ever started returning the whole document the swap would nest
+        a page inside itself — nav, hero, cards and all — which renders
+        without erring and looks catastrophic.
+        """
+        r = self.client.get("/manage/orgs/", {"panel": "groups", "frag": "1"})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'data-panel="groups"')
+        self.assertNotContains(r, "app-nav")
+
+    def test_an_unknown_panel_falls_back_rather_than_erroring(self):
+        r = self.client.get("/manage/orgs/", {"panel": "../../etc/passwd"})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'data-panel="organisations"')
+
+    def test_the_search_still_filters(self):
+        body = self.client.get("/manage/orgs/", {"panel": "organisations", "q": "zzz"}).content
+        self.assertNotIn(b">Mine<", body)
+
+    def test_the_head_count_counts_members_and_not_admins(self):
+        """The join-reuse trap.
+
+        managed_orgs() filters across `members`; an .annotate(Count("members"))
+        chained onto it reuses that join and counts only the rows the
+        permission filter matched — which is one, you. "Mine" has two members.
+        """
+        r = self.client.get("/manage/orgs/", {"panel": "members"})
+        self.assertContains(r, "2 members")

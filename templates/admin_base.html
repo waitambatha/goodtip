@@ -51,21 +51,32 @@
         <a href="{% url 'manage:overview' %}" class="{% block nav_overview %}{% endblock %}">Overview</a>
         {# count rides on the link so a waiting request is visible from any admin page #}
         <a href="{% url 'manage:approvals' %}" class="{% block nav_approvals %}{% endblock %}">Approvals{% if pending_approval_count %} <span class="an-count">{{ pending_approval_count }}</span>{% endif %}</a>
-        <a href="{% url 'manage:orgs_list' %}" class="{% block nav_orgs %}{% endblock %}">Orgs</a>
         {% comment %}
-        Sync, Enquiries, News and Public pages have gone to /admin/. None of
-        them belongs to an organisation: sync drives the platform's fixtures
-        for everybody, and an enquiry from the public contact form is
-        addressed to GoodTip rather than to anybody's league.
+        FOUR ITEMS, AND WHY IT IS FOUR.
+
+        Sync, Enquiries, News and Public pages went to /admin/ when the two
+        areas were split: none of them belongs to an organisation.
+
+        Messages and Charity have now gone too, and for the opposite reason —
+        they were duplicates rather than strangers. An admin reads and writes
+        the same threads from the member app's Messages, and Charity here was
+        a bare redirect into the organisation's own election page, which is
+        also where the Causes card on Organisations points. Two doors onto one
+        room, in a bar of six, made the bar look like the product had six
+        areas. It has four.
+
+        Their nav_messages and nav_charity blocks are kept below, unused:
+        manage/messages.html and its two siblings still set them, both pages
+        are still reachable from the member app, and a block that vanishes
+        from the parent fails silently rather than loudly.
         {% endcomment %}
-        <a href="{% url 'manage:messages' %}" class="{% block nav_messages %}{% endblock %}">Messages{% if unread_thread_count %} <span class="an-count">{{ unread_thread_count }}</span>{% endif %}</a>
+        <a href="{% url 'manage:orgs_list' %}" class="{% block nav_orgs %}{% endblock %}">Organisations</a>
         {% comment %}
-        Prefect sits beside Messages because it is about the same rooms — and it
-        carries its own count, since a queue nobody knows is waiting is a queue
-        that is not being reviewed.
+        Prefect carries its own count: a review queue nobody knows is waiting
+        is a queue that is not being reviewed.
         {% endcomment %}
         <a href="{% url 'manage:prefect' %}" class="{% block nav_prefect %}{% endblock %}">Prefect{% if prefect_open_count %} <span class="an-count">{{ prefect_open_count }}</span>{% endif %}</a>
-        <a href="{% url 'manage:charity' %}" class="{% block nav_charity %}{% endblock %}">Charity</a>
+        <span hidden>{% block nav_messages %}{% endblock %}{% block nav_charity %}{% endblock %}</span>
       </div>
       <div class="an-right">
         {% include "partials/_app_theme_switch.html" %}
@@ -110,10 +121,8 @@
     <div class="sheet-panel">
       <a href="{% url 'manage:overview' %}">Overview</a>
       <a href="{% url 'manage:approvals' %}">Approvals{% if pending_approval_count %} ({{ pending_approval_count }}){% endif %}</a>
-      <a href="{% url 'manage:orgs_list' %}">Orgs</a>
-      <a href="{% url 'manage:messages' %}">Messages{% if unread_thread_count %} ({{ unread_thread_count }}){% endif %}</a>
+      <a href="{% url 'manage:orgs_list' %}">Organisations</a>
       <a href="{% url 'manage:prefect' %}">Prefect{% if prefect_open_count %} ({{ prefect_open_count }}){% endif %}</a>
-      <a href="{% url 'manage:charity' %}">Charity</a>
       {% if user.is_superuser %}<a href="/admin/">GoodTip HQ &rarr;</a>{% endif %}
       <a href="{% url 'profile' %}">Profile</a>
       <a href="{% url 'dashboard' %}">&larr; Back to app</a>
@@ -140,21 +149,34 @@
       </div>
     {% endif %}
 
+    {% comment %}
+    THE HERO, CENTRED, AND SAYING WHERE YOU ARE BEFORE IT SAYS WHAT THE PAGE IS.
+
+    "Organisation admin" was 12.5px of lime capitals — a caption under a 42px
+    heading, which is not what it is. It is the line that tells an org admin
+    they are in their own area and not in GoodTip HQ, and that distinction is
+    the whole point of the split. It carries `.is-title` now, the same move
+    the member app makes on its league headers, at a bit over twice the size.
+
+    The page's own name stays the h1 and stays the biggest thing, because it
+    is the line that changes between Overview, Organisations, Approvals and
+    Prefect. Inverting the two would have made the only large line on every
+    page in the area the one that is identical on all of them.
+
+    The identity chip that used to float on the right has gone with the
+    centring. It said "<name> / Organisation admin", which is character for
+    character what the nav chip three inches above it says, and a centred
+    column with one thing hard right is not a layout, it is two layouts.
+    {% endcomment %}
     {% block admin_hero %}
-    <header class="gt-hero">
+    <header class="gt-hero is-centred">
       <div class="gh-shot" style="background-image:url('{% block hero_shot %}{% static 'img/scenes/stadium-panorama.jpg' %}{% endblock %}')"></div>
       <div class="gh-veil"></div>
-      <div>
-        <div class="gh-eyebrow">{% block hero_eyebrow %}Organisation admin{% endblock %}</div>
+      <div class="gh-mid">
+        <div class="gh-eyebrow is-title">{% block hero_eyebrow %}Organisation admin{% endblock %}</div>
         <h1>{% block hero_title %}Manage{% endblock %}</h1>
         <p>{% block hero_lead %}Run your leagues. Empower your community.{% endblock %}</p>
       </div>
-      {% block hero_aside %}
-      <div class="gh-who">
-        <span class="av">{% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{{ user.display_name|slice:":1"|upper }}{% endif %}</span>
-        <span><b>{{ user.display_name }}</b><small>Organisation admin</small></span>
-      </div>
-      {% endblock %}
     </header>
     {% endblock %}
 

@@ -17675,3 +17675,213 @@ html[data-theme="light"] .gt-app .ppanel .atable .abtn-ghost:hover {
   .gh-backrow { justify-content: stretch; }
   .abtn.gh-back { width: 100%; justify-content: center; }
 }
+
+/* ===========================================================================
+   THE MANAGE HERO, CENTRED — and led by the eyebrow
+   ---------------------------------------------------------------------------
+   `.gt-hero` is a flex row built around a text block on the left and the admin
+   chip on the right. With the chip gone (admin_base.html says why) there is
+   one child, and the row becomes a centred column.
+
+   The eyebrow takes `.is-title` but not the rule that already exists for it.
+   `.gt-head .gh-eyebrow.is-title` is tuned for the cream sheet and sets
+   --forest, which on this deep-green panel is the "green on green" failure
+   already fixed once further up this file. Here it keeps the lime it always
+   had and only grows — the panel's colours are unchanged.
+   ========================================================================= */
+.gt-hero.is-centred { justify-content: center; text-align: center; }
+.gt-hero.is-centred .gh-mid { max-width: 62ch; margin: 0 auto; }
+.gt-hero.is-centred p { margin-left: auto; margin-right: auto; }
+
+.gt-hero .gh-eyebrow.is-title {
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(21px, 2.5vw, 28px);
+  letter-spacing: -.005em; text-transform: none; line-height: 1.1;
+  color: var(--lime);
+}
+/* The page's own name still leads — it is the line that differs between
+   Overview, Organisations, Approvals and Prefect, and the eyebrow is the line
+   that does not. Tightened up under a kicker that is now more than twice the
+   size it was, so the two read as one stacked title rather than as a label
+   with a heading a long way below it. */
+.gt-hero .gh-eyebrow.is-title + h1 { margin-top: 2px; }
+@media (max-width: 560px) {
+  .gt-hero .gh-eyebrow.is-title { font-size: 20px; }
+}
+
+/* ===========================================================================
+   THE ORGANISATIONS DESK — cards over a panel
+   ---------------------------------------------------------------------------
+   Six cards, six colours, one panel. A card's colour arrives as a `c-` class
+   and lands in `--mc`, and that pair of custom properties is the ONLY thing
+   that differs between the six.
+
+   WHY THE COLOUR IS AN EDGE AND NOT A GROUND. /manage/ is drawn on the deep
+   green in one theme and on white in the other, and a card tinted with its own
+   hue has to be legible on both — which in practice means six pairs of
+   background-and-ink to keep in step, and the half-moved palette in this file
+   is exactly what that goes wrong as. So an unselected card is the ordinary
+   `--gt-card` surface every other panel here uses, and the colour arrives as
+   a top rail, an icon badge and the number. Only the SELECTED card takes the
+   full fill — and once it does, the ground is the card's rather than the
+   theme's, so the ink on it is `--mc-on` and is decided per theme below.
+   ========================================================================= */
+/* The six hues, twice. --mc is the colour as TYPE and as the selected fill;
+   --mc-on is the ink that goes on top of that fill. On cream the fills are
+   saturated and the ink is white; on the green the fills are the light end of
+   the same hue and the ink is near-black, because white on #7DC24A is 2.2:1
+   and a selected card nobody can read is worse than no selection at all. */
+.mcard { --mc: var(--forest); --mc-on: #fff; }
+.mcard.c-organisations { --mc: #2D7A3A; }
+.mcard.c-groups        { --mc: #12798C; }
+.mcard.c-members       { --mc: #4B5FC4; }
+.mcard.c-rounds        { --mc: #A96A12; }
+.mcard.c-charity       { --mc: #B23F65; }
+.mcard.c-create        { --mc: #56800A; }
+
+html[data-theme="dark"] body.manage-app .mcard { --mc-on: #08170F; }
+html[data-theme="dark"] body.manage-app .mcard.c-organisations { --mc: #7DC24A; }
+html[data-theme="dark"] body.manage-app .mcard.c-groups        { --mc: #63CBDE; }
+html[data-theme="dark"] body.manage-app .mcard.c-members       { --mc: #9FACF7; }
+html[data-theme="dark"] body.manage-app .mcard.c-rounds        { --mc: #F0CB63; }
+html[data-theme="dark"] body.manage-app .mcard.c-charity       { --mc: #F59BB4; }
+html[data-theme="dark"] body.manage-app .mcard.c-create        { --mc: #C8F135; }
+
+.mcards {
+  display: grid; grid-template-columns: repeat(6, 1fr);
+  gap: 14px; margin-bottom: 22px;
+}
+@media (max-width: 1180px) { .mcards { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 720px)  { .mcards { grid-template-columns: repeat(2, 1fr); } }
+
+.mcard {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 18px 16px 16px; border-radius: var(--gt-r);
+  background: var(--gt-card); border: 1px solid var(--gt-hair);
+  text-decoration: none; color: inherit;
+  transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+}
+/* The rail. 4px of the card's own colour along the top, so six cards read as
+   six things at a glance without six coloured grounds. */
+.mcard::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
+  background: var(--mc);
+}
+.mcard:hover { transform: translateY(-2px); box-shadow: 0 18px 34px -26px rgba(10,32,20,.55); }
+.mcard:focus-visible { outline: 2px solid var(--mc); outline-offset: 2px; }
+
+.mcard .mc-ic {
+  width: 38px; height: 38px; border-radius: 11px; margin-bottom: 8px;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--mc) 16%, transparent);
+  color: var(--mc);
+}
+.mcard .mc-ic svg { width: 19px; height: 19px; fill: currentColor; }
+/* The Create card wears ic-org-add, which is one of the stroke icons — filled
+   it collapses into a solid blob. The other five are the ic-f- set and are
+   drawn as fills by design. */
+.mcard.is-cta .mc-ic svg {
+  fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.mcard .mc-num {
+  font-family: var(--display); font-size: 26px; line-height: 1;
+  color: var(--mc);
+}
+.mcard .mc-lab { font-weight: 700; font-size: 14px; color: var(--ink); margin-top: 4px; }
+.mcard .mc-sub { font-size: 12px; color: var(--muted); line-height: 1.35; }
+
+/* Selected. The card becomes its colour and everything on it flips to
+   --mc-on, the number included — which is the one thing that was already
+   wearing the colour rather than sitting on it. */
+.mcard.on {
+  background: var(--mc); border-color: var(--mc);
+  box-shadow: 0 20px 38px -26px color-mix(in srgb, var(--mc) 70%, transparent);
+}
+.mcard.on::before { background: color-mix(in srgb, var(--mc-on) 45%, transparent); }
+.mcard.on .mc-ic { background: color-mix(in srgb, var(--mc-on) 16%, transparent); color: var(--mc-on); }
+.mcard.on .mc-num,
+.mcard.on .mc-lab { color: var(--mc-on); }
+.mcard.on .mc-sub { color: color-mix(in srgb, var(--mc-on) 78%, transparent); }
+
+/* The one card that is an action rather than a count. */
+.mcard.is-cta .mc-num { font-size: 30px; }
+
+/* ---- the panel ---------------------------------------------------------- */
+.mpanel { display: grid; grid-template-columns: 1fr; gap: 18px; }
+/* A panel that wants a sidebar puts .mp-side on its second section and the
+   grid follows; one that does not stays full width without saying anything.
+   `.gt-panel + .gt-panel` adds a 20px top margin between stacked panels
+   elsewhere, which inside a gapped grid is 20px of nothing — zeroed here. */
+.mpanel:has(.mp-side) { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
+@media (max-width: 1080px) { .mpanel:has(.mp-side) { grid-template-columns: 1fr; } }
+.mpanel .gt-panel + .gt-panel { margin-top: 0; }
+
+/* While a fetch is in flight. Not a spinner: the old panel stays readable and
+   simply stops accepting clicks, because the new one usually lands inside a
+   frame or two and a spinner that flashes is worse than no spinner. */
+.mpanel.is-loading { opacity: .55; pointer-events: none; transition: opacity .12s ease .08s; }
+
+/* Rows — the shape the non-table panels use. */
+.mp-rows { list-style: none; margin: 0; padding: 0; }
+.mp-rows li {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  /* No side padding: .gt-panel around these already pads to its content edge,
+     and a second inset would step the rows in from their own heading. */
+  padding: 13px 0; border-top: 1px solid var(--gt-hair);
+}
+.mp-rows li:first-child { border-top: 0; }
+.mp-rows li > span:first-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mp-rows b { font-size: 14px; color: var(--ink); }
+.mp-rows small { font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+/* .mp-rows b is the row's name, at 14px. A <b> INSIDE the small line is
+   emphasis within that line and has to stay its size. */
+.mp-rows small b { font-size: inherit; }
+.mp-rows .mp-ic {
+  width: 13px; height: 13px; flex: none;
+  fill: none; stroke: currentColor; stroke-width: 1.9;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.mp-rows .mp-nested { padding-left: 2px; opacity: .9; }
+.mp-rows-lg li { padding: 16px 0; }
+.mp-waiting { color: var(--forest); font-weight: 700; }
+
+/* The wizard's steps, as a ladder rather than a form. */
+.mp-steps {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;
+  counter-reset: step;
+}
+.mp-steps li {
+  counter-increment: step;
+  border: 1px solid var(--gt-hair); border-radius: var(--gt-r-sm);
+  padding: 12px 14px 12px 40px; position: relative;
+}
+.mp-steps li::before {
+  content: counter(step);
+  position: absolute; left: 12px; top: 12px;
+  width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 11px; font-weight: 700;
+  background: color-mix(in srgb, var(--forest) 14%, transparent); color: var(--forest);
+}
+/* --forest is #2D7A3A on cream and #7DC24A on the green, so the ink that goes
+   ON it cannot be a literal white in both. Same split as the cards' --mc-on. */
+.mp-steps { --step-ink: #fff; }
+html[data-theme="dark"] body.manage-app .mp-steps { --step-ink: #08170F; }
+.mp-steps li.done::before { content: "\2713"; background: var(--forest); color: var(--step-ink); }
+.mp-steps li.now { border-color: var(--forest); }
+.mp-steps li.now::before { background: var(--forest); color: var(--step-ink); }
+.mp-steps b { display: block; font-size: 13px; color: var(--ink); }
+.mp-steps small { font-size: 11.5px; color: var(--muted); }
+.mp-note { margin: 16px 0 0; font-size: 12.5px; color: var(--muted); max-width: 68ch; }
+/* .gt-go-btn is `width: 100%` because everywhere else it is the last thing in
+   a form. In a panel head it is one item in a row, and it is a link. */
+.gt-panel-head .gt-go-btn { width: auto; text-decoration: none; }
+
+/* Nothing else needs a dark rule. .mcard, .mp-rows and .mp-steps paint from
+   --gt-card, --gt-hair, --ink and --muted, and gt-shell.css already moves all
+   four on body.manage-app under the dark palette — which is the whole reason
+   they are written as tokens here rather than as the literals the older
+   components in this file are still being unpicked from. */

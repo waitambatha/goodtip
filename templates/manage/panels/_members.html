@@ -1,0 +1,71 @@
+{% comment %}
+Who has joined, newest first, across every organisation this person runs —
+plus a head count and a waiting count per organisation, because the answer to
+"why has nobody joined" is usually a queue nobody has looked at.
+
+Capped at 60 rows on purpose. This is the panel that says who has arrived
+lately; the full roll for one organisation, with the invite link and the
+remove and promote buttons, is behind Manage.
+{% endcomment %}
+<section class="gt-panel">
+  <div class="gt-panel-head">
+    <span class="gp-ic"><svg><use href="#ic-people"/></svg></span>
+    <div>
+      <h2>Newest members</h2>
+      <div class="gp-sub">The last {{ members|length }} to join, across your organisations.</div>
+    </div>
+  </div>
+
+  <div class="gt-tablewrap">
+    <table class="gt-table">
+      <thead><tr><th>Member</th><th>Organisation</th><th>Role</th><th>Joined</th></tr></thead>
+      <tbody>
+      {% for m in members %}
+        <tr>
+          <td>
+            <span class="gt-namecell">
+              <span class="gt-rowic"><svg><use href="#ic-people"/></svg></span>
+              <span><b>{{ m.user.display_name }}</b><small>{{ m.user.email }}</small></span>
+            </span>
+          </td>
+          <td><span class="gt-with-ic"><svg><use href="#ic-org"/></svg>{{ m.org.name }}</span></td>
+          <td>
+            {% if m.is_league_owner %}<span class="gt-chip ready">Owner</span>{% endif %}
+            {% if m.is_manager %}<span class="gt-chip draft">Manager</span>{% endif %}
+            {% if m.is_captain %}<span class="gt-chip draft">Captain</span>{% endif %}
+            {% if not m.is_league_owner and not m.is_manager and not m.is_captain %}<small>Participant</small>{% endif %}
+          </td>
+          <td><span class="gt-with-ic"><svg><use href="#ic-calendar"/></svg>{{ m.joined_at|date:"j M Y" }}</span></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="gt-empty">Nobody has joined yet. Share an organisation's invite link from Manage and they land here.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="gt-panel mp-side">
+  <div class="gt-panel-head">
+    <span class="gp-ic"><svg><use href="#ic-shield-check"/></svg></span>
+    <div>
+      <h2>By organisation</h2>
+      <div class="gp-sub">Head count, and anyone still waiting to be let in.</div>
+    </div>
+  </div>
+  <ul class="mp-rows">
+    {% for o in member_orgs %}
+    <li>
+      <span>
+        <b>{{ o.name }}</b>
+        <small>
+          {{ o.head_count }} member{{ o.head_count|pluralize }}{% if o.waiting_count %} &middot; <a href="{% url 'manage:approvals' %}" class="mp-waiting">{{ o.waiting_count }} waiting</a>{% endif %}
+        </small>
+      </span>
+      <a href="{% url 'manage:org_members' o.id %}" class="gt-pill">Manage <svg><use href="#ic-arrow-right"/></svg></a>
+    </li>
+    {% empty %}
+    <li><span><small>Nothing to show yet.</small></span></li>
+    {% endfor %}
+  </ul>
+</section>
