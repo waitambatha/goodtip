@@ -1,0 +1,106 @@
+{% extends "admin/hub/base.html" %}
+{% load i18n gtadmin %}
+
+{% comment %}
+Security, as a screen rather than as three rows in a menu.
+
+The cards carry the last 24 hours because that is the number that decides
+whether to open them: "Sign-in attempts" says a log exists, "Sign-in attempts —
+34 in the last day, 2 refused" says whether to look. Refusals are counted
+separately and shown in the warning colour; a spike in those is the one thing
+on this page anybody is ever hoping to catch early.
+
+Underneath, the two logs themselves, most recent first, so the common case —
+"what happened just now?" — is answered without a click. Django writes an
+audit row on every admin save and delete already, so the answer to "who
+changed this table, and when" comes from its records rather than from a second
+set that could disagree with them.
+{% endcomment %}
+
+{% block hub_accent %}var(--gt-c6){% endblock %}
+{% block hub_ic %}ic-f-shield{% endblock %}
+{% block hub_h1 %}{% translate 'Security' %}{% endblock %}
+{% block hub_lead %}Who got into the control plane, and who changed what once they were in.{% endblock %}
+
+{% block hub_body %}
+<div class="gta-cards">
+  {% for c in cards %}
+  <a href="{{ c.url }}" class="gta-dcard" style="--card-accent:{{ c.accent }}">
+    <span class="gta-card-ic"><svg aria-hidden="true"><use href="#{{ c.icon }}"/></svg></span>
+    <span class="gta-card-txt">
+      <b>{{ c.name }}</b>
+      <small>{{ c.blurb }}</small>
+    </span>
+    {% if c.recent is not None %}
+    <span class="gta-card-n{% if c.bad %} hot{% endif %}">
+      {{ c.recent }} today{% if c.bad %} &middot; {{ c.bad }} refused{% endif %}
+    </span>
+    {% endif %}
+    <svg class="gta-card-go" aria-hidden="true"><use href="#ic-arrow-right"/></svg>
+  </a>
+  {% endfor %}
+</div>
+
+<div class="gta-sec-grid">
+  <section class="gta-card">
+    <div class="gta-card-head">
+      <h2>{% translate 'What changed, and who changed it' %}</h2>
+      {% if audit_url %}<a class="gta-card-link" href="{{ audit_url }}">{% translate 'View all' %}</a>{% endif %}
+    </div>
+    <div class="gta-card-body">
+      {% if recent_changes %}
+      <ul class="gta-actions">
+        {% for e in recent_changes %}
+        <li>
+          <span class="gta-act-dot {% if e.is_addition %}add{% elif e.is_change %}change{% else %}delete{% endif %}">
+            <svg><use href="#{% if e.content_type %}{% model_icon e.content_type.model %}{% else %}ic-doc{% endif %}"/></svg>
+          </span>
+          <div class="gta-act-body">
+            <b>
+              {% if e.is_addition %}{% translate 'Added' %}{% elif e.is_change %}{% translate 'Updated' %}{% else %}{% translate 'Deleted' %}{% endif %}
+              {% if e.content_type %}{{ e.content_type.name|lower }}{% else %}{% translate 'record' %}{% endif %}
+            </b>
+            <small>
+              {% if e.is_deletion or not e.get_admin_url %}{{ e.object_repr }}
+              {% else %}<a href="{{ e.get_admin_url }}">{{ e.object_repr }}</a>{% endif %}
+              &middot; {{ e.user.display_name|default:e.user.email|default:"—" }}
+            </small>
+          </div>
+          <time datetime="{{ e.action_time|date:'c' }}" title="{{ e.action_time|date:'j M Y, g:i a' }}">{{ e.action_time|compact_since }}</time>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="gta-empty">{% translate 'Nothing has been changed yet.' %}</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="gta-card">
+    <div class="gta-card-head">
+      <h2>{% translate 'Recent sign-ins' %}</h2>
+      {% if logins_url %}<a class="gta-card-link" href="{{ logins_url }}">{% translate 'View all' %}</a>{% endif %}
+    </div>
+    <div class="gta-card-body">
+      {% if recent_logins %}
+      <ul class="gta-actions">
+        {% for l in recent_logins %}
+        <li>
+          <span class="gta-act-dot {% if l.success %}add{% else %}delete{% endif %}">
+            <svg><use href="#{% if l.success %}ic-shield-check{% else %}ic-shield{% endif %}"/></svg>
+          </span>
+          <div class="gta-act-body">
+            <b>{% if l.success %}{% translate 'Signed in' %}{% else %}{% translate 'Refused' %}{% endif %}</b>
+            <small>{{ l.email|default:"—" }}{% if l.ip_address %} &middot; {{ l.ip_address }}{% endif %}</small>
+          </div>
+          <time datetime="{{ l.created_at|date:'c' }}" title="{{ l.created_at|date:'j M Y, g:i a' }}">{{ l.created_at|compact_since }}</time>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="gta-empty">{% translate 'No sign-in attempts recorded.' %}</p>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

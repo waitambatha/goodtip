@@ -1,4 +1,6 @@
 {% extends "hq_base.html" %}
+{% block back_url %}{% url 'admin:hq_reviews' %}{% endblock %}
+{% block back_label %}waiting for review{% endblock %}
 {% block title %}{{ cr.summary }}. Review{% endblock %}
 {% block nav_reviews %}on{% endblock %}
 {% block hero_title %}{{ cr.summary }}{% endblock %}

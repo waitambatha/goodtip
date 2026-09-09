@@ -3,10 +3,11 @@
 Three jobs, and each of them exists because the stock admin cannot answer a
 question the control plane is asked every day:
 
-* SECTIONS turns Django's flat `available_apps` into the ten groups the menu
-  and the dashboard both show. The app list alone put Season between Sport and
-  Charity with nothing separating catalog from tipping, and that is what a
-  25-entry rail looks like when nobody has grouped it.
+* handing templates the category map in sysadmin/hub.py, which turns Django's
+  flat `available_apps` into groups named for the work rather than for the app
+  label. The app list alone put Season between Sport and Charity with nothing
+  separating catalog from tipping, and that is what a 30-entry rail looks like
+  when nobody has grouped it.
 * the dashboard numbers, including the little sparklines on the tiles — a
   count on its own says nothing about whether it is going up.
 * what is waiting on somebody, which is the first thing the screen should say
@@ -23,58 +24,16 @@ register = template.Library()
 # The section map
 # ---------------------------------------------------------------------------
 #
-# Ten groups over the ~25 registered models, in the order the menu shows them.
-# Members are named "app_label.model_name" and listed in the order they should
-# appear inside their group, which is rarely alphabetical — under Tipping, Tip
-# is the one people open and Team is the one they almost never do.
-#
-# ANYTHING NOT LISTED STILL SHOWS UP. Unclaimed models are collected into a
-# final "Everything else" group rather than dropped, so registering a model and
-# forgetting this table costs you a tidy heading, not access to your data.
-#
-# Nothing here grants access. The rows are matched against `available_apps`,
-# which Django has already filtered by permission, so a section renders only
-# the models this particular user was going to be shown anyway.
-SECTIONS = [
-    ("users", "Users", "ic-users", "var(--gt-c1)", [
-        "accounts.user", "accounts.launchsignup", "auth.group",
-    ]),
-    ("organisations", "Organisations", "ic-org", "var(--gt-gold)", [
-        "orgs.organisation", "orgs.membershiprequest", "billing.plansubscription",
-    ]),
-    ("wall", "The Wall", "ic-msg", "var(--gt-c2)", [
-        "orgs.wallpost", "orgs.wallreply",
-    ]),
-    ("charities", "Charities", "ic-heart", "var(--gt-c6)", [
-        "catalog.charity", "orgs.charityvote", "orgs.charityvoteballot",
-    ]),
-    ("tipping", "Tipping", "ic-target", "var(--gt-c1)", [
-        "tipping.tip", "tipping.match", "tipping.round", "tipping.team",
-    ]),
-    ("competitions", "Competitions", "ic-trophy", "var(--gt-gold)", [
-        "catalog.competition", "catalog.series", "catalog.sport", "catalog.season",
-    ]),
-    ("catalog", "Catalogue", "ic-sliders", "var(--gt-c4)", [
-        "catalog.state", "catalog.organisationtype", "catalog.subcategory",
-        "catalog.goodlistconfig",
-    ]),
-    ("news", "News & blog", "ic-doc", "var(--gt-c2)", [
-        "admin_panel.newspost",
-    ]),
-    ("sync", "Data sync", "ic-cloud-sync", "var(--gt-c4)", [
-        "data_sync.syncrun",
-    ]),
-    ("security", "Security", "ic-shield-check", "var(--gt-c6)", [
-        "sysadmin.loginevent", "sysadmin.auditlog", "sysadmin.stresstestrun",
-    ]),
-]
-
-FALLBACK_SECTION = ("other", "Everything else", "ic-sliders", "var(--gt-c5)")
+# It moved. What the tables are, what each one is for and which colour it
+# carries now lives in sysadmin/hub.py, because the hub screens and the
+# dashboard both render it and neither of them is a template helper. This
+# module keeps only the tags that hand it to a template.
 
 MODEL_ICONS = {
     "user": "ic-users",
     "launchsignup": "ic-send",
     "group": "ic-people",
+    "groupmember": "ic-users",
     "organisation": "ic-org",
     "membershiprequest": "ic-org-add",
     "plansubscription": "ic-coins",
@@ -96,6 +55,8 @@ MODEL_ICONS = {
     "subcategory": "ic-sliders",
     "goodlistconfig": "ic-sliders",
     "newspost": "ic-doc",
+    "pageseo": "ic-globe",
+    "redirect": "ic-link",
     "syncrun": "ic-sync",
     "loginevent": "ic-shield",
     "auditlog": "ic-clock",
@@ -121,78 +82,120 @@ def safe_url(name, *args):
         return ""
 
 
-@register.simple_tag(takes_context=True)
-def gta_sections(context):
-    """`available_apps`, regrouped by SECTIONS.
+def _apps(context):
+    return context.get("available_apps") or context.get("app_list") or []
 
-    Returns a list of dicts the menu and the dashboard grid both render:
 
-        {key, label, icon, accent, models: [...], count, is_open}
-
-    `is_open` marks the group holding the page you are on, so arriving at a
-    changelist from anywhere finds its group already expanded instead of
-    leaving you to guess which of ten it lives under.
-    """
-    apps = context.get("available_apps") or context.get("app_list") or []
+def _path(context):
     request = context.get("request")
-    path = getattr(request, "path", "") or ""
+    return getattr(request, "path", "") or ""
 
-    # Flatten to "app_label.model_name" -> the dict Django built, keeping the
-    # app label on it so the fallback group can still say where a model came
-    # from. Django spells the key `object_name` on some versions and `model`
-    # on others; the lowercase object name is stable across both.
-    flat = {}
-    for app in apps:
-        label = app.get("app_label", "")
-        for model in app.get("models", []):
-            name = (model.get("object_name") or "").lower()
-            if not name:
-                continue
-            row = dict(model)
-            row["app_label"] = label
-            row["app_name"] = app.get("name", "")
-            flat[f"{label}.{name}"] = row
 
-    claimed = set()
-    sections = []
-    for key, label, icon, accent, members in SECTIONS:
-        rows = []
-        for ref in members:
-            row = flat.get(ref)
-            if row is None:
-                continue        # not registered, or not this user's to see
-            claimed.add(ref)
-            rows.append(row)
-        if not rows:
-            continue            # an empty heading is worse than no heading
-        sections.append({
-            "key": key,
-            "label": label,
-            "icon": icon,
-            "accent": accent,
-            "models": rows,
-            "count": len(rows),
-            "is_open": any(
-                r.get("admin_url") and path.startswith(r["admin_url"]) for r in rows
-            ),
-        })
+@register.simple_tag(takes_context=True)
+def gta_categories(context):
+    """Every data category this administrator can see.
 
-    leftovers = [flat[ref] for ref in flat if ref not in claimed]
-    if leftovers:
-        key, label, icon, accent = FALLBACK_SECTION
-        leftovers.sort(key=lambda r: (r["app_label"], r.get("name", "")))
-        sections.append({
-            "key": key,
-            "label": label,
-            "icon": icon,
-            "accent": accent,
-            "models": leftovers,
-            "count": len(leftovers),
-            "is_open": any(
-                r.get("admin_url") and path.startswith(r["admin_url"]) for r in leftovers
-            ),
-        })
-    return sections
+    Used by the dashboard's "Everything in the database" card. The hub screens
+    call sysadmin.hub directly — a view has no reason to go through a template
+    library to reach a plain function.
+    """
+    from sysadmin import hub
+
+    cats = hub.categories(_apps(context), _path(context))
+    for cat in cats:
+        cat["href"] = safe_url("admin:hq_tables_category", cat["key"])
+    return cats
+
+
+@register.simple_tag(takes_context=True)
+def gta_table_accent(context):
+    """The colour of whichever table the current page belongs to, or {}.
+
+    Set on the shell by base_site.html so a changelist and a change form wear
+    the same colour as the card that was clicked to reach them. Purely a
+    thread of continuity: the alternative is thirty screens that are identical
+    until you read the heading.
+
+    Carries `ink` as well as `accent` because the accent is used as a solid
+    fill — the Add button — and white is unreadable on two of the seven. See
+    sysadmin.hub.INK.
+    """
+    from sysadmin import hub
+
+    accent = hub.accent_for_path(_apps(context), _path(context))
+    if not accent:
+        return {}
+    return {"accent": accent, "ink": hub.INK.get(accent, hub.LIGHT_INK)}
+
+
+@register.simple_tag(takes_context=True)
+def gta_on_table_screen(context):
+    """Whether this page is a table's own changelist, form or history.
+
+    Those screens are reached through Tables & models and have no other home
+    in the menu, so the rail marks that item current while you are on one.
+    Leaving the rail blank is how people lose track of which of six sections
+    they are inside.
+    """
+    return bool(gta_table_accent(context))
+
+
+# Where "up one level" goes, per screen. Keyed by what the path looks like
+# rather than by resolver name because Django's admin URL names are per-model
+# and this needs one rule for all thirty of them.
+@register.simple_tag(takes_context=True)
+def gta_up(context):
+    """The parent of the current screen: a real URL, not history.back().
+
+    `history.back()` is not "up" — it is "wherever you were", which after a
+    save is the form you just left, and after arriving from a link somebody
+    sent you is a different site entirely. A hierarchy has an actual parent,
+    and on these screens it is always known, so the button goes there.
+    """
+    from sysadmin import hub
+
+    path = _path(context)
+    index = safe_url("admin:index")
+    tables = safe_url("admin:hq_tables")
+    if not path or path == index:
+        return {}
+
+    # A record's own screens sit under their changelist: /admin/app/model/…
+    for ref, row in hub.flatten(_apps(context)).items():
+        url = row.get("admin_url") or ""
+        if not url:
+            continue
+        if path == url:
+            # A changelist belongs to whichever category card leads to it.
+            for cat in hub.categories(_apps(context), path):
+                if any(t["ref"] == ref for t in cat["tables"]):
+                    return {
+                        "url": safe_url("admin:hq_tables_category", cat["key"]),
+                        "label": cat["label"],
+                    }
+            if ref in {t.ref for t in hub.SECURITY_TABLES}:
+                return {"url": safe_url("admin:hq_security"), "label": "Security"}
+            return {"url": tables, "label": "Tables & models"}
+        if path.startswith(url):
+            return {"url": url, "label": row.get("name") or "the table"}
+
+    if path.startswith(tables) and path != tables:
+        return {"url": tables, "label": "Tables & models"}
+    return {"url": index, "label": "the dashboard"}
+
+
+@register.simple_tag(takes_context=True)
+def gta_security_visible(context):
+    """Whether this administrator can open any of the security logs.
+
+    Asked of `available_apps`, which Django has already filtered by
+    permission, rather than of `is_superuser` — a staff account granted
+    view-only access to the sign-in log should find the menu item that leads
+    to it.
+    """
+    from sysadmin import hub
+
+    return bool(hub.security_tables(_apps(context), _path(context)))
 
 
 # ---------------------------------------------------------------------------
@@ -487,6 +490,11 @@ def gta_review_counts(context):
     if access.is_full_access(user):
         out["to_review"] = ChangeRequest.objects.filter(
             status=ChangeRequest.PENDING).exclude(requested_by=user).count()
+    # One badge on one rail row now stands for the whole Your team hub, so the
+    # sum belongs here rather than being added up with template filters — the
+    # `add` filter yields "" for a missing key, which silently blanks a badge
+    # that was meant to say 3.
+    out["total"] = out.get("tasks", 0) + out.get("to_review", 0)
     return out
 
 

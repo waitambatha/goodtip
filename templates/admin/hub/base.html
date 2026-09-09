@@ -1,0 +1,56 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% comment %}
+The shell every hub screen shares: a titled header, a way back, and nothing
+else. The cards are the page.
+
+WHY A BACK LINK AND NOT JUST BREADCRUMBS. Django's breadcrumbs are a trail of
+small text links, which is fine for reading where you are and poor for leaving
+where you are — the target is eleven pixels tall and sits between two other
+links that go somewhere else. Depth is the whole point of a hub, so the way
+out of it is a button, at the top left, in the one place a back control has
+lived for thirty years. The trail stays underneath it for the "where am I"
+half of the job.
+{% endcomment %}
+
+{% block bodyclass %}{{ block.super }} gta-hub-page{% endblock %}
+{% block nav-breadcrumbs %}{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block content %}
+<div class="gta-hub">
+
+  <nav class="gta-hub-nav" aria-label="{% translate 'Breadcrumb' %}">
+    {% if back_url %}
+      <a href="{{ back_url }}" class="gta-back">
+        <svg aria-hidden="true"><use href="#ic-arrow-left"/></svg>
+        <span>{% blocktranslate %}Back to {{ back_label }}{% endblocktranslate %}</span>
+      </a>
+    {% else %}
+      <a href="{% url 'admin:index' %}" class="gta-back">
+        <svg aria-hidden="true"><use href="#ic-arrow-left"/></svg>
+        <span>{% translate 'Back to the dashboard' %}</span>
+      </a>
+    {% endif %}
+    <ol class="gta-crumbs">
+      <li><a href="{% url 'admin:index' %}">{% translate 'Dashboard' %}</a></li>
+      {% block crumbs %}{% endblock %}
+      <li aria-current="page">{{ title }}</li>
+    </ol>
+  </nav>
+
+  <header class="gta-hub-head" style="--hub-accent:{% block hub_accent %}var(--gt-c1){% endblock %}">
+    <span class="gta-hub-ic"><svg aria-hidden="true"><use href="#{% block hub_ic %}{{ hub_icon|default:'ic-sliders' }}{% endblock %}"/></svg></span>
+    <div>
+      <h1>{% block hub_h1 %}{{ hub_title|default:title }}{% endblock %}</h1>
+      <p>{% block hub_lead %}{{ hub_lead }}{% endblock %}</p>
+    </div>
+    {% block hub_aside %}{% endblock %}
+  </header>
+
+  {% block hub_body %}{% endblock %}
+</div>
+{% endblock %}
+
+{% block sidebar %}{% endblock %}

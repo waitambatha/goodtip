@@ -699,7 +699,10 @@ html[data-theme="dark"] .gta-rail-title { color: var(--gt-lime); }
 .gta-nav { list-style: none; margin: 0; padding: 0; }
 .gta-nav > li { margin: 1px 0; }
 
-/* One row, whether it is a link or a <summary> that opens a group. */
+/* One rail row. It used to also style a <summary> — the rail carried ten
+   disclosure groups over the model tables — which is why the marker reset
+   below is still here: harmless on an <a>, and the six links that replaced
+   them are all this rule has to dress now. */
 .gta-nav-a {
   display: flex;
   align-items: center;
@@ -746,41 +749,10 @@ html[data-theme="dark"] .gta-nav-a.on { background: var(--gt-gold); color: var(-
 .gta-sec-n.alert { background: rgba(199,124,30,.16); color: #7A4E06; }
 html[data-theme="dark"] .gta-sec-n.alert { background: rgba(232,180,92,.2); color: var(--gt-c3); }
 
-.gta-sec-chev {
-  width: 14px; height: 14px;
-  flex: none;
-  stroke: currentColor; fill: none; stroke-width: 2;
-  opacity: .55;
-  transition: transform .15s ease;
-}
-.gta-sec[open] > .gta-nav-a > .gta-sec-chev { transform: rotate(180deg); }
-.gta-sec[open] > .gta-nav-a { color: var(--body-loud-color); }
-.gta-sec > summary + .gta-sub { margin-top: 1px; }
-
-/* The models inside a group. Indented under the icon column rather than given
-   their own icons — twelve groups of icons is a texture, not a hierarchy. */
-.gta-sub { list-style: none; margin: 0 0 6px; padding: 0 0 0 30px; position: relative; }
-.gta-sub::before {
-  content: "";
-  position: absolute;
-  left: 19px; top: 4px; bottom: 4px;
-  width: 1px;
-  background: var(--hairline-color);
-}
-.gta-sub a {
-  display: block;
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 13.5px;
-  color: var(--body-medium-color);
-  text-decoration: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.gta-sub a:hover { background: var(--gt-surface-3); color: var(--body-loud-color); text-decoration: none; }
-.gta-sub a.on { color: var(--gt-forest); font-weight: 600; background: var(--gt-surface-3); }
-html[data-theme="dark"] .gta-sub a.on { color: var(--gt-lime); }
+/* The chevron and the indented model list that used to live here went with
+   the disclosure groups. Their contents are the Tables & models hub now, at
+   the bottom of this file — a rail row could not carry the sentence saying
+   what a group was for, and that sentence was the point. */
 
 .gta-rail-foot { flex: none; padding: 12px; border-top: 1px solid var(--hairline-color); }
 .gta-viewsite {
@@ -808,8 +780,6 @@ html.gta-rail-collapsed .gta-word,
 html.gta-rail-collapsed .gta-rail-title,
 html.gta-rail-collapsed .gta-nav-a .lbl,
 html.gta-rail-collapsed .gta-sec-n,
-html.gta-rail-collapsed .gta-sec-chev,
-html.gta-rail-collapsed .gta-sub,
 html.gta-rail-collapsed .gta-viewsite .lbl { display: none; }
 html.gta-rail-collapsed .gta-rail-top { padding: 0 6px; gap: 3px; justify-content: center; }
 html.gta-rail-collapsed .gta-mark { width: 30px; height: 30px; }
@@ -868,7 +838,7 @@ body.gta-shell #header #user-tools .gta-acct-cap {
    Everything new in the chrome is reachable by keyboard, so everything new in
    the chrome has to show where the keyboard is. */
 .gta-nav-a:focus-visible,
-.gta-sub a:focus-visible,
+.gta-back:focus-visible,
 .gta-viewsite:focus-visible,
 .gta-rail-toggle:focus-visible,
 .gta-acct > summary:focus-visible,
@@ -879,12 +849,15 @@ body.gta-shell #header #user-tools .gta-acct-cap {
   outline-offset: 2px;
 }
 html[data-theme="dark"] .gta-nav-a:focus-visible,
-html[data-theme="dark"] .gta-sub a:focus-visible { outline-color: var(--gt-lime); }
+html[data-theme="dark"] .gta-back:focus-visible { outline-color: var(--gt-lime); }
 
 @media (prefers-reduced-motion: reduce) {
   body.gta-shell #container,
   #nav-sidebar.gta-rail,
-  .gta-sec-chev { transition: none; }
+  .gta-dcard,
+  .gta-cat,
+  .gta-card-go { transition: none; }
+  .gta-dcard:hover, .gta-cat:hover { transform: none; }
 }
 
 /* ---- Breadcrumbs + content ------------------------------------------------ */
@@ -1898,3 +1871,411 @@ html[data-theme="dark"] :focus-visible {
   html:not([data-theme="light"]) #toolbar #searchbar:focus,
   html:not([data-theme="light"]) :focus-visible { outline-color: var(--gt-lime); }
 }
+
+/* ==========================================================================
+   9. THE HUB SCREENS
+   --------------------------------------------------------------------------
+   The rail carries six links now and depth moved onto pages of cards. That
+   trade only pays if the cards say more than a rail row could, so everything
+   here is built to carry the three things a menu row cannot: an icon large
+   enough to recognise before reading, a sentence saying what the thing is
+   for, and the count that decides whether to open it.
+
+   --card-accent is set per card from sysadmin/hub.py and is the whole colour
+   system on these screens. It tints the icon plate, the top edge and the hover
+   state, and the same value follows onto the table's own screens through
+   --tbl-accent — so a teal card lands you on a teal screen and you know you
+   arrived where you aimed without reading the heading.
+   ========================================================================== */
+
+.gta-hub-page #content { max-width: 1280px; }
+.gta-hub { display: flow-root; }
+
+/* ---- The way back --------------------------------------------------------
+   Ahead of the breadcrumb trail rather than inside it: the trail says where
+   you are, and this is how you leave. See base_site.html's nav-breadcrumbs.
+   ------------------------------------------------------------------------- */
+.gta-crumbbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 18px 40px 0;
+}
+.gta-crumbbar div.breadcrumbs { padding: 0; flex: 1 1 auto; min-width: 0; }
+
+.gta-back,
+.gta-hub-nav .gta-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 8px 14px 8px 11px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--gt-r-pill);
+  background: var(--gt-surface);
+  box-shadow: var(--gt-shadow-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--body-medium-color);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.gta-back svg { width: 15px; height: 15px; flex: none; stroke: currentColor; fill: none; stroke-width: 2.1; }
+.gta-back:hover {
+  color: var(--gt-forest);
+  border-color: color-mix(in srgb, var(--gt-forest) 40%, var(--border-color));
+  text-decoration: none;
+}
+html[data-theme="dark"] .gta-back:hover { color: var(--gt-lime); border-color: color-mix(in srgb, var(--gt-lime) 34%, var(--border-color)); }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .gta-back:hover { color: var(--gt-lime); border-color: color-mix(in srgb, var(--gt-lime) 34%, var(--border-color)); }
+}
+
+.gta-hub-nav { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+.gta-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12.5px;
+  color: var(--body-quiet-color);
+}
+.gta-crumbs li + li::before { content: "/"; margin-right: 8px; opacity: .5; }
+.gta-crumbs a { color: var(--breadcrumbs-link-fg); font-weight: 600; }
+.gta-crumbs [aria-current="page"] { color: var(--body-medium-color); }
+
+/* ---- The header ---------------------------------------------------------- */
+.gta-hub-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 22px 24px;
+  margin-bottom: 22px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--gt-r-card);
+  background:
+    linear-gradient(115deg,
+      color-mix(in srgb, var(--hub-accent) 11%, transparent),
+      transparent 62%),
+    var(--gt-surface);
+  box-shadow: var(--gt-shadow-sm);
+}
+.gta-hub-ic {
+  width: 54px; height: 54px;
+  flex: none;
+  display: grid; place-items: center;
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--hub-accent) 15%, transparent);
+}
+.gta-hub-ic svg { width: 26px; height: 26px; stroke: var(--hub-accent); fill: none; stroke-width: 1.8; }
+.gta-hub-head h1 {
+  font-family: var(--gt-display);
+  font-size: clamp(23px, 2.2vw, 30px);
+  line-height: 1.12;
+  letter-spacing: -.02em;
+  color: var(--body-loud-color);
+  margin: 0 0 5px;
+}
+.gta-hub-head p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--body-quiet-color); max-width: 74ch; }
+.gta-hub-count {
+  margin-left: auto;
+  flex: none;
+  padding: 7px 13px;
+  border-radius: var(--gt-r-pill);
+  background: color-mix(in srgb, var(--hub-accent) 13%, transparent);
+  color: var(--body-medium-color);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .gta-hub-head { flex-wrap: wrap; padding: 18px; }
+  .gta-hub-count { margin-left: 0; }
+}
+
+/* ---- Destination cards (HQ, Your team, Security) -------------------------
+   One link per card, and the link IS the card — a "Go" chevron in the corner
+   makes the target 20px wide when the thing being looked at is 300.
+   ------------------------------------------------------------------------- */
+.gta-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.gta-dcard {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 18px 18px 17px;
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--card-accent);
+  border-radius: var(--gt-r-card);
+  background: var(--gt-surface);
+  box-shadow: var(--gt-shadow-sm);
+  text-decoration: none;
+  transition: box-shadow .16s ease, transform .16s ease, border-color .16s ease;
+}
+.gta-dcard:hover {
+  text-decoration: none;
+  transform: translateY(-2px);
+  box-shadow: var(--gt-shadow);
+  border-color: color-mix(in srgb, var(--card-accent) 45%, var(--border-color));
+  border-left-color: var(--card-accent);
+}
+/* The card's own colour rather than the shared green: on a grid of nine, the
+   ring is the only thing saying WHICH one has the keyboard, and matching it to
+   the card makes that unmistakable. Set after the shared focus rule further up
+   this file, so it wins. */
+.gta-dcard:focus-visible { outline: 2px solid var(--card-accent); outline-offset: 2px; }
+
+.gta-card-ic {
+  width: 40px; height: 40px;
+  flex: none;
+  display: grid; place-items: center;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--card-accent) 14%, transparent);
+}
+.gta-card-ic svg { width: 19px; height: 19px; stroke: var(--card-accent); fill: none; stroke-width: 1.9; }
+
+.gta-card-txt { display: block; min-width: 0; flex: 1 1 auto; }
+.gta-card-txt b {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  color: var(--body-loud-color);
+  margin-bottom: 4px;
+}
+.gta-card-txt small { display: block; font-size: 12.5px; line-height: 1.5; color: var(--body-quiet-color); }
+
+/* Shown only when something is actually waiting. A badge that reads 0 is how
+   people learn to stop reading badges. */
+.gta-card-n {
+  flex: none;
+  align-self: center;
+  padding: 5px 10px;
+  border-radius: var(--gt-r-pill);
+  background: var(--gt-surface-3);
+  color: var(--body-quiet-color);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.gta-card-n.hot { background: var(--gt-gold-soft); color: #8A5A08; }
+html[data-theme="dark"] .gta-card-n.hot { background: rgba(232,180,92,.2); color: var(--gt-gold); }
+
+.gta-card-go {
+  position: absolute;
+  right: 15px; bottom: 15px;
+  width: 15px; height: 15px;
+  stroke: var(--card-accent);
+  fill: none;
+  stroke-width: 2;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity .16s ease, transform .16s ease;
+}
+.gta-dcard:hover .gta-card-go, .gta-dcard:focus-visible .gta-card-go { opacity: 1; transform: none; }
+
+/* ---- Category cards (Tables & models) ------------------------------------
+   Taller than a destination card because they carry the chips: the first four
+   table names, so the group can be identified without opening it. That was
+   the failure of the ten disclosure groups it replaced — you opened one to
+   find out what was in it.
+   ------------------------------------------------------------------------- */
+.gta-cats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+.gta-cats.is-compact { grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 12px; }
+
+.gta-cat {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 17px 17px 14px;
+  border: 1px solid var(--border-color);
+  border-top: 3px solid var(--card-accent);
+  border-radius: var(--gt-r-card);
+  background: var(--gt-surface);
+  box-shadow: var(--gt-shadow-sm);
+  text-decoration: none;
+  transition: box-shadow .16s ease, transform .16s ease, border-color .16s ease;
+}
+.gta-cat:hover {
+  text-decoration: none;
+  transform: translateY(-2px);
+  box-shadow: var(--gt-shadow);
+  border-color: color-mix(in srgb, var(--card-accent) 45%, var(--border-color));
+  border-top-color: var(--card-accent);
+}
+.gta-cat:focus-visible { outline: 2px solid var(--card-accent); outline-offset: 2px; }
+.gta-cat.on { border-color: var(--card-accent); }
+
+.gta-cat-head { display: flex; align-items: flex-start; gap: 13px; }
+.gta-cat-txt { display: block; min-width: 0; }
+.gta-cat-txt b {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  color: var(--body-loud-color);
+  margin-bottom: 4px;
+}
+.gta-cat-txt small { display: block; font-size: 12.5px; line-height: 1.5; color: var(--body-quiet-color); }
+
+.gta-cat-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline-color);
+}
+.gta-cat-n { font-size: 11.5px; font-weight: 600; color: var(--body-quiet-color); white-space: nowrap; flex: none; }
+
+.gta-chips { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.gta-chip {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: var(--gt-r-pill);
+  background: color-mix(in srgb, var(--chip, var(--card-accent)) 12%, transparent);
+  color: var(--body-medium-color);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+.gta-chip.is-more { background: var(--gt-surface-3); color: var(--body-quiet-color); }
+
+/* ---- Table cards (one category) ------------------------------------------ */
+.gta-tables {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 14px;
+}
+.gta-tbl {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color);
+  border-top: 3px solid var(--card-accent);
+  border-radius: var(--gt-r-card);
+  background: var(--gt-surface);
+  box-shadow: var(--gt-shadow-sm);
+  overflow: hidden;
+}
+.gta-tbl.on { border-color: var(--card-accent); }
+.gta-tbl-head { display: flex; align-items: flex-start; gap: 13px; padding: 17px 17px 14px; }
+.gta-tbl-id { flex: 1 1 auto; min-width: 0; }
+.gta-tbl-id h2 {
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  color: var(--body-loud-color);
+  margin: 0 0 4px;
+  padding: 0;
+  background: none;
+  border: 0;
+  text-transform: none;
+}
+.gta-tbl-id p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--body-quiet-color); }
+.gta-tbl-rows { flex: none; text-align: right; }
+.gta-tbl-rows b {
+  display: block;
+  font-family: var(--gt-num);
+  font-size: 21px;
+  line-height: 1;
+  color: var(--card-accent);
+  font-variant-numeric: tabular-nums;
+}
+.gta-tbl-rows small { display: block; font-size: 10.5px; color: var(--body-quiet-color); margin-top: 2px; }
+
+.gta-tbl-acts {
+  display: flex;
+  gap: 9px;
+  margin-top: auto;
+  padding: 13px 17px;
+  border-top: 1px solid var(--hairline-color);
+  background: var(--gt-surface-2);
+}
+/* --card-ink is the accent's paired text colour, set per card from
+   sysadmin/hub.py. White fails on the two warm accents (1.9:1 on gold) and
+   CSS cannot pick a legible ink from a colour on its own, so the pairing is
+   decided where the colour is. */
+.gta-tbl-acts .gta-btn {
+  width: auto;
+  flex: 1 1 auto;
+  padding: 10px 14px;
+  background: var(--card-accent);
+  color: var(--card-ink, #FFFFFF);
+}
+.gta-tbl-acts .gta-btn:hover { filter: brightness(1.08); text-decoration: none; color: var(--card-ink, #FFFFFF); }
+.gta-tbl-acts .gta-btn.ghost {
+  flex: 0 0 auto;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--card-accent) 42%, var(--border-color));
+  color: var(--body-medium-color);
+}
+.gta-tbl-acts .gta-btn.ghost:hover { background: color-mix(in srgb, var(--card-accent) 10%, transparent); color: var(--body-loud-color); filter: none; }
+.gta-tbl-ro { font-size: 12px; color: var(--body-quiet-color); align-self: center; }
+
+.gta-hub-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 20px 0 0;
+  font-size: 12.5px;
+  color: var(--body-quiet-color);
+}
+.gta-hub-note svg { width: 15px; height: 15px; flex: none; stroke: var(--gt-c1); fill: none; stroke-width: 1.9; }
+
+/* ---- Security's two logs ------------------------------------------------- */
+.gta-sec-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 1000px) { .gta-sec-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---- The palette's hidden index ------------------------------------------
+   `hidden` alone is enough — querySelectorAll still finds them, which is the
+   only thing gt-palette.js needs. The !important is base.css's: it sets
+   `#nav-sidebar a { display: block }` by id, which outranks the attribute.
+   ------------------------------------------------------------------------- */
+.gta-jumpindex, .gta-jumpindex a { display: none !important; }
+
+/* ---- A table's own colour, on the table's own screens --------------------
+   --tbl-accent is published by base_site.html on changelists, change forms
+   and history pages, and is the same value as the card in Tables & models
+   that leads to them. Absent everywhere else, which is why every rule below
+   falls back to the brand green rather than assuming it is set.
+
+   Deliberately restrained: a rule under the heading and the primary button.
+   Colour-coding thirty screens is useful as a "did I land where I aimed"
+   signal and ruinous as a paint job.
+   ------------------------------------------------------------------------- */
+.gta-shell #content > h1 { position: relative; padding-bottom: 12px; }
+.gta-shell #content > h1::after {
+  content: "";
+  position: absolute;
+  left: 0; bottom: 0;
+  width: 42px; height: 3px;
+  border-radius: 2px;
+  background: var(--tbl-accent, var(--gt-forest));
+}
+.gta-shell .object-tools a.addlink {
+  background-color: var(--tbl-accent, var(--gt-forest));
+  border-color: var(--tbl-accent, var(--gt-forest));
+  color: var(--tbl-ink, #FFFFFF);
+}
+.gta-crumbbar { border-left: 0; }

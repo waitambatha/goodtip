@@ -671,9 +671,9 @@ class WhatTheMenuShowsTests(DelegationTestCase):
         """
         sign_in(self.client, self.boss)
         html = self.client.get(reverse("admin:hq_my_work")).content.decode()
-        self.assertIn(reverse("admin:hq_team_hub"), html)
+        self.assertIn(reverse("admin:hq_team_home"), html)
 
-        hub = self.client.get(reverse("admin:hq_team_hub")).content.decode()
+        hub = self.client.get(reverse("admin:hq_team_home")).content.decode()
         for name in ("hq_team", "hq_reviews", "hq_activity", "hq_my_work"):
             self.assertIn(reverse(f"admin:{name}"), hub, name)
 

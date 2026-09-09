@@ -1,0 +1,68 @@
+{% extends "admin/hub/base.html" %}
+{% load i18n %}
+
+{% comment %}
+Level two: the tables inside one category.
+
+Each card carries its own colour, and it is the same colour the table screen
+itself then wears — see gta_table_accent in sysadmin/templatetags/gtadmin.py.
+That thread is what stops a two-level menu feeling like two places: you click
+a teal card and land on a teal screen, so you know you arrived where you aimed
+without reading the heading.
+
+The two actions are stated on the card rather than left to be discovered.
+"Open table" is browse-and-edit — Django's changelist, where a row opens for
+editing and the action bar deletes. "Add new" skips straight to a blank form.
+Both are logged: every save and every delete writes an audit row, which is
+what Security shows.
+{% endcomment %}
+
+{% block hub_accent %}{{ category.accent }}{% endblock %}
+{% block hub_ic %}{{ category.icon }}{% endblock %}
+{% block hub_h1 %}{{ category.label }}{% endblock %}
+{% block hub_lead %}{{ category.blurb }}{% endblock %}
+{% block crumbs %}<li><a href="{% url 'admin:hq_tables' %}">{% translate 'Tables & models' %}</a></li>{% endblock %}
+
+{% block hub_aside %}
+<span class="gta-hub-count">{{ category.count }} table{{ category.count|pluralize }}</span>
+{% endblock %}
+
+{% block hub_body %}
+<div class="gta-tables">
+  {% for t in category.tables %}
+  <section class="gta-tbl{% if t.is_current %} on{% endif %}" style="--card-accent:{{ t.accent }};--card-ink:{{ t.ink }}">
+    <div class="gta-tbl-head">
+      <span class="gta-card-ic"><svg aria-hidden="true"><use href="#{{ t.icon }}"/></svg></span>
+      <div class="gta-tbl-id">
+        <h2>{{ t.name }}</h2>
+        <p>{{ t.blurb }}</p>
+      </div>
+      {% if t.rows is not None %}
+      <span class="gta-tbl-rows">
+        <b>{{ t.rows|floatformat:"0" }}</b>
+        <small>row{{ t.rows|pluralize }}</small>
+      </span>
+      {% endif %}
+    </div>
+    <div class="gta-tbl-acts">
+      {% if t.url %}
+      <a href="{{ t.url }}" class="gta-btn">
+        {% translate 'Open table' %} <svg aria-hidden="true"><use href="#ic-arrow-right"/></svg>
+      </a>
+      {% else %}
+      <span class="gta-tbl-ro">{% translate 'You can view this one from elsewhere only.' %}</span>
+      {% endif %}
+      {% if t.add_url %}
+      <a href="{{ t.add_url }}" class="gta-btn ghost">{% translate 'Add new' %}</a>
+      {% endif %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
+
+<p class="gta-hub-note">
+  <svg aria-hidden="true"><use href="#ic-shield-check"/></svg>
+  {% translate 'Every record you add, change or delete here is recorded against your name in' %}
+  <a href="{% url 'admin:hq_security' %}">{% translate 'Security' %}</a>.
+</p>
+{% endblock %}

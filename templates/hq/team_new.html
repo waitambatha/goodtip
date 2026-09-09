@@ -1,4 +1,6 @@
 {% extends "hq_base.html" %}
+{% block back_url %}{% url 'admin:hq_team' %}{% endblock %}
+{% block back_label %}the administrators{% endblock %}
 {% load static %}
 {% block title %}Add an administrator. GoodTip HQ{% endblock %}
 {% block nav_team %}on{% endblock %}

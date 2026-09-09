@@ -41,32 +41,22 @@
 })();
 
 /* ==========================================================================
-   Two smaller behaviours that belong to the same chrome.
+   One smaller behaviour that belongs to the same chrome.
    ========================================================================== */
 (function () {
   "use strict";
 
   /* ---- Which groups are open ---------------------------------------------
-     Remembered per group, because the menu is a working surface and somebody
-     who lives in Tipping should not have to re-open it on every page load.
-     The server still opens the group holding the current page (the `open`
-     attribute is rendered), so a stored "shut" never hides where you are. */
-  var KEY = "gtAdminOpenSections";
+     Gone with the groups. The rail was ten <details> over the model tables and
+     this remembered which of them you had left open, per group, so somebody
+     who lived in Tipping did not have to re-open it on every page load.
 
-  function stored() {
-    try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; }
-  }
-
-  var state = stored();
-  document.querySelectorAll("details.gta-sec[data-sec]").forEach(function (d) {
-    var key = d.getAttribute("data-sec");
-    if (!d.open && state[key] === true) d.open = true;
-    d.addEventListener("toggle", function () {
-      state = stored();
-      state[key] = d.open;
-      try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* private mode */ }
-    });
-  });
+     The rail is six flat links now — see templates/admin/base_site.html — so
+     there is nothing left to remember. The `gtAdminOpenSections` key may still
+     be sitting in somebody's localStorage; it is inert, costs a few bytes, and
+     clearing it would mean shipping code whose only job is to delete something
+     nothing reads. The rail's OTHER preference, whether it is collapsed, is
+     `gtAdminRailCollapsed` and is still live at the top of this file. */
 
   /* ---- Selects that are really links --------------------------------------
      The dashboard's window picker is a GET form. Submitting it on change is

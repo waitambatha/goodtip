@@ -1,4 +1,6 @@
 {% extends "hq_base.html" %}
+{% block back_url %}{% url 'admin:hq_team_home' %}{% endblock %}
+{% block back_label %}Your team{% endblock %}
 {% block title %}Your work. GoodTip HQ{% endblock %}
 {# every page behind the team hub lights the one rail row #}
 {% block nav_team %}on{% endblock %}

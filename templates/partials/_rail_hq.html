@@ -17,7 +17,6 @@ did.
 {% gta_can 'enquiries.read' as may_enq %}
 {% gta_can 'data.sync' as may_sync %}
 {% gta_can 'data.report' as may_report %}
-{% gta_can 'orgs.view' as may_orgs %}
 {% gta_is_full_access as is_full_access %}
 {% gta_review_counts as waiting %}
 <nav class="gts-rail" aria-label="GoodTip HQ sections">
@@ -80,19 +79,26 @@ did.
   </div>
   {% endif %}
 
-  {% if may_sync or may_orgs %}
+  {% comment %}
+  The control plane's own sections, reached the same way they are reached from
+  /admin/: one link each, to a hub of cards. This rail used to point straight
+  at the organisations changelist, which was one table out of thirty picked by
+  hand — fine while it was the only one anybody wanted, and a dead end the
+  moment they wanted a different one.
+  {% endcomment %}
   <div class="gts-group">
     <div class="gts-group-title">Platform</div>
     {% if may_sync %}
     <a href="{% url 'admin:hq_sync' %}" class="{% block nav_sync %}{% endblock %}" title="Sync">
       <svg><use href="#ic-cloud-sync"/></svg><span class="lbl">Sync</span></a>
     {% endif %}
-    {% if may_orgs %}
-    <a href="{% url 'admin:orgs_organisation_changelist' %}" title="All organisations">
-      <svg><use href="#ic-org"/></svg><span class="lbl">All organisations</span></a>
+    <a href="{% safe_url 'admin:hq_tables' %}" title="Tables &amp; models">
+      <svg><use href="#ic-f-sliders"/></svg><span class="lbl">Tables &amp; models</span></a>
+    {% if is_full_access %}
+    <a href="{% safe_url 'admin:hq_security' %}" title="Security">
+      <svg><use href="#ic-shield-check"/></svg><span class="lbl">Security</span></a>
     {% endif %}
   </div>
-  {% endif %}
 
   {% if is_full_access %}
   {% comment %}
@@ -119,7 +125,7 @@ did.
     from the reader's point of view they ARE this section, whichever of them
     they are standing on.
     {% endcomment %}
-    <a href="{% url 'admin:hq_team_hub' %}" class="{% block nav_team %}{% endblock %}"
+    <a href="{% url 'admin:hq_team_home' %}" class="{% block nav_team %}{% endblock %}"
        title="Your team">
       <svg><use href="#ic-shield-star"/></svg><span class="lbl">Your team</span>
       {% if waiting.to_review %}<span class="n">{{ waiting.to_review }}</span>

@@ -131,37 +131,37 @@ list rather than pouring twenty-five entries out in one column.
     </div>
   </section>
 
+  {% comment %}
+  The database, as ten doors rather than as thirty links.
+
+  This card used to list every table by name, which made it the second copy of
+  a menu that already listed every table by name — and once the rail went flat
+  it would have been the only copy, doing a hub screen's job in a quarter of a
+  dashboard. So it names the groups and hands off: the sentence under each one
+  says what it is for, and the card opens the category that holds it.
+  {% endcomment %}
   <section class="gta-card">
     <div class="gta-card-head">
       <h2>{% translate 'Everything in the database' %}</h2>
-      <span class="gta-card-note">{% translate 'Grouped by what they are, not by which app they live in' %}</span>
+      <a class="gta-card-link" href="{% safe_url 'admin:hq_tables' %}">{% translate 'Browse all tables' %}</a>
     </div>
     <div class="gta-card-body">
-      {% gta_sections as sections %}
-      {% if sections %}
-      <div class="gta-apps">
-        {% for s in sections %}
-        <section class="gta-app" style="--app-accent:{{ s.accent }}">
-          <div class="gta-app-head">
-            <span class="gta-app-ic"><svg><use href="#{{ s.icon }}"/></svg></span>
-            <div>
-              <h3>{{ s.label }}</h3>
-              <p>{{ s.count }} table{{ s.count|pluralize }}</p>
-            </div>
-          </div>
-          <ul class="gta-app-models">
-            {% for m in s.models %}
-            <li>
-              {% if m.admin_url %}
-                <a href="{{ m.admin_url }}"{% if request.path == m.admin_url %} aria-current="page"{% endif %}>{{ m.name }}</a>
-              {% else %}
-                <span class="gta-model-flat">{{ m.name }}</span>
-              {% endif %}
-              {% if m.add_url %}<a href="{{ m.add_url }}" class="gta-add" title="{% translate 'Add' %} {{ m.name }}" aria-label="{% translate 'Add' %} {{ m.name }}">+</a>{% endif %}
-            </li>
-            {% endfor %}
-          </ul>
-        </section>
+      {% gta_categories as cats %}
+      {% if cats %}
+      <div class="gta-cats is-compact">
+        {% for c in cats %}
+        <a href="{{ c.href }}" class="gta-cat" style="--card-accent:{{ c.accent }}">
+          <span class="gta-cat-head">
+            <span class="gta-card-ic"><svg aria-hidden="true"><use href="#{{ c.icon }}"/></svg></span>
+            <span class="gta-cat-txt">
+              <b>{{ c.label }}</b>
+              <small>{{ c.blurb }}</small>
+            </span>
+          </span>
+          <span class="gta-cat-foot">
+            <span class="gta-cat-n">{{ c.count }} table{{ c.count|pluralize }}</span>
+          </span>
+        </a>
         {% endfor %}
       </div>
       {% else %}

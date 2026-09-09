@@ -168,24 +168,42 @@ class TeamHubTests(TestCase):
 
     def test_the_hub_opens_for_somebody_who_runs_the_team(self):
         self._sign_in(self.client, self.owner)
-        resp = self.client.get(reverse("admin:hq_team_hub"))
+        resp = self.client.get(reverse("admin:hq_team_home"))
         self.assertEqual(resp.status_code, 200)
         html = resp.content.decode()
         # Every room is reachable from the one page.
         for url in ("hq_reviews", "hq_team", "hq_my_work", "hq_activity"):
             self.assertIn(reverse(f"admin:{url}"), html, url)
 
-    def test_the_hub_is_full_access_only(self):
+    def test_the_hub_shows_a_restricted_administrator_only_their_own_work(self):
+        """It used to answer 403, which is the wrong answer to the right
+        question. Somebody who does not run the team still has work of their
+        own in this area; refusing them the door meant the rail had to carry a
+        second entry just for them. The hub filters instead: every card asks
+        the capability it leads to, so a restricted administrator gets the one
+        card they can use rather than a refusal."""
         self._sign_in(self.client, self.helper)
-        self.assertEqual(self.client.get(reverse("admin:hq_team_hub")).status_code, 403)
+        resp = self.client.get(reverse("admin:hq_team_home"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual([c["label"] for c in resp.context["cards"]], ["Your work"])
+        html = resp.content.decode()
+        for shut in ("hq_team", "hq_reviews", "hq_activity"):
+            self.assertNotIn(reverse(f"admin:{shut}"), html, shut)
+
+    def test_the_old_team_hub_address_still_lands_somewhere(self):
+        """Two hubs briefly meant two "Your team" pages. This one lost, but
+        its address is in bookmarks and in the area's own links."""
+        self._sign_in(self.client, self.owner)
+        resp = self.client.get(reverse("admin:hq_team_hub"))
+        self.assertRedirects(resp, reverse("admin:hq_team_home"))
 
     def test_the_rail_carries_one_team_entry_and_not_four(self):
         """The point of the change. Four peers cost four lines of the rail on
         every screen in HQ and told you nothing until you had opened them."""
         self._sign_in(self.client, self.owner)
-        html = self.client.get(reverse("admin:hq_team_hub")).content.decode()
+        html = self.client.get(reverse("admin:hq_my_work")).content.decode()
         rail = html[html.index('class="gts-rail"'):html.index("</nav>")]
-        self.assertIn(reverse("admin:hq_team_hub"), rail)
+        self.assertIn(reverse("admin:hq_team_home"), rail)
         for gone in ("hq_reviews", "hq_activity"):
             self.assertNotIn(reverse(f"admin:{gone}"), rail, gone)
 
@@ -206,8 +224,7 @@ class TeamHubTests(TestCase):
             status=ChangeRequest.PENDING,
         )
         self._sign_in(self.client, self.owner)
-        html = self.client.get(reverse("admin:hq_team_hub")).content.decode()
+        html = self.client.get(reverse("admin:hq_team_home")).content.decode()
         # A hub whose cards are only labels is a menu with an extra click in
         # front of it — the number is what earns the page.
-        self.assertIn("A new story", html)
-        self.assertIn("waiting on you", html)
+        self.assertIn("1 waiting", html)

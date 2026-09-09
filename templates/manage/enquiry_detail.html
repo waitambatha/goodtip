@@ -1,4 +1,6 @@
 {% extends "hq_base.html" %}
+{% block back_url %}{% url 'admin:hq_enquiries' %}{% endblock %}
+{% block back_label %}the enquiries inbox{% endblock %}
 {% load static %}
 {% block title %}{{ enquiry.name }}. Enquiries{% endblock %}
 {% block nav_enquiries %}on{% endblock %}

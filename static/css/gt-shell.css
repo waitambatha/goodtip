@@ -771,3 +771,26 @@ body.gt-shell .ned-toolbar select.ned-pick:hover { background: var(--ad-head-h);
   font-size: 12.5px; font-weight: 600; color: var(--sh);
 }
 .sh-clear svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+/* ---- The way back --------------------------------------------------------
+   Every screen on this shell sits one level under a hub, and the rail stopped
+   naming each of them when the menus went flat. So leaving one is a control
+   on the page, ahead of the heading, pointing at the actual parent rather
+   than at history.back() — which after a save is the form you just left.
+   ------------------------------------------------------------------------- */
+.gts-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 8px 15px 8px 12px;
+  border: 1px solid var(--gts-line);
+  border-radius: 999px;
+  background: var(--gts-surface);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gts-quiet);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.gts-back svg { width: 15px; height: 15px; flex: none; }
+.gts-back:hover { color: var(--gts-fg); border-color: var(--gts-line-2); text-decoration: none; }

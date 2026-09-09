@@ -1,4 +1,6 @@
 {% extends "hq_base.html" %}
+{% block back_url %}{% url 'admin:hq_news' %}{% endblock %}
+{% block back_label %}news &amp; blog{% endblock %}
 {% load static %}
 {% block title %}{% if is_new %}New post{% else %}Edit post{% endif %} &middot; Manage{% endblock %}
 {% block nav_news %}on{% endblock %}

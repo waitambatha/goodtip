@@ -48,6 +48,15 @@ which has to out-rank the skin's own `#user-tools .theme-toggle` circle.
     }
   } catch (e) {}
 </script>
+{% comment %}
+The table's own colour, published to the whole document rather than to one
+element, so the heading rule, the Add button and the row hover on a changelist
+can all pick it up. It is the same value as the card that was clicked to get
+here — see sysadmin/hub.py — and it is simply absent on every screen that is
+not a table's, where the rules that use it fall back to the brand green.
+{% endcomment %}
+{% gta_table_accent as tbl_accent %}
+{% if tbl_accent %}<style>:root{--tbl-accent:{{ tbl_accent.accent }};--tbl-ink:{{ tbl_accent.ink }}}</style>{% endif %}
 <script src="{% static 'gtadmin/js/gt-rail.js' %}" defer></script>
 <script src="{% static 'gtadmin/js/gt-palette.js' %}" defer></script>
 {% include "partials/_favicon.html" %}
@@ -168,32 +177,43 @@ the admin. Signing out is last, alone, and the only red thing in the menu.
 {% comment %}
 THE MENU.
 
-Three bands. The top one is the control plane's own screens. PLATFORM is the
-database, regrouped by sysadmin.templatetags.gtadmin.SECTIONS — the flat
-`available_apps` loop this replaced put Season between Sport and Charity with
-nothing separating catalog from tipping, which is what twenty-five ungrouped
-entries look like. HQ is the four screens that used to be reachable only by
-knowing their URL, because neither menu in the old split listed them.
+Six links, flat. No disclosure triangles.
 
-Every section is a <details>: native disclosure, so it opens with a keyboard
-and works with the stylesheet off, and the group holding the current page
-arrives already open.
+It used to carry ten <details> groups over the model tables plus two more
+bands of screens, and that arrangement had three problems the client named.
+The menu was taller than the window before anything was opened. A name could
+appear twice — "News & blog" was both the HQ editor and the `newspost` table,
+side by side, with nothing to say which one published a story. And a rail row
+has space for a label and nothing else, so every group was a guess: you opened
+it to find out what was in it, and closed it again when it was the wrong one.
+
+Depth moved into hub screens instead. Each of the four lower items opens a
+page of cards, and a card has room for the icon, the sentence saying what the
+thing is for and the number waiting inside it — which is the information that
+decides the click. See sysadmin/hub_views.py.
+
+Every item still asks the capability it leads to. A restricted administrator
+seeing a link they cannot open learns that the product is broken rather than
+that they were not given that job.
 {% endcomment %}
 {% block nav-sidebar %}
 {% if user.is_authenticated and user.is_staff %}
 {% gta_alerts as alerts %}
 {% url 'admin:index' as u_index %}
 {% url 'admin:system_report' as u_report %}
-{% safe_url 'admin:hq_sync' as u_sync %}
-{% safe_url 'admin:hq_enquiries' as u_enq %}
-{% safe_url 'admin:hq_news' as u_news %}
-{% safe_url 'admin:hq_pages' as u_pages %}
-{% safe_url 'admin:hq_team' as u_team %}
-{% safe_url 'admin:hq_reviews' as u_reviews %}
-{% safe_url 'admin:hq_my_work' as u_mywork %}
-{% safe_url 'admin:hq_activity' as u_activity %}
+{% safe_url 'admin:hq_tables' as u_tables %}
+{% safe_url 'admin:hq_security' as u_security %}
+{% safe_url 'admin:hq_home' as u_hq %}
+{% safe_url 'admin:hq_team_home' as u_teamhub %}
 {% gta_is_full_access as is_full_access %}
+{% gta_security_visible as may_security %}
+{% gta_on_table_screen as on_table %}
 {% gta_review_counts as waiting %}
+{% gta_can 'data.sync' as may_sync %}
+{% gta_can 'enquiries.read' as may_enq %}
+{% gta_can 'news.write' as may_news %}
+{% gta_can 'pages.edit' as may_pages %}
+{% gta_can 'seo.edit' as may_seo %}
 <nav id="nav-sidebar" class="gta-rail" aria-label="{% translate 'Admin sections' %}">
 
   <div class="gta-rail-top">
@@ -215,93 +235,72 @@ arrives already open.
         <svg class="ic"><use href="#ic-chart"/></svg><span class="lbl">System report</span></a></li>
     </ul>
 
-    {% gta_sections as sections %}
-    {% if sections %}
-    <p class="gta-rail-title">{% translate 'Platform' %}</p>
+    <p class="gta-rail-title">{% translate 'Run the platform' %}</p>
     <ul class="gta-nav">
-      {% for s in sections %}
-      <li>
-        <details class="gta-sec" data-sec="{{ s.key }}"{% if s.is_open %} open{% endif %}>
-          <summary class="gta-nav-a" style="--sec-accent:{{ s.accent }}">
-            <svg class="ic"><use href="#{{ s.icon }}"/></svg>
-            <span class="lbl">{{ s.label }}</span>
-            <span class="gta-sec-n">{{ s.count }}</span>
-            <svg class="gta-sec-chev" aria-hidden="true"><use href="#ic-chev-down"/></svg>
-          </summary>
-          <ul class="gta-sub">
-            {% for m in s.models %}
-            <li><a href="{{ m.admin_url }}"{% if request.path == m.admin_url %} class="on" aria-current="page"{% endif %}
-                   data-jump="{{ s.label }} &rsaquo; {{ m.name }}">{{ m.name }}</a></li>
-            {% endfor %}
-          </ul>
-        </details>
-      </li>
-      {% endfor %}
-    </ul>
-    {% endif %}
-
-    {% comment %}
-    HQ used to be wrapped in {% templatetag openblock %} if user.is_superuser
-    {% templatetag closeblock %}, which was right while every administrator was
-    either the owner or nobody. A restricted administrator is not a superuser,
-    so that check would have hidden the very screens they were created to use.
-    Each link now asks the capability it leads to, which is the same answer for
-    the owner (full access holds everything) and the correct one for everybody
-    else.
-    {% endcomment %}
-    {% gta_can 'data.sync' as may_sync %}
-    {% gta_can 'enquiries.read' as may_enq %}
-    {% gta_can 'news.write' as may_news %}
-    {% gta_can 'pages.edit' as may_pages %}
-    {% if may_sync or may_enq or may_news or may_pages %}
-    <p class="gta-rail-title">{% translate 'HQ' %}</p>
-    <ul class="gta-nav">
-      {% if u_sync and may_sync %}
-      <li><a href="{{ u_sync }}" class="gta-nav-a{% if request.path == u_sync %} on{% endif %}" data-jump="Sync panel">
-        <svg class="ic"><use href="#ic-cloud-sync"/></svg><span class="lbl">Sync panel</span></a></li>
+      {% comment %}
+      Tables & models is marked current for every changelist and change form
+      under it, not only for the hub itself — those screens are reached
+      through it and have no other home in the menu, so leaving the rail blank
+      while you are on one is how people lose track of where they are.
+      {% endcomment %}
+      {% if u_tables %}
+      <li><a href="{{ u_tables }}" class="gta-nav-a{% if u_tables in request.path or on_table %} on{% endif %}" data-jump="Tables &amp; models">
+        <svg class="ic"><use href="#ic-f-sliders"/></svg><span class="lbl">Tables &amp; models</span></a></li>
       {% endif %}
-      {% if u_enq and may_enq %}
-      <li><a href="{{ u_enq }}" class="gta-nav-a{% if u_enq in request.path %} on{% endif %}" data-jump="Enquiries inbox">
-        <svg class="ic"><use href="#ic-mail"/></svg><span class="lbl">Enquiries inbox</span>
+
+      {% if u_hq %}{% if may_sync or may_enq or may_news or may_pages or may_seo %}
+      <li><a href="{{ u_hq }}" class="gta-nav-a{% if u_hq in request.path %} on{% endif %}" data-jump="HQ — the site's own words and inbox">
+        <svg class="ic"><use href="#ic-f-org"/></svg><span class="lbl">HQ</span>
         {% if alerts.enquiries %}<span class="gta-sec-n alert">{{ alerts.enquiries }}</span>{% endif %}</a></li>
+      {% endif %}{% endif %}
+
+      {% if u_teamhub %}
+      <li><a href="{{ u_teamhub }}" class="gta-nav-a{% if u_teamhub in request.path %} on{% endif %}" data-jump="Your team">
+        <svg class="ic"><use href="#ic-f-shield-star"/></svg><span class="lbl">Your team</span>
+        {% if waiting.total %}<span class="gta-sec-n alert">{{ waiting.total }}</span>{% endif %}</a></li>
       {% endif %}
-      {% if u_news and may_news %}
-      <li><a href="{{ u_news }}" class="gta-nav-a{% if u_news in request.path %} on{% endif %}" data-jump="News &amp; blog editor">
-        <svg class="ic"><use href="#ic-doc"/></svg><span class="lbl">News &amp; blog</span></a></li>
-      {% endif %}
-      {% if u_pages and may_pages %}
-      <li><a href="{{ u_pages }}" class="gta-nav-a{% if u_pages in request.path %} on{% endif %}" data-jump="Pages — the words on the site">
-        <svg class="ic"><use href="#ic-globe"/></svg><span class="lbl">Pages</span></a></li>
+
+      {% if u_security and may_security %}
+      <li><a href="{{ u_security }}" class="gta-nav-a{% if u_security in request.path %} on{% endif %}" data-jump="Security — sign-ins and the audit log">
+        <svg class="ic"><use href="#ic-shield-check"/></svg><span class="lbl">Security</span></a></li>
       {% endif %}
     </ul>
-    {% endif %}
 
     {% comment %}
-    Running the team. "Your work" is for everybody — it is where a restricted
-    administrator finds out what they are allowed to do and what came back from
-    review. The other three are the powers that are never delegated.
+    THE JUMP INDEX.
+
+    gt-palette.js builds its index from `[data-jump]` inside this rail, which
+    was free while the rail listed all thirty tables. Now that it lists six
+    sections, the box would only ever find six things — and "type / and go
+    straight to Tips" is the fastest route in the whole admin, so it is not
+    something a tidier menu is allowed to cost.
+
+    So the destinations the rail no longer spells out are listed here instead:
+    hidden from sight, indexed by the palette, and still built from
+    `available_apps`, so a link this administrator was never going to be shown
+    is still one they cannot jump to.
     {% endcomment %}
-    <p class="gta-rail-title">{% translate 'Your team' %}</p>
-    <ul class="gta-nav">
-      {% if u_mywork %}
-      <li><a href="{{ u_mywork }}" class="gta-nav-a{% if request.path == u_mywork %} on{% endif %}" data-jump="Your work">
-        <svg class="ic"><use href="#ic-f-home"/></svg><span class="lbl">Your work</span>
-        {% if waiting.tasks %}<span class="gta-sec-n alert">{{ waiting.tasks }}</span>{% endif %}</a></li>
+    <div class="gta-jumpindex" hidden>
+      {% gta_categories as jump_cats %}
+      {% for c in jump_cats %}
+        <a href="{{ c.href }}" data-jump="Tables &rsaquo; {{ c.label }}"></a>
+        {% for t in c.tables %}{% if t.url %}
+        <a href="{{ t.url }}" data-jump="{{ c.label }} &rsaquo; {{ t.name }}"></a>
+        {% endif %}{% endfor %}
+      {% endfor %}
+      {% if may_sync %}<a href="{% safe_url 'admin:hq_sync' %}" data-jump="HQ &rsaquo; Sync panel"></a>{% endif %}
+      {% if may_enq %}<a href="{% safe_url 'admin:hq_enquiries' %}" data-jump="HQ &rsaquo; Enquiries inbox"></a>{% endif %}
+      {% if may_news %}<a href="{% safe_url 'admin:hq_news' %}" data-jump="HQ &rsaquo; News &amp; blog"></a>{% endif %}
+      {% if may_pages %}<a href="{% safe_url 'admin:hq_pages' %}" data-jump="HQ &rsaquo; Pages"></a>{% endif %}
+      {% if may_seo %}<a href="{% safe_url 'admin:hq_seo' %}" data-jump="HQ &rsaquo; SEO"></a>
+      <a href="{% safe_url 'admin:hq_redirects' %}" data-jump="HQ &rsaquo; Redirects"></a>{% endif %}
+      <a href="{% safe_url 'admin:hq_my_work' %}" data-jump="Your team &rsaquo; Your work"></a>
+      {% if is_full_access %}
+      <a href="{% safe_url 'admin:hq_reviews' %}" data-jump="Your team &rsaquo; Waiting for review"></a>
+      <a href="{% safe_url 'admin:hq_team' %}" data-jump="Your team &rsaquo; Administrators"></a>
+      <a href="{% safe_url 'admin:hq_activity' %}" data-jump="Your team &rsaquo; Activity log"></a>
       {% endif %}
-      {% if is_full_access and u_reviews %}
-      <li><a href="{{ u_reviews }}" class="gta-nav-a{% if u_reviews in request.path %} on{% endif %}" data-jump="Waiting for review">
-        <svg class="ic"><use href="#ic-clock"/></svg><span class="lbl">Waiting for review</span>
-        {% if waiting.to_review %}<span class="gta-sec-n alert">{{ waiting.to_review }}</span>{% endif %}</a></li>
-      {% endif %}
-      {% if is_full_access and u_team %}
-      <li><a href="{{ u_team }}" class="gta-nav-a{% if u_team in request.path %} on{% endif %}" data-jump="Administrators">
-        <svg class="ic"><use href="#ic-shield-star"/></svg><span class="lbl">Administrators</span></a></li>
-      {% endif %}
-      {% if is_full_access and u_activity %}
-      <li><a href="{{ u_activity }}" class="gta-nav-a{% if u_activity in request.path %} on{% endif %}" data-jump="Activity log">
-        <svg class="ic"><use href="#ic-doc"/></svg><span class="lbl">Activity</span></a></li>
-      {% endif %}
-    </ul>
+    </div>
   </div>
 
   <div class="gta-rail-foot">
@@ -312,6 +311,29 @@ arrives already open.
   </div>
 </nav>
 {% endif %}
+{% endblock %}
+
+{% comment %}
+THE WAY BACK.
+
+Django's breadcrumbs read well and click badly: a trail of 11px links, and the
+one that goes up a level sits between two that go somewhere else. Every screen
+under Tables & models is now two levels deep, so the way out is a button ahead
+of the trail, with the trail kept underneath for the "where am I" half of the
+job. `--tbl-accent` is the colour of whichever table this screen belongs to,
+threaded through from the card that was clicked to reach it.
+{% endcomment %}
+{% block nav-breadcrumbs %}
+{% gta_up as up %}
+<div class="gta-crumbbar">
+  {% if up.url %}
+  <a href="{{ up.url }}" class="gta-back">
+    <svg aria-hidden="true"><use href="#ic-arrow-left"/></svg>
+    <span>{% blocktranslate with where=up.label %}Back to {{ where }}{% endblocktranslate %}</span>
+  </a>
+  {% endif %}
+  {{ block.super }}
+</div>
 {% endblock %}
 
 {% block footer %}

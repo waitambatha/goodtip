@@ -8,6 +8,7 @@ from django.contrib.admin.models import ADDITION, CHANGE, DELETION
 from django.urls import path
 from django.utils import timezone
 from django.utils.html import format_html
+from django.views.generic import RedirectView
 
 from .models import AuditLog, LoginEvent, StressTestRun
 
@@ -397,10 +398,21 @@ def _get_urls():
     # answer to the super admin, so they live here now.
     from admin_panel import views as manage_views
 
-    from . import team_views
+    from . import hub_views, team_views
 
     custom = [
         path("system-report/", admin.site.admin_view(system_report_view), name="system_report"),
+
+        # The hub screens the flat menu opens onto. One menu item, one page of
+        # cards, one click to the thing itself — see sysadmin/hub_views.py for
+        # why the rail stopped carrying ten disclosure groups.
+        path("tables/", admin.site.admin_view(hub_views.tables_hub), name="hq_tables"),
+        path("tables/<str:key>/", admin.site.admin_view(hub_views.tables_category),
+             name="hq_tables_category"),
+        path("security/", admin.site.admin_view(hub_views.security_hub), name="hq_security"),
+        path("hq/", admin.site.admin_view(hub_views.hq_hub), name="hq_home"),
+        path("your-team/", admin.site.admin_view(hub_views.team_hub), name="hq_team_home"),
+
         path("sync/", admin.site.admin_view(manage_views.sync_panel), name="hq_sync"),
 
         path("enquiries/", admin.site.admin_view(manage_views.enquiries), name="hq_enquiries"),
@@ -426,7 +438,16 @@ def _get_urls():
         # menu points at; hq_team, hq_reviews, hq_my_work and hq_activity keep
         # their own addresses because every link, bookmark and redirect in the
         # area already names them.
-        path("team/hub/", admin.site.admin_view(team_views.team_hub), name="hq_team_hub"),
+        # ONE TEAM HUB, not two. Staging grew its own hub in the HQ shell at
+        # the same time this rail was being flattened, so for a while "Your
+        # team" meant two different pages depending on which menu you came
+        # from -- and the back link out of Your work landed on the other one.
+        # The card hub at `your-team/` is the one that survived: it is the
+        # shape the other three hubs use, and it degrades for a restricted
+        # administrator instead of refusing them. This address stays alive
+        # because bookmarks and the area's own links already name it.
+        path("team/hub/", RedirectView.as_view(pattern_name="admin:hq_team_home"),
+             name="hq_team_hub"),
         path("team/", admin.site.admin_view(team_views.team), name="hq_team"),
         path("team/new/", admin.site.admin_view(team_views.team_new), name="hq_team_new"),
         path("team/<int:access_id>/", admin.site.admin_view(team_views.team_edit),

@@ -1,4 +1,6 @@
 {% extends "hq_base.html" %}
+{% block back_url %}{% url 'admin:hq_seo' %}{% endblock %}
+{% block back_label %}SEO{% endblock %}
 {% load static %}
 {% block title %}SEO: {{ page.label }} &middot; Manage{% endblock %}
 {% block nav_seo %}on{% endblock %}

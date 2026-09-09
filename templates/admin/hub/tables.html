@@ -1,0 +1,50 @@
+{% extends "admin/hub/base.html" %}
+{% load i18n %}
+
+{% comment %}
+Level one of Tables & models: what the database is FOR, in ten cards.
+
+The rail used to list these as ten disclosure groups, which meant the answer to
+"where is Season?" was behind a triangle you had to guess at. Here every group
+states its job in a sentence and names the tables it holds, so the guess is
+made by reading rather than by opening.
+
+Security's tables are deliberately absent — they have their own menu item, and
+a table reachable from two places is exactly the duplication this replaced.
+{% endcomment %}
+
+{% block hub_h1 %}{% translate 'Tables & models' %}{% endblock %}
+{% block hub_ic %}ic-f-sliders{% endblock %}
+{% block hub_lead %}
+Everything in the database, grouped by what it is for rather than by which part
+of the code it lives in. {{ total_tables }} table{{ total_tables|pluralize }} in
+{{ categories|length }} group{{ categories|length|pluralize }}.
+{% endblock %}
+
+{% block hub_body %}
+{% if categories %}
+<div class="gta-cats">
+  {% for cat in categories %}
+  <a href="{{ cat.href }}" class="gta-cat{% if cat.is_current %} on{% endif %}"
+     style="--card-accent:{{ cat.accent }}">
+    <span class="gta-cat-head">
+      <span class="gta-card-ic"><svg aria-hidden="true"><use href="#{{ cat.icon }}"/></svg></span>
+      <span class="gta-cat-txt">
+        <b>{{ cat.label }}</b>
+        <small>{{ cat.blurb }}</small>
+      </span>
+    </span>
+    <span class="gta-cat-foot">
+      <span class="gta-chips">
+        {% for t in cat.tables|slice:":4" %}<span class="gta-chip" style="--chip:{{ t.accent }}">{{ t.name }}</span>{% endfor %}
+        {% if cat.count > 4 %}<span class="gta-chip is-more">+{{ cat.count|add:"-4" }}</span>{% endif %}
+      </span>
+      <span class="gta-cat-n">{{ cat.count }} table{{ cat.count|pluralize }}</span>
+    </span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<p class="gta-empty">{% translate "You don't have permission to view or edit anything." %}</p>
+{% endif %}
+{% endblock %}

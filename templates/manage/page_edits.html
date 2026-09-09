@@ -1,4 +1,6 @@
 {% extends "hq_base.html" %}
+{% block back_url %}{% url 'admin:hq_pages' %}{% endblock %}
+{% block back_label %}pages{% endblock %}
 {% load static %}
 {% block title %}{{ page.label }} edits &middot; Manage{% endblock %}
 {% block nav_pages %}on{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "admin/hub/base.html" %}
+{% load i18n %}
+
+{% comment %}
+The generic hub: a grid of destination cards, used by HQ and by Your team.
+
+Each card is a link — the whole card, not a "Go" button in the corner — so the
+target is the size of the thing you are looking at. The sentence under the
+title is the reason it exists: "Enquiries inbox" tells you a screen is there,
+"Messages sent through the public contact form, and what was replied" tells
+you whether it is the one you want. The number in the corner appears only when
+something is actually waiting, because a badge showing 0 trains people to stop
+reading badges.
+{% endcomment %}
+
+{% block hub_body %}
+{% if cards %}
+<div class="gta-cards">
+  {% for c in cards %}
+  <a href="{{ c.href }}" class="gta-dcard" style="--card-accent:{{ c.accent }}">
+    <span class="gta-card-ic"><svg aria-hidden="true"><use href="#{{ c.icon }}"/></svg></span>
+    <span class="gta-card-txt">
+      <b>{{ c.label }}</b>
+      <small>{{ c.blurb }}</small>
+    </span>
+    {% if c.note %}<span class="gta-card-n{% if c.hot %} hot{% endif %}">{{ c.note }}</span>{% endif %}
+    <svg class="gta-card-go" aria-hidden="true"><use href="#ic-arrow-right"/></svg>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<p class="gta-empty">{% translate "There is nothing here you have been given access to." %}</p>
+{% endif %}
+{% endblock %}
