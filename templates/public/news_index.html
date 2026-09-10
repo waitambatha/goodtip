@@ -32,13 +32,9 @@
     <p class="eyebrow reveal">League news</p>
     <h2 class="section-heading reveal">What's moving this week.</h2>
 
-    <!-- Filter by code -->
-    <div class="news-filters reveal" role="navigation" aria-label="Filter stories by code">
-      <a href="{% url 'news_index' %}#stories" class="fchip {% if not active_tag %}on{% endif %}">All codes</a>
-      {% for tag, label in news_tags %}
-      <a href="{% url 'news_index' %}?code={{ tag }}#stories" class="fchip {% if active_tag == tag %}on{% endif %}">{{ label }}</a>
-      {% endfor %}
-    </div>
+    <!-- Filter by code: chips and a dropdown, in the codes' colours -->
+    {% url 'news_index' as news_url %}
+    {% include "partials/news_filter.html" with base=news_url anchor="#stories" %}
 
     {% if posts %}
     <div class="pnews-grid reveal">
@@ -46,7 +42,7 @@
       <a class="pnews-card {% if forloop.first and not active_tag %}lead{% endif %}" href="{% url 'news_detail' p.slug %}">
         {% comment %} Every code the story carries — see the member list. {% endcomment %}
         {% if p.image %}<div class="pn-thumb" style="background-image:url('{{ p.image.url }}')"
-             {% if p.image_alt %}role="img" aria-label="{{ p.image_alt }}"{% endif %}>{% for t in p.tag_labels %}<span class="pn-tag">{{ t }}</span>{% endfor %}</div>
+             {% if p.image_alt %}role="img" aria-label="{{ p.image_alt }}"{% endif %}>{% include "partials/_news_tags.html" with post=p %}</div>
         {% else %}{% comment %}
           A story with no picture of its own gets one of the site's own
           match-day photographs, chosen by its code and stable per story — see
@@ -55,7 +51,7 @@
           read as a page that had failed to load rather than as a list of
           stories.
           {% endcomment %}
-          <div class="pn-thumb" style="background-image:url('{% static p.fallback_scene %}')">{% for t in p.tag_labels %}<span class="pn-tag">{{ t }}</span>{% endfor %}</div>{% endif %}
+          <div class="pn-thumb" style="background-image:url('{% static p.fallback_scene %}')">{% include "partials/_news_tags.html" with post=p %}</div>{% endif %}
         <div class="pn-body">
           {% if forloop.first and not active_tag %}<span class="pn-lead-flag">Latest story</span>{% endif %}
           <h3>{{ p.title }}</h3>

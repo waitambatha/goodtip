@@ -1,21 +1,76 @@
 {% comment %}
-Share bar + optional sources for a published story.
-Pass `prefix` = "art" (member app layout) or "pn" (public marketing layout)
-to pick up that page's existing class names.
+Sharing a story, and its sources.
+
+"On the share button, let's have the share button and the name over it,
+something of a good size that will be visible, and after clicking we must see
+the social media platforms — so when I press share my social media is open and
+I am able to share. If I click Facebook that should take me to my Facebook,
+where I will share with my friends."
+
+So it is one large, labelled button rather than a row of small unlabelled
+icons, and pressing it opens the platforms. Each is that platform's own share
+address, so pressing Facebook lands on Facebook's share box with the story
+already in it, signed in as whoever is at the keyboard — there is no GoodTip
+account in between and nothing to connect. They are ordinary links, so they
+work with JavaScript off; with it, gt-share.js opens the panel, sends the
+desktop ones to a pop-up window rather than taking the reader off the story,
+and adds the phone's own share sheet where there is one.
+
+Expects `prefix` (the page's class prefix — "rd" on the reader), `post` and
+`share_url`.
 {% endcomment %}
-<div class="{{ prefix }}-share">
-  <span class="as-label">Share this story</span>
-  <a class="as-btn as-facebook" target="_blank" rel="noopener"
-     href="https://www.facebook.com/sharer/sharer.php?u={{ share_url|urlencode }}" title="Share on Facebook">
-    <svg><use href="#s-facebook"/></svg>
-  </a>
-  <a class="as-btn as-linkedin" target="_blank" rel="noopener"
-     href="https://www.linkedin.com/sharing/share-offsite/?url={{ share_url|urlencode }}" title="Share on LinkedIn">
-    <svg><use href="#s-linkedin"/></svg>
-  </a>
-  <button type="button" class="as-btn as-copy" data-copy-link="{{ share_url }}" data-label="Copy link" title="Copy link">
-    <svg><use href="#ic-link"/></svg> <span data-copy-label>Copy link</span>
+<div class="{{ prefix }}-share shr" data-share>
+  <p class="shr-k">Enjoyed this one? Pass it on.</p>
+  <button type="button" class="shr-btn" data-share-toggle aria-expanded="false" aria-controls="{{ prefix }}-shr-panel">
+    <svg aria-hidden="true"><use href="#ic-share"/></svg>
+    <span>Share this story</span>
   </button>
+
+  {% comment %}
+  Open without JavaScript — `hidden` is added by the script — so a reader
+  with it off still has every platform, one scroll down.
+  {% endcomment %}
+  <div class="shr-panel" id="{{ prefix }}-shr-panel" data-share-panel>
+    <p class="shr-panel-h">Share &ldquo;{{ post.title|truncatechars:60 }}&rdquo; on</p>
+    <div class="shr-grid">
+      <a class="shr-go shr-fb" data-share-popup target="_blank" rel="noopener"
+         href="https://www.facebook.com/sharer/sharer.php?u={{ share_url|urlencode }}">
+        <span class="shr-ic"><svg aria-hidden="true"><use href="#s-facebook"/></svg></span><span>Facebook</span>
+      </a>
+      <a class="shr-go shr-wa" data-share-popup target="_blank" rel="noopener"
+         href="https://api.whatsapp.com/send?text={{ post.title|urlencode }}%20{{ share_url|urlencode }}">
+        <span class="shr-ic"><svg aria-hidden="true"><use href="#s-whatsapp"/></svg></span><span>WhatsApp</span>
+      </a>
+      <a class="shr-go shr-x" data-share-popup target="_blank" rel="noopener"
+         href="https://twitter.com/intent/tweet?url={{ share_url|urlencode }}&amp;text={{ post.title|urlencode }}">
+        <span class="shr-ic"><svg aria-hidden="true"><use href="#s-x"/></svg></span><span>X</span>
+      </a>
+      <a class="shr-go shr-li" data-share-popup target="_blank" rel="noopener"
+         href="https://www.linkedin.com/sharing/share-offsite/?url={{ share_url|urlencode }}">
+        <span class="shr-ic"><svg aria-hidden="true"><use href="#s-linkedin"/></svg></span><span>LinkedIn</span>
+      </a>
+      <a class="shr-go shr-tg" data-share-popup target="_blank" rel="noopener"
+         href="https://t.me/share/url?url={{ share_url|urlencode }}&amp;text={{ post.title|urlencode }}">
+        <span class="shr-ic"><svg aria-hidden="true"><use href="#s-telegram"/></svg></span><span>Telegram</span>
+      </a>
+      <a class="shr-go shr-em"
+         href="mailto:?subject={{ post.title|urlencode }}&amp;body={{ share_url|urlencode }}">
+        <span class="shr-ic"><svg aria-hidden="true"><use href="#s-mail"/></svg></span><span>Email</span>
+      </a>
+      <button type="button" class="shr-go shr-cp" data-copy-link="{{ share_url }}">
+        <span class="shr-ic is-line"><svg aria-hidden="true"><use href="#ic-link"/></svg></span><span data-copy-label>Copy link</span>
+      </button>
+      {% comment %}
+      The phone's own share sheet — Messages, Instagram, whatever the reader
+      actually uses. Only a browser that has one can offer it, so the script
+      reveals it; everywhere else it would be a button that does nothing.
+      {% endcomment %}
+      <button type="button" class="shr-go shr-more" data-share-native hidden
+              data-share-title="{{ post.title }}" data-share-url="{{ share_url }}">
+        <span class="shr-ic is-line"><svg aria-hidden="true"><use href="#ic-share"/></svg></span><span>More&hellip;</span>
+      </button>
+    </div>
+  </div>
 </div>
 
 {% if post.sources %}

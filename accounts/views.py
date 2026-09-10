@@ -1061,12 +1061,22 @@ def dashboard_view(request):
     # is worth having, bounded so a busy news week does not put eighty cards
     # into every dashboard's HTML.
     news_posts = list(NewsPost.live.all()[:18])
-    # Chunked here rather than in the template, because Django's template
-    # language cannot slice by a computed index and the alternative is a
-    # custom filter doing exactly this. A deck of one slide is the ordinary
-    # case for a new organisation and the template turns the rotation off for
-    # it — see the news block in dashboard.html.
-    news_slides = [news_posts[i:i + 6] for i in range(0, len(news_posts), 6)]
+    # BY POSITION, NOT BY PAGE (Sep 2026, client: "the first row changes by the
+    # cards doing a 360 ... the other row can have another design"). Each of
+    # the six places on the deck turns on its own — the top three spin, the
+    # bottom three slide — so what the template needs is, for every place, the
+    # run of stories that place will show in turn.
+    #
+    # Wrapped rather than padded: with eight stories the second turn shows
+    # 7, 8, 1, 2, 3, 4 instead of two cards and four holes. A deck of one turn
+    # is the ordinary case for a new organisation and the template turns the
+    # rotation off for it — see the news block in dashboard.html.
+    news_count = len(news_posts)
+    news_turns = -(-news_count // 6) if news_count > 6 else 1
+    news_slots = [
+        [news_posts[(6 * turn + place) % news_count] for turn in range(news_turns)]
+        for place in range(min(news_count, 6))
+    ]
 
     return render(request, "dashboard.html", {
         "cards": cards,
@@ -1094,9 +1104,11 @@ def dashboard_view(request):
         "round_nav": round_nav,
         "preview_round": preview_round,
         "create_url": reverse("orgs:create"),
-        "news_slides": news_slides,
-        # Kept so the first slide can be named in the markup without indexing
-        # into the deck twice.
+        "news_turns": news_turns,
+        # Top row spins, bottom row slides — two shapes, so two lists.
+        "news_spin_slots": news_slots[:3],
+        "news_slide_slots": news_slots[3:],
+        # Whether there is a deck at all — the heading and button go with it.
         "news_any": bool(news_posts),
         "prompts": _dashboard_prompts(request.user, selected, games),
     })

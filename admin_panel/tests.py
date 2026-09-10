@@ -311,7 +311,9 @@ class NewsEditorTests(TestCase):
         self.assertNotIn("Open Graph / Twitter card tags", html)
         # …while the tags those comments describe are still emitted.
         self.assertIn('property="og:title"', html)
-        self.assertIn("as-copy", html)
+        # The share panel's copy button, by its behaviour hook rather than a
+        # class name — the panel was redesigned in Sep 2026 and renamed them.
+        self.assertIn("data-copy-link", html)
 
 
     def test_the_featured_image_can_be_taken_back_off_a_post(self):
@@ -1659,3 +1661,244 @@ class AttachingAPictureInTheEditorTests(TestCase):
             r"""class="thumb"[^>]*background-image:url\('([^']+)'\)""", html,
         )
         self.assertEqual(thumbs, [post.image.url])
+
+
+# ===========================================================================
+# Sep 2026, the client's round on the blog: tags in their codes' colours, the
+# code filter on the news lists, the share button, and slideshows in a story.
+# ===========================================================================
+
+
+def _mp4(seconds, *, timescale=1000, version=0):
+    """The least of an MP4 that admin_panel.media_probe has to read.
+
+    An ftyp, some media data, and then the moov holding the mvhd — moov LAST,
+    because that is how a phone writes a video and the case a reader that only
+    looked at the start of the file would get wrong.
+    """
+    import struct
+
+    ticks = int(seconds * timescale)
+    if version == 1:
+        head = bytes([1, 0, 0, 0]) + struct.pack(">QQIQ", 0, 0, timescale, ticks)
+    else:
+        head = bytes([0, 0, 0, 0]) + struct.pack(">IIII", 0, 0, timescale, ticks)
+    payload = head + b"\0" * 80
+    mvhd = struct.pack(">I4s", 8 + len(payload), b"mvhd") + payload
+    moov = struct.pack(">I4s", 8 + len(mvhd), b"moov") + mvhd
+    ftyp = struct.pack(">I4s", 16, b"ftyp") + b"isom" + b"\0" * 4
+    mdat = struct.pack(">I4s", 8 + 256, b"mdat") + b"\0" * 256
+    return ftyp + mdat + moov
+
+
+class StoryTagColourTests(TestCase):
+    """"If it's a blog that is NRL it should carry its colour.\""""
+
+    def test_every_tag_is_paired_with_the_code_its_colour_is_keyed_on(self):
+        post = NewsPost(title="x", tags=["NRL", "NRLW"])
+        self.assertEqual(post.tag_pairs, [("nrl", "NRL"), ("nrlw", "NRLW")])
+
+    def test_every_tag_a_story_can_carry_has_a_colour(self):
+        """A code with no [data-code] rule renders as a chip with no colour at
+        all — nothing fails, it simply looks unfinished. So the list of tags
+        and the stylesheet are held against each other here."""
+        css = Path(settings.BASE_DIR, "static", "css", "goodtip.css").read_text()
+        missing = [
+            tag for tag, _ in NewsPost.TAG_CHOICES
+            if f'[data-code="{tag.lower()}"]' not in css
+        ]
+        self.assertEqual(missing, [])
+
+    def test_a_card_shows_every_code_on_the_story_each_in_its_own_colour(self):
+        NewsPost.objects.create(title="NRL v NRLW", tags=["NRL", "NRLW"])
+        html = self.client.get(reverse("news_index")).content.decode()
+        self.assertIn('<span class="nt" data-code="nrl">NRL</span>', html)
+        self.assertIn('<span class="nt" data-code="nrlw">NRLW</span>', html)
+
+
+class NewsListFilterTests(TestCase):
+    """Chips and a dropdown on the news & blog list, like the ladder's."""
+
+    def setUp(self):
+        now = timezone.now()
+        NewsPost.objects.create(title="Origin preview", tags=["NRL"], published_at=now)
+        NewsPost.objects.create(title="NRL against NRLW", tags=["NRL", "NRLW"], published_at=now)
+        NewsPost.objects.create(title="Finals race", tags=["AFL"], published_at=now)
+
+    def _html(self, **query):
+        return self.client.get(reverse("news_index"), query).content.decode()
+
+    def test_the_public_list_offers_chips_and_a_dropdown_in_the_codes_colours(self):
+        html = self._html()
+        for tag, _ in NewsPost.TAG_CHOICES:
+            self.assertIn(f'class="cf-chip" data-code="{tag.lower()}"', html)
+            self.assertIn(f'<option value="{tag}" data-code="{tag.lower()}"', html)
+        self.assertIn('<select name="code"', html)
+
+    def test_a_code_shows_every_story_that_carries_it_and_no_other(self):
+        html = self._html(code="NRLW")
+        self.assertIn("NRL against NRLW", html)
+        self.assertNotIn("Origin preview", html)
+        self.assertNotIn("Finals race", html)
+
+    def test_the_chosen_code_is_marked_on_its_chip_and_colours_the_dropdown(self):
+        html = self._html(code="NRL")
+        self.assertIn('class="cf-chip on" data-code="nrl"', html)
+        self.assertRegex(html, r'<select name="code"[^>]*data-code="nrl"')
+
+    def test_the_member_list_has_the_same_filter(self):
+        member = User.objects.create_user(
+            email="reader@goodtip.test", password="x", display_name="Reader",
+        )
+        self.client.force_login(member)
+        html = self._html(code="AFL")
+        self.assertIn("newsfilter", html)
+        self.assertIn('class="cf-chip on" data-code="afl"', html)
+        self.assertIn("Finals race", html)
+        self.assertNotIn("Origin preview", html)
+
+
+class StoryShareTests(TestCase):
+    """One labelled button, and every platform behind it."""
+
+    def setUp(self):
+        self.post = NewsPost.objects.create(
+            title="Share me", tags=["AFL"], body="<p>Short.</p>",
+        )
+        self.html = self.client.get(self.post.get_absolute_url()).content.decode()
+
+    def test_there_is_one_share_button_that_says_what_it_does(self):
+        self.assertIn("data-share-toggle", self.html)
+        self.assertIn("Share this story", self.html)
+
+    def test_each_platform_is_its_own_share_address_for_this_story(self):
+        # Django's urlencode leaves "/" alone.
+        url = "http%3A//testserver/news/share-me/"
+        for address in (
+            f"https://www.facebook.com/sharer/sharer.php?u={url}",
+            "https://api.whatsapp.com/send?text=Share%20me%20" + url,
+            f"https://twitter.com/intent/tweet?url={url}",
+            f"https://www.linkedin.com/sharing/share-offsite/?url={url}",
+            f"https://t.me/share/url?url={url}",
+            "mailto:?subject=Share%20me",
+        ):
+            self.assertIn(address, self.html)
+
+    def test_every_icon_the_panel_uses_is_on_the_page(self):
+        """An <svg><use href="#s-x"> with no #s-x anywhere draws nothing, and
+        nothing reports it."""
+        for icon in ("ic-share", "s-facebook", "s-whatsapp", "s-x", "s-linkedin",
+                     "s-telegram", "s-mail", "ic-link"):
+            self.assertIn(f'<symbol id="{icon}"', self.html)
+
+
+@override_settings(MEDIA_ROOT=temp_media())
+class StorySlideshowUploadTests(TestCase):
+    """Pictures and short videos for a slideshow, through the editor's upload."""
+
+    @classmethod
+    def tearDownClass(cls):
+        drop_temp_media()
+        super().tearDownClass()
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            email="slides@goodtip.test", password="Str0ng!pass", display_name="Slides",
+        )
+        sign_in_to_hq(self.client, self.admin)
+        self.url = reverse("admin:hq_news_upload_image")
+
+    def _up(self, name, data, ctype):
+        return self.client.post(self.url, {"file": SimpleUploadedFile(name, data, content_type=ctype)})
+
+    def test_a_picture_is_stored_and_said_to_be_one(self):
+        resp = self._up("a.gif", b"GIF89a\x01\x00\x01\x00\x00\x00\x00;", "image/gif")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["kind"], "image")
+
+    def test_a_short_video_is_stored_and_said_to_be_one(self):
+        resp = self._up("clip.mp4", _mp4(30), "video/mp4")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        body = resp.json()
+        self.assertEqual(body["kind"], "video")
+        self.assertEqual(body["seconds"], 30.0)
+        self.assertIn("/news/slides/", body["url"])
+
+    def test_a_video_over_45_seconds_is_refused_whatever_the_browser_said(self):
+        resp = self._up("long.mp4", _mp4(52), "video/mp4")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("52 seconds", resp.json()["error"])
+        # Refused before it was stored, not stored and then complained about.
+        self.assertEqual(list(Path(settings.MEDIA_ROOT).rglob("long*")), [])
+
+    def test_a_mov_is_stored_as_mp4_so_browsers_will_play_it(self):
+        resp = self._up("IMG_0001.MOV", _mp4(10), "video/quicktime")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertTrue(resp.json()["url"].endswith(".mp4"))
+
+    def test_something_that_is_neither_is_refused(self):
+        resp = self._up("notes.txt", b"hello", "text/plain")
+        self.assertEqual(resp.status_code, 400)
+
+
+@override_settings(MEDIA_ROOT=temp_media())
+class VideoLengthProbeTests(TestCase):
+    """admin_panel.media_probe reads a video's length from the file itself."""
+
+    @classmethod
+    def tearDownClass(cls):
+        drop_temp_media()
+        super().tearDownClass()
+
+    def test_it_finds_the_length_after_the_media_data(self):
+        from .media_probe import video_seconds
+
+        f = SimpleUploadedFile("c.mp4", _mp4(32.5), content_type="video/mp4")
+        self.assertAlmostEqual(video_seconds(f), 32.5)
+        self.assertEqual(f.tell(), 0, "the upload must be rewound for saving")
+
+    def test_it_reads_the_64_bit_header_too(self):
+        from .media_probe import video_seconds
+
+        f = SimpleUploadedFile("c.mp4", _mp4(12, timescale=600, version=1), content_type="video/mp4")
+        self.assertAlmostEqual(video_seconds(f), 12)
+
+    def test_it_says_it_does_not_know_rather_than_guessing(self):
+        from .media_probe import video_seconds
+
+        self.assertIsNone(video_seconds(SimpleUploadedFile("c.mp4", b"junk" * 10)))
+        self.assertIsNone(video_seconds(SimpleUploadedFile("c.webm", b"\x1aE\xdf\xa3")))
+
+
+class StorySlideshowRenderTests(TestCase):
+    """A slideshow is markup in the body: it has to survive the save and reach
+    the reader with the script that runs it."""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            email="show@goodtip.test", password="Str0ng!pass", display_name="Show",
+        )
+        sign_in_to_hq(self.client, self.admin)
+
+    SHOW = (
+        '<p>Para one.</p><figure class="gt-slides" data-slides contenteditable="false">'
+        '<div class="gs-track"><div class="gs-slide" data-kind="image"><img src="/media/a.jpg" alt="A"></div>'
+        '<div class="gs-slide" data-kind="video"><video src="/media/b.mp4" muted playsinline preload="metadata">'
+        '</video></div></div></figure><p>Para two.</p>'
+    )
+
+    def test_it_survives_the_save_and_reaches_the_reader(self):
+        self.client.post(reverse("admin:hq_news_new"), {
+            "title_html": "Slides", "body": self.SHOW, "tags": ["NRL"], "is_published": "on",
+        })
+        post = NewsPost.objects.get()
+        self.assertIn('<video src="/media/b.mp4" muted playsinline', post.body)
+        html = self.client.get(post.get_absolute_url()).content.decode()
+        self.assertIn('class="gt-slides" data-slides', html)
+        self.assertIn("js/gt-slides", html)
+
+    def test_the_editor_offers_the_slideshow_button_and_its_manager(self):
+        html = self.client.get(reverse("admin:hq_news_new")).content.decode()
+        self.assertIn('data-action="slides"', html)
+        self.assertIn("data-slides-dialog", html)
+        self.assertIn("0 of 10", html)

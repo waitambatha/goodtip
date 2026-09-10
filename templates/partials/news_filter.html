@@ -1,0 +1,49 @@
+{% comment %}
+The code filter on the news & blog list — chips and a dropdown, both in the
+codes' own colours.
+
+"Even in the blogs and news page we need to have that filter, both dropdown
+and button, with their colours, the way we have done with the other pages like
+the ladder — so I can click NRL and see blogs that are NRL."
+
+Same look as partials/comp_filter.html (the .compfilter / .cf-chip rules), not
+the same partial: that one takes Series objects and a ?series= slug, and a
+story is filtered by its NewsPost tag through ?code=. One markup contract per
+partial; the shared part is the CSS, which is where "looks like the ladder"
+actually lives.
+
+Both controls post the same URL. The chips are the control on a wide screen;
+below 720px they would wrap into a block taller than the first card, so the
+select becomes the whole control there (see .compfilter in goodtip.css). The
+select wears the chosen code's colour, since a closed dropdown cannot show a
+row of them.
+
+Expects:
+  news_tags   NewsPost.TAG_CHOICES
+  active_tag  the chosen tag, or ""
+  base        the list's URL
+  anchor      "#stories" on the public page, where the list is below a hero
+{% endcomment %}
+<div class="compfilter newsfilter">
+  <div class="cf-chips" role="group" aria-label="Filter stories by code">
+    <a class="cf-chip cf-all{% if not active_tag %} on{% endif %}" href="{{ base }}{{ anchor }}"
+       {% if not active_tag %}aria-current="true"{% endif %}>All stories</a>
+    {% for tag, label in news_tags %}
+    <a class="cf-chip{% if active_tag == tag %} on{% endif %}" data-code="{{ tag|lower }}"
+       href="{{ base }}?code={{ tag }}{{ anchor }}"
+       {% if active_tag == tag %}aria-current="true"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </div>
+  <form method="get" action="{{ base }}{{ anchor }}" class="cf-pick">
+    <label class="cf-lab" for="nf-code">Show</label>
+    <select name="code" id="nf-code" class="gt-select nf-select"
+            {% if active_tag %}data-code="{{ active_tag|lower }}"{% endif %}
+            onchange="this.form.submit()">
+      <option value="" {% if not active_tag %}selected{% endif %}>All stories</option>
+      {% for tag, label in news_tags %}
+      <option value="{{ tag }}" data-code="{{ tag|lower }}" {% if active_tag == tag %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <noscript><button type="submit" class="abtn abtn-ghost">Show</button></noscript>
+  </form>
+</div>

@@ -1,0 +1,16 @@
+{% comment %}
+Every tag on a story, each in its code's own colour.
+
+"If it's a blog that is NRL it should carry its colour, because a blog might
+just be NRL, or both — a blog comparing NRL to NFL, or NRL to NRLW." So every
+tag, not just the first, and each one wearing the same colour its code wears on
+the ladder and the fixtures — see [data-code] in goodtip.css and
+NewsPost.tag_pairs.
+
+One row, not one absolutely positioned chip per tag: the cards used to stack
+every .sport-tag at the same top-left corner, so a story with two codes showed
+one chip with another hidden underneath it.
+
+Expects `post`.
+{% endcomment %}
+<span class="nt-row">{% for code, label in post.tag_pairs %}<span class="nt" data-code="{{ code }}">{{ label }}</span>{% endfor %}</span>

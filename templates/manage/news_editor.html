@@ -349,9 +349,45 @@
           <svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.7;"><use href="#ic-image"/></svg>
         </button>
         <input type="file" accept="image/*" data-inline-image style="display:none;">
+        {% comment %}
+        A SLIDESHOW: up to ten pictures or short videos that the reader sees
+        one at a time. Put the cursor in the paragraph it should follow and
+        press this; press a slideshow already in the story to change it.
+        {% endcomment %}
+        <button type="button" data-action="slides" title="Slideshow: up to 10 pictures or short videos, shown one at a time">
+          <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;"><rect x="6" y="6" width="15" height="12" rx="2"/><path d="M3 9v9a2 2 0 0 0 2 2h12"/><path d="m11 10 4 2-4 2z"/></svg><span class="ned-tool-txt">Slideshow</span>
+        </button>
+        <input type="file" multiple accept="image/*,video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm" data-slides-input style="display:none;">
       </div>
       <div class="ned-surface" contenteditable="true" data-hidden-input="np_body"
            data-placeholder="Tell the story…">{{ initial_body|default:""|safe }}</div>
+
+      {% comment %}
+      The slideshow's manager. Inside the form, so every button in it is
+      type="button" and no input has a name — nothing here is posted; what it
+      builds is written into the story body as markup.
+      {% endcomment %}
+      <dialog class="ned-sdlg" data-slides-dialog aria-labelledby="nedSdlgH">
+        <div class="nsd-head">
+          <h3 id="nedSdlgH">Slideshow</h3>
+          <p>Up to 10 pictures or short videos (45 seconds or less). Readers see one at a time: it moves on every 3 seconds, and they can go back, go forward, or press and hold to keep one still. Videos play muted until the reader turns the sound on.</p>
+        </div>
+        <ol class="nsd-list" data-slides-list></ol>
+        <div class="nsd-empty" data-slides-empty>No slides yet. Add pictures or videos, or drop them here.</div>
+        <div class="nsd-add">
+          <button type="button" class="ned-drop-btn" data-slides-add>
+            <svg><use href="#ic-image"/></svg> <span>Add pictures or videos</span>
+          </button>
+          <span class="nsd-count" data-slides-count>0 of 10</span>
+        </div>
+        <p class="nsd-msg" data-slides-msg role="status" aria-live="polite"></p>
+        <div class="nsd-foot">
+          <button type="button" class="nsd-remove" data-slides-delete hidden>Remove slideshow</button>
+          <span class="nsd-sp"></span>
+          <button type="button" class="nsd-cancel" data-slides-cancel>Cancel</button>
+          <button type="button" class="gt-go-btn nsd-ok" data-slides-apply>Insert slideshow</button>
+        </div>
+      </dialog>
     </div>
     <input type="hidden" name="body" id="np_body">
 

@@ -790,16 +790,71 @@ def news_edit(request, post_id: int):
     })
 
 
+#: SLIDESHOWS IN A STORY (Sep 2026, client): "under paragraph one I want to be
+#: able to put a max of 10 images, but it will show as one and auto slide ...
+#: and not only images but also a video — a short video, less than 45 seconds —
+#: but 10 slides max." The count is the editor's to enforce (a slideshow is
+#: markup in the body, not a row anywhere); the length and the sizes are
+#: enforced here, because a limit only the browser knows is a convenience.
+NEWS_SLIDES_MAX = 10
+NEWS_VIDEO_MAX_SECONDS = 45
+NEWS_IMAGE_MAX_BYTES = 10 * 1024 * 1024
+#: 45 seconds of phone video is 25–90 MB depending on the phone. This is the
+#: ceiling here; nginx's client_max_body_size has to be at least this for it to
+#: be the one a reader meets.
+NEWS_VIDEO_MAX_BYTES = 80 * 1024 * 1024
+NEWS_VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".webm"}
+
+
 @requires("news.write")
 def news_upload_image(request):
-    """Inline image upload for the story editor — returns the URL to insert."""
+    """Inline upload for the story editor — returns the URL to insert.
+
+    A picture for the body, or a picture or short video for a slideshow. The
+    answer says which (`kind`), so the editor knows whether to write an <img>
+    or a <video>.
+    """
+    from pathlib import Path
+
+    from .media_probe import video_seconds
+
     f = request.FILES.get("file")
     if request.method != "POST" or not f:
         return JsonResponse({"error": "No file given."}, status=400)
-    if not (f.content_type or "").startswith("image/"):
-        return JsonResponse({"error": "That's not an image."}, status=400)
-    path = default_storage.save(f"news/body/{f.name}", f)
-    return JsonResponse({"url": default_storage.url(path)})
+    ctype = (f.content_type or "").lower()
+    suffix = Path(f.name).suffix.lower()
+
+    if ctype.startswith("image/"):
+        if f.size > NEWS_IMAGE_MAX_BYTES:
+            return JsonResponse({"error": "That picture is over 10 MB."}, status=400)
+        path = default_storage.save(f"news/body/{f.name}", f)
+        return JsonResponse({"url": default_storage.url(path), "kind": "image"})
+
+    if ctype.startswith("video/") or suffix in NEWS_VIDEO_SUFFIXES:
+        if suffix not in NEWS_VIDEO_SUFFIXES:
+            return JsonResponse({"error": "Use an MP4, MOV or WebM video."}, status=400)
+        if f.size > NEWS_VIDEO_MAX_BYTES:
+            return JsonResponse({"error": "That video is over 80 MB."}, status=400)
+        seconds = video_seconds(f)
+        if seconds is not None and seconds > NEWS_VIDEO_MAX_SECONDS:
+            return JsonResponse({
+                "error": f"That video runs {round(seconds)} seconds. Slideshow "
+                         f"videos have to be {NEWS_VIDEO_MAX_SECONDS} seconds or less.",
+            }, status=400)
+        # A .mov off an iPhone is almost always H.264 in an MP4-compatible
+        # container, and browsers that play those bytes as video/mp4 refuse
+        # them as video/quicktime — which is the type the .mov suffix gets
+        # served with. Same reasoning as MessageAttachment.video_type.
+        name = f.name
+        if suffix == ".mov":
+            name = Path(name).stem + ".mp4"
+        path = default_storage.save(f"news/slides/{name}", f)
+        return JsonResponse({
+            "url": default_storage.url(path), "kind": "video",
+            "seconds": round(seconds, 1) if seconds is not None else None,
+        })
+
+    return JsonResponse({"error": "That's not a picture or a video."}, status=400)
 
 
 @requires("news.publish", "Publish or unpublish a story")

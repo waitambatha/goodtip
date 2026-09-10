@@ -677,6 +677,8 @@
     surface.addEventListener('click', function (e) {
       var img = e.target;
       if (!img || img.tagName !== 'IMG') return;
+      // A slideshow's pictures are described in its own manager.
+      if (img.closest('[data-slides]')) return;
       var next = askAlt(img.getAttribute('alt') || '');
       if (next === null) return;
       img.setAttribute('alt', next);
@@ -745,6 +747,314 @@
       try { on = document.queryCommandState(cmd); } catch (e) { on = false; }
       btn.classList.toggle('is-on', !!on);
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
+  /* ---- Slideshows ------------------------------------------------------
+   *
+   * "Under paragraph one I want to be able to put a max of 10 images, but it
+   * will show as one and auto slide ... and not only images but also a video,
+   * less than 45 seconds ... 10 slides max."
+   *
+   * A slideshow is markup in the body, not a separate record:
+   *
+   *   <figure class="gt-slides" data-slides contenteditable="false">
+   *     <div class="gs-track"><div class="gs-slide">…</div>…</div>
+   *   </figure>
+   *
+   * so it saves, redirects, previews and gates exactly as the rest of the
+   * story does, and it sits wherever in the story the author put it. The
+   * reader's gt-slides.js turns it into one-at-a-time; here it is a strip of
+   * thumbnails that opens this manager when pressed.
+   *
+   * Files upload the moment they are chosen, so what is written into the
+   * story is only ever the address of a stored file. The limits are checked
+   * here to save a wasted upload, and again by the server, which is the
+   * check that counts (admin_panel.views.news_upload_image).
+   */
+  var SLIDES_MAX = 10;
+  var VIDEO_MAX_S = 45;
+  var IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+  var VIDEO_MAX_BYTES = 80 * 1024 * 1024;
+  var VIDEO_RE = /\.(mp4|mov|m4v|webm)$/i;
+
+  /* How long a video runs, read by the browser from the file on disk before
+     any of it is uploaded. null when the browser cannot tell — the server
+     reads MP4 and MOV itself, so that is not a way past the limit. */
+  function videoLength(file) {
+    return new Promise(function (resolve) {
+      var v = document.createElement('video');
+      var url = URL.createObjectURL(file);
+      var done = function (secs) { URL.revokeObjectURL(url); resolve(secs); };
+      v.preload = 'metadata';
+      v.onloadedmetadata = function () { done(isFinite(v.duration) ? v.duration : null); };
+      v.onerror = function () { done(null); };
+      v.src = url;
+    });
+  }
+
+  function mmss(secs) {
+    secs = Math.round(secs || 0);
+    return Math.floor(secs / 60) + ':' + ('0' + (secs % 60)).slice(-2);
+  }
+
+  function wireSlides(editor, ctrl, getSurface, commit, after) {
+    var dlg = editor.querySelector('[data-slides-dialog]');
+    var input = editor.querySelector('[data-slides-input]');
+    var uploadUrl = editor.getAttribute('data-upload-url');
+    if (!dlg || !input || !uploadUrl || typeof dlg.showModal !== 'function') {
+      ctrl.hidden = true;
+      return;
+    }
+    var list = dlg.querySelector('[data-slides-list]');
+    var empty = dlg.querySelector('[data-slides-empty]');
+    var countEl = dlg.querySelector('[data-slides-count]');
+    var msg = dlg.querySelector('[data-slides-msg]');
+    var addBtn = dlg.querySelector('[data-slides-add]');
+    var applyBtn = dlg.querySelector('[data-slides-apply]');
+    var delBtn = dlg.querySelector('[data-slides-delete]');
+    var cancelBtn = dlg.querySelector('[data-slides-cancel]');
+    var editing = null;   // the <figure> being changed, or null for a new one
+    var pending = 0;
+
+    function items() { return Array.prototype.slice.call(list.children); }
+    function say(text) { msg.textContent = text || ''; }
+
+    function refresh() {
+      var rows = items();
+      var n = rows.length;
+      empty.hidden = n > 0;
+      countEl.textContent = n + ' of ' + SLIDES_MAX;
+      addBtn.disabled = n >= SLIDES_MAX;
+      // Not while anything is still uploading: a slide written into the
+      // story before its file is stored would point at nothing.
+      applyBtn.disabled = n === 0 || pending > 0;
+      applyBtn.textContent = pending > 0 ? 'Uploading…'
+        : (editing ? 'Update slideshow' : 'Insert slideshow');
+      rows.forEach(function (li, i) {
+        li.querySelector('[data-up]').disabled = i === 0;
+        li.querySelector('[data-down]').disabled = i === n - 1;
+      });
+    }
+
+    function row(kind, src, alt, secs) {
+      var li = document.createElement('li');
+      li.className = 'nsd-item';
+      li.setAttribute('data-kind', kind);
+      if (src) li.setAttribute('data-src', src);
+      var media = kind === 'video'
+        ? '<video muted playsinline preload="metadata" src="' + escapeAttr(src || '') + '"></video>' +
+          '<b class="nsd-badge">Video' + (secs ? ' · ' + mmss(secs) : '') + '</b>'
+        : '<img alt="" src="' + escapeAttr(src || '') + '">';
+      li.innerHTML =
+        '<span class="nsd-thumb">' + media + '<i class="nsd-spin" aria-hidden="true"></i></span>' +
+        '<input type="text" class="nsd-alt" maxlength="200">' +
+        '<span class="nsd-acts">' +
+          '<button type="button" data-up title="Move earlier" aria-label="Move earlier">&uarr;</button>' +
+          '<button type="button" data-down title="Move later" aria-label="Move later">&darr;</button>' +
+          '<button type="button" data-drop title="Remove" aria-label="Remove">&times;</button>' +
+        '</span>';
+      var altBox = li.querySelector('.nsd-alt');
+      altBox.placeholder = (kind === 'video' ? 'What this video shows' : 'What this picture shows') +
+                           ' (for screen readers)';
+      altBox.value = alt || '';
+      return li;
+    }
+
+    function open(fig) {
+      editing = fig || null;
+      list.innerHTML = '';
+      say('');
+      if (fig) {
+        fig.querySelectorAll('.gs-slide').forEach(function (slide) {
+          var v = slide.querySelector('video');
+          var im = slide.querySelector('img');
+          if (v) list.appendChild(row('video', v.getAttribute('src'), v.getAttribute('aria-label')));
+          else if (im) list.appendChild(row('image', im.getAttribute('src'), im.getAttribute('alt')));
+        });
+      }
+      delBtn.hidden = !fig;
+      refresh();
+      dlg.showModal();
+    }
+
+    function upload(file, li) {
+      var data = new FormData();
+      data.append('file', file);
+      pending++;
+      li.classList.add('is-loading');
+      refresh();
+      return fetch(uploadUrl, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken(editor.closest('form') || document) },
+        body: data,
+      }).then(function (r) {
+        // nginx refuses an oversized body with its own HTML page, before
+        // Django ever sees it — so there is no JSON to read.
+        if (r.status === 413) throw new Error(file.name + ' is bigger than the server will accept.');
+        return r.json().then(function (json) {
+          if (!r.ok || !json.url) throw new Error(json.error || ("Couldn't upload " + file.name + '.'));
+          return json;
+        });
+      }).then(function (json) {
+        li.setAttribute('data-src', json.url);
+        var m = li.querySelector('img, video');
+        if (m) {
+          if (m.src.indexOf('blob:') === 0) URL.revokeObjectURL(m.src);
+          m.src = json.url;
+        }
+      }).catch(function (err) {
+        li.remove();
+        say(err && err.message ? err.message : ("Couldn't upload " + file.name + '.'));
+      }).then(function () {
+        pending--;
+        li.classList.remove('is-loading');
+        refresh();
+      });
+    }
+
+    function addFiles(files) {
+      say('');
+      var chosen = Array.prototype.slice.call(files);
+      var room = SLIDES_MAX - items().length;
+      if (chosen.length > room) {
+        say('A slideshow holds ' + SLIDES_MAX + '. The last ' + (chosen.length - Math.max(0, room)) +
+            ' you chose ' + (chosen.length - room === 1 ? 'was' : 'were') + ' left out.');
+        chosen = chosen.slice(0, Math.max(0, room));
+      }
+      chosen.forEach(function (file) {
+        var isVideo = /^video\//.test(file.type) || VIDEO_RE.test(file.name);
+        var isImage = !isVideo && /^image\//.test(file.type);
+        if (!isVideo && !isImage) { say(file.name + " isn't a picture or a video."); return; }
+        if (isImage && file.size > IMAGE_MAX_BYTES) { say(file.name + ' is over 10 MB.'); return; }
+        if (isVideo && file.size > VIDEO_MAX_BYTES) { say(file.name + ' is over 80 MB.'); return; }
+        // Shown straight away from the file on disk; swapped for the stored
+        // copy when the upload lands.
+        var li = row(isVideo ? 'video' : 'image', URL.createObjectURL(file), '');
+        li.removeAttribute('data-src');
+        list.appendChild(li);
+        refresh();
+        if (!isVideo) { upload(file, li); return; }
+        pending++;
+        refresh();
+        videoLength(file).then(function (secs) {
+          pending--;
+          if (secs != null && secs > VIDEO_MAX_S) {
+            li.remove();
+            refresh();
+            say(file.name + ' runs ' + Math.round(secs) + ' seconds. Slideshow videos have to be ' +
+                VIDEO_MAX_S + ' seconds or less.');
+            return;
+          }
+          var badge = li.querySelector('.nsd-badge');
+          if (badge && secs != null) badge.textContent = 'Video · ' + mmss(secs);
+          upload(file, li);
+        });
+      });
+    }
+
+    function markup() {
+      var slides = items().filter(function (li) { return li.getAttribute('data-src'); }).map(function (li) {
+        var src = escapeAttr(li.getAttribute('data-src'));
+        var alt = escapeAttr(li.querySelector('.nsd-alt').value.trim());
+        return li.getAttribute('data-kind') === 'video'
+          ? '<div class="gs-slide" data-kind="video"><video src="' + src + '" muted playsinline preload="metadata"' +
+            (alt ? ' aria-label="' + alt + '"' : '') + '></video></div>'
+          : '<div class="gs-slide" data-kind="image"><img src="' + src + '" alt="' + alt + '"></div>';
+      });
+      if (!slides.length) return '';
+      return '<figure class="gt-slides" data-slides contenteditable="false"><div class="gs-track">' +
+             slides.join('') + '</div></figure>';
+    }
+
+    /* The top-level block the caret is in — a slideshow goes AFTER the
+       paragraph the author is in ("under paragraph one"), never inside it:
+       a <figure> inside a <p> is not valid, and the browser would split the
+       paragraph around it wherever it liked. */
+    function blockAtCaret(surface) {
+      var sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return null;
+      var range = sel.getRangeAt(0);
+      var node = range.startContainer;
+      if (!inSurface(surface, node)) return null;
+      if (node === surface) return surface.childNodes[Math.max(0, range.startOffset - 1)] || null;
+      while (node.parentNode && node.parentNode !== surface) node = node.parentNode;
+      return node.parentNode === surface ? node : null;
+    }
+
+    function place(html) {
+      var surface = getSurface();
+      if (!surface) return;
+      commit();
+      var tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      var fig = tmp.firstElementChild;
+      if (editing && surface.contains(editing)) {
+        if (fig) editing.parentNode.replaceChild(fig, editing);
+        else editing.parentNode.removeChild(editing);
+      } else if (fig) {
+        restoreSelection(surface);
+        var block = blockAtCaret(surface);
+        if (block) surface.insertBefore(fig, block.nextSibling);
+        else surface.appendChild(fig);
+        // Somewhere to carry on typing, if it landed at the very end.
+        if (!fig.nextElementSibling) {
+          var para = document.createElement('p');
+          para.innerHTML = '<br>';
+          surface.appendChild(para);
+        }
+      }
+      after();
+      commit();
+    }
+
+    ctrl.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      var surface = getSurface();
+      if (surface) saveSelection(surface);
+    });
+    ctrl.addEventListener('click', function () { open(null); });
+    addBtn.addEventListener('click', function () { input.click(); });
+    input.addEventListener('change', function () {
+      if (input.files && input.files.length) addFiles(input.files);
+      input.value = '';
+    });
+    list.addEventListener('click', function (e) {
+      var li = e.target.closest('.nsd-item');
+      if (!li) return;
+      if (e.target.closest('[data-up]') && li.previousElementSibling) list.insertBefore(li, li.previousElementSibling);
+      else if (e.target.closest('[data-down]') && li.nextElementSibling) list.insertBefore(li.nextElementSibling, li);
+      else if (e.target.closest('[data-drop]')) li.remove();
+      else return;
+      refresh();
+    });
+    ['dragenter', 'dragover'].forEach(function (evt) {
+      dlg.addEventListener(evt, function (e) { e.preventDefault(); });
+    });
+    dlg.addEventListener('drop', function (e) {
+      e.preventDefault();
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+    });
+    applyBtn.addEventListener('click', function () {
+      var html = markup();
+      if (html) place(html);
+      dlg.close();
+    });
+    delBtn.addEventListener('click', function () {
+      if (editing) place('');
+      dlg.close();
+    });
+    cancelBtn.addEventListener('click', function () { dlg.close(); });
+    dlg.addEventListener('close', function () { editing = null; });
+
+    // Press a slideshow already in the story to change it.
+    var surface = getSurface();
+    if (surface) surface.addEventListener('click', function (e) {
+      var fig = e.target.closest && e.target.closest('[data-slides]');
+      if (fig && surface.contains(fig)) {
+        e.preventDefault();
+        open(fig);
+      }
     });
   }
 
@@ -991,6 +1301,11 @@
         return;
       }
 
+      if (action === 'slides') {
+        wireSlides(editor, ctrl, surfaceNow, commit, after);
+        return;
+      }
+
       if (action === 'image') {
         var fileInput = editor.querySelector('[data-inline-image]');
         ctrl.addEventListener('mousedown', function (e) {
@@ -1032,6 +1347,11 @@
   function wireEditor(editor) {
     var surface = editor.querySelector('.ned-surface');
     if (!surface) return;
+    // Before the first history snapshot, so undo never lands on a version of
+    // a slideshow that could be typed into.
+    surface.querySelectorAll('[data-slides]').forEach(function (f) {
+      f.setAttribute('contenteditable', 'false');
+    });
 
     var history = attachSurface(surface);
     var sync = wireToolbar(editor, function () { return surface; });

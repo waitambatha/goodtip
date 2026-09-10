@@ -1,0 +1,17 @@
+{% load static humanize %}{% comment %}
+One story card on the dashboard deck. Two shapes, because the two rows turn
+differently and the client asked for the second row to have "another design":
+
+  tall   picture over words — the top row, the cards that spin
+  wide   picture beside words — the bottom row, the cards that slide
+
+Expects `p` (a NewsPost) and `shape`.
+{% endcomment %}
+<a class="nd-card is-{{ shape }}" data-code="{{ p.tag_pairs.0.0 }}" href="{% url 'news_detail' p.slug %}">
+  <span class="ndc-thumb" style="background-image:url('{% if p.image %}{{ p.image.url }}{% else %}{% static p.fallback_scene %}{% endif %}')"{% if p.image and p.image_alt %} role="img" aria-label="{{ p.image_alt }}"{% endif %}>{% include "partials/_news_tags.html" with post=p %}</span>
+  <div class="ndc-body">
+    <h3 class="ndc-h">{{ p.title }}</h3>
+    {% if p.excerpt %}<p class="ndc-p">{% if shape == "wide" %}{{ p.excerpt|truncatechars:90 }}{% else %}{{ p.excerpt|truncatechars:120 }}{% endif %}</p>{% endif %}
+    <span class="ndc-date">{{ p.published_at|naturaltime }} &middot; <span class="ndc-on">Read the story &rarr;</span></span>
+  </div>
+</a>

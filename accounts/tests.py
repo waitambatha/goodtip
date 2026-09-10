@@ -1139,3 +1139,73 @@ class ConfirmOnlyWhenSomethingIsUnsavedTests(TestCase):
         body = self._body()
         script = body[body.index("function dockRefresh"):body.index("One path to the sheet")]
         self.assertIn("real && !real.hidden", script)
+
+
+class DashboardNewsDeckTests(TestCase):
+    """The news deck (Sep 2026, second pass): a spinning row and a sliding
+    row, turning every ten seconds, with no pause button."""
+
+    def setUp(self):
+        from admin_panel.models import NewsPost
+        from catalog.models import Season
+        from orgs.models import OrgMember, Organisation
+
+        self.NewsPost = NewsPost
+        season = Season.objects.create(year=2098, label="2098")
+        org = Organisation.objects.create(name="Deck Co", season=season)
+        self.user = User.objects.create_user(
+            email="deck@example.com", password="x", display_name="Deck",
+        )
+        OrgMember.objects.create(user=self.user, org=org)
+        self.client.force_login(self.user)
+
+    def _stories(self, n):
+        now = timezone.now()
+        for i in range(n):
+            self.NewsPost.objects.create(
+                title=f"Story {i}", tags=["NRL"], published_at=now - timedelta(minutes=i),
+            )
+
+    def _body(self):
+        return self.client.get(reverse("dashboard")).content.decode()
+
+    def test_the_heading_is_a_heading_and_all_news_is_a_button(self):
+        self._stories(3)
+        body = self._body()
+        self.assertIn('<h2 class="nd-title">News &amp; blog</h2>', body)
+        self.assertIn('class="abtn abtn-primary nd-all"', body)
+
+    def test_there_is_no_play_or_pause_button(self):
+        self._stories(12)
+        body = self._body()
+        self.assertNotIn("data-news-pause", body)
+        self.assertNotIn(">Play<", body)
+
+    def test_it_turns_every_ten_seconds(self):
+        self._stories(12)
+        self.assertIn('data-interval="10000"', self._body())
+
+    def test_the_top_row_spins_and_the_bottom_row_slides(self):
+        self._stories(6)
+        body = self._body()
+        self.assertEqual(body.count('data-news-place="spin"'), 3)
+        self.assertEqual(body.count('data-news-place="slide"'), 3)
+
+    def test_eight_stories_make_two_full_turns_with_no_empty_places(self):
+        self._stories(8)
+        body = self._body()
+        self.assertIn('data-turns="2"', body)
+        queues = re.findall(r"<template data-news-queue>(.*?)</template>", body, re.S)
+        self.assertEqual(len(queues), 6)
+        self.assertEqual([q.count('class="nd-card') for q in queues], [2] * 6)
+
+    def test_six_or_fewer_stories_do_not_turn(self):
+        self._stories(4)
+        body = self._body()
+        self.assertIn('data-turns="1"', body)
+        # The tag, not the attribute name: the deck's script on the same page
+        # mentions `template[data-news-queue]` whether or not there are any.
+        self.assertNotIn("<template data-news-queue>", body)
+        self.assertNotIn('class="nd-dot', body)
+        self.assertEqual(body.count('data-news-place="spin"'), 3)
+        self.assertEqual(body.count('data-news-place="slide"'), 1)

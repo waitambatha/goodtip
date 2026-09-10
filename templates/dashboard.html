@@ -483,85 +483,79 @@ is the part members care about and the part that is still true.
   {% endcomment %}
 </div>
 
-<!-- news & blog — a rotating deck of six, cards click through to the full story -->
+<!-- news & blog — six cards that turn over, each click through to the full story -->
 {% if news_any %}
 {% comment %}
-SIX CARDS THAT TURN OVER, NOT THREE PLUS A LIST.
+TWO ROWS, EACH TURNING ITS OWN WAY (Sep 2026, second pass).
 
-What was here: three picture cards, and then every other story repeated
-underneath as a bare list of headline + timestamp. Two shapes for one thing,
-the same stories twice, and a screenful spent on six links — which is what the
-client was looking at when they said "let it not be static, it should have a
-slick way of changing".
+The client's note on the first version, which cross-faded all six cards every
+five seconds: "the blogs should auto change and the way the cards change make
+it animated, not just something appearing — the first row changes by the cards
+doing like a 360, then the other blogs is what appears at the end of the 360.
+Change in about 10 seconds. The other row can have another design."
 
-So the list is gone and the cards do the work. Six at a time in a 3×2 grid;
-if there are more than six published, the deck turns over every five seconds
-and the dots below say how many turns there are.
+So:
+  * the TOP ROW is three picture-over-words cards that spin one full turn on
+    their upright, staggered left to right; the next story is on the far side
+    of the spin and is what faces you when it lands;
+  * the BOTTOM ROW is a different shape — picture beside words — and the next
+    story slides up into each place once the spin has landed;
+  * one clock for both, every ten seconds.
 
-The rotation is CSS opacity between absolutely-stacked slides rather than a
-transform track, because the slides are different heights (a story with no
-excerpt is shorter than one with) and a sliding track would jump the page
-under the reader every turn. Stacked, the block is as tall as its tallest
-slide and never moves.
+"Remove this Play, it should all be automatic" — so there is no pause button.
+It still stops for somebody reading: hovering or tabbing into the deck holds
+it. And it still does not move on its own for a reader whose machine asks for
+reduced motion; the dots step through by hand for them.
 
-Everything is a real link in the markup from the first paint — no slide is
-built by script — so with JavaScript off this is simply the six most recent
-stories, which is a perfectly good answer.
+Each place renders its first story as a real link. The rest wait in a
+<template>, which is inert — not rendered, not focusable, not read aloud — so
+there is no aria-hidden bookkeeping, and with JavaScript off this is simply the
+six newest stories. See news_slots in accounts.views.dashboard for how the
+stories are dealt to the places.
 {% endcomment %}
-<div class="hub-h" style="margin-bottom:14px;"><span class="k">News &amp; blog</span><a href="{% url 'news_index' %}">All news &amp; blog &rarr;</a></div>
-<div class="news-deck{% if news_slides|length > 1 %} is-live{% endif %}" data-news-deck data-interval="5000">
-  <div class="nd-stage">
-    {% for slide in news_slides %}
-    {% comment %}
-    aria-hidden on the slides that are not showing, so a screen reader is not
-    read eighteen headlines when six are on screen. The first slide keeps
-    focusable content; the rest are inert until their turn.
-    {% endcomment %}
-    <div class="nd-slide{% if forloop.first %} on{% endif %}" data-news-slide
-         {% if not forloop.first %}aria-hidden="true"{% endif %}>
-      {% for p in slide %}
-      <a class="news-lead news-link" href="{% url 'news_detail' p.slug %}"
-         {% if not forloop.parentloop.first %}tabindex="-1"{% endif %}>
-        {% if p.image %}
-        <div class="thumb" style="background-image:url('{{ p.image.url }}')"><span class="sport-tag">{{ p.tag_labels.0 }}</span></div>
-        {% else %}
-        <div class="thumb" style="background-image:url('{% static p.fallback_scene %}')"><span class="sport-tag">{{ p.tag_labels.0 }}</span></div>
-        {% endif %}
-        <div class="body">
-          <h4>{{ p.title }}</h4>
-          {% if p.excerpt %}<p>{{ p.excerpt|truncatechars:120 }}</p>{% endif %}
-          <div class="date">{{ p.published_at|naturaltime }} &middot; <span class="read-on">Read the full story &rarr;</span></div>
-        </div>
-      </a>
-      {% endfor %}
+<div class="nd-head">
+  <h2 class="nd-title">News &amp; blog</h2>
+  <a class="abtn abtn-primary nd-all" href="{% url 'news_index' %}">All news &amp; blog <span aria-hidden="true">&rarr;</span></a>
+</div>
+<div class="news-deck{% if news_turns > 1 %} is-live{% endif %}" data-news-deck
+     data-interval="10000" data-turns="{{ news_turns }}">
+  <div class="nd-row nd-row-spin">
+    {% for slot in news_spin_slots %}
+    <div class="nd-place" data-news-place="spin">
+      <div class="nd-spinner">
+        <div class="nd-face nd-front" data-face="front">{% include "partials/_news_deck_card.html" with p=slot.0 shape="tall" %}</div>
+        <div class="nd-face nd-back" data-face="back" aria-hidden="true"></div>
+      </div>
+      {% if news_turns > 1 %}<template data-news-queue>{% for p in slot %}{% include "partials/_news_deck_card.html" with p=p shape="tall" %}{% endfor %}</template>{% endif %}
     </div>
     {% endfor %}
   </div>
 
+  {% if news_slide_slots %}
+  <div class="nd-row nd-row-slide">
+    {% for slot in news_slide_slots %}
+    <div class="nd-place" data-news-place="slide">
+      <div class="nd-slot" data-face="front">{% include "partials/_news_deck_card.html" with p=slot.0 shape="wide" %}</div>
+      {% if news_turns > 1 %}<template data-news-queue>{% for p in slot %}{% include "partials/_news_deck_card.html" with p=p shape="wide" %}{% endfor %}</template>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   {% comment %}
-  The controls only exist when there is more than one turn. A deck of one with
-  a pause button and a single dot under it is a control that does nothing,
-  which is worse than no control.
+  Only when there is more than one turn — a single dot is a control that does
+  nothing. Centred under the centred heading; with the pause button gone there
+  is nothing else on the line to balance them against.
   {% endcomment %}
-  {% if news_slides|length > 1 %}
+  {% if news_turns > 1 %}
   <div class="nd-foot">
-    <div class="nd-dots" role="tablist" aria-label="News pages">
-      {% for slide in news_slides %}
+    <div class="nd-dots" role="group" aria-label="News pages">
+      {% for p in news_spin_slots.0 %}
       <button type="button" class="nd-dot{% if forloop.first %} on{% endif %}" data-news-dot="{{ forloop.counter0 }}"
-              role="tab" aria-selected="{% if forloop.first %}true{% else %}false{% endif %}"
-              aria-label="Stories {{ forloop.counter }} of {{ news_slides|length }}"></button>
+              {% if forloop.first %}aria-current="true"{% endif %}
+              aria-label="Stories, page {{ forloop.counter }} of {{ news_turns }}"></button>
       {% endfor %}
     </div>
-    {% comment %}
-    A pause that is a real control, not a hover behaviour only. Someone
-    reading a headline with a keyboard, or on a touch screen where there is no
-    hover at all, has to be able to stop the thing moving.
-    {% endcomment %}
-    <button type="button" class="nd-pause" data-news-pause aria-pressed="false">
-      <svg class="ndp-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="3.4" height="14" rx="1.2"/><rect x="13.6" y="5" width="3.4" height="14" rx="1.2"/></svg>
-      <svg class="ndp-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.4v13.2L19 12z"/></svg>
-      <span data-news-pause-label>Pause</span>
-    </button>
   </div>
   {% endif %}
 </div>
@@ -580,97 +574,152 @@ any one card.
 
 {% block app_js %}
 /* ---- NEWS DECK ----------------------------------------------------------
-   Six story cards that turn over every five seconds.
+   Six story cards in two rows, turning over every ten seconds: the top row
+   spins, the bottom row slides. See the comment on the markup for why.
 
-   Three things it has to get right, and each is a bug somebody has shipped in
-   a carousel before:
+   Four things it has to get right:
 
    * IT MUST STOP WHEN SOMEBODY IS READING IT. Hover and keyboard focus both
-     pause; so does the explicit button, which is the only one that works on a
-     touch screen. Hover resuming a deck the reader deliberately paused would
-     make the button a suggestion, so `manual` outranks `hover`.
+     hold it. There is no pause button any more ("it should all be
+     automatic"), so these are the only brakes — and focus matters twice over,
+     because a turn replaces the card nodes and would take the focused link
+     out from under the keyboard.
 
-   * IT MUST NOT MOVE WHEN THE TAB IS HIDDEN. Left running in a background
-     tab, a five-second timer turns the deck a few hundred times and the
-     reader comes back to slide 47 of 3 — plus it is work nobody asked for.
+   * IT MUST NOT MOVE WHEN THE TAB IS HIDDEN, or the reader comes back to a
+     deck that has turned a few hundred times behind their back.
 
-   * IT MUST RESPECT prefers-reduced-motion. Somebody who has asked their
-     machine to stop things moving has asked this to stop moving too, so it
-     never starts at all and the dots become the way through.
+   * IT MUST RESPECT prefers-reduced-motion. It never starts on its own for
+     that reader, and a dot press swaps the cards without spinning anything.
 
-   The slides are stacked and cross-faded by CSS class; nothing here measures
-   or positions anything, so a slide whose cards wrap to a different height
-   cannot shift the page. */
+   * A TURN STARTED WHILE ANOTHER IS STILL LANDING MUST WIN. Every turn bumps
+     `gen`, and the delayed steps of an older turn check it and stand down —
+     otherwise a quick double press on the dots could let the first turn's
+     half-way swap land after the second turn's and leave a card showing the
+     wrong story.
+
+   THE SPIN. Each top card is a front face and a back face on one element that
+   rotates a full 360 degrees. The next story goes on the back before the turn
+   starts, so it is what faces you half-way round; at that moment the front is
+   facing away, and it is swapped to the same story so that the last quarter of
+   the turn lands on it. When the animation ends the back is emptied again. */
 (function(){
   var deck = document.querySelector('[data-news-deck]');
   if (!deck) return;
-  var slides = Array.prototype.slice.call(deck.querySelectorAll('[data-news-slide]'));
-  if (slides.length < 2) return;
-  var dots = Array.prototype.slice.call(deck.querySelectorAll('[data-news-dot]'));
-  var pauseBtn = deck.querySelector('[data-news-pause]');
-  var pauseLabel = deck.querySelector('[data-news-pause-label]');
-  var every = parseInt(deck.getAttribute('data-interval'), 10) || 5000;
+  var turns = parseInt(deck.getAttribute('data-turns'), 10) || 1;
+  if (turns < 2) return;
+  var every = parseInt(deck.getAttribute('data-interval'), 10) || 10000;
   var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var i = 0, timer = null, manual = still, hovering = false;
+  var SPIN_MS = 1100, SPIN_STAGGER = 140, SLIDE_AFTER = 700, SLIDE_STAGGER = 120;
 
-  function show(n){
-    i = (n + slides.length) % slides.length;
-    slides.forEach(function(s, k){
-      var on = k === i;
-      s.classList.toggle('on', on);
-      /* Out-of-view cards are taken out of the accessibility tree AND out of
-         the tab order. Left focusable, tabbing through the dashboard walks
-         eighteen invisible links. */
-      if (on) s.removeAttribute('aria-hidden'); else s.setAttribute('aria-hidden', 'true');
-      s.querySelectorAll('a').forEach(function(a){
-        if (on) a.removeAttribute('tabindex'); else a.setAttribute('tabindex', '-1');
-      });
+  var spinN = 0, slideN = 0;
+  var places = Array.prototype.map.call(deck.querySelectorAll('[data-news-place]'), function(el){
+    var kind = el.getAttribute('data-news-place');
+    var queue = el.querySelector('template[data-news-queue]');
+    return {
+      el: el, kind: kind,
+      index: kind === 'spin' ? spinN++ : slideN++,
+      cards: queue ? Array.prototype.slice.call(queue.content.children) : []
+    };
+  });
+  var dots = Array.prototype.slice.call(deck.querySelectorAll('[data-news-dot]'));
+  var at = 0, gen = 0, timer = null, holding = false;
+
+  function cardFor(place, n){
+    if (!place.cards.length) return null;
+    return place.cards[n % place.cards.length].cloneNode(true);
+  }
+
+  function spin(place, n, g){
+    var spinner = place.el.querySelector('.nd-spinner');
+    var front = place.el.querySelector('[data-face="front"]');
+    var back = place.el.querySelector('[data-face="back"]');
+    var next = cardFor(place, n);
+    if (!spinner || !front || !back || !next) return;
+    setTimeout(function(){
+      if (g !== gen) return;
+      back.replaceChildren(next);
+      // Restart cleanly if the previous spin has not finished landing.
+      spinner.classList.remove('is-turning');
+      void spinner.offsetWidth;
+      spinner.classList.add('is-turning');
+      setTimeout(function(){
+        if (g !== gen) return;
+        front.replaceChildren(cardFor(place, n));
+      }, SPIN_MS / 2);
+      setTimeout(function(){
+        if (g !== gen) return;
+        spinner.classList.remove('is-turning');
+        back.replaceChildren();
+      }, SPIN_MS + 60);
+    }, place.index * SPIN_STAGGER);
+  }
+
+  function slide(place, n, g){
+    var slot = place.el.querySelector('[data-face="front"]');
+    var next = cardFor(place, n);
+    if (!slot || !next) return;
+    setTimeout(function(){
+      if (g !== gen) return;
+      // Anything from an interrupted slide goes first, so the slot never
+      // holds more than the card leaving and the card arriving.
+      while (slot.children.length > 1) slot.removeChild(slot.firstElementChild);
+      var old = slot.firstElementChild;
+      if (old) old.classList.add('nd-out');
+      next.classList.add('nd-in');
+      slot.appendChild(next);
+      setTimeout(function(){
+        if (old && old.parentNode) old.parentNode.removeChild(old);
+        next.classList.remove('nd-in');
+      }, 700);
+    }, SLIDE_AFTER + place.index * SLIDE_STAGGER);
+  }
+
+  function swapNow(place, n){
+    var face = place.el.querySelector('[data-face="front"]');
+    var next = cardFor(place, n);
+    if (face && next) face.replaceChildren(next);
+  }
+
+  function go(n){
+    at = (n + turns) % turns;
+    var g = ++gen;
+    places.forEach(function(place){
+      if (still) swapNow(place, at);
+      else if (place.kind === 'spin') spin(place, at, g);
+      else slide(place, at, g);
     });
     dots.forEach(function(d, k){
-      d.classList.toggle('on', k === i);
-      d.setAttribute('aria-selected', k === i ? 'true' : 'false');
+      d.classList.toggle('on', k === at);
+      if (k === at) d.setAttribute('aria-current', 'true'); else d.removeAttribute('aria-current');
     });
   }
+
   function stop(){ if (timer) { clearInterval(timer); timer = null; } }
   function start(){
     stop();
-    if (manual || hovering || document.hidden) return;
-    timer = setInterval(function(){ show(i + 1); }, every);
+    if (still || holding || document.hidden) return;
+    timer = setInterval(function(){ go(at + 1); }, every);
   }
 
   dots.forEach(function(d){
     d.addEventListener('click', function(){
-      show(parseInt(d.getAttribute('data-news-dot'), 10) || 0);
-      /* Stepping by hand restarts the clock rather than leaving the next turn
-         a few hundred milliseconds away — otherwise picking a slide can flick
-         straight past it. */
+      go(parseInt(d.getAttribute('data-news-dot'), 10) || 0);
+      /* A fresh ten seconds after a dot press, or the next turn could arrive
+         a moment after the one that was asked for. */
       start();
     });
   });
-  if (pauseBtn) {
-    pauseBtn.addEventListener('click', function(){
-      manual = !manual;
-      pauseBtn.setAttribute('aria-pressed', manual ? 'true' : 'false');
-      deck.classList.toggle('is-paused', manual);
-      if (pauseLabel) pauseLabel.textContent = manual ? 'Play' : 'Pause';
-      start();
-    });
-    if (still) {
-      /* Started paused because the reader asked for no motion. The button
-         still says so, so the state on screen is the truth. */
-      pauseBtn.setAttribute('aria-pressed', 'true');
-      deck.classList.add('is-paused');
-      if (pauseLabel) pauseLabel.textContent = 'Play';
-    }
-  }
   ['mouseenter', 'focusin'].forEach(function(ev){
-    deck.addEventListener(ev, function(){ hovering = true; stop(); });
+    deck.addEventListener(ev, function(){ holding = true; stop(); });
   });
   ['mouseleave', 'focusout'].forEach(function(ev){
-    deck.addEventListener(ev, function(){ hovering = false; start(); });
+    deck.addEventListener(ev, function(e){
+      // focusout fires moving between two cards inside the deck, too.
+      if (ev === 'focusout' && e.relatedTarget && deck.contains(e.relatedTarget)) return;
+      holding = false; start();
+    });
   });
   document.addEventListener('visibilitychange', start);
-  show(0);
   start();
 })();
 

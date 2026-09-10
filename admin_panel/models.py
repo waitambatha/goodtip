@@ -243,6 +243,19 @@ class NewsPost(SeoFieldsMixin, models.Model):
         return [labels.get(t, t) for t in self.tag_list]
 
     @property
+    def tag_pairs(self) -> list:
+        """(code, label) for every tag, the code lower-cased for `data-code`.
+
+        A TAG WEARS ITS CODE'S COLOUR, everywhere a story appears (client, Sep
+        2026: "if it's a blog that is NRL it should carry its colour"). The
+        colours are the product's own competition tokens — `[data-code="nrl"]`
+        and friends in goodtip.css — which key off the lower-case slug, so the
+        NRL chip on a story is the same amber as the NRL chip on the ladder.
+        """
+        labels = dict(self.TAG_CHOICES)
+        return [(t.lower(), labels.get(t, t)) for t in self.tag_list]
+
+    @property
     def is_scheduled(self) -> bool:
         """Published, but not yet. The editor says so rather than showing a
         green Published dot against something no reader can reach."""

@@ -42,6 +42,7 @@ gradient over the whole article.
   <script src="{% static 'js/gt-ui.js' %}" defer></script>
   <script src="{% static 'js/gt-scenes.js' %}" defer></script>
   <script src="{% static 'js/gt-share.js' %}" defer></script>
+  <script src="{% static 'js/gt-slides.js' %}" defer></script>
   {% include "partials/_news_og.html" %}
   {% include "partials/_analytics.html" %}
 </head>
@@ -90,9 +91,7 @@ gradient over the whole article.
         carries both — see NewsPost.tags — and showing only the first would
         put it back to looking like a story about one of them.
         {% endcomment %}
-        <div class="rd-tags">
-          {% for t in post.tag_labels %}<span class="rd-tag">{{ t }}</span>{% endfor %}
-        </div>
+        <div class="rd-tags">{% include "partials/_news_tags.html" with post=post %}</div>
         {% comment %}
         HEADLINE ABOVE THE PICTURE. On a phone, picture-first means the first
         two-thirds of the screen is a stock photograph and you scroll to find
@@ -255,8 +254,8 @@ gradient over the whole article.
       <div class="rd-more-grid">
         {% for p in more|slice:":3" %}
         <a class="rd-card" href="{% url 'news_detail' p.slug %}">
-          {% if p.image %}<div class="rdc-thumb" style="background-image:url('{{ p.image.url }}')"><span class="rd-tag">{{ p.tag_labels.0 }}</span></div>
-          {% else %}<div class="rdc-thumb" style="background-image:url('{% static p.fallback_scene %}')"><span class="rd-tag">{{ p.tag_labels.0 }}</span></div>{% endif %}
+          {% if p.image %}<div class="rdc-thumb" style="background-image:url('{{ p.image.url }}')">{% include "partials/_news_tags.html" with post=p %}</div>
+          {% else %}<div class="rdc-thumb" style="background-image:url('{% static p.fallback_scene %}')">{% include "partials/_news_tags.html" with post=p %}</div>{% endif %}
           <div class="rdc-body">
             <h3>{{ p.title }}</h3>
             {% if p.excerpt %}<p>{{ p.excerpt|truncatechars:110 }}</p>{% endif %}
