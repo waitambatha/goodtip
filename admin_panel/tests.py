@@ -2101,6 +2101,7 @@ class StoryCardRenderTests(TestCase):
             self.assertIn("ndc-more", html, url)
 
 
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="gt-featured-"))
 class FeaturedMediaTests(TestCase):
     """The featured set: three pictures and three videos, posted as JSON.
 
@@ -2109,6 +2110,12 @@ class FeaturedMediaTests(TestCase):
     news_upload_image) and the editor posts back their storage PATHS — which
     makes the path attacker-supplied text, and most of these tests are about
     what the view refuses to believe.
+
+    STORAGE IS A THROWAWAY FOLDER, like PruneMissingMediaTests above. These
+    write files and delete them again, and the deploy gate runs this suite ON
+    the server — against staging's real media folder, unless it is pointed
+    somewhere else. They only ever deleted what they had just created, but a
+    test has no business writing into a folder members' uploads live in.
     """
 
     def setUp(self):
