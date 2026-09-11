@@ -3,7 +3,7 @@
  * The platform buttons are plain share-intent links and work with no script
  * at all. This adds four things on top:
  *
- *   * the big Share button opens and closes the panel of platforms;
+ *   * the big Share button wipes the strip of platforms open, left to right;
  *   * on a desktop, a platform opens in a pop-up window, so the reader shares
  *     and comes straight back to the story rather than being taken off it;
  *     on a phone the link is followed as it is, which is what lets
@@ -18,11 +18,29 @@
 
   function panelFor(box) { return box && box.querySelector('[data-share-panel]'); }
 
+  /* OPEN IS A CLASS, NOT `hidden`.
+   *
+   * The strip animates from no width to its content's width, and a `hidden`
+   * element has no content width to animate to — it would snap open and snap
+   * shut. Closed is the CSS default instead (grid-template-columns: 0fr), so
+   * there is nothing to hide on load and no flash of a full-width strip
+   * before this file runs; .is-open does the opening and the CSS transition
+   * does the movement. See .shr-reveal in goodtip.css.
+   *
+   * The strip stays in the accessibility tree while it is closed, which is
+   * why the platforms inside it are made unreachable by the keyboard instead:
+   * tabbing into a control that is nought pixels wide and off to one side is
+   * the failure that a plain CSS collapse usually ships with. */
   function setOpen(box, open) {
     var panel = panelFor(box);
     var btn = box.querySelector('[data-share-toggle]');
     if (!panel || !btn) return;
-    panel.hidden = !open;
+    panel.classList.toggle('is-open', open);
+    panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+    panel.querySelectorAll('a, button').forEach(function (el) {
+      if (open) el.removeAttribute('tabindex');
+      else el.setAttribute('tabindex', '-1');
+    });
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     if (open) {
       var first = panel.querySelector('a, button:not([hidden])');
@@ -32,10 +50,10 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('[data-share]').forEach(function (box) {
-      // Closed until asked for. Open in the markup, so that with no script
-      // the platforms are still there.
-      var panel = panelFor(box);
-      if (panel) panel.hidden = true;
+      // Closed until asked for. This is also what takes the platforms out of
+      // the tab order and marks the strip aria-hidden — the CSS can collapse
+      // the width but it cannot do either of those.
+      if (panelFor(box)) setOpen(box, false);
     });
     if (navigator.share) {
       document.querySelectorAll('[data-share-native]').forEach(function (b) { b.hidden = false; });
@@ -77,10 +95,10 @@
       return;
     }
 
-    // A press anywhere else puts an open panel away.
+    // A press anywhere else puts an open strip away.
     document.querySelectorAll('[data-share]').forEach(function (b) {
       var p = panelFor(b);
-      if (p && !p.hidden && !b.contains(e.target)) setOpen(b, false);
+      if (p && p.classList.contains('is-open') && !b.contains(e.target)) setOpen(b, false);
     });
   });
 
@@ -88,7 +106,7 @@
     if (e.key !== 'Escape') return;
     document.querySelectorAll('[data-share]').forEach(function (b) {
       var p = panelFor(b);
-      if (p && !p.hidden) {
+      if (p && p.classList.contains('is-open')) {
         setOpen(b, false);
         var t = b.querySelector('[data-share-toggle]');
         if (t) t.focus();

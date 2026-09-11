@@ -15,7 +15,8 @@ itself, not leaked into my page."
 So it is a page in itself, and deliberately not extending either base: this
 file owns its <head> and its chrome. What it keeps from the app is the thing
 the client asked to keep — the two rotating photograph strips down the sides,
-with the story reading on a cream sheet between them — and what it keeps from
+with the story reading on a sheet between them, cream at the top and pure
+white from the headline down — and what it keeps from
 the marketing site is the footer, because the bottom of a story is exactly
 where somebody goes looking for who wrote it and where else to find them.
 
@@ -43,6 +44,8 @@ gradient over the whole article.
   <script src="{% static 'js/gt-scenes.js' %}" defer></script>
   <script src="{% static 'js/gt-share.js' %}" defer></script>
   <script src="{% static 'js/gt-slides.js' %}" defer></script>
+  {# the pictures inside the story cards at the foot of the page #}
+  <script src="{% static 'js/gt-news-cards.js' %}" defer></script>
   {% include "partials/_news_og.html" %}
   {% include "partials/_analytics.html" %}
 </head>
@@ -118,15 +121,38 @@ gradient over the whole article.
       </header>
 
       {% comment %}
-      A CSS background cannot carry an `alt`, so the description an admin typed
-      is given to a screen reader the way a background image has to be:
-      role="img" plus aria-label. With no alt text set it stays undescribed and
-      out of the accessibility tree, which is right for a decorative
-      photograph and much better than reading a filename out.
+      THE PICTURES AT THE TOP — the story's featured set, turning.
+
+      NOT CROPPED. This used to be a CSS background forced to 16:9 with
+      `cover`, and every featured picture on the site is 3:2 or 4:3 — so a
+      quarter of each one was cut off, and these are infographics: the part
+      that went was a heading, a label, a row of logos. The client's word for
+      it was "horrible". Each frame is a real <img> or <video> now, shown whole
+      on the deep green (object-fit: contain), in a frame whose height follows
+      the first picture's own shape up to a ceiling.
+
+      Real elements rather than backgrounds, which also means a real `alt`
+      instead of the role="img" workaround a background needed.
+
+      Up to three pictures and three videos (NewsMedia); gt-news-cards.js
+      turns them every three seconds, the same as the card. A story with no
+      pictures of its own still gets the rotating match-day shots.
       {% endcomment %}
-      {% if post.image %}
-      <figure class="rd-hero" style="background-image:url('{{ post.image.url }}')"
-              {% if post.image_alt %}role="img" aria-label="{{ post.image_alt }}"{% endif %}></figure>
+      {% with fm=post.featured_media %}
+      {% if fm %}
+      <figure class="rd-hero rd-gallery{% if fm|length > 1 %} can-turn{% endif %}"
+              {% if fm|length > 1 %}data-card-shots data-every="3000"{% endif %}>
+        {% for m in fm %}
+        <div class="rd-frame ndc-shot{% if forloop.first %} on{% endif %}" data-shot>
+          {% if m.kind == "video" %}
+          <video src="{{ m.url }}" muted playsinline loop preload="metadata"{% if not forloop.first %} tabindex="-1"{% endif %}></video>
+          {% else %}
+          <img src="{{ m.url }}" alt="{{ m.alt }}"{% if not forloop.first %} loading="lazy"{% endif %}>
+          {% endif %}
+        </div>
+        {% endfor %}
+        {% if fm|length > 1 %}<span class="ndc-pips rd-pips" aria-hidden="true">{% for m in fm %}<i{% if forloop.first %} class="on"{% endif %}></i>{% endfor %}</span>{% endif %}
+      </figure>
       {% else %}
       {% comment %}
       No picture on the post, so the slot rotates through the site's own
@@ -139,6 +165,7 @@ gradient over the whole article.
         <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
       </figure>
       {% endif %}
+      {% endwith %}
 
       <div class="rd-prose">{{ body_html|safe }}</div>
 
@@ -251,18 +278,14 @@ gradient over the whole article.
         <h2>More from GoodTip</h2>
         <a href="{% url 'news_index' %}">All news &amp; blog &rarr;</a>
       </div>
+      {% comment %}
+      The same story card the dashboard deck and the news list render. It was
+      a third card shape written only for this row — which meant three cards
+      for one kind of thing, kept looking alike by hand, and only two of them
+      ever getting a change. See partials/_news_deck_card.html.
+      {% endcomment %}
       <div class="rd-more-grid">
-        {% for p in more|slice:":3" %}
-        <a class="rd-card" href="{% url 'news_detail' p.slug %}">
-          {% if p.image %}<div class="rdc-thumb" style="background-image:url('{{ p.image.url }}')">{% include "partials/_news_tags.html" with post=p %}</div>
-          {% else %}<div class="rdc-thumb" style="background-image:url('{% static p.fallback_scene %}')">{% include "partials/_news_tags.html" with post=p %}</div>{% endif %}
-          <div class="rdc-body">
-            <h3>{{ p.title }}</h3>
-            {% if p.excerpt %}<p>{{ p.excerpt|truncatechars:110 }}</p>{% endif %}
-            <span class="rdc-date">{{ p.published_at|naturaltime }} &middot; Read the story &rarr;</span>
-          </div>
-        </a>
-        {% endfor %}
+        {% for p in more|slice:":3" %}{% include "partials/_news_deck_card.html" with p=p %}{% endfor %}
       </div>
     </section>
     {% endif %}

@@ -1,5 +1,5 @@
 {% extends "admin/hub/base.html" %}
-{% load i18n %}
+{% load i18n humanize %}
 
 {% comment %}
 Level one of Tables & models: what the database is FOR, in ten cards.
@@ -18,7 +18,8 @@ a table reachable from two places is exactly the duplication this replaced.
 {% block hub_lead %}
 Everything in the database, grouped by what it is for rather than by which part
 of the code it lives in. {{ total_tables }} table{{ total_tables|pluralize }} in
-{{ categories|length }} group{{ categories|length|pluralize }}.
+{{ categories|length }} group{{ categories|length|pluralize }}{% if total_rows %},
+holding {{ total_rows|intcomma }} row{{ total_rows|pluralize }}{% endif %}.
 {% endblock %}
 
 {% block hub_body %}
@@ -39,7 +40,16 @@ of the code it lives in. {{ total_tables }} table{{ total_tables|pluralize }} in
         {% for t in cat.tables|slice:":4" %}<span class="gta-chip" style="--chip:{{ t.accent }}">{{ t.name }}</span>{% endfor %}
         {% if cat.count > 4 %}<span class="gta-chip is-more">+{{ cat.count|add:"-4" }}</span>{% endif %}
       </span>
-      <span class="gta-cat-n">{{ cat.count }} table{{ cat.count|pluralize }}</span>
+      {% comment %}
+      How many tables AND how much is in them. The count of tables says the
+      group exists; the count of rows says whether it is the one holding the
+      data — which is the question somebody scanning ten cards is asking, and
+      the quickest way to notice a sync that has not run.
+      {% endcomment %}
+      <span class="gta-cat-n">
+        <b>{{ cat.count }} table{{ cat.count|pluralize }}</b>
+        {% if cat.rows is not None %}<small>{{ cat.rows|intcomma }} row{{ cat.rows|pluralize }}</small>{% endif %}
+      </span>
     </span>
   </a>
   {% endfor %}

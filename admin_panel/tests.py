@@ -10,6 +10,8 @@ from io import BytesIO, StringIO
 import tempfile
 import shutil
 from datetime import timedelta
+
+from django.core.files.storage import default_storage
 from pathlib import Path
 
 from django.conf import settings
@@ -1412,17 +1414,26 @@ class SchedulerLookTests(TestCase):
         )
 
     def test_the_editor_says_which_state_a_scheduled_story_is_in(self):
-        post = self._post(timezone.now() + timedelta(days=2))
+        """Sep 2026: the scheduler is a state line and a button now ("let it be
+        a button, then a nice time and calendar UI comes in"), not an open
+        date box — but it still has to say, before anything is pressed, that
+        this story is waiting on a clock."""
+        when = timezone.now() + timedelta(days=2)
+        post = self._post(when)
         html = self.client.get(reverse("admin:hq_news_edit", args=[post.id])).content.decode()
-        self.assertIn('data-state="scheduled"', html)
-        # The countdown is drawn from this, in the browser: "in 2 days" baked
-        # into the HTML is wrong the moment the page has been open an hour.
-        self.assertIn("data-at=", html)
+        self.assertIn('data-saved="scheduled"', html)
+        self.assertIn(">\n              Scheduled\n", html.replace("\r", ""))
+        # The countdown is drawn from the stored moment, in the browser: "in 2
+        # days" baked into the HTML is wrong the moment the page has been open
+        # an hour. The moment rides on the hidden field the view reads.
+        stamp = timezone.localtime(when).strftime("%Y-%m-%dT%H:%M")
+        self.assertIn(f'value="{stamp}"', html)
 
     def test_a_live_story_is_not_dressed_as_scheduled(self):
         post = self._post(timezone.now() - timedelta(days=1))
         html = self.client.get(reverse("admin:hq_news_edit", args=[post.id])).content.decode()
-        self.assertIn('data-state="live"', html)
+        self.assertIn('data-saved="live"', html)
+        self.assertNotIn('data-saved="scheduled"', html)
 
     def test_the_list_gives_scheduled_its_own_chip(self):
         """It had the draft one, so "nobody published this" and "this is
@@ -1432,11 +1443,21 @@ class SchedulerLookTests(TestCase):
         self.assertIn('gt-chip sched', html)
         self.assertNotIn('gt-chip draft">Scheduled', html)
 
-    def test_the_editor_offers_the_times_people_actually_pick(self):
+    def test_the_editor_offers_a_calendar_behind_a_button(self):
+        """The times people actually pick — in an hour, tonight, tomorrow
+        morning, next Monday — are still one press away, but they now live
+        inside the calendar the button opens, which gt-news-editor.js builds
+        ("WHEN IT GOES OUT"). A server-rendered test cannot see inside it; what
+        it can hold is that the button, the empty picker and the field it
+        writes to are all on the page, and that the old always-open date box is
+        not. The presets themselves are checked in the browser."""
         post = self._post(timezone.now())
         html = self.client.get(reverse("admin:hq_news_edit", args=[post.id])).content.decode()
-        for preset in ("now", "evening", "tomorrow", "monday"):
-            self.assertIn(f'data-sched-set="{preset}"', html)
+        self.assertIn("data-pub-open", html)
+        self.assertIn("data-pub-pop", html)
+        self.assertIn('name="published_at"', html)
+        self.assertNotIn('type="datetime-local"', html)
+        self.assertNotIn("data-sched-set", html)
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="gt-prune-"))
@@ -1650,6 +1671,11 @@ class AttachingAPictureInTheEditorTests(TestCase):
         them behind the whole page — so "img/scenes/ appears in the HTML" is
         true whatever the cards are doing, and a bare assertNotIn passes and
         fails for the wrong reasons.
+
+        The card turns through the story's pictures now (NewsPost.card_slides),
+        so the assertion is that the run of frames is exactly the one picture
+        the story has — a story with one picture must not be padded out with
+        stock ones to make its card move.
         """
         self.client.post(
             reverse("admin:hq_news_new"), self._post(image=self._png()),
@@ -1657,10 +1683,10 @@ class AttachingAPictureInTheEditorTests(TestCase):
         post = NewsPost.objects.get()
 
         html = self.client.get(reverse("news_index")).content.decode()
-        thumbs = re.findall(
-            r"""class="thumb"[^>]*background-image:url\('([^']+)'\)""", html,
+        frames = re.findall(
+            r"""class="ndc-shot[^"]*"[^>]*background-image:url\('([^']+)'\)""", html,
         )
-        self.assertEqual(thumbs, [post.image.url])
+        self.assertEqual(frames, [post.image.url])
 
 
 # ===========================================================================
@@ -1902,3 +1928,345 @@ class StorySlideshowRenderTests(TestCase):
         self.assertIn('data-action="slides"', html)
         self.assertIn("data-slides-dialog", html)
         self.assertIn("0 of 10", html)
+
+
+# ===========================================================================
+# Sep 2026, the client's third round on the blog cards: the codes above the
+# headline, the picture turning through the story's own media, "More", the
+# whole card as one link, and a colour fusion for a story about two
+# competitions. See partials/_news_deck_card.html.
+# ===========================================================================
+
+class StoryCardMediaTests(TestCase):
+    """What a card turns through — NewsPost.card_slides.
+
+    "In that place we show the images, it must be changing in like 3 seconds."
+    The frames are the story's OWN pictures, which is the whole of the
+    behaviour: a card that turns through photographs the story does not
+    contain is telling the reader something untrue about it.
+    """
+
+    def _post(self, **kw):
+        kw.setdefault("title", "A story")
+        kw.setdefault("tags", ["NRL"])
+        return NewsPost.objects.create(**kw)
+
+    def test_it_finds_the_pictures_in_the_body(self):
+        post = self._post(body=(
+            '<p>One.</p><figure class="gt-slides"><div class="gs-track">'
+            '<div class="gs-slide"><img src="/media/a.jpg" alt="A goal"></div>'
+            '<div class="gs-slide"><video src="/media/b.mp4"></video></div>'
+            "</div></figure>"
+        ))
+        self.assertEqual(
+            [(s["kind"], s["url"]) for s in post.card_slides],
+            [("image", "/media/a.jpg"), ("video", "/media/b.mp4")],
+        )
+        self.assertEqual(post.card_slides[0]["alt"], "A goal")
+        self.assertTrue(post.card_turns)
+
+    def test_the_featured_picture_comes_first(self):
+        post = self._post(body='<p><img src="/media/in-body.jpg"></p>')
+        post.image = "news/hero.png"
+        post.image_alt = "The hero"
+        post.save()
+        self.assertEqual(
+            [s["url"] for s in post.card_slides],
+            [post.image.url, "/media/in-body.jpg"],
+        )
+
+    def test_the_same_picture_twice_is_one_frame(self):
+        """A featured image reused as the first picture of the body is one
+        photograph, and a card that shows it, then shows it again, reads as
+        broken rather than as a slideshow."""
+        post = self._post(body='<p><img src="/media/news/hero.png"></p>')
+        post.image = "news/hero.png"
+        post.save()
+        self.assertEqual([s["url"] for s in post.card_slides], [post.image.url])
+        self.assertFalse(post.card_turns)
+
+    def test_one_picture_is_not_padded_out_with_stock_ones(self):
+        """The card sits still rather than claiming pictures the story has
+        not got. Movement is not worth a lie about the contents."""
+        post = self._post()
+        post.image = "news/hero.png"
+        post.save()
+        self.assertEqual(len(post.card_slides), 1)
+        self.assertFalse(post.card_turns)
+
+    def test_no_picture_at_all_turns_through_the_code_s_own_scenes(self):
+        """What the reader page has always done with a missing hero. They are
+        marked "scene" so a template knows not to describe them as the
+        story's, and they are the RIGHT sport's."""
+        post = self._post(tags=["NRL"])
+        kinds = {s["kind"] for s in post.card_slides}
+        self.assertEqual(kinds, {"scene"})
+        self.assertTrue(post.card_turns)
+        self.assertTrue(all("nrl" in s["url"] for s in post.card_slides),
+                        post.card_slides)
+        self.assertTrue(all(s["alt"] == "" for s in post.card_slides))
+
+    def test_the_first_frame_is_the_photograph_the_story_wears_elsewhere(self):
+        """The same story has to look the same on the list, on the dashboard
+        and in the "more from GoodTip" row at the foot of another story."""
+        post = self._post()
+        self.assertEqual(post.card_slides[0]["url"], post.fallback_scene)
+
+    def test_a_card_never_turns_through_more_than_six(self):
+        body = "".join(f'<img src="/media/{n}.jpg">' for n in range(20))
+        post = self._post(body=body)
+        self.assertEqual(len(post.card_slides), NewsPost.CARD_SLIDE_MAX)
+
+
+class StoryCardRenderTests(TestCase):
+    """The card itself: order, the fusion band, one link, and "More"."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="card@example.com", password="x", display_name="Card",
+        )
+        self.client.force_login(self.user)
+
+    def _card(self, **kw):
+        kw.setdefault("title", "Two codes, one story")
+        NewsPost.objects.create(**kw)
+        html = self.client.get(reverse("news_index")).content.decode()
+        start = html.index('<article class="nd-card')
+        return html[start:html.index("</article>", start)]
+
+    def test_the_codes_sit_above_the_headline_and_the_headline_above_the_picture(self):
+        """The client's order, top to bottom: "the competitions ... should be
+        on top of that blog but still look like part of that blog, then let's
+        have the Title of that blog come under it, then now the image"."""
+        card = self._card(tags=["NRL"], excerpt="A teaser.")
+        self.assertLess(card.index("ndc-tags"), card.index("ndc-h"))
+        self.assertLess(card.index("ndc-h"), card.index("ndc-shots"))
+        self.assertLess(card.index("ndc-shots"), card.index("ndc-p"))
+        self.assertLess(card.index("ndc-p"), card.index("ndc-more"))
+
+    def test_a_story_about_two_codes_gets_one_band_segment_each(self):
+        """"If it's a mixture blog of different competitions, let it have a
+        slick colour fusion that does not mix." One hard-edged segment per
+        code, each reading its own [data-code] token, so the colours meet
+        without either being diluted into the other."""
+        card = self._card(tags=["NRL", "AFL"])
+        bar = card[card.index('class="ndc-bar"'):card.index("</span>", card.index('class="ndc-bar"'))]
+        self.assertIn('<i data-code="nrl"></i>', bar)
+        self.assertIn('<i data-code="afl"></i>', bar)
+        # Nothing spells a colour out: the segments read the tokens the ladder
+        # and the fixtures read, so a competition's colour is defined once.
+        self.assertNotIn("#", bar)
+
+    def test_one_code_is_one_segment_and_still_its_own_colour(self):
+        card = self._card(tags=["AFLW"])
+        self.assertEqual(card.count("<i data-code="), 2)   # the bar and its halo
+        self.assertIn('data-code="aflw"', card)
+
+    def test_the_whole_card_is_one_link(self):
+        """A press anywhere opens the story — .ndc-a is stretched over the
+        card — and there is still only ONE link in it, so a screen reader is
+        handed the headline rather than six controls called "More"."""
+        card = self._card(tags=["NEWS"], excerpt="A teaser.")
+        self.assertEqual(card.count("<a "), 1)
+        self.assertIn('class="ndc-a"', card)
+        self.assertIn("news/", card)
+        # "More" looks like the button that was asked for and is not a second
+        # copy of the same address.
+        self.assertIn('class="ndc-more"', card)
+        self.assertNotIn('<a class="ndc-more"', card)
+
+    def test_a_turning_card_says_so_and_a_still_one_does_not(self):
+        card = self._card(tags=["NEWS"])           # no picture: scenes, so it turns
+        self.assertIn("data-card-shots", card)
+        self.assertIn('data-every="3000"', card)
+        self.assertIn("ndc-pips", card)
+
+    def test_the_public_list_and_the_dashboard_render_the_same_card(self):
+        """One story card in the product. It was three, kept looking alike by
+        hand, and only two of them ever got a change."""
+        from catalog.models import Season
+        from orgs.models import OrgMember, Organisation
+
+        # The deck lives on the dashboard a member with an organisation gets;
+        # somebody who has not joined one yet sees the "find your organisation"
+        # page instead, which has never carried it.
+        season = Season.objects.create(year=2097, label="2097")
+        org = Organisation.objects.create(name="Card Co", season=season)
+        OrgMember.objects.create(user=self.user, org=org)
+
+        NewsPost.objects.create(title="Shared", tags=["NRL"])
+        for url in (reverse("news_index"), reverse("dashboard")):
+            html = self.client.get(url).content.decode()
+            self.assertIn('<article class="nd-card', html, url)
+            self.assertIn("ndc-more", html, url)
+
+
+class FeaturedMediaTests(TestCase):
+    """The featured set: three pictures and three videos, posted as JSON.
+
+    "The place where we have featured image, can it take 3 images and 3 videos
+    as well, that will also be changing." The files upload first (through
+    news_upload_image) and the editor posts back their storage PATHS — which
+    makes the path attacker-supplied text, and most of these tests are about
+    what the view refuses to believe.
+    """
+
+    def setUp(self):
+        from django.core.files.base import ContentFile
+
+        self.admin = User.objects.create_superuser(
+            email="fm@example.com", password="x", display_name="FM",
+        )
+        self.client.force_login(self.admin)
+        s = self.client.session
+        from sysadmin import otp
+        otp.mark_verified(s)
+        s.save()
+        self.saved = []
+        for n in range(5):
+            self.saved.append(default_storage.save(f"news/featured/p{n}.png", ContentFile(b"png")))
+        for n in range(4):
+            self.saved.append(default_storage.save(f"news/featured/v{n}.mp4", ContentFile(b"mp4")))
+
+    def tearDown(self):
+        for path in self.saved:
+            default_storage.delete(path)
+
+    def _save(self, items, **extra):
+        import json
+        data = {"title_html": "Featured", "body": "<p>x</p>", "tags": ["NRL"],
+                "is_published": "on", "featured_media": json.dumps(items)}
+        data.update(extra)
+        self.client.post(reverse("admin:hq_news_new"), data)
+        return NewsPost.objects.get()
+
+    def test_pictures_and_videos_are_saved_in_order(self):
+        imgs = [p for p in self.saved if p.endswith(".png")]
+        vids = [p for p in self.saved if p.endswith(".mp4")]
+        post = self._save([
+            {"kind": "video", "path": vids[0], "alt": "The try"},
+            {"kind": "image", "path": imgs[0], "alt": "The crowd"},
+        ])
+        self.assertEqual(
+            [(m.kind, m.file.name) for m in post.media.all()],
+            [("video", vids[0]), ("image", imgs[0])],
+        )
+
+    def test_the_share_image_is_the_first_picture_not_the_first_item(self):
+        """A clip cannot be a share card. post.image follows the first IMAGE."""
+        imgs = [p for p in self.saved if p.endswith(".png")]
+        vids = [p for p in self.saved if p.endswith(".mp4")]
+        post = self._save([
+            {"kind": "video", "path": vids[0]},
+            {"kind": "image", "path": imgs[1], "alt": "Second in line, first picture"},
+        ])
+        self.assertEqual(post.image.name, imgs[1])
+        self.assertEqual(post.image_alt, "Second in line, first picture")
+
+    def test_three_of_each_and_no_more(self):
+        imgs = [p for p in self.saved if p.endswith(".png")]
+        vids = [p for p in self.saved if p.endswith(".mp4")]
+        post = self._save(
+            [{"kind": "image", "path": p} for p in imgs] +
+            [{"kind": "video", "path": p} for p in vids]
+        )
+        kinds = [m.kind for m in post.media.all()]
+        self.assertEqual(kinds.count("image"), 3)
+        self.assertEqual(kinds.count("video"), 3)
+
+    def test_a_path_outside_news_is_refused(self):
+        """Without this a crafted form could put any file in media/ — an avatar,
+        a message attachment — on a public story."""
+        from django.core.files.base import ContentFile
+        other = default_storage.save("avatars/someone.png", ContentFile(b"png"))
+        self.saved.append(other)
+        post = self._save([
+            {"kind": "image", "path": other},
+            {"kind": "image", "path": "news/../avatars/someone.png"},
+            {"kind": "image", "path": "/etc/passwd"},
+        ])
+        self.assertEqual(post.media.count(), 0)
+        self.assertFalse(post.image)
+
+    def test_a_path_that_does_not_exist_is_refused(self):
+        post = self._save([{"kind": "image", "path": "news/featured/never-uploaded.png"}])
+        self.assertEqual(post.media.count(), 0)
+
+    def test_saving_without_the_set_leaves_the_picture_alone(self):
+        """An older client, or a script, that does not send featured_media must
+        not be read as "take every picture off this story"."""
+        imgs = [p for p in self.saved if p.endswith(".png")]
+        post = self._save([{"kind": "image", "path": imgs[0], "alt": "Keep me"}])
+        self.client.post(reverse("admin:hq_news_edit", args=[post.pk]), {
+            "title_html": "Featured, edited", "body": "<p>x</p>", "tags": ["NRL"],
+            "is_published": "on",
+        })
+        post.refresh_from_db()
+        self.assertEqual(post.image.name, imgs[0])
+        self.assertEqual(post.image_alt, "Keep me")
+        self.assertEqual(post.media.count(), 1)
+
+    def test_a_story_from_before_the_set_opens_with_its_picture(self):
+        """Every story on the site today has `image` and no NewsMedia rows. It
+        must arrive in the manager as its first picture, or opening it and
+        pressing Save would drop the picture."""
+        from admin_panel.views import _featured_items
+        imgs = [p for p in self.saved if p.endswith(".png")]
+        post = NewsPost.objects.create(title="Old", tags=["NRL"], image=imgs[2], image_alt="Old pic")
+        self.assertEqual(
+            _featured_items(post),
+            [{"kind": "image", "url": post.image.url, "path": imgs[2], "alt": "Old pic"}],
+        )
+        self.assertEqual(post.featured_media[0]["url"], post.image.url)
+
+
+class WhenItGoesOutTests(TestCase):
+    """The scheduler is a button now; blank means "when you save"."""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            email="pub@example.com", password="x", display_name="Pub",
+        )
+        self.client.force_login(self.admin)
+        s = self.client.session
+        from sysadmin import otp
+        otp.mark_verified(s)
+        s.save()
+
+    def test_a_new_story_has_no_date_until_one_is_picked(self):
+        """The old box was always open and always filled in with "now", so
+        every story looked scheduled and a stray keystroke could hold one back
+        by a month."""
+        html = self.client.get(reverse("admin:hq_news_new")).content.decode()
+        self.assertIn('data-pub-input', html)
+        self.assertIn('value=""', html[html.index('data-pub-input') - 120:html.index('data-pub-input') + 40])
+        self.assertIn("Schedule for later", html)
+        self.assertNotIn('type="datetime-local"', html)
+
+    def test_blank_publishes_at_the_moment_of_saving(self):
+        before = timezone.now()
+        self.client.post(reverse("admin:hq_news_new"), {
+            "title_html": "Now", "body": "<p>x</p>", "tags": ["NRL"],
+            "is_published": "on", "published_at": "",
+        })
+        post = NewsPost.objects.get()
+        self.assertGreaterEqual(post.published_at, before)
+        self.assertTrue(post.is_live)
+
+    def test_a_picked_future_time_holds_the_story(self):
+        when = timezone.localtime(timezone.now() + timedelta(days=3)).strftime("%Y-%m-%dT%H:%M")
+        self.client.post(reverse("admin:hq_news_new"), {
+            "title_html": "Later", "body": "<p>x</p>", "tags": ["NRL"],
+            "is_published": "on", "published_at": when,
+        })
+        post = NewsPost.objects.get()
+        self.assertTrue(post.is_scheduled)
+        self.assertFalse(post.is_live)
+
+    def test_editing_a_story_keeps_its_date(self):
+        """So fixing a typo does not quietly re-date a story as today's news."""
+        old = timezone.now() - timedelta(days=10)
+        post = NewsPost.objects.create(title="Old news", tags=["NRL"], published_at=old)
+        html = self.client.get(reverse("admin:hq_news_edit", args=[post.pk])).content.decode()
+        stamp = timezone.localtime(old).strftime("%Y-%m-%dT%H:%M")
+        self.assertIn(f'value="{stamp}"', html)

@@ -23,8 +23,9 @@ Expects:
   active_tag  the chosen tag, or ""
   base        the list's URL
   anchor      "#stories" on the public page, where the list is below a hero
+  centred     truthy to centre the row under a centred heading
 {% endcomment %}
-<div class="compfilter newsfilter">
+<div class="compfilter newsfilter{% if centred %} is-centred{% endif %}">
   <div class="cf-chips" role="group" aria-label="Filter stories by code">
     <a class="cf-chip cf-all{% if not active_tag %} on{% endif %}" href="{{ base }}{{ anchor }}"
        {% if not active_tag %}aria-current="true"{% endif %}>All stories</a>

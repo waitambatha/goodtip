@@ -80,7 +80,11 @@ html[data-theme="light"],
 
   --body-fg: #23302A;
   --body-bg: #F7F5EE;
-  --body-quiet-color: #75847A;
+  /* Supporting copy on the admin's white panels. #75847A is 3.9:1 there —
+     under the 4.5:1 body text needs, and the single largest contrast problem
+     in this file: 57 rules read it. Darkened until it clears on the panel,
+     the raised panel and the hover tint alike. scripts/check_contrast.py. */
+  --body-quiet-color: #5E6B62;
   --body-medium-color: #47564D;
   --body-loud-color: var(--gt-deep);
 
@@ -89,7 +93,7 @@ html[data-theme="light"],
   --header-bg: #FFFFFF;
   --header-link-color: var(--gt-deep);
 
-  --breadcrumbs-fg: #75847A;
+  --breadcrumbs-fg: #5E6B62;   /* was #75847A — 3.9:1 on the white panel */
   --breadcrumbs-link-fg: #2F6B4A;
   --breadcrumbs-bg: transparent;
 
@@ -753,6 +757,66 @@ html[data-theme="dark"] .gta-sec-n.alert { background: rgba(232,180,92,.2); colo
    the disclosure groups. Their contents are the Tables & models hub now, at
    the bottom of this file — a rail row could not carry the sentence saying
    what a group was for, and that sentence was the point. */
+
+/* ---- WHERE YOU ARE, AND WHAT ELSE IS IN HERE ----------------------------
+   The second block of the rail: the contents of the section you are standing
+   in. See gta_section in sysadmin/templatetags/gtadmin.py for what goes in it
+   and why — the short version is that going from Tips to Matches, two tables
+   in the same group, used to be four clicks.
+
+   It is deliberately QUIETER than the six sections above it. Those are the
+   product's shape and do not change; this is where you happen to be, it
+   changes on nearly every page, and if it were drawn at the same weight the
+   rail would read as twelve equal destinations. So: a rule down the left to
+   tie the rows into one group, a smaller type size, and the row's own colour
+   as a dot rather than as a filled pill. */
+.gta-rail-here {
+  display: flex; align-items: center; gap: 7px;
+  margin-top: 20px; color: var(--body-medium-color);
+}
+.gta-rail-here svg {
+  width: 14px; height: 14px; flex: none;
+  stroke: currentColor; fill: none; stroke-width: 1.8;
+}
+.gta-rail-here span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.gta-subnav {
+  position: relative;
+  margin-left: 10px; padding-left: 12px;
+  border-left: 2px solid var(--hairline-color);
+}
+.gta-sub-a { font-size: 13.5px; padding: 7px 10px; color: var(--body-medium-color); }
+/* The table's own colour, as a dot. A rail row has no space for a coloured
+   card, but the colour is the thread that makes the hub card, this row and
+   the table screen itself read as one thing — so it survives as the smallest
+   mark that can carry it. */
+.gta-sub-a .ic {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--row-accent, var(--gt-forest));
+  stroke: none; fill: none; opacity: 1;
+}
+.gta-sub-a:hover { color: var(--body-loud-color); }
+.gta-sub-a.on { background: var(--gt-surface-3); color: var(--body-loud-color); font-weight: 700; }
+/* On the row you are on, the dot grows into a bar down the left edge — the
+   same "you are here" mark the deck's dots use, and one that does not depend
+   on telling two colours apart. */
+.gta-sub-a.on::before {
+  content: ""; position: absolute; left: -2px;
+  width: 2px; height: 22px; margin-top: -1px;
+  background: var(--row-accent, var(--gt-forest)); border-radius: 2px;
+}
+/* Up a level, inside the section. Reads as a way out rather than as another
+   destination: no dot, and the arrow instead. */
+.gta-nav-up { font-size: 12.5px; color: var(--body-quiet-color); }
+.gta-nav-up .ic { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; background: none; border-radius: 0; }
+.gta-nav-up:hover { color: var(--body-loud-color); }
+
+/* Collapsed to icons, the section block has nothing to show — its rows are a
+   dot and a word, and a column of identical dots is not a menu. The heading
+   goes with it, so the rail does not end on a label with nothing under it. */
+html.gta-rail-collapsed .gta-rail-here,
+html.gta-rail-collapsed .gta-subnav { display: none; }
+
 
 .gta-rail-foot { flex: none; padding: 12px; border-top: 1px solid var(--hairline-color); }
 .gta-viewsite {
@@ -1620,7 +1684,15 @@ html[data-theme="dark"] .gta-range a.on { background: var(--gt-lime); color: var
 .gta-pill { display: inline-block; padding: 2px 9px; border-radius: var(--gt-r-pill); font-size: 11.5px; font-weight: 700; }
 .gta-pill.ok { background: color-mix(in srgb, var(--gt-c1) 18%, transparent); color: var(--gt-c1); }
 .gta-pill.bad { background: color-mix(in srgb, var(--gt-c6) 18%, transparent); color: var(--gt-c6); }
-.gta-pill.warn { background: color-mix(in srgb, var(--gt-c3) 20%, transparent); color: var(--gt-c3); }
+/* The warn pill's ink is NOT --gt-c3. That token is the categorical amber,
+   and it is a FILL — it is the colour of the card, the chip and the chart
+   series. Written as type on a 20% wash of itself it is 2.7:1. So the pill
+   keeps the category's amber as its ground and takes a darkened amber as its
+   ink; the two are the same hue, which is the point, and one of them can be
+   read. Same split as hub.INK makes for the solid fills. */
+.gta-pill.warn { background: color-mix(in srgb, var(--gt-c3) 20%, transparent); color: var(--gt-c3-ink, #8A5608); }
+html[data-theme="dark"] .gta-pill.warn { color: var(--gt-c3); }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) .gta-pill.warn { color: var(--gt-c3); } }
 
 .gta-stamp { font-size: 12.5px; color: var(--body-quiet-color); margin: -8px 0 18px; }
 
@@ -1700,8 +1772,10 @@ html[data-theme="dark"] .gta-range a.on { background: var(--gt-lime); color: var
 .gtc-badge {
   font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
   padding: 2px 8px; border-radius: var(--gt-r-pill);
-  background: color-mix(in srgb, var(--gt-c3) 20%, transparent); color: var(--gt-c3);
+  background: color-mix(in srgb, var(--gt-c3) 20%, transparent); color: var(--gt-c3-ink, #8A5608);
 }
+html[data-theme="dark"] .gtc-badge { color: var(--gt-c3); }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]) .gtc-badge { color: var(--gt-c3); } }
 .gtc-kind {
   font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
   padding: 2px 8px; border-radius: var(--gt-r-pill);
@@ -1817,7 +1891,8 @@ html[data-theme="dark"] .gta-range a.on { background: var(--gt-lime); color: var
   margin-top: auto;
 }
 /* "3 waiting" is the one thing on this row anybody acts on. */
-.gta-kpi-hot { color: var(--gt-gold); font-weight: 700; }
+/* --gt-gold is 2.1:1 on white: a fill token, not an ink one. */
+.gta-kpi-hot { color: #8A6206; font-weight: 700; }
 html[data-theme="dark"] .gta-kpi-hot { color: var(--gt-gold-hi); }
 
 /* ==========================================================================
@@ -2141,7 +2216,14 @@ html[data-theme="dark"] .gta-card-n.hot { background: rgba(232,180,92,.2); color
   padding-top: 12px;
   border-top: 1px solid var(--hairline-color);
 }
-.gta-cat-n { font-size: 11.5px; font-weight: 600; color: var(--body-quiet-color); white-space: nowrap; flex: none; }
+.gta-cat-n {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
+  font-size: 11.5px; color: var(--body-quiet-color); white-space: nowrap; flex: none;
+}
+.gta-cat-n b { font-weight: 700; }
+/* The row count is the second line and the quieter one: it is what decides
+   the click when two groups look alike, not the first thing to read. */
+.gta-cat-n small { font-family: var(--gt-num, inherit); font-size: 11px; opacity: .85; }
 
 .gta-chips { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
 .gta-chip {
@@ -2279,3 +2361,23 @@ html[data-theme="dark"] .gta-card-n.hot { background: rgba(232,180,92,.2); color
   color: var(--tbl-ink, #FFFFFF);
 }
 .gta-crumbbar { border-left: 0; }
+
+/* THE GREEN AS A LINK, ON THE DARK PALETTE.
+   --gt-forest is 3.2:1 on the dark sheet, so these four read as disabled
+   rather than as links. They take the lime instead, which is the swap the
+   rest of this file already makes (see .gta-add:hover below).
+
+   The TOKEN is deliberately not moved: --gt-forest is a fill as well as an
+   ink — the environment pill, the avatar, the KPI icon are all white on it —
+   and lightening it puts white text at 2.2:1 on all of them. A colour that is
+   both a fill and an ink cannot be tuned once. */
+html[data-theme="dark"] .gta-queue a:hover,
+html[data-theme="dark"] .gta-app-models a:hover,
+html[data-theme="dark"] .gta-app-models a[aria-current="page"],
+html[data-theme="dark"] .gta-act-body small a:hover { color: var(--gt-lime); }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .gta-queue a:hover,
+  html:not([data-theme="light"]) .gta-app-models a:hover,
+  html:not([data-theme="light"]) .gta-app-models a[aria-current="page"],
+  html:not([data-theme="light"]) .gta-act-body small a:hover { color: var(--gt-lime); }
+}

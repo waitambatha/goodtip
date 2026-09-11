@@ -353,3 +353,75 @@ class NoTestMayDeleteRealUploadsTests(SimpleTestCase):
             "these write uploads into the real MEDIA_ROOT; add "
             "@override_settings(MEDIA_ROOT=temp_media())",
         )
+
+
+class ContrastTests(SimpleTestCase):
+    """No text in any theme may fall under WCAG AA.
+
+    THE BUG THIS IS FOR. The client, Sep 2026: "make sure on the different
+    themes text — and I mean ALL text — can be seen. That has been an issue
+    where, let's say it's a light theme, the text has a shade that is not easy
+    to see, even on the cream. So go page by page confirming that."
+
+    Page by page is how the first six are found and the seventh is missed.
+    There are four palettes — the member app's green and light, the admin
+    shell's light and dark — and the same rule paints on a different ground in
+    each, so a screen that looks right is evidence about one of the four. The
+    arithmetic is in scripts/check_contrast.py; this is the part that keeps
+    the answer true, because the way this regresses is a new rule written
+    against whichever theme its author had open.
+
+    WHEN THIS FAILS: run `venv/bin/python scripts/check_contrast.py` and it
+    will name the rule, the value, the ground and the ratio. The fix is
+    usually to darken or lighten the value; where it is a token that many
+    rules read, move the token rather than the rules. Where the checker is
+    wrong — the ground is set by a parent, or the mark is an icon rather than
+    a word — say so in PAINTED_ON, NON_TEXT or DECORATION with the reason,
+    which is a decision rather than a suppression.
+    """
+
+    def test_every_theme_clears_wcag_aa(self):
+        import sys
+
+        sys.path.insert(0, str(settings.BASE_DIR / "scripts"))
+        try:
+            import check_contrast
+        finally:
+            sys.path.pop(0)
+
+        bad = []
+        for theme in check_contrast.themes():
+            for f in check_contrast.findings(theme):
+                bad.append(
+                    f"{theme.name}: {f['ratio']}:1  {f['file']}:{f['line']}  "
+                    f"{f['selector']}  {f['value']}  on {f['ground']} "
+                    f"(needs {f['bar']}:1)"
+                )
+        self.assertEqual(bad, [], "\n" + "\n".join(bad))
+
+    def test_every_story_tag_chip_is_readable_when_ticked(self):
+        """A ticked tag in the story editor is white text on that code's own
+        colour (--ntc, one per code). The checker cannot follow a variable set
+        per chip, so it is measured here directly — and it needed to be: AFLW
+        was 3.5:1 and NRLW 4.1:1 until Sep 2026, so two of the five codes an
+        editor ticks every day were labels you had to squint at."""
+        import re
+        import sys
+
+        sys.path.insert(0, str(settings.BASE_DIR / "scripts"))
+        try:
+            from check_contrast import parse_colour, ratio
+        finally:
+            sys.path.pop(0)
+
+        css = (settings.BASE_DIR / "static/css/goodtip.css").read_text()
+        chips = re.findall(
+            r"\.ned-tag-check\.(t-[\w-]+)\s+span\s*\{\s*--ntc:\s*(#[0-9A-Fa-f]{6})", css)
+        self.assertGreaterEqual(len(chips), 5, "the tag chip colours have moved")
+        bad = [
+            f"{cls} {hexv} {ratio((255, 255, 255), parse_colour(hexv)[:3])}:1"
+            for cls, hexv in chips
+            if ratio((255, 255, 255), parse_colour(hexv)[:3]) < 4.5
+        ]
+        self.assertEqual(bad, [])
+

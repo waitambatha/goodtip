@@ -1,17 +1,104 @@
 {% load static humanize %}{% comment %}
-One story card on the dashboard deck. Two shapes, because the two rows turn
-differently and the client asked for the second row to have "another design":
+One story card on the dashboard deck.
 
-  tall   picture over words — the top row, the cards that spin
-  wide   picture beside words — the bottom row, the cards that slide
+THE ORDER IS THE CLIENT'S, TOP TO BOTTOM (Sep 2026):
 
-Expects `p` (a NewsPost) and `shape`.
+  "the place we have the competitions like NRL, the NEWS or BLOG in a blog I
+  think should be on top of that blog but still look like part of that blog
+  ... then let's have the Title of that blog come under it again, then now the
+  image ... then under it we have like some small blog as usual and we have
+  the more button that takes you to the whole blogs, also that card must be
+  clickable"
+
+So: codes, headline, picture, teaser, More. The codes are a band across the
+top of the card rather than chips floating over the photograph — which is
+where they were, and which made them look like a watermark ON the picture
+rather than a label OF the story.
+
+ONE SHAPE, ONE SIZE. The bottom row used to be a second, smaller "picture
+beside words" card ("why is it small have all of them same size"). Both rows
+render this, and every part of it is fixed or clamped — the band, the picture,
+two lines of headline, two lines of teaser, the footer — so all six cards are
+the same height whichever stories they are showing, and a card that turns over
+cannot change size under the reader.
+
+THE WHOLE CARD IS THE LINK, and there is still only one link in it. The
+headline's anchor is stretched over the card by .ndc-a::after, so a press
+anywhere opens the story, "Read more" is a label rather than a second control
+aimed at the same address, and a screen reader is handed one link with the
+headline as its name instead of six cards all called "Read more".
+
+Expects `p` (a NewsPost).
 {% endcomment %}
-<a class="nd-card is-{{ shape }}" data-code="{{ p.tag_pairs.0.0 }}" href="{% url 'news_detail' p.slug %}">
-  <span class="ndc-thumb" style="background-image:url('{% if p.image %}{{ p.image.url }}{% else %}{% static p.fallback_scene %}{% endif %}')"{% if p.image and p.image_alt %} role="img" aria-label="{{ p.image_alt }}"{% endif %}>{% include "partials/_news_tags.html" with post=p %}</span>
-  <div class="ndc-body">
-    <h3 class="ndc-h">{{ p.title }}</h3>
-    {% if p.excerpt %}<p class="ndc-p">{% if shape == "wide" %}{{ p.excerpt|truncatechars:90 }}{% else %}{{ p.excerpt|truncatechars:120 }}{% endif %}</p>{% endif %}
-    <span class="ndc-date">{{ p.published_at|naturaltime }} &middot; <span class="ndc-on">Read the story &rarr;</span></span>
+<article class="nd-card"{% if p.tag_pairs %} data-code="{{ p.tag_pairs.0.0 }}"{% endif %}>
+
+  {% comment %}
+  THE COLOUR, PICKED BY COMPETITION — and for a story about more than one, a
+  fusion that does not muddy them ("if its a mixture blog of different
+  competition lets it have a slick color fusion that do not mix, find a way").
+
+  A gradient between two colours is exactly the mixing that was asked against:
+  halfway between the NRL's amber and the AFL's blue is a grey nobody chose.
+  So the band is one hard-edged segment per code, sharing the width — the
+  colours meet without ever blending — and the only blended thing is the halo
+  behind it, which is out of focus and carries no edge for a mixed colour to
+  appear on. Each segment reads its own [data-code] token, so these are the
+  same colours the codes wear on the ladder and the fixtures, with nothing
+  duplicated into this file to drift from them.
+  {% endcomment %}
+  <span class="ndc-band" aria-hidden="true">
+    <span class="ndc-glow">{% for code, label in p.tag_pairs %}<i data-code="{{ code }}"></i>{% endfor %}</span>
+    <span class="ndc-bar">{% for code, label in p.tag_pairs %}<i data-code="{{ code }}"></i>{% endfor %}</span>
+  </span>
+
+  <div class="ndc-tags">{% include "partials/_news_tags.html" with post=p %}</div>
+
+  <h3 class="ndc-h"><a class="ndc-a" href="{% url 'news_detail' p.slug %}">{{ p.title }}</a></h3>
+
+  {% comment %}
+  THE PICTURE, TURNING ("in that place we show the images it must be changing
+  in like 3 seconds"). The frames are the story's OWN media — its featured
+  image, and every picture and clip in its body, slideshows included; see
+  NewsPost.card_slides. A story carrying one picture shows that one and does
+  not turn, because padding it out with stock photographs would be a card
+  claiming pictures the story does not have. A story carrying none turns
+  through the site's match-day shots for its code instead, which is what the
+  reader page has always done with a missing hero.
+
+  gt-news-cards.js drives it. With no script this is the first frame and
+  nothing else, which is the card as it was.
+  {% endcomment %}
+  <div class="ndc-shots{% if p.card_turns %} can-turn{% endif %}"{% if p.card_turns %} data-card-shots data-every="3000"{% endif %}>
+    {% for s in p.card_slides %}
+    {% if s.kind == "video" %}
+    <span class="ndc-shot{% if forloop.first %} on{% endif %}" data-shot>
+      <video src="{{ s.url }}" muted playsinline loop preload="metadata" tabindex="-1" aria-hidden="true"></video>
+    </span>
+    {% else %}
+    {% comment %}
+    A background image cannot carry an `alt`, so the author's description is
+    given the only way a background can give it — role="img" plus aria-label.
+    A stand-in match-day photograph gets neither: it is decoration, and
+    reading the story's headline out as a description of a stock photo of a
+    stadium is worse than saying nothing.
+    {% endcomment %}
+    <span class="ndc-shot{% if forloop.first %} on{% endif %}" data-shot
+          style="background-image:url('{% if s.kind == 'scene' %}{% static s.url %}{% else %}{{ s.url }}{% endif %}')"
+          {% if s.alt %}role="img" aria-label="{{ s.alt }}"{% endif %}></span>
+    {% endif %}
+    {% endfor %}
+    {% if p.card_turns %}<span class="ndc-pips" aria-hidden="true">{% for s in p.card_slides %}<i{% if forloop.first %} class="on"{% endif %}></i>{% endfor %}</span>{% endif %}
   </div>
-</a>
+
+  {% if p.excerpt %}<p class="ndc-p">{{ p.excerpt|truncatechars:120 }}</p>{% endif %}
+
+  <div class="ndc-foot">
+    <span class="ndc-date">{{ p.published_at|naturaltime }}</span>
+    {% comment %}
+    A span, not a link. It looks like the button the client asked for and it
+    works like one — the stretched anchor above covers it — without putting a
+    second copy of the same href on the card.
+    {% endcomment %}
+    <span class="ndc-more">More <span aria-hidden="true">&rarr;</span></span>
+  </div>
+</article>

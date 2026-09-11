@@ -185,6 +185,132 @@ def gta_up(context):
 
 
 @register.simple_tag(takes_context=True)
+def gta_section(context):
+    """The section this screen is inside, and everything else in it.
+
+    WHY THE RAIL NEEDS THIS
+    -----------------------
+    The client, on the flat menu: "when I click it, its menu should be about
+    the other pages that were in its dashboard — if I click Models and tables
+    and see all of the tables, that menu should be about the tables and
+    models, so I do not have the need to go to the main dashboard."
+
+    Which is the cost the flat rail was quietly charging. Six items and two
+    levels of hub screens meant that moving from Tips to Matches — two tables
+    in the same category, the commonest move in the admin — was: rail, hub,
+    category, table. Four clicks to go sideways by one.
+
+    So the rail keeps its six sections AND grows a second block underneath
+    them listing what is in the section you are standing in. The six are how
+    you change section; this is how you move inside one, and it is one click.
+
+    WHAT IT RETURNS, or {} on a screen that belongs to no section (the
+    dashboard and the system report are sections of their own):
+
+        {"key", "label", "icon", "accent", "href",
+         "up": {"label", "href"} | None,     # a level up, inside the section
+         "items": [{"label", "href", "on", "icon", "accent"}, ...]}
+
+    IT CANNOT SHOW WHAT ITS VIEWER CANNOT OPEN. The tables come from
+    `available_apps`, which Django has already filtered by permission, and the
+    screens ask the same capability their hub card asks. A restricted
+    administrator gets a shorter list, never a link that 403s.
+    """
+    from sysadmin import access, hub
+
+    path = _path(context)
+    if not path:
+        return {}
+    apps = _apps(context)
+    request = context.get("request")
+    user = getattr(request, "user", None)
+
+    def here(url):
+        return bool(url) and path.startswith(url)
+
+    # ---- Tables & models -------------------------------------------------
+    #
+    # Two depths. Standing on the hub itself, the section IS the ten
+    # categories. Standing inside one — on the category page, or on any of its
+    # tables' own screens — it is that category's tables, with a way back up.
+    tables_url = safe_url("admin:hq_tables")
+    cats = hub.categories(apps, path)
+    current_cat = None
+    for cat in cats:
+        cat["href"] = safe_url("admin:hq_tables_category", cat["key"])
+        if cat["is_current"] or (cat["href"] and path.startswith(cat["href"])):
+            current_cat = cat
+
+    if current_cat:
+        return {
+            "key": "tables", "label": current_cat["label"],
+            "icon": current_cat["icon"], "accent": current_cat["accent"],
+            "href": current_cat["href"],
+            "up": {"label": "All table groups", "href": tables_url},
+            "items": [
+                {"label": t["name"], "href": t["url"], "on": t["is_current"],
+                 "icon": t["icon"], "accent": t["accent"]}
+                for t in current_cat["tables"] if t["url"]
+            ],
+        }
+    if here(tables_url):
+        return {
+            "key": "tables", "label": "Tables & models",
+            "icon": "ic-f-sliders", "accent": hub.GREEN, "href": tables_url,
+            "up": None,
+            "items": [
+                {"label": c["label"], "href": c["href"], "on": c["is_current"],
+                 "icon": c["icon"], "accent": c["accent"]}
+                for c in cats if c["href"]
+            ],
+        }
+
+    # ---- Security --------------------------------------------------------
+    security_url = safe_url("admin:hq_security")
+    sec = hub.security_tables(apps, path)
+    if sec and (here(security_url) or any(t["is_current"] for t in sec)):
+        return {
+            "key": "security", "label": "Security",
+            "icon": "ic-shield-check", "accent": hub.GREEN, "href": security_url,
+            "up": None,
+            "items": [
+                {"label": t["name"], "href": t["url"], "on": t["is_current"],
+                 "icon": t["icon"], "accent": t["accent"]}
+                for t in sec if t["url"]
+            ],
+        }
+
+    # ---- HQ and Your team ------------------------------------------------
+    #
+    # Both are lists of screens rather than tables, and both come from
+    # sysadmin.hub — the same list their hub page renders, so the rail and the
+    # page cannot disagree about what the section contains.
+    def can(key):
+        return access.can(user, key) if user else False
+
+    full = bool(user) and access.is_full_access(user)
+    for key, label, icon, home, which in (
+        ("hq", "HQ", "ic-f-org", "admin:hq_home", hub.HQ_SCREENS),
+        ("team", "Your team", "ic-f-shield-star", "admin:hq_team_home", hub.TEAM_SCREENS),
+    ):
+        home_url = safe_url(home)
+        items = hub.screens(which, can, full=full)
+        # A screen's own sub-pages count as being on it — an enquiry's detail
+        # page is inside the Enquiries inbox, and a rail that goes blank there
+        # is a rail that has lost you.
+        for item in items:
+            item["on"] = here(item["href"])
+        if here(home_url) or any(i["on"] for i in items):
+            return {
+                "key": key, "label": label, "icon": icon,
+                "accent": hub.GREEN, "href": home_url, "up": None,
+                "items": items,
+            }
+
+    return {}
+
+
+@register.simple_tag(takes_context=True)
 def gta_security_visible(context):
     """Whether this administrator can open any of the security logs.
 

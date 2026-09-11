@@ -67,13 +67,32 @@ def _row_count(ref):
 # ---------------------------------------------------------------------------
 
 def tables_hub(request):
+    """Level one: what the database is FOR, in ten cards.
+
+    THE CARDS CARRY HOW MUCH IS IN THEM. "Tipping — 4 tables" says a group
+    exists; "Tipping — 4 tables, 25,663 rows" says whether it is the one with
+    the data in it, which is the question somebody standing here is actually
+    asking. It is also the cheapest way to spot a sync that has not run.
+
+    That is one COUNT per table, about thirty on this screen. They are cheap
+    counts on indexed tables and this page is opened a handful of times a day
+    by a handful of people; _row_count swallows a failure per table, so a
+    model mid-migration costs a number rather than the page.
+    """
     ctx = admin.site.each_context(request)
     cats = hub.categories(ctx.get("available_apps"), request.path)
     for cat in cats:
         cat["href"] = _url("admin:hq_tables_category", cat["key"])
+        counted = [_row_count(t["ref"]) for t in cat["tables"]]
+        known = [n for n in counted if n is not None]
+        # None, not 0, when nothing could be counted: "0 rows" is a claim
+        # about the data, and this would be a claim about the database being
+        # unavailable.
+        cat["rows"] = sum(known) if known else None
     ctx.update(
         title="Tables & models", categories=cats,
         total_tables=sum(c["count"] for c in cats),
+        total_rows=sum(c["rows"] or 0 for c in cats),
     )
     return render(request, "admin/hub/tables.html", ctx)
 
@@ -164,14 +183,18 @@ def security_hub(request):
 def hq_hub(request):
     """GoodTip's own work: the site's words, its inbox, its fixtures.
 
-    Each card asks the capability it leads to rather than `is_superuser`. A
+    WHAT is in the section comes from hub.HQ_SCREENS — the same list the rail
+    reads, so the menu and this page cannot disagree about what HQ contains.
+    What is WAITING is counted here, because a count is a fact about this
+    minute and the rail draws itself on every screen in the admin.
+
+    Each screen asks the capability it leads to rather than `is_superuser`. A
     restricted administrator is not a superuser, and hiding these from them
     would hide the very screens their account was created to use.
     """
     from admin_panel.models import Enquiry, NewsPost
 
-    def cap(key):
-        return access.can(request.user, key)
+    cards = hub.screens(hub.HQ_SCREENS, lambda key: access.can(request.user, key))
 
     try:
         open_enquiries = Enquiry.objects.filter(status=Enquiry.STATUS_NEW).count()
@@ -182,49 +205,15 @@ def hq_hub(request):
     except Exception:
         drafts = None
 
-    cards = [
-        {
-            "label": "News & blog", "icon": "ic-f-doc", "accent": hub.TEAL,
-            "blurb": "Write, publish and email stories. Everything here reaches "
-                     "every member's dashboard.",
-            "href": _url("admin:hq_news"), "show": cap("news.write"),
-            "note": (f"{drafts} draft{'' if drafts == 1 else 's'}"
-                     if drafts else None),
-        },
-        {
-            "label": "Enquiries inbox", "icon": "ic-f-mail", "accent": hub.GOLD,
-            "blurb": "Messages sent through the public contact form, and what "
-                     "was replied.",
-            "href": _url("admin:hq_enquiries"), "show": cap("enquiries.read"),
-            "note": (f"{open_enquiries} open" if open_enquiries else None),
-            "hot": bool(open_enquiries),
-        },
-        {
-            "label": "Pages", "icon": "ic-f-pages", "accent": hub.GREEN,
-            "blurb": "The words and pictures on every page, public and "
-                     "members-only. Nothing to mark up first.",
-            "href": _url("admin:hq_pages"), "show": cap("pages.edit"),
-        },
-        {
-            "label": "SEO", "icon": "ic-globe", "accent": hub.OCEAN,
-            "blurb": "Titles, descriptions and share images — what Google and "
-                     "Facebook show when a page is linked.",
-            "href": _url("admin:hq_seo"), "show": cap("seo.edit"),
-        },
-        {
-            "label": "Redirects", "icon": "ic-link", "accent": hub.PLUM,
-            "blurb": "Point an old address at a new one so no link anybody has "
-                     "shared ever dies.",
-            "href": _url("admin:hq_redirects"), "show": cap("seo.redirects"),
-        },
-        {
-            "label": "Sync panel", "icon": "ic-cloud-sync", "accent": hub.AMBER,
-            "blurb": "Pull fixtures and results in, and see whether the last "
-                     "run worked.",
-            "href": _url("admin:hq_sync"), "show": cap("data.sync"),
-        },
-    ]
-    cards = [c for c in cards if c["show"] and c["href"]]
+    notes = {
+        "news": (f"{drafts} draft{'' if drafts == 1 else 's'}", False) if drafts else None,
+        "enquiries": (f"{open_enquiries} open", True) if open_enquiries else None,
+    }
+    for card in cards:
+        note = notes.get(card["key"])
+        if note:
+            card["note"], card["hot"] = note
+
     return render(request, "admin/hub/cards.html", _ctx(
         request, "HQ",
         cards=cards,
@@ -243,6 +232,9 @@ def team_hub(request):
     full = access.is_full_access(request.user)
     user = request.user
 
+    cards = hub.screens(
+        hub.TEAM_SCREENS, lambda key: access.can(user, key), full=full)
+
     try:
         my_tasks = AdminTask.objects.filter(
             assigned_to=user, status=AdminTask.OPEN).count()
@@ -256,36 +248,15 @@ def team_hub(request):
     except Exception:
         to_review = None
 
-    cards = [
-        {
-            "label": "Your work", "icon": "ic-f-home", "accent": hub.GREEN,
-            "blurb": "What you have been asked to do, what you are allowed to "
-                     "do, and what came back from review.",
-            "href": _url("admin:hq_my_work"), "show": True,
-            "note": (f"{my_tasks} open" if my_tasks else None),
-            "hot": bool(my_tasks),
-        },
-        {
-            "label": "Waiting for review", "icon": "ic-f-clock", "accent": hub.GOLD,
-            "blurb": "Changes raised by administrators who need your approval "
-                     "before they go live.",
-            "href": _url("admin:hq_reviews"), "show": full,
-            "note": (f"{to_review} waiting" if to_review else None),
-            "hot": bool(to_review),
-        },
-        {
-            "label": "Administrators", "icon": "ic-f-shield-star", "accent": hub.RUST,
-            "blurb": "Who can get in, exactly what each of them may do, and "
-                     "which of it you see first.",
-            "href": _url("admin:hq_team"), "show": full,
-        },
-        {
-            "label": "Activity", "icon": "ic-clock", "accent": hub.PLUM,
-            "blurb": "The record of what every administrator has done, in order.",
-            "href": _url("admin:hq_activity"), "show": full,
-        },
-    ]
-    cards = [c for c in cards if c["show"] and c["href"]]
+    notes = {
+        "my_work": (f"{my_tasks} open", True) if my_tasks else None,
+        "reviews": (f"{to_review} waiting", True) if to_review else None,
+    }
+    for card in cards:
+        note = notes.get(card["key"])
+        if note:
+            card["note"], card["hot"] = note
+
     return render(request, "admin/hub/cards.html", _ctx(
         request, "Your team",
         cards=cards,

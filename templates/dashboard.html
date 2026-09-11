@@ -486,71 +486,85 @@ is the part members care about and the part that is still true.
 <!-- news & blog — six cards that turn over, each click through to the full story -->
 {% if news_any %}
 {% comment %}
-TWO ROWS, EACH TURNING ITS OWN WAY (Sep 2026, second pass).
+TWO ROWS THAT TAKE IT IN TURNS (Sep 2026, third pass).
 
-The client's note on the first version, which cross-faded all six cards every
-five seconds: "the blogs should auto change and the way the cards change make
-it animated, not just something appearing — the first row changes by the cards
-doing like a 360, then the other blogs is what appears at the end of the 360.
-Change in about 10 seconds. The other row can have another design."
+The client on the second version: "the 360 degree auto change is not working,
+it's just getting longer — I do not want that. Make sure it turns, and when it
+turns I see another blog. So the user turns, then the lower one turns, so it
+should happen alternating."
 
-So:
-  * the TOP ROW is three picture-over-words cards that spin one full turn on
-    their upright, staggered left to right; the next story is on the far side
-    of the spin and is what faces you when it lands;
-  * the BOTTOM ROW is a different shape — picture beside words — and the next
-    story slides up into each place once the spin has landed;
-  * one clock for both, every ten seconds.
+Three changes, and they are the three halves of that sentence:
+
+  * IT TURNS. The card is a front and a back on one element that flips half a
+    turn on its upright; the next story is put on the back before the flip
+    starts, so the thing that faces you when it lands is a different story.
+    Half a turn, not a full one — a 360 ends facing the way it started, which
+    is a lot of motion to end where it began, and the swap had to be smuggled
+    in behind the reader's back half way round for it to have changed at all.
+
+  * IT DOES NOT GET LONGER. Every part of a card is fixed or clamped now (see
+    _news_deck_card.html), so a card cannot grow when the story on its back is
+    longer than the story on its front — which is what "just getting longer"
+    was: the two faces share one grid cell, the cell takes the height of the
+    taller of them, and with the animation suppressed that growth was the only
+    thing that happened.
+
+  * THEY ALTERNATE. One clock, five seconds, and each tick turns ONE row. The
+    top row turns, then five seconds later the bottom row turns, then the top
+    again — so each row changes every ten seconds, which is the cadence asked
+    for originally, and something on the deck moves every five without all six
+    cards ever moving at once.
+
+Both rows are the same card in the same size now; the "picture beside words"
+shape the bottom row had is gone ("why is it small, have all of them same
+size").
 
 "Remove this Play, it should all be automatic" — so there is no pause button.
 It still stops for somebody reading: hovering or tabbing into the deck holds
-it. And it still does not move on its own for a reader whose machine asks for
-reduced motion; the dots step through by hand for them.
-
-Each place renders its first story as a real link. The rest wait in a
+it. Each place renders its first story as a real link and the rest wait in a
 <template>, which is inert — not rendered, not focusable, not read aloud — so
-there is no aria-hidden bookkeeping, and with JavaScript off this is simply the
-six newest stories. See news_slots in accounts.views.dashboard for how the
-stories are dealt to the places.
+with JavaScript off this is simply the six newest stories. See news_slots in
+accounts.views.dashboard for how the stories are dealt to the places.
 {% endcomment %}
 <div class="nd-head">
   <h2 class="nd-title">News &amp; blog</h2>
-  <a class="abtn abtn-primary nd-all" href="{% url 'news_index' %}">All news &amp; blog <span aria-hidden="true">&rarr;</span></a>
+  {% comment %}
+  "On the dashboard where we have all the blog it looks like words that is a
+  link — I need it to be in its box and look like a link." So it is both: a
+  box you can see the edges of, with an underlined link inside it rather than
+  the solid filled button it had become.
+  {% endcomment %}
+  <a class="nd-all" href="{% url 'news_index' %}">
+    <svg aria-hidden="true"><use href="#ic-f-doc"/></svg>
+    <span class="nd-all-lab">All news &amp; blog</span>
+    <span class="nd-all-go" aria-hidden="true">&rarr;</span>
+  </a>
 </div>
 <div class="news-deck{% if news_turns > 1 %} is-live{% endif %}" data-news-deck
-     data-interval="10000" data-turns="{{ news_turns }}">
-  <div class="nd-row nd-row-spin">
-    {% for slot in news_spin_slots %}
-    <div class="nd-place" data-news-place="spin">
+     data-interval="5000" data-turns="{{ news_turns }}">
+  {% for row in news_rows %}
+  <div class="nd-row" data-news-row="{{ forloop.counter0 }}">
+    {% for slot in row %}
+    <div class="nd-place" data-news-place>
       <div class="nd-spinner">
-        <div class="nd-face nd-front" data-face="front">{% include "partials/_news_deck_card.html" with p=slot.0 shape="tall" %}</div>
+        <div class="nd-face nd-front" data-face="front">{% include "partials/_news_deck_card.html" with p=slot.0 %}</div>
         <div class="nd-face nd-back" data-face="back" aria-hidden="true"></div>
       </div>
-      {% if news_turns > 1 %}<template data-news-queue>{% for p in slot %}{% include "partials/_news_deck_card.html" with p=p shape="tall" %}{% endfor %}</template>{% endif %}
+      {% if news_turns > 1 %}<template data-news-queue>{% for p in slot %}{% include "partials/_news_deck_card.html" with p=p %}{% endfor %}</template>{% endif %}
     </div>
     {% endfor %}
   </div>
-
-  {% if news_slide_slots %}
-  <div class="nd-row nd-row-slide">
-    {% for slot in news_slide_slots %}
-    <div class="nd-place" data-news-place="slide">
-      <div class="nd-slot" data-face="front">{% include "partials/_news_deck_card.html" with p=slot.0 shape="wide" %}</div>
-      {% if news_turns > 1 %}<template data-news-queue>{% for p in slot %}{% include "partials/_news_deck_card.html" with p=p shape="wide" %}{% endfor %}</template>{% endif %}
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
+  {% endfor %}
 
   {% comment %}
   Only when there is more than one turn — a single dot is a control that does
-  nothing. Centred under the centred heading; with the pause button gone there
-  is nothing else on the line to balance them against.
+  nothing. A dot moves BOTH rows at once, because it means "show me page two"
+  rather than "take the next step in the alternation".
   {% endcomment %}
   {% if news_turns > 1 %}
   <div class="nd-foot">
     <div class="nd-dots" role="group" aria-label="News pages">
-      {% for p in news_spin_slots.0 %}
+      {% for p in news_rows.0.0 %}
       <button type="button" class="nd-dot{% if forloop.first %} on{% endif %}" data-news-dot="{{ forloop.counter0 }}"
               {% if forloop.first %}aria-current="true"{% endif %}
               aria-label="Stories, page {{ forloop.counter }} of {{ news_turns }}"></button>
@@ -573,155 +587,11 @@ any one card.
 {% endblock %}
 
 {% block app_js %}
-/* ---- NEWS DECK ----------------------------------------------------------
-   Six story cards in two rows, turning over every ten seconds: the top row
-   spins, the bottom row slides. See the comment on the markup for why.
-
-   Four things it has to get right:
-
-   * IT MUST STOP WHEN SOMEBODY IS READING IT. Hover and keyboard focus both
-     hold it. There is no pause button any more ("it should all be
-     automatic"), so these are the only brakes — and focus matters twice over,
-     because a turn replaces the card nodes and would take the focused link
-     out from under the keyboard.
-
-   * IT MUST NOT MOVE WHEN THE TAB IS HIDDEN, or the reader comes back to a
-     deck that has turned a few hundred times behind their back.
-
-   * IT MUST RESPECT prefers-reduced-motion. It never starts on its own for
-     that reader, and a dot press swaps the cards without spinning anything.
-
-   * A TURN STARTED WHILE ANOTHER IS STILL LANDING MUST WIN. Every turn bumps
-     `gen`, and the delayed steps of an older turn check it and stand down —
-     otherwise a quick double press on the dots could let the first turn's
-     half-way swap land after the second turn's and leave a card showing the
-     wrong story.
-
-   THE SPIN. Each top card is a front face and a back face on one element that
-   rotates a full 360 degrees. The next story goes on the back before the turn
-   starts, so it is what faces you half-way round; at that moment the front is
-   facing away, and it is swapped to the same story so that the last quarter of
-   the turn lands on it. When the animation ends the back is emptied again. */
-(function(){
-  var deck = document.querySelector('[data-news-deck]');
-  if (!deck) return;
-  var turns = parseInt(deck.getAttribute('data-turns'), 10) || 1;
-  if (turns < 2) return;
-  var every = parseInt(deck.getAttribute('data-interval'), 10) || 10000;
-  var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var SPIN_MS = 1100, SPIN_STAGGER = 140, SLIDE_AFTER = 700, SLIDE_STAGGER = 120;
-
-  var spinN = 0, slideN = 0;
-  var places = Array.prototype.map.call(deck.querySelectorAll('[data-news-place]'), function(el){
-    var kind = el.getAttribute('data-news-place');
-    var queue = el.querySelector('template[data-news-queue]');
-    return {
-      el: el, kind: kind,
-      index: kind === 'spin' ? spinN++ : slideN++,
-      cards: queue ? Array.prototype.slice.call(queue.content.children) : []
-    };
-  });
-  var dots = Array.prototype.slice.call(deck.querySelectorAll('[data-news-dot]'));
-  var at = 0, gen = 0, timer = null, holding = false;
-
-  function cardFor(place, n){
-    if (!place.cards.length) return null;
-    return place.cards[n % place.cards.length].cloneNode(true);
-  }
-
-  function spin(place, n, g){
-    var spinner = place.el.querySelector('.nd-spinner');
-    var front = place.el.querySelector('[data-face="front"]');
-    var back = place.el.querySelector('[data-face="back"]');
-    var next = cardFor(place, n);
-    if (!spinner || !front || !back || !next) return;
-    setTimeout(function(){
-      if (g !== gen) return;
-      back.replaceChildren(next);
-      // Restart cleanly if the previous spin has not finished landing.
-      spinner.classList.remove('is-turning');
-      void spinner.offsetWidth;
-      spinner.classList.add('is-turning');
-      setTimeout(function(){
-        if (g !== gen) return;
-        front.replaceChildren(cardFor(place, n));
-      }, SPIN_MS / 2);
-      setTimeout(function(){
-        if (g !== gen) return;
-        spinner.classList.remove('is-turning');
-        back.replaceChildren();
-      }, SPIN_MS + 60);
-    }, place.index * SPIN_STAGGER);
-  }
-
-  function slide(place, n, g){
-    var slot = place.el.querySelector('[data-face="front"]');
-    var next = cardFor(place, n);
-    if (!slot || !next) return;
-    setTimeout(function(){
-      if (g !== gen) return;
-      // Anything from an interrupted slide goes first, so the slot never
-      // holds more than the card leaving and the card arriving.
-      while (slot.children.length > 1) slot.removeChild(slot.firstElementChild);
-      var old = slot.firstElementChild;
-      if (old) old.classList.add('nd-out');
-      next.classList.add('nd-in');
-      slot.appendChild(next);
-      setTimeout(function(){
-        if (old && old.parentNode) old.parentNode.removeChild(old);
-        next.classList.remove('nd-in');
-      }, 700);
-    }, SLIDE_AFTER + place.index * SLIDE_STAGGER);
-  }
-
-  function swapNow(place, n){
-    var face = place.el.querySelector('[data-face="front"]');
-    var next = cardFor(place, n);
-    if (face && next) face.replaceChildren(next);
-  }
-
-  function go(n){
-    at = (n + turns) % turns;
-    var g = ++gen;
-    places.forEach(function(place){
-      if (still) swapNow(place, at);
-      else if (place.kind === 'spin') spin(place, at, g);
-      else slide(place, at, g);
-    });
-    dots.forEach(function(d, k){
-      d.classList.toggle('on', k === at);
-      if (k === at) d.setAttribute('aria-current', 'true'); else d.removeAttribute('aria-current');
-    });
-  }
-
-  function stop(){ if (timer) { clearInterval(timer); timer = null; } }
-  function start(){
-    stop();
-    if (still || holding || document.hidden) return;
-    timer = setInterval(function(){ go(at + 1); }, every);
-  }
-
-  dots.forEach(function(d){
-    d.addEventListener('click', function(){
-      go(parseInt(d.getAttribute('data-news-dot'), 10) || 0);
-      /* A fresh ten seconds after a dot press, or the next turn could arrive
-         a moment after the one that was asked for. */
-      start();
-    });
-  });
-  ['mouseenter', 'focusin'].forEach(function(ev){
-    deck.addEventListener(ev, function(){ holding = true; stop(); });
-  });
-  ['mouseleave', 'focusout'].forEach(function(ev){
-    deck.addEventListener(ev, function(e){
-      // focusout fires moving between two cards inside the deck, too.
-      if (ev === 'focusout' && e.relatedTarget && deck.contains(e.relatedTarget)) return;
-      holding = false; start();
-    });
-  });
-  document.addEventListener('visibilitychange', start);
-  start();
-})();
+/* The news deck's own script moved out to static/js/gt-news-cards.js: it
+   drives the card pictures as well as the deck now, and those keep turning
+   inside cards this block clones, so it could not stay a one-shot run over
+   whatever happened to be on the page when the dashboard loaded. Loaded in
+   the scripts block at the foot of this file. */
 
 /* Welcome banner ticker, the prompts cycle so the banner is a message
    channel, not a static greeting. Pauses on hover; dots let you step. */
@@ -1121,4 +991,14 @@ any one card.
         });
       }
     }
+{% endblock %}
+
+{% comment %}
+The news deck and the pictures inside its cards — see gt-news-cards.js. Its
+own file rather than {% block app_js %} because a deck turn clones fresh cards
+into the page and the slideshows in them have to start themselves; a script
+that ran once over the original six could not do that.
+{% endcomment %}
+{% block scripts %}
+{% if news_any %}<script src="{% static 'js/gt-news-cards.js' %}" defer></script>{% endif %}
 {% endblock %}

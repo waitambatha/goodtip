@@ -1405,114 +1405,265 @@
     });
   }
 
-  /* Featured image: a real drop zone rather than a bare file input.
+  /* FEATURED MEDIA — up to three pictures and three videos, in order.
    *
-   * The browser's own control cannot be styled, gives no preview, shows a
-   * truncated filename, and offers no way to take an image back off a post.
-   * So the input is driven from a button beside it, the chosen file is shown
-   * immediately from a local object URL — no upload round trip — and Remove
-   * sets a flag the view reads to clear the field. */
-  function wireFeaturedImage() {
-    var drop = document.querySelector('[data-image-drop]');
-    if (!drop) return;
+   * Replaces the single featured-image drop zone (Sep 2026, client: "the place
+   * where we have featured image, can it take 3 images and 3 videos as well,
+   * that will also be changing").
+   *
+   * Each file uploads the moment it is chosen, to the same endpoint the body
+   * and the slideshows use (admin_panel.views.news_upload_image, ?slot=featured)
+   * — which is where the size, type and 45-second limits already live — and
+   * the manager keeps a list of what came back. That list is written into the
+   * hidden `featured_media` field as JSON on every change, and the view turns
+   * it into NewsMedia rows on save. Nothing is attached to the story until the
+   * story is saved: closing the page leaves an orphan file, not a changed post.
+   *
+   * THE CAP IS PER KIND, three and three, because the two do different jobs
+   * and a story with four photographs and no clip is a normal thing to want.
+   * The server enforces it again; this is the version that explains itself.
+   *
+   * ORDER MATTERS — the first item is what the card and the story open on —
+   * so items can be dragged, or moved with their arrow buttons for anyone
+   * not using a mouse. */
+  function wireFeaturedSet() {
+    var box = document.querySelector('[data-featured]');
+    if (!box) return;
+    var list = box.querySelector('[data-featured-list]');
+    var empty = box.querySelector('[data-featured-empty]');
+    var out = box.querySelector('[data-featured-json]');
+    var msg = box.querySelector('[data-featured-msg]');
+    var url = box.getAttribute('data-upload-url');
+    var MAX = parseInt(box.getAttribute('data-max'), 10) || 3;
+    var LABEL = { image: 'picture', video: 'video' };
 
-    var input = drop.querySelector('[data-image-input]');
-    var preview = drop.querySelector('[data-image-preview]');
-    var nameEl = drop.querySelector('[data-image-name]');
-    var noteEl = drop.querySelector('[data-image-note]');
-    var pickLabel = drop.querySelector('[data-image-pick-label]');
-    var pickBtn = drop.querySelector('[data-image-pick]');
-    var clearBtn = drop.querySelector('[data-image-clear]');
-    var clearFlag = drop.querySelector('[data-image-clear-flag]');
-    if (!input || !preview) return;
+    var items = [];
+    try {
+      var seed = document.getElementById('featuredData');
+      items = seed ? (JSON.parse(seed.textContent) || []) : [];
+    } catch (e) { items = []; }
 
-    var EMPTY_ICON = '<svg class="ned-drop-ph"><use href="#ic-image"/></svg>';
-    var EMPTY_NAME = 'The card and hero image for this story';
-    var EMPTY_NOTE = 'Shown on the dashboard, the news list and the top of the article. ' +
-                     'Drag a file in, or choose one.';
-    var objectUrl = null;
-
-    function releaseUrl() {
-      if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+    function csrf() {
+      var f = document.querySelector('[name=csrfmiddlewaretoken]');
+      if (f) return f.value;
+      var m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+      return m ? decodeURIComponent(m[1]) : '';
+    }
+    function count(kind) {
+      return items.filter(function (i) { return i.kind === kind && !i.pending; }).length +
+             items.filter(function (i) { return i.kind === kind && i.pending; }).length;
+    }
+    function say(text, bad) {
+      if (!msg) return;
+      msg.textContent = text || '';
+      msg.classList.toggle('is-bad', !!bad);
+    }
+    function sync() {
+      out.value = JSON.stringify(items.filter(function (i) { return !i.pending; })
+        .map(function (i) { return { kind: i.kind, path: i.path, alt: i.alt || '' }; }));
+      ['image', 'video'].forEach(function (kind) {
+        var n = count(kind);
+        var c = box.querySelector('[data-featured-count="' + kind + '"]');
+        if (c) c.textContent = n + ' / ' + MAX;
+        var b = box.querySelector('[data-featured-add="' + kind + '"]');
+        if (b) b.disabled = n >= MAX;
+      });
+      if (empty) empty.hidden = items.length > 0;
+      box.classList.toggle('has-items', items.length > 0);
     }
 
-    function readableSize(bytes) {
-      if (bytes < 1024) return bytes + ' B';
-      if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
-      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    function move(from, to) {
+      if (to < 0 || to >= items.length || from === to) return;
+      var it = items.splice(from, 1)[0];
+      items.splice(to, 0, it);
+      render();
     }
 
-    function showFile(file) {
-      releaseUrl();
-      objectUrl = URL.createObjectURL(file);
-      preview.innerHTML = '<img alt="">';
-      preview.querySelector('img').src = objectUrl;
-      drop.classList.add('has-image');
-      if (nameEl) nameEl.textContent = file.name;
-      if (noteEl) noteEl.textContent = readableSize(file.size) + ' · saved when you save the post';
-      if (pickLabel) pickLabel.textContent = 'Replace image';
-      if (clearBtn) clearBtn.hidden = false;
-      if (clearFlag) clearFlag.value = '';
+    function render() {
+      list.innerHTML = '';
+      items.forEach(function (it, n) {
+        var li = document.createElement('li');
+        li.className = 'ned-fm-item' + (it.pending ? ' is-loading' : '') + (n === 0 ? ' is-lead' : '');
+        li.draggable = !it.pending;
+        li.dataset.index = n;
+
+        var thumb = document.createElement('div');
+        thumb.className = 'ned-fm-thumb';
+        if (it.kind === 'video') {
+          var v = document.createElement('video');
+          v.src = it.url || it.preview || '';
+          v.muted = true; v.playsInline = true; v.preload = 'metadata';
+          thumb.appendChild(v);
+        } else {
+          var img = document.createElement('img');
+          img.src = it.url || it.preview || '';
+          img.alt = '';
+          thumb.appendChild(img);
+        }
+        var badge = document.createElement('span');
+        badge.className = 'ned-fm-badge';
+        badge.textContent = n === 0 ? 'Leads' : String(n + 1);
+        thumb.appendChild(badge);
+        var kind = document.createElement('span');
+        kind.className = 'ned-fm-kind';
+        kind.textContent = it.kind === 'video' ? 'Video' : 'Picture';
+        thumb.appendChild(kind);
+        if (it.pending) {
+          var spin = document.createElement('span');
+          spin.className = 'ned-fm-spin';
+          spin.setAttribute('aria-label', 'Uploading');
+          thumb.appendChild(spin);
+        }
+        li.appendChild(thumb);
+
+        var alt = document.createElement('input');
+        alt.type = 'text';
+        alt.className = 'ned-fm-alt';
+        alt.maxLength = 200;
+        alt.value = it.alt || '';
+        alt.placeholder = it.kind === 'video' ? 'What happens in this clip' : 'What this picture shows';
+        alt.setAttribute('aria-label', 'Description of ' + LABEL[it.kind] + ' ' + (n + 1));
+        alt.disabled = !!it.pending;
+        alt.addEventListener('input', function () { it.alt = alt.value; sync(); });
+        li.appendChild(alt);
+
+        var acts = document.createElement('div');
+        acts.className = 'ned-fm-acts';
+        [['←', 'Move earlier', function () { move(n, n - 1); }, n === 0],
+         ['→', 'Move later', function () { move(n, n + 1); }, n === items.length - 1],
+         ['×', 'Remove', function () { items.splice(n, 1); render(); say(''); }, false]
+        ].forEach(function (spec) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = spec[0];
+          b.title = spec[1];
+          b.setAttribute('aria-label', spec[1] + ' — ' + LABEL[it.kind] + ' ' + (n + 1));
+          b.disabled = spec[3] || !!it.pending;
+          if (spec[0] === '×') b.className = 'is-drop';
+          b.addEventListener('click', spec[2]);
+          acts.appendChild(b);
+        });
+        li.appendChild(acts);
+        list.appendChild(li);
+      });
+      sync();
     }
 
-    function showEmpty() {
-      releaseUrl();
-      preview.innerHTML = EMPTY_ICON;
-      drop.classList.remove('has-image');
-      if (nameEl) nameEl.textContent = EMPTY_NAME;
-      if (noteEl) noteEl.textContent = EMPTY_NOTE;
-      if (pickLabel) pickLabel.textContent = 'Choose image';
-      if (clearBtn) clearBtn.hidden = true;
+    /* Drag to reorder. The item being dragged is remembered by its index;
+       dropping on another item puts it in that one's place. */
+    var dragFrom = null;
+    list.addEventListener('dragstart', function (e) {
+      var li = e.target.closest('.ned-fm-item');
+      if (!li) return;
+      dragFrom = parseInt(li.dataset.index, 10);
+      li.classList.add('is-dragging');
+      try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(dragFrom)); } catch (err) {}
+    });
+    list.addEventListener('dragover', function (e) {
+      if (dragFrom === null) return;
+      e.preventDefault();
+      var li = e.target.closest('.ned-fm-item');
+      list.querySelectorAll('.is-over').forEach(function (x) { x.classList.remove('is-over'); });
+      if (li) li.classList.add('is-over');
+    });
+    list.addEventListener('drop', function (e) {
+      if (dragFrom === null) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var li = e.target.closest('.ned-fm-item');
+      var to = li ? parseInt(li.dataset.index, 10) : items.length - 1;
+      var from = dragFrom;
+      dragFrom = null;
+      move(from, to);
+    });
+    list.addEventListener('dragend', function () {
+      dragFrom = null;
+      list.querySelectorAll('.is-dragging, .is-over').forEach(function (x) {
+        x.classList.remove('is-dragging', 'is-over');
+      });
+    });
+
+    function kindOf(file) {
+      if (/^image\//.test(file.type)) return 'image';
+      if (/^video\//.test(file.type) || /\.(mp4|mov|m4v|webm)$/i.test(file.name)) return 'video';
+      return null;
     }
 
-    function accept(file) {
-      if (!file) return;
-      if (!/^image\//.test(file.type)) {
-        if (noteEl) noteEl.textContent = "That file isn't an image — pick a JPG, PNG or WebP.";
+    function upload(file) {
+      var kind = kindOf(file);
+      if (!kind) { say('"' + file.name + '" is not a picture or a video.', true); return; }
+      if (count(kind) >= MAX) {
+        say('That is already ' + MAX + ' ' + LABEL[kind] + 's — remove one to add another.', true);
         return;
       }
-      showFile(file);
+      var it = { kind: kind, pending: true, alt: '', preview: URL.createObjectURL(file) };
+      items.push(it);
+      render();
+      var data = new FormData();
+      data.append('file', file);
+      fetch(url, { method: 'POST', body: data, credentials: 'same-origin',
+                   headers: { 'X-CSRFToken': csrf() } })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (res) {
+          if (!res.ok || !res.j.url || !res.j.path) throw new Error(res.j.error || 'That upload did not go through.');
+          it.pending = false;
+          it.url = res.j.url;
+          it.path = res.j.path;
+          // The server decides what a file is: a .mov picked under "Add
+          // pictures" is still a video, and counts as one.
+          it.kind = res.j.kind === 'video' ? 'video' : 'image';
+          if (count(it.kind) > MAX) {
+            items.splice(items.indexOf(it), 1);
+            say('That is already ' + MAX + ' ' + LABEL[it.kind] + 's — that one was left out.', true);
+          } else {
+            say('');
+          }
+        })
+        .catch(function (err) {
+          var at = items.indexOf(it);
+          if (at >= 0) items.splice(at, 1);
+          say(err.message || 'That upload did not go through.', true);
+        })
+        .then(function () {
+          if (it.preview) { URL.revokeObjectURL(it.preview); it.preview = null; }
+          render();
+        });
     }
 
-    if (pickBtn) pickBtn.addEventListener('click', function () { input.click(); });
-    input.addEventListener('change', function () {
-      if (input.files && input.files[0]) accept(input.files[0]);
+    box.querySelectorAll('[data-featured-add]').forEach(function (btn) {
+      var kind = btn.getAttribute('data-featured-add');
+      var input = box.querySelector('[data-featured-input="' + kind + '"]');
+      btn.addEventListener('click', function () { if (input) input.click(); });
+      if (input) input.addEventListener('change', function () {
+        Array.prototype.slice.call(input.files || []).forEach(upload);
+        input.value = '';
+      });
     });
 
-    if (clearBtn) clearBtn.addEventListener('click', function () {
-      input.value = '';
-      // Tells the view to drop the stored image too, not just the new pick.
-      if (clearFlag) clearFlag.value = '1';
-      showEmpty();
-    });
-
+    /* Files dropped anywhere on the box — not on an item, which is a reorder. */
     ['dragenter', 'dragover'].forEach(function (evt) {
-      drop.addEventListener(evt, function (e) {
+      box.addEventListener(evt, function (e) {
+        if (dragFrom !== null) return;
+        if (!e.dataTransfer || Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') < 0) return;
         e.preventDefault();
-        drop.classList.add('is-dragging');
+        box.classList.add('is-dropping');
       });
     });
     ['dragleave', 'drop'].forEach(function (evt) {
-      drop.addEventListener(evt, function (e) {
-        if (evt === 'dragleave' && drop.contains(e.relatedTarget)) return;
-        drop.classList.remove('is-dragging');
+      box.addEventListener(evt, function (e) {
+        if (evt === 'dragleave' && box.contains(e.relatedTarget)) return;
+        box.classList.remove('is-dropping');
       });
     });
-    drop.addEventListener('drop', function (e) {
-      e.preventDefault();
+    box.addEventListener('drop', function (e) {
+      if (dragFrom !== null) return;
       var files = e.dataTransfer && e.dataTransfer.files;
       if (!files || !files.length) return;
-      // The file has to end up on the input itself — the form posts that, not
-      // whatever the preview happens to be showing.
-      try {
-        input.files = files;
-      } catch (err) {
-        var dt = new DataTransfer();
-        dt.items.add(files[0]);
-        input.files = dt.files;
-      }
-      accept(files[0]);
+      e.preventDefault();
+      Array.prototype.slice.call(files).forEach(upload);
     });
+
+    render();
   }
 
   /* The engine, published for the page editor.
@@ -1537,72 +1688,83 @@
     document.querySelectorAll('[data-editor]').forEach(wireEditor);
     wireSlugPreview();
     wireSourceRows();
-    wireFeaturedImage();
+    wireFeaturedSet();
   });
 })();
 
 /* ---------------------------------------------------------------------------
- * THE SCHEDULER
+ * WHEN IT GOES OUT — the scheduler, as a button and a calendar
  * ---------------------------------------------------------------------------
- * The publish field was a bare `datetime-local`: it tells you the moment you
- * typed and nothing else. What an editor wants to know is the STATE — is this
- * out, is it being held, how long until it goes — and none of that is legible
- * from a date, because "published" here means `is_published AND published_at
- * <= now` and a future date is a schedule rather than a mistake.
+ * The client, Sep 2026: "I do not like how that automated publishing where it
+ * will auto post. Let it be a button, then when I click, a nice time and
+ * calendar UI comes in."
  *
- * Three jobs, all of them client-side on purpose:
+ * The date box that used to sit open on every story is gone. What an editor
+ * sees now is the state in words — "Goes out when you save", "Scheduled",
+ * "Live on the site" — and one button. Pressing it opens a month grid and a
+ * clock, with the four times anybody actually picks as presets; choosing a
+ * moment writes it into the hidden `published_at` field and says, in words,
+ * when that is and how long until it.
  *
- *   THE STATE follows the input as it is edited, not only the saved value.
- *   Typing next Friday into a live story should say "will be held until
- *   Friday" before you press Save, because that is the moment you can still
- *   change your mind.
+ * BLANK MEANS "WHEN YOU SAVE". On a new story the field is empty until a date
+ * is picked, and the view uses the moment of saving (_parse_published_at's
+ * fallback). "Go out when I save" empties it again. On an existing story the
+ * same button is "Keep the original date" and puts the stored date back, so
+ * fixing a typo does not quietly re-date a story as today's news.
  *
- *   THE COUNTDOWN is computed here rather than rendered server-side. "In 2
- *   days" written into the HTML is wrong the moment the page has been open for
- *   an hour, and the story editor is a page people leave open.
+ * LOCAL TIME THROUGHOUT. The field carries "YYYY-MM-DDTHH:MM" with no zone and
+ * the view reads it in the site's timezone; toISOString would be UTC and shift
+ * the time by the offset — the classic way a scheduler publishes something
+ * eleven hours early.
  *
- *   THE PRESETS are built from the browser's own clock. `datetime-local`
- *   carries no timezone and the view reads it in the site's, so a "tomorrow"
- *   worked out on the server would be a different tomorrow for an editor
- *   sitting anywhere else.
- *
- * No cron is involved in any of this. Every reader-facing query asks for
- * `published_at <= now` (admin_panel.models.LivePostManager), so the moment
- * arrives on its own; this is a description of a fact the database already
- * enforces, not a mechanism.
+ * No cron. Every reader-facing query asks for `published_at <= now`
+ * (admin_panel.models.LivePostManager), so the moment arrives on its own.
  */
 (function () {
   'use strict';
 
-  var box = document.querySelector('[data-sched]');
+  var box = document.querySelector('[data-pub]');
   if (!box) return;
-  var input = box.querySelector('[data-sched-input]');
-  var stateEl = box.querySelector('[data-sched-state]');
-  var countEl = box.querySelector('[data-sched-count]');
-  var hintEl = box.querySelector('[data-sched-hint]');
-  if (!input) return;
+  var input = box.querySelector('[data-pub-input]');
+  var stateEl = box.querySelector('[data-pub-state]');
+  var whenEl = box.querySelector('[data-pub-when]');
+  var openBtn = box.querySelector('[data-pub-open]');
+  var openLabel = box.querySelector('[data-pub-open-label]');
+  var resetBtn = box.querySelector('[data-pub-reset]');
+  var pop = box.querySelector('[data-pub-pop]');
+  if (!input || !openBtn || !pop) return;
 
-  var savedState = box.getAttribute('data-state') || 'draft';
+  var saved = box.getAttribute('data-saved') || 'new';
+  var original = input.value;
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+                'August', 'September', 'October', 'November', 'December'];
+  var DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  /* `datetime-local` wants "YYYY-MM-DDTHH:MM" in LOCAL time. toISOString is
-     UTC and would shift the value by the offset — the classic way a scheduler
-     ends up publishing things eleven hours early. */
+  function p2(n) { return (n < 10 ? '0' : '') + n; }
   function toField(d) {
-    function p(n) { return (n < 10 ? '0' : '') + n; }
-    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
-           'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) +
+           'T' + p2(d.getHours()) + ':' + p2(d.getMinutes());
   }
-
-  function parse() {
-    var v = input.value;
+  function parse(v) {
     if (!v) return null;
-    var d = new Date(v);
-    return isNaN(d.getTime()) ? null : d;
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(v);
+    if (!m) return null;
+    return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
   }
-
-  /* Whole units, largest that fits. "in 34 hours" is worse than "in 1 day" for
-     a thing being scheduled — nobody plans a publish to the hour three days
-     out — and "in 2 minutes" matters when it is 2 minutes. */
+  function sameDay(a, b) {
+    return a && b && a.getFullYear() === b.getFullYear() &&
+           a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  }
+  function clock(d) {
+    var h = d.getHours(), m = d.getMinutes();
+    return ((h % 12) || 12) + ':' + p2(m) + (h < 12 ? ' am' : ' pm');
+  }
+  function long(d) {
+    return DAYS[(d.getDay() + 6) % 7] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()].slice(0, 3) +
+           ' ' + d.getFullYear() + ', ' + clock(d);
+  }
+  /* Whole units, largest that fits: nobody plans a publish to the hour three
+     days out, and "in 2 minutes" matters when it is two minutes. */
   function until(ms) {
     var s = Math.round(ms / 1000);
     if (s < 60) return 'in under a minute';
@@ -1615,71 +1777,214 @@
     return 'in ' + Math.round(d / 7) + ' weeks';
   }
 
+  /* ---- the summary above the button ---------------------------------- */
   function paint() {
-    var when = parse();
+    var when = parse(input.value);
     var now = new Date();
-    var state, label, hint;
-
-    if (savedState === 'new') {
-      state = 'new';
-      label = 'Not saved yet';
-      hint = when && when > now
-        ? 'Saving with Published ticked will hold it until then.'
-        : 'A past date backdates the story. A future date holds it back until then.';
-    } else if (!when) {
-      state = 'draft';
-      label = 'No date set';
-      hint = 'Pick a moment, or leave it and it publishes when you save.';
+    var state, label, line = '';
+    if (!when) {
+      state = saved === 'new' ? 'now' : saved;
+      label = saved === 'new' ? 'Goes out when you save' : 'No date';
     } else if (when > now) {
       state = 'scheduled';
-      /* The saved state is what it IS; this is what it WILL be once saved, and
-         saying so is the whole point of following the input rather than the
-         stored value. */
-      label = savedState === 'live' ? 'Will be held back' : 'Scheduled';
-      hint = 'It appears on the site on its own at that time. Nothing to run, nobody to be at a keyboard.';
+      label = 'Scheduled';
+      line = long(when) + ' · ' + until(when - now);
+    } else if (saved === 'new') {
+      state = 'back';
+      label = 'Backdated';
+      line = 'Filed under ' + long(when);
     } else {
-      state = savedState === 'draft' || savedState === 'new' ? 'draft' : 'live';
+      state = saved === 'draft' ? 'draft' : 'live';
       label = state === 'live' ? 'Live on the site' : 'Draft';
-      hint = state === 'live'
-        ? 'Readers can see this now.'
-        : 'Tick Published to put it on the site.';
+      line = (state === 'live' ? 'Published ' : 'Dated ') + long(when);
     }
-
     box.setAttribute('data-state', state);
     if (stateEl) stateEl.textContent = label;
-    if (hintEl) hintEl.textContent = hint;
-    if (countEl) countEl.textContent = (state === 'scheduled' && when) ? until(when - now) : '';
+    if (whenEl) whenEl.textContent = line;
+
+    var changed = input.value !== original;
+    if (resetBtn) {
+      resetBtn.hidden = !changed;
+      resetBtn.textContent = saved === 'new' ? 'Go out when I save' : 'Keep the original date';
+    }
+    if (openLabel) {
+      openLabel.textContent = when ? 'Change date & time' : 'Schedule for later';
+    }
   }
 
-  input.addEventListener('input', paint);
-  input.addEventListener('change', paint);
+  /* ---- the picker ------------------------------------------------------ */
+  var view, picked;
 
-  box.querySelectorAll('[data-sched-set]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var d = new Date();
-      var which = btn.getAttribute('data-sched-set');
-      if (which === 'evening') {
-        d.setHours(18, 0, 0, 0);
-        /* Already past six: "tonight" has gone, so it means tomorrow night
-           rather than a time in the past nobody asked for. */
-        if (d <= new Date()) d.setDate(d.getDate() + 1);
-      } else if (which === 'tomorrow') {
-        d.setDate(d.getDate() + 1);
-        d.setHours(9, 0, 0, 0);
-      } else if (which === 'monday') {
-        /* The NEXT Monday, never today — pressing "next Monday" on a Monday
-           and getting nine o'clock this morning is a date in the past. */
-        d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
-        d.setHours(9, 0, 0, 0);
-      }
-      input.value = toField(d);
-      paint();
-      input.focus();
+  function presets() {
+    var now = new Date();
+    var evening = new Date(now); evening.setHours(18, 0, 0, 0);
+    // Already past six, "tonight" has gone: it means tomorrow night rather
+    // than a time in the past nobody asked for.
+    if (evening <= now) evening.setDate(evening.getDate() + 1);
+    var tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(9, 0, 0, 0);
+    // The NEXT Monday, never today.
+    var monday = new Date(now); monday.setDate(monday.getDate() + ((8 - monday.getDay()) % 7 || 7));
+    monday.setHours(9, 0, 0, 0);
+    var hour = new Date(now); hour.setMinutes(0, 0, 0); hour.setHours(hour.getHours() + 1);
+    return [['In an hour', hour], [evening.getDate() === now.getDate() ? 'Tonight 6pm' : 'Tomorrow 6pm', evening],
+            ['Tomorrow 9am', tomorrow], ['Next Mon 9am', monday]];
+  }
+
+  function build() {
+    var now = new Date();
+    var first = new Date(view.getFullYear(), view.getMonth(), 1);
+    var lead = (first.getDay() + 6) % 7;             // Monday-first grid
+    var days = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
+
+    var html = '';
+    html += '<div class="pp-presets" role="group" aria-label="Quick picks">';
+    presets().forEach(function (pr, n) {
+      html += '<button type="button" data-pp-preset="' + n + '">' + pr[0] + '</button>';
     });
+    html += '</div>';
+
+    html += '<div class="pp-cal">';
+    html += '<div class="pp-month"><button type="button" class="pp-nav" data-pp-nav="-1" aria-label="Previous month">&#8249;</button>' +
+            '<b aria-live="polite">' + MONTHS[view.getMonth()] + ' ' + view.getFullYear() + '</b>' +
+            '<button type="button" class="pp-nav" data-pp-nav="1" aria-label="Next month">&#8250;</button></div>';
+    html += '<div class="pp-grid" role="grid">';
+    DAYS.forEach(function (d) { html += '<span class="pp-dow" aria-hidden="true">' + d.slice(0, 2) + '</span>'; });
+    for (var i = 0; i < lead; i++) html += '<span></span>';
+    for (var day = 1; day <= days; day++) {
+      var d = new Date(view.getFullYear(), view.getMonth(), day);
+      var cls = 'pp-day';
+      if (sameDay(d, now)) cls += ' is-today';
+      if (sameDay(d, picked)) cls += ' is-picked';
+      if (d < new Date(now.getFullYear(), now.getMonth(), now.getDate())) cls += ' is-past';
+      html += '<button type="button" class="' + cls + '" data-pp-day="' + day + '"' +
+              ' aria-label="' + DAYS[(d.getDay() + 6) % 7] + ' ' + day + ' ' + MONTHS[d.getMonth()] + '"' +
+              (sameDay(d, picked) ? ' aria-pressed="true"' : '') + '>' + day + '</button>';
+    }
+    html += '</div></div>';
+
+    var h = picked.getHours(), m = picked.getMinutes();
+    html += '<div class="pp-time"><span class="pp-k">Time</span>' +
+            '<select data-pp-h aria-label="Hour">';
+    for (var hh = 1; hh <= 12; hh++) html += '<option' + (((h % 12) || 12) === hh ? ' selected' : '') + '>' + hh + '</option>';
+    html += '</select><b>:</b><select data-pp-m aria-label="Minutes">';
+    for (var mm = 0; mm < 60; mm += 5) html += '<option value="' + mm + '"' + (Math.floor(m / 5) * 5 === mm ? ' selected' : '') + '>' + p2(mm) + '</option>';
+    html += '</select><div class="pp-ampm" role="group" aria-label="Morning or afternoon">' +
+            '<button type="button" data-pp-ampm="am"' + (h < 12 ? ' class="on" aria-pressed="true"' : '') + '>am</button>' +
+            '<button type="button" data-pp-ampm="pm"' + (h >= 12 ? ' class="on" aria-pressed="true"' : '') + '>pm</button></div></div>';
+
+    html += '<p class="pp-sum" data-pp-sum></p>';
+    html += '<div class="pp-foot"><button type="button" class="pp-cancel" data-pp-cancel>Cancel</button>' +
+            '<button type="button" class="pp-ok" data-pp-ok>Set this time</button></div>';
+    pop.innerHTML = html;
+    summary();
+  }
+
+  function summary() {
+    var el = pop.querySelector('[data-pp-sum]');
+    if (!el) return;
+    var now = new Date();
+    el.textContent = long(picked) + ' · ' +
+      (picked > now ? until(picked - now) : 'in the past — the story will be backdated');
+    el.classList.toggle('is-past', picked <= now);
+  }
+
+  function readTime() {
+    var h = parseInt(pop.querySelector('[data-pp-h]').value, 10) % 12;
+    var pm = pop.querySelector('[data-pp-ampm="pm"]').classList.contains('on');
+    picked.setHours(h + (pm ? 12 : 0), parseInt(pop.querySelector('[data-pp-m]').value, 10), 0, 0);
+    summary();
+  }
+
+  function open() {
+    var cur = parse(input.value);
+    if (!cur) {
+      // Nothing chosen yet: start on the next whole hour, which is the
+      // likeliest thing to want and never in the past.
+      cur = new Date(); cur.setMinutes(0, 0, 0); cur.setHours(cur.getHours() + 1);
+    }
+    picked = new Date(cur);
+    view = new Date(cur.getFullYear(), cur.getMonth(), 1);
+    build();
+    pop.hidden = false;
+    box.classList.add('is-open');
+    openBtn.setAttribute('aria-expanded', 'true');
+    var focus = pop.querySelector('.pp-day.is-picked') || pop.querySelector('.pp-day');
+    if (focus) focus.focus();
+  }
+  function close(refocus) {
+    pop.hidden = true;
+    box.classList.remove('is-open');
+    openBtn.setAttribute('aria-expanded', 'false');
+    if (refocus) openBtn.focus();
+  }
+
+  openBtn.addEventListener('click', function () { pop.hidden ? open() : close(true); });
+  if (resetBtn) resetBtn.addEventListener('click', function () {
+    input.value = original;
+    close(false);
+    paint();
+    openBtn.focus();
+  });
+
+  pop.addEventListener('click', function (e) {
+    var t = e.target.closest('button');
+    if (!t) return;
+    if (t.hasAttribute('data-pp-nav')) {
+      view.setMonth(view.getMonth() + parseInt(t.getAttribute('data-pp-nav'), 10));
+      build();
+      var back = pop.querySelector('[data-pp-nav="' + t.getAttribute('data-pp-nav') + '"]');
+      if (back) back.focus();
+    } else if (t.hasAttribute('data-pp-day')) {
+      picked.setFullYear(view.getFullYear(), view.getMonth(), parseInt(t.getAttribute('data-pp-day'), 10));
+      build();
+      var sel = pop.querySelector('.pp-day.is-picked');
+      if (sel) sel.focus();
+    } else if (t.hasAttribute('data-pp-preset')) {
+      picked = new Date(presets()[parseInt(t.getAttribute('data-pp-preset'), 10)][1]);
+      view = new Date(picked.getFullYear(), picked.getMonth(), 1);
+      build();
+      var ok = pop.querySelector('[data-pp-ok]');
+      if (ok) ok.focus();
+    } else if (t.hasAttribute('data-pp-ampm')) {
+      pop.querySelectorAll('[data-pp-ampm]').forEach(function (b) {
+        var on = b === t;
+        b.classList.toggle('on', on);
+        if (on) b.setAttribute('aria-pressed', 'true'); else b.removeAttribute('aria-pressed');
+      });
+      readTime();
+    } else if (t.hasAttribute('data-pp-cancel')) {
+      close(true);
+    } else if (t.hasAttribute('data-pp-ok')) {
+      readTime();
+      input.value = toField(picked);
+      close(true);
+      paint();
+    }
+  });
+  pop.addEventListener('change', function (e) {
+    if (e.target.matches('[data-pp-h], [data-pp-m]')) readTime();
+  });
+  /* Arrow keys move through the month grid — a calendar you cannot walk with
+     the keyboard is a calendar a keyboard user cannot use at all. */
+  pop.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { e.preventDefault(); close(true); return; }
+    var day = e.target.closest('[data-pp-day]');
+    if (!day) return;
+    var step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    picked.setDate(picked.getDate() + step);
+    view = new Date(picked.getFullYear(), picked.getMonth(), 1);
+    build();
+    var sel = pop.querySelector('.pp-day.is-picked');
+    if (sel) sel.focus();
+  });
+  document.addEventListener('click', function (e) {
+    if (!pop.hidden && !box.contains(e.target)) close(false);
   });
 
   paint();
-  /* The countdown goes stale on its own, so it is re-drawn on a slow tick —
-     a minute is well inside the resolution anything here is expressed in. */
+  /* The countdown goes stale on its own; a minute is well inside the
+     resolution anything here is expressed in. */
   setInterval(paint, 60000);
 })();

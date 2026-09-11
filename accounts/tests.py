@@ -1142,8 +1142,8 @@ class ConfirmOnlyWhenSomethingIsUnsavedTests(TestCase):
 
 
 class DashboardNewsDeckTests(TestCase):
-    """The news deck (Sep 2026, second pass): a spinning row and a sliding
-    row, turning every ten seconds, with no pause button."""
+    """The news deck (Sep 2026, third pass): two rows of the same card that
+    take it in turns to flip, five seconds apart, with no pause button."""
 
     def setUp(self):
         from admin_panel.models import NewsPost
@@ -1169,11 +1169,16 @@ class DashboardNewsDeckTests(TestCase):
     def _body(self):
         return self.client.get(reverse("dashboard")).content.decode()
 
-    def test_the_heading_is_a_heading_and_all_news_is_a_button(self):
+    def test_the_heading_is_a_heading_and_all_news_is_a_boxed_link(self):
+        """"I need it to be in its box and look like a link" — so it is its own
+        component rather than the solid filled button it had become. A filled
+        button reads as an action; this goes to a page."""
         self._stories(3)
         body = self._body()
         self.assertIn('<h2 class="nd-title">News &amp; blog</h2>', body)
-        self.assertIn('class="abtn abtn-primary nd-all"', body)
+        self.assertIn('class="nd-all"', body)
+        self.assertIn('class="nd-all-lab"', body)
+        self.assertNotIn("abtn-primary nd-all", body)
 
     def test_there_is_no_play_or_pause_button(self):
         self._stories(12)
@@ -1181,15 +1186,25 @@ class DashboardNewsDeckTests(TestCase):
         self.assertNotIn("data-news-pause", body)
         self.assertNotIn(">Play<", body)
 
-    def test_it_turns_every_ten_seconds(self):
+    def test_each_row_turns_every_ten_seconds(self):
+        """One tick every five seconds, and a tick moves ONE row — so each row
+        changes every ten, which is the cadence originally asked for, and
+        something moves every five without all six cards moving at once."""
         self._stories(12)
-        self.assertIn('data-interval="10000"', self._body())
+        self.assertIn('data-interval="5000"', self._body())
 
-    def test_the_top_row_spins_and_the_bottom_row_slides(self):
+    def test_two_rows_of_three_places_that_take_it_in_turns(self):
+        """Both rows are the same card in the same size now ("why is it small,
+        have all of them same size"); what differs is WHEN they move, which is
+        the row they are in rather than a shape on the card."""
         self._stories(6)
         body = self._body()
-        self.assertEqual(body.count('data-news-place="spin"'), 3)
-        self.assertEqual(body.count('data-news-place="slide"'), 3)
+        self.assertEqual(body.count("data-news-place"), 6)
+        self.assertIn('data-news-row="0"', body)
+        self.assertIn('data-news-row="1"', body)
+        # The two shapes are gone: there is one card.
+        self.assertNotIn("is-wide", body)
+        self.assertNotIn('data-news-place="spin"', body)
 
     def test_eight_stories_make_two_full_turns_with_no_empty_places(self):
         self._stories(8)
@@ -1207,5 +1222,5 @@ class DashboardNewsDeckTests(TestCase):
         # mentions `template[data-news-queue]` whether or not there are any.
         self.assertNotIn("<template data-news-queue>", body)
         self.assertNotIn('class="nd-dot', body)
-        self.assertEqual(body.count('data-news-place="spin"'), 3)
-        self.assertEqual(body.count('data-news-place="slide"'), 1)
+        # Four stories: a full top row and one card on the bottom one.
+        self.assertEqual(body.count("data-news-place"), 4)

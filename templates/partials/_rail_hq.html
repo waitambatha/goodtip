@@ -132,4 +132,34 @@ did.
       {% elif waiting.tasks %}<span class="n">{{ waiting.tasks }}</span>{% endif %}</a>
   </div>
   {% endif %}
+
+  {% comment %}
+  WHAT ELSE IS IN THE SECTION YOU ARE STANDING IN.
+
+  The same block the rail in /admin/ grows, from the same gta_section tag, so
+  the two menus behave identically — the client's note was about not having to
+  go back to the main dashboard to move sideways, and a rail that does that on
+  one shell and not the other is worse than neither.
+
+  HQ is excluded because this rail already lists every HQ screen by name a few
+  inches above; repeating them under a heading would be the duplication the
+  flat rail was built to remove. What it adds is the sections this rail shows
+  as a single door: Your team's four screens, and the tables inside whichever
+  group you opened.
+  {% endcomment %}
+  {% gta_section as section %}
+  {% if section.items and section.key != 'hq' %}
+  <div class="gts-group gts-here">
+    <div class="gts-group-title">{{ section.label }}</div>
+    {% if section.up %}
+    <a href="{{ section.up.href }}" class="gts-up" title="{{ section.up.label }}">
+      <svg><use href="#ic-arrow-left"/></svg><span class="lbl">{{ section.up.label }}</span></a>
+    {% endif %}
+    {% for item in section.items %}
+    <a href="{{ item.href }}" class="gts-sub{% if item.on %} on{% endif %}"
+       style="--row-accent:{{ item.accent }}" title="{{ item.label }}">
+      <svg><use href="#{{ item.icon }}"/></svg><span class="lbl">{{ item.label }}</span></a>
+    {% endfor %}
+  </div>
+  {% endif %}
 </nav>

@@ -246,6 +246,114 @@ SECURITY_TABLES = [
           PLUM, "ic-flask"),
 ]
 
+# ---------------------------------------------------------------------------
+# The two hubs that are screens rather than tables
+# ---------------------------------------------------------------------------
+#
+# HQ and Your team were declared inside their own views, as literal dicts
+# built at render time. That was fine while a hub page was the only thing that
+# needed to know what was in a section — and stopped being fine the moment the
+# rail had to show the same list (see gta_section in the template tags), which
+# would have meant a second copy of every label, icon and URL name, kept in
+# step by whoever remembered.
+#
+# So the STRUCTURE lives here and the NUMBERS stay in the views. What a
+# section contains is a fact about the product; how many enquiries are open is
+# a fact about this minute, and a template helper that ran four COUNT queries
+# on every page load to draw a menu would be paying for the numbers on the
+# twenty-nine screens that do not show them.
+
+
+@dataclass(frozen=True)
+class Screen:
+    """One destination inside a hub: a page, not a table.
+
+    `cap` is the capability key it asks for, checked against the viewer rather
+    than assumed from is_superuser — a restricted administrator is not a
+    superuser, and hiding these from them would hide the very screens their
+    account was created to use. `cap` of "" is open to any administrator, and
+    `full_only` marks the three that need full access.
+    """
+    key: str
+    label: str
+    blurb: str
+    icon: str
+    accent: str
+    url_name: str
+    cap: str = ""
+    full_only: bool = False
+
+
+HQ_SCREENS = [
+    Screen("news", "News & blog",
+           "Write, publish and email stories. Everything here reaches every "
+           "member's dashboard.",
+           "ic-f-doc", TEAL, "admin:hq_news", "news.write"),
+    Screen("enquiries", "Enquiries inbox",
+           "Messages sent through the public contact form, and what was replied.",
+           "ic-f-mail", GOLD, "admin:hq_enquiries", "enquiries.read"),
+    Screen("pages", "Pages",
+           "The words and pictures on every page, public and members-only. "
+           "Nothing to mark up first.",
+           "ic-f-pages", GREEN, "admin:hq_pages", "pages.edit"),
+    Screen("seo", "SEO",
+           "Titles, descriptions and share images — what Google and Facebook "
+           "show when a page is linked.",
+           "ic-globe", OCEAN, "admin:hq_seo", "seo.edit"),
+    Screen("redirects", "Redirects",
+           "Point an old address at a new one so no link anybody has shared "
+           "ever dies.",
+           "ic-link", PLUM, "admin:hq_redirects", "seo.redirects"),
+    Screen("sync", "Sync panel",
+           "Pull fixtures and results in, and see whether the last run worked.",
+           "ic-cloud-sync", AMBER, "admin:hq_sync", "data.sync"),
+]
+
+TEAM_SCREENS = [
+    Screen("my_work", "Your work",
+           "What you have been asked to do, what you are allowed to do, and "
+           "what came back from review.",
+           "ic-f-home", GREEN, "admin:hq_my_work"),
+    Screen("reviews", "Waiting for review",
+           "Changes raised by administrators who need your approval before "
+           "they go live.",
+           "ic-f-clock", GOLD, "admin:hq_reviews", full_only=True),
+    Screen("team", "Administrators",
+           "Who can get in, exactly what each of them may do, and which of it "
+           "you see first.",
+           "ic-f-shield-star", RUST, "admin:hq_team", full_only=True),
+    Screen("activity", "Activity",
+           "The record of what every administrator has done, in order.",
+           "ic-clock", PLUM, "admin:hq_activity", full_only=True),
+]
+
+
+def screens(which, can, full=True):
+    """The screens in one hub that this administrator may open.
+
+    `can` is a one-argument callable — pass `lambda key: access.can(user, key)`
+    — so this module needs no import of the access layer and can be reasoned
+    about (and tested) without a user.
+    """
+    from django.urls import NoReverseMatch, reverse
+
+    out = []
+    for s in which:
+        if s.full_only and not full:
+            continue
+        if s.cap and not can(s.cap):
+            continue
+        try:
+            href = reverse(s.url_name)
+        except NoReverseMatch:
+            continue        # a renamed URL costs a link, never a 500
+        out.append({
+            "key": s.key, "label": s.label, "blurb": s.blurb,
+            "icon": s.icon, "accent": s.accent, "href": href,
+        })
+    return out
+
+
 FALLBACK = Category(
     "other", "Everything else",
     "Registered tables that have not been filed anywhere yet.",

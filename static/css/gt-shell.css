@@ -21,6 +21,20 @@
   --gts-rail-w: 268px;
   --gts-shell: #F7F5EE;
   --gts-surface: #FFFFFF;
+  /* ---- THE STORY EDITOR'S OWN COLOURS --------------------------------------
+     Named once here and swapped once per dark block below, rather than every
+     editor rule carrying its own [data-theme="dark"] twin. This file loads
+     only in the admin, so these reach the HQ editors and nothing in the
+     member app — where goodtip.css's fallbacks (the light values) apply.
+
+     The bug they exist to fix: .ned-surface hard-coded `background: #fff`
+     while taking its text from --ink, and the dark palette makes --ink
+     near-white. A headline you could not see yourself typing, 1.16:1. */
+  --ned-surf: #FFFFFF;        --ned-surf-ink: #0F2E22;
+  --ned-fill: #0F2E22;        --ned-fill-ink: #C8F135;
+  --ned-danger: #B3261E;
+  --ned-sum-bg: rgba(244,196,48,.14);   --ned-sum-ink: #6E5106;
+  --ned-past-bg: rgba(69,86,108,.10);   --ned-past-ink: #3E4E63;
   --gts-surface-2: #FBFAF4;
   --gts-surface-3: #F2F0E6;
   --gts-line: rgba(15,46,34,.09);
@@ -67,7 +81,10 @@ body.gt-shell {
   color: var(--gts-strong); text-decoration: none;
 }
 .gts-brand span { color: var(--forest); }
-.gts-brand em { color: var(--lime-dk); font-style: normal; }
+/* The wordmark's full stop. The lime it wore is 1.8:1 on the admin's white
+   panels — it read as missing rather than as bright. The brand green instead:
+   it is still not the word, and it can be seen. */
+.gts-brand em { color: var(--forest); font-style: normal; }
 .gts-brand:hover { text-decoration: none; color: var(--gts-strong); }
 
 .gts-area {
@@ -163,6 +180,34 @@ html.gts-collapsed .gts-rail .lbl,
 html.gts-collapsed .gts-group-title,
 html.gts-collapsed .gts-toggle .lbl { display: none; }
 html.gts-collapsed .gts-rail .n { position: absolute; top: 4px; right: 8px; margin: 0; font-size: 10px; padding: 0 5px; }
+
+/* ---- what else is in the section you are standing in --------------------
+   Added by _rail_hq.html from the gta_section tag — the same block the rail
+   in /admin/ grows, so moving between two tables in one group is one click on
+   either shell. See gta_section in sysadmin/templatetags/gtadmin.py.
+
+   Quieter than the groups above it, on purpose: those are the product's
+   shape and do not change, this is where you happen to be and changes on
+   nearly every page. Drawn at the same weight, the rail would read as twice
+   as many equal destinations. */
+.gts-here { border-top: 1px solid var(--gts-line, rgba(255,255,255,.1)); padding-top: 16px; }
+.gts-rail .gts-sub {
+  font-size: 13.5px; padding: 8px 11px; color: var(--gts-quiet);
+}
+/* The table's own colour as a dot: a rail row has no space for a coloured
+   card, but the colour is the thread tying the hub card, this row and the
+   table screen together, so it survives as the smallest mark that carries it. */
+.gts-rail .gts-sub svg {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--row-accent, var(--lime)); stroke: none; fill: none;
+}
+.gts-rail .gts-sub:hover { color: var(--gts-rail-fg-on); }
+.gts-rail .gts-sub.on { background: var(--gts-surface-3); color: var(--gts-rail-fg-on); font-weight: 700; }
+.gts-rail .gts-up { font-size: 12.5px; color: var(--gts-quiet); }
+.gts-rail .gts-up svg { width: 15px; height: 15px; stroke: currentColor; fill: none; background: none; border-radius: 0; }
+/* Collapsed to icons there is nothing to show: the rows are a dot and a word,
+   and a column of identical dots is not a menu. */
+html.gts-collapsed .gts-here { display: none; }
 html.gts-collapsed .gts-group { margin-bottom: 14px; border-top: 1px solid var(--gts-line); padding-top: 14px; }
 html.gts-collapsed .gts-group:first-of-type { border-top: 0; padding-top: 0; }
 
@@ -240,7 +285,7 @@ html[data-theme="dark"] .gts-tab:hover { background: var(--gts-surface-3); color
   background: var(--gts-surface-3); color: var(--gts-quiet);
 }
 .gts-status.ok { background: rgba(45,122,58,.14); color: #226B45; }
-.gts-status.warn { background: rgba(199,124,30,.16); color: #A9660F; }
+.gts-status.warn { background: rgba(199,124,30,.16); color: #8A5308; }
 
 /* `.gt-row` used to be defined here, scoped to body.gt-shell — and the only
    page that ever used it was /manage/messages/, which is NOT a gt-shell
@@ -276,7 +321,10 @@ html[data-theme="light"] {
 
   --ad-ink:         #17342A;
   --ad-quiet:       #5A6A5D;
-  --ad-faint:       #9BA79D;
+  /* The faintest ink that is still ink. #9BA79D is 2.5:1 on a white panel —
+     not a shade, an absence — and it is read by the hub counts and the "+3
+     more" rows, which are information. */
+  --ad-faint:       #68756A;
 
   --ad-line:        rgba(15,46,34,.09);
   --ad-line-2:      rgba(15,46,34,.15);
@@ -338,6 +386,14 @@ html[data-theme="dark"] {
 
   --gts-shell:      #0B1F16;
   --gts-surface:    #102A1D;
+  /* The editor's colours on the dark palette — see the light block. The fill
+     flips to lime, because deep green on a deep green panel is a button
+     nobody can find. */
+  --ned-surf: #0C2417;        --ned-surf-ink: #E9F0EA;
+  --ned-fill: #C8F135;        --ned-fill-ink: #0F2E22;
+  --ned-danger: #FF8B7E;
+  --ned-sum-bg: rgba(244,196,48,.16);   --ned-sum-ink: #F0CB63;
+  --ned-past-bg: rgba(148,170,196,.14); --ned-past-ink: #C3D2E0;
   --gts-surface-2:  #14321F;
   --gts-surface-3:  #1B4029;
   --gts-line:       rgba(232,228,213,.10);
@@ -354,7 +410,7 @@ html[data-theme="dark"] {
 
   --ad-ink:         #E9F0EA;
   --ad-quiet:       #9BAE9F;
-  --ad-faint:       #718576;
+  --ad-faint:       #93A598;   /* the dark palette's, lifted to 4.5:1 on the sheet */
 
   --ad-line:        rgba(232,228,213,.11);
   --ad-line-2:      rgba(232,228,213,.18);
@@ -423,11 +479,14 @@ html[data-theme="dark"] {
   html[data-theme="auto"], html:not([data-theme]) {
     --gold-dk: #E0B341;
     --gts-shell: #0B1F16; --gts-surface: #102A1D; --gts-surface-2: #14321F;
+    --ned-surf: #0C2417; --ned-surf-ink: #E9F0EA; --ned-fill: #C8F135; --ned-fill-ink: #0F2E22;
+    --ned-danger: #FF8B7E; --ned-sum-bg: rgba(244,196,48,.16); --ned-sum-ink: #F0CB63;
+    --ned-past-bg: rgba(148,170,196,.14); --ned-past-ink: #C3D2E0;
     --gts-surface-3: #1B4029; --gts-line: rgba(232,228,213,.10);
     --gts-line-2: rgba(232,228,213,.17); --gts-fg: #E6EDE7; --gts-quiet: #93A697;
     --ad-card: #102A1D; --ad-field: #0C2417; --ad-bar: rgba(16,42,29,.94);
     --ad-head: #0E2519; --ad-head-h: #17351F; --ad-row-h: rgba(232,228,213,.035);
-    --ad-ink: #E9F0EA; --ad-quiet: #9BAE9F; --ad-faint: #718576;
+    --ad-ink: #E9F0EA; --ad-quiet: #9BAE9F; --ad-faint: #93A598;
     --ad-line: rgba(232,228,213,.11); --ad-line-2: rgba(232,228,213,.18);
     --ad-line-3: rgba(232,228,213,.30); --ad-ring: rgba(200,241,53,.22);
     /* The rail. Three copies of every token is the rule in this file — :root,

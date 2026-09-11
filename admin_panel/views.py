@@ -613,7 +613,12 @@ def _fill_news_post(request, post: NewsPost) -> NewsPost:
     post.published_at = _parse_published_at(
         request.POST, post.published_at or timezone.now()
     )
-    post.image_alt = request.POST.get("image_alt", "").strip()[:200]
+    # Only when the form still carries the field. The featured image's alt
+    # text now travels with the featured set (see _save_featured_media); a
+    # form without this box reading it as "" would blank every story's alt
+    # text on its next save.
+    if "image_alt" in request.POST:
+        post.image_alt = request.POST.get("image_alt", "").strip()[:200]
     _fill_seo(request, post)
     if request.FILES.get("image"):
         post.image = request.FILES["image"]
@@ -666,10 +671,116 @@ def _apply_news_slug(request, post: NewsPost) -> str:
     return ""
 
 
+#: Where a featured file may live. The editor posts back storage PATHS it was
+#: handed by news_upload_image, and a path is attacker-supplied text like any
+#: other field: without this, a crafted form could attach any file in media/ —
+#: another story's, an avatar, a message attachment — to a public story.
+FEATURED_PATH_PREFIXES = ("news/",)
+
+
+def _parse_featured(post_data) -> list:
+    """The featured set as posted by the editor, cleaned. Never trusts it.
+
+    `featured_media` is JSON: [{"kind", "path", "alt"}, ...] in display order.
+    Anything malformed, outside news/, missing from storage, or over the cap
+    of three per kind is dropped rather than rejected — the rest of the story
+    still saves, and what did not fit simply is not there when it reloads.
+    """
+    import json
+
+    from .models import NewsMedia
+
+    try:
+        raw = json.loads(post_data.get("featured_media") or "[]")
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(raw, list):
+        return []
+
+    out, seen, per_kind = [], set(), {NewsMedia.IMAGE: 0, NewsMedia.VIDEO: 0}
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        kind = item.get("kind")
+        path = str(item.get("path") or "").strip()
+        if kind not in per_kind or not path or path in seen:
+            continue
+        if ".." in path or path.startswith("/") or not path.startswith(FEATURED_PATH_PREFIXES):
+            continue
+        if per_kind[kind] >= NewsMedia.MAX_PER_KIND:
+            continue
+        if not default_storage.exists(path):
+            continue
+        seen.add(path)
+        per_kind[kind] += 1
+        out.append({
+            "kind": kind, "path": path,
+            "url": default_storage.url(path),
+            "alt": str(item.get("alt") or "").strip()[:200],
+        })
+    return out
+
+
+def _featured_items(post) -> list:
+    """What the editor's featured manager opens with: [{kind, url, path, alt}].
+
+    A story written before the set existed has no NewsMedia rows but does have
+    `image`, and it has to arrive in the manager as its first picture —
+    otherwise opening an old story and pressing Save would drop its picture.
+    """
+    if post is None or not post.pk:
+        return []
+    items = [
+        {"kind": m.kind, "url": m.url, "path": m.file.name, "alt": m.alt}
+        for m in post.media.all() if m.url
+    ]
+    if not items and post.image:
+        try:
+            items = [{"kind": "image", "url": post.image.url,
+                      "path": post.image.name, "alt": post.image_alt or ""}]
+        except ValueError:
+            pass
+    return items
+
+
+def _save_featured_media(request, post: NewsPost) -> None:
+    """Replace the story's featured set with what the editor posted.
+
+    Only when the form carried the set at all: a request without the field is
+    an older client or a script, and reading its absence as "no pictures"
+    would strip every story it touched.
+
+    `post.image` is kept pointing at the FIRST PICTURE in the set — not the
+    first item, which might be a video: the share card, the SEO defaults and
+    the sitemap all need one still image, and a clip cannot be one.
+    """
+    from .models import NewsMedia
+
+    if "featured_media" not in request.POST:
+        return
+    items = _parse_featured(request.POST)
+
+    post.media.all().delete()
+    NewsMedia.objects.bulk_create([
+        NewsMedia(post=post, kind=i["kind"], file=i["path"], alt=i["alt"], order=n)
+        for n, i in enumerate(items)
+    ])
+
+    first = next((i for i in items if i["kind"] == NewsMedia.IMAGE), None)
+    if first:
+        post.image.name = first["path"]
+        post.image_alt = first["alt"]
+    else:
+        post.image = None
+        post.image_alt = ""
+    post.save(update_fields=["image", "image_alt"])
+
+
 def _apply_news_form(request, post: NewsPost) -> NewsPost:
     _fill_news_post(request, post)
     note = _apply_news_slug(request, post)
     post.save()
+    _save_featured_media(request, post)
     if note:
         messages.info(request, note)
     return post
@@ -707,7 +818,7 @@ def news_list(request):
     })
 
 
-def _editor_context(post, *, is_new: bool) -> dict:
+def _editor_context(post, *, is_new: bool, featured=None) -> dict:
     """What every render of the story editor needs, however it got there.
 
     There are four of them — new, new-with-an-error, edit, edit-with-an-error —
@@ -726,6 +837,10 @@ def _editor_context(post, *, is_new: bool) -> dict:
     return {
         "post": post,
         "is_new": is_new,
+        # The featured set the manager opens with. On an error re-render it is
+        # what was just POSTED — files already uploaded must not vanish because
+        # the headline was left blank.
+        "featured_items": featured if featured is not None else _featured_items(post),
         "tag_choices": NewsPost.TAG_CHOICES,
         # A set, so `{% if val in selected_tags %}` is a membership test rather
         # than a list scan per checkbox.
@@ -746,7 +861,8 @@ def news_new(request):
             messages.error(request, "Give the story a headline before saving.")
             draft = _fill_news_post(request, NewsPost())
             return render(request, "manage/news_editor.html", {
-                **_editor_context(draft, is_new=True),
+                **_editor_context(draft, is_new=True,
+                                  featured=_parse_featured(request.POST)),
                 "initial_body": draft.body,
             })
         post = NewsPost(created_by=request.user, published_at=timezone.now())
@@ -772,7 +888,9 @@ def news_edit(request, post_id: int):
             messages.error(request, "Give the story a headline before saving.")
             draft = _fill_news_post(request, post)
             return render(request, "manage/news_editor.html", {
-                **_editor_context(draft, is_new=False),
+                **_editor_context(draft, is_new=False,
+                                  featured=(_parse_featured(request.POST)
+                                            if "featured_media" in request.POST else None)),
                 "initial_body": draft.body,
                 "share_url": request.build_absolute_uri(post.get_absolute_url()),
             })
@@ -823,12 +941,18 @@ def news_upload_image(request):
         return JsonResponse({"error": "No file given."}, status=400)
     ctype = (f.content_type or "").lower()
     suffix = Path(f.name).suffix.lower()
+    # The featured set files under its own folder, so a story's lead pictures
+    # are findable on disk apart from everything pasted into bodies.
+    featured = request.GET.get("slot") == "featured"
 
     if ctype.startswith("image/"):
         if f.size > NEWS_IMAGE_MAX_BYTES:
             return JsonResponse({"error": "That picture is over 10 MB."}, status=400)
-        path = default_storage.save(f"news/body/{f.name}", f)
-        return JsonResponse({"url": default_storage.url(path), "kind": "image"})
+        folder = "news/featured" if featured else "news/body"
+        path = default_storage.save(f"{folder}/{f.name}", f)
+        # `path` as well as `url`: the featured manager posts the storage path
+        # back, and a URL is not something to derive a storage path from.
+        return JsonResponse({"url": default_storage.url(path), "path": path, "kind": "image"})
 
     if ctype.startswith("video/") or suffix in NEWS_VIDEO_SUFFIXES:
         if suffix not in NEWS_VIDEO_SUFFIXES:
@@ -838,7 +962,7 @@ def news_upload_image(request):
         seconds = video_seconds(f)
         if seconds is not None and seconds > NEWS_VIDEO_MAX_SECONDS:
             return JsonResponse({
-                "error": f"That video runs {round(seconds)} seconds. Slideshow "
+                "error": f"That video runs {round(seconds)} seconds. Story "
                          f"videos have to be {NEWS_VIDEO_MAX_SECONDS} seconds or less.",
             }, status=400)
         # A .mov off an iPhone is almost always H.264 in an MP4-compatible
@@ -848,9 +972,10 @@ def news_upload_image(request):
         name = f.name
         if suffix == ".mov":
             name = Path(name).stem + ".mp4"
-        path = default_storage.save(f"news/slides/{name}", f)
+        path = default_storage.save(
+            f"{'news/featured' if featured else 'news/slides'}/{name}", f)
         return JsonResponse({
-            "url": default_storage.url(path), "kind": "video",
+            "url": default_storage.url(path), "path": path, "kind": "video",
             "seconds": round(seconds, 1) if seconds is not None else None,
         })
 
@@ -933,7 +1058,9 @@ def news_index(request):
     `NewsPost.live`, not `filter(is_published=True)`: a story scheduled for
     next week is published and must not be here yet.
     """
-    posts = NewsPost.live.all()
+    # Each card reads the story's featured set; one query for all of them
+    # rather than one per card.
+    posts = NewsPost.live.prefetch_related("media")
     # ?code=AFL filters by tag; anything unknown falls back to all stories.
     valid_tags = {t for t, _ in NewsPost.TAG_CHOICES}
     active_tag = (request.GET.get("code") or "").upper()
@@ -1063,7 +1190,7 @@ def news_detail(request, slug: str):
     # of a story is its headline slugified, so a queued announcement is
     # guessable, and "hidden from the list" is not the same as unpublished.
     post = get_object_or_404(NewsPost.live.all(), slug=slug)
-    more = NewsPost.live.exclude(pk=post.pk)[:6]
+    more = NewsPost.live.exclude(pk=post.pk).prefetch_related("media")[:6]
     # The share card's picture: the SEO team's own og:image if they set one,
     # otherwise the story's featured image, which is right nearly every time.
     share_image = post.og_image or post.image

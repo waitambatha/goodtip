@@ -11,30 +11,36 @@ drawn over them is the whole point of the look.
 {% endcomment %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% block app_content %}
-<div class="app-head"><div><div class="app-eyebrow">Around the grounds</div><h1 class="app-h1">News &amp; blog</h1><p class="app-sub">Stories, previews and updates from the GoodTip team.</p></div></div>
+{% comment %}
+CENTRED (Sep 2026, client: "the filters and all, let it be centred — let all
+of this basically be centred for a good feel"). `head-center` is the variant
+the marketing pages already use, so this is the site's own centred header
+rather than a second one written here.
+{% endcomment %}
+<div class="app-head head-center">
+  <div class="app-eyebrow">Around the grounds</div>
+  <h1 class="app-h1">News &amp; blog</h1>
+  <p class="app-sub">Stories, previews and updates from the GoodTip team.</p>
+</div>
 
 {% url 'news_index' as news_url %}
-{% include "partials/news_filter.html" with base=news_url anchor="" %}
+{% include "partials/news_filter.html" with base=news_url anchor="" centred=1 %}
 
 {% if posts %}
-<div class="grid-app g-3">
-  {% for p in posts %}
-  <a class="news-lead news-link" href="{% url 'news_detail' p.slug %}">
-    {% comment %}
-    Every code on the card, not just the first: with the list filtered to NRLW,
-    a story tagged AFLW and NRLW showing only "AFLW" reads as the filter having
-    gone wrong.
-    {% endcomment %}
-    {% if p.image %}<div class="thumb" style="background-image:url('{{ p.image.url }}')"
-         {% if p.image_alt %}role="img" aria-label="{{ p.image_alt }}"{% endif %}>{% include "partials/_news_tags.html" with post=p %}</div>
-    {% else %}<div class="thumb" style="background-image:url('{% static p.fallback_scene %}')">{% include "partials/_news_tags.html" with post=p %}</div>{% endif %}
-    <div class="body">
-      <h4>{{ p.title }}</h4>
-      {% if p.excerpt %}<p>{{ p.excerpt|truncatechars:140 }}</p>{% endif %}
-      <div class="date">{{ p.published_at|naturaltime }}</div>
-    </div>
-  </a>
-  {% endfor %}
+{% comment %}
+THE SAME CARD THE DASHBOARD DECK USES (Sep 2026, client: the story cards on
+the dashboard "and the public news page" should be the one design). It was a
+second, older card here — picture on top with the codes floating over it, no
+More button, nothing turning — so the two lists of the same stories did not
+look like the same product, and a change to one of them was a change that had
+to be remembered twice.
+
+Nothing here turns the cards over: this list is the whole archive, so there is
+no rotation to do. The pictures inside a card still turn, because that is the
+card's own behaviour and gt-news-cards.js drives it wherever a card appears.
+{% endcomment %}
+<div class="nd-row nd-list">
+  {% for p in posts %}{% include "partials/_news_deck_card.html" with p=p %}{% endfor %}
 </div>
 {% else %}
 <div class="card pad-lg" style="text-align:center;">
@@ -88,4 +94,12 @@ drawn over them is the whole point of the look.
     <a href="{% url 'how_it_works' %}" class="abtn abtn-ghost" style="color:var(--cream);border-color:rgba(255,255,255,.35);">See how it works</a>
   </div>
 </div>
+{% endblock %}
+
+{% comment %}
+The pictures inside a story card turn on their own — see gt-news-cards.js. The
+deck it also drives is not on this page; it does nothing when there isn't one.
+{% endcomment %}
+{% block scripts %}
+<script src="{% static 'js/gt-news-cards.js' %}" defer></script>
 {% endblock %}

@@ -1,3 +1,5 @@
+import re
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -304,6 +306,126 @@ class NewsPost(SeoFieldsMixin, models.Model):
             pool = self._SCENES[None]
         return f"img/scenes/{pool[(self.pk or 0) % len(pool)]}"
 
+    # ---- the pictures a card turns through ---------------------------------
+
+    #: Pulled out of `body` rather than stored alongside it. A story's pictures
+    #: are already in the story — the featured image, and whatever the editor
+    #: put into the prose or into a slideshow (see gt-slides.js) — and a second
+    #: list of "card images" maintained by hand is a list that goes stale the
+    #: first time somebody swaps a picture in the body and not in the list.
+    _MEDIA_RE = re.compile(
+        r"""<(img|video)\b[^>]*?\bsrc\s*=\s*["']([^"']+)["'][^>]*>""",
+        re.IGNORECASE | re.DOTALL,
+    )
+    _ALT_RE = re.compile(r"""\balt\s*=\s*["']([^"']*)["']""", re.IGNORECASE)
+
+    #: How many frames a card will turn through. A card that has been turning
+    #: for half a minute before it repeats has stopped being a card and become
+    #: a screensaver.
+    CARD_SLIDE_MAX = 6
+
+    @property
+    def featured_media(self) -> list:
+        """The pictures and clips at the top of the story, in order.
+
+        `[{"kind", "url", "alt"}, ...]` — the same shape as `card_media`, so
+        anything that renders one can render the other. Up to three of each
+        kind; see NewsMedia.
+
+        Falls back to the single `image` for a story written before the set
+        existed, which is every story on the site today: it has a featured
+        picture, and it must not lose it because it has no NewsMedia rows.
+        """
+        rows = []
+        if self.pk:
+            rows = [
+                {"kind": m.kind, "url": m.url, "alt": m.alt}
+                for m in self.media.all() if m.url
+            ]
+        if rows:
+            return rows
+        if self.image:
+            try:
+                return [{"kind": "image", "url": self.image.url, "alt": self.image_alt or ""}]
+            except ValueError:
+                pass
+        return []
+
+    @property
+    def card_media(self) -> list:
+        """The story's own pictures and clips, featured image first.
+
+        `[{"kind": "image"|"video", "url": ..., "alt": ...}, ...]`, de-duplicated
+        by URL and capped at `CARD_SLIDE_MAX`. Empty when the story carries no
+        pictures of its own — `card_slides` is what a template should render,
+        because it covers that case too.
+        """
+        out, seen = [], set()
+
+        def add(kind, url, alt=""):
+            if not url or url in seen or len(out) >= self.CARD_SLIDE_MAX:
+                return
+            seen.add(url)
+            out.append({"kind": kind, "url": url, "alt": alt})
+
+        # The featured set first — it is what the author chose to lead with —
+        # and then anything else they put in the body.
+        for item in self.featured_media:
+            add(item["kind"], item["url"], item["alt"])
+
+        for match in self._MEDIA_RE.finditer(self.body or ""):
+            tag, url = match.group(1), match.group(2)
+            alt = self._ALT_RE.search(match.group(0))
+            add("video" if tag.lower() == "video" else "image",
+                url, alt.group(1) if alt else "")
+        return out
+
+    @property
+    def fallback_scenes(self) -> list:
+        """The whole match-day pool for this story's code, not just one of it.
+
+        `fallback_scene` picks one and is what a single-picture slot wants. A
+        card that turns wants the set — a story with no picture of its own
+        still turns through the site's own photographs of the right sport
+        rather than sitting on one still while every card beside it moves.
+
+        Rotated to start at `fallback_scene`, so the first frame a card shows
+        is the same photograph the story wears everywhere else it appears.
+        """
+        code = (self.tag_list or [None])[0]
+        if code in ("AFL", "AFLW"):
+            pool = self._SCENES["AFL"]
+        elif code in ("NRL", "NRLW"):
+            pool = self._SCENES["NRL"]
+        else:
+            pool = self._SCENES[None]
+        start = (self.pk or 0) % len(pool)
+        ordered = pool[start:] + pool[:start]
+        return [f"img/scenes/{name}" for name in ordered[: self.CARD_SLIDE_MAX]]
+
+    @property
+    def card_slides(self) -> list:
+        """What a card actually turns through — never empty.
+
+        The story's own media where it has any, and its code's match-day
+        photographs where it has none.
+
+        A single real picture is NOT padded out with stock ones to make the
+        card move, and a stand-in photograph is never given the story's alt
+        text: a card that turns through pictures the story does not contain is
+        telling the reader something untrue about it. `kind` is "scene" for
+        the stand-ins so a template can tell the two apart.
+        """
+        media = self.card_media
+        if media:
+            return media
+        return [{"kind": "scene", "url": path, "alt": ""} for path in self.fallback_scenes]
+
+    @property
+    def card_turns(self) -> bool:
+        """Whether this card has more than one frame to turn through."""
+        return len(self.card_slides) > 1
+
     def save(self, *args, **kwargs):
         # The slug is generated from the headline only when there isn't one —
         # it is editable after that, but it does not MOVE on its own. A slug
@@ -327,6 +449,67 @@ class NewsPost(SeoFieldsMixin, models.Model):
             slug = f"{base}-{suffix}"
             suffix += 1
         return slug
+
+
+class NewsMedia(models.Model):
+    """The pictures and clips at the top of a story — up to three of each.
+
+    WHY A TABLE AND NOT MORE COLUMNS
+    --------------------------------
+    The client, Sep 2026: "the place where we have featured image, can it take
+    3 images and 3 videos as well, that will also be changing." Six nullable
+    columns would encode the cap in the schema, so raising it to four means a
+    migration; and "which of image_2 / image_3 is missing" is a question no
+    query should have to answer. Rows, ordered, counted at the point of entry.
+
+    `NewsPost.image` IS NOT RETIRED. It stays the story's primary picture and
+    is kept pointing at the first image in this set (see NewsPost.save), the
+    same arrangement `tag` has with `tags`. Everything that needs ONE image —
+    the Open Graph card, the SEO defaults, the share preview, the sitemap —
+    goes on reading it and needed no change; a share card cannot rotate, so
+    "the featured image" still has to mean one file.
+
+    THE FILE IS ALREADY ON DISK by the time a row is written. The editor
+    uploads through the same endpoint the body and the slideshows use, which
+    is where every size, type and length limit lives, and posts back the paths
+    it was given. One place enforces the rules rather than three.
+    """
+
+    IMAGE = "image"
+    VIDEO = "video"
+    KIND_CHOICES = [(IMAGE, "Picture"), (VIDEO, "Video")]
+
+    #: Three of each. Not three in total: a story with three photographs and a
+    #: clip is a normal thing to publish, and the two kinds do different jobs.
+    MAX_PER_KIND = 3
+
+    post = models.ForeignKey(
+        "NewsPost", on_delete=models.CASCADE, related_name="media",
+    )
+    kind = models.CharField(max_length=5, choices=KIND_CHOICES, default=IMAGE)
+    file = models.FileField(upload_to="news/featured/")
+    alt = models.CharField(
+        max_length=200, blank=True,
+        help_text="What this one shows, for screen readers and search engines.",
+    )
+    #: Explicit, because the order is the order they are shown in and a reader
+    #: reorders them by dragging. `pk` would be the order they were uploaded.
+    order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "pk"]
+        verbose_name = "story picture or clip"
+        verbose_name_plural = "story pictures and clips"
+
+    def __str__(self):
+        return f"{self.get_kind_display()} for {self.post_id}"
+
+    @property
+    def url(self) -> str:
+        try:
+            return self.file.url
+        except ValueError:
+            return ""
 
 
 class Enquiry(models.Model):

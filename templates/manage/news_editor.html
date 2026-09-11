@@ -116,77 +116,68 @@
       </div>
 
       {% comment %}
-      THE SCHEDULER.
+      WHEN IT GOES OUT — a button, not a form field (Sep 2026, client: "I do
+      not like how that automated publishing where it will auto post. Let it be
+      a button, then when I click, a nice time and calendar UI comes in").
 
-      One field still — `published_at` — because that is genuinely all the
-      model has, and adding a second control that means the same thing is how
-      two sources of truth start. What is new is everything around it:
+      The old scheduler was a date box that was always open and always filled
+      in with "now", so every story looked like it was being scheduled and a
+      stray keystroke in it could hold a story back by a month. Now the default
+      is said in words — it goes out when you save — and scheduling is a thing
+      you ASK for: the button opens a calendar and a clock, and until you pick
+      something the hidden field is empty and the view uses the moment of
+      saving. See the "WHEN IT GOES OUT" script in gt-news-editor.js.
 
-        * the STATE, said in words and colour, because "published" is not the
-          same as "live" here and the difference had no representation at all;
-        * a countdown on a scheduled story, so "Friday 09:00" is also "in 2
-          days" without the reader doing calendar arithmetic;
-        * presets, because the four times anybody actually picks are now, this
-          evening, tomorrow morning and next Monday — and typing those into a
-          datetime-local is eight keystrokes and a chance to get the month
-          wrong.
-
-      No cron anywhere. Every reader-facing query asks for
-      `published_at <= now`, so the moment simply arrives — see
-      admin_panel.models.LivePostManager. The countdown is decoration over a
-      fact the database already enforces.
+      Still one field underneath (`published_at`), and still no cron: every
+      reader-facing query asks for `published_at <= now`, so a scheduled story
+      simply arrives. The calendar can also go backwards, which is how a story
+      written up from last weekend is filed under last weekend.
       {% endcomment %}
       <div class="fld ned-when">
-        <div class="sched" data-sched
-             data-state="{% if is_new %}new{% elif post.is_scheduled %}scheduled{% elif post.is_live %}live{% else %}draft{% endif %}"
-             {% if post.published_at %}data-at="{{ post.published_at|date:'c' }}"{% endif %}>
+        <div class="pub" data-pub
+             data-saved="{% if is_new %}new{% elif post.is_scheduled %}scheduled{% elif post.is_live %}live{% else %}draft{% endif %}">
+          <p class="pub-k">When it goes out</p>
 
-          <div class="sched-head">
-            <span class="sched-dot" aria-hidden="true"></span>
-            <span class="sched-state" data-sched-state>
-              {% if is_new %}Not saved yet
+          <div class="pub-line">
+            <span class="pub-dot" aria-hidden="true"></span>
+            <span class="pub-state" data-pub-state>
+              {% if is_new %}Goes out when you save
               {% elif post.is_scheduled %}Scheduled
               {% elif post.is_live %}Live on the site
               {% else %}Draft{% endif %}
             </span>
-            {% comment %}
-            Filled in by the script from data-at, and only for a story that is
-            actually waiting. Rendered empty rather than server-side: "in 2
-            days" written into the HTML is wrong the moment the page has been
-            open for an hour, and this is a page people leave open.
-            {% endcomment %}
-            <span class="sched-count" data-sched-count aria-live="polite"></span>
           </div>
+          <p class="pub-when" data-pub-when aria-live="polite"></p>
 
-          <label class="sched-label" for="np_published_at">Publish date &amp; time</label>
-          <div class="sched-input">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg>
-            <input type="datetime-local" name="published_at" id="np_published_at"
-                   value="{{ published_at_value }}" data-sched-input>
+          <div class="pub-acts">
+            <button type="button" class="pub-btn" data-pub-open aria-expanded="false" aria-controls="pubPop">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg>
+              <span data-pub-open-label>{% if is_new %}Schedule for later{% else %}Change date &amp; time{% endif %}</span>
+            </button>
+            <button type="button" class="pub-reset" data-pub-reset hidden>Go out when I save</button>
           </div>
 
           {% comment %}
-          The four an editor actually reaches for. Computed in the browser from
-          the reader's own clock, which is the same clock the field is in —
-          `datetime-local` carries no zone, and the view reads it in the site's
-          timezone, so anything worked out server-side would be a different
-          "tomorrow" for an editor sitting somewhere else.
+          The picker itself. Built by the script — month grid, hour and minute,
+          the four presets — because the browser's own datetime popup cannot be
+          styled, looks different in every browser, and on desktop Chrome is a
+          tiny grey calendar with no way to say "tomorrow morning" in one press.
           {% endcomment %}
-          <div class="sched-presets">
-            <button type="button" data-sched-set="now">Now</button>
-            <button type="button" data-sched-set="evening">Tonight 6pm</button>
-            <button type="button" data-sched-set="tomorrow">Tomorrow 9am</button>
-            <button type="button" data-sched-set="monday">Next Mon 9am</button>
-          </div>
+          <div class="pub-pop" id="pubPop" data-pub-pop hidden role="dialog" aria-label="Pick a date and time"></div>
 
-          <small class="sched-hint" data-sched-hint>
-            A past date backdates the story. A future date holds it back until then.
-          </small>
+          {% comment %}
+          Blank on a new story until a date is picked: blank means "the moment
+          you press Save", which the view fills in (_parse_published_at falls
+          back to the post's own timestamp). An existing story carries its date,
+          so editing a typo does not quietly republish it as today's news.
+          {% endcomment %}
+          <input type="hidden" name="published_at" id="np_published_at" data-pub-input
+                 value="{% if not is_new %}{{ published_at_value }}{% endif %}">
         </div>
       </div>
     </div>
 
-    <label class="ned-field-label">Headline</label>
+    <h2 class="ned-sec-h"><span class="ned-sec-n">01</span>Headline</h2>
     <div class="ned-editor is-headline" data-editor="headline">
       <div class="ned-toolbar">
         <button type="button" data-history="undo" title="Undo (Ctrl+Z)" aria-label="Undo">
@@ -222,7 +213,7 @@
     formatting controls as everything else rather than being the one plain
     textarea left on the page.
     {% endcomment %}
-    <label class="ned-field-label">Teaser <span class="ned-hint">one or two sentences, shown on the dashboard card and above the story</span></label>
+    <h2 class="ned-sec-h"><span class="ned-sec-n">02</span>Teaser<small>one or two sentences, shown on the card and above the story</small></h2>
     <div class="ned-editor is-teaser" data-editor="teaser">
       <div class="ned-toolbar">
         <button type="button" data-history="undo" title="Undo (Ctrl+Z)" aria-label="Undo">
@@ -252,44 +243,50 @@
     </div>
     <input type="hidden" name="excerpt_html" id="np_excerpt_html">
 
-    <label class="ned-field-label">Featured image</label>
-    <div class="ned-drop{% if post.image %} has-image{% endif %}" data-image-drop>
-      <div class="ned-drop-prev" data-image-preview>
-        {% if post.image %}<img src="{{ post.image.url }}" alt="">
-        {% else %}<svg class="ned-drop-ph"><use href="#ic-image"/></svg>{% endif %}
-      </div>
-      <div class="ned-drop-txt">
-        <b data-image-name>{% if post.image %}Current image{% else %}The card and hero image for this story{% endif %}</b>
-        <span data-image-note>Shown on the dashboard, the news list and the top of the article. Drag a file in, or choose one.</span>
-      </div>
-      <div class="ned-drop-acts">
-        <button type="button" class="ned-drop-btn" data-image-pick>
-          <svg><use href="#ic-image"/></svg>
-          <span data-image-pick-label>{% if post.image %}Replace image{% else %}Choose image{% endif %}</span>
-        </button>
-        <button type="button" class="ned-drop-clear" data-image-clear {% if not post.image %}hidden{% endif %}>Remove</button>
-      </div>
-      {% comment %}
-      Hidden and driven by the button above: a bare file input cannot be
-      styled, and at full width it used to swallow the whole drop-zone row.
-      {% endcomment %}
-      <input type="file" name="image" accept="image/*" data-image-input class="ned-drop-file">
-      <input type="hidden" name="image_clear" value="" data-image-clear-flag>
-    </div>
     {% comment %}
-    Alt text for the featured image. Its own field rather than reusing the
-    headline: "what this picture shows" and "what this story is called" are
-    different sentences, and a search engine reads the first as a description
-    of the image itself. It is also the only thing a screen reader gets.
+    FEATURED MEDIA — three pictures and three videos (Sep 2026, client: "the
+    place where we have featured image, can it take 3 images and 3 videos as
+    well, that will also be changing").
+
+    Each file uploads the moment it is chosen, through the same endpoint the
+    body and the slideshows use — so the size, type and video-length limits
+    are the ones that already exist, enforced in one place — and the list of
+    what was uploaded posts back as JSON in `featured_media`. The view turns
+    that into NewsMedia rows and points `post.image` at the first picture, so
+    the share card and the SEO defaults keep working off a single file.
+
+    Drag to reorder: the first one is what the card and the reader open on.
     {% endcomment %}
-    <div class="fld ned-alt">
-      <label for="np_image_alt">Image alt text <span class="ned-hint">what the picture shows &mdash; for screen readers and search engines</span></label>
-      <input type="text" name="image_alt" id="np_image_alt" maxlength="200"
-             value="{{ post.image_alt }}"
-             placeholder="Crowd at the MCG holding club flags at dusk">
+    <h2 class="ned-sec-h"><span class="ned-sec-n">03</span>Featured media<small>up to 3 pictures and 3 videos &middot; they turn at the top of the story and on its card</small></h2>
+    <div class="ned-fm" data-featured
+         data-upload-url="{% url 'admin:hq_news_upload_image' %}?slot=featured"
+         data-max="3">
+      <ol class="ned-fm-grid" data-featured-list aria-label="Featured pictures and videos, in the order they are shown"></ol>
+      <div class="ned-fm-empty" data-featured-empty>
+        <svg aria-hidden="true"><use href="#ic-image"/></svg>
+        <b>Nothing here yet</b>
+        <span>Drop pictures or videos here, or use the buttons. The first one is what the card opens on.</span>
+      </div>
+      <div class="ned-fm-bar">
+        <button type="button" class="ned-fm-add" data-featured-add="image">
+          <svg aria-hidden="true"><use href="#ic-image"/></svg>
+          <span>Add pictures</span>
+          <b data-featured-count="image">0 / 3</b>
+        </button>
+        <button type="button" class="ned-fm-add is-video" data-featured-add="video">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3z"/></svg>
+          <span>Add videos</span>
+          <b data-featured-count="video">0 / 3</b>
+        </button>
+        <p class="ned-fm-msg" data-featured-msg role="status" aria-live="polite"></p>
+      </div>
+      <input type="file" multiple accept="image/*" data-featured-input="image" hidden>
+      <input type="file" multiple accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm" data-featured-input="video" hidden>
+      <input type="hidden" name="featured_media" data-featured-json>
+      {{ featured_items|json_script:"featuredData" }}
     </div>
 
-    <label class="ned-field-label" style="margin-top:26px;">Full story</label>
+    <h2 class="ned-sec-h"><span class="ned-sec-n">04</span>Full story</h2>
     <div class="ned-editor is-body" data-editor="body" data-upload-url="{% url 'admin:hq_news_upload_image' %}">
       <div class="ned-toolbar">
         <button type="button" data-history="undo" title="Undo (Ctrl+Z)" aria-label="Undo">
@@ -399,7 +396,7 @@
     whole point is that each story has its own unique URL to share. Where the
     information came from is a citation, and that is what this list is for.
     {% endcomment %}
-    <label class="ned-field-label">Sources <span class="ned-hint">optional — where this story's info came from, not required to publish</span></label>
+    <h2 class="ned-sec-h"><span class="ned-sec-n">05</span>Sources<small>optional — where this story's information came from</small></h2>
     <div data-source-list>
       {% for s in post.sources %}
       <div class="ned-source-row">

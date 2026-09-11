@@ -267,6 +267,48 @@ that they were not given that job.
     </ul>
 
     {% comment %}
+    WHERE YOU ARE, AND EVERYTHING ELSE THAT IS IN HERE.
+
+    The client: "when I click it, its menu should be about the other pages
+    that were in its dashboard — if I click Models and tables and see all of
+    the tables, that menu should be about the tables and models, so I do not
+    have the need to go to the main dashboard."
+
+    The six items above are how you change section. This is how you move
+    inside the one you are in, and it is one click: from Tips to Matches was
+    rail, hub, category, table — four clicks to go sideways by one — and is
+    now a single row in the menu you are already looking at.
+
+    IT IS NOT A DROPDOWN. Nothing here has to be opened before it can be read,
+    which was the whole complaint about the ten <details> groups this replaced;
+    it is simply the contents of where you are standing, and it is not there
+    at all on the two screens that are not inside anything.
+
+    Two levels deep in Tables & models the list becomes that category's tables
+    and gains a way back up to the categories — so the rail never shows more
+    than one screenful, and the level above is always one row away. See
+    gta_section in sysadmin/templatetags/gtadmin.py.
+    {% endcomment %}
+    {% gta_section as section %}
+    {% if section.items %}
+    <p class="gta-rail-title gta-rail-here">
+      <svg aria-hidden="true"><use href="#{{ section.icon }}"/></svg>
+      <span>{{ section.label }}</span>
+    </p>
+    <ul class="gta-nav gta-subnav" style="--sec-accent:{{ section.accent }}">
+      {% if section.up %}
+      <li><a href="{{ section.up.href }}" class="gta-nav-a gta-nav-up" data-jump="{{ section.up.label }}">
+        <svg class="ic"><use href="#ic-arrow-left"/></svg><span class="lbl">{{ section.up.label }}</span></a></li>
+      {% endif %}
+      {% for item in section.items %}
+      <li><a href="{{ item.href }}" class="gta-nav-a gta-sub-a{% if item.on %} on{% endif %}"
+             style="--row-accent:{{ item.accent }}" data-jump="{{ section.label }} &rsaquo; {{ item.label }}">
+        <svg class="ic"><use href="#{{ item.icon }}"/></svg><span class="lbl">{{ item.label }}</span></a></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% comment %}
     THE JUMP INDEX.
 
     gt-palette.js builds its index from `[data-jump]` inside this rail, which

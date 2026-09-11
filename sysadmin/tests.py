@@ -197,14 +197,47 @@ class TeamHubTests(TestCase):
         resp = self.client.get(reverse("admin:hq_team_hub"))
         self.assertRedirects(resp, reverse("admin:hq_team_home"))
 
+    def _rail(self, url):
+        html = self.client.get(url).content.decode()
+        return html[html.index('class="gts-rail"'):html.index("</nav>")]
+
     def test_the_rail_carries_one_team_entry_and_not_four(self):
         """The point of the change. Four peers cost four lines of the rail on
-        every screen in HQ and told you nothing until you had opened them."""
+        EVERY screen in HQ and told you nothing until you had opened them.
+
+        Read from a screen outside the section, which is where that cost was
+        being paid — inside it the four are listed on purpose, and that is the
+        test below.
+        """
         self._sign_in(self.client, self.owner)
-        html = self.client.get(reverse("admin:hq_my_work")).content.decode()
-        rail = html[html.index('class="gts-rail"'):html.index("</nav>")]
+        rail = self._rail(reverse("admin:hq_news"))
         self.assertIn(reverse("admin:hq_team_home"), rail)
         for gone in ("hq_reviews", "hq_activity"):
+            self.assertNotIn(reverse(f"admin:{gone}"), rail, gone)
+
+    def test_inside_the_section_the_rail_is_about_the_section(self):
+        """The client: "when I click it, its menu should be about the other
+        pages that were in its dashboard ... so I do not have the need to go to
+        the main dashboard."
+
+        So the four are absent from every other screen and present on these —
+        the rail costs one line until you are standing in the section, and then
+        moving between its screens is one click instead of a trip back through
+        the hub.
+        """
+        self._sign_in(self.client, self.owner)
+        rail = self._rail(reverse("admin:hq_my_work"))
+        for there in ("hq_my_work", "hq_reviews", "hq_team", "hq_activity"):
+            self.assertIn(reverse(f"admin:{there}"), rail, there)
+        # And it says which one you are on.
+        self.assertIn('class="gts-sub on"', rail)
+
+    def test_the_section_menu_shows_only_what_its_viewer_may_open(self):
+        """A restricted administrator gets a shorter list, never a link that
+        refuses them — the three full-access screens are not theirs."""
+        self._sign_in(self.client, self.helper)
+        rail = self._rail(reverse("admin:hq_my_work"))
+        for gone in ("hq_reviews", "hq_team", "hq_activity"):
             self.assertNotIn(reverse(f"admin:{gone}"), rail, gone)
 
     def test_an_administrator_without_the_team_keeps_your_work_in_the_rail(self):

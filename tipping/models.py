@@ -170,6 +170,10 @@ class Match(models.Model):
 
     class Meta:
         ordering = ["kickoff_at"]
+        # Django pluralises by adding an "s", which makes this table "Matchs"
+        # wherever the admin names it — the rail, the hub card, the breadcrumb
+        # and the delete confirmation.
+        verbose_name_plural = "matches"
         indexes = [
             # The live poller and the My Tips filters both slice on these.
             models.Index(fields=["status", "kickoff_at"]),

@@ -1060,7 +1060,10 @@ def dashboard_view(request):
     # 18 rather than 9: three full turns of the deck. Enough that the rotation
     # is worth having, bounded so a busy news week does not put eighty cards
     # into every dashboard's HTML.
-    news_posts = list(NewsPost.live.all()[:18])
+    # prefetch_related("media"): every card reads its story's featured set
+    # (NewsPost.featured_media), and without this that is one query per story
+    # — eighteen extra round trips on the page members open most.
+    news_posts = list(NewsPost.live.prefetch_related("media")[:18])
     # BY POSITION, NOT BY PAGE (Sep 2026, client: "the first row changes by the
     # cards doing a 360 ... the other row can have another design"). Each of
     # the six places on the deck turns on its own — the top three spin, the
@@ -1105,9 +1108,13 @@ def dashboard_view(request):
         "preview_round": preview_round,
         "create_url": reverse("orgs:create"),
         "news_turns": news_turns,
-        # Top row spins, bottom row slides — two shapes, so two lists.
-        "news_spin_slots": news_slots[:3],
-        "news_slide_slots": news_slots[3:],
+        # THE DECK, AS ROWS. Both rows are the same card in the same size now
+        # — the bottom row's smaller "picture beside words" shape is gone
+        # ("why is it small, have all of them same size") — but they are still
+        # two lists rather than one flat six, because the rows take it in
+        # turns to move and the script steps a row at a time. Three to a row,
+        # and a short deck simply has a short second row or none.
+        "news_rows": [news_slots[:3], news_slots[3:]] if news_slots[3:] else [news_slots[:3]],
         # Whether there is a deck at all — the heading and button go with it.
         "news_any": bool(news_posts),
         "prompts": _dashboard_prompts(request.user, selected, games),
