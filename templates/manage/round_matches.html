@@ -3,7 +3,7 @@
 {% block title %}Matches. Manage{% endblock %}
 {% block nav_orgs %}on{% endblock %}
 {% block admin_content %}
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;"><a href="{% url 'manage:org_rounds' org.id %}" class="flink" style="color:var(--forest);">Rounds</a><span style="color:var(--muted);">/</span><h1 class="admin-h1" style="margin:0;">Round {{ round.round_number }} &middot; Matches</h1></div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;"><a href="{% url 'manage:org_rounds' org.id %}" class="flink crumb-link">Rounds</a><span style="color:var(--muted);">/</span><h1 class="admin-h1" style="margin:0;">{{ round.label }} &middot; Matches</h1></div>
 <div class="grid-app" style="grid-template-columns:1.4fr 1fr;gap:20px;align-items:start;">
   <div>
     <div class="card" style="margin-bottom:16px;"><div class="card-h" style="margin-bottom:10px;">Matches &amp; results</div>

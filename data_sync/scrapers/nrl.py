@@ -77,6 +77,25 @@ class NrlScrapeError(Exception):
         self.status = status
 
 
+class NrlRoundMismatch(NrlScrapeError):
+    """A round nrl.com publishes came back with every fixture filed elsewhere.
+
+    That is never a quiet round. It means our idea of which round a fixture
+    belongs to has come apart from nrl.com's, and every game in the round is
+    about to be thrown away. It is how the NRL 2026 finals went missing
+    (Sep 2026): "Finals Week 1" was read as round 1, so all four games asked
+    for as round 28 were discarded, and the run reported success.
+
+    ``loud`` tells the sync layer to fail the run rather than log and move on.
+    """
+
+    loud = True
+
+
+def _norm_title(title: str) -> str:
+    return " ".join((title or "").lower().split())
+
+
 class NrlDrawScraper:
     """Fetches and parses one nrl.com draw page, with caching.
 
@@ -219,7 +238,23 @@ class NrlDrawScraper:
         return dt if timezone.is_aware(dt) else dt.replace(tzinfo=dt_timezone.utc)
 
     @staticmethod
-    def _round_of(fixture: dict) -> int | None:
+    def _round_titles(data: dict) -> dict[str, int]:
+        """nrl.com's own name -> number map for the season's rounds.
+
+        The page publishes it as filterRounds: {"value": 28, "name": "Finals
+        Week 1"}. It is the ONLY reliable way to number a finals round. Finals
+        are titled by week, not by round, and the digit in "Finals Week 1" is
+        the week, not the round.
+        """
+        out = {}
+        for r in data.get("filterRounds") or []:
+            value, name = r.get("value"), r.get("name")
+            if isinstance(value, int) and name:
+                out[_norm_title(name)] = value
+        return out
+
+    @staticmethod
+    def _round_of(fixture: dict, titles: dict[str, int] | None = None) -> int | None:
         """Which round this fixture actually belongs to.
 
         Needed because the round parameter is not honoured by every
@@ -227,10 +262,26 @@ class NrlDrawScraper:
         for, so without this every Origin "round" was created holding the whole
         series: game 1, 2 and 3 duplicated into rounds 1, 2 and 3 alike.
 
-        roundTitle is the source ("Round 22", "Game 2"); the match-centre URL
-        (.../game-2/...) is the fallback for fixtures that carry no title.
+        In order of trust:
+
+          1. The page's own round list (``titles``). "Finals Week 1" is round
+             28 of NRL 2026 and round 12 of NRLW 2026, and nothing in the title
+             says so.
+          2. A title that IS a round number: "Round 22", "Game 2". Anchored on
+             purpose. The first version took the first digit anywhere in the
+             title, read "Finals Week 1" as round 1, and discarded every final
+             of the 2026 season as belonging to another round.
+          3. The match-centre URL (.../round-22/..., .../game-2/...).
+
+        Anything else is None, which the caller reads as "trust the round that
+        was asked for".
         """
-        m = re.search(r"(\d+)", fixture.get("roundTitle") or "")
+        title = fixture.get("roundTitle") or ""
+        if titles:
+            known = titles.get(_norm_title(title))
+            if known is not None:
+                return known
+        m = re.match(r"\s*(?:round|game)\s+(\d+)\s*$", title, re.I)
         if m:
             return int(m.group(1))
         m = re.search(r"/(?:round|game)-(\d+)/", fixture.get("matchCentreUrl") or "")
@@ -270,14 +321,18 @@ class NrlDrawScraper:
                 f"Known: {', '.join(sorted(COMPETITION_IDS))}."
             )
         data = self._page(competition_id=comp_id, season=season, round_number=round_number)
+        titles = self._round_titles(data)
+        raw = data.get("fixtures") or []
+        elsewhere = 0
         out = []
-        for f in data.get("fixtures") or []:
+        for f in raw:
             # Trust the fixture's own round over the one we asked for. Where
             # the parameter IS honoured this changes nothing; where it is not,
             # it is the only thing stopping a round from absorbing the whole
             # competition.
-            actual = self._round_of(f)
+            actual = self._round_of(f, titles)
             if actual is not None and actual != round_number:
+                elsewhere += 1
                 continue
             home, away = f.get("homeTeam") or {}, f.get("awayTeam") or {}
             # A fixture with a side still to be decided (finals slots) is
@@ -303,6 +358,19 @@ class NrlDrawScraper:
                 "clock": (f.get("clock") or {}).get("gameTime") or "",
                 "period": f.get("matchState") or "",
             })
+
+        # A round the page itself lists, holding games, every one of which we
+        # just decided belongs to some other round, is a parse fault and not an
+        # empty week. Say so loudly. Rounds the page does NOT list are exempt:
+        # Origin ignores the round parameter and returns all three games for
+        # any round asked, which is ordinary and handled above.
+        if raw and elsewhere == len(raw) and round_number in titles.values():
+            raise NrlRoundMismatch(
+                f"nrl.com lists {series} {season} round {round_number} and "
+                f"returned {len(raw)} fixture(s) for it, but every one was read "
+                f"as belonging to another round (first title: "
+                f"{raw[0].get('roundTitle')!r}). Nothing was synced for this round."
+            )
         return out
 
     def available_rounds(self, *, series: str, season: int) -> list[int]:
@@ -323,7 +391,7 @@ class NrlDrawScraper:
         # rounds off the fixtures themselves instead of reporting none, which
         # is what kept Origin out of discovery entirely.
         derived = {
-            self._round_of(f)
+            self._round_of(f, self._round_titles(data))
             for f in (data.get("fixtures") or [])
         }
         return sorted(r for r in derived if r is not None)
@@ -334,17 +402,22 @@ class NrlDrawScraper:
         The draw page with no round parameter returns the current round, and
         every fixture on it carries isCurrentRound. That is the cheap way to
         locate ourselves in the season.
+
+        Resolved through the page's own round list, never the digits in the
+        title. During the 2026 finals the current fixture was titled "Finals
+        Week 2": reading that as round 2 put the rolling window on rounds 1-5,
+        so the live poller spent the finals re-reading March.
         """
         comp_id = COMPETITION_IDS.get(series.upper())
         if comp_id is None:
             return None
         data = self._page(competition_id=comp_id, season=season, round_number=None)
+        titles = self._round_titles(data)
         for f in data.get("fixtures") or []:
             if f.get("isCurrentRound"):
-                title = f.get("roundTitle") or ""
-                m = re.search(r"(\d+)", title)
-                if m:
-                    return int(m.group(1))
+                rn = self._round_of(f, titles)
+                if rn is not None:
+                    return rn
         sel = data.get("selectedRoundId")
         return sel if isinstance(sel, int) else None
 

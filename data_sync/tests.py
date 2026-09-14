@@ -633,3 +633,115 @@ class NegativeCacheTests(SimpleTestCase):
             (111, 2026, 9), s._cache,
             "a rate-limit must be retried, not remembered as an empty round",
         )
+
+
+def _nrl_fixture(title, url, home="Rabbitohs", away="Knights", current=False):
+    return {
+        "roundTitle": title, "matchCentreUrl": url, "isCurrentRound": current,
+        "homeTeam": {"nickName": home, "teamId": 1, "score": 20},
+        "awayTeam": {"nickName": away, "teamId": 2, "score": 10},
+        "clock": {"kickOffTimeLong": "2026-09-11T09:50:00Z", "gameTime": "80:00"},
+        "matchState": "FullTime",
+    }
+
+
+def _nrl_page(fixtures, selected=29):
+    """The shape nrl.com served for NRL 2026 during the finals (13 Sep 2026)."""
+    rounds = [(29, "Finals Week 2"), (28, "Finals Week 1")] + [
+        (n, f"Round {n}") for n in range(27, 0, -1)
+    ]
+    return {
+        "filterRounds": [{"value": v, "name": n} for v, n in rounds],
+        "selectedRoundId": selected,
+        "fixtures": fixtures,
+    }
+
+
+class NrlFinalsRoundTests(SimpleTestCase):
+    """The NRL 2026 finals were missing from every league (client, Fri 11 Sep).
+
+    nrl.com titles finals by WEEK ("Finals Week 1") and numbers them on from
+    the regular season (round 28). The scraper took the first digit in the
+    title as the round, so every final was filed under round 1 or 2 and thrown
+    away, and the rolling window sat on rounds 1-5 for the whole finals series.
+    """
+
+    def _scraper(self, pages):
+        from data_sync.scrapers.nrl import NrlDrawScraper
+        s = NrlDrawScraper()
+        s._cache.update(pages)
+        return s
+
+    def test_finals_week_one_fixtures_come_back_as_round_28(self):
+        page = _nrl_page([
+            _nrl_fixture("Finals Week 1", "/draw/nrl-premiership/2026/finals-week-1/rabbitohs-v-knights/"),
+            _nrl_fixture("Finals Week 1", "/draw/nrl-premiership/2026/finals-week-1/warriors-v-dolphins/",
+                         home="Warriors", away="Dolphins"),
+        ], selected=28)
+        s = self._scraper({(111, 2026, 28): page})
+        rows = s.fixtures(series="NRL", season=2026, round_number=28)
+        self.assertEqual([r["home_name"] for r in rows], ["Rabbitohs", "Warriors"])
+
+    def test_the_current_round_during_the_finals_is_the_finals_round(self):
+        page = _nrl_page([
+            _nrl_fixture("Finals Week 2", "/draw/nrl-premiership/2026/finals-week-2/roosters-v-sharks/",
+                         current=True),
+        ])
+        s = self._scraper({(111, 2026, None): page})
+        self.assertEqual(s.current_round(series="NRL", season=2026), 29)
+        # And so the rolling window reaches both finals weeks, not March.
+        self.assertEqual(s.rounds_in_window(series="NRL", season=2026), [28, 29])
+
+    def test_a_listed_round_whose_games_all_land_elsewhere_fails_loudly(self):
+        from data_sync.scrapers.nrl import NrlRoundMismatch
+        # Round 27 asked for, round 28's games served: every one is filed
+        # elsewhere, and the round is one nrl.com lists.
+        page = _nrl_page([
+            _nrl_fixture("Finals Week 1", "/draw/nrl-premiership/2026/finals-week-1/rabbitohs-v-knights/"),
+        ])
+        s = self._scraper({(111, 2026, 27): page})
+        with self.assertRaises(NrlRoundMismatch) as caught:
+            s.fixtures(series="NRL", season=2026, round_number=27)
+        self.assertTrue(getattr(caught.exception, "loud", False))
+
+    def test_origin_ignoring_the_round_parameter_is_still_quiet(self):
+        # No filterRounds (Origin has no round picker), all three games served
+        # whatever round is asked: nothing for round 24, and no alarm either.
+        page = {"fixtures": [
+            _nrl_fixture(f"Game {n}", f"/draw/state-of-origin/2026/game-{n}/blues-v-maroons/",
+                         home="Blues", away="Maroons")
+            for n in (1, 2, 3)
+        ]}
+        s = self._scraper({(116, 2026, 24): page, (116, 2026, 2): page})
+        self.assertEqual(s.fixtures(series="STATE OF ORIGIN", season=2026, round_number=24), [])
+        self.assertEqual(len(s.fixtures(series="STATE OF ORIGIN", season=2026, round_number=2)), 1)
+
+    def test_plain_round_titles_still_parse(self):
+        from data_sync.scrapers.nrl import NrlDrawScraper
+        self.assertEqual(NrlDrawScraper._round_of({"roundTitle": "Round 22"}), 22)
+        self.assertEqual(NrlDrawScraper._round_of({"roundTitle": "Game 2"}), 2)
+        # A finals title with no round list to consult is "don't know", never
+        # the week number.
+        self.assertIsNone(NrlDrawScraper._round_of({"roundTitle": "Finals Week 1"}))
+
+
+class LoudScrapeFaultTests(SimpleTestCase):
+    """A loud scraper fault fails the sync run instead of being logged past."""
+
+    def test_series_rows_records_it_and_the_run_raises(self):
+        from unittest.mock import patch
+        from data_sync.scrapers.nrl import NrlRoundMismatch
+        from data_sync.services import NrlScrapeSyncService, SyncError
+
+        svc = NrlScrapeSyncService()
+        svc._scraper = MagicMock()
+        svc._scraper.fixtures.side_effect = NrlRoundMismatch("every fixture filed elsewhere")
+        with patch("data_sync.services.Series") as series_model, \
+                patch("data_sync.services.fixture_cache_get", return_value=None):
+            series_model.objects.filter.return_value.first.return_value = MagicMock()
+            _series, rows = svc._series_rows("NRL", 28, 2026)
+        self.assertEqual(rows, [])
+        with self.assertRaises(SyncError):
+            svc._raise_problems()
+        # Once raised, it is spent: the next org's run starts clean.
+        svc._raise_problems()

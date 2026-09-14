@@ -80,6 +80,7 @@ urlpatterns = [
     path("messages/<int:thread_id>/file/<int:attachment_id>/", views.message_file,
          name="message_file"),
     path("<int:org_id>/wall/", views.wall_view, name="wall"),
+    path("<int:org_id>/wall/recaps/", views.wall_recap_pref, name="wall_recap_pref"),
     path("<int:org_id>/wall/post/", views.wall_post_create, name="wall_post"),
     path("<int:org_id>/wall/<int:post_id>/react/", views.wall_react, name="wall_react"),
     path("<int:org_id>/wall/<int:post_id>/remove/", views.wall_post_remove, name="wall_remove"),

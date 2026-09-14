@@ -272,7 +272,7 @@ Expects: c (the selected org card), games, open_games, org_series,
         {% endcomment %}
         <div class="fx-roundhead{% if not grp.list.0.round_open %} is-shut{% endif %}"
              data-code="{{ grp.grouper.series.slug }}" data-cat="{{ grp.grouper.series.category }}">
-          <span class="fxr-n">Round {{ grp.grouper.round_number }}</span>
+          <span class="fxr-n">{{ grp.grouper.label }}</span>
           {% comment %}
           The code wears its own colour here too, not only on the filter chip.
           A slate of AFL and AFLW interleaved by kickoff is the case this is

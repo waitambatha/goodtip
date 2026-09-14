@@ -714,7 +714,7 @@ body.gt-shell .ned-toolbar select.ned-pick:hover { background: var(--ad-head-h);
 
 .hub-grid {
   display: grid; gap: 18px;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
 }
 
 /* THE CARD IS THE LINK. No "Open →" in the corner: a card with one
@@ -790,7 +790,9 @@ body.gt-shell .ned-toolbar select.ned-pick:hover { background: var(--ad-head-h);
    ========================================================================== */
 .seo-health .sh-grid {
   display: grid; gap: 14px; padding: 4px 0 2px;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  /* min(300px, 100%): a bare 300px track is wider than the panel on a phone,
+     and the cards ran past the screen's edge. */
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
 }
 .sh-card {
   --sh: var(--ad-quiet);
@@ -853,3 +855,416 @@ body.gt-shell .ned-toolbar select.ned-pick:hover { background: var(--ad-head-h);
 }
 .gts-back svg { width: 15px; height: 15px; flex: none; }
 .gts-back:hover { color: var(--gts-fg); border-color: var(--gts-line-2); text-decoration: none; }
+
+/* ==========================================================================
+   HQ, AS THE ENQUIRIES MOCKUP (Sep 2026)
+   ==========================================================================
+   Client, with a mockup of Customer enquiries: "have it like that, as well as
+   the other pages of the admin that have that type of vibe ... and the drop
+   down of the admin that shows things like logout and your profile and view
+   site".
+
+   Four pieces, shared by every page on this shell:
+     * the account menu in the top bar;
+     * the page's own card — the way back, the name, the lead, and an
+       illustration with a little note beside it;
+     * the list bar — pill tabs with counts, a search, a sort;
+     * rows as rounded cards rather than ruled lines, with pagination under.
+
+   Colours from the --gts-/--ad- tokens above plus the few --hq- ones below,
+   each stated for light, for dark and for "auto" on a dark device, the rule
+   this file keeps.
+   ========================================================================== */
+:root {
+  --hq-on-bg: var(--forest);       --hq-on-fg: #FFFFFF;
+  --hq-tile-bg: var(--deep);       --hq-tile-fg: var(--lime);
+  --hq-blue-bg: rgba(47,93,168,.12); --hq-blue-fg: #2B559A;
+  --hq-open-bg: rgba(45,122,58,.13); --hq-open-fg: #1C5E30;
+  --hq-danger: #A62121;            --hq-danger-bg: rgba(166,33,33,.07);
+  --hq-gold-fg: #8A5A08;           --hq-gold-bg: rgba(244,196,48,.20);
+  --hq-heart: #C2334F;
+  --hq-shadow: rgba(15,46,34,.30);
+}
+html[data-theme="dark"] {
+  --hq-on-bg: var(--lime);         --hq-on-fg: var(--deep);
+  --hq-tile-bg: var(--lime);       --hq-tile-fg: var(--deep);
+  --hq-blue-bg: rgba(157,187,240,.15); --hq-blue-fg: #AFC8F3;
+  --hq-open-bg: rgba(125,194,74,.18); --hq-open-fg: #A7DE7E;
+  --hq-danger: #F08A8A;            --hq-danger-bg: rgba(240,138,138,.10);
+  --hq-gold-fg: #F0CB63;           --hq-gold-bg: rgba(244,196,48,.16);
+  --hq-heart: #FF8FA3;
+  --hq-shadow: rgba(0,0,0,.60);
+}
+@media (prefers-color-scheme: dark) {
+  html[data-theme="auto"], html:not([data-theme]) {
+    --hq-on-bg: var(--lime);       --hq-on-fg: var(--deep);
+    --hq-tile-bg: var(--lime);     --hq-tile-fg: var(--deep);
+    --hq-blue-bg: rgba(157,187,240,.15); --hq-blue-fg: #AFC8F3;
+    --hq-open-bg: rgba(125,194,74,.18); --hq-open-fg: #A7DE7E;
+    --hq-danger: #F08A8A;          --hq-danger-bg: rgba(240,138,138,.10);
+    --hq-gold-fg: #F0CB63;         --hq-gold-bg: rgba(244,196,48,.16);
+    --hq-heart: #FF8FA3;
+    --hq-shadow: rgba(0,0,0,.60);
+  }
+}
+
+/* ---- the account menu ---------------------------------------------------- */
+.gts-acct { position: relative; flex: none; }
+.gts-acct > summary {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 10px 4px 4px; border-radius: 999px;
+  cursor: pointer; list-style: none; user-select: none;
+}
+.gts-acct > summary::-webkit-details-marker { display: none; }
+.gts-acct > summary::marker { content: ""; }
+.gts-acct > summary:hover,
+.gts-acct[open] > summary { background: var(--gts-surface-3); }
+.gts-acct > summary:focus-visible { outline: 3px solid var(--ad-ring); outline-offset: 2px; }
+.gts-acct-who b { display: block; font-size: 13.5px; font-weight: 600; line-height: 1.2; color: var(--gts-strong); max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gts-acct-who small { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--gts-quiet); }
+.gts-acct-chev { width: 15px; height: 15px; flex: none; fill: none; stroke: var(--gts-quiet); stroke-width: 2; transition: transform .15s ease; }
+.gts-acct[open] .gts-acct-chev { transform: rotate(180deg); }
+
+.gts-acct-menu {
+  position: absolute; top: calc(100% + 10px); right: 0; z-index: 90;
+  width: 276px; max-width: calc(100vw - 24px); padding: 6px;
+  background: var(--ad-card); border: 1px solid var(--ad-line-2); border-radius: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.06), 0 28px 50px -24px var(--hq-shadow);
+}
+.gts-acct-menu a,
+.gts-acct-menu button {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 9px 11px; border: 0; border-radius: 10px; background: none;
+  font: inherit; font-size: 13.5px; font-weight: 500; color: var(--ad-ink);
+  text-align: left; text-decoration: none; cursor: pointer;
+}
+.gts-acct-menu a:hover, .gts-acct-menu button:hover { background: var(--gts-surface-3); text-decoration: none; }
+.gts-acct-menu svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.9; opacity: .8; }
+.gts-acct-menu .gts-acct-out { margin-left: auto; width: 13px; height: 13px; opacity: .55; transform: rotate(-45deg); }
+.gts-acct-card {
+  display: flex; align-items: flex-start; gap: 11px;
+  margin: -6px -6px 4px; padding: 13px 13px 14px;
+  background: var(--gts-surface-2); border-bottom: 1px solid var(--ad-line);
+  border-radius: 16px 16px 0 0;
+}
+.gts-acct-face { width: 42px; height: 42px; font-size: 16px; }
+.gts-acct-id { min-width: 0; }
+.gts-acct-id b { display: block; font-size: 14px; font-weight: 700; line-height: 1.3; color: var(--ad-ink); }
+/* The address identifies the account, so it wraps rather than truncating to
+   something that could match two. */
+.gts-acct-id small { display: block; margin-top: 1px; font-size: 12px; line-height: 1.35; color: var(--ad-quiet); overflow-wrap: anywhere; }
+.gts-acct-role {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 7px;
+  padding: 2px 9px 2px 6px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  background: var(--gts-surface-3); color: var(--ad-quiet);
+}
+.gts-acct-role.is-super { background: var(--hq-gold-bg); color: var(--hq-gold-fg); }
+.gts-acct-role svg { width: 12px; height: 12px; fill: currentColor; stroke: none; }
+.gts-acct-group + .gts-acct-group { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--ad-line); }
+.gts-acct-cap { margin: 7px 11px 3px; font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--ad-quiet); }
+.gts-acct-out-form { margin: 6px 0 0; padding-top: 6px; border-top: 1px solid var(--ad-line); }
+.gts-acct-out-form button:hover { color: var(--hq-danger); background: var(--hq-danger-bg); }
+
+/* ---- the page's own card ------------------------------------------------- */
+.gts-hero {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+  align-items: center; gap: 12px 28px;
+  margin-bottom: 24px; padding: 24px clamp(20px, 3vw, 40px) 28px;
+  background: var(--ad-card); border: 1px solid var(--ad-line); border-radius: 24px;
+  box-shadow: 0 1px 2px rgba(15,46,34,.04), 0 22px 44px -36px var(--hq-shadow);
+  overflow: hidden;
+}
+.gts-hero .gts-head { margin: 0; min-width: 0; }
+.gts-hero .gts-back { margin-bottom: 20px; background: var(--gts-surface-2); }
+.gts-hero .gts-head .eyebrow { color: var(--gts-area-fg); font-weight: 800; margin-bottom: 8px; }
+.gts-hero .gts-head h1 { font-size: clamp(28px, 3.1vw, 44px); margin-bottom: 10px; overflow-wrap: anywhere; }
+.gts-hero .gts-head .gts-lead { font-size: 15.5px; line-height: 1.55; color: var(--ad-quiet); }
+
+.gts-hero-art { position: relative; height: 176px; }
+.gts-art-blob {
+  position: absolute; right: 12%; top: 50%; width: 156px; height: 156px;
+  transform: translateY(-50%); border-radius: 50%; background: var(--ad-tint-2);
+}
+.gts-art-dots {
+  position: absolute; right: 2%; top: 10px; width: 74px; height: 58px; opacity: .55;
+  background-image: radial-gradient(var(--ad-line-3) 1.6px, transparent 1.7px);
+  background-size: 12px 12px;
+}
+.gts-art-tile {
+  position: absolute; right: calc(12% + 36px); top: 50%;
+  width: 86px; height: 86px; display: grid; place-items: center;
+  transform: translateY(-50%) rotate(-8deg); border-radius: 24px;
+  background: var(--hq-tile-bg); color: var(--hq-tile-fg);
+  box-shadow: 0 20px 34px -18px var(--hq-shadow);
+}
+.gts-art-tile svg { width: 40px; height: 40px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.gts-art-spark { position: absolute; color: var(--hq-gold-fg); }
+.gts-art-spark svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.gts-art-spark.s1 { width: 22px; height: 22px; right: calc(12% + 2px); top: 18px; }
+.gts-art-spark.s2 { width: 15px; height: 15px; right: calc(12% + 150px); bottom: 26px; }
+/* The note: a small card beside the picture, like a sticker on it. Written on
+   one line in hq_base.html so that an empty one really is :empty. */
+.gts-art-note {
+  position: absolute; left: 0; bottom: 6px; max-width: 190px; margin: 0;
+  padding: 10px 13px; border-radius: 14px; transform: rotate(-3deg);
+  background: var(--ad-card); border: 1px solid var(--ad-line-2);
+  box-shadow: 0 14px 26px -18px var(--hq-shadow);
+  font-size: 12.5px; font-weight: 700; line-height: 1.4; color: var(--ad-ink);
+}
+.gts-art-note:empty { display: none; }
+.gts-heart { color: var(--hq-heart); }
+
+/* The enquiries envelope, drawn for the page. */
+.gts-env { position: absolute; right: 0; top: 50%; width: 240px; height: 170px; transform: translateY(-50%); overflow: visible; }
+.gts-env .e-blob { fill: var(--ad-tint-2); }
+.gts-env .e-back { fill: var(--forest); opacity: .35; }
+.gts-env .e-letter rect { fill: var(--ad-card); stroke: var(--ad-line-3); stroke-width: 1.5; }
+.gts-env .e-letter path { stroke: var(--ad-line-3); stroke-width: 5; stroke-linecap: round; fill: none; }
+.gts-env .e-front { fill: var(--hq-tile-bg); }
+.gts-env .e-fold { stroke: var(--hq-tile-fg); stroke-opacity: .35; stroke-width: 2; fill: none; stroke-linecap: round; }
+.gts-env .e-badge { fill: var(--hq-heart); }
+.gts-env .e-heart { fill: #FFFFFF; stroke: #FFFFFF; stroke-width: 1.2; }
+.gts-env .e-spark { fill: none; stroke: var(--hq-gold-fg); stroke-width: 1.8; }
+.gts-hero-art:has(.gts-env) .gts-art-note { left: -8px; }
+
+@media (max-width: 1100px) {
+  .gts-hero { grid-template-columns: minmax(0, 1fr) 230px; }
+  .gts-env { width: 200px; }
+  .gts-hero-art .gts-art-note { display: none; }
+}
+@media (max-width: 760px) {
+  .gts-hero { grid-template-columns: minmax(0, 1fr); padding: 18px 18px 22px; border-radius: 20px; }
+  .gts-hero-art { display: none; }
+}
+
+/* ---- the list bar -------------------------------------------------------- */
+.hq-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-bottom: 18px; }
+.hq-tabs {
+  display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px;
+  border-radius: 999px; background: var(--gts-surface-3); border: 1px solid var(--ad-line);
+}
+.hq-tabs a {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 15px; border-radius: 999px;
+  font-size: 13.5px; font-weight: 700; color: var(--ad-quiet); text-decoration: none;
+  transition: background .15s ease, color .15s ease;
+}
+.hq-tabs a:hover { color: var(--ad-ink); text-decoration: none; }
+.hq-tabs a.on { background: var(--ad-card); color: var(--ad-ink); box-shadow: 0 1px 3px rgba(15,46,34,.14); }
+.hq-n {
+  min-width: 22px; padding: 1px 7px; border-radius: 999px; text-align: center;
+  font-family: var(--score); font-size: 11.5px; font-weight: 800;
+  background: var(--ad-quiet-bg); color: var(--ad-ink);
+}
+.hq-tabs a.on .hq-n { background: var(--hq-on-bg); color: var(--hq-on-fg); }
+
+.hq-find { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-left: auto; }
+.hq-search { position: relative; display: block; }
+.hq-search svg {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  width: 16px; height: 16px; fill: none; stroke: var(--ad-quiet); stroke-width: 2; pointer-events: none;
+}
+.hq-search input,
+.hq-sort select {
+  font: inherit; font-size: 13.5px; color: var(--ad-ink);
+  background: var(--ad-field); border: 1px solid var(--ad-line-2); border-radius: 999px;
+  outline: none;
+}
+.hq-search input { width: min(280px, 100%); padding: 9px 16px 9px 38px; }
+.hq-search input::placeholder { color: var(--ad-quiet); opacity: 1; }
+.hq-search input:focus,
+.hq-sort select:focus { border-color: var(--forest); box-shadow: 0 0 0 3px var(--ad-ring); }
+.hq-sort { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--ad-quiet); }
+.hq-sort select { padding: 9px 14px; cursor: pointer; }
+
+/* ---- rows as cards ------------------------------------------------------- */
+/* Every table on this shell, not only the enquiries: the rows stop being
+   ruled lines and become rounded cards with a gap between them, which is the
+   "vibe" the mockup is. Restates the header and cell rules further up this
+   file, which is why it sits after them. */
+body.gt-shell .gt-table { border-collapse: separate; border-spacing: 0 10px; margin: -10px 0; }
+body.gt-shell .gt-table thead th {
+  background: transparent; color: var(--ad-quiet); border: 0;
+  padding: 10px 18px 2px; font-size: 11px; font-weight: 800;
+  letter-spacing: .12em; text-transform: uppercase; text-align: left;
+}
+body.gt-shell .gt-table tbody td {
+  background: var(--ad-card);
+  border-top: 1px solid var(--ad-line-2); border-bottom: 1px solid var(--ad-line-2);
+  padding: 15px 18px;
+}
+body.gt-shell .gt-table tbody tr td:first-child { border-left: 1px solid var(--ad-line-2); border-radius: 14px 0 0 14px; }
+body.gt-shell .gt-table tbody tr td:last-child { border-right: 1px solid var(--ad-line-2); border-radius: 0 14px 14px 0; }
+body.gt-shell .gt-table tbody tr:last-child td { border-bottom: 1px solid var(--ad-line-2); }
+body.gt-shell .gt-table tbody tr:hover { background: transparent; }
+body.gt-shell .gt-table tbody tr:hover td { background: var(--ad-card); border-color: var(--ad-line-3); }
+body.gt-shell .gt-table tbody tr.is-open td:first-child { box-shadow: inset 4px 0 0 var(--forest); }
+
+/* The enquiry rows fit their panel rather than scrolling inside it — which
+   also lets the ⋮ menu hang below its row instead of being clipped by the
+   scroll box. On a phone they stack (below). */
+.hq-list .gt-tablewrap { overflow: visible; }
+.gt-table.hq-rows { min-width: 0; }
+.hq-rows td { vertical-align: middle; }
+
+.hq-who { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.hq-who > span:last-child { min-width: 0; }
+.hq-who b { display: block; font-size: 14.5px; font-weight: 700; color: var(--ad-ink); }
+.hq-who small { display: block; margin-top: 1px; font-size: 12.5px; color: var(--ad-quiet); overflow-wrap: anywhere; }
+.hq-where { display: inline-flex !important; align-items: center; gap: 4px; }
+.hq-where svg { width: 12px; height: 12px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; }
+/* Six solid fills with white initials: each is 4.5:1 or better, and solid
+   rather than tinted so they read the same on both themes. */
+.hq-av {
+  width: 42px; height: 42px; flex: none; border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--display); font-size: 17px; color: #FFFFFF; background: #2D7A3A;
+}
+.hq-av[data-tone="1"] { background: #2F5DA8; }
+.hq-av[data-tone="2"] { background: #7E3E96; }
+.hq-av[data-tone="3"] { background: #A94E1C; }
+.hq-av[data-tone="4"] { background: #0D7078; }
+.hq-av[data-tone="5"] { background: #A3324B; }
+
+.hq-about { display: flex; align-items: flex-start; gap: 12px; }
+.hq-about-ic {
+  flex: none; width: 34px; height: 34px; border-radius: 10px;
+  display: grid; place-items: center; background: var(--ad-ic-bg); color: var(--ad-ic-fg);
+}
+.hq-about-ic svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.9; }
+.hq-about b { display: block; font-size: 14px; font-weight: 700; color: var(--ad-ink); }
+.hq-about small {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  max-width: 46ch; margin-top: 2px; font-size: 12.5px; line-height: 1.45; color: var(--ad-quiet);
+}
+.hq-when b { display: block; font-size: 13.5px; font-weight: 700; color: var(--ad-ink); white-space: nowrap; }
+.hq-when small { font-size: 12px; color: var(--ad-quiet); }
+
+.hq-status {
+  display: inline-block; padding: 4px 11px; border-radius: 999px; white-space: nowrap;
+  font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  background: var(--ad-quiet-bg); color: var(--ad-quiet);
+}
+.hq-status.is-open { background: var(--hq-open-bg); color: var(--hq-open-fg); }
+.hq-status.is-replied { background: var(--hq-blue-bg); color: var(--hq-blue-fg); }
+
+.hq-acts { display: inline-flex; align-items: center; gap: 6px; }
+.hq-reply {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 15px; border-radius: 999px; white-space: nowrap;
+  border: 1.5px solid var(--forest); color: var(--forest); background: transparent;
+  font-size: 13px; font-weight: 800; text-decoration: none;
+  transition: background .15s ease, color .15s ease;
+}
+.hq-reply svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; }
+.hq-reply:hover { background: var(--hq-on-bg); border-color: var(--hq-on-bg); color: var(--hq-on-fg); text-decoration: none; }
+
+.hq-more { position: relative; }
+.hq-more > summary {
+  width: 34px; height: 34px; display: grid; place-items: center;
+  border-radius: 50%; cursor: pointer; list-style: none; color: var(--ad-quiet);
+}
+.hq-more > summary::-webkit-details-marker { display: none; }
+.hq-more > summary::marker { content: ""; }
+.hq-more > summary:hover, .hq-more[open] > summary { background: var(--gts-surface-3); color: var(--ad-ink); }
+.hq-more > summary svg { width: 18px; height: 18px; fill: currentColor; }
+.hq-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 30;
+  min-width: 232px; padding: 6px;
+  background: var(--ad-card); border: 1px solid var(--ad-line-2); border-radius: 14px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.06), 0 24px 44px -22px var(--hq-shadow);
+}
+.hq-menu form { margin: 0; }
+.hq-menu a, .hq-menu button {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 11px; border: 0; border-radius: 9px; background: none;
+  font: inherit; font-size: 13.5px; font-weight: 500; color: var(--ad-ink);
+  text-align: left; text-decoration: none; white-space: nowrap; cursor: pointer;
+}
+.hq-menu a:hover, .hq-menu button:hover { background: var(--gts-surface-3); text-decoration: none; }
+.hq-menu svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.9; opacity: .8; }
+
+.hq-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.hq-foot p { margin: 0; font-size: 13.5px; color: var(--ad-quiet); }
+.hq-pager { display: flex; align-items: center; gap: 6px; }
+.hq-pager a, .hq-pager span {
+  min-width: 36px; height: 36px; padding: 0 10px; border-radius: 10px;
+  display: inline-grid; place-items: center;
+  font-size: 13.5px; font-weight: 700; color: var(--ad-ink); text-decoration: none;
+  border: 1px solid var(--ad-line-2); background: var(--ad-card);
+}
+.hq-pager a:hover { border-color: var(--forest); color: var(--forest); text-decoration: none; }
+.hq-pager .on { background: var(--hq-on-bg); border-color: var(--hq-on-bg); color: var(--hq-on-fg); }
+.hq-pager .off { opacity: .4; }
+.hq-pager .gap { border-color: transparent; background: none; }
+.hq-pager svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; }
+
+.hq-empty { padding: 40px 20px 30px; text-align: center; }
+.hq-empty-ic {
+  width: 58px; height: 58px; margin: 0 auto 14px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--ad-ic-bg); color: var(--ad-ic-fg);
+}
+.hq-empty-ic svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.hq-empty h3 { font-family: var(--display); font-size: 21px; color: var(--ad-ink); margin: 0 0 6px; }
+.hq-empty p { margin: 0 auto; max-width: 52ch; color: var(--ad-quiet); }
+.hq-empty a { color: var(--forest); font-weight: 700; }
+
+/* ---- narrower screens ---------------------------------------------------- */
+@media (max-width: 1100px) {
+  .hq-about small { max-width: 32ch; }
+}
+@media (max-width: 900px) {
+  /* Django admin and View site are both in the account menu, so the bar keeps
+     only what has nowhere else to go. */
+  .gts-actions > a { display: none; }
+  .gts-acct-who { display: none; }
+  .gts-acct > summary { padding: 3px; }
+  .gts-acct-chev { display: none; }
+  .hq-find { margin-left: 0; width: 100%; }
+  .hq-search { flex: 1 1 200px; }
+  .hq-search input { width: 100%; }
+}
+/* On a phone each enquiry is one card: who and the status on top, what it is
+   about under them, then when and the buttons. */
+@media (max-width: 760px) {
+  .gt-table.hq-rows, .gt-table.hq-rows tbody { display: block; margin: 0; }
+  .gt-table.hq-rows thead { display: none; }
+  /* Flex with an explicit order, not a two-column grid: in a grid the
+     buttons shared a column with the status pill, that column took the
+     buttons' width, and the name was left about 100px to wrap into. Here each
+     line sizes on its own — who beside the status, what it is about across
+     the card, then when beside the buttons. */
+  .gt-table.hq-rows tr {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+    margin-bottom: 10px; padding: 14px;
+    background: var(--ad-card); border: 1px solid var(--ad-line-2); border-radius: 14px;
+  }
+  .gt-table.hq-rows tr.is-open { box-shadow: inset 4px 0 0 var(--forest); }
+  /* :nth-child(n) is only there for weight: the desktop card rules name
+     td:first-child / td:last-child and would otherwise keep drawing a card
+     edge inside this card. */
+  body.gt-shell .gt-table.hq-rows tbody tr td:nth-child(n) {
+    display: block; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;
+  }
+  .gt-table.hq-rows td:nth-child(1) { order: 1; flex: 1 1 0; min-width: 0; }
+  .gt-table.hq-rows td:nth-child(4) { order: 2; flex: none; align-self: flex-start; }
+  .gt-table.hq-rows td:nth-child(2) { order: 3; flex: 1 1 100%; }
+  .gt-table.hq-rows td:nth-child(3) { order: 4; flex: 1 1 auto; }
+  .gt-table.hq-rows td:nth-child(5) { order: 5; flex: none; }
+  .hq-tabs { min-width: 0; }
+  .hq-tabs a { padding: 7px 9px; gap: 5px; font-size: 13px; }
+  .hq-when b, .hq-when small { display: inline; }
+  .hq-when small::before { content: " \00B7 "; }
+  .hq-about small { max-width: none; }
+  /* Below 620px the theme switch is already hidden and the two links went
+     at 900px, so the actions group is an empty box still taking a gap —
+     which is what pushed the avatar 3px past the edge of a 390px phone. */
+  .gts-top { gap: 10px; }
+  .gts-top .gts-actions { display: none; }
+  .gts-brand { font-size: 21px; }
+  .gts-area { font-size: 10.5px; padding: 3px 9px; letter-spacing: .1em; }
+  .hq-tabs { width: 100%; justify-content: space-between; }
+  .hq-tabs a { flex: 1 1 auto; justify-content: center; padding: 8px 10px; }
+  .hq-foot { justify-content: center; text-align: center; }
+}

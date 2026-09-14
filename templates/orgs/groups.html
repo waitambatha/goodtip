@@ -388,7 +388,13 @@ the view already expects (name, kind, label), so nothing behind this changed.
     });
   })();
 
-<script>
+  /* No script tags in this block, and none in its comments either: app_base
+     already wraps the block in one script element and a function. An inner
+     pair of tags ended that element early. The stray opening tag was a syntax
+     error that took down every inline script on the page, the create-a-group
+     sheet with it, and app_base's closing lines were printed onto the page as
+     text. The HTML parser ends a script at the first closing tag it meets,
+     even one written inside a JavaScript comment. */
 (function () {
   var box   = document.querySelector('[data-grp-search]');
   var input = document.querySelector('[data-grp-input]');
@@ -428,6 +434,5 @@ the view already expects (name, kind, label), so nothing behind this changed.
   });
   apply();
 })();
-</script>
 
 {% endblock %}

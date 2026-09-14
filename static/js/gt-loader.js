@@ -46,7 +46,12 @@
      Skipped outright, before any timer starts, rather than dismissed early:
      an early dismiss would still paint one visible frame of the full-screen
      splash on every step. */
-  if (document.body.classList.contains('wiz-page')) {
+  /* no-page-loader: the same early exit, for a page that asks for it. The
+     Wall is the first — it works like a chat, and moving between its rooms
+     should feel like changing conversation, not like opening a new screen
+     (client: "when we click it ... remove that loader"). */
+  if (document.body.classList.contains('wiz-page') ||
+      document.body.classList.contains('no-page-loader')) {
     L.style.display = 'none';
     return;
   }

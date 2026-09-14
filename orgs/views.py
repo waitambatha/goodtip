@@ -1893,30 +1893,38 @@ def _global_wall_posts(limit=GLOBAL_WALL_SIZE):
     return list(WallPost.public_feed()[:limit])
 
 
-def _wall_posts_context(request, org, group=None):
-    """The feed, with per-post reaction state for the current user.
+def _wall_posts_context(request, org, group=None, room=None):
+    """The feed, newest first, with per-post reaction state for the current user.
 
     `group=None` is the organisation's own wall and excludes every group post —
     otherwise a sub-team's chatter would surface in front of the whole
     organisation, which is the opposite of what a group is for.
+
+    `room` is a competition (a Series), or None for the all-competitions room.
+    A competition's room holds the posts written in it and the round recaps
+    for its rounds. GoodTip's own updates belong to every competition at once,
+    so they live in the all room, with everything else.
     """
+    from django.db.models import Q
+
     from .models import WallPost, WallReaction
 
+    qs = WallPost.objects.filter(org=org, group=group, is_hidden=False)
+    if room is not None:
+        qs = qs.filter(
+            Q(kind=WallPost.KIND_MEMBER, series=room)
+            | Q(kind=WallPost.KIND_RECAP, recap__round__series=room)
+        )
     posts = list(
-        WallPost.objects.filter(org=org, group=group, is_hidden=False)
         # "recap" is the reverse OneToOne carrying the round's leaderboard and
-        # conversation starters — one join beats a query per card.
-        .select_related(
-            "author", "recap", "recap__round",
+        # conversation starters — one join beats a query per card. Both series
+        # ride along because every card wears its competition.
+        qs.select_related(
+            "author", "series", "recap", "recap__round", "recap__round__series",
             "tip__match__home_team", "tip__match__away_team",
         )
         [:WALL_PAGE_SIZE]
     )
-    # The latest recap card is pinned to the top (recap spec §2).
-    recap = next((p for p in posts if p.kind == WallPost.KIND_RECAP), None)
-    if recap is not None:
-        posts.remove(recap)
-        posts.insert(0, recap)
 
     counts = (
         WallReaction.objects.filter(post__in=posts)
@@ -1990,22 +1998,113 @@ def _current_round_tips(user, org, group=None):
     )
 
 
+def _room_mark(series) -> str:
+    """A room's badge: a short competition name as it is, a long one as its
+    initials ("State of Origin" -> "SOO")."""
+    name = series.name.strip()
+    if len(name) <= 5:
+        return name.upper()
+    initials = "".join(w[0] for w in name.split() if w[:1].isalnum())
+    return (initials or name)[:4].upper()
+
+
+def _wall_rooms(request, org, group):
+    """The Wall's rooms — "All competitions", then one per competition — and
+    which one is open.
+
+    Client, Sep 2026: "the menu of it should be the competitions — I click
+    NRL, then I find NRL where I can chat and see the group recap". There is a
+    room for every competition the organisation tips and for any competition
+    that already has recaps on this wall, each with its newest line and how
+    many round recaps it holds, so the list answers "is anything new in NRL?"
+    before it is opened.
+
+    ``?room=<slug>`` opens a room and ``?room=all`` the all room. With no
+    choice made, the member's saved room opens first (User.recap_codes —
+    "I'm more into NRL, that is the recap I want"), otherwise the all room.
+
+    Returns (rooms, room, room_series, room_chosen).
+    """
+    from django.db.models import Count
+
+    from catalog.models import Series
+
+    from .models import RoundRecap, WallPost
+
+    ids = set()
+    for comp in org.competitions.all():
+        ids.update(s.id for s in comp.series.all())
+    recap_counts = dict(
+        RoundRecap.objects.filter(org=org, group=group, post__is_hidden=False)
+        .values_list("round__series_id").annotate(n=Count("id"))
+    )
+    ids.update(recap_counts)
+    series = list(Series.objects.filter(id__in=ids).order_by("name"))
+
+    # Each room's newest line: its newest post or its newest recap, whichever
+    # is later. DISTINCT ON keeps it to one row per competition.
+    base = WallPost.objects.filter(org=org, group=group, is_hidden=False)
+    latest = {}
+    for row in (base.filter(kind=WallPost.KIND_MEMBER, series__isnull=False)
+                .order_by("series_id", "-created_at").distinct("series_id")
+                .values("series_id", "created_at", "body")):
+        latest[row["series_id"]] = (row["created_at"], row["body"])
+    for row in (base.filter(kind=WallPost.KIND_RECAP, recap__isnull=False)
+                .order_by("recap__round__series_id", "-created_at")
+                .distinct("recap__round__series_id")
+                .values("recap__round__series_id", "created_at", "body")):
+        sid = row["recap__round__series_id"]
+        if sid not in latest or row["created_at"] > latest[sid][0]:
+            latest[sid] = (row["created_at"], row["body"])
+    newest = base.order_by("-created_at").values("created_at", "body").first() or {}
+
+    slugs = {s.slug for s in series}
+    saved = next((c for c in (request.user.recap_codes or []) if c in slugs), None)
+    rooms = [{
+        "slug": "all", "code": "", "name": "All competitions", "mark": "ALL",
+        "latest": newest.get("created_at"), "preview": newest.get("body", ""),
+        "recaps": sum(recap_counts.values()), "is_default": saved is None,
+        "series": None,
+    }]
+    for s in series:
+        when, body = latest.get(s.id, (None, ""))
+        rooms.append({
+            "slug": s.slug, "code": s.slug, "name": s.name, "mark": _room_mark(s),
+            "latest": when, "preview": body, "recaps": recap_counts.get(s.id, 0),
+            "is_default": saved == s.slug, "series": s,
+        })
+
+    raw = (request.GET.get("room") or "").strip()
+    wanted = raw or saved or "all"
+    room = next((r for r in rooms if r["slug"] == wanted), rooms[0])
+    return rooms, room, room["series"], bool(raw)
+
+
 @login_required
 def wall_view(request, org_id: int):
+    from .models import WallPost
+
     org = get_object_or_404(Organisation, pk=org_id)
     if not _is_member(request.user, org):
         return HttpResponseForbidden()
     group = ctx.current_group(request, org)
+    rooms, room, room_series, room_chosen = _wall_rooms(request, org, group)
+    posts = _wall_posts_context(request, org, group, room=room_series)
+    # The room's newest round recap is pinned above its chat (recap spec §2),
+    # and so is not repeated in the chat below it.
+    pinned = next((p for p in posts if p.kind == WallPost.KIND_RECAP), None)
+    if pinned is not None:
+        posts = [p for p in posts if p is not pinned]
     # No donation figures on the Wall — participants are out of the money
     # flow entirely (donation-model reference, 23 Jul 2026).
     return render(request, "orgs/wall.html", {
         "org": org,
         "group": group,
-        "posts": _wall_posts_context(request, org, group),
-        # The cross-organisation feed is about organisations, so it stays off
-        # a group's wall — a group is a room inside one building, not a window
-        # onto the street.
-        "global_posts": _global_wall_posts() if group is None else [],
+        "rooms": rooms,
+        "room": room,
+        "room_chosen": room_chosen,
+        "pinned_recap": pinned,
+        "posts": posts,
         "my_tips": _current_round_tips(request.user, org, group),
         "is_admin": _can_manage(request.user, org),
         # Only offer the public toggle where it can actually do something — in
@@ -2017,6 +2116,31 @@ def wall_view(request, org_id: int):
 
 @login_required
 @require_POST
+def wall_recap_pref(request, org_id: int):
+    """Keep the Wall's recap filter as this member's default, on every Wall.
+
+    Series slugs are the same in every organisation, so "NRL" chosen on one
+    Wall is NRL on all of them. An empty set means all competitions.
+    """
+    from catalog.models import Series
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _is_member(request.user, org):
+        return HttpResponseForbidden()
+    wanted = request.POST.getlist("codes")
+    codes = sorted(set(Series.objects.filter(slug__in=wanted).values_list("slug", flat=True)))
+    request.user.recap_codes = codes
+    request.user.save(update_fields=["recap_codes"])
+    messages.success(
+        request,
+        "All competitions opens first on your Wall." if not codes
+        else "Saved. That room opens first on your Wall.",
+    )
+    return redirect(f"{reverse('orgs:wall', args=[org.id])}?room={codes[0] if codes else 'all'}")
+
+
+@login_required
+@require_POST
 def wall_post_create(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _is_member(request.user, org):
@@ -2024,6 +2148,13 @@ def wall_post_create(request, org_id: int):
     from .models import WallPost
 
     group = ctx.current_group(request, org)
+    # The room it was written in — the composer of a competition's room sends
+    # its slug. Only a real competition; anything else, or none, is the
+    # all-competitions room.
+    from catalog.models import Series
+
+    room_slug = (request.POST.get("room") or "").strip()
+    room = Series.objects.filter(slug=room_slug).first() if room_slug else None
     body = (request.POST.get("body") or "").strip()[:500]
     tip = None
     tip_id = request.POST.get("tip")
@@ -2039,6 +2170,7 @@ def wall_post_create(request, org_id: int):
     if body or tip:
         post = WallPost.objects.create(
             org=org, group=group, author=request.user, body=body, tip=tip,
+            series=room,
             kind=WallPost.KIND_MEMBER,
             # Opt-in, only honoured while the organisation is publicly listed,
             # and never for a group post: the public wall is the organisation
@@ -2052,7 +2184,9 @@ def wall_post_create(request, org_id: int):
         _notify_wall_post(post)
     else:
         messages.error(request, "Say something — or at least attach a pick.")
-    return redirect("orgs:wall", org_id=org.id)
+    # Back to the room it was written in.
+    url = reverse("orgs:wall", args=[org.id])
+    return redirect(f"{url}?room={room.slug}" if room else url)
 
 
 def _notify_wall_post(post):

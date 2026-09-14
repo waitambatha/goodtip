@@ -1383,7 +1383,7 @@ def leaderboard_view(request, org_id: int):
     at = steps.index(here)
     labels = {"all": "All rounds"}
     for r in rounds:
-        labels[str(r.id)] = f"Round {r.round_number}"
+        labels[str(r.id)] = r.label
     # The strip of round buttons, on the same design as the ladder's — five at
     # a time, the current one highlighted, stepping backwards a page at a time.
     # DE-DUPLICATED. A Round row is per (org, round_number, series), so a league

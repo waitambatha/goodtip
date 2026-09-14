@@ -1046,6 +1046,15 @@ class WallPost(models.Model):
         "tipping.Tip", on_delete=models.SET_NULL,
         null=True, blank=True, related_name="wall_posts",
     )
+    # WHICH COMPETITION'S ROOM this was said in (Sep 2026: the Wall became
+    # rooms by competition, laid out like Messages — "I click NRL, then I find
+    # NRL where I can chat and see the group recap"). NULL is the
+    # all-competitions room, which is where every post written before the rooms
+    # existed now lives. A recap's room is its round's series, not this field.
+    series = models.ForeignKey(
+        "catalog.Series", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="wall_posts",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     # Admin hide (recap spec §11): gone from the feed, data kept.
     is_hidden = models.BooleanField(default=False)

@@ -40,7 +40,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
       <div>
         <span class="badge-live">{% if preview_round.is_locked %}Locked{% else %}Live &middot; locks soon{% endif %}</span>
-        <div class="card-h" style="margin-top:8px;">Round {{ preview_round.round_number }} &middot; {{ preview_round.series }}</div>
+        <div class="card-h" style="margin-top:8px;">{{ preview_round.label }} &middot; {{ preview_round.series }}</div>
         <div class="card-lead">Coming up on GoodTip</div>
       </div>
     </div>
@@ -136,7 +136,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
   <div class="veil"></div>
   <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;">
     <div style="min-width:0;flex:1;">
-      {% if c.round %}<div class="app-eyebrow db-eyebrow">Round {{ c.round.round_number }} &middot; {{ c.round.series }}</div>{% endif %}
+      {% if c.round %}<div class="app-eyebrow db-eyebrow">{{ c.round.label }} &middot; {{ c.round.series }}</div>{% endif %}
 
       {% comment %}
       The headline is a message channel, not a nameplate. It opens on the
@@ -266,7 +266,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
       <div>
         <span class="badge-live">{% if not open_games %}All started{% elif c.round.is_locked %}Part-locked{% else %}Live &middot; locks soon{% endif %}</span>
-        <div class="card-h" style="margin-top:8px;">Round {{ c.round.round_number }} &middot; {{ c.round.series }}</div>
+        <div class="card-h" style="margin-top:8px;">{{ c.round.label }} &middot; {{ c.round.series }}</div>
         {% comment %}The org name headlines the card directly above this one —
         repeating it here just pushed the countdown further down.{% endcomment %}
         <div class="card-lead">{{ c.round.get_stage_display }}</div>
@@ -540,39 +540,7 @@ accounts.views.dashboard for how the stories are dealt to the places.
     <span class="nd-all-go" aria-hidden="true">&rarr;</span>
   </a>
 </div>
-<div class="news-deck{% if news_turns > 1 %} is-live{% endif %}" data-news-deck
-     data-interval="5000" data-turns="{{ news_turns }}">
-  {% for row in news_rows %}
-  <div class="nd-row" data-news-row="{{ forloop.counter0 }}">
-    {% for slot in row %}
-    <div class="nd-place" data-news-place>
-      <div class="nd-spinner">
-        <div class="nd-face nd-front" data-face="front">{% include "partials/_news_deck_card.html" with p=slot.0 %}</div>
-        <div class="nd-face nd-back" data-face="back" aria-hidden="true"></div>
-      </div>
-      {% if news_turns > 1 %}<template data-news-queue>{% for p in slot %}{% include "partials/_news_deck_card.html" with p=p %}{% endfor %}</template>{% endif %}
-    </div>
-    {% endfor %}
-  </div>
-  {% endfor %}
-
-  {% comment %}
-  Only when there is more than one turn — a single dot is a control that does
-  nothing. A dot moves BOTH rows at once, because it means "show me page two"
-  rather than "take the next step in the alternation".
-  {% endcomment %}
-  {% if news_turns > 1 %}
-  <div class="nd-foot">
-    <div class="nd-dots" role="group" aria-label="News pages">
-      {% for p in news_rows.0.0 %}
-      <button type="button" class="nd-dot{% if forloop.first %} on{% endif %}" data-news-dot="{{ forloop.counter0 }}"
-              {% if forloop.first %}aria-current="true"{% endif %}
-              aria-label="Stories, page {{ forloop.counter }} of {{ news_turns }}"></button>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
-</div>
+{% include "partials/_news_deck.html" %}
 {% endif %}
 
 {% endwith %}

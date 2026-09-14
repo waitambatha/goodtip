@@ -102,6 +102,12 @@ class User(AbstractUser):
     # route can be renamed without re-showing a tour somebody has finished.
     onboarding_pages_seen = models.JSONField(default=list, blank=True)
 
+    # WHICH COMPETITIONS' ROUND RECAPS THIS PERSON WANTS ON THE WALL, as Series
+    # slugs ("nrl", "nrlw"). Empty means all of them. Set from the chips above
+    # the Wall (client, Sep 2026: "lets say im more into NRL, that is the recap
+    # i want"). A column rather than a cookie, so it follows them to their phone.
+    recap_codes = models.JSONField(default=list, blank=True)
+
     def has_seen_tour(self, key: str) -> bool:
         return key in (self.onboarding_pages_seen or [])
 

@@ -1393,3 +1393,26 @@ html[data-theme="light"] .gtm-paper::after {
 .paper-thumb-none { background: repeating-linear-gradient(45deg, #EDEAE0 0 8px, #F7F5EE 8px 16px); }
 .paper-opt b { font-size: 13px; font-weight: 700; }
 .paper-opt i { font-style: normal; font-size: 11.5px; line-height: 1.4; color: var(--muted); }
+
+/* ---- THE WORDS FOLLOW THE BUBBLE (Sep 2026 contrast audit) ---------------
+   The bubbles above set their own ink (--m-bubble-ink / --m-mine-ink), but
+   `.gtm-chat .chat-text` names --m-ink — the page's cream in the green theme —
+   and outranks the colour the bubble passes down. So in green, somebody else's
+   message was cream on the near-white bubble: an empty white box (1.01:1).
+   The same for the time stamp, and the blue "Read" tick sat on your own blue
+   bubble. */
+.gtm-chat .chat-bubble .chat-text { color: inherit; }
+.gtm-chat .chat-bubble .chat-stamp { color: rgba(22,32,43,.68); opacity: 1; }
+.gtm-chat .chat-row.mine .chat-bubble .chat-stamp { color: rgba(255,255,255,.84); }
+.gtm-chat .chat-row.mine .chat-bubble .chat-tick,
+.gtm-chat .chat-row.mine .chat-bubble .chat-tick i { color: #D6E6FF; }
+
+/* The quietest ink (times, "Recent chats", previews) was cream at 42% on the
+   dark panels — 3.6:1 — and #737A72 on white in light — 4.4:1. */
+.gtm-page { --m-ink-3: rgba(244,242,233,.62); }
+html[data-theme="light"] body.gt-app.gtm-page { --m-ink-3: #5F665E; }
+/* Your own bubble is blue in BOTH themes, as the note above says. The light
+   palette's block (html[data-theme="light"] body.gt-app.gtm-page) set it to
+   pale lime at a higher specificity than that note's rule, and with white ink
+   on it "hello" was white on pale lime. */
+html[data-theme="light"] body.gt-app.gtm-page { --m-mine: #2F5DA8; --m-mine-ink: #FFFFFF; }

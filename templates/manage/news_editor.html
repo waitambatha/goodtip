@@ -5,8 +5,8 @@
 {% block title %}{% if is_new %}New post{% else %}Edit post{% endif %} &middot; Manage{% endblock %}
 {% block nav_news %}on{% endblock %}
 {% block hero_title %}{% if is_new %}Write a new story{% else %}Edit story{% endif %}{% endblock %}
+{% block hero_icon %}ic-doc{% endblock %}
 {% block hero_lead %}{% if is_new %}A full page to write in — headline, body, images, formatting, all of it.{% else %}{{ post.title }}{% endif %}{% endblock %}
-{% block hero_shot %}{% static 'img/scenes/aussie-crowd-flag.jpg' %}{% endblock %}
 {% block extra_head %}
 <script src="{% static 'js/gt-news-editor.js' %}" defer></script>
 <script src="{% static 'js/gt-share.js' %}" defer></script>

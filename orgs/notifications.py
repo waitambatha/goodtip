@@ -280,7 +280,7 @@ def _round_result_messages(round_obj, org, room, matches) -> list:
         messages.append(build(
             "tip_results",
             subject=(
-                f"Round {round_obj.round_number}{where}: you got {correct} of {graded}"
+                f"{round_obj.label}{where}: you got {correct} of {graded}"
             ),
             to=user.email,
             context={

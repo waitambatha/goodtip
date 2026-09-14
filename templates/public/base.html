@@ -124,6 +124,38 @@
       window.addEventListener('resize', function () {
         if (window.innerWidth > 1120) setNavOpen(false);
       });
+
+      /* THE BAR FITS ITS SCREEN (Sep 2026) — see "the public site's bar fits
+         its screen too" in goodtip.css. Signed in, the row carries the account
+         actions as well and ran 224px past its container at MacBook widths.
+         Above the drawer breakpoint it now measures itself: tighten first, and
+         if that is not enough, use the drawer it already has below 1,120px. */
+      var navInner = nav.querySelector('.nav-inner');
+      var navLinks = nav.querySelector('.nav-links');
+      var navMark = nav.querySelector('.wordmark');
+      /* Against the SCREEN, not the bar's inner box. The row is wider than
+         that box at every desktop width and always was; on a 1,920px screen
+         it overhangs the box but ends 150px short of the edge, which is fine.
+         Measuring the box sent every wide screen to the drawer and hid the
+         whole menu behind a button. What matters is whether the row reaches
+         the edge of the screen or runs into the wordmark. */
+      function navOver() {
+        var lr = navLinks.getBoundingClientRect();
+        var edge = document.documentElement.clientWidth - 12;
+        var mark = navMark ? navMark.getBoundingClientRect().right + 8 : 0;
+        return lr.right > edge || lr.left < mark;
+      }
+      function fitNav() {
+        nav.classList.remove('is-tight', 'is-tight2', 'is-drawer');
+        if (!navInner || !navLinks || window.innerWidth <= 1120) return;
+        if (navOver()) nav.classList.add('is-tight');
+        if (navOver()) nav.classList.add('is-tight2');   // links lose their icons
+        if (navOver()) nav.classList.add('is-drawer');   // last resort only
+      }
+      fitNav();
+      window.addEventListener('resize', fitNav);
+      window.addEventListener('load', fitNav);
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitNav);
     }
 
     /* ---- Scroll reveal ----

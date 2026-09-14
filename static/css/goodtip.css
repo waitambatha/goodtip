@@ -4057,6 +4057,52 @@ a.gt-stat:hover .gs-go { opacity: 1; color: var(--lime); }
 }
 .gt-post:hover { box-shadow: 0 16px 34px -26px rgba(15,46,34,.5); }
 .gt-post.is-recap { border-left-color: var(--lime); background: linear-gradient(110deg, rgba(200,241,53,.12), var(--gt-card) 52%); }
+/* A RECAP WEARS ITS COMPETITION (Sep 2026, client: "a creative way of knowing
+   and distinguishing this is for NRL, this is for NRLW ... let them have
+   separate colours and tags"). The same [data-code] tokens the fixtures, the
+   ladder and the story cards read, so NRL is amber here because it is amber
+   everywhere. The edge takes the deep ink and the wash is the light tone at
+   low strength, so the words on it are still reading off the card colour. */
+.gt-post.is-recap[data-code] {
+  border-left-color: var(--code-ink);
+  background: var(--gt-card);
+  background: linear-gradient(110deg, color-mix(in srgb, var(--code) 16%, var(--gt-card)), var(--gt-card) 55%);
+}
+.gt-post .gpt-tag.gpt-code { background: var(--code-ink, var(--deep)); color: var(--code-on, #fff); }
+.gt-post .gpt-tag + .gpt-tag { margin-left: -4px; }
+
+/* The recap filter above the feed: one chip per competition, each in its own
+   colour, and a way to keep the choice. */
+.gwall-recaps {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  margin-top: 18px; padding: 12px 14px; border-radius: var(--gt-r-sm);
+  background: var(--gt-card); border: 1px solid var(--gt-hair);
+}
+.gwr-lab {
+  font-family: var(--mark); font-weight: 700; font-size: 10.5px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted);
+}
+.gwr-chips { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.gwr-chip {
+  display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border-radius: 100px;
+  font-size: 13px; font-weight: 700; line-height: 1.2; text-decoration: none; color: var(--ink);
+  border: 1px solid var(--gt-hair); background: transparent;
+  transition: background .15s var(--ease), border-color .15s var(--ease), color .15s var(--ease);
+}
+.gwr-chip i { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--code, var(--lime)); }
+.gwr-chip:hover { border-color: var(--code-ink, var(--forest)); }
+.gwr-chip.on { background: var(--code-ink, var(--deep)); border-color: var(--code-ink, var(--deep)); color: var(--code-on, #fff); }
+.gwr-chip.on i { background: var(--code-on, #fff); }
+.gwr-chip:focus-visible { outline: 3px solid var(--lime); outline-offset: 2px; }
+.gwr-save { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.gwr-note { font-size: 12.5px; font-weight: 700; color: var(--forest); }
+.gwr-btn {
+  font: inherit; font-size: 12.5px; font-weight: 700; line-height: 1.2; padding: 7px 13px;
+  border-radius: 100px; cursor: pointer; background: transparent; color: var(--forest);
+  border: 1px dashed var(--forest);
+}
+.gwr-btn:hover { background: color-mix(in srgb, var(--forest) 10%, transparent); }
+@media (max-width: 620px) { .gwr-save { margin-left: 0; width: 100%; } }
 .gt-post.is-system { border-left-color: rgba(45,122,58,.4); }
 .gt-post .gpt-head { display: flex; align-items: center; gap: 12px; }
 .gt-post .gpt-av {
@@ -14697,27 +14743,72 @@ html[data-theme="light"] .gt-app.page-deep .nd-title { color: var(--lt-ink); }
    anchor — which has no size of its own the browser can draw around. */
 .nd-card:has(.ndc-a:focus-visible) { outline: 3px solid var(--lime); outline-offset: 3px; }
 
-/* ---- the flip ------------------------------------------------------------
-   A front and a back on one element that turns half a circle. The next story
-   goes on the back before the turn, so what faces you when it lands is a
-   different story; the faces then swap roles, so the next turn goes the same
-   way round again rather than winding back. */
-.nd-place { perspective: 1600px; }
-.nd-spinner {
-  position: relative; display: grid; height: 100%;
-  transform-style: preserve-3d;
-  transition: transform .9s cubic-bezier(.45, .05, .25, 1);
-}
-.nd-spinner.is-flipped { transform: rotateY(180deg); }
+/* ---- the five turns ------------------------------------------------------
+   Sep 2026, client: "lets have like 5 ways or design that the cards will be
+   changing". Two faces share one grid cell and the one showing carries
+   .is-up. A turn puts the next story on the other face and plays a pair of
+   keyframe animations — .is-leaving on the old face, .is-arriving on the new
+   — picked by data-turn on the place. gt-news-cards.js takes the five in
+   order, one per tick, and its LASTS table must agree with the timings here.
+
+   `perspective` is on the spinner, the faces' own parent: it only gives depth
+   to an element's children, and on anything further up the 3D turns flatten
+   into a squash. */
+.nd-spinner { position: relative; display: grid; height: 100%; perspective: 1600px; }
 .nd-face {
   grid-area: 1 / 1; display: grid; min-width: 0;
   -webkit-backface-visibility: hidden; backface-visibility: hidden;
 }
-.nd-back { transform: rotateY(180deg); }
+.nd-face:not(.is-up):not(.is-leaving) { visibility: hidden; }
+.nd-face.is-arriving { z-index: 1; }
+/* Slide and iris clip to the card's own corners while they run. */
+.nd-place.is-turning[data-turn="slide"] .nd-spinner,
+.nd-place.is-turning[data-turn="iris"] .nd-spinner { overflow: hidden; border-radius: 16px; }
 
-/* ---- the cross-fade a reduced-motion reader gets instead ---------------- */
-.nd-face.nd-fade { animation: nd-fade .5s var(--ease) both; }
-@keyframes nd-fade { from { opacity: 0; } to { opacity: 1; } }
+/* 1. FLIP — the card turns on its upright; the new story is on the far side. */
+.nd-place[data-turn="flip"] .nd-face.is-leaving  { animation: nd-flip-out .43s cubic-bezier(.55,.06,.68,.19) both; }
+.nd-place[data-turn="flip"] .nd-face.is-arriving { animation: nd-flip-in .43s .43s cubic-bezier(.22,.61,.36,1) both; }
+@keyframes nd-flip-out { from { transform: rotateY(0); } to { transform: rotateY(-90deg); } }
+@keyframes nd-flip-in  { from { transform: rotateY(90deg); } to { transform: rotateY(0); } }
+
+/* 2. TUMBLE — the same turn on the horizontal, like a departures board. */
+.nd-place[data-turn="tumble"] .nd-face.is-leaving  { animation: nd-tumble-out .43s cubic-bezier(.55,.06,.68,.19) both; }
+.nd-place[data-turn="tumble"] .nd-face.is-arriving { animation: nd-tumble-in .43s .43s cubic-bezier(.22,.61,.36,1) both; }
+@keyframes nd-tumble-out { from { transform: rotateX(0); } to { transform: rotateX(90deg); } }
+@keyframes nd-tumble-in  { from { transform: rotateX(-90deg); } to { transform: rotateX(0); } }
+
+/* 3. SLIDE — the new story pushes the old one out sideways. */
+.nd-place[data-turn="slide"] .nd-face.is-leaving  { animation: nd-slide-out .7s cubic-bezier(.65,0,.35,1) both; }
+.nd-place[data-turn="slide"] .nd-face.is-arriving { animation: nd-slide-in .7s cubic-bezier(.65,0,.35,1) both; }
+@keyframes nd-slide-out { from { transform: translateX(0); } to { transform: translateX(-104%); } }
+@keyframes nd-slide-in  { from { transform: translateX(104%); } to { transform: translateX(0); } }
+
+/* 4. ZOOM — the old story falls back and fades as the new one settles in. */
+.nd-place[data-turn="zoom"] .nd-face.is-leaving  { animation: nd-zoom-out .5s cubic-bezier(.4,0,1,1) both; }
+.nd-place[data-turn="zoom"] .nd-face.is-arriving { animation: nd-zoom-in .6s .15s cubic-bezier(0,0,.2,1) both; }
+@keyframes nd-zoom-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(.88); } }
+@keyframes nd-zoom-in  { from { opacity: 0; transform: scale(1.1); } to { opacity: 1; transform: scale(1); } }
+
+/* 5. IRIS — the new story opens out of the middle of the old one. */
+.nd-place[data-turn="iris"] .nd-face.is-leaving  { animation: nd-iris-under .8s ease both; }
+.nd-place[data-turn="iris"] .nd-face.is-arriving { animation: nd-iris-in .8s cubic-bezier(.65,0,.35,1) both; }
+@keyframes nd-iris-under { from { transform: scale(1); opacity: 1; } to { transform: scale(.95); opacity: .55; } }
+@keyframes nd-iris-in {
+  from { -webkit-clip-path: circle(0% at 50% 45%); clip-path: circle(0% at 50% 45%); }
+  to   { -webkit-clip-path: circle(150% at 50% 45%); clip-path: circle(150% at 50% 45%); }
+}
+
+/* THE FADE — every turn, for a reader whose system asks for reduced motion.
+   The deck still changes every five seconds (the client's instruction, and a
+   change of content rather than a movement); nothing travels. */
+.nd-place[data-turn="fade"] .nd-face.is-leaving  { animation: nd-fade-out .4s ease both; }
+.nd-place[data-turn="fade"] .nd-face.is-arriving { animation: nd-fade .4s ease both; }
+@keyframes nd-fade     { from { opacity: 0; } to { opacity: 1; } }
+@keyframes nd-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+/* The news page's copy of the deck sits above the full archive list. */
+.news-top { margin-top: 6px; }
+.news-all-h { text-align: center; font-size: 22px; margin: 30px 0 16px; }
 
 /* ---- the dots ------------------------------------------------------------ */
 .nd-foot { display: flex; justify-content: center; margin-top: 16px; }
@@ -14737,13 +14828,14 @@ html[data-theme="light"] .gt-app.page-deep .nd-title { color: var(--lt-ink); }
 .page-deep .nd-dot.on { background: var(--lime); }
 .nd-dot:focus-visible { outline: 3px solid var(--lime); outline-offset: 3px; }
 
-/* Asked not to have things move: the script starts no clock, turns nothing
-   over on its own, and cross-fades rather than flips when a dot is pressed.
-   This covers any animation that slips through. */
+/* Asked not to have things move: the deck and the card pictures still change,
+   but every change is a cross-fade in place. The script already asks for the
+   "fade" turn under this setting; this catches anything that slips through,
+   whichever movement a place was last given. */
 @media (prefers-reduced-motion: reduce) {
-  .nd-spinner { transition: none; }
-  .ndc-shot { transition: opacity .01ms; transform: none; }
-  .nd-face.nd-fade { animation-duration: .01ms; }
+  .nd-place .nd-face.is-leaving  { animation: nd-fade-out .4s ease both; }
+  .nd-place .nd-face.is-arriving { animation: nd-fade .4s ease both; }
+  .ndc-shot { transition: opacity .45s ease; transform: none; }
 }
 
 /* ==========================================================================
@@ -18945,3 +19037,522 @@ html[data-theme="dark"] .pub[data-state="back"]      { --sc: #C3D2E0; }
   .pub-pop { left: 0; right: auto; }
   .ned-fm-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ==========================================================================
+   ============ THE BAR FITS THE SCREEN IT IS ON (Sep 2026) =================
+   ==========================================================================
+   Client: "containers and certain things fall out of place depending on the
+   laptop or pad in use ... people with Mac where things are not holding, and
+   on my HP everything is intact".
+
+   Measured, not guessed (Chromium, 8px steps, a staff account with all eight
+   items): the full bar needs 1,474px against a 1,300px cap, its compact tier
+   only started at 1,400px, and even that needs 1,330px. So every screen from
+   ~1,360 to ~1,650px wide pushed the profile and log-out controls off the
+   right-hand edge — and 1,440, 1,470, 1,512 and 1,536px are the widths
+   MacBooks run at by default, where an HP laptop is usually 1,366 or 1,920.
+   That was "falls apart on a Mac, fine on my HP".
+
+   A breakpoint cannot fix that for good, because the width the bar needs
+   depends on things no media query can see: how many items this account
+   has, how long the league's name is, the machine's text scaling and zoom,
+   which fonts it ended up with. So the bar measures itself (the script right
+   after the nav in app_base.html) and steps down a tier at a time until the
+   account cluster is on screen and on the first row:
+
+     nav-tight   the wordmark becomes GT, the theme switch drops its words,
+                 the links tighten (the old 1,181–1,400px tier, on demand)
+     nav-tight2  the links drop their glyphs
+     nav-burger  the links go to the drawer, as they do under 1,181px
+
+   The media queries stay as the starting point, so on a screen where the bar
+   already fits nothing moves.
+   ========================================================================== */
+.gt-v2 .an-inner.nav-tight .an-brand,
+.an-inner.nav-tight .an-brand { font-size: 0; letter-spacing: 0; }
+/* No colour on the G: it inherits the wordmark's own ink, which is white on
+   the green bar and dark on the light one. */
+.gt-v2 .an-inner.nav-tight .an-brand::before,
+.an-inner.nav-tight .an-brand::before { content: "G"; font-size: 20px; }
+.gt-v2 .an-inner.nav-tight .an-brand::after,
+.an-inner.nav-tight .an-brand::after { content: "T"; font-size: 20px; color: var(--lime); }
+html[data-theme="light"] .gt-app .an-inner.nav-tight .an-brand::after { color: var(--lt-accent-ink); }
+.an-inner.nav-tight .an-theme button span { display: none; }
+.an-inner.nav-tight .an-theme button { padding: 6px 8px; }
+.gt-v2 .an-inner.nav-tight .an-links a,
+.an-inner.nav-tight .an-menu-btn { padding: 9px 10px; font-size: 13.5px; }
+.gt-v2 .an-inner.nav-tight2 .an-links .an-ic,
+.an-inner.nav-tight2 .an-menu-btn .an-ic { display: none; }
+.gt-v2 .an-inner.nav-burger .an-links,
+.an-inner.nav-burger .an-org { display: none; }
+.an-inner.nav-burger .an-burger { display: inline-grid; }
+
+/* THE LINKS LEAVE UNDER 1,181px, AS THEY WERE ALWAYS MEANT TO. The chip's
+   own strip (max-width: 1300px, above) sets `.gt-v2 .an-links { display:
+   flex }` to give row one its height, and at two classes deep that outranked
+   the one-class rules hiding the row at 1,180 and 760px. So on every tablet
+   and phone the whole row of links stayed on the bar beside the burger,
+   could not shrink (flex: none), and pushed the page up to 724px wider than
+   the screen. */
+@media (max-width: 1180px) {
+  .gt-v2 .an-links, .gt-v2 .an-org { display: none; }
+}
+
+/* The short mark in the LIGHT theme. Its "G" was hard-coded white, which on
+   the light bar is white on cream: the logo vanished between 1,181 and
+   1,400px and on every phone. It takes the wordmark's ink instead, and the
+   "T" the light theme's accent ink. */
+html[data-theme="light"] .gt-app .an-brand::before { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .an-brand::after { color: var(--lt-accent-ink); }
+
+/* ==========================================================================
+   ============ EVERY WORD READABLE IN BOTH THEMES (Sep 2026 audit) =========
+   ==========================================================================
+   Client, Sep 2026: "go page by page checking each and every text in both
+   green and light theme ... I do not want to go to a page and when it's in
+   green theme I can see and when it's in the light mode I cannot see certain
+   things, and vice versa."
+
+   Found by measuring, not by eye: every page a member, a league admin and an
+   HQ admin can open (59 of them), in both themes, at laptop and phone widths,
+   in Chromium and WebKit. For each piece of text the browser was asked what is
+   actually painted underneath it, and the ratio computed; anything under WCAG
+   AA (4.5:1, or 3:1 for large type) is answered below. The worst were not
+   subtle — about 1:1, invisible — and nearly all were one of three mistakes:
+
+     1. A rule written for the green SHEET leaking into the cream CARD inside
+        it. `.sheet-page .page-sheet .app-sub` is cream, so was every hint in
+        every card on the profile, invite and charity pages.
+     2. A dark-theme rule with no light-theme partner — the new-league
+        wizard's rail and footer, the Manage captions, the org picker menus:
+        cream words on the light theme's white.
+     3. Opacity on text. 72% of a grey is a paler grey; the chips, counts and
+        stamps below keep their colour and lose the opacity.
+
+   `html:not([data-theme="light"])` scopes the green-only rules: the green is
+   the product, so "auto" and an unset key are green, as everywhere else.
+   ========================================================================== */
+
+/* ---- 1. the green sheet, and the cream card inside it -------------------- */
+.sheet-page .page-sheet .card .app-sub,
+.sheet-page .page-sheet .card .hint { color: var(--muted); }
+.sheet-page .page-sheet .card .app-eyebrow { color: var(--forest); }
+/* Straight on the green sheet, text inherited the app's dark ink — dark on
+   dark (the group charity ballot, "All organisations" on league search). */
+html:not([data-theme="light"]) .sheet-page .page-sheet > .hint { color: rgba(232,228,213,.82); }
+html:not([data-theme="light"]) .sheet-page .page-sheet > .hint a { color: var(--lime); }
+html:not([data-theme="light"]) .sheet-page .browse-title .card-h { color: #fff; }
+html:not([data-theme="light"]) .sheet-page .browse-count { color: var(--lime); background: rgba(200,241,53,.12); }
+html:not([data-theme="light"]) .sheet-page .browse-sort label { color: rgba(232,228,213,.8); }
+/* The charity "backing" strip is a tint over the sheet, not a card. */
+html:not([data-theme="light"]) .sheet-page .ch-backing .ch-name { color: #fff; }
+html:not([data-theme="light"]) .sheet-page .ch-backing .ch-url,
+html:not([data-theme="light"]) .sheet-page .ch-backing .ch-current-label { color: rgba(232,228,213,.84); }
+html[data-theme="light"] .gt-app .ch-backing .ch-url,
+html[data-theme="light"] .gt-app .ch-backing .ch-current-label { color: #3F4A43; }
+
+/* Role pills. Written as white on glass for a DARK ground, but keyed on the
+   page being dark (.page-deep), so they were white-on-white wherever a pill
+   sat in a table or card on such a page: profile, league search, "You" on
+   the leaderboard. On a light surface they take their own colours again. */
+.page-deep :is(.card, .atable, .gt-board, .bl-row, .gb-row) .pill-role { color: #1C5E30; background: rgba(15,46,34,.08); }
+.page-deep :is(.card, .atable, .gt-board, .bl-row, .gb-row) .pill-role.manager { color: #1C5E30; background: rgba(45,122,58,.16); }
+.page-deep :is(.card, .atable, .gt-board, .bl-row, .gb-row) .pill-role.captain { color: #245B66; background: rgba(46,110,122,.16); }
+.page-deep :is(.card, .atable, .gt-board, .bl-row, .gb-row) .pill-role.owner { color: var(--deep); background: var(--lime); }
+/* ...except on the dashboard banner's photograph, where they are glass, now
+   darker glass: the right-hand end of the banner is the bright end of it. */
+.page-deep .dash-banner .pill-role:not(.owner),
+.dash-banner .pill-role:not(.owner),
+html[data-theme="light"] .gt-app .dash-banner .pill-role:not(.owner) {
+  color: #fff; background: rgba(8,21,14,.55);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+
+/* ---- 2. dark-only rules that needed a light partner ---------------------- */
+/* The new-league wizard: rail, draft chip and footer note were cream on the
+   light theme's white. */
+html[data-theme="light"] .gt-app .wz-label,
+html[data-theme="light"] .gt-app .wiz-step.current .wz-label { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .wz-sub,
+html[data-theme="light"] .gt-app .wiz-step.current .wz-sub { color: #4A5850; }
+html[data-theme="light"] .gt-app .wiz-step:not(.current) .wz-num { color: #3D4B43; background: rgba(15,46,34,.06); border-color: rgba(15,46,34,.2); }
+html[data-theme="light"] .gt-app .draft-chip,
+html[data-theme="light"] .gt-app .wiz-foot { background: var(--lt-surface); border-color: var(--lt-line); }
+html[data-theme="light"] .gt-app .draft-chip .dc-txt b,
+html[data-theme="light"] .gt-app .wf-txt b,
+html[data-theme="light"] .gt-app .wf-note b { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .draft-chip .dc-txt i,
+html[data-theme="light"] .gt-app .wf-txt i { color: #4A5850; }
+html[data-theme="light"] .gt-app .hl-lime { color: var(--lt-accent-ink); }
+
+/* The org picker's options on billing, charities and Manage ▸ Charity were
+   white on the light theme's white. */
+html[data-theme="light"] .gt-app.sheet-page .pnav-opt { color: var(--lt-ink); background: rgba(15,46,34,.05); }
+html[data-theme="light"] .gt-app.sheet-page .pnav-lab { color: #4A5850; }
+
+/* The dashboard's season-points card is deliberately dark in the light
+   theme, but a nested-card rule painted it white under its cream words. */
+html[data-theme="light"] .gt-app .card .card .stat-card.accent,
+html[data-theme="light"] .gt-app .stat-card.accent { background: linear-gradient(160deg, #14382A, var(--lt-ink)); }
+/* The round eyebrow on the banner photograph stays lime: the light theme's
+   eyebrow colour is a dark olive meant for white paper, not for the photo. */
+.sheet-page .page-sheet .dash-banner .db-eyebrow,
+html[data-theme="light"] .gt-app.sheet-page .page-sheet .dash-banner .db-eyebrow { color: var(--lime); opacity: 1; }
+/* Words on a photograph carry their own shadow, whatever the photograph is. */
+.dash-banner .db-h1, .dash-banner .dp-txt, .dash-banner .db-eyebrow, .dash-banner .db-rank,
+.gt-hero h1, .gt-hero p, .gt-hero .gh-eyebrow { text-shadow: 0 1px 2px rgba(0,0,0,.35), 0 2px 18px rgba(0,0,0,.45); }
+.gt-hero p { opacity: .94; }
+
+/* Manage (the league admin) in the light theme: its captions and ghost
+   buttons were written for the green shell only — cream on the light sheet. */
+html[data-theme="light"] body.manage-app .app-sub { color: #4A5850; }
+html[data-theme="light"] body.manage-app .app-eyebrow { color: var(--forest); }
+html[data-theme="light"] body.manage-app .btn-ghost { color: var(--forest); border-color: rgba(15,46,34,.25); }
+/* Breadcrumbs, which were inline lime / cream in the templates. */
+.crumb-link { color: var(--lime); font-weight: 700; text-decoration: none; }
+.crumb-link:hover { text-decoration: underline; }
+.crumb-sep { color: rgba(245,241,230,.55); }
+html[data-theme="light"] .crumb-link { color: var(--forest); }
+html[data-theme="light"] .crumb-sep { color: rgba(15,46,34,.72); }
+/* Manage in green: dropdowns kept a white button under the shell's light ink,
+   so a chosen team or status was invisible; the Prefect tab was white on its
+   pale-green highlight. */
+html[data-theme="dark"] body.manage-app .ddx-btn { background: var(--ad-field, #0C2417); border-color: rgba(255,255,255,.16); color: var(--ad-ink, #E9F0EA); box-shadow: none; }
+html[data-theme="dark"] body.manage-app .ddx-val.is-placeholder { color: rgba(233,240,234,.68); }
+html[data-theme="dark"] body.manage-app .ddx-menu { background: var(--ad-card, #102A1D); border-color: rgba(255,255,255,.14); }
+html[data-theme="dark"] body.manage-app .ddx-opt { color: var(--ad-ink, #E9F0EA); }
+html[data-theme="dark"] body.manage-app .ddx-opt:hover,
+html[data-theme="dark"] body.manage-app .ddx-opt.on { background: rgba(200,241,53,.14); color: #fff; }
+html[data-theme="dark"] body.manage-app .pf-tab.on { color: #0C2417; }
+
+/* The news page's "Your move" card is dark in both themes. It was dark by an
+   inline background the light theme's card rule could not see past, and so
+   turned white under its cream words. */
+.news-cta,
+.sheet-page .page-sheet .card.news-cta,
+html[data-theme="light"] .gt-app.sheet-page .page-sheet .card.news-cta { background: #0F2E22; border-color: #0F2E22; }
+html[data-theme="light"] .gt-app.sheet-page .page-sheet .news-cta .abtn-ghost { color: #E8E4D5; background: transparent; border-color: rgba(255,255,255,.35); }
+
+/* The nav in light: the org name, the Manage menu and the theme switch's
+   idle half were 3.5–4.2:1. */
+html[data-theme="light"] .gt-app .an-ctx-org { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .an-links a,
+html[data-theme="light"] .gt-app .an-menu-btn { opacity: 1; }
+html[data-theme="light"] .gt-app .an-theme button:not(.on) { color: #3D4B43; }
+html[data-theme="light"] .gt-app .charity-strip .cs-right { opacity: .92; }
+
+/* The group wall's rotating cards sit on white in both themes, but their
+   times, club lines and ghost chips were still cream (1.1–2.6:1). */
+.sheet-page .wr-card .wr-when,
+.sheet-page .wr-card .wr-who small { color: var(--muted); opacity: 1; }
+.sheet-page .wr-card .wr-who b { color: var(--ink); }
+.sheet-page .wr-card .wr-chip { color: var(--forest); background: rgba(15,46,34,.07); }
+.sheet-page .wr-card .wr-chip.ghost { color: var(--muted); background: transparent; box-shadow: inset 0 0 0 1px rgba(15,46,34,.16); opacity: 1; }
+html[data-theme="light"] .gt-app .wr-card .wr-when,
+html[data-theme="light"] .gt-app .wr-card .wr-who small,
+html[data-theme="light"] .gt-app .wr-card .wr-chip.ghost { color: #4A5850; }
+
+/* ---- 3. opacity on text -------------------------------------------------- */
+/* A switched-off competition chip was the whole chip at 72%: white at 3.7:1
+   on NRL's amber. Off is now told by the colour going quiet, with the words
+   at full strength. */
+.cf-chip[data-code]:not(.on),
+.sfilter-chip[data-code]:not(.on) { opacity: 1; filter: saturate(.4) brightness(.9); }
+.ndc-more {
+  color: color-mix(in srgb, var(--code-ink, var(--forest)) 80%, #000);
+  background: color-mix(in srgb, var(--code-ink, var(--forest)) 9%, transparent);
+}
+.gt-toast .gtt-x { opacity: .8; }
+.rw-opt > i { opacity: .9; }
+.cf-pick .cf-lab { opacity: 1; }
+.wr-when, .wf-reply small, .wf-fine { opacity: .74; }
+.wr-chip.ghost { opacity: .82; }
+/* My Tips: the losing side is dimmed as a whole, so its words start darker. */
+.fxc-outcome i { color: #26332B; opacity: 1; }
+.fxc-outcome .fxc-pts,
+.fxc-outcome.is-won i,
+.fxc-outcome.is-won .fxc-pts { color: #14532D; opacity: 1; }
+.gt-filter i { opacity: 1; }
+.gfx-stamp { opacity: 1; }
+.gfx-stamp.is-auto { color: #6B5410; }
+.gt-strip .gsp-sub, .gt-stat .gs-sub { opacity: .8; }
+/* Ladder and leaderboard. A step that cannot be taken is exempt from the
+   contrast bar, but it should still be legible as "not now". */
+.rs-step.is-off { opacity: .55; }
+.gt-board.ladder .lad-left i { opacity: .85; }
+.gt-board .gb-acc i, .gt-board .gb-behind i { opacity: 1; }
+.gt-board.mb-board .gb-name small { opacity: 1; }
+.gt-board .gb-av { color: #1F5C2B; }
+/* Billing tiers. */
+.tier[data-tier] .tier-price span, .tier[data-tier] .tier-per { opacity: .9; }
+.tier[data-tier] .tier-for { opacity: .92; }
+.tier[data-tier].featured .tier-feats .tk { color: var(--tier-ink); }
+/* Charity / members cards: white on the members green was 3.4:1. */
+.pcard.on, .sheet-page .pcard.on { background: color-mix(in srgb, var(--pc) 78%, #000); }
+.mcard.on .mc-sub { color: color-mix(in srgb, var(--mc-on) 92%, transparent); }
+html:not([data-theme="dark"]) .gt-chip.needs { color: #6B480C; }
+/* HQ bits drawn by this file. */
+.np-sep { opacity: .7; }
+.gt-choice .gc-txt p { opacity: .82; }
+.enq-tabs a { opacity: .86; }
+
+/* Placeholders nobody styled were the browser's own #757575 — 2.7:1 on the
+   dark fields. They take the field's own ink at 70%, which reads on either
+   ground. Zero specificity, so every placeholder that WAS styled keeps its
+   colour. */
+::placeholder { color: color-mix(in srgb, currentColor 70%, transparent); opacity: 1; }
+
+/* ---- the light theme's sheet covers the photo strips ----------------------
+   In light the sheet was made transparent so "the page becomes the ground".
+   But that ground is only the column between the two photo strips, and the
+   sheet is wider than the column — so everything near its edges sat on the
+   photographs: "YOUR ORGANISATION", "STEP 1 OF 7", the banner's corners. The
+   green sheet is opaque, which is why it never showed there. The light sheet
+   now takes the page's own colour: still no visible box, and the strips stay
+   outside it. */
+html[data-theme="light"] .gt-app.sheet-page .page-sheet { background: var(--lt-page); border-radius: 22px; }
+
+/* ==========================================================================
+   ============ NOTHING WIDER THAN ITS SCREEN (Sep 2026 audit) ===============
+   ==========================================================================
+   The same pages at eleven widths — the HP and MacBook laptop widths, iPads
+   both ways up, a 390px phone — in Chromium, Firefox and WebKit (Safari's
+   engine). Nearly every break was the same CSS default: a grid or flex child
+   will not shrink below its content (min-width: auto), so one long team name
+   or a 220px dropdown pushes its row off the side of a phone. What follows is
+   the missing min-width: 0 / minmax(0, 1fr), at each place it was found.
+   ========================================================================== */
+.grid-app > * { min-width: 0; }
+@media (max-width: 820px) { .g-2, .g-3 { grid-template-columns: minmax(0, 1fr); } }
+.statgrid { grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); }
+.gwh-stack { grid-template-columns: minmax(0, 1fr); }
+.gwh-slot { min-width: 0; }
+.mpanel { grid-template-columns: minmax(0, 1fr); }
+.mpanel > * { min-width: 0; }
+
+/* Fixture cards: each team's side sized its column to its content — 120px of
+   it inside a 70px slot on a phone. */
+.fxc-side { grid-template-columns: minmax(0, 1fr); }
+.fxc-form { min-width: 0; flex-wrap: wrap; }
+@media (max-width: 480px) {
+  .fxc-team { grid-template-columns: 30px minmax(0, 1fr); column-gap: 6px; }
+  .fxc-outcome { grid-column: 1 / -1; justify-self: start; max-width: 100%; flex-wrap: wrap; }
+}
+/* Tip a round: the two team buttons either side of the "v". */
+.pick { grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr); }
+.pick .team { min-width: 0; }
+@media (max-width: 480px) { .pick .team { padding: 12px 10px; } }
+/* The dashboard's league picker had a 220px floor. */
+@media (max-width: 560px) {
+  .dash-ctl .dc-pick { flex-wrap: wrap; }
+  .dash-ctl .dc-pick .ddx, .dash-ctl .dc-pick > select { min-width: 0; flex: 1 1 100%; }
+}
+/* The new-league wizard: seven steps in a rail that could not wrap, and two
+   footer buttons that would not give up their padding. */
+@media (max-width: 620px) {
+  .wiz-rail { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .wiz-rail::-webkit-scrollbar { display: none; }
+  .wiz-foot .wiz-nav .abtn { min-width: 0; padding-left: 14px; padding-right: 14px; }
+}
+/* Competition statistics on a phone: five number columns left the club name
+   no width at all. */
+.gt-board { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 480px) {
+  .gt-board.compstats .gb-head, .gt-board.compstats .gb-row { grid-template-columns: minmax(0, 1fr) 40px 40px 46px 38px; column-gap: 6px; }
+}
+/* Manage: two pages set their two columns inline; on a phone they stack. */
+@media (max-width: 820px) {
+  .manage-app .grid-app[style*="grid-template-columns"] { grid-template-columns: minmax(0, 1fr) !important; }
+}
+/* A table wider than a phone scrolls inside its panel instead of pushing the
+   page; and the organisations table's "Manage" heading gets its width back. */
+@media (max-width: 760px) {
+  .gt-panel .gt-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+.gt-table.gt-t-orgs { table-layout: auto; }
+
+/* HQ on a phone — the staff console was never laid out below a laptop. Not a
+   redesign: nothing is allowed to be wider than the screen. */
+@media (max-width: 600px) {
+  .gt-shell > *, .gta-grid-2 > *, .gta-cats > *, .gta-cards > * { min-width: 0; max-width: 100%; }
+  .gta-grid-2, .gta-cats, .gta-cards { grid-template-columns: minmax(0, 1fr) !important; }
+  .gta-card-body.flush { overflow-x: auto; }
+  .gts-top .gts-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .gt-panel-head .gp-right { flex-wrap: wrap; min-width: 0; }
+}
+
+/* ---- the podium's ink, on every part of its metal -------------------------
+   Gold runs from pale butter to a dark bronze-gold, silver and bronze each
+   end on their darkest stop; the medal words, the "pts" and the chips were a
+   mid-tone of their own metal and fell under 3:1 wherever they met that dark
+   end. Each card's ink is now dark enough for its darkest stop, and gold's
+   last stop is lifted a little so its dark ink clears 4.5:1 there too. */
+.gt-pod.p1 { background: linear-gradient(165deg, #FFF0B8 0%, #F0CE62 38%, #D4A640 72%, #BB8F2E 100%); }
+.gt-pod.p1 .gp-name, .gt-pod.p1 .gp-pts, .gt-pod.p1 .gp-pts small,
+.gt-pod.p1 .gp-medal, .gt-pod.p1 .gp-chip, .gt-pod.p1 .gp-av { color: #241A03; }
+.gt-pod.p2 .gp-name, .gt-pod.p2 .gp-pts, .gt-pod.p2 .gp-pts small,
+.gt-pod.p2 .gp-medal, .gt-pod.p2 .gp-chip, .gt-pod.p2 .gp-av, .gt-pod.p2 .gp-rank { color: #252B32; }
+.gt-pod.p3 .gp-name, .gt-pod.p3 .gp-pts, .gt-pod.p3 .gp-pts small,
+.gt-pod.p3 .gp-medal, .gt-pod.p3 .gp-chip, .gt-pod.p3 .gp-av { color: #3A220C; }
+.gt-pod.p3 .gp-rank { color: #FFF6EC; }
+
+/* ---- the members board on a phone ----------------------------------------
+   Under 700px the roles column was `auto`, which takes its max-content — every
+   pill on one line — and left the name column nothing: names and emails were
+   0px wide. The roles column is capped and wraps; on a phone it goes under the
+   name. */
+@media (max-width: 700px) {
+  .gt-board.mb-board .gb-head,
+  .gt-board.mb-board .gb-row { grid-template-columns: minmax(0, 1fr) fit-content(46%); }
+}
+@media (max-width: 440px) {
+  .gt-board.mb-board .gb-head { display: none; }
+  .gt-board.mb-board .gb-row { grid-template-columns: minmax(0, 1fr); row-gap: 8px; }
+  .gt-board.mb-board .mb-roles { justify-content: flex-start; }
+}
+
+/* ---- the public site's bar fits its screen too ----------------------------
+   Signed in, the public bar carries its nine links plus the account actions,
+   and between its drawer breakpoint (1,120px) and ~1,650px that row ran
+   224px past its container — the same MacBook-width failure as the app bar.
+   The same answer: public/base.html measures the row and steps down a tier
+   (is-tight, then is-drawer, which is the drawer the bar already has under
+   1,120px) until it fits. */
+.nav.is-tight .nav-links a { padding-left: 9px; padding-right: 9px; font-size: 13.5px; }
+.nav.is-tight .nav-auth { margin-left: 2px; padding-left: 8px; }
+.nav.is-drawer .nav-toggle { display: block; }
+.nav.is-drawer .nav-links {
+  position: absolute; top: 66px; left: 0; right: 0;
+  background: var(--deep); flex-direction: column; align-items: stretch;
+  gap: 0; padding: 8px var(--gutter) 20px;
+  border-bottom: 1px solid var(--line-d);
+  transform: translateY(-8px); opacity: 0; pointer-events: none;
+  transition: .2s var(--ease);
+  max-height: calc(100vh - 66px); overflow-y: auto;
+}
+.nav.is-drawer .nav-links a { padding: 14px 0; border-bottom: 1px solid var(--line-d); }
+.nav.is-drawer .nav-links .btn-nav { text-align: center; margin-top: 12px; }
+.nav.is-drawer[data-open="true"] .nav-links { transform: none; opacity: 1; pointer-events: auto; }
+.nav.is-drawer .nav-auth { margin-left: 0; padding-left: 0; border-left: 0; border-top: 1px solid var(--line-d); }
+
+/* The recap card's competition colour, on the sheet pages too. The sheet's
+   own post card (`.sheet-page .gt-feed .gt-post`, and its light twin) paints
+   every post white with a hairline edge, and it outranked the recap's colour,
+   so on the Wall a recap for NRLW looked like a recap for anything. */
+.sheet-page .gt-feed .gt-post.is-recap[data-code],
+html[data-theme="light"] .gt-app.sheet-page .gt-feed .gt-post.is-recap[data-code] {
+  border-left: 5px solid var(--code-ink);
+  background: #fff;
+  background: linear-gradient(110deg, color-mix(in srgb, var(--code) 16%, #fff), #fff 55%);
+}
+
+/* ---- second pass, after re-measuring (Sep 2026) ---------------------------- */
+/* The news page is not a sheet page, so its "Your move" card answers to the
+   light theme's plain `.gt-app .card` rule, not the sheet one. */
+html[data-theme="light"] .gt-app .card.news-cta { background: #0F2E22; border-color: #0F2E22; }
+/* Bronze's rank disc runs from pale peach to copper; no one ink read on both
+   ends of that. The disc keeps its metal on a narrower, lighter range. */
+.gt-pod.p3 .gp-rank { background: linear-gradient(145deg, #F2C9A2, #CF955C); color: #2A1606; }
+/* My Tips: the losing side is faded as a block, and its result badge cannot
+   escape the fade — so the fade is lighter where there is a result to read,
+   and the badge's ink starts darker. */
+.fxc-team.is-dim.has-outcome { opacity: .9; }
+.fxc-outcome i { color: #111A15; }
+.fxc-outcome .fxc-pts,
+.fxc-outcome.is-won i,
+.fxc-outcome.is-won .fxc-pts { color: #0B3D20; }
+.gt-filter i { color: #1B4D25; }
+.gt-filter.on i { color: inherit; }
+/* The group switcher's sub-labels and the wizard's footer note faded
+   themselves under the bar. */
+.room-switch .rw-opt i, .room-switch .rw-opt.on i { opacity: 1; }
+.wf-note { opacity: 1; }
+html:not([data-theme="light"]) .wf-txt i,
+html:not([data-theme="light"]) .draft-chip .dc-txt i { color: rgba(245,241,230,.76); }
+/* Members' initials in the coloured panels take a darker cut of the panel's
+   own colour. */
+.sheet-page .ppanel .gb-av,
+html[data-theme="light"] .gt-app .ppanel .gb-av { color: color-mix(in srgb, var(--pc) 72%, #000); }
+.np-sep { opacity: 1; }
+.gt-board.ladder .lad-left i { opacity: 1; }
+.gt-choice .gc-txt p { opacity: .92; }
+/* The public wall: the green emphasis inside a white heading on a near-black
+   stage, and the "for you" cards' tags and copy. */
+.wall-stage .section-heading em { color: var(--lime); }
+.for-card .for-tag { box-shadow: inset 0 0 0 100px rgba(0,0,0,.2); }
+.for-card p { color: #4D5A4C; }
+.tab-btn { color: #4D5A4C; }
+
+/* THE MENU BUTTON YOU COULD NOT SEE. Its icon is three strokes (M3 6h18 …) and
+   the button's svg had no stroke — the paths were painted with a black fill
+   that a line does not have. So on every phone and tablet, where this button
+   is the only way to the rest of the app, it was an empty 42px square that
+   worked if you happened to press it. It draws in the bar's own ink now, and in
+   the light theme's ink on the light bar. */
+.an-burger svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+html[data-theme="light"] .gt-app .an-burger { color: var(--lt-ink); }
+
+/* ---- third pass, after re-measuring ---------------------------------------- */
+/* The "Read" tick in your own bubble sat at 60% of its pale blue. */
+.gtm-chat .chat-row.mine .chat-bubble .chat-tick,
+.gtm-chat .chat-row.mine .chat-bubble .chat-tick i { opacity: 1; }
+/* The news card's ghost button took the light theme's white button fill under
+   its cream words. On the dark card it stays a ghost. */
+html[data-theme="light"] .gt-app .news-cta .abtn-ghost { background: transparent; }
+/* The idle half of the theme switch on the two shells whose bars stay dark in
+   both themes — Manage in light, HQ in dark — was 3.6 and 4.5:1. */
+html[data-theme="light"] body.manage-app .an-theme button:not(.on) { color: #A9B8AD; }
+html[data-theme="dark"] .gts-theme button:not(.on) { color: #B4C4B8; }
+
+/* ---- phone widths, second pass ------------------------------------------- */
+/* The ladder kept nine columns at 390px, so the club name got 0px. On a phone
+   the ladder scrolls sideways inside its own box, as a table would, with the
+   club column wide enough to read. */
+@media (max-width: 620px) {
+  .gt-board.ladder { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .gt-board.ladder > * { min-width: 470px; }
+  .gt-board.ladder .lad-head,
+  .gt-board.ladder .lad-row { grid-template-columns: 34px minmax(120px, 1fr) repeat(6, 42px) 40px; }
+}
+/* Invite: the address field kept its built-in width beside the Copy button. */
+.copy-field > :not(.abtn) { min-width: 0; flex: 1 1 auto; }
+/* Tip a round: a long club name beside its crest. */
+.pick .team > span:not(.crest) { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .pick .team .crest { width: 26px; } }
+/* The public wall's hero stacks on a tablet; 1fr alone would not shrink. */
+@media (max-width: 820px) { .hero-split { grid-template-columns: minmax(0, 1fr); } }
+/* A member's email line ends in an ellipsis rather than a hard cut. */
+.gt-board.mb-board .gb-name small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- public pages: section intros centred ---------------------------------
+   Client, Sep 2026: "since we have had things centered in the private page,
+   also in the public [pages] certain text have it centered". The private pages
+   centre their page heads (`head-center`); here the matching text is each
+   section's intro — the eyebrow, the heading and the line under it — which the
+   public templates always write as direct children of `.section > .wrap`.
+   Split layouts (story-split, hero-split, the wall's feed head, the contact
+   shell) keep their intros inside their own columns, so the child combinator
+   leaves them left-aligned beside their pictures and forms, where centred text
+   would float away from what it describes. The heading and the line under it
+   have a max-width, so they are centred as blocks as well as in their text. */
+.section > .wrap > .eyebrow,
+.section > .wrap > .section-heading,
+.section > .wrap > .section-sub { text-align: center; margin-left: auto; margin-right: auto; }
+/* The public bar's middle tier. Tightening the spacing alone saves ~60px and
+   the row needed ~150px at MacBook widths (1,440–1,536), so it fell straight
+   through to the drawer and hid the whole menu. Dropping the link icons there
+   buys ~200px, which keeps every link on the bar; the drawer is now reached
+   only where even that does not fit. */
+.nav.is-tight2 .nav-links a > svg { display: none; }
+.nav.is-tight2 .nav-links a { padding-left: 8px; padding-right: 8px; }
+
+/* The centred news filter (Sep 2026, client: "this part — All stories, AFL,
+   AFLW, NRL, NRLW, News, Blog — have it centered"). The row holds the chips AND
+   the "Show" dropdown, and centring the row centred the PAIR, which put the
+   chips ~145px left of centre. Both stay (the client asked for chip and
+   dropdown): the chips get a centred line of their own, the dropdown the
+   centred line under it. Below 720px the chips are hidden and the dropdown is
+   the whole control, as before. */
+.compfilter.is-centred { flex-wrap: wrap; row-gap: 12px; }
+.compfilter.is-centred .cf-chips { flex: 1 1 100%; justify-content: center; }
+.compfilter.is-centred .cf-pick { flex: 1 1 100%; justify-content: center; }

@@ -309,6 +309,9 @@ class _ScrapeSyncService:
         self._history_seen: set[tuple[int, int, int, int]] = set()
         # Seasons whose finals staging has already been recomputed this run.
         self._restaged: set[tuple[int, int]] = set()
+        # Scraper faults that must fail the run rather than be logged past —
+        # see _series_rows and _raise_problems.
+        self._problems: list[str] = []
 
     # ---- subclass hooks -------------------------------------------------
 
@@ -360,10 +363,27 @@ class _ScrapeSyncService:
         except self._error as e:
             # One series failing — Origin has no round 24 — must not abort the
             # others, which are the ones anybody is tipping.
+            #
+            # Unless the scraper says the failure is LOUD: a round the feed
+            # publishes whose games we could not place. Logged at info, that
+            # is exactly how the 2026 NRL finals went missing for a week while
+            # every run on /manage/sync/ read ok. The other series still sync;
+            # the run is failed at the end, with this as its message.
+            if getattr(e, "loud", False):
+                logger.warning("%s %s round %s: %s", self.SOURCE, series_name, round_number, e)
+                self._problems.append(f"{series_name} round {round_number}: {e}")
+                return series, []
             logger.info("%s %s round %s: %s", self.SOURCE, series_name, round_number, e)
             return series, []
         fixture_cache_put(self.SOURCE, key, year, round_number, rows)
         return series, rows
+
+    def _raise_problems(self) -> None:
+        """Fail the current run if any series hit a loud scraper fault."""
+        if self._problems:
+            msg = " | ".join(self._problems)
+            self._problems.clear()
+            raise SyncError(msg)
 
     def _round_for(self, org: Organisation, series: Series, round_number: int) -> Round | None:
         return Round.objects.filter(
@@ -570,6 +590,7 @@ class _ScrapeSyncService:
                 written += 1
 
             refresh_round_state(round_obj)
+        self._raise_problems()
         return written
 
     # ---- live -----------------------------------------------------------
@@ -623,6 +644,7 @@ class _ScrapeSyncService:
                 written += 1
 
             refresh_round_state(round_obj)
+        self._raise_problems()
         return written
 
     # ---- results --------------------------------------------------------
@@ -733,6 +755,7 @@ class _ScrapeSyncService:
             if recorded:
                 self._restage(series, year)
             refresh_round_state(round_obj)
+        self._raise_problems()
         return written
 
     def _restage(self, series: Series, season: int) -> None:

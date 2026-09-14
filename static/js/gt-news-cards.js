@@ -15,14 +15,15 @@
  * once. The client: "so the user turns, then the lower one turns, so it
  * should happen alternating".
  *
- * A TURN IS HALF A FLIP, NOT A FULL ONE. The card is a front face and a back
- * face on one element. The next story goes on the back, the element turns 180
- * degrees, and the back — a different story — is what faces the reader when
- * it lands; the faces then swap roles so the next turn goes the same way
- * round. The version before this turned a full 360 and had to swap the front
- * face behind the reader's back at the half-way point for anything to have
- * changed at all, which is a lot of machinery to end up facing the way it
- * started.
+ * FIVE WAYS TO TURN (Sep 2026, client: "lets have like 5 ways or design that
+ * the cards will be changing"). Each place is two faces in one grid cell; the
+ * one showing carries .is-up. A turn puts the next story on the other face
+ * and plays a pair of keyframe animations, one leaving and one arriving,
+ * chosen by data-turn on the place: flip, tumble, slide, zoom, iris. The deck
+ * takes them in order, one per tick, so half a minute of watching shows every
+ * one. The movements live in goodtip.css under "the five turns"; LASTS below
+ * has to agree with their durations, because it is when the leaving face is
+ * emptied.
  *
  * Four things it still has to get right:
  *
@@ -43,21 +44,19 @@
  * ---------------------------------------------------------------------------
  * REDUCED MOTION
  * ---------------------------------------------------------------------------
- * A reader whose system asks for reduced motion gets no flip and no automatic
- * picture change — that setting is a request not to be moved at, and a deck
- * that spins anyway is the thing it was switched on to stop.
+ * The deck STILL CHANGES every five seconds for a reader whose system asks
+ * for reduced motion, and the pictures inside a card still change too. It
+ * used to stop dead instead, and on a machine with that setting on — the
+ * client's own development machine among them — the deck never moved at all,
+ * which read as the feature not existing. Changing what a card shows is not
+ * motion; what the setting asks to be spared is things travelling across the
+ * screen. So under it every turn is a short cross-fade ("fade" below) and
+ * nothing flips, slides or zooms: the rule the site's other rotating
+ * pictures already follow.
  *
- * What they get instead is a CROSS-FADE on the dots and the arrows, rather
- * than the instant node swap the old version did. An instant swap plus two
- * faces sharing a grid cell was read, reasonably, as the card "just getting
- * longer": the cell takes the height of the taller face, so the only visible
- * result of a turn was the card changing size.
- *
- * WORTH KNOWING WHEN NOTHING MOVES ON YOUR OWN MACHINE: this is a browser and
- * OS setting, not a site one. Chrome follows the desktop's "reduce motion"
- * switch, and DevTools can force it (Rendering ▸ Emulate CSS media feature
- * prefers-reduced-motion). If the deck is sitting still where you expected it
- * to turn, check that before this file.
+ * WORTH KNOWING WHEN YOU ONLY EVER SEE A FADE: that is this setting. Chrome
+ * follows the desktop's "reduce motion" switch, and DevTools can force it
+ * either way (Rendering ▸ Emulate CSS media feature prefers-reduced-motion).
  */
 (function () {
   'use strict';
@@ -129,7 +128,9 @@
     var watch = setInterval(reap, 5000);
 
     show(0);
-    if (!still) queue();
+    // Under reduced motion as well — see REDUCED MOTION above. The frames
+    // cross-fade in place; the slow zoom is switched off in the CSS.
+    queue();
   }
 
   function startShotsIn(root) {
@@ -146,7 +147,10 @@
   function deckUp(deck) {
     var turns = parseInt(deck.getAttribute('data-turns'), 10) || 1;
     var every = parseInt(deck.getAttribute('data-interval'), 10) || 5000;
-    var FLIP_MS = 900, STAGGER = 110;
+    var STAGGER = 110;
+    var STYLES = ['flip', 'tumble', 'slide', 'zoom', 'iris'];
+    // How long each turn runs, in ms — must match goodtip.css.
+    var LASTS = { flip: 860, tumble: 860, slide: 700, zoom: 750, iris: 800, fade: 400 };
 
     var rows = Array.prototype.map.call(
       deck.querySelectorAll('[data-news-row]'),
@@ -158,7 +162,7 @@
             function (el, i) {
               var queue = el.querySelector('template[data-news-queue]');
               return {
-                el: el, index: i,
+                el: el, index: i, gen: 0,
                 cards: queue ? Array.prototype.slice.call(queue.content.children) : []
               };
             }
@@ -169,65 +173,62 @@
     if (!rows.length) return;
 
     var dots = Array.prototype.slice.call(deck.querySelectorAll('[data-news-dot]'));
-    var at = 0, turn = 0, gen = 0, timer = null, holding = false;
+    var at = 0, turn = 0, styleAt = 0, timer = null, holding = false;
 
     function cardFor(place, n) {
       if (!place.cards.length) return null;
       return place.cards[n % place.cards.length].cloneNode(true);
     }
 
-    /* Which face is toward the reader. It alternates, so the element turns
-     * the same way every time instead of winding back and forth. */
-    function faces(place) {
-      var spinner = place.el.querySelector('.nd-spinner');
-      var flipped = spinner && spinner.classList.contains('is-flipped');
-      return {
-        spinner: spinner,
-        front: place.el.querySelector(flipped ? '.nd-back' : '.nd-front'),
-        back: place.el.querySelector(flipped ? '.nd-front' : '.nd-back'),
-        flipped: flipped
-      };
+    /* Finish whatever turn is still landing, at once. A dot pressed half way
+     * through a turn must not leave two stories showing, and the face that is
+     * down is emptied so the deck holds six cards rather than twelve. */
+    function settle(place) {
+      Array.prototype.forEach.call(place.el.querySelectorAll('.nd-face'), function (f) {
+        f.classList.remove('is-leaving', 'is-arriving');
+        if (!f.classList.contains('is-up')) f.replaceChildren();
+      });
+      place.el.classList.remove('is-turning');
     }
 
-    function flip(place, n, g) {
-      var f = faces(place);
+    /* One place, one story on, in one of the five movements. */
+    function turnPlace(place, n, style, delay) {
       var next = cardFor(place, n);
-      if (!f.spinner || !f.back || !next) return;
+      if (!next) return;
+      // A newer turn of this place stands the older one down.
+      var g = ++place.gen;
       setTimeout(function () {
-        if (g !== gen) return;
+        if (g !== place.gen) return;
+        settle(place);
+        var up = place.el.querySelector('.nd-face.is-up');
+        var down = place.el.querySelector('.nd-face:not(.is-up)');
+        if (!up || !down) return;
+        down.replaceChildren(next);
+        startShotsIn(down);
+        place.el.setAttribute('data-turn', style);
+        place.el.classList.add('is-turning');
         // The arriving face is the one that will be facing the reader, so it
         // stops being aria-hidden and the leaving one starts.
-        f.back.replaceChildren(next);
-        f.back.removeAttribute('aria-hidden');
-        f.front.setAttribute('aria-hidden', 'true');
-        startShotsIn(f.back);
-        f.spinner.classList.toggle('is-flipped');
-        setTimeout(function () {
-          if (g !== gen) return;
-          // Empty the face that is now pointing away, so the deck holds six
-          // cards rather than twelve.
-          f.front.replaceChildren();
-        }, FLIP_MS + 80);
-      }, place.index * STAGGER);
+        up.classList.remove('is-up');
+        up.classList.add('is-leaving');
+        up.setAttribute('aria-hidden', 'true');
+        down.classList.add('is-up', 'is-arriving');
+        down.removeAttribute('aria-hidden');
+        setTimeout(function () { if (g === place.gen) settle(place); }, LASTS[style] + 60);
+      }, delay);
     }
 
-    function fade(place, n) {
-      var f = faces(place);
-      var next = cardFor(place, n);
-      if (!f.front || !next) return;
-      f.front.replaceChildren(next);
-      f.front.classList.remove('nd-fade');
-      void f.front.offsetWidth;
-      f.front.classList.add('nd-fade');
-      startShotsIn(f.front);
+    function nextStyle() {
+      var style = STYLES[styleAt % STYLES.length];
+      styleAt++;
+      return style;
     }
 
-    /* One row, one step on. `which` is the row; `n` is the page of stories. */
-    function turnRow(row, n) {
-      var g = ++gen;
+    /* One row, one step on, every place in it the same movement, a beat
+     * apart. `n` is the page of stories. */
+    function turnRow(row, n, style) {
       row.places.forEach(function (place) {
-        if (still) fade(place, n);
-        else flip(place, n, g);
+        turnPlace(place, n, still ? 'fade' : style, place.index * STAGGER);
       });
     }
 
@@ -246,7 +247,7 @@
     function tick() {
       var which = turn % rows.length;
       if (which === 0) at = (at + 1) % turns;
-      turnRow(rows[which], at);
+      turnRow(rows[which], at, nextStyle());
       turn++;
       markDots(at);
     }
@@ -255,14 +256,16 @@
     function go(n) {
       at = (n + turns) % turns;
       turn = 0;
-      rows.forEach(function (row) { turnRow(row, at); });
+      var style = nextStyle();
+      rows.forEach(function (row) { turnRow(row, at, style); });
       markDots(at);
     }
 
     function stop() { if (timer) { clearInterval(timer); timer = null; } }
     function start() {
       stop();
-      if (still || holding || document.hidden || turns < 2) return;
+      // Not `still`: the deck changes under reduced motion too, as a fade.
+      if (holding || document.hidden || turns < 2) return;
       timer = setInterval(tick, every);
     }
 

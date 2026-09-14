@@ -1073,11 +1073,20 @@ def news_index(request):
     else:
         active_tag = ""
     tpl = "news_index.html" if request.user.is_authenticated else "public/news_index.html"
+    # Both news pages, member and public, are the dashboard's turning deck
+    # at three rows: the newest stories under the same filter, nine at a
+    # time, turning every five seconds, the dots under it paging back through
+    # older ones (client, Sep 2026: "lets have a max, or like 3 rows, then have
+    # it switching ... the way we have the news and blogs in the dashboard").
+    from .news_deck import NEWS_PAGE_ROWS, NEWS_PAGE_STORIES, deal_news_deck
+
+    deck = deal_news_deck(posts[:NEWS_PAGE_STORIES], rows=NEWS_PAGE_ROWS)
     return render(request, tpl, {
         "posts": posts,
         "active": "news",
         "news_tags": NewsPost.TAG_CHOICES,
         "active_tag": active_tag,
+        **deck,
     })
 
 
@@ -1240,22 +1249,62 @@ def enquiries(request):
     three-day-old unanswered message should not be buried under this morning's
     answered ones.
     """
+    from django.core.paginator import Paginator
+    from django.db.models import Q
+
     from .models import Enquiry
 
     show = request.GET.get("show") or "open"
+    if show not in ENQUIRY_TABS:
+        show = "open"
+    q = (request.GET.get("q") or "").strip()[:120]
+    sort = request.GET.get("sort") or "new"
+    if sort not in ENQUIRY_SORTS:
+        sort = "new"
+
     qs = Enquiry.objects.select_related("replied_by")
     if show == "open":
         qs = qs.filter(status=Enquiry.STATUS_NEW)
     elif show == "replied":
         qs = qs.filter(status=Enquiry.STATUS_REPLIED)
+    if q:
+        qs = qs.filter(
+            Q(name__icontains=q) | Q(email__icontains=q) | Q(organisation__icontains=q)
+            | Q(interest__icontains=q) | Q(message__icontains=q)
+        )
+    qs = qs.order_by(*ENQUIRY_SORTS[sort][1])
+
+    page = Paginator(qs, ENQUIRIES_PER_PAGE).get_page(request.GET.get("page"))
+    for e in page.object_list:
+        # The same person always gets the same colour, from anywhere in the list.
+        e.tone = sum(map(ord, e.email.lower())) % 6
+
+    # The filters a page link has to carry, so page 2 is page 2 of THIS search.
+    keep = request.GET.copy()
+    keep.pop("page", None)
 
     return render(request, "manage/enquiries.html", {
-        "enquiries": qs[:200],
+        "enquiries": page.object_list,
+        "page": page,
+        "page_range": page.paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1),
+        "keep": keep.urlencode(),
         "show": show,
+        "q": q,
+        "sort": sort,
+        "sorts": [(key, label) for key, (label, _) in ENQUIRY_SORTS.items()],
         "open_count": Enquiry.objects.filter(status=Enquiry.STATUS_NEW).count(),
         "replied_count": Enquiry.objects.filter(status=Enquiry.STATUS_REPLIED).count(),
         "total_count": Enquiry.objects.count(),
     })
+
+
+ENQUIRY_TABS = ("open", "replied", "all")
+ENQUIRY_SORTS = {
+    "new": ("Newest first", ("-created_at", "-pk")),
+    "old": ("Oldest first", ("created_at", "pk")),
+    "name": ("Name, A to Z", ("name", "-created_at")),
+}
+ENQUIRIES_PER_PAGE = 10
 
 
 @requires("enquiries.read", "Reply to an enquiry", to_submit="enquiries.reply")

@@ -1,0 +1,53 @@
+{% comment %}
+THE TURNING NEWS DECK — the dashboard's and the news page's (Sep 2026, client:
+"on the blogs and news when I login in the dashboard as well as in the news
+page ... I should see the cards change after like 5 seconds ... and let's have
+like 5 ways or designs that the cards will be changing").
+
+Six places in two rows. Every five seconds one row turns to the next story,
+the rows taking it in turns, and each turn uses the next of five movements —
+flip, tumble, slide, zoom, iris — so half a minute of watching shows all five.
+gt-news-cards.js drives it; the movements live in goodtip.css under "the five
+turns".
+
+Each place renders its first story as a real link on the face that is up
+(.is-up) and the rest wait in a <template>, which is inert — not rendered, not
+focusable, not read aloud — so with JavaScript off this is simply the six
+newest stories. Hover or keyboard focus holds the deck still for somebody
+reading it.
+
+Expects news_rows and news_turns — see admin_panel.news_deck.deal_news_deck.
+{% endcomment %}
+<div class="news-deck{% if news_turns > 1 %} is-live{% endif %}" data-news-deck
+     data-interval="5000" data-turns="{{ news_turns }}">
+  {% for row in news_rows %}
+  <div class="nd-row" data-news-row="{{ forloop.counter0 }}">
+    {% for slot in row %}
+    <div class="nd-place" data-news-place>
+      <div class="nd-spinner">
+        <div class="nd-face nd-front is-up" data-face="front">{% include "partials/_news_deck_card.html" with p=slot.0 %}</div>
+        <div class="nd-face nd-back" data-face="back" aria-hidden="true"></div>
+      </div>
+      {% if news_turns > 1 %}<template data-news-queue>{% for p in slot %}{% include "partials/_news_deck_card.html" with p=p %}{% endfor %}</template>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  {% comment %}
+  Only when there is more than one turn — a single dot is a control that does
+  nothing. A dot moves BOTH rows at once, because it means "show me page two"
+  rather than "take the next step in the alternation".
+  {% endcomment %}
+  {% if news_turns > 1 %}
+  <div class="nd-foot">
+    <div class="nd-dots" role="group" aria-label="News pages">
+      {% for p in news_rows.0.0 %}
+      <button type="button" class="nd-dot{% if forloop.first %} on{% endif %}" data-news-dot="{{ forloop.counter0 }}"
+              {% if forloop.first %}aria-current="true"{% endif %}
+              aria-label="Stories, page {{ forloop.counter }} of {{ news_turns }}"></button>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>

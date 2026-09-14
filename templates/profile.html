@@ -42,7 +42,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
       {% csrf_token %}
       <div class="fld"><label for="id_display_name">Display name</label><input type="text" name="display_name" id="id_display_name" value="{{ form.display_name.value|default:user.display_name }}">
         {% if form.display_name.errors %}<div class="fld-err">{{ form.display_name.errors|join:" " }}</div>{% endif %}</div>
-      <div class="fld"><label>Email</label><input type="email" value="{{ user.email }}" disabled style="opacity:.6;"></div>
+      <div class="fld"><label>Email</label><input type="email" value="{{ user.email }}" disabled style="opacity:.8;"></div>
       <button type="submit" class="abtn abtn-primary">Save changes</button>
     </form>
   </div>

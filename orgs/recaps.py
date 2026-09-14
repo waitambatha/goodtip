@@ -357,6 +357,10 @@ def build_recap_facts(org, rnd, group=None):
         "seed": f"{org.id}:{group.id if group is not None else 0}:{rnd.id}",
         "round": {
             "number": rnd.round_number,
+            # The series by name and the round as members call it, so the
+            # sentence itself says "NRLW Round 5" or "NRL Finals Week 1".
+            "series": rnd.series.name,
+            "label": rnd.label,
             "competition": rnd.competition.name if rnd.competition else rnd.series.name,
             "stage": rnd.stage,
             "is_origin": rnd.stage == rnd.STAGE_ORIGIN,
@@ -398,10 +402,19 @@ def _name_for(org, user_id):
 # The writer (§7-9)
 # ---------------------------------------------------------------------------
 
-def _round_label(rnd) -> str:
+def _round_label(rnd, lower: bool = False) -> str:
+    """The round with its competition in front: "NRLW Round 5", "NRL Finals
+    Week 1". A Wall carrying NRL and NRLW recaps side by side needs the
+    sentence to say which, not only the tag above it (client, Sep 2026).
+    ``lower`` lowers the round part only; a competition's name keeps its case.
+    """
     if rnd["is_origin"]:
         return f"State of Origin {rnd['number']}".strip()
-    return f"Round {rnd['number']}"
+    label = rnd.get("label") or f"Round {rnd['number']}"
+    if lower:
+        label = label.lower()
+    series = rnd.get("series")
+    return f"{series} {label}" if series else label
 
 
 def _pts(n: int) -> str:
@@ -733,14 +746,14 @@ def fallback_line(facts) -> str:
     """§10: one factual line for a round with nothing to say about it."""
     if not facts["members"]:
         leader = facts["group_digest"][0]
-        label = _round_label(facts["round"]).lower()
+        label = _round_label(facts["round"], lower=True)
         return (
             f"{leader['name']} leads the groups after {label} on "
             f"{_pts(round(leader['avg_points']))} a member."
         )
     top = facts["members"][0]
     rnd = facts["round"]
-    label = _round_label(rnd).lower()
+    label = _round_label(rnd, lower=True)
     return (
         f"{top['name']} topped {label} for {facts['group']['name']} with "
         f"{_pts(top['round_points'])} from {_picks(top['picks'])}."

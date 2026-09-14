@@ -1,74 +1,152 @@
 {% extends "hq_base.html" %}
-{% load static %}
-{% block title %}Enquiries. Manage{% endblock %}
+{% load gtadmin %}
+{% block title %}Enquiries. GoodTip HQ{% endblock %}
 {% block nav_enquiries %}on{% endblock %}
 {% block hero_title %}Customer enquiries{% endblock %}
 {% block hero_lead %}Messages from the contact form on the public site. Reply here and the answer is emailed straight back.{% endblock %}
-{% block hero_shot %}{% static 'img/scenes/mcg-stadium.jpg' %}{% endblock %}
+{% block hero_note %}Real people. Real conversations. Greater impact <span class="gts-heart">&hearts;</span>{% endblock %}
+{% block hero_art %}
+<svg class="gts-env" viewBox="0 0 240 170" aria-hidden="true">
+  <circle cx="132" cy="86" r="74" class="e-blob"/>
+  <rect x="44" y="64" width="176" height="96" rx="14" class="e-back"/>
+  <g class="e-letter">
+    <rect x="66" y="22" width="132" height="104" rx="10"/>
+    <path d="M86 46h62M86 62h92M86 78h80M86 94h54"/>
+  </g>
+  <path d="M44 76 132 124 220 76v70a14 14 0 0 1-14 14H58a14 14 0 0 1-14-14Z" class="e-front"/>
+  <path d="M48 156 112 112M216 156 152 112" class="e-fold"/>
+  <circle cx="204" cy="40" r="19" class="e-badge"/>
+  <svg x="192" y="28" width="24" height="24" class="e-heart"><use href="#ic-heart"/></svg>
+  <svg x="22" y="22" width="18" height="18" class="e-spark"><use href="#ic-spark"/></svg>
+</svg>
+{% endblock %}
 {% block admin_content %}
+{% gta_can 'enquiries.reply' as may_reply %}
 
-<div class="gt-shell gt-shell-wide">
-  <section class="gt-panel">
-    <div class="gt-panel-head">
-      <span class="gp-ic"><svg><use href="#ic-mail"/></svg></span>
-      <div>
-        <h2>Inbox</h2>
-        <div class="gp-sub">
-          {% if open_count %}{{ open_count }} waiting on a reply{% else %}Nothing waiting, all caught up.{% endif %}
-        </div>
-      </div>
-    </div>
+<section class="gt-panel hq-list">
+  {% comment %}
+  One bar: which enquiries (open first by default — what matters about an
+  enquiry is whether somebody has dealt with it), a search across who wrote
+  and what they wrote, and the order. The search and the order ride along on
+  every tab and every page link, so narrowing never quietly resets.
+  {% endcomment %}
+  <div class="hq-bar">
+    <nav class="hq-tabs" aria-label="Which enquiries">
+      <a href="?show=open{% if q %}&amp;q={{ q|urlencode }}{% endif %}&amp;sort={{ sort }}" class="{% if show == 'open' %}on{% endif %}"{% if show == 'open' %} aria-current="page"{% endif %}>Open <span class="hq-n">{{ open_count }}</span></a>
+      <a href="?show=replied{% if q %}&amp;q={{ q|urlencode }}{% endif %}&amp;sort={{ sort }}" class="{% if show == 'replied' %}on{% endif %}"{% if show == 'replied' %} aria-current="page"{% endif %}>Replied <span class="hq-n">{{ replied_count }}</span></a>
+      <a href="?show=all{% if q %}&amp;q={{ q|urlencode }}{% endif %}&amp;sort={{ sort }}" class="{% if show == 'all' %}on{% endif %}"{% if show == 'all' %} aria-current="page"{% endif %}>All <span class="hq-n">{{ total_count }}</span></a>
+    </nav>
+    <form class="hq-find" method="get" role="search">
+      <input type="hidden" name="show" value="{{ show }}">
+      <label class="hq-search">
+        <svg aria-hidden="true"><use href="#ic-search"/></svg>
+        <input type="search" name="q" value="{{ q }}" placeholder="Search enquiries&hellip;" aria-label="Search enquiries">
+      </label>
+      <label class="hq-sort">
+        <span>Sort</span>
+        <select name="sort" data-autosubmit aria-label="Sort enquiries">
+          {% for key, label in sorts %}<option value="{{ key }}"{% if key == sort %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+    </form>
+  </div>
 
-    {# Open first by default: what matters is whether someone has dealt with it. #}
-    <div class="enq-tabs">
-      <a href="?show=open" class="{% if show == 'open' %}on{% endif %}">Open{% if open_count %} <span class="an-count">{{ open_count }}</span>{% endif %}</a>
-      <a href="?show=replied" class="{% if show == 'replied' %}on{% endif %}">Replied ({{ replied_count }})</a>
-      <a href="?show=all" class="{% if show == 'all' %}on{% endif %}">All ({{ total_count }})</a>
-    </div>
-
-    {% if enquiries %}
-    <div class="gt-tablewrap">
-      <table class="gt-table">
-        <thead><tr><th>From</th><th>About</th><th>Received</th><th>Status</th><th class="fit">&nbsp;</th></tr></thead>
-        <tbody>
-        {% for e in enquiries %}
-          <tr>
-            <td>
-              <span class="gt-namecell">
-                <span>
-                  <b>{{ e.name }}</b>
-                  <small>{{ e.email }}{% if e.organisation %} &middot; {{ e.organisation }}{% endif %}</small>
-                </span>
+  {% if enquiries %}
+  <div class="gt-tablewrap">
+    <table class="gt-table hq-rows">
+      <thead><tr><th>From</th><th>About</th><th>Received</th><th>Status</th><th class="fit">Actions</th></tr></thead>
+      <tbody>
+      {% for e in enquiries %}
+        <tr{% if e.status == 'new' %} class="is-open"{% endif %}>
+          <td>
+            <span class="hq-who">
+              <span class="hq-av" data-tone="{{ e.tone }}" aria-hidden="true">{{ e.name|slice:":1"|upper }}</span>
+              <span>
+                <b>{{ e.name }}</b>
+                <small>{{ e.email }}</small>
+                {% if e.organisation %}<small class="hq-where"><svg aria-hidden="true"><use href="#ic-pin"/></svg>{{ e.organisation }}</small>{% endif %}
               </span>
-            </td>
-            <td>
-              {% if e.interest %}<span class="gt-with-ic"><svg><use href="#ic-flag"/></svg>{{ e.interest }}</span>{% else %}<span class="gt-muted">-</span>{% endif %}
-              <small class="enq-snip">{{ e.message|truncatechars:90 }}</small>
-            </td>
-            <td>{{ e.created_at|date:"j M Y, g:i a" }}</td>
-            <td>
-              {% if e.status == 'new' %}<span class="gt-chip draft">Open</span>
-              {% elif e.status == 'replied' %}<span class="gt-chip live">Replied</span>
-              {% else %}<span class="gt-chip">Closed</span>{% endif %}
-            </td>
-            <td class="fit">
-              <span class="gt-actions">
-                <a href="{% url 'admin:hq_enquiry_detail' e.id %}">{% if e.status == 'new' %}Reply{% else %}View{% endif %}</a>
+            </span>
+          </td>
+          <td>
+            <span class="hq-about">
+              <span class="hq-about-ic" aria-hidden="true"><svg><use href="#ic-msg"/></svg></span>
+              <span>
+                <b>{% firstof e.interest "General enquiry" %}</b>
+                <small>{{ e.message|truncatechars:110 }}</small>
               </span>
-            </td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <p class="gt-empty">
-      {% if show == 'open' %}No enquiries waiting on a reply.
-      {% elif show == 'replied' %}Nothing replied to yet.
-      {% else %}No enquiries yet. They arrive here from the contact form on the public site.{% endif %}
-    </p>
+            </span>
+          </td>
+          <td class="hq-when">
+            <b>{{ e.created_at|date:"j M Y" }}</b>
+            <small>{{ e.created_at|date:"g:i a" }}</small>
+          </td>
+          <td>
+            {% if e.status == 'new' %}<span class="hq-status is-open">Open</span>
+            {% elif e.status == 'replied' %}<span class="hq-status is-replied">Replied</span>
+            {% else %}<span class="hq-status">Closed</span>{% endif %}
+          </td>
+          <td class="fit">
+            <span class="hq-acts">
+              <a class="hq-reply" href="{% url 'admin:hq_enquiry_detail' e.id %}">{% if e.status == 'new' %}Reply{% else %}View{% endif %}</a>
+              <details class="hq-more" data-pop>
+                <summary aria-label="More for {{ e.name }}">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+                </summary>
+                <div class="hq-menu">
+                  <a href="{% url 'admin:hq_enquiry_detail' e.id %}"><svg><use href="#ic-msg"/></svg>Open the enquiry</a>
+                  <a href="mailto:{{ e.email }}"><svg><use href="#ic-mail"/></svg>Email from your own inbox</a>
+                  {% if may_reply %}
+                  <form method="post" action="{% url 'admin:hq_enquiry_detail' e.id %}" data-busy="Saving">
+                    {% csrf_token %}
+                    {% if e.status == 'new' %}
+                    <input type="hidden" name="action" value="close">
+                    <button type="submit"><svg><use href="#ic-check"/></svg>Close without a reply</button>
+                    {% else %}
+                    <input type="hidden" name="action" value="reopen">
+                    <button type="submit"><svg><use href="#ic-sync"/></svg>Reopen</button>
+                    {% endif %}
+                  </form>
+                  {% endif %}
+                </div>
+              </details>
+            </span>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="hq-foot">
+    <p>Showing {{ page.start_index }} to {{ page.end_index }} of {{ page.paginator.count }} enquir{{ page.paginator.count|pluralize:"y,ies" }}</p>
+    {% if page.has_other_pages %}
+    <nav class="hq-pager" aria-label="Pages">
+      {% if page.has_previous %}<a href="?{% if keep %}{{ keep }}&amp;{% endif %}page={{ page.previous_page_number }}" aria-label="Previous page"><svg><use href="#ic-chev-left"/></svg></a>
+      {% else %}<span class="off" aria-hidden="true"><svg><use href="#ic-chev-left"/></svg></span>{% endif %}
+      {% for n in page_range %}
+        {% if n == page.paginator.ELLIPSIS %}<span class="gap">&hellip;</span>
+        {% elif n == page.number %}<span class="on" aria-current="page">{{ n }}</span>
+        {% else %}<a href="?{% if keep %}{{ keep }}&amp;{% endif %}page={{ n }}">{{ n }}</a>{% endif %}
+      {% endfor %}
+      {% if page.has_next %}<a href="?{% if keep %}{{ keep }}&amp;{% endif %}page={{ page.next_page_number }}" aria-label="Next page"><svg><use href="#ic-chev-right"/></svg></a>
+      {% else %}<span class="off" aria-hidden="true"><svg><use href="#ic-chev-right"/></svg></span>{% endif %}
+    </nav>
     {% endif %}
-  </section>
-</div>
+  </div>
+
+  {% else %}
+  <div class="hq-empty">
+    <span class="hq-empty-ic" aria-hidden="true"><svg><use href="#ic-mail"/></svg></span>
+    <h3>{% if q %}Nothing matches &ldquo;{{ q }}&rdquo;{% elif show == 'open' %}All caught up{% elif show == 'replied' %}Nothing replied to yet{% else %}No enquiries yet{% endif %}</h3>
+    <p>
+      {% if q %}Try a name, an email address or a word from the message, or <a href="?show={{ show }}">clear the search</a>.
+      {% elif show == 'open' %}No enquiries waiting on a reply.
+      {% elif show == 'replied' %}Answered enquiries collect here.
+      {% else %}They arrive here from the contact form on the public site.{% endif %}
+    </p>
+  </div>
+  {% endif %}
+</section>
 
 {% endblock %}

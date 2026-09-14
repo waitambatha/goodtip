@@ -3,6 +3,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from django.utils.functional import cached_property
 
 
 class Team(models.Model):
@@ -84,6 +85,26 @@ class Round(models.Model):
 
     def __str__(self):
         return f"Round {self.round_number} [{self.series}] — {self.org.name}"
+
+    @cached_property
+    def label(self) -> str:
+        """What a member calls this round: "Round 12", "Finals Week 1",
+        "Origin Game 2".
+
+        The feeds number finals on past the regular season (NRL 2026's first
+        final is round 28), and "Round 28" reads as a round nobody has heard
+        of. The week is counted from this league's own finals rounds, so it
+        needs no season shape hardcoded and costs a query only for a final.
+        """
+        if self.stage == self.STAGE_ORIGIN:
+            return f"Origin Game {self.round_number}"
+        if self.stage == self.STAGE_FINALS:
+            week = Round.objects.filter(
+                org_id=self.org_id, series_id=self.series_id,
+                stage=self.STAGE_FINALS, round_number__lte=self.round_number,
+            ).count()
+            return f"Finals Week {week or 1}"
+        return f"Round {self.round_number}"
 
     @property
     def points_per_correct(self) -> int:

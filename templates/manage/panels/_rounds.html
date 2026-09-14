@@ -23,7 +23,7 @@ each organisation in turn to find out.
             <span class="gt-namecell">
               <span class="gt-rowic"><svg><use href="#ic-match"/></svg></span>
               <span>
-                <b>Round {{ r.round_number }}</b>
+                <b>{{ r.label }}</b>
                 <small>{{ r.series.name }}{% if r.stage != 'regular' %} &middot; {{ r.get_stage_display }}{% endif %}</small>
               </span>
             </span>

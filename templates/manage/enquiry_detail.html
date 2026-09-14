@@ -5,8 +5,8 @@
 {% block title %}{{ enquiry.name }}. Enquiries{% endblock %}
 {% block nav_enquiries %}on{% endblock %}
 {% block hero_title %}{{ enquiry.name }}{% endblock %}
+{% block hero_icon %}ic-mail{% endblock %}
 {% block hero_lead %}{{ enquiry.email }}{% if enquiry.organisation %} &middot; {{ enquiry.organisation }}{% endif %}{% endblock %}
-{% block hero_shot %}{% static 'img/scenes/mcg-stadium.jpg' %}{% endblock %}
 {% block admin_content %}
 
 <div class="gt-shell gt-shell-wide">

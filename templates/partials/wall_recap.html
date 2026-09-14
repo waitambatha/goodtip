@@ -18,9 +18,9 @@ Takes `recap` (a RoundRecap) and `post`.
 <div class="gpt-recap">
 
   {% if recap.leaderboard %}
-  <div class="grc-board" role="table" aria-label="Standings after round {{ recap.round.round_number }}">
+  <div class="grc-board" role="table" aria-label="{{ recap.round.series.name }} standings after {{ recap.round.label }}">
     <div class="grc-bhead" role="row">
-      <span role="columnheader">After round {{ recap.round.round_number }}</span>
+      <span role="columnheader">After {{ recap.round.label }}</span>
       <span role="columnheader">Round</span>
       <span role="columnheader">Season</span>
     </div>

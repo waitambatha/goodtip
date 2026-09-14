@@ -372,6 +372,39 @@ goodtip.css.
       </div>
     </div>
   </nav>
+  {% comment %}
+  THE BAR FITS THE SCREEN IT IS ON (Sep 2026) — see the block of that name at
+  the end of goodtip.css for why. It steps the bar down one tier at a time
+  (nav-tight, nav-tight2, nav-burger) until the account cluster is on screen
+  and on the first row. Inline and straight after the bar, so it has settled
+  before the first paint instead of jumping when the deferred scripts arrive;
+  and it measures again whenever the bar's box changes size (a window
+  resized, an iPad turned) and once the web fonts land, since those change
+  the width of every label.
+  {% endcomment %}
+  <script>
+  (function () {
+    var inner = document.querySelector('.app-nav .an-inner');
+    if (!inner) return;
+    var TIERS = ['nav-tight', 'nav-tight2', 'nav-burger'];
+    function fits() {
+      var right = inner.querySelector('.an-right'), brand = inner.querySelector('.an-brand');
+      if (!right || !brand) return true;
+      var rr = right.getBoundingClientRect(), br = brand.getBoundingClientRect();
+      var sameRow = Math.abs((rr.top + rr.bottom) / 2 - (br.top + br.bottom) / 2) < 12;
+      return sameRow && rr.right <= document.documentElement.clientWidth - 2;
+    }
+    function fit() {
+      for (var i = 0; i < TIERS.length; i++) inner.classList.remove(TIERS[i]);
+      for (var j = 0; j < TIERS.length && !fits(); j++) inner.classList.add(TIERS[j]);
+    }
+    fit();
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(inner);
+    else window.addEventListener('resize', fit);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+    window.addEventListener('load', fit);
+  })();
+  </script>
 
   {% comment %}
   Live toasts: a notification that arrives while you're on the page slams in,

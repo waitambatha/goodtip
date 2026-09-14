@@ -2381,3 +2381,17 @@ html[data-theme="dark"] .gta-act-body small a:hover { color: var(--gt-lime); }
   html:not([data-theme="light"]) .gta-app-models a[aria-current="page"],
   html:not([data-theme="light"]) .gta-act-body small a:hover { color: var(--gt-lime); }
 }
+
+/* ---- Sep 2026 contrast audit ----------------------------------------------
+   The alert count on the ACTIVE nav item was gold on the gold highlight —
+   1:1 in dark, 4.1:1 in light. It goes dark on the highlight. The account
+   menu's caption and the table counts lose the opacity that took them under
+   4.5:1. */
+.gta-nav-a.on .gta-sec-n.alert { color: #3A2503; background: rgba(0,0,0,.12); }
+html[data-theme="dark"] .gta-nav-a.on .gta-sec-n.alert { color: #F0CE62; background: #2A1A02; }
+.gta-acct-cap { opacity: 1; }
+.gta-cat-n small { opacity: 1; }
+html:not([data-theme="dark"]) .gta-pill.ok { color: color-mix(in srgb, var(--gt-c1) 78%, #000); }
+html[data-theme="dark"] .gta-shell .object-tools a.addlink { color: #0C2417; background-color: var(--tbl-accent, #7BD48A); }
+#changelist-filter a.viewlink { color: var(--body-fg); }
+.gta-search input::placeholder { color: color-mix(in srgb, currentColor 70%, transparent); opacity: 1; }

@@ -1063,23 +1063,12 @@ def dashboard_view(request):
     # prefetch_related("media"): every card reads its story's featured set
     # (NewsPost.featured_media), and without this that is one query per story
     # — eighteen extra round trips on the page members open most.
-    news_posts = list(NewsPost.live.prefetch_related("media")[:18])
-    # BY POSITION, NOT BY PAGE (Sep 2026, client: "the first row changes by the
-    # cards doing a 360 ... the other row can have another design"). Each of
-    # the six places on the deck turns on its own — the top three spin, the
-    # bottom three slide — so what the template needs is, for every place, the
-    # run of stories that place will show in turn.
     #
-    # Wrapped rather than padded: with eight stories the second turn shows
-    # 7, 8, 1, 2, 3, 4 instead of two cards and four holes. A deck of one turn
-    # is the ordinary case for a new organisation and the template turns the
-    # rotation off for it — see the news block in dashboard.html.
-    news_count = len(news_posts)
-    news_turns = -(-news_count // 6) if news_count > 6 else 1
-    news_slots = [
-        [news_posts[(6 * turn + place) % news_count] for turn in range(news_turns)]
-        for place in range(min(news_count, 6))
-    ]
+    # Dealt by admin_panel.news_deck, which the news page's deck uses too, so
+    # the two decks cannot drift apart.
+    from admin_panel.news_deck import DECK_STORIES, deal_news_deck
+
+    news_deck = deal_news_deck(NewsPost.live.prefetch_related("media")[:DECK_STORIES])
 
     return render(request, "dashboard.html", {
         "cards": cards,
@@ -1107,16 +1096,10 @@ def dashboard_view(request):
         "round_nav": round_nav,
         "preview_round": preview_round,
         "create_url": reverse("orgs:create"),
-        "news_turns": news_turns,
-        # THE DECK, AS ROWS. Both rows are the same card in the same size now
-        # — the bottom row's smaller "picture beside words" shape is gone
-        # ("why is it small, have all of them same size") — but they are still
-        # two lists rather than one flat six, because the rows take it in
-        # turns to move and the script steps a row at a time. Three to a row,
-        # and a short deck simply has a short second row or none.
-        "news_rows": [news_slots[:3], news_slots[3:]] if news_slots[3:] else [news_slots[:3]],
-        # Whether there is a deck at all — the heading and button go with it.
-        "news_any": bool(news_posts),
+        # THE DECK: news_turns, news_rows (two rows of three, because the rows
+        # take it in turns to move) and news_any (whether there is a deck at
+        # all — the heading and button go with it).
+        **news_deck,
         "prompts": _dashboard_prompts(request.user, selected, games),
     })
 

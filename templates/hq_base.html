@@ -35,13 +35,61 @@ that collapses.
       {% include "partials/_gt_theme_switch.html" %}
       <a href="/admin/"><svg><use href="#ic-sliders"/></svg><span>Django admin</span></a>
       <a href="/" target="_blank" rel="noopener"><svg><use href="#ic-eye"/></svg><span>View site</span></a>
-      <a href="{% url 'profile' %}" class="gts-who">
-        <span class="gts-av">
-          {% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{{ user.display_name|slice:":1"|upper }}{% endif %}
-        </span>
-        <span><b>{{ user.display_name }}</b><small>Super admin</small></span>
-      </a>
     </div>
+
+    {% comment %}
+    THE ACCOUNT MENU, the same one /admin/ has (admin/base_site.html) so the
+    two shells answer "who am I signed in as, and how do I get out?" the same
+    way. The avatar in this bar used to be a plain link to the profile, which
+    left signing out with no door at all on these pages.
+
+    Outside .gts-actions on purpose: those rules restyle every link and button
+    in the bar as a pill, and would reach into the menu.
+    {% endcomment %}
+    <details class="gts-acct" data-pop>
+      <summary aria-label="Your account">
+        <span class="gts-av">
+          {% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{% firstof user.display_name|slice:":1"|upper user.email|slice:":1"|upper %}{% endif %}
+        </span>
+        <span class="gts-acct-who">
+          <b>{% firstof user.display_name user.email %}</b>
+          <small>{% if user.is_superuser %}Super admin{% else %}Administrator{% endif %}</small>
+        </span>
+        <svg class="gts-acct-chev" aria-hidden="true"><use href="#ic-chev-down"/></svg>
+      </summary>
+      <div class="gts-acct-menu">
+        <div class="gts-acct-card">
+          <span class="gts-av gts-acct-face">
+            {% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{% firstof user.display_name|slice:":1"|upper user.email|slice:":1"|upper %}{% endif %}
+          </span>
+          <span class="gts-acct-id">
+            <b>{% firstof user.display_name user.email %}</b>
+            <small title="{{ user.email }}">{{ user.email }}</small>
+            <span class="gts-acct-role{% if user.is_superuser %} is-super{% endif %}">
+              <svg aria-hidden="true"><use href="#{% if user.is_superuser %}ic-f-shield-star{% else %}ic-f-shield{% endif %}"/></svg>
+              {% if user.is_superuser %}Super admin{% else %}Administrator{% endif %}
+            </span>
+          </span>
+        </div>
+
+        <div class="gts-acct-group">
+          <p class="gts-acct-cap">Your account</p>
+          <a href="{% url 'profile' %}"><svg><use href="#ic-users"/></svg>Your profile</a>
+          {% if user.has_usable_password %}<a href="{% url 'admin:password_change' %}"><svg><use href="#ic-lock"/></svg>Change password</a>{% endif %}
+        </div>
+
+        <div class="gts-acct-group">
+          <p class="gts-acct-cap">GoodTip</p>
+          <a href="/" target="_blank" rel="noopener"><svg><use href="#ic-eye"/></svg>View site<svg class="gts-acct-out" aria-hidden="true"><use href="#ic-arrow-right"/></svg></a>
+          <a href="/admin/"><svg><use href="#ic-sliders"/></svg>Django admin</a>
+        </div>
+
+        <form method="post" action="{% url 'admin:logout' %}" class="gts-acct-out-form">
+          {% csrf_token %}
+          <button type="submit"><svg><use href="#ic-logout"/></svg>Log out</button>
+        </form>
+      </div>
+    </details>
   </header>
 
   <div class="gts-body">
@@ -57,27 +105,47 @@ that collapses.
       {% endif %}
 
       {% comment %}
-      THE WAY BACK, on this shell too.
+      THE PAGE'S OWN CARD. The way back, the page's name and what it is for, on
+      one rounded card with an illustration beside them — client: "have it
+      like that [the enquiries mockup], as well as the other pages of the admin
+      that have that type of vibe".
 
-      These screens are one level under the HQ hub and the rail no longer
-      names each of them, so leaving one has to be a control rather than a
-      browser button. It points at a real parent — the hub — not at
-      history.back(), which after saving a post is the editor you have just
-      left.
+      The illustration is the page's own icon on a tilted tile unless a page
+      draws its own (hero_art — the enquiries envelope). hero_note is the
+      little card beside it; left empty, it collapses (:empty in gt-shell.css,
+      which is why that paragraph is written on one line).
       {% endcomment %}
-      {% block admin_back %}
-      <a href="{% block back_url %}{% url 'admin:hq_home' %}{% endblock %}" class="gts-back">
-        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5m0 0 6-6m-6 6 6 6"/></svg>
-        <span>Back to {% block back_label %}HQ{% endblock %}</span>
-      </a>
-      {% endblock %}
-
       {% block admin_hero %}
-      <div class="gts-head">
-        <p class="eyebrow">{% block hero_eyebrow %}GoodTip HQ{% endblock %}</p>
-        <h1>{% block hero_title %}HQ{% endblock %}</h1>
-        <p>{% block hero_lead %}The platform's own work, not any organisation's.{% endblock %}</p>
-      </div>
+      <section class="gts-hero">
+        <div class="gts-head">
+          {% comment %}
+          THE WAY BACK. These screens are one level under the HQ hub and the
+          rail no longer names each of them, so leaving one has to be a
+          control rather than a browser button. It points at a real parent,
+          not at history.back() — which after saving a post is the editor you
+          have just left.
+          {% endcomment %}
+          {% block admin_back %}
+          <a href="{% block back_url %}{% url 'admin:hq_home' %}{% endblock %}" class="gts-back">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5m0 0 6-6m-6 6 6 6"/></svg>
+            <span>Back to {% block back_label %}HQ{% endblock %}</span>
+          </a>
+          {% endblock %}
+          <p class="eyebrow">{% block hero_eyebrow %}GoodTip HQ{% endblock %}</p>
+          <h1>{% block hero_title %}HQ{% endblock %}</h1>
+          <p class="gts-lead">{% block hero_lead %}The platform's own work, not any organisation's.{% endblock %}</p>
+        </div>
+        <div class="gts-hero-art" aria-hidden="true">
+          {% block hero_art %}
+          <span class="gts-art-blob"></span>
+          <span class="gts-art-dots"></span>
+          <span class="gts-art-tile"><svg><use href="#{% block hero_icon %}ic-home{% endblock %}"/></svg></span>
+          <span class="gts-art-spark s1"><svg><use href="#ic-spark"/></svg></span>
+          <span class="gts-art-spark s2"><svg><use href="#ic-spark"/></svg></span>
+          {% endblock %}
+          <p class="gts-art-note">{% block hero_note %}{% endblock %}</p>
+        </div>
+      </section>
       {% endblock %}
 
       {% block admin_content %}{% endblock %}
@@ -91,6 +159,34 @@ that collapses.
         var v=t.value!==undefined?t.value:t.textContent;
         if(navigator.clipboard)navigator.clipboard.writeText(v);
         var o=btn.innerHTML; btn.innerHTML='Copied &#10003;'; setTimeout(function(){btn.innerHTML=o;},1500);
+      });
+    });
+
+    /* Pop-over menus (<details data-pop>): the account menu and each row's
+       ⋮ menu. One open at a time, and a click anywhere else or Escape closes
+       it — a <details> on its own stays open until its own summary is
+       pressed again. */
+    (function () {
+      var pops = document.querySelectorAll('details[data-pop]');
+      function closeAll(except) {
+        pops.forEach(function (d) { if (d !== except) d.open = false; });
+      }
+      pops.forEach(function (d) {
+        d.addEventListener('toggle', function () { if (d.open) closeAll(d); });
+      });
+      document.addEventListener('click', function (e) {
+        if (!e.target.closest('details[data-pop]')) closeAll(null);
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeAll(null);
+      });
+    })();
+
+    /* A sort or filter <select> takes effect when it is changed, with no
+       separate button to press. */
+    document.querySelectorAll('select[data-autosubmit]').forEach(function (s) {
+      s.addEventListener('change', function () {
+        if (s.form.requestSubmit) s.form.requestSubmit(); else s.form.submit();
       });
     });
   </script>
