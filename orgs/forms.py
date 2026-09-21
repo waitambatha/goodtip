@@ -181,6 +181,31 @@ class OrgCreateForm(forms.ModelForm):
         initial="no",
         label="Split into groups?",
     )
+    # THE AGREEMENT, ON THE LAST STEP, TICKED BY A PERSON.
+    #
+    # Client task list, Sep 2026: "Add a checkbox agreement into the
+    # organisation sign-up workflow with a plain-English top-3 summary of what
+    # they're agreeing to."
+    #
+    # Not a model field and not pre-ticked. The person creating an organisation
+    # is taking on the thing every other member of it is trusting — their data,
+    # their money, their name on it — and a box that arrives already ticked is
+    # not an agreement, it is a notice. What they agreed to and when is written
+    # onto the Organisation at save(); see terms_accepted_at there.
+    #
+    # It lives on the review step, which owns no other fields, because that is
+    # the screen with the Create button on it. Agreeing three screens before
+    # the thing you are agreeing about happens is agreeing to nothing.
+    terms_accepted = forms.BooleanField(
+        required=True,
+        label="I've read and agree to the Terms and the Privacy Policy",
+        error_messages={
+            "required": (
+                "Tick the box to say you agree to the Terms and Privacy Policy "
+                "— we can't create the organisation without it."
+            ),
+        },
+    )
 
     class Meta:
         model = Organisation
@@ -328,9 +353,23 @@ class OrgCreateForm(forms.ModelForm):
         return self.cleaned_data.get("charity_method") == "vote"
 
     def save(self, commit=True):
+        from django.utils import timezone
+
+        from goodtip.legal import TERMS_VERSION
+
         org = super().save(commit=False)
         # In vote mode the charity stays unset until the vote resolves.
         org.charity = None if self.is_vote else self.cleaned_data.get("charity")
+        # The agreement, stamped at the moment the organisation comes into
+        # existence. terms_accepted is required, so reaching here at all means
+        # it was ticked — but the version is recorded too, because a tick
+        # against wording nobody can identify afterwards proves nothing.
+        #
+        # WHO ticked it is set by the view, which is the only thing that knows
+        # the request. See orgs.views.create_org_view.
+        if self.cleaned_data.get("terms_accepted"):
+            org.terms_accepted_at = timezone.now()
+            org.terms_version = TERMS_VERSION
         if commit:
             org.save()
             self.save_m2m()

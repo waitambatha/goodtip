@@ -118,6 +118,10 @@ class OrgCategoryFormTests(TestCase):
             "formality": "formal",
             "name": "Testers", "season": self.season.pk, "competitions": [self.comp.pk],
             "charity_method": "pick", "charity": self.charity.pk, "groups_enabled": "no",
+            # Required since Sep 2026 and asked on the wizard's last step. These
+            # tests are about the per-type category rules, so the agreement is
+            # supplied as a given; TermsAgreementTests covers it on its own.
+            "terms_accepted": "1",
         }
         data.update(extra)
         return OrgCreateForm(data)
@@ -576,7 +580,13 @@ def _walk_create_wizard(client, case, name, **extra):
         "step": CHARITY_STEP, "action": "next",
         "charity_method": "pick", "charity": case.charity.pk, "parent": parent,
     })
-    final = {"step": REVIEW_STEP, "action": "next", "parent": parent}
+    # terms_accepted is required on the review step since Sep 2026 — the
+    # wizard refuses to create an organisation without it. See
+    # OrgCreateForm.terms_accepted and TermsAgreementTests below.
+    final = {
+        "step": REVIEW_STEP, "action": "next", "parent": parent,
+        "terms_accepted": "1",
+    }
     if extra.get("duplicate_confirmed"):
         final["duplicate_confirmed"] = extra["duplicate_confirmed"]
     return client.post(url, final)
@@ -1764,9 +1774,12 @@ class CreateWizardTests(TestCase):
             "charity_method": "pick", "charity": self.charity.pk,
         })
 
-    def _review_step(self):
+    def _review_step(self, **extra):
+        # The agreement is required to get past this step. Overridable, so a
+        # test can post it unticked and check the refusal.
         return self.client.post(self.URL, {
             "step": self._steps["review"], "action": "next",
+            "terms_accepted": "1", **extra,
         })
 
     def _through_to_review(self, name="Wizard Group"):
@@ -2261,8 +2274,8 @@ class WizardEndToEndTests(TestCase):
         )
         # 6 — the cause
         self._post(CHARITY_STEP, charity_method="pick", charity=self.charity.id)
-        # 7 — create
-        self._post(LAST_STEP)
+        # 7 — agree to the terms, and create
+        self._post(LAST_STEP, terms_accepted="1")
 
         org = Organisation.objects.filter(name="Wizard Walk FC").first()
         self.assertIsNotNone(org, "the wizard finished without creating a group")
@@ -2796,8 +2809,15 @@ class GroupsPageTests(TestCase):
         self.charity, _ = Charity.objects.get_or_create(
             slug="lifeline", defaults={"name": "Lifeline", "is_approved": True},
         )
+        # team_size puts this org on a plan that includes groups. Groups are
+        # gated at Workplace (billing/pricing.py) and, with no subscription to
+        # read, the gate sizes an org by the larger of its stated team size and
+        # its real headcount — so a two-member fixture is a Starter comp and
+        # cannot create a group at all. The gate itself is exercised in
+        # GroupsPlanGateTests; these tests are about approval and visibility
+        # and want an organisation that is allowed to have groups.
         self.org = Organisation.objects.create(
-            name="Acme", season=self.season, charity=self.charity,
+            name="Acme", season=self.season, charity=self.charity, team_size=200,
         )
         self.admin = User.objects.create_user(
             email="admin@example.com", password="x", display_name="Admin",
@@ -4984,6 +5004,71 @@ class WallReplyThreadingTests(TestCase):
         self.assertIsNone(latest.reply_to_id)
 
 
+class WallEditTests(TestCase):
+    """Client, 17 Sep 2026 — the chat's edit control, asked for on the Wall too."""
+
+    def setUp(self):
+        from .models import WallReply
+
+        User = get_user_model()
+        self.season = Season.objects.create(year=2095, label="2095")
+        self.org = Organisation.objects.create(name="Second Draft", season=self.season)
+        self.user = User.objects.create_user(email="w1@b.com", password="x", display_name="W1")
+        self.other = User.objects.create_user(email="w2@b.com", password="x", display_name="W2")
+        self.boss = User.objects.create_user(email="w3@b.com", password="x", display_name="W3")
+        OrgMember.objects.create(user=self.user, org=self.org)
+        OrgMember.objects.create(user=self.other, org=self.org)
+        OrgMember.objects.create(user=self.boss, org=self.org, role=OrgMember.ROLE_MANAGER)
+        self.post = WallPost.objects.create(org=self.org, author=self.user, body="Big cal.")
+        self.reply = WallReply.objects.create(post=self.post, author=self.user, body="Nah.")
+        self.post_url = reverse("orgs:wall_edit", args=[self.org.id, self.post.id])
+        self.reply_url = reverse("orgs:wall_reply_edit", args=[self.org.id, self.reply.id])
+
+    def test_the_author_rewords_their_post_and_it_says_edited(self):
+        self.client.force_login(self.user)
+        self.client.post(self.post_url, {"body": "Big call."})
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.body, "Big call.")
+        self.assertIsNotNone(self.post.edited_at)
+
+    def test_the_author_rewords_their_reply(self):
+        self.client.force_login(self.user)
+        self.client.post(self.reply_url, {"body": "Nah mate."})
+        self.reply.refresh_from_db()
+        self.assertEqual(self.reply.body, "Nah mate.")
+        self.assertIsNotNone(self.reply.edited_at)
+
+    def test_nobody_else_can_reword_it_including_an_admin(self):
+        """An admin may take a post DOWN. Rewriting one under somebody else's
+        name is a different power and this product does not have it."""
+        for user in (self.other, self.boss):
+            self.client.force_login(user)
+            self.assertEqual(self.client.post(self.post_url, {"body": "nope"}).status_code, 404)
+            self.assertEqual(self.client.post(self.reply_url, {"body": "nope"}).status_code, 404)
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.body, "Big cal.")
+
+    def test_an_empty_edit_leaves_the_post_alone(self):
+        self.client.force_login(self.user)
+        self.client.post(self.post_url, {"body": "  "})
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.body, "Big cal.")
+        self.assertIsNone(self.post.edited_at)
+
+    def test_a_recap_card_carries_no_edit_control(self):
+        """It has no author, which is most of why it is worth trusting."""
+        recap = WallPost.objects.create(
+            org=self.org, kind=WallPost.KIND_RECAP, body="Round 3 recap.",
+        )
+        self.client.force_login(self.user)
+        self.assertEqual(
+            self.client.post(
+                reverse("orgs:wall_edit", args=[self.org.id, recap.id]), {"body": "x"},
+            ).status_code,
+            404,
+        )
+
+
 class CharityEditTests(TestCase):
     """Fixing a charity up, and who is allowed to.
 
@@ -5866,6 +5951,221 @@ class MessagePinTests(TestCase):
         self.assertIsNone(self.room.pinned_message_id)
 
 
+class MessageEditAndDeleteTests(TestCase):
+    """Client, 17 Sep 2026: "is there a way messages can be edited or deleted
+    from the chat?" """
+
+    def setUp(self):
+        from .models import Message
+        from .services import org_room
+
+        User = get_user_model()
+        season = Season.objects.create(year=2092, label="2092")
+        self.org = Organisation.objects.create(name="Second Thoughts", season=season)
+        self.admin = User.objects.create_user(
+            email="boss@st.com", password="x", display_name="Bo",
+        )
+        self.ann = User.objects.create_user(
+            email="ann@st.com", password="x", display_name="Ann",
+        )
+        self.bob = User.objects.create_user(
+            email="bob@st.com", password="x", display_name="Bob",
+        )
+        OrgMember.objects.create(user=self.admin, org=self.org, role=OrgMember.ROLE_MANAGER)
+        OrgMember.objects.create(user=self.ann, org=self.org)
+        OrgMember.objects.create(user=self.bob, org=self.org)
+        self.room = org_room(self.org)
+        self.msg = Message.objects.create(
+            thread=self.room, author=self.ann, body="Tigres by 12",
+        )
+        self.edit_url = reverse(
+            "orgs:message_edit", args=[self.org.id, self.room.id, self.msg.id],
+        )
+        self.remove_url = reverse(
+            "orgs:message_remove", args=[self.org.id, self.room.id, self.msg.id],
+        )
+
+    # ---- editing ---------------------------------------------------------
+
+    def test_the_author_rewords_their_own_message_and_it_says_edited(self):
+        self.client.force_login(self.ann)
+        self.client.post(self.edit_url, {"body": "Tigers by 12"})
+        self.msg.refresh_from_db()
+        self.assertEqual(self.msg.body, "Tigers by 12")
+        self.assertIsNotNone(self.msg.edited_at)
+        self.assertTrue(self.msg.is_edited)
+
+    def test_nobody_else_can_edit_it_not_even_an_admin(self):
+        for user in (self.bob, self.admin):
+            self.client.force_login(user)
+            self.assertEqual(
+                self.client.post(self.edit_url, {"body": "hijacked"}).status_code, 403,
+            )
+        self.msg.refresh_from_db()
+        self.assertEqual(self.msg.body, "Tigres by 12")
+
+    def test_an_empty_edit_changes_nothing(self):
+        """Blanking the box is not a way to delete without being asked to
+        confirm it."""
+        self.client.force_login(self.ann)
+        self.client.post(self.edit_url, {"body": "   "})
+        self.msg.refresh_from_db()
+        self.assertEqual(self.msg.body, "Tigres by 12")
+        self.assertIsNone(self.msg.edited_at)
+
+    def test_an_edit_that_changes_nothing_does_not_stamp_it(self):
+        self.client.force_login(self.ann)
+        self.client.post(self.edit_url, {"body": "Tigres by 12"})
+        self.msg.refresh_from_db()
+        self.assertIsNone(self.msg.edited_at)
+
+    # ---- deleting --------------------------------------------------------
+
+    def test_the_author_deletes_their_own_and_a_tombstone_is_left(self):
+        self.client.force_login(self.ann)
+        self.client.post(self.remove_url)
+        self.msg.refresh_from_db()
+        self.assertTrue(self.msg.is_deleted)
+        self.assertEqual(self.msg.body, "")
+        self.assertEqual(self.msg.deleted_by_id, self.ann.id)
+        # The row is still there, so replies quoting it still answer something.
+        self.assertEqual(self.msg.quote, "This message was deleted")
+
+    def test_an_admin_can_take_anybodys_message_down(self):
+        self.client.force_login(self.admin)
+        self.client.post(self.remove_url)
+        self.msg.refresh_from_db()
+        self.assertTrue(self.msg.is_deleted)
+        self.assertEqual(self.msg.deleted_by_id, self.admin.id)
+
+    def test_an_ordinary_member_cannot_delete_somebody_elses(self):
+        self.client.force_login(self.bob)
+        self.assertEqual(self.client.post(self.remove_url).status_code, 403)
+        self.msg.refresh_from_db()
+        self.assertFalse(self.msg.is_deleted)
+
+    def test_a_deleted_message_can_no_longer_be_edited_or_deleted_again(self):
+        self.client.force_login(self.ann)
+        self.client.post(self.remove_url)
+        self.assertEqual(self.client.post(self.edit_url, {"body": "back"}).status_code, 403)
+        self.assertEqual(self.client.post(self.remove_url).status_code, 403)
+
+    def test_deleting_the_pinned_message_takes_the_pin_down_with_it(self):
+        self.client.force_login(self.admin)
+        self.client.post(
+            reverse("orgs:message_pin", args=[self.org.id, self.room.id]),
+            {"message": str(self.msg.id)},
+        )
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.pinned_message_id, self.msg.id)
+        self.client.post(self.remove_url)
+        self.room.refresh_from_db()
+        self.assertIsNone(self.room.pinned_message_id)
+
+    def test_the_controls_are_actually_drawn_on_the_messages_screen(self):
+        """Client, 20 Sep 2026: "I should be able to delete and edit a chat, I
+        can not see that." They were rendered and invisible until hover; this
+        pins that they are rendered at all, so a styling change can never
+        quietly take them away again."""
+        self.client.force_login(self.ann)
+        body = self.client.get(
+            reverse("orgs:member_message_thread", args=[self.org.id, self.room.id])
+        ).content
+        self.assertIn(b'data-chat-edit-open="%d"' % self.msg.id, body)
+        self.assertIn(
+            reverse(
+                "orgs:message_remove", args=[self.org.id, self.room.id, self.msg.id],
+            ).encode(),
+            body,
+        )
+        self.assertIn(
+            reverse(
+                "orgs:message_edit", args=[self.org.id, self.room.id, self.msg.id],
+            ).encode(),
+            body,
+        )
+
+    def test_the_actions_are_one_menu_and_not_a_rail_of_icons(self):
+        """Client, 20 Sep 2026: "on the edit and delete, it should not be
+        buttons ... when I click on it, or if it's touch I will press it a
+        little bit, and those should be there."
+
+        The rail it replaced had Reply rendering at two pixels wide and Edit
+        at zero — the flex items had collapsed, so the two controls being
+        asked about were not merely hard to hit, they were absent. A menu has
+        no width to run out of.
+        """
+        self.client.force_login(self.ann)
+        body = self.client.get(
+            reverse("orgs:member_message_thread", args=[self.org.id, self.room.id])
+        ).content.decode()
+        self.assertIn("data-msg-menu", body)
+        self.assertIn("data-msg-more", body)
+        # The old rail is gone, not merely hidden.
+        for dead in ("chat-replybtn", "chat-editbtn", "chat-delbtn", "chat-pinbtn"):
+            self.assertNotIn(dead, body, dead)
+
+    def test_every_destructive_item_is_still_a_real_form(self):
+        """The menu is an arrangement, not a mechanism. With scripting off it
+        is simply always open, and each item still has to work — which it only
+        does if it is a form with its own CSRF token rather than something the
+        script posts."""
+        self.client.force_login(self.ann)
+        body = self.client.get(
+            reverse("orgs:member_message_thread", args=[self.org.id, self.room.id])
+        ).content.decode()
+        menu = body[body.index("data-msg-menu"):]
+        menu = menu[:menu.index("</li>")]
+        remove = reverse(
+            "orgs:message_remove", args=[self.org.id, self.room.id, self.msg.id],
+        )
+        self.assertIn('action="%s"' % remove, menu)
+        self.assertIn("csrfmiddlewaretoken", menu)
+        self.assertIn("data-confirm", menu)
+
+    def test_reply_edit_and_delete_all_live_in_the_menu(self):
+        self.client.force_login(self.ann)
+        body = self.client.get(
+            reverse("orgs:member_message_thread", args=[self.org.id, self.room.id])
+        ).content.decode()
+        menu = body[body.index("data-msg-menu"):]
+        menu = menu[:menu.index("</li>")]
+        self.assertIn('data-reply-to="%d"' % self.msg.id, menu)
+        self.assertIn('data-chat-edit-open="%d"' % self.msg.id, menu)
+        # Whitespace-insensitive: the indentation of a menu item is not the
+        # thing under test, and pinning it makes a reformat look like a bug.
+        self.assertIn("Delete", menu)
+        self.assertIn("chat-menu-item is-danger", menu)
+
+    def test_somebody_elses_message_offers_neither_control(self):
+        self.client.force_login(self.bob)
+        body = self.client.get(
+            reverse("orgs:member_message_thread", args=[self.org.id, self.room.id])
+        ).content
+        self.assertNotIn(b'data-chat-edit-open="%d"' % self.msg.id, body)
+        self.assertNotIn(
+            reverse(
+                "orgs:message_remove", args=[self.org.id, self.room.id, self.msg.id],
+            ).encode(),
+            body,
+        )
+
+    def test_the_thread_hands_the_page_the_right_two_permissions(self):
+        from .services import thread_entries
+
+        entry = thread_entries(self.room, self.ann)[0]
+        self.assertTrue(entry.can_edit)
+        self.assertTrue(entry.can_remove)
+
+        entry = thread_entries(self.room, self.bob)[0]
+        self.assertFalse(entry.can_edit)
+        self.assertFalse(entry.can_remove)
+
+        entry = thread_entries(self.room, self.admin)[0]
+        self.assertFalse(entry.can_edit)      # moderation, not authorship
+        self.assertTrue(entry.can_remove)
+
+
 class MessagesFollowContextTests(TestCase):
     """Opening a conversation moves you into its organisation.
 
@@ -6264,7 +6564,38 @@ class OpeningARoomDoesNotReloadTheScreenTests(TestCase):
             reverse("orgs:member_messages", args=[self.org.id])
         ).content.decode()
         self.assertIn("pane=room", body)
-        self.assertIn('hx-target=".gtm-chat"', body)
+        self.assertIn('hx-target="[data-gtm-chat-slot]"', body)
+
+    def test_the_swap_does_not_take_the_wallpaper_with_it(self):
+        """Client, 20 Sep 2026: "on the wallpaper of each chat ... it's only in
+        one, the others I do not see the images."
+
+        The swap used to target .gtm-chat, which CONTAINS the wallpaper layer,
+        so opening any conversation deleted the photographs and the timer
+        rotating them. The layer is the panel's, not the conversation's; this
+        pins that it stays outside whatever a conversation change replaces.
+        """
+        body = self.client.get(
+            reverse("orgs:member_messages", args=[self.org.id])
+        ).content.decode()
+        # The slot's own element opens AFTER the paper layer, so the paper is
+        # its sibling and not its child. Matched on the class attributes, not
+        # on the bare names — the selector "[data-gtm-chat-slot]" appears far
+        # higher up the page in every conversation link's hx-target.
+        self.assertLess(
+            body.index('class="gtm-paper"'), body.index('class="gtm-chat-slot"'),
+        )
+        # And nothing aims at the panel itself any more.
+        self.assertNotIn('hx-target=".gtm-chat"', body)
+
+    def test_a_conversation_fragment_carries_no_wallpaper_of_its_own(self):
+        """Otherwise the swap would drop a second layer into the panel on top
+        of the one already running, and the two would crossfade out of step."""
+        body = self.client.get(
+            reverse("orgs:message_room", args=[self.org.id]) + "?pane=room",
+        ).content.decode()
+        self.assertIn("gtm-chat-in", body)
+        self.assertNotIn("gtm-paper", body)
 
     def test_reading_a_room_this_way_still_moves_you_into_it(self):
         """_follow_context runs on the fragment path as well, or the sidebar
@@ -7343,8 +7674,10 @@ class GroupsPageHierarchyTests(TestCase):
     def setUp(self):
         User = get_user_model()
         self.season = Season.objects.create(year=2099, label="2099")
+        # Workplace-sized, so the group controls are drawn live rather than
+        # locked — see the note in GroupsPageTests.setUp.
         self.org = Organisation.objects.create(
-            name="Hier Co", season=self.season, groups_enabled=True,
+            name="Hier Co", season=self.season, groups_enabled=True, team_size=200,
         )
         self.admin = User.objects.create_user(
             email="hier@example.com", password="x", display_name="Admin",
@@ -7687,3 +8020,334 @@ class TeamManagementIsDrawnAsABoardTests(TestCase):
         })
         self.membership.refresh_from_db()
         self.assertEqual(self.membership.role, OrgMember.ROLE_CAPTAIN)
+
+
+class GroupsPlanGateTests(TestCase):
+    """Groups are sold from Workplace up, and a smaller plan is TOLD so.
+
+    Client, 16 Sep 2026: "Starter (up to 20 people) and Team (up to 50 people):
+    Groups/sub-groups feature is locked. If a user on either tier tries to
+    access group creation, show the upgrade prompt instead of the group UI,
+    don't just hide the option, they should see what they're missing and get a
+    clear upgrade path."
+
+    So there are two halves to check and the second one is the one that is easy
+    to get wrong: that the action is refused, and that the control is still on
+    the screen when it is.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2094, label="2094")
+        self.admin = User.objects.create_user(
+            email="gate-admin@example.com", password="x", display_name="Admin",
+        )
+
+    def _org(self, *, team_size, groups_enabled=True):
+        org = Organisation.objects.create(
+            name=f"Gate {team_size}", season=self.season,
+            team_size=team_size, groups_enabled=groups_enabled,
+        )
+        OrgMember.objects.create(
+            user=self.admin, org=org, role=OrgMember.ROLE_BOTH, is_league_owner=True,
+        )
+        return org
+
+    def test_a_small_org_cannot_create_a_group(self):
+        from billing.entitlements import GroupsLocked
+
+        from .services import create_group
+
+        org = self._org(team_size=20)
+        with self.assertRaises(GroupsLocked):
+            create_group(org, name="Marketing", by_user=self.admin)
+        self.assertFalse(Group.objects.filter(org=org).exists())
+
+    def test_the_team_plan_is_still_too_small(self):
+        """The line sits between Team and Workplace, not below Team."""
+        from billing.entitlements import GroupsLocked
+
+        from .services import create_group
+
+        org = self._org(team_size=50)
+        with self.assertRaises(GroupsLocked):
+            create_group(org, name="Sales", by_user=self.admin)
+
+    def test_a_workplace_org_can(self):
+        from .services import create_group
+
+        org = self._org(team_size=150)
+        group = create_group(org, name="Marketing", by_user=self.admin)
+        self.assertEqual(group.org_id, org.id)
+
+    def test_the_refusal_is_a_value_error_so_old_callers_still_flash_it(self):
+        """GroupsLocked subclasses ValueError on purpose — see the class."""
+        from .services import create_group
+
+        org = self._org(team_size=20)
+        with self.assertRaises(ValueError):
+            create_group(org, name="Marketing", by_user=self.admin)
+
+    def test_the_locked_org_still_sees_the_button(self):
+        """The whole point: visible and disabled, not removed."""
+        org = self._org(team_size=20)
+        self.client.force_login(self.admin)
+        body = self.client.get(reverse("orgs:groups", args=[org.id])).content.decode()
+
+        self.assertIn("Create group", body)          # still on the screen
+        self.assertIn("is-locked", body)             # and visibly not available
+        self.assertIn("lock-prompt", body)           # with the reason beside it
+        self.assertIn("Workplace", body)             # naming the plan that has it
+
+    def test_the_upgrade_prompt_points_at_this_org_s_plans(self):
+        org = self._org(team_size=20)
+        self.client.force_login(self.admin)
+        body = self.client.get(reverse("orgs:groups", args=[org.id])).content.decode()
+        self.assertIn(reverse("billing:plans", args=[org.id]), body)
+
+    def test_posting_the_create_form_anyway_lands_on_the_plans_page(self):
+        """The disabled control is not the enforcement. This is."""
+        org = self._org(team_size=20)
+        self.client.force_login(self.admin)
+        resp = self.client.post(
+            reverse("orgs:groups", args=[org.id]),
+            {"action": "create", "name": "Marketing"},
+        )
+        self.assertRedirects(
+            resp, reverse("billing:plans", args=[org.id]),
+            fetch_redirect_response=False,
+        )
+        self.assertFalse(Group.objects.filter(org=org).exists())
+
+    def test_switching_groups_on_is_refused_too(self):
+        org = self._org(team_size=20, groups_enabled=False)
+        self.client.force_login(self.admin)
+        self.client.post(reverse("orgs:groups_toggle", args=[org.id]))
+        org.refresh_from_db()
+        self.assertFalse(org.groups_enabled)
+
+    def test_switching_groups_OFF_is_never_refused(self):
+        """An org that drops to a smaller plan must still be able to simplify.
+
+        Refusing this would trap them inside a feature they are no longer being
+        sold, which is the opposite of what the gate is for.
+        """
+        org = self._org(team_size=20, groups_enabled=True)
+        self.client.force_login(self.admin)
+        self.client.post(reverse("orgs:groups_toggle", args=[org.id]))
+        org.refresh_from_db()
+        self.assertFalse(org.groups_enabled)
+
+    def test_headcount_counts_when_no_team_size_was_ever_recorded(self):
+        """Hundreds of orgs predate the wizard asking for team_size.
+
+        Sizing those by their stated size alone would put a three-hundred
+        person comp on Starter and lock it out of departments it is already
+        running.
+        """
+        from billing.entitlements import groups_gate
+
+        User = get_user_model()
+        org = Organisation.objects.create(
+            name="No size recorded", season=self.season, groups_enabled=True,
+        )
+        for n in range(60):
+            user = User.objects.create_user(
+                email=f"crowd{n}@example.com", password="x", display_name=f"P{n}",
+            )
+            OrgMember.objects.create(user=user, org=org)
+
+        self.assertIsNone(org.team_size)
+        self.assertTrue(groups_gate(org).allowed)
+
+
+class WizardPlanRecommendationTests(CreateWizardTests):
+    """Client, 17 Sep 2026: "where in the process do they select their plan or
+    get a recommended package — is it when they get asked the size of the
+    group, in the org sign-up process?" """
+
+    def _open_step(self, key):
+        """Walk to a step and GET it, so what is rendered is what a person
+        would actually be looking at."""
+        return self.client.get(self.URL).content
+
+    def test_the_size_screen_names_the_plan_that_size_lands_on(self):
+        self._step1("Sizeable")
+        self._verify_step()
+        self._groups_step(enabled=False)
+        body = self.client.get(self.URL).content
+        self.assertIn(b"Your plan, going by that", body)
+        # No size given yet, so the smallest plan, and it says groups are not
+        # in it rather than staying quiet about them.
+        self.assertIn(b"Starter", body)
+        self.assertIn(b"One shared ladder for everyone", body)
+
+    def test_asking_for_groups_shows_the_plan_groups_start_at(self):
+        self._step1("Groupie")
+        self._verify_step()
+        self._groups_step(enabled=True)
+        body = self.client.get(self.URL).content
+        self.assertIn(b"Workplace", body)
+        self.assertIn(b"Groups start at Workplace", body)
+
+    def test_the_review_screen_states_the_plan_and_that_nothing_is_charged(self):
+        self._through_to_review("Reviewed Co")
+        body = self.client.get(self.URL).content
+        self.assertIn(b"The plan we", body)          # "The plan we'd put you on"
+        self.assertIn(b"nothing is charged today", body)
+        # And the door for somebody the number just lost.
+        self.assertIn(b"sponsored place", body)
+
+    def test_the_size_typed_in_decides_the_plan_on_the_review(self):
+        self._step1("Fifty Two")
+        self._verify_step()
+        self._groups_step(enabled=False)
+        self.client.post(self.URL, {
+            "step": self._steps["tipping"], "action": "next",
+            "competitions": [self.comp.pk], "season": self.season.pk,
+            "team_size": "52",
+        })
+        self._charity_step()
+        body = self.client.get(self.URL).content
+        # 52 people is past Team's ceiling of 50.
+        self.assertIn(b"Workplace", body)
+        self.assertIn(b"$799", body)
+
+
+class TermsAgreementTests(CreateWizardTests):
+    """The Terms checkbox on the last step of the org wizard.
+
+    Client task list, Sep 2026: "Add a checkbox agreement into the organisation
+    sign-up workflow with a plain-English top-3 summary of what they're
+    agreeing to."
+
+    Inherits CreateWizardTests for its step helpers, which know the step
+    numbers off WIZARD_STEPS rather than writing them out.
+    """
+
+    def test_the_summary_and_the_box_are_on_the_review_step(self):
+        self._through_to_review("Terms Co")
+        body = self.client.get(self.URL).content.decode()
+
+        self.assertIn('name="terms_accepted"', body)
+        # The plain-English three, printed from goodtip.legal — checking the
+        # first one's opening words rather than the whole paragraph, so
+        # rewording the summary does not break this test for no reason.
+        self.assertIn("Your organisation pays one fee", body)
+        self.assertIn('href="/terms/"', body)
+        self.assertIn('href="/privacy/"', body)
+
+    def test_the_box_is_not_pre_ticked(self):
+        """A box that arrives ticked is a notice, not an agreement."""
+        self._through_to_review("Unticked Co")
+        body = self.client.get(self.URL).content.decode()
+
+        tick = body[body.index('name="terms_accepted"'):]
+        tick = tick[:tick.index(">")]
+        self.assertNotIn("checked", tick)
+
+    def test_nothing_is_created_without_it(self):
+        self._through_to_review("No Tick Co")
+        resp = self.client.post(self.URL, {
+            "step": self._steps["review"], "action": "next",
+        })
+        self.assertEqual(resp.status_code, 200, "it should stay on the review step")
+        self.assertFalse(Organisation.objects.filter(name="No Tick Co").exists())
+
+    def test_the_refusal_says_what_to_do(self):
+        self._through_to_review("No Tick Co")
+        body = self.client.post(self.URL, {
+            "step": self._steps["review"], "action": "next",
+        }).content.decode()
+        self.assertIn("Tick the box", body)
+
+    def test_ticking_it_records_who_agreed_when_and_to_what(self):
+        from goodtip.legal import TERMS_VERSION
+
+        self._through_to_review("Agreed Co")
+        self._review_step()
+
+        org = Organisation.objects.get(name="Agreed Co")
+        self.assertIsNotNone(org.terms_accepted_at)
+        self.assertEqual(org.terms_accepted_by, self.user)
+        self.assertEqual(org.terms_version, TERMS_VERSION)
+
+    def test_the_terms_page_prints_the_same_three(self):
+        """The page and the checkbox read one source, so they cannot drift."""
+        from goodtip.legal import TERMS_TOP_THREE
+
+        body = self.client.get("/terms/").content.decode()
+        for heading, _body in TERMS_TOP_THREE:
+            # The headings carry an apostrophe or two, which the template
+            # escapes — compare on a distinctive unescaped fragment instead.
+            self.assertIn(heading.split(".")[0].split("'")[0], body)
+
+
+class SponsorshipApplicationTests(TestCase):
+    """Applying for a sponsored place, for a group that cannot pay the fee.
+
+    Client task list: "Build a sponsorship application path for individuals who
+    can't pay — aimed initially at the PNG audience, a way to apply for a
+    sponsored place if they can't afford the platform fee."
+    """
+
+    URL = "/sponsorship/"
+
+    def test_the_page_is_public(self):
+        """The audience for this has not signed up. That is the whole point."""
+        resp = self.client.get(self.URL)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Sponsored places")
+
+    def test_an_application_is_recorded(self):
+        from billing.models import SponsorshipApplication
+
+        self.client.post(self.URL, {
+            "contact_name": "Joe Kila",
+            "email": "joe@example.com",
+            "organisation_name": "Lae Warehouse Crew",
+            "organisation_kind": "Workplace",
+            "people": "30",
+            "reason": "We all tip already, on paper. The fee is a fortnight's food budget.",
+        })
+        app = SponsorshipApplication.objects.get()
+        self.assertEqual(app.organisation_name, "Lae Warehouse Crew")
+        self.assertEqual(app.people, 30)
+        self.assertEqual(app.status, app.STATUS_NEW)
+
+    def test_a_signed_in_applicant_is_linked_to_their_account(self):
+        from billing.models import SponsorshipApplication
+
+        user = User.objects.create_user(
+            email="member@example.com", password="x", display_name="Member",
+        )
+        self.client.force_login(user)
+        self.client.post(self.URL, {
+            "contact_name": "Member", "email": "member@example.com",
+            "organisation_name": "Their Club", "reason": "Because.",
+        })
+        self.assertEqual(SponsorshipApplication.objects.get().user, user)
+
+    def test_the_four_required_answers_are_required(self):
+        from billing.models import SponsorshipApplication
+
+        resp = self.client.post(self.URL, {
+            "contact_name": "Joe", "email": "", "organisation_name": "", "reason": "",
+        })
+        self.assertContains(resp, "are all needed")
+        self.assertFalse(SponsorshipApplication.objects.exists())
+
+    def test_the_honeypot_swallows_a_bot_without_saying_so(self):
+        from billing.models import SponsorshipApplication
+
+        resp = self.client.post(self.URL, {
+            "contact_name": "Bot", "email": "bot@example.com",
+            "organisation_name": "Bot Co", "reason": "spam",
+            "company": "filled in by a bot",
+        })
+        self.assertContains(resp, "Got it")
+        self.assertFalse(SponsorshipApplication.objects.exists())
+
+    def test_it_is_reachable_from_the_pricing_page(self):
+        """The moment to catch is right after somebody reads the number."""
+        self.assertContains(self.client.get("/pricing/"), self.URL)

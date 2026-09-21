@@ -247,7 +247,7 @@ gt-messages.js and the .gtm-page media queries.
               data-find="{{ c.title|lower }} {{ c.subtitle|lower }} {{ c.preview|lower }}">
             <a href="{% url 'orgs:member_message_thread' c.org.id c.id %}"
                hx-get="{% url 'orgs:member_message_thread' c.org.id c.id %}?pane=room"
-               hx-target=".gtm-chat" hx-swap="innerHTML"
+               hx-target="[data-gtm-chat-slot]" hx-swap="innerHTML"
                hx-push-url="{% url 'orgs:member_message_thread' c.org.id c.id %}" data-gtm-open>
               <span class="gtm-av {{ c.face }}" aria-hidden="true">
                 {% if c.avatar_user and c.avatar_user.avatar %}<img src="{{ c.avatar_user.avatar.url }}" alt="">
@@ -314,7 +314,7 @@ gt-messages.js and the .gtm-page media queries.
              data-gtm-open
              href="{% url 'orgs:message_room' o.id %}"
              hx-get="{% url 'orgs:message_room' o.id %}?pane=room"
-             hx-target=".gtm-chat" hx-swap="innerHTML"
+             hx-target="[data-gtm-chat-slot]" hx-swap="innerHTML"
              hx-push-url="{% url 'orgs:message_room' o.id %}">
             <span class="gtm-av org" aria-hidden="true"><svg><use href="#ic-f-org"/></svg></span>
             <span class="gtm-dir-txt">
@@ -344,7 +344,7 @@ gt-messages.js and the .gtm-page media queries.
              data-gtm-open
              href="{% url 'orgs:message_group_room' g.org.id g.id %}"
              hx-get="{% url 'orgs:message_group_room' g.org.id g.id %}?pane=room"
-             hx-target=".gtm-chat" hx-swap="innerHTML"
+             hx-target="[data-gtm-chat-slot]" hx-swap="innerHTML"
              hx-push-url="{% url 'orgs:message_group_room' g.org.id g.id %}">
             <span class="gtm-av group" aria-hidden="true">{{ g.name|slice:":1"|upper }}</span>
             <span class="gtm-dir-txt">
@@ -406,12 +406,38 @@ gt-messages.js and the .gtm-page media queries.
   photograph of a stadium between two messages is noise.
   {% endcomment %}
   <section class="gtm-chat" data-gtm-pane="chat">
+    {% comment %}
+    THE WALLPAPER SITS OUTSIDE WHAT A CONVERSATION CHANGE REPLACES.
+
+    CLIENT, 20 SEP 2026: "on the wallpaper of each chat ... it's only in one,
+    the others I do not see the images."
+
+    Exactly right, and the reason was one selector. Opening a conversation
+    htmx-swaps the INNER HTML of .gtm-chat, and this layer was inside it — so
+    the photographs survived the first page load and were thrown away by the
+    first click, along with the timer rotating them. Every conversation opened
+    after that had a plain panel, which is why it looked like one chat had a
+    wallpaper and the rest did not.
+
+    The swap now targets the slot below instead, and the paper is its sibling:
+    it belongs to the PANEL, not to the conversation showing in it, the same
+    way the composer belongs to the screen and not to the poll that refreshes
+    the messages above it. The rotation keeps running across conversation
+    changes rather than restarting, which is also what it should have been
+    doing — a crossfade that jumps back to photograph one every time somebody
+    opens a chat is a fidget, not a background.
+
+    The slot is display:contents (gt-messages.css) so it adds a node for htmx
+    to aim at and nothing at all to the layout — .gtm-chat-in stays a flex
+    child of .gtm-chat exactly as before.
+    {% endcomment %}
     <div class="gtm-paper" data-gtm-paper aria-hidden="true">
       {% for shot in wallpapers %}
       <div class="gtm-paper-shot{% if forloop.first %} on{% endif %}"
            data-paper="{{ shot.key }}" style="background-image:url('{{ shot.url }}')"></div>
       {% endfor %}
     </div>
+    <div class="gtm-chat-slot" data-gtm-chat-slot>
     {% if thread %}
     {% include "orgs/partials/_room_chat.html" %}
     {% else %}
@@ -435,6 +461,7 @@ gt-messages.js and the .gtm-page media queries.
       </div>
     </div>
     {% endif %}
+    </div>
   </section>
 </div>
 

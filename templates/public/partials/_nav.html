@@ -4,14 +4,18 @@ at the page you are reading is a dead control, and the wordmark to its left
 already goes there. Everywhere else it stays, because that is where it is
 actually useful.
 
-PRIVACY IS THE ONLY ONE THAT LEFT (Sep 2026, client).
+SEVEN ITEMS, AND WHICH TWO LEFT (Sep 2026, client).
 
 A first pass moved four items to the footer. The client wanted three of them
 back — The Good List, Charities and About Us are things a visitor goes looking
-for mid-visit, and the bar is where you look. Privacy is not: it is the one
+for mid-visit, and the bar is where you look. Privacy was not: it is the one
 item nobody navigates to while reading, and everybody expects to find it under
 the copyright. So it stays out of the desktop row and lives in the footer's
 legal line.
+
+The Good List came off again later, and for a different reason: the client
+counted the row and wanted exactly seven. See the note beside where it used to
+sit for how that count works out.
 
 It keeps its place in the DRAWER, though. Below 1120px the drawer is not a
 condensed bar, it is the whole site, and "it's in the footer" is a desktop
@@ -45,13 +49,24 @@ unchanged.
       <li><a href="/tell-the-boss/" {% if active == 'boss' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-send"/></svg><span>Tell the Boss</span></a></li>
 
       {% comment %}
-      Privacy, and only Privacy. Hidden from the desktop row by
-      .nav-links .nav-tuck and shown in the drawer, where the footer is not a
-      realistic destination.
+      THE GOOD LIST IS OFF THE BAR (Sep 2026, client): "remove The Good List
+      from the menu items for now so we have exactly 7". Counting the row as
+      it renders on the home page — where Home is absent because the wordmark
+      already goes there — that leaves exactly seven: How It Works, Pricing,
+      News, The Wall, Tell the Boss, Charities, About Us.
+
+      The page itself is untouched. /leaderboard/ still serves, still carries
+      its SEO record, and the footer's Platform column still links to it — it
+      is off the bar, not gone, and "for now" is doing real work in that
+      sentence.
+
+      Privacy, and only Privacy, is the tucked one. Hidden from the desktop row
+      by .nav-links .nav-tuck and shown in the drawer, where the footer is not
+      a realistic destination.
       {% endcomment %}
-      <li><a href="/leaderboard/" {% if active == 'leaderboard' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>The Good List</span></a></li>
       <li><a href="/#charities" {% if active == 'charities' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-heart"/></svg><span>Charities</span></a></li>
       <li><a href="/about/" {% if active == 'about' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-spark"/></svg><span>About Us</span></a></li>
+      <li class="nav-tuck"><a href="/terms/" {% if active == 'terms' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-doc"/></svg><span>Terms</span></a></li>
       <li class="nav-tuck"><a href="/privacy/" {% if active == 'privacy' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Privacy</span></a></li>
 
       <li class="nav-sep" aria-hidden="true"></li>

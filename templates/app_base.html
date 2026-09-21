@@ -546,36 +546,43 @@ goodtip.css.
     through {% block loader_task %}.
     {% endcomment %}
     <div class="page-sheet">
-  {# ---- sport loader — post shape follows the code (AFL: four posts, no crossbar · NRL: one H frame). Never one shape recoloured for both. ---- #}
-  <div class="loader loader-inset" id="loader" role="status" aria-live="polite" aria-label="Loading" data-min="400">
-    <div class="loader-inner">
-      <div class="pitch">
-        {% if primary_sport == "Rugby League" %}
-        <svg class="posts" viewBox="0 0 240 150" aria-hidden="true">
-          <g stroke="#C8F135" stroke-width="4" fill="none" stroke-linecap="round">
-            <line x1="84" y1="22" x2="84" y2="128"/><line x1="156" y1="22" x2="156" y2="128"/><line x1="84" y1="52" x2="156" y2="52"/>
-          </g>
-        </svg>
-        {% elif primary_sport == "Netball" %}
-        <svg class="posts" viewBox="0 0 240 150" aria-hidden="true">
-          <g stroke="#C8F135" stroke-width="4" fill="none" stroke-linecap="round">
-            <line x1="120" y1="42" x2="120" y2="128"/><ellipse cx="120" cy="34" rx="16" ry="6"/>
-          </g>
-        </svg>
-        {% else %}
-        <svg class="posts" viewBox="0 0 240 150" aria-hidden="true">
-          <g stroke="#C8F135" stroke-width="4" fill="none" stroke-linecap="round">
-            <line x1="48" y1="62" x2="48" y2="128"/><line x1="96" y1="18" x2="96" y2="128"/><line x1="144" y1="18" x2="144" y2="128"/><line x1="192" y1="62" x2="192" y2="128"/>
-          </g>
-        </svg>
-        {% endif %}
-        <span class="ball {% if primary_sport == 'Netball' %}round{% else %}oval{% endif %}" aria-hidden="true"></span><span class="ground"></span>
-      </div>
-      <div class="loader-word">GOOD<span>TIP</span><span class="dot" style="color:var(--lime)">.</span></div>
-      <div class="loader-sport" id="loaderSport">{% if primary_sport == "Rugby League" %}Rugby League{% elif primary_sport == "Netball" %}Netball{% else %}Aussie Rules{% endif %}</div>
-      <div class="loader-task">{% block loader_task %}Getting things ready{% endblock %}</div>
-      <div class="loader-bar"><i></i></div>
-    </div>
+  {% comment %}
+  =========================================================================
+  THE PAGE-TO-PAGE LOADER IN THE MEMBER APP: A BAR, NOT A SPLASH.
+  =========================================================================
+  CLIENT, 20 SEP 2026: "the loaders in the private pages are horrible. I am
+  getting the loader that is internally from page to page ... that loader does
+  not make sense. We have 2 types of loaders, the ones on filters and the page
+  to page, so we need to have a clean loader from page to page in the private
+  page."
+
+  Right, and the reason it did not make sense is that it was the wrong SIZE of
+  gesture. What was here is the full sport scene — a goal, a wordmark, a
+  competition name, a caption — inset over the page sheet. That is a front
+  door. It is the right thing when somebody arrives at goodtip.com.au and
+  exactly the wrong thing twenty times a day when a member steps from the
+  Ladder to Messages inside an app they are already signed into: it covers the
+  furniture they are using to navigate, to announce a move they just made on
+  purpose.
+
+  So the app gets the other convention, the one every tool people already use
+  has settled on: a thin determinate bar across the top of the window, and
+  nothing else. It covers nothing, it blocks nothing, it reports real progress
+  from gt-loader.js rather than a guess, and it is gone the moment the page is
+  ready.
+
+  THE SCENES STAY ON THE PUBLIC SITE. That is where a splash is doing work —
+  a first impression, and the six competitions in rotation. Nobody signed in
+  needs to be sold the product on the way to their own ladder.
+
+  Filters no longer come through here at all: they swap their own region and
+  raise a loader over THAT, in the competition's colour, which is the second
+  half of the same message. See gt-veil.js and partials/comp_filter.html.
+  =========================================================================
+  {% endcomment %}
+  <div class="loader loader-slim" id="loader" role="status" aria-live="polite"
+       aria-label="{% block loader_task %}Loading{% endblock %}" data-min="240">
+    <div class="loader-bar"><i></i></div>
   </div>
       {% block app_content %}{% endblock %}
     </div>

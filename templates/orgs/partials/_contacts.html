@@ -25,7 +25,7 @@ works here exactly as it does over there.
 <a class="gtm-mem" data-gtm-open
    href="{% url 'orgs:message_direct' row.org.id row.user.id %}"
    hx-get="{% url 'orgs:message_direct' row.org.id row.user.id %}?pane=room"
-   hx-target=".gtm-chat" hx-swap="innerHTML"
+   hx-target="[data-gtm-chat-slot]" hx-swap="innerHTML"
    hx-push-url="{% url 'orgs:message_direct' row.org.id row.user.id %}">
   <span class="gtm-av person sm" aria-hidden="true">
     {% if row.user.avatar %}<img src="{{ row.user.avatar.url }}" alt="">{% else %}{{ row.user.display_name|slice:":1"|upper }}{% endif %}

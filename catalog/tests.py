@@ -1,7 +1,7 @@
 from django.test import SimpleTestCase, TestCase
 
 from .logos import JUNK_NAME, candidate_icon_urls, derive_website
-from .models import Charity
+from .models import Charity, Season
 
 
 class CharityCardHelperTests(SimpleTestCase):
@@ -86,3 +86,47 @@ class CharityLogoFieldTests(TestCase):
         c = Charity.objects.create(name="Unreachable Trust", slug="unreachable")
         self.assertFalse(c.logo)
         self.assertEqual(c.initials, "UT")
+
+
+class HiddenCharityTests(TestCase):
+    """Client, 17 Sep 2026: "please hide 'gamblers help' from the charities —
+    is there a way we can do this without deleting them?"
+
+    ``is_hidden`` is that way. The row, its logo and every donation record that
+    points at it stay exactly where they are; what changes is that nobody can
+    choose it again.
+    """
+
+    def setUp(self):
+        self.shown = Charity.objects.create(
+            name="Visible Trust", slug="visible", is_approved=True,
+        )
+        self.hidden = Charity.objects.create(
+            name="Retired Trust", slug="retired", is_approved=True, is_hidden=True,
+        )
+
+    def test_a_hidden_charity_is_out_of_the_approved_list(self):
+        approved = Charity.objects.approved()
+        self.assertIn(self.shown, approved)
+        self.assertNotIn(self.hidden, approved)
+
+    def test_a_hidden_charity_is_out_of_every_picker(self):
+        available = Charity.objects.available_to(None)
+        self.assertNotIn(self.hidden, available)
+
+    def test_an_organisations_own_hidden_charity_is_hidden_from_it_too(self):
+        """Otherwise "hide this" would mean "hide it from everyone except the
+        organisation that added it", which is not what hiding means."""
+        from orgs.models import Organisation
+
+        season = Season.objects.create(year=2097, label="2097")
+        org = Organisation.objects.create(name="Owner Co", season=season)
+        mine = Charity.objects.create(
+            name="Our Own", slug="our-own", owner_org=org, is_hidden=True,
+        )
+        self.assertNotIn(mine, Charity.objects.available_to(org))
+
+    def test_the_row_and_its_history_survive(self):
+        self.hidden.refresh_from_db()
+        self.assertTrue(Charity.objects.filter(pk=self.hidden.pk).exists())
+        self.assertTrue(self.hidden.is_approved)

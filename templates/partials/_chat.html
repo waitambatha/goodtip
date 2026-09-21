@@ -94,7 +94,49 @@ Expects: entries (from orgs.views._thread_entries), thread.
           </a>
           {% endif %}
 
-          {% if e.body %}<p class="chat-text">{{ e.body|linebreaksbr }}</p>{% endif %}
+          {% if e.is_deleted %}
+          {% comment %}
+          A DELETED MESSAGE LEAVES A MARK, it does not leave a gap.
+
+          The row stays so the replies that quote it still answer something,
+          and so the other side is told that a message they may have already
+          read has been taken back rather than finding the conversation
+          quietly one line shorter. Same convention as every chat app that
+          allows this, and for the same reason.
+          {% endcomment %}
+          <p class="chat-text chat-gone">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>
+            This message was deleted
+          </p>
+          {% elif e.body %}
+          <p class="chat-text">{{ e.body|linebreaksbr }}</p>
+          {% endif %}
+
+          {% if e.can_edit %}
+          {% comment %}
+          THE EDITOR, IN PLACE OF THE BUBBLE'S TEXT rather than in a dialog.
+
+          Editing a line of a conversation is a small act and it belongs where
+          the line is — a modal over the thread hides the messages either side,
+          which are the whole reason anybody is rewording anything. Hidden
+          until the pencil is pressed; gt-chat.js does nothing but swap which
+          of the two is showing.
+
+          It is a real form with a real action, so it still works with no
+          JavaScript: the box is simply always open on such a browser.
+          {% endcomment %}
+          <form method="post" class="chat-edit" data-chat-edit hidden
+                action="{% url 'orgs:message_edit' thread.org_id thread.id e.id %}"
+                data-busy="Saving the change" data-busy-for="#msg-{{ e.id }} .chat-bubble">
+            {% csrf_token %}
+            <textarea name="body" rows="1" maxlength="2000" data-grow data-chat-edit-body
+                      aria-label="Edit this message">{{ e.body }}</textarea>
+            <div class="chat-edit-acts">
+              <button type="button" class="abtn abtn-ghost abtn-sm" data-chat-edit-cancel>Cancel</button>
+              <button type="submit" class="abtn abtn-dark abtn-sm">Save</button>
+            </div>
+          </form>
+          {% endif %}
 
           {% if e.attachments.all %}
           <div class="chat-files">
@@ -189,6 +231,15 @@ Expects: entries (from orgs.views._thread_entries), thread.
           {% endcomment %}
           <span class="chat-stamp">
             {{ e.created_at|date:"g:i a" }}
+            {% comment %}
+            EDITED IS NOT OPTIONAL. It is the whole reason an edit control is
+            safe to offer: a conversation where what somebody said can change
+            underneath the answer to it is one you cannot rely on. Titled with
+            when, so "edited" is checkable rather than just a word.
+            {% endcomment %}
+            {% if e.is_edited and not e.is_deleted %}
+            <i class="chat-edited" title="Edited {{ e.edited_at|date:'l j F Y, g:i a' }}">edited</i>
+            {% endif %}
             {% if e.is_mine %}
             <span class="chat-tick {% if e.is_read %}read{% else %}sent{% endif %}">
               {% if e.is_read %}
@@ -224,52 +275,101 @@ Expects: entries (from orgs.views._thread_entries), thread.
         </div>
       </div>
 
+      {% comment %}
+      =====================================================================
+      WHAT TO DO WITH A MESSAGE: ONE MENU, NOT A RAIL OF ICONS.
+      =====================================================================
+      CLIENT, 20 SEP 2026: "on the edit and delete, it should not be buttons.
+      What it should be is when I click on it — or if it's touch I will press
+      it a little bit — and those should be there: reply on that message,
+      reply to that so the response will come with that, the delete, and edit
+      as well. Ensure it is well spaced as well."
+
+      There were five icon buttons crammed into a rail beside every bubble,
+      and measured on the live page two of them — Reply and Edit — were
+      rendering at ZERO and TWO pixels wide. Not hard to hit: impossible. The
+      rail had run out of room and the flex items had collapsed, silently, on
+      the two controls the client was asking for.
+
+      A rail was the wrong shape anyway. Five affordances per message, on
+      every message, is a column of noise down the side of a conversation —
+      and it is not how anybody expects to reach them: every chat app people
+      already use puts them behind a press on the message itself.
+
+      So: press the bubble (or hold it, on touch) and the menu opens. The ⋮
+      stays for the keyboard and for anybody who wants something to aim at.
+      Items are full-width rows with room around them, which is the "well
+      spaced" — a menu you can hit with a thumb.
+
+      EVERY DESTRUCTIVE ITEM IS STILL A REAL FORM with its own CSRF token, so
+      none of this depends on the script: with JavaScript off the menu is
+      simply always open, and every item still works.
+      =====================================================================
+      {% endcomment %}
       <div class="chat-rowacts">
-        <button type="button" class="chat-replybtn" data-reply-to="{{ e.id }}"
-                aria-label="Reply to this message">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 7 7v4"/></svg>
+        <button type="button" class="chat-more" data-msg-more
+                aria-label="What to do with this message" aria-haspopup="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
         </button>
-        {% comment %}
-        PIN, for whoever runs the room. `can_pin` is only set by the messages
-        screen — the admin's support-thread page never defines it, so this is
-        absent there, which is right: a two-party ticket has no room to pin
-        anything to. Posting the id that is already pinned takes the pin down,
-        so one control does both.
-        {% endcomment %}
-        {% if can_pin %}
-        <form method="post" action="{% url 'orgs:message_pin' thread.org_id thread.id %}" class="chat-pinform">
-          {% csrf_token %}
-          <input type="hidden" name="message" value="{{ e.id }}">
-          <button type="submit" class="chat-pinbtn{% if thread.pinned_message_id == e.id %} on{% endif %}"
-                  aria-label="{% if thread.pinned_message_id == e.id %}Unpin this message{% else %}Pin this message{% endif %}"
-                  title="{% if thread.pinned_message_id == e.id %}Unpin{% else %}Pin to the top{% endif %}">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/></svg>
+
+        <div class="chat-menu" data-msg-menu hidden role="menu">
+          {% comment %}
+          REPLY FIRST, because it is the one somebody reaches for most and the
+          only one that is not destructive or administrative. It fills this
+          post's own composer with a quote — gt-chat.js, same handler the
+          swipe uses — so the answer goes out carrying what it answers.
+          {% endcomment %}
+          <button type="button" class="chat-menu-item" role="menuitem" data-reply-to="{{ e.id }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 7 7v4"/></svg>
+            Reply
           </button>
-        </form>
-        {% endif %}
-        {% comment %}
-        REPORT, on somebody else's message only.
 
-        "Apart from the prefect, the member can also report a member to the group
-        admin or organisation admin." It goes to the same review queue Prefect
-        feeds, and the reviewer is shown which of the two raised it.
-
-        Never on your own message: reporting yourself is not a thing anybody
-        means to do, and offering it is one more control to read past.
-
-        A plain form, so it works with no JavaScript, and it confirms first —
-        this puts a colleague's name in front of the people who run their comp
-        and should not be a stray click.
-        {% endcomment %}
-        {% if thread.org_id and e.author_id != request.user.id %}
-        <form method="post" action="{% url 'orgs:report_message' thread.org_id e.id %}" class="chat-repform"
-              data-confirm="Report this message to the people who run {{ thread.org.name }}?">
-          {% csrf_token %}
-          <button type="submit" class="chat-repbtn" aria-label="Report this message" title="Report to your admins">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V4h11l-1 3h6l-2 4 2 4h-9l-1-3H6"/></svg>
+          {% if e.can_edit %}
+          <button type="button" class="chat-menu-item" role="menuitem" data-chat-edit-open="{{ e.id }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14.5 5.5 18.5 9.5"/></svg>
+            Edit
           </button>
-        </form>
-        {% endif %}
+          {% endif %}
+
+          {% if can_pin %}
+          <form method="post" action="{% url 'orgs:message_pin' thread.org_id thread.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="message" value="{{ e.id }}">
+            <button type="submit" class="chat-menu-item" role="menuitem">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/></svg>
+              {% if thread.pinned_message_id == e.id %}Unpin{% else %}Pin to the top{% endif %}
+            </button>
+          </form>
+          {% endif %}
+
+          {% if thread.org_id and e.author_id != request.user.id %}
+          {% comment %}
+          Never on your own message: reporting yourself is not a thing anybody
+          means to do, and offering it is one more row to read past.
+          {% endcomment %}
+          <form method="post" action="{% url 'orgs:report_message' thread.org_id e.id %}"
+                data-confirm="Report this message to the people who run {{ thread.org.name }}?">
+            {% csrf_token %}
+            <button type="submit" class="chat-menu-item" role="menuitem">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V4h11l-1 3h6l-2 4 2 4h-9l-1-3H6"/></svg>
+              Report to admins
+            </button>
+          </form>
+          {% endif %}
+
+          {% if e.can_remove %}
+          <form method="post" class="chat-menu-danger"
+                action="{% url 'orgs:message_remove' thread.org_id thread.id e.id %}"
+                data-confirm="{% if e.author_id == request.user.id %}The words and any files go for everyone in this conversation, and the bubble will read &ldquo;This message was deleted&rdquo;. It cannot be undone.{% else %}This removes {{ e.author.display_name }}&rsquo;s message for everyone in this conversation. It cannot be undone, and it is recorded as your decision.{% endif %}"
+                data-confirm-title="Delete this message?" data-confirm-ok="Delete" data-confirm-danger>
+            {% csrf_token %}
+            <button type="submit" class="chat-menu-item is-danger" role="menuitem">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg>
+              Delete
+            </button>
+          </form>
+          {% endif %}
+        </div>
       </div>
     </li>
     {% empty %}

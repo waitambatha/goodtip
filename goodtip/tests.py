@@ -425,3 +425,146 @@ class ContrastTests(SimpleTestCase):
         ]
         self.assertEqual(bad, [])
 
+
+
+class LoaderSceneTests(TestCase):
+    """The eight competition loaders.
+
+    Client, 20 Sep 2026: "let's only have NRL and AFL ... they will be like 8
+    loaders. For the NRLW, either male or female, on their loader we can add
+    the sign of male or female."
+    """
+
+    #: Four AFL, four NRL. Not one per Series: Super Netball and Super League
+    #: are rows in the database with zero rounds and zero fixtures between
+    #: them, and State of Origin is three games a year inside the NRL.
+    SCENES = ("afl-set", "afl-bounce", "afl-mark", "afl-flags",
+              "nrl-convert", "nrl-count", "nrl-try", "nrl-pass")
+
+    def test_every_scene_reaches_the_public_site(self):
+        body = self.client.get("/pricing/").content
+        for key in self.SCENES:
+            self.assertIn(('data-lscene="%s"' % key).encode(), body, key)
+
+    def test_every_scene_reaches_the_sign_in_screen(self):
+        body = self.client.get("/login/").content
+        for key in self.SCENES:
+            self.assertIn(('data-lscene="%s"' % key).encode(), body, key)
+
+    def test_the_codes_that_carry_no_fixtures_are_gone(self):
+        """A splash advertising a competition the product does not run — and a
+        round ball through a ring reads as basketball long before netball."""
+        body = self.client.get("/pricing/").content
+        for key in ("super-netball", "super-league", "state-of-origin"):
+            self.assertNotIn(('data-lscene="%s"' % key).encode(), body, key)
+
+    def test_both_sex_marks_are_drawn(self):
+        """Drawing one only on the women's scenes would make the women's
+        competition read as the variant and the men's as the default."""
+        body = self.client.get("/pricing/").content
+        self.assertIn(b'class="lsex-w"', body)
+        self.assertIn(b'class="lsex-m"', body)
+        # One mark for the stage, not one per scene — eight copies is seven
+        # chances for them to drift apart.
+        self.assertEqual(body.count(b'class="lsex"'), 1)
+
+    def test_no_two_scenes_share_a_motion(self):
+        """Client, on the first attempt: "zero new animation, just the old one
+        and some text showing colour change." Four of six were a ball kicked
+        through something. Each scene names its own motion class now."""
+        from pathlib import Path
+
+        from django.conf import settings
+
+        markup = (
+            Path(settings.BASE_DIR) / "templates/partials/_loader_scenes.html"
+        ).read_text()
+        for motion in ("l-arc", "l-bounce", "l-fall", "l-convert",
+                       "l-roll", "l-place", "l-chain"):
+            self.assertEqual(
+                markup.count(" " + motion + '"'), 1,
+                f"{motion} should be used by exactly one scene",
+            )
+        # The goal umpire has no ball at all — it is what happens after one,
+        # and it is the only scene that is a person signalling.
+        flags = markup[markup.index('data-lscene="afl-flags"'):]
+        flags = flags[:flags.index("</div>")]
+        self.assertNotIn("lball", flags)
+
+    def test_every_moving_part_is_exempt_from_the_reduced_motion_sweep(self):
+        """The blanket rule in goodtip.css freezes anything without `.lanim`.
+        The first six shipped invisible because the exemption still named the
+        OLD loader's classes, so this pins the two halves together."""
+        from pathlib import Path
+
+        from django.conf import settings
+
+        base = Path(settings.BASE_DIR)
+        css = (base / "static/css/goodtip.css").read_text()
+        self.assertIn(":not(.lanim)", css)
+        markup = (base / "templates/partials/_loader_scenes.html").read_text()
+        # Anything carrying an animation class is also marked lanim.
+        for motion in ("l-arc", "l-bounce", "l-fall", "l-convert",
+                       "l-roll", "l-place", "l-chain"):
+            line = [l for l in markup.splitlines() if " " + motion + '"' in l][0]
+            self.assertIn("lanim", line, motion)
+
+    def test_the_splash_is_given_time_to_be_seen(self):
+        """Client, 20 Sep 2026: "also give time for the loaders to load so we
+        can see the loader." At 400ms on a warm cache it was gone before the
+        shot had left the boot."""
+        import re
+
+        body = self.client.get("/pricing/").content.decode()
+        held = int(re.search(r'data-min="(\d+)"', body).group(1))
+        self.assertGreaterEqual(held, 2000)
+        self.assertIn("data-full-shot", body)
+
+    def test_the_public_site_cycles_and_names_no_scene_up_front(self):
+        """The choice is the script's, one step per load. A server-rendered
+        data-scene would pin every visitor to the same competition."""
+        body = self.client.get("/pricing/").content
+        self.assertNotIn(b"data-scene-fixed", body)
+
+    def test_the_member_app_gets_a_bar_and_not_a_splash(self):
+        """Client, 20 Sep 2026: "the loaders in the private pages are
+        horrible ... we need a clean loader from page to page in the private
+        page."
+
+        The scenes are a front door — a first impression and the six
+        competitions in rotation. Inside the app, where a member crosses
+        between screens twenty times a day, a full-screen splash covers the
+        furniture they just used to navigate. So the app gets a bar and the
+        public site keeps the splash, and this pins both halves: if the scenes
+        ever come back in here, or the bar leaks out there, one of these fails.
+        """
+        from django.contrib.auth import get_user_model
+        from catalog.models import Competition, Season, Sport
+        from orgs.models import OrgMember, Organisation
+
+        season = Season.objects.create(year=2098, label="2098")
+        sport, _ = Sport.objects.get_or_create(
+            slug="rugby-league", defaults={"name": "Rugby League"},
+        )
+        comp = Competition.objects.create(
+            sport=sport, season=season, name="NRL 2098", slug="nrl-2098",
+        )
+        org = Organisation.objects.create(name="Leaguies", season=season)
+        org.competitions.add(comp)
+        user = get_user_model().objects.create_user(
+            email="scene@x.com", password="x", display_name="Scene",
+        )
+        OrgMember.objects.create(user=user, org=org)
+        self.client.force_login(user)
+
+        body = self.client.get("/dashboard/").content
+        self.assertIn(b"loader-slim", body)
+        # No scene, no stage, no competition caption — the bar IS the loader.
+        self.assertNotIn(b"data-lscene", body)
+        self.assertNotIn(b"data-scene-fixed", body)
+        self.assertNotIn(b'id="loaderSport"', body)
+
+    def test_the_public_site_still_gets_the_scenes(self):
+        body = self.client.get("/pricing/").content
+        self.assertNotIn(b"loader-slim", body)
+        self.assertIn(b"data-lscene", body)

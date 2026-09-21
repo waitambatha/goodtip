@@ -226,6 +226,45 @@ class Match(models.Model):
     # plus a delay; past it, an ungraded match is over rather than in play.
     ASSUMED_MAX_DURATION = timedelta(hours=4)
 
+    # How long a match flagged in-play may go without the feed changing
+    # anything about it before we stop believing the flag.
+    #
+    # ``live_updated_at`` is stamped only when a value actually MOVED (see
+    # data_sync.services.sync_live), so this measures "the feed has had nothing
+    # new to say", not "the poller has not run". During play that is a matter
+    # of a poll or two: the NRL feed's game clock changes every tick, and AFL
+    # scores and periods move often enough. The longest legitimate silence is a
+    # main break, so the threshold sits well clear of one.
+    LIVE_STALE_AFTER = timedelta(minutes=45)
+
+    @property
+    def live_has_lapsed(self) -> bool:
+        """True when a match still flagged in-play cannot still be in play.
+
+        CLIENT, 19 SEP 2026: "it still says it going ... I've seen it stuck on
+        75 minutes". Correct, and nothing in the app disbelieved it. ``status``
+        is whatever the feed last said, and the feed stops saying anything the
+        moment it drops a finished fixture from its live list — or the moment
+        a scrape fails, or the poller is not running. There was no rule that a
+        game cannot still be at 75 minutes three hours later, so the badge sat
+        there pulsing for the rest of the night.
+
+        Two ways to know better, neither of which needs the feed's help:
+
+          * nothing has moved for ``LIVE_STALE_AFTER``. A live game is a stream
+            of small changes; silence that long means the stream has stopped.
+          * it kicked off longer ago than any match runs. A backstop for a row
+            that was flagged live and never stamped at all.
+
+        Only ever turns a match OFF live. A match the feed is still reporting
+        on is never second-guessed.
+        """
+        now = timezone.now()
+        if now - self.kickoff_at > self.ASSUMED_MAX_DURATION:
+            return True
+        last = self.live_updated_at
+        return last is not None and now - last > self.LIVE_STALE_AFTER
+
     @property
     def phase(self) -> str:
         """Which bucket this match belongs in: upcoming / live / complete.
@@ -235,13 +274,18 @@ class Match(models.Model):
         Two cases it has to get right without any feed data: a fixture that
         kicked off minutes ago is live, and one that kicked off last month is
         finished — not still running.
+
+        A third, added Sep 2026: a fixture the feed flagged live and then went
+        quiet on. See ``live_has_lapsed``. Deriving it here rather than only
+        sweeping the database means every stuck row in the app reads correctly
+        from the next page load, with no job having to run first.
         """
         if self.status == self.STATUS_COMPLETE or self.result is not None:
             return "complete"
-        if self.status == self.STATUS_LIVE:
-            return "live"
         if self.status == self.STATUS_POSTPONED:
             return "upcoming"
+        if self.status == self.STATUS_LIVE:
+            return "complete" if self.live_has_lapsed else "live"
         if not self.is_locked:
             return "upcoming"
         started_ago = timezone.now() - self.kickoff_at
@@ -254,10 +298,28 @@ class Match(models.Model):
     @property
     def live_label(self) -> str:
         """The betting-board style clock: "Q3 12:45", "66'", "Half Time"."""
+        if not self.is_live:
+            # A frozen clock is the whole complaint. Nothing that is not
+            # actually in play gets to print a minute.
+            return ""
         parts = [p for p in (self.period, self.clock) if p]
         if parts:
             return " ".join(parts)
-        return "In play" if self.phase == "live" else ""
+        return "In play"
+
+    @property
+    def done_label(self) -> str:
+        """What the badge on a finished match says, beside its score.
+
+        A graded match wears the feed's own word for it ("Full Time"). One that
+        is finished only because the clock ran out on its live flag has not
+        been graded, and the score beside it was read mid-game — so it says
+        exactly that rather than stamping "Final" on a number that may not be
+        the final one.
+        """
+        if self.result is not None:
+            return self.period or "Final"
+        return "Awaiting final score"
 
     @property
     def score_line(self) -> str:

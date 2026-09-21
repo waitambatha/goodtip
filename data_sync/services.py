@@ -276,6 +276,55 @@ def refresh_round_state(round_obj: Round) -> bool:
     return True
 
 
+def close_out_stale_live() -> int:
+    """Take the in-play flag off matches the feed has stopped reporting on.
+
+    CLIENT, 19 SEP 2026: "it still says it going ... stuck on 75 minutes."
+
+    ``sync_live`` can only ever write what the feed hands it. When a finished
+    fixture drops out of the feed's live list — which is what both feeds do,
+    within minutes — the row simply stops being touched, and it keeps whatever
+    status, period and clock it had at the last poll that saw it. Nothing then
+    revisited it until ``sync_results`` happened to run against that exact
+    round, and a round outside the results window is never revisited at all.
+
+    ``Match.live_has_lapsed`` already makes every page read correctly without
+    this, because ``phase`` is derived. This writes the same conclusion back to
+    the database, which matters for the three things that read ``status``
+    directly rather than through ``phase``:
+
+      * ``refresh_round_state`` — a round cannot be "complete" while one of its
+        fixtures is flagged live, so the round stayed "locked" indefinitely
+      * the live poller's own round targeting
+      * the admin, where a human looking for what is wrong should not have to
+        know that the column is lying
+
+    NOT A GRADING STEP. The result stays null and the score is left exactly as
+    the feed last reported it — mid-game, possibly. ``sync_results`` grades,
+    and it regrades a match closed out here the moment the final score lands,
+    because its "already settled" check requires ``result is not None``.
+    """
+    stale = [
+        m for m in Match.objects.filter(status=Match.STATUS_LIVE)
+        if m.live_has_lapsed
+    ]
+    if not stale:
+        return 0
+
+    Match.objects.filter(pk__in=[m.pk for m in stale]).update(
+        status=Match.STATUS_COMPLETE,
+    )
+    logger.info("closed out %d stale live match(es)", len(stale))
+
+    # The rounds they belong to can now reach "complete", which they could not
+    # while one of their fixtures claimed to be in play.
+    for round_obj in Round.objects.filter(
+        pk__in={m.round_id for m in stale}
+    ).distinct():
+        refresh_round_state(round_obj)
+    return len(stale)
+
+
 class _ScrapeSyncService:
     """What the two scraped feeds have in common, which is nearly everything.
 

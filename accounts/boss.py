@@ -41,6 +41,7 @@ def complete_boss_invites(org, creator) -> int:
     second league later should not re-add people who asked about the first.
     """
     from orgs.models import OrgMember
+    from orgs.services import add_member
 
     from .models import BossInvite
 
@@ -50,13 +51,20 @@ def complete_boss_invites(org, creator) -> int:
     )
     added = 0
     for invite in invites:
-        # get_or_create rather than create: the sender may already have joined
-        # under their own steam while waiting, and a duplicate membership would
-        # double-count them on the ladder.
-        _, created = OrgMember.objects.get_or_create(
-            user=invite.sender, org=org,
-            defaults={"role": OrgMember.ROLE_BOTH},
-        )
+        # THROUGH add_member, NOT OrgMember.objects.get_or_create. This wrote
+        # the membership row directly and so skipped everything joining an
+        # organisation is supposed to do — the person who talked their workplace
+        # into starting a comp landed in it with no picks carried across from
+        # their other comps and no backdating for rounds already gone, then had
+        # to tip a round they had already tipped. That is half of what the
+        # client reported on 16 Sep 2026; see tipping.carry.carry_existing_tips.
+        #
+        # It is still idempotent: the sender may have joined under their own
+        # steam while waiting, and add_member's get_or_create covers that the
+        # same way, without double-counting them on the ladder.
+        before = OrgMember.objects.filter(user=invite.sender, org=org).exists()
+        add_member(invite.sender, org, role=OrgMember.ROLE_BOTH)
+        created = not before
         invite.status = BossInvite.STATUS_COMPLETE
         invite.completed_at = timezone.now()
         invite.org = org

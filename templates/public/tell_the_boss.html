@@ -47,21 +47,26 @@
     <p class="ttb-lede reveal ttb-centre">Two ways to put it in front of them. Same words either way, pick whichever suits your office.</p>
     {% comment %}
     Both presentations of the same note, side by side as a hero split — the
-    parchment scroll and the card on a desk. They share the letter body partial
-    and the props (pen, inkwell, seal), so the wording exists once and the copy
-    button gets the same text whichever half caught your eye.
-    {% endcomment %}
-    {% include "public/partials/_boss_letter_props.html" %}
+    sticky note and the message card. They share the letter body partial, so
+    the wording exists once and the copy button gets the same text whichever
+    half caught your eye.
 
+    They replaced a parchment scroll and a lined card on a green envelope,
+    complete with fountain pen, inkwell and a red wax seal (client: "a more
+    modern look, like a post-it note or the like"). The seal is the one worth
+    naming: it was stamped GOOD / TIPS, so the single most brand-looking object
+    on the page was wearing a name the company does not have. Both halves now
+    sign off with the site's own wordmark.
+    {% endcomment %}
     <div class="boss-note reveal">
       <div class="ttb-split">
         <div class="ttb-half">
-          <span class="ttb-tag">Print it &middot; pin it up</span>
-          {% include "public/partials/_boss_letter_scroll.html" %}
+          <span class="ttb-tag">Stick it on their monitor</span>
+          {% include "public/partials/_boss_letter_postit.html" %}
         </div>
         <div class="ttb-half">
-          <span class="ttb-tag">Write it &middot; leave it on the desk</span>
-          {% include "public/partials/_boss_letter_desk.html" %}
+          <span class="ttb-tag">Email it &middot; paste it in chat</span>
+          {% include "public/partials/_boss_letter_card.html" %}
         </div>
       </div>
 
@@ -96,15 +101,23 @@
         {% if boss_error %}<p class="bn-error" role="alert">{{ boss_error }}</p>{% endif %}
         <div class="bn-fields">
           <label>Your name
-            <input type="text" name="your_name" id="bnYourName" value="{% firstof your_name user.display_name %}" maxlength="80" required autocomplete="name" placeholder="e.g. Sam from accounts">
+            <input type="text" name="your_name" id="bnYourName" data-letter-src="name" value="{% firstof your_name user.display_name %}" maxlength="80" required autocomplete="name" placeholder="e.g. Sam from accounts">
           </label>
           <label>Boss's name <span class="bn-opt">(optional)</span>
-            <input type="text" name="boss_name" id="bnBossName" value="{{ boss_name }}" maxlength="80" autocomplete="off" placeholder="e.g. Priya">
+            <input type="text" name="boss_name" id="bnBossName" data-letter-src="boss" value="{{ boss_name }}" maxlength="80" autocomplete="off" placeholder="e.g. Priya">
           </label>
           <label>Boss's email
-            <input type="email" name="boss_email" required autocomplete="off" placeholder="boss@yourwork.com.au">
+            <input type="email" name="boss_email" data-letter-src="email" value="{{ boss_email_draft }}" required autocomplete="off" placeholder="boss@yourwork.com.au">
           </label>
         </div>
+
+        {% comment %}
+        The note as it will go out, between the fields and the button — so the
+        last thing under the sender's eye before they commit is the thing they
+        are committing to. See _boss_letter_preview.html for why this did not
+        exist before.
+        {% endcomment %}
+        {% include "public/partials/_boss_letter_preview.html" %}
         <input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;top:0;">
         <div class="bn-send-row">
           <button type="submit" class="btn-primary">Send the note</button>
@@ -184,45 +197,35 @@
 
 <script>
 (function(){
-  /* The letter renders twice — once per presentation — so every name span has
-     to be updated, not just the first one found. */
-  var bossSpans = document.querySelectorAll('[data-letter-boss]');
-  var nameSpans = document.querySelectorAll('[data-letter-name]');
-  var bossIn = document.getElementById('bnBossName');
-  var nameIn = document.getElementById('bnYourName');
+  /* COPYING THE NOTE. The name spans are not this script's business any more:
+     the letter now renders in up to three places on this page (sticky, card,
+     and the preview inside the send form), and one piece of code keeping all
+     of them in step lives in _boss_letter_preview.html, which is where the
+     form fields are. That partial only renders for a signed-in member, hence
+     every call through window.gtBossLetter being guarded — an anonymous
+     visitor has no fields to type into, so the letter simply reads as written. */
   var note = document.getElementById('bossNote');
+
+  function sync(){ if (window.gtBossLetter) window.gtBossLetter.sync(); }
 
   function letterText(){
     /* Both halves show the same wording, so read the first and stop — walking
-       every .bn-body on the page would hand over the letter twice. */
+       every .bn-body on the page would hand over the letter twice, or three
+       times once the preview is on screen. */
     var one = document.querySelector('.bn-body');
     if (!one) return '';
     return [].map.call(one.querySelectorAll('p'), function(p){
       return p.textContent.trim();
     }).join('\n\n');
   }
-  function sync(){
-    if (bossIn) {
-      var b = bossIn.value.trim() || 'Boss';
-      bossSpans.forEach(function(s){ s.textContent = b; });
-    }
-    if (nameIn) {
-      var n = nameIn.value.trim() || '[Your name]';
-      nameSpans.forEach(function(s){ s.textContent = n; });
-    }
-    note.value = letterText();
-  }
-  if (bossIn) bossIn.addEventListener('input', sync);
-  if (nameIn) nameIn.addEventListener('input', sync);
-  sync();
 
-  function flash(btn){ var o = btn.textContent; btn.textContent = 'Copied ✓'; setTimeout(function(){ btn.textContent = o; }, 1600); }
+  function flash(btn){ var o = btn.textContent; btn.textContent = 'Copied \u2713'; setTimeout(function(){ btn.textContent = o; }, 1600); }
   function put(text, btn){
     if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(function(){ flash(btn); }); }
-    else { note.value = text; note.focus(); note.select(); try { document.execCommand('copy'); } catch(e){} flash(btn); sync(); }
+    else { note.value = text; note.focus(); note.select(); try { document.execCommand('copy'); } catch(e){} flash(btn); }
   }
   document.querySelectorAll('[data-copy-note]').forEach(function(btn){
-    btn.addEventListener('click', function(){ sync(); put(note.value, btn); });
+    btn.addEventListener('click', function(){ sync(); put(letterText(), btn); });
   });
   document.querySelectorAll('[data-copy-link]').forEach(function(btn){
     btn.addEventListener('click', function(){ put(window.location.origin + window.location.pathname, btn); });

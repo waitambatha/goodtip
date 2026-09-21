@@ -28,41 +28,67 @@ observer at the bottom of this file.
 {% block meta_description %}How GoodTip collects, uses and protects your personal information.{% endblock %}
 {% block body_class %}page-legal{% endblock %}
 
+{% block extra_head %}
+{% comment %}
+Marks the clause you are reading — the card takes the green and the contents
+rail lights to match. See static/js/gt-legal.js for why it is a reading band
+rather than hover.
+{% endcomment %}
+<script src="{% static 'js/gt-legal.js' %}" defer></script>
+{% endblock %}
+
 {% block content %}
 
-<!-- HERO -->
-<section class="hero-lean">
-  <div class="hl-bg" aria-hidden="true">
-    <div class="shot on" style="background-image:url('{% static 'img/scenes/stadium-panorama.jpg' %}')"></div>
-    <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
-    <div class="shot" style="background-image:url('{% static 'img/scenes/mcg-stadium.jpg' %}')"></div>
-  </div>
-  <div class="hl-veil" aria-hidden="true"></div>
-  <div class="wrap">
-    <p class="eyebrow" style="color:var(--lime);">Legal</p>
+<!-- SPLIT HERO -->
+{% comment %}
+THE SPLIT, NOT A BAND (client, 20 Sep 2026: "on the Terms and Privacy we
+should have the hero split at the top, and the images on one side").
+
+This is the resolution of what looked like two contradictory instructions. The
+photograph was a problem when it sat BEHIND the words — a shot at 34% under a
+veil, with the heading on top of it, which is what read as translucent. In a
+split it is beside them: its own panel, its own edge, nothing over it and
+nothing under the type. The document keeps a clean ground and the page keeps a
+picture, and the two stop fighting.
+
+Same component the pricing and sponsorship heroes use, so these five public
+pages now open the same way.
+{% endcomment %}
+<section class="hero-split hero-legal">
+  <div class="hs-left">
+    <span class="pill" style="align-self:flex-start;margin-bottom:22px;"><span class="dot"></span>Legal</span>
     <h1>Privacy Policy</h1>
-    <p class="hl-sub">What we collect, why we collect it, and who can see it. In plain English, because a policy nobody can read is not a policy anybody agreed to.</p>
+    <p class="hero-sub">What we collect, why we collect it, and who can see it. In plain English, because a policy nobody can read is not a policy anybody agreed to.</p>
     <div class="hl-meta">
       <span class="hl-chip"><svg><use href="#ic-clock"/></svg> Last updated: August 2026</span>
       <span class="hl-chip"><svg><use href="#ic-shield-check"/></svg> Applies to goodtip.com.au and the GoodTip app</span>
     </div>
   </div>
+  <div class="hs-right">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="shot active" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+    </div>
+    <div class="hs-veil" aria-hidden="true"></div>
+    <div class="hs-tagstrip"><span class="live-dot">What we hold, and why</span></div>
+  </div>
 </section>
 
 <!-- THE POLICY -->
-<section class="section on-cream has-rails" style="padding-top:clamp(36px,5vw,56px);">
-  <div class="pg-rails" aria-hidden="true">
-    <div class="rail left">
-      <div class="shot on" style="background-image:url('{% static 'img/scenes/afl-goal-posts.jpg' %}')"></div>
-      <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-goal-posts.jpg' %}')"></div>
-      <div class="shot" style="background-image:url('{% static 'img/scenes/afl-training.jpg' %}')"></div>
-    </div>
-    <div class="rail right">
-      <div class="shot on" style="background-image:url('{% static 'img/scenes/nrl-ground-dusk.jpg' %}')"></div>
-      <div class="shot" style="background-image:url('{% static 'img/scenes/afl-ball-grass.jpg' %}')"></div>
-      <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
-    </div>
-  </div>
+<section class="section on-cream" style="padding-top:clamp(36px,5vw,56px);">
+  {% comment %}
+  THE SIDE RAILS ARE GONE TOO (client, 20 Sep 2026: "remove that translucent
+  feel, and let's have white and green").
+
+  Four more stadium photographs, 230px wide and running the FULL height of the
+  document down both margins. On a marketing page they frame the content; on a
+  legal one they put a picture of a goalpost beside every clause somebody is
+  being asked to agree to, and they were the last thing making this page feel
+  like a poster instead of a document.
+
+  The section keeps `on-cream` and drops `has-rails`, so the clauses sit on
+  paper edge to edge.
+  {% endcomment %}
 
   <div class="wrap">
     <div class="legal-layout" data-legal>
@@ -115,7 +141,20 @@ observer at the bottom of this file.
         <article class="legal-card reveal" id="providers">
           <h2><span class="lc-n">04</span> Service providers</h2>
           <div class="prose">
-            <p>We use third parties to deliver parts of the service: an email provider to send sign-in codes and notifications, a payment provider to process donations, and hosting infrastructure to run the site. They receive only what they need to perform their function and are not permitted to use it for anything else.</p>
+            {% comment %}
+            "a payment provider to process donations" was wrong, and wrong in
+            the one direction that matters: it described a product where money
+            moves from members to charities through us. Nobody playing GoodTip
+            is ever asked for money. An organisation pays one platform fee,
+            GoodTip funds the donation from its own revenue, and the only card
+            our payment provider ever sees belongs to the organisation.
+
+            A privacy policy that contradicts the funding model on every other
+            page is worse than one that says less — it is the document somebody
+            reaches for when they want to know exactly what happens to their
+            money, and this sentence told them the wrong thing.
+            {% endcomment %}
+            <p>We use third parties to deliver parts of the service: an email provider to send sign-in codes and notifications, a payment provider to take your organisation's platform fee, and hosting infrastructure to run the site. They receive only what they need to perform their function and are not permitted to use it for anything else. Participants are never asked to pay anything, so no participant's payment details are ever collected or held.</p>
           </div>
         </article>
 
@@ -129,7 +168,7 @@ observer at the bottom of this file.
         <article class="legal-card reveal" id="choices">
           <h2><span class="lc-n">06</span> Your choices</h2>
           <div class="prose">
-            <p>You can view and change your details at any time from your profile, and turn notification emails off there. You can ask us for a copy of the personal information we hold about you, ask us to correct it, or ask us to delete your account. Some records — donation receipts in particular — may need to be retained where the law requires it.</p>
+            <p>You can view and change your details at any time from your profile, and turn notification emails off there. You can ask us for a copy of the personal information we hold about you, ask us to correct it, or ask us to delete your account. Some records — an organisation's payment and tax records in particular — may need to be retained where the law requires it.</p>
           </div>
         </article>
 

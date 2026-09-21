@@ -34,7 +34,7 @@ never more than one poll behind the sync, slow enough to stay cheap.
   {% elif match.phase == "complete" %}
     {% if match.score_line %}
       <span class="ms-score final">{{ match.score_line }}</span>
-      <span class="ms-badge done">{% if match.period %}{{ match.period }}{% else %}Final{% endif %}</span>
+      <span class="ms-badge done">{{ match.done_label }}</span>
     {% else %}
       <span class="ms-badge done">Awaiting result</span>
     {% endif %}

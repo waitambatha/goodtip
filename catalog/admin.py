@@ -70,7 +70,7 @@ class SeasonAdmin(admin.ModelAdmin):
 
 @admin.register(Charity)
 class CharityAdmin(admin.ModelAdmin):
-    list_display = ("name", "_logo", "is_approved", "website", "slug")
+    list_display = ("name", "_logo", "is_approved", "is_hidden", "website", "slug")
     actions = ("refetch_logos",)
 
     @admin.display(description="Logo")
@@ -112,7 +112,7 @@ class CharityAdmin(admin.ModelAdmin):
                 f"{failed} still without one — their site published nothing usable.",
                 level=messages.WARNING,
             )
-    list_filter = ("is_approved",)
+    list_filter = ("is_approved", "is_hidden")
     search_fields = ("name",)
     prepopulated_fields = {"slug": ("name",)}
-    list_editable = ("is_approved",)
+    list_editable = ("is_approved", "is_hidden")

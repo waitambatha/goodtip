@@ -28,25 +28,11 @@
 
   <!-- SPORT LOADER (alternates per load) -->
   <div class="loader" id="loader" role="status" aria-label="Loading"
-       data-min="2000" data-cycle-sports>
+       data-min="2600" data-cycle-sports data-full-shot>
     <div class="loader-inner">
-      <div class="pitch">
-        <svg class="posts" viewBox="0 0 240 150" aria-hidden="true">
-          <g stroke="#C8F135" stroke-width="4" fill="none" stroke-linecap="round">
-            <line x1="84"  y1="22" x2="84"  y2="128"/>
-            <line x1="156" y1="22" x2="156" y2="128"/>
-            <line x1="84"  y1="52" x2="156" y2="52"/>
-          </g>
-          <g stroke="rgba(200,241,53,.25)" stroke-width="3" fill="none" stroke-linecap="round">
-            <line x1="60"  y1="40" x2="60"  y2="128"/>
-            <line x1="180" y1="40" x2="180" y2="128"/>
-          </g>
-        </svg>
-        <span class="ball" aria-hidden="true"></span>
-        <span class="ground"></span>
-      </div>
-      <div class="loader-word">GOOD<span>TIP</span><span class="dot" style="color:var(--lime)">.</span></div>
-      <div class="loader-sport" id="loaderSport">Aussie Rules</div>
+      {% include "partials/_loader_scenes.html" %}
+      <div class="loader-word">GOOD<span>TIP</span><span class="dot">.</span></div>
+      <div class="loader-sport" id="loaderSport">AFL</div>
       <div class="loader-task">{% block loader_task %}Loading the good stuff{% endblock %}</div>
       <div class="loader-bar"><i></i></div>
     </div>
@@ -254,7 +240,11 @@
             // laid out at the width it will actually animate in.
             if (isFlow) group.classList.add('rv-wave-' + waveAxis(kids));
             kids.forEach(function (k, n) {
-              revealNow(k, isFlow ? n * 150 : n * 60);
+              /* CAPPED. At 150ms a child, the tenth card in a grid waits a
+                 second and a half before it starts — by which time the reader
+                 has scrolled past it. The wave still reads as a wave at 90ms,
+                 and nothing waits longer than half a second to begin. */
+              revealNow(k, Math.min(n, 6) * (isFlow ? 90 : 45));
               /* The entrance swell plays once. A wave does not stop, so when
                  it finishes the member switches to the standing ripple that
                  runs from then on — the flag, rather than a single flap. It
@@ -271,19 +261,68 @@
                 // without this the ripple would simply never begin. Adding the
                 // class twice is harmless.
                 k.addEventListener('animationend', live, { once: true });
-                setTimeout(live, n * 150 + 1600);
+                setTimeout(live, Math.min(n, 6) * 90 + 1600);
               }
             });
             gio.unobserve(e.target);
           });
-        }, { threshold: 0.15 });
+        /* STARTS BEFORE IT ARRIVES, not once it is a sixth of the way in.
+           A bare 0.15 threshold means a group only begins revealing when it is
+           already well on screen, and with a 0.6s transition and up to 150ms of
+           stagger per child, anyone scrolling at a normal speed reads a column
+           of ghost text for a second or more. The client saw exactly that and
+           reported it as things "not visible". The bottom margin brings the
+           trigger a fifth of a viewport BELOW the fold, so the entrance is
+           finishing as the content arrives rather than starting. */
+        }, { threshold: 0.01, rootMargin: '0px 0px 20% 0px' });
         gio.observe(group);
       });
 
       var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
-      }, { threshold: 0.12 });
+      }, { threshold: 0.01, rootMargin: '0px 0px 20% 0px' });
       items.forEach(function (el) { if (!grouped.has(el)) io.observe(el); });
+
+      /* THE FAILSAFE, and it is not belt-and-braces — it is the difference
+         between a slow entrance and content that is simply missing.
+         An observer can be beaten: a jump to an anchor, a restored scroll
+         position, a fast flick that outruns the callback, a tab that was
+         backgrounded while the page loaded. Any of those leaves an element
+         that is plainly on screen still sitting at opacity 0, and there is
+         nothing the reader can do about it — scrolling back up does not
+         re-fire an observer that already ran.
+
+         So anything the viewport has reached is shown, full stop, checked on
+         scroll and once after load. Cheap: it only looks at what is still
+         hidden, and that set only ever shrinks. */
+      var swept = false;
+      var sweep = function () {
+        swept = false;
+        var limit = window.innerHeight * 1.15;
+        var left = document.querySelectorAll('.reveal:not(.in)');
+        left.forEach(function (el) {
+          if (el.getBoundingClientRect().top < limit) revealNow(el, 0);
+        });
+        /* Nothing hidden left anywhere on the page: stop listening. On a long
+           document this runs its last pass at the bottom and then costs
+           nothing for the rest of the visit. */
+        if (!left.length) {
+          window.removeEventListener('scroll', onSweep);
+          window.removeEventListener('resize', onSweep);
+        }
+      };
+      /* ONE PASS PER FRAME AT MOST. Scroll fires several times faster than the
+         screen redraws, and each pass reads a rect for every element still
+         hidden — unthrottled, that is enough layout work on a long page to
+         make the renderer stop answering, which is exactly what it did. */
+      var onSweep = function () {
+        if (swept) return;
+        swept = true;
+        requestAnimationFrame(sweep);
+      };
+      window.addEventListener('scroll', onSweep, { passive: true });
+      window.addEventListener('resize', onSweep, { passive: true });
+      setTimeout(sweep, 400);
     }
 
     /* ---- FAQ accordions ---- */
@@ -485,10 +524,16 @@
     /* ---- Live Wall demo: typing -> new post -> tally bump ---- */
     var feed = document.getElementById('wall-feed');
     if (feed && !reduce) {
+      /* NOBODY IN HERE PUTS MONEY IN. Two of these posts used to: one
+         "chucking in +$25" and one announcing the match cap had gone up.
+         Neither is a thing that can happen — participants are never asked to
+         contribute and there is no organisation match — so the demo feed was
+         showing a funding model the product does not have, with an invented
+         dollar figure attached. Same voices, same joke, no money. */
       var queue = [
-        { who: 'Priya', av: 'PR', tag: 'Top giver', body: 'Chucking in <span class="pick">+$25</span> — if Sharon can do it on a Tuesday, so can I.' },
+        { who: 'Priya', av: 'PR', tag: 'On a streak', body: 'Four from four this round. <span class="pick">★ 4/4</span> — if Sharon can do it on a Tuesday, so can I.' },
         { who: 'The Quiet One in Legal', av: 'TQ', tag: '', body: 'Said nothing. Tipped everything right. <span class="pick">★ 12/12</span>.' },
-        { who: 'Big Dave', av: 'BD', tag: 'Top tipper', body: 'Right, the match cap just got raised. You\u2019re welcome, headspace.' }
+        { who: 'Big Dave', av: 'BD', tag: 'Top tipper', body: 'Right, that\u2019s the ladder settled. You\u2019re welcome, headspace.' }
       ];
       var i = 0;
       function typingThenPost() {

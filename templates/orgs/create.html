@@ -476,11 +476,27 @@ missed click and got submitted twice.
       <label class="opt-card radio">
         <input type="radio" name="groups_enabled" value="yes" {% is_checked form.groups_enabled 'yes' %}>
         <span class="oc-box"></span>
-        <span><span class="oc-title">Yes, switch them on</span><span class="oc-sub">Worth it once there are enough people that one ladder stops feeling personal. Members can start their own group, or ask, and you approve.</span></span>
+        <span><span class="oc-title">Yes, switch them on</span><span class="oc-sub">Worth it once there are enough people that one ladder stops feeling personal. Members can start their own group, or ask, and you approve. Part of the {{ groups_plan_label }} plan and up.</span></span>
       </label>
     </div>
     {% if form.groups_enabled.errors %}<div class="fld-err">{{ form.groups_enabled.errors|join:" " }}</div>{% endif %}
-    <p class="app-sub" style="margin-top:14px;">This isn't final — an admin can switch groups on or off later from Settings, and nothing is ever lost by waiting.</p>
+    {% comment %}
+    THE PLAN IS NAMED HERE, AND THE GATE IS NOT ENFORCED HERE.
+
+    Groups are sold from Workplace up. This step is asked before the tipping
+    step, which is where team size is collected — so at this point in the
+    wizard nobody, including us, knows which plan this organisation will land
+    on, and a lock drawn on a guess would be a lock drawn wrongly.
+
+    So the choice stays open and carries its price, and the gate does its work
+    where the client described it: on the group button itself, once the
+    organisation exists and its size is known. An organisation that answers yes
+    here and turns out to be twelve people meets the upgrade prompt the first
+    time it goes to add a group, which is exactly the flow asked for — "under
+    50 people can have the group button but if they click on it it triggers an
+    upgrade".
+    {% endcomment %}
+    <p class="app-sub" style="margin-top:14px;">Groups come with {{ groups_plan_label }} (${{ groups_plan_price }}/year) and above; smaller plans run one ladder for everyone. This isn't final either way — an admin can switch groups on or off later from Settings, and nothing is ever lost by waiting.</p>
   </div>
   {% endif %}
 
@@ -534,7 +550,47 @@ missed click and got submitted twice.
     </div>
     <div class="fld">
       <label for="id_team_size">Expected organisation size <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
-      <input type="number" name="team_size" id="id_team_size" value="{{ form.team_size.value|default:'' }}" placeholder="e.g. 24">
+      <input type="number" name="team_size" id="id_team_size" value="{{ form.team_size.value|default:'' }}" placeholder="e.g. 24"
+             data-plan-size>
+    </div>
+    {% comment %}
+    THE PLAN, SAID OUT LOUD AT THE MOMENT IT IS DECIDED.
+
+    Client, 17 Sep 2026: "with the groups not being available to the small
+    accounts — where in the process do they select their plan or get a
+    recommended package? Is it when they get asked the size of the group, in
+    the org sign-up process?" It was nowhere: the wizard asked the size and
+    never mentioned a price again, and the first number anybody saw was on the
+    plans screen after the organisation already existed.
+
+    So it is here, under the field that decides it, and it follows the number
+    as it is typed — a person trying 45 and then 60 watches the plan change,
+    which is a far better explanation of how the pricing works than a sentence
+    about it would be.
+
+    It says plainly that nothing is being bought. This screen creates an
+    organisation; the plan is chosen and paid for afterwards, and a price
+    appearing mid-sign-up with no such line reads as a checkout step.
+    {% endcomment %}
+    {{ plan_ladder|json_script:"planLadder" }}
+    <div class="plan-pick" data-plan-pick
+         data-groups="{% if form.groups_enabled.value == 'yes' %}1{% else %}0{% endif %}">
+      <span class="pp-lab">Your plan, going by that</span>
+      <span class="pp-row">
+        <b data-plan-name>{{ plan_pick.label }}</b>
+        <span class="pp-price">${{ plan_pick.price }}<i>/year</i></span>
+        <span class="pp-seats" data-plan-seats>{{ plan_pick.seats }}</span>
+      </span>
+      <small data-plan-note>
+        {% if plan_pick.raised_by_groups %}
+          Groups start at {{ plan_pick.label }}, which is why it is this one and not the smaller plan your size alone would land on. Switch groups off on the previous step and the smaller plan is yours.
+        {% elif plan_pick.has_groups %}
+          Includes groups &mdash; a separate ladder for each team or department.
+        {% else %}
+          One shared ladder for everyone. Groups start at {{ groups_plan_label }}, ${{ groups_plan_price }}/year.
+        {% endif %}
+      </small>
+      <small class="pp-fine">Nothing is charged now. Creating the organisation is free &mdash; you pick and pay for a plan afterwards, and <a href="/pricing/" target="_blank" rel="noopener">every plan is here</a>. Can&rsquo;t afford it? <a href="{% url 'sponsorship' %}" target="_blank" rel="noopener">Apply for a sponsored place.</a></small>
     </div>
     <label class="opt-card" style="margin-top:4px;"><input type="checkbox" name="finals_only" {% is_checked form.finals_only 'True' %}><span class="oc-box"><svg><use href="#ic-check"/></svg></span><span><span class="oc-title">Finals only</span><span class="oc-sub">Skip the regular season and tip finals only</span></span></label>
   </div>
@@ -671,16 +727,117 @@ missed click and got submitted twice.
     </div>
   </div>
 
-  {% if step_errors %}
-  {# Something invalid slipped through from an earlier step — name it and say where. #}
+  {% comment %}
+  Something invalid slipped through from an EARLIER step — name it and say
+  where. terms_accepted is excluded: it is the one error whose field is on this
+  screen, it already carries its own message beside the box, and telling
+  somebody to "step back to fix it" when the fix is six inches below sends them
+  the wrong way through the wizard.
+  {% endcomment %}
+  {% with earlier=step_errors|length %}
+  {% if earlier > 1 or earlier == 1 and not step_errors.terms_accepted %}
   <div class="flash error" style="margin-bottom:16px;">
     <span>
       Not quite there yet:
-      {% for field, errs in step_errors.items %}{{ errs|join:" " }}{% if not forloop.last %} {% endif %}{% endfor %}
+      {% for field, errs in step_errors.items %}{% if field != "terms_accepted" %}{{ errs|join:" " }}{% if not forloop.last %} {% endif %}{% endif %}{% endfor %}
       Step back to fix it.
     </span>
   </div>
   {% endif %}
+  {% endwith %}
+  {% endif %}
+
+  {% comment %}
+  =========================================================================
+  THE AGREEMENT, ON THE SCREEN WITH THE CREATE BUTTON ON IT.
+  =========================================================================
+  Client task list, Sep 2026: "Add a checkbox agreement into the organisation
+  sign-up workflow with a plain-English top-3 summary of what they're agreeing
+  to."
+
+  Both halves are here and the summary is the half that does the work. A link
+  to two long documents and a tick box is the pattern everybody has learned to
+  click through without reading; three short paragraphs saying what would
+  actually surprise you is a thing somebody might read. The three are chosen
+  and worded in goodtip/legal.py, so this page and the Terms page cannot come
+  to print different versions of the same promise.
+
+  It is on the last step because that is where the Create button is. Agreeing
+  three screens before the thing you are agreeing about happens is agreeing to
+  nothing. The box is unticked — required, never pre-ticked: a box that arrives
+  ticked is a notice, not an agreement.
+  =========================================================================
+  {% endcomment %}
+  {% if step == last_step %}
+  {% comment %}
+  THE PLAN, ONCE MORE, WHERE THE DECISION IS MADE.
+
+  Repeated deliberately. The readout on the size step is seen while somebody
+  is still adjusting a number; this is the one they read on the way to pressing
+  Create, and by then the groups answer and the size answer are both in, so it
+  is the first place the recommendation is final. It is also the last screen
+  before an organisation exists, which makes it the last honest moment to say
+  what the thing will cost.
+
+  Still not a checkout. Nothing is charged here and the card says so.
+  {% endcomment %}
+  <div class="card pad-lg wiz-card" style="margin-bottom:16px;">
+    <div class="wc-head">
+      <span class="wc-ic" aria-hidden="true"><svg style="stroke:currentColor;fill:none;stroke-width:1.8;"><use href="#ic-coins"/></svg></span>
+      <div>
+        <h2>The plan we&rsquo;d put you on</h2>
+        <p>Based on the size you gave and whether you asked for groups. You choose and pay for it after this, not now.</p>
+      </div>
+    </div>
+    <div class="plan-pick is-final">
+      <span class="pp-row">
+        <b>{{ plan_pick.label }}</b>
+        <span class="pp-price">${{ plan_pick.price }}<i>/year</i></span>
+        <span class="pp-seats">{{ plan_pick.seats }}</span>
+      </span>
+      <small>
+        {% if plan_pick.is_top %}
+          The largest published plan. Above this we price it with you rather than from a table &mdash; <a href="/pricing/" target="_blank" rel="noopener">see the plans</a>.
+        {% elif plan_pick.raised_by_groups %}
+          You asked for groups, and groups start at {{ plan_pick.label }}. Turn them off and you drop to the plan your size alone would take.
+        {% elif plan_pick.has_groups %}
+          Includes groups &mdash; a separate ladder for each team or department.
+        {% else %}
+          One shared ladder for everyone. Groups start at {{ groups_plan_label }}, ${{ groups_plan_price }}/year.
+        {% endif %}
+      </small>
+      <small class="pp-fine">Creating the organisation is free and nothing is charged today. Sign up before 31 December 2026 and your rate is locked for the three seasons after it. If the fee is what&rsquo;s stopping you, <a href="{% url 'sponsorship' %}" target="_blank" rel="noopener">apply for a sponsored place</a>.</small>
+    </div>
+  </div>
+  <div class="card pad-lg wiz-card terms-card" style="margin-bottom:16px;">
+    <div class="wc-head">
+      <span class="wc-ic" aria-hidden="true"><svg style="stroke:currentColor;fill:none;stroke-width:1.8;"><use href="#ic-shield"/></svg></span>
+      <div>
+        <h2>Before you create it</h2>
+        <p>The three things worth knowing, in plain English. The full wording is in the <a href="{% url 'terms' %}" target="_blank" rel="noopener">Terms</a> and the <a href="{% url 'privacy' %}" target="_blank" rel="noopener">Privacy Policy</a>.</p>
+      </div>
+    </div>
+
+    <ol class="terms-three">
+      {% for heading, body in terms_top_three %}
+      <li>
+        <b>{{ heading }}</b>
+        <span>{{ body }}</span>
+      </li>
+      {% endfor %}
+    </ol>
+
+    <label class="terms-tick{% if step_errors.terms_accepted %} has-error{% endif %}">
+      <input type="checkbox" name="terms_accepted" value="1"
+             {% if form.terms_accepted.value %}checked{% endif %} required>
+      <span>
+        I've read and agree to the <a href="{% url 'terms' %}" target="_blank" rel="noopener">Terms</a>
+        and the <a href="{% url 'privacy' %}" target="_blank" rel="noopener">Privacy Policy</a>,
+        and I'm authorised to set this organisation up.
+      </span>
+    </label>
+    {% if step_errors.terms_accepted %}<div class="fld-err">{{ step_errors.terms_accepted|join:" " }}</div>{% endif %}
+  </div>
   {% endif %}
 
   {% if duplicates %}
@@ -753,6 +910,89 @@ missed click and got submitted twice.
 {% endblock %}
 
 {% block app_js %}
+    /* ------------------------------------------------------------------
+       THE PLAN FOLLOWS THE NUMBER.
+
+       The server has already worked out the recommendation and printed it, so
+       this is only here to keep it true while somebody is still deciding. A
+       person who types 45, sees Team, then types 60 and watches it become
+       Workplace has understood the pricing in a way no paragraph about it
+       would have managed.
+
+       It walks the same ladder the server did, handed over as JSON from
+       billing.pricing rather than written out again here — the one thing that
+       must not be possible is for this to quote a price the server disagrees
+       with. With no JavaScript the server's own answer simply stands, which is
+       correct, just not live.
+       ------------------------------------------------------------------ */
+    (function(){
+      var box = document.querySelector('[data-plan-pick]');
+      var field = document.querySelector('[data-plan-size]');
+      var data = document.getElementById('planLadder');
+      if (!box || !field || !data) return;
+
+      var ladder;
+      try { ladder = JSON.parse(data.textContent); } catch (e) { return; }
+      if (!ladder || !ladder.length) return;
+
+      var wantsGroups = box.getAttribute('data-groups') === '1';
+      var groupsFloor = null;
+      for (var i = 0; i < ladder.length; i++) {
+        if (ladder[i].groups) { groupsFloor = ladder[i]; break; }
+      }
+
+      var nameEl = box.querySelector('[data-plan-name]');
+      var priceEl = box.querySelector('.pp-price');
+      var seatsEl = box.querySelector('[data-plan-seats]');
+      var noteEl = box.querySelector('[data-plan-note]');
+
+      function bySize(n) {
+        if (!n) return ladder[0];
+        for (var i = 0; i < ladder.length; i++) {
+          if (n <= ladder[i].seat_limit) return ladder[i];
+        }
+        return ladder[ladder.length - 1];
+      }
+
+      function paint() {
+        var n = parseInt(field.value, 10);
+        if (isNaN(n) || n < 1) n = 0;
+        var size = bySize(n);
+        var pick = size;
+        var raised = false;
+        if (wantsGroups && !size.groups && groupsFloor) {
+          // The floor can be BELOW what size alone chose only if the ladder
+          // were out of order, so take the larger of the two rather than
+          // assuming; a 400-person org asking for groups stays on its own plan.
+          if (groupsFloor.price > size.price) { pick = groupsFloor; raised = true; }
+        }
+
+        if (nameEl) nameEl.textContent = pick.label;
+        if (priceEl) priceEl.innerHTML = '$' + pick.price + '<i>/year</i>';
+        if (seatsEl) {
+          seatsEl.textContent = pick.seat_limit >= 100000
+            ? '500+' : 'Up to ' + pick.seat_limit;
+        }
+        if (!noteEl) return;
+        if (raised) {
+          noteEl.textContent =
+            'Groups start at ' + pick.label + ', which is why it is this one and '
+            + 'not the smaller plan your size alone would land on. Switch groups '
+            + 'off on the previous step and the smaller plan is yours.';
+        } else if (pick.groups) {
+          noteEl.textContent =
+            'Includes groups \u2014 a separate ladder for each team or department.';
+        } else {
+          noteEl.textContent =
+            'One shared ladder for everyone. Groups start at '
+            + (groupsFloor ? groupsFloor.label + ', $' + groupsFloor.price + '/year.' : 'a larger plan.');
+        }
+      }
+
+      field.addEventListener('input', paint);
+      paint();
+    })();
+
     (function(){
       /* Preview the chosen logo before it is uploaded. The file still posts on
          the next Continue/Save, this only removes the beat where you pick an

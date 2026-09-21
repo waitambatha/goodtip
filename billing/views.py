@@ -13,8 +13,16 @@ from orgs.models import OrgMember, Organisation
 from orgs.services import is_creator_admin
 
 from . import donations, goodlist, services
-from .models import DonationPledge, PlanSubscription
-from .pricing import TIERS, seat_limit_label
+from .models import DonationPledge, PlanSubscription, SponsorshipApplication
+from .pricing import (
+    FOUNDING_WINDOW_CLOSES,
+    GROUPS_MIN_TIER,
+    STARTER,
+    TIERS,
+    founding_window_open,
+    seat_limit_label,
+    tier_label,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,10 +85,17 @@ def _require_owner(user, org):
     ).exists()
 
 
-def _tier_cards():
+def _tier_cards(org=None):
+    """The five plans as the template wants them.
+
+    Takes the org so each card can show what THIS organisation would actually
+    be charged. A founding member looking at a price list showing everyone
+    else's prices has been sold something they cannot see, which is the same
+    problem the lock was built to fix.
+    """
     cards = []
     for key, cfg in TIERS.items():
-        cards.append({
+        card = {
             "key": key,
             "label": cfg["label"],
             "price": cfg["price"],
@@ -88,7 +103,15 @@ def _tier_cards():
             "audience": cfg["audience"],
             "features": cfg["features"],
             "popular": cfg["popular"],
-        })
+            "groups": cfg["groups"],
+            "your_price": cfg["price"],
+            "is_founding": False,
+        }
+        if org is not None:
+            price, founding, _list = services.price_for(org, key)
+            card["your_price"] = price
+            card["is_founding"] = founding
+        cards.append(card)
     return cards
 
 
@@ -99,9 +122,17 @@ def plans_view(request, org_id: int):
         return HttpResponseForbidden()
     return render(request, "billing/plans.html", {
         "org": org,
-        "tiers": _tier_cards(),
+        "tiers": _tier_cards(org),
         "current": services.active_subscription(org),
         "stripe_configured": services.is_configured(),
+        # The organisation's own founding lock, and — for one that has not
+        # taken a plan yet — whether the window is still open to them. Both,
+        # because "you are locked until 2029" and "you have until 31 December
+        # to be" are different sentences and the page has to pick the true one.
+        "founding_rate": services.founding_rate_for(org),
+        "founding_open": founding_window_open(),
+        "founding_closes": FOUNDING_WINDOW_CLOSES,
+        "groups_min_label": tier_label(GROUPS_MIN_TIER),
     })
 
 
@@ -298,3 +329,128 @@ def _record_donation_from_session(session, meta):
         checkout_session_id=session.get("id", ""),
         payment_intent_id=session.get("payment_intent") or "",
     )
+
+
+# ---------------------------------------------------------------------------
+# Sponsored places — applying for one
+# ---------------------------------------------------------------------------
+#
+# Saved first, emailed second, exactly as the public contact form does it and
+# for the same reason: a mail outage must never lose the application. The
+# difference from an enquiry is who is on the other end of it. Somebody filling
+# this in has already read the price and concluded they cannot pay it, and they
+# are telling us so — which takes a bit of doing, and a form that swallows that
+# silently is a worse failure than losing a sales lead.
+
+SPONSOR_LIMIT = 3            # applications per session…
+SPONSOR_WINDOW = 24 * 3600   # …per day
+
+
+def sponsorship_view(request):
+    """Public page: apply for a sponsored place.
+
+    Open to anyone, signed in or not. The audience for this is people who read
+    /pricing/ and stopped — asking them to create an account and set up an
+    organisation before they can ask whether they can afford one is the wrong
+    order, and it is the order that loses them.
+    """
+    import time
+
+    from django.core.exceptions import ValidationError
+    from django.core.validators import validate_email
+
+    from catalog.models import Country
+    from goodtip.mail import send_template, site_url
+
+    sent = False
+    error = ""
+    form = {}
+
+    if request.method == "POST":
+        form = {
+            "contact_name": (request.POST.get("contact_name") or "").strip()[:120],
+            "email": (request.POST.get("email") or "").strip()[:254],
+            "organisation_name": (request.POST.get("organisation_name") or "").strip()[:160],
+            "organisation_kind": (request.POST.get("organisation_kind") or "").strip()[:120],
+            "people": (request.POST.get("people") or "").strip()[:6],
+            "country": (request.POST.get("country") or "").strip()[:6],
+            "reason": (request.POST.get("reason") or "").strip()[:4000],
+        }
+        now = time.time()
+        recent = [
+            t for t in request.session.get("sponsor_applications", [])
+            if now - t < SPONSOR_WINDOW
+        ]
+
+        if request.POST.get("company"):
+            # Honeypot. Answer as though it worked — telling a bot it was
+            # caught only helps it try again.
+            sent = True
+        elif not (form["contact_name"] and form["email"]
+                  and form["organisation_name"] and form["reason"]):
+            error = "Your name, email, the group's name and the last question are all needed."
+        elif len(recent) >= SPONSOR_LIMIT:
+            error = "You've sent a few of these already — give us a day to read them."
+        else:
+            try:
+                validate_email(form["email"])
+            except ValidationError:
+                error = "That email address doesn't look right — check it and try again."
+
+        if not sent and not error:
+            country = (
+                Country.objects.filter(pk=form["country"], is_active=True).first()
+                if form["country"].isdigit() else None
+            )
+            application = SponsorshipApplication.objects.create(
+                contact_name=form["contact_name"],
+                email=form["email"],
+                organisation_name=form["organisation_name"],
+                organisation_kind=form["organisation_kind"],
+                country=country,
+                people=int(form["people"]) if form["people"].isdigit() else None,
+                reason=form["reason"],
+                user=request.user if request.user.is_authenticated else None,
+            )
+            recent.append(now)
+            request.session["sponsor_applications"] = recent
+            sent = True
+
+            # THE APPLICATION IS SAVED. NOTHING BELOW MAY UNDO THAT — same
+            # reasoning as contact_submit_view, which has the long version.
+            try:
+                from accounts.models import User
+
+                staff_emails = list(
+                    User.objects.filter(is_staff=True, is_active=True)
+                    .exclude(email="")
+                    .values_list("email", flat=True)
+                )
+                if staff_emails:
+                    send_template(
+                        "sponsorship_applied",
+                        subject=f"Sponsorship application — {application.organisation_name}",
+                        to=staff_emails,
+                        context={"application": application, "site_link": site_url("/")},
+                        reply_to=[application.email],
+                    )
+                send_template(
+                    "sponsorship_received",
+                    subject="We've got your application — GoodTip",
+                    to=[application.email],
+                    context={"application": application, "site_link": site_url("/")},
+                )
+            except Exception:  # noqa: BLE001 — see the note above
+                logger.exception(
+                    "Sponsorship application %s saved, but its email(s) failed",
+                    application.pk,
+                )
+
+    return render(request, "public/sponsorship.html", {
+        "active": "pricing",
+        "sent": sent,
+        "error": error,
+        "form": form,
+        "countries": Country.objects.filter(is_active=True),
+        "starter_price": TIERS[STARTER]["price"],
+    })

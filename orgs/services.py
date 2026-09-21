@@ -86,7 +86,16 @@ def _resolve_inviter(org, inviter_id, joining_user):
 
 
 def add_member(user, org, *, inviter_id=None, role=OrgMember.ROLE_PARTICIPANT) -> OrgMember:
-    """Add a user to an org, recording who referred them (if known)."""
+    """Add a user to an org, recording who referred them (if known).
+
+    THE ONE WAY INTO AN ORGANISATION. Everything that puts somebody in a comp
+    goes through here — an invite, a join link, a membership request being
+    approved, the boss note closing its loop, the wizard adding its own
+    creator — because arriving with an empty season is a thing that has to be
+    dealt with exactly once, in one place, and it used to be dealt with in
+    some of them.
+    """
+    from tipping.carry import carry_existing_tips
     from tipping.services import backdate_missed_tips
 
     inviter = _resolve_inviter(org, inviter_id, user)
@@ -97,14 +106,28 @@ def add_member(user, org, *, inviter_id=None, role=OrgMember.ROLE_PARTICIPANT) -
     if not created and member.invited_by_id is None and inviter is not None:
         member.invited_by = inviter
         member.save(update_fields=["invited_by"])
+    # WHAT THE JOIN DID TO THEIR SEASON, carried back to the caller.
+    #
+    # Transient attributes on the returned member rather than a second return
+    # value, because every existing caller wants the member and only the join
+    # screen wants the numbers. They are what lets the welcome message say what
+    # actually happened instead of guessing — see orgs.views.join_view. Zero on
+    # a member who was already here, which is also the truth.
+    member.carried_tips = 0
+    member.backdated_tips = 0
     if created:
-        # A mid-season joiner starts on the away side for every round that is
-        # already gone, rather than on nothing. See backdate_missed_tips for
-        # why this cannot be left to the grading-time default.
+        # TWO STEPS, AND THE ORDER IS THE POINT.
         #
-        # Only on the join itself: it is idempotent, but re-running it on
-        # every call would be a full-season scan on each of these.
-        backdate_missed_tips(user, org)
+        # First their own picks, from every other comp they tip in — the same
+        # games, already decided, made in time. Then the away-side default for
+        # whatever is left. Doing it the other way round would fill the season
+        # with defaults and leave nothing for the real picks to land on, since
+        # neither step ever overwrites a tip that is already there.
+        #
+        # Only on the join itself: both are idempotent, but re-running them on
+        # every call would be two full-season scans per invite accepted.
+        member.carried_tips = carry_existing_tips(user, org)
+        member.backdated_tips = backdate_missed_tips(user, org)
     return member
 
 
@@ -999,6 +1022,8 @@ def create_group(org, *, name, by_user, kind=None, label="", country=None):
     wanted it to exist and who knows who belongs in it, and a group nobody can
     administer is worse than no group.
     """
+    from billing.entitlements import require_groups
+
     from .models import Group, GroupMember, OrgMember
 
     name = (name or "").strip()
@@ -1008,6 +1033,14 @@ def create_group(org, *, name, by_user, kind=None, label="", country=None):
         raise ValueError("Groups sit inside a top-level organisation.")
     if not org.groups_enabled:
         raise ValueError(f"{org.name} hasn't switched groups on.")
+    # The plan gate, and it is here rather than only on the screens because a
+    # POST is a POST: three templates draw a disabled Create control, and this
+    # is what happens to anyone who sends the form anyway. Organisations that
+    # switched groups on before the gate existed reach this too — they keep the
+    # groups they have, and cannot mint a new one until they are on a plan that
+    # includes them. Raises GroupsLocked, which IS a ValueError, so every
+    # existing caller already handles it. See billing/entitlements.py.
+    require_groups(org)
     if Group.objects.filter(org=org, name__iexact=name).exists():
         raise ValueError(f"{org.name} already has a group called {name}.")
     if not OrgMember.objects.filter(user=by_user, org=org).exists():
@@ -1129,10 +1162,15 @@ def join_group(group, *, user):
         raise ValueError("You have to be in the organisation first.")
     member, created = GroupMember.objects.get_or_create(group=group, user=user)
     if created:
-        # A group is its own ladder, so it needs its own backdating — the
-        # organisation's rows do not score here. See backdate_missed_tips.
+        # A group is its own ladder, so it needs its own carry and its own
+        # backdating — the organisation's rows do not score here. Same order
+        # and the same reason as add_member: real picks first, defaults after.
+        # The carry can draw on what this person tipped for the organisation
+        # itself, which is a different room in the same org.
+        from tipping.carry import carry_existing_tips
         from tipping.services import backdate_missed_tips
 
+        carry_existing_tips(user, group.org, group=group)
         backdate_missed_tips(user, group.org, group=group)
     return member
 
@@ -1736,6 +1774,18 @@ def thread_entries(thread, user):
             user_id__in={e.author_id for e in entries},
         )
     }
+    # Asked ONCE for the whole thread, not once per bubble. Whether this reader
+    # may take somebody else's message down is a property of the reader and the
+    # organisation; it cannot differ between two messages in the same room, and
+    # a room of two hundred would otherwise run two hundred identical queries
+    # to reach the same answer. See Message.can_remove.
+    viewer_is_admin = (
+        user is not None and user.is_authenticated
+        and OrgMember.objects.filter(
+            org_id=thread.org_id, user=user,
+            role__in=(OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH),
+        ).exists()
+    )
     previous = None
     to_mark = []
     for entry in entries:
@@ -1792,6 +1842,20 @@ def thread_entries(thread, user):
             if row.user_id == user.id:
                 chip["mine"] = True
         entry.reaction_chips = list(chips.values())
+
+        # The two controls added Sep 2026, answered here and handed to the
+        # template as plain booleans. The policy itself stays in orgs.models,
+        # where the single-message views read it too — a template that asked
+        # the question its own way is how the control and the endpoint come to
+        # disagree about who may press it.
+        #
+        # Named apart from the model's methods and then assigned, because
+        # assigning `entry.can_edit` shadows the method on that instance and
+        # reading it twice would be reading a boolean the second time.
+        may_edit = Message.can_edit(entry, user)
+        may_remove = Message.can_remove(entry, user, viewer_is_admin=viewer_is_admin)
+        entry.can_edit = may_edit
+        entry.can_remove = may_remove
 
         member = roles.get(entry.author_id)
         entry.author_role = (

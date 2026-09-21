@@ -750,6 +750,30 @@
     open = null;
   }
 
+  /* IT HAS TO CLOSE, COMPLETELY (client, 20 Sep 2026: "check on the menu on
+   * that chat, make sure it closes and closes completely").
+   *
+   * A click outside was the only thing that took it down, and that leaves
+   * three ways to strand it on screen. The menu is position:fixed, so
+   * SCROLLING slides the conversation list out from under it and leaves it
+   * hanging over whatever arrives; ESCAPE did nothing, which is the first
+   * thing anybody tries; and a swap that replaces the list detaches the node
+   * this is holding, so the next close() has nothing left to close and the
+   * one on screen belongs to a row that no longer exists.
+   *
+   * Capture on the scroll listener because the list scrolls, not the window,
+   * and a scroll inside an element does not bubble.
+   */
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') close();
+  });
+  window.addEventListener('scroll', close, { passive: true, capture: true });
+  window.addEventListener('resize', close, { passive: true });
+  document.body && document.body.addEventListener('htmx:afterSettle', function () {
+    if (open && !document.body.contains(open)) { open = null; return; }
+    close();
+  });
+
   function show(menu, x, y) {
     close();
     menu.hidden = false;
@@ -868,9 +892,17 @@
  * THE CHAT WALLPAPER
  *
  * "The chat area, one can have a wallpaper ... the images that we have in our
- * system will be changing in like 10 seconds. Give the user the ability to set
- * a wallpaper — just one image — then the option of no image; the default is
- * the images we have, changing every 10 seconds."
+ * system will be changing. Give the user the ability to set a wallpaper — just
+ * one image — then the option of no image; the default is the images we have,
+ * changing" — every six seconds, per the client on 20 Sep 2026.
+ *
+ * THE LAYER IS NOT INSIDE THE CONVERSATION. Opening a chat htmx-swaps the
+ * conversation, and while the paper lived inside that region the swap deleted
+ * it — so the wallpaper appeared on first load and never again, and this timer
+ * went on ticking against six detached nodes. It is now a sibling of the slot
+ * that gets swapped (orgs/messages.html), which means the rotation also runs
+ * CONTINUOUSLY across conversation changes rather than restarting at
+ * photograph one every time somebody opens a chat.
  *
  * Three states, one layer:
  *
@@ -894,7 +926,12 @@
   if (!shots.length) return;
 
   var KEY = 'gt-chat-wallpaper';
-  var DWELL = 10000;
+  /* SIX SECONDS (client, 20 Sep 2026: "it should be changing in like 6
+     seconds"). It was ten, from the original brief. The crossfade is 1.4s of
+     that, so six leaves four and a half seconds of stillness per photograph —
+     any shorter and the layer is never actually at rest, which is the point
+     at which a background stops being a background. */
+  var DWELL = 6000;
   var timer = null;
   var at = 0;
 
@@ -917,8 +954,8 @@
 
     if (choice === 'auto') {
       show(at % shots.length);
-      /* Ten seconds, as asked. The crossfade itself is CSS, so this only ever
-         moves a class — nothing here is animating a frame at a time. */
+      /* The crossfade itself is CSS, so this only ever moves a class —
+         nothing here is animating a frame at a time. */
       timer = setInterval(function () {
         at = (at + 1) % shots.length;
         show(at);

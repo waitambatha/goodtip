@@ -10,8 +10,16 @@ Expects `p` (a WallPost from orgs.views._wall_posts_context), plus the page's
 data-chat-scope keeps the reply controls honest: picking a reply under one post
 has to fill in THAT post's box, and gt-chat.js looks for the composer inside
 the nearest scope.
+
+data-busy-scope makes THE CARD the thing that shows it is working. Replying,
+removing a reply and removing the post are ordinary form posts that reload the
+Wall, and until now the only sign any of them had landed was a spinner on a
+button — on a screen where nothing else moves for the length of a round trip
+(client, 19 Sep 2026: the loader belongs "on the part where we have the
+context ... not the whole page"). The veil covers this post and nothing else:
+the rooms list, the header and every other post stay legible and stay put.
 {% endcomment %}
-<article class="gt-post {% if p.kind == 'recap' %}is-recap{% elif p.kind == 'system' %}is-system{% endif %}" id="post-{{ p.id }}" data-chat-scope{% if p.kind == 'recap' and p.recap %} data-code="{{ p.recap.round.series.slug }}"{% endif %}>
+<article class="gt-post {% if p.kind == 'recap' %}is-recap{% elif p.kind == 'system' %}is-system{% endif %}" id="post-{{ p.id }}" data-chat-scope data-busy-scope{% if p.kind == 'recap' and p.recap %} data-code="{{ p.recap.round.series.slug }}"{% endif %}>
   <div class="gpt-head">
     {% if p.kind == 'member' and p.author %}
       <span class="gpt-av">{% if p.author.avatar %}<img src="{{ p.author.avatar.url }}" alt="">{% else %}{{ p.author.display_name|slice:":2"|upper }}{% endif %}</span>
@@ -30,8 +38,20 @@ the nearest scope.
         {% if p.recap %}<span class="gpt-tag gpt-code">{{ p.recap.round.series.name }}</span><span class="gpt-tag">{{ p.recap.round.label }} recap</span>{% else %}<span class="gpt-tag">Round recap</span>{% endif %}
       {% else %}<span class="gpt-tag">Update</span>{% endif %}
     {% endif %}
+    {% if p.can_edit %}
+    {% comment %}
+    REWORD YOUR OWN POST. Author only and member posts only — see
+    orgs/views.py _wall_posts_context. The editor itself is the hidden form
+    below, swapped in place of the text by gt-chat.js, exactly as in a chat
+    bubble: one gesture to learn, on both screens.
+    {% endcomment %}
+    <button type="button" class="gpt-edit" data-chat-edit-open="{{ p.id }}"
+            aria-label="Edit this post" title="Edit">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14.5 5.5 18.5 9.5"/></svg>
+    </button>
+    {% endif %}
     {% if p.can_remove %}{# admins can also hide a recap/system card — recap spec §11 #}
-    <form method="post" action="{% url 'orgs:wall_remove' org.id p.id %}" class="gpt-x" data-confirm="This removes the post and its replies for everyone in {% if group %}{{ group.name }}{% else %}the organisation{% endif %}. It cannot be undone." data-confirm-title="Remove this post?" data-confirm-ok="Remove post" data-confirm-danger>
+    <form method="post" action="{% url 'orgs:wall_remove' org.id p.id %}" class="gpt-x" data-busy="Removing the post" data-confirm="This removes the post and its replies for everyone in {% if group %}{{ group.name }}{% else %}the organisation{% endif %}. It cannot be undone." data-confirm-title="Remove this post?" data-confirm-ok="Remove post" data-confirm-danger>
       {% csrf_token %}<button type="submit" title="{% if p.author_id == user.id %}Delete post{% else %}Hide post (admin){% endif %}">&times;</button>
     </form>
     {% endif %}
@@ -39,7 +59,20 @@ the nearest scope.
   {% if p.tip %}
   <span class="gpt-pick">&#9733; {% if p.tip.selection == 'home' %}{{ p.tip.match.home_team.name }}{% else %}{{ p.tip.match.away_team.name }}{% endif %} to beat {% if p.tip.selection == 'home' %}{{ p.tip.match.away_team.name }}{% else %}{{ p.tip.match.home_team.name }}{% endif %}{% if p.tip.is_correct is not None %} &middot; {% if p.tip.is_correct %}<b class="hit">got it &#10003;</b>{% else %}<b class="miss">didn't land</b>{% endif %}{% endif %}</span>
   {% endif %}
-  {% if p.body %}<p class="gpt-body">{{ p.body|linebreaksbr }}</p>{% endif %}
+  {% if p.body %}<p class="gpt-body">{{ p.body|linebreaksbr }}{% if p.edited_at %} <i class="chat-edited" title="Edited {{ p.edited_at|date:'l j F Y, g:i a' }}">edited</i>{% endif %}</p>{% endif %}
+  {% if p.can_edit %}
+  <form method="post" class="chat-edit" data-chat-edit hidden
+        action="{% url 'orgs:wall_edit' org.id p.id %}"
+        data-busy="Saving the change" data-busy-for="#post-{{ p.id }}">
+    {% csrf_token %}
+    <textarea name="body" rows="1" maxlength="500" data-grow data-chat-edit-body
+              aria-label="Edit this post">{{ p.body }}</textarea>
+    <div class="chat-edit-acts">
+      <button type="button" class="abtn abtn-ghost abtn-sm" data-chat-edit-cancel>Cancel</button>
+      <button type="submit" class="abtn abtn-dark abtn-sm">Save</button>
+    </div>
+  </form>
+  {% endif %}
   {% if p.kind == 'recap' and p.recap %}
     {% include "partials/wall_recap.html" with recap=p.recap post=p %}
   {% endif %}
@@ -70,7 +103,20 @@ the nearest scope.
           <span>{{ r.reply_to.quote }}</span>
         </a>
         {% endif %}
-        <p>{{ r.body|linebreaksbr }}</p>
+        <p>{{ r.body|linebreaksbr }}{% if r.edited_at %} <i class="chat-edited" title="Edited {{ r.edited_at|date:'l j F Y, g:i a' }}">edited</i>{% endif %}</p>
+        {% if r.can_edit %}
+        <form method="post" class="chat-edit" data-chat-edit hidden
+              action="{% url 'orgs:wall_reply_edit' org.id r.id %}"
+              data-busy="Saving the change" data-busy-for="#reply-{{ r.id }}">
+          {% csrf_token %}
+          <textarea name="body" rows="1" maxlength="500" data-grow data-chat-edit-body
+                    aria-label="Edit this reply">{{ r.body }}</textarea>
+          <div class="chat-edit-acts">
+            <button type="button" class="abtn abtn-ghost abtn-sm" data-chat-edit-cancel>Cancel</button>
+            <button type="submit" class="abtn abtn-dark abtn-sm">Save</button>
+          </div>
+        </form>
+        {% endif %}
         <div class="chat-peek" hidden>
           <span class="cp-av">{{ r.initials }}</span>
           <span class="cp-body">
@@ -84,8 +130,14 @@ the nearest scope.
                 aria-label="Reply to {{ r.display_name }}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 7 7v4"/></svg>
         </button>
+        {% if r.can_edit %}
+        <button type="button" class="chat-editbtn" data-chat-edit-open="{{ r.id }}"
+                aria-label="Edit this reply" title="Edit">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14.5 5.5 18.5 9.5"/></svg>
+        </button>
+        {% endif %}
         {% if r.can_remove %}
-        <form method="post" action="{% url 'orgs:wall_reply_remove' org.id r.id %}" class="gpr-x" data-confirm="The reply will be removed for everyone. It cannot be undone." data-confirm-title="Remove this reply?" data-confirm-ok="Remove reply" data-confirm-danger>
+        <form method="post" action="{% url 'orgs:wall_reply_remove' org.id r.id %}" class="gpr-x" data-busy="Removing the reply" data-confirm="The reply will be removed for everyone. It cannot be undone." data-confirm-title="Remove this reply?" data-confirm-ok="Remove reply" data-confirm-danger>
           {% csrf_token %}<button type="submit" title="Remove reply">&times;</button>
         </form>
         {% endif %}
@@ -95,7 +147,7 @@ the nearest scope.
   </div>
   {% endif %}
 
-  <form method="post" action="{% url 'orgs:wall_reply' org.id p.id %}" class="gpt-replybox" data-chat-form>
+  <form method="post" action="{% url 'orgs:wall_reply' org.id p.id %}" class="gpt-replybox" data-chat-form data-busy="Posting your reply">
     {% csrf_token %}
     <div class="cc-quote" data-reply-banner hidden>
       <span class="ccq-bar" aria-hidden="true"></span>

@@ -1,0 +1,189 @@
+{% extends "public/base.html" %}
+{% load static %}
+
+{% block title %}Apply for a sponsored place &middot; GoodTip{% endblock %}
+{% block loader_task %}Opening the application{% endblock %}
+{% block meta_description %}If the platform fee is out of reach for your group, ask. Sponsored places exist for exactly that, and applying takes two minutes.{% endblock %}
+{% block body_class %}page-sponsorship{% endblock %}
+
+{% block content %}
+{% comment %}
+=============================================================================
+SPONSORED PLACES.
+=============================================================================
+The platform fee is what funds the donation, so it cannot be waived by a
+checkbox — but it also quietly excludes the groups this is worth most to. The
+client's first audience for this is Papua New Guinea, where running a workplace
+comp is an ordinary thing to do and AUD 99 a year is not an ordinary thing to
+spend.
+
+THE WHOLE PAGE IS WRITTEN FOR ONE READER: somebody who got as far as /pricing/,
+saw the number, and closed the tab. Three things follow from that.
+
+  * It never uses the words "can't afford". They know. Saying it back to them
+    is the sentence that makes a person close the tab a second time.
+  * It does not ask them to prove anything. No budget figures, no evidence, no
+    "attach a letter from your finance director" — a group without a finance
+    director is precisely who this is for. One open question, answered in their
+    own words, read by a person.
+  * It does not require an account. The audience has not signed up, and making
+    them create an organisation before they can ask whether they can afford one
+    is the wrong order and the order that loses them.
+
+Nothing here promises an outcome or a date. Approving one of these means
+GoodTip carries an organisation's fee out of a real budget, and a page that
+implies otherwise writes a cheque somebody else has to honour.
+=============================================================================
+{% endcomment %}
+
+<!-- SPLIT HERO -->
+<section class="hero-split">
+  <div class="hs-left">
+    <span class="pill" style="align-self:flex-start;margin-bottom:24px;"><span class="dot"></span>Sponsored places</span>
+    <h1>The fee shouldn't be the reason. <em>Ask us.</em></h1>
+    <p class="hero-sub">Some of the groups this matters most to are the ones a yearly fee puts out of reach. If that's yours, tell us about it. There's no form to prove anything on, and no catch on the other side of it.</p>
+    <div class="hero-ctas" style="justify-content:flex-start;">
+      <a href="#apply" class="btn-primary">Apply for a place &darr;</a>
+      <a href="/pricing/" class="btn-ghost">See the plans</a>
+    </div>
+  </div>
+  <div class="hs-right">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="shot active" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-players-fans.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
+    </div>
+    <div class="hs-veil" aria-hidden="true"></div>
+    <div class="hs-tagstrip"><span class="live-dot">Free to play, wherever you are</span></div>
+  </div>
+</section>
+
+<!-- WHAT IT IS -->
+<section class="section on-cream">
+  <div class="wrap">
+    <p class="eyebrow reveal">What a sponsored place is</p>
+    <h2 class="section-heading reveal">Your comp, with the fee covered.</h2>
+    <p class="section-sub reveal">Everything a paying organisation gets: all four codes, the live ladder, the Wall, the Charity Vote, round reminders. The difference is only in who pays the platform fee, and nobody in your group ever pays anything either way.</p>
+
+    <div class="roles-2 reveal" style="margin-top:32px;">
+      <div class="role-card r1">
+        <span class="role-tag">Who it's for</span>
+        <h3>Groups a yearly fee shuts out</h3>
+        <ul class="cmp-list good">
+          <li>Workplaces where ${{ starter_price }} a year is a real decision, not a rounding error</li>
+          <li>Community clubs and school groups running on whatever's left</li>
+          <li>Anywhere the comp would happen anyway, on paper, in a group chat</li>
+        </ul>
+      </div>
+      <div class="role-card r2">
+        <span class="role-tag">How it works</span>
+        <ul class="cmp-list good">
+          <li>You tell us about your group, in your own words</li>
+          <li>A person reads it &mdash; not a form, not a score</li>
+          <li>We come back to you either way</li>
+          <li>Nothing is on hold meanwhile: setting up, inviting people and running the Charity Vote are all free already</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- THE FORM -->
+<section class="section on-paper" id="apply">
+  <div class="wrap">
+    <p class="eyebrow reveal">Apply</p>
+    <h2 class="section-heading reveal">Five questions. Two minutes.</h2>
+
+    {% if sent %}
+    <div class="contact-sent reveal" role="status" style="max-width:620px;">
+      <span class="cs-tick" aria-hidden="true"><svg><use href="#ic-heart"/></svg></span>
+      <h3>Got it. Thanks for asking.</h3>
+      <p>Your application is with the GoodTip team and we'll come back to you. There's a copy in the inbox you gave us.</p>
+      <p style="margin-top:12px;">Nothing has to wait on our answer &mdash; you can set your organisation up, invite your people and run the Charity Vote right now, for free.</p>
+      <a href="{% url 'accounts:signup' %}" class="btn-primary" style="margin-top:16px;">Set up your organisation &rarr;</a>
+    </div>
+
+    {% else %}
+    <div class="reveal" style="max-width:720px;">
+      {% if error %}<p class="contact-err" role="alert">{{ error }}</p>{% endif %}
+
+      <form method="post" action="{% url 'sponsorship' %}" novalidate
+            data-busy="Sending your application" data-busy-scope>
+        {% csrf_token %}
+        {# honeypot: invisible to people, irresistible to bots #}
+        <input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;top:0;">
+
+        <div class="form-grid">
+          <div class="field">
+            <input type="text" name="contact_name" id="sp-name" value="{{ form.contact_name|default:'' }}" placeholder=" " maxlength="120" required autocomplete="name">
+            <label for="sp-name">Your name</label>
+          </div>
+          <div class="field">
+            <input type="email" name="email" id="sp-email" value="{{ form.email|default:'' }}" placeholder=" " maxlength="254" required autocomplete="email">
+            <label for="sp-email">Email we can reach you on</label>
+          </div>
+          <div class="field col-span">
+            <input type="text" name="organisation_name" id="sp-org" value="{{ form.organisation_name|default:'' }}" placeholder=" " maxlength="160" required autocomplete="organization">
+            <label for="sp-org">What's the group called</label>
+          </div>
+          {% comment %}
+          Free text, not our five categories. A workplace in Lae describing
+          itself in its own words is more use to whoever reads this than the
+          nearest of a list written for Australian offices.
+          {% endcomment %}
+          <div class="field">
+            <input type="text" name="organisation_kind" id="sp-kind" value="{{ form.organisation_kind|default:'' }}" placeholder=" " maxlength="120">
+            <label for="sp-kind">What kind of group (optional)</label>
+          </div>
+          <div class="field">
+            <input type="number" name="people" id="sp-people" value="{{ form.people|default:'' }}" placeholder=" " min="1" max="100000" inputmode="numeric">
+            <label for="sp-people">Roughly how many of you (optional)</label>
+          </div>
+          <div class="field col-span">
+            <select name="country" id="sp-country">
+              <option value=""></option>
+              {% for co in countries %}
+              <option value="{{ co.pk }}"{% if form.country == co.pk|stringformat:"s" %} selected{% endif %}>{{ co.name }}</option>
+              {% endfor %}
+            </select>
+            <label for="sp-country">Where you are (optional)</label>
+          </div>
+          {% comment %}
+          The one question that matters, and it is deliberately open. Asking for
+          budget figures or evidence would filter for the groups with a finance
+          function, which is the opposite of who this is for.
+          {% endcomment %}
+          <div class="field col-span">
+            <textarea name="reason" id="sp-why" placeholder=" " maxlength="4000" required>{{ form.reason|default:'' }}</textarea>
+            <label for="sp-why">Tell us about your group and why the fee is out of reach</label>
+          </div>
+          <div class="col-span">
+            <button type="submit" class="form-submit">Send the application &rarr;</button>
+          </div>
+        </div>
+      </form>
+
+      <p class="note reveal" style="margin-top:18px;">
+        We read every one of these ourselves. What you write here goes to the
+        GoodTip team and nowhere else, and it is never published, on The Good
+        List or anywhere else.
+      </p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- WHILE YOU WAIT -->
+<section class="section on-dark">
+  <div class="wrap">
+    <p class="eyebrow reveal">In the meantime</p>
+    <h2 class="section-heading reveal">Don't wait on us to start.</h2>
+    <p class="section-sub reveal">Setting up your organisation, inviting your people and running the Charity Vote are all free, whatever happens with this application. The platform fee only ever comes up when a comp launches, so there is nothing to lose by getting it all ready now.</p>
+    <div class="hero-ctas" style="justify-content:flex-start;margin-top:22px;">
+      <a href="{% url 'accounts:signup' %}" class="btn-primary">Set up your organisation &rarr;</a>
+      <a href="/how-it-works/" class="btn-ghost">See how it works</a>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

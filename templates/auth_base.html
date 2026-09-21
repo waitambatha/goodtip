@@ -22,16 +22,11 @@
 
   {# ---- sport loader ---- #}
   <div class="loader" id="loader" role="status" aria-label="Loading"
-       data-min="400" data-cycle-sports data-full-shot>
+       data-min="1800" data-cycle-sports data-full-shot>
     <div class="loader-inner">
-      <div class="pitch">
-        <svg class="posts" viewBox="0 0 240 150" aria-hidden="true">
-          <g stroke="#C8F135" stroke-width="4" fill="none" stroke-linecap="round"><line x1="84" y1="22" x2="84" y2="128"/><line x1="156" y1="22" x2="156" y2="128"/><line x1="84" y1="52" x2="156" y2="52"/></g>
-        </svg>
-        <span class="ball" aria-hidden="true"></span><span class="ground"></span>
-      </div>
-      <div class="loader-word">GOOD<span>TIP</span><span class="dot" style="color:var(--lime)">.</span></div>
-      <div class="loader-sport" id="loaderSport">Aussie Rules</div>
+      {% include "partials/_loader_scenes.html" %}
+      <div class="loader-word">GOOD<span>TIP</span><span class="dot">.</span></div>
+      <div class="loader-sport" id="loaderSport">AFL</div>
       <div class="loader-task">{% block loader_task %}Getting things ready{% endblock %}</div>
       <div class="loader-bar"><i></i></div>
     </div>
@@ -114,9 +109,19 @@
           </ol>
           {% endblock %}
 
+          {% comment %}
+          Illustrative, and it says so (Sep 2026, client: disclaimers on every
+          non-real dollar figure — this one appears on both the sign-up and the
+          log-in sidebar). It is a worked example of what one organisation's
+          season looks like, not a total anybody has raised, and the sentence
+          under it is the disclaimer rather than a footnote somewhere else on
+          the page.
+          {% endcomment %}
           <div class="aa-stat">
-            <span class="n">$8,420</span>
-            <span class="t">raised for Lifeline<br>by one organisation this season</span>
+            <span class="n">$8,420 <span class="illus-tag is-beside">Example</span></span>
+            <span class="t">what a season could look like for one organisation<br>
+              <span class="illus-note">An illustration, not funds raised. No real donation totals are shown here.</span>
+            </span>
           </div>
         </div>
       </aside>

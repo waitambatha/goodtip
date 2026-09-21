@@ -19,14 +19,21 @@
       so the admin's own light/dark/auto toggle still drives it.
    ========================================================================== */
 
-/* ---- Brand constants (theme-independent) --------------------------------- */
+/* ---- Brand constants (theme-independent) ---------------------------------
+   Resaturated Sep 2026 with the member app's, and by the same method: the
+   three dark greens were 51-69% saturated, which at this darkness reads as
+   charcoal with a green cast rather than as green. They are 86% now, solved
+   for the LUMINANCE each one already had, so the contrast of everything
+   written on them is unchanged to the fourth decimal. See the long note in
+   goodtip.css — the two palettes have to move together or the admin and the
+   app stop looking like the same company. */
 :root {
-  --gt-deep:    #0F2E22;
-  --gt-deep-2:  #0B2319;
-  --gt-panel:   #152B1E;
+  --gt-deep:    #072F1E;
+  --gt-deep-2:  #042316;
+  --gt-panel:   #052C1A;
   --gt-forest:  #2D7A3A;
-  --gt-lime:    #C8F135;
-  --gt-lime-dk: #A9D11C;
+  --gt-lime:    #CFF93A;
+  --gt-lime-dk: #B2DE22;
   --gt-cream:   #E8E4D5;
 
   /* Gold. The second brand colour, and the one the control plane leans on:
@@ -2395,3 +2402,306 @@ html:not([data-theme="dark"]) .gta-pill.ok { color: color-mix(in srgb, var(--gt-
 html[data-theme="dark"] .gta-shell .object-tools a.addlink { color: #0C2417; background-color: var(--tbl-accent, #7BD48A); }
 #changelist-filter a.viewlink { color: var(--body-fg); }
 .gta-search input::placeholder { color: color-mix(in srgb, currentColor 70%, transparent); opacity: 1; }
+
+/* ==========================================================================
+   IMAGES & VIDEOS, AND SERVICES
+   ==========================================================================
+   Two screens added 20 Sep 2026 at the client's request. They share the filter
+   chip and nothing else: one is a gallery and the other is a set of gauges. */
+
+/* ---- filter chips, as LINKS ---------------------------------------------
+   .gta-chip already existed as a label — a small tinted word on a table card,
+   not something anybody presses. These are addresses: every state of the
+   gallery and every window on Services is a URL somebody can send to a
+   colleague. So they are scoped inside .gta-chipset and given the one thing
+   the label version deliberately has not got, which is an edge. */
+.gta-chipset { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.gta-chipset .gta-chip {
+  padding: 7px 14px;
+  border: 1px solid var(--border-color);
+  background: var(--gt-surface);
+  color: var(--body-medium-color);
+  font-size: 12.5px;
+  text-decoration: none;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.gta-chipset .gta-chip:hover {
+  text-decoration: none;
+  border-color: var(--gt-c1);
+  color: var(--body-loud-color);
+}
+/* The chosen one is filled. --primary is the token that already flips per
+   theme — the deep green on the cream, the lime on the dark — and --primary-fg
+   is what the admin writes on it. Spelling either of them out by hand is how a
+   control ends up dark green on near-black in the dark theme. */
+.gta-chipset .gta-chip.on {
+  background: var(--primary); border-color: var(--primary); color: var(--primary-fg);
+}
+/* The background is repeated on the hover rule rather than inherited. The
+   generic .gta-chip:hover above it repaints the surface, so without this the
+   chosen chip would briefly become pale-with-pale-text under the pointer —
+   and the contrast audit reads the pair exactly as a browser would. */
+.gta-chipset .gta-chip.on:hover {
+  background: var(--primary); border-color: var(--primary); color: var(--primary-fg);
+}
+
+/* ---- the gallery --------------------------------------------------------
+   THE TILE IS THE PICTURE. Somebody looking for a photograph recognises it in
+   a tenth of the time it takes them to read a filename, so the name is the
+   caption and the picture is the control. A table of paths would have been
+   quicker to build and useless for the one job this screen has. */
+.gta-media-find { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.gta-media-find input[type="search"] {
+  flex: 1; min-width: 0; padding: 9px 13px;
+  border: 1px solid var(--border-color); border-radius: var(--gt-r-pill);
+  background: var(--gt-surface); color: var(--body-fg); font-size: 13.5px;
+}
+.gta-media-clear { font-size: 12.5px; color: var(--body-quiet-color); }
+.gta-media-filters { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 14px; }
+.gta-media-count { font-size: 12.5px; color: var(--body-quiet-color); margin: 0 0 12px; }
+.gta-media-tally { display: flex; align-items: baseline; gap: 6px; font-size: 12.5px; color: var(--body-quiet-color); }
+.gta-media-tally b { font-family: var(--gt-num, inherit); font-size: 19px; color: var(--body-loud-color); }
+.gta-media-tally b + span { margin-right: 10px; }
+
+.gta-media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+}
+.gta-media-tile {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border-color); border-radius: var(--gt-r-card);
+  background: var(--gt-surface); overflow: hidden; text-decoration: none;
+  transition: box-shadow .16s ease, transform .16s ease, border-color .16s ease;
+}
+.gta-media-tile:hover {
+  text-decoration: none; transform: translateY(-2px);
+  box-shadow: var(--gt-shadow); border-color: var(--gt-c1);
+}
+.gmt-shot {
+  position: relative; display: block; aspect-ratio: 4 / 3;
+  /* A chequerboard, so a PNG with a transparent background reads as
+     transparent rather than as a picture that failed to load. */
+  background:
+    linear-gradient(45deg, var(--gt-surface-3) 25%, transparent 25% 75%, var(--gt-surface-3) 75%) 0 0 / 16px 16px,
+    linear-gradient(45deg, var(--gt-surface-3) 25%, transparent 25% 75%, var(--gt-surface-3) 75%) 8px 8px / 16px 16px,
+    var(--gt-surface-2);
+}
+.gmt-shot img, .gmt-shot video {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain;
+}
+.gmt-play {
+  position: absolute; right: 8px; bottom: 8px;
+  width: 26px; height: 26px; display: grid; place-items: center;
+  border-radius: 50%; background: rgba(15,46,34,.78); color: #FFF; font-size: 11px;
+}
+.gmt-meta { display: block; padding: 10px 12px 2px; min-width: 0; }
+.gmt-meta b {
+  display: block; font-size: 13px; color: var(--body-loud-color);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gmt-meta small {
+  display: block; font-size: 11.5px; color: var(--body-quiet-color); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gmt-tags { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 12px 12px; }
+.gmt-tag {
+  font-style: normal; font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; padding: 2px 7px; border-radius: var(--gt-r-pill);
+  background: var(--gt-surface-3); color: var(--body-quiet-color);
+}
+.gmt-tag.is-site { background: color-mix(in srgb, var(--gt-c4) 16%, transparent); color: var(--gt-c4); }
+.gmt-tag.is-up   { background: color-mix(in srgb, var(--gt-c1) 16%, transparent); color: var(--gt-c1); }
+
+/* ---- one picture --------------------------------------------------------- */
+.gta-media-detail {
+  display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, 1fr);
+  gap: 20px; margin-bottom: 24px;
+}
+.gmd-shot {
+  border: 1px solid var(--border-color); border-radius: var(--gt-r-card);
+  background: var(--gt-surface-2); padding: 14px; display: grid; place-items: center;
+  min-height: 240px;
+}
+.gmd-shot img, .gmd-shot video { max-width: 100%; max-height: 420px; }
+.gmd-facts { margin: 0 0 18px; font-size: 13px; }
+.gmd-facts dt { font-weight: 700; color: var(--body-quiet-color); font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; }
+.gmd-facts dd { margin: 2px 0 12px; color: var(--body-loud-color); word-break: break-all; }
+.gmd-facts code { font-size: 12px; }
+.gmd-act {
+  border: 1px solid var(--border-color); border-radius: var(--gt-r-card);
+  padding: 16px; background: var(--gt-surface-2);
+}
+.gmd-act h3 { margin: 0 0 8px; font-size: 14px; color: var(--body-loud-color); }
+.gmd-act p { font-size: 13px; line-height: 1.6; color: var(--body-medium-color); margin: 0 0 10px; }
+.gmd-note { font-size: 12.5px; color: var(--body-quiet-color); }
+
+/* WHERE IT APPEARS — the answer the screen exists for. A numbered list, with
+   the file and line in the left column and the actual line of code beneath it,
+   because "templates/public/home.html" tells you where to look and the line
+   itself tells you whether you have found the right one. */
+.gmd-uses h2 { font-size: 16px; color: var(--body-loud-color); margin: 0 0 6px; }
+.gmd-uses-lead { font-size: 13px; color: var(--body-medium-color); margin: 0 0 14px; max-width: 78ch; line-height: 1.6; }
+.gmd-hits { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.gmd-hits li {
+  border: 1px solid var(--border-color); border-radius: 10px;
+  padding: 10px 13px; background: var(--gt-surface);
+}
+.gmh-where { display: flex; align-items: baseline; gap: 9px; margin-bottom: 5px; }
+.gmh-where b { font-size: 12.5px; color: var(--body-loud-color); }
+.gmh-where i { font-style: normal; font-size: 11px; color: var(--body-quiet-color); }
+.gmd-hits code {
+  display: block; font-size: 11.5px; line-height: 1.5; color: var(--body-medium-color);
+  white-space: pre-wrap; word-break: break-word;
+}
+
+/* ---- Services ------------------------------------------------------------
+   Every panel is the same shape on purpose: a state word, one headline, three
+   figures, then whatever is specific to the service. Six cards each reporting
+   health their own way is six things to learn. */
+.gta-svc-window { margin-left: auto; }
+.gta-svc-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 16px;
+}
+.gta-svc {
+  border: 1px solid var(--border-color); border-left: 3px solid var(--svc, var(--gt-c1));
+  border-radius: var(--gt-r-card); background: var(--gt-surface);
+  padding: 18px; box-shadow: var(--gt-shadow-sm);
+}
+/* The four states, and the left edge is the only thing that changes colour.
+   A whole card tinted red is a card nobody can read the numbers on, and the
+   numbers are what somebody came for. */
+.gta-svc.is-good  { --svc: var(--gt-c1); }
+.gta-svc.is-watch { --svc: var(--gt-gold); }
+.gta-svc.is-bad   { --svc: var(--gt-c6, #B3452B); }
+.gta-svc.is-idle  { --svc: var(--border-color); }
+
+.gsv-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.gsv-ic {
+  width: 34px; height: 34px; flex: none; display: grid; place-items: center;
+  border-radius: 9px; background: color-mix(in srgb, var(--svc) 14%, transparent);
+}
+.gsv-ic svg { width: 17px; height: 17px; fill: none; stroke: var(--svc); stroke-width: 1.9; }
+.gsv-title { flex: 1; min-width: 0; }
+.gsv-title h2 { margin: 0; font-size: 15px; color: var(--body-loud-color); }
+.gsv-title p { margin: 3px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--body-quiet-color); }
+.gsv-state {
+  flex: none; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--svc); white-space: nowrap;
+}
+.gsv-state i { width: 8px; height: 8px; border-radius: 50%; background: var(--svc); }
+
+.gsv-headline { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.gsv-headline b { font-family: var(--gt-num, inherit); font-size: 24px; color: var(--body-loud-color); line-height: 1; }
+.gsv-headline span { font-size: 13px; color: var(--body-medium-color); }
+.gsv-headline i { font-style: normal; font-size: 11.5px; color: var(--body-quiet-color); margin-left: auto; }
+
+.gsv-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0 0 14px; }
+.gsv-stats dt { font-size: 11px; color: var(--body-quiet-color); line-height: 1.35; }
+.gsv-stats dd { margin: 3px 0 0; font-family: var(--gt-num, inherit); font-size: 17px; color: var(--body-loud-color); }
+
+.gsv-facts { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 5px; }
+.gsv-facts li { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; }
+.gsv-facts b { font-weight: 600; color: var(--body-medium-color); }
+.gsv-facts span { color: var(--body-quiet-color); text-align: right; }
+
+.gsv-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 12px; }
+.gsv-table th {
+  text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--body-quiet-color); padding: 0 8px 6px 0; font-weight: 700;
+}
+.gsv-table td { padding: 6px 8px 6px 0; border-top: 1px solid var(--border-color); color: var(--body-loud-color); }
+.gsv-up { color: var(--gt-c1); font-weight: 700; }
+.gsv-down { color: var(--gt-c6, #B3452B); font-weight: 700; }
+
+.gsv-recent h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--body-quiet-color); margin: 0 0 6px; }
+.gsv-recent ul { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 5px; }
+.gsv-recent li { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+.gsv-recent b { font-weight: 500; color: var(--body-medium-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gsv-recent i { font-style: normal; color: var(--body-quiet-color); white-space: nowrap; }
+
+/* THE NOTE IS DATA, NOT SMALL PRINT. Where a figure is a proxy rather than a
+   measurement, or where there is no measurement at all, the panel says so —
+   so it is set as prose against a tinted ground rather than as a footnote
+   somebody's eye slides past. */
+.gsv-note {
+  margin: 12px 0 0; padding: 10px 12px; border-radius: 10px;
+  background: var(--gt-surface-2); border: 1px solid var(--border-color);
+  font-size: 12px; line-height: 1.6; color: var(--body-quiet-color);
+}
+
+@media (max-width: 900px) {
+  .gta-media-detail { grid-template-columns: 1fr; }
+  .gta-svc-window { margin-left: 0; }
+}
+
+/* A failure row: what it was on one line, why it failed under it. The reason
+   is the whole value of the list — without it every entry sends the reader to
+   the server log, which is what the Services screen exists to save them. */
+.gsv-recent li { align-items: flex-start; }
+.gsv-r-txt { display: block; min-width: 0; }
+.gsv-r-txt em {
+  display: block; font-style: normal; font-size: 11.5px; margin-top: 2px;
+  color: var(--gt-c6, #B3452B); word-break: break-word;
+}
+
+/* ---- the two buttons the media detail screen needs ----------------------
+   .gta-btn is a full-width neutral button. These are the two states it has
+   never had to carry: the recommended action, and the one that edits the
+   repository. */
+.gta-btn-primary {
+  background: var(--primary); color: var(--primary-fg); border-color: var(--primary);
+}
+/* HOVER KEEPS THE SAME FILL and moves the ring instead.
+   Two reasons and they agree. --primary is the deep green in one theme and
+   the lime in the other, so any single "slightly brighter" value is wrong in
+   one of them; and a hover rule that changes the text colour without naming
+   its own background is a pair the contrast audit has to assume the worst
+   about, because that is what a browser would do if the cascade fell that
+   way. Same fill, same ink, a ring to say it is under the pointer. */
+.gta-btn-primary:hover {
+  background: var(--primary); color: var(--primary-fg);
+  border-color: var(--primary); text-decoration: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 26%, transparent);
+}
+.gta-btn-danger {
+  background: var(--delete-button-bg, #B23434); color: #FFFFFF;
+  border-color: var(--delete-button-bg, #B23434);
+}
+.gta-btn-danger:hover { background: var(--delete-button-hover-bg, #932A2A); color: #FFFFFF; }
+
+/* ---- replacing a shipped picture ----------------------------------------
+   The panel is drawn as the consequence it carries. Everything else on this
+   screen is neutral; this one has a red edge and the warning is set as a
+   sentence rather than as small print, because the thing it says — the next
+   deploy stops until somebody commits — is specific, checkable and easy to
+   discover far too late. */
+.gmd-danger {
+  border-color: color-mix(in srgb, var(--delete-button-bg, #B23434) 45%, var(--border-color));
+  border-left: 3px solid var(--delete-button-bg, #B23434);
+  margin-top: 14px;
+}
+.gmd-warn {
+  display: flex; gap: 10px; align-items: flex-start;
+  font-size: 13px; line-height: 1.6;
+  color: var(--body-medium-color);
+}
+.gmd-warn svg {
+  width: 20px; height: 20px; flex: none; margin-top: 1px;
+  fill: none; stroke: var(--delete-button-bg, #B23434);
+  stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round;
+}
+.gmd-warn b { color: var(--body-loud-color); }
+.gmd-danger input[type="file"] {
+  display: block; width: 100%; margin: 12px 0 10px; font-size: 12.5px;
+  color: var(--body-medium-color);
+}
+.gmd-tick {
+  display: flex; gap: 9px; align-items: flex-start;
+  font-size: 12.5px; line-height: 1.5; margin-bottom: 12px;
+  color: var(--body-medium-color); cursor: pointer;
+}
+.gmd-tick input { margin-top: 2px; flex: none; }

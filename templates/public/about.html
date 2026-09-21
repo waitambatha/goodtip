@@ -60,7 +60,7 @@ GoodTip is a paragraph, and the cards are what you remember it by afterwards.
 </section>
 
 <!-- THE THREE FACTS -->
-<section class="section on-cream" style="padding-top:clamp(40px,5vw,64px);">
+<section class="section on-white" style="padding-top:clamp(40px,5vw,64px);">
   <div class="wrap">
     <div class="fact-row reveal" data-cards>
       <div class="fact"><b>Free</b><span>to play, for every participant</span></div>
@@ -71,7 +71,7 @@ GoodTip is a paragraph, and the cards are what you remember it by afterwards.
 </section>
 
 <!-- THE STORY -->
-<section class="section on-cream has-rails" style="padding-top:clamp(28px,4vw,44px);">
+<section class="section on-white" style="padding-top:clamp(28px,4vw,44px);">
   {% comment %}
   Side rails. The client asked for the changing imagery that runs down the
   edges of the private pages to be standard everywhere, and this is the public
@@ -79,18 +79,16 @@ GoodTip is a paragraph, and the cards are what you remember it by afterwards.
   fills the margin this narrow column is not using and vanishes when there
   isn't one. See .pg-rails in goodtip.css.
   {% endcomment %}
-  <div class="pg-rails" aria-hidden="true">
-    <div class="rail left">
-      <div class="shot on" style="background-image:url('{% static 'img/scenes/afl-goal-posts.jpg' %}')"></div>
-      <div class="shot" style="background-image:url('{% static 'img/scenes/afl-player-training.jpg' %}')"></div>
-      <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-ground-dusk.jpg' %}')"></div>
-    </div>
-    <div class="rail right">
-      <div class="shot on" style="background-image:url('{% static 'img/scenes/mcg-stadium.jpg' %}')"></div>
-      <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-players-fans.jpg' %}')"></div>
-      <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-panorama.jpg' %}')"></div>
-    </div>
-  </div>
+  {% comment %}
+  THE SIDE RAILS ARE GONE (client, 20 Sep 2026: "on the About Us we also have
+  that translucent page feel, work on it, remove that cream, let's use white
+  and green").
+
+  Two full-height stadium photographs down the margins, behind the page. They
+  are the same "translucent feel" the legal pages had and the same fix: a
+  picture that sits BEHIND content competes with it, and the hero split above
+  already gives this page a photograph with a panel of its own.
+  {% endcomment %}
   <div class="wrap">
     <div class="story-split">
       <div class="ss-aside reveal from-left">
@@ -179,7 +177,7 @@ GoodTip is a paragraph, and the cards are what you remember it by afterwards.
 </section>
 
 <!-- STRAIGHT ANSWERS -->
-<section class="section on-cream">
+<section class="section on-white">
   <div class="wrap">
     <p class="eyebrow reveal">Straight answers</p>
     <h2 class="section-heading reveal">The questions we get before anyone signs up.</h2>

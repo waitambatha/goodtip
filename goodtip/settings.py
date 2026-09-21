@@ -21,6 +21,20 @@ GOODTIP_ENV = os.environ.get("GOODTIP_ENV", "production").strip().lower()
 IS_STAGING = GOODTIP_ENV == "staging"
 
 INSTALLED_APPS = [
+    # BEFORE django.contrib.staticfiles, and it has to be.
+    #
+    # `runserver` normally wraps the WSGI handler in StaticFilesHandler, which
+    # intercepts /static/ before Django's middleware runs at all — so in DEBUG
+    # neither WhiteNoise nor anything else gets a say in the headers, and the
+    # dev server sends a Last-Modified with no Cache-Control. A browser then
+    # applies heuristic caching and can hold a stylesheet for a whole session
+    # without asking whether it changed, which presents as an edit that is on
+    # disk, in staticfiles/, correct over curl, and simply not on the page.
+    #
+    # This app turns that handler off, so WhiteNoise serves static in
+    # development the same way it does in production — and WHITENOISE_MAX_AGE
+    # and WHITENOISE_AUTOREFRESH below become real rather than ignored.
+    "whitenoise.runserver_nostatic",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -314,6 +328,26 @@ STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
 JOIN_LINK_MAX_AGE_DAYS = 7
+
+# ---------------------------------------------------------------------------
+# STATIC FILES IN DEVELOPMENT: always revalidate.
+#
+# WhiteNoise serves /static/ with a Last-Modified and no Cache-Control at all,
+# which leaves the browser to apply HEURISTIC caching — and Chrome will then
+# hold a stylesheet in its memory cache for the rest of a session without ever
+# asking whether it changed. The result is a CSS edit that is on disk, in
+# staticfiles/, served correctly by curl, and simply not what the page is
+# using. It cost two rounds of "the loaders did not change" on 20 Sep 2026
+# before the cause was found, and it looks exactly like the code not working.
+#
+# AUTOREFRESH also matters: WhiteNoise builds its index of files at startup, so
+# without it a file added after the server booted is a 404 until a restart.
+#
+# Both are DEBUG-only. In production the manifest storage hashes every filename
+# and the long-lived immutable caching is the entire point of that.
+if DEBUG:
+    WHITENOISE_AUTOREFRESH = True
+    WHITENOISE_MAX_AGE = 0
 
 # Pre-launch staging gate (branded replacement for nginx auth_basic).
 # STAGING_GATE=true locks the whole site behind /gate/; credentials are

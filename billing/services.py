@@ -7,8 +7,12 @@ import stripe
 from django.conf import settings
 from django.utils import timezone
 
-from .models import PlanSubscription
-from .pricing import tier_config
+from .models import FoundingRate, PlanSubscription
+from .pricing import (
+    founding_locked_until,
+    founding_window_open,
+    tier_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,25 +35,107 @@ def _client():
     return stripe
 
 
-def create_subscription(org, tier: str) -> PlanSubscription:
-    """Create (or reuse) a pending subscription for an org's current season."""
+# ---------------------------------------------------------------------------
+# Founding Member rate
+# ---------------------------------------------------------------------------
+
+
+def founding_rate_for(org) -> FoundingRate | None:
+    """This organisation's live founding lock, or None."""
+    rate = FoundingRate.objects.filter(org=org).first()
+    return rate if rate is not None and rate.is_live() else None
+
+
+def grant_founding_rate(org, tier: str, *, note: str = "") -> FoundingRate | None:
+    """Lock this organisation's rate, if the founding window is still open.
+
+    CALLED WHEN A PLAN IS FIRST CHOSEN, not when it is first paid. The promise
+    on the site is made to anyone who "signs up before 31 December", and
+    choosing a plan is the act of signing up — an organisation that picks
+    Workplace on 30 December and whose payment settles on 2 January has not
+    missed the window by any reading a customer would accept. The subscription
+    row that comes out of the same call is still pending until Stripe says
+    otherwise, so nothing here grants access to anything.
+
+    IDEMPOTENT, AND IT NEVER RE-PRICES AN EXISTING LOCK. Coming back to change
+    plan before paying must not move the locked amount up, and must not restart
+    the clock; the first lock an organisation is granted is the one it keeps.
+    A rate granted by hand (``note`` set) is likewise never overwritten here.
+    """
+    if not founding_window_open():
+        return None
+    existing = FoundingRate.objects.filter(org=org).first()
+    if existing is not None:
+        return existing
     cfg = tier_config(tier)
-    sub, _ = PlanSubscription.objects.get_or_create(
+    return FoundingRate.objects.create(
+        org=org,
+        tier=tier,
+        price_aud=Decimal(cfg["price"]),
+        locked_until=founding_locked_until(),
+        note=note,
+    )
+
+
+def price_for(org, tier: str) -> tuple[Decimal, bool, Decimal]:
+    """What to charge this org for this plan: (price, is_founding, list_price).
+
+    TWO RULES, AND BOTH OF THEM NARROW THE LOCK.
+
+    It only applies to the plan it was granted for. A $99 Starter lock does not
+    follow an organisation up to the $799 Workplace plan — the promise was that
+    their price would not rise under them, not that every larger product would
+    be sold to them at the small one's rate, and reading it the other way hands
+    a founding member a $1,299 plan for $99. Moving up, or down, is buying a
+    different thing, and a different thing costs what it costs.
+
+    And it is a CEILING, never a floor. If the list price ever falls below
+    somebody's locked amount they pay the list price, because a loyalty rate
+    that costs more than walking in off the street is not a loyalty rate.
+    """
+    list_price = Decimal(tier_config(tier)["price"])
+    rate = founding_rate_for(org)
+    if rate is None or rate.tier != tier or rate.price_aud >= list_price:
+        return list_price, False, list_price
+    return rate.price_aud, True, list_price
+
+
+def create_subscription(org, tier: str) -> PlanSubscription:
+    """Create (or reuse) a pending subscription for an org's current season.
+
+    Also the moment the founding rate is granted — see grant_founding_rate for
+    why choosing the plan, rather than paying for it, is the right trigger.
+    """
+    cfg = tier_config(tier)
+    grant_founding_rate(org, tier)
+    price, founding, list_price = price_for(org, tier)
+    sub, created = PlanSubscription.objects.get_or_create(
         org=org,
         season=org.season,
         status=PlanSubscription.STATUS_PENDING,
         defaults={
             "tier": tier,
-            "price_aud": Decimal(cfg["price"]),
+            "price_aud": price,
             "seat_limit": cfg["seat_limit"],
+            "is_founding_rate": founding,
+            "list_price_aud": list_price,
         },
     )
-    # If they reselect a different tier before paying, update the pending row.
-    if sub.tier != tier:
+    # If they reselect a different tier before paying, update the pending row —
+    # including its price, which a founding lock may have moved.
+    if not created and (
+        sub.tier != tier
+        or sub.price_aud != price
+        or sub.is_founding_rate != founding
+    ):
         sub.tier = tier
-        sub.price_aud = Decimal(cfg["price"])
+        sub.price_aud = price
         sub.seat_limit = cfg["seat_limit"]
-        sub.save(update_fields=["tier", "price_aud", "seat_limit"])
+        sub.is_founding_rate = founding
+        sub.list_price_aud = list_price
+        sub.save(update_fields=[
+            "tier", "price_aud", "seat_limit", "is_founding_rate", "list_price_aud",
+        ])
     return sub
 
 
@@ -57,6 +143,19 @@ def create_checkout_session(sub: PlanSubscription, *, success_url: str, cancel_u
     """Create a Stripe Checkout session for the platform fee. Returns the session."""
     client = _client()
     cfg = tier_config(sub.tier)
+    # The founding rate is named on the charge itself, not just in our database.
+    # Somebody approving this line on a corporate card months later should be
+    # able to see why it is not the price on the website, and a Stripe receipt
+    # is the document that reaches them.
+    description = f"Platform service fee · {sub.season} season"
+    if sub.is_founding_rate:
+        rate = founding_rate_for(sub.org)
+        until = rate.locked_until.year if rate else ""
+        description += f" · Founding Member rate, locked through {until}"
+    metadata = {"subscription_id": str(sub.id), "org_id": str(sub.org_id)}
+    if sub.is_founding_rate:
+        metadata["founding_rate"] = "1"
+        metadata["list_price_aud"] = str(sub.list_price_aud or "")
     session = client.checkout.Session.create(
         mode="payment",
         line_items=[{
@@ -66,14 +165,14 @@ def create_checkout_session(sub: PlanSubscription, *, success_url: str, cancel_u
                 "unit_amount": int(sub.price_aud * 100),
                 "product_data": {
                     "name": f"GoodTip {cfg['label']} plan — {sub.org.name}",
-                    "description": f"Platform service fee · {sub.season} season",
+                    "description": description,
                 },
             },
         }],
         success_url=success_url,
         cancel_url=cancel_url,
         client_reference_id=str(sub.id),
-        metadata={"subscription_id": str(sub.id), "org_id": str(sub.org_id)},
+        metadata=metadata,
     )
     sub.stripe_checkout_session_id = session.id
     sub.save(update_fields=["stripe_checkout_session_id"])

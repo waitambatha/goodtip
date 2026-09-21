@@ -398,7 +398,7 @@ def _get_urls():
     # answer to the super admin, so they live here now.
     from admin_panel import views as manage_views
 
-    from . import hub_views, team_views
+    from . import hub_views, media_views, services_views, team_views
 
     custom = [
         path("system-report/", admin.site.admin_view(system_report_view), name="system_report"),
@@ -412,6 +412,27 @@ def _get_urls():
         path("security/", admin.site.admin_view(hub_views.security_hub), name="hq_security"),
         path("hq/", admin.site.admin_view(hub_views.hq_hub), name="hq_home"),
         path("your-team/", admin.site.admin_view(hub_views.team_hub), name="hq_team_home"),
+
+        # THE MEDIA LIBRARY and THE SERVICES SCREEN, both new on 20 Sep 2026.
+        #
+        # Media answers "where is this picture shown, and how do I change it" —
+        # a question that previously had no answer inside the product at all,
+        # because half of what the site displays is not in the database.
+        #
+        # Services answers "is the thing that runs on its own still running" for
+        # the five that do: the email, the feeds, Prefect, MatchReader and the
+        # recap writer. Each is gated on the capability it is about rather than
+        # on is_superuser, so a restricted administrator sees the screens their
+        # account exists to use.
+        path("media/", admin.site.admin_view(media_views.media_hub), name="hq_media"),
+        path("media/item/", admin.site.admin_view(media_views.media_detail),
+             name="hq_media_detail"),
+        # The one action in the library that edits the codebase. POST only,
+        # behind a tick box, and it says what it does before it does it.
+        path("media/replace/", admin.site.admin_view(media_views.media_replace),
+             name="hq_media_replace"),
+        path("services/", admin.site.admin_view(services_views.services_hub),
+             name="hq_services"),
 
         path("sync/", admin.site.admin_view(manage_views.sync_panel), name="hq_sync"),
 

@@ -56,10 +56,29 @@ destructive-sounding one is visibly the quieter of the two.
       description as three separate optional-looking fields, which is three
       decisions before you have made the one that matters.
       {% endcomment %}
+      {% comment %}
+      LOCKED, NOT MISSING. An organisation whose plan does not include groups
+      still sees this button — greyed, disabled, with the reason and the way
+      out underneath (client: "don't just hide the option, they should see
+      what they're missing and get a clear upgrade path").
+
+      It can be reached in the first place because groups_enabled and the plan
+      are two different facts: every organisation that switched groups on
+      before the gate existed is still switched on, keeps the groups it has,
+      and finds this button locked when it goes to add the next one.
+      {% endcomment %}
+      {% if groups_gate %}
       <button type="button" data-coach="groups-create" class="abtn abtn-primary abtn-lg dh-cta" data-group-open>
         <svg class="cic" aria-hidden="true" viewBox="0 0 24 24"><path d="M11 5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5Z"/></svg>
         Create group
       </button>
+      {% else %}
+      <button type="button" class="abtn abtn-primary abtn-lg dh-cta is-locked" disabled
+              aria-describedby="groupsLockNote">
+        <svg class="lk-pad" aria-hidden="true"><use href="#ic-lock"/></svg>
+        Create group
+      </button>
+      {% endif %}
       {% if is_admin %}
       <form method="post" action="{% url 'orgs:groups_toggle' org.id %}" data-busy="Switching off"
             data-confirm="Every group and every tip in them stays exactly where it is. This only takes groups out of the nav."
@@ -69,6 +88,9 @@ destructive-sounding one is visibly the quieter of the two.
       </form>
       {% endif %}
     </div>
+    {% if not groups_gate %}
+    <div id="groupsLockNote">{% include "billing/_groups_locked.html" %}</div>
+    {% endif %}
     {% endif %}
   </div>
 </div>
@@ -107,10 +129,23 @@ selling a switch for the sake of it.
     where it is.
   </p>
   {% if is_admin %}
-  <form method="post" action="{% url 'orgs:groups_toggle' org.id %}" style="margin-top:18px;" data-busy="Switching on">
-    {% csrf_token %}
-    <button type="submit" class="abtn abtn-primary abtn-lg">Switch groups on</button>
-  </form>
+    {% if groups_gate %}
+    <form method="post" action="{% url 'orgs:groups_toggle' org.id %}" style="margin-top:18px;" data-busy="Switching on">
+      {% csrf_token %}
+      <button type="submit" class="abtn abtn-primary abtn-lg">Switch groups on</button>
+    </form>
+    {% else %}
+    {% comment %}
+    Same switch, visibly there and visibly off. Switching groups ON is the
+    gated action — the server refuses it too (orgs.views.groups_toggle), so
+    this is the explanation rather than the enforcement.
+    {% endcomment %}
+    <button type="button" class="abtn abtn-primary abtn-lg is-locked" disabled style="margin-top:18px;">
+      <svg class="lk-pad" aria-hidden="true"><use href="#ic-lock"/></svg>
+      Switch groups on
+    </button>
+    {% include "billing/_groups_locked.html" %}
+    {% endif %}
   {% else %}
   <p class="card-lead" style="margin-top:18px;">Only an admin of {{ org.name }} can switch these on.</p>
   {% endif %}
@@ -256,6 +291,13 @@ picking from the kinds this organisation's type actually uses, or by naming
 something the list has never heard of. Both paths post the same three fields
 the view already expects (name, kind, label), so nothing behind this changed.
 {% endcomment %}
+{% comment %}
+Not rendered at all when the plan does not include groups. The button that
+opens it is disabled and the server refuses the POST either way, so this is
+belt and braces — but a form sitting in the DOM that nothing can legitimately
+submit is a form somebody will eventually find a way to submit.
+{% endcomment %}
+{% if groups_gate %}
 <div class="gmodal" id="groupModal" hidden>
   <div class="gm-backdrop" data-group-close></div>
   <div class="gm-panel" role="dialog" aria-modal="true" aria-labelledby="gmTitle">
@@ -318,6 +360,7 @@ the view already expects (name, kind, label), so nothing behind this changed.
     </form>
   </div>
 </div>
+{% endif %}
 
 {% endif %}
 {% endblock %}

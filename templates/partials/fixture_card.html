@@ -139,9 +139,9 @@ goodtip.css. Both callers select_related round__series, so this costs no query.
             aria-expanded="false" aria-controls="read-{{ match.id }}">
       <span class="fxc-why-badge"><svg aria-hidden="true"><use href="#ic-f-spark"/></svg> MatchReader</span>
       <span class="fxc-why-text">
-        <b class="fxc-why-open">See the read{% if not reader.prediction.is_even %}: {{ reader.prediction.leader }}{% endif %}</b>
+        <b class="fxc-why-open">Read the match{% if not reader.prediction.is_even %}: {{ reader.prediction.leader }}{% endif %}</b>
         <b class="fxc-why-shut">Hide the read</b>
-        <small>Our tipping assistant, from the last five</small>
+        <small>We look into the past to help you read the match</small>
       </span>
       <svg class="fxc-chev" aria-hidden="true"><use href="#ic-chev-left"/></svg>
     </button>

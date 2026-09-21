@@ -1,4 +1,3 @@
-{% load static %}
 {% comment %}
 THE FOOTER CARRIES THE WHOLE SITE, AND ONE LEGAL LINE.
 
@@ -18,7 +17,18 @@ being on the bar is not a reason to leave it out of the footer.
 <footer class="footer">
   <div class="footer-top">
     <div class="footer-brand">
-      <a href="/" class="footer-logo"><img src="{% static 'img/goodtip-logo.png' %}" alt="GoodTip" height="36"></a>
+      {% comment %}
+      THE SAME MARK AS THE TOP OF THE SITE (Sep 2026, client: "Can we fix this
+      logo to be like the one at the top of the site?").
+
+      This was goodtip-logo.png — black type on a lime block, a second version
+      of the brand that appeared nowhere else and read as a different company's
+      badge sitting above our own social buttons. The bar's mark is the
+      wordmark, set in type, so the footer now renders the identical markup
+      rather than a picture of something close to it: one mark, one place it is
+      defined, and it stays crisp at any size and in any theme.
+      {% endcomment %}
+      <a href="/" class="footer-logo wordmark">GOOD<span>TIP</span><span class="dot">.</span></a>
       <p>Footy tipping, for good.</p>
       <p class="cat-label" style="color:var(--lime);opacity:.8;">Follow us</p>
       <div class="socials">
@@ -38,7 +48,9 @@ being on the bar is not a reason to leave it out of the footer.
           <li><a href="/tell-the-boss/">Tell the Boss</a></li>
           <li><a href="/news/">News &amp; blog</a></li>
           <li><a href="/wall/">The Wall</a></li>
-          {# off the nav bar, so this is where it has to be findable #}
+          {% comment %}Off the nav bar since Sep 2026, so this is now the only
+          place a reader can navigate to it — see _nav.html for why it came
+          off.{% endcomment %}
           <li><a href="/leaderboard/">The Good List</a></li>
         </ul>
       </div>
@@ -58,6 +70,14 @@ being on the bar is not a reason to leave it out of the footer.
         <ul>
           <li><a href="/about/">About Us</a></li>
           <li><a href="/#founding">Founding Partners</a></li>
+          {% comment %}
+          The sponsored-place path, in the site map as well as on /pricing/.
+          Somebody who read a price, closed the tab and came back a week later
+          does not retrace their steps through the price table to find it —
+          they scan the footer, which is where everything else that is not on
+          the bar has always lived.
+          {% endcomment %}
+          <li><a href="{% url 'sponsorship' %}">Sponsored places</a></li>
           <li><a href="/#start">For firms</a></li>
           <li><a href="/#start">Contact</a></li>
           <li><a href="mailto:hello@goodtip.com.au">hello@goodtip.com.au</a></li>
@@ -72,8 +92,40 @@ being on the bar is not a reason to leave it out of the footer.
   {% endcomment %}
   <div class="footer-bottom">
     <p class="footer-legal">&copy; 2026 GoodTip Pty Ltd &middot; goodtip.com.au &middot; &ldquo;Good Tip, Mate.&rdquo;<br>Not affiliated with the AFL or NRL.</p>
+    {% comment %}
+    Terms joined Privacy here in Sep 2026, when the organisation sign-up
+    started asking people to agree to them. A document somebody is asked to
+    accept has to be findable afterwards without going back through the form
+    that asked — and under the copyright is where everybody looks.
+
+    CLIENT, 20 SEP 2026: "in the footer where we have the terms, have it as
+    Terms and Conditions and the Privacy — those two look small and do not
+    look clickable. Make sure people can see the Terms and Conditions as well
+    as the Privacy Policy."
+
+    Three things were wrong and only one of them was the size. They were
+    abbreviated to one word each, so "Terms" could as easily have been a
+    section heading as a link; they were set at the weight of the copyright
+    beside them, so nothing separated a thing you press from a thing you read;
+    and a thin underline is not something anybody reads as a control at 13px
+    on a dark green ground.
+
+    Now they are what they are called in full, drawn as bordered pills with a
+    document icon apiece, at the size of the rest of the footer's links. A pill
+    with an edge round it is the one shape on a page that nobody has to be told
+    is pressable. The icon also survives the row wrapping onto two lines on a
+    phone, where the pills sit side by side rather than stacking into something
+    that reads as a list.
+    {% endcomment %}
     <nav class="footer-legal-nav" aria-label="Legal">
-      <a href="/privacy/">Privacy</a>
+      <a href="/terms/">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h4"/></svg>
+        Terms &amp; Conditions
+      </a>
+      <a href="/privacy/">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.3-2.9 8.3-7 9.5-4.1-1.2-7-5.2-7-9.5V6z"/><path d="m9 12 2 2 4-4"/></svg>
+        Privacy Policy
+      </a>
     </nav>
   </div>
 </footer>

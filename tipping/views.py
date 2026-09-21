@@ -1134,7 +1134,21 @@ def ladder_view(request, org_id: int):
         .values_list("match__home_team_id", flat=True)
     )
 
-    return render(request, "ladder.html", {
+    # THE TABLE ON ITS OWN, for the competition chips and the round strip.
+    #
+    # Client, 20 Sep 2026: "let it load on the area of context", and — of the
+    # same press — that the full-page loader firing "does not make sense".
+    # Both were one bug: the filters were ordinary links, so choosing NRL
+    # navigated, and a navigation inside the member app raises the whole-page
+    # splash over the top of the scoped one. Answering the fragment means the
+    # press never leaves the page, so only the table's own loader runs, in that
+    # competition's colour.
+    #
+    # Built from the SAME context as the full page and rendering the same
+    # partial, so the fragment cannot drift from what a reload would produce.
+    # The href on every control is unchanged, so a copied address, a new tab
+    # and a browser with no JavaScript all still work.
+    ctx = {
         "org": org,
         "series_options": ordered,
         "selected_series": selected,
@@ -1148,7 +1162,11 @@ def ladder_view(request, org_id: int):
         # Stepping through rounds must not silently change which competition's
         # ladder is on screen.
         "ladder_keep": f"series={selected.slug}" if selected else "",
-    })
+    }
+
+    if request.GET.get("pane") == "table":
+        return render(request, "partials/ladder_table.html", ctx)
+    return render(request, "ladder.html", ctx)
 
 
 @login_required

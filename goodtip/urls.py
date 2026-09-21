@@ -13,7 +13,8 @@ from accounts.views import (
 )
 from admin_panel.views import news_detail, news_index
 from goodtip.sitemaps import SITEMAPS
-from billing.views import good_list_view, stripe_webhook
+from billing.views import good_list_view, sponsorship_view, stripe_webhook
+from goodtip.legal import TERMS_TOP_THREE, TERMS_VERSION
 from goodtip.staging_gate import gate_view, robots_view
 from orgs.views import join_view, public_wall_reply, public_wall_view
 from sysadmin.invite_views import accept as admin_invite_accept
@@ -55,10 +56,28 @@ urlpatterns = [
         template_name="public/privacy.html",
         extra_context={"active": "privacy"},
     ), name="privacy"),
+    # The Terms, which the org sign-up's agreement checkbox links to. Same
+    # shape as Privacy: a template view with the clause wording editable from
+    # the Pages screen, and the summary printed from goodtip.legal so the page
+    # and the checkbox cannot come to say different things.
+    path("terms/", TemplateView.as_view(
+        template_name="public/terms.html",
+        extra_context={
+            "active": "terms",
+            "terms_top_three": TERMS_TOP_THREE,
+            "terms_version": TERMS_VERSION,
+        },
+    ), name="terms"),
     path("pricing/", TemplateView.as_view(
         template_name="public/pricing.html",
         extra_context={"active": "pricing"},
     ), name="pricing"),
+    # A PUBLIC path, not one under /billing/. Somebody applying for a sponsored
+    # place has usually just read /pricing/ and stopped, and may have no account
+    # at all — so it sits with the other pages a visitor can reach rather than
+    # behind the billing prefix, which everything else in that app requires a
+    # login and an org id for.
+    path("sponsorship/", sponsorship_view, name="sponsorship"),
     path("coming-soon/", coming_soon_view, name="coming_soon"),
     path("contact/", contact_submit_view, name="contact_submit"),
     path("tell-the-boss/", tell_the_boss_view, name="tell_the_boss"),

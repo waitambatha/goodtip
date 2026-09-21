@@ -73,6 +73,13 @@ urlpatterns = [
     path("<int:org_id>/messages/<int:thread_id>/pin/", views.message_pin, name="message_pin"),
     path("<int:org_id>/messages/<int:thread_id>/react/<int:message_id>/",
          views.message_react, name="message_react"),
+    # Editing and taking down one message (client, 17 Sep 2026). Both POST
+    # only, both scoped by thread so an id from another conversation cannot be
+    # walked into — the same shape as react and file above.
+    path("<int:org_id>/messages/<int:thread_id>/edit/<int:message_id>/",
+         views.message_edit, name="message_edit"),
+    path("<int:org_id>/messages/<int:thread_id>/remove/<int:message_id>/",
+         views.message_remove, name="message_remove"),
     # Attachments, served by a view rather than from /media/ so the same
     # can_read check the thread page makes is made again on every fetch. Not
     # org-scoped: the thread id already decides who may read it, and the org
@@ -84,6 +91,11 @@ urlpatterns = [
     path("<int:org_id>/wall/post/", views.wall_post_create, name="wall_post"),
     path("<int:org_id>/wall/<int:post_id>/react/", views.wall_react, name="wall_react"),
     path("<int:org_id>/wall/<int:post_id>/remove/", views.wall_post_remove, name="wall_remove"),
+    # Rewording your own post or reply (client, 17 Sep 2026 — asked of the
+    # chat, and asked again of the Wall).
+    path("<int:org_id>/wall/<int:post_id>/edit/", views.wall_post_edit, name="wall_edit"),
+    path("<int:org_id>/wall/reply/<int:reply_id>/edit/", views.wall_reply_edit,
+         name="wall_reply_edit"),
     path("<int:org_id>/wall/<int:post_id>/reply/", views.wall_reply_create, name="wall_reply"),
     path("<int:org_id>/wall/reply/<int:reply_id>/remove/", views.wall_reply_remove, name="wall_reply_remove"),
     # Where the user is. POST, because each one changes state that outlives

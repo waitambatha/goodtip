@@ -25,11 +25,19 @@ an unfiltered board the number 4 is up to five different rounds. Resolved in
 the view because a Django template cannot look a dict up by a variable key.
 {% endcomment %}
 {% if strip %}
+{% comment %}
+data-veil-for names the region that goes busy while a press is answered.
+WHICH loader is drawn in it is not decided here and is not a parameter: it is
+one of four, rotated per competition so pressing NRL twice never gives the
+same animation twice, and coloured by the [data-code] on the control that was
+pressed. See gt-veil.js.
+{% endcomment %}
 <div class="rstrip" data-veil-for="{{ veil_for }}">
   <span class="rs-showing">{{ strip.showing }}</span>
 
   {% if strip.older %}
   <a class="rs-step" href="{{ base }}?back={{ strip.older }}{% if keep %}&amp;{{ keep }}{% endif %}"
+     {% if swap_into %}hx-get="{{ base }}?back={{ strip.older }}{% if keep %}&amp;{{ keep }}{% endif %}&amp;pane={{ pane|default:'table' }}" hx-target="{{ swap_into }}" hx-swap="innerHTML" hx-push-url="{{ base }}?back={{ strip.older }}{% if keep %}&amp;{{ keep }}{% endif %}"{% endif %}
      aria-label="Five rounds earlier" title="Five rounds earlier">
     <svg><use href="#ic-arrow-left"/></svg><span>Earlier</span>
   </a>
@@ -41,12 +49,14 @@ the view because a Django template cannot look a dict up by a variable key.
     {% for b in strip.window %}
     <a class="rs-num{% if b.on %} on{% endif %}"
        href="{{ base }}?{{ param }}={{ b.value }}{% if keep %}&amp;{{ keep }}{% endif %}"
+       {% if swap_into %}hx-get="{{ base }}?{{ param }}={{ b.value }}{% if keep %}&amp;{{ keep }}{% endif %}&amp;pane={{ pane|default:'table' }}" hx-target="{{ swap_into }}" hx-swap="innerHTML" hx-push-url="{{ base }}?{{ param }}={{ b.value }}{% if keep %}&amp;{{ keep }}{% endif %}"{% endif %}
        {% if b.on %}aria-current="true"{% endif %}>{{ b.n }}</a>
     {% endfor %}
   </div>
 
   {% if strip.newer is not None %}
   <a class="rs-step" href="{{ base }}?back={{ strip.newer }}{% if keep %}&amp;{{ keep }}{% endif %}"
+     {% if swap_into %}hx-get="{{ base }}?back={{ strip.newer }}{% if keep %}&amp;{{ keep }}{% endif %}&amp;pane={{ pane|default:'table' }}" hx-target="{{ swap_into }}" hx-swap="innerHTML" hx-push-url="{{ base }}?back={{ strip.newer }}{% if keep %}&amp;{{ keep }}{% endif %}"{% endif %}
      aria-label="Five rounds later" title="Five rounds later">
     <span>Later</span><svg><use href="#ic-arrow-right"/></svg>
   </a>
@@ -60,7 +70,8 @@ the view because a Django template cannot look a dict up by a variable key.
   button that does nothing most of the time.
   {% endcomment %}
   {% if strip.current %}
-  <a class="rs-all" href="{{ base }}{% if keep %}?{{ keep }}{% endif %}">{{ all_label|default:"Whole season" }}</a>
+  <a class="rs-all" href="{{ base }}{% if keep %}?{{ keep }}{% endif %}"
+     {% if swap_into %}hx-get="{{ base }}?pane={{ pane|default:'table' }}{% if keep %}&amp;{{ keep }}{% endif %}" hx-target="{{ swap_into }}" hx-swap="innerHTML" hx-push-url="{{ base }}{% if keep %}?{{ keep }}{% endif %}"{% endif %}>{{ all_label|default:"Whole season" }}</a>
   {% endif %}
 </div>
 {% endif %}

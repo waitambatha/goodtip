@@ -98,10 +98,24 @@
       <div class="ladder-row"><span class="rank">3</span><span class="who">The Quiet One in Legal<small>Quietly cooking</small></span><span class="form"><i class="w"></i><i class="w"></i><i></i><i class="w"></i><i></i></span><span class="pts">119</span></div>
       <div class="ladder-row"><span class="rank">4</span><span class="who">Mardi &amp; the Mailroom<small>One good week away</small></span><span class="form"><i></i><i class="w"></i><i class="w"></i><i></i><i class="w"></i></span><span class="pts">112</span></div>
     </div>
+    {% comment %}
+    THE FIGURES IN HERE ARE MADE UP, AND SAY SO (Sep 2026, client).
+
+    The ladder beside it has always been labelled a sample — four invented
+    names and their invented points, which nobody mistakes for a live board.
+    The dollar total did not carry the same label, and a big lime $8,420 under
+    the words "Raised so far" reads as a real number even sitting next to an
+    obviously fake ladder. It is the one figure on this page a visitor could
+    repeat to somebody else as fact.
+
+    So the panel wears the same EXAMPLE chip as every other unreal amount on
+    the site, and the caption now leads with what the number is before it
+    explains where the money comes from.
+    {% endcomment %}
     <div class="tally">
-      <p class="eyebrow">Raised so far &middot; this organisation</p>
+      <p class="eyebrow">Raised so far &middot; this organisation <span class="illus-tag">Example</span></p>
       <div class="tally-num" data-countto="8420" data-prefix="$">$0</div>
-      <p class="tally-cap">GoodTip funds this from its own revenue. Every dollar lands with the charity your organisation picked.</p>
+      <p class="tally-cap"><b>An illustration, not money raised.</b> GoodTip has not begun disbursing, and no organisation's real total is shown here. When it is real, GoodTip funds it from its own revenue and every dollar lands with the charity your organisation picked.</p>
       <div class="tally-bar"><i data-pct="68"></i></div>
       <div class="tally-meta"><span>68% to season goal</span><span>Goal $12,500</span></div>
     </div>
@@ -211,36 +225,48 @@
   </div>
 </section>
 
-<!-- SUPPORTERS (alternating carousel) -->
-<section class="section on-paper">
-  <div class="wrap">
-    <p class="eyebrow reveal">Supporters</p>
-    <h2 class="section-heading reveal">People who get it.</h2>
-    <p class="section-sub reveal">People who back what we're doing — on the field, in the rooms, and everywhere else. You don't need a title to be one of them.</p>
+{% comment %}
+SUPPORTERS — THE WHOLE SECTION IS OFF (Sep 2026, client).
 
-    <div class="amb-carousel reveal" aria-roledescription="carousel">
-      <div class="amb-stage">
-        <div class="amb-slide on">
-          <div class="amb-portrait"><img src="{% static 'img/nick-maxwell.jpg' %}" alt="Nick Maxwell"><span class="pbadge">Supporter</span></div>
-          <div class="amb-quote"><div class="qmark">&ldquo;</div><blockquote>Same ritual the rooms have always had. Now it leaves something behind.</blockquote><div class="who">Nick Maxwell</div><div class="role">Premiership Captain</div></div>
+"Need to hide this section until we have more supporters on board", and on the
+task list: hide the whole section, not just the one quote.
+
+There was one supporter on it, and his quote was written by us and attributed
+to him. That is the legal risk, and it is why the quote and the portrait are
+not sitting here commented out waiting to be uncommented by whoever restores
+the carousel — they are gone. The two "Announcing soon" slides are kept below
+as the skeleton, because they promise nothing and name nobody.
+
+TO BRING IT BACK: uncomment, and add one slide per real supporter — a
+photograph you have the rights to and words that person actually said and
+agreed to have published. A section with one card in it looks thinner than no
+section at all, which is the other half of why this is off.
+
+  <section class="section on-paper">
+    <div class="wrap">
+      <p class="eyebrow reveal">Supporters</p>
+      <h2 class="section-heading reveal">People who get it.</h2>
+      <p class="section-sub reveal">People who back what we're doing — on the field, in the rooms, and everywhere else. You don't need a title to be one of them.</p>
+      <div class="amb-carousel reveal" aria-roledescription="carousel">
+        <div class="amb-stage">
+          <div class="amb-slide on">
+            <div class="amb-portrait"><div class="pinitials">AFLW</div><span class="pbadge">Announcing soon</span></div>
+            <div class="amb-quote"><div class="qmark">&ldquo;</div><blockquote>The women's game deserves the same Saturday energy, and a cause behind it.</blockquote><div class="who">Announcing soon</div><div class="role">AFLW Supporter</div></div>
+          </div>
+          <div class="amb-slide">
+            <div class="amb-portrait"><div class="pinitials">NRL</div><span class="pbadge">Announcing soon</span></div>
+            <div class="amb-quote"><div class="qmark">&ldquo;</div><blockquote>Footy brings the room together. This gives the room something to play for.</blockquote><div class="who">Announcing soon</div><div class="role">NRL &amp; NRLW Supporter</div></div>
+          </div>
         </div>
-        <div class="amb-slide">
-          <div class="amb-portrait"><div class="pinitials">AFLW</div><span class="pbadge">Announcing soon</span></div>
-          <div class="amb-quote"><div class="qmark">&ldquo;</div><blockquote>The women's game deserves the same Saturday energy, and a cause behind it.</blockquote><div class="who">Announcing soon</div><div class="role">AFLW Supporter</div></div>
+        <div class="amb-controls">
+          <div class="amb-dots"><button class="amb-dot on" aria-label="Slide 1"></button><button class="amb-dot" aria-label="Slide 2"></button></div>
+          <button class="amb-pausebtn">&#10073;&#10073;&nbsp; Pause</button>
+          <span class="amb-hint">Tap to pause &amp; read</span>
         </div>
-        <div class="amb-slide">
-          <div class="amb-portrait"><div class="pinitials">NRL</div><span class="pbadge">Announcing soon</span></div>
-          <div class="amb-quote"><div class="qmark">&ldquo;</div><blockquote>Footy brings the room together. This gives the room something to play for.</blockquote><div class="who">Announcing soon</div><div class="role">NRL &amp; NRLW Supporter</div></div>
-        </div>
-      </div>
-      <div class="amb-controls">
-        <div class="amb-dots"><button class="amb-dot on" aria-label="Slide 1"></button><button class="amb-dot" aria-label="Slide 2"></button><button class="amb-dot" aria-label="Slide 3"></button></div>
-        <button class="amb-pausebtn">&#10073;&#10073;&nbsp; Pause</button>
-        <span class="amb-hint">Tap to pause &amp; read</span>
       </div>
     </div>
-  </div>
-</section>
+  </section>
+{% endcomment %}
 
 <!-- CHARITIES (icon cards) -->
 <section class="section on-cream" id="charities">
@@ -277,14 +303,14 @@
   <div class="wrap">
     <p class="eyebrow reveal">Pricing</p>
     <h2 class="section-heading reveal">One flat fee. All year. All four codes.</h2>
-    <p class="section-sub reveal">Priced by team size, nothing else. Tipping is free for your people, and GoodTip funds a donation to the charity your organisation picked.</p>
+    <p class="section-sub reveal">Priced by team size. Tipping is free for your people, and GoodTip funds a donation to the charity your organisation picked. Groups — a separate ladder per team — start at Workplace.</p>
     <div class="pricing-grid reveal" data-cards>
-      <div class="price-card"><div class="price-ic"><svg><use href="#ic-spark"/></svg></div><div class="price-tier">Starter</div><div class="price-size">Up to 20 people</div><div class="price-num">$99</div><div class="price-period">/year</div><div class="price-per">~$5 per person</div><p class="price-desc">The full platform. AFL, AFLW, NRL, NRLW. Charity Vote, live ladder, the Wall, email reminders.</p></div>
-      <div class="price-card featured"><div class="price-badge">Most popular</div><div class="price-ic"><svg><use href="#ic-users"/></svg></div><div class="price-tier">Team</div><div class="price-size">Up to 50 people</div><div class="price-num">$299</div><div class="price-period">/year</div><div class="price-per">~$6 per person</div><p class="price-desc">Everything in Starter, plus your organisation's name and logo and a round-by-round participation dashboard.</p></div>
-      <div class="price-card"><div class="price-ic"><svg><use href="#ic-doc"/></svg></div><div class="price-tier">Workplace</div><div class="price-size">Up to 150 people</div><div class="price-num">$799</div><div class="price-period">/year</div><div class="price-per">~$5 per person</div><p class="price-desc">Everything in Team, plus priority support and a full CSR Impact Report for your board and ESG team.</p></div>
-      <div class="price-card"><div class="price-ic"><svg><use href="#ic-globe"/></svg></div><div class="price-tier">Organisation</div><div class="price-size">Up to 500 people</div><div class="price-num">$1,299</div><div class="price-period">/year</div><div class="price-per">from ~$3 per person</div><p class="price-desc">White-label platform, dedicated account manager, bespoke onboarding. Make it feel entirely your own.</p></div>
+      <div class="price-card"><div class="price-ic"><svg><use href="#ic-spark"/></svg></div><div class="price-tier">Starter</div><div class="price-size">Up to 20 people</div><div class="price-num">$99</div><div class="price-period">/year</div><div class="price-per">~$5 per person</div><p class="price-desc">The full platform. AFL, AFLW, NRL, NRLW. Charity Vote, live ladder, the Wall, email reminders. One ladder for everyone.</p></div>
+      <div class="price-card featured"><div class="price-badge">Most popular</div><div class="price-ic"><svg><use href="#ic-users"/></svg></div><div class="price-tier">Team</div><div class="price-size">Up to 50 people</div><div class="price-num">$299</div><div class="price-period">/year</div><div class="price-per">~$6 per person</div><p class="price-desc">Everything in Starter, plus your organisation's name and logo and a round-by-round participation dashboard. Still one shared ladder.</p></div>
+      <div class="price-card"><div class="price-ic"><svg><use href="#ic-doc"/></svg></div><div class="price-tier">Workplace</div><div class="price-size">Up to 150 people</div><div class="price-num">$799</div><div class="price-period">/year</div><div class="price-per">~$5 per person</div><p class="price-desc">Everything in Team, plus <b>groups</b> — a ladder of its own for each team or department — priority support and a full CSR Impact Report.</p></div>
+      <div class="price-card"><div class="price-ic"><svg><use href="#ic-globe"/></svg></div><div class="price-tier">Organisation</div><div class="price-size">Up to 500 people</div><div class="price-num">$1,299</div><div class="price-period">/year</div><div class="price-per">from ~$3 per person</div><p class="price-desc">Groups and sub-groups, white-label platform, dedicated account manager, bespoke onboarding. Make it feel entirely your own.</p></div>
     </div>
-    <p class="pricing-footnote reveal">2,500+ people? <a href="/pricing/#enterprise">Let's talk Enterprise.</a> &middot; Founding Partner pricing closes December 31. <a href="/#founding">Learn more.</a></p>
+    <p class="pricing-footnote reveal">2,500+ people? <a href="/pricing/#enterprise">Let's talk Enterprise.</a> &middot; Founding Member pricing closes December 31, 2026. <a href="/#founding">Learn more.</a></p>
   </div>
 </section>
 
@@ -310,9 +336,9 @@ saying nothing, because every question it raises has no answer on the site.
     <div class="reveal from-left">
       <span class="fp-badge"><span class="live-dot"></span> Founding Partner Program</span>
       <h2>In before the finals. <em>In for life.</em></h2>
-      <p class="lead">Founding Partners lock their pricing permanently, not for year one, for good. Plus first access to new sports and features in 2027, and your name on the list of organisations that backed it before it was obvious.</p>
+      <p class="lead">Founding Members lock their rate for three full seasons — 2027, 2028 and 2029 — not for year one. Plus first access to new sports and features in 2027, and your name on the list of organisations that backed it before it was obvious.</p>
       <ul class="fp-benefits">
-        <li><span class="bk">&check;</span> Pricing locked permanently, never increases</li>
+        <li><span class="bk">&check;</span> Your rate locked through the 2029 season, whatever list prices do</li>
         <li><span class="bk">&check;</span> First access to every new sport and feature in 2027</li>
         <li><span class="bk">&check;</span> Founding Partner recognition across the platform</li>
       </ul>

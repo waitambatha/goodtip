@@ -718,6 +718,27 @@ def dashboard_view(request):
                 if prev is None or rnd.round_number < prev.round_number:
                     earliest_per_series[rnd.series_id] = rnd
             week_rounds = list(earliest_per_series.values())
+
+            # Client, 17 Sep 2026: "the initial screen goes to State of Origin
+            # — that's ancient history, probably best to default to latest
+            # games." Origin is a representative series (CATEGORY_REPRESENTATIVE)
+            # and should never be the default landing — it is three games a year
+            # and is confusing as a first screen. If the only open rounds are
+            # representative, fall back to the most recent non-representative
+            # round instead so the member lands on regular-season games.
+            from catalog.models import Series as CatalogSeries
+            rep_series_ids = set(
+                CatalogSeries.objects.filter(
+                    category=CatalogSeries.CATEGORY_REPRESENTATIVE,
+                ).values_list("id", flat=True)
+            )
+            non_rep_week_rounds = [
+                r for r in week_rounds if r.series_id not in rep_series_ids
+            ]
+            if non_rep_week_rounds:
+                week_rounds = non_rep_week_rounds
+            # If truly only Origin is open, keep it — better than an empty panel.
+
             week_round_ids = [r.id for r in week_rounds]
             open_numbers = sorted(r.round_number for r in week_rounds)
 
@@ -1318,6 +1339,12 @@ def tell_the_boss_view(request):
                 # Reply-to is the sender, not GoodTip: the boss replying should
                 # reach the member who asked for the note, and it tells the
                 # recipient a real colleague is behind this.
+                #
+                # "See how it works" points at How It Works, not back here. It
+                # used to be /tell-the-boss/, which sent the boss to the page
+                # whose whole job is persuading someone to send them this
+                # email — a loop, and the one link in the note that has to
+                # answer "what IS this" instead answered "send this again".
                 ok = send_template(
                     "tell_the_boss",
                     subject=f"{your_name} wants your tipping comp to do some good",
@@ -1325,7 +1352,7 @@ def tell_the_boss_view(request):
                     context={
                         "your_name": your_name,
                         "boss_name": boss_name,
-                        "how_url": site_url("/tell-the-boss/"),
+                        "how_url": site_url("/how-it-works/"),
                     },
                     reply_to=[request.user.email] if request.user.email else None,
                 )
@@ -1345,7 +1372,7 @@ def tell_the_boss_view(request):
                         body_preview=render_to_string(
                             "emails/tell_the_boss.txt",
                             {"your_name": your_name, "boss_name": boss_name,
-                             "how_url": site_url("/tell-the-boss/")},
+                             "how_url": site_url("/how-it-works/")},
                         ),
                     )
                     request.session.pop("boss_draft", None)

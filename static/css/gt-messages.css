@@ -1345,6 +1345,12 @@ html[data-theme="light"] .gtm-arch i { background: rgba(15,46,34,.08); }
    under lights are very different backgrounds for the same white text, and the
    wash flattens both to something a bubble reads against. */
 .gtm-chat { position: relative; }
+/* The slot htmx swaps a conversation into. display:contents so it is a node to
+   aim at and nothing else — .gtm-chat-in stays a direct flex child of
+   .gtm-chat, which is what the phone layout depends on. Its whole purpose is
+   to keep the wallpaper layer OUT of what a conversation change replaces; see
+   the comment in orgs/messages.html. */
+.gtm-chat-slot { display: contents; }
 .gtm-paper { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
 .gtm-paper.is-off { display: none; }
 .gtm-paper-shot {
@@ -1416,3 +1422,315 @@ html[data-theme="light"] body.gt-app.gtm-page { --m-ink-3: #5F665E; }
    pale lime at a higher specificity than that note's rule, and with white ink
    on it "hello" was white on pale lime. */
 html[data-theme="light"] body.gt-app.gtm-page { --m-mine: #2F5DA8; --m-mine-ink: #FFFFFF; }
+
+/* ==========================================================================
+   THE LOADING VEIL, ON THIS SCREEN'S OWN GROUND
+   ==========================================================================
+   gt-busy.js and gt-veil.js paint one veil for the whole app, and its default
+   is cream — right on the paper sheets, a glare on a deep green chat panel.
+   Both the Wall and Messages are dark by default, so the veil is inverted here
+   and follows the theme switch with everything else.
+
+   This matters more than it sounds: the veil now lands on a single Wall post
+   (client, 19 Sep 2026 — the loader belongs on the card you are working in,
+   "not the whole page"), which means it appears INSIDE the reading surface
+   rather than over a form on its own screen. A cream rectangle blinking in the
+   middle of a dark stream is the thing that would get noticed instead of the
+   post. */
+.gtm-page .busy-veil {
+  background: color-mix(in srgb, var(--m-ground) 82%, transparent);
+  border-radius: inherit;
+}
+.gtm-page .busy-veil .bv-label { color: var(--m-ink); }
+.gtm-page .busy-veil .bv-ring {
+  border-color: var(--m-line-2);
+  border-top-color: var(--m-accent);
+}
+/* color-mix is the clean way to say "this ground, mostly opaque", but it is
+   recent enough to want a floor under it: without one an unsupporting browser
+   drops the declaration and falls back to the cream. */
+@supports not (background: color-mix(in srgb, red 50%, transparent)) {
+  .gtm-page .busy-veil { background: rgba(11, 33, 24, .82); }
+  html[data-theme="light"] body.gt-app.gtm-page .busy-veil { background: rgba(247, 245, 238, .84); }
+}
+
+/* ==========================================================================
+   EDITING AND DELETING A MESSAGE
+   ==========================================================================
+   Client, 17 Sep 2026: "is there a way messages can be edited or deleted from
+   the chat?" Both controls sit in the same hover rail as Reply, Pin and
+   Report, so a bubble at rest still shows only what was said.
+
+   The same three classes dress the Wall (a post and a reply), because it is
+   one gesture in two places — see templates/orgs/partials/_wall_post.html. */
+.chat-editbtn,
+.chat-delbtn,
+.gpt-edit {
+  width: 30px; height: 30px; display: grid; place-items: center;
+  background: none; border: 0; cursor: pointer; border-radius: 8px;
+  color: var(--m-ink-3); opacity: 0;
+  transition: opacity .15s var(--ease), color .15s var(--ease);
+}
+.chat-editbtn svg, .chat-delbtn svg, .gpt-edit svg {
+  width: 15px; height: 15px; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linejoin: round; stroke-linecap: round;
+}
+.chat-row:hover .chat-editbtn, .chat-editbtn:focus-visible,
+.chat-row:hover .chat-delbtn, .chat-delbtn:focus-visible,
+.gt-post:hover .gpt-edit, .gpt-edit:focus-visible,
+.gpt-reply:hover .chat-editbtn { opacity: 1; }
+.chat-editbtn:hover, .gpt-edit:hover { color: var(--m-accent-ink); }
+/* Delete is the one control here that cannot be undone, so it is the one that
+   goes red on hover rather than lime. Nothing else on this screen does. */
+.chat-delbtn:hover { color: #FF8A7A; }
+.chat-delform { display: flex; }
+
+/* ---- "edited" ----
+   Deliberately quiet and deliberately always there. It is not a warning, it
+   is a fact about the line, and it has to survive somebody skimming. */
+.chat-edited {
+  font-style: normal; font-size: 11px; letter-spacing: .02em;
+  color: var(--m-ink-3); cursor: help;
+}
+
+/* ---- a deleted message ----
+   The bubble keeps its place so the replies quoting it still answer
+   something. What it loses is the voice: no weight, no full-strength ink. */
+.chat-gone {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-style: italic; color: var(--m-ink-3);
+}
+.chat-gone svg {
+  width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor;
+  stroke-width: 1.8; stroke-linecap: round;
+}
+
+/* ---- the editor, in place of the text ---- */
+.chat-edit { display: block; margin: 2px 0 0; }
+.chat-edit textarea {
+  width: 100%; resize: none; font: inherit; font-size: 14px; line-height: 1.45;
+  color: var(--m-ink); background: var(--m-panel-2);
+  border: 1px solid var(--m-accent-line); border-radius: var(--m-r2);
+  padding: 8px 10px; max-height: 150px; overflow-y: auto;
+}
+.chat-edit textarea:focus-visible { outline: 2px solid var(--m-accent-line); outline-offset: 1px; }
+.chat-edit-acts { display: flex; justify-content: flex-end; gap: 7px; margin-top: 7px; }
+/* While a bubble is being edited it stops looking like a finished message —
+   the reader is inside it, not reading it. */
+.chat-row.is-editing .chat-bubble,
+.gt-post.is-editing { box-shadow: 0 0 0 1px var(--m-accent-line) inset; }
+
+/* Touch has no hover, so the rail cannot be the only way to reach a control
+   that exists. Below the pointer breakpoint everything in it stays visible. */
+@media (hover: none) {
+  .chat-editbtn, .chat-delbtn, .gpt-edit { opacity: 1; }
+}
+
+/* ==========================================================================
+   THE ROW'S CONTROLS ARE NOT A SECRET
+   ==========================================================================
+   CLIENT, 20 SEP 2026: "I should be able to delete and edit a chat, I can not
+   see that — currently I am not seeing anything like that."
+
+   The controls were there and had been since the day before. They were also
+   at opacity 0 until the row was hovered, which is the convention every chat
+   app uses and which, on a first look at a screen, is indistinguishable from
+   the feature not existing. Hover-to-reveal is a fine way to keep a finished
+   conversation clean; it is a terrible way to ANSWER "can I edit this?",
+   because the only way to find out is to already suspect the answer.
+
+   So the rail now rests at a readable weight instead of at nothing. Every
+   control is visible on every row from the moment the screen is drawn, and
+   hover raises it to full rather than conjuring it. Two things follow:
+
+     * the bubble still reads as the message, because the rail is quiet ink on
+       the panel and sits outside the bubble's own box; and
+     * somebody who has never used this screen can see, without touching
+       anything, that a message can be replied to, changed or removed.
+
+   The delete control keeps its red hover and its confirmation, which is where
+   the caution belongs — on the press, not on the discovery. */
+.chat-rowacts .chat-replybtn,
+.chat-rowacts .chat-pinbtn,
+.chat-rowacts .chat-repbtn,
+.chat-rowacts .chat-editbtn,
+.chat-rowacts .chat-delbtn,
+.gpr-tools .chat-replybtn,
+.gpr-tools .chat-editbtn { opacity: .52; }
+
+.chat-row:hover .chat-rowacts .chat-replybtn,
+.chat-row:hover .chat-rowacts .chat-pinbtn,
+.chat-row:hover .chat-rowacts .chat-repbtn,
+.chat-row:hover .chat-rowacts .chat-editbtn,
+.chat-row:hover .chat-rowacts .chat-delbtn,
+.gpt-reply:hover .gpr-tools .chat-replybtn,
+.gpt-reply:hover .gpr-tools .chat-editbtn,
+.chat-rowacts button:focus-visible,
+.gpr-tools button:focus-visible { opacity: 1; }
+
+/* The Wall's post controls sit in the card's header rather than in a rail
+   beside it, where an always-on row of glyphs would compete with the author's
+   name. They rest lower and come up on the card — the card is a much bigger
+   hover target than a single chat row, so the reveal is actually reachable. */
+.gt-post .gpt-edit, .gt-post .gpt-x button { opacity: .5; }
+.gt-post:hover .gpt-edit, .gt-post:hover .gpt-x button { opacity: 1; }
+
+/* Touch has no hover at all, so there the rail is simply always at full. */
+@media (hover: none) {
+  .chat-rowacts .chat-replybtn,
+  .chat-rowacts .chat-pinbtn,
+  .chat-rowacts .chat-repbtn,
+  .chat-rowacts .chat-editbtn,
+  .chat-rowacts .chat-delbtn,
+  .gpr-tools .chat-replybtn,
+  .gpr-tools .chat-editbtn,
+  .gt-post .gpt-edit, .gt-post .gpt-x button { opacity: 1; }
+}
+
+/* ==========================================================================
+   THE MESSAGE MENU — press the bubble, or hold it
+   ==========================================================================
+   Client, 20 Sep 2026: "on the edit and delete, it should not be buttons ...
+   when I click on it, or if it's touch I will press it a little bit, and
+   those should be there ... ensure it is well spaced as well."
+
+   WHAT THIS REPLACED, and why it had to go: five icon buttons in a rail beside
+   every bubble, of which — measured on the live page — Reply was rendering at
+   TWO pixels wide and Edit at ZERO. The rail had run out of room and the flex
+   items had collapsed silently, so the two controls being asked about were not
+   merely hard to hit, they were not there. A rail was also five affordances
+   per message on every message, which is a column of noise down the side of a
+   conversation nobody is trying to administer. */
+.chat-rowacts { display: flex; align-items: center; position: relative; }
+
+/* The ⋮ is the keyboard's way in and a target for anybody who wants one. It
+   is one control now rather than five, so it can afford to be visible at
+   rest — which is what stops the menu being a secret. */
+.chat-more {
+  width: 30px; height: 30px; flex: none;
+  display: grid; place-items: center;
+  background: none; border: 0; border-radius: 9px; cursor: pointer;
+  color: var(--m-ink-3); opacity: .55;
+  transition: opacity .15s var(--ease), color .15s var(--ease), background .15s var(--ease);
+}
+.chat-more svg { width: 16px; height: 16px; fill: currentColor; stroke: none; }
+.chat-row:hover .chat-more, .chat-more:focus-visible { opacity: 1; }
+.chat-more:hover { color: var(--m-ink); background: var(--m-panel-2); }
+.chat-row.is-menu-open .chat-more { opacity: 1; color: var(--m-accent-ink); }
+
+/* The bubble says it can be pressed — but only on the way in, and only just.
+   A permanent hover state on every message would make the conversation look
+   like a list of buttons. */
+.chat-bubble { transition: filter .15s var(--ease); }
+.chat-row:hover .chat-bubble { filter: brightness(1.04); }
+.chat-row.is-pressing .chat-bubble { filter: brightness(1.1); transform: scale(.985); }
+.chat-row.is-pressing .chat-bubble { transition: transform .18s var(--ease), filter .18s var(--ease); }
+
+/* ---- the menu itself ----
+   position:fixed and placed in viewport coordinates by gt-chat.js: a menu
+   anchored to a bubble inside a scrolling stream slides away from it the
+   moment anything moves. */
+.chat-menu {
+  position: fixed; z-index: 120; min-width: 208px;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 7px;
+  background: var(--m-panel);
+  border: 1px solid var(--m-line-2);
+  border-radius: 14px;
+  box-shadow: 0 26px 54px -24px rgba(0,0,0,.85), 0 2px 8px rgba(0,0,0,.3);
+}
+.chat-menu[hidden] { display: none; }
+.chat-menu form { margin: 0; display: block; }
+
+/* WELL SPACED, as asked: full-width rows with room to be hit with a thumb.
+   44px is the size a touch target has to be before it stops being a game of
+   chance, and it is the reason this is a menu rather than four 28px icons. */
+.chat-menu-item {
+  display: flex; align-items: center; gap: 11px;
+  width: 100%; min-height: 44px; padding: 10px 13px;
+  background: none; border: 0; border-radius: 9px; cursor: pointer;
+  font: inherit; font-size: 14px; text-align: left;
+  color: var(--m-ink);
+  transition: background .12s var(--ease), color .12s var(--ease);
+}
+.chat-menu-item svg {
+  width: 17px; height: 17px; flex: none;
+  fill: none; stroke: currentColor; stroke-width: 1.9;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.chat-menu-item:hover, .chat-menu-item:focus-visible {
+  background: var(--m-panel-2); color: var(--m-ink);
+}
+/* Delete is the one row here that cannot be undone, so it is the one that
+   goes red — and it sits last, behind a confirmation, with a hairline above
+   it so a thumb travelling down the menu meets a boundary before it. */
+.chat-menu-danger { margin-top: 4px; padding-top: 5px; border-top: 1px solid var(--m-line); }
+.chat-menu-item.is-danger { color: #FF8A7A; }
+.chat-menu-item.is-danger:hover { background: rgba(255,138,122,.12); color: #FF8A7A; }
+
+/* No script: the menu cannot be opened, so it is simply always there. Every
+   item is a real form or a real control, so all of them still work. */
+html:not(.js) .chat-menu { position: static; box-shadow: none; margin-top: 6px; }
+html:not(.js) .chat-menu[hidden] { display: flex; }
+
+/* ==========================================================================
+   EMOJI, AFTER THEY ARE SENT
+   ==========================================================================
+   Client, 20 Sep 2026: "the emoji is seen but when you send it, it is not
+   seen — both as a reaction and as a text. Make sure it's there and visible,
+   and white background and all."
+
+   TWO DIFFERENT PROBLEMS WEARING ONE COMPLAINT.
+
+   As TEXT: the glyph is in the message and it does render, but at the body
+   font's own size, inside a coloured bubble, a 14px emoji is a smudge. It is
+   not missing, it is too small to read — so it is set a little larger than
+   the words around it, with the emoji fonts named first so a system that has
+   both a text and a colour glyph for a character picks the colour one.
+
+   As a REACTION: the chip was panel-coloured on a panel-coloured ground, so
+   the emoji sat on almost exactly its own background. That is the one the
+   client means by "white background" — a reaction is a small bright token on
+   a dark conversation, and it has to read as an object rather than as a tint.
+*/
+.chat-text {
+  font-family: var(--body), "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
+/* Big enough to read at a glance, not so big it breaks the line. */
+.chat-text { --emoji-size: 1.18em; }
+.chat-text img.emoji { width: var(--emoji-size); height: var(--emoji-size); vertical-align: -.18em; }
+
+.rx { gap: 6px; margin-top: 6px; }
+.rx-chip {
+  background: var(--white, #FFFFFF);
+  border: 1px solid rgba(7,47,30,.14);
+  color: #16202B;
+  padding: 4px 10px;
+  box-shadow: 0 2px 6px -3px rgba(0,0,0,.5);
+}
+.rx-chip:hover { border-color: rgba(7,47,30,.3); background: #FFFFFF; }
+/* The one you are in keeps the white ground and takes a lime rim, so "mine"
+   is legible without the emoji going back onto a tint. */
+.rx-chip.mine {
+  background: #FFFFFF;
+  border-color: var(--m-accent);
+  box-shadow: 0 0 0 2px var(--m-accent-bg), 0 2px 6px -3px rgba(0,0,0,.5);
+  color: #16202B;
+}
+.rx-e {
+  font-size: 15px; line-height: 1;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", var(--body), sans-serif;
+}
+.rx-n { color: #3C4A40; }
+
+/* THE WAY TO ADD ONE HAS TO BE FINDABLE. It was opacity:0 until the row was
+   hovered, which on touch means never — there is no hover on a phone, so the
+   reaction picker did not exist there at all. */
+.rx-add summary { opacity: .5; }
+.chat-row:hover .rx-add summary, .rx-add[open] summary, .rx-add summary:focus-visible { opacity: 1; }
+@media (hover: none) { .rx-add summary { opacity: 1; } }
+/* The picker's own faces, big enough to tell apart. */
+.rx-menu .rx-opt {
+  font-size: 19px; line-height: 1; padding: 7px 8px;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", var(--body), sans-serif;
+}

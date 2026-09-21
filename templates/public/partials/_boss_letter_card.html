@@ -1,0 +1,35 @@
+{% comment %}
+Presentation B — the note as a message card.
+
+The pair is "stick it somewhere they'll see it" and "send it". A is the thing
+you leave on a monitor; this is the thing you paste into an email or a Slack
+DM, so it is drawn as a message rather than as stationery: a white card, a lime
+header bar carrying the mark, the note, and one quiet line of provenance under
+it.
+
+IT REPLACED A LINED CARD ON A DARK GREEN ENVELOPE, tilted on a desk with a pen
+and an inkwell beside it and a wax seal in the corner. Every one of those props
+was arguing that this is a letter, which is the look the client asked us to
+move off — and the seal was the thing actually reading "GOOD TIPS", a name the
+company does not have.
+
+The card is dead straight. Presentation A carries the tilt and the texture;
+doing it twice makes the pair look like one illustration repeated rather than
+two genuinely different ways to send the same words.
+{% endcomment %}
+<div class="ttb-stage ttb-card" data-letter-style="card" role="group" aria-label="The note, as a message">
+
+  <div class="ck-card">
+    <div class="ck-bar">
+      {% include "public/partials/_boss_letter_mark.html" %}
+      <span class="ck-bar-label">A note to the boss</span>
+    </div>
+    <div class="ck-body">
+      {% include "public/partials/_boss_letter_body.html" %}
+    </div>
+    <div class="ck-foot">
+      <span class="ck-dot" aria-hidden="true"></span>
+      Free to play &middot; your organisation picks the charity &middot; goodtip.com.au
+    </div>
+  </div>
+</div>

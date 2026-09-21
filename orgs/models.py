@@ -130,6 +130,24 @@ class Organisation(models.Model):
         related_name="departments_approved", null=True, blank=True,
     )
 
+    # --- Terms and Privacy, as agreed at creation ---
+    # WHO AGREED, WHEN, AND TO WHICH VERSION. The wizard's last step carries a
+    # required checkbox (OrgCreateForm.terms_accepted); this is where the fact
+    # of it lands, because "they ticked a box in 2026" is only worth anything
+    # if the wording they ticked it against can still be identified.
+    #
+    # Nullable because every organisation created before the checkbox existed
+    # has no answer, and inventing one for them would be a worse record than
+    # none. A blank here means "not asked", not "refused".
+    terms_accepted_at = models.DateTimeField(null=True, blank=True)
+    terms_accepted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name="orgs_terms_accepted", null=True, blank=True,
+    )
+    # The dated edition of the Terms in force when they agreed. See
+    # goodtip.legal.TERMS_VERSION.
+    terms_version = models.CharField(max_length=20, blank=True)
+
     # --- Work-domain verification ---
     # The domain this organisation was proved against, e.g. "acme.com.au", and
     # the role the person who proved it said they hold. Proof is a code emailed
@@ -1056,6 +1074,10 @@ class WallPost(models.Model):
         null=True, blank=True, related_name="wall_posts",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    # Stamped the first time its author changes it. Only ever a member post:
+    # a recap or a system card has no author to edit it, which is what makes
+    # it worth trusting as the record of a round.
+    edited_at = models.DateTimeField(null=True, blank=True)
     # Admin hide (recap spec §11): gone from the feed, data kept.
     is_hidden = models.BooleanField(default=False)
     # Author's own choice, per post, default off — never inherited from a
@@ -1205,6 +1227,10 @@ class WallReply(models.Model):
     )
     body = models.TextField(max_length=500)
     created_at = models.DateTimeField(auto_now_add=True)
+    # Stamped the first time the author changes it. Same reasoning as
+    # Message.edited_at: a reply that can be rewritten under the answer to it
+    # has to say that it was.
+    edited_at = models.DateTimeField(null=True, blank=True)
     # Members are approved on arrival; guests wait for a staff review.
     is_approved = models.BooleanField(default=True)
     is_hidden = models.BooleanField(default=False)
@@ -1622,6 +1648,32 @@ class Message(models.Model):
         related_name="replies", null=True, blank=True,
     )
     created_at = models.DateTimeField(default=timezone.now)
+    # CLIENT, 17 SEP 2026: "is there a way messages can be edited or deleted
+    # from the chat?" There was not. Both are now here, and both leave a mark.
+    #
+    # An edit is stamped rather than silent. A conversation where what somebody
+    # said can change underneath a reply to it is a conversation you cannot
+    # trust, so the bubble says "edited" from the first change onwards; what it
+    # used to say is not kept, because nothing in this product has a use for an
+    # old draft and storing one is storing something nobody asked us to.
+    edited_at = models.DateTimeField(null=True, blank=True)
+    # A DELETE IS A TOMBSTONE, NOT A HOLE. The row stays, the words go, and
+    # the bubble reads "This message was deleted".
+    #
+    # Deleting it outright was the obvious alternative and it is wrong in a
+    # group room: replies quote the message they answer, and a thread that
+    # silently loses its third message leaves four answers to nothing. It also
+    # takes the other side's memory of the conversation away without telling
+    # them anything happened, which is the thing people find alarming about
+    # deletion in chat apps that do it.
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    # Whose decision it was. An author clearing their own line and an admin
+    # taking somebody else's down are different acts, and only one of them is
+    # anybody else's business to ask about later.
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="messages_deleted",
+    )
     # Who has opened the thread since this landed. A read *receipt* per message
     # rather than a per-thread pointer, so "3 unread" stays correct when an
     # admin answers a thread the member had already caught up on.
@@ -1643,12 +1695,61 @@ class Message(models.Model):
         )
 
     @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
+
+    @property
+    def is_edited(self) -> bool:
+        return self.edited_at is not None
+
+    def can_edit(self, user) -> bool:
+        """Only the author, and only while there is something to edit.
+
+        Not an admin. Hiding what somebody said is a moderation power and this
+        product already has it below; PUTTING WORDS IN THEIR MOUTH is not, and
+        an edit control that let one member rewrite another's message while
+        leaving their name on it would do exactly that.
+
+        An attachment-only message has nothing to type over, and a deleted one
+        has nothing left at all.
+        """
+        if not user or not user.is_authenticated or self.is_deleted:
+            return False
+        return self.author_id == user.id and bool((self.body or "").strip())
+
+    def can_remove(self, user, *, viewer_is_admin: bool | None = None) -> bool:
+        """The author, or whoever runs the organisation the thread belongs to.
+
+        Same rule as the Wall, deliberately: a member who has learned that they
+        can take their own post down should not have to discover separately
+        whether the same is true in a message.
+
+        ``viewer_is_admin`` is the same question asked once for a whole thread
+        rather than once per bubble. Drawing a two-hundred-message room would
+        otherwise run two hundred identical membership queries to decide
+        whether to show two hundred copies of the same control. Left unset, it
+        answers the question itself, so a caller holding one message does not
+        have to know any of this.
+        """
+        if not user or not user.is_authenticated or self.is_deleted:
+            return False
+        if self.author_id == user.id:
+            return True
+        if viewer_is_admin is None:
+            viewer_is_admin = self.thread.org.members.filter(
+                user=user, role__in=(OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH),
+            ).exists()
+        return viewer_is_admin
+
+    @property
     def quote(self) -> str:
         """One line of this message, for the reply block that quotes it.
 
         Falls back to naming the attachment when there are no words, because a
         reply to a photo quoting an empty string reads as a bug.
         """
+        if self.is_deleted:
+            return "This message was deleted"
         text = (self.body or "").strip()
         if text:
             return text[:120] + ("\u2026" if len(text) > 120 else "")

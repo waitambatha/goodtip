@@ -318,7 +318,7 @@ class CharityQuerySet(models.QuerySet):
     """Charity visibility, in one place so no picker has to reinvent it."""
 
     def approved(self):
-        return self.filter(is_approved=True)
+        return self.filter(is_approved=True, is_hidden=False)
 
     def available_to(self, org):
         """Every charity `org` may pick or put on a ballot.
@@ -331,10 +331,17 @@ class CharityQuerySet(models.QuerySet):
 
         A group's charities are its organisation's: the org is the one that
         adds them, and its groups choose from what it has made available.
+
+        Hidden charities (is_hidden=True) are never shown in any picker.
+        They remain in the database so existing references and donation records
+        stay intact — they simply stop appearing as a choice.
         """
         if org is None:
             return self.approved()
-        return self.filter(models.Q(is_approved=True) | models.Q(owner_org=org))
+        return self.filter(
+            models.Q(is_approved=True) | models.Q(owner_org=org),
+            is_hidden=False,
+        )
 
 
 class Charity(models.Model):
@@ -383,6 +390,14 @@ class Charity(models.Model):
     # has no usable icon is not re-fetched on every pass.
     logo_fetched_at = models.DateTimeField(null=True, blank=True)
     is_approved = models.BooleanField(default=False)
+    # Soft-hide: keeps the row and all donation history intact but removes the
+    # charity from every picker. Set via the Django admin. Client request,
+    # 17 Sep 2026: "please hide 'gamblers help' from the charities — is there
+    # a way we can do this without deleting them?"
+    is_hidden = models.BooleanField(
+        default=False,
+        help_text="Hide from all pickers without deleting. Existing selections are unaffected.",
+    )
 
     objects = CharityQuerySet.as_manager()
 

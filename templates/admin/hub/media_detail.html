@@ -1,0 +1,145 @@
+{% extends "admin/hub/base.html" %}
+{% load i18n %}
+
+{% comment %}
+ONE PICTURE, AND THE ANSWER TO "WHERE IS THIS BEING SHOWN?"
+
+That question is the whole reason this feature exists — the client asked for it
+after somebody wanted a photograph taken off the site and there was no way to
+find out what taking it off would affect.
+
+The answer has two shapes because there are two kinds of picture here, and
+pretending otherwise would send half the people who read it to the wrong
+screen:
+
+  UPLOADED    it belongs to a row, and that row's own form is where it is
+              changed. One link, straight there.
+  SHIPS WITH  it is named by templates, stylesheets and occasionally a list in
+  THE SITE    Python. Every one of those is listed with its line number, and
+              the way to change what a VISITOR sees is the Pages editor, which
+              swaps a photograph without anybody going near the repository.
+
+There is deliberately no upload box on the site-picture side. A web request
+that overwrote a file inside the git checkout would be undone by the next
+deploy — and because deploy.sh rebases, an uncommitted modified file is a
+deploy that STOPS, not a change that quietly reverts. Saying so is more use
+than a button that appears to work.
+{% endcomment %}
+
+{% block hub_accent %}var(--gt-c4){% endblock %}
+{% block hub_ic %}ic-image{% endblock %}
+
+{% block crumbs %}
+<li><a href="{% url 'admin:hq_media' %}">{% translate "Images &amp; videos" %}</a></li>
+{% endblock %}
+
+{% block hub_body %}
+<div class="gta-media-detail">
+
+  <div class="gmd-shot">
+    {% if asset.kind == 'video' %}
+    <video src="{{ asset.url }}" controls preload="metadata" playsinline></video>
+    {% else %}
+    <img src="{{ asset.url }}" alt="">
+    {% endif %}
+  </div>
+
+  <div class="gmd-side">
+    <dl class="gmd-facts">
+      <dt>{% translate "File" %}</dt><dd>{{ asset.name }}</dd>
+      <dt>{% translate "Kind" %}</dt><dd>{% if asset.kind == 'video' %}{% translate "Clip" %}{% else %}{% translate "Picture" %}{% endif %}</dd>
+      {% if asset.size_label %}<dt>{% translate "Size" %}</dt><dd>{{ asset.size_label }}</dd>{% endif %}
+      <dt>{% translate "Address" %}</dt><dd><a href="{{ asset.url }}" target="_blank" rel="noopener">{{ asset.url }}</a></dd>
+      {% if asset.source == 'site' %}
+      <dt>{% translate "In the codebase" %}</dt><dd><code>static/{{ asset.key }}</code></dd>
+      {% else %}
+      <dt>{% translate "Belongs to" %}</dt><dd>{{ asset.subtitle }} &middot; {{ asset.owner_label }}</dd>
+      {% endif %}
+    </dl>
+
+    {% if asset.source == 'upload' %}
+    <div class="gmd-act">
+      <h3>{% translate "Changing it" %}</h3>
+      <p>{% translate "This one was uploaded, so it belongs to a single record. Changing it there changes it everywhere it appears, and nothing else is affected." %}</p>
+      {% if asset.owner_url %}
+      <a class="gta-btn gta-btn-primary" href="{{ asset.owner_url }}">{% translate "Open the record" %} &rarr;</a>
+      {% else %}
+      <p class="gmd-note">{% translate "The record this belongs to has no editing screen of its own." %}</p>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="gmd-act">
+      <h3>{% translate "Changing it on one page" %}</h3>
+      <p>{% translate "This picture ships with the product, so it is the same on every deployment and nobody uploaded it." %}</p>
+      <p>{% translate "The Pages editor swaps a photograph on a single page. It takes effect immediately, touches nothing in the codebase, and every other page that uses this picture keeps it." %}</p>
+      <a class="gta-btn gta-btn-primary" href="{% url 'admin:hq_pages' %}">{% translate "Open the Pages editor" %} &rarr;</a>
+    </div>
+
+    {% comment %}
+    REPLACING THE FILE ITSELF.
+
+    Client, 20 Sep 2026: "yes, add the button with the caveat."
+
+    The caveat is not a formality and it is not about permissions. `static/` is
+    inside the git checkout and deploy.sh pulls with `git pull --rebase`, so a
+    tracked file modified on the server is not quietly reverted by the next
+    deploy — the rebase REFUSES, and deploys stop until somebody logs in and
+    sorts it out. That is a specific, checkable consequence, so it is stated as
+    one rather than softened into "may affect deployment".
+
+    The tick box is the whole guard, and it is enough: this is a screen only an
+    administrator with pages.images can reach, and the failure mode is an
+    afternoon of confusion rather than lost data — the old file is one `git
+    checkout` away for as long as nobody commits over it.
+    {% endcomment %}
+    <form class="gmd-act gmd-danger" method="post" enctype="multipart/form-data"
+          action="{% url 'admin:hq_media_replace' %}">
+      {% csrf_token %}
+      <input type="hidden" name="key" value="{{ asset.key }}">
+      <h3>{% translate "Replacing it everywhere" %}</h3>
+      <p class="gmd-warn">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4.5"/><path d="M12 17.4v.2"/></svg>
+        <span>{% blocktranslate %}This overwrites the file inside the codebase. <b>static/</b> is part of the git checkout, and the deploy pulls with a rebase — so once you do this, the change sits there uncommitted and <b>the next deploy will stop on it</b> until somebody commits or discards it.{% endblocktranslate %}</span>
+      </p>
+      <p class="gmd-note">
+        {% blocktranslate %}It has to be the same file type, and at most {{ max_mb }} MB. The static files are rebuilt straight afterwards, so visitors see the new one immediately.{% endblocktranslate %}
+      </p>
+      <input type="file" name="replacement" required>
+      <label class="gmd-tick">
+        <input type="checkbox" name="understood" value="1" required>
+        <span>{% translate "I have read the above and this change will be committed." %}</span>
+      </label>
+      <button type="submit" class="gta-btn gta-btn-danger">{% translate "Replace this picture" %}</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if asset.source == 'site' %}
+<section class="gmd-uses">
+  <h2>{% translate "Where it appears" %}</h2>
+  {% if hits %}
+  <p class="gmd-uses-lead">
+    {% blocktranslate count n=hits|length %}Named in {{ n }} place.{% plural %}Named in {{ n }} places.{% endblocktranslate %}
+    {% translate "A template or a stylesheet naming a picture is what puts it on a screen, so this is the list of everything that would change if it went." %}
+  </p>
+  <ol class="gmd-hits">
+    {% for h in hits %}
+    <li>
+      <span class="gmh-where"><b>{{ h.path }}</b><i>{% translate "line" %} {{ h.line }}</i></span>
+      <code>{{ h.text }}</code>
+    </li>
+    {% endfor %}
+  </ol>
+  {% if hits|length >= hit_cap %}
+  <p class="gmd-note">{% blocktranslate %}Only the first {{ hit_cap }} are listed. A picture named this many times is almost always one drawn in a loop.{% endblocktranslate %}</p>
+  {% endif %}
+  {% else %}
+  <p class="gta-empty">
+    {% translate "Nothing names this picture. It is in the codebase and is not currently shown anywhere — which usually means it was replaced and the file was left behind." %}
+  </p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% endblock %}

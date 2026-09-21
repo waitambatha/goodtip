@@ -67,6 +67,10 @@
     var btn = e.target.closest('[data-reply-to]');
     if (btn) {
       e.preventDefault();
+      /* Reply now lives in the press menu, and a menu item that leaves its
+         menu open has not finished. Declared later in this file, so it is
+         reached through the window rather than by moving the handler. */
+      if (typeof closeMsgMenu === 'function') closeMsgMenu();
       var row = btn.closest('[data-msg]');
       if (row) setReply(row);
       return;
@@ -314,4 +318,316 @@
   } else {
     toBottom();
   }
+
+  /* ---- WHAT TO DO WITH A MESSAGE ----------------------------------------
+   *
+   * CLIENT, 20 SEP 2026: "on the edit and delete, it should not be buttons.
+   * What it should be is when I click on it — or if it's touch I will press it
+   * a little bit — and those should be there."
+   *
+   * THREE WAYS IN, ONE MENU. A press on the bubble, a hold on touch, or the ⋮
+   * for the keyboard and for anybody who wants a target. They all open the
+   * same markup, which is rendered server-side with real forms — so with
+   * scripting off the menu is simply always open and every item still works.
+   *
+   * WHY PRESSING THE BUBBLE IS SAFE. A bubble is not a link and has nothing
+   * else to do when pressed, so the gesture is free — and it is the one every
+   * chat app people already use has trained them in. A press that lands on a
+   * LINK inside the message, or on a selection somebody is making, is left
+   * alone: reading a URL and copying a quote both have to keep working.
+   */
+  var msgMenu = null;
+  var msgMenuHome = null;    // where it lives when it is not open
+  var msgMenuRow = null;
+
+  /* IT HAS TO BE MOVED TO THE BODY TO OPEN, and that is not a stylistic
+   * choice. The menu is position:fixed so it can be placed in viewport
+   * coordinates — a menu anchored inside a scrolling conversation slides away
+   * from its message the moment anything moves. But `.chat-row` carries a
+   * transform (the swipe-to-reply drag lives on it), and ANY transform makes
+   * an element the containing block for fixed descendants. Left where it was
+   * rendered, the menu's coordinates were being resolved against the row
+   * instead of the window and it opened at x=2111 on a 1920px screen: open,
+   * visible, correct in every computed style, and off the side of the world.
+   *
+   * So it is portalled out on open and put back on close, which keeps the
+   * markup where it belongs — inside the message, with its forms and its CSRF
+   * tokens — and the positioning where it has to be.
+   */
+  function closeMsgMenu() {
+    if (!msgMenu) return;
+    msgMenu.hidden = true;
+    msgMenu.style.removeProperty('left');
+    msgMenu.style.removeProperty('top');
+    if (msgMenuRow) msgMenuRow.classList.remove('is-menu-open');
+    /* Home again — unless the poll replaced the conversation while it was
+       open, in which case its row is gone and the node goes with it rather
+       than being left parked on the body forever. */
+    if (msgMenuHome && document.body.contains(msgMenuHome)) msgMenuHome.appendChild(msgMenu);
+    else msgMenu.remove();
+    msgMenu = null; msgMenuHome = null; msgMenuRow = null;
+  }
+
+  function openMsgMenu(row, x, y) {
+    var menu = row.querySelector('[data-msg-menu]');
+    if (!menu) return;
+    if (menu === msgMenu) { closeMsgMenu(); return; }
+    closeMsgMenu();
+
+    if (x == null) {
+      var at = (row.querySelector('.chat-bubble') || row).getBoundingClientRect();
+      x = at.left; y = at.bottom + 6;
+    }
+
+    msgMenuHome = menu.parentElement;
+    msgMenuRow = row;
+    document.body.appendChild(menu);
+    menu.hidden = false;
+    msgMenu = menu;
+    row.classList.add('is-menu-open');
+
+    /* Clamped so it cannot open with half of itself past an edge — on the
+       newest message, which sits at the bottom of the stream, that is
+       otherwise exactly where it opens. */
+    var box = menu.getBoundingClientRect();
+    var left = Math.min(x, window.innerWidth - box.width - 10);
+    var top = Math.min(y, window.innerHeight - box.height - 10);
+    menu.style.left = Math.max(10, left) + 'px';
+    menu.style.top = Math.max(10, top) + 'px';
+  }
+
+  document.addEventListener('click', function (e) {
+    var more = e.target.closest && e.target.closest('[data-msg-more]');
+    if (more) {
+      e.preventDefault(); e.stopPropagation();
+      var r = more.closest('[data-msg]');
+      var at = more.getBoundingClientRect();
+      if (r) openMsgMenu(r, at.right - 200, at.bottom + 4);
+      return;
+    }
+    /* Inside the menu is a command; anywhere else closes it. */
+    if (e.target.closest('[data-msg-menu]')) return;
+    if (msgMenu) { closeMsgMenu(); return; }
+
+    var bubble = e.target.closest && e.target.closest('.chat-bubble');
+    if (!bubble) return;
+    /* A link in the message, a control, or a selection being made — all of
+       those are what the press was for, and none of them is "open the menu". */
+    if (e.target.closest('a, button, input, textarea, .chat-vn, video, audio')) return;
+    var sel = window.getSelection();
+    if (sel && String(sel).length) return;
+    var row = bubble.closest('[data-msg]');
+    if (row) openMsgMenu(row, e.clientX, e.clientY);
+  });
+
+  /* ---- the hold, on touch ---- */
+  var holdTimer = null, holdFrom = null, holdRow = null;
+
+  document.addEventListener('touchstart', function (e) {
+    var bubble = e.target.closest && e.target.closest('.chat-bubble');
+    if (!bubble) return;
+    var row = bubble.closest('[data-msg]');
+    if (!row || !row.querySelector('[data-msg-menu]')) return;
+    holdRow = row;
+    holdFrom = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    row.classList.add('is-pressing');
+    holdTimer = setTimeout(function () {
+      row.classList.remove('is-pressing');
+      var at = bubble.getBoundingClientRect();
+      openMsgMenu(row, at.left, at.bottom + 6);
+      holdRow = null;
+      /* The press has become a menu, so the tap it would otherwise have been
+         must not also fire — see the click guard below. */
+      row.dataset.heldOpen = '1';
+    }, 420);
+  }, { passive: true });
+
+  function cancelHold() {
+    if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    if (holdRow) { holdRow.classList.remove('is-pressing'); holdRow = null; }
+  }
+  document.addEventListener('touchmove', function (e) {
+    /* A scroll, not a hold. Ten pixels of travel is enough to tell them apart
+       and small enough that a steady finger is never mistaken for a swipe. */
+    if (!holdFrom || !e.touches[0]) return;
+    var t = e.touches[0];
+    if (Math.abs(t.clientX - holdFrom.x) > 10 || Math.abs(t.clientY - holdFrom.y) > 10) cancelHold();
+  }, { passive: true });
+  document.addEventListener('touchend', cancelHold, { passive: true });
+  document.addEventListener('touchcancel', cancelHold, { passive: true });
+  document.addEventListener('click', function (e) {
+    var row = e.target.closest && e.target.closest('[data-msg]');
+    if (row && row.dataset.heldOpen) { delete row.dataset.heldOpen; e.stopPropagation(); }
+  }, true);
+
+  /* ---- and it has to CLOSE, completely ----
+   * Client, of the conversation menu: "make sure it closes and closes
+   * completely." The same three gaps apply to this one, and all three leave a
+   * menu on screen that nothing will take down: it is position:fixed, so
+   * scrolling slides the conversation out from under it and leaves it
+   * floating; Escape did nothing; and a poll that replaces the stream detaches
+   * the node this is holding, so the next close() has nothing to close.
+   */
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && msgMenu) closeMsgMenu();
+  });
+  window.addEventListener('scroll', closeMsgMenu, { passive: true, capture: true });
+  window.addEventListener('resize', closeMsgMenu, { passive: true });
+  document.body && document.body.addEventListener('htmx:afterSettle', function () {
+    /* The poll replaces the whole conversation every twelve seconds. An open
+       menu is on the BODY by then, so the swap cannot take it — which means
+       it would otherwise survive as an orphan pointing at a message that no
+       longer exists on screen. Closed outright, and close() drops the node
+       because its row has gone. */
+    if (msgMenu) closeMsgMenu();
+    document.querySelectorAll('[data-msg-menu]:not([hidden])').forEach(function (m) {
+      m.hidden = true;
+    });
+  });
+
+  /* ---- EDITING A MESSAGE IN PLACE ---------------------------------------
+   *
+   * The form is already in the page, rendered hidden beside the text it would
+   * replace (partials/_chat.html). All this does is decide which of the two is
+   * showing, which is why editing still works with JavaScript off: there the
+   * box is simply always open.
+   *
+   * Delegated like everything else here, because the conversation is replaced
+   * whole by the poll and anything bound to a bubble at load would stop
+   * existing at the first refresh.
+   */
+  /* The box the control belongs to.
+   *
+   * Three shapes wear an editor and they are not nested the same way: a chat
+   * bubble ([data-msg]), a Wall post ([data-chat-scope]) and a Wall reply
+   * ([data-msg] again, inside the post). `closest` over both selectors picks
+   * the innermost, which is what makes the pencil on a reply open the reply's
+   * box and not the post's — the reply is found first on the way up. */
+  var EDIT_HOST = '[data-msg], [data-chat-scope]';
+
+  function hostOf(el) {
+    return el && el.closest && el.closest(EDIT_HOST);
+  }
+
+  function editorIn(row) {
+    return row && row.querySelector('[data-chat-edit]');
+  }
+
+  function openEditor(row) {
+    var form = editorIn(row);
+    if (!form) return;
+    /* One at a time. Two half-finished edits in one thread is a way to lose
+       the one you meant to keep. */
+    document.querySelectorAll('[data-chat-edit]').forEach(function (f) {
+      if (f !== form) f.hidden = true;
+    });
+    row.classList.add('is-editing');
+    form.hidden = false;
+    var box = form.querySelector('[data-chat-edit-body]');
+    if (!box) return;
+    box.style.height = 'auto';
+    box.style.height = Math.min(box.scrollHeight, 150) + 'px';
+    box.focus();
+    // Caret at the end, not at the start: an edit is almost always a fix to
+    // the end of a line, and selecting the whole thing invites replacing it.
+    box.setSelectionRange(box.value.length, box.value.length);
+  }
+
+  function closeEditor(row) {
+    var form = editorIn(row);
+    if (!form) return;
+    form.hidden = true;
+    row.classList.remove('is-editing');
+    // Put back what was actually sent, so reopening does not resume an
+    // abandoned draft as though it were the message.
+    var box = form.querySelector('[data-chat-edit-body]');
+    if (box) box.value = box.defaultValue;
+  }
+
+  document.addEventListener('click', function (e) {
+    var open = e.target.closest && e.target.closest('[data-chat-edit-open]');
+    if (open) {
+      closeMsgMenu();            // the menu did its job
+      var row = hostOf(open);
+      if (row) openEditor(row);
+      return;
+    }
+    var cancel = e.target.closest && e.target.closest('[data-chat-edit-cancel]');
+    if (cancel) {
+      var cancelRow = hostOf(cancel);
+      if (cancelRow) closeEditor(cancelRow);
+    }
+  });
+
+  /* Escape closes it, as it closes everything else that opens over something.
+     Enter sends it, because this is a chat and that is what Enter does here —
+     Shift+Enter still breaks the line. */
+  document.addEventListener('keydown', function (e) {
+    var box = e.target;
+    if (!box.matches || !box.matches('[data-chat-edit-body]')) return;
+    if (e.key === 'Escape') {
+      var row = hostOf(box);
+      if (row) closeEditor(row);
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      var form = box.closest('form');
+      if (form && form.requestSubmit) form.requestSubmit();
+      else if (form) form.submit();
+    }
+  });
+
+  /* ---- A POLL MUST NOT PULL A CLIP OUT FROM UNDER SOMEBODY --------------
+   *
+   * CLIENT, 17 SEP 2026: "the audio only lasts a few seconds after you click
+   * on it and then it cuts off."
+   *
+   * Nothing was wrong with the player or the file. The conversation refreshes
+   * itself every twelve seconds by replacing the whole scrolling pane
+   * (partials/_room_stream.html), and a replaced <audio> is a destroyed
+   * <audio>: the element that was playing is gone, its replacement is a new
+   * one at 0:00 and paused. So every voice note stopped somewhere inside the
+   * first twelve seconds, at a point that moved depending on when in the
+   * cycle you pressed play — which is exactly what "a few seconds" describes.
+   *
+   * The pane already refuses to poll while the tab is in the background, for
+   * the same class of reason. This is the other case where refreshing costs
+   * more than it is worth: while something is playing inside it, the poll
+   * waits. A voice note is capped at ninety seconds and the reader is, by
+   * definition, right there — a message arriving during one shows up the
+   * moment the clip finishes.
+   *
+   * Only actual playback holds it off. A note left PAUSED half way does lose
+   * its place at the next swap, and that is the deliberate side of the trade:
+   * a guard that also counted paused clips could be held open indefinitely by
+   * somebody who pressed pause and walked away, and a conversation that never
+   * updates again is a worse bug than the one being fixed.
+   *
+   * Applies to video by the same argument, and to any polled region — the
+   * rule is about the region, not about this screen.
+   */
+  function mediaPlayingInside(el) {
+    if (!el || !el.querySelectorAll) return false;
+    var media = el.querySelectorAll('audio, video');
+    for (var i = 0; i < media.length; i++) {
+      if (!media[i].paused && !media[i].ended) return true;
+    }
+    return false;
+  }
+
+  document.body && document.body.addEventListener('htmx:beforeRequest', function (e) {
+    var el = e.detail && e.detail.elt;
+    if (!el || !el.getAttribute) return;
+    // Polls only. A press of Send, a room change or a reply must always go.
+    var trigger = el.getAttribute('hx-trigger') || '';
+    if (trigger.indexOf('every') === -1) return;
+    if (mediaPlayingInside(el)) { e.preventDefault(); return; }
+    /* AN OPEN EDITOR IS STATE THE READER MADE, and the poll replaces the pane
+       it sits in. The composer was moved outside the polled region for exactly
+       this reason (see partials/_room_stream.html) — an editor cannot be,
+       because it belongs to the message it is editing. So the poll waits, the
+       same way it waits for a clip. Closing the box lets it through again. */
+    if (el.querySelector('[data-chat-edit]:not([hidden])')) e.preventDefault();
+  });
 })();

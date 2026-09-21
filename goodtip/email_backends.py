@@ -31,6 +31,39 @@ API_URL = "https://api.postmarkapp.com/email/batch"
 MAX_BATCH = 500
 
 
+def _subject_of(batch) -> str:
+    """The subject of the first message in a Postmark batch.
+
+    A batch is almost always one template going to many people, so the first
+    subject names the whole batch. Where it is not, the count beside it is
+    what says so.
+    """
+    try:
+        return (batch[0] or {}).get("Subject", "")
+    except (IndexError, AttributeError, TypeError):
+        return ""
+
+
+def _log(backend, subject, recipients, ok, detail=""):
+    """Record one outbound batch for the Services screen.
+
+    Imported inside the function on purpose: this module is loaded while
+    settings are being read, and reaching for a model at import time is how an
+    app-registry-not-ready error turns "the site cannot send email" into "the
+    site cannot start". MailLog.record swallows its own failures too — see
+    the note there — so this is the second lock on the same door.
+    """
+    try:
+        from sysadmin.models import MailLog
+
+        MailLog.record(
+            backend=backend, subject=subject, recipients=recipients,
+            ok=ok, detail=detail,
+        )
+    except Exception:  # noqa: BLE001 — monitoring must never break a send
+        pass
+
+
 class PostmarkEmailBackend(BaseEmailBackend):
     def __init__(self, fail_silently=False, **kwargs):
         super().__init__(fail_silently=fail_silently, **kwargs)
@@ -53,6 +86,10 @@ class PostmarkEmailBackend(BaseEmailBackend):
             logger.warning(
                 "POSTMARK_SERVER_TOKEN is not set — %d message(s) dropped.",
                 len(email_messages),
+            )
+            _log(
+                "postmark", email_messages[0].subject, len(email_messages),
+                False, "POSTMARK_SERVER_TOKEN is not set",
             )
             return 0
 
@@ -116,6 +153,7 @@ class PostmarkEmailBackend(BaseEmailBackend):
             results = r.json()
         except requests.RequestException as e:
             logger.error("Postmark batch of %d failed: %s", len(batch), e)
+            _log("postmark", _subject_of(batch), len(batch), False, str(e))
             if not self.fail_silently:
                 raise
             return 0
@@ -123,6 +161,7 @@ class PostmarkEmailBackend(BaseEmailBackend):
         # Postmark returns 200 for the batch with per-message ErrorCode values,
         # so a 2xx does not mean every message was accepted.
         ok = 0
+        rejected = []
         for res in results if isinstance(results, list) else []:
             self.last_results.append(res)
             if res.get("ErrorCode") == 0:
@@ -132,6 +171,16 @@ class PostmarkEmailBackend(BaseEmailBackend):
                     "Postmark rejected %s: [%s] %s",
                     res.get("To"), res.get("ErrorCode"), res.get("Message"),
                 )
+                rejected.append(f"[{res.get('ErrorCode')}] {res.get('Message')}")
+        # ONE ROW FOR THE BATCH, because Postmark answered it as a batch. A row
+        # per recipient would be five hundred independent-looking outcomes that
+        # were in fact one request — and the first thing anybody would do with
+        # them is count failures, which would then be wrong by a factor of the
+        # batch size.
+        _log(
+            "postmark", _subject_of(batch), len(batch),
+            ok == len(batch), "; ".join(rejected[:3]),
+        )
         return ok
 
 
@@ -231,6 +280,16 @@ class AllowlistEmailBackend(BaseEmailBackend):
                 "EMAIL_ALLOWLIST: %d message(s) dropped, %d allowed through.",
                 len(blocked),
                 len(permitted),
+            )
+            # Recorded as a FAILURE, deliberately. Nothing is broken — the
+            # allowlist did its job — but on the Services screen "we tried to
+            # email forty people and forty did not get it" is the fact that
+            # matters, and a screen that reported it as a clean send would be
+            # the reason somebody spends an afternoon wondering why nothing
+            # arrived on staging.
+            _log(
+                "allowlist", blocked[0].subject, len(blocked), False,
+                "Held by EMAIL_ALLOWLIST",
             )
 
         return self.delegate.send_messages(permitted) if permitted else 0

@@ -39,6 +39,81 @@ class LoginEvent(models.Model):
         return f"{self.email or 'unknown'} ({state}) @ {self.created_at:%Y-%m-%d %H:%M}"
 
 
+class MailLog(models.Model):
+    """One outbound batch of email, recorded so it can be watched.
+
+    CLIENT, 20 SEP 2026: "in the super admin we also need to add Services —
+    where in Services we have things like email services, where we monitor the
+    email services and such."
+
+    THIS WAS THE ONE SERVICE WITH NO RECORD. The fixture syncs have SyncRun,
+    Prefect has its flags, the recaps have their rows, MatchReader has its
+    model versions — every one of those can be asked how it has been getting
+    on. Email could only be asked of the application log, over ssh, if the log
+    had not rotated. So "did that organisation's invitations actually go?" was
+    unanswerable from inside the product, which is exactly the question people
+    ask about email and exactly the one the Services screen exists to answer.
+
+    A BATCH, NOT A MESSAGE. The Postmark backend posts up to five hundred
+    messages in one request and gets one answer back, so a row per recipient
+    would be five hundred rows claiming five hundred independent outcomes that
+    were in fact one. `recipients` is how many the batch carried.
+
+    NO ADDRESSES AND NO BODIES. This is a health record, not an archive: it
+    holds how many, whether it worked, and what broke. Keeping who was written
+    to and what was said would make an inbox out of a monitoring table, and
+    every member's correspondence readable by anyone with the Services screen.
+    The subject is kept because it is the only thing that says WHICH email, and
+    subjects here are templated lines like "Your sign-in code".
+    """
+
+    #: What handled it. The same field can carry another provider later without
+    #: a migration, which is the point of it being text.
+    backend = models.CharField(max_length=40, default="postmark")
+    subject = models.CharField(max_length=200, blank=True)
+    recipients = models.PositiveIntegerField(default=0)
+    #: Accepted by the provider. False is a refusal or a transport failure; the
+    #: reason is in `detail`.
+    ok = models.BooleanField(default=True)
+    #: Why it failed, or why it was held. Truncated hard — a provider that
+    #: returns a wall of JSON should not be able to fill the table with it.
+    detail = models.CharField(max_length=300, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "mail send"
+        verbose_name_plural = "mail sends"
+        indexes = [
+            models.Index(fields=["-created_at"]),
+            models.Index(fields=["ok", "-created_at"]),
+        ]
+
+    def __str__(self):
+        state = "ok" if self.ok else "failed"
+        return f"{self.subject or 'email'} × {self.recipients} ({state})"
+
+    @classmethod
+    def record(cls, *, backend, subject, recipients, ok, detail=""):
+        """Write one row, and never let writing it break a send.
+
+        Called from inside the email backend, which is to say from inside
+        whatever was trying to email somebody. A monitoring table that can
+        raise is a monitoring table that can stop a sign-in code going out,
+        and the whole point of it is the opposite.
+        """
+        try:
+            return cls.objects.create(
+                backend=backend[:40],
+                subject=(subject or "")[:200],
+                recipients=max(0, int(recipients or 0)),
+                ok=bool(ok),
+                detail=(detail or "")[:300],
+            )
+        except Exception:  # noqa: BLE001 — see above
+            return None
+
+
 class StressTestRun(models.Model):
     """The result of a load/stress test run against this app.
 

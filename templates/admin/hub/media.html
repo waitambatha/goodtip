@@ -1,0 +1,96 @@
+{% extends "admin/hub/base.html" %}
+{% load i18n %}
+
+{% comment %}
+THE MEDIA LIBRARY.
+
+Client, 20 Sep 2026: "the admin did want some images removed, so that had me
+thinking we need to add a functionality in the super admin that will be images
+and videos — all the images and videos, when clicked, it should [show] where
+and where it is being displayed, and have the option of changing it."
+
+A GALLERY, NOT A TABLE. The thing somebody is looking for here is a picture,
+and they will recognise it in a tenth of the time it takes them to read a
+filename. So the tile is the picture, big enough to be recognised, and the name
+is underneath it in small type for when two shots of the same ground need
+telling apart.
+
+THE FILTERS ARE PLAIN LINKS, not a form. Every state of this screen is an
+address — somebody can send "the videos" to a colleague, and the back button
+walks back through what they looked at. A GET form would do the same thing
+with more machinery and a worse URL.
+
+Two sources, and the labels say which is which everywhere: a picture that
+ships with the product and one somebody uploaded are changed in completely
+different ways, and a gallery that blurred them would send half the people who
+used it to the wrong screen.
+{% endcomment %}
+
+{% block hub_accent %}var(--gt-c4){% endblock %}
+{% block hub_ic %}ic-image{% endblock %}
+
+{% block hub_aside %}
+<div class="gta-media-tally">
+  <b>{{ totals.images }}</b><span>{% translate "pictures" %}</span>
+  <b>{{ totals.videos }}</b><span>{% translate "clips" %}</span>
+</div>
+{% endblock %}
+
+{% block hub_body %}
+
+<form class="gta-media-find" method="get" action="">
+  <input type="hidden" name="source" value="{{ source }}">
+  <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="search" name="q" value="{{ q }}" placeholder="{% translate 'Find a picture by name, or by what it belongs to' %}"
+         aria-label="{% translate 'Search the library' %}">
+  <button type="submit" class="gta-btn">{% translate "Search" %}</button>
+  {% if q %}<a class="gta-media-clear" href="?source={{ source }}&amp;kind={{ kind }}">{% translate "Clear" %}</a>{% endif %}
+</form>
+
+<div class="gta-media-filters">
+  <div class="gta-chipset" role="group" aria-label="{% translate 'Where it comes from' %}">
+    <a class="gta-chip{% if source == 'all' %} on{% endif %}" href="?kind={{ kind }}{% if q %}&amp;q={{ q }}{% endif %}">{% translate "Everything" %}</a>
+    <a class="gta-chip{% if source == 'site' %} on{% endif %}" href="?source=site&amp;kind={{ kind }}{% if q %}&amp;q={{ q }}{% endif %}">{% translate "Ships with the site" %}</a>
+    <a class="gta-chip{% if source == 'upload' %} on{% endif %}" href="?source=upload&amp;kind={{ kind }}{% if q %}&amp;q={{ q }}{% endif %}">{% translate "Uploaded" %}</a>
+  </div>
+  <div class="gta-chipset" role="group" aria-label="{% translate 'Pictures or clips' %}">
+    <a class="gta-chip{% if kind == 'all' %} on{% endif %}" href="?source={{ source }}{% if q %}&amp;q={{ q }}{% endif %}">{% translate "Both" %}</a>
+    <a class="gta-chip{% if kind == 'image' %} on{% endif %}" href="?source={{ source }}&amp;kind=image{% if q %}&amp;q={{ q }}{% endif %}">{% translate "Pictures" %}</a>
+    <a class="gta-chip{% if kind == 'video' %} on{% endif %}" href="?source={{ source }}&amp;kind=video{% if q %}&amp;q={{ q }}{% endif %}">{% translate "Clips" %}</a>
+  </div>
+</div>
+
+{% if assets %}
+<p class="gta-media-count">{% blocktranslate count n=showing.total %}{{ n }} item{% plural %}{{ n }} items{% endblocktranslate %}</p>
+<div class="gta-media-grid">
+  {% for a in assets %}
+  <a class="gta-media-tile" href="{% url 'admin:hq_media_detail' %}?source={{ a.source }}&amp;key={{ a.key|urlencode }}">
+    <span class="gmt-shot">
+      {% if a.kind == 'video' %}
+        {% comment %}
+        preload="metadata" so a gallery of clips fetches poster frames and not
+        sixty whole videos. muted and playsinline because some browsers will
+        not draw a frame at all for a clip they are not allowed to play.
+        {% endcomment %}
+        <video src="{{ a.url }}" preload="metadata" muted playsinline></video>
+        <span class="gmt-play" aria-hidden="true">&#9658;</span>
+      {% else %}
+        <img src="{{ a.url }}" alt="" loading="lazy">
+      {% endif %}
+    </span>
+    <span class="gmt-meta">
+      <b>{{ a.name }}</b>
+      <small>{% if a.owner_label %}{{ a.owner_label }}{% else %}{{ a.subtitle }}{% endif %}</small>
+    </span>
+    <span class="gmt-tags">
+      <i class="gmt-tag {% if a.source == 'site' %}is-site{% else %}is-up{% endif %}">{% if a.source == 'site' %}{% translate "Site" %}{% else %}{% translate "Uploaded" %}{% endif %}</i>
+      {% if a.size_label %}<i class="gmt-tag">{{ a.size_label }}</i>{% endif %}
+    </span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<p class="gta-empty">{% translate "Nothing here matches that." %}</p>
+{% endif %}
+
+{% endblock %}

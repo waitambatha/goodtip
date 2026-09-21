@@ -46,7 +46,20 @@
 (function () {
   'use strict';
 
-  var SHOW_AFTER = 180;      // ms before a veil is worth showing at all
+  /* WHEN A VEIL APPEARS, AND HOW LONG IT STAYS.
+   *
+   * SHOW_AFTER is the flash guard: below it the swap simply happens, which is
+   * what "fast" should look like. It came down from 180ms because at that
+   * threshold a good connection never saw a scoped loader at all, and the
+   * client asked to be able to see them (20 Sep 2026).
+   *
+   * MIN_SHOW is the other half of the same problem, and without it lowering
+   * SHOW_AFTER would make things worse: a response landing at 130ms would put
+   * a veil up and take it down two frames later, which reads as a glitch
+   * rather than as progress. Once one is up it stays up for long enough to be
+   * read as deliberate. */
+  var SHOW_AFTER = 110;      // ms before a veil is worth showing at all
+  var MIN_SHOW = 520;        // ms it stays once it has appeared
   var pending = new WeakMap();
 
   /* A ball with a progress ring sweeping around it. The splash uses a ball, so
@@ -63,6 +76,110 @@
     wrap.appendChild(document.createElement('i'));
     return wrap;
   }
+
+  /* ---- FOUR LOADERS PER COMPETITION, AND YOU GET A DIFFERENT ONE EACH TIME
+   *
+   * CLIENT, 20 SEP 2026, correcting the first attempt: "when you log in we
+   * have filter buttons in pages like ladder, leaderboard — some are for
+   * organisations, some are for groups, some are for competition. That is when
+   * I said let each competition have like 4 types of loaders with its own type
+   * of animation, so when I click NRL to see maybe the leaderboard, that small
+   * section that is loading should have the different loader. And the reason I
+   * said 4 in each competition is that if I have a certain loader I have seen
+   * in NRL, if I go to NRL again I should see another type of design and
+   * animation."
+   *
+   * The first pass read "four" as four kinds of DATA — one shape for fixtures,
+   * one for a ladder and so on — so pressing NRL twice gave you the same
+   * loader twice, which is the one thing the sentence rules out. The four are
+   * a ROTATION, and the position is kept per competition: NRL walks kick →
+   * climb → score → sweep → kick, and AFLW has its own place in the cycle.
+   *
+   * WHICH SHAPE and WHICH COLOUR are separate questions, which is what keeps
+   * this at four shapes rather than twenty-four. The shape is the rotation;
+   * the colour is the competition's own token, read off the [data-code] the
+   * pressed control already carries. Add a competition tomorrow and it has all
+   * four the day it gets a colour.
+   *
+   * Stepping rather than random, for the same reason the splash steps: random
+   * gives you the same one three presses running, and three identical loaders
+   * in a row is exactly what the client is complaining about.
+   *
+   * Every animated node carries `busy-run` on the ELEMENT. The blanket
+   * reduced-motion rule kills animation on anything without it, and a class on
+   * a wrapper does not reach the children inside it.
+   */
+  var SHAPES = ['kick', 'climb', 'score', 'sweep'];
+  var SHAPE_STORE = 'gt-veil-shape:';
+
+  function nextShape(code) {
+    var key = SHAPE_STORE + (code || 'all');
+    var i = -1;
+    try {
+      var stored = parseInt(window.localStorage.getItem(key), 10);
+      if (!isNaN(stored)) i = stored;
+    } catch (e) { /* storage blocked — fall through to a random start */ }
+    i = i < 0 ? Math.floor(Math.random() * SHAPES.length) : (i + 1) % SHAPES.length;
+    try { window.localStorage.setItem(key, String(i)); } catch (e) { /* ignore */ }
+    return SHAPES[i];
+  }
+
+  function shapeNode(shape) {
+    var wrap = document.createElement('span');
+    wrap.setAttribute('aria-hidden', 'true');
+
+    if (shape === 'climb') {
+      /* Four bars finding their order. Deliberately NOT four bars growing in
+         step — a ladder is about which is above which, so they overtake. A row
+         pulsing together is an equaliser, and an equaliser says "audio". */
+      wrap.className = 'bv-climb';
+      wrap.innerHTML =
+        '<i class="busy-run"></i><i class="busy-run"></i>' +
+        '<i class="busy-run"></i><i class="busy-run"></i>';
+      return wrap;
+    }
+    if (shape === 'score') {
+      /* A scoreline settling: two blocks turning over with the dash between
+         them held still, so the eye has one fixed point. Scaling on Y rather
+         than sliding digits — a number you cannot read beats a wrong one. */
+      wrap.className = 'bv-score';
+      wrap.innerHTML =
+        '<i class="bv-score-n busy-run"></i><b>&ndash;</b>' +
+        '<i class="bv-score-n bv-score-b busy-run"></i>';
+      return wrap;
+    }
+    if (shape === 'sweep') {
+      /* Four chevrons chasing across, each picking up where the last left
+         off. The only one of the four that travels, which is what makes it
+         read as different from the kick rather than as a smaller version. */
+      wrap.className = 'bv-sweep';
+      wrap.innerHTML =
+        '<i class="busy-run"></i><i class="busy-run"></i>' +
+        '<i class="busy-run"></i><i class="busy-run"></i>';
+      return wrap;
+    }
+    /* kick — a ball over a set of posts, in miniature. The default, and the
+       one that ties the small loaders to the splash. */
+    wrap.className = 'bv-kick';
+    wrap.innerHTML =
+      '<i class="bv-kick-posts busy-run"></i><b class="bv-kick-ball busy-run"></b>';
+    return wrap;
+  }
+
+  /* Which competition's colour this veil wears.
+   *
+   * data-veil-code is the explicit answer, for a control that is not itself
+   * inside the thing it is fetching. Otherwise the nearest [data-code] above
+   * the trigger — which on the filter chips IS the trigger. Nothing found
+   * means no code, and the veil keeps the app's own green, which is right for
+   * "all competitions": it is not a competition and should not borrow one. */
+  function codeFor(el) {
+    var named = el.getAttribute && el.getAttribute('data-veil-code');
+    if (named) return named;
+    var host = el.closest && el.closest('[data-code]');
+    return host ? host.getAttribute('data-code') : '';
+  }
+
 
   function label(el) {
     return el.getAttribute('data-veil-label') || 'Loading';
@@ -102,24 +219,43 @@
     return !!trigger && trigger.indexOf('every') !== -1;
   }
 
-  function show(scope, text) {
+  function show(scope, text, shape, code) {
     if (!scope || scope.querySelector(':scope > .busy-veil')) return;
 
     var veil = document.createElement('div');
     veil.className = 'busy-veil bv-scoped';
     veil.setAttribute('role', 'status');
     veil.setAttribute('aria-live', 'polite');
+    /* The competition's token, on the veil itself. Everything inside draws in
+       var(--code), so one attribute colours the whole thing and no shape ever
+       names a colour. */
+    if (code) veil.setAttribute('data-code', code);
+
+    /* A SMALL REGION GETS THE SHAPE AND NOT THE SENTENCE.
+     *
+     * The veil carries a caption because on a fixture list or a ladder it is
+     * worth saying what is being fetched. On a reaction chip it is not: the
+     * scope is forty pixels across, and "LOADING" laid over it is a word
+     * wider than the thing it is describing. Below the threshold the label is
+     * dropped and the animation alone reports the wait, which is all the room
+     * there is and all the information a toggle needs. */
+    var at = scope.getBoundingClientRect();
+    var tight = at.width < 220 || at.height < 90;
+    if (tight) veil.setAttribute('data-veil-compact', '');
 
     var inner = document.createElement('div');
     inner.className = 'bv-inner';
-    inner.appendChild(spinner());
+    inner.appendChild(shapeNode(shape));
 
-    var caption = document.createElement('span');
-    caption.className = 'bv-label';
-    caption.textContent = text;          // textContent — a label can never inject markup
-    inner.appendChild(caption);
+    if (!tight) {
+      var caption = document.createElement('span');
+      caption.className = 'bv-label';
+      caption.textContent = text;        // textContent — a label can never inject markup
+      inner.appendChild(caption);
+    }
 
     veil.appendChild(inner);
+    veil.dataset.shownAt = String(Date.now());
     scope.classList.add('is-busy-scope');
     scope.appendChild(veil);
   }
@@ -127,8 +263,20 @@
   function clear(scope) {
     if (!scope) return;
     var veil = scope.querySelector(':scope > .busy-veil');
-    if (veil) veil.remove();
-    if (!scope.querySelector('.busy-veil')) scope.classList.remove('is-busy-scope');
+    if (!veil) {
+      if (!scope.querySelector('.busy-veil')) scope.classList.remove('is-busy-scope');
+      return;
+    }
+    /* Held for the rest of MIN_SHOW where the answer beat it. See the note on
+       the constant: a veil that appears and vanishes inside a couple of frames
+       is read as a glitch, not as a load. */
+    var shown = parseInt(veil.dataset.shownAt || '0', 10);
+    var left = MIN_SHOW - (Date.now() - shown);
+    var drop = function () {
+      veil.remove();
+      if (!scope.querySelector('.busy-veil')) scope.classList.remove('is-busy-scope');
+    };
+    if (left > 0) setTimeout(drop, left); else drop();
   }
 
   document.body.addEventListener('htmx:beforeRequest', function (evt) {
@@ -138,7 +286,13 @@
     var scope = scopeFor(evt);
     if (!scope) return;
 
-    var timer = setTimeout(function () { show(scope, label(el)); }, SHOW_AFTER);
+    var code = codeFor(el);
+    /* Advanced at REQUEST time, not at paint time. A fast round trip never
+       paints a veil at all, and if it did not move the cycle on, a run of
+       quick presses would leave the next slow one showing the shape you last
+       actually saw. */
+    var shape = nextShape(code);
+    var timer = setTimeout(function () { show(scope, label(el), shape, code); }, SHOW_AFTER);
     pending.set(el, { timer: timer, scope: scope });
   });
 
@@ -166,10 +320,19 @@
   document.body.addEventListener('htmx:afterSettle', function () {
     document.querySelectorAll('.bv-scoped').forEach(function (v) {
       var scope = v.parentElement;
-      v.remove();
-      if (scope && !scope.querySelector('.busy-veil')) {
-        scope.classList.remove('is-busy-scope');
+      /* A veil whose scope was replaced by the swap is already off the screen
+         — the new content is in its place — so it goes at once. Holding it for
+         MIN_SHOW would be holding a node nobody can see.
+
+         One still attached to a live region is a different thing: it IS what
+         the reader is looking at, and it gets the same minimum as every other
+         veil rather than being yanked a frame after it appeared. */
+      if (!scope || !document.body.contains(scope)) {
+        v.remove();
+        if (scope) scope.classList.remove('is-busy-scope');
+        return;
       }
+      clear(scope);
     });
   });
 
@@ -228,7 +391,9 @@
 
     var scope = navScope(link);
     if (!scope) return;
-    setTimeout(function () { show(scope, label(scope)); }, SHOW_AFTER);
+    var code = codeFor(link);
+    var shape = nextShape(code);
+    setTimeout(function () { show(scope, label(scope), shape, code); }, SHOW_AFTER);
   });
 
   document.addEventListener('submit', function (e) {
@@ -237,7 +402,9 @@
     if (form.method && form.method.toLowerCase() !== 'get') return;
     var scope = navScope(form);
     if (!scope) return;
-    setTimeout(function () { show(scope, label(scope)); }, SHOW_AFTER);
+    var fcode = codeFor(form);
+    var fshape = nextShape(fcode);
+    setTimeout(function () { show(scope, label(scope), fshape, fcode); }, SHOW_AFTER);
   });
 
   /* Back/forward can restore a page from cache with a veil still painted on

@@ -1,0 +1,242 @@
+{% extends "public/base.html" %}
+{% load static %}
+{% comment %}
+TERMS OF USE.
+
+Built exactly like the Privacy Policy next door, and for the same reasons:
+clauses as cards with edges you can point at, a sticky contents rail, and every
+clause editable from the Pages screen in /admin/ so the client's lawyer can
+revise the wording without a deploy.
+
+NOT SIGNED OFF, AND THE PAGE SAYS SO. The client's task list has "Terms and
+Conditions and Privacy Policy sign-off" open, pending the outstanding NFP and
+gaming lawyer review. What is written below describes what this system actually
+does — one fee, no stake, no prize pool, who can see what — which is the only
+honest starting point for a lawyer to work from, and a great deal more use to
+them than boilerplate copied off another product. The banner at the top is
+deliberate and should come off as part of sign-off, not before it.
+
+THE WAGERING CLAUSE IS THE ONE TO READ TWICE. GoodTip's whole position is that
+this is not gambling: no entry fee, no stake, no prize pool, no cash prize. §3
+is where that is stated as a rule members agree to rather than as marketing
+copy, and it is the clause the gaming review exists to check.
+
+The top-three summary is not repeated here in its own words — it is printed
+from goodtip/legal.py, the same source the sign-up checkbox reads, so the
+summary somebody agreed to and the summary on this page cannot drift apart.
+{% endcomment %}
+
+{% block title %}Terms &middot; GoodTip{% endblock %}
+{% block loader_task %}Loading the terms{% endblock %}
+{% block meta_description %}The terms for using GoodTip: one platform fee, free to play, no stake and no prize pool.{% endblock %}
+{% block body_class %}page-legal{% endblock %}
+
+{% block extra_head %}
+{% comment %}
+Marks the clause you are reading — the card takes the green and the contents
+rail lights to match. See static/js/gt-legal.js for why it is a reading band
+rather than hover.
+{% endcomment %}
+<script src="{% static 'js/gt-legal.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+
+<!-- SPLIT HERO -->
+{% comment %}
+THE SPLIT, NOT A BAND (client, 20 Sep 2026: "on the Terms and Privacy we
+should have the hero split at the top, and the images on one side").
+
+This is the resolution of what looked like two contradictory instructions. The
+photograph was a problem when it sat BEHIND the words — a shot at 34% under a
+veil, with the heading on top of it, which is what read as translucent. In a
+split it is beside them: its own panel, its own edge, nothing over it and
+nothing under the type. The document keeps a clean ground and the page keeps a
+picture, and the two stop fighting.
+
+Same component the pricing and sponsorship heroes use, so these five public
+pages now open the same way.
+{% endcomment %}
+<section class="hero-split hero-legal">
+  <div class="hs-left">
+    <span class="pill" style="align-self:flex-start;margin-bottom:22px;"><span class="dot"></span>Legal</span>
+    <h1>Terms of Use</h1>
+    <p class="hero-sub">What GoodTip provides, what your organisation agrees to, and what nobody is ever asked for. In plain English, because terms nobody can read are terms nobody agreed to.</p>
+    <div class="hl-meta">
+      <span class="hl-chip"><svg><use href="#ic-clock"/></svg> Last updated: {{ terms_version }}</span>
+      <span class="hl-chip"><svg><use href="#ic-shield-check"/></svg> Applies to goodtip.com.au and the GoodTip app</span>
+    </div>
+  </div>
+  <div class="hs-right">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="shot active" style="background-image:url('{% static 'img/scenes/stadium-panorama.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/mcg-stadium.jpg' %}')"></div>
+    </div>
+    <div class="hs-veil" aria-hidden="true"></div>
+    <div class="hs-tagstrip"><span class="live-dot">Plain English, on purpose</span></div>
+  </div>
+</section>
+
+<section class="section on-cream" style="padding-top:clamp(36px,5vw,56px);">
+  {% comment %}
+  THE SIDE RAILS ARE GONE TOO (client, 20 Sep 2026: "remove that translucent
+  feel, and let's have white and green").
+
+  Four more stadium photographs, 230px wide and running the FULL height of the
+  document down both margins. On a marketing page they frame the content; on a
+  legal one they put a picture of a goalpost beside every clause somebody is
+  being asked to agree to, and they were the last thing making this page feel
+  like a poster instead of a document.
+
+  The section keeps `on-cream` and drops `has-rails`, so the clauses sit on
+  paper edge to edge.
+  {% endcomment %}
+
+  <div class="wrap">
+
+    {% comment %}
+    The banner comes off at sign-off, not before. Publishing a document that
+    looks final while a lawyer still has it is the failure mode worth a banner.
+    {% endcomment %}
+    <div class="flash info" style="margin-bottom:26px;max-width:860px;">
+      <span><b>Draft, pending legal sign-off.</b> These terms describe how GoodTip actually works today and are written to be read, not to be impressive. They have not yet been reviewed by a lawyer. If anything here matters to a decision you're making, <a href="mailto:hello@goodtip.com.au">ask us</a> and we'll tell you where it stands.</span>
+    </div>
+
+    {% comment %}
+    THE SUMMARY FIRST, and it is the same three paragraphs printed beside the
+    checkbox in the organisation sign-up. Somebody arriving here from that
+    checkbox should meet what they just read, not a differently worded version
+    of it that leaves them wondering which one they agreed to.
+    {% endcomment %}
+    <div class="legal-summary reveal" style="max-width:860px;margin-bottom:34px;">
+      <p class="eyebrow">The short version</p>
+      <h2 class="section-heading" style="margin-bottom:14px;">Three things worth knowing.</h2>
+      <ol class="terms-three">
+        {% for heading, body in terms_top_three %}
+        <li><b>{{ heading }}</b><span>{{ body }}</span></li>
+        {% endfor %}
+      </ol>
+      <p class="note" style="margin-top:14px;">Everything below is the long version. The three above are the parts people are most often surprised by.</p>
+    </div>
+
+    <div class="legal-layout" data-legal>
+
+      <!-- CONTENTS RAIL -->
+      <nav class="legal-toc" aria-label="Contents">
+        <div class="lt-head">On this page</div>
+        <a href="#what"><i>01</i><span>What GoodTip is</span></a>
+        <a href="#accounts"><i>02</i><span>Accounts</span></a>
+        <a href="#nowagering"><i>03</i><span>No stake, no prize pool</span></a>
+        <a href="#fee"><i>04</i><span>The platform fee</span></a>
+        <a href="#donation"><i>05</i><span>The donation</span></a>
+        <a href="#admins"><i>06</i><span>If you run an organisation</span></a>
+        <a href="#conduct"><i>07</i><span>Behaving on the Wall</span></a>
+        <a href="#results"><i>08</i><span>Fixtures and scoring</span></a>
+        <a href="#ending"><i>09</i><span>Ending it</span></a>
+        <a href="#liability"><i>10</i><span>What we don't promise</span></a>
+        <a href="#changes"><i>11</i><span>Changes</span></a>
+      </nav>
+
+      <!-- CLAUSES -->
+      <div class="legal-body">
+        <article class="legal-card reveal" id="what">
+          <h2><span class="lc-n">01</span> What GoodTip is</h2>
+          <div class="prose">
+            <p>GoodTip is a footy tipping competition for workplaces, clubs, schools and groups of friends. Your organisation runs a comp, its members pick winners each round, and a ladder keeps score. Your organisation pays one platform fee per season and GoodTip gives a share of that fee to a charity your organisation chooses.</p>
+            <p>We are not affiliated with the AFL or the NRL, or with any club or competition. Team names and fixtures are used to describe real matches and nothing more.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="accounts">
+          <h2><span class="lc-n">02</span> Accounts</h2>
+          <div class="prose">
+            <p>You need an account to tip, and you must be old enough to hold one under the law where you live. Keep your sign-in details to yourself — anything done from your account is treated as done by you. Tell us if you think somebody else has got into it.</p>
+            <p>Use a real name or a display name people in your organisation will recognise. Accounts set up to impersonate somebody else are closed.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="nowagering">
+          <h2><span class="lc-n">03</span> No stake, no prize pool</h2>
+          <div class="prose">
+            <p>GoodTip is free to play. There is no entry fee, no stake, no prize pool and no cash prize. What is on the line is the ladder.</p>
+            <p>You agree not to run a side pot, a buy-in, a sweep or any betting arrangement through GoodTip or on the back of a GoodTip comp. Organisations found doing it have their comp closed. This is not a technicality we are being careful about — it is the difference between what this is and what it is not.</p>
+            <p>Nothing on GoodTip is betting advice, and nothing here is an invitation to bet anywhere else.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="fee">
+          <h2><span class="lc-n">04</span> The platform fee</h2>
+          <div class="prose">
+            <p>One fee per organisation per season, priced by how many people are in the comp, in Australian dollars. It is charged when the comp launches — setting an organisation up, inviting people and running the charity vote are all free before that.</p>
+            <p>Founding Member pricing, where an organisation holds it, locks the rate charged at renewal for the seasons stated on that organisation's plan screen. It is a ceiling on what you are charged, never a floor: move up to a larger plan and you pay that plan's price, and you are never charged above the published price for the plan you are on.</p>
+            <p>Nobody playing is ever asked for money, and GoodTip never collects payment details from a participant.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="donation">
+          <h2><span class="lc-n">05</span> The donation</h2>
+          <div class="prose">
+            <p>GoodTip gives a share of the platform fee to the charity your organisation picked, from its own revenue. Your members' tips do not generate the donation and do not change its size — the fee does.</p>
+            <p>Your organisation chooses its charity from the list we make available, by vote or by an admin's decision, and can change it between seasons. Where a chosen charity cannot accept a donation, we will tell you and ask you to choose again.</p>
+            <p>Figures shown as examples on our marketing pages are labelled as examples and are not money raised.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="admins">
+          <h2><span class="lc-n">06</span> If you run an organisation</h2>
+          <div class="prose">
+            <p>Setting up an organisation makes you its admin. You can see your members' email addresses, invite and remove people, and act on their behalf inside the comp. You agree to use that only to run this comp.</p>
+            <p>Invite people who are expecting it. A list exported from somewhere else is not a reason to believe somebody wants a tipping invitation, and bulk invitations to people with no connection to your organisation are treated as spam.</p>
+            <p>You are responsible for what your organisation's admins do with it, including anyone you make an admin.</p>
+            <p><strong>As the Admin, Manager or Captain of your organisation you are responsible for the culture and behaviour of your group.</strong> That means setting the tone, moderating the Wall and group chat, and acting on anything that falls below the standard your members expect. GoodTip can act over the top of you where something is serious enough to warrant it, but the day-to-day is yours.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="conduct">
+          <h2><span class="lc-n">07</span> Behaving on the Wall</h2>
+          <div class="prose">
+            <p>The Wall and group chat are for the comp. Abuse, harassment, discrimination, threats, and content that is unlawful or obviously not welcome at somebody's work will be removed, and the account behind it can be suspended.</p>
+            <p>Your organisation's admins moderate their own comp and we can act over the top of them where something is serious enough to warrant it.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="results">
+          <h2><span class="lc-n">08</span> Fixtures, results and scoring</h2>
+          <div class="prose">
+            <p>Fixtures and results come from public sources and are reproduced as faithfully as we can manage. They can be late, and occasionally they can be wrong. Where a result is corrected, the affected round is re-scored.</p>
+            <p>Tips lock at the start of each match. If you have not tipped a match by then, the system records the away side for you, marked as an automatic pick so it can be told apart from one you made — it counts toward your points and not toward your accuracy.</p>
+            <p>The ladder is the product of those rules applied consistently. We will fix a scoring error when we find one; we will not adjust a ladder because a result went against somebody.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="ending">
+          <h2><span class="lc-n">09</span> Ending it</h2>
+          <div class="prose">
+            <p>You can leave an organisation, or ask us to delete your account, at any time. Deleting an account removes your personal details; tips already scored on a shared ladder stay as an anonymised record, because removing them would rewrite everyone else's season.</p>
+            <p>An organisation can stop at the end of a season by not renewing. Fees already paid for a season in progress are not refunded, except where the law says otherwise or where we have not delivered what was paid for.</p>
+            <p>We can suspend or close an account or an organisation that breaks these terms, and will say why.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="liability">
+          <h2><span class="lc-n">10</span> What we don't promise</h2>
+          <div class="prose">
+            <p>GoodTip is provided as it is. We work to keep it running and accurate, but we do not promise it will be uninterrupted, that every fixture will be current, or that it will suit a purpose you have in mind for it.</p>
+            <p>Nothing here excludes any right you have under the Australian Consumer Law or other law that cannot be excluded. Where we can limit our liability, it is limited to the platform fee your organisation paid for the season in question.</p>
+          </div>
+        </article>
+
+        <article class="legal-card reveal" id="changes">
+          <h2><span class="lc-n">11</span> Changes</h2>
+          <div class="prose">
+            <p>We will update these terms as the product changes. Where a change materially affects what your organisation agreed to, we will tell the admins by email before it takes effect, and the version you agreed to at sign-up is recorded against your organisation.</p>
+            <p>These terms are governed by the law of Victoria, Australia.</p>
+            <p>Questions: <a href="mailto:hello@goodtip.com.au">hello@goodtip.com.au</a>.</p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

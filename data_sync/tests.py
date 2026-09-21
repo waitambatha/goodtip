@@ -220,6 +220,83 @@ class MatchPhaseTests(_FixtureBase):
         )
         self.assertEqual(m.phase, "upcoming")
 
+    # ---- a match the feed stopped reporting on --------------------------
+    #
+    # Client, 19 Sep 2026: "it still says it going ... I've seen it stuck on
+    # 75 minutes." The feed drops a finished fixture from its live list, the
+    # row stops being written, and nothing disbelieved the flag it was left
+    # wearing.
+
+    def test_a_live_match_the_feed_is_still_reporting_stays_live(self):
+        m = self._match(
+            kickoff_at=timezone.now() - timedelta(minutes=75),
+            status=Match.STATUS_LIVE, period="2nd Half", clock="75:00",
+            home_score=18, away_score=12,
+            live_updated_at=timezone.now() - timedelta(minutes=1),
+        )
+        self.assertEqual(m.phase, "live")
+        self.assertEqual(m.live_label, "2nd Half 75:00")
+
+    def test_a_live_match_gone_quiet_for_an_hour_is_complete(self):
+        m = self._match(
+            kickoff_at=timezone.now() - timedelta(minutes=150),
+            status=Match.STATUS_LIVE, period="2nd Half", clock="75:00",
+            home_score=18, away_score=12,
+            live_updated_at=timezone.now() - timedelta(minutes=60),
+        )
+        self.assertTrue(m.live_has_lapsed)
+        self.assertEqual(m.phase, "complete")
+
+    def test_a_lapsed_match_stops_printing_its_frozen_clock(self):
+        m = self._match(
+            kickoff_at=timezone.now() - timedelta(minutes=150),
+            status=Match.STATUS_LIVE, period="2nd Half", clock="75:00",
+            live_updated_at=timezone.now() - timedelta(minutes=60),
+        )
+        self.assertEqual(m.live_label, "")
+        # And the badge beside the score does not claim to be the final one.
+        self.assertEqual(m.done_label, "Awaiting final score")
+
+    def test_a_live_flag_older_than_any_match_lapses_without_a_stamp(self):
+        m = self._match(
+            kickoff_at=timezone.now() - timedelta(hours=9),
+            status=Match.STATUS_LIVE, period="2nd Half", clock="75:00",
+        )
+        self.assertEqual(m.phase, "complete")
+
+    def test_a_graded_match_keeps_the_feeds_own_word_for_it(self):
+        m = self._match(
+            kickoff_at=timezone.now() - timedelta(hours=5),
+            status=Match.STATUS_COMPLETE, period="Full Time",
+            result="home", home_score=18, away_score=12,
+        )
+        self.assertEqual(m.done_label, "Full Time")
+
+    def test_close_out_writes_the_lapse_back_to_the_database(self):
+        from data_sync.services import close_out_stale_live
+
+        stuck = self._match(
+            kickoff_at=timezone.now() - timedelta(minutes=150),
+            status=Match.STATUS_LIVE, period="2nd Half", clock="75:00",
+            home_score=18, away_score=12,
+            live_updated_at=timezone.now() - timedelta(minutes=60),
+        )
+        running = self._match(
+            kickoff_at=timezone.now() - timedelta(minutes=40),
+            status=Match.STATUS_LIVE,
+            live_updated_at=timezone.now() - timedelta(seconds=30),
+        )
+
+        self.assertEqual(close_out_stale_live(), 1)
+
+        stuck.refresh_from_db()
+        running.refresh_from_db()
+        self.assertEqual(stuck.status, Match.STATUS_COMPLETE)
+        self.assertEqual(running.status, Match.STATUS_LIVE)
+        # Closing out is not grading: the result is still the feed's to give.
+        self.assertIsNone(stuck.result)
+        self.assertEqual(stuck.home_score, 18)
+
     def test_venue_label_combines_ground_and_city(self):
         m = self._match(kickoff_at=timezone.now(), venue="M.C.G.", venue_city="Melbourne")
         self.assertEqual(m.venue_label, "M.C.G., Melbourne")

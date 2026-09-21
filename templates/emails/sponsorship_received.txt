@@ -1,0 +1,16 @@
+Hi {{ application.contact_name }},
+
+Thanks for writing to us about {{ application.organisation_name }}. Your
+application for a sponsored place is with the team — a real person reads every
+one of these, and we'll come back to you.
+
+WHAT YOU TOLD US
+{{ application.organisation_name }}{% if application.organisation_kind %} · {{ application.organisation_kind }}{% endif %}{% if application.country %} · {{ application.country.name }}{% endif %}{% if application.people %} · about {{ application.people }} people{% endif %}
+
+{{ application.reason }}
+
+Nothing is on hold while you wait. You can set your organisation up, invite
+your people and run the Charity Vote for free right now — the fee only ever
+comes up when a comp launches.
+
+{{ site_link }}

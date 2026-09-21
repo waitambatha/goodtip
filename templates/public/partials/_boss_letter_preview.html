@@ -1,0 +1,100 @@
+{% comment %}
+WHAT YOU ARE ABOUT TO SEND, BEFORE YOU SEND IT.
+
+Client, Sep 2026: "It would be nice for them to see what they are actually
+sending before they send it? This preview is after they sent it?"
+
+Yes it was. There was a preview, and it was on /boss/progress/ — rendered from
+BossInvite.body_preview, which is written at the moment the email goes out. So
+the only time a sender ever saw the note was after it had already landed in
+their boss's inbox, which is the one moment a preview is no use to anybody.
+
+This is the same note, in the same card the marketing page shows, sitting
+directly above the Send button and filled in from the fields as they are typed.
+Two things it deliberately shows that a static sample cannot:
+
+  * the names as they will actually read — "Dear Priya", signed "Sam from
+    accounts" — because that is the half the sender is responsible for and the
+    half that goes out wrong
+  * who it is going to, spelled out. The address is the irreversible part of
+    this form: the wording is fixed and safe, a typo'd address is a note to a
+    stranger that cannot be recalled.
+
+THE PREVIEW IS NOT THE EMAIL TEMPLATE. templates/emails/tell_the_boss.html is
+the thing Postmark renders, and it carries a header, a footer and the small
+"what GoodTip actually is" pitch under the letter. Reproducing all of that here
+would be a second copy of the email to keep in step, and it is not what the
+sender is deciding about. The letter is — so the letter is what this shows, and
+the line under it says the rest exists.
+
+Used on both send surfaces: the focused member send page (boss_send.html) and
+the form at the bottom of the full marketing page.
+{% endcomment %}
+<div class="bn-preview" data-boss-preview>
+  <div class="bn-preview-head">
+    <b>Before you send</b>
+    <span>This is the note, with your names in it.</span>
+  </div>
+  {% comment %}
+  The address only. The boss's NAME is already on the card below, in the
+  greeting, which is where the sender will actually check it — repeating it up
+  here would be the same value twice on one screen, and the empty state ("To
+  Boss at —") reads as a mistake rather than as a field waiting to be filled.
+  {% endcomment %}
+  <div class="bn-preview-to">
+    <span class="k">Goes to</span><span class="v" data-letter-email>{{ boss_email_draft }}</span>
+  </div>
+  {% include "public/partials/_boss_letter_card.html" %}
+  <p class="illus-note" style="color:var(--muted);opacity:1;">
+    GoodTip adds its own header and a short "what GoodTip is" note underneath.
+    The letter above is the part you're sending, and the wording of it is fixed.
+  </p>
+</div>
+
+{% comment %}
+One script for every name span on the page, not one per surface.
+
+The marketing page draws the note twice (sticky and card) and, for a signed-in
+member, a third time inside this preview — so a handler that found the first
+matching span and stopped would update the sticky and leave the card reading
+"Dear Boss" while the sender watched. Everything is a querySelectorAll, and the
+inputs announce themselves with data-letter-src rather than being looked up by
+id, because the two send forms have different ids for the same three fields.
+
+Exposed as window.gtBossLetter so the copy-to-clipboard buttons on the
+marketing page can force a sync before reading the letter out.
+{% endcomment %}
+<script>
+(function(){
+  if (window.gtBossLetter) return;          /* one page, one binding */
+
+  var spans = {
+    boss:  document.querySelectorAll('[data-letter-boss]'),
+    name:  document.querySelectorAll('[data-letter-name]'),
+    email: document.querySelectorAll('[data-letter-email]')
+  };
+  var inputs = {
+    boss:  document.querySelector('[data-letter-src="boss"]'),
+    name:  document.querySelector('[data-letter-src="name"]'),
+    email: document.querySelector('[data-letter-src="email"]')
+  };
+  /* Empty reads as a placeholder, never as an empty gap: "Dear ," on a note
+     somebody is about to send to their boss is worse than no preview at all. */
+  var fallback = { boss: 'Boss', name: '[Your name]', email: '' };
+
+  function sync(){
+    Object.keys(spans).forEach(function(key){
+      var input = inputs[key];
+      if (!input) return;
+      var value = (input.value || '').trim() || fallback[key];
+      spans[key].forEach(function(el){ el.textContent = value; });
+    });
+  }
+  Object.keys(inputs).forEach(function(key){
+    if (inputs[key]) inputs[key].addEventListener('input', sync);
+  });
+  sync();
+
+  window.gtBossLetter = { sync: sync };
+})();
+</script>

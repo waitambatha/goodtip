@@ -31,6 +31,10 @@ Expects:
   centred   truthy to centre the row — the ladder, where the chips are the only
             control on the page and a left-aligned row under a centred table
             reads as though it had come loose from it
+  The loader shown while a press is answered is not a parameter. It is one
+  of four animations, rotated per competition so pressing NRL twice never
+  gives the same one twice, and coloured by the [data-code] the pressed chip
+  already carries. See gt-veil.js.
 {% endcomment %}
 {% if options|length > 1 %}
 <div class="compfilter{% if centred %} is-centred{% endif %}" data-veil-for="{{ veil_for }}">
@@ -38,12 +42,36 @@ Expects:
     {% if all_label %}
     <a class="cf-chip cf-all{% if not selected %} on{% endif %}"
        href="{{ base }}{% if keep %}?{{ keep }}{% endif %}"
+       {% if swap_into %}
+       hx-get="{{ base }}?pane={{ pane|default:'table' }}{% if keep %}&amp;{{ keep }}{% endif %}"
+       hx-target="{{ swap_into }}" hx-swap="innerHTML"
+       hx-push-url="{{ base }}{% if keep %}?{{ keep }}{% endif %}"
+       {% endif %}
        {% if not selected %}aria-current="true"{% endif %}>{{ all_label }}</a>
     {% endif %}
     {% for s in options %}
+    {% comment %}
+    THE PRESS SWAPS THE TABLE, NOT THE PAGE.
+
+    Client, 20 Sep 2026: "let it load on the area of context", and separately
+    that the full-page loader firing on a filter press "does not make sense".
+    Both are the same bug — these were ordinary links, so pressing NRL
+    navigated, and a navigation inside the member app raises the whole-page
+    splash on top of the scoped one.
+
+    `swap_into` is opt-in per screen: a page that has no fragment endpoint
+    passes nothing and the chip stays the plain link it always was, which is
+    also what runs with no JavaScript. The href never changes, so a new tab, a
+    bookmark and a copied address all still work.
+    {% endcomment %}
     <a class="cf-chip{% if selected.id == s.id %} on{% endif %}"
        data-code="{{ s.slug }}" data-cat="{{ s.category }}"
        href="{{ base }}?{{ param }}={{ s.slug }}{% if keep %}&amp;{{ keep }}{% endif %}"
+       {% if swap_into %}
+       hx-get="{{ base }}?{{ param }}={{ s.slug }}&amp;pane={{ pane|default:'table' }}{% if keep %}&amp;{{ keep }}{% endif %}"
+       hx-target="{{ swap_into }}" hx-swap="innerHTML"
+       hx-push-url="{{ base }}?{{ param }}={{ s.slug }}{% if keep %}&amp;{{ keep }}{% endif %}"
+       {% endif %}
        {% if selected.id == s.id %}aria-current="true"{% endif %}>{{ s.name }}</a>
     {% endfor %}
   </div>

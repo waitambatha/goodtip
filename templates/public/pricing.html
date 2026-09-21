@@ -14,7 +14,35 @@
     <span class="pill" style="align-self:flex-start;margin-bottom:24px;"><span class="dot"></span>Pricing</span>
     <h1>One price. <em>All year.</em> All sports.</h1>
     <p class="hero-sub">One flat annual fee covering every season of every code. Tipping is free for your people, and GoodTip funds the donation.</p>
-    <div class="hero-ctas" style="justify-content:flex-start;"><a href="#tiers" class="btn-primary">See the plans &rarr;</a></div>
+    {% comment %}
+    TWO WAYS OUT OF THIS HERO, and the second one is the point.
+
+    Client, 20 Sep 2026: "in the pricing page, where we have the text on the
+    left side of the heroic split, make sure that is there — and make sure also
+    the button to go to the sponsorship page is also there and visible, and
+    maybe vibrates so it can draw attention."
+
+    The sponsored-place path was reachable from this page only by scrolling
+    past the prices to the band below, which is one scroll too late for the
+    reader it exists for: somebody who came to find out what it costs and is
+    about to decide it is too much. Putting it in the hero means they meet the
+    answer at the same moment as the question.
+
+    It is the GHOST button, not the primary one. "See the plans" is still what
+    most people came for, and a page that pushes the concession harder than the
+    product reads as apologising for the price.
+
+    The nudge is a two-second shiver every eight seconds, not a loop — see
+    .btn-nudge in goodtip.css for why a constantly-moving button stops being
+    read as a button at all.
+    {% endcomment %}
+    <div class="hero-ctas" style="justify-content:flex-start;">
+      <a href="#tiers" class="btn-primary">See the plans &rarr;</a>
+      <a href="{% url 'sponsorship' %}" class="btn-ghost btn-nudge">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-4.5-9.2-9.2C1.3 8.4 3 5 6.4 5c2 0 3.3 1.1 4.1 2.3l1.5 2 1.5-2C14.3 6.1 15.6 5 17.6 5 21 5 22.7 8.4 21.2 11.8 19 16.5 12 21 12 21Z"/></svg>
+        Can&rsquo;t afford it? Ask us
+      </a>
+    </div>
   </div>
   <div class="hs-right">
     <div class="hero-bg" aria-hidden="true">
@@ -32,7 +60,7 @@
   <div class="wrap">
     <p class="eyebrow reveal">Plans</p>
     <h2 class="section-heading reveal">Priced by team size. Nothing else.</h2>
-    <p class="section-sub reveal">Every plan includes the full platform, no feature gates, no per-sport upsells.</p>
+    <p class="section-sub reveal">Every plan runs every code, all year, with no per-sport upsells. Groups &mdash; a separate ladder per team or department &mdash; start at Workplace.</p>
     <div class="tier-table-wrap reveal">
       <table class="tier-table">
         <thead>
@@ -47,46 +75,132 @@
           <tr>
             <td data-label="Tier" class="tt-tier"><span class="tt-name">Starter</span><span class="tt-sub">Small teams</span></td>
             <td data-label="Team size">Up to 20 people</td>
-            <td data-label="What changes">Full platform. Choose AFL, NRL or both. Women's competitions included. Charity Vote. Live leaderboard. Email support.</td>
+            <td data-label="What changes">Full platform. Choose AFL, NRL or both. Women's competitions included. Charity Vote. Live leaderboard. Email support. One shared ladder.</td>
             <td data-label="Annual price" class="tt-priced"><span class="tt-price">$99<span>/yr</span></span><span class="tt-per">~$5 per person</span></td>
           </tr>
-          <tr class="is-popular">
-            <td data-label="Tier" class="tt-tier"><span class="tt-name">Team <span class="tier-badge">Popular</span></span><span class="tt-sub">Growing teams</span></td>
+          <tr>
+            <td data-label="Tier" class="tt-tier"><span class="tt-name">Team</span><span class="tt-sub">Growing teams</span></td>
             <td data-label="Team size">21 to 50 people</td>
-            <td data-label="What changes">Everything in Starter, plus custom organisation branding and a round-by-round participation dashboard.</td>
+            <td data-label="What changes">Everything in Starter, plus custom organisation branding and a round-by-round participation dashboard. Still one shared ladder.</td>
             <td data-label="Annual price" class="tt-priced"><span class="tt-price">$299<span>/yr</span></span><span class="tt-per">~$6 per person</span></td>
           </tr>
-          <tr>
-            <td data-label="Tier" class="tt-tier"><span class="tt-name">Workplace</span><span class="tt-sub">Mid-size organisations</span></td>
+          {% comment %}
+          FROM HERE DOWN, THE PLANS THAT CARRY GROUPS.
+
+          Client, 19 Sep 2026: "a little tag of 'groups' would be handy as
+          people won't realise it's a big step up ... unless there is another
+          colour coding that can help distinguish it from the non group packs."
+
+          Both, in the end, because the tag alone is a thing you notice only if
+          you were already reading that cell. `has-groups` draws a lime edge
+          down the whole row and lifts the tier name, so the table splits into
+          two blocks at a glance and the step up is visible before a single
+          word has been read. The tag then names what the block is.
+          {% endcomment %}
+          <tr class="is-popular has-groups">
+            <td data-label="Tier" class="tt-tier"><span class="tt-name">Workplace <span class="tier-badge">Most popular</span> <span class="tier-badge tier-badge--groups">Groups</span></span><span class="tt-sub">Mid-size organisations</span></td>
             <td data-label="Team size">51 to 150 people</td>
-            <td data-label="What changes">Everything in Team, plus priority support and a full CSR Impact Report at season end.</td>
+            <td data-label="What changes">Everything in Team, plus <b>groups</b> &mdash; each team or department gets its own ladder alongside the organisation's &mdash; priority support and a full CSR Impact Report at season end.</td>
             <td data-label="Annual price" class="tt-priced"><span class="tt-price">$799<span>/yr</span></span><span class="tt-per">~$5&ndash;$16 per person</span></td>
           </tr>
-          <tr>
-            <td data-label="Tier" class="tt-tier"><span class="tt-name">Organisation</span><span class="tt-sub">Large organisations</span></td>
+          <tr class="has-groups">
+            <td data-label="Tier" class="tt-tier"><span class="tt-name">Organisation <span class="tier-badge tier-badge--groups">Groups</span></span><span class="tt-sub">Large organisations</span></td>
             <td data-label="Team size">151 to 500 people</td>
-            <td data-label="What changes">Everything in Workplace, plus a dedicated account manager and priority onboarding support.</td>
+            <td data-label="What changes">Everything in Workplace, including groups and sub-groups, plus a dedicated account manager and priority onboarding support.</td>
             <td data-label="Annual price" class="tt-priced"><span class="tt-price">$1,299<span>/yr</span></span><span class="tt-per">~$3&ndash;$9 per person</span></td>
           </tr>
-          <tr>
-            <td data-label="Tier" class="tt-tier"><span class="tt-name">Enterprise+</span><span class="tt-sub">Large enterprise</span></td>
+          <tr class="has-groups">
+            <td data-label="Tier" class="tt-tier"><span class="tt-name">Enterprise+ <span class="tier-badge tier-badge--groups">Groups</span></span><span class="tt-sub">Large enterprise</span></td>
             <td data-label="Team size">501 to 2,499 people</td>
-            <td data-label="What changes">Full bespoke configuration. Multi-league setup, API access, flexible payment terms.</td>
+            <td data-label="What changes">Everything in Organisation, including groups and sub-groups. Full bespoke configuration, multi-league setup, API access, flexible payment terms.</td>
             <td data-label="Annual price" class="tt-priced"><span class="tt-price">$1,999<span>/yr</span></span><span class="tt-per">from ~$1 per person</span></td>
           </tr>
         </tbody>
       </table>
     </div>
-    <p class="pricing-footnote reveal">Founding Partner pricing closes December 31, locked for good after that. <a href="/#founding">Learn more.</a></p>
+    <p class="pricing-footnote reveal">Founding Member pricing closes December 31, 2026 &mdash; sign up before then and your rate is locked for the three seasons after it. <a href="/#founding">Learn more.</a></p>
+    {% comment %}
+    THE DOOR FOR PEOPLE THE TABLE ABOVE JUST LOST.
+
+    It sits immediately under the prices and nowhere else on this page, because
+    the moment it has to catch is the one right after somebody reads the number
+    and decides it is not for them. A line in the footer or a mention in the
+    FAQ is a line they will never reach.
+
+    Phrased as an invitation rather than a concession — see the page it links
+    to for the reasoning about tone.
+    {% endcomment %}
+  </div>
+</section>
+
+{% comment %}
+=============================================================================
+THE DOOR FOR THE PEOPLE THE TABLE ABOVE JUST LOST.
+=============================================================================
+CLIENT, 20 SEP 2026: "we do have the sponsorship page, so in the pricing I
+think we should have that so someone can see the sponsorship and all."
+
+It WAS on this page — as a sentence of footnote under the table, in the same
+grey as the founding-rate note beside it. That is not nothing, but a person who
+has just read a number and decided it is not for them is not reading footnotes;
+they are closing the tab. A line of small print underneath the thing that lost
+them is the least likely place on the page for them to look.
+
+So it is a band of its own, immediately after the prices and before anything
+else, with the weight of a section rather than an asterisk. It is the one place
+on this page that is not selling: no price, no plan, no comparison. It also
+repeats the three things the application page opens with — no proof, no
+account, a person reads it — because those are what decide whether somebody
+asks, and making them click through to find out is asking them to spend trust
+they have not got yet.
+
+Written as an invitation, never as a concession. "Can't afford it" is a
+sentence people say about themselves and not one to say back to them; the
+heading puts the fee at fault, which is both kinder and true.
+=============================================================================
+{% endcomment %}
+<section class="section sponsor-band" id="sponsored">
+  <div class="wrap">
+    <div class="sb-card reveal">
+      <div class="sb-main">
+        <span class="pill sb-pill"><span class="dot"></span>Sponsored places</span>
+        <h2>The fee shouldn&rsquo;t be the reason you don&rsquo;t.</h2>
+        <p>Some of the groups this is worth most to are the ones a yearly fee puts out of reach &mdash; which is why sponsored places exist. If that&rsquo;s yours, tell us about it and we&rsquo;ll read it.</p>
+        <ul class="sb-points">
+          <li><svg aria-hidden="true"><use href="#ic-check"/></svg> Nothing to prove &mdash; no budgets, no letters, no attachments</li>
+          <li><svg aria-hidden="true"><use href="#ic-check"/></svg> No account needed. You don&rsquo;t have to start an organisation to ask</li>
+          <li><svg aria-hidden="true"><use href="#ic-check"/></svg> Five questions, one of them open. A person reads every one</li>
+        </ul>
+        <div class="sb-ctas">
+          <a href="{% url 'sponsorship' %}" class="btn-primary">Apply for a sponsored place &rarr;</a>
+          <a href="mailto:hello@goodtip.com.au?subject=Sponsored%20place%20enquiry" class="btn-ghost">Ask a question first</a>
+        </div>
+      </div>
+      <div class="sb-aside" aria-hidden="true">
+        <span class="sb-glyph"><svg><use href="#ic-heart"/></svg></span>
+        <p class="sb-quote">&ldquo;Running a workplace comp is an ordinary thing to do. Paying for one isn&rsquo;t always.&rdquo;</p>
+      </div>
+    </div>
   </div>
 </section>
 
 <!-- EVERY PLAN — feature v2 -->
 <section class="section on-paper">
   <div class="wrap">
+    {% comment %}
+    THIS SECTION USED TO SAY "NO FEATURE GATES" and it was true until Sep 2026,
+    when the client gated groups at Workplace: "if people want the
+    groups/departments functionality, they only get it on the $799 plan".
+
+    The claim is narrowed rather than deleted, because the part that is still
+    true is the part that sells: every plan runs all four codes for a whole
+    year, women's comps included, and nobody is ever charged per sport. One
+    feature is sized, and it is named — a pricing page that quietly drops a
+    promise it used to make is worse than one that says what changed.
+    {% endcomment %}
     <p class="eyebrow reveal">Every plan</p>
-    <h2 class="section-heading reveal">The full platform. No feature gates.</h2>
-    <p class="section-sub reveal">The same product whether you're twelve people or twelve hundred. You're paying for size, not features.</p>
+    <h2 class="section-heading reveal">All four codes. All year. Every plan.</h2>
+    <p class="section-sub reveal">Nearly all of it is the same product whether you're twelve people or twelve hundred &mdash; you're paying for size. The one exception is groups, which arrive at Workplace, where organisations start having genuinely separate teams to split into.</p>
     <div class="feature-grid2 reveal" data-cards>
       <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-flag"/></svg></div><h3>Your codes, all year</h3><p>AFL, AFLW, NRL, NRLW. Run one, run both. Women's comps come with the men's, same price.</p></div>
       <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-vote"/></svg></div><h3>Charity Vote</h3><p>Your organisation nominates and votes on where the season's money goes. Majority wins.</p></div>
@@ -147,7 +261,7 @@ movements that never happen.
       <div class="faq-item"><button class="faq-q"><span><span class="qn">02</span> What counts toward our team size?</span><span class="qx"></span></button><div class="faq-a">Active tippers in your comp. You can invite more than your tier allows during setup; you only move up a tier if you exceed the cap when the season locks.</div></div>
       <div class="faq-item"><button class="faq-q"><span><span class="qn">03</span> When do we pay?</span><span class="qx"></span></button><div class="faq-a">When you launch. Set up the organisation, run the Charity Vote and invite your people for free. The subscription is charged when the first round of tips locks in.</div></div>
       <div class="faq-item"><button class="faq-q"><span><span class="qn">04</span> Is the donation included in the price?</span><span class="qx"></span></button><div class="faq-a">Yes. There is one flat fee, and GoodTip gives a share of it to the charity your organisation picked. Nobody in your organisation is ever asked to contribute.</div></div>
-      <div class="faq-item"><button class="faq-q"><span><span class="qn">05</span> What's Founding Partner pricing?</span><span class="qx"></span></button><div class="faq-a">Lock your current rate permanently if you join before December 31, 2026, plus first access to new sports and features in 2027. After the window, standard rates apply.</div></div>
+      <div class="faq-item"><button class="faq-q"><span><span class="qn">05</span> What's Founding Partner pricing?</span><span class="qx"></span></button><div class="faq-a">Join before December 31, 2026 and the rate you sign up at is the rate you're charged at renewal for the three seasons that follow &mdash; 2027, 2028 and 2029 &mdash; whatever list prices do in the meantime. You also get first access to new sports and features in 2027. Move up a plan and you pay that plan's price; you're never charged above list. After the window, standard rates apply.</div></div>
     </div>
   </div>
 </section>
@@ -158,7 +272,7 @@ movements that never happen.
 <section class="cta-pro">
   <div class="wrap reveal zoom">
     <h2>In before the finals. In for life.</h2>
-    <p>Founding Partners lock pricing for good and get first access to everything we ship next. The window closes December 31, 2026, no late extensions.</p>
+    <p>Founding Members lock their rate for three seasons and get first access to everything we ship next. The window closes December 31, 2026, no late extensions.</p>
     <a href="/#start" class="btn-dark">Set up your organisation &rarr;</a>
   </div>
 </section>

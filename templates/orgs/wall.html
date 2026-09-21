@@ -129,7 +129,8 @@ with no room chosen starts on the list.
           prefers opens first, on every Wall they are on. One tap here rather
           than a setting somewhere else.
           {% endcomment %}
-          <form method="post" action="{% url 'orgs:wall_recap_pref' org.id %}" data-busy="Saving">
+          <form method="post" action="{% url 'orgs:wall_recap_pref' org.id %}" data-busy="Saving"
+                data-busy-for=".gwr-chat">
             {% csrf_token %}
             {% if room.is_default %}
             <button type="submit" class="gwr-pin on" title="Opens first. Press to open all competitions first instead.">&#9733; Opens first</button>
@@ -170,7 +171,16 @@ with no room chosen starts on the list.
         </div>
 
         {# ---- the composer, at the foot of the room, as in a chat ---- #}
-        <form method="post" action="{% url 'orgs:wall_post' org.id %}" class="gtm-composer gwr-composer">
+        {% comment %}
+        The composer sits BELOW the stream it posts into, so the box that goes
+        busy has to be named — see data-busy-for in gt-busy.js. Posting reloads
+        the Wall; what a person is waiting to see is their line appear at the
+        foot of the stream, and that is the only part worth covering while it
+        does (client, 19 Sep 2026: the loader on the posts, "not the whole
+        page"). The composer itself stays visible and stays put.
+        {% endcomment %}
+        <form method="post" action="{% url 'orgs:wall_post' org.id %}" class="gtm-composer gwr-composer"
+              data-busy="Posting" data-busy-for=".gwr-stage">
           {% csrf_token %}
           {% if room.code %}<input type="hidden" name="room" value="{{ room.slug }}">{% endif %}
           <div class="gwr-compose-extra">

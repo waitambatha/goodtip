@@ -1,0 +1,247 @@
+{% comment %}
+=============================================================================
+EIGHT LOADER SCENES — FOUR FOR THE AFL, FOUR FOR THE NRL.
+=============================================================================
+CLIENT, 20 SEP 2026: "let's only have NRL and AFL, so that means think so that
+they will be like 8 loaders. For the NRLW, either male or female, on their
+loader we can add the sign of male or female."
+
+WHY THE OTHER TWO WENT. The rotation used to carry six, one per Series in the
+database — which put Super Netball in it, and a round ball dropping through a
+ring reads as basketball long before it reads as netball. Checking the data
+settled it rather than taste: Super Netball and Super League have ZERO rounds
+and ZERO matches. Nobody tips them. A splash was advertising a competition the
+product does not run, in a sport it does not cover. State of Origin went with
+them — it has fixtures, but it is three games a year inside the NRL, and the
+same client asked a week ago that it stop being treated as a competition in
+its own right on the landing screens.
+
+TWO CODES, FOUR SCENES EACH, AND THE SEX MARK CARRIES THE REST.
+Four competitions still need telling apart, and the answer is not eight more
+drawings: an AFLW set shot and an AFL set shot are the same act. So the CODE
+picks the scene and the colour, and a ♀ / ♂ mark in the corner says which side
+of it — which is both less work and more honest, because it is exactly how the
+competitions relate to each other.
+
+  AFL   set shot · centre bounce · the mark · the goal umpire
+  NRL   conversion · tackle count · the try · the pass
+
+Eight scenes, eight different motions: arc, bounce, catch, wave, arc-over,
+count, place, chain. No two of them can be mistaken for one another, which was
+the whole complaint about the first attempt.
+
+COLOUR IS NEVER SPELLED OUT HERE. Every scene draws in --lc, which
+gt-loader.js points at the [data-code] token block in goodtip.css — so the
+AFLW scenes come up rose and the NRLW ones orchid without a single rule here
+knowing that.
+
+`lanim` on every moving part is not decoration: it is what exempts these from
+the blanket reduced-motion rule in goodtip.css. Without it they are frozen,
+and a frozen loader says the opposite of what a loader is for.
+=============================================================================
+{% endcomment %}
+<div class="lstage" aria-hidden="true">
+
+  {% comment %}
+  THE SEX MARK, drawn once and switched by [data-sex] on #loader rather than
+  copied into all eight scenes. One copy is one thing to redraw; eight is
+  seven chances for them to drift apart.
+
+  Bottom-right, small, in the competition's own colour: it is a qualifier on
+  the scene, not the subject of it. Both marks are drawn — the men's as well
+  as the women's — because a mark that appears only on the women's scenes
+  reads as the women's competition being the variant and the men's being the
+  default, which is not how these two sit in the product.
+  {% endcomment %}
+  <svg class="lsex" viewBox="0 0 26 26" aria-hidden="true">
+    <g class="lsex-w" fill="none" stroke-linecap="round">
+      <circle cx="13" cy="9" r="5.4" stroke-width="2.4"/>
+      <path d="M13 14.6V23" stroke-width="2.4"/>
+      <path d="M9.4 19.6h7.2" stroke-width="2.4"/>
+    </g>
+    <g class="lsex-m" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="10.5" cy="15.5" r="5.4" stroke-width="2.4"/>
+      <path d="M14.6 11.4 22 4" stroke-width="2.4"/>
+      <path d="M16.4 4H22v5.6" stroke-width="2.4"/>
+    </g>
+  </svg>
+
+  {# ==================== AFL ==================== #}
+
+  {# ---- 1. THE SET SHOT (arc) ---- #}
+  {% comment %}
+  Four posts: the tall goal pair, the short behind pair outside them. The
+  silhouette is the whole tell — an AFL set of posts must never be drawn as an
+  H, per the client's own Goal Posts Reference. The two flags going up after it
+  are what make the loop a GOAL rather than a ball leaving the frame.
+  {% endcomment %}
+  <div class="lscene" data-lscene="afl-set">
+    <svg class="lsvg" viewBox="0 0 240 150" aria-hidden="true">
+      <g class="lposts lanim" fill="none" stroke-linecap="round">
+        <line x1="96" y1="14" x2="96" y2="126" stroke-width="5"/>
+        <line x1="144" y1="14" x2="144" y2="126" stroke-width="5"/>
+        <line class="lfaint" x1="52" y1="56" x2="52" y2="126" stroke-width="3.5"/>
+        <line class="lfaint" x1="188" y1="56" x2="188" y2="126" stroke-width="3.5"/>
+      </g>
+      <g class="lflags lanim" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M68 118v-22l14 5-14 5" stroke-width="3"/>
+        <path d="M172 118v-22l-14 5 14 5" stroke-width="3"/>
+      </g>
+      <line class="lground" x1="22" y1="128" x2="218" y2="128"/>
+    </svg>
+    <span class="lball lanim oval l-arc"></span>
+  </div>
+
+  {# ---- 2. THE CENTRE BOUNCE (bounce) ---- #}
+  {% comment %}
+  The centre square and circle from above, ball driven into it and coming back
+  up. The one moment in Aussie Rules that looks nothing like anything in rugby
+  league, and the only scene where the ball comes back towards the viewer.
+  {% endcomment %}
+  <div class="lscene" data-lscene="afl-bounce">
+    <svg class="lsvg" viewBox="0 0 240 150" aria-hidden="true">
+      <g fill="none" stroke-linecap="round">
+        <rect class="lfaint" x="74" y="26" width="92" height="92" rx="2" stroke-width="3"/>
+        <circle class="lposts lanim" cx="120" cy="72" r="27" stroke-width="4"/>
+        <circle class="lping lanim" cx="120" cy="72" r="27" stroke-width="3"/>
+        <line class="lfaint" x1="120" y1="14" x2="120" y2="26" stroke-width="3"/>
+        <line class="lfaint" x1="120" y1="118" x2="120" y2="130" stroke-width="3"/>
+      </g>
+    </svg>
+    <span class="lball lanim oval l-bounce"></span>
+  </div>
+
+  {# ---- 3. THE MARK (catch) ---- #}
+  {% comment %}
+  The ball drops out of the sky and two arms come up and take it. The only
+  scene of the eight where something REACHES for the ball rather than sending
+  it somewhere, and the one act that is most associated with this code.
+  {% endcomment %}
+  <div class="lscene" data-lscene="afl-mark">
+    <svg class="lsvg" viewBox="0 0 240 150" aria-hidden="true">
+      {% comment %}
+      TWO ARMS AND SIX FINGERS, and no bar between them. The first version
+      joined the arms with a crossbar and drew no fingers, which made it a
+      croquet hoop — and worse, on a dark screen at 240px it read as a set of
+      rugby league posts, which is the one thing an AFL scene must never look
+      like. Fingers are what make a hand a hand, and the gap between the arms
+      is what the ball lands in.
+      {% endcomment %}
+      <g class="lhands lanim" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M96 130V88" stroke-width="5"/>
+        <path d="M96 88l-9-10M96 88v-13M96 88l9-10" stroke-width="3.5"/>
+        <path d="M144 130V88" stroke-width="5"/>
+        <path d="M144 88l-9-10M144 88v-13M144 88l9-10" stroke-width="3.5"/>
+      </g>
+      <circle class="lburst lanim" cx="120" cy="72" r="16" fill="none" stroke-width="3"/>
+      <line class="lground" x1="46" y1="130" x2="194" y2="130"/>
+    </svg>
+    <span class="lball lanim oval l-fall"></span>
+  </div>
+
+  {# ---- 4. THE GOAL UMPIRE (wave) ---- #}
+  {% comment %}
+  Two flags waved from the boundary and six points going up on the board. No
+  ball in the scene at all: this is what happens AFTER one, and it is the only
+  motion of the eight that is a person signalling rather than a ball moving.
+  {% endcomment %}
+  <div class="lscene" data-lscene="afl-flags">
+    <svg class="lsvg" viewBox="0 0 240 150" aria-hidden="true">
+      <g class="lwave-l lanim" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M80 126V44" stroke-width="4"/>
+        <path d="M80 48l22 8-22 8z" stroke-width="3"/>
+      </g>
+      <g class="lwave-r lanim" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M160 126V44" stroke-width="4"/>
+        <path d="M160 48l-22 8 22 8z" stroke-width="3"/>
+      </g>
+      <g class="lsix lanim" fill="none" stroke-linecap="round">
+        <rect x="104" y="60" width="32" height="34" rx="4" stroke-width="3"/>
+      </g>
+      <line class="lground" x1="46" y1="128" x2="194" y2="128"/>
+    </svg>
+  </div>
+
+  {# ==================== NRL ==================== #}
+
+  {# ---- 5. THE CONVERSION (arc over) ---- #}
+  {% comment %}
+  The H. Uprights that carry on above the crossbar, which is the difference a
+  rugby league supporter reads in a quarter of a second — and the ball clears a
+  BAR here rather than threading a gap, which is what separates this from the
+  AFL set shot beyond the colour.
+  {% endcomment %}
+  <div class="lscene" data-lscene="nrl-convert">
+    <svg class="lsvg" viewBox="0 0 240 150" aria-hidden="true">
+      <g class="lposts lanim" fill="none" stroke-linecap="round">
+        <line x1="86" y1="14" x2="86" y2="128" stroke-width="5"/>
+        <line x1="154" y1="14" x2="154" y2="128" stroke-width="5"/>
+        <line x1="86" y1="52" x2="154" y2="52" stroke-width="5"/>
+      </g>
+      <line class="lground" x1="22" y1="130" x2="218" y2="130"/>
+    </svg>
+    <span class="lball lanim oval l-convert"></span>
+  </div>
+
+  {# ---- 6. THE TACKLE COUNT (count) ---- #}
+  {% comment %}
+  Five tallies lighting one at a time, the sixth stroke drawn through them, and
+  the ball played back as the set restarts. Nothing flies anywhere: this scene
+  COUNTS, which is a rhythm rather than a trajectory, and it is the only one of
+  the eight whose timing a supporter can predict before it happens.
+  {% endcomment %}
+  <div class="lscene" data-lscene="nrl-count">
+    <svg class="lsvg" viewBox="0 0 240 150" aria-hidden="true">
+      <g class="ltally lanim" fill="none" stroke-linecap="round">
+        <line class="lt1 lanim" x1="44" y1="38" x2="44" y2="86" stroke-width="7"/>
+        <line class="lt2 lanim" x1="76" y1="38" x2="76" y2="86" stroke-width="7"/>
+        <line class="lt3 lanim" x1="108" y1="38" x2="108" y2="86" stroke-width="7"/>
+        <line class="lt4 lanim" x1="140" y1="38" x2="140" y2="86" stroke-width="7"/>
+        <line class="lt5 lanim" x1="172" y1="38" x2="172" y2="86" stroke-width="7"/>
+        <line class="lt6 lanim" x1="32" y1="90" x2="184" y2="34" stroke-width="5"/>
+      </g>
+      <line class="lground" x1="22" y1="120" x2="218" y2="120"/>
+    </svg>
+    <span class="lball lanim oval l-roll"></span>
+  </div>
+
+  {# ---- 7. THE TRY (place) ---- #}
+  {% comment %}
+  The try line and the in-goal beyond it. The ball comes in low, is grounded,
+  and STAYS there while the line lights and a ring goes out from the spot. The
+  only scene that ends with the ball at rest — a try is a ball being put
+  somewhere, which is the other half of how rugby league is scored.
+  {% endcomment %}
+  <div class="lscene" data-lscene="nrl-try">
+    <svg class="lsvg" viewBox="0 0 240 150" aria-hidden="true">
+      <g fill="none" stroke-linecap="round">
+        <line class="lposts ltryline lanim" x1="150" y1="18" x2="150" y2="128" stroke-width="5"/>
+        <line class="lfaint" x1="178" y1="26" x2="178" y2="120" stroke-width="3"/>
+        <line class="lfaint" x1="204" y1="34" x2="204" y2="112" stroke-width="3"/>
+        <line class="lfaint" x1="34" y1="112" x2="150" y2="112" stroke-width="2.5"/>
+      </g>
+      <circle class="lburst lanim" cx="166" cy="104" r="10" fill="none" stroke-width="3"/>
+    </svg>
+    <span class="lball lanim oval l-place"></span>
+  </div>
+
+  {# ---- 8. THE PASS (chain) ---- #}
+  {% comment %}
+  Three players and the ball going down the line, each one lighting as it
+  reaches them. The one scene built out of a SEQUENCE across the width rather
+  than a single flight — closest in spirit to the tackle count, and separated
+  from it by having something actually travel.
+  {% endcomment %}
+  <div class="lscene" data-lscene="nrl-pass">
+    <svg class="lsvg" viewBox="0 0 240 150" aria-hidden="true">
+      <g class="lmates" fill="none" stroke-linecap="round">
+        <circle class="lm1 lanim" cx="48" cy="96" r="13" stroke-width="4"/>
+        <circle class="lm2 lanim" cx="120" cy="96" r="13" stroke-width="4"/>
+        <circle class="lm3 lanim" cx="192" cy="96" r="13" stroke-width="4"/>
+      </g>
+      <line class="lground" x1="22" y1="128" x2="218" y2="128"/>
+    </svg>
+    <span class="lball lanim oval l-chain"></span>
+  </div>
+
+</div>

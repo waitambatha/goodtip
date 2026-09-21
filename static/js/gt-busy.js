@@ -103,6 +103,39 @@
       setTimeout(function () { btn.disabled = true; }, 0);
       btn.setAttribute('aria-busy', 'true');
 
+      /* WHICH BOX GOES BUSY.
+       *
+       * data-busy-for names it by selector, for the case where the control is
+       * not inside the thing it reloads — the Wall's composer sits below the
+       * stream it posts into, and the star that changes which room opens first
+       * sits in the header above it. Without this the only reachable scope is
+       * the form itself, so posting to the Wall spun a 60px button while the
+       * entire screen sat looking exactly as it did before.
+       *
+       * Deliberately the same shape as data-veil-for in gt-veil.js: one way to
+       * say "this is the region that is busy", whether the request goes out
+       * through htmx or as an ordinary form post. */
+      var scope = null;
+      var named = btn.getAttribute('data-busy-for') || form.getAttribute('data-busy-for');
+      if (named) scope = document.querySelector(named);
+      if (!scope) scope = form.closest('[data-busy-scope]');
+
+      /* A VEILED REGION NEEDS NOTHING ON ITS BUTTON.
+       *
+       * The veil sits over the button and says what is happening in full
+       * words, so swapping the button's own label underneath it is invisible
+       * work — and worse than invisible: a button that grows from "Reply" to
+       * "Posting your reply" reflows the card it is inside WHILE the card is
+       * covered, so the veil lifts onto a layout that has moved. Resolve the
+       * scope first, and where there is one, leave the button alone. */
+      if (scope) {
+        veil(scope, label, kind);
+        // No strip as well. It would sit under the veil where nobody can see
+        // it, and two indeterminate indicators for one action read as two
+        // things happening.
+        return;
+      }
+
       /* TWO TREATMENTS, chosen by whether the label was authored.
        *
        * Replacing a button's contents with a word only works when the button
@@ -122,15 +155,6 @@
       } else {
         btn.dataset.idleLabel = btn.innerHTML;
         btn.innerHTML = '<span class="busy-dot busy-run" aria-hidden="true"></span>' + label;
-      }
-
-      var scope = form.closest('[data-busy-scope]');
-      if (scope) {
-        veil(scope, label, kind);
-        // No strip as well. It would sit under the veil where nobody can see
-        // it, and two indeterminate indicators for one action read as two
-        // things happening.
-        return;
       }
 
       if (!form.querySelector('.busy-strip')) {

@@ -113,3 +113,93 @@ body.no-page-loader #loader { display: none !important; }
   .gwr-stream .gt-post, .gwr-stream .gt-post.is-recap { padding: 16px; }
   .gwr-pin { padding: 6px 10px; font-size: 12px; }
 }
+
+/* ==========================================================================
+   THE COMPETITION'S COLOUR LEADS THE ROOM
+   ==========================================================================
+   CLIENT, 20 SEP 2026: "on the Wall we do have different group recaps based on
+   the type of competition. I do not want a fusion, but the colour of the
+   competition — let it be predominant in the message design and all."
+
+   Up to now the code's colour was applied one element at a time: the room's
+   avatar, the count pill, a rule under the header. Everything ELSE in the room
+   — the send button, the pin, the reply rails, the focus rings, the reaction
+   chips — went on wearing GoodTip's lime, so opening the NRL room gave you a
+   green screen with four amber objects on it. That is the fusion.
+
+   THE FIX IS ONE SUBSTITUTION, NOT THIRTY. This screen already routes every
+   accented thing it draws through four tokens (--m-accent and friends, see
+   gt-messages.css). Repointing those four at the competition's colour at the
+   top of the room hands the whole panel over in one move: nothing below needs
+   to know a competition exists, nothing is blended, and anything added to the
+   room later is the right colour on the day it is written.
+
+   WHICH OF THE TWO CODE COLOURS GOES WHERE. Every [data-code] publishes a
+   bright --code and a dark --code-ink. The bright one is the FILL, in both
+   themes, because the app hard-codes deep green as the text on an accent fill
+   and that only reads against a light one. The TYPE colour has to flip: the
+   bright code on the deep green ground, the dark --code-ink on the cream. Get
+   those two the wrong way round and every caption in the room fails contrast.
+
+   The all-competitions room has no [data-code] and keeps the lime, which is
+   right — it is not a competition, and giving it a sixth colour would say it
+   was. */
+.gwr-chat[data-code],
+.gwr-room[data-code] {
+  --m-accent:      var(--code);
+  --m-accent-ink:  var(--code);
+  --m-accent-bg:   color-mix(in srgb, var(--code) 14%, transparent);
+  --m-accent-line: color-mix(in srgb, var(--code) 40%, transparent);
+}
+html[data-theme="light"] body.gt-app .gwr-chat[data-code],
+html[data-theme="light"] body.gt-app .gwr-room[data-code] {
+  --m-accent-ink:  var(--code-ink);
+  --m-accent-bg:   color-mix(in srgb, var(--code) 20%, transparent);
+  --m-accent-line: color-mix(in srgb, var(--code-ink) 34%, transparent);
+}
+
+/* The header stops being a green bar with a coloured rule under it and becomes
+   the competition's own. Still a wash rather than a fill: the room's name and
+   its line sit on it, and a solid amber header would make them the least
+   legible text on the screen. */
+.gwr-chat[data-code] .gwr-head {
+  background: linear-gradient(
+    color-mix(in srgb, var(--code) 17%, transparent),
+    color-mix(in srgb, var(--code) 6%, transparent)
+  );
+  box-shadow: inset 0 -3px 0 var(--code);
+}
+
+/* And the stream behind the posts carries the faintest trace of it, so the
+   colour is the room rather than a stripe at the top of it. Four per cent:
+   enough that moving from NRL to AFLW is felt, far too little to do anything
+   to the text sitting on it. */
+.gwr-chat[data-code] .gwr-stage {
+  background: color-mix(in srgb, var(--code) 4%, transparent);
+}
+
+/* THE RECAP CARD IS THE THING THE CLIENT IS LOOKING AT when they say this —
+   "different group recaps based on the type of competition". It already wears
+   the code on its left edge; now the round's own tag is filled rather than
+   outlined, and the ladder's leader takes the same colour, so the card reads
+   as that competition's card at a glance and not as a generic card with a
+   coloured stripe. */
+.gwr-stream .gt-post.is-recap[data-code] .gpt-tag.gpt-code {
+  background: var(--code); color: #0F2E22; border-color: transparent;
+}
+.gwr-stream .gt-post.is-recap[data-code] .grc-brow.lead {
+  box-shadow: inset 3px 0 0 var(--code);
+}
+.gwr-stream .gt-post.is-recap[data-code] .grc-tlab { color: var(--m-accent-ink); }
+
+/* No color-mix, no colour. Each of the five codes gets a flat fallback rather
+   than falling back to lime, which would undo the whole point of this block on
+   the one browser that needed it most. */
+@supports not (background: color-mix(in srgb, red 50%, transparent)) {
+  .gwr-chat[data-code] .gwr-head { background: transparent; }
+  .gwr-chat[data-code] .gwr-stage { background: transparent; }
+  .gwr-chat[data-code], .gwr-room[data-code] {
+    --m-accent-bg: rgba(255,255,255,.08);
+    --m-accent-line: rgba(255,255,255,.28);
+  }
+}

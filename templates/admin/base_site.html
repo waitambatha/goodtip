@@ -205,11 +205,15 @@ that they were not given that job.
 {% safe_url 'admin:hq_security' as u_security %}
 {% safe_url 'admin:hq_home' as u_hq %}
 {% safe_url 'admin:hq_team_home' as u_teamhub %}
+{% safe_url 'admin:hq_media' as u_media %}
+{% safe_url 'admin:hq_services' as u_services %}
 {% gta_is_full_access as is_full_access %}
 {% gta_security_visible as may_security %}
 {% gta_on_table_screen as on_table %}
 {% gta_review_counts as waiting %}
 {% gta_can 'data.sync' as may_sync %}
+{% gta_can 'data.report' as may_report %}
+{% gta_can 'pages.images' as may_images %}
 {% gta_can 'enquiries.read' as may_enq %}
 {% gta_can 'news.write' as may_news %}
 {% gta_can 'pages.edit' as may_pages %}
@@ -253,6 +257,29 @@ that they were not given that job.
         <svg class="ic"><use href="#ic-f-org"/></svg><span class="lbl">HQ</span>
         {% if alerts.enquiries %}<span class="gta-sec-n alert">{{ alerts.enquiries }}</span>{% endif %}</a></li>
       {% endif %}{% endif %}
+
+      {% comment %}
+      IMAGES & VIDEOS and SERVICES, added 20 Sep 2026 at the client's request.
+
+      Both sit in "Run the platform" rather than inside HQ, and deliberately:
+      HQ is GoodTip's own WORDS — the stories, the pages, the inbox — while
+      these two are about the machine. A picture belongs to whichever page
+      happens to use it, and a sync belongs to no page at all.
+
+      Each asks the capability it leads to. Media asks pages.images, because
+      finding out what changing a photograph would affect is only useful to
+      somebody who may change one; Services asks data.report, which is the
+      permission for looking at how the platform is running.
+      {% endcomment %}
+      {% if u_media and may_images %}
+      <li><a href="{{ u_media }}" class="gta-nav-a{% if u_media in request.path %} on{% endif %}" data-jump="Images &amp; videos">
+        <svg class="ic"><use href="#ic-image"/></svg><span class="lbl">Images &amp; videos</span></a></li>
+      {% endif %}
+
+      {% if u_services and may_report %}
+      <li><a href="{{ u_services }}" class="gta-nav-a{% if u_services in request.path %} on{% endif %}" data-jump="Services — email, feeds and the AI">
+        <svg class="ic"><use href="#ic-chart"/></svg><span class="lbl">Services</span></a></li>
+      {% endif %}
 
       {% if u_teamhub %}
       <li><a href="{{ u_teamhub }}" class="gta-nav-a{% if u_teamhub in request.path %} on{% endif %}" data-jump="Your team">

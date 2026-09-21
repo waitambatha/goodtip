@@ -1,0 +1,14 @@
+{{ application.contact_name }} has applied for a sponsored place for
+{{ application.organisation_name }}.
+
+Contact: {{ application.contact_name }} · {{ application.email }}
+Group:   {{ application.organisation_name }}{% if application.organisation_kind %} ({{ application.organisation_kind }}){% endif %}
+{% if application.country %}Country: {{ application.country.name }}
+{% endif %}{% if application.people %}People:  about {{ application.people }}
+{% endif %}{% if application.user %}Account: {{ application.user.email }}
+{% endif %}
+WHY THE FEE IS OUT OF REACH
+{{ application.reason }}
+
+Record what you decide on the application in the admin, so the next person to
+read it can see it has been handled.

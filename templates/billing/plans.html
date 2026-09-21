@@ -22,6 +22,33 @@ the deep sheet over the rotating strips.
 <div class="flash info" style="margin-bottom:18px;"><svg class="cic" style="width:18px;height:18px;stroke:#245b66;fill:none;flex:none;"><use href="#ic-lock"/></svg><span>Payments aren't switched on yet, your choice is saved and we'll confirm before charging.</span></div>
 {% endif %}
 
+{% comment %}
+THE FOUNDING RATE, SAID ON THE SCREEN WHERE IT IS CHARGED.
+
+"Founding Partner pricing, locked" has been on the marketing pages since launch
+and was, until Sep 2026, only a sentence there — nothing in the product knew
+who had been promised it. It does now (billing.models.FoundingRate), and this
+is where an organisation reads its own position back: either it holds a lock
+and can see the date, or the window is still open and it can see the deadline.
+{% endcomment %}
+{% if founding_rate %}
+<div class="flash success" style="margin-bottom:18px;">
+  <span>
+    <b>Founding Member.</b> Your rate is locked at ${{ founding_rate.price_aud|floatformat:0 }}
+    a year through {{ founding_rate.locked_until|date:"j F Y" }} — list prices can rise, yours can't.
+    Move up a plan and you pay that plan's price; you're never charged more than the list.
+  </span>
+</div>
+{% elif founding_open %}
+<div class="flash info" style="margin-bottom:18px;">
+  <span>
+    <b>Founding Member pricing is open.</b> Choose a plan on or before
+    {{ founding_closes|date:"j F Y" }} and the price you pick is the price you
+    pay at renewal, locked in for the three seasons after that.
+  </span>
+</div>
+{% endif %}
+
 <div class="tier-cards" data-coach="plan-tiers">
   {% for t in tiers %}
   {% comment %}
@@ -48,10 +75,37 @@ the deep sheet over the rotating strips.
     {% if current and current.tier == t.key %}<span class="tier-current" data-coach="plan-current">Current</span>{% endif %}
     <div class="tier-name">{{ t.label }}</div>
     <div class="tier-for">{{ t.seat_label }} &middot; {{ t.audience }}</div>
+    {% comment %}
+    The price THIS organisation pays, with the list price struck through beside
+    it when a founding lock is holding it down. A price list that shows the
+    shelf price to somebody who is not being charged the shelf price is a page
+    that will generate a support email.
+    {% endcomment %}
+    {% if t.is_founding %}
+    <div class="tier-price">${{ t.your_price|floatformat:0 }}<span>/yr</span>
+      <span class="tier-was"><s>${{ t.price }}</s> Founding rate</span>
+    </div>
+    {% else %}
     <div class="tier-price">${{ t.price }}<span>/yr</span></div>
+    {% endif %}
     <ul class="tier-feats">{% for f in t.features %}<li><span class="tk">&check;</span> {{ f }}</li>{% endfor %}</ul>
+    {% comment %}
+    Groups are the one feature that genuinely differs between plans now, so the
+    two plans that do not carry them say so rather than leaving a customer to
+    infer it from a features list that does not mention them.
+    {% endcomment %}
+    {% if not t.groups %}<p class="tier-note">One shared ladder. Groups start at {{ groups_min_label }}.</p>{% endif %}
     <form method="post" action="{% url 'billing:checkout' org.id %}" style="margin-top:auto;">{% csrf_token %}<input type="hidden" name="tier" value="{{ t.key }}"><button class="tier-cta" type="submit">{% if current and current.tier == t.key %}Current plan{% else %}Choose {{ t.label }}{% endif %}</button></form>
   </div>
   {% endfor %}
 </div>
+
+{% comment %}
+Under the cards, for the organisation that has got as far as choosing a plan
+and then stopped. See templates/public/sponsorship.html.
+{% endcomment %}
+<p class="app-sub" style="text-align:center;margin-top:22px;">
+  Is the fee what's stopping you? <a href="{% url 'sponsorship' %}">Apply for a sponsored place</a> &mdash;
+  setting up, inviting your people and the Charity Vote are free either way.
+</p>
 {% endblock %}

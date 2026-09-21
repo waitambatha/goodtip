@@ -1,0 +1,39 @@
+{% comment %}
+Presentation A — the post-it note.
+
+"This needs updating with the right logo and the right name Good Tip — a more
+modern look, like a post-it note or the like" (client, Sep 2026). This is the
+post-it, and it replaces the parchment scroll that used to stand here.
+
+WHY A STICKY IS THE RIGHT OBJECT and not just a newer-looking letter: the page
+is about putting a note in front of somebody who has not asked for it. A sticky
+is the only piece of stationery whose entire purpose is exactly that, and
+everyone already knows what finding one on their monitor means. The parchment
+said "historic document"; this says "read me before your first meeting".
+
+HOW IT IS BUILT. A square of colour, tilted two degrees, with three real
+stickiness cues and nothing else:
+
+  * the adhesive strip — the top band is very slightly deeper in colour,
+    because that is the part that is glued and it sits a hair off the wall
+  * the lift — the bottom corners curl away, drawn as a shadow that is tight
+    at the top and loose at the bottom rather than an even drop shadow
+  * the tape — one strip of translucent washi across the top-left corner,
+    rotated against the note so it reads as applied rather than printed
+
+The second sticky behind it is not decoration: it is what makes the front one
+read as a pad rather than a painted square, and it is the cheapest depth cue
+available. Both are aria-hidden, the note itself carries the text.
+{% endcomment %}
+<div class="ttb-stage ttb-postit" data-letter-style="postit" role="group" aria-label="The note, as a post-it">
+
+  <div class="pi-stack">
+    <div class="pi-behind" aria-hidden="true"></div>
+    <div class="pi-note">
+      <span class="pi-tape" aria-hidden="true"></span>
+      <span class="pi-glue" aria-hidden="true"></span>
+      {% include "public/partials/_boss_letter_body.html" %}
+      <div class="pi-mark">{% include "public/partials/_boss_letter_mark.html" %}</div>
+    </div>
+  </div>
+</div>

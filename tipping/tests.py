@@ -3134,3 +3134,326 @@ class TheWayBackIsAButtonTests(TestCase):
                 body = self.client.get(url).content.decode()
                 for sub in body.split('class="gh-sub"')[1:]:
                     self.assertNotIn("<a ", sub.split("</p>")[0])
+
+
+class CarryIntoNewRoomTests(TestCase):
+    """A member joining a comp arrives with the picks they already made.
+
+    Client, 16 Sep 2026: "One of the team signed up and created a new account.
+    Neither my tips nor other tipper in the system showed up with their
+    existing tips. It asked us to tip again when we have already tipped."
+
+    Rounds and matches are per-organisation, so "the same game" is an
+    external_id that appears once per org — everything here joins on that.
+    """
+
+    def setUp(self):
+        self.sport = Sport.objects.create(name="Carry Footy", slug="carry-footy")
+        self.series = Series.objects.create(
+            sport=self.sport, name="Carry Series", slug="carry-series",
+        )
+        self.season = Season.objects.create(year=2093, label="2093")
+        self.comp = Competition.objects.create(
+            sport=self.sport, season=self.season, name="Carry Comp", slug="carry-comp",
+        )
+        self.home = Team.objects.create(name="Pies", slug="pies", series=self.series)
+        self.away = Team.objects.create(name="Blues", slug="blues", series=self.series)
+
+        self.user = User.objects.create_user(
+            email="carrier@example.com", password="x", display_name="Carrier",
+        )
+        # Where they already tip, and where they are about to.
+        self.old = self._org("Old Comp")
+        self.new = self._org("New Comp")
+        OrgMember.objects.create(user=self.user, org=self.old)
+
+    def _org(self, name):
+        return Organisation.objects.create(name=name, season=self.season)
+
+    def _fixture(self, org, external_id, *, kickoff, result=None):
+        """The same real game, as it exists inside one organisation."""
+        rnd, _ = Round.objects.get_or_create(
+            org=org, round_number=1, series=self.series,
+            defaults={"competition": self.comp, "lockout_at": kickoff},
+        )
+        return Match.objects.create(
+            round=rnd, home_team=self.home, away_team=self.away,
+            kickoff_at=kickoff, external_id=external_id, result=result,
+        )
+
+    def _played_pair(self, external_id="g1", *, result="home"):
+        """One finished game, present in both organisations."""
+        kickoff = timezone.now() - timedelta(days=7)
+        a = self._fixture(self.old, external_id, kickoff=kickoff, result=result)
+        b = self._fixture(self.new, external_id, kickoff=kickoff, result=result)
+        return a, b
+
+    def _tipped(self, match, selection="home", *, when=None, is_auto=False):
+        tip = Tip.objects.create(
+            user=self.user, match=match, org=match.round.org,
+            selection=selection, is_auto=is_auto,
+        )
+        if when is not None:
+            # submitted_at is auto_now, so it can only be set past the ORM.
+            Tip.objects.filter(pk=tip.pk).update(submitted_at=when)
+            tip.refresh_from_db()
+        return tip
+
+    def _join(self):
+        from orgs.services import add_member
+
+        return add_member(self.user, self.new)
+
+    # --- the reported bug ---------------------------------------------------
+
+    def test_joining_brings_the_picks_across(self):
+        _old_match, new_match = self._played_pair()
+        self._tipped(_old_match, "home", when=timezone.now() - timedelta(days=9))
+
+        self._join()
+
+        carried = Tip.objects.get(user=self.user, match=new_match)
+        self.assertEqual(carried.selection, "home")
+        self.assertFalse(carried.is_auto, "a carried pick is the member's own")
+
+    def test_a_carried_pick_on_a_finished_game_is_scored(self):
+        """Otherwise the newcomer still reads 0/0 — which is the screenshot."""
+        _old_match, new_match = self._played_pair(result="home")
+        self._tipped(_old_match, "home", when=timezone.now() - timedelta(days=9))
+
+        self._join()
+
+        carried = Tip.objects.get(user=self.user, match=new_match)
+        self.assertTrue(carried.is_correct)
+        self.assertGreater(carried.points_awarded, 0)
+
+    def test_the_join_reports_what_it_did(self):
+        """The welcome message is written from these two numbers.
+
+        Client, 18 Sep 2026: "I created a new group and it asked me to tip
+        again when I already have tips in the system ... why would I need this
+        if I am happy with my original tips." Telling a joiner they have been
+        "awarded the away games" when most of their season is their own carried
+        picks is the same confusion from the other side — so the join hands the
+        screen the counts, and the screen says which happened.
+        """
+        old_match, _new_match = self._played_pair("g1")
+        self._tipped(old_match, "home", when=timezone.now() - timedelta(days=9))
+        # A second game that only the new comp has, so there is nothing to
+        # carry onto it and the away-side default takes it.
+        self._fixture(self.new, "g2", kickoff=timezone.now() - timedelta(days=6))
+
+        member = self._join()
+
+        self.assertEqual(member.carried_tips, 1)
+        self.assertEqual(member.backdated_tips, 1)
+
+    def test_a_member_who_was_already_here_is_reported_as_having_done_nothing(self):
+        self._join()
+        member = self._join()
+        self.assertEqual(member.carried_tips, 0)
+        self.assertEqual(member.backdated_tips, 0)
+
+    # --- the integrity rule -------------------------------------------------
+
+    def test_a_pick_made_after_kickoff_is_not_carried(self):
+        """Copying a pick onto a game whose result is known is not carrying."""
+        old_match, new_match = self._played_pair()
+        self._tipped(old_match, "home", when=timezone.now() - timedelta(days=1))
+
+        self._join()
+
+        carried = Tip.objects.get(user=self.user, match=new_match)
+        self.assertTrue(
+            carried.is_auto,
+            "it should have fallen through to the away-side default",
+        )
+        self.assertEqual(carried.selection, "away")
+
+    def test_an_auto_assigned_pick_is_not_carried(self):
+        """The away default is what the system does when you did NOT pick."""
+        old_match, new_match = self._played_pair()
+        self._tipped(
+            old_match, "away", when=timezone.now() - timedelta(days=9), is_auto=True,
+        )
+
+        self._join()
+
+        carried = Tip.objects.get(user=self.user, match=new_match)
+        self.assertTrue(carried.is_auto)
+
+    def test_disagreeing_sources_carry_nothing(self):
+        """Tipped their club at home and against it at work: they meant both."""
+        third = self._org("Third Comp")
+        OrgMember.objects.create(user=self.user, org=third)
+
+        old_match, new_match = self._played_pair()
+        third_match = self._fixture(third, "g1", kickoff=old_match.kickoff_at)
+        made = timezone.now() - timedelta(days=9)
+        self._tipped(old_match, "home", when=made)
+        self._tipped(third_match, "away", when=made)
+
+        self._join()
+
+        carried = Tip.objects.get(user=self.user, match=new_match)
+        self.assertTrue(carried.is_auto, "a disagreement is left for the member")
+
+    # --- the rules it shares with backdating --------------------------------
+
+    def test_it_never_overwrites_what_is_already_there(self):
+        from tipping.carry import carry_existing_tips
+
+        old_match, new_match = self._played_pair()
+        self._tipped(old_match, "home", when=timezone.now() - timedelta(days=9))
+        OrgMember.objects.create(user=self.user, org=self.new)
+        Tip.objects.create(
+            user=self.user, match=new_match, org=self.new, selection="away",
+        )
+
+        carry_existing_tips(self.user, self.new)
+
+        self.assertEqual(
+            Tip.objects.get(user=self.user, match=new_match).selection, "away",
+        )
+
+    def test_running_it_twice_writes_nothing_the_second_time(self):
+        from tipping.carry import carry_existing_tips
+
+        old_match, _new = self._played_pair()
+        self._tipped(old_match, "home", when=timezone.now() - timedelta(days=9))
+
+        self._join()
+        before = Tip.objects.filter(user=self.user, org=self.new).count()
+        self.assertEqual(carry_existing_tips(self.user, self.new), 0)
+        self.assertEqual(
+            Tip.objects.filter(user=self.user, org=self.new).count(), before,
+        )
+
+    def test_a_manager_who_never_tips_is_not_entered(self):
+        from tipping.carry import carry_existing_tips
+
+        old_match, _new = self._played_pair()
+        self._tipped(old_match, "home", when=timezone.now() - timedelta(days=9))
+        OrgMember.objects.create(
+            user=self.user, org=self.new, role=OrgMember.ROLE_MANAGER,
+        )
+
+        self.assertEqual(carry_existing_tips(self.user, self.new), 0)
+
+    def test_an_org_with_no_fixtures_yet_is_simply_a_no_op(self):
+        """Which is the state every freshly created org is in for a minute."""
+        from tipping.carry import carry_existing_tips
+
+        empty = self._org("Not synced yet")
+        OrgMember.objects.create(user=self.user, org=empty)
+        self.assertEqual(carry_existing_tips(self.user, empty), 0)
+
+    def test_a_fixture_the_other_comp_does_not_tip_is_left_alone(self):
+        """Different codes, no shared external_id, nothing to carry."""
+        kickoff = timezone.now() - timedelta(days=7)
+        only_here = self._fixture(self.new, "nrl-99", kickoff=kickoff)
+
+        self._join()
+
+        tip = Tip.objects.get(user=self.user, match=only_here)
+        self.assertTrue(tip.is_auto, "nothing to carry, so it defaults")
+
+
+class LadderFilterLoadsInPlaceTests(TestCase):
+    """Client, 20 Sep 2026: "let it load on the area of context", and of the
+    same press, that the full-page loader firing "does not make sense".
+
+    Both were one bug. The competition chips and the round strip were ordinary
+    links, so choosing NRL navigated — and a navigation inside the member app
+    raises the whole-page splash on top of the scoped one. They swap the table
+    now, so the press never leaves the page.
+    """
+
+    def setUp(self):
+        from catalog.models import Competition, Season, Sport
+        from orgs.models import OrgMember, Organisation
+
+        self.season = Season.objects.create(year=2099, label="2099")
+        sport, _ = Sport.objects.get_or_create(
+            slug="australian-rules", defaults={"name": "Australian Rules"},
+        )
+        league, _ = Sport.objects.get_or_create(
+            slug="rugby-league", defaults={"name": "Rugby League"},
+        )
+        comp = Competition.objects.create(
+            sport=sport, season=self.season, name="AFL 2099", slug="afl-2099",
+        )
+        # TWO codes, because the competition filter only draws itself when
+        # there is a choice to make — a one-code organisation has no chips and
+        # this would be testing an empty page.
+        comp2 = Competition.objects.create(
+            sport=league, season=self.season, name="NRL 2099", slug="nrl-2099",
+        )
+        # The chips are built from Competition.series, not from the sport —
+        # a competition with no series attached renders no filter at all, and
+        # the test would then be asserting against an empty page.
+        from catalog.models import Series
+
+        afl, _ = Series.objects.get_or_create(
+            slug="afl", defaults={"name": "AFL", "sport": sport, "category": "mens"},
+        )
+        nrl, _ = Series.objects.get_or_create(
+            slug="nrl", defaults={"name": "NRL", "sport": league, "category": "mens"},
+        )
+        comp.series.add(afl)
+        comp2.series.add(nrl)
+        self.org = Organisation.objects.create(name="Pane Co", season=self.season)
+        self.org.competitions.add(comp, comp2)
+        self.user = User.objects.create_user(
+            email="pane@x.com", password="x", display_name="Pane",
+        )
+        OrgMember.objects.create(user=self.user, org=self.org)
+        self.client.force_login(self.user)
+        self.url = reverse("tipping:ladder", args=[self.org.id])
+
+    def test_the_page_carries_the_swap_target(self):
+        body = self.client.get(self.url).content
+        self.assertIn(b'id="ladderPane"', body)
+
+    def test_the_chips_swap_the_pane_rather_than_navigating(self):
+        body = self.client.get(self.url).content.decode()
+        self.assertIn('hx-target="#ladderPane"', body)
+        self.assertIn("pane=table", body)
+
+    def test_the_href_still_works_without_javascript(self):
+        """A chip is still a link. A copied address, a new tab and a browser
+        with no JavaScript all have to keep working — the swap is an
+        enhancement, never the only way in."""
+        body = self.client.get(self.url).content.decode()
+        self.assertIn('href="%s?series=' % self.url, body)
+
+    def test_the_fragment_returns_the_region_and_not_the_page(self):
+        """It is the same partial the page includes, so the two cannot drift —
+        and it is a fragment, not a document, so the swap does not drop a
+        second <html> into the middle of the first."""
+        whole = self.client.get(self.url).content.decode()
+        piece = self.client.get(self.url, {"pane": "table"}).content.decode()
+        self.assertNotIn("<!DOCTYPE", piece)
+        self.assertNotIn("loader-slim", piece)
+        self.assertNotIn("nav-sidebar", piece)
+        # This organisation has no ladder rows, so both render the empty state
+        # — which is the point: the region's job is to show whichever of the
+        # two is true, and the fragment has to be able to return either.
+        self.assertIn("No ladder yet", whole)
+        self.assertIn("No ladder yet", piece)
+        self.assertLess(len(piece), len(whole) / 3)
+
+    def test_the_veil_is_aimed_at_the_pane(self):
+        """The loader covers the table and nothing else, and takes its colour
+        from the [data-code] on the chip that was pressed."""
+        body = self.client.get(self.url).content.decode()
+        self.assertIn('data-veil-for="#ladderPane"', body)
+        self.assertIn('data-code=', body)
+
+    def test_a_member_of_another_org_cannot_read_the_fragment(self):
+        other = User.objects.create_user(
+            email="nope@x.com", password="x", display_name="Nope",
+        )
+        self.client.force_login(other)
+        r = self.client.get(self.url, {"pane": "table"})
+        self.assertEqual(r.status_code, 403)

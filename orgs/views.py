@@ -20,7 +20,15 @@ from django.utils.timesince import timesince
 from django.views.decorators.http import require_POST
 
 from accounts.views import JOIN_INVITER_SESSION_KEY, JOIN_SESSION_KEY
+# The plan gate for groups. Imported here rather than inside each view because
+# three separate paths on this module need it — the directory, the on/off
+# toggle and the create POST — and an import three deep in a function body is
+# how the fourth one gets forgotten.
+from billing.entitlements import GroupsLocked, groups_context, groups_gate
+from billing import pricing
+from billing.pricing import GROUPS_MIN_TIER, TIERS, tier_label
 from catalog.models import Charity, Country, GroupType
+from goodtip.legal import TERMS_TOP_THREE
 from .forms import (
     CharityEditForm, GroupCharityBallotForm, InviteByEmailForm, OrgCharityForm,
     OrgCreateForm,
@@ -203,7 +211,11 @@ WIZARD_STEPS = [
     (6, "The charity", "Choose a cause",
      ["charity_method", "charity", "vote_charities",
       "vote_opens_at", "vote_closes_at"]),
-    (7, "Review", "Check & create", []),
+    # The review step owns one field: the Terms agreement. It is the only
+    # thing on this screen a person can get wrong, and it is here rather than
+    # earlier because this is the screen with the Create button on it — see
+    # the block in orgs/create.html.
+    (7, "Review", "Check & create", ["terms_accepted"]),
 ]
 VERIFY_STEP = 3
 # The step that collects `competitions`, and so the earliest point at which the
@@ -232,7 +244,7 @@ LAST_STEP = WIZARD_STEPS[-1][0]
 WIZARD_MULTI_FIELDS = {"sub_categories", "competitions", "vote_charities"}
 # Unchecked checkboxes post nothing at all, so "absent" has to mean False for
 # these rather than "leave whatever was there before".
-WIZARD_BOOLEAN_FIELDS = {"finals_only"}
+WIZARD_BOOLEAN_FIELDS = {"finals_only", "terms_accepted"}
 
 
 def _wizard_fields(step: int) -> list:
@@ -416,9 +428,17 @@ def _seed_fixtures_for(org) -> None:
             # lot, so the founder would sit at the bottom of a ladder of their
             # own league on a technicality. Run it here, once the fixtures are
             # actually there. Idempotent, so the later joiners are unaffected.
+            from tipping.carry import carry_existing_tips
             from tipping.services import backdate_missed_tips
 
             for m in OrgMember.objects.filter(org_id=org_id).select_related("user"):
+                # Carry first, default second — see orgs.services.add_member
+                # for why that order matters. Both of these ran at join time
+                # too and found an org with no fixtures in it; this is the
+                # pass that actually does the work, and both are idempotent,
+                # so the join-time calls cost nothing and this one is not a
+                # duplicate of them.
+                carry_existing_tips(m.user, m.org)
                 backdate_missed_tips(m.user, m.org)
         except Exception:  # noqa: BLE001 — the scheduled sync will retry
             logger.exception("fixture sync failed for new org %s", org_id)
@@ -569,8 +589,15 @@ def create_org_view(request):
             return _create_redirect(parent_org)
 
         # Absorb first, so going back never loses what was just typed.
-        if step != LAST_STEP:
-            _absorb_step(draft, request.POST, step, request.FILES)
+        #
+        # THE LAST STEP USED TO BE EXCLUDED, because the review screen owned no
+        # fields and there was nothing on it to absorb. It owns one now — the
+        # Terms agreement — and skipping the absorb meant the tick never
+        # reached the draft, so the bound form saw a missing required field and
+        # the wizard refused to create anything no matter how many times the
+        # box was ticked. _absorb_step only ever reads the fields the step
+        # declares, so running it on every step is the safe shape.
+        _absorb_step(draft, request.POST, step, request.FILES)
 
         if action == "back":
             # The verify step has sub-states of its own — nothing started, a
@@ -753,7 +780,10 @@ def create_org_view(request):
                 )
             org = form.save()
             org.created_by = request.user
-            org.save(update_fields=["created_by"])
+            # The form stamped WHEN they agreed and to WHICH version; only the
+            # view knows WHO, because only the view has the request.
+            org.terms_accepted_by = request.user if org.terms_accepted_at else None
+            org.save(update_fields=["created_by", "terms_accepted_by"])
             # Carry the work-email check onto the org it was done for. Belt and
             # braces on the gate above: an org whose type does not require
             # verification still records one if its creator did it anyway.
@@ -775,10 +805,20 @@ def create_org_view(request):
                 org.logo.name = draft.data["logo"]
                 org.save(update_fields=["logo"])
             # The creator runs and owns the league: Manager + Captain + Owner.
-            OrgMember.objects.get_or_create(
-                user=request.user, org=org,
-                defaults={"role": OrgMember.ROLE_BOTH, "is_league_owner": True},
-            )
+            #
+            # Through add_member, so the founder gets the same treatment as
+            # everyone they are about to invite — their picks from other comps
+            # carried across, and the season so far backdated. Doing this with
+            # a bare get_or_create meant the person who set the comp up was the
+            # one member who never got either.
+            #
+            # is_league_owner is set afterwards because it is not add_member's
+            # business: ownership is about who created this organisation, not
+            # about how somebody came to be in it.
+            member = add_member(request.user, org, role=OrgMember.ROLE_BOTH)
+            if not member.is_league_owner:
+                member.is_league_owner = True
+                member.save(update_fields=["is_league_owner"])
             # Start pulling this comp's draw from the feeds straight away.
             # Rounds are per-org, and until this ran a freshly created org had
             # none at all — so the dashboard's fixture card, gated on
@@ -860,6 +900,19 @@ def _draft_form(draft, parent_org, *, bound: bool) -> OrgCreateForm:
     return OrgCreateForm(data) if bound else OrgCreateForm(initial=data)
 
 
+def _draft_int(draft, field):
+    """One numeric answer out of the draft's JSON, or None.
+
+    The draft holds whatever the form posted, which for an optional number
+    field is "" as often as it is a number, and int("") raises.
+    """
+    raw = (draft.data or {}).get(field)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 def _render_wizard(request, draft, form, step, parent_org, *, errors=None, duplicates=None,
                    verify_error=None, verify_values=None):
     steps = [
@@ -896,6 +949,44 @@ def _render_wizard(request, draft, form, step, parent_org, *, errors=None, dupli
         "details_step": DETAILS_STEP,
         "verify_step": VERIFY_STEP,
         "groups_step": GROUPS_STEP,
+        # The plan groups are sold from, so the groups step can name its price
+        # instead of a template hardcoding "Workplace, $799" and going stale
+        # the next time the pricing changes. Read from billing.pricing, which
+        # is the one place the plans are defined.
+        "groups_plan_label": tier_label(GROUPS_MIN_TIER),
+        "groups_plan_price": TIERS[GROUPS_MIN_TIER]["price"],
+        # The plain-English summary beside the Terms checkbox on the last step.
+        # From goodtip.legal so this page and /terms/ print the same words —
+        # see that module for why they must not be able to drift.
+        "terms_top_three": TERMS_TOP_THREE,
+        # WHICH PLAN THIS ORGANISATION IS HEADING FOR (client, 17 Sep 2026:
+        # "where in the process do they select their plan or get a recommended
+        # package — is it when they get asked the size of the group?"). It is
+        # now, on the screen that asks the size, and again on the review.
+        #
+        # Read from the DRAFT rather than from the bound form, so it is right
+        # on a GET of any step: stepping back to the groups screen shows the
+        # plan the answers so far add up to, not a blank.
+        #
+        # Nothing here charges anybody — see the copy in both places it prints.
+        "plan_pick": pricing.recommendation(
+            _draft_int(draft, "team_size"),
+            wants_groups=(draft.data or {}).get("groups_enabled") == "yes",
+        ),
+        # The same ladder the sum above walks, handed to the page so the
+        # readout can follow the number as it is typed instead of waiting for
+        # the next step. One source: if the prices change here, the live
+        # version changes with them and cannot be left behind.
+        "plan_ladder": [
+            {
+                "tier": key,
+                "label": pricing.TIERS[key]["label"],
+                "price": pricing.TIERS[key]["price"],
+                "seat_limit": pricing.TIERS[key]["seat_limit"],
+                "groups": pricing.TIERS[key]["groups"],
+            }
+            for key in pricing.TIER_ORDER
+        ],
         "tipping_step": COMPETITION_STEP,
         "charity_step": CHARITY_STEP,
         # {"field": "domain"|"work_email"|"role"|None, "message": str}
@@ -1087,6 +1178,69 @@ def org_invite_view(request, org_id: int):
     })
 
 
+def _welcome_late_joiner(request, org, member):
+    """Tell somebody who has just joined what happened to their season.
+
+    TWO CLIENT NOTES, ONE SCREEN.
+
+    17 Sep: "do we need a pop up if someone joins late in the year or in the
+    comp — that says 'You're late to the party but we don't want you to be at a
+    disadvantage. To get you started you've been awarded all the away games
+    since the beginning of the season.'"
+
+    18 Sep: "I created a new group and it asked me to tip again when I already
+    have tips in the system ... why would I need this if I am happy with my
+    original tips."
+
+    The second is why this is not simply the sentence from the first. Joining
+    now does two things in order (orgs.services.add_member): the member's OWN
+    picks are carried in from the other comps they tip in, and only what is
+    left over gets the away-side default. Telling somebody they have been
+    "awarded all the away games" when most of their season is their own real
+    picks is telling them the wrong thing about their own ladder — and it is
+    the exact confusion the 18 Sep mail is about.
+
+    So the message says which of the two actually happened, and how much of
+    each. The client's words are kept for the case they were written about: a
+    joiner with nothing to carry, who really has been given the away side.
+    """
+    carried = getattr(member, "carried_tips", 0) or 0
+    backdated = getattr(member, "backdated_tips", 0) or 0
+
+    if not carried and not backdated:
+        # Nothing to explain — either the season has not started or they have
+        # not missed anything.
+        messages.success(request, f"Joined {org.name}.")
+        return
+
+    if carried and backdated:
+        messages.info(
+            request,
+            f"Welcome to {org.name}. You\u2019re late to the party but we don\u2019t "
+            f"want you to be at a disadvantage \u2014 we\u2019ve brought "
+            f"{carried} of your own tips across from your other comps, and "
+            f"filled the {backdated} game{'' if backdated == 1 else 's'} you "
+            "had no pick for with the away side. From here on out you tip your "
+            "way up the ladder.",
+        )
+    elif carried:
+        messages.info(
+            request,
+            f"Welcome to {org.name}. No need to tip it all again \u2014 we\u2019ve "
+            f"brought {carried} tip{'' if carried == 1 else 's'} across from "
+            "your other comps, so your season here starts where it already "
+            "stood. Change any of them up to kick-off.",
+        )
+    else:
+        messages.info(
+            request,
+            "You\u2019re late to the party but we don\u2019t want you to be at a "
+            "disadvantage. To get you started you\u2019ve been awarded all the "
+            "\u201caway\u201d games since the beginning of the season. "
+            "From here on out you tip your way up the ladder.",
+        )
+
+
 def join_view(request, org_id: int, token: str):
     parsed = parse_join_token(token)
     if parsed is None or parsed["org_id"] != org_id:
@@ -1095,7 +1249,7 @@ def join_view(request, org_id: int, token: str):
     inviter_id = parsed["inviter_id"]
     if request.user.is_authenticated:
         already_member = _is_member(request.user, org)
-        add_member(request.user, org, inviter_id=inviter_id)
+        member = add_member(request.user, org, inviter_id=inviter_id)
         # Stand them IN the organisation they just accepted an invitation to.
         # Without this, joining wrote a membership row and nothing else, so
         # somebody who already belonged to other organisations followed an
@@ -1105,7 +1259,10 @@ def join_view(request, org_id: int, token: str):
         # organisation and the screen says another, which reads as the
         # invitation having joined you to the wrong one.
         ctx.set_current_org(request, org)
-        messages.success(request, f"Joined {org.name}.")
+        if not already_member:
+            _welcome_late_joiner(request, org, member)
+        else:
+            messages.success(request, f"Joined {org.name}.")
         from accounts.views import post_join_redirect
 
         # Only nudge the optional top-up the first time they join.
@@ -1878,6 +2035,9 @@ def _attach_threads(posts, *, viewer=None):
         )
         # Which side of the thread it sits on, the same way a message does.
         r.is_mine = bool(viewer and viewer.is_authenticated and r.author_id == viewer.id)
+        # Reworded by whoever wrote it, and by nobody else. A guest reply has
+        # no author row to match, so it is never editable from the site.
+        r.can_edit = r.is_mine
         by_post.setdefault(r.post_id, []).append(r)
     for p in posts:
         p.thread = by_post.get(p.id, [])
@@ -1950,6 +2110,14 @@ def _wall_posts_context(request, org, group=None, room=None):
         ]
         p.can_remove = (
             p.author_id == request.user.id or _can_manage(request.user, org)
+        )
+        # Editing is the AUTHOR'S only, and only a member post has an author.
+        # An admin gets the remove control above and not this one: taking a
+        # post down is moderation, rewriting one under somebody else's name is
+        # not. A recap card has no author at all, which is a large part of why
+        # it can be trusted as the record of a round.
+        p.can_edit = (
+            p.kind == p.KIND_MEMBER and p.author_id == request.user.id
         )
     return _attach_threads(posts, viewer=request.user)
 
@@ -2256,6 +2424,68 @@ def wall_reply_create(request, org_id: int, post_id: int):
     # Land on the reply just written rather than on the top of the post, so
     # a long thread does not send the author back to hunt for their own line.
     return redirect(reverse("orgs:wall", args=[org.id]) + f"#reply-{reply.id}")
+
+
+@login_required
+@require_POST
+def wall_post_edit(request, org_id: int, post_id: int):
+    """Reword your own post on the Wall.
+
+    CLIENT, 17 SEP 2026, asked of the chat and asked again of the Wall. Author
+    only, member posts only — a recap card has nobody to edit it, and that is
+    what makes it the record of the round rather than a version of it.
+
+    The post keeps its id, its reactions and its thread. What it gains is an
+    "edited" mark, for the same reason a message does: a reply underneath is
+    answering words that must not be able to change silently.
+    """
+    from .models import WallPost
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _is_member(request.user, org):
+        return HttpResponseForbidden()
+    post = get_object_or_404(
+        WallPost, pk=post_id, org=org, is_hidden=False,
+        kind=WallPost.KIND_MEMBER, author=request.user,
+    )
+    if not _can_see_wall_post(request.user, post):
+        return HttpResponseForbidden()
+
+    body = (request.POST.get("body") or "").strip()[:500]
+    if not body:
+        messages.error(request, "An edited post still needs to say something.")
+    elif body != post.body:
+        post.body = body
+        post.edited_at = timezone.now()
+        post.save(update_fields=["body", "edited_at"])
+    return redirect(_wall_anchor(org, post))
+
+
+@login_required
+@require_POST
+def wall_reply_edit(request, org_id: int, reply_id: int):
+    """Reword your own reply in a thread. Same rule as the post above."""
+    from .models import WallReply
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _is_member(request.user, org):
+        return HttpResponseForbidden()
+    reply = get_object_or_404(
+        WallReply, pk=reply_id, post__org=org, author=request.user, is_hidden=False,
+    )
+    if not _can_see_wall_post(request.user, reply.post):
+        return HttpResponseForbidden()
+
+    body = (request.POST.get("body") or "").strip()[:500]
+    if not body:
+        messages.error(request, "An edited reply still needs to say something.")
+    elif body != reply.body:
+        reply.body = body
+        reply.edited_at = timezone.now()
+        reply.save(update_fields=["body", "edited_at"])
+    return redirect(
+        reverse("orgs:wall", args=[org.id]) + f"#reply-{reply.id}"
+    )
 
 
 def _wall_anchor(org, post):
@@ -2734,6 +2964,15 @@ def groups_toggle(request, org_id: int):
     if not _is_creator_admin(request.user, org):
         return HttpResponseForbidden()
 
+    # Switching groups ON is the thing the plan gates, so it is refused here as
+    # well as at create_group. Switching OFF never is: an organisation that
+    # drops to a smaller plan must still be able to put its comp back to one
+    # ladder, and refusing that would trap them inside a feature they are no
+    # longer being sold.
+    if not org.groups_enabled and not groups_gate(org).allowed:
+        messages.info(request, groups_context(org)["groups_locked_blurb"])
+        return redirect("orgs:groups", org_id=org.pk)
+
     org.groups_enabled = not org.groups_enabled
     org.save(update_fields=["groups_enabled"])
     if org.groups_enabled:
@@ -2791,6 +3030,13 @@ def groups_view(request, org_id: int):
                     )
                 else:
                     messages.success(request, f"{group.name} is live. Bring your team in.")
+            except GroupsLocked:
+                # Not a mistake the member made — they asked for a feature
+                # their organisation's plan does not carry. Same sentence the
+                # disabled control shows, and it lands them on the plans
+                # screen rather than back where they started.
+                messages.info(request, groups_context(root)["groups_locked_blurb"])
+                return redirect("billing:plans", org_id=root.pk)
             except ValueError as e:
                 messages.error(request, str(e))
             return redirect("orgs:groups", org_id=root.pk)
@@ -2871,6 +3117,11 @@ def groups_view(request, org_id: int):
         "is_admin": is_admin,
         "current_group": ctx.current_group(request, root),
         "pending_count": sum(1 for r in rows if r["awaiting_approval"]),
+        # Whether this organisation's plan includes groups, plus the sentence
+        # and the destination for when it does not. The template draws the
+        # Create and Switch-on controls DISABLED rather than hiding them —
+        # see billing/entitlements.py for why that is the requirement.
+        **groups_context(root),
     })
 
 
@@ -3934,6 +4185,96 @@ def message_react(request, org_id: int, thread_id: int, message_id: int):
     ):
         return redirect(back)
     return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
+
+
+def _message_back(request, org, thread):
+    """Where a plain form post on a message should land.
+
+    The same two-party thread is drawn on two different pages — the member's
+    and, for a support ticket, the admin's — so a hard-coded route would send
+    half the people who used the control to somebody else's screen. The referer
+    is checked against this host first, or it is an open redirect.
+    """
+    back = request.META.get("HTTP_REFERER") or ""
+    if back and url_has_allowed_host_and_scheme(
+        back, allowed_hosts={request.get_host()}, require_https=request.is_secure(),
+    ):
+        return redirect(back)
+    return redirect("orgs:member_message_thread", org_id=org.id, thread_id=thread.id)
+
+
+@login_required
+@require_POST
+def message_edit(request, org_id: int, thread_id: int, message_id: int):
+    """Change the words of your own message.
+
+    CLIENT, 17 SEP 2026: "is there a way messages can be edited or deleted
+    from the chat?"
+
+    Author only — see Message.can_edit for why an admin does not get this.
+    The message keeps its place in the thread, its reactions, its replies and
+    its read receipts: it is the same message, said better. What it gains is
+    an "edited" mark, which is not optional and is the reason the feature is
+    safe to have at all.
+    """
+    from orgs.models import Message, MessageThread
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    thread = get_object_or_404(MessageThread, pk=thread_id, org=org)
+    if not thread.can_read(request.user):
+        raise Http404("No thread matches the given query.")
+    entry = get_object_or_404(Message, pk=message_id, thread=thread)
+    if not entry.can_edit(request.user):
+        return HttpResponseForbidden()
+
+    body = (request.POST.get("body") or "").strip()[:2000]
+    if not body:
+        # An empty edit is a delete with the confirmation skipped, and the two
+        # must not be the same gesture. Nothing is written.
+        messages.error(request, "An edited message still needs to say something.")
+        return _message_back(request, org, thread)
+    if body != entry.body:
+        entry.body = body
+        entry.edited_at = timezone.now()
+        entry.save(update_fields=["body", "edited_at"])
+    return _message_back(request, org, thread)
+
+
+@login_required
+@require_POST
+def message_remove(request, org_id: int, thread_id: int, message_id: int):
+    """Take a message down: the author's own, or anyone's if you run the org.
+
+    A TOMBSTONE, not a hole in the thread — see Message.deleted_at. The words
+    and any attached files go, the row stays, and the bubble says so.
+
+    The attachments are deleted properly, files and all. A voice note nobody
+    can play any more is still a voice note sitting in the media directory,
+    and "delete" has to mean it.
+    """
+    from orgs.models import Message, MessageThread
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    thread = get_object_or_404(MessageThread, pk=thread_id, org=org)
+    if not thread.can_read(request.user):
+        raise Http404("No thread matches the given query.")
+    entry = get_object_or_404(Message, pk=message_id, thread=thread)
+    if not entry.can_remove(request.user):
+        return HttpResponseForbidden()
+
+    for attachment in entry.attachments.all():
+        attachment.file.delete(save=False)
+        attachment.delete()
+    entry.body = ""
+    entry.deleted_at = timezone.now()
+    entry.deleted_by = request.user
+    entry.save(update_fields=["body", "deleted_at", "deleted_by"])
+    # A pinned message that no longer says anything is not worth the top of
+    # the room.
+    if thread.pinned_message_id == entry.id:
+        thread.pinned_message = None
+        thread.save(update_fields=["pinned_message"])
+    return _message_back(request, org, thread)
 
 
 def _reaction_chips(entry, user) -> list:

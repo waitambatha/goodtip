@@ -61,6 +61,14 @@ Saying that beats a blank table that reads like a fault.
   </div>
   <ul class="mp-rows">
     {% for o in groups_off %}
+    {% comment %}
+    The link stays live even for an organisation whose plan does not include
+    groups — it lands on the groups screen, which is where the disabled control
+    and the upgrade prompt live (billing/_groups_locked.html). Sending them
+    somewhere that explains the gate is the point; hiding the row would just
+    make the feature invisible, which is the thing the client asked us not to
+    do. The label is what changes.
+    {% endcomment %}
     <li>
       <span><b>{{ o.name }}</b><small>Everyone tips on one board</small></span>
       <a href="{% url 'orgs:groups' o.id %}" class="gt-pill">Set up groups <svg><use href="#ic-arrow-right"/></svg></a>

@@ -23,7 +23,7 @@ are the only thing left to do.
 
 {% block auth_form %}
 <h1>Send it to the boss</h1>
-<p class="sub">Three fields. The letter itself is fixed, you're not writing it, so it can't go wrong.</p>
+<p class="sub">Three fields, then read it back before it goes. The letter itself is fixed, you're not writing it, so it can't go wrong.</p>
 
 {% if boss_error %}<div class="flash error" style="margin-bottom:16px;"><span>{{ boss_error }}</span></div>{% endif %}
 
@@ -31,29 +31,37 @@ are the only thing left to do.
   {% csrf_token %}
   <div class="fld">
     <label for="bsYourName">Your name</label>
-    <input type="text" name="your_name" id="bsYourName" value="{{ your_name }}"
+    <input type="text" name="your_name" id="bsYourName" data-letter-src="name" value="{{ your_name }}"
            maxlength="80" autocomplete="name" placeholder="e.g. Sam from accounts" autofocus>
     <div class="hint">This is the name the note goes out under.</div>
   </div>
 
   <div class="fld">
     <label for="bsBossName">Boss's name <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
-    <input type="text" name="boss_name" id="bsBossName" value="{{ boss_name }}"
+    <input type="text" name="boss_name" id="bsBossName" data-letter-src="boss" value="{{ boss_name }}"
            maxlength="80" autocomplete="off" placeholder="e.g. Priya">
   </div>
 
   <div class="fld">
     <label for="bsBossEmail">Boss's email</label>
-    <input type="email" name="boss_email" id="bsBossEmail" value="{{ boss_email_draft }}"
+    <input type="email" name="boss_email" id="bsBossEmail" data-letter-src="email" value="{{ boss_email_draft }}"
            autocomplete="off" placeholder="boss@yourwork.com.au">
     <div class="hint">They'll be able to reply straight to you.</div>
   </div>
+
+  {% comment %}
+  THE NOTE ITSELF, ABOVE THE BUTTON. This page had the three fields and a
+  sentence promising the letter was fine — the sender never saw a word of what
+  was about to go out under their name until the progress page showed it to
+  them afterwards. See _boss_letter_preview.html.
+  {% endcomment %}
+  {% include "public/partials/_boss_letter_preview.html" %}
 
   {% comment %}Bots fill every field; a human never sees this one.{% endcomment %}
   <input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true"
          style="position:absolute;left:-9999px;width:1px;height:1px;">
 
-  <button type="submit" class="abtn abtn-primary abtn-block">Send the note &rarr;</button>
+  <button type="submit" class="abtn abtn-primary abtn-block">Looks right &mdash; send it &rarr;</button>
 </form>
 
 <p class="sub" style="margin-top:16px;text-align:center;">

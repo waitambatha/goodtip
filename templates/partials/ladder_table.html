@@ -1,0 +1,139 @@
+{% load static team_extras %}
+{% comment %}
+A partial loads its OWN tags. `{% templatetag openblock %} load {% templatetag closeblock %}` does not inherit through an
+include — the crest tag came from ladder.html's load line, and pulling the
+table out of that file took it out of scope.
+{% endcomment %}
+{% comment %}
+THE LADDER ITSELF, and nothing around it.
+
+Its own file so the competition chips and the round strip can swap JUST this
+instead of reloading the page (client, 20 Sep 2026: "let it load on the area
+of context"). Pressing NRL used to be an ordinary link, so it navigated — and
+a navigation inside the member app fires the full-page splash, which is the
+"loader that does not make sense" the same message is about. Two loaders for
+one press, and the big one won.
+
+tipping.views.ladder_view renders this alone for ?pane=table, and the whole
+page includes it, so there is one copy of the table and no chance of the
+fragment and the page drifting apart.
+
+The wrapper element is OUTSIDE this file, in ladder.html: htmx swaps this
+file's output INTO it, so the target has to survive the swap.
+
+Expects everything the ladder page has: entries, selected_series, updated_at,
+at_round, org.
+{% endcomment %}
+{% comment %}
+The whole branch lives here, empty state included: "what the table region
+shows" is either a ladder or the line explaining why there is not one, and the
+fragment has to be able to return either. Leaving the {% templatetag openblock %} if {% templatetag closeblock %} in the page and
+the {% templatetag openblock %} endif {% templatetag closeblock %} in here split one tag across two files, which is a template
+that will not compile.
+{% endcomment %}
+{% if entries %}
+<p class="lad-foot lad-head-key is-centred">
+  <span class="lad-all">{{ selected_series.name }} &middot; every club, this season</span>
+  <span class="lad-key"><i class="k-finals"></i> shaded rows are the finals places</span>
+  {% if updated_at %}<span class="lad-when">Updated {{ updated_at|timesince }} ago</span>
+  {% elif at_round %}<span class="lad-when">As it stood after round {{ at_round }}</span>{% endif %}
+</p>
+
+<div class="gt-listwrap" id="ladderTable" data-veil data-veil-label="Loading the ladder">
+  {# The competition's colour, on the table that is about it. #}
+  <div class="gt-board ladder" data-coach="ladder-table"
+       data-code="{{ selected_series.slug }}" data-cat="{{ selected_series.category }}">
+    {% comment %}
+    Column heads carry .lad-col so they stripe with the cells beneath them —
+    the numeric columns share a tint that runs the height of the table, which
+    is what lets you track one club's row across eight columns without losing
+    your place.
+    {% endcomment %}
+    <div class="gb-head lad-head">
+      <span>#</span>
+      <span>CLUB</span>
+      {% comment %}
+      FULL WORDS, IN CAPITALS. "The names of the clubs are not that big, so we
+      do have space — I want the other column names in full. Instead of P I want
+      to see POINTS." A single letter is a legend you have to have been taught;
+      the row of them read as a code rather than as a table, and there was room
+      for the words all along.
+      {% endcomment %}
+      <span class="lad-num lad-col">PLAYED</span>
+      <span class="lad-num lad-col">WON</span>
+      <span class="lad-num lad-col">LOST</span>
+      <span class="lad-num lad-col lad-d">DRAWN</span>
+      <span class="lad-num lad-col lad-pct">PCT</span>
+      <span class="lad-num lad-col lad-pts">POINTS</span>
+      {% comment %}
+      What is still to come. Honest about its source: this is what the SYSTEM
+      knows is scheduled and unplayed, de-duplicated across leagues — a dash
+      where no fixtures have been loaded yet, rather than a nought that would
+      read as "their season is over".
+      {% endcomment %}
+      <span class="lad-num lad-col lad-left">GAMES LEFT</span>
+      <span class="lad-stats-h">STATISTICS</span>
+    </div>
+
+    <div class="gt-scroll gb-rows">
+      {% for e in entries %}
+      {% comment %}
+      Top 8 play finals in the AFL, so the cut is drawn there rather than left
+      for the reader to count — it is the line the whole table is read against.
+      {% endcomment %}
+      <div class="gb-row lad-row{% if e.rank <= 8 %} in-finals{% endif %}{% if e.rank == 1 %} is-top{% endif %}">
+        <span class="gb-rank">{{ e.rank }}</span>
+        <span class="gb-who">
+          {% comment %}
+          The shared crest tag, not a bare two-letter slice. No club has
+          uploaded a logo, so the old markup rendered every badge as identical
+          grey initials — while team_colors has carried real club colours the
+          whole time. crest uses the logo when there is one and the club's own
+          colours when there is not, so the ladder now looks like the rest of
+          the app instead of a spreadsheet.
+          {% endcomment %}
+          {% crest e.team %}
+          {% comment %}
+          THE CLUB IS A LINK NOW. "Be able to click a team, see its stats, how
+          has it been performing." The row itself stays a row — making the whole
+          thing clickable would swallow the crest and the numbers, and a table
+          where every cell navigates is a table you cannot select text in.
+          {% endcomment %}
+          <a class="gb-name lad-link" href="{% url 'tipping:team_stats' org.id e.team.id %}">{{ e.team.name }}</a>
+        </span>
+        <span class="lad-num lad-col">{{ e.played }}</span>
+        <span class="lad-num lad-col lad-w">{{ e.wins }}</span>
+        <span class="lad-num lad-col">{{ e.losses }}</span>
+        <span class="lad-num lad-col lad-d">{{ e.draws }}</span>
+        <span class="lad-num lad-col lad-pct">{{ e.percentage|floatformat:1 }}</span>
+        <span class="lad-num lad-col lad-pts">{{ e.points }}</span>
+        <span class="lad-num lad-col lad-left">{% if e.games_left %}{{ e.games_left }}{% else %}<i>&ndash;</i>{% endif %}</span>
+        {% comment %}
+        A BUTTON, SAYING WHAT IT IS. The club's name was already a link to its
+        season and that was not enough — "I did not see the stats button, and I
+        want it in full for the ladder: statistics, be able to see stats, click
+        a team, see the stats of its performance." A name that happens to be
+        underlined is not an offer; a button in a column headed STATISTICS is.
+
+        The name stays a link as well, because that is where a reader's hand
+        goes first.
+        {% endcomment %}
+        <a class="lad-stats" href="{% url 'tipping:team_stats' org.id e.team.id %}"
+           aria-label="{{ e.team.name }} statistics">
+          <svg aria-hidden="true"><use href="#ic-f-chart"/></svg><span>Stats</span>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="card pad-lg" style="text-align:center;">
+  <div class="card-h" style="font-size:20px;">No ladder yet for {{ selected_series }}</div>
+  <p class="card-lead" style="margin:6px 0 0;">
+    Standings arrive with the results feed and refresh after every game. If this
+    stays empty, the competition's feed is not connected yet.
+  </p>
+</div>
+{% endif %}

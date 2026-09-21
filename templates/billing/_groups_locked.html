@@ -1,0 +1,46 @@
+{% comment %}
+THE UPGRADE PROMPT FOR GROUPS.
+
+Drawn wherever a group control is disabled, immediately beside the control it
+explains. The client's instruction was specific about the shape of this:
+
+  "a visible but disabled/greyed group-creation entry point, with a click
+   triggering the upgrade prompt ... rather than removing the menu item
+   entirely" — and "don't just hide the option, they should see what they're
+   missing and get a clear upgrade path".
+
+So it names three things and no more: what groups would give them, which plan
+carries it and what that costs, and one button to go and get it. The reasoning
+("one shared ladder keeps a comp this size lively") is the client's own, and it
+is there because a gate that reads as a paywall alone invites the reply "so
+you've taken a feature away"; a gate that says why the line is drawn where it
+is does not.
+
+Context comes from billing.entitlements.groups_context: `groups_gate`,
+`groups_locked_blurb` and `groups_upgrade_url`. Include it inside the block
+that holds the disabled control, never as a standalone banner at the top of a
+page — a prompt that has floated away from the thing it is about is just an
+advertisement.
+{% endcomment %}
+<div class="lock-prompt" role="note">
+  <div class="lk-head">
+    <span class="lk-ic" aria-hidden="true"><svg class="cic"><use href="#ic-lock"/></svg></span>
+    <div>
+      <b class="lk-title">Groups are part of {{ groups_gate.required_label }}</b>
+      <span class="lk-plan">${{ groups_gate.required_price }}/year &middot; up to {{ groups_gate.required_seats }} people</span>
+    </div>
+  </div>
+
+  <p class="lk-body">{{ groups_locked_blurb }}</p>
+
+  <ul class="lk-gets">
+    <li>A separate ladder for each team, department or site</li>
+    <li>Each group gets its own wall, and can back its own charity</li>
+    <li>The organisation's main ladder keeps running underneath it all</li>
+  </ul>
+
+  <div class="lk-acts">
+    <a href="{{ groups_upgrade_url }}" class="abtn abtn-primary">See {{ groups_gate.required_label }} &rarr;</a>
+    <a href="/pricing/" class="abtn abtn-ghost">Compare the plans</a>
+  </div>
+</div>

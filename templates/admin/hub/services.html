@@ -1,0 +1,144 @@
+{% extends "admin/hub/base.html" %}
+{% load i18n %}
+
+{% comment %}
+SERVICES — what the system does on its own, and how it has been getting on.
+
+Client, 20 Sep 2026: "in the super admin we also need to add Services ...
+things like email services where we monitor the email services and such, your
+traffic and such — kind of services that our system does. And the AI, like the
+Prefect; monitor things like the MatchReader, Group Recap, see how they
+perform."
+
+EVERY PANEL IS THE SAME SHAPE and that is the point of the screen. A dashboard
+whose six cards each report health their own way is six things to learn; here
+every one says a word for its state, one headline number, three figures under
+it, and then whatever is specific to that service. Somebody who has read one
+panel can read all six.
+
+ONE WINDOW ACROSS ALL OF THEM, for the same reason. "Were the emails failing
+while the syncs were?" is the question people open this page with, and it can
+only be answered if the panels are describing the same hours.
+
+THE NOTES ARE PART OF THE DATA. Where a number is a proxy rather than a
+measurement — Prefect's "acted on" rate — or where there is no measurement at
+all — page views — the panel says so in full. A monitoring screen earns its
+figures by being honest about the ones it has not got.
+{% endcomment %}
+
+{% block hub_accent %}var(--gt-c2){% endblock %}
+{% block hub_ic %}ic-chart{% endblock %}
+
+{% block hub_aside %}
+<div class="gta-chipset gta-svc-window" role="group" aria-label="{% translate 'Period' %}">
+  {% for key, label, days in windows %}
+  <a class="gta-chip{% if window == key %} on{% endif %}" href="?window={{ key }}">{{ label }}</a>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block hub_body %}
+<div class="gta-svc-grid">
+  {% for p in panels %}
+  <section class="gta-svc is-{{ p.state }}">
+
+    <header class="gsv-head">
+      <span class="gsv-ic"><svg aria-hidden="true"><use href="#{{ p.icon }}"/></svg></span>
+      <div class="gsv-title">
+        <h2>{{ p.label }}</h2>
+        <p>{{ p.blurb }}</p>
+      </div>
+      {% comment %}
+      One word for the state, and the same four words everywhere: good, watch,
+      bad, idle. A dot alone cannot be read by somebody who cannot separate
+      green from amber, and a percentage alone needs working out.
+      {% endcomment %}
+      <span class="gsv-state">
+        <i aria-hidden="true"></i>
+        {% if p.state == 'good' %}{% translate "Healthy" %}
+        {% elif p.state == 'watch' %}{% translate "Worth a look" %}
+        {% elif p.state == 'bad' %}{% translate "Needs attention" %}
+        {% else %}{% translate "Idle" %}{% endif %}
+      </span>
+    </header>
+
+    <div class="gsv-headline">
+      <b>{{ p.headline }}</b>
+      {% if p.headline_sub %}<span>{{ p.headline_sub }}</span>{% endif %}
+      <i>{{ window_label|lower }}</i>
+    </div>
+
+    {% if p.stats %}
+    <dl class="gsv-stats">
+      {% for label, value in p.stats %}
+      <div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>
+      {% endfor %}
+    </dl>
+    {% endif %}
+
+    {% if p.facts %}
+    <ul class="gsv-facts">
+      {% for label, value in p.facts %}
+      <li><b>{{ label }}</b><span>{{ value }}</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% comment %}
+    MatchReader's own table. Accuracy on its own is meaningless here — 58% is
+    a good model in a code where always picking the home side gets 55% and a
+    bad one where it gets 62% — so the baseline is printed beside it and the
+    gap between them is the column that actually matters.
+    {% endcomment %}
+    {% if p.edges %}
+    <table class="gsv-table">
+      <thead><tr>
+        <th>{% translate "Competition" %}</th>
+        <th>{% translate "Accuracy" %}</th>
+        <th>{% translate "Always home" %}</th>
+        <th>{% translate "Edge" %}</th>
+        <th>{% translate "Tested on" %}</th>
+      </tr></thead>
+      <tbody>
+        {% for e in p.edges %}
+        <tr>
+          <td>{{ e.series }}</td>
+          <td>{{ e.accuracy }}%</td>
+          <td>{{ e.baseline }}%</td>
+          <td class="{% if e.beats_baseline %}gsv-up{% else %}gsv-down{% endif %}">
+            {% if e.beats_baseline %}+{% endif %}{{ e.edge }} pts
+          </td>
+          <td>{{ e.samples }} {% translate "games" %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if p.schedule %}
+    <ul class="gsv-facts">
+      {% for s in p.schedule %}
+      <li><b>{{ s.kind|title }}</b><span>{% translate "next" %} {{ s.next_run_at|default:"—" }}</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if p.recent %}
+    <div class="gsv-recent">
+      <h3>{{ p.recent_label }}</h3>
+      <ul>
+        {% for r in p.recent %}
+        <li>
+          <span class="gsv-r-txt"><b>{{ r.what }}</b>{% if r.why %}<em>{{ r.why }}</em>{% endif %}</span>
+          <i>{{ r.when }}</i>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if p.note %}<p class="gsv-note">{{ p.note }}</p>{% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

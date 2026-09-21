@@ -38,7 +38,9 @@ from django.db.models import Q
 from django.utils import timezone
 
 from data_sync.models import SyncRun
-from data_sync.services import SyncError, competition_for_series, get_sync_service
+from data_sync.services import (
+    SyncError, close_out_stale_live, competition_for_series, get_sync_service,
+)
 from orgs.models import Organisation
 from tipping.models import Match, Round
 
@@ -108,6 +110,15 @@ class Command(BaseCommand):
         kinds = [k for k in ("live", "results", "fixtures", "ladder") if opts[k]]
         if not kinds:
             kinds = ["live", "results"]
+
+        # Before asking the feed anything: drop the in-play flag from matches
+        # the feed has already stopped reporting on. Deliberately FIRST and
+        # deliberately outside the round targeting below — a stuck fixture is
+        # stuck precisely because nothing targets its round any more, so a
+        # close-out that ran only after a successful plan would never reach
+        # the rows that need it. See data_sync.services.close_out_stale_live.
+        if "live" in kinds:
+            close_out_stale_live()
 
         # The ladder is a property of the competition and season, not of a round
         # or a league, so it runs once per competition rather than once per
