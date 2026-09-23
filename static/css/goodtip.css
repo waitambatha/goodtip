@@ -13492,7 +13492,9 @@ a.ch-item:hover .ch-item-edit, a.ch-item:focus-visible .ch-item-edit { opacity: 
    however strong the selector on <html> was. Same trap as the admin shell —
    see the note on gt-shell.css — so the same fix, on the same element.
    ========================================================================== */
-html[data-theme="light"] body.gt-app {
+html[data-theme="light"] body.gt-app,
+html[data-theme="light"] body.manage-app,
+html[data-theme="light"] body.gt-shell {
   /* ---- The four layers ----
      Cream is gone, and so is every translucent overlay that went with it. The
      client's note was that the cream read as haze rather than as a surface —
@@ -13609,7 +13611,7 @@ html[data-theme="light"] .gt-app.page-deep .page-scenes .scene.right { border-le
    The diagonal hatch over the top is what stops a seven-stop gradient reading
    as a smudge: it gives the surface a texture to be, at a strength you only
    notice when you look for it. Both layers sit on nothing translucent. */
-html[data-theme="light"] .gt-app .app-nav {
+html[data-theme="light"] .app .app-nav {
   background:
     repeating-linear-gradient(135deg,
       rgba(23,107,69,.04) 0 1.5px, rgba(255,255,255,0) 1.5px 8px),
@@ -13618,10 +13620,10 @@ html[data-theme="light"] .gt-app .app-nav {
   border-bottom: 1px solid rgba(23,107,69,.18);
   box-shadow: 0 1px 0 rgba(255,255,255,.7) inset, 0 10px 22px -20px rgba(15,46,34,.35);
 }
-html[data-theme="light"] .gt-app .an-brand { color: var(--lt-ink); }
-html[data-theme="light"] .gt-app .an-brand span { color: var(--lt-accent-ink); }
-html[data-theme="light"] .gt-app .an-links a { color: #46554B; opacity: 1; }
-html[data-theme="light"] .gt-app .an-links a:hover { background: var(--lt-tint); color: var(--lt-ink); }
+html[data-theme="light"] .app .an-brand { color: var(--lt-ink); }
+html[data-theme="light"] .app .an-brand span { color: var(--lt-accent-ink); }
+html[data-theme="light"] .app .an-links a { color: #46554B; opacity: 1; }
+html[data-theme="light"] .app .an-links a:hover { background: var(--lt-tint); color: var(--lt-ink); }
 
 /* THE ACTIVE PAGE: A SOLID FILL, NOT A TINT.
    Pale lime was tried and rejected — "that green infill on the menu, it looks
@@ -13635,12 +13637,12 @@ html[data-theme="light"] .gt-app .an-links a:hover { background: var(--lt-tint);
    screens out as handling colour well. So the member app says "you are here"
    the same way, and the two areas stop disagreeing about what selected looks
    like. */
-html[data-theme="light"] .gt-app .an-links a.on {
+html[data-theme="light"] .app .an-links a.on {
   background: var(--lt-ink); color: #FFFFFF; font-weight: 600;
   box-shadow: 0 6px 14px -8px rgba(15,46,34,.55);
 }
-html[data-theme="light"] .gt-app .an-links a.on svg { stroke: var(--lime); color: var(--lime); }
-html[data-theme="light"] .gt-app .an-links a.on:hover { background: #17402F; color: #FFFFFF; }
+html[data-theme="light"] .app .an-links a.on svg { stroke: var(--lime); color: var(--lime); }
+html[data-theme="light"] .app .an-links a.on:hover { background: #17402F; color: #FFFFFF; }
 
 /* THE GLYPHS TRAVEL FROM LIGHT GREEN TO DARK GREEN.
    On the green theme the marks sit at 62% cream and light up lime on hover —
@@ -13651,35 +13653,35 @@ html[data-theme="light"] .gt-app .an-links a.on:hover { background: #17402F; col
    the label travels and the same direction the fill travels when the item
    becomes current. The current item keeps its lime, because by then the tile
    under it is deep green and lime is the only bright thing left. */
-html[data-theme="light"] .gt-app .an-links a .an-ic,
-html[data-theme="light"] .gt-app .an-menu-btn .an-ic { color: #8DC63F; opacity: 1; }
-html[data-theme="light"] .gt-app .an-links a:hover .an-ic,
-html[data-theme="light"] .gt-app .an-links a:focus-visible .an-ic,
-html[data-theme="light"] .gt-app .an-menu-btn:hover .an-ic,
-html[data-theme="light"] .gt-app .an-menu-btn[aria-expanded="true"] .an-ic { color: var(--lt-ink); opacity: 1; }
-html[data-theme="light"] .gt-app .an-links a.on .an-ic { color: var(--lime); opacity: 1; }
-html[data-theme="light"] .gt-app .an-menu-btn { color: #46554B; }
-html[data-theme="light"] .gt-app .an-menu-btn:hover { color: var(--lt-ink); }
+html[data-theme="light"] .app .an-links a .an-ic,
+html[data-theme="light"] .app .an-menu-btn .an-ic { color: #8DC63F; opacity: 1; }
+html[data-theme="light"] .app .an-links a:hover .an-ic,
+html[data-theme="light"] .app .an-links a:focus-visible .an-ic,
+html[data-theme="light"] .app .an-menu-btn:hover .an-ic,
+html[data-theme="light"] .app .an-menu-btn[aria-expanded="true"] .an-ic { color: var(--lt-ink); opacity: 1; }
+html[data-theme="light"] .app .an-links a.on .an-ic { color: var(--lime); opacity: 1; }
+html[data-theme="light"] .app .an-menu-btn { color: #46554B; }
+html[data-theme="light"] .app .an-menu-btn:hover { color: var(--lt-ink); }
 
 /* The context chip is a control, so it gets a control's edge — a clean white
    card, not a tinted wash. */
-html[data-theme="light"] .gt-app .an-ctx-btn {
+html[data-theme="light"] .app .an-ctx-btn {
   color: var(--lt-ink); background: var(--lt-surface);
   border-color: var(--lt-line-3);
 }
-html[data-theme="light"] .gt-app .an-ctx-btn:hover {
+html[data-theme="light"] .app .an-ctx-btn:hover {
   border-color: rgba(23,107,69,.45); background: var(--lt-tint);
 }
-html[data-theme="light"] .gt-app .an-ctx-org { opacity: .78; }
+html[data-theme="light"] .app .an-ctx-org { opacity: .78; }
 /* The group half decides which ladder a tip lands on, so it stays the
    emphasised one — in a green that can actually be read on white. */
-html[data-theme="light"] .gt-app .an-ctx-group { color: var(--lt-forest); }
-html[data-theme="light"] .gt-app .an-iconbtn { color: #46554B; }
-html[data-theme="light"] .gt-app .an-iconbtn:hover { background: var(--lt-tint); color: var(--lt-ink); }
-html[data-theme="light"] .gt-app .an-burger { color: var(--lt-ink); }
+html[data-theme="light"] .app .an-ctx-group { color: var(--lt-forest); }
+html[data-theme="light"] .app .an-iconbtn { color: #46554B; }
+html[data-theme="light"] .app .an-iconbtn:hover { background: var(--lt-tint); color: var(--lt-ink); }
+html[data-theme="light"] .app .an-burger { color: var(--lt-ink); }
 html[data-theme="light"] .gt-app .bell-btn { color: #46554B; }
-html[data-theme="light"] .gt-app .an-chip .cn b { color: var(--lt-ink); }
-html[data-theme="light"] .gt-app .an-org { color: var(--lt-ink); opacity: .78; }
+html[data-theme="light"] .app .an-chip .cn b { color: var(--lt-ink); }
+html[data-theme="light"] .app .an-org { color: var(--lt-ink); opacity: .78; }
 
 /* The drop-down panels hang off a white bar now, so they need their own edge
    rather than the contrast the dark bar was giving them for free. */
@@ -13696,25 +13698,25 @@ html[data-theme="light"] .gt-app .an-org { color: var(--lt-ink); opacity: .78; }
    Every one of them is restated here. It is a long block on purpose: each of
    those colours was chosen against green, and there is no single token that
    flips them. */
-html[data-theme="light"] .gt-app .an-menu-panel,
-html[data-theme="light"] .gt-app .an-ctx-panel {
+html[data-theme="light"] .app .an-menu-panel,
+html[data-theme="light"] .app .an-ctx-panel {
   background: var(--lt-surface);
   border: 1px solid var(--lt-line);
   box-shadow: var(--lt-lift-2);
 }
-html[data-theme="light"] .gt-app .an-menu-panel a,
-html[data-theme="light"] .gt-app .an-ctx-row { color: var(--lt-ink); }
-html[data-theme="light"] .gt-app .an-menu-panel a b,
-html[data-theme="light"] .gt-app .an-ctx-row .mi-txt b { color: var(--lt-ink); }
-html[data-theme="light"] .gt-app .an-menu-panel a i,
-html[data-theme="light"] .gt-app .an-ctx-row .mi-txt i { color: var(--lt-quiet); }
-html[data-theme="light"] .gt-app .an-menu-panel a:hover { background: var(--lt-tint); }
-html[data-theme="light"] .gt-app .an-menu-panel a .mi-ic {
+html[data-theme="light"] .app .an-menu-panel a,
+html[data-theme="light"] .app .an-ctx-row { color: var(--lt-ink); }
+html[data-theme="light"] .app .an-menu-panel a b,
+html[data-theme="light"] .app .an-ctx-row .mi-txt b { color: var(--lt-ink); }
+html[data-theme="light"] .app .an-menu-panel a i,
+html[data-theme="light"] .app .an-ctx-row .mi-txt i { color: var(--lt-quiet); }
+html[data-theme="light"] .app .an-menu-panel a:hover { background: var(--lt-tint); }
+html[data-theme="light"] .app .an-menu-panel a .mi-ic {
   background: var(--lt-surface-2);
   border-color: var(--lt-line-g);
   color: var(--lt-forest);
 }
-html[data-theme="light"] .gt-app .an-menu-panel a:hover .mi-ic {
+html[data-theme="light"] .app .an-menu-panel a:hover .mi-ic {
   background: var(--lt-sel); border-color: rgba(23,107,69,.38); color: var(--lt-ink);
 }
 
@@ -22740,4 +22742,140 @@ html[data-theme="light"] .gt-app .an-ctx-btn .an-ctx-role.is-member { color: rgb
      link row off centre. Past it the name ellipsises, as it always did. */
   .gt-app .an-ctx-btn,
   .gt-v2 .an-ctx-btn { max-width: 340px; width: auto; }
+}
+
+/* ===========================================================================
+   GROUPS IN LIGHT MODE — the words come back
+   ===========================================================================
+   Client, 23 Sep 2026: "on the groups the texts are not being seen in the
+   light mode."
+
+   Everything this page gained yesterday was written for the dark sheet and
+   said so in absolute terms: cards at rgba(255,255,255,.04), names in
+   --white, supporting copy and ghost buttons in --cream. On the light theme
+   the page ground turns white, so a 4%-white card IS the page and cream text
+   on it is cream on white — 1.2:1, which is not faint, it is gone.
+
+   This is the same mistake three times over now (the contact form's fields,
+   the group cards' ghost buttons, the chip's role pill): a colour chosen from
+   the surface it was FIRST drawn on rather than from the surface it is
+   painted on. Here the surface moves with the theme, so the colours have to
+   move with it too. */
+html[data-theme="light"] .gt-app .grp-panel {
+  background: var(--lt-surface-2);
+  border-color: var(--lt-line);
+}
+html[data-theme="light"] .gt-app .grp-grid .dept-card {
+  background: var(--lt-surface) !important;
+  border-color: var(--lt-line) !important;
+  box-shadow: 0 1px 2px rgba(15,46,34,.05);
+}
+html[data-theme="light"] .gt-app .grp-grid .dept-card:hover {
+  background: var(--lt-tint) !important;
+  border-color: rgba(23,107,69,.4) !important;
+}
+html[data-theme="light"] .gt-app .grp-grid .dc-name { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .grp-grid .dc-meta,
+html[data-theme="light"] .gt-app .grp-grid .card-lead {
+  color: var(--lt-quiet) !important; opacity: 1;
+}
+/* The ghost buttons carried !important on the dark rules, so the light ones
+   have to as well — and they are the controls, so they matter most. */
+html[data-theme="light"] .gt-app .grp-grid .dept-card .abtn-ghost {
+  border-color: var(--lt-line) !important;
+  color: var(--lt-ink) !important;
+  background: var(--lt-surface) !important;
+}
+html[data-theme="light"] .gt-app .grp-grid .dept-card .abtn-ghost:hover {
+  border-color: var(--lt-forest) !important;
+  background: var(--lt-tint) !important;
+  color: var(--lt-ink) !important;
+}
+html[data-theme="light"] .gt-app .grp-grid .dept-card .pill-role {
+  color: var(--lt-forest) !important;
+  border-color: rgba(23,107,69,.4) !important;
+  background: var(--lt-sel) !important;
+}
+html[data-theme="light"] .gt-app .grp-grid .dept-card.is-pending {
+  background: #FFF9E8 !important;
+  border-color: rgba(154,90,5,.38) !important;
+}
+
+/* The list header and the hero above it. */
+html[data-theme="light"] .gt-app .grp-listhead-t { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .grp-listhead-n { color: var(--lt-quiet); opacity: 1; }
+html[data-theme="light"] .gt-app .grp-listhead-rule { background: var(--lt-line); }
+html[data-theme="light"] .gt-app .grp-listhead-ic {
+  background: var(--lt-sel); color: var(--lt-forest);
+}
+html[data-theme="light"] .gt-app .grp-total { color: var(--lt-accent-ink); opacity: 1; }
+html[data-theme="light"] .gt-app .dept-hero.dh-noart .gh-eyebrow.is-title { color: var(--lt-ink); }
+html[data-theme="light"] .gt-app .dept-hero.dh-noart h1.dh-word { color: var(--lt-accent-ink); }
+html[data-theme="light"] .gt-app .dh-noart .dh-lead { color: var(--lt-quiet); }
+
+/* ===========================================================================
+   THE LIGHT BAR — the green and the white, turned up
+   ===========================================================================
+   Client, 23 Sep 2026: "in the light mode let's make that pattern on the menu
+   where we have green and white, make the green and white more [pronounced]
+   so I can see and get the feel of that contrast."
+
+   The bar carries a diagonal pinstripe over a pale green-to-white sweep. Both
+   halves were set so quietly that on a bright screen the whole thing read as
+   one flat off-white: the stripe was 4% green on a 1.5px pitch, which is
+   below what most panels resolve, and the sweep's greens were #E7F3CE to
+   #FFFFFF — four steps of nearly the same value.
+
+   Turned up on both counts, and the pattern is the part that carries it: the
+   stripe goes to 9% on a wider 3px band so it is a texture you can see rather
+   than one you can measure, and the sweep's green ends go deeper so the white
+   in the middle reads as white BECAUSE there is something beside it. The type
+   on top does not move — every colour written on this bar was measured
+   against the white in the middle, which is still white. */
+html[data-theme="light"] .app .app-nav {
+  background:
+    repeating-linear-gradient(135deg,
+      rgba(23,107,69,.09) 0 3px, rgba(255,255,255,0) 3px 11px),
+    linear-gradient(100deg,
+      #D4EBA6 0%, #E8F5C8 16%, #F8FCEE 36%, #FFFFFF 52%, #F4FADF 70%, #E2F2B8 86%, #CFE89C 100%);
+  border-bottom: 1px solid rgba(23,107,69,.3);
+  box-shadow: 0 1px 0 rgba(255,255,255,.8) inset, 0 12px 24px -20px rgba(15,46,34,.45);
+}
+/* The links sit on the pale ends as well as the white middle now, so their
+   resting colour goes a step darker to hold at both. */
+html[data-theme="light"] .app .an-links a { color: #33453A; }
+/* The brand keeps the same relationship it has on the dark bar: the mark in
+   ink, TIP in the accent — but the accent has to be the type-safe one, since
+   the fill lime is 1.4:1 on this. */
+html[data-theme="light"] .app .an-brand { color: var(--lt-ink); }
+html[data-theme="light"] .app .an-brand span { color: var(--lt-accent-ink); }
+
+/* ---- the "groups are part of Workplace" panel, in light mode ----
+   Same failure as the cards around it: written for the dark sheet, in cream
+   and low-alpha white, so on the light theme it is pale-on-pale. It is the
+   panel that explains why the Create button is disabled, which makes it the
+   one block on the page a reader most needs to be able to read. */
+html[data-theme="light"] .app .lock-prompt {
+  background: var(--lt-surface-2);
+  border-color: rgba(23,107,69,.26);
+}
+html[data-theme="light"] .app .lock-prompt .lk-title { color: var(--lt-ink); }
+html[data-theme="light"] .app .lock-prompt .lk-plan { color: var(--lt-accent-ink); }
+html[data-theme="light"] .app .lock-prompt .lk-body { color: var(--lt-ink); opacity: 1; }
+html[data-theme="light"] .app .lock-prompt .lk-gets,
+html[data-theme="light"] .app .lock-prompt .lk-gets li { color: var(--lt-quiet); opacity: 1; }
+html[data-theme="light"] .app .lock-prompt .lk-ic {
+  background: var(--lt-sel); color: var(--lt-forest);
+}
+html[data-theme="light"] .app .lock-prompt .abtn-ghost {
+  border-color: var(--lt-line); color: var(--lt-ink); background: var(--lt-surface);
+}
+html[data-theme="light"] .app .lock-prompt .abtn-ghost:hover {
+  border-color: var(--lt-forest); background: var(--lt-tint);
+}
+/* The disabled Create button sits beside it and is the thing being explained. */
+html[data-theme="light"] .app .abtn.is-locked[disabled] {
+  background: var(--lt-surface-2) !important;
+  color: var(--lt-quiet) !important;
+  border: 1px solid var(--lt-line) !important;
 }
