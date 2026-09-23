@@ -7,6 +7,8 @@ from django.contrib.auth import (
 )
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db import transaction
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
@@ -28,6 +30,7 @@ from .forms import (
     AvatarForm, LoginForm, ProfileForm, SecurityForm, SignupForm, TipCarryForm,
     VerifyCodeForm,
 )
+from .form_replies import json_error, json_ok, wants_json
 from .models import LoginCode
 from .onboarding import TOURS
 from .notifications import send_login_code
@@ -1245,38 +1248,147 @@ def profile_view(request):
     })
 
 
+# ---------------------------------------------------------------------------
+# "TELL ME WHEN IT'S READY" — the pre-launch waiting list
+# ---------------------------------------------------------------------------
+# One recorder, two pages. The form is on the home page (where the client sends
+# people) and on /coming-soon/ (where it started), and both post here. Written
+# as a function rather than duplicated into two views because the two had
+# already drifted once: /coming-soon/ asked for the current platform and the
+# client's new brief added an org type, and a second hand-maintained copy is
+# how one of them ends up missing a field nobody notices for a month.
+
+
+def record_launch_signup(request) -> tuple[bool, str]:
+    """Take a "tell me when it's ready" submission. Returns (saved, error).
+
+    Upserts on the email address. Somebody who fills the form in twice at a
+    function — which is exactly what happens when a room is pointed at one
+    address — should end up on the list once, with whatever they said last.
+
+    Only name and email are required. The other two are useful and neither is
+    worth losing a lead over: a person standing in a function room with a phone
+    will abandon a form that argues with them.
+    """
+    from .models import LaunchSignup
+
+    name = (request.POST.get("name") or "").strip()
+    email = (request.POST.get("email") or "").strip().lower()
+
+    # An unrecognised value is dropped rather than rejected. These come from
+    # <select>s we render, so anything else is either a stale page or somebody
+    # poking at the form; neither is a reason to refuse the name and address.
+    org_type = (request.POST.get("org_type") or "").strip()
+    if org_type not in {c[0] for c in LaunchSignup.ORG_TYPE_CHOICES}:
+        org_type = ""
+    platform = (request.POST.get("current_platform") or "").strip()
+    if platform not in {c[0] for c in LaunchSignup.PLATFORM_CHOICES}:
+        platform = ""
+
+    if not name or not email:
+        return False, "Both a name and an email address are needed."
+
+    try:
+        validate_email(email)
+    except ValidationError:
+        return False, "That email address doesn't look right — check it and try again."
+
+    try:
+        row, _ = LaunchSignup.objects.update_or_create(
+            email=email,
+            defaults={
+                "name": name,
+                "org_type": org_type,
+                "current_platform": platform,
+                "source_page": (request.POST.get("source_page") or "")[:200],
+            },
+        )
+    except Exception:  # noqa: BLE001 — a lead is never worth a 500
+        logger.exception("Launch signup failed to save")
+        return False, "That didn't save — please try again in a moment."
+
+    # THE ROW IS SAVED. NOTHING BELOW MAY UNDO THAT.
+    #
+    # Same rule as the contact form: the acknowledgement is a courtesy and the
+    # lead is the asset. Rendering a template or opening a connection can raise
+    # before send_template gets far enough to swallow anything, and a 500 here
+    # would tell somebody their details did not save while the row sits in the
+    # table. Broad except, logged, and the visitor is told it worked — because
+    # it did.
+    try:
+        from goodtip.mail import send_template, site_url
+
+        from .form_replies import reply_for
+
+        reply = reply_for("launch")
+        send_template(
+            reply["template"],
+            subject=reply["subject"],
+            to=[email],
+            context={"signup": row, "site_link": site_url("/")},
+            reply_to=[CONTACT_REPLY_TO],
+        )
+    except Exception:  # noqa: BLE001 — see above
+        logger.exception("Launch signup %s saved, but its email failed", row.pk)
+    return True, ""
+
+
+def launch_signup_context() -> dict:
+    """Everything a template needs to draw the form."""
+    from .models import LaunchSignup
+
+    return {
+        "org_types": LaunchSignup.ORG_TYPE_CHOICES,
+        "platforms": LaunchSignup.PLATFORM_CHOICES,
+    }
+
+
+def home_view(request):
+    """The public home page, which now also takes launch sign-ups.
+
+    It was a bare TemplateView until the client asked for the form on it
+    (22 Sep 2026). It has to be a real view to accept a POST, and the pricing
+    facts that used to ride along in extra_context come through here instead.
+    """
+    from goodtip.urls import PRICING_FACTS
+
+    from billing.pricing import public_cards
+
+    locked_in = False
+    error = ""
+    if request.method == "POST":
+        locked_in, error = record_launch_signup(request)
+        # gt-forms.js submitted this; it wants the answer, not the page.
+        if wants_json(request):
+            return json_ok("launch") if locked_in else json_error(error)
+
+    ctx = {
+        "active": "home",
+        "price_cards": public_cards(4),
+        "locked_in": locked_in,
+        "error": error,
+        **PRICING_FACTS,
+        **launch_signup_context(),
+    }
+    return render(request, "public/home.html", ctx)
+
+
 def coming_soon_view(request):
     """Pre-launch 'lock in your spot' page (client's index template).
 
     Public by design; the staging gate still fronts it until launch. Saves a
     LaunchSignup lead and re-renders with the locked-in confirmation.
     """
-    from .models import LaunchSignup
-
     locked_in = False
     error = ""
     if request.method == "POST":
-        name = (request.POST.get("name") or "").strip()
-        email = (request.POST.get("email") or "").strip().lower()
-        platform = (request.POST.get("current_platform") or "").strip()
-        valid_platforms = {c[0] for c in LaunchSignup.PLATFORM_CHOICES}
-        if platform not in valid_platforms:
-            platform = ""
-        if not name or not email:
-            error = "Both name and email are needed to lock in your spot."
-        else:
-            try:
-                LaunchSignup.objects.update_or_create(
-                    email=email,
-                    defaults={"name": name, "current_platform": platform},
-                )
-                locked_in = True
-            except Exception:
-                error = "That didn't save — check the email address and try again."
+        locked_in, error = record_launch_signup(request)
+        if wants_json(request):
+            return json_ok("launch") if locked_in else json_error(error)
     return render(request, "public/coming_soon.html", {
         "locked_in": locked_in,
         "error": error,
-        "platforms": LaunchSignup.PLATFORM_CHOICES,
+        **launch_signup_context(),
     })
 
 
@@ -1376,6 +1488,14 @@ def tell_the_boss_view(request):
                         ),
                     )
                     request.session.pop("boss_draft", None)
+                    # THE SUCCESS PATH IS A REDIRECT, not a render, so this is
+                    # where a successful send has to be caught for the script.
+                    # The `sent` flag below is only ever set by the honeypot
+                    # branch — a real send leaves here and never reaches it,
+                    # which is why testing `sent` further down answered "no"
+                    # for every genuine submission.
+                    if wants_json(request):
+                        return json_ok("boss")
                     return redirect("boss_progress")
                 else:
                     error = "The note didn't send — try again in a minute, or just copy it."
@@ -1384,6 +1504,15 @@ def tell_the_boss_view(request):
     # send page: two image panes, one card, three fields. The full marketing
     # page is still there behind ?copy=1 for anyone who wants the letter to
     # paste themselves.
+    # A REFUSAL, for the script. It sits above the member render because that
+    # render returns — an earlier attempt put this below it and it was
+    # unreachable for exactly the people who can use the form. The variable is
+    # `error`; `boss_error` is only the template's name for it.
+    if request.method == "POST" and wants_json(request):
+        return json_ok("boss") if sent else json_error(
+            error or "That did not send — try again."
+        )
+
     if request.user.is_authenticated and request.GET.get("copy") != "1":
         return render(request, "public/boss_send.html", {
             "boss_error": error,
@@ -1472,6 +1601,8 @@ def contact_submit_view(request):
     # Honeypot: a field no human sees, that bots fill in anyway. Answer as
     # though it worked — telling a bot it was caught only helps it try again.
     if request.POST.get("company"):
+        if wants_json(request):
+            return json_ok("enquiry")
         return redirect(f"{back}?sent=1#contact-form")
 
     name = (request.POST.get("name") or "").strip()[:120]
@@ -1495,6 +1626,10 @@ def contact_submit_view(request):
             error = "That email address doesn't look right — check it and try again."
 
     if error:
+        if wants_json(request):
+            # No session draft needed — the script never navigated, so the
+            # visitor's typing is still in the fields in front of them.
+            return json_error(error)
         # Held in the session rather than re-rendered, because the form is an
         # include on five different pages: bouncing back to whichever one they
         # were on is the only way to return them to the page they were reading.
@@ -1572,4 +1707,6 @@ def contact_submit_view(request):
     except Exception:  # noqa: BLE001 — see the note above
         logger.exception("Enquiry %s saved, but its email(s) failed", enquiry.pk)
 
+    if wants_json(request):
+        return json_ok("enquiry")
     return redirect(f"{back}?sent=1#contact-form")

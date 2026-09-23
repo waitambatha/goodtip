@@ -1,0 +1,26 @@
+Hi {{ signup.name }},
+
+Thanks for asking — you're on the list.
+
+GoodTip isn't open for sign-ups yet. When it is, you'll get one email from us
+saying so, and that's the only thing this list is for. Nothing between now and
+then, and nothing afterwards you didn't ask for.
+
+{% if signup.org_type_label %}You told us you're with: {{ signup.org_type_label }}
+{% endif %}{% if signup.platform_label %}Tipping with now: {{ signup.platform_label }}
+{% endif %}
+A short version of what you'll be getting:
+
+  - Tipping is free for everyone who plays. Always.
+  - Your organisation pays one platform fee, and GoodTip gives a share of it
+    to a charity your organisation picks.
+  - AFL, AFLW, NRL and NRLW, all season, one price.
+
+Founding Member pricing opens to this list first.
+
+Have a look around while you wait:
+{{ site_link }}
+
+Questions in the meantime? Just reply to this email — it reaches a person.
+
+— GoodTip

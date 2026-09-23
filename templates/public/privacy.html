@@ -7,11 +7,11 @@ Same arrangement as About Us: every clause is editable from the Pages screen
 in /admin/, so the client's lawyer can revise the wording without a deploy.
 Nothing here is marked up for it — the editor reads the rendered page.
 
-The defaults below are a plain-English starting point that describes what this
-system ACTUALLY does — the data it holds, why, and who it goes to — rather
-than boilerplate copied from another product. They are honest as written, but
-they are not legal advice and have not been through a lawyer. Whoever signs
-this off should read every clause and edit it on the Pages screen.
+The defaults below are a plain-English statement of what this system ACTUALLY
+does — the data it holds, why, and who it goes to — rather than boilerplate
+copied from another product, which is what made it reviewable. The client
+confirmed sign-off on 22 Sep 2026, so the wording here is approved rather than
+draft. Later revisions still go through the Pages screen, not a deploy.
 
 WHY IT IS BUILT LIKE A REFERENCE, NOT AN ARTICLE (Aug 2026)
 It used to be one 900-word column of undifferentiated <p> — and `.prose`,
@@ -60,7 +60,7 @@ pages now open the same way.
     <h1>Privacy Policy</h1>
     <p class="hero-sub">What we collect, why we collect it, and who can see it. In plain English, because a policy nobody can read is not a policy anybody agreed to.</p>
     <div class="hl-meta">
-      <span class="hl-chip"><svg><use href="#ic-clock"/></svg> Last updated: August 2026</span>
+      <span class="hl-chip"><svg><use href="#ic-clock"/></svg> Last updated: September 2026</span>
       <span class="hl-chip"><svg><use href="#ic-shield-check"/></svg> Applies to goodtip.com.au and the GoodTip app</span>
     </div>
   </div>
@@ -75,7 +75,7 @@ pages now open the same way.
 </section>
 
 <!-- THE POLICY -->
-<section class="section on-cream" style="padding-top:clamp(36px,5vw,56px);">
+<section class="section on-cream legal-section has-rails" style="padding-top:clamp(36px,5vw,56px);">
   {% comment %}
   THE SIDE RAILS ARE GONE TOO (client, 20 Sep 2026: "remove that translucent
   feel, and let's have white and green").
@@ -89,6 +89,44 @@ pages now open the same way.
   The section keeps `on-cream` and drops `has-rails`, so the clauses sit on
   paper edge to edge.
   {% endcomment %}
+
+  {% comment %}
+  SIDE RAILS, USING THE COMPONENT THAT ALREADY DOES THIS PROPERLY.
+
+  Client, 22 Sep 2026: "on the Terms and Privacy the images look horrible, and
+  at the far end we have some cream block ... look at how we have handled the
+  images on the side in the private pages, it handles that well."
+
+  Right on both counts, and the second is the fix. A first attempt drew its
+  own rails: full-strength photographs, hard-edged, butted straight against
+  the cream column. A picture at 100% beside a document does not read as a
+  margin illustration, it reads as two pages stuck together — which is what
+  the cream block at the seam actually was.
+
+  .pg-rails has existed the whole time and is what the app uses. The thing it
+  does that mine did not is the WASH: a gradient from the photograph towards
+  the content, so the image gives way to the page instead of meeting it at a
+  line. That is the whole difference, and it is why the private pages look
+  settled and this did not.
+
+  It is NOT the arrangement that got rails removed from these pages on 20
+  September. That one ran photographs the full width behind the clauses. This
+  hangs off the section, fills only the margin the 1180px column is not using,
+  and .has-rails puts the content above it — and the media guard below means
+  there is never a width at which it could reach the text anyway.
+  {% endcomment %}
+  <div class="pg-rails legal-rails" aria-hidden="true">
+    <div class="rail left" data-shots>
+      <div class="shot on" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/afl-posts-mcg.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/mcg-stadium.jpg' %}')"></div>
+    </div>
+    <div class="rail right" data-shots>
+      <div class="shot on" style="background-image:url('{% static 'img/scenes/nrl-posts-sunset.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-ground-dusk.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+    </div>
+  </div>
 
   <div class="wrap">
     <div class="legal-layout" data-legal>

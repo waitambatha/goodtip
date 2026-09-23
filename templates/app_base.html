@@ -85,30 +85,42 @@ goodtip.css.
       <div class="an-menu an-ctx" data-anmenu>
         <button type="button" class="an-menu-btn an-ctx-btn" aria-expanded="false" aria-haspopup="true"
                 title="{{ current_org.name }}{% if current_group %} &rsaquo; {{ current_group.name }}{% endif %}">
-          <span class="an-ctx-org">{{ current_org.name }}</span>
-          {% if current_group %}<span class="an-ctx-sep" aria-hidden="true">&rsaquo;</span><span class="an-ctx-group">{{ current_group.name }}</span>{% endif %}
           {% comment %}
-          WHAT YOU ARE HERE — as a glyph, never as a word.
+          THE CHIP, REDRAWN (client, 22 Sep 2026: "make sure we have the full
+          text of the organisation and the dropdown icon in it, so redo that
+          menu to something that makes sense ... this should be centred:
+          AquaFlow Water Co / Admin").
 
-          The word version of this badge read "Admin" beside a truncated name
-          and, on a narrow bar, instead of one: "it should not say admin on
-          that menu, it should read the name of the organisation that it is
-          in." Right. The name is what the control is for, and a badge that can
-          crowd it out is a badge that has taken the place of the thing it was
-          meant to annotate.
+          It was one line — name, then a lime pill holding a shield glyph,
+          then a chevron — and the pill read as a toggle switch rather than as
+          a badge. Three things in a row at three different weights, none of
+          them obviously the label of the others.
 
-          So the role keeps a shield or a pair of figures and gives up its
-          label. The distinction still carries — the shield is lime and the
-          member glyph is not — and the full word is on every row of the panel
-          below, where there is room for it and where it is read BEFORE a
-          switch, which is where it does its work.
+          Two lines now, centred as a block: the organisation on top at full
+          strength, what you are in it underneath. The chevron sits outside
+          that block on the right, so the text can centre without it pulling
+          the optical centre off.
+
+          THE WORD "ADMIN" IS BACK, and that reverses an earlier decision
+          rather than forgetting it. The objection then was that the word sat
+          BESIDE a truncated name and, on a narrow bar, instead of one — "it
+          should not say admin on that menu, it should read the name of the
+          organisation that it is in." That was right while the bar was capped
+          at 1300px and centred. The bar spans the window now, the name is no
+          longer truncated at any width the chip is shown at, and the word can
+          have its own line without taking anything from the name. The glyph
+          stays with it, because a shield and a pair of figures tell the two
+          roles apart faster than reading does.
           {% endcomment %}
-          <span class="an-ctx-role {% if primary_org_is_admin %}is-admin{% else %}is-member{% endif %}"
-                title="{% if primary_org_is_admin %}You run this organisation{% else %}You're a member of this organisation{% endif %}">
-            <svg aria-hidden="true"><use href="{% if primary_org_is_admin %}#ic-f-shield{% else %}#ic-f-users{% endif %}"/></svg>
-            <span class="sr-only">{% if primary_org_is_admin %}Admin{% else %}Member{% endif %}</span>
+          <span class="an-ctx-text">
+            <span class="an-ctx-org">{{ current_org.name }}</span>
+            <span class="an-ctx-role {% if primary_org_is_admin %}is-admin{% else %}is-member{% endif %}">
+              <svg aria-hidden="true"><use href="{% if primary_org_is_admin %}#ic-f-shield{% else %}#ic-f-users{% endif %}"/></svg>
+              <span class="an-ctx-roleword">{% if primary_org_is_admin %}Admin{% else %}Member{% endif %}</span>
+              {% if current_group %}<span class="an-ctx-sep" aria-hidden="true">&middot;</span><span class="an-ctx-group">{{ current_group.name }}</span>{% endif %}
+            </span>
           </span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          <svg class="an-ctx-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="an-menu-panel an-ctx-panel" hidden>
           {% comment %}

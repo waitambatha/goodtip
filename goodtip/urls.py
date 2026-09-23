@@ -9,16 +9,36 @@ from django.views.static import serve as static_serve
 from accounts.forms import RegisteredEmailPasswordResetForm
 from accounts.views import (
     boss_progress_view, coming_soon_view, contact_submit_view, dashboard_view,
-    tell_the_boss_view,
+    home_view, tell_the_boss_view,
 )
 from admin_panel.views import news_detail, news_index
 from goodtip.sitemaps import SITEMAPS
 from billing.views import good_list_view, sponsorship_view, stripe_webhook
+from billing.pricing import (
+    FOUNDING_WINDOW_CLOSES, founding_seasons, founding_stub_ends, public_cards,
+)
 from goodtip.legal import TERMS_TOP_THREE, TERMS_VERSION
 from goodtip.staging_gate import gate_view, robots_view
 from orgs.views import join_view, public_wall_reply, public_wall_view
 from sysadmin.invite_views import accept as admin_invite_accept
 
+
+# THE PRICING FACTS, ONCE, FOR EVERY PAGE THAT QUOTES THEM.
+#
+# Client, 22 Sep 2026: "just have to match the changes to the pricing page."
+# The home teaser and /pricing/ had been hand-typed copies of each other, so
+# corrections landed on one and not the other — see billing.pricing.public_cards
+# for the full account. Both routes now read the same dict.
+#
+# Safe as import-time state: every value is module-level configuration. The one
+# thing that genuinely varies with the date — whether the founding window is
+# still open — is deliberately NOT here, because extra_context is evaluated
+# once per process and a process that outlives 31 January would keep saying yes.
+PRICING_FACTS = {
+    "founding_closes": FOUNDING_WINDOW_CLOSES,
+    "founding_stub_ends": founding_stub_ends(),
+    "founding_seasons": founding_seasons(),
+}
 
 urlpatterns = [
     path("gate/", gate_view, name="staging_gate"),
@@ -31,10 +51,10 @@ urlpatterns = [
     # guard in there would bounce them to a login they cannot pass.
     path("admin-invite/<str:token>/", admin_invite_accept, name="admin_invite_accept"),
     # Public marketing pages (no login required)
-    path("", TemplateView.as_view(
-        template_name="public/home.html",
-        extra_context={"active": "home"},
-    ), name="landing"),
+    # A real view now, not a TemplateView: the home page takes POSTs from the
+    # "Tell me when it's ready" form (client, 22 Sep 2026). It reads the same
+    # PRICING_FACTS below — see accounts.views.home_view.
+    path("", home_view, name="landing"),
     path("how-it-works/", TemplateView.as_view(
         template_name="public/how_it_works.html",
         extra_context={"active": "how"},
@@ -70,7 +90,7 @@ urlpatterns = [
     ), name="terms"),
     path("pricing/", TemplateView.as_view(
         template_name="public/pricing.html",
-        extra_context={"active": "pricing"},
+        extra_context={"active": "pricing", "price_cards": public_cards(), **PRICING_FACTS},
     ), name="pricing"),
     # A PUBLIC path, not one under /billing/. Somebody applying for a sponsored
     # place has usually just read /pricing/ and stopped, and may have no account

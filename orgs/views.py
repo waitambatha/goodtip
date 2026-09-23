@@ -35,6 +35,7 @@ from .forms import (
     fed_competitions,
 )
 from .notifications import notify_new_message, send_org_invites
+from .hero_images import hero_images
 from .models import (
     CharityVote,
     CharityVoteOption,
@@ -3117,6 +3118,14 @@ def groups_view(request, org_id: int):
         "is_admin": is_admin,
         "current_group": ctx.current_group(request, root),
         "pending_count": sum(1 for r in rows if r["awaiting_approval"]),
+        # Pictures for the hero, from the product's own media library rather
+        # than hardcoded in the template (client brief, 22 Sep 2026). Seeded on
+        # the organisation so a given org opens on the same one every visit.
+        # An empty list is handled by the template with a plain panel.
+        "hero_images": hero_images(root.pk),
+        # The total BEFORE the search filter, so "24 groups" does not become
+        # "2 groups" the moment somebody types.
+        "group_total": Group.objects.filter(org=root).count(),
         # Whether this organisation's plan includes groups, plus the sentence
         # and the destination for when it does not. The template draws the
         # Create and Switch-on controls DISABLED rather than hiding them —

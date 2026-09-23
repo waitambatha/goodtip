@@ -128,19 +128,38 @@ GROUPS_MIN_SEATS = TIERS[PRO]["seat_limit"]
 # ---------------------------------------------------------------------------
 # FOUNDING MEMBER PRICE LOCK
 # ---------------------------------------------------------------------------
-# Sign up before the window closes and the rate you signed up at is the rate
-# you are charged at renewal, for three further seasons, whatever the list
-# price has done in the meantime.
+# CLIENT, 22 SEP 2026, answering the contradiction this block used to describe:
 #
-# THE TWO NUMBERS ARE SEPARATE ON PURPOSE. The window is when you have to be in
-# by; the lock is how long it then holds for. The client's own brief gave both
-# a three-year lock and a "locked through end of 2027" label in the same
-# paragraph, which cannot both be true — three seasons from a window closing on
-# 31 Dec 2026 is 2027, 2028 and 2029. The three-year figure is implemented,
-# because that is what the task asked to be built, and changing the answer is
-# changing FOUNDING_LOCK_SEASONS on the line below and nothing else.
-FOUNDING_WINDOW_CLOSES = date(2026, 12, 31)
-FOUNDING_LOCK_SEASONS = 3
+#   "Locked for 3 years at the founding rate. First year is a stub period —
+#    runs from now through the end of the 2027 season, not a standard 12
+#    months — then two more full years on top. The founding rate is only
+#    available to new sign-ups until end of January; after that the price goes
+#    up for new joiners, but existing founding members keep their locked rate
+#    regardless."
+#
+# So there are THREE numbers, not two, and the middle one is the one that was
+# missing. The window is when you have to be in by. The stub is the ragged
+# first term, which ends on a season boundary rather than twelve months after
+# whatever day you happened to sign up. The extra seasons are the full years
+# that follow it.
+#
+# THE LOCK ENDS ON THE SAME DAY FOR EVERYBODY, and that falls out of the stub
+# rather than being imposed on top of it: sign up in October or in January and
+# your first term still ends with the 2027 season, so the two full seasons
+# after it are 2028 and 2029 either way. The old code tried to get the same
+# fairness by anchoring to the window's close and adding three years, which
+# now that the window crosses into 2027 would have run every lock to 2030.
+FOUNDING_WINDOW_CLOSES = date(2027, 1, 31)
+
+# The season the ragged first term runs through. Not a duration — a boundary.
+FOUNDING_STUB_SEASON = 2027
+
+# Full seasons on top of the stub. Stub + 2 is the "3 years" the client sells.
+FOUNDING_EXTRA_SEASONS = 2
+
+# What the marketing pages call it. One string, so "three" and the arithmetic
+# above cannot come to disagree on a page nobody re-reads.
+FOUNDING_LOCK_SEASONS = 1 + FOUNDING_EXTRA_SEASONS
 
 
 def founding_window_open(on: date | None = None) -> bool:
@@ -151,14 +170,26 @@ def founding_window_open(on: date | None = None) -> bool:
 def founding_locked_until(granted_on: date | None = None) -> date:
     """The last day a founding rate holds.
 
-    Anchored to the END of the window rather than to the day this particular
-    organisation signed up, so every founding member's lock expires together
-    and nobody is worse off for joining in January than in December. The three
-    seasons are counted from the season after the window closes.
+    The same day for every founding member, whenever in the window they came
+    in — the stub term ends with the 2027 season for all of them, and the two
+    full seasons after it are therefore the same two. ``granted_on`` is kept in
+    the signature because callers pass it and because a lock granted after the
+    window (which ``grant_founding_rate`` refuses) would otherwise be silently
+    back-dated; anything that late gets its stub from its own year instead.
     """
     granted_on = granted_on or date.today()
-    base = max(granted_on.year, FOUNDING_WINDOW_CLOSES.year)
-    return date(base + FOUNDING_LOCK_SEASONS, 12, 31)
+    stub = max(FOUNDING_STUB_SEASON, granted_on.year)
+    return date(stub + FOUNDING_EXTRA_SEASONS, 12, 31)
+
+
+def founding_stub_ends() -> date:
+    """The end of the ragged first term — what "your first year" actually means."""
+    return date(FOUNDING_STUB_SEASON, 12, 31)
+
+
+def founding_seasons() -> list[int]:
+    """Every season a founding lock covers, for a page that wants to name them."""
+    return list(range(FOUNDING_STUB_SEASON, FOUNDING_STUB_SEASON + FOUNDING_LOCK_SEASONS))
 
 
 def tier_config(tier: str) -> dict:
@@ -211,7 +242,7 @@ def next_tier_with_groups(tier: str | None) -> str:
 
 
 def seat_limit_label(seat_limit: int) -> str:
-    return "500+" if seat_limit >= UNLIMITED_SEATS else f"Up to {seat_limit}"
+    return "500+" if seat_limit >= UNLIMITED_SEATS else f"Up to {seat_limit:,}"
 
 
 def recommendation(team_size: int | None, *, wants_groups: bool = False) -> dict:
@@ -255,3 +286,102 @@ def recommendation(team_size: int | None, *, wants_groups: bool = False) -> dict
         "raised_by_groups": tier != by_size,
         "is_top": tier == ENTERPRISE_PLUS,
     }
+
+
+# ---------------------------------------------------------------------------
+# THE PUBLIC PRICE CARDS
+# ---------------------------------------------------------------------------
+# CLIENT, 22 SEP 2026, with a screenshot of the home page attached: "just have
+# to match the changes to the pricing page."
+#
+# He was right, and the cause is worth naming because it will happen again
+# otherwise. /pricing/ and the home page's pricing teaser were two hand-typed
+# copies of the same five plans. Every correction since 16 September — most
+# popular moving to Workplace, the groups tags, the founding date — was applied
+# to the table on /pricing/ and to nothing else, so the first pricing anybody
+# meets on the site still put MOST POPULAR on the $299 plan and offered no
+# groups tag at all. Two sources of truth, and the one that got updated was the
+# one fewer people read.
+#
+# So the cards are built from TIERS now. A price, a badge or a tag moves here
+# and both pages follow; there is nothing left to forget to mirror.
+#
+# The home teaser shows the first four and /pricing/ shows all five — that is a
+# slice of one list, not a second list.
+
+# What the card says under the price, in the client's voice rather than the
+# feature list's. The feature lists above are for the plans screen, which is
+# read by somebody who has already decided; these are for somebody deciding.
+CARD_BLURBS = {
+    STARTER: (
+        "The full platform. AFL, AFLW, NRL, NRLW. Charity Vote, live ladder, "
+        "the Wall, email reminders. One ladder for everyone."
+    ),
+    GROWTH: (
+        "Everything in Starter, plus your organisation&rsquo;s name and logo and a "
+        "round-by-round participation dashboard. Still one shared ladder."
+    ),
+    PRO: (
+        "Everything in Team, plus <b>groups</b> &mdash; a ladder of its own for each "
+        "team or department &mdash; priority support and a full CSR Impact Report."
+    ),
+    ENTERPRISE: (
+        "Groups and sub-groups, white-label platform, dedicated account manager, "
+        "bespoke onboarding. Make it feel entirely your own."
+    ),
+    ENTERPRISE_PLUS: (
+        "Everything in Organisation. Multi-league setup, API access, flexible "
+        "payment terms and full bespoke configuration."
+    ),
+}
+
+# The icon each card wears, from templates/public/partials/_icons.html. Held
+# here rather than in the template for the same reason as everything else in
+# this block: so the two pages cannot disagree about which plan is which.
+CARD_ICONS = {
+    STARTER: "ic-spark",
+    GROWTH: "ic-users",
+    PRO: "ic-org",
+    ENTERPRISE: "ic-globe",
+    ENTERPRISE_PLUS: "ic-shield-star",
+}
+
+
+def per_person(tier: str) -> str:
+    """The price at the plan's ceiling, which is the best case and says so.
+
+    Rounded to the dollar and prefixed "~", because the exact figure depends on
+    how many people actually join and quoting cents on an estimate reads as a
+    precision the number does not have. The largest plan says "from" instead:
+    at 2,499 people it is under a dollar, and "~$1" would undersell it.
+    """
+    cfg = TIERS[tier]
+    at_ceiling = cfg["price"] / cfg["seat_limit"]
+    lead = "from ~" if tier in (ENTERPRISE, ENTERPRISE_PLUS) else "~"
+    return f"{lead}${max(1, round(at_ceiling))} per person"
+
+
+def public_cards(limit: int | None = None) -> list[dict]:
+    """The price cards, in size order, ready for a template to print.
+
+    ``limit`` takes the first N — the home page teaser shows four and links to
+    /pricing/ for the rest. Everything a card needs is computed here so neither
+    template has to know a price, a ceiling or which plan carries the badge.
+    """
+    cards = []
+    for key in TIER_ORDER:
+        cfg = TIERS[key]
+        cards.append({
+            "tier": key,
+            "label": cfg["label"],
+            "audience": cfg["audience"],
+            "price": f"${cfg['price']:,}",
+            "seats": seat_limit_label(cfg["seat_limit"]),
+            "seat_limit": cfg["seat_limit"],
+            "per_person": per_person(key),
+            "blurb": CARD_BLURBS[key],
+            "icon": CARD_ICONS[key],
+            "groups": cfg["groups"],
+            "popular": cfg["popular"],
+        })
+    return cards[:limit] if limit else cards

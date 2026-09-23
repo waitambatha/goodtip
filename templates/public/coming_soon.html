@@ -44,31 +44,78 @@
     <h2 class="section-heading reveal">Be first to know when we go live.</h2>
     <p class="section-sub reveal">Leave your details below. We'll email you the moment sign-ups open.</p>
 
-    <div class="soon-form reveal">
+    {% comment %}
+    On the shared in-place submit path, like the home page form and the two
+    enquiry forms (client, 22 Sep 2026: "for any other forms ... make sure
+    when all is entered we will have a nice loader, not the whole page but
+    just that form section"). This page was missed on the first pass and was
+    still doing a full reload.
+
+    Same contract as everywhere else: data-form-shell marks what the veil
+    covers, data-ajax opts the form in, and the markup below still works
+    without JavaScript because the view keeps rendering {% templatetag openblock %} if locked_in {% templatetag closeblock %}.
+    {% endcomment %}
+    <div class="soon-form form-card reveal" data-form-shell>
       {% if locked_in %}
-      <div class="soon-done">
-        <h3>You're locked in.</h3>
-        <p>We'll email you the moment GoodTip goes live. Thanks for backing it early.</p>
+      <div class="gtf-done on" role="status">
+        <span class="gtf-tick" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6.5"/></svg>
+        </span>
+        <h3>You&rsquo;re on the list.</h3>
+        <p>We&rsquo;ll email you the moment GoodTip opens for sign-ups. Nothing before then.</p>
       </div>
       {% else %}
-      <form method="post" action="{% url 'coming_soon' %}#lock-in">
+      <form method="post" action="{% url 'coming_soon' %}#lock-in" data-ajax
+            data-busy="Adding you to the list" data-return-after="4000">
         {% csrf_token %}
-        {% if error %}<p class="soon-error">{{ error }}</p>{% endif %}
+        {% if error %}<p class="gtf-error" data-form-error role="alert">{{ error }}</p>{% endif %}
         <label>Name<input type="text" name="name" required maxlength="120" autocomplete="name"></label>
         <label>Email<input type="email" name="email" required autocomplete="email"></label>
+        {% comment %}
+        Org type, added 22 Sep 2026 with the home-page version of this form.
+        The two forms post to the same recorder and must therefore offer the
+        same fields — a lead taken here without an org type is a lead the
+        client cannot segment, and he asked for the field by name.
+        {% endcomment %}
+        <label>What kind of organisation? <span class="opt">(optional)</span>
+          <select name="org_type">
+            <option value="">Select one</option>
+            {% for val, lab in org_types %}<option value="{{ val }}">{{ lab }}</option>{% endfor %}
+          </select>
+        </label>
         <label>What are you tipping with now? <span class="opt">(optional)</span>
           <select name="current_platform">
             <option value="">Select one</option>
             {% for val, lab in platforms %}<option value="{{ val }}">{{ lab }}</option>{% endfor %}
           </select>
         </label>
+        <input type="hidden" name="source_page" value="coming-soon">
         <button type="submit" class="btn-primary" style="width:100%;">Lock in my spot</button>
         <p class="soon-note">No spam. One email, the day we go live.</p>
       </form>
       {% endif %}
     </div>
 
-    <p class="soon-login reveal">Already part of the GoodTip team? <a href="/login/">Log in &rarr;</a></p>
+  </div>
+</section>
+
+{% comment %}
+THE SIGN-IN LINK, MOVED TO THE FOOT OF THE PAGE (client, 22 Sep 2026: "move
+the preview login down the bottom of the page").
+
+It used to sit immediately under the form. The client is about to point a room
+of people at this page, and the last thing under the thing you want them to do
+was an invitation to do something else — something almost none of them can do,
+because the product is not open yet. A visitor who reads "log in" before they
+have understood what this is concludes they are in the wrong place.
+
+It is not removed. The handful of people who DO have access arrive here too,
+and hiding the door from them to tidy the page would be the other mistake. It
+is simply last, and quiet.
+{% endcomment %}
+<section class="section soon-foot">
+  <div class="wrap">
+    <p class="soon-login">Already part of the GoodTip team? <a href="/login/">Log in &rarr;</a></p>
   </div>
 </section>
 

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  GOODTIP "TELL THE BOSS" POSTCARD — reference artwork.
+
+  This is the design the printed card is built from, taken from
+  goodtip.com.au/tell-the-boss/ (the message-card presentation). It is drawn at
+  print scale so it can be opened, measured and pulled apart.
+
+  It is NOT a finished layout. It is the object and its rules; the postcard is
+  yours to design.
+
+  THE CARD IS DEAD STRAIGHT. No tilt, no paper texture, no props. Its whole
+  character comes from three things: a lime bar across the top, a white face
+  with room to breathe, and a quiet footer.
+
+  WHAT IT IS MADE OF, top to bottom:
+    · a lime header bar carrying the wordmark and a small all-caps label
+    · the note, on white, with generous margins
+    · a footer on light paper with one lime dot and the provenance line
+
+  A6 PORTRAIT: 105 x 148 mm trim, 3 mm bleed, artboard 111 x 154 mm.
+  Units are millimetres (1 user unit = 1 mm). Corner radius 4.5 mm.
+
+  ONE COLOUR RULE WORTH KEEPING. On the lime bar the mark cannot be lime, and
+  it cannot be mid-green at reduced strength either — that measured 3.5:1 and
+  failed the site's own contrast check. GOOD is #2A7337 and TIP is #072F1E at
+  full strength, so the two halves still read as two halves and both are legible.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="111mm" height="154mm" viewBox="0 0 111 154">
+  <title>GoodTip — the note as a message card (reference artwork)</title>
+
+  <defs>
+    <filter id="cardlift" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="1"  stdDeviation="1"   flood-color="#0F2E22" flood-opacity="0.10"/>
+      <feDropShadow dx="0" dy="7"  stdDeviation="6.5" flood-color="#0F2E22" flood-opacity="0.26"/>
+    </filter>
+    <clipPath id="cardclip"><rect x="13" y="20" width="85" height="114" rx="4.5"/></clipPath>
+  </defs>
+
+  <rect width="111" height="154" fill="#E8E4D5"/>
+  <rect x="3" y="3" width="105" height="148" fill="none" stroke="#2A7337"
+        stroke-width="0.2" stroke-dasharray="1.5 1.5" opacity="0.45"/>
+
+  <g filter="url(#cardlift)">
+    <rect x="13" y="20" width="85" height="114" rx="4.5" fill="#FFFFFF"
+          stroke="#0F2E22" stroke-opacity="0.10" stroke-width="0.25"/>
+  </g>
+
+  <g clip-path="url(#cardclip)">
+    <!-- the lime header bar -->
+    <rect x="13" y="20" width="85" height="13" fill="#CFF93A"/>
+    <text x="18" y="29" font-family="Barlow Condensed" font-weight="900" font-size="6"
+          letter-spacing="0.06" fill="#2A7337">GOOD<tspan fill="#072F1E">TIP.</tspan></text>
+    <text x="93" y="28.4" font-family="Barlow Condensed" font-weight="800" font-size="3"
+          letter-spacing="0.42" text-anchor="end" fill="#0F2E22" fill-opacity="0.7">A NOTE TO THE BOSS</text>
+
+    <!-- the note -->
+    <text font-family="Barlow Condensed" font-weight="900" font-size="6" fill="#2A7337">
+      <tspan x="19" y="45">Dear [Boss],</tspan>
+    </text>
+    <text font-family="Archivo" font-size="4" fill="#0F2E22">
+      <tspan x="19" y="54">What if our footy tips actually did</tspan>
+      <tspan x="19" y="60.5">some good?</tspan>
+      <tspan x="19" y="71">We&#8217;re already picking teams and</tspan>
+      <tspan x="19" y="77.5">checking the ladder every Monday.</tspan>
+      <tspan x="19" y="84">With GoodTip it stays free for all of</tspan>
+      <tspan x="19" y="90.5">us, and GoodTip gives to a charity</tspan>
+      <tspan x="19" y="97">we choose. Together.</tspan>
+      <tspan x="19" y="107.5">Five minutes to set up. Nothing to</tspan>
+      <tspan x="19" y="114">lose but bragging rights.</tspan>
+    </text>
+    <text x="19" y="124" font-family="Archivo" font-size="4.3" font-weight="800" fill="#2A7337">Can we do this? &#8212; [Your name]</text>
+
+    <!-- the footer -->
+    <rect x="13" y="126" width="85" height="8" fill="#F2EFE6"/>
+    <line x1="13" y1="126" x2="98" y2="126" stroke="#0F2E22" stroke-opacity="0.08" stroke-width="0.25"/>
+    <circle cx="18" cy="130" r="1" fill="#CFF93A"/>
+    <text x="21" y="131.1" font-family="Archivo" font-size="3" fill="#5C6B62">Free to play &#183; your organisation picks the charity &#183; goodtip.com.au</text>
+  </g>
+</svg>

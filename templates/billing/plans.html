@@ -44,7 +44,8 @@ and can see the date, or the window is still open and it can see the deadline.
   <span>
     <b>Founding Member pricing is open.</b> Choose a plan on or before
     {{ founding_closes|date:"j F Y" }} and the price you pick is the price you
-    pay at renewal, locked in for the three seasons after that.
+    pay for three seasons — a stub first term running through the end of the
+    {{ founding_stub_ends|date:"Y" }} season, then two full seasons after it.
   </span>
 </div>
 {% endif %}

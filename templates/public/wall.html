@@ -66,7 +66,21 @@ the right is never covered. Cards swap every 2s.
     {% endif %}
 
     {% if has_live_posts %}
-    <div class="wallfeed">
+    {% comment %}
+    THE REAL FEED TYPES ITSELF OUT TOO (client, 22 Sep 2026: "the typing thing
+    is working on the home page but I want to see it done on the wall").
+
+    I had deliberately excluded the live feed and animated only the samples,
+    on the reasoning that replaying somebody's actual words as if they were
+    arriving now misrepresents when they were written. The client wants it,
+    and on a second look the objection does not hold up: every card keeps its
+    own timestamp ("2h ago"), so nothing here claims to be new — the animation
+    is how the page is presented, not a claim about the clock.
+
+    gt-live.js only animates the first few and reveals the rest at once, so a
+    long feed is not a queue the reader has to wait through.
+    {% endcomment %}
+    <div class="wallfeed wall-live" data-live-thread>
       {% for post in posts %}
       <div class="wf-item">
         {% include "public/partials/_wall_card.html" with post=post %}
@@ -116,7 +130,14 @@ the right is never covered. Cards swap every 2s.
       <b>Nobody's shared a post publicly yet.</b>
       <span>Members choose, post by post, whether their banter goes beyond the organisation. Here's what it looks like when they do.</span>
     </div>
-    <div class="wallfeed is-preview">
+    {% comment %}
+    The sample feed plays itself out — gt-live.js types each post in turn, in
+    the order a room would actually have said them (client, 22 Sep 2026). It
+    is only ever the SAMPLES that do this: a real feed, in the branch above,
+    is other people's words and replaying them as if they were arriving now
+    would be a lie about when they were written.
+    {% endcomment %}
+    <div class="wallfeed is-preview wall-live" data-live-thread>
       {% include "public/partials/_wall_samples.html" %}
     </div>
     {% endif %}

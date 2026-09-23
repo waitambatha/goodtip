@@ -84,7 +84,7 @@
       {% elif not user.is_authenticated %}
       <div class="bn-send bn-lock" id="send">
         <div class="bn-lock-badge"><svg class="cic"><use href="#ic-users"/></svg></div>
-        {% if boss_error %}<p class="bn-error" role="alert">{{ boss_error }}</p>{% endif %}
+        {% if boss_error %}<p class="gtf-error" data-form-error role="alert">{{ boss_error }}</p>{% endif %}
         <h3>Want us to send it? Members only.</h3>
         <p>Anyone can copy the note above. But when GoodTip delivers it, it goes out with a member's name on it, so sign up first (it's free), then come back and we'll put it on the boss's desk.</p>
         <div class="bn-lock-ctas">
@@ -94,8 +94,16 @@
         <span class="bn-hint" style="display:block;margin-top:14px;">Two minutes. No payment. Then the note sends with your name on it.</span>
       </div>
       {% else %}
+      {% comment %}
+      On the shared in-place submit path with the other public forms (client,
+      22 Sep 2026). The form is its own shell here rather than having a wrapper
+      — the veil covers exactly the panel that is doing the work, which is what
+      "just that form section" means on a page where the note itself sits above
+      it and should stay readable while the note is being sent.
+      {% endcomment %}
       <form method="post" class="bn-send" id="send" action="{% url 'tell_the_boss' %}#send"
-            data-busy="Sending the note" data-busy-scope>
+            data-form-shell data-ajax
+            data-busy="Sending the note" data-return-after="4500">
         {% csrf_token %}
         <h3>Or let us send it for you.</h3>
         {% if boss_error %}<p class="bn-error" role="alert">{{ boss_error }}</p>{% endif %}

@@ -38,7 +38,35 @@ decision about this whole screen is, at the same size, and phrased so the
 destructive-sounding one is visibly the quieter of the two.
 =============================================================================
 {% endcomment %}
-<div class="dept-hero is-centred">
+{% comment %}
+THE HERO IS A SPLIT NOW, WITH A PICTURE FROM THE MEDIA LIBRARY.
+
+Client brief, 22 Sep 2026: a large hero, copy on the left, a rounded image
+panel taking roughly 40-45% on the right — and the image "MUST NOT be
+hardcoded ... use images that already exist in the application's image/media
+system ... if multiple suitable images exist, support a rotating behaviour ...
+if there is no image available, gracefully fall back to a clean dark-green
+visual area rather than using an external image."
+
+WHERE THE PICTURES COME FROM. orgs/hero_images.py reads
+sysadmin.media_library.site_assets() — the same inventory the super-admin media
+screen lists. A photograph added to static/img/scenes/ appears here with no
+template change, which is what "configurable from the backend" asks for. The
+starting picture is seeded on the organisation's id so a given org opens on the
+same one every time rather than shuffling on each reload.
+
+THE FALLBACK IS A REAL BRANCH, not a placeholder image. When the library has no
+photographs the panel is drawn as plain deep green with the organisation's
+initial in it — nothing is fetched from anywhere else, which is the one thing
+the brief was explicit about.
+
+data-shots is gt-scenes.js's generic opt-in, so the rotation is the engine the
+public heroes already use and there is no new script.
+
+is-centred is gone: a centred column beside a picture is a column that has lost
+an argument with it.
+{% endcomment %}
+<div class="dept-hero dh-noart">
   <div class="dh-copy">
     <div class="gh-eyebrow is-title">{{ org.name }}</div>
     <h1 class="dh-word">Groups</h1>
@@ -93,6 +121,20 @@ destructive-sounding one is visibly the quieter of the two.
     {% endif %}
     {% endif %}
   </div>
+
+  {% comment %}
+  THE HERO PICTURE IS OFF FOR NOW (client, 22 Sep 2026: "on the groups, for
+  now remove the image").
+
+  Taken out of the markup rather than hidden in CSS, so the hero is genuinely
+  a single column and the copy uses the full width instead of sitting in a
+  1fr column with an empty one beside it.
+
+  EVERYTHING BEHIND IT IS STILL WIRED. orgs/hero_images.py still reads the
+  media library, groups_view still passes `hero_images`, and the tests still
+  cover both. Putting it back is this block again — the panel markup is in
+  the git history for 22 Sep — and nothing else has to be rebuilt.
+  {% endcomment %}
 </div>
 
 {% if not org.groups_enabled %}
@@ -182,6 +224,17 @@ The form is still a real GET form: pressing Enter with scripting off submits it
 and the server-side `q` filter answers exactly as before. The live filter is an
 enhancement on top, not the mechanism.
 {% endcomment %}
+{% comment %}
+THE WORKING AREA, AS ONE PANEL (client, 22 Sep 2026, against a reference
+design: "that section does not look like the image I shared").
+
+The search and the list were two loose blocks on the page ground. In the
+reference they sit inside one bordered panel below the hero, with a labelled
+header row between them — "Your groups" on the left, the count on the right,
+a rule running between. That grouping is what makes the page read as a hero
+plus a working area rather than as four stacked things.
+{% endcomment %}
+<div class="grp-panel">
 <div class="grp-search" data-grp-search>
   <form method="get" action="{% url 'orgs:groups' org.id %}" class="grp-search-form" role="search">
     <svg class="grp-search-ic" aria-hidden="true"><use href="#ic-search"/></svg>
@@ -192,10 +245,22 @@ enhancement on top, not the mechanism.
     <button type="submit" class="grp-search-go">Search</button>
   </form>
   <p class="grp-search-count" data-grp-count hidden></p>
+  {% comment %}
+  The standing total lives in the list header below, beside "Your groups",
+  which is where the reference design puts it. It was briefly here as well
+  and the page showed "4 groups" twice in eleven lines.
+  {% endcomment %}
+</div>
+
+<div class="grp-listhead">
+  <span class="grp-listhead-ic" aria-hidden="true"><svg><use href="#ic-people"/></svg></span>
+  <span class="grp-listhead-t">Your groups</span>
+  <span class="grp-listhead-rule" aria-hidden="true"></span>
+  <span class="grp-listhead-n">{{ group_total }} group{{ group_total|pluralize }}</span>
 </div>
 
 <p class="grp-none" data-grp-none hidden>No groups match that.</p>
-<div class="grid-app g-3" data-coach="groups-list" style="margin-top:18px;" data-grp-list>
+<div class="grid-app g-3 grp-grid" data-coach="groups-list" data-grp-list>
   {% for row in rows %}
   <div class="card pad-lg dept-card{% if row.awaiting_approval %} is-pending{% endif %}"
        data-grp-item data-grp-name="{{ row.group.name|lower }}">
@@ -284,6 +349,7 @@ enhancement on top, not the mechanism.
   </div>
   {% endfor %}
 </div>
+</div>{# /.grp-panel #}
 
 {% comment %}
 The create sheet. One question — which team is this — answered either by

@@ -19,10 +19,13 @@ from .pricing import (
     GROUPS_MIN_TIER,
     STARTER,
     TIERS,
+    founding_stub_ends,
     founding_window_open,
     seat_limit_label,
     tier_label,
 )
+
+from accounts.form_replies import json_error, json_ok, wants_json
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +135,10 @@ def plans_view(request, org_id: int):
         "founding_rate": services.founding_rate_for(org),
         "founding_open": founding_window_open(),
         "founding_closes": FOUNDING_WINDOW_CLOSES,
+        # The end of the ragged first term. Named on this screen because it is
+        # the number an organisation queries when the first invoice does not
+        # cover twelve months (client, 22 Sep 2026).
+        "founding_stub_ends": founding_stub_ends(),
         "groups_min_label": tier_label(GROUPS_MIN_TIER),
     })
 
@@ -445,6 +452,12 @@ def sponsorship_view(request):
                     "Sponsorship application %s saved, but its email(s) failed",
                     application.pk,
                 )
+
+    # gt-forms.js asked; give it the answer rather than the page.
+    if request.method == "POST" and wants_json(request):
+        return json_ok("sponsorship") if sent else json_error(
+            error or "That did not go through — try again."
+        )
 
     return render(request, "public/sponsorship.html", {
         "active": "pricing",

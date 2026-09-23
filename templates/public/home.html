@@ -209,17 +209,53 @@
       <span class="rline">Monday's ladder screenshot posts itself now, and the room does the rest.</span>
       <span class="rline">The quiet one in Legal tipped 12 from 12 and said nothing. The Wall said it for them.</span>
       <span class="rline">It's the bit ESPN FootyTips never built, and the reason your organisation keeps showing up every round.</span></p>
-    <div class="reveal" style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;max-width:920px;">
-      <div class="post" style="margin-top:0;">
+    {% comment %}
+    data-live-thread: gt-live.js takes these two posts apart at runtime and
+    plays them back — Dave types, the room reacts, then GoodTip answers. The
+    posts below are written out in full and are what the page shows with
+    JavaScript off or reduced motion on; nothing is invented by the script.
+    Client, 22 Sep 2026: "let me see the first text being typed, then the other
+    kind of like replies ... like see the magic happen."
+    {% endcomment %}
+    <div class="reveal wall-live" data-live-thread>
+      {% comment %}
+      SIX POSTS, NOT TWO (client, 22 Sep 2026: "let it not only be one but
+      lots"). Two exchanges read as a mock-up of a feed; six read as a room.
+      The order is the argument: somebody sledges, the room answers, the
+      system posts the ladder, the quiet one lands the punchline. That is what
+      the Wall is for, and it is easier to show than to describe.
+      {% endcomment %}
+      <div class="post">
         <div class="post-head"><span class="av">BD</span><span class="meta"><b>Big Dave</b><small>Round 14 &middot; 2h ago</small></span><span class="tag">Top tipper</span></div>
         <p class="post-body">Backing the <span class="pick">&#9733; Pies</span> by 30+. Screenshot this if I'm wrong.</p>
         <div class="post-foot"><span class="react" data-on="false">&#128293; <span class="c">14</span></span><span class="react" data-on="false">&#128514; <span class="c">8</span></span><span class="react" data-on="false">Reply</span></div>
       </div>
-      <div class="post" style="margin-top:0;">
+      <div class="post">
+        <div class="post-head"><span class="av" style="background:rgba(255,142,180,.18);">PK</span><span class="meta"><b>Priya</b><small>Round 14 &middot; 2h ago</small></span></div>
+        <p class="post-body">Dave has tipped the Pies every week since April. One of these rounds he'll be right.</p>
+        <div class="post-foot"><span class="react" data-on="true">&#128514; <span class="c">22</span></span><span class="react" data-on="false">&#128076; <span class="c">6</span></span></div>
+      </div>
+      <div class="post">
         <div class="post-head"><span class="av" style="background:rgba(200,241,53,.15);">GT</span><span class="meta"><b>GoodTip</b><small>Auto &middot; Round 14 close</small></span><span class="tag sys">Ladder</span></div>
         <p class="post-body">Round 14 locked. <b style="color:#fff;">The Quiet One in Legal</b> went 9 from 9 and jumped to <strong style="color:var(--lime);">3rd</strong>. Three on the bounce. Watch your back, Dave.</p>
         <div class="post-foot"><span class="react" data-on="true">&#128064; <span class="c">31</span></span><span class="react" data-on="false">&#127881; <span class="c">12</span></span></div>
       </div>
+      <div class="post">
+        <div class="post-head"><span class="av" style="background:rgba(90,169,255,.18);">QL</span><span class="meta"><b>The Quiet One in Legal</b><small>Round 14 &middot; 1h ago</small></span><span class="tag">3rd</span></div>
+        <p class="post-body">No comment.</p>
+        <div class="post-foot"><span class="react" data-on="true">&#128514; <span class="c">47</span></span><span class="react" data-on="false">&#128293; <span class="c">19</span></span></div>
+      </div>
+      <div class="post">
+        <div class="post-head"><span class="av" style="background:rgba(199,155,255,.18);">SM</span><span class="meta"><b>Sam &middot; Warehouse</b><small>Round 14 &middot; 48m ago</small></span></div>
+        <p class="post-body">Finance floor is two points off the lead and they will not stop talking about it. Someone please tip against them.</p>
+        <div class="post-foot"><span class="react" data-on="false">&#128514; <span class="c">15</span></span><span class="react" data-on="false">Reply</span></div>
+      </div>
+      <div class="post">
+        <div class="post-head"><span class="av" style="background:rgba(200,241,53,.15);">GT</span><span class="meta"><b>GoodTip</b><small>Auto &middot; Season total</small></span><span class="tag sys">Raised</span></div>
+        <p class="post-body">Your organisation has raised <strong style="color:var(--lime);">$1,840</strong> for <b style="color:#fff;">Lifeline</b> this season. Fourteen rounds, nobody paid a cent to play.</p>
+        <div class="post-foot"><span class="react" data-on="true">&#10084;&#65039; <span class="c">63</span></span><span class="react" data-on="false">&#127881; <span class="c">28</span></span></div>
+      </div>
+    </div>
     </div>
     <p class="mt-m reveal"><a href="/wall/" class="btn-ghost">See the Wall &rarr;</a></p>
   </div>
@@ -304,13 +340,47 @@ section at all, which is the other half of why this is off.
     <p class="eyebrow reveal">Pricing</p>
     <h2 class="section-heading reveal">One flat fee. All year. All four codes.</h2>
     <p class="section-sub reveal">Priced by team size. Tipping is free for your people, and GoodTip funds a donation to the charity your organisation picked. Groups — a separate ladder per team — start at Workplace.</p>
+    {% comment %}
+    THE CARDS ARE PRINTED FROM billing/pricing.py, NOT TYPED HERE.
+
+    Client, 22 Sep 2026, attaching a screenshot of this very section: "just
+    have to match the changes to the pricing page."
+
+    He was right, and the cause is the reason this is now a loop. This teaser
+    and the table on /pricing/ were two hand-maintained copies of the same five
+    plans, so every correction since 16 September — most popular moving to
+    Workplace, the groups tags, the founding date — was made to /pricing/ and
+    to nothing else. The first prices anybody meets on the site still put MOST
+    POPULAR on the $299 plan. Two sources of truth, and the stale one was the
+    one more people read.
+
+    Four of the five, because the fifth is Enterprise+ and its answer is "talk
+    to us" — the footnote below carries that. It is a slice of one list, not a
+    second list.
+    {% endcomment %}
     <div class="pricing-grid reveal" data-cards>
-      <div class="price-card"><div class="price-ic"><svg><use href="#ic-spark"/></svg></div><div class="price-tier">Starter</div><div class="price-size">Up to 20 people</div><div class="price-num">$99</div><div class="price-period">/year</div><div class="price-per">~$5 per person</div><p class="price-desc">The full platform. AFL, AFLW, NRL, NRLW. Charity Vote, live ladder, the Wall, email reminders. One ladder for everyone.</p></div>
-      <div class="price-card featured"><div class="price-badge">Most popular</div><div class="price-ic"><svg><use href="#ic-users"/></svg></div><div class="price-tier">Team</div><div class="price-size">Up to 50 people</div><div class="price-num">$299</div><div class="price-period">/year</div><div class="price-per">~$6 per person</div><p class="price-desc">Everything in Starter, plus your organisation's name and logo and a round-by-round participation dashboard. Still one shared ladder.</p></div>
-      <div class="price-card"><div class="price-ic"><svg><use href="#ic-doc"/></svg></div><div class="price-tier">Workplace</div><div class="price-size">Up to 150 people</div><div class="price-num">$799</div><div class="price-period">/year</div><div class="price-per">~$5 per person</div><p class="price-desc">Everything in Team, plus <b>groups</b> — a ladder of its own for each team or department — priority support and a full CSR Impact Report.</p></div>
-      <div class="price-card"><div class="price-ic"><svg><use href="#ic-globe"/></svg></div><div class="price-tier">Organisation</div><div class="price-size">Up to 500 people</div><div class="price-num">$1,299</div><div class="price-period">/year</div><div class="price-per">from ~$3 per person</div><p class="price-desc">Groups and sub-groups, white-label platform, dedicated account manager, bespoke onboarding. Make it feel entirely your own.</p></div>
+      {% for c in price_cards %}
+      <div class="price-card{% if c.popular %} featured{% endif %}">
+        {% if c.popular %}<div class="price-badge">Most popular</div>{% endif %}
+        <div class="price-ic"><svg><use href="#{{ c.icon }}"/></svg></div>
+        <div class="price-tier">{{ c.label }}</div>
+        <div class="price-size">{{ c.seats }} people</div>
+        <div class="price-num">{{ c.price }}</div>
+        <div class="price-period">/year</div>
+        <div class="price-per">{{ c.per_person }}</div>
+        {% comment %}
+        THE GROUPS TAG (client, 19 Sep 2026: "a little tag of 'groups' would be
+        handy as people won't realise it's a big step up"). It was added to the
+        table on /pricing/ and never to these cards, which is exactly the drift
+        the loop above exists to stop. Printed from the plan's own `groups`
+        flag, so the gate can move without this template being touched.
+        {% endcomment %}
+        {% if c.groups %}<div class="price-tags"><span class="price-tag">Groups</span></div>{% endif %}
+        <p class="price-desc">{{ c.blurb|safe }}</p>
+      </div>
+      {% endfor %}
     </div>
-    <p class="pricing-footnote reveal">2,500+ people? <a href="/pricing/#enterprise">Let's talk Enterprise.</a> &middot; Founding Member pricing closes December 31, 2026. <a href="/#founding">Learn more.</a></p>
+    <p class="pricing-footnote reveal">2,500+ people? <a href="/pricing/#enterprise">Let&rsquo;s talk Enterprise.</a> &middot; Founding Member pricing closes {{ founding_closes|date:"j F Y" }}. <a href="/#founding">Learn more.</a></p>
   </div>
 </section>
 
@@ -336,21 +406,153 @@ saying nothing, because every question it raises has no answer on the site.
     <div class="reveal from-left">
       <span class="fp-badge"><span class="live-dot"></span> Founding Partner Program</span>
       <h2>In before the finals. <em>In for life.</em></h2>
-      <p class="lead">Founding Members lock their rate for three full seasons — 2027, 2028 and 2029 — not for year one. Plus first access to new sports and features in 2027, and your name on the list of organisations that backed it before it was obvious.</p>
+      <p class="lead">Founding Members lock their rate for three seasons, not for year one. The first of the three is a stub term &mdash; it runs from the day you join through the end of the {{ founding_stub_ends|date:"Y" }} season rather than for twelve months &mdash; and two full seasons follow it. Plus first access to new sports and features in {{ founding_stub_ends|date:"Y" }}, and your name on the list of organisations that backed it before it was obvious.</p>
       <ul class="fp-benefits">
-        <li><span class="bk">&check;</span> Your rate locked through the 2029 season, whatever list prices do</li>
-        <li><span class="bk">&check;</span> First access to every new sport and feature in 2027</li>
+        <li><span class="bk">&check;</span> Your rate locked through the {{ founding_seasons|last }} season, whatever list prices do</li>
+        <li><span class="bk">&check;</span> First access to every new sport and feature in {{ founding_stub_ends|date:"Y" }}</li>
         <li><span class="bk">&check;</span> Founding Partner recognition across the platform</li>
       </ul>
     </div>
     <div class="fp-card reveal from-right">
       <div class="dl-label">Window closes</div>
-      <div class="fp-deadline">Dec 31, 2026</div>
-      <p class="dl-sub">After that, standard rates. No exceptions, no late extensions. Set up your organisation free today and pay only when you launch.</p>
+      <div class="fp-deadline">{{ founding_closes|date:"j M Y" }}</div>
+      <p class="dl-sub">After that the price rises for new joiners only &mdash; if you are already in, your rate is untouched. No exceptions, no late extensions. Set up your organisation free today and pay only when you launch.</p>
       <a href="/#start" class="btn-primary" style="width:100%;justify-content:center;">Set up your organisation &rarr;</a>
     </div>
   </div>
 </div>
+
+{% comment %}
+=============================================================================
+"TELL ME WHEN IT'S READY" — THE WAITING LIST
+=============================================================================
+CLIENT, 22 SEP 2026: "can you create a simple 'tell me when it's ready' form
+on the home page for GoodTip ... this will really help me at the function
+tomorrow. This way I can direct people there until we are properly ready for
+launch. We talked about this idea ages ago but we never really got around to
+it."
+
+THE FORM ALREADY EXISTED — on /coming-soon/, and nowhere else. That is why it
+had never done any work: the address you give a room full of people is
+goodtip.com.au, and the form was one click and a guess away from it. Same
+model, same recorder, now on the page people actually land on.
+
+IT IS ID="start", WHICH IS THE OTHER HALF OF THE FIX. Six calls to action
+across this site point at /#start — the hero, the pricing footnote, About Us,
+Tell the Boss, both legal pages — and no element with that id existed. Every
+one of them scrolled to the top of the home page and left the visitor to work
+out what had happened. They now land here, which is the right destination
+anyway until launch: "set up your organisation" is not a thing a stranger can
+usefully do yet, and "tell me when it's ready" is.
+
+FOUR FIELDS, TWO REQUIRED. Name and email are the list. Org type and current
+platform are the two the client asked for and both are optional — somebody
+standing in a function room with a phone in one hand abandons a form that
+argues with them, and a lead with two fields beats no lead with four.
+{% endcomment %}
+<section class="section tmw-band" id="start">
+  <div class="wrap">
+    <div class="tmw">
+      <div class="tmw-aside reveal from-left">
+        <p class="eyebrow" style="color:var(--lime);">Not quite open yet</p>
+        <h2 class="section-heading" style="color:var(--white);">Tell me when it&rsquo;s ready.</h2>
+        <p class="section-sub" style="color:rgba(232,228,213,.82);">
+          We&rsquo;re building toward launch. Leave your details and you&rsquo;ll be the first to
+          know when organisations can sign up &mdash; one email, when it&rsquo;s actually ready.
+        </p>
+        <ul class="tmw-points">
+          <li><span class="bk">&check;</span> No spam, and nothing until there is something to say</li>
+          <li><span class="bk">&check;</span> Founding Member pricing is open to the list first</li>
+          <li><span class="bk">&check;</span> Tipping stays free for everyone who plays</li>
+        </ul>
+      </div>
+
+      <div class="tmw-card reveal from-right" data-form-shell>
+        {% comment %}
+        data-form-shell + data-ajax: the submit happens in place, the veil
+        covers this card and nothing else, the thank-you replaces the form, and
+        the form comes back a few seconds later. See static/js/gt-forms.js.
+
+        WITHOUT JAVASCRIPT IT STILL WORKS. The form keeps a real action and a
+        real method, the view still redirects, and {% templatetag openblock %} if locked_in {% templatetag closeblock %} below still
+        renders the confirmation. The script is an improvement on a working
+        form, not the thing that makes it work.
+        {% endcomment %}
+        {% if locked_in %}
+        <div class="gtf-done on" role="status">
+          <span class="gtf-tick" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6.5"/></svg>
+          </span>
+          <h3>You&rsquo;re on the list.</h3>
+          <p>We&rsquo;ll email you the moment GoodTip opens for sign-ups. Nothing before then.</p>
+        </div>
+        {% else %}
+        <form method="post" action="/#start" class="tmw-form" data-ajax
+              data-busy="Adding you to the list" data-return-after="4000">
+          {% csrf_token %}
+          <input type="hidden" name="source_page" value="home">
+          {% if error %}<p class="gtf-error" data-form-error role="alert">{{ error }}</p>{% endif %}
+
+          <div class="tmw-rows">
+            <label class="tmw-field">
+              <span class="tmw-lab">Name</span>
+              <input type="text" name="name" required maxlength="120" autocomplete="name"
+                     placeholder="Your name">
+            </label>
+
+            <label class="tmw-field">
+              <span class="tmw-lab">Email</span>
+              <input type="email" name="email" required maxlength="254" autocomplete="email"
+                     placeholder="you@work.com.au">
+            </label>
+
+            {% comment %}
+            The two optional ones sit side by side below the required pair, so
+            the form reads as "two things we need, two we'd like" rather than
+            as four equal demands. Client, 22 Sep 2026, asked for the dropdowns
+            to look designed — .tmw-select draws the chevron and the focus ring
+            rather than leaving it to the operating system, which is what makes
+            a <select> look like 2003 on Windows and like a different form on
+            every machine.
+            {% endcomment %}
+            <div class="tmw-pair">
+              <label class="tmw-field">
+                <span class="tmw-lab">Org type <i>optional</i></span>
+                <span class="tmw-select">
+                  <select name="org_type">
+                    <option value="">Choose one&hellip;</option>
+                    {% for val, lab in org_types %}<option value="{{ val }}">{{ lab }}</option>{% endfor %}
+                  </select>
+                  <svg class="tmw-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </span>
+              </label>
+
+              <label class="tmw-field">
+                <span class="tmw-lab">Tipping with now? <i>optional</i></span>
+                <span class="tmw-select">
+                  <select name="current_platform">
+                    <option value="">Choose one&hellip;</option>
+                    {% for val, lab in platforms %}<option value="{{ val }}">{{ lab }}</option>{% endfor %}
+                  </select>
+                  <svg class="tmw-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary tmw-submit">
+            <span>Tell me when it&rsquo;s ready</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+          <p class="tmw-fine">
+            One email, when it&rsquo;s actually ready. We&rsquo;ll only use this to tell you about
+            launch &mdash; see the <a href="/privacy/">Privacy Policy</a>.
+          </p>
+        </form>
+        {% endif %}
+    </div>
+  </div>
+</section>
 
 <!-- FAQ v2 -->
 <section class="section on-cream">

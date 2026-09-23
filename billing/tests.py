@@ -599,3 +599,54 @@ class TierGroupsTests(TestCase):
 
         self.assertEqual(next_tier_with_groups(S), PRO)
         self.assertEqual(next_tier_with_groups(GROWTH), PRO)
+
+
+class SponsorshipAjaxTests(TestCase):
+    """The sponsorship form on the shared in-place submit path (22 Sep 2026).
+
+    The other two forms are covered in accounts.tests; this one has its own
+    view and its own set of required fields, and its JSON branch sits after a
+    block that can set `sent` several ways — which is exactly the shape where
+    a refactor silently starts answering the page instead of the script.
+    """
+
+    AJAX = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
+
+    def _payload(self, **over):
+        data = {
+            "contact_name": "Dana Okafor",
+            "email": "dana@example.com",
+            "organisation_name": "Lae Warehouse Crew",
+            "reason": "Forty of us and no budget for it.",
+        }
+        data.update(over)
+        return data
+
+    def test_a_good_application_answers_json(self):
+        resp = self.client.post(reverse("sponsorship"), self._payload(), **self.AJAX)
+        self.assertEqual(resp["Content-Type"], "application/json")
+        data = resp.json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["title"], "Application received.")
+        # It promises what the page promises: nothing is published.
+        self.assertIn("nothing you wrote is published", data["message"])
+
+    def test_a_missing_field_is_json_and_not_an_http_error(self):
+        resp = self.client.post(reverse("sponsorship"),
+                                self._payload(reason=""), **self.AJAX)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertFalse(data["ok"])
+        self.assertTrue(data["error"])
+
+    def test_without_the_header_the_page_still_renders(self):
+        resp = self.client.post(reverse("sponsorship"), self._payload())
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Thanks for asking")
+
+    def test_a_get_is_not_treated_as_a_submission(self):
+        """The JSON branch is guarded on method as well as on the header — a
+        prefetcher sending XHR headers on a GET must still get the page."""
+        resp = self.client.get(reverse("sponsorship"), **self.AJAX)
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotIn("application/json", resp["Content-Type"])

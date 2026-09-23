@@ -8,18 +8,18 @@ the wording of the summary and the version string can drift apart, then every
 acceptance recorded between the drift and somebody noticing is an acceptance of
 nothing identifiable.
 
-NOT LEGAL ADVICE, AND NOT SIGNED OFF. The client's task list has "Terms and
-Conditions and Privacy Policy sign-off" as an open item pending the outstanding
-NFP/gaming lawyer review. What is here describes what the system actually does
-— which is the only honest starting point for a lawyer to edit — and the page
-says so at the top in as many words. Bump TERMS_VERSION when the wording
-changes, so acceptances before and after can be told apart.
+SIGNED OFF 22 SEP 2026. The NFP/gaming review is complete and the client has
+approved both documents, so the draft banner is off /terms/ and the third
+summary below was reworded as part of it. What is here still describes what the
+system actually does, which is what made it reviewable. Bump TERMS_VERSION
+whenever the wording changes, so acceptances either side of the change can be
+told apart — this one moved from 2026-09-20 to 2026-09-22 for exactly that.
 """
 from __future__ import annotations
 
 # Dated, not numbered. "v2" tells a support person nothing; "2026-09-17" tells
 # them which draft an organisation agreed to without opening anything.
-TERMS_VERSION = "2026-09-20"
+TERMS_VERSION = "2026-09-22"
 
 # THE PLAIN-ENGLISH TOP THREE, in the client's words: "a plain-English top-3
 # summary of what they're agreeing to".
@@ -65,9 +65,16 @@ TERMS_TOP_THREE = [
     ),
     (
         "It's a tipping comp, not a wagering one.",
+        # REWORDED AT SIGN-OFF, 22 Sep 2026. The old wording made the organiser
+        # agree not to run a side pot "on the back of" GoodTip — a promise about
+        # their private conduct that GoodTip can neither see nor enforce. The
+        # client's position is narrower and truer: nothing of that kind through
+        # the platform, nothing wearing GoodTip's name, and what a group does
+        # privately is on them. §3 of the Terms says the same at length.
         "There is no entry fee, no stake, no prize pool and no cash prize. The "
         "ladder is for bragging rights. You agree not to run a side pot, a "
-        "buy-in or any betting arrangement through GoodTip or on the back of "
-        "it.",
+        "buy-in or any betting arrangement through GoodTip, or to attach one to "
+        "GoodTip's name. What your group does privately is your own affair — we "
+        "would rather you didn't, and we ask you to keep it away from here.",
     ),
 ]

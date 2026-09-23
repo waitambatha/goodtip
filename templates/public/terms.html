@@ -8,18 +8,22 @@ clauses as cards with edges you can point at, a sticky contents rail, and every
 clause editable from the Pages screen in /admin/ so the client's lawyer can
 revise the wording without a deploy.
 
-NOT SIGNED OFF, AND THE PAGE SAYS SO. The client's task list has "Terms and
-Conditions and Privacy Policy sign-off" open, pending the outstanding NFP and
-gaming lawyer review. What is written below describes what this system actually
-does — one fee, no stake, no prize pool, who can see what — which is the only
-honest starting point for a lawyer to work from, and a great deal more use to
-them than boilerplate copied off another product. The banner at the top is
-deliberate and should come off as part of sign-off, not before it.
+SIGNED OFF 22 SEP 2026. The client confirmed the NFP/gaming review is complete
+and both documents approved, so the "Draft, pending legal sign-off" banner that
+used to head this page is gone. What is written below still describes what this
+system actually does — one fee, no stake, no prize pool, who can see what —
+which is what made it reviewable in the first place. If a clause changes, bump
+TERMS_VERSION in goodtip/legal.py so acceptances either side can be told apart.
 
-THE WAGERING CLAUSE IS THE ONE TO READ TWICE. GoodTip's whole position is that
-this is not gambling: no entry fee, no stake, no prize pool, no cash prize. §3
-is where that is stated as a rule members agree to rather than as marketing
-copy, and it is the clause the gaming review exists to check.
+THE WAGERING CLAUSE IS THE ONE TO READ TWICE, and it was reworded at sign-off.
+It used to say organisations running a side pot "have their comp closed", which
+promised policing GoodTip has no way of doing — we cannot see what a group does
+privately, so a rule written as enforcement was a rule written as bluff. The
+client's own framing is better and is what §3 now says: GoodTip is flipping the
+script from stakes and prize pools to doing good together; nothing of that kind
+runs through the platform; what a group does privately is their business and
+their responsibility; we discourage it and we want GoodTip's name kept out of
+it. Same position, stated as something we can actually stand behind.
 
 The top-three summary is not repeated here in its own words — it is printed
 from goodtip/legal.py, the same source the sign-up checkbox reads, so the
@@ -77,7 +81,7 @@ pages now open the same way.
   </div>
 </section>
 
-<section class="section on-cream" style="padding-top:clamp(36px,5vw,56px);">
+<section class="section on-cream legal-section has-rails" style="padding-top:clamp(36px,5vw,56px);">
   {% comment %}
   THE SIDE RAILS ARE GONE TOO (client, 20 Sep 2026: "remove that translucent
   feel, and let's have white and green").
@@ -92,15 +96,60 @@ pages now open the same way.
   paper edge to edge.
   {% endcomment %}
 
+  {% comment %}
+  SIDE RAILS, USING THE COMPONENT THAT ALREADY DOES THIS PROPERLY.
+
+  Client, 22 Sep 2026: "on the Terms and Privacy the images look horrible, and
+  at the far end we have some cream block ... look at how we have handled the
+  images on the side in the private pages, it handles that well."
+
+  Right on both counts, and the second is the fix. A first attempt drew its
+  own rails: full-strength photographs, hard-edged, butted straight against
+  the cream column. A picture at 100% beside a document does not read as a
+  margin illustration, it reads as two pages stuck together — which is what
+  the cream block at the seam actually was.
+
+  .pg-rails has existed the whole time and is what the app uses. The thing it
+  does that mine did not is the WASH: a gradient from the photograph towards
+  the content, so the image gives way to the page instead of meeting it at a
+  line. That is the whole difference, and it is why the private pages look
+  settled and this did not.
+
+  It is NOT the arrangement that got rails removed from these pages on 20
+  September. That one ran photographs the full width behind the clauses. This
+  hangs off the section, fills only the margin the 1180px column is not using,
+  and .has-rails puts the content above it — and the media guard below means
+  there is never a width at which it could reach the text anyway.
+  {% endcomment %}
+  <div class="pg-rails legal-rails" aria-hidden="true">
+    <div class="rail left" data-shots>
+      <div class="shot on" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/afl-posts-mcg.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/mcg-stadium.jpg' %}')"></div>
+    </div>
+    <div class="rail right" data-shots>
+      <div class="shot on" style="background-image:url('{% static 'img/scenes/nrl-posts-sunset.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/nrl-ground-dusk.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+    </div>
+  </div>
+
   <div class="wrap">
 
     {% comment %}
-    The banner comes off at sign-off, not before. Publishing a document that
-    looks final while a lawyer still has it is the failure mode worth a banner.
+    THE DRAFT BANNER IS GONE (client, 22 Sep 2026: "Terms and Privacy: already
+    approved by legal — take the 'pending sign-off' banner down").
+
+    It read "Draft, pending legal sign-off ... they have not yet been reviewed
+    by a lawyer", and it was correct until this date. It is not correct now,
+    and a document that describes itself as unreviewed after it has been
+    reviewed is as wrong as the reverse — it invites every reader to discount
+    the clause they came to check. Removed rather than commented out: if these
+    ever go back to draft they get a banner written for that moment.
+
+    TERMS_VERSION in goodtip/legal.py moved with this, so acceptances recorded
+    against the draft and against the approved wording can be told apart.
     {% endcomment %}
-    <div class="flash info" style="margin-bottom:26px;max-width:860px;">
-      <span><b>Draft, pending legal sign-off.</b> These terms describe how GoodTip actually works today and are written to be read, not to be impressive. They have not yet been reviewed by a lawyer. If anything here matters to a decision you're making, <a href="mailto:hello@goodtip.com.au">ask us</a> and we'll tell you where it stands.</span>
-    </div>
 
     {% comment %}
     THE SUMMARY FIRST, and it is the same three paragraphs printed beside the
@@ -158,8 +207,9 @@ pages now open the same way.
         <article class="legal-card reveal" id="nowagering">
           <h2><span class="lc-n">03</span> No stake, no prize pool</h2>
           <div class="prose">
-            <p>GoodTip is free to play. There is no entry fee, no stake, no prize pool and no cash prize. What is on the line is the ladder.</p>
-            <p>You agree not to run a side pot, a buy-in, a sweep or any betting arrangement through GoodTip or on the back of a GoodTip comp. Organisations found doing it have their comp closed. This is not a technicality we are being careful about — it is the difference between what this is and what it is not.</p>
+            <p>GoodTip is free to play. There is no entry fee, no stake, no prize pool and no cash prize. What is on the line is the ladder. The whole idea is to flip the script: the thing your comp plays for is what it raises, not what it pays out.</p>
+            <p>Nothing of that kind runs through GoodTip. You agree not to operate a side pot, a buy-in, a sweep or any betting arrangement through this platform, and not to present one as part of, connected to, or endorsed by GoodTip.</p>
+            <p>What a group does privately among themselves is their own affair and their own responsibility — we have no visibility of it and we are not a party to it. We would rather you did not, we discourage it, and we ask that it is kept away from GoodTip's name.</p>
             <p>Nothing on GoodTip is betting advice, and nothing here is an invitation to bet anywhere else.</p>
           </div>
         </article>

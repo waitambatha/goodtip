@@ -27,7 +27,15 @@ are the only thing left to do.
 
 {% if boss_error %}<div class="flash error" style="margin-bottom:16px;"><span>{{ boss_error }}</span></div>{% endif %}
 
-<form method="post" action="{% url 'tell_the_boss' %}" novalidate data-busy="Sending the note">
+{% comment %}
+On the shared in-place submit path with the other public forms (client, 22 Sep
+2026). THIS is the form a signed-in member actually sees — tell_the_boss.html
+carries a second copy behind ?copy=1, and wiring that one alone left the real
+send on the old full-reload path.
+{% endcomment %}
+<form method="post" action="{% url 'tell_the_boss' %}" novalidate
+      data-form-shell data-ajax
+      data-busy="Sending the note" data-return-after="4500">
   {% csrf_token %}
   <div class="fld">
     <label for="bsYourName">Your name</label>

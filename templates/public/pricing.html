@@ -118,7 +118,7 @@
         </tbody>
       </table>
     </div>
-    <p class="pricing-footnote reveal">Founding Member pricing closes December 31, 2026 &mdash; sign up before then and your rate is locked for the three seasons after it. <a href="/#founding">Learn more.</a></p>
+    <p class="pricing-footnote reveal">Founding Member pricing closes {{ founding_closes|date:"j F Y" }} &mdash; sign up before then and your rate is locked through the {{ founding_seasons|last }} season. <a href="/#founding">Learn more.</a></p>
     {% comment %}
     THE DOOR FOR PEOPLE THE TABLE ABOVE JUST LOST.
 
@@ -261,7 +261,7 @@ movements that never happen.
       <div class="faq-item"><button class="faq-q"><span><span class="qn">02</span> What counts toward our team size?</span><span class="qx"></span></button><div class="faq-a">Active tippers in your comp. You can invite more than your tier allows during setup; you only move up a tier if you exceed the cap when the season locks.</div></div>
       <div class="faq-item"><button class="faq-q"><span><span class="qn">03</span> When do we pay?</span><span class="qx"></span></button><div class="faq-a">When you launch. Set up the organisation, run the Charity Vote and invite your people for free. The subscription is charged when the first round of tips locks in.</div></div>
       <div class="faq-item"><button class="faq-q"><span><span class="qn">04</span> Is the donation included in the price?</span><span class="qx"></span></button><div class="faq-a">Yes. There is one flat fee, and GoodTip gives a share of it to the charity your organisation picked. Nobody in your organisation is ever asked to contribute.</div></div>
-      <div class="faq-item"><button class="faq-q"><span><span class="qn">05</span> What's Founding Partner pricing?</span><span class="qx"></span></button><div class="faq-a">Join before December 31, 2026 and the rate you sign up at is the rate you're charged at renewal for the three seasons that follow &mdash; 2027, 2028 and 2029 &mdash; whatever list prices do in the meantime. You also get first access to new sports and features in 2027. Move up a plan and you pay that plan's price; you're never charged above list. After the window, standard rates apply.</div></div>
+      <div class="faq-item"><button class="faq-q"><span><span class="qn">05</span> What's Founding Partner pricing?</span><span class="qx"></span></button><div class="faq-a">Join on or before {{ founding_closes|date:"j F Y" }} and the rate you sign up at is the rate you're charged for three seasons. The first of those is a stub rather than a full year: it runs from the day you join through the end of the {{ founding_stub_ends|date:"Y" }} season, however many months that happens to be. Two full seasons follow it &mdash; {{ founding_seasons|slice:"1:"|join:" and " }} &mdash; whatever list prices do in the meantime. You also get first access to new sports and features in {{ founding_stub_ends|date:"Y" }}. Move up a plan and you pay that plan's price; you're never charged above list. After the window the price rises for new joiners only &mdash; if you are already in, your rate is untouched.</div></div>
     </div>
   </div>
 </section>
@@ -272,7 +272,7 @@ movements that never happen.
 <section class="cta-pro">
   <div class="wrap reveal zoom">
     <h2>In before the finals. In for life.</h2>
-    <p>Founding Members lock their rate for three seasons and get first access to everything we ship next. The window closes December 31, 2026, no late extensions.</p>
+    <p>Founding Members lock their rate for three seasons and get first access to everything we ship next. The window closes {{ founding_closes|date:"j F Y" }}, no late extensions.</p>
     <a href="/#start" class="btn-dark">Set up your organisation &rarr;</a>
   </div>
 </section>

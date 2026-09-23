@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  GOODTIP WORDMARK — the construction, not a picture of it.
+
+  Same three-part build the website uses everywhere the mark appears: GOOD,
+  then TIP, then a full stop. It is SET TYPE, not a drawn logo, so it is
+  reproduced by setting it rather than by scaling a bitmap.
+
+  TYPEFACE      Barlow Condensed, weight 900 (Black)
+                Free, SIL Open Font Licence — fonts.google.com/specimen/Barlow+Condensed
+  CASE          All capitals
+  TRACKING      +10/1000 em (0.01em)
+  THE STOP      Full size, same weight, same colour as TIP
+
+  COLOUR. Two approved treatments, both measured:
+    on white, cream or the lime bar    GOOD #2A7337   TIP + stop #072F1E
+    reversed out of deep green         the whole mark #CFF93A
+
+  On the lime bar the mark cannot be lime, and mid-green at reduced strength
+  measures 3.5:1 and fails. Full strength is the only pair that reads.
+
+  THE NAME IS "GoodTip" — one word, capital G, capital T. Not "Good Tips".
+
+  Text is left live rather than converted to outlines so the colours stay
+  editable. Convert to outlines before sending to the printer.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="132" viewBox="0 0 420 132">
+  <title>GoodTip wordmark</title>
+
+  <!-- ON LIGHT (white, cream, or the lime bar) -->
+  <text x="10" y="54" font-family="Barlow Condensed" font-weight="900" font-size="54"
+        letter-spacing="0.54" fill="#2A7337">GOOD<tspan fill="#072F1E">TIP.</tspan></text>
+
+  <!-- REVERSED OUT OF DEEP GREEN -->
+  <rect x="0" y="72" width="200" height="60" fill="#072F1E"/>
+  <text x="10" y="116" font-family="Barlow Condensed" font-weight="900" font-size="54"
+        letter-spacing="0.54" fill="#CFF93A">GOOD<tspan fill="#CFF93A">TIP.</tspan></text>
+</svg>

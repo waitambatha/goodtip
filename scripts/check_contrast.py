@@ -70,6 +70,10 @@ DECORATION = {
     ".flow-seq .flow-arrow": "a chevron between steps, not a character to read",
     ".art-hero.noimg .noimg-mark": "the ghosted wordmark where a picture is missing",
     ".rdc-mark": "the ghosted wordmark where a picture is missing",
+    ".dh-art-plain span": "the organisation's initial, ghosted into the Groups hero "
+                          "panel when the media library holds no photographs. The "
+                          "panel is aria-hidden and the letter names nothing the "
+                          "page does not already say in the heading beside it.",
     ".amb-photo .ph": "initials behind a portrait placeholder",
     ".amb-portrait .pinitials": "initials behind a portrait placeholder",
     ".ned-sw-bar": "a 15x5px bar showing the chosen colour; there is no text in it",

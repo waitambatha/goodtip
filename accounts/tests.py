@@ -1013,15 +1013,41 @@ class OrganisationIsLeftZeroTests(TestCase):
         self.assertNotIn("<a href", between[between.index(">"):])
 
     def test_the_role_marker_never_replaces_the_name(self):
-        """It said "Admin" beside a truncated name, and on a narrow bar instead
-        of one. A glyph annotates the name; a word competes with it."""
+        """The rule is that the role never costs the name, not that the word
+        is banned.
+
+        Sep 2026, first version: "it should not say admin on that menu, it
+        should read the name of the organisation that it is in." The word was
+        sitting beside a truncated name and, on a narrow bar, instead of one —
+        so it lost its label and kept a glyph.
+
+        22 Sep 2026, superseding it: "make sure we have the full text of the
+        organisation and the dropdown icon in it ... this should be centred,
+        AquaFlow Water Co / Admin." The bar spans the window now, so the name
+        is not truncated and the word can have a line of its own beneath it.
+
+        What both versions actually require, and what is tested here: the
+        organisation's name is present in full and comes FIRST. Whether the
+        role is a glyph, a word, or both is presentation.
+        """
         nav = self._nav(self.client.get(reverse("dashboard")).content.decode())
         chip = nav[nav.index("an-ctx-btn"):nav.index("an-ctx-panel")]
         self.assertIn("an-ctx-role", chip)
-        # The word survives for a screen reader and nowhere else.
-        self.assertIn('<span class="sr-only">Admin</span>', chip)
-        visible = re.sub(r'<span class="sr-only">.*?</span>', "", chip, flags=re.S)
-        self.assertNotIn("Admin", visible)
+        self.assertIn("an-ctx-org", chip)
+        # The name leads. A role marker that came first would be the failure
+        # the original complaint was about, whatever form it took.
+        self.assertLess(chip.index("an-ctx-org"), chip.index("an-ctx-role"))
+        # And the name is whole — never abbreviated into the markup itself.
+        self.assertIn(self.org.name, chip)
+
+    def test_the_chip_says_it_opens_something(self):
+        """"Or even know it's a dropdown." A caret that turns over, and the
+        ARIA that says the same thing to anything not looking at it."""
+        nav = self._nav(self.client.get(reverse("dashboard")).content.decode())
+        chip = nav[nav.index("an-ctx-btn"):nav.index("an-ctx-panel")]
+        self.assertIn("an-ctx-caret", chip)
+        self.assertIn('aria-haspopup="true"', chip)
+        self.assertIn('aria-expanded="false"', chip)
 
 
 class ConfirmOnlyWhenSomethingIsUnsavedTests(TestCase):
@@ -1224,3 +1250,283 @@ class DashboardNewsDeckTests(TestCase):
         self.assertNotIn('class="nd-dot', body)
         # Four stories: a full top row and one card on the bottom one.
         self.assertEqual(body.count("data-news-place"), 4)
+
+
+class LaunchSignupFormTests(TestCase):
+    """The "tell me when it's ready" form (client, 22 Sep 2026).
+
+    Built the day before a function the client is running off it, so these
+    cover the ways a lead gets LOST rather than the ways a field gets stored:
+    a duplicate, a bad address, a page that forgets to offer the field.
+    """
+
+    def setUp(self):
+        from .models import LaunchSignup
+        self.LaunchSignup = LaunchSignup
+
+    # --- the form is reachable where the client sends people ---------------
+
+    def test_home_page_carries_the_form(self):
+        """It is on the HOME page, not only on /coming-soon/.
+
+        This is the whole request: the form already existed a click away and
+        had therefore never been filled in by anybody.
+        """
+        body = self.client.get("/").content.decode()
+        self.assertIn('id="start"', body)
+        self.assertIn('name="org_type"', body)
+        self.assertIn('name="current_platform"', body)
+        self.assertIn("Tell me when it", body)
+
+    def test_start_anchor_exists_for_the_links_that_point_at_it(self):
+        """Six CTAs across the site link to /#start and nothing had that id.
+
+        Every one of them used to scroll to the top of the home page and stop.
+        """
+        body = self.client.get("/").content.decode()
+        self.assertIn('href="/#start"', body)
+        self.assertIn('id="start"', body)
+
+    def test_coming_soon_offers_the_same_four_fields(self):
+        """Two pages, one recorder — so they have to ask for the same things."""
+        body = self.client.get(reverse("coming_soon")).content.decode()
+        for field in ('name="name"', 'name="email"', 'name="org_type"',
+                      'name="current_platform"'):
+            self.assertIn(field, body)
+
+    # --- what it stores ----------------------------------------------------
+
+    def test_a_signup_is_recorded_with_every_field(self):
+        resp = self.client.post("/", {
+            "name": "Dana Okafor", "email": "Dana@Example.COM",
+            "org_type": "business", "current_platform": "footytips",
+            "source_page": "home",
+        })
+        self.assertEqual(resp.status_code, 200)
+        row = self.LaunchSignup.objects.get()
+        self.assertEqual(row.name, "Dana Okafor")
+        # Lower-cased, so the same person typing it two ways is one row.
+        self.assertEqual(row.email, "dana@example.com")
+        self.assertEqual(row.org_type, "business")
+        self.assertEqual(row.current_platform, "footytips")
+        self.assertEqual(row.source_page, "home")
+        self.assertContains(resp, "You&rsquo;re on the list.")
+
+    def test_only_name_and_email_are_required(self):
+        """A person on a phone in a function room abandons a form that argues."""
+        self.client.post("/", {"name": "Sam", "email": "sam@example.com"})
+        row = self.LaunchSignup.objects.get()
+        self.assertEqual(row.org_type, "")
+        self.assertEqual(row.current_platform, "")
+
+    def test_the_same_address_twice_is_one_row_with_the_later_answers(self):
+        """The failure this actually prevents is mailing somebody twice."""
+        self.client.post("/", {"name": "Sam", "email": "sam@example.com",
+                               "org_type": "informal"})
+        self.client.post("/", {"name": "Samira Ahmed", "email": "sam@example.com",
+                               "org_type": "business"})
+        self.assertEqual(self.LaunchSignup.objects.count(), 1)
+        row = self.LaunchSignup.objects.get()
+        self.assertEqual(row.name, "Samira Ahmed")
+        self.assertEqual(row.org_type, "business")
+
+    def test_a_junk_choice_is_dropped_not_refused(self):
+        """A stale page must not cost a real lead its name and address."""
+        self.client.post("/", {"name": "Sam", "email": "sam@example.com",
+                               "org_type": "not-a-type",
+                               "current_platform": "nonsense"})
+        row = self.LaunchSignup.objects.get()
+        self.assertEqual(row.org_type, "")
+        self.assertEqual(row.current_platform, "")
+
+    # --- what it refuses ---------------------------------------------------
+
+    def test_a_bad_address_is_refused_with_the_form_still_there(self):
+        resp = self.client.post("/", {"name": "Sam", "email": "not-an-email"})
+        self.assertEqual(self.LaunchSignup.objects.count(), 0)
+        self.assertContains(resp, "doesn&#x27;t look right")
+        # The form comes back, so they can correct it in place.
+        self.assertContains(resp, 'name="email"')
+
+    def test_a_missing_name_is_refused(self):
+        resp = self.client.post("/", {"name": "", "email": "sam@example.com"})
+        self.assertEqual(self.LaunchSignup.objects.count(), 0)
+        self.assertContains(resp, "name and an email")
+
+    def test_the_confirmation_replaces_the_form(self):
+        """A filled form still on screen under a success message is how the
+        same person ends up on the list twice."""
+        resp = self.client.post("/", {"name": "Sam", "email": "sam@example.com"})
+        body = resp.content.decode()
+        self.assertIn("You&rsquo;re on the list.", body)
+        self.assertNotIn('class="tmw-form"', body)
+
+    # --- the page still works as a page ------------------------------------
+
+    def test_home_still_renders_its_pricing(self):
+        """It stopped being a TemplateView to take the POST; the context it
+        used to get from extra_context has to still arrive."""
+        body = self.client.get("/").content.decode()
+        self.assertIn("Most popular", body)
+        self.assertIn("$799", body)
+        self.assertIn("31 January 2027", body)
+
+
+class LaunchSignupExportTests(TestCase):
+    """The list exists to leave. Without an export it is unreadable at 200 rows."""
+
+    def test_csv_carries_labels_not_stored_keys(self):
+        from django.contrib.admin.sites import AdminSite
+
+        from .admin import LaunchSignupAdmin
+        from .models import LaunchSignup
+
+        LaunchSignup.objects.create(
+            name="Dana", email="dana@example.com",
+            org_type="business", current_platform="footytips",
+        )
+        admin_obj = LaunchSignupAdmin(LaunchSignup, AdminSite())
+        resp = admin_obj.export_csv(None, LaunchSignup.objects.all())
+        body = resp.content.decode()
+        self.assertEqual(resp["Content-Type"], "text/csv")
+        self.assertIn("dana@example.com", body)
+        # The words a person reads, not "business" / "footytips".
+        self.assertIn("Business or workplace", body)
+        self.assertIn("footytips (ESPN)", body)
+
+
+class PublicFormReplyTests(TestCase):
+    """The in-place submit path (client, 22 Sep 2026).
+
+    gt-forms.js posts with X-Requested-With and expects JSON. The old redirect
+    has to keep working for everyone else, because these forms carry the only
+    leads the business gets and a browser without JavaScript must still be able
+    to send one.
+    """
+
+    AJAX = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
+
+    def test_launch_signup_answers_json_to_the_script(self):
+        resp = self.client.post("/", {"name": "Sam", "email": "sam@example.com"}, **self.AJAX)
+        self.assertEqual(resp["Content-Type"], "application/json")
+        data = resp.json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["title"], "You're on the list.")
+        self.assertIn("one email", data["message"])
+
+    def test_a_refusal_is_json_too_and_is_not_an_http_error(self):
+        """200 with ok:false. A 4xx here trips error reporting on a typo."""
+        resp = self.client.post("/", {"name": "Sam", "email": "nope"}, **self.AJAX)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertFalse(data["ok"])
+        self.assertIn("look right", data["error"])
+
+    def test_without_the_header_the_old_redirect_path_still_renders(self):
+        """No JavaScript: a full page back, with the confirmation on it."""
+        resp = self.client.post("/", {"name": "Sam", "email": "sam@example.com"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "You&rsquo;re on the list.")
+        self.assertNotIn("application/json", resp["Content-Type"])
+
+    def test_contact_form_answers_json(self):
+        resp = self.client.post(reverse("contact_submit"), {
+            "source": "/", "name": "Dana", "email": "dana@example.com",
+            "message": "Is this right for a school?",
+        }, **self.AJAX)
+        data = resp.json()
+        self.assertTrue(data["ok"])
+        self.assertIn("person reads every one", data["message"])
+
+    def test_contact_form_without_the_header_still_redirects(self):
+        resp = self.client.post(reverse("contact_submit"), {
+            "source": "/", "name": "Dana", "email": "dana@example.com",
+            "message": "Hello",
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("sent=1", resp["Location"])
+
+    def test_the_screen_and_the_email_promise_the_same_thing(self):
+        """One dict drives both, so they cannot drift — which is the failure
+        somebody notices: the page promises a quick reply and the email does
+        not mention one, and now neither is believed."""
+        from .form_replies import REPLIES
+        for kind, reply in REPLIES.items():
+            with self.subTest(kind=kind):
+                self.assertTrue(reply["title"])
+                self.assertTrue(reply["message"])
+                if reply["template"]:
+                    self.assertTrue(reply["subject"], f"{kind} mails without a subject")
+
+    def test_a_signup_gets_an_acknowledgement(self):
+        mail.outbox = []
+        self.client.post("/", {"name": "Sam", "email": "sam@example.com",
+                               "org_type": "business"})
+        sent = [m for m in mail.outbox if "sam@example.com" in m.to]
+        self.assertEqual(len(sent), 1)
+        self.assertIn("on the list", sent[0].subject)
+        # It quotes their own answer back, so it does not read as an autoresponder.
+        self.assertIn("Business or workplace", sent[0].body)
+
+    def test_a_failed_acknowledgement_never_loses_the_lead(self):
+        """The row is the asset; the email is a courtesy."""
+        from unittest.mock import patch
+
+        from .models import LaunchSignup
+        with patch("goodtip.mail.send_template", side_effect=RuntimeError("postmark down")):
+            resp = self.client.post("/", {"name": "Sam", "email": "sam@example.com"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(LaunchSignup.objects.count(), 1)
+
+
+class BossNoteAjaxTests(TestCase):
+    """The tell-the-boss send, on the shared in-place submit path.
+
+    Its form only renders for a signed-in member — an anonymous visitor gets
+    the "members only" block instead — so this is the one public form whose
+    new behaviour cannot be seen by fetching the page anonymously. Worth a
+    test for exactly that reason.
+    """
+
+    AJAX = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="member@example.com", password="Str0ng-Passw0rd!x",
+            display_name="Sam",
+        )
+        self.client.force_login(self.user)
+
+    def test_the_form_is_on_the_shared_path_for_a_member(self):
+        body = self.client.get(reverse("tell_the_boss")).content.decode()
+        self.assertIn("data-ajax", body)
+        self.assertIn("data-form-shell", body)
+
+    def test_an_anonymous_visitor_still_gets_the_members_only_block(self):
+        self.client.logout()
+        body = self.client.get(reverse("tell_the_boss")).content.decode()
+        self.assertIn("Members only", body)
+        # No form, so nothing for the handler to wire — and that is correct.
+        self.assertNotIn('class="bn-send" id="send" action', body)
+
+    def test_a_send_answers_json(self):
+        resp = self.client.post(reverse("tell_the_boss"), {
+            "your_name": "Sam", "boss_name": "Alex",
+            "boss_email": "alex@example.com",
+        }, **self.AJAX)
+        self.assertEqual(resp["Content-Type"], "application/json")
+        data = resp.json()
+        self.assertTrue(data["ok"])
+        self.assertIn("on their desk", data["title"])
+
+    def test_a_bad_address_is_json_and_keeps_the_page(self):
+        resp = self.client.post(reverse("tell_the_boss"), {
+            "your_name": "Sam", "boss_name": "Alex", "boss_email": "nope",
+        }, **self.AJAX)
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["ok"])
+
+    def test_a_get_is_never_treated_as_a_submission(self):
+        resp = self.client.get(reverse("tell_the_boss"), **self.AJAX)
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotIn("application/json", resp["Content-Type"])

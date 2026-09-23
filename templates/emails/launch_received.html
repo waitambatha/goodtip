@@ -1,0 +1,75 @@
+{% extends "emails/_base.html" %}
+{% comment %}
+THE WAITING-LIST ACKNOWLEDGEMENT (client, 22 Sep 2026: "if they have entered
+their email, based on which form, make sure we will send an email saying thank
+you for what they were trying to do, and have an appropriate response based on
+what they were trying to do").
+
+What they were trying to do here is ask to be told about something later. So
+the one job of this email is to make the wait feel deliberate rather than
+uncertain: it says when they will next hear from us, how many times, and about
+what. An acknowledgement that only says "thanks" leaves them wondering whether
+the form worked at all.
+
+IT QUOTES THEIR OWN ANSWERS BACK for the same reason the enquiry receipt does
+— an acknowledgement with nothing specific in it reads as an autoresponder,
+and an autoresponder is the thing people mark as spam. Both lines are
+conditional, because both fields are optional and printing "You told us you're
+with:" followed by nothing is worse than not printing it.
+
+NO DATE IS PROMISED. The launch date has moved once already; a date in an
+inbox is a commitment and this one is not ours to make.
+{% endcomment %}
+{% block title %}You're on the list{% endblock %}
+{% block eyebrow %}From the GoodTip team{% endblock %}
+{% block badge %}&#10003;{% endblock %}{# tick — you're in #}
+{% block preheader %}You'll get one email from us the day GoodTip opens for sign-ups.{% endblock %}
+{% block content %}
+  <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">Hi {{ signup.name }},</p>
+  <p style="margin:0 0 22px;font-size:16px;line-height:1.6;color:#1A1A14;">
+    Thanks for asking &mdash; you&rsquo;re on the list.
+  </p>
+  <p style="margin:0 0 22px;font-size:16px;line-height:1.6;color:#1A1A14;">
+    GoodTip isn&rsquo;t open for sign-ups yet. When it is, you&rsquo;ll get one email from
+    us saying so, and that is the only thing this list is for. Nothing between
+    now and then, and nothing afterwards you didn&rsquo;t ask for.
+  </p>
+
+  {% if signup.org_type_label or signup.platform_label %}
+  {% include "emails/_bits.html" with bit="eyebrow" label="What you told us" %}
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+         style="margin:0 0 22px;border-collapse:collapse;">
+    {% if signup.org_type_label %}
+    <tr>
+      <td style="padding:7px 0;font-size:14px;color:#6B7A6E;width:44%;">You&rsquo;re with</td>
+      <td style="padding:7px 0;font-size:14px;color:#1A1A14;font-weight:bold;">{{ signup.org_type_label }}</td>
+    </tr>
+    {% endif %}
+    {% if signup.platform_label %}
+    <tr>
+      <td style="padding:7px 0;font-size:14px;color:#6B7A6E;">Tipping with now</td>
+      <td style="padding:7px 0;font-size:14px;color:#1A1A14;font-weight:bold;">{{ signup.platform_label }}</td>
+    </tr>
+    {% endif %}
+  </table>
+  {% endif %}
+
+  {% include "emails/_bits.html" with bit="eyebrow" label="What you'll be getting" %}
+  <p style="margin:0 0 10px;font-size:15px;line-height:1.65;color:#1A1A14;">
+    &bull;&nbsp; Tipping is <strong>free for everyone who plays</strong>. Always.
+  </p>
+  <p style="margin:0 0 10px;font-size:15px;line-height:1.65;color:#1A1A14;">
+    &bull;&nbsp; Your organisation pays one platform fee, and GoodTip gives a share of
+    it to a charity your organisation picks.
+  </p>
+  <p style="margin:0 0 22px;font-size:15px;line-height:1.65;color:#1A1A14;">
+    &bull;&nbsp; AFL, AFLW, NRL and NRLW, all season, one price.
+  </p>
+
+  <p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#6B7A6E;">
+    Founding Member pricing opens to this list first. Questions in the meantime?
+    Just reply to this email &mdash; it reaches a person.
+  </p>
+
+  {% include "emails/_bits.html" with bit="button" href=site_link label="Have a look around" %}
+{% endblock %}

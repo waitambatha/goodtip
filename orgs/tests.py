@@ -7700,12 +7700,60 @@ class GroupsPageHierarchyTests(TestCase):
             "the switch is still below the create sheet",
         )
 
-    def test_the_hero_is_centred_and_leads_with_the_organisation(self):
+    def test_the_hero_leads_with_the_organisation(self):
+        """The hierarchy requirement has outlived two layouts now.
+
+        Sep 2026: "have them all centred, and have this AquaFlow Water Co to be
+        larger than the Groups."
+        22 Sep 2026, morning: a split hero with a picture on the right, so the
+        centring went.
+        22 Sep 2026, afternoon: "for now remove the image", so the split went
+        too and the hero is a single full-width column again.
+
+        Through all three, one thing has been asked for every time and is what
+        this test is for: the organisation's name leads, and it outranks the
+        word "Groups".
+        """
         body = self.client.get(
             reverse("orgs:groups", args=[self.org.id])
         ).content.decode()
-        self.assertIn("dept-hero is-centred", body)
+        self.assertIn("dept-hero dh-noart", body)
         self.assertIn("gh-eyebrow is-title", body)
+        self.assertLess(
+            body.index("gh-eyebrow is-title"), body.index("dh-word"),
+            "the organisation's name must come before the word Groups",
+        )
+
+    def test_the_hero_picture_is_off_but_its_source_still_works(self):
+        """The image was removed from the page, not ripped out of the system.
+
+        Client, 22 Sep 2026: "on the groups, for now remove the image" — "for
+        now" being the operative part. The panel is out of the template; the
+        view still passes hero_images and orgs/hero_images.py still reads the
+        media library, so putting it back is markup and nothing else.
+
+        This test is what stops the plumbing rotting quietly while the picture
+        is off the page.
+        """
+        from orgs.hero_images import hero_images
+
+        resp = self.client.get(reverse("orgs:groups", args=[self.org.id]))
+        body = resp.content.decode()
+        # Off the page.
+        self.assertNotIn("dh-art", body)
+        # Still wired.
+        self.assertIn("hero_images", resp.context)
+        urls = hero_images(self.org.pk)
+        self.assertTrue(urls, "the media library returned no pictures at all")
+        for u in urls:
+            self.assertTrue(u.startswith("/"), f"{u} is not a local media URL")
+
+    def test_the_hero_pictures_are_stable_for_an_organisation(self):
+        """A hero that is a different photograph on each reload reads as the
+        page not having settled. The choice is seeded on the org's id."""
+        from orgs.hero_images import hero_images
+
+        self.assertEqual(hero_images(self.org.pk), hero_images(self.org.pk))
 
 
 class EmojiPickerComesFromADataFileTests(TestCase):

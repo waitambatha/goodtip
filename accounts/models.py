@@ -234,11 +234,38 @@ class LoginCode(models.Model):
 
 
 class LaunchSignup(models.Model):
-    """A pre-launch 'lock in my spot' lead from the coming-soon page.
+    """A pre-launch "tell me when it's ready" lead.
 
     Stored, not mailed: the launch announcement goes out as a single batch
     when sign-ups open, so all we need here is the list.
+
+    CLIENT, 22 SEP 2026: "can you create a simple 'tell me when it's ready'
+    form on the home page ... this will really help me at the function
+    tomorrow. This way I can direct people there until we are properly ready
+    for launch."
+
+    It already existed on /coming-soon/ and nowhere else, which is why it had
+    never been used — the address the client gives people is goodtip.com.au,
+    and the form was one click off it. The same form is now on the home page
+    and both post here.
+
+    ORG TYPE was the field the client added, and it uses the SAME FIVE WORDS as
+    catalog.OrganisationType (Community, Business, Education, Charities,
+    Informal) rather than a prettier marketing list. A lead becomes an
+    organisation later, and if the two vocabularies disagree then the answer
+    somebody gave at a function cannot be carried into their account. Stored as
+    a plain CharField and not an FK: a lead is not an organisation, and making
+    this form depend on the catalog being seeded would be a new way for a lead
+    capture to fail at exactly the moment it matters.
     """
+
+    ORG_TYPE_CHOICES = [
+        ("business", "Business or workplace"),
+        ("community", "Community group or sports club"),
+        ("education", "School or university"),
+        ("charities", "Charity or not-for-profit"),
+        ("informal", "Group of mates"),
+    ]
 
     PLATFORM_CHOICES = [
         ("footytips", "footytips (ESPN)"),
@@ -252,17 +279,37 @@ class LaunchSignup(models.Model):
     ]
 
     name = models.CharField(max_length=120)
+    # UNIQUE, and the view upserts on it. A room of people being pointed at one
+    # address will produce the same person twice; a duplicate is worse than an
+    # overwrite because the launch mail-out then goes to them twice.
     email = models.EmailField(unique=True)
+    org_type = models.CharField(max_length=20, choices=ORG_TYPE_CHOICES, blank=True)
     current_platform = models.CharField(
         max_length=20, choices=PLATFORM_CHOICES, blank=True
     )
+    # Which page took the lead. The client is about to run a function off one
+    # of them, and "did the home page form actually work" is a question worth
+    # being able to answer without guessing.
+    source_page = models.CharField(max_length=200, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    # Set when the launch announcement goes out, so a second batch can skip
+    # them. Null means nobody has told this person anything yet.
+    notified_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.name} <{self.email}>"
+
+    @property
+    def org_type_label(self) -> str:
+        """The chosen label, safe for a blank or a choice since retired."""
+        return dict(self.ORG_TYPE_CHOICES).get(self.org_type, "")
+
+    @property
+    def platform_label(self) -> str:
+        return dict(self.PLATFORM_CHOICES).get(self.current_platform, "")
 
 
 class BossInvite(models.Model):
