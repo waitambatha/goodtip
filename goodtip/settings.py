@@ -359,10 +359,14 @@ STAGING_GATE_USERS = os.environ.get("STAGING_GATE_USERS", "")
 # page at "/" plus the public pages on its menu, instead of a bare login wall.
 # Off unless asked for; does nothing when STAGING_GATE is off. See staging_gate.
 HOLDING_PAGE = os.environ.get("HOLDING_PAGE", "False").lower() == "true"
+# Lockdown: the trailer and nothing else, for everyone -- the gate password
+# opens nothing and /gate/ itself is closed. Works with or without the gate.
+HOLDING_LOCKDOWN = os.environ.get("HOLDING_LOCKDOWN", "False").lower() == "true"
 if "test" in sys.argv:
     # Never let a developer's .env lock the test client out of every view;
     # gate tests enable the gate explicitly via override_settings.
     STAGING_GATE = False
+    HOLDING_LOCKDOWN = False
     # Manifest storage requires a collectstatic-built manifest, which the test
     # environment doesn't have; hashed URLs aren't what tests assert on anyway.
     STORAGES["staticfiles"] = {

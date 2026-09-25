@@ -66,10 +66,28 @@ HOLDING_SHOWCASES = (
     ("/privacy/", "privacy"),
 )
 
+# LOCKDOWN (HOLDING_LOCKDOWN=true): the trailer and nothing else, for everyone.
+#
+# Holding mode still lets anyone with the gate password through to the real
+# site. The client wants goodtip.com.au to show the trailer only until launch
+# (25 Sep 2026): a visitor who watches the trailer's tours and then types the
+# addresses they saw (/news, /pricing) must not reach a page, and must not be
+# shown a password box either. So under lockdown the gate cookie opens nothing,
+# /gate/ itself is closed, and every path outside /coming-soon/ is sent to the
+# trailer. The team works on staging, which has no lockdown.
+#
+# Static files stay open (the trailer's videos and styles are there), as do
+# robots.txt and the Stripe webhook, which is server-to-server, not a page.
+LOCKDOWN_EXEMPT_PREFIXES = (settings.STATIC_URL, "/stripe/webhook/", ROBOTS_PATH)
+
+
+def _locked_down():
+    return getattr(settings, "HOLDING_LOCKDOWN", False)
+
 
 def is_holding_visitor(request):
     """True for someone the trailer is standing in front of the site for."""
-    return (
+    return _locked_down() or (
         getattr(settings, "STAGING_GATE", False)
         and getattr(settings, "HOLDING_PAGE", False)
         and not has_gate_access(request)
@@ -111,24 +129,35 @@ class StagingGateMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        if _locked_down():
+            if request.path.startswith(LOCKDOWN_EXEMPT_PREFIXES):
+                return self.get_response(request)
+            return self._holding(request) or redirect(HOLDING_HOME_PATH)
         if (
             getattr(settings, "STAGING_GATE", False)
             and not request.path.startswith(EXEMPT_PREFIXES)
             and not has_gate_access(request)
         ):
             if getattr(settings, "HOLDING_PAGE", False):
-                if request.path == "/" and request.method in ("GET", "HEAD"):
-                    # Re-route, don't render: session, CSRF and the template
-                    # context all still run in their normal place after us.
-                    request.path = request.path_info = HOLDING_HOME_PATH
-                    return self.get_response(request)
-                if request.path.startswith(HOLDING_HOME_PATH):
-                    return self.get_response(request)
-                slug = _showcase_for(request.path)
-                if slug and request.method in ("GET", "HEAD"):
-                    return redirect(f"{HOLDING_HOME_PATH}#{slug}")
+                response = self._holding(request)
+                if response is not None:
+                    return response
             return redirect(f"{GATE_PATH}?next={request.path}")
         return self.get_response(request)
+
+    def _holding(self, request):
+        """The trailer's answer to `request`, or None when it has none."""
+        if request.path == "/" and request.method in ("GET", "HEAD"):
+            # Re-route, don't render: session, CSRF and the template
+            # context all still run in their normal place after us.
+            request.path = request.path_info = HOLDING_HOME_PATH
+            return self.get_response(request)
+        if request.path.startswith(HOLDING_HOME_PATH):
+            return self.get_response(request)
+        slug = _showcase_for(request.path)
+        if slug and request.method in ("GET", "HEAD"):
+            return redirect(f"{HOLDING_HOME_PATH}#{slug}")
+        return None
 
 
 @never_cache

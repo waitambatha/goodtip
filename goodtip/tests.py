@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest import mock
 
 from django.conf import settings
-from django.core import mail
+from django.core import mail, signing
 from django.core.management.base import CommandError
 from django.db import connection
 from django.test import SimpleTestCase, TestCase, override_settings
@@ -157,6 +157,73 @@ class HoldingModeOffTests(TestCase):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 302)
 
+
+
+@override_settings(HOLDING_PAGE=True, HOLDING_LOCKDOWN=True, **GATE_ON)
+class HoldingLockdownTests(TestCase):
+    """goodtip.com.au shows the trailer and nothing else (client, 25 Sep 2026)."""
+
+    def unlock(self):
+        self.client.cookies["gt_gate"] = signing.dumps("team", salt="goodtip.staging_gate")
+
+    def test_the_front_door_is_the_trailer(self):
+        resp = self.client.get("/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "tr-hero")
+
+    def test_every_other_page_goes_to_the_trailer_not_to_a_password_box(self):
+        for path in ("/pricing/", "/pricing", "/login/", "/signup/", "/dashboard/", "/admin/",
+                     "/manage/", "/gate/", "/gate/?next=/dashboard/", "/sitemap.xml",
+                     "/media/news/x.jpg", "/no-such-page/"):
+            with self.subTest(path=path):
+                resp = self.client.get(path)
+                self.assertEqual(resp.status_code, 302)
+                self.assertEqual(resp.url, "/coming-soon/")
+
+    def test_the_showcased_pages_still_open_their_showcase(self):
+        for path, slug in (("/news/", "blog"), ("/news/some-story/", "blog"), ("/about/", "about")):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).url, f"/coming-soon/#{slug}")
+
+    def test_the_gate_password_opens_nothing(self):
+        self.unlock()
+        self.assertEqual(self.client.post("/gate/", {
+            "username": "team", "password": "Team-Pass-1234", "next": "/dashboard/",
+        }).url, "/coming-soon/")
+        for path in ("/dashboard/", "/pricing/", "/how-it-works/"):
+            with self.subTest(path=path):
+                self.assertTrue(self.client.get(path).url.startswith("/coming-soon/"))
+        body = self.client.get("/").content.decode()
+        self.assertIn("tr-hero", body)
+        self.assertNotIn("Open the live page", body)
+
+    def test_a_write_anywhere_else_goes_nowhere(self):
+        self.assertEqual(self.client.post("/wall/1/reply/", {}).url, "/coming-soon/")
+        self.assertEqual(self.client.post("/", {}).url, "/coming-soon/")
+
+    def test_the_waiting_list_still_works(self):
+        from accounts.models import LaunchSignup
+        resp = self.client.post("/coming-soon/", {
+            "name": "Pat Visitor", "email": "pat@example.com", "source_page": "coming-soon",
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(LaunchSignup.objects.filter(email="pat@example.com").exists())
+        # The waiting list's own sign-in answers there, not at the trailer's door.
+        resp = self.client.post("/coming-soon/signin/", {"email": "pat@example.com", "password": "x"},
+                                HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(resp["Content-Type"], "application/json")
+
+    def test_static_files_and_the_stripe_webhook_are_not_pages(self):
+        resp = self.client.post("/stripe/webhook/", data="{}", content_type="application/json")
+        self.assertNotEqual(resp.status_code, 302)
+        self.assertNotEqual(self.client.get(settings.STATIC_URL + "css/goodtip.css").status_code, 302)
+
+
+@override_settings(HOLDING_LOCKDOWN=True, STAGING_GATE=False)
+class HoldingLockdownWithoutGateTests(TestCase):
+    def test_lockdown_does_not_depend_on_the_gate(self):
+        self.assertContains(self.client.get("/"), "tr-hero")
+        self.assertEqual(self.client.get("/pricing/").url, "/coming-soon/")
 
 class TrailerClipTests(SimpleTestCase):
     """Every chapter on the page has its recording and its poster on disk."""
