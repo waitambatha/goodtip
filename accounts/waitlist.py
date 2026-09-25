@@ -118,7 +118,10 @@ def send_code(row: LaunchSignup, code: str) -> int:
     _echo_code_to_console(_Who, code, "signup")
     msg = build(
         "waitlist_code",
-        subject="Confirm your email — GoodTip",
+        # The code in the subject, as the sign-in email does: it is readable
+        # from the inbox list, and a fresh subject each time stops Gmail filing
+        # it into an older "Confirm your email" thread where nobody looks.
+        subject=f"{code} is your GoodTip waiting-list code",
         to=row.email,
         context={
             "name": (row.pending or {}).get("name") or row.name,

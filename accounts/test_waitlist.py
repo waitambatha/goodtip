@@ -57,7 +57,8 @@ class SignUpTests(TestCase):
         self.assertFalse(row.is_verified)
         self.assertFalse(row.has_account)
         self.assertEqual(len(mail.outbox), 1)
-        self.assertIn("Confirm", mail.outbox[0].subject)
+        self.assertRegex(mail.outbox[0].subject, r"^\d{6} is your GoodTip waiting-list code$")
+        self.assertIn(mail.outbox[0].subject[:6], mail.outbox[0].body)
         # Nothing about the person can sign in until the code comes back.
         self.assertNotIn("waitlist_member_id", self.client.session)
 
