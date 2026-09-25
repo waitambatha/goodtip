@@ -355,6 +355,10 @@ if DEBUG:
 # Unset or set to false at launch to open the site.
 STAGING_GATE = os.environ.get("STAGING_GATE", "False").lower() == "true"
 STAGING_GATE_USERS = os.environ.get("STAGING_GATE_USERS", "")
+# Holding mode: with the gate on, show visitors WITHOUT gate access the trailer
+# page at "/" plus the public pages on its menu, instead of a bare login wall.
+# Off unless asked for; does nothing when STAGING_GATE is off. See staging_gate.
+HOLDING_PAGE = os.environ.get("HOLDING_PAGE", "False").lower() == "true"
 if "test" in sys.argv:
     # Never let a developer's .env lock the test client out of every view;
     # gate tests enable the gate explicitly via override_settings.

@@ -190,7 +190,23 @@ DATA = Group("data", "Fixtures & reports", "Where the sport data comes from.", [
     ),
 ])
 
-GROUPS = [NEWS, PAGES, SEO, ENQUIRIES, ORGS, PEOPLE, CHARITIES, DATA]
+WAITLIST = Group("waitlist", "Waiting list", "The people who asked to be told when GoodTip opens.", [
+    Capability(
+        "waitlist.view", "See the waiting list",
+        "Open the list of everyone who signed up, with their email addresses and "
+        "answers, and download it.",
+        "waitlist", reviewable=False,
+    ),
+    Capability(
+        "waitlist.invite", "Write and send the launch invitation",
+        "Edit the email that tells the list GoodTip is open, and send it to "
+        "everyone waiting — now, or at a time you set. It goes to real inboxes "
+        "and cannot be recalled.",
+        "waitlist", reviewable=False, sensitive=True,
+    ),
+])
+
+GROUPS = [NEWS, PAGES, SEO, ENQUIRIES, ORGS, PEOPLE, CHARITIES, DATA, WAITLIST]
 
 ALL = {c.key: c for g in GROUPS for c in g.capabilities}
 KEYS = list(ALL)

@@ -1,0 +1,108 @@
+{% extends "admin/hub/base.html" %}
+{% load i18n %}
+
+{% comment %}
+THE WAITING LIST (client, 25 Sep 2026): who signed up from the holding page, how
+many have confirmed their email, how many have been told GoodTip is open, and
+the way into the invitation.
+
+The filters are plain links, like the media library's, so every state of the
+screen is an address that can be sent to somebody. The place number is the
+person's position in the WHOLE queue whatever the filter is showing — it is the
+same number they see on their own page.
+{% endcomment %}
+
+{% block hub_accent %}var(--gt-c2){% endblock %}
+{% block hub_ic %}ic-f-people{% endblock %}
+
+{% block hub_aside %}
+<div class="gta-media-tally">
+  <b>{{ total }}</b><span>{% translate "on the list" %}</span>
+  <b>{{ waiting }}</b><span>{% translate "not invited yet" %}</span>
+</div>
+{% endblock %}
+
+{% block hub_body %}
+
+<section class="gta-wl-bar">
+  <div class="gta-wl-stats">
+    <div><b>{{ total }}</b><span>{% translate "signed up" %}</span></div>
+    <div><b>{{ confirmed }}</b><span>{% translate "confirmed their email" %}</span></div>
+    <div><b>{{ invited }}</b><span>{% translate "invited" %}</span></div>
+    <div><b>{{ waiting }}</b><span>{% translate "still waiting" %}</span></div>
+  </div>
+  <div class="gta-wl-invite">
+    <div>
+      <b>{% translate "Launch invitation" %}</b>
+      <span class="gta-wl-state is-{{ campaign.status }}">{{ campaign.get_status_display }}</span>
+      <p>
+        {% if campaign.status == 'scheduled' and campaign.scheduled_for %}
+          {% blocktranslate with when=campaign.scheduled_for|date:"D j M, g:i A" %}Goes out {{ when }}.{% endblocktranslate %}
+        {% elif campaign.status == 'sending' %}
+          {% translate "Sending now — the rest follows automatically." %}
+        {% elif campaign.status == 'sent' %}
+          {% blocktranslate with n=campaign.sent_count %}{{ n }} sent.{% endblocktranslate %}
+        {% else %}
+          {% translate "Written and ready to edit. Nothing has been sent." %}
+        {% endif %}
+        {% if campaign.failed_count %}<em>{% blocktranslate with n=campaign.failed_count %}{{ n }} could not be delivered.{% endblocktranslate %}</em>{% endif %}
+      </p>
+    </div>
+    <a class="gta-wl-btn primary" href="{% url 'admin:hq_waitlist_invitation' %}">
+      {% if can_invite %}{% translate "Write &amp; send invitation" %}{% else %}{% translate "See the invitation" %}{% endif %}
+    </a>
+  </div>
+</section>
+
+<form class="gta-media-find" method="get" action="">
+  <input type="hidden" name="show" value="{{ show }}">
+  <input type="search" name="q" value="{{ q }}" placeholder="{% translate 'Find someone by name or email' %}" aria-label="{% translate 'Search the list' %}">
+  <button type="submit" class="gta-wl-btn">{% translate "Search" %}</button>
+  {% if q %}<a class="gta-media-clear" href="?show={{ show }}">{% translate "Clear" %}</a>{% endif %}
+  <a class="gta-wl-btn" href="?show={{ show }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}&amp;export=csv">{% translate "Download CSV" %}</a>
+</form>
+
+<div class="gta-media-filters">
+  <div class="gta-chipset" role="group" aria-label="{% translate 'Filter the list' %}">
+    {% for key, label in filters %}
+    <a class="gta-chip{% if show == key %} on{% endif %}" href="?show={{ key }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+{% if rows %}
+<div class="gta-wl-tablewrap">
+<table class="gta-wl-table">
+  <thead><tr>
+    <th>#</th><th>{% translate "Name" %}</th><th>{% translate "Email" %}</th><th>{% translate "Organisation" %}</th>
+    <th>{% translate "Tipping with" %}</th><th>{% translate "Joined" %}</th><th>{% translate "Email" %}</th><th>{% translate "Invited" %}</th>
+  </tr></thead>
+  <tbody>
+  {% for place, r in rows %}
+  <tr>
+    <td class="num">{{ place }}</td>
+    <td><b>{{ r.name }}</b></td>
+    <td>{{ r.email }}</td>
+    <td>{{ r.org_type_label|default:"—" }}</td>
+    <td>{{ r.platform_label|default:"—" }}</td>
+    <td>{{ r.created_at|date:"j M Y, g:i A" }}</td>
+    <td>{% if r.is_verified %}<i class="gta-wl-pill ok">{% translate "Confirmed" %}</i>{% else %}<i class="gta-wl-pill">{% translate "Not confirmed" %}</i>{% endif %}</td>
+    <td>{% if r.notified_at %}<i class="gta-wl-pill ok">{{ r.notified_at|date:"j M, g:i A" }}</i>{% else %}<i class="gta-wl-pill">{% translate "Not yet" %}</i>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if page.paginator.num_pages > 1 %}
+<nav class="gta-wl-pager" aria-label="{% translate 'Pages' %}">
+  {% if page.has_previous %}<a href="?show={{ show }}&amp;q={{ q|urlencode }}&amp;page={{ page.previous_page_number }}">&larr; {% translate "Earlier" %}</a>{% endif %}
+  <span>{% blocktranslate with n=page.number of=page.paginator.num_pages %}Page {{ n }} of {{ of }}{% endblocktranslate %}</span>
+  {% if page.has_next %}<a href="?show={{ show }}&amp;q={{ q|urlencode }}&amp;page={{ page.next_page_number }}">{% translate "Later" %} &rarr;</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+<p class="gta-empty">{% translate "Nobody matches that." %}</p>
+{% endif %}
+
+{% endblock %}

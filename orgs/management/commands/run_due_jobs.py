@@ -25,6 +25,8 @@ JOBS = [
     ("send_election_reminders", "vote reminders (a day out, an hour out)"),
     ("send_result_emails", "round scorecards and election outcomes"),
     ("generate_recaps", "AI round recaps"),
+    # The waiting list's launch invitation, when the super admin has set a time.
+    ("send_waitlist_invites", "waiting-list launch invitation, if scheduled and due"),
     # Housekeeping. Both are self-throttling no-ops on almost every tick, which
     # is why they can sit in a ten-minute loop rather than needing timers of
     # their own — a new unit is a thing that has to be installed with sudo, and

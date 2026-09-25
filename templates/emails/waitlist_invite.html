@@ -1,0 +1,22 @@
+{% extends "emails/_base.html" %}
+{% comment %}
+THE LAUNCH INVITATION. The wording is not in this file: the super admin writes
+it (Waiting list -> Invitation) and it arrives here as `heading`, `paragraphs`
+and `button_label`, already personalised. Everything is escaped by Django; the
+only structure an editor controls is where the paragraphs break, and a line
+break inside a paragraph is kept, so a short numbered list survives.
+{% endcomment %}
+{% block title %}{{ heading }}{% endblock %}
+{% block eyebrow %}GoodTip is on{% endblock %}
+{% block badge %}&#9733;{% endblock %}
+{% block preheader %}{{ heading }}{% endblock %}
+{% block content %}
+  <p style="margin:0 0 18px;font-size:24px;font-weight:bold;line-height:1.25;color:#0F2E22;">{{ heading }}</p>
+  {% for p in paragraphs %}
+  <p style="margin:0 0 18px;font-size:16px;line-height:1.65;color:#1A1A14;">{{ p|linebreaksbr }}</p>
+  {% endfor %}
+  {% include "emails/_bits.html" with bit="button" url=button_url label=button_label %}
+  <p style="margin:18px 0 0;font-size:12.5px;line-height:1.6;color:#6B7A6E;text-align:center;">
+    You are getting this once because you joined the GoodTip waiting list.
+  </p>
+{% endblock %}

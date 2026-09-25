@@ -73,6 +73,122 @@ class StagingGateOnTests(TestCase):
         self.assertEqual(resp.status_code, 200)
 
 
+@override_settings(HOLDING_PAGE=True, **GATE_ON)
+class HoldingModeTests(TestCase):
+    """The trailer page in front of a locked site (client, 24 Sep 2026)."""
+
+    def test_visitor_sees_the_trailer_at_the_front_door(self):
+        resp = self.client.get("/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "tr-hero")
+        self.assertContains(resp, 'name="org_type"')
+
+    def test_the_real_pages_send_a_visitor_to_their_showcase(self):
+        # A shared link or an old bookmark lands on the trailer with that
+        # page's showcase open, not on a password box.
+        for path, slug in (
+            ("/how-it-works/", "how-it-works"), ("/news/", "blog"), ("/news/some-story/", "blog"),
+            ("/wall/", "wall"), ("/about/", "about"), ("/terms/", "terms"), ("/privacy/", "privacy"),
+        ):
+            with self.subTest(path=path):
+                resp = self.client.get(path)
+                self.assertEqual(resp.status_code, 302)
+                self.assertEqual(resp.url, f"/coming-soon/#{slug}")
+
+    def test_the_menu_and_footer_open_showcases_and_offer_no_login_or_signup(self):
+        body = self.client.get("/").content.decode()
+        nav = body[body.index('<nav class="nav"'):body.index("</nav>")]
+        self.assertNotIn("/login/", nav)
+        self.assertNotIn("/signup/", nav)
+        self.assertIn("#join", nav)
+        foot = body[body.index('<footer class="footer"'):body.index("</footer>")]
+        for slug in ("how-it-works", "blog", "wall", "about", "terms", "privacy"):
+            with self.subTest(slug=slug):
+                self.assertIn(f'href="#{slug}"', nav + foot)
+                self.assertContains(self.client.get("/"), f'data-peek="{slug}"')
+
+    def test_a_visitor_is_not_offered_the_real_pages_from_a_showcase(self):
+        body = self.client.get("/").content.decode()
+        self.assertNotIn("Open the live page", body)
+        for href in ("/how-it-works/", "/news/", "/wall/", "/about/", "/terms/", "/privacy/"):
+            self.assertNotIn(f'href="{href}"', body)
+
+    def test_everything_else_is_still_gated(self):
+        for path in ("/login/", "/signup/", "/dashboard/", "/pricing/", "/media/messages/x.pdf", "/media/news/x.jpg"):
+            with self.subTest(path=path):
+                resp = self.client.get(path)
+                self.assertEqual(resp.status_code, 302)
+                self.assertTrue(resp.url.startswith("/gate/"))
+
+    def test_only_a_read_is_redirected_to_a_showcase(self):
+        resp = self.client.post("/wall/1/reply/", {})
+        self.assertTrue(resp.url.startswith("/gate/"))
+
+    def test_the_team_reaches_the_real_pages_and_is_offered_them(self):
+        self.client.post("/gate/", {"username": "team", "password": "Team-Pass-1234", "next": "/"})
+        for path in ("/how-it-works/", "/about/", "/terms/"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 200)
+        body = self.client.get("/coming-soon/").content.decode()
+        self.assertIn("Open the live page", body)
+        self.assertIn('href="/how-it-works/"', body)
+
+    def test_a_post_to_the_front_door_is_not_swallowed(self):
+        self.assertEqual(self.client.post("/", {}).status_code, 302)
+
+    def test_team_with_the_gate_password_still_sees_the_real_home_page(self):
+        self.client.post("/gate/", {"username": "team", "password": "Team-Pass-1234", "next": "/"})
+        body = self.client.get("/").content.decode()
+        self.assertNotIn("tr-hero", body)
+
+    def test_the_waiting_list_form_works_through_the_gate(self):
+        from accounts.models import LaunchSignup
+        resp = self.client.post("/coming-soon/", {
+            "name": "Pat Visitor", "email": "pat@example.com", "source_page": "coming-soon",
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(LaunchSignup.objects.filter(email="pat@example.com").exists())
+
+
+@override_settings(HOLDING_PAGE=False, **GATE_ON)
+class HoldingModeOffTests(TestCase):
+    def test_off_means_the_gate_is_a_plain_wall(self):
+        for path in ("/", "/coming-soon/", "/news/"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 302)
+
+
+class TrailerClipTests(SimpleTestCase):
+    """Every chapter on the page has its recording and its poster on disk."""
+
+    def test_each_chapter_has_a_video_and_a_poster(self):
+        from accounts.trailer import TRAILER_CHAPTERS, TRAILER_HERO_CLIPS
+        folder = Path(settings.BASE_DIR) / "static" / "video" / "trailer"
+        stems = [c["clip"] for c in TRAILER_CHAPTERS]
+        self.assertEqual(len(stems), len(set(stems)))
+        for stem in stems:
+            with self.subTest(clip=stem):
+                self.assertTrue((folder / f"{stem}.mp4").is_file())
+                self.assertTrue((folder / f"{stem}.jpg").is_file())
+        for stem in TRAILER_HERO_CLIPS:
+            self.assertIn(stem, stems)
+
+    def test_each_showcase_has_its_tour_and_its_stills(self):
+        from accounts.trailer import TRAILER_PEEKS
+        folder = Path(settings.BASE_DIR) / "static" / "video" / "trailer"
+        slugs = [p["slug"] for p in TRAILER_PEEKS]
+        self.assertEqual(len(slugs), len(set(slugs)))
+        for p in TRAILER_PEEKS:
+            with self.subTest(slug=p["slug"]):
+                self.assertTrue((folder / f"{p['clip']}.mp4").is_file())
+                self.assertTrue((folder / f"{p['clip']}.jpg").is_file())
+                self.assertEqual(len(p["shots"]), 3)
+                for shot in p["shots"]:
+                    self.assertTrue((folder / f"{shot['file']}.jpg").is_file())
+                self.assertIn(p["prev"], slugs)
+                self.assertIn(p["next"], slugs)
+
+
 ALLOWLIST_ON = dict(
     EMAIL_BACKEND="goodtip.email_backends.AllowlistEmailBackend",
     EMAIL_ALLOWLIST_DELEGATE="django.core.mail.backends.locmem.EmailBackend",

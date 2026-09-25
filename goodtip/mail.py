@@ -85,6 +85,12 @@ EMAIL_SCENES = {
     "election_reminder": ["img/scenes/mcg-match.jpg", "img/scenes/afl-ground.jpg"],
     "election_result": ["img/scenes/aussie-crowd-flag.jpg", "img/scenes/mcg-match.jpg"],
     "news_published": ["img/scenes/afl-ground.jpg", "img/scenes/afl-training.jpg"],
+    "waitlist_code": ["img/scenes/stadium-lights-grass.jpg", "img/scenes/nrl-ground-dusk.jpg"],
+    "waitlist_invite": [
+        "img/scenes/aussie-crowd-flag.jpg",
+        "img/scenes/mcg-match.jpg",
+        "img/scenes/nrl-players-fans.jpg",
+    ],
     "enquiry_admin": ["img/scenes/stadium-panorama.jpg"],
     "enquiry_reply": ["img/scenes/stadium-panorama.jpg"],
 }

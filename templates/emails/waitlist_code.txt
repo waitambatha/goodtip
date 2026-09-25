@@ -1,0 +1,16 @@
+{% autoescape off %}Hello {{ name }},
+
+You are one step from the GoodTip waiting list. Enter the code below to confirm
+this email address is yours.
+
+    {{ code }}
+
+This code expires in {{ minutes }} minutes.
+
+Did not request this? Ignore this email and nothing will happen. This is the
+only code you will need — after today you sign in to the waiting list with your
+email and password. GoodTip will never ask you for it by phone, text message or
+reply.
+
+— GoodTip
+{% endautoescape %}

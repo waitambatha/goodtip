@@ -1,0 +1,8 @@
+{% autoescape off %}{{ heading }}
+
+{{ body_text }}
+
+{{ button_label }}: {{ button_url }}
+
+You are getting this once because you joined the GoodTip waiting list.
+{% endautoescape %}

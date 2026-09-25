@@ -398,7 +398,7 @@ def _get_urls():
     # answer to the super admin, so they live here now.
     from admin_panel import views as manage_views
 
-    from . import hub_views, media_views, services_views, team_views
+    from . import hub_views, media_views, services_views, team_views, waitlist_views
 
     custom = [
         path("system-report/", admin.site.admin_view(system_report_view), name="system_report"),
@@ -433,6 +433,15 @@ def _get_urls():
              name="hq_media_replace"),
         path("services/", admin.site.admin_view(services_views.services_hub),
              name="hq_services"),
+
+        # THE WAITING LIST, 25 Sep 2026. Everyone who joined from the holding
+        # page, and the one email that tells them GoodTip is open — written
+        # here, sent now or at a time chosen, see sysadmin/waitlist_views.py.
+        path("waitlist/", admin.site.admin_view(waitlist_views.waitlist_hub), name="hq_waitlist"),
+        path("waitlist/invitation/", admin.site.admin_view(waitlist_views.invitation),
+             name="hq_waitlist_invitation"),
+        path("waitlist/invitation/preview/", admin.site.admin_view(waitlist_views.invitation_preview),
+             name="hq_waitlist_preview"),
 
         path("sync/", admin.site.admin_view(manage_views.sync_panel), name="hq_sync"),
 

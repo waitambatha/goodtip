@@ -207,6 +207,8 @@ that they were not given that job.
 {% safe_url 'admin:hq_team_home' as u_teamhub %}
 {% safe_url 'admin:hq_media' as u_media %}
 {% safe_url 'admin:hq_services' as u_services %}
+{% safe_url 'admin:hq_waitlist' as u_waitlist %}
+{% gta_can 'waitlist.view' as may_waitlist %}
 {% gta_is_full_access as is_full_access %}
 {% gta_security_visible as may_security %}
 {% gta_on_table_screen as on_table %}
@@ -279,6 +281,11 @@ that they were not given that job.
       {% if u_services and may_report %}
       <li><a href="{{ u_services }}" class="gta-nav-a{% if u_services in request.path %} on{% endif %}" data-jump="Services — email, feeds and the AI">
         <svg class="ic"><use href="#ic-chart"/></svg><span class="lbl">Services</span></a></li>
+      {% endif %}
+
+      {% if u_waitlist and may_waitlist %}
+      <li><a href="{{ u_waitlist }}" class="gta-nav-a{% if u_waitlist in request.path %} on{% endif %}" data-jump="Waiting list — sign-ups and the launch invitation">
+        <svg class="ic"><use href="#ic-f-people"/></svg><span class="lbl">Waiting list</span></a></li>
       {% endif %}
 
       {% if u_teamhub %}

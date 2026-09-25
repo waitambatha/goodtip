@@ -6,6 +6,7 @@ from django.urls import include, path
 from django.views.generic import TemplateView
 from django.views.static import serve as static_serve
 
+from accounts import waitlist_views
 from accounts.forms import RegisteredEmailPasswordResetForm
 from accounts.views import (
     boss_progress_view, coming_soon_view, contact_submit_view, dashboard_view,
@@ -99,6 +100,14 @@ urlpatterns = [
     # login and an org id for.
     path("sponsorship/", sponsorship_view, name="sponsorship"),
     path("coming-soon/", coming_soon_view, name="coming_soon"),
+    # The waiting list's own account. Under /coming-soon/ so the staging gate's
+    # holding mode lets it through as it does the page itself.
+    path("coming-soon/join/", waitlist_views.join, name="waitlist_join"),
+    path("coming-soon/verify/", waitlist_views.verify, name="waitlist_verify"),
+    path("coming-soon/resend/", waitlist_views.resend, name="waitlist_resend"),
+    path("coming-soon/signin/", waitlist_views.signin, name="waitlist_signin"),
+    path("coming-soon/signout/", waitlist_views.signout, name="waitlist_signout"),
+    path("coming-soon/me/", waitlist_views.home, name="waitlist_home"),
     path("contact/", contact_submit_view, name="contact_submit"),
     path("tell-the-boss/", tell_the_boss_view, name="tell_the_boss"),
     path("tell-the-boss/progress/", boss_progress_view, name="boss_progress"),

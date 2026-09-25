@@ -296,11 +296,89 @@ class LaunchSignup(models.Model):
     # them. Null means nobody has told this person anything yet.
     notified_at = models.DateTimeField(null=True, blank=True)
 
+    # ---- THE WAITING-LIST ACCOUNT (client, 25 Sep 2026) ----------------------
+    # While the product is finished behind the gate, goodtip.com.au is the
+    # holding page and nothing else. A person who joined the list still needs
+    # somewhere to come back to, so a lead can now hold a small account of its
+    # own — deliberately NOT an accounts.User. It cannot sign in to the product,
+    # own an organisation or appear in one; it can see its place in the queue and
+    # change what it told us. Keeping it a separate table is what makes "waiting
+    # list people do not interact with the system" true by construction rather
+    # than by a check somebody has to remember to write.
+    #
+    # The password is hashed with Django's hashers like any other. A code is
+    # asked for ONCE, at sign-up, to prove the address is theirs; sign-in is
+    # email + password only.
+    password_hash = models.CharField(max_length=128, blank=True)
+    email_verified_at = models.DateTimeField(null=True, blank=True)
+    # What a sign-up form said, held until the code comes back. An address that
+    # is already verified must not have its name, answers or password changed by
+    # whoever types it into a form next, so the new values wait here and are only
+    # applied by the person who can read that inbox.
+    pending = models.JSONField(default=dict, blank=True)
+    code_hash = models.CharField(max_length=128, blank=True)
+    code_expires_at = models.DateTimeField(null=True, blank=True)
+    code_sent_at = models.DateTimeField(null=True, blank=True)
+    code_attempts = models.PositiveSmallIntegerField(default=0)
+    failed_signins = models.PositiveSmallIntegerField(default=0)
+    locked_until = models.DateTimeField(null=True, blank=True)
+    last_signin_at = models.DateTimeField(null=True, blank=True)
+
+    CODE_TTL = timedelta(minutes=10)
+    CODE_MAX_ATTEMPTS = 5
+    RESEND_AFTER = timedelta(seconds=45)
+    SIGNIN_MAX_FAILS = 6
+    SIGNIN_LOCK = timedelta(minutes=15)
+
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.name} <{self.email}>"
+
+    @property
+    def is_verified(self) -> bool:
+        return self.email_verified_at is not None
+
+    @property
+    def has_account(self) -> bool:
+        return bool(self.password_hash) and self.is_verified
+
+    @property
+    def is_invited(self) -> bool:
+        return self.notified_at is not None
+
+    def position(self) -> int:
+        """Place in the queue: 1 for the first person who asked."""
+        return (
+            LaunchSignup.objects.filter(created_at__lt=self.created_at).count()
+            + LaunchSignup.objects.filter(created_at=self.created_at, pk__lte=self.pk).count()
+        )
+
+    def set_password(self, raw: str) -> None:
+        self.password_hash = make_password(raw)
+
+    def check_password(self, raw: str) -> bool:
+        return bool(self.password_hash) and check_password(raw, self.password_hash)
+
+    def issue_code(self) -> str:
+        """Make a fresh six-digit code, keep only its hash, return the plain one."""
+        code = f"{secrets.randbelow(10**6):06d}"
+        now = timezone.now()
+        self.code_hash = make_password(code)
+        self.code_expires_at = now + self.CODE_TTL
+        self.code_sent_at = now
+        self.code_attempts = 0
+        return code
+
+    def check_code(self, raw: str) -> bool:
+        """Consume an attempt and say whether `raw` is the live code."""
+        if not self.code_hash or not self.code_expires_at or self.code_expires_at < timezone.now():
+            return False
+        if self.code_attempts >= self.CODE_MAX_ATTEMPTS:
+            return False
+        self.code_attempts += 1
+        return check_password((raw or "").strip(), self.code_hash)
 
     @property
     def org_type_label(self) -> str:
@@ -310,6 +388,74 @@ class LaunchSignup(models.Model):
     @property
     def platform_label(self) -> str:
         return dict(self.PLATFORM_CHOICES).get(self.current_platform, "")
+
+
+class WaitlistCampaign(models.Model):
+    """The one email that tells the waiting list GoodTip is open.
+
+    A single row, edited in place, rather than a history of campaigns: there is
+    exactly one launch and one list, and the person running it wants "the
+    email" in front of them, not a table of them. `current()` makes it on first
+    use with the drafted wording from accounts.waitlist, so the screen is never
+    empty and nobody starts from a blank box.
+
+    THE WORDING IS PLAIN TEXT on purpose. The body is typed by a person into a
+    textarea and rendered into a fixed, branded template — paragraphs on blank
+    lines, `{first_name}` and `{name}` swapped in per recipient. There is no
+    HTML to break, nothing to sanitise, and the email cannot come out looking
+    unlike the rest of GoodTip's mail because somebody pasted in a table.
+
+    STATUS is a small machine and only the sender moves it:
+        draft      -> being written; nothing will go out
+        scheduled  -> `scheduled_for` is set; the jobs timer sends when it passes
+        sending    -> started and not finished (a long list is sent in chunks)
+        sent       -> nobody left to invite
+    Whether an individual has been invited is LaunchSignup.notified_at, which is
+    what makes any of it safe to run twice.
+    """
+
+    STATUS_DRAFT = "draft"
+    STATUS_SCHEDULED = "scheduled"
+    STATUS_SENDING = "sending"
+    STATUS_SENT = "sent"
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Draft"),
+        (STATUS_SCHEDULED, "Scheduled"),
+        (STATUS_SENDING, "Sending"),
+        (STATUS_SENT, "Sent"),
+    ]
+
+    subject = models.CharField(max_length=200)
+    heading = models.CharField(max_length=120)
+    body = models.TextField()
+    button_label = models.CharField(max_length=60)
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+    scheduled_for = models.DateTimeField(null=True, blank=True)
+    # The launch date the list is told about. Separate from `scheduled_for` (when
+    # the invitation email goes out): the email might go a day early, or the
+    # date might not be settled when the first is. Blank means "no date yet" and
+    # the countdown on the members' page stays hidden rather than inventing one.
+    launch_at = models.DateTimeField(null=True, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    sent_count = models.PositiveIntegerField(default=0)
+    failed_count = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        "accounts.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+    )
+
+    def __str__(self):
+        return f"Waiting-list invitation ({self.status})"
+
+    @classmethod
+    def current(cls) -> "WaitlistCampaign":
+        row = cls.objects.order_by("pk").first()
+        if row is None:
+            from .waitlist import default_campaign_fields
+
+            row = cls.objects.create(**default_campaign_fields())
+        return row
 
 
 class BossInvite(models.Model):

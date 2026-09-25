@@ -1,0 +1,29 @@
+{% comment %}
+The bar for the holding page. Its four pages do not leave the trailer: each is
+a hash that opens that page's showcase (a filmed tour of it) over the trailer,
+see gt-trailer.js. Same markup and classes as _nav.html, so the drawer, the
+glyphs and the narrow layouts all come for free; only the list is shorter. The
+product's own Log in and Sign up are not offered: nobody outside the team can
+use either yet. "Sign in" here is the waiting list's, a pop-up with no code.
+{% endcomment %}
+<nav class="nav" data-open="false">
+  <div class="nav-inner">
+    <a href="/" class="wordmark">GOOD<span>TIP</span><span class="dot">.</span></a>
+    <button class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-menu">
+      <span></span><span></span><span></span>
+    </button>
+    <ul class="nav-links" id="nav-menu">
+      <li><a href="#how-it-works"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-lifebuoy"/></svg><span>How It Works</span></a></li>
+      <li><a href="#blog"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-doc"/></svg><span>Blog</span></a></li>
+      <li><a href="#wall"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-msg"/></svg><span>The Wall</span></a></li>
+      <li><a href="#about"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-spark"/></svg><span>About Us</span></a></li>
+      <li class="nav-sep" aria-hidden="true"></li>
+      {% if wl_member %}
+      <li class="nav-auth"><a href="{% url 'waitlist_home' %}" class="btn-nav"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-people"/></svg><span>Your place on the list</span></a></li>
+      {% else %}
+      <li><a href="#signin" data-wl-open="signin"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-login"/></svg><span>Sign in</span></a></li>
+      <li class="nav-auth"><a href="#join" data-wl-open="join" class="btn-nav"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-people"/></svg><span>Join the waiting list</span></a></li>
+      {% endif %}
+    </ul>
+  </div>
+</nav>

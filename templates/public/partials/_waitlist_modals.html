@@ -1,0 +1,129 @@
+{% load static %}
+{% comment %}
+THE WAITING-LIST POP-UPS (client, 25 Sep 2026: the sign-up form "be like a pop
+up at the centre ... something dope", and the same for the waiting-list sign-in).
+
+ONE dialog, four steps, switched by gt-waitlist.js: join -> verify (the one
+emailed code, at sign-up only) -> done, and signin (email + password, no code).
+Opened from anything marked data-wl-open, or by the address hash (#join,
+#signin) so the link can be printed on a card at a function.
+
+The fields keep the look of the form that was on the page. The two dropdowns are
+real <select>s underneath — that is what is submitted, and what a visitor with
+no script still gets — and gt-waitlist.js draws the picker over them.
+
+The dialog is hidden until script runs; the <noscript> form in the page itself
+is the fallback that still takes a name and an address.
+{% endcomment %}
+<div class="wl" id="wl" hidden data-wl data-resend="{% url 'waitlist_resend' %}">
+  <div class="wl-scrim" data-wl-close></div>
+  <div class="wl-card" role="dialog" aria-modal="true" aria-labelledby="wl-title" tabindex="-1">
+    <button type="button" class="wl-x" data-wl-close aria-label="Close">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+
+    <aside class="wl-side" aria-hidden="true">
+      <div class="wl-side-photo" style="background-image:url('{% static 'img/scenes/nrl-ground-dusk.jpg' %}')"></div>
+      <div class="wl-side-veil"></div>
+      <div class="wl-side-copy">
+        <span class="wl-side-k">GOOD<b>TIP</b>.</span>
+        <p class="wl-side-big">Round one is <em>coming.</em></p>
+        <p class="wl-side-small">Be in the room when it does.</p>
+        <ul>
+          <li>Free to tip</li>
+          <li>Your organisation picks the charity</li>
+          <li>One email, the day we go live</li>
+        </ul>
+      </div>
+    </aside>
+
+    <div class="wl-main" data-wl-main>
+
+      {# ---- STEP 1: join ---- #}
+      <section class="wl-step" data-wl-step="join" hidden>
+        <span class="tr-pill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9a2 2 0 0 0 0 4v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a2 2 0 0 1 0-4V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1zM14 6v11"/></svg>Join the game</span>
+        <h2 class="wl-h" id="wl-title">Be first through <em>the gate.</em></h2>
+        <p class="wl-sub">Create your account and we&rsquo;ll email you the moment sign-ups open.</p>
+        <form class="tr-form wl-form" method="post" action="{% url 'waitlist_join' %}" data-wl-form="join" novalidate>
+          {% csrf_token %}
+          <p class="wl-err" data-wl-error role="alert" hidden></p>
+          <div class="tr-row">
+            <div class="tr-f"><svg class="tr-fi" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c.6-3.7 3.5-5.7 7.5-5.7s6.9 2 7.5 5.7"/></svg><input id="wl-name" type="text" name="name" required maxlength="120" autocomplete="name" placeholder=" "><label for="wl-name">Your name</label></div>
+            <div class="tr-f"><svg class="tr-fi" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.4"/><path d="m4 8 8 6 8-6"/></svg><input id="wl-email" type="email" name="email" required autocomplete="email" placeholder=" "><label for="wl-email">Email address</label></div>
+          </div>
+          <div class="tr-f tr-f-pw"><svg class="tr-fi" viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="2.4"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg><input id="wl-pw" type="password" name="password" required minlength="8" maxlength="128" autocomplete="new-password" placeholder=" "><label for="wl-pw">Choose a password</label>
+            <button type="button" class="wl-eye" data-wl-eye aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></svg></button></div>
+          <p class="wl-hint">At least 8 characters. You&rsquo;ll use it, with your email, to check your place on the list.</p>
+          <div class="tr-f tr-f-sel">
+            <svg class="tr-fi" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V5.5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1V20M15 10h3.5a.5.5 0 0 1 .5.5V20M3.5 20h17M8.5 8.5h3M8.5 12h3M8.5 15.5h3"/></svg><select id="wl-org" name="org_type" data-dd>
+              <option value="">Select one</option>
+              {% for val, lab in org_types %}<option value="{{ val }}">{{ lab }}</option>{% endfor %}
+            </select><svg class="tr-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            <label for="wl-org">What kind of organisation? <em>optional</em></label>
+          </div>
+          <div class="tr-f tr-f-sel">
+            <svg class="tr-fi" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9a2 2 0 0 0 0 4v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a2 2 0 0 1 0-4V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z"/><path d="M10 9.5h4M10 13.5h4"/></svg><select id="wl-plat" name="current_platform" data-dd>
+              <option value="">Select one</option>
+              {% for val, lab in platforms %}<option value="{{ val }}">{{ lab }}</option>{% endfor %}
+            </select><svg class="tr-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            <label for="wl-plat">What are you tipping with now? <em>optional</em></label>
+          </div>
+          <input type="hidden" name="source_page" value="coming-soon">
+          <button type="submit" class="tr-submit" data-wl-submit><span>Lock in my spot</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </form>
+        <p class="wl-switch">Already on the list? <a href="#signin" data-wl-open="signin">Sign in</a></p>
+      </section>
+
+      {# ---- STEP 2: confirm the address, once ---- #}
+      <section class="wl-step" data-wl-step="verify" hidden>
+        <span class="tr-pill"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.4"/><path d="m4 8 8 6 8-6"/></svg>Check your inbox</span>
+        <h2 class="wl-h">Confirm it&rsquo;s <em>you.</em></h2>
+        <p class="wl-sub">We sent a 6-digit code to <b data-wl-email></b>. Type it in below &mdash; it&rsquo;s the only time we&rsquo;ll ask.</p>
+        <form class="tr-form wl-form" method="post" action="{% url 'waitlist_verify' %}" data-wl-form="verify" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="email" value="">
+          <input type="hidden" name="code" value="">
+          <p class="wl-err" data-wl-error role="alert" hidden></p>
+          <div class="wl-otp" data-wl-otp role="group" aria-label="6-digit code">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" autocomplete="one-time-code" aria-label="Digit 1">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit 2">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit 3">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit 4">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit 5">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" aria-label="Digit 6">
+          </div>
+          <button type="submit" class="tr-submit" data-wl-submit><span>Confirm my spot</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </form>
+        <p class="wl-switch">
+          Nothing arrived? <button type="button" class="wl-link" data-wl-resend>Send it again</button><span data-wl-wait></span>
+          &middot; <button type="button" class="wl-link" data-wl-back>Change my details</button>
+        </p>
+      </section>
+
+      {# ---- STEP 3: done ---- #}
+      <section class="wl-step wl-done" data-wl-step="done" hidden>
+        <span class="wl-tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>
+        <h2 class="wl-h" data-wl-done-h>You&rsquo;re on the list.</h2>
+        <p class="wl-sub">Taking you to your place in the queue&hellip;</p>
+        <a class="tr-submit" href="{% url 'waitlist_home' %}"><span>See my place</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </section>
+
+      {# ---- sign in: email + password, no code ---- #}
+      <section class="wl-step" data-wl-step="signin" hidden>
+        <span class="tr-pill"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c.6-3.7 3.5-5.7 7.5-5.7s6.9 2 7.5 5.7"/></svg>Waiting-list sign in</span>
+        <h2 class="wl-h">Welcome <em>back.</em></h2>
+        <p class="wl-sub">Sign in to see where you are in the queue.</p>
+        <form class="tr-form wl-form" method="post" action="{% url 'waitlist_signin' %}" data-wl-form="signin" novalidate>
+          {% csrf_token %}
+          <p class="wl-err" data-wl-error role="alert" hidden></p>
+          <div class="tr-f"><svg class="tr-fi" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.4"/><path d="m4 8 8 6 8-6"/></svg><input id="wl-si-email" type="email" name="email" required autocomplete="email" placeholder=" "><label for="wl-si-email">Email address</label></div>
+          <div class="tr-f tr-f-pw"><svg class="tr-fi" viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="2.4"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg><input id="wl-si-pw" type="password" name="password" required maxlength="128" autocomplete="current-password" placeholder=" "><label for="wl-si-pw">Password</label>
+            <button type="button" class="wl-eye" data-wl-eye aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></svg></button></div>
+          <button type="submit" class="tr-submit" data-wl-submit><span>Sign in</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </form>
+        <p class="wl-switch">Not on the list yet? <a href="#join" data-wl-open="join">Join it</a></p>
+        <p class="wl-hint wl-center">Forgot your password? Join again with the same email and choose a new one &mdash; we&rsquo;ll confirm it&rsquo;s you.</p>
+      </section>
+    </div>
+  </div>
+</div>

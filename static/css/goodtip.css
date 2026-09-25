@@ -2589,6 +2589,22 @@ html[data-theme="dark"] .gt-app .ch-picker .opt-card .ch-tile { opacity: .82; }
 .page-deep .ch-picker .opt-card:has(input:checked) .ch-tile,
 html[data-theme="dark"] .gt-app .ch-picker .opt-card:has(input:checked) .ch-tile { opacity: 1; }
 
+/* The create wizard is a cream sheet standing on a deep page, so the dark-ground
+   treatment above (cream name, lime tick box) turns the chosen option's name
+   into cream on cream. On that sheet the chosen card keeps the light-mode
+   signals: dark name, forest tick box, white tick. */
+.page-deep .wiz-card .opt-card:has(input:checked) .oc-title,
+html[data-theme="dark"] .gt-app .wiz-card .opt-card:has(input:checked) .oc-title,
+.page-deep .wiz-card .opt-card:has(input:checked) .ch-name,
+html[data-theme="dark"] .gt-app .wiz-card .opt-card:has(input:checked) .ch-name { color: var(--deep); }
+.page-deep .wiz-card .opt-card:has(input:checked) .oc-sub,
+html[data-theme="dark"] .gt-app .wiz-card .opt-card:has(input:checked) .oc-sub { color: #3f5648; }
+.page-deep .wiz-card .opt-card:has(input:checked) .oc-box,
+html[data-theme="dark"] .gt-app .wiz-card .opt-card:has(input:checked) .oc-box { background: var(--forest); border-color: var(--forest); }
+.page-deep .wiz-card .opt-card:has(input:checked) .oc-box svg,
+html[data-theme="dark"] .gt-app .wiz-card .opt-card:has(input:checked) .oc-box svg { stroke: #fff; }
+.page-deep .wiz-card .opt-card:has(input:checked),
+html[data-theme="dark"] .gt-app .wiz-card .opt-card:has(input:checked) { background: rgba(200,241,53,.22); }
 .opt-card:hover { border-color: var(--forest); }
 .opt-card:has(input:checked) { border-color: var(--lime); background: rgba(200,241,53,.10); box-shadow: 0 0 0 3px rgba(200,241,53,.14); }
 .opt-card input { position: absolute; opacity: 0; width: 0; height: 0; }
@@ -3141,8 +3157,6 @@ html[data-theme="dark"] .gt-app .ch-picker .opt-card:has(input:checked) .ch-tile
 .soon-form .soon-error { margin: 0 0 14px; font-weight: 700; color: #9a2b2b; }
 .soon-form .soon-done { text-align: center; }
 .soon-form .soon-done h3 { font-family: var(--display); font-size: 24px; color: var(--forest); margin: 0 0 8px; }
-.soon-login { text-align: center; margin-top: 26px; color: var(--muted); }
-.soon-login a { color: var(--forest); font-weight: 700; }
 
 /* ---------- NOTIFICATIONS: bell, panel, popup ---------- */
 .an-bell { position: relative; display: flex; align-items: center; }
@@ -21509,15 +21523,6 @@ body.loading:has(#loader.loader-slim) { overflow: visible; }
   from { transform: scale(.6); opacity: 0; }
   to   { transform: scale(1);  opacity: 1; }
 }
-
-/* The sign-in line at the foot of the coming-soon page. Deliberately the
-   quietest thing on it — see the comment in public/coming_soon.html. */
-.soon-foot { padding-top: 0; padding-bottom: clamp(30px, 4vw, 48px); }
-.soon-foot .soon-login {
-  margin: 0; text-align: center; font-size: 14px; color: var(--muted);
-  padding-top: clamp(22px, 3vw, 32px); border-top: 1px solid var(--line);
-}
-.soon-foot .soon-login a { color: var(--forest); font-weight: 700; }
 
 /* ===========================================================================
    THE "MOST POPULAR" ROW ON /pricing/ — it breathes, and it walks the codes

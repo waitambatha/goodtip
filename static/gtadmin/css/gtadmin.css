@@ -2705,3 +2705,78 @@ html[data-theme="dark"] .gta-shell .object-tools a.addlink { color: #0C2417; bac
   color: var(--body-medium-color); cursor: pointer;
 }
 .gmd-tick input { margin-top: 2px; flex: none; }
+
+/* ===========================================================================
+   THE WAITING LIST (25 Sep 2026) — sysadmin/waitlist_views.py
+   Two screens: the list, and the launch-invitation composer. Own button class
+   because .gta-btn is a full-width block in this file.
+   =========================================================================== */
+.gta-wl-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 9px 16px; border-radius: var(--gt-r-ctl); border: 1px solid var(--border-color);
+  background: var(--gt-surface); color: var(--body-fg);
+  font: 600 13.5px/1.2 var(--gt-body); cursor: pointer; text-decoration: none;
+}
+.gta-wl-btn:hover { border-color: var(--body-quiet-color); text-decoration: none; color: var(--body-fg); }
+.gta-wl-btn.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+.gta-wl-btn.primary:hover { background: var(--primary); color: var(--primary-fg); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 26%, transparent); }
+.gta-wl-btn.gold { background: var(--gt-gold); color: var(--gt-deep); border-color: var(--gt-gold); }
+.gta-wl-btn.gold:hover { background: var(--gt-gold); color: var(--gt-deep); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gt-gold) 30%, transparent); }
+.gta-wl-btn.ghost { background: transparent; color: var(--body-quiet-color); }
+.gta-wl-btn[disabled] { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.gta-wl-btn:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 45%, transparent); outline-offset: 2px; }
+
+.gta-wl-bar { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; margin-bottom: 18px; }
+.gta-wl-stats, .gta-wl-invite { background: var(--gt-surface); border: 1px solid var(--border-color); border-radius: var(--gt-r-card); padding: 16px 18px; }
+.gta-wl-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.gta-wl-stats b { display: block; font: 700 28px/1.1 var(--gt-num); color: var(--body-loud-color); }
+.gta-wl-stats span { font-size: 12.5px; color: var(--body-quiet-color); }
+.gta-wl-invite { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.gta-wl-invite p { margin: 6px 0 0; font-size: 13px; color: var(--body-quiet-color); }
+.gta-wl-invite em { display: block; font-style: normal; color: var(--gt-c6); }
+.gta-wl-state { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: var(--gt-r-pill); font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; background: var(--gt-surface-3); color: var(--body-quiet-color); }
+.gta-wl-state.is-scheduled, .gta-wl-state.is-sending { background: color-mix(in srgb, var(--gt-gold) 26%, transparent); color: var(--body-loud-color); }
+.gta-wl-state.is-sent { background: color-mix(in srgb, var(--gt-c1) 22%, transparent); color: var(--body-loud-color); }
+.gta-media-find .gta-wl-btn { flex: none; }
+
+.gta-wl-tablewrap { overflow-x: auto; border: 1px solid var(--border-color); border-radius: var(--gt-r-card); background: var(--gt-surface); }
+.gta-wl-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.gta-wl-table th { text-align: left; padding: 10px 14px; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--body-quiet-color); border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+.gta-wl-table td { padding: 10px 14px; border-bottom: 1px solid var(--hairline-color, var(--border-color)); vertical-align: top; }
+.gta-wl-table tr:last-child td { border-bottom: 0; }
+.gta-wl-table .num { font-family: var(--gt-num); font-weight: 700; color: var(--body-quiet-color); }
+.gta-wl-pill { display: inline-block; padding: 2px 9px; border-radius: var(--gt-r-pill); font-style: normal; font-size: 12px; background: var(--gt-surface-3); color: var(--body-quiet-color); white-space: nowrap; }
+.gta-wl-pill.ok { background: color-mix(in srgb, var(--gt-c1) 20%, transparent); color: var(--body-loud-color); }
+.gta-wl-pager { display: flex; gap: 16px; align-items: center; justify-content: center; margin: 16px 0; font-size: 13px; color: var(--body-quiet-color); }
+
+.gta-wl-warn { margin: 0 0 14px; padding: 12px 16px; border-radius: var(--gt-r-ctl); border: 1px solid color-mix(in srgb, var(--gt-gold) 60%, transparent); background: color-mix(in srgb, var(--gt-gold) 16%, transparent); color: var(--body-loud-color); font-size: 13.5px; line-height: 1.5; }
+.gta-wl-status { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; font-size: 13.5px; color: var(--body-quiet-color); }
+.gta-wl-status .gta-wl-state { margin-left: 0; }
+.gta-wl-audience { margin-left: auto; }
+.gta-wl-audience b { font: 700 18px var(--gt-num); color: var(--body-loud-color); }
+
+.gta-wl-compose { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.gta-wl-form, .gta-wl-preview { background: var(--gt-surface); border: 1px solid var(--border-color); border-radius: var(--gt-r-card); padding: 18px 20px; }
+.gta-wl-form label { display: block; margin: 14px 0 5px; font-size: 12.5px; font-weight: 700; color: var(--body-loud-color); }
+.gta-wl-form label:first-child { margin-top: 0; }
+.gta-wl-form input[type="text"], .gta-wl-form input[type="datetime-local"], .gta-wl-form textarea {
+  width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--gt-r-ctl);
+  background: var(--gt-surface); color: var(--body-fg); font: 14px/1.55 var(--gt-body);
+}
+.gta-wl-form textarea { resize: vertical; min-height: 260px; }
+.gta-wl-hint { margin: 6px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--body-quiet-color); }
+.gta-wl-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.gta-wl-send { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border-color); }
+.gta-wl-send h2 { margin: 0 0 6px; font-size: 16px; color: var(--body-loud-color); }
+.gta-wl-send p { margin: 0; font-size: 13px; color: var(--body-quiet-color); line-height: 1.5; }
+.gta-wl-form .gta-wl-check { display: flex; gap: 10px; align-items: flex-start; margin: 14px 0 0; font-weight: 600; }
+.gta-wl-check input { margin-top: 3px; }
+.gta-wl-when { margin-top: 12px; max-width: 280px; }
+.gta-wl-preview { position: sticky; top: 16px; }
+.gta-wl-preview h2 { margin: 0 0 4px; font-size: 16px; color: var(--body-loud-color); }
+.gta-wl-preview iframe { width: 100%; height: 720px; border: 1px solid var(--border-color); border-radius: var(--gt-r-ctl); background: #fff; margin-top: 10px; }
+@media (max-width: 1100px) {
+  .gta-wl-bar, .gta-wl-compose { grid-template-columns: 1fr; }
+  .gta-wl-preview { position: static; }
+}
+@media (max-width: 560px) { .gta-wl-stats { grid-template-columns: repeat(2, 1fr); } }

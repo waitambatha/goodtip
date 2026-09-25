@@ -42,13 +42,13 @@
     </div>
   </div>
 
-  {% include "public/partials/_nav.html" %}
+  {% block nav %}{% include "public/partials/_nav.html" %}{% endblock %}
 
   <main>
     {% block content %}{% endblock %}
   </main>
 
-  {% include "public/partials/_footer.html" %}
+  {% block footer %}{% include "public/partials/_footer.html" %}{% endblock %}
 
   <script>
   (function () {

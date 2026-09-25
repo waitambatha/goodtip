@@ -39,6 +39,50 @@ ROBOTS_PATH = "/robots.txt"
 # rather than a 302 to a login page.
 EXEMPT_PREFIXES = (GATE_PATH, settings.STATIC_URL, "/stripe/webhook/", ROBOTS_PATH)
 
+# HOLDING MODE (HOLDING_PAGE=true, only ever alongside STAGING_GATE).
+#
+# The gate hides the whole product; the client wants the public to be able to
+# see a trailer of it at events while it is finished (24 Sep 2026). So a visitor
+# WITHOUT gate access gets: "/" answered by the trailer page, and the trailer
+# page itself with its waiting-list form. Everything else still goes to the
+# gate. A visitor WITH access sees the real site as before.
+#
+# The trailer's menu and footer (How It Works, Blog, The Wall, About Us, Terms,
+# Privacy) do not lead to those pages. Each opens a showcase on the trailer
+# page: a filmed tour and stills of the page, so the visitor sees what it is
+# but cannot click around inside it (client, 25 Sep 2026). A visitor who
+# arrives at one of the real addresses (a shared link, an old bookmark, the
+# back button) is sent to its showcase rather than to the password box.
+#
+# Deliberately nothing else is opened: no /media/, no login, signup or
+# dashboard. Message attachments and change-request uploads live under /media/.
+HOLDING_HOME_PATH = "/coming-soon/"
+HOLDING_SHOWCASES = (
+    ("/how-it-works/", "how-it-works"),
+    ("/news/", "blog"),
+    ("/wall/", "wall"),
+    ("/about/", "about"),
+    ("/terms/", "terms"),
+    ("/privacy/", "privacy"),
+)
+
+
+def is_holding_visitor(request):
+    """True for someone the trailer is standing in front of the site for."""
+    return (
+        getattr(settings, "STAGING_GATE", False)
+        and getattr(settings, "HOLDING_PAGE", False)
+        and not has_gate_access(request)
+    )
+
+
+def _showcase_for(path):
+    """The showcase that stands in for `path`, or None."""
+    for prefix, slug in HOLDING_SHOWCASES:
+        if path.startswith(prefix):
+            return slug
+    return None
+
 
 def _credentials():
     """Parse STAGING_GATE_USERS ('name:pass,name:pass') into a dict."""
@@ -72,6 +116,17 @@ class StagingGateMiddleware:
             and not request.path.startswith(EXEMPT_PREFIXES)
             and not has_gate_access(request)
         ):
+            if getattr(settings, "HOLDING_PAGE", False):
+                if request.path == "/" and request.method in ("GET", "HEAD"):
+                    # Re-route, don't render: session, CSRF and the template
+                    # context all still run in their normal place after us.
+                    request.path = request.path_info = HOLDING_HOME_PATH
+                    return self.get_response(request)
+                if request.path.startswith(HOLDING_HOME_PATH):
+                    return self.get_response(request)
+                slug = _showcase_for(request.path)
+                if slug and request.method in ("GET", "HEAD"):
+                    return redirect(f"{HOLDING_HOME_PATH}#{slug}")
             return redirect(f"{GATE_PATH}?next={request.path}")
         return self.get_response(request)
 

@@ -1294,15 +1294,21 @@ def record_launch_signup(request) -> tuple[bool, str]:
         return False, "That email address doesn't look right — check it and try again."
 
     try:
-        row, _ = LaunchSignup.objects.update_or_create(
-            email=email,
-            defaults={
-                "name": name,
-                "org_type": org_type,
-                "current_platform": platform,
-                "source_page": (request.POST.get("source_page") or "")[:200],
-            },
-        )
+        existing = LaunchSignup.objects.filter(email=email).first()
+        if existing is not None and existing.is_verified:
+            # A waiting-list ACCOUNT: whoever types the address into a form
+            # does not get to rewrite it. They change their details signed in.
+            row = existing
+        else:
+            row, _ = LaunchSignup.objects.update_or_create(
+                email=email,
+                defaults={
+                    "name": name,
+                    "org_type": org_type,
+                    "current_platform": platform,
+                    "source_page": (request.POST.get("source_page") or "")[:200],
+                },
+            )
     except Exception:  # noqa: BLE001 — a lead is never worth a 500
         logger.exception("Launch signup failed to save")
         return False, "That didn't save — please try again in a moment."
@@ -1385,9 +1391,21 @@ def coming_soon_view(request):
         locked_in, error = record_launch_signup(request)
         if wants_json(request):
             return json_ok("launch") if locked_in else json_error(error)
+    from goodtip.staging_gate import is_holding_visitor
+
+    from . import waitlist
+    from .trailer import TRAILER_CHAPTERS, TRAILER_HERO_CLIPS, TRAILER_PEEKS
+
     return render(request, "public/coming_soon.html", {
+        "peeks": TRAILER_PEEKS,
+        # Signed in to the waiting list (not the product): the page offers their place.
+        "wl_member": waitlist.current_member(request),
+        # The real pages are only offered to people who can open them.
+        "can_open_pages": not is_holding_visitor(request),
         "locked_in": locked_in,
         "error": error,
+        "chapters": TRAILER_CHAPTERS,
+        "hero_clips": [c for c in TRAILER_CHAPTERS if c["clip"] in TRAILER_HERO_CLIPS],
         **launch_signup_context(),
     })
 

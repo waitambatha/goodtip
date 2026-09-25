@@ -1,0 +1,130 @@
+{% extends "admin/hub/base.html" %}
+{% load i18n %}
+
+{% comment %}
+THE LAUNCH INVITATION (client, 25 Sep 2026). A composer with the drafted
+message already in it, a live preview of the real email beside it, a test send
+to yourself, and the two ways of sending: now, or at a time. The wording is
+plain text — paragraphs on blank lines, {first_name} and {name} filled in per
+person — so nothing typed here can break the layout of the email.
+
+WHAT MAKES THE BIG BUTTONS SAFE: each needs a tick box, the button says how many
+people it will email, and a person is only ever invited once no matter how many
+times this runs. The page says so, because "what if I press it twice" is the
+first thing anybody asks of a button that emails a list.
+{% endcomment %}
+
+{% block hub_accent %}var(--gt-c3){% endblock %}
+{% block hub_ic %}ic-f-mail{% endblock %}
+
+{% block hub_body %}
+
+{% if holding_on %}
+<p class="gta-wl-warn"><b>{% translate "The holding page is still on." %}</b>
+  {% translate "The button in this email goes to the sign-up page, and while the holding page is on, visitors are shown the coming-soon page instead. Turn it off (HOLDING_PAGE) before this goes out." %}</p>
+{% endif %}
+{% if is_staging %}
+<p class="gta-wl-warn"><b>{% translate "This is staging." %}</b>
+  {% translate "The list here is a copy of the real one — sending will email real people. Use “Send me a test” unless you mean it." %}</p>
+{% endif %}
+
+<div class="gta-wl-status">
+  <span class="gta-wl-state is-{{ campaign.status }}">{{ campaign.get_status_display }}</span>
+  {% if campaign.status == 'scheduled' and campaign.scheduled_for %}
+    <span>{% blocktranslate with when=campaign.scheduled_for|date:"l j F, g:i A" %}Set to go out {{ when }} ({{ tz_name }}).{% endblocktranslate %}</span>
+  {% elif campaign.status == 'sending' %}
+    <span>{% translate "Sending — whatever is left goes out on the next automatic run." %}</span>
+  {% elif campaign.status == 'sent' %}
+    <span>{% blocktranslate with n=campaign.sent_count %}{{ n }} sent{% endblocktranslate %}{% if campaign.failed_count %}, {{ campaign.failed_count }} {% translate "could not be delivered" %}{% endif %}.</span>
+  {% endif %}
+  <span class="gta-wl-audience"><b>{{ waiting }}</b> {% translate "not invited yet" %}</span>
+</div>
+
+<div class="gta-wl-compose">
+  <form method="post" class="gta-wl-form" id="wl-form" action="">
+    {% csrf_token %}
+    <label for="wl-subject">{% translate "Subject line" %}</label>
+    <input id="wl-subject" name="subject" type="text" maxlength="200" value="{{ campaign.subject }}" {% if not can_invite %}readonly{% endif %}>
+
+    <label for="wl-heading">{% translate "Big heading in the email" %}</label>
+    <input id="wl-heading" name="heading" type="text" maxlength="120" value="{{ campaign.heading }}" {% if not can_invite %}readonly{% endif %}>
+
+    <label for="wl-body">{% translate "Message" %}</label>
+    <textarea id="wl-body" name="body" rows="17" {% if not can_invite %}readonly{% endif %}>{{ campaign.body }}</textarea>
+    <p class="gta-wl-hint">{% translate "A blank line starts a new paragraph. {first_name} and {name} are replaced with each person's own name. Plain text only." %}</p>
+
+    <label for="wl-button">{% translate "Button label" %}</label>
+    <input id="wl-button" name="button_label" type="text" maxlength="60" value="{{ campaign.button_label }}" {% if not can_invite %}readonly{% endif %}>
+    <p class="gta-wl-hint">{% blocktranslate %}The button opens{% endblocktranslate %} <code>{{ signup_link }}</code>.</p>
+
+    {% if can_invite %}
+    <div class="gta-wl-row">
+      <button class="gta-wl-btn" type="submit" name="action" value="save">{% translate "Save changes" %}</button>
+      <button class="gta-wl-btn" type="submit" name="action" value="test">{% blocktranslate %}Send me a test{% endblocktranslate %}</button>
+      <button class="gta-wl-btn ghost" type="submit" name="action" value="reset" formnovalidate
+              onclick="return confirm('Put the wording back to the original draft? Your edits will be lost.');">{% translate "Reset to the original draft" %}</button>
+    </div>
+
+    <div class="gta-wl-send">
+      <h2>{% translate "Launch date" %}</h2>
+      <p>{% translate "Shows the waiting list a countdown on their page. It is only a date they see: it does not send anything, and it can differ from the time the email goes out. Leave it empty to hide the countdown." %}</p>
+      <div class="gta-wl-when">
+        <label for="wl-launch">{% blocktranslate with tz=tz_name %}Launch ({{ tz }}){% endblocktranslate %}</label>
+        <input id="wl-launch" type="datetime-local" name="launch_at" value="{{ launch_local }}">
+      </div>
+      <div class="gta-wl-row">
+        <button class="gta-wl-btn" type="submit" name="action" value="launch_date" formnovalidate>{% translate "Save launch date" %}</button>
+      </div>
+    </div>
+
+    <div class="gta-wl-send">
+      <h2>{% translate "Send it" %}</h2>
+      <p>{% blocktranslate %}Everyone who has not been invited yet gets it — once. Pressing a button twice, or a schedule running twice, cannot email anyone a second time.{% endblocktranslate %}</p>
+
+      <label class="gta-wl-check"><input type="checkbox" name="confirm" value="yes">
+        {% blocktranslate with n=waiting %}Yes — email the {{ n }} people who haven't been invited yet.{% endblocktranslate %}</label>
+
+      <div class="gta-wl-when">
+        <label for="wl-when">{% blocktranslate with tz=tz_name %}Send at ({{ tz }}){% endblocktranslate %}</label>
+        <input id="wl-when" type="datetime-local" name="scheduled_for" value="{{ scheduled_local }}">
+      </div>
+
+      <div class="gta-wl-row">
+        <button class="gta-wl-btn primary" type="submit" name="action" value="send_now" {% if not waiting %}disabled{% endif %}
+                onclick="return confirm('Send this to {{ waiting }} people now? This cannot be recalled.');">{% translate "Send now" %}</button>
+        <button class="gta-wl-btn gold" type="submit" name="action" value="schedule" {% if not waiting %}disabled{% endif %}>{% translate "Schedule for that time" %}</button>
+        {% if campaign.status == 'scheduled' or campaign.status == 'sending' %}
+        <button class="gta-wl-btn ghost" type="submit" name="action" value="unschedule" formnovalidate>{% translate "Cancel the schedule" %}</button>
+        {% endif %}
+      </div>
+      <p class="gta-wl-hint">{% translate "Scheduled sends are picked up by an automatic job that runs every ten minutes, so it lands within ten minutes after the time you choose." %}</p>
+    </div>
+    {% else %}
+    <p class="gta-wl-hint">{% translate "You can read the invitation, but you don't have permission to edit or send it." %}</p>
+    {% endif %}
+  </form>
+
+  <aside class="gta-wl-preview" aria-label="{% translate 'Preview of the email' %}">
+    <h2>{% translate "Preview" %}</h2>
+    <p class="gta-wl-hint">{% translate "Exactly how it will look, using “Alex Sample” as the reader. Updates as you type." %}</p>
+    <iframe id="wl-frame" title="{% translate 'Email preview' %}" sandbox="" data-url="{% url 'admin:hq_waitlist_preview' %}"></iframe>
+  </aside>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById('wl-form'), frame = document.getElementById('wl-frame'), t;
+  if (!form || !frame) return;
+  function draw() {
+    var fd = new FormData();
+    ['subject', 'heading', 'body', 'button_label'].forEach(function (n) { fd.append(n, form.elements[n].value); });
+    fd.append('csrfmiddlewaretoken', form.elements.csrfmiddlewaretoken.value);
+    fetch(frame.dataset.url, { method: 'POST', body: fd, credentials: 'same-origin' })
+      .then(function (r) { return r.text(); })
+      .then(function (html) { frame.srcdoc = html; });
+  }
+  form.addEventListener('input', function () { clearTimeout(t); t = setTimeout(draw, 450); });
+  draw();
+})();
+</script>
+{% endblock %}

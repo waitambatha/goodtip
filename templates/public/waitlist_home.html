@@ -1,0 +1,181 @@
+{% extends "public/base.html" %}
+{% load static %}
+
+{% block title %}Your place on the list. GoodTip.{% endblock %}
+{% block body_class %}page-soon page-waitlist{% endblock %}
+{% block loader_task %}Finding your place{% endblock %}
+{% block extra_head %}<meta name="robots" content="noindex">
+  <link rel="stylesheet" href="{% static 'css/gt-trailer.css' %}">
+  <link rel="stylesheet" href="{% static 'css/gt-waitlist.css' %}">
+  <script src="{% static 'js/gt-waitlist.js' %}" defer></script>{% endblock %}
+
+{% comment %}
+WHAT A WAITING-LIST MEMBER SEES WHEN THEY SIGN IN (client, 25 Sep 2026).
+
+Deliberately its own small world: no product navigation, no links into the
+system, no menu of pages that are not open. The bar has the wordmark and Sign
+out; the page shows their place, lets them correct their details, and says what
+happens next. The session behind it is the waiting-list one (accounts.waitlist),
+which cannot open the product. The only door out is the invitation, and that
+appears only once the site can actually be opened (can_open_pages).
+{% endcomment %}
+{% block nav %}
+<header class="wm-bar">
+  <a href="{% url 'coming_soon' %}" class="wordmark">GOOD<span>TIP</span><span class="dot">.</span></a>
+  <form method="post" action="{% url 'waitlist_signout' %}">{% csrf_token %}<button type="submit" class="wm-out"><span>Sign out</span><svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4.5h4a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5h-4M10 8l-4 4 4 4M6 12h9"/></svg></button></form>
+</header>
+{% endblock %}
+
+{% block content %}
+<main class="wm">
+  <div class="wm-wrap">
+
+    {% comment %}
+    THE HEADER OF THE PAGE. Greeting on the left; your place and, only when the
+    super admin has set a launch date, the countdown on the right. Under it, a
+    card carries the four steps; the first one not yet done is the lit one. "GoodTip
+    is on" is done only for a visitor who can actually open the site.
+    {% endcomment %}
+    <section class="wm-hero" style="--wm-photo:url('{% static 'img/stadium-night.jpg' %}')">
+      <svg class="wm-scrib" viewBox="0 0 60 60" aria-hidden="true"><path d="M8 52 26 8M24 56 40 22M40 58 52 34"/></svg>
+      <div class="wm-hero-l">
+        <p class="wm-pill"><svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4.5" width="16" height="15" rx="2.5"/><path d="m8 12.5 3 3 5-6"/></svg><span>Waiting list</span></p>
+        <h1 class="wm-h">{% if first_name %}G&rsquo;day, {{ first_name }}.{% else %}G&rsquo;day.{% endif %} <em>You&rsquo;re in.</em></h1>
+        <p class="wm-lead">You&rsquo;re on the list for GoodTip, footy tipping rebuilt around your community. We&rsquo;ll email <b>{{ member.email }}</b> the moment sign-ups open.</p>
+      </div>
+      <div class="wm-tiles">
+        <div class="wm-tile wm-place" aria-label="Your place in the queue">
+          <p class="wm-tile-k"><svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14a5 5 0 0 1 4.5 5"/></svg><span>Your place</span></p>
+          <p class="wm-num">#{{ position }}</p>
+          <p class="wm-of">of <b>{{ total }}</b> {% if total == 1 %}person{% else %}people{% endif %} waiting</p>
+        </div>
+        {% if launch_at and not member.is_invited %}
+        <div class="wm-tile wm-count" data-countdown="{{ launch_at|date:'c' }}" role="timer" aria-label="Time until launch">
+          <p class="wm-tile-k"><svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span>Launch countdown</span></p>
+          <div class="wm-count-n" aria-hidden="true">
+            <span><b data-cd="d">--</b><i>days</i></span><span><b data-cd="h">--</b><i>hours</i></span><span><b data-cd="m">--</b><i>mins</i></span><span><b data-cd="s">--</b><i>secs</i></span>
+          </div>
+          <p class="wm-count-d"><svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14" rx="2.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></svg><span>{{ launch_at|date:"l j F, g:i A" }} <small>Sydney time</small></span></p>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <ol class="wm-progress" aria-label="Your progress">
+      {% for st in steps %}
+      <li class="is-{{ st.state }}"{% if st.state == 'current' %} aria-current="step"{% endif %}>
+        {% if st.state == 'current' %}<span class="wm-here">You are here</span>{% endif %}
+        <span class="wm-dot" aria-hidden="true">{% if st.state == 'done' %}<svg class="wm-i" viewBox="0 0 24 24"><path d="M5 12.5 10 17.5 19 7"/></svg>{% elif st.state == 'current' %}{% if st.key == 'invited' %}<svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="17" height="12.5" rx="2.5"/><path d="m4.5 8 7.5 5.5L19.5 8"/></svg>{% else %}<svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V4M6 5h11l-2 4 2 4H6"/></svg>{% endif %}{% else %}<svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>{% endif %}</span>
+        <span class="wm-sl"><b>{{ st.label }}</b>{% if st.when %}<small>{{ st.when|date:"j M Y" }}</small>{% elif st.state == 'current' %}<small>Next up</small>{% elif st.state == 'done' %}<small>Open now</small>{% else %}<small>Coming soon</small>{% endif %}</span>
+      </li>
+      {% endfor %}
+    </ol>
+
+    {% if member.is_invited %}
+    <section class="wm-invited">
+      <span class="wm-invited-i" aria-hidden="true"><svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4a1 1 0 0 0 1 1h2l6 4V5L7 9H5a1 1 0 0 0-1 1Z"/><path d="M16.5 9.5a3.5 3.5 0 0 1 0 5M19 7a7 7 0 0 1 0 10"/></svg></span>
+      <div>
+        <h2>GoodTip is on.</h2>
+        <p>{% if can_open_pages %}Sign-ups are open. Create your account and set up your comp.{% else %}You&rsquo;ve been invited. Check your inbox: the link to create your account is in there.{% endif %}</p>
+      </div>
+      {% if can_open_pages %}<a class="tr-submit" href="/signup/"><span>Create my account</span><svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>{% endif %}
+    </section>
+    {% endif %}
+
+    {% comment %}
+    A LOOK INSIDE. One player and a numbered set of chapters, not six videos in a
+    row. These are recordings of the real app running against invented people
+    (accounts/trailer.py). Nothing downloads until something is tapped.
+    {% endcomment %}
+    <section class="wm-card wm-theatre" aria-labelledby="wm-reel-h">
+      <div class="wm-ch">
+        <span class="wm-th-ico" aria-hidden="true"><svg class="wm-i wm-i-fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg></span>
+        <div>
+          <h2 id="wm-reel-h">A look inside</h2>
+          <p>See how GoodTip works. Short clips, big ideas.</p>
+        </div>
+        <a class="wm-replay" href="{% url 'coming_soon' %}"><svg class="wm-i wm-i-fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg><span>Full trailer</span></a>
+      </div>
+      <div class="wm-th-body">
+        {% with first=reel.0 %}
+        <div class="wm-stage" data-stage data-clip="{% static 'video/trailer/'|add:first.clip|add:'.mp4' %}">
+          <img class="wm-stage-img" src="{% static 'video/trailer/'|add:first.clip|add:'.jpg' %}" alt="" width="640" height="400">
+          <button type="button" class="wm-stage-play" data-stage-play aria-label="Play: {{ first.tag }}"><svg class="wm-i wm-i-fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg></button>
+          <div class="wm-stage-cap"><b data-stage-t>{{ first.tag }}</b><small data-stage-b>{{ first.title }}</small></div>
+        </div>
+        {% endwith %}
+        <ul class="wm-thumbs">
+          {% for c in reel %}
+          <li><button type="button" class="wm-th{% if forloop.first %} is-on{% endif %}" data-clip="{% static 'video/trailer/'|add:c.clip|add:'.mp4' %}" data-poster="{% static 'video/trailer/'|add:c.clip|add:'.jpg' %}" data-title="{{ c.title }}" data-tag="{{ c.tag }}"{% if forloop.first %} aria-current="true"{% endif %}>
+            <span class="wm-th-img"><img src="{% static 'video/trailer/'|add:c.clip|add:'.jpg' %}" alt="" loading="lazy" width="640" height="400"><i class="wm-th-n">{{ forloop.counter|stringformat:"02d" }}</i></span>
+            <b class="wm-th-t">{{ c.tag }}</b>
+            <small class="wm-th-s">{{ c.title }}</small>
+          </button></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </section>
+
+    <div class="wm-duo">
+      <section class="wm-card wm-details">
+        <div class="wm-ch">
+          <span class="wm-ci" aria-hidden="true"><svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.8"/><path d="M4.5 20.5c.6-4 3.6-6 7.5-6s6.9 2 7.5 6"/></svg></span>
+          <div>
+            <h2>Your details</h2>
+            <p>Help us get your group set up for launch day.</p>
+          </div>
+        </div>
+        <form method="post" class="tr-form wm-dform" action="{% url 'waitlist_home' %}">
+          {% csrf_token %}
+          <div class="tr-f"><svg class="tr-fi" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c.6-3.7 3.5-5.7 7.5-5.7s6.9 2 7.5 5.7"/></svg><input id="wm-name" type="text" name="name" required maxlength="120" autocomplete="name" placeholder=" " value="{{ member.name }}"><label for="wm-name">Your name</label></div>
+          <div class="tr-f tr-f-sel">
+            <svg class="tr-fi" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V5.5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1V20M15 10h3.5a.5.5 0 0 1 .5.5V20M3.5 20h17M8.5 8.5h3M8.5 12h3M8.5 15.5h3"/></svg><select id="wm-org" name="org_type" data-dd>
+              <option value="">Select one</option>
+              {% for val, lab in org_types %}<option value="{{ val }}"{% if member.org_type == val %} selected{% endif %}>{{ lab }}</option>{% endfor %}
+            </select><svg class="tr-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            <label for="wm-org">What kind of organisation? <em>optional</em></label>
+          </div>
+          <div class="tr-f tr-f-sel">
+            <svg class="tr-fi" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9a2 2 0 0 0 0 4v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a2 2 0 0 1 0-4V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z"/><path d="M10 9.5h4M10 13.5h4"/></svg><select id="wm-plat" name="current_platform" data-dd>
+              <option value="">Select one</option>
+              {% for val, lab in platforms %}<option value="{{ val }}"{% if member.current_platform == val %} selected{% endif %}>{{ lab }}</option>{% endfor %}
+            </select><svg class="tr-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            <label for="wm-plat">What are you tipping with now? <em>optional</em></label>
+          </div>
+          <div class="wm-actions">
+            <button type="submit" class="tr-submit"><span>Save my details</span></button>
+            {% if saved == 'details' %}<p class="wl-ok wm-saved" role="status"><svg class="wm-i" viewBox="0 0 24 24"><path d="M5 12.5 10 17.5 19 7"/></svg><span>Saved.</span></p>{% endif %}
+            {% if error %}<p class="wl-err wm-flash" role="alert">{{ error }}</p>{% endif %}
+          </div>
+        </form>
+        <div class="wm-facts">
+          <span><svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14" rx="2.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></svg><span>On the list since<br>{{ member.created_at|date:"j F Y" }}.</span></span>
+          <span><svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9.5" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg><span>Your password is only for this page.<br>It doesn&rsquo;t open the app.</span></span>
+        </div>
+      </section>
+      <section class="wm-card wm-next">
+      <div class="wm-ch">
+        <span class="wm-ci" aria-hidden="true"><svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4c3.5-.5 5.5.5 6 6-1.5 3-4 5.5-7 7l-6-6c1.5-3 4-5.5 7-7Z"/><circle cx="14.5" cy="9.5" r="1.6"/><path d="M8 13.5l-3.5 1 1.5 1.5M10.5 16l-1 3.5-1.5-1.5M6 18l-2 2"/></svg></span>
+        <div>
+          <h2>What happens next</h2>
+          <p>The journey&rsquo;s almost here. Here&rsquo;s what happens next.</p>
+        </div>
+      </div>
+      <div class="wm-next-row">
+        <div class="wm-step"><span class="wm-step-n">1</span><p><b>We finish the build.</b> The full system is being polished behind the scenes.</p></div>
+        <div class="wm-step"><span class="wm-step-n">2</span><p><b>You get one email.</b> The day GoodTip goes live, it lands in your inbox with your link.</p></div>
+        <div class="wm-step"><span class="wm-step-n">3</span><p><b>Sign up and tip.</b> Your organisation picks the charity. Tipping is free.</p></div>
+        <p class="wm-slogan" aria-hidden="true">Better tips.<br>Bigger impact.</p>
+      </div>
+      </section>
+    </div>
+  </div>
+
+  <footer class="wm-foot">
+    <svg class="wm-grass" viewBox="0 0 220 90" aria-hidden="true"><path fill="#3a8a3f" d="M4 90C10 60 6 36 16 12c4 26 8 46 10 78Z"/><path fill="#CFF93A" d="M22 90c2-30 0-52 10-74 3 28 8 50 8 74Z"/><path fill="#0b5a37" d="M38 90c6-28 8-46 22-64-2 24 0 44-2 64Z"/><path fill="#3a8a3f" d="M56 90c0-26 4-42 16-56 0 22 2 40 0 56Z"/><path fill="#CFF93A" d="M74 90c2-22 8-36 22-46-4 18-4 30-6 46Z"/><path fill="#0b5a37" d="M92 90c4-18 12-28 26-34-6 14-8 22-10 34Z"/></svg>
+    <p>Footy. Community. Good.</p>
+  </footer>
+</main>
+{% endblock %}
+
+{% block footer %}{% endblock %}

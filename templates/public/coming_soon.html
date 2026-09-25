@@ -1,122 +1,305 @@
 {% extends "public/base.html" %}
 {% load static %}
 
-{% block title %}GoodTip. Footy tips that do good.{% endblock %}
-{% block loader_task %}Warming up for launch{% endblock %}
-{% block meta_description %}GoodTip is footy tipping, rebuilt around your community. You tip, GoodTip gives, and your organisation picks the charity. Launching 28 August 2026.{% endblock %}
-{% block body_class %}page-soon{% endblock %}
+{% block title %}GoodTip. Footy tips that do good. Coming soon.{% endblock %}
+{% block loader_task %}Rolling the trailer{% endblock %}
+{% block meta_description %}GoodTip is footy tipping, rebuilt around your community. You tip, GoodTip gives, and your organisation picks the charity. Watch the trailer and join the waiting list.{% endblock %}
+{% block body_class %}page-soon page-trailer{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/gt-trailer.css' %}">
+  <link rel="stylesheet" href="{% static 'css/gt-waitlist.css' %}">
+  <script src="{% static 'js/gt-trailer.js' %}" defer></script>
+  <script src="{% static 'js/gt-waitlist.js' %}" defer></script>{% endblock %}
+{% block nav %}{% include "public/partials/_nav_holding.html" %}{% endblock %}
+{% block footer %}{% include "public/partials/_footer_holding.html" %}{% endblock %}
 
 {% block content %}
 
-<!-- HERO -->
-<section class="hero-split">
-  <div class="hs-left">
-    <span class="pill" style="align-self:flex-start;margin-bottom:24px;"><span class="dot"></span>Launching 28 August 2026</span>
-    <h1>Footy tips that <em>do good.</em></h1>
-    <p class="hero-sub">GoodTip is footy tipping, rebuilt around your community. You tip, GoodTip gives, and your organisation picks the charity. Together.</p>
-    <div class="hero-ctas" style="justify-content:flex-start;"><a href="#lock-in" class="btn-primary">Lock in your spot &darr;</a></div>
-  </div>
-  <div class="hs-right">
-    <div class="hero-bg" aria-hidden="true">
-      <div class="shot active" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
-      <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
+{% comment %}
+THE HOLDING PAGE IS A TRAILER (client, 24 Sep 2026: something Ian can put in
+front of a room at an event while the product is finished).
+
+Three parts, top to bottom: a split hero that plays itself (words typed on
+the left, then a hand presses play on the product at the right and it fills
+the whole hero, then steps back for the next scene), a two-row grid of cards
+for the fourteen scenes, and a split waiting-list section of its own.
+
+Every video is a REAL screen recording, one journey per clip. They were filmed
+headless against a throwaway database of invented people (scripts/trailer/) so
+no member data is on screen. Where a visitor cannot or should not play video
+(reduced motion, data saver) each <video> keeps its poster frame.
+
+Video elements carry data-tsrc, not src, on purpose: gt-trailer.js decides
+which one loads and when, and gt-video.js (which owns data-src) is kept out.
+{% endcomment %}
+
+<!-- HERO: a directed sequence. Words type in on the left, a hand presses play on the right, the product fills the hero, then steps back for the next scene. -->
+<section class="tr-hero" id="top" data-hero>
+  <div class="tr-letterbox" aria-hidden="true"></div>
+
+  {% comment %}
+  What a screen reader gets. The typed copy below is decoration that is
+  rewritten every few seconds, so it is hidden from assistive tech and this
+  stands in for it.
+  {% endcomment %}
+  <h1 class="sr-only">GoodTip. Footy tipping that does good. Coming soon.</h1>
+  <p class="sr-only">You tip. GoodTip gives. Your organisation picks the charity, and tipping is free for everyone playing. Join the waiting list to be first through the gate the day sign-ups open.</p>
+
+  <div class="tr-hero-left">
+    <div class="tr-photos" aria-hidden="true" data-photos>
+      <div class="tr-shot is-on" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
+      <div class="tr-shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
+      <div class="tr-shot" style="background-image:url('{% static 'img/scenes/nrl-posts-sunset.jpg' %}')"></div>
+      <div class="tr-shot" style="background-image:url('{% static 'img/scenes/afl-posts-mcg.jpg' %}')"></div>
+      <div class="tr-shot" style="background-image:url('{% static 'img/scenes/afl-player-training.jpg' %}')"></div>
+      <div class="tr-veil"></div>
     </div>
-    <div class="hs-veil" aria-hidden="true"></div>
-    <div class="hs-tagstrip"><span class="live-dot">Coming soon</span></div>
-  </div>
-</section>
-
-<!-- VALUE PROPS -->
-<section class="section on-paper">
-  <div class="wrap">
-    <div class="score-cards reveal" data-cards>
-      <div class="score-card"><span class="score-pts">4</span><p class="pts-lab">All four codes</p><h3>AFL · AFLW · NRL · NRLW</h3><p>Every code, every round, one comp for your whole organisation.</p></div>
-      <div class="score-card"><span class="score-pts">&#10003;</span><p class="pts-lab">Your call</p><h3>You choose the charity</h3><p>Voted by your organisation, not decided for you.</p></div>
-      <div class="score-card"><span class="score-pts">1</span><p class="pts-lab">Flat fee</p><h3>One platform fee</h3><p>No cut taken from what you raise.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- LOCK-IN FORM -->
-<section class="section on-cream" id="lock-in">
-  <div class="wrap">
-    <p class="eyebrow reveal">Before we launch</p>
-    <h2 class="section-heading reveal">Be first to know when we go live.</h2>
-    <p class="section-sub reveal">Leave your details below. We'll email you the moment sign-ups open.</p>
-
+    <span class="tr-bignum" aria-hidden="true" data-bignum></span>
     {% comment %}
-    On the shared in-place submit path, like the home page form and the two
-    enquiry forms (client, 22 Sep 2026: "for any other forms ... make sure
-    when all is entered we will have a nice loader, not the whole page but
-    just that form section"). This page was missed on the first pass and was
-    still doing a full reload.
-
-    Same contract as everywhere else: data-form-shell marks what the veil
-    covers, data-ajax opts the form in, and the markup below still works
-    without JavaScript because the view keeps rendering {% templatetag openblock %} if locked_in {% templatetag closeblock %}.
+    The intro copy is real markup so it is complete with no JavaScript and so
+    the script can read its words. gt-trailer.js types it, then wipes it and
+    types each scene's title and blurb in its place.
     {% endcomment %}
-    <div class="soon-form form-card reveal" data-form-shell>
-      {% if locked_in %}
-      <div class="gtf-done on" role="status">
-        <span class="gtf-tick" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6.5"/></svg>
-        </span>
-        <h3>You&rsquo;re on the list.</h3>
-        <p>We&rsquo;ll email you the moment GoodTip opens for sign-ups. Nothing before then.</p>
+    <div class="tr-hero-copy" aria-hidden="true" data-copy>
+      <span class="tr-now" data-k><i class="tr-rec"></i><span data-k-t>Coming soon &middot; Rated G for Good</span></span>
+      <div class="tr-h1" data-h>Footy tipping that <em>does good.</em></div>
+      <p class="tr-lead" data-l>You tip. GoodTip gives. Your organisation picks the charity, and tipping is free for everyone playing.</p>
+      <div class="tr-why" data-why>
+        <p class="tr-why-h" data-why-h>Why join the waiting list?</p>
+        <ul class="tr-why-list">
+          <li data-why-i>First through the gate the day sign-ups open.</li>
+          <li data-why-i>Set your organisation up before round one.</li>
+          <li data-why-i>One email, the day we go live. Nothing before.</li>
+        </ul>
+        <a class="tr-why-go" href="#lock-in" tabindex="-1" data-why-go>Lock in my spot &darr;</a>
       </div>
-      {% else %}
-      <form method="post" action="{% url 'coming_soon' %}#lock-in" data-ajax
-            data-busy="Adding you to the list" data-return-after="4000">
-        {% csrf_token %}
-        {% if error %}<p class="gtf-error" data-form-error role="alert">{{ error }}</p>{% endif %}
-        <label>Name<input type="text" name="name" required maxlength="120" autocomplete="name"></label>
-        <label>Email<input type="email" name="email" required autocomplete="email"></label>
-        {% comment %}
-        Org type, added 22 Sep 2026 with the home-page version of this form.
-        The two forms post to the same recorder and must therefore offer the
-        same fields — a lead taken here without an org type is a lead the
-        client cannot segment, and he asked for the field by name.
-        {% endcomment %}
-        <label>What kind of organisation? <span class="opt">(optional)</span>
-          <select name="org_type">
-            <option value="">Select one</option>
-            {% for val, lab in org_types %}<option value="{{ val }}">{{ lab }}</option>{% endfor %}
-          </select>
-        </label>
-        <label>What are you tipping with now? <span class="opt">(optional)</span>
-          <select name="current_platform">
-            <option value="">Select one</option>
-            {% for val, lab in platforms %}<option value="{{ val }}">{{ lab }}</option>{% endfor %}
-          </select>
-        </label>
-        <input type="hidden" name="source_page" value="coming-soon">
-        <button type="submit" class="btn-primary" style="width:100%;">Lock in my spot</button>
-        <p class="soon-note">No spam. One email, the day we go live.</p>
-      </form>
-      {% endif %}
+    </div>
+  </div>
+
+  <div class="tr-hero-right" data-pane>
+    <div class="tr-pane-glow" aria-hidden="true"></div>
+    <div class="tr-stagebox is-framed" data-stagebox>
+      {% for c in chapters %}
+      <video class="tr-vid{% if forloop.first %} is-on{% endif %}" muted playsinline preload="none"
+             data-tsrc="{% static 'video/trailer/'|add:c.clip|add:'.mp4' %}"
+             poster="{% static 'video/trailer/'|add:c.clip|add:'.jpg' %}"
+             data-act="{{ c.act }}" data-title="{{ c.title }}" data-blurb="{{ c.blurb }}" data-tag="{{ c.tag }}"
+             aria-hidden="true" tabindex="-1"></video>
+      {% endfor %}
+      <span class="tr-play" aria-hidden="true" data-play><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg></span>
+      <div class="tr-cap" aria-hidden="true"><b data-cap-n>01</b><span data-cap-t>{{ chapters.0.title }}</span></div>
+    </div>
+    <span class="tr-float f1" aria-hidden="true">+1 correct</span>
+    <span class="tr-float f3" aria-hidden="true">Rank 2 &uarr;</span>
+
+    <div class="tr-hand" aria-hidden="true" data-hand>
+      <svg viewBox="0 0 32 32"><path d="M12 3.5a2 2 0 0 1 4 0V14h1.2v-1.6a2 2 0 0 1 4 0V14h.8v-.9a2 2 0 0 1 4 0V14h.5a2 2 0 0 1 2 2v6.5c0 4-3 7.5-7.5 7.5h-2.8c-2.4 0-4-.9-5.4-2.6L5 20.5a2 2 0 0 1 3-2.6L12 21z"/></svg>
     </div>
 
+    <div class="tr-tools">
+      <button type="button" class="tr-tool" data-prev aria-label="Previous scene"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7"/></svg></button>
+      <button type="button" class="tr-tool" data-pause aria-pressed="false" aria-label="Pause the trailer">
+        <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
+        <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+      </button>
+      <button type="button" class="tr-tool" data-next aria-label="Next scene"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+    </div>
+  </div>
+
+  <div class="tr-steps" data-steps>
+    {% for c in chapters %}<button type="button" class="tr-step" data-step aria-label="Scene {{ forloop.counter }}: {{ c.tag }}"></button>{% endfor %}
+  </div>
+</section>
+
+<!-- THE SCENES: one big card, seven small ones; every few seconds the next scene takes the big place -->
+<section class="section on-cream tr-cards" id="scenes" data-cards>
+  <div class="wrap">
+    <div class="tr-cards-head">
+      <div class="tr-cards-title">
+        <svg class="tr-spark" viewBox="0 0 60 50" aria-hidden="true"><path d="M8 44 30 22M22 46 34 8M38 44 56 20"/></svg>
+        <h2 class="tr-cards-h">The whole <em>product</em></h2>
+        <p class="tr-cards-sub">Fourteen scenes. One comp.</p>
+      </div>
+      <div class="tr-cards-side">
+        <div class="tr-pager" aria-label="Scenes">
+          <button type="button" class="tr-tool tr-tool-lt" data-cprev aria-label="Previous scene"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7"/></svg></button>
+          <span class="tr-dots" data-dots aria-hidden="true"></span>
+          <button type="button" class="tr-tool tr-tool-lt" data-cnext aria-label="Next scene"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+        </div>
+        <p class="tr-note">Click through<br>and see it in action.<svg viewBox="0 0 160 14" aria-hidden="true"><path d="M2 11C40 3 100 3 158 6"/></svg></p>
+      </div>
+    </div>
+
+    <div class="tr-grid" data-grid>
+      {% for c in chapters %}
+      <button type="button" class="tr-card" data-i="{{ forloop.counter0 }}" data-clip="{{ c.clip }}" data-tsrc="{% static 'video/trailer/'|add:c.clip|add:'.mp4' %}" aria-label="{{ forloop.counter }}: {{ c.title }}">
+        <span class="tr-card-body">
+          <span class="tr-card-top"><i class="tr-card-num">{{ forloop.counter|stringformat:"02d" }}</i><small>{{ c.tag }}</small></span>
+          <b>{{ c.title }}</b>
+          <span class="tr-card-blurb">{{ c.blurb }}</span>
+          <svg class="tr-card-line" viewBox="0 0 90 8" aria-hidden="true"><path d="M2 6C25 1 55 1 88 4"/></svg>
+        </span>
+        <span class="tr-card-media">
+          <img src="{% static 'video/trailer/'|add:c.clip|add:'.jpg' %}" alt="" loading="lazy" width="1280" height="800">
+        </span>
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- THE WAITING LIST: a section of its own, form on the right, photographs turning on the left -->
+<section class="tr-join" id="lock-in">
+  <div class="tr-join-left" aria-hidden="true" data-photos-join>
+    <div class="tr-shot is-on" style="background-image:url('{% static 'img/scenes/nrl-ground-dusk.jpg' %}')"></div>
+    <div class="tr-shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
+    <div class="tr-shot" style="background-image:url('{% static 'img/scenes/nrl-players-fans.jpg' %}')"></div>
+    <div class="tr-shot" style="background-image:url('{% static 'img/scenes/afl-training.jpg' %}')"></div>
+    <div class="tr-shot" style="background-image:url('{% static 'img/scenes/afl-ball-grass.jpg' %}')"></div>
+    <div class="tr-veil"></div>
+    <div class="tr-join-quote">
+      <p class="tr-join-big">Round one is <em>coming.</em></p>
+      <p class="tr-join-small">Be in the room when it does.</p>
+    </div>
+    <ul class="tr-join-perks">
+      <li>
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3.5 19c0-3.2 2.4-5.4 5.5-5.4s5.5 2.2 5.5 5.4M15.5 14.2c2.6-.5 5 1.2 5 4.3"/></svg>
+        <span><b>Pick your team</b>AFL or NRL</span>
+      </li>
+      <li>
+        <svg viewBox="0 0 24 24"><path d="M12 20.5S3.5 15.4 3.5 9.3A4.6 4.6 0 0 1 12 7a4.6 4.6 0 0 1 8.5 2.3c0 6.1-8.5 11.2-8.5 11.2z"/></svg>
+        <span><b>Support a cause</b>Your organisation picks the charity</span>
+      </li>
+      <li>
+        <svg viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H4.5c0 3 1.3 4.5 3.7 4.8M16 6h3.5c0 3-1.3 4.5-3.7 4.8M12 13v4M8.5 20h7"/></svg>
+        <span><b>Win together</b>Workplaces, friends, communities</span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="tr-join-right">
+    <div class="tr-join-in">
+      <span class="tr-pill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9a2 2 0 0 0 0 4v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a2 2 0 0 1 0-4V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1zM14 6v11"/></svg>Join the game</span>
+      <h2 class="tr-join-h tr-kin" data-kinetic>Be first through <em>the gate.</em></h2>
+      <p class="tr-join-sub">Create your account and we&rsquo;ll email you the moment sign-ups open.</p>
+
+      {% comment %}
+      THE FORM IS A POP-UP NOW (client, 25 Sep 2026). This card is the pitch and
+      the way in; the form itself, its emailed-code step and the waiting-list
+      sign-in live in _waitlist_modals.html and open over the page. Anything
+      marked data-wl-open opens them, and so does the address hash (#join,
+      #signin). A member who is already signed in is offered their place instead.
+      {% endcomment %}
+      <div class="tr-join-cta">
+        {% if wl_member %}
+        <a class="tr-submit" href="{% url 'waitlist_home' %}"><span>See your place on the list</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        {% else %}
+        <a class="tr-submit" href="#join" data-wl-open="join"><span>Lock in my spot</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <p class="tr-join-have">Already on the list? <a href="#signin" data-wl-open="signin">Sign in</a></p>
+        {% endif %}
+      </div>
+
+      <noscript>
+        {% comment %}Without script the pop-up cannot open, so the page keeps the plain form: a name and an address still land on the list.{% endcomment %}
+        <form method="post" action="{% url 'coming_soon' %}#lock-in" class="tr-form tr-nojs">
+          {% csrf_token %}
+          {% if locked_in %}<p class="wl-ok">You&rsquo;re on the list. We&rsquo;ll email you the moment GoodTip opens.</p>{% endif %}
+          {% if error %}<p class="gtf-error" role="alert">{{ error }}</p>{% endif %}
+          <div class="tr-row">
+            <div class="tr-f"><input id="lf-name" type="text" name="name" required maxlength="120" placeholder="Your name"></div>
+            <div class="tr-f"><input id="lf-email" type="email" name="email" required placeholder="Email address"></div>
+          </div>
+          <input type="hidden" name="source_page" value="coming-soon">
+          <button type="submit" class="tr-submit"><span>Lock in my spot</span></button>
+        </form>
+      </noscript>
+
+      <ul class="tr-trust">
+        <li>Free to tip</li>
+        <li>Your organisation picks the charity</li>
+        <li>One email, the day we go live</li>
+      </ul>
+    </div>
+    <div class="tr-join-foot" aria-hidden="true">
+      <span class="tr-codes"><b>NRL</b><i></i><b>AFL</b></span>
+      <span class="tr-mate">Good Tip, Mate.</span>
+    </div>
   </div>
 </section>
 
 {% comment %}
-THE SIGN-IN LINK, MOVED TO THE FOOT OF THE PAGE (client, 22 Sep 2026: "move
-the preview login down the bottom of the page").
+THE SHOWCASES (client, 25 Sep 2026: "if I click How it works, let's have images
+and video of the How it works page, scrolled down, so the user sees what the
+page is rather than us taking them to it ... they will be able to click
+everything if we take them to the page").
 
-It used to sit immediately under the form. The client is about to point a room
-of people at this page, and the last thing under the thing you want them to do
-was an invitation to do something else — something almost none of them can do,
-because the product is not open yet. A visitor who reads "log in" before they
-have understood what this is concludes they are in the wrong place.
+Every item on the menu and in the footer opens one of these instead of leaving
+the page: a filmed tour of the real page in a browser frame, three captioned
+stills, and a way onward. Opened by the address hash (#how-it-works, #blog,
+#wall, #about, #terms, #privacy), so a link to one works, and Back closes it.
+gt-trailer.js does the opening. Nothing inside is a link to the real page
+except, for people who can open it (the team), one quiet "open the live page".
 
-It is not removed. The handful of people who DO have access arrive here too,
-and hiding the door from them to tidy the page would be the other mistake. It
-is simply last, and quiet.
+Videos carry data-psrc and are only given a source when their showcase opens,
+so six more clips cost a visitor nothing until they ask for one.
 {% endcomment %}
-<section class="section soon-foot">
-  <div class="wrap">
-    <p class="soon-login">Already part of the GoodTip team? <a href="/login/">Log in &rarr;</a></p>
-  </div>
-</section>
+<div class="tr-peeks" data-peeks>
+  {% for p in peeks %}
+  <section class="tr-peek" id="peek-{{ p.slug }}" data-peek="{{ p.slug }}" role="dialog" aria-modal="true" aria-labelledby="peek-{{ p.slug }}-h" hidden>
+    <div class="tr-peek-in">
+      <div class="tr-peek-bar">
+        <span class="tr-peek-k"><i class="tr-rec"></i>Page tour &middot; {{ forloop.counter }} / {{ peeks|length }}</span>
+        <nav class="tr-peek-jump" aria-label="Pages">
+          {% for q in peeks %}<a href="#{{ q.slug }}"{% if q.slug == p.slug %} aria-current="true"{% endif %}>{{ q.label }}</a>{% endfor %}
+        </nav>
+        <button type="button" class="tr-peek-x" data-peek-close aria-label="Close and go back to the trailer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span>Close</span>
+        </button>
+      </div>
+
+      <div class="tr-peek-body">
+        <div class="tr-peek-copy">
+          <span class="tr-pill">{{ p.eyebrow }}</span>
+          <h2 class="tr-peek-h" id="peek-{{ p.slug }}-h">{{ p.title }}</h2>
+          <p class="tr-peek-sub">{{ p.blurb }}</p>
+          <ul class="tr-peek-points">
+            {% for pt in p.points %}<li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5 9.5 18 20 6.5"/></svg>{{ pt }}</li>{% endfor %}
+          </ul>
+          <div class="tr-peek-cta">
+            <a class="tr-submit" href="#join" data-peek-join><span>Join the waiting list</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+            {% if can_open_pages %}<a class="tr-peek-live" href="{{ p.real }}">Open the live page &rarr;</a>{% endif %}
+          </div>
+        </div>
+
+        <figure class="tr-peek-stage">
+          <div class="tr-frame">
+            <div class="tr-frame-bar" aria-hidden="true"><i></i><i></i><i></i><span>{{ p.url }}</span></div>
+            <div class="tr-frame-screen">
+              <video muted loop playsinline preload="none" tabindex="-1" aria-label="A tour of the {{ p.label }} page"
+                     data-psrc="{% static 'video/trailer/'|add:p.clip|add:'.mp4' %}"
+                     poster="{% static 'video/trailer/'|add:p.clip|add:'.jpg' %}"></video>
+            </div>
+          </div>
+        </figure>
+      </div>
+
+      <div class="tr-peek-shots">
+        {% for s in p.shots %}
+        <figure>
+          <img src="{% static 'video/trailer/'|add:s.file|add:'.jpg' %}" alt="{{ s.cap }}, on the {{ p.label }} page" loading="lazy" decoding="async" width="960" height="600">
+          <figcaption>{{ s.cap }}</figcaption>
+        </figure>
+        {% endfor %}
+      </div>
+
+      <div class="tr-peek-pn">
+        <a href="#{{ p.prev }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7"/></svg>Previous page</a>
+        <a href="#{{ p.next }}">Next page<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></a>
+      </div>
+    </div>
+  </section>
+  {% endfor %}
+</div>
+
+{% include "public/partials/_waitlist_modals.html" %}
 
 {% endblock %}
