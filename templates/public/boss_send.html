@@ -45,6 +45,18 @@ send on the old full-reload path.
   </div>
 
   <div class="fld">
+    <label for="bsPosition">Your position <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+    <input type="text" name="your_position" id="bsPosition" data-letter-src="position" value="{{ your_position }}"
+           maxlength="80" autocomplete="organization-title" placeholder="e.g. Accounts Manager">
+  </div>
+
+  <div class="fld">
+    <label for="bsCompany">Company name <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+    <input type="text" name="company_name" id="bsCompany" data-letter-src="company" value="{{ company_name }}"
+           maxlength="120" autocomplete="organization" placeholder="e.g. Acme Freight">
+  </div>
+
+  <div class="fld">
     <label for="bsBossName">Boss's name <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
     <input type="text" name="boss_name" id="bsBossName" data-letter-src="boss" value="{{ boss_name }}"
            maxlength="80" autocomplete="off" placeholder="e.g. Priya">

@@ -475,3 +475,26 @@ class LadderAdjustment(models.Model):
 
     def __str__(self):
         return f"{self.team.name} {self.points:+d} ({self.reason})"
+
+
+class ChampionPhoto(models.Model):
+    """The photo shown beside a season champion's certificate (client, 3 Oct
+    2026). By default the champion's profile photo is used; this is the one
+    the org side chose instead — "if they want to change, they can enter
+    their nice image". One per champion, per competition, per organisation.
+    Kept off the certificate itself, which stays the win only (spec §2)."""
+
+    org = models.ForeignKey("orgs.Organisation", on_delete=models.CASCADE, related_name="champion_photos")
+    series = models.ForeignKey("catalog.Series", on_delete=models.CASCADE, related_name="+")
+    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="champion_photos")
+    image = models.ImageField(upload_to="certificate_photos/")
+    uploaded_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("org", "series", "user")
+
+    def __str__(self):
+        return f"{self.user} · {self.series} · {self.org}"

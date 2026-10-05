@@ -231,6 +231,125 @@ class DonationViewTests(TestCase):
         self.assertTrue(resp.content.startswith(b"%PDF"))
 
 
+class StripeWebhookTests(TestCase):
+    """checkout.session.completed, signed exactly as Stripe signs it.
+
+    FOUND 28 SEP 2026, LIVE: stripe==15.2.0's StripeObject stopped being a
+    dict subclass — event["data"]["object"] still supports [] (__getitem__),
+    but not .get(), which is what stripe_webhook and _record_donation_from_
+    session are written in. Every real webhook delivery 500'd, silently,
+    because Stripe keys had never been configured in any environment before
+    that day, so nothing had ever actually called this view with a real,
+    Stripe-shaped (not hand-built dict) event. Posting a real signed payload,
+    the way `stripe listen`/Stripe's own servers do, is the only way this
+    reproduces — a hand-built dict payload passed straight to the view
+    function would not catch it, since a plain dict's .get() works fine."""
+
+    def setUp(self):
+        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test Season"})
+        self.charity, _ = Charity.objects.get_or_create(
+            slug="webhook-charity", defaults={"name": "Webhook Charity", "is_approved": True}
+        )
+        self.org = Organisation.objects.create(name="Webhook Org", season=self.season, charity=self.charity)
+        self.sub = PlanSubscription.objects.create(
+            org=self.org, season=self.season, tier=STARTER,
+            price_aud=tier_config(STARTER)["price"], seat_limit=tier_config(STARTER)["seat_limit"],
+            status=PlanSubscription.STATUS_PENDING,
+        )
+
+    def _post_signed(self, session_extra, event_type="checkout.session.completed", obj="checkout.session"):
+        import json
+        import time
+
+        import stripe
+        from django.test import override_settings
+
+        secret = "whsec_test_only_not_a_real_secret"
+        payload = json.dumps({
+            "id": "evt_test",
+            "object": "event",
+            "type": event_type,
+            "data": {"object": {"object": obj, **session_extra}},
+        }).encode()
+        timestamp = int(time.time())
+        sig = stripe.WebhookSignature._compute_signature(f"{timestamp}.{payload.decode()}", secret)
+        with override_settings(STRIPE_WEBHOOK_SECRET=secret):
+            return self.client.post(
+                reverse("stripe_webhook"), data=payload, content_type="application/json",
+                HTTP_STRIPE_SIGNATURE=f"t={timestamp},v1={sig}",
+            )
+
+    def test_real_signed_event_activates_the_subscription(self):
+        resp = self._post_signed({
+            "id": "cs_test", "payment_intent": "pi_test",
+            "metadata": {"subscription_id": str(self.sub.id), "org_id": str(self.org.id)},
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.status, PlanSubscription.STATUS_ACTIVE)
+        self.assertEqual(self.sub.stripe_payment_intent_id, "pi_test")
+
+    # ---- the yearly subscription (3 Oct 2026) ----
+
+    def test_subscription_checkout_subscribes_but_does_not_mark_paid(self):
+        resp = self._post_signed({
+            "id": "cs_sub", "mode": "subscription", "subscription": "sub_test", "customer": "cus_test",
+            "metadata": {"subscription_id": str(self.sub.id), "org_id": str(self.org.id)},
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.status, PlanSubscription.STATUS_SCHEDULED)
+        self.assertEqual(self.sub.stripe_subscription_id, "sub_test")
+        self.assertIsNone(self.sub.paid_at)
+
+    def test_first_paid_invoice_activates_it(self):
+        self.sub.status = PlanSubscription.STATUS_SCHEDULED
+        self.sub.stripe_subscription_id = "sub_test"
+        self.sub.save()
+        resp = self._post_signed({
+            "id": "in_test", "amount_paid": 9900, "status": "paid",
+            "hosted_invoice_url": "https://invoice.stripe.com/i/test",
+            # newer API versions only carry it here
+            "parent": {"subscription_details": {"subscription": "sub_test"}},
+        }, event_type="invoice.paid", obj="invoice")
+        self.assertEqual(resp.status_code, 200)
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.status, PlanSubscription.STATUS_ACTIVE)
+        self.assertEqual(self.sub.stripe_invoice_url, "https://invoice.stripe.com/i/test")
+
+    def test_a_zero_invoice_does_not_count_as_paid(self):
+        self.sub.status = PlanSubscription.STATUS_SCHEDULED
+        self.sub.stripe_subscription_id = "sub_test"
+        self.sub.save()
+        self._post_signed({"id": "in_zero", "amount_paid": 0, "status": "paid", "subscription": "sub_test"},
+                          event_type="invoice.paid", obj="invoice")
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.status, PlanSubscription.STATUS_SCHEDULED)
+
+    def test_a_scheduled_subscription_already_sets_the_plan(self):
+        from .entitlements import current_tier
+
+        self.sub.status = PlanSubscription.STATUS_SCHEDULED
+        self.sub.save()
+        self.assertEqual(current_tier(self.org), (STARTER, True))
+
+    def test_bad_signature_is_rejected_and_changes_nothing(self):
+        import json
+
+        from django.test import override_settings
+
+        with override_settings(STRIPE_WEBHOOK_SECRET="whsec_test_only_not_a_real_secret"):
+            resp = self.client.post(
+                reverse("stripe_webhook"),
+                data=json.dumps({"id": "evt_x", "type": "checkout.session.completed"}),
+                content_type="application/json",
+                HTTP_STRIPE_SIGNATURE="t=1,v1=not-a-real-signature",
+            )
+        self.assertEqual(resp.status_code, 400)
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.status, PlanSubscription.STATUS_PENDING)
+
+
 class FoundingRateTests(TestCase):
     """The Founding Member price lock, which until Sep 2026 was only a sentence.
 
@@ -468,7 +587,7 @@ class PricingPageGroupsTests(TestCase):
 
     def test_the_799_plan_is_the_one_marked_most_popular(self):
         body = self.client.get("/pricing/").content
-        self.assertIn(b'<tr class="is-popular has-groups">', body)
+        self.assertIn(b'<tr class="is-popular has-groups" data-plan="workplace"', body)
         # And the module the app bills from agrees with the page.
         from .pricing import PRO, TIERS
 
@@ -650,3 +769,76 @@ class SponsorshipAjaxTests(TestCase):
         resp = self.client.get(reverse("sponsorship"), **self.AJAX)
         self.assertEqual(resp.status_code, 200)
         self.assertNotIn("application/json", resp["Content-Type"])
+
+
+class YearlySubscriptionCheckoutTests(TestCase):
+    """The plan is a yearly Stripe subscription billed from FIRST_BILLING_DATE."""
+
+    def setUp(self):
+        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Test Season"})
+        self.org = Organisation.objects.create(name="Yearly Org", season=self.season)
+
+    def _session_kwargs(self, **kw):
+        from unittest.mock import MagicMock, patch
+
+        from django.test import override_settings
+
+        from . import services
+
+        sub = services.create_subscription(self.org, STARTER)
+        client = MagicMock()
+        client.checkout.Session.create.return_value = MagicMock(id="cs_x", url="https://x")
+        client.test_helpers.TestClock.create.return_value = MagicMock(id="clock_x")
+        client.Customer.create.return_value = MagicMock(id="cus_x")
+        with override_settings(STRIPE_SECRET_KEY="sk_test_x"), patch.object(services, "_client", return_value=client):
+            services.create_checkout_session(sub, success_url="s", cancel_url="c", email="o@example.com", **kw)
+        sub.refresh_from_db()
+        return client, sub
+
+    def test_it_subscribes_yearly_and_bills_from_the_start_date(self):
+        from datetime import datetime
+        from unittest.mock import patch
+
+        from django.utils import timezone
+
+        with patch("django.utils.timezone.now", return_value=timezone.make_aware(datetime(2026, 10, 3))):
+            client, sub = self._session_kwargs()
+        kw = client.checkout.Session.create.call_args.kwargs
+        self.assertEqual(kw["mode"], "subscription")
+        self.assertEqual(kw["line_items"][0]["price_data"]["recurring"], {"interval": "year"})
+        anchor = kw["subscription_data"]["billing_cycle_anchor"]
+        from zoneinfo import ZoneInfo
+        # midday 31 January in Melbourne, so the date reads the 31st everywhere west of it too
+        self.assertEqual(datetime.fromtimestamp(anchor, ZoneInfo("Australia/Melbourne")).isoformat(), "2027-01-31T12:00:00+11:00")
+        self.assertEqual(kw["subscription_data"]["proration_behavior"], "none")
+        self.assertEqual(kw["customer_email"], "o@example.com")
+        self.assertEqual(kw["adaptive_pricing"], {"enabled": False})
+        self.assertFalse(sub.is_demo)
+
+    def test_once_the_date_has_passed_it_bills_straight_away(self):
+        from datetime import datetime
+        from unittest.mock import patch
+
+        from django.utils import timezone
+
+        with patch("django.utils.timezone.now", return_value=timezone.make_aware(datetime(2027, 3, 1))):
+            client, sub = self._session_kwargs()
+        self.assertNotIn("billing_cycle_anchor", client.checkout.Session.create.call_args.kwargs["subscription_data"])
+        self.assertIsNone(sub.starts_at)
+
+    def test_the_demo_runs_on_a_test_clock(self):
+        client, sub = self._session_kwargs(demo=True)
+        self.assertEqual(sub.stripe_test_clock_id, "clock_x")
+        self.assertEqual(client.checkout.Session.create.call_args.kwargs["customer"], "cus_x")
+
+    def test_the_demo_refuses_live_keys(self):
+        from unittest.mock import MagicMock, patch
+
+        from django.test import override_settings
+
+        from . import services
+
+        sub = services.create_subscription(self.org, STARTER)
+        with override_settings(STRIPE_SECRET_KEY="sk_live_x"), patch.object(services, "_client", return_value=MagicMock()):
+            with self.assertRaises(services.BillingNotConfigured):
+                services.create_checkout_session(sub, success_url="s", cancel_url="c", demo=True)

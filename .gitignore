@@ -34,3 +34,5 @@ htmlcov/
 
 # deploy lock (legacy location; the lock now lives in .git/)
 .deploy.lock
+.demo_cert_seed_log.json
+.local_login.txt

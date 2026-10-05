@@ -1,0 +1,151 @@
+{% extends "public/base.html" %}
+{% load static humanize %}
+
+{% block title %}The Industry &amp; National Leaderboards &middot; GoodTip{% endblock %}
+{% block meta_description %}Every GoodTip organisation on one table — tipping points and dollars raised, side by side. Filter to your own sector, or see the whole country.{% endblock %}
+{% block body_class %}page-tipping-ladder{% endblock %}
+{% block loader_task %}Loading the leaderboards{% endblock %}
+{% block extra_head %}<script src="{% static 'js/gt-board.js' %}" defer></script>{% endblock %}
+
+{% block content %}
+
+<!-- SPLIT HERO -->
+<section class="hero-split">
+  <div class="hs-left">
+    <span class="pill" style="align-self:flex-start;margin-bottom:22px;"><span class="dot"></span>The Leaderboards</span>
+    <h1>Every GoodTip organisation, <em>one table.</em></h1>
+    <p class="hero-sub">Tipping nous and generosity, side by side. Filter to your sector for the Industry leaderboard, or clear the filter for the National one — organisations appear here only once they opt in to public listing, the same choice that puts them on The Good List.</p>
+  </div>
+  <div class="hs-right">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="shot active" style="background-image:url('{% static 'img/scenes/stadium-panorama.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
+      <div class="shot" style="background-image:url('{% static 'img/stadium-night.jpg' %}')"></div>
+    </div>
+    <div class="hs-veil" aria-hidden="true"></div>
+    <div class="hs-tagstrip"><span class="live-dot">Updated every round</span></div>
+  </div>
+</section>
+
+<section class="section on-cream">
+  <div class="wrap">
+    <div class="lb-head reveal">
+      <h2>The Leaderboards</h2>
+      <div class="note">Ranked by average points per tipper this season, so a small office and a big workplace compete fairly. Dollars raised ride alongside — the same organisations, the same opt-in, as The Good List.</div>
+    </div>
+
+    <form method="get" action="{% url 'tipping_ladder' %}" id="tlFilters" class="gl-filterbar reveal">
+      <select name="type" id="tlType" aria-label="Organisation type">
+        <option value="">National &mdash; all organisation types</option>
+        {% for gt in organisation_types %}<option value="{{ gt.slug }}" {% if sel_type == gt.slug %}selected{% endif %}>Industry &mdash; {{ gt.name }}</option>{% endfor %}
+      </select>
+      <select name="cat" id="tlCat" aria-label="Sub-category">
+        <option value="">All sub-categories</option>
+        {% for gt in organisation_types %}{% for sc in gt.sub_categories.all %}{% if sc.is_active %}<option value="{{ sc.slug }}" data-type="{{ gt.slug }}" {% if sel_type == gt.slug and sel_cat == sc.slug %}selected{% endif %}>{{ sc.name }}</option>{% endif %}{% endfor %}{% endfor %}
+      </select>
+      <select name="state" id="tlState" aria-label="State or territory">
+        <option value="">All states &amp; territories</option>
+        {% for st in states %}<option value="{{ st.code }}" {% if sel_state == st.code %}selected{% endif %}>{{ st.name }}</option>{% endfor %}
+      </select>
+      <noscript><button type="submit" class="btn-dark">Filter</button></noscript>
+    </form>
+
+    {% if not board_live %}
+    <div class="gl-empty reveal">
+      <span class="ge-ic"><svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg></span>
+      <h3>The board is warming up.</h3>
+      <p class="note">The leaderboard appears once at least {{ credibility_min }} organisations have opted in to public listing. No sample figures here, everything shown is a real tip or a real dollar.</p>
+    </div>
+    {% elif not board %}
+    <div class="gl-empty reveal">
+      <span class="ge-ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></span>
+      <h3>No organisations match this filter yet.</h3>
+      <p class="note">Try a different organisation type, sub-category, or state.</p>
+    </div>
+    {% else %}
+    <div class="lb lb--orgs lb--tips reveal">
+      <div class="lb-colhead"><span>Rank</span><span>Organisation</span><span class="r-amt">Points</span><span class="r-amt">Raised</span></div>
+      {% for row in board %}
+      <div class="lb-row {% if forloop.counter <= 3 %}t3{% endif %}">
+        <span class="lb-rank">{{ forloop.counter|stringformat:"02d" }}</span>
+        <span class="lb-name"><b>{{ row.name }}</b><small>{% if row.category %}{{ row.category }}{% endif %}{% if row.category and row.state %} &middot; {% endif %}{{ row.state }}</small></span>
+        <span class="lb-amt">{{ row.points|intcomma }} pts</span>
+        <span class="lb-amt">${{ row.raised|floatformat:0|intcomma }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- LIVE THIS SEASON: same real-results board as the home page, reused here
+     read only, per the client's own reference for this section. -->
+{% if board_snapshot.codes %}
+<section class="ladder-band board-band" id="board">
+  <div class="wrap reveal bd-intro">
+    <p class="eyebrow">Live this season</p>
+    <h2 class="section-heading">The real ladder, moving as the results come in.</h2>
+    <div class="bd-now" aria-hidden="true">{% for c in board_snapshot.codes %}<span data-code="{{ c.code }}" class="{% if forloop.first %}on{% endif %}">{{ c.code }}</span>{% endfor %}</div>
+  </div>
+  {% with first=board_snapshot.codes.0 %}
+  <div class="board-shell reveal" data-board data-code="{{ first.code|lower }}" data-comp="{{ first.code|lower }}">
+    <div class="bd-ladder">
+      <div class="bd-head"><span class="bd-title" data-bd-title>{{ first.code }} {{ first.season }} &middot; after round {{ first.round }}</span><span class="bd-updated"><i aria-hidden="true"></i><span data-bd-updated>Live from results</span></span></div>
+      <div class="bd-cols" aria-hidden="true"><span></span><span></span><span>Club</span><span>Form</span><span>P</span><span>W-L</span><span>{% if first.by_percentage %}%{% else %}Diff{% endif %}</span><span>Pts</span></div>
+      <div class="bd-rows" data-bd-rows>
+        {% for r in first.ladder %}
+        <div class="bd-row{% if forloop.first %} top{% endif %}"><span class="rank">{{ r.rank }}</span>{% if r.logo %}<span class="crest has-logo"><img src="{{ r.logo }}" alt="" loading="lazy"></span>{% else %}<span class="crest" style="--crest-bg:{{ r.bg }};--crest-fg:{{ r.fg }}">{{ r.code }}</span>{% endif %}<span class="who">{{ r.name }}</span><span class="form">{% for ch in r.form %}<i class="{% if ch == 'W' %}w{% elif ch == 'L' %}l{% endif %}"></i>{% endfor %}</span><span class="pl">{{ r.played }}</span><span class="rec">{{ r.wins }}-{{ r.losses }}</span><span class="df">{{ r.diff }}</span><span class="pts">{{ r.points }}</span></div>
+        {% endfor %}
+      </div>
+      <p class="bd-foot">The top eight, worked out by GoodTip from completed results.</p>
+    </div>
+    <div class="bd-stage" data-bd-stage aria-hidden="true">
+      <div class="bd-charts" data-bd-charts></div>
+    </div>
+  </div>
+  {% endwith %}
+  {{ board_snapshot|json_script:"board-data" }}
+</section>
+{% endif %}
+
+{% include "public/partials/_contact.html" with contact_id="contact" %}
+
+<!-- CTA -->
+<section class="cta-pro">
+  <div class="wrap reveal zoom">
+    <h2>Get your organisation on the Leaderboard.</h2>
+    <p>Set up free, run the Charity Vote, and opt in to public listing whenever you're ready to be named.</p>
+    <a href="/#start" class="btn-dark">Set up your organisation &rarr;</a>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+    /* ---- The Ladder: type -> sub-category filter, auto-apply (same
+       behaviour as The Good List's filter bar) ---- */
+    (function () {
+      var form = document.getElementById('tlFilters');
+      if (!form) return;
+      var typeSel = document.getElementById('tlType');
+      var catSel = document.getElementById('tlCat');
+      function syncCats(reset) {
+        var t = typeSel.value;
+        var visible = 0;
+        [].slice.call(catSel.options).forEach(function (o) {
+          if (!o.value) return;
+          var show = !!t && o.getAttribute('data-type') === t;
+          o.hidden = !show;
+          o.disabled = !show;
+          if (show) visible++;
+          if (!show && o.selected && reset) o.selected = false;
+        });
+        if (reset) catSel.value = '';
+        catSel.disabled = !visible;
+      }
+      typeSel.addEventListener('change', function () { syncCats(true); form.submit(); });
+      catSel.addEventListener('change', function () { form.submit(); });
+      document.getElementById('tlState').addEventListener('change', function () { form.submit(); });
+      syncCats(false);
+    })();
+{% endblock %}

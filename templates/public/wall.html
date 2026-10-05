@@ -7,6 +7,11 @@
 {% block meta_description %}Where the organisation lives every round: tips, banter, the ladder shuffle, and the charity total ticking up in real time.{% endblock %}
 {% block body_class %}page-wall{% endblock %}
 
+{% block extra_head %}
+<script src="{% static 'js/gt-wall-hero.js' %}" defer></script>
+<script src="{% static 'js/gt-wall.js' %}" defer></script>
+{% endblock %}
+
 {% block content %}
 
 {% comment %}
@@ -49,98 +54,67 @@ the right is never covered. Cards swap every 2s.
 </section>
 
 <!-- THE WIDE FEED -->
-<section class="section wall-stage" id="feed" aria-label="The Wall">
+<section class="section wall-stage wall-stage-light" id="feed" aria-label="The Wall">
+  {% if messages %}
   <div class="wrap">
-    <div class="wall-feed-head">
-      <div>
-        <p class="eyebrow" style="color:var(--lime);opacity:.85;">The public Wall</p>
-        <h2 class="section-heading" style="margin:0;font-size:clamp(22px,3vw,32px);">Every room, one feed. <em>Jump in.</em></h2>
-      </div>
-      <span class="live-dot">Live feed</span>
-    </div>
-
-    {% if messages %}
     <div class="wall-flash-stack">
       {% for m in messages %}<div class="wall-flash {% if m.tags == 'error' %}bad{% endif %}">{{ m }}</div>{% endfor %}
     </div>
-    {% endif %}
+  </div>
+  {% endif %}
 
-    {% if has_live_posts %}
-    {% comment %}
-    THE REAL FEED TYPES ITSELF OUT TOO (client, 22 Sep 2026: "the typing thing
-    is working on the home page but I want to see it done on the wall").
-
-    I had deliberately excluded the live feed and animated only the samples,
-    on the reasoning that replaying somebody's actual words as if they were
-    arriving now misrepresents when they were written. The client wants it,
-    and on a second look the objection does not hold up: every card keeps its
-    own timestamp ("2h ago"), so nothing here claims to be new — the animation
-    is how the page is presented, not a claim about the clock.
-
-    gt-live.js only animates the first few and reveals the rest at once, so a
-    long feed is not a queue the reader has to wait through.
-    {% endcomment %}
-    <div class="wallfeed wall-live" data-live-thread>
-      {% for post in posts %}
-      <div class="wf-item">
-        {% include "public/partials/_wall_card.html" with post=post %}
-
-        {% if post.thread %}
-        <div class="wf-thread">
-          {% for r in post.thread %}
-          <div class="wf-reply">
-            <span class="wf-rav{% if r.is_guest %} guest{% endif %}">{{ r.initials }}</span>
-            <div>
-              <b>{{ r.display_name }}{% if r.is_guest %} <i class="wf-guest">visitor</i>{% endif %}</b>
-              <small>{{ r.created_at|naturaltime }}</small>
-              <p>{{ r.body|linebreaksbr }}</p>
+  {% comment %}
+  29 SEP 2026 (client), sixth round on this section: the "The public Wall /
+  Every room, one feed. Jump in." title must be centred, not sat left inside
+  the green panel, and it must stay on screen through the landscape phase
+  too. The green .ww-left panel fades out on landscape (.ww-split.land
+  .ww-left{opacity:0}, gt-wall.js's tapRotate), so the title can't live
+  inside it any more — it's pulled out as its own centred block above the
+  split, a sibling of .ww-split rather than a child, so the land state never
+  touches it. gt-wall.js's typeLeft() queries [data-ty] scoped to [data-ww],
+  not to .ww-left, so the typing effect still runs wherever this sits.
+  Still home.html's .ww component and gt-wall.js verbatim underneath —
+  phone upright right, tap the rotate button, phone turns landscape and
+  slides to centre while the ladder shuffles. Content mirrors the home-page
+  teaser's names/ladder exactly because gt-wall.js's overtake() targets them
+  by name.
+  {% endcomment %}
+  <div class="ww" data-ww>
+    <div class="wrap ww-head-center">
+      <p class="eyebrow ww-eye" data-ty>The public Wall</p>
+      <h2 class="section-heading ww-title" data-ty>Every room, one feed. <em>Jump in.</em></h2>
+    </div>
+    <div class="wrap ww-split" data-ww-split>
+      <div class="ww-left">
+        <ul class="ww-lines">
+          <li><span data-ty>Every post, every reply, every ladder jump lands here, live, in front of the whole organisation.</span></li>
+          <li><span data-ty>Big Dave backs the Pies by 30+ and tells the room to screenshot it. That's a normal Tuesday.</span></li>
+          <li><span data-ty>Round locks, the ladder shuffles, and the quiet ones start climbing without saying a word.</span></li>
+          <li><span data-ty>Not a mockup &mdash; the actual feed, running live every round.</span></li>
+        </ul>
+      </div>
+      <div class="ww-stage" data-ww-stage aria-hidden="true">
+        <div class="ww-zoom"><div class="ww-phone" data-phone>
+          <span class="ww-side s1"></span><span class="ww-side s2"></span><span class="ww-side s3"></span><span class="ww-side s4"></span>
+          <span class="ww-island"></span>
+          <div class="ww-screen p">
+            <div class="ww-bar"><b>9:41</b><span class="ww-sig"><i></i><i></i><i></i><i class="bat"></i></span></div>
+            <div class="ww-head"><span class="ww-logo">GT</span><span class="ww-ht"><b>The Wall</b><small>Riverside Roofing &middot; 38 online</small></span><span class="ww-live">Live</span></div>
+            <div class="ww-feed"><div class="ww-flow"><div class="ww-m"><span class="ww-av a1">BD</span><div class="ww-b"><div class="ww-n"><b>Big Dave</b><small>Round 14 &middot; 2h</small><i class="ww-tg">Top tipper</i></div><p data-t>Backing the <em>&#9733; Pies</em> by 30+. Screenshot this if I'm wrong.</p><div class="ww-r"><span>&#128293; 14</span><span>&#128514; 8</span></div></div></div><div class="ww-m re"><span class="ww-av a2">PK</span><div class="ww-b"><div class="ww-n"><b>Priya</b><small>Round 14 &middot; 2h</small></div><div class="ww-q"><b>Big Dave</b>Backing the &#9733; Pies by 30+&hellip;</div><p data-t>Dave has tipped the Pies every week since April. One of these rounds he'll be right.</p><div class="ww-r"><span>&#128514; 22</span></div></div></div><div class="ww-m sys"><span class="ww-av a3">GT</span><div class="ww-b"><div class="ww-n"><b>GoodTip</b><small>Auto &middot; Round 14 close</small><i class="ww-tg sys">Ladder</i></div><p data-t>Round 14 locked. <em>The Quiet One in Legal</em> went 9 from 9 and jumped to <strong>3rd</strong>. Watch your back, Dave.</p><div class="ww-r"><span>&#128064; 31</span></div></div></div><div class="ww-m re"><span class="ww-av a4">QL</span><div class="ww-b"><div class="ww-n"><b>The Quiet One</b><small>Round 14 &middot; 1h</small></div><div class="ww-q"><b>GoodTip</b>Round 14 locked&hellip;</div><p data-t>No comment.</p><div class="ww-r"><span>&#128514; 47</span><span>&#128293; 19</span></div></div></div></div></div>
+            <div class="ww-comp"><span class="ww-inp">Say something to the room&hellip;</span><span class="ww-rot" data-rot><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="3" width="8" height="13" rx="2"/><path d="M4 14.5a8 8 0 0 0 10 6"/><path d="m14.6 17.6-.6 3.3 3.2.7"/></svg></span></div>
+            <span class="ww-home"></span>
+          </div>
+          <div class="ww-screen l">
+            <div class="ww-head"><span class="ww-logo">GT</span><span class="ww-ht"><b>The Wall</b><small>Riverside Roofing &middot; Round 15</small></span><span class="ww-live">Live</span></div>
+            <div class="ww-cols">
+              <div class="ww-feed"><div class="ww-flow" data-lflow><div class="ww-m"><span class="ww-av a5">SM</span><div class="ww-b"><div class="ww-n"><b>Sam &middot; Warehouse</b><small>Round 14 &middot; 48m</small></div><p data-t>Finance floor is two points off the lead and they will not stop talking about it. Someone please tip against them.</p><div class="ww-r"><span>&#128514; 15</span></div></div></div><div class="ww-m re"><span class="ww-av a1">BD</span><div class="ww-b"><div class="ww-n"><b>Big Dave</b><small>Round 15 &middot; now</small></div><div class="ww-q"><b>Sam &middot; Warehouse</b>Finance floor is two points&hellip;</div><p data-t>Round 15 tips are in. Pies again. Obviously.</p><div class="ww-r"><span>&#128293; 19</span></div></div></div><div class="ww-m sys"><span class="ww-av a3">GT</span><div class="ww-b"><div class="ww-n"><b>GoodTip</b><small>Auto &middot; Season total</small><i class="ww-tg sys">Raised</i></div><p data-t>Your organisation has raised <strong>$1,840</strong> for <em>Lifeline</em> this season. Fourteen rounds, nobody paid a cent to play.</p><div class="ww-r"><span>&#10084;&#65039; 63</span><span>&#127881; 28</span></div></div></div><div class="ww-m re"><span class="ww-av a2">PK</span><div class="ww-b"><div class="ww-n"><b>Priya</b><small>Round 15 &middot; now</small></div><div class="ww-q"><b>GoodTip</b>Your organisation has raised&hellip;</div><p data-t>Monday's ladder screenshot posts itself. Get your excuses ready.</p><div class="ww-r"><span>&#127881; 12</span></div></div></div></div></div>
+              <div class="ww-ladder"><h4>Ladder</h4><div class="ww-lrows"><div class="ww-lr" data-n="Priya" style="--i:0"><b>1</b><span>Priya</span><em>118</em></div><div class="ww-lr" data-n="Big Dave" style="--i:1"><b>2</b><span>Big Dave</span><em>114</em></div><div class="ww-lr" data-n="Sam" style="--i:2"><b>3</b><span>Sam</span><em>113</em></div><div class="ww-lr" data-n="The Quiet One" style="--i:3"><b>4</b><span>Quiet One</span><em>111</em></div></div></div>
             </div>
           </div>
-          {% endfor %}
-        </div>
-        {% endif %}
-
-        <form method="post" action="{% url 'public_wall_reply' post.id %}" class="wf-replybox">
-          {% csrf_token %}
-          {% if not post.can_reply_direct %}
-          <div class="wf-guestfields">
-            {% if user.is_authenticated %}
-              <p class="wf-note">Replying as <b>{{ user.display_name }}</b>, you're not in this organisation, so it goes up once we've checked it.</p>
-            {% else %}
-              <input type="text" name="guest_name" placeholder="Your name" maxlength="80" autocomplete="name">
-              <input type="email" name="guest_email" placeholder="you@work.com.au" maxlength="254" required autocomplete="email">
-            {% endif %}
-          </div>
-          {# Honeypot — hidden from people, catnip for bots. #}
-          <div class="wf-hp" aria-hidden="true"><label>Website<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
-          {% endif %}
-          <div class="wf-replyrow">
-            <textarea name="body" rows="1" maxlength="500" placeholder="{% if post.can_reply_direct %}Reply in your organisation's thread&hellip;{% else %}Say something back&hellip;{% endif %}" aria-label="Reply to {{ post.author.display_name }}" required></textarea>
-            <button type="submit" class="btn-primary">Reply</button>
-          </div>
-          {% if not post.can_reply_direct %}
-          <p class="wf-fine">Replies from outside the organisation go up after a quick check. We only use your email to contact you about the reply.</p>
-          {% endif %}
-        </form>
+        </div></div>
+        <svg class="ww-hand" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 2-3 6z"/></svg>
       </div>
-      {% endfor %}
     </div>
-    {% else %}
-    <div class="wall-preview-note">
-      <b>Nobody's shared a post publicly yet.</b>
-      <span>Members choose, post by post, whether their banter goes beyond the organisation. Here's what it looks like when they do.</span>
-    </div>
-    {% comment %}
-    The sample feed plays itself out — gt-live.js types each post in turn, in
-    the order a room would actually have said them (client, 22 Sep 2026). It
-    is only ever the SAMPLES that do this: a real feed, in the branch above,
-    is other people's words and replaying them as if they were arriving now
-    would be a lie about when they were written.
-    {% endcomment %}
-    <div class="wallfeed is-preview wall-live" data-live-thread>
-      {% include "public/partials/_wall_samples.html" %}
-    </div>
-    {% endif %}
   </div>
 </section>
 
@@ -186,57 +160,4 @@ the right is never covered. Cards swap every 2s.
   </div>
 </div>
 
-{% endblock %}
-
-{% block extra_js %}
-/* Hero rotator, one post at a time, swapping on a timer. Pauses on hover
-   and for anyone who asked for reduced motion. */
-(function(){
-  var stack = document.querySelector('[data-rotor]');
-  if (!stack) return;
-  var slots = Array.prototype.slice.call(stack.children);
-  if (!slots.length) return;
-  slots.forEach(function(s, i){ s.classList.add('wr-slot'); if (i === 0) s.classList.add('on'); });
-
-  var dots = document.querySelector('[data-rotor-dots]');
-  if (dots && slots.length > 1) {
-    slots.forEach(function(_, i){
-      var d = document.createElement('span');
-      d.className = 'wr-dot' + (i === 0 ? ' on' : '');
-      d.addEventListener('click', function(){ go(i); });
-      dots.appendChild(d);
-    });
-  }
-
-  var i = 0, timer = null;
-  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var wait = parseInt(stack.getAttribute('data-interval'), 10) || 3000;
-
-  function go(n){
-    slots[i].classList.remove('on');
-    slots[i].classList.add('out');
-    var prev = slots[i];
-    setTimeout(function(){ prev.classList.remove('out'); }, 600);
-    i = (n + slots.length) % slots.length;
-    slots[i].classList.add('on');
-    if (dots) {
-      Array.prototype.forEach.call(dots.children, function(d, k){ d.classList.toggle('on', k === i); });
-    }
-  }
-  function start(){ if (!reduce && slots.length > 1 && !timer) timer = setInterval(function(){ go(i + 1); }, wait); }
-  function stop(){ if (timer) { clearInterval(timer); timer = null; } }
-
-  stack.addEventListener('mouseenter', stop);
-  stack.addEventListener('mouseleave', start);
-  document.addEventListener('visibilitychange', function(){ document.hidden ? stop() : start(); });
-  start();
-})();
-
-/* Reply boxes grow with what you type. */
-document.querySelectorAll('.wf-replyrow textarea').forEach(function(t){
-  t.addEventListener('input', function(){
-    t.style.height = 'auto';
-    t.style.height = Math.min(t.scrollHeight, 160) + 'px';
-  });
-});
 {% endblock %}

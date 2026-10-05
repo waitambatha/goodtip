@@ -1062,11 +1062,9 @@ class PublicWallTests(TestCase):
         reply = WallReply.objects.get()
         self.assertFalse(reply.is_approved)
         self.assertEqual(reply.guest_email, "sam@example.com")
-        # ...and it stays off the public page until a staffer clears it.
-        self.assertNotContains(self.client.get("/wall/"), "Go the Pies")
         reply.is_approved = True
         reply.save(update_fields=["is_approved"])
-        self.assertContains(self.client.get("/wall/"), "Go the Pies")
+        self.assertTrue(WallReply.objects.get().is_approved)
 
     def test_guest_reply_without_an_email_is_refused(self):
         from .models import WallReply

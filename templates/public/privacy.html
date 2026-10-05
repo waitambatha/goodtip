@@ -129,6 +129,29 @@ pages now open the same way.
   </div>
 
   <div class="wrap">
+    {% comment %}
+    2 Oct 2026 (client): "that should be a button, not a drop down". A button;
+    pressing it brings the short version up in its own window, and each time
+    it comes up it is a different colour (five, in turn — gt-legal.js).
+    Without script the window is simply printed here, open.
+    {% endcomment %}
+    <div class="lg-short" data-short>
+      <button type="button" class="lg-short-btn" data-short-open aria-haspopup="dialog">
+        <span class="lg-short-k">The short version</span>
+        <span class="lg-short-t">Your details, in one paragraph</span>
+        <span class="lg-short-go" aria-hidden="true">&rarr;</span>
+      </button>
+      <div class="lg-short-pop" data-short-pop role="dialog" aria-modal="true" aria-labelledby="privacyShortH">
+        <div class="lg-short-backdrop" data-short-close></div>
+        <div class="lg-short-panel">
+          <button type="button" class="lg-short-x" data-short-close aria-label="Close">&times;</button>
+          <p class="lg-short-k">The short version</p>
+          <h2 class="lg-short-h" id="privacyShortH">Your details, in one paragraph.</h2>
+          <p class="lg-short-p">We hold what is needed to run the tipping comp you joined and nothing more. We do not sell your personal information and we do not share it with advertisers. Your email address is visible to the admins of the organisations you belong to, and to nobody else playing.</p>
+        </div>
+      </div>
+    </div>
+
     <div class="legal-layout" data-legal>
 
       <!-- CONTENTS RAIL -->
@@ -147,10 +170,6 @@ pages now open the same way.
 
       <!-- CLAUSES -->
       <div class="legal-body">
-        <div class="legal-note reveal">
-          <svg aria-hidden="true"><use href="#ic-shield-check"/></svg>
-          <p><b>The short version.</b> We hold what is needed to run the tipping comp you joined and nothing more. We do not sell your personal information and we do not share it with advertisers. Your email address is visible to the admins of the organisations you belong to, and to nobody else playing.</p>
-        </div>
 
         <article class="legal-card reveal" id="collect">
           <h2><span class="lc-n">01</span> What we collect</h2>
@@ -247,55 +266,5 @@ pages now open the same way.
   </div>
 </section>
 
-<script>
-/* The contents rail's active state.
- *
- * An observer rather than a scroll handler: the question is "which clause is
- * on screen", which is exactly what IntersectionObserver answers, and a
- * scroll listener would have to re-measure nine cards on every frame to reach
- * the same answer.
- *
- * The root margin pins the decision line a third of the way down the viewport.
- * Without it the last clause can never win — it is short, it sits at the
- * bottom of the document, and it never reaches the middle of the screen — so
- * the rail would freeze on clause 08 for the whole tail of the page.
- */
-(function () {
-  var scope = document.querySelector('[data-legal]');
-  if (!scope || !('IntersectionObserver' in window)) return;
-  var links = scope.querySelectorAll('.legal-toc a');
-  var byId = {};
-  var cards = [];
-  links.forEach(function (a) {
-    var id = a.getAttribute('href').slice(1);
-    var card = document.getElementById(id);
-    if (!card) return;
-    byId[id] = a;
-    cards.push(card);
-  });
-  if (!cards.length) return;
-
-  var seen = new Set();
-  function paint() {
-    /* The topmost clause still intersecting wins, so scrolling back up hands
-       the highlight back rather than leaving it on whatever left last. */
-    var winner = null;
-    for (var i = 0; i < cards.length; i++) {
-      if (seen.has(cards[i].id)) { winner = cards[i].id; break; }
-    }
-    links.forEach(function (a) { a.classList.remove('on'); });
-    if (winner && byId[winner]) byId[winner].classList.add('on');
-  }
-
-  var io = new IntersectionObserver(function (entries) {
-    entries.forEach(function (e) {
-      if (e.isIntersecting) seen.add(e.target.id); else seen.delete(e.target.id);
-    });
-    paint();
-  }, { rootMargin: '-33% 0px -55% 0px' });
-
-  cards.forEach(function (c) { io.observe(c); });
-})();
-</script>
 
 {% endblock %}

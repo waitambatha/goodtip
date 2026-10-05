@@ -71,16 +71,20 @@ marketing page can force a sync before reading the letter out.
   var spans = {
     boss:  document.querySelectorAll('[data-letter-boss]'),
     name:  document.querySelectorAll('[data-letter-name]'),
-    email: document.querySelectorAll('[data-letter-email]')
+    email: document.querySelectorAll('[data-letter-email]'),
+    company:  document.querySelectorAll('[data-letter-company]'),
+    position: document.querySelectorAll('[data-letter-position]')
   };
   var inputs = {
     boss:  document.querySelector('[data-letter-src="boss"]'),
     name:  document.querySelector('[data-letter-src="name"]'),
-    email: document.querySelector('[data-letter-src="email"]')
+    email: document.querySelector('[data-letter-src="email"]'),
+    company:  document.querySelector('[data-letter-src="company"]'),
+    position: document.querySelector('[data-letter-src="position"]')
   };
   /* Empty reads as a placeholder, never as an empty gap: "Dear ," on a note
      somebody is about to send to their boss is worse than no preview at all. */
-  var fallback = { boss: 'Boss', name: '[Your name]', email: '' };
+  var fallback = { boss: 'Boss', name: '[Your name]', email: '', company: 'work', position: '' };
 
   function sync(){
     Object.keys(spans).forEach(function(key){

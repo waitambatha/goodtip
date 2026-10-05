@@ -1,26 +1,124 @@
 {% extends "app_base.html" %}
 {% block title %}You're set, {{ org.name }}{% endblock %}
-{% block loader_task %}Confirming your payment{% endblock %}
+{% block loader_task %}Confirming your subscription{% endblock %}
 {% comment %}
 The rotating side strips. Standard on every member page (client request,
 Aug 2026) — these were the last screens without them. Outside the sheet,
 never inside it: the strips belong to the page background, and a sheet
 drawn over them is the whole point of the look.
+
+3 OCT 2026: the plan is a yearly subscription now (billing.services). This
+page reads the subscription's real state straight back from Stripe, says
+which of the two it is — subscribed and waiting for its first charge, or
+paid — and for the DEMO (test keys only) runs the start in front of you: a
+ten-second count, then the subscription's test clock is moved to the first
+billing date and the page watches Stripe raise and take the payment.
 {% endcomment %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% block app_content %}
-<div style="max-width:560px;margin:0 auto;text-align:center;">
-  <div style="width:64px;height:64px;border-radius:50%;background:var(--lime);display:grid;place-items:center;margin:12px auto 20px;"><svg class="cic" style="width:34px;height:34px;stroke:var(--deep);stroke-width:2.4;"><use href="#ic-check"/></svg></div>
-  {% if sub %}
-    <h1 class="app-h1">You're set for the season.</h1>
-    <p class="app-sub" style="font-size:16px;">{{ org.name }} is on the <strong>{{ sub.get_tier_display }}</strong> plan, {{ sub.seat_limit_label }}. Time to get your people tipping.</p>
+<div class="bl-done" data-bl-done
+     data-status-url="{% url 'billing:subscription_status' org.id %}"
+     {% if is_demo %}data-demo-url="{% url 'billing:demo_start' org.id %}"{% endif %}
+     data-status="{{ sub.status|default:'none' }}">
+  <div class="bl-tick"><svg class="cic"><use href="#ic-check"/></svg></div>
+
+  {% if sub and sub.is_active %}
+    <h1 class="app-h1" data-bl-title>Subscription active.</h1>
+    <p class="app-sub bl-lede" data-bl-lede>{{ org.name }} is on the <strong>{{ sub.get_tier_display }}</strong> plan, {{ sub.seat_limit_label }}. The first year's ${{ sub.price_aud|floatformat:0 }} has been paid, and it renews yearly.</p>
+  {% elif sub and sub.is_scheduled %}
+    <h1 class="app-h1" data-bl-title>You're subscribed.</h1>
+    <p class="app-sub bl-lede" data-bl-lede>{{ org.name }} is on the <strong>{{ sub.get_tier_display }}</strong> plan. Your card is saved and nothing was charged today; the first yearly payment of ${{ sub.price_aud|floatformat:0 }} is taken on <strong>{{ sub.starts_at|date:"j F Y" }}</strong>.</p>
   {% else %}
-    <h1 class="app-h1">Thanks, payment received.</h1>
-    <p class="app-sub" style="font-size:16px;">We're confirming it now; your plan will show as active on the dashboard in a moment.</p>
+    <h1 class="app-h1" data-bl-title>Thanks, we're confirming it.</h1>
+    <p class="app-sub bl-lede" data-bl-lede>Stripe is finishing up; your plan will show on the dashboard in a moment.</p>
   {% endif %}
-  <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px;">
+
+  {% if sub %}
+  <ol class="bl-steps" aria-label="Subscription progress">
+    <li class="done"><b>Subscribed</b><span>Card saved {{ sub.created_at|date:"j M" }}</span></li>
+    <li class="{% if sub.is_active %}done{% else %}next{% endif %}" data-bl-step-start><b>Billing starts</b><span>{% if sub.starts_at %}{{ sub.starts_at|date:"j M Y" }}{% else %}Today{% endif %}</span></li>
+    <li class="{% if sub.is_active %}done{% endif %}" data-bl-step-paid><b>First payment</b><span data-bl-paid-note>{% if sub.is_active %}${{ sub.price_aud|floatformat:0 }} paid{% else %}${{ sub.price_aud|floatformat:0 }}{% endif %}</span></li>
+  </ol>
+  {% endif %}
+
+  {% if is_demo and not sub.is_active %}
+  <div class="bl-demo bl-demo-run" data-bl-demo>
+    <div class="bl-demo-tag">Demo &middot; Stripe test mode</div>
+    <p class="bl-demo-big" data-bl-count>Starting the subscription in <b>10</b></p>
+    <p class="bl-demo-p" data-bl-demo-note>Moving this subscription to {{ sub.starts_at|date:"j F Y"|default:"its start date" }} on Stripe's test clock — Stripe will raise the year's invoice and charge the saved card, exactly as it will on the day.</p>
+    <div class="bl-bar"><i data-bl-bar></i></div>
+  </div>
+  {% endif %}
+
+  <div class="bl-actions">
     <a href="{% url 'dashboard' %}" class="abtn abtn-primary">Go to dashboard</a>
-    <a href="{% url 'billing:receipt' org.id %}" class="abtn abtn-ghost">View receipt</a>
+    <a href="{{ sub.stripe_invoice_url|default:'#' }}" class="abtn abtn-ghost" data-bl-invoice target="_blank" rel="noopener" {% if not sub.stripe_invoice_url %}hidden{% endif %}>View the Stripe invoice</a>
+    <a href="{% url 'billing:plans' org.id %}" class="abtn abtn-ghost">Back to plans</a>
   </div>
 </div>
+
+<script>
+(function () {
+  var box = document.querySelector('[data-bl-done]');
+  if (!box) return;
+  var statusUrl = box.getAttribute('data-status-url');
+  var demoUrl = box.getAttribute('data-demo-url');
+  var csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+  function $(s) { return box.querySelector(s); }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  function paint(info) {
+    if (!info || !info.paid) return false;
+    $('[data-bl-title]').textContent = 'Subscription active.';
+    $('[data-bl-lede]').innerHTML = 'The first yearly payment of <strong>$' + Math.round(+info.amount) + '</strong> has been taken by Stripe. The plan renews every year from here.';
+    var s1 = $('[data-bl-step-start]'), s2 = $('[data-bl-step-paid]');
+    if (s1) { s1.className = 'done'; }
+    if (s2) { s2.className = 'done'; $('[data-bl-paid-note]').textContent = '$' + Math.round(+info.amount) + ' paid'; }
+    var inv = $('[data-bl-invoice]');
+    if (inv && info.invoice_url) { inv.href = info.invoice_url; inv.hidden = false; }
+    var demo = $('[data-bl-demo]');
+    if (demo) {
+      $('[data-bl-count]').innerHTML = '<b>Paid.</b> The subscription has started.';
+      $('[data-bl-demo-note]').textContent = 'Stripe raised the invoice and charged the saved card. Open the invoice to show it.';
+      demo.classList.add('is-paid');
+    }
+    box.setAttribute('data-status', 'active');
+    return true;
+  }
+  async function poll(times, every) {
+    for (var i = 0; i < times; i++) {
+      try {
+        var r = await fetch(statusUrl, { credentials: 'same-origin' });
+        if (r.ok && paint(await r.json())) return true;
+      } catch (e) {}
+      await wait(every);
+    }
+    return false;
+  }
+
+  /* not the demo: if Stripe has not reported yet, keep checking for a bit */
+  if (!demoUrl) { if (box.getAttribute('data-status') !== 'active') poll(10, 3000); return; }
+
+  /* the demo: count ten, move the clock to the start date, watch it pay */
+  (async function () {
+    var n = 10, count = $('[data-bl-count] b'), bar = $('[data-bl-bar]');
+    while (n > 0) {
+      if (count) count.textContent = n;
+      if (bar) bar.style.width = ((10 - n) * 10) + '%';
+      await wait(1000); n--;
+    }
+    if (bar) bar.style.width = '100%';
+    $('[data-bl-count]').innerHTML = 'Jumping to <b>' + ($('[data-bl-step-start] span') || {}).textContent + '</b>&hellip;';
+    try {
+      var r = await fetch(demoUrl, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': decodeURIComponent(csrf) } });
+      if (!r.ok) throw new Error('advance');
+    } catch (e) {
+      $('[data-bl-count]').textContent = 'Could not move the test clock — try reloading.';
+      return;
+    }
+    $('[data-bl-count]').innerHTML = 'Stripe is taking the first payment&hellip;';
+    if (!(await poll(30, 2000))) $('[data-bl-count]').textContent = 'Still waiting on Stripe — reload in a moment.';
+  })();
+})();
+</script>
 {% endblock %}

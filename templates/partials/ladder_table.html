@@ -37,6 +37,7 @@ that will not compile.
   <span class="lad-key"><i class="k-finals"></i> shaded rows are the finals places</span>
   {% if updated_at %}<span class="lad-when">Updated {{ updated_at|timesince }} ago</span>
   {% elif at_round %}<span class="lad-when">As it stood after round {{ at_round }}</span>{% endif %}
+  {% if prev_round %}<span class="lad-when">&#9650;&#9660; places moved since round {{ prev_round }}</span>{% endif %}
 </p>
 
 <div class="gt-listwrap" id="ladderTable" data-veil data-veil-label="Loading the ladder">
@@ -82,7 +83,7 @@ that will not compile.
       for the reader to count — it is the line the whole table is read against.
       {% endcomment %}
       <div class="gb-row lad-row{% if e.rank <= 8 %} in-finals{% endif %}{% if e.rank == 1 %} is-top{% endif %}">
-        <span class="gb-rank">{{ e.rank }}</span>
+        <span class="gb-rank">{{ e.rank }}{% if prev_round %}<i class="lad-move{% if e.move > 0 %} is-up{% elif e.move < 0 %} is-down{% endif %}" title="{% if e.prev_rank %}Was {{ e.prev_rank }} after round {{ prev_round }}{% endif %}">{% if e.move > 0 %}&#9650;{{ e.move }}{% elif e.move < 0 %}&#9660;{{ e.move|stringformat:"d"|slice:"1:" }}{% else %}&ndash;{% endif %}</i>{% endif %}</span>
         <span class="gb-who">
           {% comment %}
           The shared crest tag, not a bare two-letter slice. No club has

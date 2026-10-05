@@ -7,6 +7,9 @@
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 
 {% block app_content %}
+{% if certs_ready %}
+<div class="lb-cert" role="status"><b>&#127942; Season champion certificates are ready</b><span>{{ certs_ready|join:", " }} &mdash; print them or post them.</span><a href="{% url 'tipping:certificates' org.id %}">Get the certificates &rarr;</a></div>
+{% endif %}
 {% comment %}
 ORDER OF THE PAGE, and it is not the order it was in.
 
@@ -71,6 +74,55 @@ still drawn as selected.
 {% url 'tipping:leaderboard' org.id as lb_url %}
 {% with cq=selected_comp.slug|default:"" %}
 {% comment %}
+WHERE YOU STAND (client, 4 Oct 2026): "I'm number 2 in my organisation but
+number 20 nationally". Five positions at a glance — you in your organisation
+(and your group), your organisation in its industry and nationally, and you
+against every tipper on GoodTip. Each one opens the board behind it.
+{% endcomment %}
+<div class="lb-stand" aria-label="Where you stand">
+  <a class="lbs-tile{% if board_view == 'org' %} on{% endif %}" href="{{ lb_url }}{% if cq %}?comp={{ cq }}{% endif %}">
+    <span class="lbs-k">You in {{ org.name }}</span>
+    <b>{% if standing.me_org.rank %}#{{ standing.me_org.rank }}{% else %}&ndash;{% endif %}</b>
+    <span class="lbs-of">of {{ standing.me_org.of }} tipper{{ standing.me_org.of|pluralize }}</span>
+  </a>
+  {% if standing.me_group %}
+  <a class="lbs-tile" href="{{ lb_url }}{% if cq %}?comp={{ cq }}{% endif %}">
+    <span class="lbs-k">You in {{ standing.me_group.name }}</span>
+    <b>{% if standing.me_group.rank %}#{{ standing.me_group.rank }}{% else %}&ndash;{% endif %}</b>
+    <span class="lbs-of">of {{ standing.me_group.of }} in the group</span>
+  </a>
+  {% endif %}
+  <a class="lbs-tile{% if board_view == 'industry' %} on{% endif %}" href="{{ lb_url }}?view=industry{% if cq %}&amp;comp={{ cq }}{% endif %}">
+    <span class="lbs-k">{{ org.name }} in {{ standing.org_industry.label|default:"its industry" }}</span>
+    <b>{% if standing.org_industry.rank %}#{{ standing.org_industry.rank }}{% else %}&ndash;{% endif %}</b>
+    <span class="lbs-of">of {{ standing.org_industry.of }} organisation{{ standing.org_industry.of|pluralize }}</span>
+  </a>
+  <a class="lbs-tile{% if board_view == 'national' %} on{% endif %}" href="{{ lb_url }}?view=national{% if cq %}&amp;comp={{ cq }}{% endif %}">
+    <span class="lbs-k">{{ org.name }} nationally</span>
+    <b>{% if standing.org_national.rank %}#{{ standing.org_national.rank }}{% else %}&ndash;{% endif %}</b>
+    <span class="lbs-of">of {{ standing.org_national.of }} organisation{{ standing.org_national.of|pluralize }}</span>
+  </a>
+  <a class="lbs-tile{% if board_view == 'everyone' %} on{% endif %}" href="{{ lb_url }}?view=everyone{% if cq %}&amp;comp={{ cq }}{% endif %}">
+    <span class="lbs-k">You nationally</span>
+    <b>{% if standing.me_national.rank %}#{{ standing.me_national.rank }}{% else %}&ndash;{% endif %}</b>
+    <span class="lbs-of">of {{ standing.me_national.of }} tippers on GoodTip</span>
+  </a>
+</div>
+
+<nav class="lb-views" aria-label="Which leaderboard">
+  <a href="{{ lb_url }}{% if cq %}?comp={{ cq }}{% endif %}" class="{% if board_view == 'org' %}on{% endif %}">Your organisation</a>
+  <a href="{{ lb_url }}?view=industry{% if cq %}&amp;comp={{ cq }}{% endif %}" class="{% if board_view == 'industry' %}on{% endif %}">Industry{% if standing.org_industry.label %} &middot; {{ standing.org_industry.label }}{% endif %}</a>
+  <a href="{{ lb_url }}?view=national{% if cq %}&amp;comp={{ cq }}{% endif %}" class="{% if board_view == 'national' %}on{% endif %}">National</a>
+  <a href="{{ lb_url }}?view=everyone{% if cq %}&amp;comp={{ cq }}{% endif %}" class="{% if board_view == 'everyone' %}on{% endif %}">Everyone</a>
+</nav>
+
+{% comment %}
+THE FILTERS, ON WHITE (client, 4 Oct 2026): the room (organisation or group),
+the competition and the round sit together on one white panel, and the
+competition dropdown stays on the same line as the competition chips.
+{% endcomment %}
+<div class="lb-filters">
+{% comment %}
 WHICH ROOM THIS BOARD IS, straight after the title and before the filters.
 
 It was moved to the foot and sent back — "this should not be at the bottom, it
@@ -89,7 +141,8 @@ has been in three places across three passes and this is the one that reads: the
 sentence says whose board this is, the button offers you yours, and the rooms
 below still start at the left edge where a list is expected to start.
 {% endcomment %}
-{% include "partials/room_switch.html" with noun="leaderboard" surface="dark" align="centre" action_url=my_stats_url action_label="My statistics" action_icon="ic-f-chart" %}
+{% if board_view == 'org' %}
+{% include "partials/room_switch.html" with noun="leaderboard" surface="light" align="centre" action_url=my_stats_url action_label="My statistics" action_icon="ic-f-chart" %}
 
 {% comment %}
 THE SAME BUTTON, FOR AN ORGANISATION WITH GROUPS SWITCHED OFF. The switcher
@@ -116,10 +169,12 @@ exist. Round 26 of the NRL and round 26 of the AFLW are different rounds and one
 of them may not have been played, so choosing the code first and the round
 second is the sequence the data itself is in.
 {% endcomment %}
+{% endif %}
 <div class="boardbar">
   {% include "partials/comp_filter.html" with options=comp_options selected=selected_comp param="comp" base=lb_url keep=comp_keep keep_pairs=comp_keep_pairs all_label="All competitions" veil_for="#lbtable" centred=1 %}
 </div>
 
+{% if board_view == 'org' %}
 <div class="boardbar boardbar-round">
   <div class="bb-round" role="group" aria-label="Choose a round">
     <span class="bb-lab">Round</span>
@@ -158,6 +213,8 @@ second is the sequence the data itself is in.
   {% endcomment %}
   {% include "partials/round_strip.html" with strip=round_strip base=lb_url param="round" keep=comp_keep_round all_label="All rounds" veil_for="#lbtable" %}
 </div>
+{% endif %}
+</div>
 {% endwith %}
 
 {% if is_family %}
@@ -169,6 +226,7 @@ second is the sequence the data itself is in.
 {% if scope == 'national' %}<p class="gh-lead" style="margin:-10px 0 20px;">Every tipper across {{ org.root.name }} and all its child organisations, ranked together.</p>{% endif %}
 {% endif %}
 
+{% if board_view == 'org' %}
 {% if ranked %}
 <div class="gt-podium">
   {% with a=ranked.0 b=ranked.1 c=ranked.2 %}
@@ -260,5 +318,9 @@ it.
     </section>
   </aside>
 </div>
+
+{% else %}
+{% include "partials/leaderboard_wide.html" with board=wide_board view=board_view %}
+{% endif %}
 
 {% endblock %}

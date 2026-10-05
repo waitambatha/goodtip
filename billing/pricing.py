@@ -42,7 +42,7 @@ TIERS = {
         "price": 99,
         "seat_limit": 20,
         "audience": "Small business, small sports club",
-        "features": ["1 league", "All four codes", "Charity vote", "Invite link", "Live ladder"],
+        "features": ["1 league", "All four competitions", "Charity vote", "Invite link", "Live ladder"],
         # See GROUPS_MIN_SEATS below for why this is False on the two small
         # plans and what a locked group control has to do.
         "groups": False,
@@ -160,6 +160,34 @@ FOUNDING_EXTRA_SEASONS = 2
 # What the marketing pages call it. One string, so "three" and the arithmetic
 # above cannot come to disagree on a page nobody re-reads.
 FOUNDING_LOCK_SEASONS = 1 + FOUNDING_EXTRA_SEASONS
+
+
+# WHEN THE FIRST CHARGE LANDS (client, 3 Oct 2026). Organisations subscribe
+# now and their card is saved, but nothing is charged until this day; from
+# then on the plan renews yearly on it. MIDDAY in Melbourne, not midnight:
+# Stripe prints the date in the viewer's own time zone, and midnight in
+# Melbourne is still the 30th everywhere west of it — the checkout page read
+# "January 30" from Nairobi. Midday is the 31st from Australia to Europe and
+# Africa. Once the date has passed, a new subscription is charged at once.
+FIRST_BILLING_DATE = date(2027, 1, 31)
+BILLING_TZ = "Australia/Melbourne"
+
+
+def first_billing_at(now=None):
+    """The moment the first yearly charge is taken, or None to charge today.
+
+    None once the date is less than an hour away: Stripe will not anchor a
+    subscription to a moment that has as good as arrived.
+    """
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from django.utils import timezone
+
+    now = now or timezone.now()
+    at = datetime(FIRST_BILLING_DATE.year, FIRST_BILLING_DATE.month, FIRST_BILLING_DATE.day, 12,
+                  tzinfo=ZoneInfo(BILLING_TZ))
+    return at if at - now > timedelta(hours=1) else None
 
 
 def founding_window_open(on: date | None = None) -> bool:

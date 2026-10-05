@@ -5,6 +5,7 @@
 {% block loader_task %}Loading how it works{% endblock %}
 {% block meta_description %}You tip. GoodTip gives. Tipping is free for everyone playing. Here's the whole season, step by step.{% endblock %}
 {% block body_class %}page-how{% endblock %}
+{% block extra_head %}<script src="{% static 'js/gt-how.js' %}" defer></script><script src="{% static 'js/gt-board.js' %}" defer></script><script src="{% static 'js/gt-ladder-demo.js' %}" defer></script>{% endblock %}
 
 {% block content %}
 
@@ -32,30 +33,88 @@
   </div>
 </section>
 
-<!-- TIMELINE FLOW -->
-<section class="section on-cream">
-  <div class="wrap">
-    <p class="eyebrow reveal">The season, end to end</p>
-    <h2 class="section-heading reveal">Feel the flow. Three moves, one season.</h2>
-    <div class="timeline" style="margin-top:36px;" data-flow>
-      <div class="tl-step reveal from-left"><div class="tl-marker">01</div><div class="tl-card"><p class="tl-tag">Set up</p><h2>Set up your organisation. Run the Charity Vote.</h2><p>Name your comp and invite your team. No payment until you're ready to launch. While the organisation fills, run the Charity Vote. Everyone nominates, everyone votes, majority wins. That settles where GoodTip's giving is headed before a single game is tipped.</p></div></div>
-      <div class="tl-step reveal from-left"><div class="tl-marker">02</div><div class="tl-card"><p class="tl-tag">Tip</p><h2>Tip and track, every round.</h2><p>AFL, AFLW, NRL and NRLW. Weekly tips, a live ladder, and the running charity total in the same place. State of Origin picks are worth four points; finals worth two. The Wall keeps the banter and the tally front and centre all season long.</p></div></div>
-      <div class="tl-step reveal from-left"><div class="tl-marker">03</div><div class="tl-card"><p class="tl-tag">Impact</p><h2>Season done well.</h2><p>Last grand final done. The Impact Report goes out: total raised, charity named, tipping results, the lot. One number your board can cite and your organisation can be proud of. Season done well.</p></div></div>
+<!-- TIMELINE FLOW: competition colours (purple/amber/blue, the same set the home
+     page's own "How it works" cards use), and the same travel-grow-spin-into-a-
+     clip trick (static/js/gt-how.js) riding this section's own vertical
+     marker-and-card layout instead of a row — client, 28 Sep 2026: keep the
+     shape and size of these cards, just the colour and "the first one should
+     automatically enlarge then a 360 and that 360 should take me to a video". -->
+<section class="section on-white hw" id="how-timeline" data-hw data-base="{% static 'video/trailer/' %}">
+  <div class="hw-track">
+   <div class="hw-stage">
+    <div class="wrap">
+      <div class="hw-head">
+        <p class="eyebrow reveal">The season, end to end</p>
+        <h2 class="section-heading reveal">Feel the flow. Three moves, one season.</h2>
+      </div>
+      <div class="timeline" style="margin-top:36px;" data-flow data-hw-row>
+        <div class="tl-step reveal from-left s1"><div class="tl-marker">01</div><div class="tl-card hw-card"><p class="tl-tag">Set up</p><h2>Set up your organisation. Run the Charity Vote.</h2><p>Name your comp and invite your team. No payment until you're ready to launch. While the organisation fills, run the Charity Vote. Everyone nominates, everyone votes, majority wins. That settles where GoodTip's giving is headed before a single game is tipped.</p></div></div>
+        <div class="tl-step reveal from-left s2"><div class="tl-marker">02</div><div class="tl-card hw-card"><p class="tl-tag">Tip</p><h2>Tip and track, every round.</h2><p>AFL, AFLW, NRL and NRLW. Weekly tips, a live ladder, and the running charity total in the same place. State of Origin picks are worth four points; finals worth two. The Wall keeps the banter and the tally front and centre all season long.</p></div></div>
+        <div class="tl-step reveal from-left s3"><div class="tl-marker">03</div><div class="tl-card hw-card"><p class="tl-tag">Impact</p><h2>Season done well.</h2><p>Last grand final done. The Impact Report goes out: total raised, charity named, tipping results, the lot. One number your board can cite and your organisation can be proud of. Season done well.</p></div></div>
+      </div>
     </div>
+    <div class="hw-panels" aria-hidden="true">
+      <div class="hw-panel s1" data-segs='[["create-org",1,4.5,"Set up your organisation"],["charity-vote",2,5.5,"Run the Charity Vote"]]'>
+        <div class="hw-in">
+          <div class="hw-copy"><p class="tl-tag">Set up</p><h3>Set up your organisation. Run the Charity Vote.</h3><p>Name your comp and invite your team. Run the Charity Vote while it fills — everyone nominates, everyone votes, majority wins.</p><div class="hw-dots"></div></div>
+          <div class="hw-media"><video muted playsinline preload="none" poster="{% static 'video/trailer/create-org.jpg' %}"></video><span class="hw-cap"></span></div>
+        </div>
+      </div>
+      <div class="hw-panel s2" data-segs='[["picks",2,5.5,"Pick your winners"],["leaderboard",1.5,4.5,"Watch the live leaderboard"]]'>
+        <div class="hw-in">
+          <div class="hw-copy"><p class="tl-tag">Tip</p><h3>Tip and track, every round.</h3><p>AFL, AFLW, NRL and NRLW — a live ladder and the running charity total, every round.</p><div class="hw-dots"></div></div>
+          <div class="hw-media"><video muted playsinline preload="none" poster="{% static 'video/trailer/picks.jpg' %}"></video><span class="hw-cap"></span></div>
+        </div>
+      </div>
+      <div class="hw-panel s3" data-segs='[["leaderboard",8.5,12.5,"Your season, round by round"]]'>
+        <div class="hw-in">
+          <div class="hw-copy"><p class="tl-tag">Impact</p><h3>Season done well.</h3><p>The Impact Report goes out: total raised, charity named, tipping results, the lot.</p><div class="hw-dots"></div></div>
+          <div class="hw-media"><video muted playsinline preload="none" poster="{% static 'video/trailer/leaderboard.jpg' %}"></video><span class="hw-cap"></span></div>
+        </div>
+      </div>
+    </div>
+   </div>
   </div>
 </section>
 
-<!-- SCORING -->
-<section class="section on-paper">
-  <div class="wrap">
-    <p class="eyebrow reveal">Scoring</p>
-    <h2 class="section-heading reveal">Points that mean something.</h2>
-    <p class="section-sub reveal">Simple enough for the casual tipper, with just enough weighting to keep the big rounds interesting.</p>
-    <div class="score-cards reveal" data-cards>
-      <div class="score-card"><span class="score-pts">1</span><p class="pts-lab">One point</p><h3>Correct tip</h3><p>One point for every game you pick right, across all four codes. The bread and butter of the ladder.</p></div>
-      <div class="score-card"><span class="score-pts">2</span><p class="pts-lab">Double</p><h3>Finals</h3><p>Finals tips are worth two points each. The run home is where ladders are won and lost.</p></div>
-      <div class="score-card"><span class="score-pts">4</span><p class="pts-lab">Quadruple</p><h3>State of Origin</h3><p>Origin picks are worth four points. Three nights that can flip the whole comp on its head.</p></div>
+<!-- SCORING: same trick, this section's own 3-up points-square layout, cream
+     background kept as-is per the client. -->
+<section class="section on-paper hw" id="how-scoring" data-hw data-base="{% static 'video/trailer/' %}">
+  <div class="hw-track">
+   <div class="hw-stage">
+    <div class="wrap">
+      <div class="hw-head">
+        <p class="eyebrow reveal">Scoring</p>
+        <h2 class="section-heading reveal">Points that mean something.</h2>
+        <p class="section-sub reveal">Simple enough for the casual tipper, with just enough weighting to keep the big rounds interesting.</p>
+      </div>
+      <div class="score-cards reveal" data-cards data-hw-row>
+        <div class="score-card hw-card s1"><span class="score-pts">1</span><p class="pts-lab">One point</p><h3>Correct tip</h3><p>One point for every game you pick right, across all four competitions. The bread and butter of the ladder.</p></div>
+        <div class="score-card hw-card s2"><span class="score-pts">2</span><p class="pts-lab">Double</p><h3>Finals</h3><p>Finals tips are worth two points each. The run home is where ladders are won and lost.</p></div>
+        <div class="score-card hw-card s3"><span class="score-pts">4</span><p class="pts-lab">Quadruple</p><h3>State of Origin</h3><p>Origin picks are worth four points. Three nights that can flip the whole comp on its head.</p></div>
+      </div>
     </div>
+    <div class="hw-panels" aria-hidden="true">
+      <div class="hw-panel s1" data-segs='[["picks",5.75,7.6,"Pick your winner"],["my-tips",2,4.5,"The point lands straight away"]]'>
+        <div class="hw-in">
+          <div class="hw-copy"><p class="pts-lab">One point</p><h3>Correct tip</h3><p>One point for every game you pick right, across all four competitions. The bread and butter of the ladder in real life.</p><div class="hw-dots"></div></div>
+          <div class="hw-media"><video muted playsinline preload="none" poster="{% static 'video/trailer/picks.jpg' %}"></video><span class="hw-cap"></span></div>
+        </div>
+      </div>
+      <div class="hw-panel s2" data-segs='[["picks",5.75,7.6,"Tip every final"],["my-tips",2,4.5,"Two points, straight onto the ladder"]]'>
+        <div class="hw-in">
+          <div class="hw-copy"><p class="pts-lab">Double</p><h3>Finals</h3><p>Finals tips are worth two points each. The run home is where ladders are won and lost.</p><div class="hw-dots"></div></div>
+          <div class="hw-media"><video muted playsinline preload="none" poster="{% static 'video/trailer/picks.jpg' %}"></video><span class="hw-cap"></span></div>
+        </div>
+      </div>
+      <div class="hw-panel s3" data-segs='[["picks",5.75,7.6,"Pick your Origin winner"],["my-tips",2,4.5,"Four points in one hit"]]'>
+        <div class="hw-in">
+          <div class="hw-copy"><p class="pts-lab">Quadruple</p><h3>State of Origin</h3><p>Origin picks are worth four points. Three nights that can flip the whole comp on its head.</p><div class="hw-dots"></div></div>
+          <div class="hw-media"><video muted playsinline preload="none" poster="{% static 'video/trailer/picks.jpg' %}"></video><span class="hw-cap"></span></div>
+        </div>
+      </div>
+    </div>
+   </div>
   </div>
 </section>
 
@@ -72,16 +131,69 @@
 </section>
 
 <!-- LEADERBOARD -->
-<section class="section on-cream">
+<section class="section on-white">
   <div class="wrap">
-    <p class="eyebrow reveal">The ladder</p>
-    <h2 class="section-heading reveal">The leaderboard nobody's seen before.</h2>
-    <p class="section-sub reveal">Your organisation's ladder is the heartbeat, but it doesn't stop there.</p>
-    <div class="ladder-3 reveal">
-      <div class="ladder-card"><div class="lrank">01</div><h3>Your organisation</h3><p>Live, round by round. Form lines, biggest movers, who's quietly cooking. The table your organisation argues about all week.</p></div>
-      <div class="ladder-card"><div class="lrank">02</div><h3>Industry ladder</h3><p>See how your organisation ranks against others in your sector, for tips and for dollars raised. Bragging rights at the next conference.</p></div>
-      <div class="ladder-card"><div class="lrank">03</div><h3>National ladder</h3><p>Every GoodTip organisation on one national table. Tipping nous and generosity, side by side.</p></div>
+    <p class="eyebrow reveal">The leaderboard</p>
+    <h2 class="section-heading reveal">Where you stand, from your desk to the whole country.</h2>
+    <p class="section-sub reveal">Your organisation's leaderboard is the heartbeat. GoodTip also ranks your organisation against its industry and the nation &mdash; and you against every tipper on GoodTip.</p>
+
+    {% comment %}
+    4 Oct 2026 (client): "the ladder is purely for teams". These four were
+    sold as ladders; they rank PEOPLE and ORGANISATIONS, so they are the
+    leaderboard's four levels (tipping/rankings.py). The team ladder follows
+    under its own heading, open, with nothing pretending to open it.
+    {% endcomment %}
+    <div class="lb-demo reveal" data-lbdemo>
+      <div class="ladder-3 ladder-4">
+        <a href="/#start" class="ladder-card"><div class="lrank">01</div><svg class="cic" style="width:22px;height:22px;margin-bottom:6px;"><use href="#ic-f-chart"/></svg><h3>Your organisation</h3><p>You against your colleagues, round by round &mdash; and inside your team or department too. The table your organisation argues about all week.</p><span class="lc-go">Start your comp <i aria-hidden="true">&rarr;</i></span></a>
+        <a href="{% url 'tipping_ladder' %}" class="ladder-card"><div class="lrank">02</div><svg class="cic" style="width:22px;height:22px;margin-bottom:6px;"><use href="#ic-f-org"/></svg><h3>Industry leaderboard</h3><p>Your organisation against others in your sector, on how its tippers have done. Bragging rights at the next conference.</p><span class="lc-go">See the sectors <i aria-hidden="true">&rarr;</i></span></a>
+        <a href="{% url 'tipping_ladder' %}" class="ladder-card"><div class="lrank">03</div><svg class="cic" style="width:22px;height:22px;margin-bottom:6px;"><use href="#ic-f-trophy"/></svg><h3>National leaderboard</h3><p>Every GoodTip organisation on one table, whatever it does. Tipping nous and generosity, side by side.</p><span class="lc-go">See the nation <i aria-hidden="true">&rarr;</i></span></a>
+        <a href="/#start" class="ladder-card"><div class="lrank">04</div><svg class="cic" style="width:22px;height:22px;margin-bottom:6px;"><use href="#ic-users"/></svg><h3>You, nationally</h3><p>You against every tipper on GoodTip, people you'll never meet included. Second in the office, twentieth in the country.</p><span class="lc-go">Join and find out <i aria-hidden="true">&rarr;</i></span></a>
+      </div>
+
+      <div class="hiw-ladder-head">
+        <p class="eyebrow">The ladder</p>
+        <h3>And the ladder: every club, where it sits, round by round.</h3>
+      </div>
+      {% if board.codes %}
+      <div class="lb-panel open" data-lb-panel>
+        <div class="bd-now" aria-hidden="true">{% for c in board.codes %}<span data-code="{{ c.code }}" class="{% if forloop.first %}on{% endif %}">{{ c.code }}</span>{% endfor %}</div>
+        {% with first=board.codes.0 %}
+        <div class="board-shell lb-board" data-board data-code="{{ first.code|lower }}" data-comp="{{ first.code|lower }}">
+          <div class="bd-ladder">
+            <div class="bd-head"><span class="bd-title" data-bd-title>{{ first.code }} {{ first.season }} &middot; after round {{ first.round }}</span><span class="bd-updated"><i aria-hidden="true"></i><span data-bd-updated>Live from results</span></span></div>
+            <div class="bd-cols" aria-hidden="true"><span></span><span></span><span>Club</span><span>Form</span><span>P</span><span>W-L</span><span>{% if first.by_percentage %}%{% else %}Diff{% endif %}</span><span>Pts</span></div>
+            <div class="bd-rows" data-bd-rows data-lb-rows>
+              {% for r in first.ladder %}
+              <div class="bd-row{% if forloop.first %} top{% endif %}"><span class="rank">{{ r.rank }}</span>{% if r.logo %}<span class="crest has-logo"><img src="{{ r.logo }}" alt="" loading="lazy"></span>{% else %}<span class="crest" style="--crest-bg:{{ r.bg }};--crest-fg:{{ r.fg }}">{{ r.code }}</span>{% endif %}<span class="who">{{ r.name }}</span><span class="form">{% for ch in r.form %}<i class="{% if ch == 'W' %}w{% elif ch == 'L' %}l{% endif %}"></i>{% endfor %}</span><span class="pl">{{ r.played }}</span><span class="rec">{{ r.wins }}-{{ r.losses }}</span><span class="df">{{ r.diff }}</span><span class="pts">{{ r.points }}</span></div>
+              {% endfor %}
+            </div>
+            <p class="bd-foot">Six on screen, the rest a scroll away &mdash; worked out by GoodTip from completed results.</p>
+          </div>
+          <div class="bd-stage" data-bd-stage aria-hidden="true">
+            <div class="bd-charts" data-bd-charts></div>
+          </div>
+        </div>
+        {% endwith %}
+      </div>
+      {{ board|json_script:"board-data" }}
+      {% endif %}
+      <svg class="lb-cursor" data-lb-cursor viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 2-3 6z"/></svg>
     </div>
+
+    {% comment %}
+    A filter right here, not just in the app's Ladder menu — "it should not be
+    a must for me to use the menu" (client, 28 Sep 2026). Jumps straight to
+    the Industry leaderboard pre-filtered to whatever sector a visitor picks.
+    {% endcomment %}
+    <form method="get" action="{% url 'tipping_ladder' %}" class="ladder-jump reveal">
+      <label for="lj-type">See your sector's leaderboard</label>
+      <select name="type" id="lj-type">
+        <option value="">Choose an organisation type&hellip;</option>
+        {% for gt in organisation_types %}<option value="{{ gt.slug }}">{{ gt.name }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="hw-btn"><span>View that leaderboard</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+    </form>
   </div>
 </section>
 

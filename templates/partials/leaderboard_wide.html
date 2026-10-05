@@ -1,0 +1,55 @@
+{% comment %}
+The Leaderboard's wider boards (client, 4 Oct 2026; tipping/rankings.py):
+  industry / national — organisations, by average points per active tipper
+  everyone            — every tipper on GoodTip, one entry each
+Organisations that have not opted in to public naming read as "An
+organisation in <type>"; yours is always named to you. People appear as first
+name and last initial.
+{% endcomment %}
+<section class="lbw" data-coach="board-table">
+  {% if view == "everyone" %}
+    <header class="lbw-head">
+      <h2>Everyone on GoodTip</h2>
+      <p>Every tipper in every organisation, ranked on their best season this year. {% if board.mine %}You're <b>#{{ board.mine.rank }}</b> of {{ board.of }}.{% endif %}</p>
+    </header>
+    {% if board.rows %}
+    <div class="lbw-table">
+      <div class="lbw-row lbw-cols" aria-hidden="true"><span>#</span><span>Tipper</span><span>Organisation</span><span class="n">Correct</span><span class="n">Points</span></div>
+      {% for r in board.rows %}
+        {% if forloop.counter <= 50 or r.is_me %}
+        <div class="lbw-row{% if r.is_me %} is-me{% endif %}{% if r.rank == 1 %} is-top{% endif %}">
+          <span class="lbw-rank">{{ r.rank }}</span>
+          <span class="lbw-name">{{ r.name }}{% if r.is_me %} <i>You</i>{% endif %}</span>
+          <span class="lbw-org">{{ r.org_name }}</span>
+          <span class="n">{{ r.correct }}/{{ r.graded }}</span>
+          <span class="n lbw-pts">{{ r.points }}</span>
+        </div>
+        {% elif forloop.counter == 51 %}<div class="lbw-gap">&hellip;</div>{% endif %}
+      {% endfor %}
+    </div>
+    {% else %}<p class="lbw-empty">Nobody has a graded tip yet this season.</p>{% endif %}
+  {% else %}
+    <header class="lbw-head">
+      <h2>{% if view == "industry" %}{{ board.label|default:"Your industry" }}{% else %}Every organisation on GoodTip{% endif %}</h2>
+      <p>{% if view == "industry" %}How {{ org.name }} compares with other {{ board.label }} organisations.{% else %}Every organisation, whatever it does.{% endif %}
+         Ranked on average points per tipper, so a small office and a big workplace compete fairly. {% if board.mine %}{{ org.name }} is <b>#{{ board.mine.rank }}</b> of {{ board.of }}.{% endif %}</p>
+    </header>
+    {% if view == "industry" and not org.organisation_type_id %}
+      <p class="lbw-empty">{{ org.name }} doesn't have an organisation type yet, so there's no industry to compare with. An admin can set it in the organisation's settings.</p>
+    {% elif board.rows %}
+    <div class="lbw-table">
+      <div class="lbw-row lbw-cols lbw-orgcols" aria-hidden="true"><span>#</span><span>Organisation</span><span class="n">Tippers</span><span class="n">Avg / tipper</span><span class="n">Points</span></div>
+      {% for r in board.rows %}
+        <div class="lbw-row lbw-orgcols{% if r.is_mine %} is-me{% endif %}{% if r.rank == 1 %} is-top{% endif %}">
+          <span class="lbw-rank">{{ r.rank }}</span>
+          <span class="lbw-name">{{ r.name }}{% if r.is_mine %} <i>Yours</i>{% endif %}</span>
+          <span class="n">{{ r.tippers }}</span>
+          <span class="n lbw-pts">{{ r.avg }}</span>
+          <span class="n">{{ r.points }}</span>
+        </div>
+      {% endfor %}
+    </div>
+    <p class="lbw-note">Organisations that haven't chosen to be named publicly appear by their type only.</p>
+    {% else %}<p class="lbw-empty">No organisation has a graded tip yet this season.</p>{% endif %}
+  {% endif %}
+</section>

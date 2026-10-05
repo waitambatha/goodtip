@@ -1519,6 +1519,17 @@ class BossNoteAjaxTests(TestCase):
         self.assertTrue(data["ok"])
         self.assertIn("on their desk", data["title"])
 
+    def test_company_and_position_go_into_the_letter(self):
+        from django.core import mail
+
+        self.client.post(reverse("tell_the_boss"), {
+            "your_name": "Sam", "boss_name": "Alex", "boss_email": "alex@example.com",
+            "company_name": "Acme Freight", "your_position": "Accounts Manager",
+        }, **self.AJAX)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("footy tips at Acme Freight", mail.outbox[0].body)
+        self.assertIn("Sam, Accounts Manager", mail.outbox[0].body)
+
     def test_a_bad_address_is_json_and_keeps_the_page(self):
         resp = self.client.post(reverse("tell_the_boss"), {
             "your_name": "Sam", "boss_name": "Alex", "boss_email": "nope",

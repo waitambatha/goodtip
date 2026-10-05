@@ -1,0 +1,110 @@
+{% extends "app_base.html" %}
+{% block title %}Champion certificates, {{ org.name }}{% endblock %}
+{% block loader_task %}Loading the certificates{% endblock %}
+{% comment %}
+SEASON CHAMPION CERTIFICATES (spec addendum, Ian Hopkinson, 14 Aug 2026).
+
+One card per internal leaderboard the organisation runs (AFL, AFLW, NRL,
+NRLW). While a competition's season is still going, its card says why there is
+nothing to download yet — the certificate only exists once the board is final
+and locked (§4). After that, every champion is listed (co-champions each get
+their own, identical certificate — §2) with the two exports the spec requires:
+the landscape PDF for print and the 1080×1080 PNG for social, plus the
+optional 9:16 story PNG (§5). "Share" opens the phone's own share sheet with
+the square image where the browser supports it — no social account to
+connect, which is all §5 asks for. Lives on the org side: admins, captains and
+team managers (tipping.views._can_certify), not the winner's own account.
+{% endcomment %}
+{% block body_class %}page-deep sheet-page{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+{% block app_content %}
+<div class="app-head is-centred is-orgfirst"><div>
+  <div class="cert-mark" aria-hidden="true">GOOD<span>TIP.</span></div>
+  <div class="app-eyebrow">{{ org.name }} &middot; {{ year }} season</div>
+  <h1 class="app-h1">Champion certificates</h1>
+  <p class="app-sub">One for the season champion of each competition you run, ready to print or post once that season's leaderboard is final.</p>
+</div></div>
+
+<div class="cert-list">
+{% for c in comps %}
+  <section class="cert-comp" style="--ca: {{ c.accent }};">
+    <header class="cert-comp-head">
+      <span class="cert-chip">{{ c.series.name }}</span>
+      <h2>{{ year }} {{ c.series.name }} Season Champion</h2>
+      {% if c.state.final %}<span class="cert-state is-final">Final &middot; closed {{ c.state.closed_on|date:"j M Y" }}</span>{% else %}<span class="cert-state">Season in progress</span>{% endif %}
+    </header>
+
+    {% if not c.state.final %}
+      <p class="cert-wait">Available once the {{ c.series.name }} leaderboard is final. {{ c.state.reason }}</p>
+    {% elif not c.champions %}
+      <p class="cert-wait">The season is final, but nobody scored a point in it, so there's no champion to certify.</p>
+    {% else %}
+      {% if c.champions|length > 1 %}<p class="cert-co">Co-champions. Each gets their own certificate, same title and wording.</p>{% endif %}
+      {% comment %}
+      3 Oct 2026 (client's mock-up): each champion is one wide row — the
+      certificate itself large on the left, and on the right the champion's
+      photo in a circle (their profile photo, or one chosen for this
+      certificate), their name and title, and the downloads.
+      {% endcomment %}
+      <div class="cert-rows">
+      {% for cert in c.champions %}
+        <article class="cert-row">
+          <a class="cert-hero" href="{% url 'tipping:certificate_file' org.id cert.series cert.user_id 'square' %}?view=1" target="_blank" rel="noopener" title="Open full size">
+            <img src="{% url 'tipping:certificate_file' org.id cert.series cert.user_id 'square' %}?view=1" alt="{{ cert.headline }}: {{ cert.winner }}, {{ cert.org_name }}" width="1080" height="1080">
+          </a>
+          <div class="cert-side">
+            <div class="cert-face">
+              {% if cert.photo_url %}<img src="{{ cert.photo_url }}" alt="{{ cert.winner }}">{% else %}<span>{{ cert.initials }}</span>{% endif %}
+            </div>
+            <b class="cert-name">{{ cert.winner }}</b>
+            <span class="cert-title">{{ cert.headline }}</span>
+            <div class="cert-actions">
+              <a class="cert-btn" href="{% url 'tipping:certificate_file' org.id cert.series cert.user_id 'pdf' %}">Print PDF</a>
+              <a class="cert-btn" href="{% url 'tipping:certificate_file' org.id cert.series cert.user_id 'square' %}">Square PNG</a>
+              <a class="cert-btn cert-btn-ghost cert-wide" href="{% url 'tipping:certificate_file' org.id cert.series cert.user_id 'story' %}">Story PNG</a>
+              <button type="button" class="cert-btn cert-share cert-wide" data-cert-share
+                      data-src="{% url 'tipping:certificate_file' org.id cert.series cert.user_id 'square' %}?view=1"
+                      data-name="{{ cert.filename_png_square }}" data-title="{{ cert.headline }}: {{ cert.winner }}" hidden>Share</button>
+            </div>
+            <form class="cert-photo" method="post" enctype="multipart/form-data" action="{% url 'tipping:certificate_photo' org.id cert.series cert.user_id %}">
+              {% csrf_token %}
+              <label class="cert-photo-pick">
+                <input type="file" name="photo" accept="image/*" data-cert-photo>
+                <span>{% if cert.photo_url %}Change photo{% else %}Add a photo{% endif %}</span>
+              </label>
+              {% if cert.photo_is_custom %}<button type="submit" name="reset" value="1" class="cert-photo-reset">Use profile photo</button>{% endif %}
+            </form>
+            <p class="cert-photo-note">{% if cert.photo_is_custom %}A photo chosen for this certificate.{% elif cert.photo_url %}From {{ cert.winner }}'s profile.{% else %}No profile photo yet &mdash; add one for this certificate.{% endif %}</p>
+          </div>
+        </article>
+      {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+{% empty %}
+  <p class="cert-wait">Certificates appear here for each competition your organisation tips, once its season is final.</p>
+{% endfor %}
+</div>
+
+<script>
+document.querySelectorAll('[data-cert-photo]').forEach(function (input) {
+  input.addEventListener('change', function () { if (input.files.length) input.form.submit(); });
+});
+(function () {
+  /* §5: "a native mobile share sheet on the image is sufficient". Shown only
+     where the browser can share a file; everywhere else the downloads do it. */
+  var probe = typeof File === 'function' && new File([''], 'x.png', { type: 'image/png' });
+  if (!(navigator.canShare && probe && navigator.canShare({ files: [probe] }))) return;
+  document.querySelectorAll('[data-cert-share]').forEach(function (btn) {
+    btn.hidden = false;
+    btn.addEventListener('click', async function () {
+      try {
+        var blob = await (await fetch(btn.getAttribute('data-src'), { credentials: 'same-origin' })).blob();
+        var file = new File([blob], btn.getAttribute('data-name') || 'certificate.png', { type: 'image/png' });
+        await navigator.share({ files: [file], title: btn.getAttribute('data-title') });
+      } catch (e) { /* the person closed the sheet */ }
+    });
+  });
+})();
+</script>
+{% endblock %}

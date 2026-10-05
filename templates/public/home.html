@@ -4,11 +4,12 @@
 {% block title %}GoodTip. Footy Tipping, For Good.{% endblock %}
 {% block loader_task %}Loading GoodTip{% endblock %}
 {% block body_class %}page-home{% endblock %}
+{% block extra_head %}<script src="{% static 'js/gt-board.js' %}" defer></script><script src="{% static 'js/gt-vs.js' %}" defer></script><script src="{% static 'js/gt-how.js' %}" defer></script><script src="{% static 'js/gt-who.js' %}" defer></script><script src="{% static 'js/gt-women.js' %}" defer></script><script src="{% static 'js/gt-pick.js' %}" defer></script><script src="{% static 'js/gt-wall.js' %}" defer></script><script src="{% static 'js/gt-cause.js' %}" defer></script><script src="{% static 'js/gt-price.js' %}" defer></script><script src="{% static 'js/gt-founding.js' %}" defer></script><script src="{% static 'js/gt-hero.js' %}" defer></script>{% endblock %}
 
 {% block content %}
 
 <!-- HERO (full crossfading image) -->
-<section class="hero has-shots">
+<section class="hero has-shots" data-hero>
   <div class="hero-bg collage" aria-hidden="true">
     {% comment %}
     Each pane carries both kinds — three photographs and one clip — and
@@ -49,14 +50,33 @@
     </div>
   </div>
   <div class="hero-veil" aria-hidden="true"></div>
-  <span class="pill"><span class="dot"></span>Finals start August 28 &middot; Are you in?</span>
-  <h1>Footy tipping <em>that does good.</em></h1>
-  <p class="hero-sub">You tip. GoodTip gives. Your organisation picks the charity, and tipping is free for everyone playing.</p>
+  {% comment %}
+  Client, 27 Sep 2026: "the pill, the h1, the sub, the CTAs, the scoreboard,
+  when the page loads I want to see them typed, like I can see it happening
+  live... also add a bit more, something short that builds interest, and
+  mention that even the women's sports, like AFLW and NRLW, are part of it."
+
+  data-ty marks every line static/js/gt-hero.js types out, in order, once the
+  page loads — it is NOT scroll-triggered, unlike gt-founding.js, because the
+  hero is what greets you, always on screen from the first frame.
+  It plays once; nobody wants their own hero retyping every time they scroll
+  back to the top. The sb-labels are included so the scoreboard's own numbers
+  (still counting up exactly as before, via base.html) get typed captions
+  arriving alongside them, but the ring/pips/chips/count-up choreography
+  itself is untouched. .hero-note is new copy — the "something short" — the
+  client did not supply exact wording, so this is a placeholder to review.
+  With JavaScript off, or reduced motion, every line already stands, same as
+  everywhere else this pattern is used.
+  {% endcomment %}
+  <span class="pill" data-ty><span class="dot"></span>Finals start August 28 &middot; Are you in?</span>
+  <h1 data-ty>Footy tipping <em>that does good.</em></h1>
+  <p class="hero-sub" data-ty>You tip. GoodTip gives. Your organisation picks the charity, and tipping is free for everyone playing.</p>
   <div class="hero-ctas">
-    <a href="/how-it-works/" class="btn-ghost">How it works</a>
-    <a href="/#start" class="btn-primary">Set up your organisation &rarr;</a>
+    <a href="/how-it-works/" class="btn-ghost" data-ty>How it works</a>
+    <a href="/#start" class="btn-primary" data-ty>Set up your organisation &rarr;</a>
   </div>
-  <p class="cta-subtext">Set up your organisation. Pay when you launch.</p>
+  <p class="cta-subtext" data-ty>Set up your organisation. Pay when you launch.</p>
+  <p class="hero-note" data-ty>Every competition counts the same way &mdash; AFL and AFLW, NRL and NRLW &mdash; so the women's competitions get their own ladder, not an afterthought.</p>
 
   <div class="scoreboard" id="scoreboard" role="group" aria-label="GoodTip at a glance">
     <div class="sb-cell">
@@ -69,195 +89,352 @@
         {% endcomment %}
         <span class="pct">FREE</span>
       </div>
-      <div class="sb-label">to play, for every participant</div>
+      <div class="sb-label" data-ty>to play, for every participant</div>
     </div>
     <div class="sb-cell">
       <div class="sb-num" data-countto="23" data-suffix="+">0</div>
       <div class="sb-pips" data-pips="9"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="sb-label">rounds a season</div>
+      <div class="sb-label" data-ty>rounds a season</div>
     </div>
     <div class="sb-cell">
       <div class="sb-num" data-countto="4">0</div>
       <div class="sb-chips" data-chips><span class="sb-chip">AFL</span><span class="sb-chip">AFLW</span><span class="sb-chip">NRL</span><span class="sb-chip">NRLW</span></div>
-      <div class="sb-label">codes, every season</div>
+      <div class="sb-label" data-ty>competitions, every season</div>
     </div>
   </div>
 </section>
 
-<!-- LADDER SIGNATURE -->
-<section class="ladder-band">
-  <div class="wrap reveal" style="margin-bottom:32px;">
-    <p class="eyebrow" style="color:var(--lime);opacity:.8;">Live this season</p>
-    <h2 class="section-heading" style="color:var(--white);">The ladder still runs. The total just goes somewhere good.</h2>
+<!-- LIVE THIS SEASON: the real ladders, worked out from real results.
+     Nothing here is interactive on purpose: it walks through the competitions
+     by itself (gt-board.js) and refreshes its own numbers. -->
+{% if board.codes %}
+<section class="ladder-band board-band" id="board">
+  <div class="wrap reveal bd-intro">
+    <p class="eyebrow">Live this season</p>
+    <h2 class="section-heading">The real ladder, moving as the results come in.</h2>
+    <p class="section-sub">AFL, AFLW, NRL and NRLW, worked out from every completed game. This is what your organisation is tipping against, round after round.</p>
+    <div class="bd-now" aria-hidden="true">{% for c in board.codes %}<span data-code="{{ c.code }}" class="{% if forloop.first %}on{% endif %}">{{ c.code }}</span>{% endfor %}</div>
   </div>
-  <div class="ladder-shell reveal">
-    <div class="ladder" aria-label="Sample organisation ladder">
-      <div class="ladder-head"><span class="label">Group ladder &middot; Round 14</span><span class="round">Top of the table</span></div>
-      <div class="ladder-row top"><span class="rank">1</span><span class="who">Sharon from Accounts<small>Tipped 11/12 last round</small></span><span class="form"><i class="w"></i><i class="w"></i><i class="w"></i><i></i><i class="w"></i></span><span class="pts">128</span></div>
-      <div class="ladder-row"><span class="rank">2</span><span class="who">Big Dave<small>Origin bonus locked in</small></span><span class="form"><i class="w"></i><i></i><i class="w"></i><i class="w"></i><i class="w"></i></span><span class="pts">124</span></div>
-      <div class="ladder-row"><span class="rank">3</span><span class="who">The Quiet One in Legal<small>Quietly cooking</small></span><span class="form"><i class="w"></i><i class="w"></i><i></i><i class="w"></i><i></i></span><span class="pts">119</span></div>
-      <div class="ladder-row"><span class="rank">4</span><span class="who">Mardi &amp; the Mailroom<small>One good week away</small></span><span class="form"><i></i><i class="w"></i><i class="w"></i><i></i><i class="w"></i></span><span class="pts">112</span></div>
+  {% with first=board.codes.0 %}
+  <div class="board-shell reveal" data-board data-code="{{ first.code|lower }}" data-comp="{{ first.code|lower }}">
+    <div class="bd-ladder">
+      <div class="bd-head"><span class="bd-title" data-bd-title>{{ first.code }} {{ first.season }} &middot; after round {{ first.round }}</span><span class="bd-updated"><i aria-hidden="true"></i><span data-bd-updated>Live from results</span></span></div>
+      <div class="bd-cols" aria-hidden="true"><span></span><span></span><span>Club</span><span>Form</span><span>P</span><span>W-L</span><span>{% if first.by_percentage %}%{% else %}Diff{% endif %}</span><span>Pts</span></div>
+      <div class="bd-rows" data-bd-rows>
+        {% for r in first.ladder %}
+        <div class="bd-row{% if forloop.first %} top{% endif %}"><span class="rank">{{ r.rank }}</span>{% if r.logo %}<span class="crest has-logo"><img src="{{ r.logo }}" alt="" loading="lazy"></span>{% else %}<span class="crest" style="--crest-bg:{{ r.bg }};--crest-fg:{{ r.fg }}">{{ r.code }}</span>{% endif %}<span class="who">{{ r.name }}</span><span class="form">{% for ch in r.form %}<i class="{% if ch == 'W' %}w{% elif ch == 'L' %}l{% endif %}"></i>{% endfor %}</span><span class="pl">{{ r.played }}</span><span class="rec">{{ r.wins }}-{{ r.losses }}</span><span class="df">{{ r.diff }}</span><span class="pts">{{ r.points }}</span></div>
+        {% endfor %}
+      </div>
+      <p class="bd-foot">The top eight, worked out by GoodTip from completed results. Byes and points penalties can make it differ from the official table.</p>
     </div>
-    {% comment %}
-    THE FIGURES IN HERE ARE MADE UP, AND SAY SO (Sep 2026, client).
-
-    The ladder beside it has always been labelled a sample — four invented
-    names and their invented points, which nobody mistakes for a live board.
-    The dollar total did not carry the same label, and a big lime $8,420 under
-    the words "Raised so far" reads as a real number even sitting next to an
-    obviously fake ladder. It is the one figure on this page a visitor could
-    repeat to somebody else as fact.
-
-    So the panel wears the same EXAMPLE chip as every other unreal amount on
-    the site, and the caption now leads with what the number is before it
-    explains where the money comes from.
-    {% endcomment %}
-    <div class="tally">
-      <p class="eyebrow">Raised so far &middot; this organisation <span class="illus-tag">Example</span></p>
-      <div class="tally-num" data-countto="8420" data-prefix="$">$0</div>
-      <p class="tally-cap"><b>An illustration, not money raised.</b> GoodTip has not begun disbursing, and no organisation's real total is shown here. When it is real, GoodTip funds it from its own revenue and every dollar lands with the charity your organisation picked.</p>
-      <div class="tally-bar"><i data-pct="68"></i></div>
-      <div class="tally-meta"><span>68% to season goal</span><span>Goal $12,500</span></div>
+    <div class="bd-stage" data-bd-stage aria-hidden="true">
+      <div class="bd-charts" data-bd-charts></div>
     </div>
   </div>
+  {% endwith %}
+  {{ board|json_script:"board-data" }}
 </section>
+{% endif %}
 
 <!-- COMPARISON -->
-<section class="section on-cream">
+<section class="section on-white">
   <div class="wrap">
-    <h2 class="section-heading reveal">Every other tipping comp ends the same way.</h2>
-    <p class="section-sub reveal">Someone wins the money. Everyone else waits until next year. With GoodTip nobody puts money in at all. Your organisation pays one platform fee, and GoodTip gives a share of it to the charity your organisation picks.</p>
-    <div class="compare-frame reveal">
-      <div class="compare-col col-them">
-        <div class="compare-header"><div class="lab">Right now</div><h3>Your current footy tipping</h3></div>
-        <div class="compare-cell"><span class="cell-icon icon-no">&times;</span>Everyone chips in, one person collects</div>
-        <div class="compare-cell"><span class="cell-icon icon-no">&times;</span>Zero ESG or CSR value</div>
-        <div class="compare-cell"><span class="cell-icon icon-no">&times;</span>Nothing to show for it</div>
-        <div class="compare-cell"><span class="cell-icon icon-no">&times;</span>No engagement data</div>
-        <div class="compare-cell"><span class="cell-icon icon-no">&times;</span>Season ends, nothing lasts</div>
+    <div class="vs-intro">
+      <h2 class="vs-title reveal">Every other tipping comp ends <em>the same way.</em></h2>
+      <p class="vs-sub reveal">Someone wins the money. Everyone else waits until next year. With GoodTip, <strong>nobody in your organisation chips in.</strong> Your organisation pays one platform fee, and GoodTip gives a share of it to the charity your organisation picks.</p>
+    </div>
+    <div class="vs" data-vs>
+      <div class="vs-head">
+        <div class="vs-h vs-h-no"><div class="lab">Right now</div><h3>Your current footy tipping</h3></div>
+        <span class="vs-gap" aria-hidden="true"></span>
+        <div class="vs-h vs-h-yes"><div class="lab">With GoodTip</div><h3>Same comp. Better outcome.</h3></div>
       </div>
-      <div class="compare-col col-us">
-        <div class="compare-header"><div class="lab">With GoodTip</div><h3>Same comp. Better outcome.</h3></div>
-        <div class="compare-cell"><span class="cell-icon icon-yes">&check;</span>Free to play, and GoodTip gives to your charity</div>
-        <div class="compare-cell"><span class="cell-icon icon-yes">&check;</span>Measurable impact, reportable</div>
-        <div class="compare-cell"><span class="cell-icon icon-yes">&check;</span>Impact Report at season end</div>
-        <div class="compare-cell"><span class="cell-icon icon-yes">&check;</span>Participation data every round</div>
-        <div class="compare-cell"><span class="cell-icon icon-yes">&check;</span>A community story worth telling</div>
+      <div class="vs-row" style="--i:0">
+        <div class="vs-no"><span class="cell-icon icon-no">&times;</span><span>Everyone chips in, one person collects</span></div>
+        <span class="vs-to" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <div class="vs-yes"><span class="cell-icon icon-yes">&check;</span><span>Free to play, and GoodTip gives to your charity</span></div>
+      </div>
+      <div class="vs-row" style="--i:1">
+        <div class="vs-no"><span class="cell-icon icon-no">&times;</span><span>No community impact to point to</span></div>
+        <span class="vs-to" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <div class="vs-yes"><span class="cell-icon icon-yes">&check;</span><span>Measurable impact, ready for ESG and CSR reporting</span></div>
+      </div>
+      <div class="vs-row" style="--i:2">
+        <div class="vs-no"><span class="cell-icon icon-no">&times;</span><span>Nothing to show for it</span></div>
+        <span class="vs-to" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <div class="vs-yes"><span class="cell-icon icon-yes">&check;</span><span>Impact Report at season end</span></div>
+      </div>
+      <div class="vs-row" style="--i:3">
+        <div class="vs-no"><span class="cell-icon icon-no">&times;</span><span>No engagement data</span></div>
+        <span class="vs-to" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <div class="vs-yes"><span class="cell-icon icon-yes">&check;</span><span>Participation data every round</span></div>
+      </div>
+      <div class="vs-row" style="--i:4">
+        <div class="vs-no"><span class="cell-icon icon-no">&times;</span><span>Season ends, nothing lasts</span></div>
+        <span class="vs-to" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <div class="vs-yes"><span class="cell-icon icon-yes">&check;</span><span>A community story worth telling</span></div>
       </div>
     </div>
-    <div class="compare-callout reveal"><span class="mark">&ldquo;</span><p>Your organisation still tips every round. The leaderboard still runs. The result on Saturday still matters. The only difference: nobody has to put a cent in for any of it to count. <strong>Same ritual. Something good comes out the other end.</strong></p></div>
+    <div class="compare-callout reveal"><span class="mark">&ldquo;</span><p>Your organisation still tips every round. The leaderboard still runs. The result on Saturday still matters. The only difference: nobody in your organisation has to put a cent in for any of it to count. <strong>Same ritual. Something good comes out the other end.</strong></p></div>
   </div>
 </section>
 
-<!-- HOW IT WORKS (3 steps) -->
-<section class="section on-paper" id="how">
-  <div class="wrap">
-    <p class="eyebrow reveal">How it works</p>
-    <h2 class="section-heading reveal">Same game. Different stakes.</h2>
-    <p class="section-sub reveal">Three steps. One season. A donation your organisation made together, without anyone having to organise a fundraiser.</p>
-    <div class="step-flow reveal" data-flow>
-      <div class="step s1"><span class="step-num">Step 01</span><div class="step-icon"><svg class="cic" style="stroke:#0F2E22"><use href="#ic-users"/></svg></div><h3>Set up your organisation. Run the Charity Vote.</h3><p>Name it. Invite your team. No payment until you're ready to go. While your organisation fills, run the Charity Vote.</p></div>
+<!-- HOW IT WORKS (3 steps). On a wide screen each card in turn travels to the middle, grows,
+     spins open into a panel with a short clip, and goes back (static/js/gt-how.js);
+     everywhere else it is the plain cards. -->
+<section class="section on-paper hw" id="how" data-hw data-base="{% static 'video/trailer/' %}">
+  <div class="hw-track">
+   <div class="hw-stage">
+    <div class="wrap">
+      <div class="hw-head">
+        <p class="eyebrow reveal">How it works</p>
+        <h2 class="section-heading reveal">Same game. Different stakes.</h2>
+        <p class="section-sub reveal">Three steps. One season. A donation your organisation made together, without anyone having to organise a fundraiser.</p>
+      </div>
+      <div class="step-flow" data-flow data-hw-row>
+      <div class="step hw-card s1"><span class="step-num">Step 01</span><div class="step-icon"><svg class="cic" style="stroke:#0F2E22"><use href="#ic-users"/></svg></div><h3>Set up your organisation. Run the Charity Vote.</h3><p>Name it. Invite your team. No payment until you're ready to go. While your organisation fills, run the Charity Vote.</p><img class="step-shot" src="{% static 'video/trailer/create-org.jpg' %}" alt="" loading="lazy" width="640" height="400"></div>
       <div class="flow-conn" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></div>
-      <div class="step s2"><span class="step-num">Step 02</span><div class="step-icon"><svg class="cic" style="stroke:#0F2E22"><use href="#ic-clock"/></svg></div><h3>Tip and track.</h3><p>AFL. AFLW. NRL. NRLW. Weekly tips. Live leaderboard. Running charity total. State of Origin tips worth four points. Finals worth two.</p></div>
+      <div class="step hw-card s2"><span class="step-num">Step 02</span><div class="step-icon"><svg class="cic" style="stroke:#0F2E22"><use href="#ic-clock"/></svg></div><h3>Tip and track.</h3><p>AFL. AFLW. NRL. NRLW. Weekly tips. Live leaderboard. Running charity total. State of Origin tips worth four points. Finals worth two.</p><img class="step-shot" src="{% static 'video/trailer/picks.jpg' %}" alt="" loading="lazy" width="640" height="400"></div>
       <div class="flow-conn" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></div>
-      <div class="step s3"><span class="step-num">Step 03</span><div class="step-icon"><svg class="cic" style="stroke:#0F2E22"><use href="#ic-trophy"/></svg></div><h3>Season done well.</h3><p>Last grand final done. Impact Report goes out. Total raised. Charity named. Tipping results. Season done well.</p></div>
+      <div class="step hw-card s3"><span class="step-num">Step 03</span><div class="step-icon"><svg class="cic" style="stroke:#0F2E22"><use href="#ic-trophy"/></svg></div><h3>Season done well.</h3><p>Last grand final done. Impact Report goes out. Total raised. Charity named. Tipping results. Season done well.</p><img class="step-shot" src="{% static 'video/trailer/leaderboard.jpg' %}" alt="" loading="lazy" width="640" height="400"></div>
+      </div>
+      <p class="hw-note"><a class="hw-btn" href="/how-it-works/"><span>See the full breakdown</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a></p>
     </div>
-    <p class="note mt-m reveal"><a href="/how-it-works/">See the full breakdown &rarr;</a></p>
+    <div class="hw-panels" aria-hidden="true">
+      <div class="hw-panel s1" data-segs='[["create-org",1,4.5,"Set up your organisation"],["charity-vote",2,5.5,"Run the Charity Vote"]]'>
+        <div class="hw-in">
+          <div class="hw-copy"><span class="step-num">Step 01</span><h3>Set up your organisation. Run the Charity Vote.</h3><p>Name it. Invite your team. No payment until you're ready to go. While your organisation fills, run the Charity Vote.</p><div class="hw-dots"></div></div>
+          <div class="hw-media"><video muted playsinline preload="none" poster="{% static 'video/trailer/create-org.jpg' %}"></video><span class="hw-cap"></span></div>
+        </div>
+      </div>
+      <div class="hw-panel s2" data-segs='[["picks",2,5.5,"Pick your winners"],["leaderboard",1.5,4.5,"Watch the live leaderboard"]]'>
+        <div class="hw-in">
+          <div class="hw-copy"><span class="step-num">Step 02</span><h3>Tip and track.</h3><p>AFL. AFLW. NRL. NRLW. Weekly tips. Live leaderboard. Running charity total. State of Origin tips worth four points. Finals worth two.</p><div class="hw-dots"></div></div>
+          <div class="hw-media"><video muted playsinline preload="none" poster="{% static 'video/trailer/picks.jpg' %}"></video><span class="hw-cap"></span></div>
+        </div>
+      </div>
+      <div class="hw-panel s3" data-segs='[["leaderboard",8.5,12.5,"Your season, round by round"]]'>
+        <div class="hw-in">
+          <div class="hw-copy"><span class="step-num">Step 03</span><h3>Season done well.</h3><p>Last grand final done. Impact Report goes out. Total raised. Charity named. Tipping results. Season done well.</p><div class="hw-dots"></div></div>
+          <div class="hw-media"><video muted playsinline preload="none" poster="{% static 'video/trailer/leaderboard.jpg' %}"></video><span class="hw-cap"></span></div>
+        </div>
+      </div>
+    </div>
+   </div>
   </div>
 </section>
 
-<!-- WHO IT'S FOR -->
-<section class="section on-cream">
+<!-- WHO IT'S FOR
+     Three solid, distinct cards under a centred header. One is always "lit" —
+     it lifts, the others step back — and the light walks along them while the
+     section is on screen; a hover or Tab takes the light and holds it
+     (static/js/gt-who.js). Without JS or with reduced motion they are just
+     three cards. -->
+<section class="section on-white whofor" data-who>
   <div class="wrap">
-    <p class="eyebrow reveal">Who it's for</p>
-    <h2 class="section-heading reveal">Your community already tips. Now it does something with it.</h2>
-    <p class="section-sub reveal">Tipping comps are the best community engagement tool in Australian sport. GoodTip keeps all of that and adds one thing: somewhere worth going when the season ends.</p>
-    <div class="grid-3 reveal" data-cards>
-      <div class="for-card"><span class="for-tag">Workplaces</span><h3>A culture tool your team actually enjoys.</h3><p>Your team tips every round, free. GoodTip gives to the charity they voted for. At season end you get an Impact Report with a real number your board can cite. It sits in culture budgets. It belongs in ESG reporting. And people actually look forward to it.</p><a href="/#start" class="for-link">Get started &rarr;</a></div>
-      <div class="for-card"><span class="for-tag">Sporting clubs</span><h3>Run a season-long comp for members.</h3><p>Your members already tip. GoodTip gives it somewhere to land. Your club picks the cause and GoodTip gives to it. The leaderboard runs all season. The giving is real at the end of it.</p><a href="/#start" class="for-link">Get started &rarr;</a></div>
-      <div class="for-card"><span class="for-tag">Community organisations</span><h3>Bring people together around the footy.</h3><p>Tipping already happens. GoodTip makes it count. Your community votes for the charity, tips the games, and raises real money for a cause they chose themselves. Something worth coming back for every round.</p><a href="/#start" class="for-link">Get in touch &rarr;</a></div>
+    <div class="who-head">
+      <p class="eyebrow reveal">Who it's for</p>
+      <h2 class="section-heading reveal">Your community already tips. Now it does something with it.</h2>
+      <p class="section-sub reveal">Tipping comps are the best community engagement tool in Australian sport. GoodTip keeps all of that and adds one thing: somewhere worth going when the season ends.</p>
+    </div>
+    <div class="who-grid" data-who-grid>
+      <article class="who-card who1 reveal">
+        <span class="who-glow" aria-hidden="true"></span>
+        <div class="who-top"><span class="who-ic"><svg class="cic"><use href="#ic-org"/></svg></span><span class="who-tag">Workplaces</span></div>
+        <h3>A culture tool your team actually enjoys.</h3>
+        <p>Your team tips every round, free. GoodTip gives to the charity they voted for. At season end you get an Impact Report with a real number your board can cite. It sits in culture budgets. It belongs in ESG reporting. And people actually look forward to it.</p>
+        <ul class="who-chips"><li>Free to tip</li><li>Team-voted charity</li><li>A number for the board</li></ul>
+        <a href="/#start" class="who-btn"><span>Get started</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
+      </article>
+      <article class="who-card who2 reveal">
+        <span class="who-glow" aria-hidden="true"></span>
+        <div class="who-top"><span class="who-ic"><svg class="cic"><use href="#ic-trophy"/></svg></span><span class="who-tag">Sporting clubs</span></div>
+        <h3>Run a season-long comp for members.</h3>
+        <p>Your members already tip. GoodTip gives it somewhere to land. Your club picks the cause and GoodTip gives to it. The leaderboard runs all season. The giving is real at the end of it.</p>
+        <ul class="who-chips"><li>Club picks the cause</li><li>Season-long leaderboard</li><li>Real giving at the end</li></ul>
+        <a href="/#start" class="who-btn"><span>Get started</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
+      </article>
+      <article class="who-card who3 reveal">
+        <span class="who-glow" aria-hidden="true"></span>
+        <div class="who-top"><span class="who-ic"><svg class="cic"><use href="#ic-people"/></svg></span><span class="who-tag">Community organisations</span></div>
+        <h3>Bring people together around the footy.</h3>
+        <p>Tipping already happens. GoodTip makes it count. Your community votes for the charity, tips the games, and raises real money for a cause they chose themselves. Something worth coming back for every round.</p>
+        <ul class="who-chips"><li>Community votes</li><li>Tip the games</li><li>A cause they chose</li></ul>
+        <a href="/#start" class="who-btn"><span>Get in touch</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
+      </article>
     </div>
   </div>
 </section>
 
-<!-- IMAGE BAND (players) -->
-<section class="image-band">
+<!-- WOMEN'S SPORT INCLUDED
+     Client, 26 Sep 2026: split it. Left, what GoodTip does for women's sport,
+     typed out live; right, the women's games being tipped — and only the ones
+     that are not locked (static/js/gt-women.js). The words are all written here
+     in full and the script types them back in; with JavaScript off or reduced
+     motion the section is complete as written (reduced motion also shows the
+     tips already made). The fixtures are a sample round, labelled as one.
+     Keep .image-band and the .shot stack: gt-scenes.js rotates the photos. -->
+<section class="image-band wm" data-wm>
   <div class="shot active" style="background-image:url('{% static 'img/nrlw-players.jpg' %}')" aria-hidden="true"></div>
   <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')" aria-hidden="true"></div>
   <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')" aria-hidden="true"></div>
   <div class="veil" aria-hidden="true"></div>
-  <div class="wrap reveal from-left">
-    <p class="eyebrow" style="color:var(--lime);">Women's sport included, always</p>
-    <blockquote>AFLW comes with AFL. NRLW comes with NRL. Same price, same season.</blockquote>
-    <p class="src">Sydney Roosters NRLW &middot; Allianz Stadium</p>
+  <div class="wrap wm-split">
+    <div class="wm-left">
+      <p class="eyebrow" style="color:var(--lime);">Women's sport included, always</p>
+      <h2 class="wm-title" data-type>AFLW comes with AFL. NRLW comes with NRL. <em>Same price, same season.</em></h2>
+      <ul class="wm-list">
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg><span data-type>Tip the women's rounds right alongside the men's.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg><span data-type>One leaderboard, one season, and the charity your organisation picked.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg><span data-type>The women's game deserves the same Saturday energy, and a cause behind it.</span></li>
+      </ul>
+      <div class="wm-codes" aria-label="Competitions">
+        <span class="wm-pairing"><span class="wm-code men afl">AFL</span><i>+</i><span class="wm-code aflw">AFLW</span></span>
+        <span class="wm-pairing"><span class="wm-code men nrl">NRL</span><i>+</i><span class="wm-code nrlw">NRLW</span></span>
+      </div>
+      <p class="src">Sydney Roosters NRLW &middot; Allianz Stadium</p>
+    </div>
+    <div class="wm-card" data-wm-card role="group" aria-label="A sample round being tipped">
+      <div class="wm-head">
+        <div class="wm-tabs" role="tablist"><button type="button" class="wm-tab aflw on" data-go="0">AFLW</button><button type="button" class="wm-tab nrlw" data-go="1">NRLW</button></div>
+        <span class="wm-round">Sample round</span>
+      </div>
+      <div class="wm-body">
+        <div class="wm-panel aflw on" data-tab="AFLW">
+          <div class="wm-fix locked"><span class="wm-when"><svg class="wm-lk" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-lock"/></svg>Locked &middot; underway</span><div class="wm-pair"><span class="wm-pick"><img src="{% static 'img/teams/carlton.png' %}" alt="" width="28" height="28"><b>Carlton</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><i>v</i><span class="wm-pick"><img src="{% static 'img/teams/collingwood.png' %}" alt="" width="28" height="28"><b>Collingwood</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></div></div>
+          <div class="wm-fix"><span class="wm-when">Sat 1:05pm</span><div class="wm-pair"><span class="wm-pick"><img src="{% static 'img/teams/adelaide-crows.png' %}" alt="" width="28" height="28"><b>Adelaide</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><i>v</i><span class="wm-pick"><img src="{% static 'img/teams/brisbane-lions.png' %}" alt="" width="28" height="28"><b>Brisbane</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></div></div>
+          <div class="wm-fix"><span class="wm-when">Sat 3:30pm</span><div class="wm-pair"><span class="wm-pick"><img src="{% static 'img/teams/geelong-cats.png' %}" alt="" width="28" height="28"><b>Geelong</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><i>v</i><span class="wm-pick"><img src="{% static 'img/teams/melbourne.png' %}" alt="" width="28" height="28"><b>Melbourne</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></div></div>
+          <div class="wm-fix"><span class="wm-when">Sun 1:10pm</span><div class="wm-pair"><span class="wm-pick"><img src="{% static 'img/teams/richmond.png' %}" alt="" width="28" height="28"><b>Richmond</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><i>v</i><span class="wm-pick"><img src="{% static 'img/teams/fremantle.png' %}" alt="" width="28" height="28"><b>Fremantle</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></div></div>
+        </div>
+        <div class="wm-panel nrlw" data-tab="NRLW">
+          <div class="wm-fix locked"><span class="wm-when"><svg class="wm-lk" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-lock"/></svg>Locked &middot; underway</span><div class="wm-pair"><span class="wm-pick"><img src="{% static 'img/teams/roosters.png' %}" alt="" width="28" height="28"><b>Roosters</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><i>v</i><span class="wm-pick"><img src="{% static 'img/teams/brisbane-broncos.png' %}" alt="" width="28" height="28"><b>Broncos</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></div></div>
+          <div class="wm-fix"><span class="wm-when">Sat 3:00pm</span><div class="wm-pair"><span class="wm-pick"><img src="{% static 'img/teams/knights.png' %}" alt="" width="28" height="28"><b>Knights</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><i>v</i><span class="wm-pick"><img src="{% static 'img/teams/sharks.png' %}" alt="" width="28" height="28"><b>Sharks</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></div></div>
+          <div class="wm-fix"><span class="wm-when">Sat 5:30pm</span><div class="wm-pair"><span class="wm-pick"><img src="{% static 'img/teams/dragons.png' %}" alt="" width="28" height="28"><b>Dragons</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><i>v</i><span class="wm-pick"><img src="{% static 'img/teams/warriors.png' %}" alt="" width="28" height="28"><b>Warriors</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></div></div>
+          <div class="wm-fix"><span class="wm-when">Sun 2:00pm</span><div class="wm-pair"><span class="wm-pick"><img src="{% static 'img/teams/titans.png' %}" alt="" width="28" height="28"><b>Titans</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><i>v</i><span class="wm-pick"><img src="{% static 'img/teams/canberra-raiders.png' %}" alt="" width="28" height="28"><b>Raiders</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></div></div>
+        </div>
+      </div>
+      <div class="wm-slip"><span class="wm-count"><b>0</b> of 3 open games tipped</span><span class="wm-bar"><i></i></span><span class="wm-saved"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Tips in</span></div>
+      <div class="wm-toast" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#ic-lock"/></svg>Locked. That game has started.</div>
+      <svg class="wm-cursor" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 2-3 6z"/></svg>
+    </div>
   </div>
 </section>
 
-<!-- QUOTE BREAK -->
-<div class="quote-break reveal">
-  <blockquote>Your organisation picks the charity. <em>Then tips for it all season.</em></blockquote>
+<!-- QUOTE BREAK
+     Four organisations, four colours, each running its own Charity Vote
+     (static/js/gt-pick.js). A card opens into a wide panel, its members vote,
+     a charity wins, and the panel closes back to the card, which now says who
+     it is supporting. Then the next. The organisations, votes and results are a
+     sample, labelled as one; the charities are the ones named further down the
+     page. The cards carry the finished picture (each already supporting its
+     winner), so with JavaScript off or reduced motion that is what shows. -->
+<div class="quote-break qb reveal" data-qb>
+  <blockquote><span class="qb-l1">Your organisation picks the charity.</span> <em class="qb-l2">Then tips for it all season.</em></blockquote>
+  <p class="qb-cap">Four organisations, four Charity Votes &middot; sample</p>
+  <div class="qb-stage" data-stage>
+    <div class="qb-orgs">
+      <div class="qb-org o1"><span class="qb-oic"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-org"/></svg></span><b>Riverside Logistics</b><small>Workplace</small><span class="qb-state"><span class="s-wait">Choosing a charity&hellip;</span><span class="s-done"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Supporting <em>Lifeline</em></span></span></div>
+      <div class="qb-org o2"><span class="qb-oic"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-trophy"/></svg></span><b>Eastgate Juniors FC</b><small>Sporting club</small><span class="qb-state"><span class="s-wait">Choosing a charity&hellip;</span><span class="s-done"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Supporting <em>Australian Red Cross</em></span></span></div>
+      <div class="qb-org o3"><span class="qb-oic"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-people"/></svg></span><b>Parkview Community Centre</b><small>Community organisation</small><span class="qb-state"><span class="s-wait">Choosing a charity&hellip;</span><span class="s-done"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Supporting <em>headspace</em></span></span></div>
+      <div class="qb-org o4"><span class="qb-oic"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-org"/></svg></span><b>Southbank Legal</b><small>Workplace</small><span class="qb-state"><span class="s-wait">Choosing a charity&hellip;</span><span class="s-done"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Supporting <em>McGrath Foundation</em></span></span></div>
+    </div>
+    <div class="qb-panels" aria-hidden="true">
+      <div class="qb-panel o1">
+        <div class="qb-in">
+          <div class="qb-left"><span class="qb-lab">Charity Vote</span><h3>Riverside Logistics</h3><small>Workplace</small><div class="qb-live"><i></i><span class="l-open">Voting open</span><span class="l-shut">Voting closed</span></div><div class="qb-foot"><span class="qb-confirm"><span class="c-ask">Confirm my vote</span><span class="c-sent"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Vote confirmed</span></span><div class="qb-count"><b data-count>50</b><span>votes cast</span></div></div></div>
+          <div class="qb-right">
+          <div class="qb-row win" style="--v:46%" data-v="46"><span class="qb-ric"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-lifebuoy"/></svg></span><span class="qb-rn"><b>Lifeline</b><span class="qb-bar"><i></i></span></span><span class="qb-radio"></span><em>46%</em><span class="qb-badge">Winner</span></div>
+          <div class="qb-row" style="--v:31%" data-v="31"><span class="qb-ric"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-mind"/></svg></span><span class="qb-rn"><b>headspace</b><span class="qb-bar"><i></i></span></span><span class="qb-radio"></span><em>31%</em></div>
+          <div class="qb-row" style="--v:23%" data-v="23"><span class="qb-ric"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-mustache"/></svg></span><span class="qb-rn"><b>Movember</b><span class="qb-bar"><i></i></span></span><span class="qb-radio"></span><em>23%</em></div>
+          </div>
+        </div>
+        <div class="qb-won"><span class="qb-wic"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-lifebuoy"/></svg></span><small>The vote is in</small><strong>Lifeline has won</strong><span class="qb-wsub">Riverside Logistics will support it all season</span></div>
+        <svg class="qb-cursor" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 2-3 6z"/></svg>
+      </div>
+      <div class="qb-panel o2">
+        <div class="qb-in">
+          <div class="qb-left"><span class="qb-lab">Charity Vote</span><h3>Eastgate Juniors FC</h3><small>Sporting club</small><div class="qb-live"><i></i><span class="l-open">Voting open</span><span class="l-shut">Voting closed</span></div><div class="qb-foot"><span class="qb-confirm"><span class="c-ask">Confirm my vote</span><span class="c-sent"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Vote confirmed</span></span><div class="qb-count"><b data-count>50</b><span>votes cast</span></div></div></div>
+          <div class="qb-right">
+          <div class="qb-row" style="--v:27%" data-v="27"><span class="qb-ric"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-cap"/></svg></span><span class="qb-rn"><b>The Smith Family</b><span class="qb-bar"><i></i></span></span><span class="qb-radio"></span><em>27%</em></div>
+          <div class="qb-row win" style="--v:52%" data-v="52"><span class="qb-ric"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-cross"/></svg></span><span class="qb-rn"><b>Australian Red Cross</b><span class="qb-bar"><i></i></span></span><span class="qb-radio"></span><em>52%</em><span class="qb-badge">Winner</span></div>
+          <div class="qb-row" style="--v:21%" data-v="21"><span class="qb-ric"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-people"/></svg></span><span class="qb-rn"><b>ReachOut</b><span class="qb-bar"><i></i></span></span><span class="qb-radio"></span><em>21%</em></div>
+          </div>
+        </div>
+        <div class="qb-won"><span class="qb-wic"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-cross"/></svg></span><small>The vote is in</small><strong>Australian Red Cross has won</strong><span class="qb-wsub">Eastgate Juniors FC will support it all season</span></div>
+        <svg class="qb-cursor" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 2-3 6z"/></svg>
+      </div>
+      <div class="qb-panel o3">
+        <div class="qb-in">
+          <div class="qb-left"><span class="qb-lab">Charity Vote</span><h3>Parkview Community Centre</h3><small>Community organisation</small><div class="qb-live"><i></i><span class="l-open">Voting open</span><span class="l-shut">Voting closed</span></div><div class="qb-foot"><span class="qb-confirm"><span class="c-ask">Confirm my vote</span><span class="c-sent"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Vote confirmed</span></span><div class="qb-count"><b data-count>50</b><span>votes cast</span></div></div></div>
+          <div class="qb-right">
+          <div class="qb-row win" style="--v:41%" data-v="41"><span class="qb-ric"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-mind"/></svg></span><span class="qb-rn"><b>headspace</b><span class="qb-bar"><i></i></span></span><span class="qb-radio"></span><em>41%</em><span class="qb-badge">Winner</span></div>
+          <div class="qb-row" style="--v:35%" data-v="35"><span class="qb-ric"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-flask"/></svg></span><span class="qb-rn"><b>Black Dog Institute</b><span class="qb-bar"><i></i></span></span><span class="qb-radio"></span><em>35%</em></div>
+          <div class="qb-row" style="--v:24%" data-v="24"><span class="qb-ric"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-people"/></svg></span><span class="qb-rn"><b>ReachOut</b><span class="qb-bar"><i></i></span></span><span class="qb-radio"></span><em>24%</em></div>
+          </div>
+        </div>
+        <div class="qb-won"><span class="qb-wic"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-mind"/></svg></span><small>The vote is in</small><strong>headspace has won</strong><span class="qb-wsub">Parkview Community Centre will support it all season</span></div>
+        <svg class="qb-cursor" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 2-3 6z"/></svg>
+      </div>
+      <div class="qb-panel o4">
+        <div class="qb-in">
+          <div class="qb-left"><span class="qb-lab">Charity Vote</span><h3>Southbank Legal</h3><small>Workplace</small><div class="qb-live"><i></i><span class="l-open">Voting open</span><span class="l-shut">Voting closed</span></div><div class="qb-foot"><span class="qb-confirm"><span class="c-ask">Confirm my vote</span><span class="c-sent"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Vote confirmed</span></span><div class="qb-count"><b data-count>50</b><span>votes cast</span></div></div></div>
+          <div class="qb-right">
+          <div class="qb-row" style="--v:18%" data-v="18"><span class="qb-ric"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-mustache"/></svg></span><span class="qb-rn"><b>Movember</b><span class="qb-bar"><i></i></span></span><span class="qb-radio"></span><em>18%</em></div>
+          <div class="qb-row" style="--v:24%" data-v="24"><span class="qb-ric"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-lifebuoy"/></svg></span><span class="qb-rn"><b>Lifeline</b><span class="qb-bar"><i></i></span></span><span class="qb-radio"></span><em>24%</em></div>
+          <div class="qb-row win" style="--v:58%" data-v="58"><span class="qb-ric"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-ribbon"/></svg></span><span class="qb-rn"><b>McGrath Foundation</b><span class="qb-bar"><i></i></span></span><span class="qb-radio"></span><em>58%</em><span class="qb-badge">Winner</span></div>
+          </div>
+        </div>
+        <div class="qb-won"><span class="qb-wic"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-ribbon"/></svg></span><small>The vote is in</small><strong>McGrath Foundation has won</strong><span class="qb-wsub">Southbank Legal will support it all season</span></div>
+        <svg class="qb-cursor" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 2-3 6z"/></svg>
+      </div>
+    </div>
+  </div>
   <p class="quote-attr">That's the bit that changes everything.</p>
 </div>
 
-<!-- THE WALL TEASER -->
-<section class="section wall-stage">
-  <div class="wrap">
-    <p class="eyebrow reveal">New for 2026 &middot; The Wall</p>
-    <h2 class="section-heading reveal">The banter is half the reason people tip. <em>Now it has a home.</em></h2>
-    <p class="section-sub reveal rotate-lines" data-rotate-lines aria-live="polite"><span class="rline on">Every round, the Wall is where the organisation lives: tips, sledges, and the leaderboard shuffle, in real time.</span>
-      <span class="rline">Big Dave just backed the Pies by 30+ and told the whole room to screenshot it. That's the Wall.</span>
-      <span class="rline">Monday's ladder screenshot posts itself now, and the room does the rest.</span>
-      <span class="rline">The quiet one in Legal tipped 12 from 12 and said nothing. The Wall said it for them.</span>
-      <span class="rline">It's the bit ESPN FootyTips never built, and the reason your organisation keeps showing up every round.</span></p>
-    {% comment %}
-    data-live-thread: gt-live.js takes these two posts apart at runtime and
-    plays them back — Dave types, the room reacts, then GoodTip answers. The
-    posts below are written out in full and are what the page shows with
-    JavaScript off or reduced motion on; nothing is invented by the script.
-    Client, 22 Sep 2026: "let me see the first text being typed, then the other
-    kind of like replies ... like see the magic happen."
-    {% endcomment %}
-    <div class="reveal wall-live" data-live-thread>
-      {% comment %}
-      SIX POSTS, NOT TWO (client, 22 Sep 2026: "let it not only be one but
-      lots"). Two exchanges read as a mock-up of a feed; six read as a room.
-      The order is the argument: somebody sledges, the room answers, the
-      system posts the ladder, the quiet one lands the punchline. That is what
-      the Wall is for, and it is easier to show than to describe.
-      {% endcomment %}
-      <div class="post">
-        <div class="post-head"><span class="av">BD</span><span class="meta"><b>Big Dave</b><small>Round 14 &middot; 2h ago</small></span><span class="tag">Top tipper</span></div>
-        <p class="post-body">Backing the <span class="pick">&#9733; Pies</span> by 30+. Screenshot this if I'm wrong.</p>
-        <div class="post-foot"><span class="react" data-on="false">&#128293; <span class="c">14</span></span><span class="react" data-on="false">&#128514; <span class="c">8</span></span><span class="react" data-on="false">Reply</span></div>
-      </div>
-      <div class="post">
-        <div class="post-head"><span class="av" style="background:rgba(255,142,180,.18);">PK</span><span class="meta"><b>Priya</b><small>Round 14 &middot; 2h ago</small></span></div>
-        <p class="post-body">Dave has tipped the Pies every week since April. One of these rounds he'll be right.</p>
-        <div class="post-foot"><span class="react" data-on="true">&#128514; <span class="c">22</span></span><span class="react" data-on="false">&#128076; <span class="c">6</span></span></div>
-      </div>
-      <div class="post">
-        <div class="post-head"><span class="av" style="background:rgba(200,241,53,.15);">GT</span><span class="meta"><b>GoodTip</b><small>Auto &middot; Round 14 close</small></span><span class="tag sys">Ladder</span></div>
-        <p class="post-body">Round 14 locked. <b style="color:#fff;">The Quiet One in Legal</b> went 9 from 9 and jumped to <strong style="color:var(--lime);">3rd</strong>. Three on the bounce. Watch your back, Dave.</p>
-        <div class="post-foot"><span class="react" data-on="true">&#128064; <span class="c">31</span></span><span class="react" data-on="false">&#127881; <span class="c">12</span></span></div>
-      </div>
-      <div class="post">
-        <div class="post-head"><span class="av" style="background:rgba(90,169,255,.18);">QL</span><span class="meta"><b>The Quiet One in Legal</b><small>Round 14 &middot; 1h ago</small></span><span class="tag">3rd</span></div>
-        <p class="post-body">No comment.</p>
-        <div class="post-foot"><span class="react" data-on="true">&#128514; <span class="c">47</span></span><span class="react" data-on="false">&#128293; <span class="c">19</span></span></div>
-      </div>
-      <div class="post">
-        <div class="post-head"><span class="av" style="background:rgba(199,155,255,.18);">SM</span><span class="meta"><b>Sam &middot; Warehouse</b><small>Round 14 &middot; 48m ago</small></span></div>
-        <p class="post-body">Finance floor is two points off the lead and they will not stop talking about it. Someone please tip against them.</p>
-        <div class="post-foot"><span class="react" data-on="false">&#128514; <span class="c">15</span></span><span class="react" data-on="false">Reply</span></div>
-      </div>
-      <div class="post">
-        <div class="post-head"><span class="av" style="background:rgba(200,241,53,.15);">GT</span><span class="meta"><b>GoodTip</b><small>Auto &middot; Season total</small></span><span class="tag sys">Raised</span></div>
-        <p class="post-body">Your organisation has raised <strong style="color:var(--lime);">$1,840</strong> for <b style="color:#fff;">Lifeline</b> this season. Fourteen rounds, nobody paid a cent to play.</p>
-        <div class="post-foot"><span class="react" data-on="true">&#10084;&#65039; <span class="c">63</span></span><span class="react" data-on="false">&#127881; <span class="c">28</span></span></div>
-      </div>
+<!-- THE WALL TEASER
+     A split. The words on the left are typed out live; on the right a phone
+     shows the Wall being used (static/js/gt-wall.js). Two threads, each a post
+     and its reply, then a hand taps the rotate button, the phone turns to
+     landscape, slides to the middle, and more of the room comes in. Everything
+     is written out in full below, so with JavaScript off or reduced motion the
+     page shows the finished phone and all the words; the script takes it apart
+     and replays it. The names and posts are sample copy. -->
+<section class="section wall-stage ww" data-ww>
+  <div class="wrap ww-split" data-ww-split>
+    <div class="ww-left">
+      <p class="eyebrow ww-eye" data-ty>New for 2026 &middot; The Wall</p>
+      <h2 class="section-heading ww-title" data-ty>The banter is half the reason people tip. <em>Now it has a home.</em></h2>
+      <ul class="ww-lines">
+        <li><span data-ty>Every round, the Wall is where the organisation lives: tips, sledges, and the leaderboard shuffle, in real time.</span></li>
+        <li><span data-ty>Big Dave just backed the Pies by 30+ and told the whole room to screenshot it. That's the Wall.</span></li>
+        <li><span data-ty>Monday's ladder screenshot posts itself now, and the room does the rest.</span></li>
+        <li><span data-ty>The quiet one in Legal tipped 12 from 12 and said nothing. The Wall said it for them.</span></li>
+        <li><span data-ty>It's the bit ESPN FootyTips never built, and the reason your organisation keeps showing up every round.</span></li>
+      </ul>
+      <p class="ww-cta"><a href="/wall/" class="btn-ghost">See the Wall &rarr;</a></p>
     </div>
+    <div class="ww-stage" data-ww-stage aria-hidden="true">
+      <div class="ww-zoom"><div class="ww-phone" data-phone>
+        <span class="ww-side s1"></span><span class="ww-side s2"></span><span class="ww-side s3"></span><span class="ww-side s4"></span>
+        <span class="ww-island"></span>
+        <div class="ww-screen p">
+          <div class="ww-bar"><b>9:41</b><span class="ww-sig"><i></i><i></i><i></i><i class="bat"></i></span></div>
+          <div class="ww-head"><span class="ww-logo">GT</span><span class="ww-ht"><b>The Wall</b><small>Riverside Logistics &middot; 38 online</small></span><span class="ww-live">Live</span></div>
+          <div class="ww-feed"><div class="ww-flow"><div class="ww-m"><span class="ww-av a1">BD</span><div class="ww-b"><div class="ww-n"><b>Big Dave</b><small>Round 14 &middot; 2h</small><i class="ww-tg">Top tipper</i></div><p data-t>Backing the <em>&#9733; Pies</em> by 30+. Screenshot this if I'm wrong.</p><div class="ww-r"><span>&#128293; 14</span><span>&#128514; 8</span></div></div></div><div class="ww-m re"><span class="ww-av a2">PK</span><div class="ww-b"><div class="ww-n"><b>Priya</b><small>Round 14 &middot; 2h</small></div><div class="ww-q"><b>Big Dave</b>Backing the &#9733; Pies by 30+&hellip;</div><p data-t>Dave has tipped the Pies every week since April. One of these rounds he'll be right.</p><div class="ww-r"><span>&#128514; 22</span></div></div></div><div class="ww-m sys"><span class="ww-av a3">GT</span><div class="ww-b"><div class="ww-n"><b>GoodTip</b><small>Auto &middot; Round 14 close</small><i class="ww-tg sys">Ladder</i></div><p data-t>Round 14 locked. <em>The Quiet One in Legal</em> went 9 from 9 and jumped to <strong>3rd</strong>. Watch your back, Dave.</p><div class="ww-r"><span>&#128064; 31</span></div></div></div><div class="ww-m re"><span class="ww-av a4">QL</span><div class="ww-b"><div class="ww-n"><b>The Quiet One</b><small>Round 14 &middot; 1h</small></div><div class="ww-q"><b>GoodTip</b>Round 14 locked&hellip;</div><p data-t>No comment.</p><div class="ww-r"><span>&#128514; 47</span><span>&#128293; 19</span></div></div></div></div></div>
+          <div class="ww-comp"><span class="ww-inp">Say something to the room&hellip;</span><span class="ww-rot" data-rot><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="3" width="8" height="13" rx="2"/><path d="M4 14.5a8 8 0 0 0 10 6"/><path d="m14.6 17.6-.6 3.3 3.2.7"/></svg></span></div>
+          <span class="ww-home"></span>
+        </div>
+        <div class="ww-screen l">
+          <div class="ww-head"><span class="ww-logo">GT</span><span class="ww-ht"><b>The Wall</b><small>Riverside Logistics &middot; Round 15</small></span><span class="ww-live">Live</span></div>
+          <div class="ww-cols">
+            <div class="ww-feed"><div class="ww-flow" data-lflow><div class="ww-m"><span class="ww-av a5">SM</span><div class="ww-b"><div class="ww-n"><b>Sam &middot; Warehouse</b><small>Round 14 &middot; 48m</small></div><p data-t>Finance floor is two points off the lead and they will not stop talking about it. Someone please tip against them.</p><div class="ww-r"><span>&#128514; 15</span></div></div></div><div class="ww-m re"><span class="ww-av a1">BD</span><div class="ww-b"><div class="ww-n"><b>Big Dave</b><small>Round 15 &middot; now</small></div><div class="ww-q"><b>Sam &middot; Warehouse</b>Finance floor is two points&hellip;</div><p data-t>Round 15 tips are in. Pies again. Obviously.</p><div class="ww-r"><span>&#128293; 19</span></div></div></div><div class="ww-m sys"><span class="ww-av a3">GT</span><div class="ww-b"><div class="ww-n"><b>GoodTip</b><small>Auto &middot; Season total</small><i class="ww-tg sys">Raised</i></div><p data-t>Your organisation has raised <strong>$1,840</strong> for <em>Lifeline</em> this season. Fourteen rounds, nobody paid a cent to play.</p><div class="ww-r"><span>&#10084;&#65039; 63</span><span>&#127881; 28</span></div></div></div><div class="ww-m re"><span class="ww-av a2">PK</span><div class="ww-b"><div class="ww-n"><b>Priya</b><small>Round 15 &middot; now</small></div><div class="ww-q"><b>GoodTip</b>Your organisation has raised&hellip;</div><p data-t>Monday's ladder screenshot posts itself. Get your excuses ready.</p><div class="ww-r"><span>&#127881; 12</span></div></div></div></div></div>
+            <div class="ww-ladder"><h4>Ladder</h4><div class="ww-lrows"><div class="ww-lr" data-n="Priya" style="--i:0"><b>1</b><span>Priya</span><em>118</em></div><div class="ww-lr" data-n="Big Dave" style="--i:1"><b>2</b><span>Big Dave</span><em>114</em></div><div class="ww-lr" data-n="Sam" style="--i:2"><b>3</b><span>Sam</span><em>113</em></div><div class="ww-lr" data-n="The Quiet One" style="--i:3"><b>4</b><span>Quiet One</span><em>111</em></div></div></div>
+          </div>
+        </div>
+      </div></div>
+      <svg class="ww-hand" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 2-3 6z"/></svg>
     </div>
-    <p class="mt-m reveal"><a href="/wall/" class="btn-ghost">See the Wall &rarr;</a></p>
   </div>
 </section>
 
@@ -304,63 +481,135 @@ section at all, which is the other half of why this is off.
   </section>
 {% endcomment %}
 
-<!-- CHARITIES (icon cards) -->
-<section class="section on-cream" id="charities">
+<!-- CHARITIES
+     One plate that turns. The title of each set sits in the middle first, spins
+     up into place, and the cards flip in, each in its own colour; then the whole
+     plate turns 360 and the other set is on the other side (static/js/gt-cause.js).
+     Written out in full, so with JavaScript off or reduced motion both sets show
+     one under the other. -->
+<section class="section on-cream cpx" id="charities" data-cpx>
   <div class="wrap">
     <p class="eyebrow reveal">Charity partners</p>
     <h2 class="section-heading reveal">Supporting the causes closest to Australian hearts.</h2>
     <p class="section-sub reveal">Your organisation votes on which charity receives the season's donations. Choose from our donation pool, or pair with a hands-on activity partner for something your whole organisation can do together.</p>
 
-    <p class="cat-label reveal">Donation partners</p>
-    <div class="grid-4 reveal" data-cards style="margin-bottom:44px;">
-      <div class="charity-card"><div class="charity-icon"><svg><use href="#ic-lifebuoy"/></svg></div><h4>Lifeline</h4><p>Crisis support</p><span class="cgive">Funds go here &rarr;</span></div>
-      <div class="charity-card"><div class="charity-icon"><svg><use href="#ic-mind"/></svg></div><h4>headspace</h4><p>Youth mental health</p><span class="cgive">Funds go here &rarr;</span></div>
-      <div class="charity-card"><div class="charity-icon"><svg><use href="#ic-people"/></svg></div><h4>ReachOut</h4><p>Online youth wellbeing</p><span class="cgive">Funds go here &rarr;</span></div>
-      <div class="charity-card"><div class="charity-icon"><svg><use href="#ic-mustache"/></svg></div><h4>Movember</h4><p>Men's health</p><span class="cgive">Funds go here &rarr;</span></div>
-      <div class="charity-card"><div class="charity-icon"><svg><use href="#ic-flask"/></svg></div><h4>Black Dog Institute</h4><p>Mental health research</p><span class="cgive">Funds go here &rarr;</span></div>
-      <div class="charity-card"><div class="charity-icon"><svg><use href="#ic-ribbon"/></svg></div><h4>McGrath Foundation</h4><p>Breast cancer support</p><span class="cgive">Funds go here &rarr;</span></div>
-      <div class="charity-card"><div class="charity-icon"><svg><use href="#ic-cross"/></svg></div><h4>Australian Red Cross</h4><p>Humanitarian</p><span class="cgive">Funds go here &rarr;</span></div>
-      <div class="charity-card"><div class="charity-icon"><svg><use href="#ic-cap"/></svg></div><h4>The Smith Family</h4><p>Children's education</p><span class="cgive">Funds go here &rarr;</span></div>
+    <div class="cpx-tabs" data-cpx-tabs role="tablist" aria-label="Partner type"><button type="button" class="on" role="tab">Donation partners</button><button type="button" role="tab">Hands-on activity partners</button></div>
+    <div class="cpx-stage" data-cpx-stage>
+      <div class="cpx-back" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#ic-heart"/></svg></div>
+      <div class="cpx-face don on">
+        <div class="cpx-title"><h3>Donation partners</h3><span class="cpx-count">8 charities in the pool</span></div>
+        <div class="cpx-grid">
+        <div class="cpx-card t1"><span class="cpx-ic logo"><img src="{% static 'img/charities/lifeline.png' %}" alt="" width="48" height="48" loading="lazy"></span><h4>Lifeline</h4><p>Crisis support</p><span class="cpx-tag">Funds go here &rarr;</span></div>
+        <div class="cpx-card t2"><span class="cpx-ic"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-mind"/></svg></span><h4>headspace</h4><p>Youth mental health</p><span class="cpx-tag">Funds go here &rarr;</span></div>
+        <div class="cpx-card t3"><span class="cpx-ic logo"><img src="{% static 'img/charities/reachout.png' %}" alt="" width="48" height="48" loading="lazy"></span><h4>ReachOut</h4><p>Online youth wellbeing</p><span class="cpx-tag">Funds go here &rarr;</span></div>
+        <div class="cpx-card t4"><span class="cpx-ic logo"><img src="{% static 'img/charities/movember.png' %}" alt="" width="48" height="48" loading="lazy"></span><h4>Movember</h4><p>Men's health</p><span class="cpx-tag">Funds go here &rarr;</span></div>
+        <div class="cpx-card t5"><span class="cpx-ic"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-flask"/></svg></span><h4>Black Dog Institute</h4><p>Mental health research</p><span class="cpx-tag">Funds go here &rarr;</span></div>
+        <div class="cpx-card t6"><span class="cpx-ic logo"><img src="{% static 'img/charities/mcgrath.png' %}" alt="" width="48" height="48" loading="lazy"></span><h4>McGrath Foundation</h4><p>Breast cancer support</p><span class="cpx-tag">Funds go here &rarr;</span></div>
+        <div class="cpx-card t7"><span class="cpx-ic logo"><img src="{% static 'img/charities/red-cross.png' %}" alt="" width="48" height="48" loading="lazy"></span><h4>Australian Red Cross</h4><p>Humanitarian</p><span class="cpx-tag">Funds go here &rarr;</span></div>
+        <div class="cpx-card t8"><span class="cpx-ic logo"><img src="{% static 'img/charities/smith-family.png' %}" alt="" width="48" height="48" loading="lazy"></span><h4>The Smith Family</h4><p>Children's education</p><span class="cpx-tag">Funds go here &rarr;</span></div>
+        </div>
+      </div>
+      <div class="cpx-face han">
+        <div class="cpx-title"><h3>Hands-on activity partners</h3><span class="cpx-count">Do something together</span></div>
+        <div class="cpx-grid">
+        <div class="cpx-card h1"><span class="cpx-ic"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-bowl"/></svg></span><h4>Foodbank Australia</h4><p>Food relief</p><span class="cpx-tag">Warehouse shifts</span></div>
+        <div class="cpx-card h2"><span class="cpx-ic logo dk"><img src="{% static 'img/charities/habitat.png' %}" alt="" width="48" height="48" loading="lazy"></span><h4>Habitat for Humanity</h4><p>Housing</p><span class="cpx-tag">Build days</span></div>
+        <div class="cpx-card h3"><span class="cpx-ic logo"><img src="{% static 'img/charities/clean-up.png' %}" alt="" width="48" height="48" loading="lazy"></span><h4>Clean Up Australia</h4><p>Environment</p><span class="cpx-tag">Community clean-ups</span></div>
+        <div class="cpx-card h4"><span class="cpx-ic"><svg viewBox="0 0 24 24" class="cic"><use href="#ic-recycle"/></svg></span><h4>OzHarvest</h4><p>Food rescue</p><span class="cpx-tag">Food rescue shifts</span></div>
+        </div>
+      </div>
     </div>
-
-    <p class="cat-label reveal">Hands-on activity partners</p>
-    <div class="grid-4 reveal" data-cards style="margin-bottom:24px;">
-      <div class="charity-card"><div class="charity-icon alt"><svg><use href="#ic-bowl"/></svg></div><h4>Foodbank Australia</h4><p>Food relief</p><span class="cgive">Warehouse shifts</span></div>
-      <div class="charity-card"><div class="charity-icon alt"><svg><use href="#ic-home"/></svg></div><h4>Habitat for Humanity</h4><p>Housing</p><span class="cgive">Build days</span></div>
-      <div class="charity-card"><div class="charity-icon alt"><svg><use href="#ic-leaf"/></svg></div><h4>Clean Up Australia</h4><p>Environment</p><span class="cgive">Community clean-ups</span></div>
-      <div class="charity-card"><div class="charity-icon alt"><svg><use href="#ic-recycle"/></svg></div><h4>OzHarvest</h4><p>Food rescue</p><span class="cgive">Food rescue shifts</span></div>
-    </div>
-    <p class="note reveal">Want your charity in the pool? <a href="/#start">Get in touch.</a></p>
+    <p class="cpx-cta reveal"><a class="cpx-btn" href="/#start"><span>Want your charity in the pool?</span><b>Get in touch</b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a></p>
   </div>
 </section>
 
 <!-- PRICING TEASER -->
-<section class="section on-paper" id="pricing">
+<!-- Pricing, on lime. REBUILT 29 SEP 2026 to match a reference the client
+     supplied, /home/mbatha_waita/Documents/card1.png, and then the exact
+     generation prompt behind it, pasted in full: "reproduce these designs as
+     closely as possible... study the images carefully and reproduce their
+     composition, spacing, proportions, typography, colors, card sizes,
+     shadows, and decorative elements... the reference images are the source
+     of truth."
+
+     That prompt describes one static illustration, not an interaction, so
+     the 28 Sep build's typing/cursor/flip-to-a-receipt sequence is gone —
+     there is no receipt or payment form in the reference, just one large
+     membership card. What is kept from "should not be static" (client, 28
+     Sep) is smaller and quieter: static/js/gt-price.js cross-fades the
+     copy line on the left, and turns the card itself with a short Y-axis
+     flip (30 Sep 2026, client: "have that card on the right turn in a nice
+     animated way and show the plan"), swapping its plan badge/team size
+     at the midpoint of the turn, through the same four real plans on an
+     interval. Everything else drawn on the card stays exactly as laid out
+     here. The four real
+     .price-card divs from billing/pricing.py stay in the DOM, hidden once
+     .prz-js lands, purely as that data source — with JavaScript off, on a
+     screen under 900px, or with reduced motion, .prz-js never lands and
+     they are what's shown instead, exactly as before. The prompt says to
+     use the site's own logo, not redraw the reference's wordmark, so the
+     card carries the real .wordmark, not the old red "GOOD TIPS" seal the
+     client already had retired from the brand (see _boss_letter_mark.html). -->
+<section class="section on-lime prz" id="pricing" data-prz>
   <div class="wrap">
-    <p class="eyebrow reveal">Pricing</p>
-    <h2 class="section-heading reveal">One flat fee. All year. All four codes.</h2>
-    <p class="section-sub reveal">Priced by team size. Tipping is free for your people, and GoodTip funds a donation to the charity your organisation picked. Groups — a separate ladder per team — start at Workplace.</p>
-    {% comment %}
-    THE CARDS ARE PRINTED FROM billing/pricing.py, NOT TYPED HERE.
+    <div class="prz-stage" data-stage>
+      <div class="prz-copy" data-copy>
+        <span class="wordmark prz-mark" aria-hidden="true">GOOD<span>TIP</span><span class="dot">.</span></span>
+        <p class="eyebrow prz-eyebrow">Pricing</p>
+        <h2 class="section-heading">One flat fee. All year. <span class="prz-accent">All four competitions.</span></h2>
+        <p class="section-sub">Priced by team size. Tipping is free for your people, and GoodTip funds a donation to the charity your organisation picked. Groups — a separate ladder per team — start at Workplace.</p>
+        <a class="prz-btn" href="/pricing/">
+          <span class="prz-btn-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#ic-people"/></svg></span>
+          Compare every plan
+          <span class="prz-btn-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </a>
+        <div class="prz-live pf-blue" data-live>
+          <span class="prz-live-eyebrow">
+            <svg class="prz-live-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-people"/></svg>
+            Showing now
+          </span>
+          <p class="prz-live-row">
+            <span class="prz-live-plan" data-live-plan>Team</span>
+            <span class="prz-live-price"><span data-live-price>$299</span><small>/year</small></span>
+          </p>
+          <p class="prz-live-sub">For <span data-live-seats>Up to 50</span> people.</p>
+        </div>
+        <ul class="prz-feats">
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-shield"/></svg>Support charity</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-trophy"/></svg>Real competition</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-people"/></svg>Build community</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-trend"/></svg>Simple &amp; affordable</li>
+        </ul>
+      </div>
 
-    Client, 22 Sep 2026, attaching a screenshot of this very section: "just
-    have to match the changes to the pricing page."
+      {% comment %}
+      THE CARDS ARE PRINTED FROM billing/pricing.py, NOT TYPED HERE.
 
-    He was right, and the cause is the reason this is now a loop. This teaser
-    and the table on /pricing/ were two hand-maintained copies of the same five
-    plans, so every correction since 16 September — most popular moving to
-    Workplace, the groups tags, the founding date — was made to /pricing/ and
-    to nothing else. The first prices anybody meets on the site still put MOST
-    POPULAR on the $299 plan. Two sources of truth, and the stale one was the
-    one more people read.
+      Client, 22 Sep 2026, attaching a screenshot of this very section: "just
+      have to match the changes to the pricing page."
 
-    Four of the five, because the fifth is Enterprise+ and its answer is "talk
-    to us" — the footnote below carries that. It is a slice of one list, not a
-    second list.
-    {% endcomment %}
-    <div class="pricing-grid reveal" data-cards>
+      He was right, and the cause is the reason this is now a loop. This teaser
+      and the table on /pricing/ were two hand-maintained copies of the same five
+      plans, so every correction since 16 September — most popular moving to
+      Workplace, the groups tags, the founding date — was made to /pricing/ and
+      to nothing else. The first prices anybody meets on the site still put MOST
+      POPULAR on the $299 plan. Two sources of truth, and the stale one was the
+      one more people read.
+
+      Four of the five, because the fifth is Enterprise+ and its answer is "talk
+      to us" — the footnote below carries that. It is a slice of one list, not a
+      second list.
+
+      The membership card further down (.prz-pay) is a static illustration,
+      not these cards — it is a picture of a payment, not a form: nothing on
+      the home page takes money, and the organisation, card and token drawn
+      on it are made up. static/js/gt-price.js reads these cards' own label,
+      price and seat count as its only data source, cycling the card through
+      them in turn; the prz-cN class on each is how it finds which one is
+      currently showing.
+      {% endcomment %}
       {% for c in price_cards %}
-      <div class="price-card{% if c.popular %} featured{% endif %}">
+      <div class="price-card prz-c{{ forloop.counter }}{% if c.popular %} featured{% endif %}">
         {% if c.popular %}<div class="price-badge">Most popular</div>{% endif %}
         <div class="price-ic"><svg><use href="#{{ c.icon }}"/></svg></div>
         <div class="price-tier">{{ c.label }}</div>
@@ -379,8 +628,33 @@ section at all, which is the other half of why this is off.
         <p class="price-desc">{{ c.blurb|safe }}</p>
       </div>
       {% endfor %}
+
+      <div class="prz-pay" data-pay aria-hidden="true">
+        <span class="prz-dashes prz-dashes-l" aria-hidden="true"></span>
+        <span class="prz-layer prz-layer-1"></span>
+        <span class="prz-layer prz-layer-2"></span>
+        <div class="pf-card pf-blue">
+          <div class="pf-ctop">
+            <span class="pf-mark wordmark" aria-hidden="true">GOOD<span>TIP</span><span class="dot">.</span></span>
+            <span class="pf-tag">Good Tip, Mate.</span>
+          </div>
+          <span class="pf-plan" data-plan>Team plan &middot; $299/year</span>
+          <div class="pf-ccblk"><small>Card number</small><span class="pf-ccno">4242&nbsp;4242&nbsp;4242&nbsp;4242</span></div>
+          <div class="pf-crow">
+            <div class="pf-ccell"><svg class="pf-cic" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-calendar"/></svg><small>Expiry</small><span>09/29</span></div>
+            <div class="pf-ccell"><svg class="pf-cic" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-shield"/></svg><small>CVC</small><span>&bull;&bull;8</span></div>
+            <div class="pf-ccell"><svg class="pf-cic" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-people"/></svg><small>Team size</small><span data-seats>Up to 50</span></div>
+          </div>
+          <div class="pf-ccfoot"><small>Name on card</small><span class="pf-ccnm">Riverside Rovers</span></div>
+          <span class="pf-swoosh" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><use href="#ic-flag"/></svg>
+          </span>
+        </div>
+        <span class="prz-dashes prz-dashes-r" aria-hidden="true"></span>
+        <p class="prz-script" aria-hidden="true">More than<br>just tipping.</p>
+      </div>
     </div>
-    <p class="pricing-footnote reveal">2,500+ people? <a href="/pricing/#enterprise">Let&rsquo;s talk Enterprise.</a> &middot; Founding Member pricing closes {{ founding_closes|date:"j F Y" }}. <a href="/#founding">Learn more.</a></p>
+    <p class="pricing-footnote prz-foot reveal">2,500+ people? <a href="/pricing/#enterprise">Let&rsquo;s talk Enterprise.</a> &middot; Founding Member pricing closes {{ founding_closes|date:"j F Y" }}. <a href="/#founding">Learn more.</a></p>
   </div>
 </section>
 
@@ -392,7 +666,7 @@ product no longer uses: participants are never asked for money and there is
 nothing to match. Explaining a mechanism that does not exist is worse than
 saying nothing, because every question it raises has no answer on the site.
 {% endcomment %}
-<section class="section on-dark">
+<section class="section on-white don-white">
   <div class="wrap">
     <p class="eyebrow reveal">How the donation works</p>
     <h2 class="section-heading reveal">One fee. <em>That's the whole story.</em></h2>
@@ -401,21 +675,43 @@ saying nothing, because every question it raises has no answer on the site.
 </section>
 
 <!-- FOUNDING (premium band) -->
-<div class="founding-pro" id="founding">
+{% comment %}
+Client, 27 Sep 2026: "for this section that we have this Founding Partner
+Program... looks good, but I want that part to be not static, but let it get
+typed as I reach there, then after typing this part... what I want to see on
+the right [is] a calendar, that we see we flicker through the calendar, the
+calendar that looks like pages, so we see move from page to page quickly and
+get to that date, have it highlighted, and that action will be on a loop."
+
+data-ty marks each line static/js/gt-founding.js types out once the section
+scrolls into view — the badge, the heading, the lead paragraph, then each
+checklist item as its own line. data-cal is the flipping day-calendar that
+replaces the plain "Window closes / date" pairing; it still carries the real
+date in .fp-cal-mo/.fp-cal-day/.fp-cal-yr, so with JavaScript off, or reduced
+motion, it reads as a plain date card and nothing "flickers" at all. Nothing
+else in the card (the sub-copy, the button) changes.
+{% endcomment %}
+<div class="founding-pro" id="founding" data-founding>
   <div class="fp-inner">
-    <div class="reveal from-left">
-      <span class="fp-badge"><span class="live-dot"></span> Founding Partner Program</span>
-      <h2>In before the finals. <em>In for life.</em></h2>
-      <p class="lead">Founding Members lock their rate for three seasons, not for year one. The first of the three is a stub term &mdash; it runs from the day you join through the end of the {{ founding_stub_ends|date:"Y" }} season rather than for twelve months &mdash; and two full seasons follow it. Plus first access to new sports and features in {{ founding_stub_ends|date:"Y" }}, and your name on the list of organisations that backed it before it was obvious.</p>
+    <div class="reveal from-left" data-fp-copy>
+      <span class="fp-badge" data-ty><span class="live-dot"></span> Founding Partner Program</span>
+      <h2 data-ty>In before the finals. <em>In for life.</em></h2>
+      <p class="lead" data-ty>Founding Members lock their rate for three seasons, not for year one. The first of the three is a stub term &mdash; it runs from the day you join through the end of the {{ founding_stub_ends|date:"Y" }} season rather than for twelve months &mdash; and two full seasons follow it. Plus first access to new sports and features in {{ founding_stub_ends|date:"Y" }}, and your name on the list of organisations that backed it before it was obvious.</p>
       <ul class="fp-benefits">
-        <li><span class="bk">&check;</span> Your rate locked through the {{ founding_seasons|last }} season, whatever list prices do</li>
-        <li><span class="bk">&check;</span> First access to every new sport and feature in {{ founding_stub_ends|date:"Y" }}</li>
-        <li><span class="bk">&check;</span> Founding Partner recognition across the platform</li>
+        <li data-ty><span class="bk">&check;</span> Your rate locked through the {{ founding_seasons|last }} season, whatever list prices do</li>
+        <li data-ty><span class="bk">&check;</span> First access to every new sport and feature in {{ founding_stub_ends|date:"Y" }}</li>
+        <li data-ty><span class="bk">&check;</span> Founding Partner recognition across the platform</li>
       </ul>
     </div>
     <div class="fp-card reveal from-right">
       <div class="dl-label">Window closes</div>
-      <div class="fp-deadline">{{ founding_closes|date:"j M Y" }}</div>
+      <div class="fp-cal" data-cal>
+        <div class="fp-cal-page">
+          <span class="fp-cal-mo">{{ founding_closes|date:"M"|upper }}</span>
+          <span class="fp-cal-day">{{ founding_closes|date:"d" }}</span>
+          <span class="fp-cal-yr">{{ founding_closes|date:"Y" }}</span>
+        </div>
+      </div>
       <p class="dl-sub">After that the price rises for new joiners only &mdash; if you are already in, your rate is untouched. No exceptions, no late extensions. Set up your organisation free today and pay only when you launch.</p>
       <a href="/#start" class="btn-primary" style="width:100%;justify-content:center;">Set up your organisation &rarr;</a>
     </div>
@@ -509,33 +805,33 @@ argues with them, and a lead with two fields beats no lead with four.
             {% comment %}
             The two optional ones sit side by side below the required pair, so
             the form reads as "two things we need, two we'd like" rather than
-            as four equal demands. Client, 22 Sep 2026, asked for the dropdowns
-            to look designed — .tmw-select draws the chevron and the focus ring
-            rather than leaving it to the operating system, which is what makes
-            a <select> look like 2003 on Windows and like a different form on
-            every machine.
+            as four equal demands.
+
+            Client, 22 Sep 2026, asked for the dropdowns to look designed;
+            client, 27 Sep 2026, asked again ("the drop down on the form needs
+            to be enhanced") because a bare <select> is drawn by the OS no
+            matter how the chevron beside it looks. So rather than dressing
+            the native control up further, gt-ui.js now progressively swaps it
+            for the site's own `.ddx` dropdown — the same widget the app and
+            the contact form below already use — and this markup is just a
+            plain <select>: the enhancement, and its no-JS fallback, live
+            entirely in gt-ui.js / .ddx-* in the stylesheet.
             {% endcomment %}
             <div class="tmw-pair">
               <label class="tmw-field">
                 <span class="tmw-lab">Org type <i>optional</i></span>
-                <span class="tmw-select">
-                  <select name="org_type">
-                    <option value="">Choose one&hellip;</option>
-                    {% for val, lab in org_types %}<option value="{{ val }}">{{ lab }}</option>{% endfor %}
-                  </select>
-                  <svg class="tmw-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-                </span>
+                <select name="org_type">
+                  <option value="">Choose one&hellip;</option>
+                  {% for val, lab in org_types %}<option value="{{ val }}">{{ lab }}</option>{% endfor %}
+                </select>
               </label>
 
               <label class="tmw-field">
                 <span class="tmw-lab">Tipping with now? <i>optional</i></span>
-                <span class="tmw-select">
-                  <select name="current_platform">
-                    <option value="">Choose one&hellip;</option>
-                    {% for val, lab in platforms %}<option value="{{ val }}">{{ lab }}</option>{% endfor %}
-                  </select>
-                  <svg class="tmw-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-                </span>
+                <select name="current_platform">
+                  <option value="">Choose one&hellip;</option>
+                  {% for val, lab in platforms %}<option value="{{ val }}">{{ lab }}</option>{% endfor %}
+                </select>
               </label>
             </div>
           </div>
@@ -554,21 +850,104 @@ argues with them, and a lead with two fields beats no lead with four.
   </div>
 </section>
 
-<!-- FAQ v2 -->
-<section class="section on-cream">
-  <div class="wrap faq-grid">
-    <div class="faq-aside reveal from-left">
-      <p class="eyebrow">FAQ</p>
+<!-- FAQ v5 -->
+{% comment %}
+Client, 27 Sep 2026: "this section FAQ / Fair questions. / The honest answers,
+up front... but that should be at the center, then on the left a question
+comes up in like I can see it been typed, then an answer comes on the right,
+so it should come also as see it been lived typed, the box or enclosure of
+the question and answer should have different colors and all."
+
+Client, 28 Sep 2026, on the six-rows-in-a-column version that followed: "lets
+just show two at a time, and i want the cards to be of different colors
+couse i do not like the way they are many and all are going down ... let
+that section be already there so what is been added is words so i do not
+what to see that section expanding."
+
+Client, 28 Sep 2026, working from /home/mbatha_waita/Documents/fqa.png: a
+fixed two-column grid, six cards, all of them visible all the time, each its
+own colour, a round icon on the left of each and a small circular chevron on
+the right. No typing, no paging.
+
+REBUILT 29 SEP 2026 against fqa.png a second time, closer: white background
+(not cream), a pill-shaped "FAQ" badge rather than plain eyebrow text, the
+six cards on the client's own named colours — pale blue, warm cream, sky
+blue, neutral sage, lavender, pale aqua, none of them pale green — and two
+faint decorative line-swashes in the corners. Still a plain, static grid and
+not an accordion: an AI prompt describing this same image separately asked
+for click-to-expand cards, but that is the opposite of the 28 Sep instruction
+above, given about this exact section, so the fully-visible reading stands
+until that is confirmed. static/js/gt-faq.js (the old typed, two-at-a-time
+version) is gone along with the state it needed — there is nothing here for
+a script to page through or retype, and nothing for JavaScript-off or
+reduced motion to fall back to, because this already is the fallback.
+{% endcomment %}
+<section class="section on-cream faqx" id="faq" data-faq>
+  <svg class="faqx-swash faqx-swash-tl" viewBox="0 0 230 230" aria-hidden="true">
+    <path fill="var(--forest)" fill-opacity=".14" d="M-10 90C0 30 60 -10 130 0C200 10 220 70 190 120C160 170 90 200 30 170C-10 150 -20 150 -10 90Z"/>
+    <path fill="var(--forest)" fill-opacity=".22" d="M-10 60C0 15 50 -10 100 -4C150 2 165 45 140 80C115 115 60 130 20 105C-10 87 -18 100 -10 60Z"/>
+  </svg>
+  <svg class="faqx-swash faqx-swash-br" viewBox="0 0 230 230" aria-hidden="true">
+    <path fill="var(--forest)" fill-opacity=".14" d="M240 140C230 200 170 240 100 230C30 220 10 160 40 110C70 60 140 30 200 60C240 80 250 80 240 140Z"/>
+    <path fill="var(--forest)" fill-opacity=".22" d="M240 170C230 215 180 240 130 234C80 228 65 185 90 150C115 115 170 100 210 125C240 143 248 130 240 170Z"/>
+  </svg>
+  <div class="wrap">
+    <div class="faqx-head reveal">
+      <span class="faqx-tag">Good Tip, Mate.</span>
+      <span class="faqx-badge">FAQ</span>
       <h2 class="section-heading">Fair questions.</h2>
-      <p class="section-sub" style="margin-bottom:0;">The honest answers, up front. Anything else, just ask.</p>
+      <svg class="faqx-underline" viewBox="0 0 130 14" aria-hidden="true"><path d="M2 10C22 2 42 2 62 8C82 14 102 4 128 6"/></svg>
+      <p class="section-sub">The honest answers, up front. Anything else, just ask.</p>
     </div>
-    <div class="reveal">
-      <div class="faq-item" data-open="true"><button class="faq-q"><span><span class="qn">01</span> How is this different from a normal tipping comp?</span><span class="qx"></span></button><div class="faq-a">Your organisation tips for free, every round. Your organisation pays one platform fee, and GoodTip gives a share of it to the charity your organisation picked.</div></div>
-      <div class="faq-item"><button class="faq-q"><span><span class="qn">02</span> How does GoodTip make money?</span><span class="qx"></span></button><div class="faq-a">Your organisation pays one platform fee. GoodTip gives a share of that fee to the charity your organisation picks, from its own revenue. Tipping is free for every participant. It always will be.</div></div>
-      <div class="faq-item"><button class="faq-q"><span><span class="qn">03</span> Who picks the charity?</span><span class="qx"></span></button><div class="faq-a">Your organisation does. Everyone nominates. Everyone votes. Majority wins. That's where the money goes.</div></div>
-      <div class="faq-item"><button class="faq-q"><span><span class="qn">04</span> Which sports are included?</span><span class="qx"></span></button><div class="faq-a">AFL, AFLW, NRL, and NRLW at launch. Four codes, all season. Women's competitions come with the men's, same price either way. More in 2027.</div></div>
-      <div class="faq-item"><button class="faq-q"><span><span class="qn">05</span> Where does the donation come from?</span><span class="qx"></span></button><div class="faq-a">GoodTip funds it from its own revenue. Your organisation pays one flat fee to run the comp; a share of that goes to the charity your organisation picked. Participants are never asked for money.</div></div>
-      <div class="faq-item"><button class="faq-q"><span><span class="qn">06</span> When can we start?</span><span class="qx"></span></button><div class="faq-a">Set up your organisation now, free. Pay when you launch. Finals start August 28.</div></div>
+    <div class="faqx-list">
+      <div class="faqx-row">
+        <span class="faqx-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-spark"/></svg></span>
+        <div class="faqx-body">
+          <p class="faqx-q">How is this different from a normal tipping comp?</p>
+          <p class="faqx-a">Your organisation tips for free, every round. Your organisation pays one platform fee, and GoodTip gives a share of it to the charity your organisation picked.</p>
+        </div>
+        <span class="faqx-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#ic-chev-down"/></svg></span>
+      </div>
+      <div class="faqx-row">
+        <span class="faqx-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-coins"/></svg></span>
+        <div class="faqx-body">
+          <p class="faqx-q">How does GoodTip make money?</p>
+          <p class="faqx-a">Your organisation pays one platform fee. GoodTip gives a share of that fee to the charity your organisation picks, from its own revenue. Tipping is free for every participant. It always will be.</p>
+        </div>
+        <span class="faqx-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#ic-chev-down"/></svg></span>
+      </div>
+      <div class="faqx-row">
+        <span class="faqx-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-vote"/></svg></span>
+        <div class="faqx-body">
+          <p class="faqx-q">Who picks the charity?</p>
+          <p class="faqx-a">Your organisation does. Everyone nominates. Everyone votes. Majority wins. That's where the money goes.</p>
+        </div>
+        <span class="faqx-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#ic-chev-down"/></svg></span>
+      </div>
+      <div class="faqx-row">
+        <span class="faqx-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-match"/></svg></span>
+        <div class="faqx-body">
+          <p class="faqx-q">Which sports are included?</p>
+          <p class="faqx-a">AFL, AFLW, NRL, and NRLW at launch. Four competitions, all season. Women's competitions come with the men's, same price either way. More in 2027.</p>
+        </div>
+        <span class="faqx-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#ic-chev-down"/></svg></span>
+      </div>
+      <div class="faqx-row">
+        <span class="faqx-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-heart"/></svg></span>
+        <div class="faqx-body">
+          <p class="faqx-q">Where does the donation come from?</p>
+          <p class="faqx-a">GoodTip funds it from its own revenue. Your organisation pays one flat fee to run the comp; a share of that goes to the charity your organisation picked. Participants are never asked for money.</p>
+        </div>
+        <span class="faqx-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#ic-chev-down"/></svg></span>
+      </div>
+      <div class="faqx-row">
+        <span class="faqx-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-clock"/></svg></span>
+        <div class="faqx-body">
+          <p class="faqx-q">When can we start?</p>
+          <p class="faqx-a">Set up your organisation now, free. Pay when you launch. Finals start August 28.</p>
+        </div>
+        <span class="faqx-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#ic-chev-down"/></svg></span>
+      </div>
     </div>
   </div>
 </section>

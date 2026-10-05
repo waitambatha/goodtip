@@ -156,6 +156,9 @@ def user_orgs(request):
     # and Settings without ever seeing the bill, so the Plan link in the
     # Manage menu is gated on ownership specifically, not on can_manage.
     primary_org_is_owner = False
+    # Season champion certificates (spec addendum 14 Aug 2026 §5): the admin,
+    # the captain or the team manager — wider than Manage by the captain.
+    primary_org_can_certify = False
     if primary is not None:
         # Local import avoids an app-load-order import cycle.
         from billing.donations import donation_summary
@@ -168,6 +171,7 @@ def user_orgs(request):
 
         primary_org_is_admin = is_creator_admin(request.user, primary, membership=mine)
         primary_org_is_owner = bool(mine and mine.is_league_owner)
+        primary_org_can_certify = primary_org_is_admin or bool(mine and mine.is_captain)
         comp = primary.competitions.select_related("sport").first()
         if comp:
             primary_sport = comp.sport.name
@@ -188,6 +192,7 @@ def user_orgs(request):
         "current_org_groups": list(groups_for(request.user, primary)) if primary else [],
         "primary_org_is_admin": primary_org_is_admin,
         "primary_org_is_owner": primary_org_is_owner,
+        "primary_org_can_certify": primary_org_can_certify,
         "primary_donation": donation,
         # e.g. "Australian Rules" / "Rugby League" — drives the loader's
         # goal-post shape (client's Goal Posts Reference doc: AFL and NRL

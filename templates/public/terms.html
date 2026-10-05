@@ -157,15 +157,32 @@ pages now open the same way.
     checkbox should meet what they just read, not a differently worded version
     of it that leaves them wondering which one they agreed to.
     {% endcomment %}
-    <div class="legal-summary reveal" style="max-width:860px;margin-bottom:34px;">
-      <p class="eyebrow">The short version</p>
-      <h2 class="section-heading" style="margin-bottom:14px;">Three things worth knowing.</h2>
-      <ol class="terms-three">
-        {% for heading, body in terms_top_three %}
-        <li><b>{{ heading }}</b><span>{{ body }}</span></li>
-        {% endfor %}
-      </ol>
-      <p class="note" style="margin-top:14px;">Everything below is the long version. The three above are the parts people are most often surprised by.</p>
+    {% comment %}
+    2 Oct 2026 (client): "that should be a button, not a drop down". A button;
+    pressing it brings the short version up in its own window, and each time
+    it comes up it is a different colour (five, in turn — gt-legal.js).
+    Without script the window is simply printed here, open.
+    {% endcomment %}
+    <div class="lg-short" data-short>
+      <button type="button" class="lg-short-btn" data-short-open aria-haspopup="dialog">
+        <span class="lg-short-k">The short version</span>
+        <span class="lg-short-t">Three things worth knowing</span>
+        <span class="lg-short-go" aria-hidden="true">&rarr;</span>
+      </button>
+      <div class="lg-short-pop" data-short-pop role="dialog" aria-modal="true" aria-labelledby="termsShortH">
+        <div class="lg-short-backdrop" data-short-close></div>
+        <div class="lg-short-panel">
+          <button type="button" class="lg-short-x" data-short-close aria-label="Close">&times;</button>
+          <p class="lg-short-k">The short version</p>
+          <h2 class="lg-short-h" id="termsShortH">Three things worth knowing.</h2>
+          <ol class="terms-three">
+            {% for heading, body in terms_top_three %}
+            <li><b>{{ heading }}</b><span>{{ body }}</span></li>
+            {% endfor %}
+          </ol>
+          <p class="note lg-short-note">Everything below is the long version. The three above are the parts people are most often surprised by.</p>
+        </div>
+      </div>
     </div>
 
     <div class="legal-layout" data-legal>

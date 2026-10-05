@@ -19,11 +19,12 @@ the decent thing and what keeps this out of spam folders.
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
     <tr><td style="background:#FBF4E2;border:1px solid #E4D9B8;border-radius:12px;padding:26px 24px;">
       <p style="margin:0 0 14px;font-size:17px;font-style:italic;font-weight:bold;color:#2A2114;font-family:Georgia,'Times New Roman',serif;">Dear {{ boss_name|default:"Boss" }},</p>
-      <p style="margin:0 0 13px;font-size:15px;line-height:1.75;color:#2A2114;font-family:Georgia,'Times New Roman',serif;">What if our footy tips actually did some good?</p>
+      <p style="margin:0 0 13px;font-size:15px;line-height:1.75;color:#2A2114;font-family:Georgia,'Times New Roman',serif;">What if our footy tips at {{ company_name|default:"work" }} actually did some good?</p>
       <p style="margin:0 0 13px;font-size:15px;line-height:1.75;color:#2A2114;font-family:Georgia,'Times New Roman',serif;">We're already picking teams and checking the ladder every Monday. With GoodTip it stays free for all of us, and GoodTip gives to a charity we choose. Together.</p>
       <p style="margin:0 0 13px;font-size:15px;line-height:1.75;color:#2A2114;font-family:Georgia,'Times New Roman',serif;">Five minutes to set up. Nothing to lose but bragging rights.</p>
       <p style="margin:0 0 16px;font-size:15px;line-height:1.75;color:#2A2114;font-family:Georgia,'Times New Roman',serif;">Can we do this?</p>
-      <p style="margin:0;font-size:16px;font-style:italic;font-weight:bold;color:#6B2B1E;font-family:Georgia,'Times New Roman',serif;">&mdash; {{ your_name }}</p>
+      <p style="margin:0;font-size:16px;font-style:italic;font-weight:bold;color:#6B2B1E;font-family:Georgia,'Times New Roman',serif;">&mdash; {{ your_name }}</p>{% if your_position %}
+      <p style="margin:2px 0 0;font-size:13px;color:#6b6b5e;font-family:Georgia,'Times New Roman',serif;">{{ your_position }}</p>{% endif %}
     </td></tr>
   </table>
 

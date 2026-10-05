@@ -22,6 +22,11 @@ urlpatterns = [
     # identical whoever is looking, and it carries no tip.
     path("match/<int:match_id>/state/", views.match_state_partial, name="match_state"),
     path("<int:org_id>/leaderboard/", views.leaderboard_view, name="leaderboard"),
+    # Season champion certificates (spec addendum, 14 Aug 2026): the list for
+    # the org side, and each certificate as a print PDF or a social PNG.
+    path("<int:org_id>/certificates/", views.certificates_view, name="certificates"),
+    path("<int:org_id>/certificates/<str:series>/<int:user_id>/photo/", views.certificate_photo, name="certificate_photo"),
+    path("<int:org_id>/certificates/<str:series>/<int:user_id>/<str:fmt>/", views.certificate_file, name="certificate_file"),
     # The competition ladder (where the teams sit) — distinct from the
     # leaderboard above, which ranks tippers.
     path("<int:org_id>/ladder/", views.ladder_view, name="ladder"),

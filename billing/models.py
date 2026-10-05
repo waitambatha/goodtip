@@ -13,10 +13,13 @@ class PlanSubscription(models.Model):
     """
 
     STATUS_PENDING = "pending"
+    # Subscribed and card saved, first charge still to come (FIRST_BILLING_DATE).
+    STATUS_SCHEDULED = "scheduled"
     STATUS_ACTIVE = "active"
     STATUS_EXPIRED = "expired"
     STATUS_CHOICES = [
         (STATUS_PENDING, "Pending payment"),
+        (STATUS_SCHEDULED, "Subscribed, billing starts later"),
         (STATUS_ACTIVE, "Active"),
         (STATUS_EXPIRED, "Expired"),
     ]
@@ -31,6 +34,17 @@ class PlanSubscription(models.Model):
 
     stripe_checkout_session_id = models.CharField(max_length=255, blank=True)
     stripe_payment_intent_id = models.CharField(max_length=255, blank=True)
+
+    # --- Yearly subscription (3 Oct 2026) ---
+    # The plan is a Stripe subscription now, not a one-off charge: subscribed
+    # today, first charged on ``starts_at``, renewing yearly from then.
+    stripe_customer_id = models.CharField(max_length=255, blank=True)
+    stripe_subscription_id = models.CharField(max_length=255, blank=True, db_index=True)
+    starts_at = models.DateTimeField(null=True, blank=True)
+    stripe_invoice_url = models.URLField(max_length=500, blank=True)
+    # Test mode only: the Stripe test clock the demo subscription runs on, so
+    # the demo can jump it to the first billing date instead of waiting.
+    stripe_test_clock_id = models.CharField(max_length=255, blank=True)
 
     # --- Founding Member rate ---
     # Whether THIS charge was taken at a locked founding rate, and what the
@@ -56,6 +70,14 @@ class PlanSubscription(models.Model):
     @property
     def is_active(self) -> bool:
         return self.status == self.STATUS_ACTIVE
+
+    @property
+    def is_scheduled(self) -> bool:
+        return self.status == self.STATUS_SCHEDULED
+
+    @property
+    def is_demo(self) -> bool:
+        return bool(self.stripe_test_clock_id)
 
     @property
     def seat_limit_label(self) -> str:

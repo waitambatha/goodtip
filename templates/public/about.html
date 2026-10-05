@@ -27,6 +27,7 @@ GoodTip is a paragraph, and the cards are what you remember it by afterwards.
 {% block loader_task %}Loading about us{% endblock %}
 {% block meta_description %}GoodTip turns the footy tipping comp your workplace already runs into money for Australian charities.{% endblock %}
 {% block body_class %}page-about{% endblock %}
+{% block extra_head %}<script src="{% static 'js/gt-about.js' %}" defer></script>{% endblock %}
 
 {% block content %}
 
@@ -60,12 +61,48 @@ GoodTip is a paragraph, and the cards are what you remember it by afterwards.
 </section>
 
 <!-- THE THREE FACTS -->
+{% comment %}
+2 Oct 2026 (client): "why is that card of the same color … it should expand
+and show some nice animation … then contract and move to the next, it should
+not be that dry". Three colours, and gt-about.js lights one at a time: the lit
+card widens, plays a small scene about its fact, shrinks back, next. The
+scenes are plain markup + CSS keyframes; their resting (unanimated) state is
+the finished picture, so reduced motion and no-JS still read correctly.
+{% endcomment %}
 <section class="section on-white" style="padding-top:clamp(40px,5vw,64px);">
   <div class="wrap">
-    <div class="fact-row reveal" data-cards>
-      <div class="fact"><b>Free</b><span>to play, for every participant</span></div>
-      <div class="fact"><b>4</b><span>codes: AFL, AFLW, NRL, NRLW</span></div>
-      <div class="fact"><b>100%</b><span>of the cause chosen by your people</span></div>
+    <div class="ab-turns ab-facts" data-turns data-hold="4800">
+      <article class="ab-t ft-free" data-turn data-fx="rise">
+        <div class="ab-t-head"><b>Free</b><span>to play, for every participant</span></div>
+        <div class="ab-t-show" aria-hidden="true">
+          <div class="sc-free">
+            <div class="sc-tag"><s>$20 entry</s><b>$0</b></div>
+            <span class="sc-stamp">Free</span>
+          </div>
+          <p class="ab-t-line">Nobody pays to tip. Not a cent, all season.</p>
+        </div>
+      </article>
+      <article class="ab-t ft-codes" data-turn data-fx="rise">
+        <div class="ab-t-head"><b>4</b><span>competitions: AFL, AFLW, NRL, NRLW</span></div>
+        <div class="ab-t-show" aria-hidden="true">
+          <div class="sc-codes">
+            <span class="sc-ball"></span>
+            <i>AFL</i><i>AFLW</i><i>NRL</i><i>NRLW</i>
+          </div>
+          <p class="ab-t-line">Men's and women's competitions, every round.</p>
+        </div>
+      </article>
+      <article class="ab-t ft-cause" data-turn data-fx="rise">
+        <div class="ab-t-head"><b>100%</b><span>of the cause chosen by your people</span></div>
+        <div class="ab-t-show" aria-hidden="true">
+          <div class="sc-ring">
+            <svg viewBox="0 0 120 120"><circle class="r-bg" cx="60" cy="60" r="50"/><circle class="r-fg" cx="60" cy="60" r="50"/></svg>
+            <span class="sc-ring-n">100%</span>
+            <span class="sc-votes"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+          </div>
+          <p class="ab-t-line">Your people choose the cause. Nobody else does.</p>
+        </div>
+      </article>
     </div>
   </div>
 </section>
@@ -105,60 +142,144 @@ GoodTip is a paragraph, and the cards are what you remember it by afterwards.
   </div>
 </section>
 
+<!-- A WORD FROM OUR FOUNDER -->
+{% comment %}
+1 Oct 2026 (client): the founder's letter, in his words, with his photo
+(static/img/founder/ian-hopkinson.jpg — cropped 3:4 from the supplied shot,
+head to the premiership cup). Green section, letter on a white sheet so a long
+read stays easy. 2 Oct 2026 (client): "too thin and long … have it like a
+rectangle and it should go to the further end" — the sheet runs to the right
+edge in two columns; the photo slides in from the left and the letter rises
+from the bottom when the section arrives (gt-about.js, [data-founder]). The heading
+is his own question, lifted from the letter. Like the rest of this page, every
+sentence is editable from Pages in /admin/.
+{% endcomment %}
+<section class="section on-dark founder" id="founder" data-founder>
+  <div class="wrap">
+    <div class="fd-grid">
+      <div class="fd-head">
+        <p class="fd-kicker">A word from our founder</p>
+        <h2 class="fd-q">Why does sport have to run on an industry that profits off people's addictions?</h2>
+      </div>
+      <figure class="fd-photo">
+        <img src="{% static 'img/founder/ian-hopkinson.jpg' %}" alt="Ian Hopkinson, founder and CEO of Good Tip, smiling and holding a premiership cup" width="695" height="927" loading="lazy">
+        <figcaption><b>Ian Hopkinson</b><span>Founder &amp; CEO</span></figcaption>
+      </figure>
+        <div class="fd-paper">
+          <p>People think Good Tip is a weird move for me. They don't know rugby league's in my blood. My great uncle was Ray Stehr, a Rugby League Hall of Famer. He had a hard life and just got on with it. That's how my family's always done things.</p>
+          <p>Inequality is the thing that gets to me more than anything else. Good Tip is where I finally get to do something about it.</p>
+          <p>I've lost people most of my life, mates to drugs, to car accidents. Then 2024 happened. I lost my dad. I lost my brother-in-law to suicide. There was other stuff too that I won't get into here, but it was all the same year. I spent months just watching my family go through it.</p>
+          <p>Around then I was watching a lot of footy, mostly rugby league. It was the thing I'd switch on when I needed to switch off.</p>
+          <p>Except every ad break was a gambling ad. Odds read out during the commentary, betting logos everywhere on screen. And I remember thinking, this sport I love is being used to sell people the exact thing that just chewed up my family. Not the sport itself, obviously, but the industry riding on the back of it.</p>
+          <p class="fd-pull">That's really where Good Tip started. Not as a plan, just as a question I couldn't shake: why does sport have to run on an industry that profits off people's addictions? What if it didn't have to?</p>
+          <p>Here's the other thing that got me. A workplace tipping comp already exists in most offices. Someone's always running the ladder. And whatever money's in it either goes to the winner or gets eaten by a bookmaker selling odds in between rounds. Nobody had built the third option.</p>
+          <p>I run a digital agency, specialising in search, so trust is more or less what I sell for a living. A few years ago one of my best people had a gambling problem, quietly, during work hours. He left not long after. Years later he came back, not for a job, but to send his own family's business my way. That's stayed with me.</p>
+          <p>So that's Good Tip. Your team tips every round, same as always. No entry fee, no prize pool, nobody's wage at risk. Your organisation pays one platform fee, and Good Tip funds a donation to whatever charity your group votes for.</p>
+          <p>I built it because I've watched what vulnerable actually looks like up close, and I've watched an industry cash in on it in broad daylight. If you've ever run an office comp and wondered where all that energy went, that's where it can go now.</p>
+          <p class="fd-sign"><b>Ian Hopkinson</b><span>Founder &amp; CEO</span></p>
+        </div>
+    </div>
+  </div>
+</section>
+
 <!-- VALUES -->
-<section class="section">
+{% comment %}
+2 Oct 2026 (client): the same idea as the facts — one card at a time widens
+and shows something about what it says — "but each in different styles":
+the first spins round as it opens, the second flips over, the third zooms.
+{% endcomment %}
+<section class="section ab-values">
   <div class="wrap">
     <p class="eyebrow reveal">What we stand on</p>
     <h2 class="section-heading reveal">Three things we will not trade away.</h2>
     <p class="section-sub reveal">Everything else about GoodTip is up for debate. These are not.</p>
-    <div class="cards-3" style="margin-top:34px;" data-cards>
-      <article class="card-lift">
-        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-people"/></svg></span>
-        <h3>Free to play</h3>
-        <p>Nobody pays to enter a tipping comp on GoodTip. If a member has to reach for a card to join in, we have built the wrong thing.</p>
-        <span class="cl-n" aria-hidden="true">01</span>
+    <div class="ab-turns ab-vals" data-turns data-hold="5600" style="margin-top:34px;">
+      <article class="ab-t vl-free" data-turn data-fx="spin">
+        <div class="ab-t-head">
+          <span class="ab-ic" aria-hidden="true"><svg><use href="#ic-people"/></svg></span>
+          <span class="ab-n" aria-hidden="true">01</span>
+          <h3>Free to play</h3>
+          <p>Nobody pays to enter a tipping comp on GoodTip. If a member has to reach for a card to join in, we have built the wrong thing.</p>
+        </div>
+        <div class="ab-t-show" aria-hidden="true">
+          <ul class="sc-players">
+            <li><span>S</span>Sam joined<b>$0</b></li>
+            <li><span>P</span>Priya joined<b>$0</b></li>
+            <li><span>L</span>Lee joined<b>$0</b></li>
+            <li><span>J</span>Jo joined<b>$0</b></li>
+          </ul>
+          <p class="sc-total">Entry fees collected: <b>$0</b></p>
+        </div>
       </article>
-      <article class="card-lift">
-        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-eye"/></svg></span>
-        <h3>The money is traceable</h3>
-        <p>Every dollar is tied to the charity that was active when it was raised. The Good List shows what has actually been settled — never a projection dressed up as a total.</p>
-        <span class="cl-n" aria-hidden="true">02</span>
+      <article class="ab-t vl-trace" data-turn data-fx="flip">
+        <div class="ab-t-head">
+          <span class="ab-ic" aria-hidden="true"><svg><use href="#ic-eye"/></svg></span>
+          <span class="ab-n" aria-hidden="true">02</span>
+          <h3>The money is traceable</h3>
+          <p>Every dollar is tied to the charity that was active when it was raised. The Good List shows what has actually been settled — never a projection dressed up as a total.</p>
+        </div>
+        <div class="ab-t-show" aria-hidden="true">
+          <ul class="sc-ledger">
+            <li><em>Round 1</em><b>$180</b><i>Settled</i></li>
+            <li><em>Round 2</em><b>$180</b><i>Settled</i></li>
+            <li><em>Round 3</em><b>$180</b><i>Settled</i></li>
+          </ul>
+          <p class="sc-total">On the Good List: <b>$540 to Beyond Blue</b>, all of it settled</p>
+        </div>
       </article>
-      <article class="card-lift">
-        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-vote"/></svg></span>
-        <h3>The group decides</h3>
-        <p>Which cause you back is your organisation's call, not ours. Pick it, or hold a vote and let every member have a say.</p>
-        <span class="cl-n" aria-hidden="true">03</span>
+      <article class="ab-t vl-vote" data-turn data-fx="zoom">
+        <div class="ab-t-head">
+          <span class="ab-ic" aria-hidden="true"><svg><use href="#ic-vote"/></svg></span>
+          <span class="ab-n" aria-hidden="true">03</span>
+          <h3>The group decides</h3>
+          <p>Which cause you back is your organisation's call, not ours. Pick it, or hold a vote and let every member have a say.</p>
+        </div>
+        <div class="ab-t-show" aria-hidden="true">
+          <ul class="sc-vote">
+            <li class="win" style="--v:48%"><span>Beyond Blue</span><i></i><b>48%</b></li>
+            <li style="--v:31%"><span>Lifeline</span><i></i><b>31%</b></li>
+            <li style="--v:21%"><span>headspace</span><i></i><b>21%</b></li>
+          </ul>
+          <p class="sc-total">Majority wins. <b>Beyond Blue</b> it is.</p>
+        </div>
       </article>
     </div>
   </div>
 </section>
 
 <!-- HOW THE MONEY MOVES -->
-<section class="section on-dark">
+{% comment %}
+2 Oct 2026 (client): "the cards look like the ones at the top, let's have
+variety". Not cards: a track. A coin runs from the organisation, through
+GoodTip, to the receipt, and each stop lights as it passes. CSS only.
+{% endcomment %}
+<section class="section on-dark ab-money">
   <div class="wrap">
     <p class="eyebrow reveal" style="color:var(--lime);">Where the money comes from</p>
     <h2 class="section-heading reveal" style="color:var(--white);">Nobody in the comp puts a dollar in.</h2>
     <p class="section-sub reveal" style="color:rgba(232,228,213,.8);">This is the part people ask about first, so it is worth being plain about.</p>
-    <div class="cards-3" style="margin-top:34px;" data-flow>
-      <article class="card-lift">
-        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-org"/></svg></span>
-        <h3>Your organisation subscribes</h3>
-        <p>One platform fee for the season, paid by the organisation when the first round locks in. Not by the people tipping.</p>
-        <span class="cl-n" aria-hidden="true">01</span>
-      </article>
-      <article class="card-lift">
-        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-heart"/></svg></span>
-        <h3>GoodTip gives a share of it</h3>
-        <p>A share of that fee goes to the charity your organisation is backing. It comes out of our revenue, not out of anybody's pay packet.</p>
-        <span class="cl-n" aria-hidden="true">02</span>
-      </article>
-      <article class="card-lift">
-        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-doc"/></svg></span>
-        <h3>You get the receipt</h3>
-        <p>At the end of the season the Impact Report goes out: total raised, charity named, tipping results. One number your board can cite.</p>
-        <span class="cl-n" aria-hidden="true">03</span>
-      </article>
+    <div class="mt reveal">
+      <div class="mt-rail" aria-hidden="true"><span class="mt-coin">$</span></div>
+      <ol class="mt-stops">
+        <li class="mt-stop m1">
+          <span class="mt-dot" aria-hidden="true"><svg><use href="#ic-org"/></svg></span>
+          <span class="mt-n">01</span>
+          <h3>Your organisation subscribes</h3>
+          <p>One platform fee for the season, paid by the organisation when the first round locks in. Not by the people tipping.</p>
+        </li>
+        <li class="mt-stop m2">
+          <span class="mt-dot" aria-hidden="true"><svg><use href="#ic-heart"/></svg></span>
+          <span class="mt-n">02</span>
+          <h3>GoodTip gives a share of it</h3>
+          <p>A share of that fee goes to the charity your organisation is backing. It comes out of our revenue, not out of anybody's pay packet.</p>
+        </li>
+        <li class="mt-stop m3">
+          <span class="mt-dot" aria-hidden="true"><svg><use href="#ic-doc"/></svg></span>
+          <span class="mt-n">03</span>
+          <h3>You get the receipt</h3>
+          <p>At the end of the season the Impact Report goes out: total raised, charity named, tipping results. One number your board can cite.</p>
+        </li>
+      </ol>
     </div>
   </div>
 </section>
@@ -177,30 +298,57 @@ GoodTip is a paragraph, and the cards are what you remember it by afterwards.
 </section>
 
 <!-- STRAIGHT ANSWERS -->
+{% comment %}
+2 Oct 2026 (client): "the cards will be there with the question but on
+expanding we should see the question getting answered". One at a time, a card
+opens into a little chat: the question goes up, GoodTip types, the answer
+arrives. The answer is real text in the markup (so the Pages editor and
+no-JS both see it); gt-about.js only types it out.
+{% endcomment %}
 <section class="section on-white">
   <div class="wrap">
     <p class="eyebrow reveal">Straight answers</p>
     <h2 class="section-heading reveal">The questions we get before anyone signs up.</h2>
-    <div class="cards-2" style="margin-top:32px;" data-cards>
-      <article class="card-lift">
-        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-coins"/></svg></span>
-        <h3>Do our people pay anything?</h3>
-        <p>No. Tipping is free for every participant, every round, all season. The only invoice GoodTip sends goes to the organisation.</p>
+    <div class="ab-turns ab-qa" data-turns data-hold="2600" style="margin-top:32px;">
+      <article class="ab-t qa-1" data-turn data-fx="qa">
+        <div class="ab-t-head"><span class="ab-ic" aria-hidden="true"><svg><use href="#ic-coins"/></svg></span><h3>Do our people pay anything?</h3></div>
+        <div class="ab-t-show">
+          <div class="qa-chat">
+            <p class="qa-q" aria-hidden="true">Do our people pay anything?</p>
+            <p class="qa-typing" aria-hidden="true"><i></i><i></i><i></i></p>
+            <p class="qa-a" data-answer>No. Tipping is free for every participant, every round, all season. The only invoice GoodTip sends goes to the organisation.</p>
+          </div>
+        </div>
       </article>
-      <article class="card-lift">
-        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-shield-check"/></svg></span>
-        <h3>Who picks the charity?</h3>
-        <p>Your organisation. Choose one outright, or run the Charity Vote — everyone nominates, everyone votes, and the ballot stays blind until it closes.</p>
+      <article class="ab-t qa-2" data-turn data-fx="qa">
+        <div class="ab-t-head"><span class="ab-ic" aria-hidden="true"><svg><use href="#ic-shield-check"/></svg></span><h3>Who picks the charity?</h3></div>
+        <div class="ab-t-show">
+          <div class="qa-chat">
+            <p class="qa-q" aria-hidden="true">Who picks the charity?</p>
+            <p class="qa-typing" aria-hidden="true"><i></i><i></i><i></i></p>
+            <p class="qa-a" data-answer>Your organisation. Choose one outright, or run the Charity Vote — everyone nominates, everyone votes, and the ballot stays blind until it closes.</p>
+          </div>
+        </div>
       </article>
-      <article class="card-lift">
-        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-lock"/></svg></span>
-        <h3>What happens to our data?</h3>
-        <p>It runs the comp and nothing else. We do not sell personal information and we do not pass it to advertisers — the <a href="/privacy/">Privacy Policy</a> says exactly what we hold and why.</p>
+      <article class="ab-t qa-3" data-turn data-fx="qa">
+        <div class="ab-t-head"><span class="ab-ic" aria-hidden="true"><svg><use href="#ic-lock"/></svg></span><h3>What happens to our data?</h3></div>
+        <div class="ab-t-show">
+          <div class="qa-chat">
+            <p class="qa-q" aria-hidden="true">What happens to our data?</p>
+            <p class="qa-typing" aria-hidden="true"><i></i><i></i><i></i></p>
+            <p class="qa-a" data-answer>It runs the comp and nothing else. We do not sell personal information and we do not pass it to advertisers — the <a href="/privacy/">Privacy Policy</a> says exactly what we hold and why.</p>
+          </div>
+        </div>
       </article>
-      <article class="card-lift">
-        <span class="cl-ic" aria-hidden="true"><svg><use href="#ic-clock"/></svg></span>
-        <h3>How long does setting up take?</h3>
-        <p>A few minutes. Name the comp, invite your people, run the vote while the organisation fills. You pay nothing until the first tips lock in.</p>
+      <article class="ab-t qa-4" data-turn data-fx="qa">
+        <div class="ab-t-head"><span class="ab-ic" aria-hidden="true"><svg><use href="#ic-clock"/></svg></span><h3>How long does setting up take?</h3></div>
+        <div class="ab-t-show">
+          <div class="qa-chat">
+            <p class="qa-q" aria-hidden="true">How long does setting up take?</p>
+            <p class="qa-typing" aria-hidden="true"><i></i><i></i><i></i></p>
+            <p class="qa-a" data-answer>A few minutes. Name the comp, invite your people, run the vote while the organisation fills. You pay nothing until the first tips lock in.</p>
+          </div>
+        </div>
       </article>
     </div>
   </div>

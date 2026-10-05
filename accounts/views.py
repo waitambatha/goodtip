@@ -1368,8 +1368,11 @@ def home_view(request):
         if wants_json(request):
             return json_ok("launch") if locked_in else json_error(error)
 
+    from data_sync.public_board import board
+
     ctx = {
         "active": "home",
+        "board": board(),
         "price_cards": public_cards(4),
         "locked_in": locked_in,
         "error": error,
@@ -1377,6 +1380,24 @@ def home_view(request):
         **launch_signup_context(),
     }
     return render(request, "public/home.html", ctx)
+
+
+def how_it_works_view(request):
+    """The public "How it Works" page.
+
+    A real view rather than a TemplateView (like home_view before it) purely
+    to carry the same "Live this season" board data down to the Ladder
+    section's read-only showcase table — same payload, same gt-board.js, so
+    it needs no second data source or endpoint.
+    """
+    from catalog.models import OrganisationType
+    from data_sync.public_board import board
+
+    return render(request, "public/how_it_works.html", {
+        "active": "how",
+        "board": board(),
+        "organisation_types": OrganisationType.objects.all(),
+    })
 
 
 def coming_soon_view(request):
@@ -1431,6 +1452,13 @@ def tell_the_boss_view(request):
     error = ""
     your_name = ""
     boss_name = ""
+    # Added to the send flow 1 Oct 2026 (client). Company and position go into
+    # the letter itself; "company" is NOT the field name because that is the
+    # honeypot below. All three are optional server-side so the focused member
+    # page (boss_send.html), which does not ask for them, keeps working.
+    company_name = (request.POST.get("company_name") or "").strip()[:120]
+    your_position = (request.POST.get("your_position") or "").strip()[:80]
+    your_email = (request.POST.get("your_email") or "").strip()[:254]
     if request.method == "POST" and not request.user.is_authenticated:
         # Sending is a member perk — the template hides the form, but guard
         # the POST too so the relay can't be driven anonymously. Carry them to
@@ -1440,6 +1468,9 @@ def tell_the_boss_view(request):
             "your_name": (request.POST.get("your_name") or "").strip()[:80],
             "boss_name": (request.POST.get("boss_name") or "").strip()[:80],
             "boss_email": (request.POST.get("boss_email") or "").strip()[:254],
+            "company_name": company_name,
+            "your_position": your_position,
+            "your_email": your_email,
         }
         messages.info(request, "Create your free account and we'll send that note straight away.")
         return redirect(f"{reverse('accounts:signup')}?next={reverse('tell_the_boss')}")
@@ -1482,6 +1513,8 @@ def tell_the_boss_view(request):
                     context={
                         "your_name": your_name,
                         "boss_name": boss_name,
+                        "company_name": company_name,
+                        "your_position": your_position,
                         "how_url": site_url("/how-it-works/"),
                     },
                     reply_to=[request.user.email] if request.user.email else None,
@@ -1502,6 +1535,8 @@ def tell_the_boss_view(request):
                         body_preview=render_to_string(
                             "emails/tell_the_boss.txt",
                             {"your_name": your_name, "boss_name": boss_name,
+                             "company_name": company_name,
+                             "your_position": your_position,
                              "how_url": site_url("/how-it-works/")},
                         ),
                     )
@@ -1537,6 +1572,8 @@ def tell_the_boss_view(request):
             "your_name": your_name or draft.get("your_name", "") or request.user.display_name,
             "boss_name": boss_name or draft.get("boss_name", ""),
             "boss_email_draft": draft.get("boss_email", ""),
+            "company_name": company_name or draft.get("company_name", ""),
+            "your_position": your_position or draft.get("your_position", ""),
         })
     return render(request, "public/tell_the_boss.html", {
         "active": "boss",
@@ -1547,6 +1584,9 @@ def tell_the_boss_view(request):
         ),
         "boss_name": boss_name or draft.get("boss_name", ""),
         "boss_email_draft": draft.get("boss_email", ""),
+        "company_name": company_name or draft.get("company_name", ""),
+        "your_position": your_position or draft.get("your_position", ""),
+        "your_email": your_email or draft.get("your_email", ""),
         "my_invites": (
             request.user.boss_invites.select_related("org", "boss_user")[:5]
             if request.user.is_authenticated else []

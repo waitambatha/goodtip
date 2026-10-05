@@ -3,8 +3,9 @@
 
 {% block title %}Pricing &middot; GoodTip{% endblock %}
 {% block loader_task %}Loading the pricing{% endblock %}
-{% block meta_description %}One price. All year. All four codes. Priced by team size, nothing else.{% endblock %}
+{% block meta_description %}One price. All year. All four competitions. Priced by team size, nothing else.{% endblock %}
 {% block body_class %}page-pricing{% endblock %}
+{% block extra_head %}<script src="{% static 'js/gt-plans.js' %}" defer></script>{% endblock %}
 
 {% block content %}
 
@@ -13,7 +14,7 @@
   <div class="hs-left">
     <span class="pill" style="align-self:flex-start;margin-bottom:24px;"><span class="dot"></span>Pricing</span>
     <h1>One price. <em>All year.</em> All sports.</h1>
-    <p class="hero-sub">One flat annual fee covering every season of every code. Tipping is free for your people, and GoodTip funds the donation.</p>
+    <p class="hero-sub">One flat annual fee covering every season of every competition. Tipping is free for your people, and GoodTip funds the donation.</p>
     {% comment %}
     TWO WAYS OUT OF THIS HERO, and the second one is the point.
 
@@ -51,17 +52,17 @@
       <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
     </div>
     <div class="hs-veil" aria-hidden="true"></div>
-    <div class="hs-tagstrip"><span class="live-dot">Four codes, one fee</span></div>
+    <div class="hs-tagstrip"><span class="live-dot">Four competitions, one fee</span></div>
   </div>
 </section>
 
 <!-- TIER CARDS (shaded) -->
-<section class="section on-cream" id="tiers">
+<section class="section on-white" id="tiers">
   <div class="wrap">
     <p class="eyebrow reveal">Plans</p>
     <h2 class="section-heading reveal">Priced by team size. Nothing else.</h2>
-    <p class="section-sub reveal">Every plan runs every code, all year, with no per-sport upsells. Groups &mdash; a separate ladder per team or department &mdash; start at Workplace.</p>
-    <div class="tier-table-wrap reveal">
+    <p class="section-sub reveal">Every plan runs every competition, all year, with no per-sport upsells. Groups &mdash; a separate ladder per team or department &mdash; start at Workplace.</p>
+    <div class="tier-table-wrap reveal" data-plans>
       <table class="tier-table">
         <thead>
           <tr>
@@ -72,13 +73,13 @@
           </tr>
         </thead>
         <tbody>
-          <tr>
+          <tr data-plan="starter" data-fx="spin">
             <td data-label="Tier" class="tt-tier"><span class="tt-name">Starter</span><span class="tt-sub">Small teams</span></td>
             <td data-label="Team size">Up to 20 people</td>
             <td data-label="What changes">Full platform. Choose AFL, NRL or both. Women's competitions included. Charity Vote. Live leaderboard. Email support. One shared ladder.</td>
             <td data-label="Annual price" class="tt-priced"><span class="tt-price">$99<span>/yr</span></span><span class="tt-per">~$5 per person</span></td>
           </tr>
-          <tr>
+          <tr data-plan="team" data-fx="flip">
             <td data-label="Tier" class="tt-tier"><span class="tt-name">Team</span><span class="tt-sub">Growing teams</span></td>
             <td data-label="Team size">21 to 50 people</td>
             <td data-label="What changes">Everything in Starter, plus custom organisation branding and a round-by-round participation dashboard. Still one shared ladder.</td>
@@ -97,19 +98,19 @@
           two blocks at a glance and the step up is visible before a single
           word has been read. The tag then names what the block is.
           {% endcomment %}
-          <tr class="is-popular has-groups">
+          <tr class="is-popular has-groups" data-plan="workplace" data-fx="burst">
             <td data-label="Tier" class="tt-tier"><span class="tt-name">Workplace <span class="tier-badge">Most popular</span> <span class="tier-badge tier-badge--groups">Groups</span></span><span class="tt-sub">Mid-size organisations</span></td>
             <td data-label="Team size">51 to 150 people</td>
             <td data-label="What changes">Everything in Team, plus <b>groups</b> &mdash; each team or department gets its own ladder alongside the organisation's &mdash; priority support and a full CSR Impact Report at season end.</td>
             <td data-label="Annual price" class="tt-priced"><span class="tt-price">$799<span>/yr</span></span><span class="tt-per">~$5&ndash;$16 per person</span></td>
           </tr>
-          <tr class="has-groups">
+          <tr class="has-groups" data-plan="organisation" data-fx="swing">
             <td data-label="Tier" class="tt-tier"><span class="tt-name">Organisation <span class="tier-badge tier-badge--groups">Groups</span></span><span class="tt-sub">Large organisations</span></td>
             <td data-label="Team size">151 to 500 people</td>
             <td data-label="What changes">Everything in Workplace, including groups and sub-groups, plus a dedicated account manager and priority onboarding support.</td>
             <td data-label="Annual price" class="tt-priced"><span class="tt-price">$1,299<span>/yr</span></span><span class="tt-per">~$3&ndash;$9 per person</span></td>
           </tr>
-          <tr class="has-groups">
+          <tr class="has-groups" data-plan="enterprise" data-fx="rise">
             <td data-label="Tier" class="tt-tier"><span class="tt-name">Enterprise+ <span class="tier-badge tier-badge--groups">Groups</span></span><span class="tt-sub">Large enterprise</span></td>
             <td data-label="Team size">501 to 2,499 people</td>
             <td data-label="What changes">Everything in Organisation, including groups and sub-groups. Full bespoke configuration, multi-league setup, API access, flexible payment terms.</td>
@@ -117,6 +118,61 @@
           </tr>
         </tbody>
       </table>
+      {% comment %}
+      3 OCT 2026 (client): the table stays, and each plan takes a turn — its
+      row lights in the plan's colour and a card grows out of it with more
+      detail, each plan arriving a different way (a 360 turn, a flip, a
+      burst, a swing, a rise), then shrinks back into its row and the next
+      plan goes. Workplace's card says why it is the most popular. The detail
+      below is the source gt-plans.js copies from; without script it is not
+      shown and the table is the page, as it always was.
+      {% endcomment %}
+      <div class="pt-details" hidden>
+        <div data-plan-detail="starter">
+          <div class="pd-top"><span class="pd-k">Small teams</span><h3>Starter</h3><p class="pd-price">$99<span>/yr</span></p><p class="pd-per">Up to 20 people &middot; about $5 a person</p></div>
+          <div class="pd-body">
+            <p class="pd-lead">Everything you need to run a proper comp for a small office, a crew or a club committee.</p>
+            <ul class="pd-list"><li>The full platform, all four competitions</li><li>AFL, NRL or both &mdash; women's competitions included</li><li>Charity Vote</li><li>Live leaderboard</li><li>Email support</li><li>One shared ladder</li></ul>
+            <div class="pd-seats"><span>Team size</span><i style="--w:8%"></i><b>up to 20</b></div>
+          </div>
+        </div>
+        <div data-plan-detail="team">
+          <div class="pd-top"><span class="pd-k">Growing teams</span><h3>Team</h3><p class="pd-price">$299<span>/yr</span></p><p class="pd-per">21 to 50 people &middot; about $6 a person</p></div>
+          <div class="pd-body">
+            <p class="pd-lead">Make it yours: your organisation's name and logo on the comp, and a view of who is turning up each round.</p>
+            <ul class="pd-list"><li>Everything in Starter</li><li>Your organisation's name and logo</li><li>Round-by-round participation dashboard</li><li>One shared ladder</li></ul>
+            <div class="pd-seats"><span>Team size</span><i style="--w:20%"></i><b>up to 50</b></div>
+          </div>
+        </div>
+        <div data-plan-detail="workplace">
+          <div class="pd-top"><span class="pd-k pd-crown">&#9733; Most popular</span><h3>Workplace</h3><p class="pd-price">$799<span>/yr</span></p><p class="pd-per">51 to 150 people &middot; about $5&ndash;$16 a person</p></div>
+          <div class="pd-body">
+            <p class="pd-lead">Why it's the most popular: it's the size where an organisation stops being one team and starts being several.</p>
+            <div class="pd-why">
+              <div><b>Groups</b><span>Every team or department gets its own ladder, alongside the whole organisation's.</span></div>
+              <div><b>CSR Impact Report</b><span>A full report at season end that your board and ESG team can use.</span></div>
+              <div><b>Priority support</b><span>Questions answered first, all season.</span></div>
+            </div>
+            <div class="pd-seats"><span>Team size</span><i style="--w:45%"></i><b>up to 150</b></div>
+          </div>
+        </div>
+        <div data-plan-detail="organisation">
+          <div class="pd-top"><span class="pd-k">Large organisations</span><h3>Organisation</h3><p class="pd-price">$1,299<span>/yr</span></p><p class="pd-per">151 to 500 people &middot; about $3&ndash;$9 a person</p></div>
+          <div class="pd-body">
+            <p class="pd-lead">For organisations with departments inside departments, and someone at GoodTip who knows yours by name.</p>
+            <ul class="pd-list"><li>Everything in Workplace</li><li>Groups and sub-groups</li><li>A dedicated account manager</li><li>Priority onboarding support</li></ul>
+            <div class="pd-seats"><span>Team size</span><i style="--w:72%"></i><b>up to 500</b></div>
+          </div>
+        </div>
+        <div data-plan-detail="enterprise">
+          <div class="pd-top"><span class="pd-k">Large enterprise</span><h3>Enterprise+</h3><p class="pd-price">$1,999<span>/yr</span></p><p class="pd-per">501 to 2,499 people &middot; from about $1 a person</p></div>
+          <div class="pd-body">
+            <p class="pd-lead">Configured around you: several sites, several leagues, and the systems you already run.</p>
+            <ul class="pd-list"><li>Everything in Organisation</li><li>Full bespoke configuration</li><li>Multi-league setup</li><li>API access</li><li>Flexible payment terms</li></ul>
+            <div class="pd-seats"><span>Team size</span><i style="--w:100%"></i><b>up to 2,499</b></div>
+          </div>
+        </div>
+      </div>
     </div>
     <p class="pricing-footnote reveal">Founding Member pricing closes {{ founding_closes|date:"j F Y" }} &mdash; sign up before then and your rate is locked through the {{ founding_seasons|last }} season. <a href="/#founding">Learn more.</a></p>
     {% comment %}
@@ -185,7 +241,7 @@ heading puts the fee at fault, which is both kinder and true.
 </section>
 
 <!-- EVERY PLAN — feature v2 -->
-<section class="section on-paper">
+<section class="section on-white">
   <div class="wrap">
     {% comment %}
     THIS SECTION USED TO SAY "NO FEATURE GATES" and it was true until Sep 2026,
@@ -199,10 +255,10 @@ heading puts the fee at fault, which is both kinder and true.
     promise it used to make is worse than one that says what changed.
     {% endcomment %}
     <p class="eyebrow reveal">Every plan</p>
-    <h2 class="section-heading reveal">All four codes. All year. Every plan.</h2>
+    <h2 class="section-heading reveal">All four competitions. All year. Every plan.</h2>
     <p class="section-sub reveal">Nearly all of it is the same product whether you're twelve people or twelve hundred &mdash; you're paying for size. The one exception is groups, which arrive at Workplace, where organisations start having genuinely separate teams to split into.</p>
     <div class="feature-grid2 reveal" data-cards>
-      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-flag"/></svg></div><h3>Your codes, all year</h3><p>AFL, AFLW, NRL, NRLW. Run one, run both. Women's comps come with the men's, same price.</p></div>
+      <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-flag"/></svg></div><h3>Your competitions, all year</h3><p>AFL, AFLW, NRL, NRLW. Run one, run both. Women's comps come with the men's, same price.</p></div>
       <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-vote"/></svg></div><h3>Charity Vote</h3><p>Your organisation nominates and votes on where the season's money goes. Majority wins.</p></div>
       <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-trophy"/></svg></div><h3>Live ladder &amp; the Wall</h3><p>Round-by-round ladder, the running charity tally, and the social feed that keeps people coming back.</p></div>
       <div class="feat2"><div class="feat-ic"><svg class="cic"><use href="#ic-bell"/></svg></div><h3>Round reminders</h3><p>Automated nudges before each round close, on email and the Wall, until your people are in.</p></div>
@@ -248,20 +304,74 @@ movements that never happen.
   </div>
 </section>
 
-<!-- FAQ v2 -->
-<section class="section on-paper">
-  <div class="wrap faq-grid">
-    <div class="faq-aside reveal from-left">
-      <p class="eyebrow">FAQ</p>
+<!-- FAQ — the home page's design (client, 3 Oct 2026: "let's do it the way
+     we did it in the home page"). Same .faqx component and colours. -->
+<section class="section on-cream faqx" id="faq">
+  <svg class="faqx-swash faqx-swash-tl" viewBox="0 0 230 230" aria-hidden="true">
+    <path fill="var(--forest)" fill-opacity=".14" d="M-10 90C0 30 60 -10 130 0C200 10 220 70 190 120C160 170 90 200 30 170C-10 150 -20 150 -10 90Z"/>
+    <path fill="var(--forest)" fill-opacity=".22" d="M-10 60C0 15 50 -10 100 -4C150 2 165 45 140 80C115 115 60 130 20 105C-10 87 -18 100 -10 60Z"/>
+  </svg>
+  <svg class="faqx-swash faqx-swash-br" viewBox="0 0 230 230" aria-hidden="true">
+    <path fill="var(--forest)" fill-opacity=".14" d="M240 140C230 200 170 240 100 230C30 220 10 160 40 110C70 60 140 30 200 60C240 80 250 80 240 140Z"/>
+    <path fill="var(--forest)" fill-opacity=".22" d="M240 170C230 215 180 240 130 234C80 228 65 185 90 150C115 115 170 100 210 125C240 143 248 130 240 170Z"/>
+  </svg>
+  <div class="wrap">
+    <div class="faqx-head reveal">
+      <span class="faqx-tag">Good Tip, Mate.</span>
+      <span class="faqx-badge">FAQ</span>
       <h2 class="section-heading">Pricing, answered.</h2>
-      <p class="section-sub" style="margin-bottom:0;">The questions we get most about plans and money.</p>
+      <svg class="faqx-underline" viewBox="0 0 130 14" aria-hidden="true"><path d="M2 10C22 2 42 2 62 8C82 14 102 4 128 6"/></svg>
+      <p class="section-sub">The questions we get most about plans and money.</p>
     </div>
-    <div class="reveal">
-      <div class="faq-item" data-open="true"><button class="faq-q"><span><span class="qn">01</span> Can we choose which sports we tip?</span><span class="qx"></span></button><div class="faq-a">Yes. Run AFL only, NRL only, or both. Women's competitions aren't optional. AFLW comes with AFL, NRLW comes with NRL. The price is the same either way. Women's sport is structural, not decorative.</div></div>
-      <div class="faq-item"><button class="faq-q"><span><span class="qn">02</span> What counts toward our team size?</span><span class="qx"></span></button><div class="faq-a">Active tippers in your comp. You can invite more than your tier allows during setup; you only move up a tier if you exceed the cap when the season locks.</div></div>
-      <div class="faq-item"><button class="faq-q"><span><span class="qn">03</span> When do we pay?</span><span class="qx"></span></button><div class="faq-a">When you launch. Set up the organisation, run the Charity Vote and invite your people for free. The subscription is charged when the first round of tips locks in.</div></div>
-      <div class="faq-item"><button class="faq-q"><span><span class="qn">04</span> Is the donation included in the price?</span><span class="qx"></span></button><div class="faq-a">Yes. There is one flat fee, and GoodTip gives a share of it to the charity your organisation picked. Nobody in your organisation is ever asked to contribute.</div></div>
-      <div class="faq-item"><button class="faq-q"><span><span class="qn">05</span> What's Founding Partner pricing?</span><span class="qx"></span></button><div class="faq-a">Join on or before {{ founding_closes|date:"j F Y" }} and the rate you sign up at is the rate you're charged for three seasons. The first of those is a stub rather than a full year: it runs from the day you join through the end of the {{ founding_stub_ends|date:"Y" }} season, however many months that happens to be. Two full seasons follow it &mdash; {{ founding_seasons|slice:"1:"|join:" and " }} &mdash; whatever list prices do in the meantime. You also get first access to new sports and features in {{ founding_stub_ends|date:"Y" }}. Move up a plan and you pay that plan's price; you're never charged above list. After the window the price rises for new joiners only &mdash; if you are already in, your rate is untouched.</div></div>
+    <div class="faqx-list">
+      <div class="faqx-row">
+        <span class="faqx-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-match"/></svg></span>
+        <div class="faqx-body">
+          <p class="faqx-q">Can we choose which sports we tip?</p>
+          <p class="faqx-a">Yes. Run AFL only, NRL only, or both. Women's competitions aren't optional. AFLW comes with AFL, NRLW comes with NRL. The price is the same either way. Women's sport is structural, not decorative.</p>
+        </div>
+        <span class="faqx-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#ic-chev-down"/></svg></span>
+      </div>
+      <div class="faqx-row">
+        <span class="faqx-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-users"/></svg></span>
+        <div class="faqx-body">
+          <p class="faqx-q">What counts toward our team size?</p>
+          <p class="faqx-a">Active tippers in your comp. You can invite more than your tier allows during setup; you only move up a tier if you exceed the cap when the season locks.</p>
+        </div>
+        <span class="faqx-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#ic-chev-down"/></svg></span>
+      </div>
+      <div class="faqx-row">
+        <span class="faqx-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-clock"/></svg></span>
+        <div class="faqx-body">
+          <p class="faqx-q">When do we pay?</p>
+          <p class="faqx-a">Subscribe whenever you're ready. Your card is saved and nothing is charged until 31 January 2027; after that the plan renews yearly. Setting up, inviting your people and running the Charity Vote are free.</p>
+        </div>
+        <span class="faqx-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#ic-chev-down"/></svg></span>
+      </div>
+      <div class="faqx-row">
+        <span class="faqx-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-heart"/></svg></span>
+        <div class="faqx-body">
+          <p class="faqx-q">Is the donation included in the price?</p>
+          <p class="faqx-a">Yes. There is one flat fee, and GoodTip gives a share of it to the charity your organisation picked. Nobody in your organisation is ever asked to contribute.</p>
+        </div>
+        <span class="faqx-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#ic-chev-down"/></svg></span>
+      </div>
+      <div class="faqx-row">
+        <span class="faqx-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-spark"/></svg></span>
+        <div class="faqx-body">
+          <p class="faqx-q">What's Founding Partner pricing?</p>
+          <p class="faqx-a">Join on or before {{ founding_closes|date:"j F Y" }} and the rate you sign up at is the rate you're charged for three seasons. The first of those is a stub rather than a full year: it runs from the day you join through the end of the {{ founding_stub_ends|date:"Y" }} season, however many months that happens to be. Two full seasons follow it &mdash; {{ founding_seasons|slice:"1:"|join:" and " }} &mdash; whatever list prices do in the meantime. You also get first access to new sports and features in {{ founding_stub_ends|date:"Y" }}. Move up a plan and you pay that plan's price; you're never charged above list. After the window the price rises for new joiners only &mdash; if you are already in, your rate is untouched.</p>
+        </div>
+        <span class="faqx-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#ic-chev-down"/></svg></span>
+      </div>
+      <div class="faqx-row">
+        <span class="faqx-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-coins"/></svg></span>
+        <div class="faqx-body">
+          <p class="faqx-q">Can we change plans later?</p>
+          <p class="faqx-a">Yes. Grow past your plan and you move up to the next one, at that plan's price. A Founding rate stays with the plan it was locked on, and you're never charged above the published price for the plan you're on.</p>
+        </div>
+        <span class="faqx-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#ic-chev-down"/></svg></span>
+      </div>
     </div>
   </div>
 </section>

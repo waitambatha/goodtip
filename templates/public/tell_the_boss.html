@@ -6,6 +6,12 @@
 {% block meta_description %}A real note, ready to send. Copy it, paste it, and let the person who says yes actually see it.{% endblock %}
 {% block body_class %}page-boss{% endblock %}
 
+{% block extra_head %}
+<script src="{% static 'js/gt-vs.js' %}" defer></script>
+<script src="{% static 'js/gt-boss.js' %}" defer></script>
+<script src="{% static 'js/gt-how.js' %}" defer></script>
+{% endblock %}
+
 {% block content %}
 
 <!-- SPLIT HERO -->
@@ -24,7 +30,7 @@
       stated, and there is no entry fee. Replaced with a non-financial fact.
       {% endcomment %}
       <div><b>$0</b><span>Cost to every participant</span></div>
-      <div><b>4</b><span>Codes, every season</span></div>
+      <div><b>4</b><span>Competitions, every season</span></div>
       <div><b>0</b><span>Sign-up needed to look</span></div>
     </div>
   </div>
@@ -39,144 +45,303 @@
 </section>
 
 <!-- THE NOTE -->
-<section class="section on-cream" id="note">
-  <div class="wrap">
-    {# centred, because the two letters below it are a symmetric pair #}
-    <p class="eyebrow reveal ttb-centre">Real note. Send it.</p>
-    <h2 class="section-heading reveal ttb-centre">Stick it somewhere they'll actually see it.</h2>
-    <p class="ttb-lede reveal ttb-centre">Two ways to put it in front of them. Same words either way, pick whichever suits your office.</p>
-    {% comment %}
-    Both presentations of the same note, side by side as a hero split — the
-    sticky note and the message card. They share the letter body partial, so
-    the wording exists once and the copy button gets the same text whichever
-    half caught your eye.
+{% comment %}
+1 OCT 2026 (client), third pass. Two halves, edge to edge:
+  * LEFT, all green: the two letters share ONE spot and take turns — only one
+    is ever on screen, never one above the other. gt-boss.js cycles five
+    different entrances (fade, slide, flip, zoom, rise), one per change.
+  * RIGHT, white: a self-playing email client showing the note being written,
+    sent, landing in the boss's inbox, opened and answered. Illustrative only,
+    no inputs. Under it, the one real control: the Tell the Boss button, which
+    opens the flow — "send it for me" (six fields, we email it) or "I'll do it
+    myself" (a template with [brackets] to fill in, nothing shared with us).
+The copy / members-only / send blocks that used to sit under the demo now
+live inside that flow.
+{% endcomment %}
+<section class="ttb-note" id="note">
+  <div class="ttb-note-left on-dark">
+    <div class="ttb-note-inner">
+      <p class="eyebrow reveal">Real note. Send it.</p>
+      <h2 class="section-heading reveal">Stick it somewhere they'll actually see it.</h2>
+      <p class="ttb-note-lede reveal">The same note, two ways: on their monitor, or in their inbox.</p>
 
-    They replaced a parchment scroll and a lined card on a green envelope,
-    complete with fountain pen, inkwell and a red wax seal (client: "a more
-    modern look, like a post-it note or the like"). The seal is the one worth
-    naming: it was stamped GOOD / TIPS, so the single most brand-looking object
-    on the page was wearing a name the company does not have. Both halves now
-    sign off with the site's own wordmark.
-    {% endcomment %}
-    <div class="boss-note reveal">
-      <div class="ttb-split">
-        <div class="ttb-half">
-          <span class="ttb-tag">Stick it on their monitor</span>
+      <div class="ttb-deck" data-letter-rotate>
+        <div class="ttb-half is-on" data-label="Stick it on their monitor">
           {% include "public/partials/_boss_letter_postit.html" %}
         </div>
-        <div class="ttb-half">
-          <span class="ttb-tag">Email it &middot; paste it in chat</span>
+        <div class="ttb-half" data-label="Email it &middot; paste it in chat">
           {% include "public/partials/_boss_letter_card.html" %}
         </div>
       </div>
-
-      <div class="bn-actions">
-        <span class="bn-hint">Real text. Fill in the names below, the letter follows.</span>
-        <button type="button" class="btn-ghost" data-copy-note>Copy this note</button>
+      <div class="ttb-deck-foot" aria-hidden="true">
+        <span class="ttb-deck-label" data-deck-label>Stick it on their monitor</span>
+        <span class="ttb-rotate-dots"><i class="on"></i><i></i></span>
       </div>
-      <textarea id="bossNote" aria-hidden="true" tabindex="-1" style="position:absolute;left:-9999px;top:0;"></textarea>
-
-      {% if sent %}
-      <div class="bn-send bn-sent" id="send">
-        <h3>Sent. It's on their desk.</h3>
-        <p>The note is in the boss's inbox with your name on it. Follow it up over a coffee, that's usually all it takes.</p>
-      </div>
-      {% elif not user.is_authenticated %}
-      <div class="bn-send bn-lock" id="send">
-        <div class="bn-lock-badge"><svg class="cic"><use href="#ic-users"/></svg></div>
-        {% if boss_error %}<p class="gtf-error" data-form-error role="alert">{{ boss_error }}</p>{% endif %}
-        <h3>Want us to send it? Members only.</h3>
-        <p>Anyone can copy the note above. But when GoodTip delivers it, it goes out with a member's name on it, so sign up first (it's free), then come back and we'll put it on the boss's desk.</p>
-        <div class="bn-lock-ctas">
-          <a href="{% url 'accounts:signup' %}?next={{ request.path|urlencode }}%23send" class="btn-primary">Become a member &rarr;</a>
-          <a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}%23send" class="btn-ghost">I'm already in, log in</a>
-        </div>
-        <span class="bn-hint" style="display:block;margin-top:14px;">Two minutes. No payment. Then the note sends with your name on it.</span>
-      </div>
-      {% else %}
-      {% comment %}
-      On the shared in-place submit path with the other public forms (client,
-      22 Sep 2026). The form is its own shell here rather than having a wrapper
-      — the veil covers exactly the panel that is doing the work, which is what
-      "just that form section" means on a page where the note itself sits above
-      it and should stay readable while the note is being sent.
-      {% endcomment %}
-      <form method="post" class="bn-send" id="send" action="{% url 'tell_the_boss' %}#send"
-            data-form-shell data-ajax
-            data-busy="Sending the note" data-return-after="4500">
-        {% csrf_token %}
-        <h3>Or let us send it for you.</h3>
-        {% if boss_error %}<p class="bn-error" role="alert">{{ boss_error }}</p>{% endif %}
-        <div class="bn-fields">
-          <label>Your name
-            <input type="text" name="your_name" id="bnYourName" data-letter-src="name" value="{% firstof your_name user.display_name %}" maxlength="80" required autocomplete="name" placeholder="e.g. Sam from accounts">
-          </label>
-          <label>Boss's name <span class="bn-opt">(optional)</span>
-            <input type="text" name="boss_name" id="bnBossName" data-letter-src="boss" value="{{ boss_name }}" maxlength="80" autocomplete="off" placeholder="e.g. Priya">
-          </label>
-          <label>Boss's email
-            <input type="email" name="boss_email" data-letter-src="email" value="{{ boss_email_draft }}" required autocomplete="off" placeholder="boss@yourwork.com.au">
-          </label>
-        </div>
-
-        {% comment %}
-        The note as it will go out, between the fields and the button — so the
-        last thing under the sender's eye before they commit is the thing they
-        are committing to. See _boss_letter_preview.html for why this did not
-        exist before.
-        {% endcomment %}
-        {% include "public/partials/_boss_letter_preview.html" %}
-        <input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;top:0;">
-        <div class="bn-send-row">
-          <button type="submit" class="btn-primary">Send the note</button>
-          <span class="bn-hint">One email, exactly as written above. No list, no follow-ups.</span>
-        </div>
-      </form>
-      {% endif %}
     </div>
   </div>
+
+  <div class="ttb-note-right">
+    <div class="ttb-note-inner">
+      <p class="mx-kicker">What happens when you send it</p>
+
+      <div class="mx" data-mail-demo aria-label="Illustration: the note being sent to the boss and answered" role="img">
+        <div class="mx-bar">
+          <span class="mx-dot r"></span><span class="mx-dot y"></span><span class="mx-dot g"></span>
+          <span class="mx-where" data-mx-where>Your mail &middot; sam@acme.com.au</span>
+        </div>
+        <ol class="mx-steps">
+          <li data-mx-step="0" class="is-on">Write<i class="mx-load"></i></li>
+          <li data-mx-step="1">Send<i class="mx-load"></i></li>
+          <li data-mx-step="2">Delivered<i class="mx-load"></i></li>
+          <li data-mx-step="3">Opened<i class="mx-load"></i></li>
+          <li data-mx-step="4">Reply<i class="mx-load"></i></li>
+        </ol>
+
+        <div class="mx-stage">
+          {# 1-2: the sender's compose window #}
+          <div class="mx-scene mx-compose is-on" data-mx-scene="compose">
+            <div class="mx-compose-head">New message</div>
+            <div class="mx-field"><span>To</span><b data-mx-type="priya.sharma@acme.com.au">priya.sharma@acme.com.au</b><i class="mx-caret"></i></div>
+            <div class="mx-field"><span>Subject</span><b>Sam wants our tipping comp to do some good</b></div>
+            <div class="mx-body">
+              <p>Dear Priya,</p>
+              <p>What if our footy tips at Acme actually did some good?</p>
+              <p>We're already picking teams and checking the ladder every Monday. With GoodTip it stays free for all of us, and GoodTip gives to a charity we choose.</p>
+              <p>Can we do this?</p>
+              <p class="mx-sign">Sam<br><small>Accounts Manager</small></p>
+            </div>
+            <div class="mx-compose-foot">
+              <span class="mx-send" data-mx-send>Send</span>
+              <span class="mx-pointer" aria-hidden="true"></span>
+            </div>
+            <div class="mx-toast" data-mx-toast>Message sent</div>
+          </div>
+
+          {# 3: the boss's inbox, the note arriving on top #}
+          <div class="mx-scene mx-inbox" data-mx-scene="inbox">
+            <div class="mx-row mx-new" data-mx-new>
+              <span class="mx-av">S</span>
+              <span class="mx-row-txt"><b>Sam (via GoodTip)</b><em>Sam wants our tipping comp to do some good</em></span>
+              <span class="mx-time">now</span>
+            </div>
+            <div class="mx-row"><span class="mx-av mx-av-mute">F</span><span class="mx-row-txt"><b>Finance</b><em>Q3 budget sign-off</em></span><span class="mx-time">9:12</span></div>
+            <div class="mx-row"><span class="mx-av mx-av-mute">L</span><span class="mx-row-txt"><b>Lee, Ops</b><em>Friday lunch numbers</em></span><span class="mx-time">8:47</span></div>
+            <div class="mx-row"><span class="mx-av mx-av-mute">H</span><span class="mx-row-txt"><b>HR</b><em>Leave calendar for October</em></span><span class="mx-time">Mon</span></div>
+          </div>
+
+          {# 4-5: opened, and the reply going back #}
+          <div class="mx-scene mx-read" data-mx-scene="read">
+            <div class="mx-read-subject">Sam wants our tipping comp to do some good</div>
+            <div class="mx-read-from"><span class="mx-av">S</span><span><b>Sam (via GoodTip)</b><small>to Priya Sharma</small></span></div>
+            <div class="mx-body mx-body-sm">
+              <p>Dear Priya,</p>
+              <p>What if our footy tips at Acme actually did some good? &hellip;</p>
+              <p>Can we do this?</p>
+            </div>
+            <div class="mx-reply" data-mx-reply>
+              <div class="mx-read-from"><span class="mx-av mx-av-boss">P</span><span><b>Priya Sharma</b><small>to Sam</small></span></div>
+              <p data-mx-type-reply="Love this. Let's set it up for the office this week."></p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="mx-note">An illustration. Your boss sees your name on it, not ours.</p>
+
+      <div class="ttb-begin">
+        <p>Click <b>Tell the Boss</b> to begin. We send it for you, or you copy it and send it yourself.</p>
+        <button type="button" class="btn-primary ttb-begin-btn" data-tb-open>Tell the Boss &rarr;</button>
+      </div>
+    </div>
+  </div>
+  <textarea id="bossNote" aria-hidden="true" tabindex="-1" style="position:absolute;left:-9999px;top:0;"></textarea>
 </section>
 
-<!-- THE REFRAME -->
-<section class="section on-dark">
-  <div class="wrap">
-    <p class="eyebrow reveal">The reframe</p>
-    <h2 class="section-heading reveal">Same comp. Different point to it.</h2>
-    <div class="roles-2 reveal">
-      <div class="role-card r1">
-        <span class="role-tag">Right now</span>
-        <h3>Your current tipping comp</h3>
-        <ul class="cmp-list bad">
-          <li>Everyone chips in, one person collects</li>
-          <li>Bragging rights until round two</li>
-          <li>Someone has to chase the stragglers all season</li>
-          <li>Season ends, nothing lasts</li>
-        </ul>
+{# ---- the Tell the Boss flow: choose, then send-for-me or do-it-myself ---- #}
+<div class="tbf" data-tb-flow {% if boss_error %}data-tb-start="auto"{% endif %} hidden>
+  <div class="tbf-backdrop" data-tb-close></div>
+  <div class="tbf-panel" role="dialog" aria-modal="true" aria-labelledby="tbfTitle">
+    <div class="tbf-head">
+      <button type="button" class="tbf-back" data-tb-back hidden aria-label="Back">&larr;</button>
+      <h2 id="tbfTitle" data-tb-title>Tell the Boss</h2>
+      <button type="button" class="tbf-x" data-tb-close aria-label="Close">&times;</button>
+    </div>
+
+    <div class="tbf-body">
+      {# step 1: how #}
+      <div class="tbf-step" data-tb-step="choose">
+        <p class="tbf-lede">How do you want to do it?</p>
+        <div class="tbf-choices">
+          <button type="button" class="tbf-choice" data-tb-go="auto">
+            <span class="tbf-choice-ic">&#9993;</span>
+            <b>Send it for me</b>
+            <span>Give us six details and we email the note to your boss, with your name on it.</span>
+          </button>
+          <button type="button" class="tbf-choice" data-tb-go="manual">
+            <span class="tbf-choice-ic">&#9998;</span>
+            <b>I'll send it myself</b>
+            <span>Copy a ready template, fill in the bits in brackets, send it however you like. Nothing shared with us.</span>
+          </button>
+        </div>
       </div>
-      <div class="role-card r2">
-        <span class="role-tag">With GoodTip</span>
-        <h3>Same comp. Better outcome.</h3>
-        <ul class="cmp-list good">
-          <li>Free to play, and nobody chases anybody</li>
-          <li>Ladder still counts. Bragging rights still real</li>
-          <li>GoodTip gives to the charity your organisation picks</li>
-          <li>Season ends, the impact stays</li>
-        </ul>
+
+      {# step 2a: we send it #}
+      <div class="tbf-step" data-tb-step="auto" hidden>
+        {% if sent %}
+        <div class="bn-send bn-sent">
+          <h3>Sent. It's on their desk.</h3>
+          <p>The note is in the boss's inbox with your name on it. Follow it up over a coffee, that's usually all it takes.</p>
+        </div>
+        {% else %}
+        {% if not user.is_authenticated %}
+        <p class="tbf-members"><b>Members only, and free.</b> A note we send goes out with a member's name on it. Fill this in, create your free account, and it sends straight after. <a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">Already a member? Log in</a></p>
+        {% endif %}
+        <form method="post" class="tbf-form" action="{% url 'tell_the_boss' %}"
+              {% if user.is_authenticated %}data-form-shell data-ajax data-busy="Sending the note" data-return-after="4500"{% endif %}>
+          {% csrf_token %}
+          {% if boss_error %}<p class="bn-error" role="alert">{{ boss_error }}</p>{% endif %}
+          <div class="tbf-fields">
+            <label>Your name
+              <input type="text" name="your_name" data-letter-src="name" value="{{ your_name }}" maxlength="80" required autocomplete="name" placeholder="e.g. Sam Taylor">
+            </label>
+            <label>Your email
+              <input type="email" name="your_email" value="{% firstof your_email user.email %}" maxlength="254" required autocomplete="email" placeholder="sam@yourwork.com.au" {% if user.is_authenticated %}readonly{% endif %}>
+            </label>
+            <label>Your position
+              <input type="text" name="your_position" data-letter-src="position" value="{{ your_position }}" maxlength="80" required autocomplete="organization-title" placeholder="e.g. Accounts Manager">
+            </label>
+            <label>Company name
+              <input type="text" name="company_name" data-letter-src="company" value="{{ company_name }}" maxlength="120" required autocomplete="organization" placeholder="e.g. Acme Freight">
+            </label>
+            <label>Boss's name
+              <input type="text" name="boss_name" data-letter-src="boss" value="{{ boss_name }}" maxlength="80" required autocomplete="off" placeholder="e.g. Priya Sharma">
+            </label>
+            <label>Boss's email
+              <input type="email" name="boss_email" data-letter-src="email" value="{{ boss_email_draft }}" maxlength="254" required autocomplete="off" placeholder="priya@yourwork.com.au">
+            </label>
+          </div>
+          {% include "public/partials/_boss_letter_preview.html" %}
+          <input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;top:0;">
+          <div class="tbf-actions">
+            <button type="submit" class="btn-primary">{% if user.is_authenticated %}Send to my boss{% else %}Continue: create my free account{% endif %}</button>
+            <span class="bn-hint">One email, exactly as previewed. No list, no follow-ups.</span>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+
+      {# step 2b: they send it #}
+      <div class="tbf-step" data-tb-step="manual" hidden>
+        <p class="tbf-lede">Copy it, swap the <mark>[bracketed]</mark> bits for real names, and send it however you like: email, Teams, Slack, a sticky on the monitor.</p>
+        <div class="tbf-template" data-tb-template>
+<p>Subject: Can our footy tips at <mark>[Company name]</mark> do some good?</p>
+<p>Dear <mark>[Boss's name]</mark>,</p>
+<p>What if our footy tips at <mark>[Company name]</mark> actually did some good?</p>
+<p>We're already picking teams and checking the ladder every Monday. With GoodTip it stays free for all of us, and GoodTip gives to a charity we choose. Together.</p>
+<p>Five minutes to set up. Nothing to lose but bragging rights. Here's how it works: goodtip.com.au/how-it-works</p>
+<p>Can we do this?</p>
+<p><mark>[Your name]</mark><br><mark>[Your position]</mark></p>
+        </div>
+        <div class="tbf-actions">
+          <button type="button" class="btn-primary" data-copy-template>Copy the template</button>
+          <button type="button" class="tbf-link" data-tb-go="auto">Rather we send it? &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- THE REFRAME -->
+<section class="section on-cream">
+  <div class="wrap">
+    {% comment %}
+    30 Sep 2026 (client): "borrow from what we did in the homepage in this
+    section Every other tipping comp ends the same way" — same .vs component
+    home.html uses (markup + gt-vs.js, both generic/reusable already), same
+    four points this page already made, just carried by the shared component
+    instead of the page's own .roles-2/.cmp-list pair. Background follows the
+    borrowed component onto on-cream too: .vs-h-yes and the default .vs-yes
+    both paint var(--deep), which is the same colour this page's on-dark
+    sections use as their background — on-dark it would blend invisibly into
+    the section itself, exactly the outcome cream avoids (matches home.html).
+    {% endcomment %}
+    <div class="vs-intro">
+      <p class="eyebrow reveal">The reframe</p>
+      <h2 class="section-heading reveal">Same comp. Different point to it.</h2>
+    </div>
+    <div class="vs" data-vs>
+      <div class="vs-head">
+        <div class="vs-h vs-h-no"><div class="lab">Right now</div><h3>Your current tipping comp</h3></div>
+        <span class="vs-gap" aria-hidden="true"></span>
+        <div class="vs-h vs-h-yes"><div class="lab">With GoodTip</div><h3>Same comp. Better outcome.</h3></div>
+      </div>
+      <div class="vs-row" style="--i:0">
+        <div class="vs-no"><span class="cell-icon icon-no">&times;</span><span>Everyone chips in, one person collects</span></div>
+        <span class="vs-to" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <div class="vs-yes"><span class="cell-icon icon-yes">&check;</span><span>Free to play, and nobody chases anybody</span></div>
+      </div>
+      <div class="vs-row" style="--i:1">
+        <div class="vs-no"><span class="cell-icon icon-no">&times;</span><span>Bragging rights until round two</span></div>
+        <span class="vs-to" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <div class="vs-yes"><span class="cell-icon icon-yes">&check;</span><span>Ladder still counts. Bragging rights still real</span></div>
+      </div>
+      <div class="vs-row" style="--i:2">
+        <div class="vs-no"><span class="cell-icon icon-no">&times;</span><span>Someone has to chase the stragglers all season</span></div>
+        <span class="vs-to" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <div class="vs-yes"><span class="cell-icon icon-yes">&check;</span><span>GoodTip gives to the charity your organisation picks</span></div>
+      </div>
+      <div class="vs-row" style="--i:3">
+        <div class="vs-no"><span class="cell-icon icon-no">&times;</span><span>Season ends, nothing lasts</span></div>
+        <span class="vs-to" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span>
+        <div class="vs-yes"><span class="cell-icon icon-yes">&check;</span><span>Season ends, the impact stays</span></div>
       </div>
     </div>
   </div>
 </section>
 
 <!-- THREE STEPS -->
-<section class="section on-paper">
-  <div class="wrap">
-    <p class="eyebrow reveal">How it starts</p>
-    <h2 class="section-heading reveal">Three steps. No admin headache.</h2>
-    <div class="timeline" style="margin-top:36px;" data-flow>
-      <div class="tl-step reveal from-left"><div class="tl-marker">01</div><div class="tl-card"><p class="tl-tag">Set up</p><h2>Set up your organisation</h2><p>Takes minutes. Works for an office floor, a school year group or a club committee.</p></div></div>
-      <div class="tl-step reveal from-left"><div class="tl-marker">02</div><div class="tl-card"><p class="tl-tag">Choose</p><h2>Pick a charity together</h2><p>The organisation decides. Democratic, not handed down from the top.</p></div></div>
-      <div class="tl-step reveal from-left"><div class="tl-marker">03</div><div class="tl-card"><p class="tl-tag">Tip</p><h2>Tip every round</h2><p>Your organisation pays one platform fee. GoodTip gives a share of it to the charity your organisation picks. Nobody on your team pays a cent.</p></div></div>
+{% comment %}
+1 Oct 2026 (client): "copy what we did in the how it works page — The season,
+end to end". The same gt-how.js show: one card at a time leaves its row,
+grows into the middle, turns into a wide panel playing a clip of the product,
+then shrinks back and the next card goes. Each card turns its own way
+(data-turn on the panel): 01 the full 360, 02 a zoom-open, 03 a flip-board
+flap. Narrow screens and reduced motion keep the plain cards (gt-how.js).
+{% endcomment %}
+<section class="section on-paper hw" id="how-it-starts" data-hw data-base="{% static 'video/trailer/' %}">
+  <div class="hw-track">
+   <div class="hw-stage">
+    <div class="wrap">
+      <div class="hw-head">
+        <p class="eyebrow reveal">How it starts</p>
+        <h2 class="section-heading reveal">Three steps. No admin headache.</h2>
+      </div>
+      <div class="timeline" style="margin-top:36px;" data-flow data-hw-row>
+        <div class="tl-step reveal from-left s1"><div class="tl-marker">01</div><div class="tl-card hw-card"><p class="tl-tag">Set up</p><h2>Set up your organisation</h2><p>Takes minutes. Works for an office floor, a school year group or a club committee.</p></div></div>
+        <div class="tl-step reveal from-left s2"><div class="tl-marker">02</div><div class="tl-card hw-card"><p class="tl-tag">Choose</p><h2>Pick a charity together</h2><p>The organisation decides. Democratic, not handed down from the top.</p></div></div>
+        <div class="tl-step reveal from-left s3"><div class="tl-marker">03</div><div class="tl-card hw-card"><p class="tl-tag">Tip</p><h2>Tip every round</h2><p>Your organisation pays one platform fee. GoodTip gives a share of it to the charity your organisation picks. Nobody on your team pays a cent.</p></div></div>
+      </div>
     </div>
+    <div class="hw-panels" aria-hidden="true">
+      <div class="hw-panel s1" data-turn="spin" data-segs='[["create-org",1,4.5,"Set up your organisation"],["create-org",4.5,8,"Invite your team"]]'>
+        <div class="hw-in">
+          <div class="hw-copy"><p class="tl-tag">Set up</p><h3>Set up your organisation</h3><p>Name the comp, invite the team. Minutes, not a project.</p><div class="hw-dots"></div></div>
+          <div class="hw-media"><video muted playsinline preload="none" poster="{% static 'video/trailer/create-org.jpg' %}"></video><span class="hw-cap"></span></div>
+        </div>
+      </div>
+      <div class="hw-panel s2" data-turn="zoom" data-segs='[["charity-vote",2,5.5,"Everyone nominates"],["charity-vote",5.5,9,"Majority wins"]]'>
+        <div class="hw-in">
+          <div class="hw-copy"><p class="tl-tag">Choose</p><h3>Pick a charity together</h3><p>Everyone nominates, everyone votes, majority wins.</p><div class="hw-dots"></div></div>
+          <div class="hw-media"><video muted playsinline preload="none" poster="{% static 'video/trailer/charity-vote.jpg' %}"></video><span class="hw-cap"></span></div>
+        </div>
+      </div>
+      <div class="hw-panel s3" data-turn="flap" data-segs='[["picks",2,5.5,"Pick your winners"],["my-tips",2,4.5,"The points land"]]'>
+        <div class="hw-in">
+          <div class="hw-copy"><p class="tl-tag">Tip</p><h3>Tip every round</h3><p>One platform fee from the organisation. Nobody on the team pays a cent.</p><div class="hw-dots"></div></div>
+          <div class="hw-media"><video muted playsinline preload="none" poster="{% static 'video/trailer/picks.jpg' %}"></video><span class="hw-cap"></span></div>
+        </div>
+      </div>
+    </div>
+   </div>
   </div>
 </section>
 
@@ -192,6 +357,8 @@
     <p class="src">Tell the boss &middot; takes 5 minutes</p>
   </div>
 </section>
+
+{% include "public/partials/_contact.html" with contact_id="contact" %}
 
 <!-- CTA -->
 <section class="cta-pro">
@@ -228,15 +395,29 @@
   }
 
   function flash(btn){ var o = btn.textContent; btn.textContent = 'Copied \u2713'; setTimeout(function(){ btn.textContent = o; }, 1600); }
+  function legacy(text, btn){ note.value = text; note.focus(); note.select(); try { document.execCommand('copy'); } catch(e){} flash(btn); }
   function put(text, btn){
-    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(function(){ flash(btn); }); }
-    else { note.value = text; note.focus(); note.select(); try { document.execCommand('copy'); } catch(e){} flash(btn); }
+    /* Brave (and Flatpak builds especially) can refuse writeText; without the
+       catch the button silently did nothing and the clipboard stayed empty. */
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function(){ flash(btn); }, function(){ legacy(text, btn); });
+    }
+    else { legacy(text, btn); }
   }
   document.querySelectorAll('[data-copy-note]').forEach(function(btn){
     btn.addEventListener('click', function(){ sync(); put(letterText(), btn); });
   });
   document.querySelectorAll('[data-copy-link]').forEach(function(btn){
     btn.addEventListener('click', function(){ put(window.location.origin + window.location.pathname, btn); });
+  });
+  /* The do-it-yourself template, brackets and all — one paragraph per line
+     so it pastes into an email the way it reads on screen. */
+  document.querySelectorAll('[data-copy-template]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var box = document.querySelector('[data-tb-template]');
+      if (!box) return;
+      put([].map.call(box.querySelectorAll('p'), function(p){ return p.innerText.trim(); }).join('\n\n'), btn);
+    });
   });
 })();
 </script>

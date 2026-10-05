@@ -3,7 +3,7 @@
 ----
 Dear {{ boss_name|default:"Boss" }},
 
-What if our footy tips actually did some good?
+What if our footy tips at {{ company_name|default:"work" }} actually did some good?
 
 We're already picking teams and checking the ladder every Monday. With GoodTip
 it stays free for all of us, and GoodTip gives to a charity we choose. Together.
@@ -12,7 +12,7 @@ Five minutes to set up. Nothing to lose but bragging rights.
 
 Can we do this?
 
-— {{ your_name }}
+— {{ your_name }}{% if your_position %}, {{ your_position }}{% endif %}
 ----
 
 WHAT GOODTIP ACTUALLY IS

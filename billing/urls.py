@@ -9,6 +9,8 @@ urlpatterns = [
     path("<int:org_id>/plans/", views.plans_view, name="plans"),
     path("<int:org_id>/checkout/", views.checkout_view, name="checkout"),
     path("<int:org_id>/success/", views.success_view, name="success"),
+    path("<int:org_id>/subscription-status/", views.subscription_status_view, name="subscription_status"),
+    path("<int:org_id>/demo-start/", views.demo_start_view, name="demo_start"),
     # The donation pledge page and the participant top-up flow are gone
     # (client wording spec, 18 Aug 2026). GoodTip funds the donation from its
     # own revenue now, so there is no pledge for an organisation to set and

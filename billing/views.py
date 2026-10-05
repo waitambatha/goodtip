@@ -2,7 +2,7 @@ import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
@@ -16,6 +16,7 @@ from . import donations, goodlist, services
 from .models import DonationPledge, PlanSubscription, SponsorshipApplication
 from .pricing import (
     FOUNDING_WINDOW_CLOSES,
+    first_billing_at,
     GROUPS_MIN_TIER,
     STARTER,
     TIERS,
@@ -126,8 +127,10 @@ def plans_view(request, org_id: int):
     return render(request, "billing/plans.html", {
         "org": org,
         "tiers": _tier_cards(org),
-        "current": services.active_subscription(org),
+        "current": services.current_subscription(org),
         "stripe_configured": services.is_configured(),
+        "stripe_test_mode": services.is_test_mode(),
+        "first_billing_at": first_billing_at(),
         # The organisation's own founding lock, and — for one that has not
         # taken a plan yet — whether the window is still open to them. Both,
         # because "you are locked until 2029" and "you have until 31 December
@@ -163,6 +166,9 @@ def checkout_view(request, org_id: int):
         services.create_subscription(org, tier)
         return redirect("billing:plans", org_id=org.id)
 
+    # The demo (test keys only): the same subscription, run on a Stripe test
+    # clock so the success page can jump it to the first billing date.
+    demo = request.POST.get("demo") == "1" and services.is_test_mode()
     sub = services.create_subscription(org, tier)
     success_url = request.build_absolute_uri(
         reverse("billing:success", args=[org.id])
@@ -170,7 +176,8 @@ def checkout_view(request, org_id: int):
     cancel_url = request.build_absolute_uri(reverse("billing:plans", args=[org.id]))
     try:
         session = services.create_checkout_session(
-            sub, success_url=success_url, cancel_url=cancel_url
+            sub, success_url=success_url, cancel_url=cancel_url,
+            email=request.user.email or "", demo=demo,
         )
     except Exception:  # noqa: BLE001 — surface any Stripe error gracefully
         logger.exception("Stripe checkout session creation failed")
@@ -287,10 +294,55 @@ def success_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _require_owner(request.user, org):
         return HttpResponseForbidden()
-    sub = services.active_subscription(org)
-    # The webhook is the source of truth; this page may render a moment before
-    # it lands, so we just reassure the owner either way.
-    return render(request, "billing/success.html", {"org": org, "sub": sub})
+    # Back from Stripe Checkout. The webhook is the source of truth in
+    # production; this also reads the real state straight back from Stripe so
+    # the page is right even where no webhook reaches (a laptop, locally).
+    sub = services.latest_subscription(org)
+    info = {}
+    if sub is not None and services.is_configured():
+        try:
+            info = services.sync_from_stripe(sub)
+        except Exception:  # noqa: BLE001 — show what we have; the webhook will catch up
+            logger.exception("Could not read subscription %s back from Stripe", sub.pk)
+    return render(request, "billing/success.html", {
+        "org": org, "sub": sub, "info": info,
+        "is_demo": bool(sub and sub.is_demo and services.is_test_mode()),
+    })
+
+
+@login_required
+def subscription_status_view(request, org_id: int):
+    """JSON for the success page's live status (and the demo's countdown)."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_owner(request.user, org):
+        return HttpResponseForbidden()
+    sub = services.latest_subscription(org)
+    if sub is None or not services.is_configured():
+        return JsonResponse({"status": "none"})
+    try:
+        return JsonResponse(services.sync_from_stripe(sub))
+    except Exception:  # noqa: BLE001
+        logger.exception("Subscription status read failed for %s", sub.pk)
+        return JsonResponse({"status": sub.status, "error": "stripe"}, status=502)
+
+
+@login_required
+@require_POST
+def demo_start_view(request, org_id: int):
+    """Demo only (test keys): jump the demo subscription to its first billing
+    date so the first yearly charge happens now, for real, in test mode."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_owner(request.user, org) or not services.is_test_mode():
+        return HttpResponseForbidden()
+    sub = services.latest_subscription(org)
+    if sub is None or not sub.is_demo:
+        return JsonResponse({"ok": False, "error": "No demo subscription to start."}, status=400)
+    try:
+        services.demo_jump_to_first_billing(sub)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("Demo clock advance failed for %s", sub.pk)
+        return JsonResponse({"ok": False, "error": str(e)[:200]}, status=502)
+    return JsonResponse({"ok": True})
 
 
 @csrf_exempt
@@ -306,7 +358,13 @@ def stripe_webhook(request):
         return HttpResponse(status=400)
 
     if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
+        # stripe==15.2.0's StripeObject stopped being a dict subclass (only
+        # __getitem__/__contains__ remain) — .get() below is dict-only, so
+        # this has to be converted once, here, rather than at every call site.
+        # Found 28 Sep 2026: every real webhook delivery 500s without this,
+        # for both a plan payment and a donation top-up, silently, because
+        # Stripe keys had never been live in any environment before today.
+        session = event["data"]["object"].to_dict()
         meta = session.get("metadata") or {}
         if meta.get("kind") == "donation":
             _record_donation_from_session(session, meta)
@@ -314,8 +372,21 @@ def stripe_webhook(request):
             sub_id = meta.get("subscription_id") or session.get("client_reference_id")
             if sub_id:
                 sub = PlanSubscription.objects.filter(pk=sub_id).first()
-                if sub:
+                if sub and session.get("mode") == "subscription":
+                    # Subscribed; the charge itself arrives as invoice.paid.
+                    services.record_subscribed(
+                        sub, subscription_id=session.get("subscription") or "",
+                        customer_id=session.get("customer") or "",
+                    )
+                elif sub:
                     services.mark_paid(sub, payment_intent_id=session.get("payment_intent") or "")
+    elif event["type"] == "invoice.paid":
+        inv = event["data"]["object"].to_dict()
+        if (inv.get("amount_paid") or 0) > 0:
+            sid = services._invoice_subscription_id(inv)
+            sub = PlanSubscription.objects.filter(stripe_subscription_id=sid).first() if sid else None
+            if sub:
+                services.record_invoice_paid(sub, inv)
     return HttpResponse(status=200)
 
 

@@ -8,9 +8,9 @@ filled in from the form below the letter, hence the data- hooks.
 {% endcomment %}
 <div class="bn-body">
   <p class="bn-greet">Dear <span data-letter-boss>{% firstof boss_name "Boss" %}</span>,</p>
-  <p>What if our footy tips actually did some good?</p>
+  <p>What if our footy tips at <span data-letter-company>{% firstof company_name "work" %}</span> actually did some good?</p>
   <p>We're already picking teams and checking the ladder every Monday. With GoodTip it stays free for all of us, and GoodTip gives to a charity we choose. Together.</p>
   <p>Five minutes to set up. Nothing to lose but bragging rights.</p>
   <p>Can we do this?</p>
-  <p class="bn-sign"><span data-letter-name>{% firstof your_name "[Your name]" %}</span></p>
+  <p class="bn-sign"><span data-letter-name>{% firstof your_name "[Your name]" %}</span><span class="bn-position" data-letter-position>{{ your_position }}</span></p>
 </div>

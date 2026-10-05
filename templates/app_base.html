@@ -225,6 +225,12 @@ goodtip.css.
           {% endcomment %}
           <a href="{% url 'tipping:my_tips' primary_org.id %}" class="{% block nav_tips %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-vote"/></svg><span>My Tips</span></a>
           <a href="{% url 'tipping:leaderboard' primary_org.id %}" class="{% block nav_board %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>Leaderboard</span></a>
+          {% comment %}
+          Ladder is ONE link again (client, 4 Oct 2026): "the ladder is purely
+          for teams" — where every club sits, round by round. The Industry and
+          National boards it used to drop down to rank PEOPLE and ORGANISATIONS,
+          so they live on the Leaderboard now, as views of it.
+          {% endcomment %}
           <a href="{% url 'tipping:ladder' primary_org.id %}" data-coach="ladder" class="{% block nav_ladder %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg><span>Ladder</span></a>
           <a href="{% url 'orgs:wall' primary_org.id %}" data-coach="wall" class="{% block nav_wall %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-msg"/></svg><span>The Wall</span></a>
           {% comment %}
@@ -315,6 +321,10 @@ goodtip.css.
               <a href="{% url 'billing:season_summary' primary_org.id %}">
                 <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-coins"/></svg></span>
                 <span class="mi-txt"><b>Season summary</b><i>Entries, donations and totals</i></span>
+              </a>
+              <a href="{% url 'tipping:certificates' primary_org.id %}">
+                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-trophy"/></svg></span>
+                <span class="mi-txt"><b>Champion certificates</b><i>Print or post your season champions</i></span>
               </a>
 
             </div>
@@ -486,6 +496,7 @@ goodtip.css.
           <span class="sheet-label">Manage</span>
           <a href="{% url 'orgs:members' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-users"/></svg><span>Members</span></a>
           <a href="{% url 'billing:season_summary' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-coins"/></svg><span>Season summary</span></a>
+          <a href="{% url 'tipping:certificates' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>Certificates</span></a>
           <a href="{% url 'orgs:charities' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-heart"/></svg><span>Charities</span></a>
         {% endif %}
       {% endif %}

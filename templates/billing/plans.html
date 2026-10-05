@@ -16,7 +16,7 @@ the deep sheet over the rotating strips.
 {% block body_class %}page-deep sheet-page{% endblock %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% block app_content %}
-<div class="app-head is-centred is-orgfirst"><div><div class="app-eyebrow">{{ org.name }} &middot; billing</div><h1 class="app-h1">Choose your plan</h1><p class="app-sub">Priced by organisation size. Every plan includes all four codes and the full platform. GoodTip gives a share of this fee to the charity your organisation picks.</p></div></div>
+<div class="app-head is-centred is-orgfirst"><div><div class="app-eyebrow">{{ org.name }} &middot; billing</div><h1 class="app-h1">Choose your plan</h1><p class="app-sub">Priced by organisation size. Every plan includes all four competitions and the full platform. GoodTip gives a share of this fee to the charity your organisation picks.</p></div></div>
 
 {% if not stripe_configured %}
 <div class="flash info" style="margin-bottom:18px;"><svg class="cic" style="width:18px;height:18px;stroke:#245b66;fill:none;flex:none;"><use href="#ic-lock"/></svg><span>Payments aren't switched on yet, your choice is saved and we'll confirm before charging.</span></div>
@@ -47,6 +47,27 @@ and can see the date, or the window is still open and it can see the deadline.
     pay for three seasons — a stub first term running through the end of the
     {{ founding_stub_ends|date:"Y" }} season, then two full seasons after it.
   </span>
+</div>
+{% endif %}
+
+{% comment %}
+SUBSCRIBE NOW, BILLED FROM 31 JANUARY (client, 3 Oct 2026). The plan is a
+yearly Stripe subscription: the card is saved today and the first charge
+lands on billing.pricing.FIRST_BILLING_DATE. Said here, before the button,
+because "why wasn't I charged?" and "why was I charged in January?" are the
+same support email from two directions.
+{% endcomment %}
+{% if current and current.is_scheduled %}
+<div class="flash success bl-status" style="margin-bottom:18px;">
+  <span><b>Subscribed to {{ current.get_tier_display }}.</b> Your card is saved; the first yearly payment of ${{ current.price_aud|floatformat:0 }} is taken on {{ current.starts_at|date:"j F Y" }}.</span>
+</div>
+{% elif current and current.is_active %}
+<div class="flash success bl-status" style="margin-bottom:18px;">
+  <span><b>{{ current.get_tier_display }} is active.</b> Paid{% if current.paid_at %} {{ current.paid_at|date:"j F Y" }}{% endif %}, renewing yearly.{% if current.stripe_invoice_url %} <a href="{{ current.stripe_invoice_url }}" target="_blank" rel="noopener">View the invoice</a>.{% endif %}</span>
+</div>
+{% elif first_billing_at %}
+<div class="flash info bl-status" style="margin-bottom:18px;">
+  <span><b>Subscribe today, pay from {{ first_billing_at|date:"j F Y" }}.</b> Your card is saved at checkout and nothing is charged until then; after that the plan renews yearly.</span>
 </div>
 {% endif %}
 
@@ -96,10 +117,34 @@ and can see the date, or the window is still open and it can see the deadline.
     infer it from a features list that does not mention them.
     {% endcomment %}
     {% if not t.groups %}<p class="tier-note">One shared ladder. Groups start at {{ groups_min_label }}.</p>{% endif %}
-    <form method="post" action="{% url 'billing:checkout' org.id %}" style="margin-top:auto;">{% csrf_token %}<input type="hidden" name="tier" value="{{ t.key }}"><button class="tier-cta" type="submit">{% if current and current.tier == t.key %}Current plan{% else %}Choose {{ t.label }}{% endif %}</button></form>
+    <form method="post" action="{% url 'billing:checkout' org.id %}" style="margin-top:auto;">{% csrf_token %}<input type="hidden" name="tier" value="{{ t.key }}"><button class="tier-cta" type="submit">{% if current and current.tier == t.key %}Current plan{% else %}Subscribe to {{ t.label }}{% endif %}</button></form>
   </div>
   {% endfor %}
 </div>
+
+{% if stripe_configured and stripe_test_mode %}
+{% comment %}
+THE DEMO (client, 3 Oct 2026: "something I can showcase where we do the
+Stripe payment and the subscription starts in about 10 seconds"). Only ever
+rendered on Stripe TEST keys — billing.services.is_test_mode — so it cannot
+appear on a live site. It runs the real subscription, with the real 31
+January start, on a Stripe test clock; the page it returns to counts ten
+seconds and then moves that clock to the start date, so Stripe takes the
+first payment in front of the audience exactly as it will on the day.
+{% endcomment %}
+<div class="bl-demo">
+  <div class="bl-demo-tag">Demo &middot; Stripe test mode</div>
+  <h2 class="bl-demo-h">See a subscription start, in about 10 seconds</h2>
+  <p class="bl-demo-p">Subscribes this organisation for real in Stripe's test mode, with billing set to start {% if first_billing_at %}on {{ first_billing_at|date:"j F Y" }}{% else %}straight away{% endif %}. Back here, a ten-second countdown jumps the subscription to that date and Stripe takes the first payment. Use the test card <b>4242 4242 4242 4242</b>, any future expiry, any CVC.</p>
+  <form method="post" action="{% url 'billing:checkout' org.id %}" class="bl-demo-form">{% csrf_token %}
+    <input type="hidden" name="demo" value="1">
+    <label class="bl-demo-sel"><span>Plan</span>
+      <select name="tier">{% for t in tiers %}<option value="{{ t.key }}"{% if forloop.first %} selected{% endif %}>{{ t.label }} &middot; ${{ t.your_price|floatformat:0 }}/yr</option>{% endfor %}</select>
+    </label>
+    <button type="submit" class="bl-demo-btn">Run the demo &rarr;</button>
+  </form>
+</div>
+{% endif %}
 
 {% comment %}
 Under the cards, for the organisation that has got as far as choosing a plan

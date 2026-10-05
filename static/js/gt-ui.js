@@ -109,6 +109,19 @@
         var cs = getComputedStyle(n);
         if (cs.transform !== 'none' || cs.perspective !== 'none' ||
             (cs.filter && cs.filter !== 'none')) return false;
+        /* A [data-form-shell] is not transformed yet at the moment a click
+           both opens it (gt-formfocus.js) and opens a menu inside it (this
+           file) — that lands a setTimeout later. place() measures the button
+           in viewport coordinates, which is only correct while fixed really
+           is relative to the viewport; the instant the shell's centring
+           transform lands, fixed becomes relative to the shell instead, and
+           those same pixels are reinterpreted against the shell's box and
+           land nowhere near it — clipped away by the shell's own overflow.
+           There is no repositioning that survives that switch, so a menu
+           inside a form shell never escapes to fixed, transformed yet or
+           not; the shell is spacious enough that its own overflow:auto is
+           the fallback, not a clipping strip like the one this is for. */
+        if (n.hasAttribute('data-form-shell')) return false;
         if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') clipped = true;
         return true;
       }) && clipped;
@@ -184,10 +197,13 @@
   function init() {
     /* The public contact form was missing from this list, so its "I'm
        interested in…" field was the one raw native select left on the site —
-       an OS-drawn popup in the middle of a designed dark panel. */
+       an OS-drawn popup in the middle of a designed dark panel. The waiting
+       list's two optional fields (client, 27 Sep 2026: "the drop down on the
+       form needs to be enhanced") were the same gap on a light card, which is
+       why .tmw-card is here rather than folded into .mini-form. */
     document.querySelectorAll(
       '.app-main select, .admin-main select, .gl-filterbar select, ' +
-      '.mini-form select, .contact-shell select'
+      '.mini-form select, .contact-shell select, .tmw-card select'
     ).forEach(enhanceSelect);
   }
 
