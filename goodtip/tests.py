@@ -751,3 +751,37 @@ class LoaderSceneTests(TestCase):
         body = self.client.get("/pricing/").content
         self.assertNotIn(b"loader-slim", body)
         self.assertIn(b"data-lscene", body)
+
+
+class MotionForEveryoneTests(SimpleTestCase):
+    """Motion plays for every visitor (client, 5 Oct 2026). A computer asking
+    for reduced motion used to get a static site — staging "looked broken"
+    next to localhost, which had ?motion=1 remembered."""
+
+    TEMPLATES = Path(settings.BASE_DIR) / "templates"
+    STYLES = Path(settings.BASE_DIR) / "static" / "css"
+
+    def test_every_page_head_switches_motion_on_first(self):
+        for path in sorted(self.TEMPLATES.rglob("*.html")):
+            text = path.read_text()
+            head = re.search(r"<head[^>]*>(.*?)</head>", text, re.S)
+            if not head or path.parent.name == "emails":
+                continue
+            body = head.group(1)
+            self.assertIn('{% include "partials/_motion.html" %}', body, path.name)
+            first = re.search(r"<script|<link|{% include", body)
+            self.assertIn("_motion.html", body[first.start():first.start() + 40],
+                          f"{path.name}: must run before any script or style")
+
+    def test_no_reduced_motion_rule_applies_while_motion_is_on(self):
+        for css in sorted(self.STYLES.glob("*.css")):
+            text = re.sub(r"/\*.*?\*/", "", css.read_text(), flags=re.S)
+            for block in re.finditer(r"@media\s*\(\s*prefers-reduced-motion\s*:\s*reduce\s*\)\s*\{", text):
+                depth, i = 1, block.end()
+                while depth:
+                    depth += {"{": 1, "}": -1}.get(text[i], 0)
+                    i += 1
+                inner = re.sub(r"@keyframes[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}", "", text[block.end():i - 1])
+                for selectors in re.findall(r"([^{}]+)\{[^{}]*\}", inner):
+                    for sel in selectors.split(","):
+                        self.assertIn("gt-motion", sel, f"{css.name}: {sel.strip()}")

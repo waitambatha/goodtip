@@ -300,7 +300,7 @@
    thing that has ever shut it. */
 .gtm-details[hidden] { display: none; }
 @keyframes gtmSlideIn { from { transform: translateX(14px); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .gtm-details { animation: none; } }
+@media (prefers-reduced-motion: reduce) { :where(html:not(.gt-motion)) .gtm-details{ animation: none; } }
 .gtm-details-head {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   flex: none; padding: 12px 10px 12px 18px; border-bottom: 1px solid var(--m-line);
@@ -715,8 +715,8 @@
 
 /* Motion off means motion off. Both of these are decorative loops. */
 @media (prefers-reduced-motion: reduce) {
-  .ccr-dot, .ccr-wave i { animation: none; }
-  .ccr-wave i { height: 14px; }
+  :where(html:not(.gt-motion)) .ccr-dot, :where(html:not(.gt-motion)) .ccr-wave i{ animation: none; }
+  :where(html:not(.gt-motion)) .ccr-wave i{ height: 14px; }
 }
 
 /* ==========================================================================
@@ -1006,7 +1006,7 @@ html[data-theme="light"] .gtm-tagchip.is-admin { background: var(--m-accent); co
   animation: gtmSpin .7s linear infinite;
 }
 @keyframes gtmSpin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .gtm-chat.is-loading::before { animation: none; } }
+@media (prefers-reduced-motion: reduce) { :where(html:not(.gt-motion)) .gtm-chat.is-loading::before{ animation: none; } }
 
 /* The selected room, so pressing one looks like it did something even before
    the panel arrives. */
@@ -1367,7 +1367,7 @@ html[data-theme="light"] .gtm-arch i { background: rgba(15,46,34,.08); }
 html[data-theme="light"] .gtm-paper::after {
   background: linear-gradient(rgba(247,245,238,.90), rgba(247,245,238,.94));
 }
-@media (prefers-reduced-motion: reduce) { .gtm-paper-shot { transition: none; } }
+@media (prefers-reduced-motion: reduce) { :where(html:not(.gt-motion)) .gtm-paper-shot{ transition: none; } }
 /* Everything above the paper. The conversation keeps its own ground colour
    only where it must — the header and the composer — so the photograph shows
    through the message area, which is the part a wallpaper is for. */

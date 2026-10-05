@@ -469,11 +469,11 @@ body:not(.loading) .tr-letterbox::before, body:not(.loading) .tr-letterbox::afte
 
 /* ---------- REDUCED MOTION / SAVE-DATA: still, but complete ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .tr-hero::after, .tr-letterbox, .tr-float, .tr-rec, .tr-play, .tr-caret::after { animation: none; }
-  .tr-letterbox { display: none; }
-  .tr-shot.is-on { animation: none; transform: none; }
-  .tr-stagebox { transition: none; }
-  .tr-js .tr-kin .tr-w > span { transform: none; transition: none; }
+  :where(html:not(.gt-motion)) .tr-hero::after, :where(html:not(.gt-motion)) .tr-letterbox, :where(html:not(.gt-motion)) .tr-float, :where(html:not(.gt-motion)) .tr-rec, :where(html:not(.gt-motion)) .tr-play, :where(html:not(.gt-motion)) .tr-caret::after{ animation: none; }
+  :where(html:not(.gt-motion)) .tr-letterbox{ display: none; }
+  :where(html:not(.gt-motion)) .tr-shot.is-on{ animation: none; transform: none; }
+  :where(html:not(.gt-motion)) .tr-stagebox{ transition: none; }
+  :where(html:not(.gt-motion)) .tr-js .tr-kin .tr-w > span{ transform: none; transition: none; }
 }
 
 /* ---------- ON AIR ----------

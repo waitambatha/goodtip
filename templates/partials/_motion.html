@@ -1,0 +1,37 @@
+{% comment %}
+Motion is part of GoodTip's design, so it plays for every visitor (client,
+5 Oct 2026) — including people whose computer asks sites for "reduced motion",
+which many machines do by default or after a battery/animation setting change.
+Those visitors used to get a static site with nothing typing or turning, and
+it looked broken.
+
+This runs first in every <head>, before any stylesheet or script:
+  * html.gt-motion goes on — every reduced-motion CSS rule is scoped to
+    html:not(.gt-motion), so none of them apply;
+  * window.matchMedia answers "(prefers-reduced-motion: …)" as if the visitor
+    had no preference, so every script — ours and inline — animates.
+
+`?motion=0` is the way out for anyone who needs still pages: it is remembered,
+and the computer's own setting is honoured again. `?motion=1` undoes it.
+{% endcomment %}
+<script>
+(function () {
+  var optOut = false;
+  try {
+    var q = new URLSearchParams(location.search).get('motion');
+    if (q === '0') localStorage.setItem('gtMotion', '0');
+    if (q === '1') localStorage.removeItem('gtMotion');
+    optOut = localStorage.getItem('gtMotion') === '0';
+  } catch (err) { /* storage blocked: motion stays on */ }
+  if (optOut) return;
+  document.documentElement.classList.add('gt-motion');
+  var mm = window.matchMedia;
+  if (!mm) return;
+  window.matchMedia = function (query) {
+    return mm.call(window, String(query)
+      .replace(/\(\s*prefers-reduced-motion\s*:\s*reduce\s*\)/g, '(max-width: 0px)')
+      .replace(/\(\s*prefers-reduced-motion\s*:\s*no-preference\s*\)/g, '(min-width: 0px)')
+      .replace(/\(\s*prefers-reduced-motion\s*\)/g, '(max-width: 0px)'));
+  };
+})();
+</script>

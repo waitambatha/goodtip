@@ -27,6 +27,7 @@ gradient over the whole article.
 {% endcomment %}
 <head>
   <meta charset="UTF-8">
+  {% include "partials/_motion.html" %}
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ post.meta_title|default:post.title }} &middot; GoodTip</title>
   <meta name="description" content="{{ post.meta_description|default:post.excerpt|default:post.title|truncatechars:150 }}">

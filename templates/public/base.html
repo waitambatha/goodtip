@@ -3,6 +3,7 @@
 <html lang="en" class="no-js">
 <head>
   <meta charset="UTF-8">
+  {% include "partials/_motion.html" %}
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}GoodTip. Footy Tipping, For Good.{% endblock %}</title>
   <meta name="description" content="{% block meta_description %}You tip. GoodTip gives. Your organisation pays one platform fee and GoodTip gives a share of it to the charity your organisation picks. Tipping is free.{% endblock %}">
@@ -54,26 +55,11 @@
 
   <script>
   (function () {
-    /* ---- Motion gate ----
-       The stylesheet has a blanket `animation: none !important` under reduced
-       motion, so with that setting on, NOTHING on the site moves — which is
-       correct for a visitor and useless for anyone building the thing, who
-       then cannot see their own motion design without changing an OS setting.
-
-       `?motion=1` in the URL forces motion on and remembers it; `?motion=0`
-       clears it. The class it sets is what the blanket rule checks. Nobody
-       arrives at a URL with that parameter by accident, so a real visitor with
-       the setting on is unaffected. */
-    var forceMotion = false;
-    try {
-      var q = new URLSearchParams(location.search).get('motion');
-      if (q === '1') localStorage.setItem('gtMotion', '1');
-      if (q === '0') localStorage.removeItem('gtMotion');
-      forceMotion = localStorage.getItem('gtMotion') === '1';
-    } catch (err) { /* private mode / storage disabled — just stay off */ }
-    if (forceMotion) document.documentElement.classList.add('gt-motion');
-
-    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches && !forceMotion;
+    /* ---- Motion ----
+       partials/_motion.html (first in <head>) has already decided: motion
+       plays for everyone unless they opted out with ?motion=0, and this
+       matchMedia call already answers accordingly. */
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
     /* Sport loader is handled by gt-loader.js. */

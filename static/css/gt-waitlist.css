@@ -291,7 +291,7 @@ html.wl-lock { overflow: hidden; }
   .wm-grass { width: 130px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .wm-th, .wm-stage-play, .wm-replay, .wm-out { transition: none !important; }
+  :where(html:not(.gt-motion)) .wm-th, :where(html:not(.gt-motion)) .wm-stage-play, :where(html:not(.gt-motion)) .wm-replay, :where(html:not(.gt-motion)) .wm-out{ transition: none !important; }
 }
 @media (max-width: 760px) {
   .wl { padding: 0; place-items: end center; }
@@ -304,6 +304,6 @@ html.wl-lock { overflow: hidden; }
   .wl-otp input { height: 58px; font-size: 26px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .wl-card, .wl-scrim, .wl-step, .wl-dd, .wl-side-photo, .wl-tick svg { animation: none !important; transition: none !important; }
-  .wl-tick svg { stroke-dashoffset: 0; }
+  :where(html:not(.gt-motion)) .wl-card, :where(html:not(.gt-motion)) .wl-scrim, :where(html:not(.gt-motion)) .wl-step, :where(html:not(.gt-motion)) .wl-dd, :where(html:not(.gt-motion)) .wl-side-photo, :where(html:not(.gt-motion)) .wl-tick svg{ animation: none !important; transition: none !important; }
+  :where(html:not(.gt-motion)) .wl-tick svg{ stroke-dashoffset: 0; }
 }
