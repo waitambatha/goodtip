@@ -170,6 +170,32 @@ stating rather than leaving the reader to infer from a slope.
     <p class="sp-verdict">{{ stats.right }} right, {{ stats.missed }} missed.</p>
     {% endif %}
   </section>
+
+  {% comment %}
+  THE FIFTH PICTURE (client, 12 Oct 2026: "five charts... each and everything
+  must be of different colours... let not be of the same shades of colour").
+  Its own fixed colour (violet), not the competition's — the other panels
+  already borrow the selected competition's accent, so a filter switch is the
+  one thing that must NOT also recolour where you stand against everyone else.
+  {% endcomment %}
+  <section class="statpanel statpanel-standing">
+    <h2>Where you stand</h2>
+    <p class="sp-sub">Your position against everyone else tipping{% if selected_comp %} the {{ selected_comp.name }}{% else %} here{% endif %}.</p>
+    {% if chart_standing %}
+    <div class="sp-donut">
+      <svg viewBox="0 0 {{ chart_standing.size }} {{ chart_standing.size }}" role="img" aria-label="Ahead of {{ chart_standing.pct }} per cent of tippers">
+        <circle cx="{{ chart_standing.cx }}" cy="{{ chart_standing.cy }}" r="{{ chart_standing.r }}" fill="none"
+                stroke="currentColor" stroke-opacity=".16" stroke-width="{{ chart_standing.thickness }}"/>
+        <circle cx="{{ chart_standing.cx }}" cy="{{ chart_standing.cy }}" r="{{ chart_standing.r }}" fill="none"
+                stroke="currentColor" stroke-width="{{ chart_standing.thickness }}" stroke-linecap="round"
+                stroke-dasharray="{{ chart_standing.dash }}"
+                transform="rotate(-90 {{ chart_standing.cx }} {{ chart_standing.cy }})"/>
+      </svg>
+      <div class="sp-donut-mid"><b>#{{ rank }}</b><span>of {{ total_rankers }}</span></div>
+    </div>
+    <p class="sp-verdict">Ahead of {{ chart_standing.pct }}% of tipper{{ total_rankers|pluralize }}.</p>
+    {% else %}<p class="sp-empty">Fills in once you're on the board.</p>{% endif %}
+  </section>
 </div>
 
 {% if stats.best_round %}

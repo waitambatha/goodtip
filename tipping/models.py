@@ -478,11 +478,11 @@ class LadderAdjustment(models.Model):
 
 
 class ChampionPhoto(models.Model):
-    """The photo shown beside a season champion's certificate (client, 3 Oct
-    2026). By default the champion's profile photo is used; this is the one
-    the org side chose instead — "if they want to change, they can enter
-    their nice image". One per champion, per competition, per organisation.
-    Kept off the certificate itself, which stays the win only (spec §2)."""
+    """The champion's own photo on their certificate (client, 3 Oct 2026,
+    extended 12 Oct 2026 to appear on the certificate itself rather than just
+    beside it). By default the champion's profile photo is used; this is the
+    one the org side chose instead — "if they want to change, they can enter
+    their nice image". One per champion, per competition, per organisation."""
 
     org = models.ForeignKey("orgs.Organisation", on_delete=models.CASCADE, related_name="champion_photos")
     series = models.ForeignKey("catalog.Series", on_delete=models.CASCADE, related_name="+")

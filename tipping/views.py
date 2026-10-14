@@ -1215,19 +1215,31 @@ def my_stats_view(request, org_id: int):
     selected = pick_series(options, request.GET.get("comp"))
     group = _group(request, org)
     st = member_season(request.user, org, group=group, series=selected)
+    # Rank AND the field it was read from the middle of, together — read from
+    # the same board the competition filter scopes (client, 12 Oct 2026: the
+    # rank card used to stay "all competitions" even with a filter chip on,
+    # disagreeing with every other number on the page).
+    board = leaderboard_for_org(org, group=group, series=selected)
+    total_rankers = len(board)
+    mine = next((u for u in board if u.id == request.user.id), None)
+    rank = mine.rank if mine else None
     return render(request, "my_stats.html", {
         "org": org,
         "comp_options": options,
         "selected_comp": selected,
         "stats": st,
-        "rank": user_rank_in_org(request.user, org, group=group),
-        # Four pictures, and each one answers a question the table cannot.
+        "rank": rank,
+        "total_rankers": total_rankers,
+        # Five pictures, each answering a question the table cannot, no two
+        # the same colour (client, 12 Oct 2026) — the house SVG/CSS chart
+        # kit (tipping/stats.py), not a JS charting library.
         "chart_accuracy": spark(
             [r["accuracy"] for r in st["run"]], floor=0, ceiling=100,
         ),
         "chart_points": bars(st["run"], key="points"),
         "chart_codes": bars(st["codes"], key="accuracy"),
         "chart_split": donut(st["right"], st["played"]),
+        "chart_standing": donut(total_rankers - rank + 1, total_rankers) if rank else None,
     })
 
 
@@ -1580,6 +1592,10 @@ def _can_certify(user, org) -> bool:
 
 @login_required
 def certificates_view(request, org_id: int):
+    """The competition picker (client, 12 Oct 2026: "square, 2 in each row,
+    have the colours of the competitions"): one card per competition this
+    organisation runs, coloured in that competition's own accent, each
+    leading to that competition's own page — never four stacked at once."""
     from django.http import HttpResponseForbidden
 
     from orgs.models import Organisation
@@ -1589,17 +1605,14 @@ def certificates_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _can_certify(request.user, org):
         return HttpResponseForbidden()
-    comps = []
-    for series in certs.competitions_for(org):
-        state = certs.season_state(org, series)
-        champs = certs.champions(org, series) if state.final else []
-        _attach_photos(org, series, champs)
-        comps.append({
+    comps = [
+        {
             "series": series,
             "accent": certs.ACCENTS.get(series.name, certs.FOREST),
-            "state": state,
-            "champions": champs,
-        })
+            "state": certs.season_state(org, series),
+        }
+        for series in certs.competitions_for(org)
+    ]
     return render(request, "certificates.html", {
         "org": org,
         "comps": comps,
@@ -1607,9 +1620,73 @@ def certificates_view(request, org_id: int):
     })
 
 
+@login_required
+def certificate_competition_view(request, org_id: int, series: str):
+    """One competition, on its own page (client, 12 Oct 2026: "when I click
+    in each that is when I should see a preview of the certificate in that
+    specific competition — not showing all of them at once"). The real
+    certificate shown full size once the season is final; a SAMPLE preview on
+    request while it's still running; otherwise a pointer at the member's own
+    season-so-far — the same three states the old combined list carried, now
+    one at a time instead of stacked four deep.
+    """
+    from django.http import Http404, HttpResponseForbidden
+
+    from catalog.models import Series
+    from orgs.models import Organisation
+
+    from . import certificates as certs
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _can_certify(request.user, org):
+        return HttpResponseForbidden()
+    if series not in certs.CERT_SERIES:
+        raise Http404
+    series_obj = get_object_or_404(Series, name=series)
+    if series_obj not in certs.competitions_for(org):
+        raise Http404
+    state = certs.season_state(org, series_obj)
+    champions = certs.champions(org, series_obj) if state.final else []
+    _attach_photos(org, series_obj, champions)
+    preview = request.GET.get("preview") == "1"
+    sample = None
+    if not champions and preview and not state.final:
+        sample = certs.sample_certificate(org, series_obj, request.user)
+        _attach_photos(org, series_obj, [sample])
+    return render(request, "certificate_competition.html", {
+        "org": org,
+        "series": series_obj,
+        "state": state,
+        "champions": champions,
+        "sample": sample,
+        "preview": preview,
+        "accent": certs.ACCENTS.get(series_obj.name, certs.FOREST),
+        "year": org.season.year if org.season_id else "",
+        "industry": certs.industry_champion(org, series_obj) if state.final else None,
+        "national": certs.national_org_champion(org, series_obj) if state.final else None,
+        "individual_national": certs.national_individual_champion(org, series_obj) if state.final else None,
+    })
+
+
+def _champion_photo_field(org, series, user_id):
+    """The field behind a champion's certificate photo (client, 12 Oct 2026:
+    baked into the certificate itself, not just shown beside it): the one
+    chosen for this certificate if there is one, else their profile photo,
+    else ``None`` so the certificate falls back to initials."""
+    from accounts.models import User
+
+    from .models import ChampionPhoto
+
+    override = ChampionPhoto.objects.filter(org=org, series=series, user_id=user_id).first()
+    if override:
+        return override.image
+    avatar = getattr(User.objects.filter(id=user_id).first(), "avatar", None)
+    return avatar or None
+
+
 def _attach_photos(org, series, champs):
     """Each champion's photo for the page: the one chosen for this certificate
-    if there is one, else their profile photo, else nothing (initials)."""
+    if there is one, else their profile photo, else nothing."""
     from accounts.models import User
 
     from .models import ChampionPhoto
@@ -1621,7 +1698,6 @@ def _attach_photos(org, series, champs):
         avatar = getattr(users.get(c.user_id), "avatar", None)
         c.photo_url = override.image.url if override else (avatar.url if avatar else "")
         c.photo_is_custom = bool(override)
-        c.initials = "".join(w[0] for w in c.winner.split()[:2]).upper() or "?"
 
 
 @login_required
@@ -1684,8 +1760,38 @@ def certificate_photo(request, org_id: int, series: str, user_id: int):
 
 
 @login_required
+def certificate_sample_file(request, org_id: int, series: str, fmt: str):
+    """A competition's SAMPLE certificate, as ``pdf`` or ``png``
+    — the preview's downloads. Marked SAMPLE on its face and in its name."""
+    from django.http import Http404, HttpResponse, HttpResponseForbidden
+
+    from catalog.models import Series
+    from orgs.models import Organisation
+
+    from . import certificates as certs
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _can_certify(request.user, org):
+        return HttpResponseForbidden()
+    if series not in certs.CERT_SERIES or fmt not in ("pdf", "png"):
+        raise Http404
+    series_obj = get_object_or_404(Series, name=series)
+    cert = certs.sample_certificate(org, series_obj, request.user)
+    photo = _champion_photo_field(org, series_obj, cert.user_id)
+    if fmt == "pdf":
+        body, ctype, name = certs.render_pdf(cert, photo), "application/pdf", cert.filename("pdf")
+    else:
+        body, ctype, name = certs.render_png(cert, photo), "image/png", cert.filename("png")
+    resp = HttpResponse(body, content_type=ctype)
+    disposition = "inline" if request.GET.get("view") == "1" else "attachment"
+    resp["Content-Disposition"] = f'{disposition}; filename="{name}"'
+    resp["Cache-Control"] = "private, max-age=60"
+    return resp
+
+
+@login_required
 def certificate_file(request, org_id: int, series: str, user_id: int, fmt: str):
-    """One certificate, as ``pdf`` (print), ``square`` or ``story`` (PNG).
+    """One certificate, as ``pdf`` (print) or ``png`` (to post).
 
     Re-derived from the final board on every request rather than stored: a
     certificate can only ever say what the locked ladder says, and a
@@ -1702,16 +1808,67 @@ def certificate_file(request, org_id: int, series: str, user_id: int, fmt: str):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _can_certify(request.user, org):
         return HttpResponseForbidden()
-    if series not in certs.CERT_SERIES or fmt not in ("pdf", "square", "story"):
+    if series not in certs.CERT_SERIES or fmt not in ("pdf", "png"):
         raise Http404
     series_obj = get_object_or_404(Series, name=series)
     cert = next((c for c in certs.champions(org, series_obj) if c.user_id == user_id), None)
     if cert is None:
         raise Http404("No certificate — the season is not final, or this member is not its champion.")
+    photo = _champion_photo_field(org, series_obj, user_id)
     if fmt == "pdf":
-        body, ctype, name = certs.render_pdf(cert), "application/pdf", cert.filename("pdf")
+        body, ctype, name = certs.render_pdf(cert, photo), "application/pdf", cert.filename("pdf")
     else:
-        body, ctype, name = certs.render_png(cert, fmt), "image/png", cert.filename("png", fmt)
+        body, ctype, name = certs.render_png(cert, photo), "image/png", cert.filename("png")
+    resp = HttpResponse(body, content_type=ctype)
+    disposition = "inline" if request.GET.get("view") == "1" else "attachment"
+    resp["Content-Disposition"] = f'{disposition}; filename="{name}"'
+    resp["Cache-Control"] = "private, max-age=300"
+    return resp
+
+
+_SCOPE_COMPUTE = {
+    "industry": "industry_champion",
+    "national": "national_org_champion",
+    "individual": "national_individual_champion",
+}
+
+
+@login_required
+def certificate_scope_file(request, org_id: int, series: str, scope: str, fmt: str):
+    """A certificate beyond this organisation's own champion (12 Oct 2026):
+    best in its industry, best on all of GoodTip, or the top individual
+    tipper nationwide. Re-derived fresh, like the per-member one — the
+    moment the wider field stops being final, this stops existing too."""
+    from django.http import Http404, HttpResponse, HttpResponseForbidden
+
+    from catalog.models import Series
+    from orgs.models import Organisation
+
+    from . import certificates as certs
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _can_certify(request.user, org):
+        return HttpResponseForbidden()
+    if series not in certs.CERT_SERIES or fmt not in ("pdf", "png") or scope not in _SCOPE_COMPUTE:
+        raise Http404
+    series_obj = get_object_or_404(Series, name=series)
+    cert = getattr(certs, _SCOPE_COMPUTE[scope])(org, series_obj)
+    if cert is None:
+        raise Http404("No certificate — that wider field isn't final, or this organisation didn't top it.")
+    # The org's own logo stands in for a photo on an organisation's
+    # certificate; the individual one is a person, so it's their profile
+    # photo — there's no per-org override to look up, since this spans every
+    # organisation on the board, not just this one.
+    if cert.scope == certs.SCOPE_INDIVIDUAL_NATIONAL:
+        from accounts.models import User
+
+        photo = getattr(User.objects.filter(id=cert.user_id).first(), "avatar", None)
+    else:
+        photo = org.logo
+    if fmt == "pdf":
+        body, ctype, name = certs.render_pdf(cert, photo), "application/pdf", cert.filename("pdf")
+    else:
+        body, ctype, name = certs.render_png(cert, photo), "image/png", cert.filename("png")
     resp = HttpResponse(body, content_type=ctype)
     disposition = "inline" if request.GET.get("view") == "1" else "attachment"
     resp["Content-Disposition"] = f'{disposition}; filename="{name}"'

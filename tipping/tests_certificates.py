@@ -126,9 +126,14 @@ class CertificateTests(CertFixture):
             self.client.force_login(u)
             resp = self.client.get(reverse("tipping:certificates", args=[self.org.id]))
             self.assertEqual(resp.status_code, 200)
-            self.assertContains(resp, "Ann Lee")
+            self.assertContains(resp, "NRL")
+            detail = self.client.get(reverse("tipping:certificate_competition", args=[self.org.id, "NRL"]))
+            self.assertEqual(detail.status_code, 200)
+            self.assertContains(detail, "Ann Lee")
 
-    def test_the_print_pdf_and_the_social_pngs(self):
+    def test_the_print_pdf_and_the_png(self):
+        import re
+
         from PIL import Image
 
         self._finished_season()
@@ -138,10 +143,17 @@ class CertificateTests(CertFixture):
         self.assertEqual(pdf["Content-Type"], "application/pdf")
         self.assertTrue(pdf.content.startswith(b"%PDF"))
         self.assertIn("attachment", pdf["Content-Disposition"])
-        sq = self.client.get(reverse("tipping:certificate_file", args=base + ["square"]))
-        self.assertEqual(Image.open(BytesIO(sq.content)).size, (1080, 1080))
-        story = self.client.get(reverse("tipping:certificate_file", args=base + ["story"]))
-        self.assertEqual(Image.open(BytesIO(story.content)).size, (1080, 1920))
+        # A landscape page cut to the artwork's own shape — no portrait page,
+        # no white border round it.
+        box = [float(v) for v in re.search(rb"/MediaBox \[\s*([\d.\s]+)\]", pdf.content).group(1).split()]
+        self.assertAlmostEqual((box[2] - box[0]) / (box[3] - box[1]), 1672 / 941, places=2)
+        png = self.client.get(reverse("tipping:certificate_file", args=base + ["png"]))
+        w, h = Image.open(BytesIO(png.content)).size
+        # Landscape, the shape of the client's artwork (13 Oct 2026).
+        self.assertEqual((w, h), (2508, 1411))
+        self.assertEqual(
+            self.client.get(reverse("tipping:certificate_file", args=base + ["square"])).status_code, 404,
+        )
 
     def test_nobody_else_can_be_certified(self):
         self._finished_season(ann=3, bob=1)
@@ -152,7 +164,7 @@ class CertificateTests(CertFixture):
     def test_mid_season_there_is_no_file(self):
         self._tip(self.ann, self._match(1), 1)
         self.client.force_login(self.boss)
-        url = reverse("tipping:certificate_file", args=[self.org.id, "NRL", self.ann.id, "square"])
+        url = reverse("tipping:certificate_file", args=[self.org.id, "NRL", self.ann.id, "png"])
         self.assertEqual(self.client.get(url).status_code, 404)
 
     def test_the_leaderboard_points_the_captain_at_them(self):
@@ -185,10 +197,11 @@ class ChampionPhotoTests(CertFixture):
         super().tearDownClass()
         drop_temp_media()
 
-    def test_without_a_photo_the_circle_shows_initials(self):
-        resp = self.client.get(reverse("tipping:certificates", args=[self.org.id]))
-        self.assertContains(resp, ">AL<")
+    def test_without_a_photo_the_page_offers_one(self):
+        resp = self.client.get(reverse("tipping:certificate_competition", args=[self.org.id, "NRL"]))
         self.assertContains(resp, "Add a photo")
+        # The preview IS the downloadable picture, not a separate drawing of it.
+        self.assertContains(resp, reverse("tipping:certificate_file", args=[self.org.id, "NRL", self.ann.id, "png"]))
 
     def test_an_upload_is_squared_and_shown(self):
         from PIL import Image
@@ -198,9 +211,30 @@ class ChampionPhotoTests(CertFixture):
         self.client.post(self.url, {"photo": self._png()})
         photo = ChampionPhoto.objects.get(org=self.org, user=self.ann)
         self.assertEqual(Image.open(photo.image.path).size, (800, 800))
-        resp = self.client.get(reverse("tipping:certificates", args=[self.org.id]))
-        self.assertContains(resp, photo.image.url)
+        resp = self.client.get(reverse("tipping:certificate_competition", args=[self.org.id, "NRL"]))
+        self.assertContains(resp, "a photo chosen for this certificate")
         self.assertContains(resp, "Use profile photo")
+
+    def test_the_profile_photo_is_in_the_certificate_itself(self):
+        from django.core.files.base import ContentFile
+        from PIL import Image
+
+        buf = BytesIO()
+        Image.new("RGB", (600, 600), (220, 20, 20)).save(buf, "JPEG")
+        self.ann.avatar.save("ann.jpg", ContentFile(buf.getvalue()), save=True)
+        png = self.client.get(reverse("tipping:certificate_file", args=[self.org.id, "NRL", self.ann.id, "png"]))
+        r, g, b = Image.open(BytesIO(png.content)).convert("RGB").getpixel((560, 660))
+        self.assertGreater(r, 180)
+        self.assertLess(g, 60)
+
+    def test_padding_bars_are_trimmed_off_a_photo(self):
+        from PIL import Image
+
+        from .certificates import _trim_bars
+
+        photo = Image.new("RGB", (400, 800), (0, 0, 0))
+        photo.paste((200, 120, 60), (0, 300, 400, 800))
+        self.assertEqual(_trim_bars(photo).size, (400, 500))
 
     def test_reset_goes_back_to_the_profile_photo(self):
         from .models import ChampionPhoto
@@ -220,3 +254,224 @@ class ChampionPhotoTests(CertFixture):
     def test_only_a_champion_can_be_given_one(self):
         url = reverse("tipping:certificate_photo", args=[self.org.id, "NRL", self.bob.id])
         self.assertEqual(self.client.post(url, {"photo": self._png()}).status_code, 404)
+
+
+class SampleCertificateTests(CertFixture):
+    """The showcase preview (client, 7 Oct 2026): a SAMPLE certificate while a
+    season is still going, in the real design, with the real downloads."""
+
+    def setUp(self):
+        super().setUp()
+        self._tip(self.ann, self._match(1), 3)          # mid-season: Ann leads
+        self.client.force_login(self.boss)
+
+    def test_the_preview_shows_a_sample_naming_the_viewer(self):
+        from .certificates import sample_certificate
+
+        page = self.client.get(
+            reverse("tipping:certificate_competition", args=[self.org.id, "NRL"]), {"preview": "1"},
+        )
+        self.assertContains(page, "Hide the sample")
+        self.assertContains(page, "with your name and profile photo")
+        # Ann leads the board, but the preview is the viewer's own.
+        self.assertEqual(sample_certificate(self.org, self.nrl, self.boss).winner, "Boss")
+        self.assertContains(page, reverse("tipping:certificate_sample_file", args=[self.org.id, "NRL", "pdf"]))
+
+    def test_without_the_switch_there_is_no_sample(self):
+        page = self.client.get(reverse("tipping:certificate_competition", args=[self.org.id, "NRL"]))
+        self.assertNotContains(page, "Hide the sample")
+        self.assertContains(page, "Preview a sample certificate")
+
+    def test_the_sample_downloads_and_says_sample(self):
+        from PIL import Image
+
+        from .certificates import sample_certificate
+
+        pdf = self.client.get(reverse("tipping:certificate_sample_file", args=[self.org.id, "NRL", "pdf"]))
+        self.assertTrue(pdf.content.startswith(b"%PDF"))
+        self.assertIn("-sample.pdf", pdf["Content-Disposition"])
+        png = self.client.get(reverse("tipping:certificate_sample_file", args=[self.org.id, "NRL", "png"]))
+        self.assertEqual(Image.open(BytesIO(png.content)).size, (2508, 1411))
+        cert = sample_certificate(self.org, self.nrl, self.boss)
+        self.assertTrue(cert.sample)
+        self.assertEqual(cert.footer_line, "SAMPLE  ·  SEASON IN PROGRESS")
+
+    def test_a_participant_cannot_get_one(self):
+        self.client.force_login(self.ann)
+        url = reverse("tipping:certificate_sample_file", args=[self.org.id, "NRL", "pdf"])
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+
+class CrossOrgCertificateTests(TestCase):
+    """Beyond one organisation (client, 12 Oct 2026): an organisation against
+    its own type, against every organisation, and a person against every
+    consenting organisation's tippers. Same consent gate as the Good List and
+    the national/industry ladders — ``is_public_listed`` — and nothing is
+    named until every consenting organisation that runs the competition has
+    reached ITS OWN final, the same per-org trigger the single-org
+    certificate already uses."""
+
+    def setUp(self):
+        from catalog.models import Competition, GoodListConfig, OrganisationType, Season, Series
+
+        self.season = Season.objects.create(year=2097, label="2097")
+        self.nrl = Series.objects.get(slug="nrl")
+        self.comp = Competition.objects.create(
+            sport=self.nrl.sport, season=self.season, name="Cross Comp", slug="cross-comp",
+        )
+        self.comp.series.add(self.nrl)
+        self.business = OrganisationType.objects.get(slug="business")
+        self.community = OrganisationType.objects.get(slug="community")
+        cfg = GoodListConfig.get()
+        cfg.credibility_min_groups = 2
+        cfg.save()
+        self.home = Team.objects.create(name="XH", slug="cross-h", series=self.nrl)
+        self.away = Team.objects.create(name="XA", slug="cross-a", series=self.nrl)
+        self.past = timezone.now() - timedelta(days=5)
+        self._seq = 0
+
+    def _user(self):
+        self._seq += 1
+        return User.objects.create_user(
+            email=f"co{self._seq}@example.com", password="x", display_name=f"Co {self._seq}",
+        )
+
+    def make_org(self, name, *, public=True, organisation_type=None):
+        from orgs.models import Organisation
+
+        return Organisation.objects.create(
+            name=name, season=self.season, is_public_listed=public,
+            organisation_type=organisation_type or self.business,
+        )
+
+    def finish_season(self, org):
+        """A graded regular round (where points are scored) and a one-match
+        graded finals round — the same shape ``CertFixture`` uses — so
+        ``season_state(org, nrl).final`` is True."""
+        reg = Round.objects.create(
+            org=org, round_number=1, series=self.nrl, competition=self.comp,
+            lockout_at=self.past, stage=Round.STAGE_REGULAR,
+        )
+        match = Match.objects.create(
+            round=reg, home_team=self.home, away_team=self.away,
+            kickoff_at=self.past, status="complete", result="home",
+        )
+        finals = Round.objects.create(
+            org=org, round_number=2, series=self.nrl, competition=self.comp,
+            lockout_at=self.past + timedelta(days=1), stage=Round.STAGE_FINALS,
+        )
+        Match.objects.create(
+            round=finals, home_team=self.home, away_team=self.away,
+            kickoff_at=self.past + timedelta(days=1), status="complete", result="home",
+        )
+        return match
+
+    def score(self, org, match, points):
+        from orgs.models import OrgMember
+
+        user = self._user()
+        OrgMember.objects.create(user=user, org=org)
+        Tip.objects.create(
+            user=user, match=match, org=org, selection="home",
+            is_correct=True, points_awarded=points,
+        )
+        return user
+
+    def test_not_final_until_every_consenting_org_is_final(self):
+        from tipping.certificates import industry_champion
+
+        a = self.make_org("A Co")
+        b = self.make_org("B Co")
+        match = self.finish_season(a)
+        self.score(a, match, 10)
+        # b's own season is not final yet — nothing can be named for the pool.
+        self.assertIsNone(industry_champion(a, self.nrl))
+
+    def test_a_private_organisation_is_excluded_from_the_pool(self):
+        from tipping.certificates import industry_champion
+
+        a = self.make_org("A Co")
+        private = self.make_org("Private Co", public=False)
+        ma = self.finish_season(a)
+        self.finish_season(private)
+        self.score(a, ma, 10)
+        # Only one CONSENTING org runs this competition — a field of one is
+        # not a comparison, whatever the private organisation scored.
+        self.assertIsNone(industry_champion(a, self.nrl))
+
+    def test_the_organisation_with_the_better_average_tops_the_industry(self):
+        from tipping.certificates import industry_champion
+
+        a = self.make_org("A Co")
+        b = self.make_org("B Co")
+        ma, mb = self.finish_season(a), self.finish_season(b)
+        self.score(a, ma, 10)
+        self.score(b, mb, 1)
+        cert = industry_champion(a, self.nrl)
+        self.assertIsNotNone(cert)
+        self.assertEqual(cert.winner, "A Co")
+        self.assertEqual(cert.scope, "industry")
+        self.assertEqual(cert.scope_label, "Business")
+        # The organisation that did NOT top it gets nothing.
+        self.assertIsNone(industry_champion(b, self.nrl))
+
+    def test_a_different_type_does_not_enter_the_industry_pool(self):
+        from tipping.certificates import industry_champion
+
+        a = self.make_org("A Co", organisation_type=self.business)
+        b = self.make_org("B Co", organisation_type=self.business)
+        c = self.make_org("C Charity", organisation_type=self.community)
+        ma, mb, mc = self.finish_season(a), self.finish_season(b), self.finish_season(c)
+        self.score(a, ma, 10)
+        self.score(b, mb, 1)
+        self.score(c, mc, 999)
+        # C would win outright, but it is not a Business organisation, so it
+        # never enters A and B's industry pool.
+        cert = industry_champion(a, self.nrl)
+        self.assertIsNotNone(cert)
+        self.assertEqual(cert.winner, "A Co")
+
+    def test_national_tops_every_consenting_organisation_regardless_of_type(self):
+        from tipping.certificates import national_org_champion
+
+        a = self.make_org("A Co", organisation_type=self.business)
+        c = self.make_org("C Charity", organisation_type=self.community)
+        ma, mc = self.finish_season(a), self.finish_season(c)
+        self.score(a, ma, 1)
+        self.score(c, mc, 10)
+        self.assertIsNone(national_org_champion(a, self.nrl))
+        cert = national_org_champion(c, self.nrl)
+        self.assertIsNotNone(cert)
+        self.assertEqual(cert.winner, "C Charity")
+        self.assertEqual(cert.scope, "national")
+
+    def test_the_top_individual_is_attributed_to_their_own_organisation(self):
+        from tipping.certificates import national_individual_champion
+
+        a = self.make_org("A Co")
+        b = self.make_org("B Co")
+        ma, mb = self.finish_season(a), self.finish_season(b)
+        star = self.score(a, ma, 50)
+        self.score(b, mb, 1)
+        cert_a = national_individual_champion(a, self.nrl)
+        self.assertIsNotNone(cert_a)
+        self.assertEqual(cert_a.winner, star.display_name)
+        self.assertEqual(cert_a.scope, "individual_national")
+        # B never tipped with this person — B does not get to show their cert.
+        self.assertIsNone(national_individual_champion(b, self.nrl))
+
+    def test_the_certificates_page_shows_the_wider_wins(self):
+        a = self.make_org("A Co")
+        b = self.make_org("B Co")
+        ma, mb = self.finish_season(a), self.finish_season(b)
+        boss = self._user()
+        from orgs.models import OrgMember
+
+        OrgMember.objects.create(user=boss, org=a, role=OrgMember.ROLE_MANAGER)
+        self.score(a, ma, 10)
+        self.score(b, mb, 1)
+        self.client.force_login(boss)
+        page = self.client.get(reverse("tipping:certificate_competition", args=[a.id, "NRL"])).content.decode()
+        self.assertIn("Beyond A Co", page)
+        self.assertIn("Best Business organisation", page)
+        self.assertIn("Best organisation nationwide", page)
