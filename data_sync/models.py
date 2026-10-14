@@ -18,12 +18,14 @@ class SyncRun(models.Model):
     KIND_LIVE = "live"
     KIND_LADDER = "ladder"
     KIND_BACKFILL = "backfill"
+    KIND_CHECK = "check"
     KIND_CHOICES = [
         (KIND_FIXTURES, "Fixtures"),
         (KIND_RESULTS, "Results"),
         (KIND_LIVE, "Live scores"),
         (KIND_LADDER, "Ladder"),
         (KIND_BACKFILL, "Full-season backfill"),
+        (KIND_CHECK, "Feed check"),
     ]
 
     kind = models.CharField(max_length=10, choices=KIND_CHOICES)
@@ -202,3 +204,56 @@ class FixtureCache(models.Model):
     @property
     def is_fresh(self) -> bool:
         return timezone.now() - self.fetched_at < self.FRESH_FOR
+
+
+class FeedCheck(models.Model):
+    """One comparison of what the feeds publish against what every league holds.
+
+    Exists because a sync that "ran ok" says nothing about whether the data is
+    right. AFLW kept playing while the client asked why it was not on the site
+    (Ian Hopkinson, 9 Oct 2026) — and every run on the panel read green. This
+    is the answer to "are the fixtures actually up to date?", asked of the
+    feed itself, game by game, every hour.
+
+    ``found`` is what the check saw before it tried to fix anything; it then
+    re-syncs every round with a fixable gap and checks again, and only what is
+    still wrong after that lands in ``unresolved`` — which is what alerts.
+    """
+
+    SCOPE_WINDOW = "window"
+    SCOPE_SEASON = "season"
+    SCOPE_CHOICES = [
+        (SCOPE_WINDOW, "Rounds around today"),
+        (SCOPE_SEASON, "Whole season"),
+    ]
+
+    scope = models.CharField(max_length=10, choices=SCOPE_CHOICES, default=SCOPE_WINDOW)
+    started_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    #: Nothing left wrong after healing. False while running and on a crash.
+    ok = models.BooleanField(default=False)
+    #: Feed games compared, so "ok" over nothing is visibly nothing.
+    games_checked = models.IntegerField(default=0)
+    found = models.JSONField(default=list, blank=True)
+    healed = models.IntegerField(default=0)
+    unresolved = models.JSONField(default=list, blank=True)
+    #: Stable digest of the unresolved errors, so the same problem is emailed
+    #: once rather than every hour it persists.
+    signature = models.CharField(max_length=64, blank=True)
+    alerted = models.BooleanField(default=False)
+    #: The check itself failed to run (feed unreachable, a crash).
+    error = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-started_at"]
+
+    def __str__(self):
+        return f"Feed check ({self.scope}) {self.started_at:%Y-%m-%d %H:%M} — {'ok' if self.ok else 'issues'}"
+
+    @property
+    def unresolved_errors(self) -> list[dict]:
+        return [i for i in self.unresolved if i.get("severity") == "error"]
+
+    @property
+    def unresolved_warnings(self) -> list[dict]:
+        return [i for i in self.unresolved if i.get("severity") != "error"]

@@ -1,5 +1,7 @@
 import html
+import logging
 import re
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib import messages
@@ -35,6 +37,8 @@ from tipping.services import record_match_result
 # why the unit is a job rather than a model permission. superuser_required
 # stays for the screens that are genuinely owner-only and never delegated.
 from sysadmin.guards import requires
+
+logger = logging.getLogger(__name__)
 
 
 # Map the org-creation form's value to one or more Competition slugs.
@@ -385,9 +389,34 @@ def org_members(request, org_id: int):
     })
 
 
+def _start_feed_check() -> None:
+    """Run the feed check off the request thread — it reads the feeds for a
+    minute or two, far longer than a page should hang."""
+    import threading
+
+    from django.db import connections
+
+    def work():
+        try:
+            from data_sync.feedcheck import run_check
+
+            run_check()
+        except Exception:  # noqa: BLE001 — recorded on the FeedCheck row itself
+            logger.exception("manual feed check failed")
+        finally:
+            connections.close_all()
+
+    threading.Thread(target=work, daemon=True, name="feed-check").start()
+
+
 @requires("data.sync")
 def sync_panel(request):
-    msg = None
+    from data_sync.models import FeedCheck
+
+    if request.method == "POST" and request.POST.get("action") == "check":
+        _start_feed_check()
+        messages.success(request, "Feed check started. It takes a minute or two — refresh to see the result.")
+        return redirect("admin:hq_sync")
     if request.method == "POST":
         comp = request.POST["competition"]
         round_number = int(request.POST["round_number"])
@@ -431,7 +460,20 @@ def sync_panel(request):
         # ladder wrong were invisible precisely because every run said ok.
         "schedules": SyncSchedule.objects.all(),
         "coverage": _feed_coverage(),
+        **_feed_check_context(FeedCheck),
     })
+
+
+def _feed_check_context(FeedCheck) -> dict:
+    finished = FeedCheck.objects.filter(finished_at__isnull=False)
+    last = finished.first()
+    return {
+        "last_check": last,
+        # Hourly by design, so two hours without one means the scheduler that
+        # runs it — and every other sync — has stopped.
+        "check_overdue": bool(last and timezone.now() - last.started_at > timedelta(hours=2)),
+        "recent_checks": list(finished[:24])[::-1],
+    }
 
 
 def _feed_coverage():

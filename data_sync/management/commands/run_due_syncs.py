@@ -43,12 +43,17 @@ class Command(BaseCommand):
         # (goodtip-backfill) because these kinds run sequentially in one
         # process, and a sweep of every round of every series would hold the
         # two-minute live poller behind it for as long as it took.
-        order = ["fixtures", "results", "live", "ladder"]
+        # The feed check last of all: it judges what the others just wrote,
+        # and re-syncs whatever they left wrong.
+        order = ["fixtures", "results", "live", "ladder", "check"]
         ran = []
         for kind in order:
             if not opts["force"] and not claim(kind):
                 continue
-            call_command("sync_matches", **{kind: True}, verbosity=opts["verbosity"])
+            if kind == "check":
+                call_command("check_feeds", verbosity=opts["verbosity"])
+            else:
+                call_command("sync_matches", **{kind: True}, verbosity=opts["verbosity"])
             ran.append(kind)
 
         if ran:

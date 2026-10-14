@@ -160,6 +160,30 @@ class LiveSyncTests(_FixtureBase):
         self.assertEqual(m.status, Match.STATUS_COMPLETE)
         self.assertEqual(m.phase, "complete")
 
+    def test_a_game_finishing_is_graded_within_the_same_live_poll(self):
+        """THE WHISTLE TRIGGER (14 Oct 2026): a game found complete on a live
+        poll is graded there and then, rather than waiting for the next
+        15-minute results tick — the mocked scraper answers the same "complete"
+        row to the sync_results call this chains internally."""
+        self._match(4)
+        svc = self._svc_with(status="complete", period="Full Time", home_score=75, away_score=71)
+        svc.sync_live(competition="AFL", round_number=1, org=self.org)
+        m = Match.objects.get()
+        self.assertEqual(m.result, "home")
+
+    def test_a_game_already_complete_does_not_regrade_on_every_poll(self):
+        """Only a FRESH transition to complete triggers results — a game that
+        was already complete last poll must not re-grade (and re-fetch results)
+        every two minutes for the rest of its life."""
+        from unittest.mock import patch
+
+        self._match(4)
+        svc = self._svc_with(status="complete", period="Full Time", home_score=75, away_score=71)
+        svc.sync_live(competition="AFL", round_number=1, org=self.org)
+        with patch.object(svc, "sync_results") as results:
+            svc.sync_live(competition="AFL", round_number=1, org=self.org)
+        results.assert_not_called()
+
     def test_results_sync_ignores_unfinished_games(self):
         self._match(1)
         svc = self._svc_with(status="live", period="Q3", home_score=54, away_score=41)
@@ -604,6 +628,52 @@ class DiscoveryTargetingTests(_FixtureBase):
         svc.return_value.sync_results.assert_called_once()
         self.assertEqual(svc.return_value.sync_results.call_args.kwargs["round_number"], 7)
         from_db.assert_not_called()
+
+
+class ResultsTargetingTests(_FixtureBase):
+    """A round can be marked "complete" (every fixture closed out) while one
+    of its games was never actually graded — close_out_stale_live does exactly
+    that to a live game the feed stopped reporting on. The old targeting read
+    only Match.status, so a round in that state was never asked about again
+    and sat ungraded until the six-hourly backfill found it by accident."""
+
+    def _targets(self, **opts):
+        from data_sync.management.commands.sync_matches import Command
+
+        base = {"org": None, "round": None, "all_rounds": False}
+        return Command()._targets({**base, **opts}, "results")
+
+    def test_a_complete_round_with_an_ungraded_game_is_still_a_results_target(self):
+        self.round.status = "complete"
+        self.round.save(update_fields=["status"])
+        Match.objects.create(
+            round=self.round, home_team=self.home, away_team=self.away,
+            kickoff_at=timezone.now() - timedelta(hours=3),
+            status=Match.STATUS_COMPLETE,  # closed out, but never graded
+        )
+        targets = self._targets()
+        self.assertIn((self.org, 1, "AFL"), targets)
+
+    def test_a_fully_graded_complete_round_is_not_a_target(self):
+        self.round.status = "complete"
+        self.round.save(update_fields=["status"])
+        Match.objects.create(
+            round=self.round, home_team=self.home, away_team=self.away,
+            kickoff_at=timezone.now() - timedelta(hours=3),
+            status=Match.STATUS_COMPLETE, result="home",
+            home_score=10, away_score=5,
+        )
+        self.assertEqual(self._targets(), [])
+
+    def test_a_postponed_game_is_never_asked_for_a_result(self):
+        self.round.status = "complete"
+        self.round.save(update_fields=["status"])
+        Match.objects.create(
+            round=self.round, home_team=self.home, away_team=self.away,
+            kickoff_at=timezone.now() - timedelta(hours=3),
+            status=Match.STATUS_POSTPONED,
+        )
+        self.assertEqual(self._targets(), [])
 
 
 class _Sink:

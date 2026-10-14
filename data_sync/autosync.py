@@ -37,6 +37,7 @@ INTERVALS = {
     "results": 900,    # final scores; this is what grades tips
     "fixtures": 3600,  # discovery: new rounds and games, around today
     "ladder": 1800,    # standings only move when a game finishes
+    "check": 3600,     # feed vs every league, fix what it can, alert the rest
 }
 
 # The full-season sweep, on its own cadence and its own systemd unit.
@@ -80,6 +81,10 @@ def claim(kind: str) -> bool:
 
     now = timezone.now()
     interval = ALL_INTERVALS[kind]
+    # A kind with no row is never claimed — it simply never runs, silently.
+    # That has happened twice (see migrations 0004 and 0006), so the row is
+    # made here if it is missing rather than trusted to a migration.
+    SyncSchedule.objects.get_or_create(kind=kind)
     with transaction.atomic():
         claimed = (
             SyncSchedule.objects.filter(kind=kind, next_run_at__lte=now)
@@ -117,6 +122,8 @@ def _run(kind: str) -> None:
     try:
         if kind == "fixtures":
             call_command("sync_matches", fixtures=True, verbosity=0)
+        elif kind == "check":
+            call_command("check_feeds", verbosity=0)
         else:
             call_command("sync_matches", **{kind: True}, verbosity=0)
     except Exception:
