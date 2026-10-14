@@ -66,6 +66,26 @@
 
   function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
+  /* 6 Oct 2026 (client): the hero buttons still shook while typing. The
+     hidden remainder holds a line's size only to within a fraction of a
+     pixel — split text kerns differently at the join — and the two centred
+     buttons shift with every letter of it. So each element is measured once,
+     finished, and held at exactly that box until its line is typed. */
+  lines.forEach(function (l) {
+    /* Measured when typing starts (fonts loaded, the untyped text still laid
+       out invisibly in .ty-rest), from the computed size rather than
+       getBoundingClientRect: an entrance transform may be mid-flight. */
+    l.hold = function () {
+      var cs = getComputedStyle(l.el);
+      /* Shrink-to-fit boxes — inline ones, and flex/grid items like the two
+         buttons (blockified, so their display no longer says inline) — take
+         their width from their text; those are the ones to pin. */
+      var pd = l.el.parentElement ? getComputedStyle(l.el.parentElement).display : '';
+      if (cs.display.indexOf('inline') === 0 || /flex|grid/.test(pd)) { l.el.style.width = cs.width; }
+      l.el.style.height = cs.height;
+    };
+    l.release = function () { l.el.style.width = l.el.style.height = ''; };
+  });
   lines.forEach(function (l) { l.parts.forEach(function (p) { put(p, 0); }); });
 
   async function typeLine(l) {
@@ -78,9 +98,12 @@
         await wait(d);
       }
     }
+    l.release();
   }
 
   async function play() {
+    if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
+    lines.forEach(function (l) { l.hold(); });
     for (var i = 0; i < lines.length; i++) {
       await typeLine(lines[i]);
       await wait(160);

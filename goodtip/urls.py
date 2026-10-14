@@ -92,6 +92,12 @@ urlpatterns = [
             "terms_version": TERMS_VERSION,
         },
     ), name="terms"),
+    # Charities, a page of its own rather than the home page's section
+    # (client, 6 Oct 2026). The partner plate is shared with home.
+    path("charities/", TemplateView.as_view(
+        template_name="public/charities.html",
+        extra_context={"active": "charities"},
+    ), name="charities"),
     path("pricing/", TemplateView.as_view(
         template_name="public/pricing.html",
         extra_context={"active": "pricing", "price_cards": public_cards(), **PRICING_FACTS},

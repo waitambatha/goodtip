@@ -2646,6 +2646,41 @@ class CurrentContextTests(TestCase):
         )
         self.assertEqual(resp["Location"], self.reverse("dashboard"))
 
+    def test_next_pointing_at_the_old_org_lands_on_the_new_one(self):
+        """Every switcher form sends next=request.path — the org-scoped page
+        you were already on. Without rewriting it, switching from an org's
+        Plans page landed right back on THAT org's Plans page, not the one
+        just picked, until a manual reload (client-reported, 11 Oct 2026)."""
+        resp = self.client.post(
+            self.reverse("orgs:switch_org", args=[self.beta.id]),
+            {"next": f"/billing/{self.acme.id}/plans/"},
+        )
+        self.assertEqual(resp["Location"], f"/billing/{self.beta.id}/plans/")
+
+    def test_a_number_elsewhere_in_next_that_is_not_the_old_org_is_left_alone(self):
+        """Only a path segment that is genuinely the org just switched away
+        from is touched — a coincidentally matching number further along the
+        path (a thread id, a member id) is not the org and must not move."""
+        other_org = Organisation.objects.create(
+            name="Zeta", season=self.season, charity=self.charity,
+        )
+        resp = self.client.post(
+            self.reverse("orgs:switch_org", args=[self.beta.id]),
+            {"next": f"/billing/{other_org.id}/plans/"},
+        )
+        self.assertEqual(resp["Location"], f"/billing/{other_org.id}/plans/")
+
+    def test_switching_group_also_lands_the_next_path_on_the_right_org(self):
+        # Starting on Beta's own billing page, then picking a group that
+        # belongs to Acme from the switcher — the row that does both the org
+        # and the group move in one POST.
+        self.client.post(self.reverse("orgs:switch_org", args=[self.beta.id]))
+        resp = self.client.post(
+            self.reverse("orgs:switch_group", args=[self.acme.id, self.marketing.id]),
+            {"next": f"/billing/{self.beta.id}/plans/"},
+        )
+        self.assertEqual(resp["Location"], f"/billing/{self.acme.id}/plans/")
+
 
 class GroupTippingTests(TestCase):
     """The two tip sets, end to end: tipping in a group and tipping in the

@@ -70,9 +70,16 @@
     }
 
     /* ---- clips ------------------------------------------------------------ */
+    /* A panel shows either a clip (<video>, segments are [file, from, to,
+       caption]) or a live demo drawn in the page ([data-demo], segments are
+       [step, 0, seconds, caption]: each step is announced to the demo as a
+       hw:play event and given its seconds — static/js/gt-charity-demo.js).
+       6 Oct 2026, the Charities page's Charity Vote. */
     function Player(panel) {
       var segs = JSON.parse(panel.getAttribute('data-segs') || '[]');
       var v = panel.querySelector('video');
+      var demo = panel.querySelector('[data-demo]');
+      function tell(type, detail) { if (demo) demo.dispatchEvent(new CustomEvent(type, { detail: detail })); }
       var cap = panel.querySelector('.hw-cap');
       var dots = panel.querySelector('.hw-dots');
       var cur = '';
@@ -84,13 +91,14 @@
       }
       function ready(t) {
         return new Promise(function (res) {
-          if (v.readyState >= 1) return res();
+          if (!v || v.readyState >= 1) return res();
           var to = setTimeout(res, 3000);
           v.addEventListener('loadedmetadata', function () { clearTimeout(to); res(); }, { once: true });
         });
       }
       function point(k) {
         var s = segs[k];
+        if (!v) return;
         if (cur !== s[0]) { cur = s[0]; v.src = base + cur + '.mp4'; v.load(); }
       }
       return {
@@ -103,13 +111,17 @@
             mark(k); point(k);
             await ready(t);
             if (t !== token) return false;
-            try { v.currentTime = segs[k][1]; } catch (e) {}
-            var p = v.play(); if (p && p.catch) p.catch(function () {});
+            if (v) {
+              try { v.currentTime = segs[k][1]; } catch (e) {}
+              var p = v.play(); if (p && p.catch) p.catch(function () {});
+            } else {
+              tell('hw:play', { step: segs[k][0], ms: (segs[k][2] - segs[k][1]) * 1000 });
+            }
             if (!(await wait((segs[k][2] - segs[k][1]) * 1000, t))) return false;
           }
           return true;
         },
-        stop: function () { v.pause(); mark(-1); }
+        stop: function () { if (v) v.pause(); tell('hw:stop'); mark(-1); }
       };
     }
 
@@ -190,7 +202,9 @@
       sec.style.setProperty('--a', a.toFixed(3));
       cards.forEach(function (c, m) {
         c.style.visibility = m === j && q1 > 0 ? 'hidden' : '';
-        c.style.opacity = m === j ? '' : String(1 - a * 0.75);
+        /* The waiting cards keep their colour (client, 6 Oct 2026: faded to
+           a quarter they read "too dull"); a 10% dip is all the spotlight. */
+        c.style.opacity = m === j ? '' : String(1 - a * 0.1);
       });
     }
 

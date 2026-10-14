@@ -134,9 +134,16 @@
       var below = window.innerHeight - r.bottom - gap - edge;
       var above = r.top - gap - edge;
       var up = below < 180 && above > below;
-      menu.style.width = r.width + 'px';
-      menu.style.left = Math.max(edge, Math.min(r.left, window.innerWidth - r.width - edge)) + 'px';
-      menu.style.maxHeight = Math.max(140, Math.min(300, up ? above : below)) + 'px';
+      /* A menu may be roomier than its button (--ddx-min-w, --ddx-max-h —
+         the public forms set them, client 6 Oct 2026: "the dropdown looks
+         squeezed"), never wider than the window. */
+      var ms = getComputedStyle(menu);
+      var minW = parseFloat(ms.getPropertyValue('--ddx-min-w')) || 0;
+      var maxH = parseFloat(ms.getPropertyValue('--ddx-max-h')) || 300;
+      var w = Math.min(Math.max(r.width, minW), window.innerWidth - edge * 2);
+      menu.style.width = w + 'px';
+      menu.style.left = Math.max(edge, Math.min(r.left, window.innerWidth - w - edge)) + 'px';
+      menu.style.maxHeight = Math.max(140, Math.min(maxH, up ? above : below)) + 'px';
       if (up) {
         menu.style.top = 'auto';
         menu.style.bottom = (window.innerHeight - r.top + gap) + 'px';

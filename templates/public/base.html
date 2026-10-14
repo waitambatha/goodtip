@@ -45,13 +45,20 @@
     </div>
   </div>
 
-  {% block nav %}{% include "public/partials/_nav.html" %}{% endblock %}
+  {% comment %}
+  LOCKDOWN'S REAL PAGES wear the stripped nav and footer, not the site's full
+  menu (client, 12 Oct 2026: "remove any other type of menu... just see the
+  blogs"). is_holding (goodtip.context_processors.environment) is only ever
+  true here for the five pages staging_gate.HOLDING_REAL_PAGES lets through
+  at all — everything else still never reaches this template while it holds.
+  {% endcomment %}
+  {% block nav %}{% if is_holding %}{% include "public/partials/_nav_lockdown_page.html" %}{% else %}{% include "public/partials/_nav.html" %}{% endif %}{% endblock %}
 
   <main>
     {% block content %}{% endblock %}
   </main>
 
-  {% block footer %}{% include "public/partials/_footer.html" %}{% endblock %}
+  {% block footer %}{% if is_holding %}{% include "public/partials/_footer_lockdown_page.html" %}{% else %}{% include "public/partials/_footer.html" %}{% endif %}{% endblock %}
 
   <script>
   (function () {
@@ -72,7 +79,7 @@
        instead, which on a phone reads as the menu being broken.
 
        Tapping a link closes it too. Most links navigate and the drawer dies
-       with the page anyway — but /#charities is an anchor on the home page,
+       with the page anyway — but /#start is an anchor on the home page,
        and there the drawer would otherwise stay sitting over the section it
        had just jumped to. */
     var nav = document.querySelector('.nav');

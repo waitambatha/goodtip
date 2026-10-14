@@ -83,38 +83,77 @@ class HoldingModeTests(TestCase):
         self.assertContains(resp, "tr-hero")
         self.assertContains(resp, 'name="org_type"')
 
-    def test_the_real_pages_send_a_visitor_to_their_showcase(self):
+    def test_how_it_works_and_the_wall_still_send_a_visitor_to_their_showcase(self):
         # A shared link or an old bookmark lands on the trailer with that
-        # page's showcase open, not on a password box.
-        for path, slug in (
-            ("/how-it-works/", "how-it-works"), ("/news/", "blog"), ("/news/some-story/", "blog"),
-            ("/wall/", "wall"), ("/about/", "about"), ("/terms/", "terms"), ("/privacy/", "privacy"),
-        ):
+        # page's showcase open, not on a password box. These two are still
+        # video only — see test_the_five_real_pages_render_for_real below
+        # for the ones that changed (client, 12 Oct 2026).
+        for path, slug in (("/how-it-works/", "how-it-works"), ("/wall/", "wall")):
             with self.subTest(path=path):
                 resp = self.client.get(path)
                 self.assertEqual(resp.status_code, 302)
                 self.assertEqual(resp.url, f"/coming-soon/#{slug}")
 
-    def test_the_menu_and_footer_open_showcases_and_offer_no_login_or_signup(self):
+    def test_the_five_real_pages_render_for_real(self):
+        # News, About, Terms, Privacy and Pricing are no longer a filmed
+        # stand-in (client, 12 Oct 2026: "it has to be real... as Ian keeps
+        # on posting") — the actual page renders, wearing its own stripped
+        # nav rather than the showcase or the full site menu.
+        for path in ("/news/", "/about/", "/terms/", "/privacy/", "/pricing/"):
+            with self.subTest(path=path):
+                resp = self.client.get(path)
+                self.assertEqual(resp.status_code, 200)
+                self.assertContains(resp, 'href="/coming-soon/"')
+                self.assertNotContains(resp, "/dashboard/")
+                self.assertNotContains(resp, "/login/")
+                self.assertNotContains(resp, "/signup/")
+
+    def test_a_real_page_links_back_to_the_trailer_and_nowhere_else(self):
+        body = self.client.get("/about/").content.decode()
+        nav = body[body.index('<nav class="nav"'):body.index("</nav>")]
+        self.assertIn('href="/coming-soon/"', nav)
+        for other in ("/news/", "/terms/", "/privacy/", "/pricing/", "/how-it-works/", "/wall/"):
+            self.assertNotIn(f'href="{other}"', nav)
+
+    def test_the_menu_and_footer_offer_the_real_pages_and_still_showcase_the_rest(self):
         body = self.client.get("/").content.decode()
         nav = body[body.index('<nav class="nav"'):body.index("</nav>")]
         self.assertNotIn("/login/", nav)
         self.assertNotIn("/signup/", nav)
         self.assertIn("#join", nav)
         foot = body[body.index('<footer class="footer"'):body.index("</footer>")]
-        for slug in ("how-it-works", "blog", "wall", "about", "terms", "privacy"):
+        for slug in ("how-it-works", "wall"):
             with self.subTest(slug=slug):
                 self.assertIn(f'href="#{slug}"', nav + foot)
                 self.assertContains(self.client.get("/"), f'data-peek="{slug}"')
+        for path in ("/news/", "/about/", "/terms/", "/privacy/", "/pricing/"):
+            with self.subTest(path=path):
+                self.assertIn(f'href="{path}"', nav + foot)
 
-    def test_a_visitor_is_not_offered_the_real_pages_from_a_showcase(self):
+    def test_a_visitor_is_not_offered_the_showcased_pages_as_real_links(self):
         body = self.client.get("/").content.decode()
         self.assertNotIn("Open the live page", body)
-        for href in ("/how-it-works/", "/news/", "/wall/", "/about/", "/terms/", "/privacy/"):
+        for href in ("/how-it-works/", "/wall/"):
             self.assertNotIn(f'href="{href}"', body)
 
+    def test_a_real_story_renders_with_the_stripped_reader_chrome(self):
+        # news_reader.html owns its own <head> and chrome rather than
+        # extending public/base.html (admin_panel.views.news_detail's own
+        # docstring explains why), so it needs its own check that is_holding
+        # actually stripped it — the nav/footer swap in base.html alone
+        # would not have caught a regression here.
+        from admin_panel.models import NewsPost
+
+        NewsPost.objects.create(title="Finals Loom", slug="finals-loom", is_published=True)
+        resp = self.client.get("/news/finals-loom/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'href="/coming-soon/"')
+        self.assertNotContains(resp, "/dashboard/")
+        self.assertNotContains(resp, "Sign up free")
+        self.assertNotContains(resp, "/login/")
+
     def test_everything_else_is_still_gated(self):
-        for path in ("/login/", "/signup/", "/dashboard/", "/pricing/", "/media/messages/x.pdf", "/media/news/x.jpg"):
+        for path in ("/login/", "/signup/", "/dashboard/", "/media/messages/x.pdf", "/media/news/x.jpg"):
             with self.subTest(path=path):
                 resp = self.client.get(path)
                 self.assertEqual(resp.status_code, 302)
@@ -172,7 +211,7 @@ class HoldingLockdownTests(TestCase):
         self.assertContains(resp, "tr-hero")
 
     def test_every_other_page_goes_to_the_trailer_not_to_a_password_box(self):
-        for path in ("/pricing/", "/pricing", "/login/", "/signup/", "/dashboard/", "/admin/",
+        for path in ("/login/", "/signup/", "/dashboard/", "/admin/",
                      "/manage/", "/gate/", "/gate/?next=/dashboard/", "/sitemap.xml",
                      "/media/news/x.jpg", "/no-such-page/"):
             with self.subTest(path=path):
@@ -181,16 +220,24 @@ class HoldingLockdownTests(TestCase):
                 self.assertEqual(resp.url, "/coming-soon/")
 
     def test_the_showcased_pages_still_open_their_showcase(self):
-        for path, slug in (("/news/", "blog"), ("/news/some-story/", "blog"), ("/about/", "about")):
+        for path, slug in (("/how-it-works/", "how-it-works"), ("/wall/", "wall")):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).url, f"/coming-soon/#{slug}")
+
+    def test_the_five_real_pages_render_under_lockdown_too(self):
+        # Lockdown is "the trailer and nothing else" — but these five ARE
+        # something else, deliberately, same as plain holding mode above
+        # (client, 12 Oct 2026).
+        for path in ("/news/", "/about/", "/terms/", "/privacy/", "/pricing/"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 200)
 
     def test_the_gate_password_opens_nothing(self):
         self.unlock()
         self.assertEqual(self.client.post("/gate/", {
             "username": "team", "password": "Team-Pass-1234", "next": "/dashboard/",
         }).url, "/coming-soon/")
-        for path in ("/dashboard/", "/pricing/", "/how-it-works/"):
+        for path in ("/dashboard/", "/how-it-works/"):
             with self.subTest(path=path):
                 self.assertTrue(self.client.get(path).url.startswith("/coming-soon/"))
         body = self.client.get("/").content.decode()
@@ -223,7 +270,7 @@ class HoldingLockdownTests(TestCase):
 class HoldingLockdownWithoutGateTests(TestCase):
     def test_lockdown_does_not_depend_on_the_gate(self):
         self.assertContains(self.client.get("/"), "tr-hero")
-        self.assertEqual(self.client.get("/pricing/").url, "/coming-soon/")
+        self.assertEqual(self.client.get("/dashboard/").url, "/coming-soon/")
 
 class TrailerClipTests(SimpleTestCase):
     """Every chapter on the page has its recording and its poster on disk."""
@@ -785,3 +832,18 @@ class MotionForEveryoneTests(SimpleTestCase):
                 for selectors in re.findall(r"([^{}]+)\{[^{}]*\}", inner):
                     for sel in selectors.split(","):
                         self.assertIn("gt-motion", sel, f"{css.name}: {sel.strip()}")
+
+
+class CharitiesPageTests(TestCase):
+    """Charities is a page of its own (client, 6 Oct 2026), not a jump to the
+    home page's section — and both show the same partner plate."""
+
+    def test_the_page_stands_alone_and_the_menu_goes_there(self):
+        page = self.client.get("/charities/")
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Charities, answered.")
+        self.assertContains(page, "Lifeline")
+        home = self.client.get("/")
+        self.assertContains(home, 'href="/charities/"')
+        self.assertNotContains(home, 'href="/#charities"')
+        self.assertContains(home, 'id="charities"')

@@ -1,0 +1,15 @@
+{% comment %}
+The bar for a real page shown during lockdown or holding mode — About, Terms,
+Privacy, Pricing, the blog (client, 12 Oct 2026: "remove any other type of
+menu... we just want them to be able to just see the blogs"). Unlike
+_nav_holding.html (the trailer page's own bar, whose links open a showcase
+IN PLACE over the trailer), this page has actually navigated away from the
+trailer to a real address, so there is nothing here to open in place — just
+the mark, back to the trailer, and nothing else: no other locked page, no
+login, no sign-up.
+{% endcomment %}
+<nav class="nav" data-open="false">
+  <div class="nav-inner">
+    <a href="{% url 'coming_soon' %}" class="wordmark">GOOD<span>TIP</span><span class="dot">.</span></a>
+  </div>
+</nav>
