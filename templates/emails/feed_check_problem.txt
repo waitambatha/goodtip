@@ -1,6 +1,0 @@
-The feed check compared {{ check.games_checked }} game{{ check.games_checked|pluralize }} on the sports' own sites with what every league shows, and re-synced {{ check.healed }} round{{ check.healed|pluralize }} on its own. These were still wrong afterwards:
-{% for i in errors %}
-- {{ i.label }}{% if i.series %} · {{ i.series }} {{ i.year }}{% endif %}{% if i.round %} round {{ i.round }}{% endif %}{% if i.orgs %} · {{ i.orgs|length }} league{{ i.orgs|length|pluralize }}{% endif %}
-  {{ i.detail }}
-{% endfor %}
-Open the sync panel: {{ panel_link }}

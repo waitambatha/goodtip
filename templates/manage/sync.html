@@ -41,13 +41,11 @@ what runs, how often, and on what, before offering the button.
     </div>
     <div class="gta-item">
       <b>Live scores</b><span>every 2 minutes</span>
-      <small>Score, period and clock while a game is being played — and the moment a game
-             turns final, its result and ladder are pulled in on the spot, not on the next tick.</small>
+      <small>Score, period and clock while a game is being played.</small>
     </div>
     <div class="gta-item">
       <b>Results</b><span>every 15 minutes</span>
-      <small>Final scores and backstop for anything the live poll's own trigger missed.
-             This is what grades tips and awards points.</small>
+      <small>Final scores. This is what grades tips and awards points.</small>
     </div>
     <div class="gta-item">
       <b>Ladders</b><span>every 30 minutes</span>
@@ -58,58 +56,7 @@ what runs, how often, and on what, before offering the button.
       <small>Re-reads every round of every competition, so a game added mid-season
              or a round missed while a feed was down is picked up without anyone asking.</small>
     </div>
-    <div class="gta-item wide">
-      <b>Feed check</b><span>every hour, and after every sweep</span>
-      <small>Compares every game on the AFL and NRL sites with what every league shows,
-             re-syncs anything that differs, and emails the team about anything it could not fix.</small>
-    </div>
   </div>
-</div>
-
-{% comment %}
-THE FEED CHECK (client, 13 Oct 2026, after Ian's "AFLW still going but not in
-the site?"): the answer to "are the fixtures actually right?" rather than "did
-the sync run?". See data_sync/feedcheck.py.
-{% endcomment %}
-<div class="fc-card{% if not last_check %} is-none{% elif check_overdue or not last_check.ok %} is-bad{% else %} is-good{% endif %}">
-  <div class="fc-head">
-    <div>
-      <h3>Feed check</h3>
-      {% if not last_check %}
-        <p>Not run yet. It runs on its own every hour; you can start one now.</p>
-      {% elif check_overdue %}
-        <p><b>The hourly check has not run since {{ last_check.started_at|date:"D j M, g:i A" }}.</b>
-           The server's sync timer may have stopped — nothing on this page is being kept up to date.</p>
-      {% elif last_check.ok %}
-        <p><b>Everything matches the feeds.</b> {{ last_check.games_checked }} game{{ last_check.games_checked|pluralize }} compared
-           {{ last_check.started_at|timesince }} ago{% if last_check.healed %}; {{ last_check.healed }} round{{ last_check.healed|pluralize }} re-synced to get there{% endif %}.</p>
-      {% else %}
-        <p><b>{{ last_check.unresolved_errors|length }} problem{{ last_check.unresolved_errors|length|pluralize }} the check could not fix.</b>
-           Compared {{ last_check.games_checked }} game{{ last_check.games_checked|pluralize }} {{ last_check.started_at|timesince }} ago{% if last_check.healed %} and re-synced {{ last_check.healed }} round{{ last_check.healed|pluralize }}{% endif %}.{% if last_check.alerted %} The team has been emailed.{% endif %}</p>
-      {% endif %}
-    </div>
-    <form method="post">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="check">
-      <button type="submit" class="abtn abtn-primary">Check now</button>
-    </form>
-  </div>
-  {% if last_check and last_check.unresolved %}
-  <ul class="fc-list">
-    {% for i in last_check.unresolved %}
-    <li class="fc-{{ i.severity }}">
-      <b>{{ i.label }}</b>
-      <span>{% if i.series %}{{ i.series }} {{ i.year }}{% endif %}{% if i.round %} &middot; round {{ i.round }}{% endif %}{% if i.orgs %} &middot; {{ i.orgs|length }} league{{ i.orgs|length|pluralize }}{% endif %}</span>
-      {% if i.detail %}<small>{{ i.detail }}</small>{% endif %}
-    </li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-  {% if recent_checks %}
-  <p class="fc-history">Recent:
-    {% for c in recent_checks %}<span class="fc-pip {% if c.ok %}ok{% else %}bad{% endif %}" title="{{ c.started_at|date:'D j M, g:i A' }} · {{ c.get_scope_display }} · {{ c.found|length }} found, {{ c.healed }} re-synced, {{ c.unresolved_errors|length }} left"></span>{% endfor %}
-  </p>
-  {% endif %}
 </div>
 
 {% comment %}

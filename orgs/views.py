@@ -2793,26 +2793,6 @@ def _safe_next(request, fallback="dashboard"):
     return reverse(fallback)
 
 
-def _rewrite_org_in_path(path: str, old_org_id: int, new_org_id: int) -> str:
-    """Swap the organisation the `next` path points at, not just the session.
-
-    Every nav switcher form sends `next=request.path` — the page you were
-    already on. For an org-scoped URL (billing's /billing/<id>/plans/,
-    /orgs/<id>/..., and the rest) that path still names the OLD organisation,
-    so switching from it landed back on the same org's version of the page —
-    not the one just picked — until a manual reload (client-reported, 11 Oct
-    2026, from the Plans page specifically). Only the first occurrence is
-    touched: a later number in the path belongs to something else (a thread,
-    a member), not the org, and it is only touched at all when it is really
-    the org just switched away from, not a coincidence.
-    """
-    needle = f"/{old_org_id}/"
-    idx = path.find(needle)
-    if idx == -1:
-        return path
-    return path[:idx] + f"/{new_org_id}/" + path[idx + len(needle):]
-
-
 @login_required
 @require_POST
 def switch_org(request, org_id: int):
@@ -2828,13 +2808,9 @@ def switch_org(request, org_id: int):
         messages.error(request, "You're not a member of that organisation.")
         return redirect(_safe_next(request))
 
-    previous = ctx.current_org(request)
     ctx.set_current_org(request, org)
     messages.success(request, f"You're now in {org.name}.")
-    next_path = _safe_next(request)
-    if previous and previous.id != org.id:
-        next_path = _rewrite_org_in_path(next_path, previous.id, org.id)
-    return redirect(next_path)
+    return redirect(_safe_next(request))
 
 
 @login_required
@@ -2852,13 +2828,9 @@ def switch_group(request, org_id: int, group_id: int):
         messages.error(request, "Groups aren't switched on for this organisation.")
         return redirect(_safe_next(request))
 
-    previous = ctx.current_org(request)
     ctx.set_current_group(request, group)
     messages.success(request, f"You're now tipping in {group.name}.")
-    next_path = _safe_next(request)
-    if previous and previous.id != group.org_id:
-        next_path = _rewrite_org_in_path(next_path, previous.id, group.org_id)
-    return redirect(next_path)
+    return redirect(_safe_next(request))
 
 
 @login_required

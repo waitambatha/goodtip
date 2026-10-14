@@ -209,8 +209,6 @@ that they were not given that job.
 {% safe_url 'admin:hq_services' as u_services %}
 {% safe_url 'admin:hq_waitlist' as u_waitlist %}
 {% gta_can 'waitlist.view' as may_waitlist %}
-{% safe_url 'admin:hq_custom_pricing' as u_custom_pricing %}
-{% gta_can 'billing.custom_pricing' as may_custom_pricing %}
 {% gta_is_full_access as is_full_access %}
 {% gta_security_visible as may_security %}
 {% gta_on_table_screen as on_table %}
@@ -288,11 +286,6 @@ that they were not given that job.
       {% if u_waitlist and may_waitlist %}
       <li><a href="{{ u_waitlist }}" class="gta-nav-a{% if u_waitlist in request.path %} on{% endif %}" data-jump="Waiting list — sign-ups and the launch invitation">
         <svg class="ic"><use href="#ic-f-people"/></svg><span class="lbl">Waiting list</span></a></li>
-      {% endif %}
-
-      {% if u_custom_pricing and may_custom_pricing %}
-      <li><a href="{{ u_custom_pricing }}" class="gta-nav-a{% if u_custom_pricing in request.path %} on{% endif %}" data-jump="Custom pricing — requests outside the five plans">
-        <svg class="ic"><use href="#ic-f-org"/></svg><span class="lbl">Custom pricing</span></a></li>
       {% endif %}
 
       {% if u_teamhub %}

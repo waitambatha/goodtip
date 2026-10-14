@@ -206,17 +206,7 @@ WAITLIST = Group("waitlist", "Waiting list", "The people who asked to be told wh
     ),
 ])
 
-BILLING = Group("billing", "Custom pricing", "Organisations asking for a price outside the five published plans.", [
-    Capability(
-        "billing.custom_pricing", "Respond to custom pricing requests",
-        "See who has asked for a custom price, and set one for them — or "
-        "decline and point them back at the five published plans. The reply "
-        "goes to the organisation by email.",
-        "billing", reviewable=False, sensitive=True,
-    ),
-])
-
-GROUPS = [NEWS, PAGES, SEO, ENQUIRIES, ORGS, PEOPLE, CHARITIES, DATA, WAITLIST, BILLING]
+GROUPS = [NEWS, PAGES, SEO, ENQUIRIES, ORGS, PEOPLE, CHARITIES, DATA, WAITLIST]
 
 ALL = {c.key: c for g in GROUPS for c in g.capabilities}
 KEYS = list(ALL)

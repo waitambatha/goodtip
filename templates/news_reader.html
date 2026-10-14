@@ -27,7 +27,6 @@ gradient over the whole article.
 {% endcomment %}
 <head>
   <meta charset="UTF-8">
-  {% include "partials/_motion.html" %}
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ post.meta_title|default:post.title }} &middot; GoodTip</title>
   <meta name="description" content="{{ post.meta_description|default:post.excerpt|default:post.title|truncatechars:150 }}">
@@ -76,12 +75,6 @@ gradient over the whole article.
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
         <span>All news &amp; blog</span>
       </a>
-      {% comment %}
-      During lockdown or holding mode this slot is empty — no login, no
-      sign-up, no dashboard, same as everywhere else a holding visitor can
-      reach (client, 12 Oct 2026: "remove any other type of menu").
-      {% endcomment %}
-      {% if not is_holding %}
       <div class="rd-bar-end">
         {% if user.is_authenticated %}
         <a href="{% url 'dashboard' %}" class="rd-ghost">Back to my dashboard</a>
@@ -90,7 +83,6 @@ gradient over the whole article.
         <a href="{% url 'accounts:signup' %}" class="rd-cta">Sign up free</a>
         {% endif %}
       </div>
-      {% endif %}
     </div>
   </header>
 
@@ -260,7 +252,7 @@ gradient over the whole article.
     {% endcomment %}
     <section class="rd-socials" aria-labelledby="rdSocialsH">
       <h2 id="rdSocialsH">Follow GoodTip</h2>
-      <p>Every competition, every round, and where the money goes.</p>
+      <p>Every code, every round, and where the money goes.</p>
       <div class="rd-social-row">
         <a class="rd-social s-email" href="mailto:hello@goodtip.com.au" aria-label="Email GoodTip">
           <span class="rds-ic"><svg><use href="#s-mail"/></svg></span><span class="rds-lab">Email</span>
@@ -303,10 +295,8 @@ gradient over the whole article.
   The site's own footer, socials and all — the client asked for it here
   specifically, and it is what makes this feel like a page on a site rather
   than a document that ends. Same include the marketing pages use, so it
-  cannot drift from them. During lockdown or holding mode it is the stripped
-  footer instead (client, 12 Oct 2026) — the full site map is exactly the
-  set of other pages a holding visitor must not be able to click into.
+  cannot drift from them.
   {% endcomment %}
-  {% if is_holding %}{% include "public/partials/_footer_lockdown_page.html" %}{% else %}{% include "public/partials/_footer.html" %}{% endif %}
+  {% include "public/partials/_footer.html" %}
 </body>
 </html>

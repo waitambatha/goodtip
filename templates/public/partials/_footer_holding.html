@@ -1,11 +1,8 @@
 {% comment %}
 The footer for the holding page. The full footer is the whole site map
-(charities, firms, ...) and most of that is still not open, so a visitor gets
-the brand, the pages on the menu, Pricing, and the two legal pills. How It
-Works and The Wall still open their showcase over the trailer (gt-trailer.js);
-Blog, Pricing, Terms and Privacy are real links now (client, 12 Oct 2026) —
-see _nav_holding.html for why that is enough on its own to stop gt-trailer.js
-intercepting the click.
+(pricing, charities, firms, ...) and none of that is open yet, so a visitor gets
+the brand, the pages on the menu and the two legal pills. Every one of them
+opens its showcase over the trailer (gt-trailer.js) rather than leaving it.
 {% endcomment %}
 <footer class="footer">
   <div class="footer-top">
@@ -26,10 +23,9 @@ intercepting the click.
         <h4>Explore</h4>
         <ul>
           <li><a href="#how-it-works">How It Works</a></li>
-          <li><a href="{% url 'news_index' %}">News &amp; blog</a></li>
+          <li><a href="#blog">News &amp; blog</a></li>
           <li><a href="#wall">The Wall</a></li>
-          <li><a href="{% url 'about' %}">About Us</a></li>
-          <li><a href="{% url 'pricing' %}">Pricing</a></li>
+          <li><a href="#about">About Us</a></li>
           <li><a href="#join" data-wl-open="join">Join the waiting list</a></li>
           <li><a href="#signin" data-wl-open="signin">Waiting-list sign in</a></li>
         </ul>
@@ -39,11 +35,11 @@ intercepting the click.
   <div class="footer-bottom">
     <p class="footer-legal">&copy; 2026 GoodTip Pty Ltd &middot; goodtip.com.au &middot; &ldquo;Good Tip, Mate.&rdquo;<br>Not affiliated with the AFL or NRL.</p>
     <nav class="footer-legal-nav" aria-label="Legal">
-      <a href="{% url 'terms' %}">
+      <a href="#terms">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h4"/></svg>
         Terms &amp; Conditions
       </a>
-      <a href="{% url 'privacy' %}">
+      <a href="#privacy">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.3-2.9 8.3-7 9.5-4.1-1.2-7-5.2-7-9.5V6z"/><path d="m9 12 2 2 4-4"/></svg>
         Privacy Policy
       </a>

@@ -1,7 +1,0 @@
-{{ org.name }} has declined the custom price you offered —
-{{ req.label }}, ${{ req.price_aud|floatformat:0 }}/yr for up to {{ req.seat_limit }} people.
-{% if req.org_decline_reason %}
-WHY
-{{ req.org_decline_reason }}
-{% endif %}
-Open the custom pricing queue: {{ queue_link }}

@@ -109,19 +109,6 @@
         var cs = getComputedStyle(n);
         if (cs.transform !== 'none' || cs.perspective !== 'none' ||
             (cs.filter && cs.filter !== 'none')) return false;
-        /* A [data-form-shell] is not transformed yet at the moment a click
-           both opens it (gt-formfocus.js) and opens a menu inside it (this
-           file) — that lands a setTimeout later. place() measures the button
-           in viewport coordinates, which is only correct while fixed really
-           is relative to the viewport; the instant the shell's centring
-           transform lands, fixed becomes relative to the shell instead, and
-           those same pixels are reinterpreted against the shell's box and
-           land nowhere near it — clipped away by the shell's own overflow.
-           There is no repositioning that survives that switch, so a menu
-           inside a form shell never escapes to fixed, transformed yet or
-           not; the shell is spacious enough that its own overflow:auto is
-           the fallback, not a clipping strip like the one this is for. */
-        if (n.hasAttribute('data-form-shell')) return false;
         if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') clipped = true;
         return true;
       }) && clipped;
@@ -134,16 +121,9 @@
       var below = window.innerHeight - r.bottom - gap - edge;
       var above = r.top - gap - edge;
       var up = below < 180 && above > below;
-      /* A menu may be roomier than its button (--ddx-min-w, --ddx-max-h —
-         the public forms set them, client 6 Oct 2026: "the dropdown looks
-         squeezed"), never wider than the window. */
-      var ms = getComputedStyle(menu);
-      var minW = parseFloat(ms.getPropertyValue('--ddx-min-w')) || 0;
-      var maxH = parseFloat(ms.getPropertyValue('--ddx-max-h')) || 300;
-      var w = Math.min(Math.max(r.width, minW), window.innerWidth - edge * 2);
-      menu.style.width = w + 'px';
-      menu.style.left = Math.max(edge, Math.min(r.left, window.innerWidth - w - edge)) + 'px';
-      menu.style.maxHeight = Math.max(140, Math.min(maxH, up ? above : below)) + 'px';
+      menu.style.width = r.width + 'px';
+      menu.style.left = Math.max(edge, Math.min(r.left, window.innerWidth - r.width - edge)) + 'px';
+      menu.style.maxHeight = Math.max(140, Math.min(300, up ? above : below)) + 'px';
       if (up) {
         menu.style.top = 'auto';
         menu.style.bottom = (window.innerHeight - r.top + gap) + 'px';
@@ -204,13 +184,10 @@
   function init() {
     /* The public contact form was missing from this list, so its "I'm
        interested in…" field was the one raw native select left on the site —
-       an OS-drawn popup in the middle of a designed dark panel. The waiting
-       list's two optional fields (client, 27 Sep 2026: "the drop down on the
-       form needs to be enhanced") were the same gap on a light card, which is
-       why .tmw-card is here rather than folded into .mini-form. */
+       an OS-drawn popup in the middle of a designed dark panel. */
     document.querySelectorAll(
       '.app-main select, .admin-main select, .gl-filterbar select, ' +
-      '.mini-form select, .contact-shell select, .tmw-card select'
+      '.mini-form select, .contact-shell select'
     ).forEach(enhanceSelect);
   }
 

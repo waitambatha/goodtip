@@ -54,17 +54,7 @@ Expects: team, form (a reader row, optional), pick ("home"|"away"),
 
   {% else %}
   {# Locked or graded: still a side, no longer a control. #}
-  {% comment %}
-  TWO REASONS A SIDE STOPS BEING A BUTTON, AND THEY MUST NOT LOOK THE SAME
-  (client, 14 Oct 2026: "if it's locked let it be seen just like the other
-  fixtures ... have like a small lock"). Graded (`match.result` is set) fades
-  the side that lost — that is information, the comparison the card exists to
-  make. Locked-but-undecided is not a comparison yet; dimming it the same way
-  read as "this fixture is broken or gone", which is the opposite of what a
-  not-yet-open round means. `is-locked-pick` keeps full colour and gets the
-  padlock/shake treatment below instead of `is-dim`.
-  {% endcomment %}
-  <div class="fxc-team{% if selection == pick %} sel{% elif match.result %} is-dim{% else %} is-locked-pick{% endif %}{% if match.result %} has-outcome{% endif %}">
+  <div class="fxc-team{% if selection == pick %} sel{% else %} is-dim{% endif %}{% if match.result %} has-outcome{% endif %}">
     <span class="fxc-crest">{% crest team %}</span>
     <span class="fxc-name">{{ team.name }}</span>
     {% comment %}

@@ -21,19 +21,5 @@ def environment(request):
     the live database" — the admin's own chrome is identical in both, and the
     two checkouts are told apart by working directory rather than by anything
     a human sees on screen.
-
-    ``is_holding`` is the other thing every public template may need to ask:
-    whether THIS visitor is the one lockdown or holding mode is standing in
-    front of the real site for (goodtip.staging_gate.is_holding_visitor). Only
-    a handful of pages are ever let through to render at all while that is
-    true (About, Terms, Privacy, Pricing, the blog — see staging_gate.py's
-    HOLDING_REAL_PAGES), and when one is, it wears the stripped nav and
-    footer rather than the full site map (client, 12 Oct 2026: "remove any
-    other type of menu... just see the blogs").
     """
-    from .staging_gate import is_holding_visitor
-
-    return {
-        "is_staging": getattr(settings, "IS_STAGING", False),
-        "is_holding": is_holding_visitor(request),
-    }
+    return {"is_staging": getattr(settings, "IS_STAGING", False)}

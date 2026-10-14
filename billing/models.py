@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.db import models
 
-from .pricing import CUSTOM, TIER_CHOICES, seat_limit_label, tier_label
+from .pricing import TIER_CHOICES, seat_limit_label, tier_label
 
 
 class PlanSubscription(models.Model):
@@ -13,13 +13,10 @@ class PlanSubscription(models.Model):
     """
 
     STATUS_PENDING = "pending"
-    # Subscribed and card saved, first charge still to come (FIRST_BILLING_DATE).
-    STATUS_SCHEDULED = "scheduled"
     STATUS_ACTIVE = "active"
     STATUS_EXPIRED = "expired"
     STATUS_CHOICES = [
         (STATUS_PENDING, "Pending payment"),
-        (STATUS_SCHEDULED, "Subscribed, billing starts later"),
         (STATUS_ACTIVE, "Active"),
         (STATUS_EXPIRED, "Expired"),
     ]
@@ -34,29 +31,6 @@ class PlanSubscription(models.Model):
 
     stripe_checkout_session_id = models.CharField(max_length=255, blank=True)
     stripe_payment_intent_id = models.CharField(max_length=255, blank=True)
-    # The card is saved through a SetupIntent, confirmed on our own page with
-    # Stripe Elements (client, 10 Oct 2026: a loader, a decline animation and
-    # a success animation GoodTip draws itself — not reachable with Checkout's
-    # own iframe UI, which handles all of that inside itself with no event the
-    # parent page can see). The subscription itself is created once this
-    # succeeds — see billing.services.finalize_subscription.
-    stripe_setup_intent_id = models.CharField(max_length=255, blank=True)
-
-    # --- Yearly subscription (3 Oct 2026) ---
-    # The plan is a Stripe subscription now, not a one-off charge: subscribed
-    # today, first charged on ``starts_at``, renewing yearly from then.
-    stripe_customer_id = models.CharField(max_length=255, blank=True)
-    stripe_subscription_id = models.CharField(max_length=255, blank=True, db_index=True)
-    starts_at = models.DateTimeField(null=True, blank=True)
-    stripe_invoice_url = models.URLField(max_length=500, blank=True)
-    # Test mode only: the Stripe test clock the demo subscription runs on, so
-    # the demo can jump it to the first billing date instead of waiting.
-    stripe_test_clock_id = models.CharField(max_length=255, blank=True)
-    # Test mode (client, 6 Oct 2026): on Stripe TEST keys only, a plan can be
-    # taken as a DAILY subscription whose first charge lands about a day after
-    # checkout, so testers can watch real (test-money) charges arrive without
-    # waiting for 31 January or a year. Never possible on live keys.
-    is_test_daily = models.BooleanField(default=False)
 
     # --- Founding Member rate ---
     # Whether THIS charge was taken at a locked founding rate, and what the
@@ -73,48 +47,15 @@ class PlanSubscription(models.Model):
     paid_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    # --- Switching and opting out (client, 10 Oct 2026: "upgrade or
-    # downgrade", "opting out") ---
-    # Set when an ACTIVE subscription is cancelled: it keeps the season
-    # already paid for and simply will not renew, rather than cutting off
-    # something that has been paid for. A SCHEDULED one — nothing charged
-    # yet — is cancelled outright instead (billing.services.cancel_subscription)
-    # and never sets this; it goes straight to STATUS_EXPIRED.
-    cancel_at_period_end = models.BooleanField(default=False)
-    canceled_at = models.DateTimeField(null=True, blank=True)
-
-    # Only set on a CUSTOM-tier subscription (CustomPriceRequest, below) — the
-    # name Ian gave the offer when approving it, e.g. "AquaFlow partner plan".
-    # Held here rather than looked up from the request every time a page or an
-    # invoice needs a label, so the name on an old receipt still reads right
-    # even if the request row it came from is edited or gone.
-    custom_label = models.CharField(max_length=80, blank=True)
-
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.get_tier_display()} — {self.org.name} ({self.status})"
 
-    def get_tier_display(self):
-        """The five published plans read their name from TIER_CHOICES as
-        usual; a custom one reads the name Ian gave it, because "Custom" on
-        every screen an organisation sees is not the name of their plan."""
-        if self.tier == CUSTOM and self.custom_label:
-            return self.custom_label
-        return dict(TIER_CHOICES).get(self.tier, self.tier)
-
     @property
     def is_active(self) -> bool:
         return self.status == self.STATUS_ACTIVE
-
-    @property
-    def is_scheduled(self) -> bool:
-        return self.status == self.STATUS_SCHEDULED
-
-    @property
-    def is_demo(self) -> bool:
-        return bool(self.stripe_test_clock_id)
 
     @property
     def seat_limit_label(self) -> str:
@@ -435,91 +376,3 @@ class SponsorshipApplication(models.Model):
     @property
     def is_open(self) -> bool:
         return self.status in (self.STATUS_NEW, self.STATUS_REVIEWING)
-
-
-class CustomPriceRequest(models.Model):
-    """An organisation asking for a price outside the five published plans,
-    and the super admin's answer to it.
-
-    CLIENT, 11 OCT 2026: "the user will be able to request for a custom
-    price... an email will be sent to the super admin that this specific
-    organisation is requesting for a custom price... the super admin will be
-    able to create a custom price for that specific organisation... or deny
-    it and say we can work with the five subscriptions we currently have."
-
-    Shaped like SponsorshipApplication (a request, a decision, a person who
-    made it) rather than sysadmin.ChangeRequest's hold-and-replay-the-POST
-    machinery — there is no form submission to replay here, only a price for
-    a reviewer to set once, which then drives billing.services.
-    create_custom_subscription directly.
-
-    ONE OFFER AT A TIME IS NOT ENFORCED HERE. An organisation can ask again
-    after a decline, and a later approval simply becomes the current one —
-    billing.views reads the most recent APPROVED row, so an old declined or
-    superseded request is history, not a row that has to be deleted to get
-    out of the way.
-    """
-
-    STATUS_PENDING = "pending"
-    STATUS_APPROVED = "approved"
-    STATUS_DECLINED = "declined"
-    STATUS_CHOICES = [
-        (STATUS_PENDING, "Waiting for review"),
-        (STATUS_APPROVED, "Approved"),
-        (STATUS_DECLINED, "Declined"),
-    ]
-
-    org = models.ForeignKey(
-        "orgs.Organisation", on_delete=models.CASCADE, related_name="custom_price_requests",
-    )
-    requested_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="custom_price_requests",
-    )
-    message = models.TextField(
-        blank=True, help_text="What the organisation is asking for, in their own words.",
-    )
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    # Set only on approval — what the organisation is being offered.
-    price_aud = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
-    seat_limit = models.PositiveIntegerField(null=True, blank=True)
-    label = models.CharField(
-        max_length=80, blank=True, help_text="Shown to the organisation as the plan's name.",
-    )
-
-    decision_note = models.TextField(
-        blank=True, help_text="Sent to the organisation by email — why declined, or terms of the offer.",
-    )
-    decided_at = models.DateTimeField(null=True, blank=True)
-    decided_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="custom_prices_decided",
-    )
-
-    # THE OTHER HALF OF THE NEGOTIATION (client, 12 Oct 2026): approving a
-    # request offers a price, it does not commit the organisation to it —
-    # "you can either accept it or reject it... give a reason why... a form
-    # of negotiation." Kept on the same row as the approval rather than a
-    # new status, because an org that declines has not un-approved Ian's
-    # price, it has said no to it — the offer stays exactly what it was for
-    # the record, and billing.services.current_custom_offer simply stops
-    # treating a declined-by-the-org row as live.
-    org_declined_at = models.DateTimeField(null=True, blank=True)
-    org_decline_reason = models.TextField(
-        blank=True, help_text="Sent back to the team by email — why the organisation said no to the offer.",
-    )
-
-    class Meta:
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"{self.org.name} — {self.get_status_display()}"
-
-    @property
-    def is_pending(self) -> bool:
-        return self.status == self.STATUS_PENDING
-
-    @property
-    def is_declined_by_org(self) -> bool:
-        return self.status == self.STATUS_APPROVED and self.org_declined_at is not None

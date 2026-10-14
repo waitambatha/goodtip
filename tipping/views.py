@@ -9,9 +9,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from billing.donations import donation_summary
-from catalog.models import GoodListConfig, OrganisationType, State
 from orgs.models import Group, OrgMember, Organisation
-from . import national_ladder
 from .models import LadderEntry, Match, Round, Team, Tip
 from .services import (
     annotate_play_state, clear_tip, competition_filter, current_round,
@@ -1129,26 +1127,6 @@ def ladder_view(request, org_id: int):
     for e in entries:
         e.games_left = left_by_team.get(e.team.id)
 
-    # WHERE EACH TEAM WAS A ROUND AGO (client, 4 Oct 2026: "this team is
-    # number two on this ladder; the previous round it was number six — it
-    # went up"). The table as it stood after the round before the one shown,
-    # by the same arithmetic as any past round, and the difference per club.
-    prev_round = None
-    if selected and rounds_available:
-        ordered_rounds = sorted(rounds_available)
-        ref = at_round if at_round is not None else ordered_rounds[-1]
-        earlier = [r for r in ordered_rounds if r < ref]
-        prev_round = earlier[-1] if earlier else None
-    if prev_round is not None:
-        before = {
-            r["team_id"]: r["rank"]
-            for r in ladder_standings(series=selected, season=org.season, up_to_round=prev_round)
-        }
-        for e in entries:
-            was = before.get(e.team.id)
-            e.prev_rank = was
-            e.move = (was - e.rank) if was is not None else 0
-
     # Which teams this member has tipped most, so the ladder connects to their
     # own season rather than being a bare table.
     my_team_ids = set(
@@ -1181,7 +1159,6 @@ def ladder_view(request, org_id: int):
             rounds_available, at_round, request.GET.get("back"),
         ),
         "at_round": at_round,
-        "prev_round": prev_round,
         # Stepping through rounds must not silently change which competition's
         # ladder is on screen.
         "ladder_keep": f"series={selected.slug}" if selected else "",
@@ -1215,31 +1192,19 @@ def my_stats_view(request, org_id: int):
     selected = pick_series(options, request.GET.get("comp"))
     group = _group(request, org)
     st = member_season(request.user, org, group=group, series=selected)
-    # Rank AND the field it was read from the middle of, together — read from
-    # the same board the competition filter scopes (client, 12 Oct 2026: the
-    # rank card used to stay "all competitions" even with a filter chip on,
-    # disagreeing with every other number on the page).
-    board = leaderboard_for_org(org, group=group, series=selected)
-    total_rankers = len(board)
-    mine = next((u for u in board if u.id == request.user.id), None)
-    rank = mine.rank if mine else None
     return render(request, "my_stats.html", {
         "org": org,
         "comp_options": options,
         "selected_comp": selected,
         "stats": st,
-        "rank": rank,
-        "total_rankers": total_rankers,
-        # Five pictures, each answering a question the table cannot, no two
-        # the same colour (client, 12 Oct 2026) — the house SVG/CSS chart
-        # kit (tipping/stats.py), not a JS charting library.
+        "rank": user_rank_in_org(request.user, org, group=group),
+        # Four pictures, and each one answers a question the table cannot.
         "chart_accuracy": spark(
             [r["accuracy"] for r in st["run"]], floor=0, ceiling=100,
         ),
         "chart_points": bars(st["run"], key="points"),
         "chart_codes": bars(st["codes"], key="accuracy"),
         "chart_split": donut(st["right"], st["played"]),
-        "chart_standing": donut(total_rankers - rank + 1, total_rankers) if rank else None,
     })
 
 
@@ -1412,11 +1377,6 @@ def leaderboard_view(request, org_id: int):
     # another one names a round that comp does not have and empties the table.
     # Changing code resets to all rounds, which is the only honest default.
     comp_keep_pairs = [("scope", scope)] if (is_family and scope == "national") else []
-    # The Industry / National / Everyone boards keep their view when the
-    # competition changes, or a filter would silently drop you back on your own.
-    _view = request.GET.get("view", "org")
-    if _view in ("industry", "national", "everyone"):
-        comp_keep_pairs = comp_keep_pairs + [("view", _view)]
     comp_keep = "&amp;".join(f"{k}={v}" for k, v in comp_keep_pairs)
     # The ROUND buttons carry the comp as well as the scope — they are inside
     # the competition, not beside it, so a round link that dropped ?comp would
@@ -1469,34 +1429,7 @@ def leaderboard_view(request, org_id: int):
         "prev_label": labels.get(steps[at - 1]) if at > 0 else "",
         "next_label": labels.get(steps[at + 1]) if at < len(steps) - 1 else "",
     }
-    # Season champion certificates ready for this org, for the people who can
-    # hand them out (spec addendum 14 Aug 2026) — a captain has no Manage
-    # menu, so this is how they find them.
-    certs_ready = []
-    if _can_certify(request.user, org):
-        from . import certificates as _certs
-        certs_ready = [s.name for s in _certs.competitions_for(org) if _certs.season_state(org, s).final]
-
-    # BEYOND YOUR OWN ORGANISATION (client, 4 Oct 2026). The Industry and
-    # National boards were under the Ladder menu, which is for teams; they rank
-    # people and organisations, so they are views of this page. See
-    # tipping/rankings.py for how each is scored and what is named.
-    from . import rankings
-
-    board_view = request.GET.get("view", "org")
-    if board_view not in ("org", "industry", "national", "everyone"):
-        board_view = "org"
-    standing = rankings.standing(request.user, org, series=selected_comp, group=group)
-    wide_board = None
-    if board_view in ("industry", "national"):
-        wide_board = rankings.org_board(org, board_view, series=selected_comp)
-    elif board_view == "everyone":
-        wide_board = rankings.everyone_board(request.user, org, series=selected_comp)
     return render(request, "leaderboard.html", {
-        "board_view": board_view,
-        "standing": standing,
-        "wide_board": wide_board,
-        "certs_ready": certs_ready,
         "org": org, "rounds": rounds, "selected_round_id": selected_round_id or "all",
         # Built here rather than in the template. The button now rides inside
         # the room switcher, which takes its href as an `action_url` argument —
@@ -1519,358 +1452,3 @@ def leaderboard_view(request, org_id: int):
         "current_round": current_round,
         "donation": donation_summary(org),
     })
-
-
-def tipping_ladder_view(request):
-    """The public Industry / National ladder (/tipping-ladder/).
-
-    Not org-scoped and not login-gated — same footing as billing.good_list_view,
-    which this sits beside: an organisation opts in once
-    (`Organisation.is_public_listed`) and shows up on both public boards.
-
-    "Industry" and "National" are not two views. They are the same board,
-    filtered by organisation type or not — arriving with `?type=` pre-fills
-    the type filter (how the app nav's "Industry ladder" link gets you
-    straight to your own sector); arriving with none shows every opted-in
-    organisation.
-    """
-    type_slug = request.GET.get("type", "")
-    cat_slug = request.GET.get("cat", "")
-    state_code = request.GET.get("state", "")
-
-    organisation_types = list(OrganisationType.objects.prefetch_related("sub_categories"))
-    states = list(State.objects.all())
-    # Drop unknown / mismatched filter values rather than 404ing a public page.
-    if type_slug and not any(gt.slug == type_slug for gt in organisation_types):
-        type_slug = ""
-    if cat_slug and (not type_slug or not any(
-        sc.slug == cat_slug
-        for gt in organisation_types if gt.slug == type_slug
-        for sc in gt.sub_categories.all()
-    )):
-        cat_slug = ""
-    if state_code and not any(s.code == state_code for s in states):
-        state_code = ""
-
-    from data_sync.public_board import board as team_board
-
-    cfg = GoodListConfig.get()
-    return render(request, "public/tipping_ladder.html", {
-        "active": "ladder",
-        # The real-competitions read-only board, same payload/JS as home.html
-        # — the "images and videos... tables changing with stats, read only"
-        # showcase the client asked the How It Works ladder section to reuse.
-        "board_snapshot": team_board(),
-        "board_live": national_ladder.board_is_live(),
-        "board": national_ladder.ladder(
-            organisation_type_slug=type_slug or None,
-            sub_category_slug=cat_slug or None,
-            state_code=state_code or None,
-        ),
-        "organisation_types": organisation_types,
-        "states": states,
-        "sel_type": type_slug,
-        "sel_cat": cat_slug,
-        "sel_state": state_code,
-        "credibility_min": cfg.credibility_min_groups,
-    })
-
-
-
-# ---------------------------------------------------------------------------
-# Season Champion Certificates (spec addendum, 14 Aug 2026). See
-# tipping/certificates.py for the rules; these are the org-side screens.
-# ---------------------------------------------------------------------------
-
-def _can_certify(user, org) -> bool:
-    """§5: the admin, captain or team manager — the org side, not the winner."""
-    from orgs.models import OrgMember
-
-    m = OrgMember.objects.filter(user=user, org=org).first()
-    return bool(m and (m.can_manage or m.is_captain))
-
-
-@login_required
-def certificates_view(request, org_id: int):
-    """The competition picker (client, 12 Oct 2026: "square, 2 in each row,
-    have the colours of the competitions"): one card per competition this
-    organisation runs, coloured in that competition's own accent, each
-    leading to that competition's own page — never four stacked at once."""
-    from django.http import HttpResponseForbidden
-
-    from orgs.models import Organisation
-
-    from . import certificates as certs
-
-    org = get_object_or_404(Organisation, pk=org_id)
-    if not _can_certify(request.user, org):
-        return HttpResponseForbidden()
-    comps = [
-        {
-            "series": series,
-            "accent": certs.ACCENTS.get(series.name, certs.FOREST),
-            "state": certs.season_state(org, series),
-        }
-        for series in certs.competitions_for(org)
-    ]
-    return render(request, "certificates.html", {
-        "org": org,
-        "comps": comps,
-        "year": org.season.year if org.season_id else "",
-    })
-
-
-@login_required
-def certificate_competition_view(request, org_id: int, series: str):
-    """One competition, on its own page (client, 12 Oct 2026: "when I click
-    in each that is when I should see a preview of the certificate in that
-    specific competition — not showing all of them at once"). The real
-    certificate shown full size once the season is final; a SAMPLE preview on
-    request while it's still running; otherwise a pointer at the member's own
-    season-so-far — the same three states the old combined list carried, now
-    one at a time instead of stacked four deep.
-    """
-    from django.http import Http404, HttpResponseForbidden
-
-    from catalog.models import Series
-    from orgs.models import Organisation
-
-    from . import certificates as certs
-
-    org = get_object_or_404(Organisation, pk=org_id)
-    if not _can_certify(request.user, org):
-        return HttpResponseForbidden()
-    if series not in certs.CERT_SERIES:
-        raise Http404
-    series_obj = get_object_or_404(Series, name=series)
-    if series_obj not in certs.competitions_for(org):
-        raise Http404
-    state = certs.season_state(org, series_obj)
-    champions = certs.champions(org, series_obj) if state.final else []
-    _attach_photos(org, series_obj, champions)
-    preview = request.GET.get("preview") == "1"
-    sample = None
-    if not champions and preview and not state.final:
-        sample = certs.sample_certificate(org, series_obj, request.user)
-        _attach_photos(org, series_obj, [sample])
-    return render(request, "certificate_competition.html", {
-        "org": org,
-        "series": series_obj,
-        "state": state,
-        "champions": champions,
-        "sample": sample,
-        "preview": preview,
-        "accent": certs.ACCENTS.get(series_obj.name, certs.FOREST),
-        "year": org.season.year if org.season_id else "",
-        "industry": certs.industry_champion(org, series_obj) if state.final else None,
-        "national": certs.national_org_champion(org, series_obj) if state.final else None,
-        "individual_national": certs.national_individual_champion(org, series_obj) if state.final else None,
-    })
-
-
-def _champion_photo_field(org, series, user_id):
-    """The field behind a champion's certificate photo (client, 12 Oct 2026:
-    baked into the certificate itself, not just shown beside it): the one
-    chosen for this certificate if there is one, else their profile photo,
-    else ``None`` so the certificate falls back to initials."""
-    from accounts.models import User
-
-    from .models import ChampionPhoto
-
-    override = ChampionPhoto.objects.filter(org=org, series=series, user_id=user_id).first()
-    if override:
-        return override.image
-    avatar = getattr(User.objects.filter(id=user_id).first(), "avatar", None)
-    return avatar or None
-
-
-def _attach_photos(org, series, champs):
-    """Each champion's photo for the page: the one chosen for this certificate
-    if there is one, else their profile photo, else nothing."""
-    from accounts.models import User
-
-    from .models import ChampionPhoto
-
-    chosen = {p.user_id: p for p in ChampionPhoto.objects.filter(org=org, series=series)}
-    users = {u.id: u for u in User.objects.filter(id__in=[c.user_id for c in champs])}
-    for c in champs:
-        override = chosen.get(c.user_id)
-        avatar = getattr(users.get(c.user_id), "avatar", None)
-        c.photo_url = override.image.url if override else (avatar.url if avatar else "")
-        c.photo_is_custom = bool(override)
-
-
-@login_required
-@require_POST
-def certificate_photo(request, org_id: int, series: str, user_id: int):
-    """Set (or, with ``reset``, clear) the photo beside a champion's
-    certificate. Squared and sized on the way in, so a phone photo of any
-    shape lands as a clean circle and nobody uploads twelve megabytes."""
-    from io import BytesIO
-
-    from django.core.files.base import ContentFile
-    from django.http import Http404
-    from PIL import Image, ImageOps
-
-    from catalog.models import Series
-    from orgs.models import Organisation
-
-    from . import certificates as certs
-    from .models import ChampionPhoto
-
-    org = get_object_or_404(Organisation, pk=org_id)
-    if not _can_certify(request.user, org):
-        return HttpResponseForbidden()
-    series_obj = get_object_or_404(Series, name=series)
-    if not any(c.user_id == user_id for c in certs.champions(org, series_obj)):
-        raise Http404
-    back = reverse("tipping:certificates", args=[org.id])
-    if request.POST.get("reset") == "1":
-        for p in ChampionPhoto.objects.filter(org=org, series=series_obj, user_id=user_id):
-            p.image.delete(save=False)
-            p.delete()
-        messages.success(request, "Back to the profile photo.")
-        return redirect(back)
-    upload = request.FILES.get("photo")
-    if not upload:
-        messages.error(request, "Choose a photo to upload.")
-        return redirect(back)
-    if upload.size > 12 * 1024 * 1024:
-        messages.error(request, "That photo is over 12 MB. Try a smaller one.")
-        return redirect(back)
-    try:
-        img = Image.open(upload)
-        img = ImageOps.exif_transpose(img).convert("RGB")
-    except Exception:  # noqa: BLE001 — not an image Pillow can read
-        messages.error(request, "That file isn't a photo we can read. Try a JPG or PNG.")
-        return redirect(back)
-    img = ImageOps.fit(img, (800, 800), Image.LANCZOS, centering=(0.5, 0.4))
-    out = BytesIO()
-    img.save(out, "JPEG", quality=88, optimize=True)
-    photo, _ = ChampionPhoto.objects.get_or_create(
-        org=org, series=series_obj, user_id=user_id, defaults={"uploaded_by": request.user},
-    )
-    if photo.image:
-        photo.image.delete(save=False)
-    photo.image.save(f"{org.id}-{series.lower()}-{user_id}.jpg", ContentFile(out.getvalue()), save=False)
-    photo.uploaded_by = request.user
-    photo.save()
-    messages.success(request, "Photo updated.")
-    return redirect(back)
-
-
-@login_required
-def certificate_sample_file(request, org_id: int, series: str, fmt: str):
-    """A competition's SAMPLE certificate, as ``pdf`` or ``png``
-    — the preview's downloads. Marked SAMPLE on its face and in its name."""
-    from django.http import Http404, HttpResponse, HttpResponseForbidden
-
-    from catalog.models import Series
-    from orgs.models import Organisation
-
-    from . import certificates as certs
-
-    org = get_object_or_404(Organisation, pk=org_id)
-    if not _can_certify(request.user, org):
-        return HttpResponseForbidden()
-    if series not in certs.CERT_SERIES or fmt not in ("pdf", "png"):
-        raise Http404
-    series_obj = get_object_or_404(Series, name=series)
-    cert = certs.sample_certificate(org, series_obj, request.user)
-    photo = _champion_photo_field(org, series_obj, cert.user_id)
-    if fmt == "pdf":
-        body, ctype, name = certs.render_pdf(cert, photo), "application/pdf", cert.filename("pdf")
-    else:
-        body, ctype, name = certs.render_png(cert, photo), "image/png", cert.filename("png")
-    resp = HttpResponse(body, content_type=ctype)
-    disposition = "inline" if request.GET.get("view") == "1" else "attachment"
-    resp["Content-Disposition"] = f'{disposition}; filename="{name}"'
-    resp["Cache-Control"] = "private, max-age=60"
-    return resp
-
-
-@login_required
-def certificate_file(request, org_id: int, series: str, user_id: int, fmt: str):
-    """One certificate, as ``pdf`` (print) or ``png`` (to post).
-
-    Re-derived from the final board on every request rather than stored: a
-    certificate can only ever say what the locked ladder says, and a
-    correction to a result before the season closed cannot leave a stale file
-    behind. ``?view=1`` serves it inline for the on-page preview.
-    """
-    from django.http import Http404, HttpResponse, HttpResponseForbidden
-
-    from catalog.models import Series
-    from orgs.models import Organisation
-
-    from . import certificates as certs
-
-    org = get_object_or_404(Organisation, pk=org_id)
-    if not _can_certify(request.user, org):
-        return HttpResponseForbidden()
-    if series not in certs.CERT_SERIES or fmt not in ("pdf", "png"):
-        raise Http404
-    series_obj = get_object_or_404(Series, name=series)
-    cert = next((c for c in certs.champions(org, series_obj) if c.user_id == user_id), None)
-    if cert is None:
-        raise Http404("No certificate — the season is not final, or this member is not its champion.")
-    photo = _champion_photo_field(org, series_obj, user_id)
-    if fmt == "pdf":
-        body, ctype, name = certs.render_pdf(cert, photo), "application/pdf", cert.filename("pdf")
-    else:
-        body, ctype, name = certs.render_png(cert, photo), "image/png", cert.filename("png")
-    resp = HttpResponse(body, content_type=ctype)
-    disposition = "inline" if request.GET.get("view") == "1" else "attachment"
-    resp["Content-Disposition"] = f'{disposition}; filename="{name}"'
-    resp["Cache-Control"] = "private, max-age=300"
-    return resp
-
-
-_SCOPE_COMPUTE = {
-    "industry": "industry_champion",
-    "national": "national_org_champion",
-    "individual": "national_individual_champion",
-}
-
-
-@login_required
-def certificate_scope_file(request, org_id: int, series: str, scope: str, fmt: str):
-    """A certificate beyond this organisation's own champion (12 Oct 2026):
-    best in its industry, best on all of GoodTip, or the top individual
-    tipper nationwide. Re-derived fresh, like the per-member one — the
-    moment the wider field stops being final, this stops existing too."""
-    from django.http import Http404, HttpResponse, HttpResponseForbidden
-
-    from catalog.models import Series
-    from orgs.models import Organisation
-
-    from . import certificates as certs
-
-    org = get_object_or_404(Organisation, pk=org_id)
-    if not _can_certify(request.user, org):
-        return HttpResponseForbidden()
-    if series not in certs.CERT_SERIES or fmt not in ("pdf", "png") or scope not in _SCOPE_COMPUTE:
-        raise Http404
-    series_obj = get_object_or_404(Series, name=series)
-    cert = getattr(certs, _SCOPE_COMPUTE[scope])(org, series_obj)
-    if cert is None:
-        raise Http404("No certificate — that wider field isn't final, or this organisation didn't top it.")
-    # The org's own logo stands in for a photo on an organisation's
-    # certificate; the individual one is a person, so it's their profile
-    # photo — there's no per-org override to look up, since this spans every
-    # organisation on the board, not just this one.
-    if cert.scope == certs.SCOPE_INDIVIDUAL_NATIONAL:
-        from accounts.models import User
-
-        photo = getattr(User.objects.filter(id=cert.user_id).first(), "avatar", None)
-    else:
-        photo = org.logo
-    if fmt == "pdf":
-        body, ctype, name = certs.render_pdf(cert, photo), "application/pdf", cert.filename("pdf")
-    else:
-        body, ctype, name = certs.render_png(cert, photo), "image/png", cert.filename("png")
-    resp = HttpResponse(body, content_type=ctype)
-    disposition = "inline" if request.GET.get("view") == "1" else "attachment"
-    resp["Content-Disposition"] = f'{disposition}; filename="{name}"'
-    resp["Cache-Control"] = "private, max-age=300"
-    return resp

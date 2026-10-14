@@ -102,14 +102,6 @@ class Command(BaseCommand):
             # The sweep has its own systemd timer and so never goes through
             # `claim`; without this its schedule row would read overdue forever.
             stamp(SyncRun.KIND_BACKFILL)
-            # Then verify the whole season against the feed. Cheap here — the
-            # sweep has just cached every page — and it runs on a different
-            # timer from the hourly check, so if the two-minute scheduler ever
-            # stops, this is what notices and says so.
-            from data_sync.feedcheck import run_check
-
-            if not opts.get("org"):
-                run_check(full_season=True)
             return
 
         self._sweep(opts)
@@ -384,15 +376,11 @@ class Command(BaseCommand):
         if not opts["all_rounds"] and not opts["round"]:
             now = timezone.now()
             if kind == "results":
-                # Kicked off and not yet graded. That is the definition of "we
-                # owe this round a result", and it stays true until we deliver
-                # one. "Not graded" is the result being empty, not just the
-                # status: close_out_stale_live marks a lapsed live game complete
-                # WITHOUT a result, and keying on status alone then stopped
-                # asking about it — leaving it for the six-hourly backfill.
-                outstanding = Match.objects.filter(kickoff_at__lte=now).filter(
-                    Q(result__isnull=True) | ~Q(status=Match.STATUS_COMPLETE)
-                ).exclude(status=Match.STATUS_POSTPONED).values("round_id")
+                # Kicked off, not complete. That is the definition of "we owe
+                # this round a result", and it stays true until we deliver one.
+                outstanding = Match.objects.filter(
+                    kickoff_at__lte=now,
+                ).exclude(status=Match.STATUS_COMPLETE).values("round_id")
                 rounds = rounds.filter(id__in=outstanding)
             else:
                 # A round is in play if any of its matches kicked off recently
@@ -407,11 +395,7 @@ class Command(BaseCommand):
 
         seen = set()
         targets = []
-        # A results target can sit in a round already marked complete (its
-        # games closed out, not graded), so only the other kinds skip those.
-        if kind != "results":
-            rounds = rounds.exclude(status="complete")
-        for r in rounds:
+        for r in rounds.exclude(status="complete"):
             comp = competition_for_series(r.series.name)
             if comp is None:
                 # No feed covers this series. Skipping is right: raising per

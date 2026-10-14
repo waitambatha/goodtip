@@ -1,3 +1,0 @@
-All clear. The problems in the last alert are resolved: the latest check compared {{ check.games_checked }} game{{ check.games_checked|pluralize }} with the sports' own sites and every league matches.
-
-Open the sync panel: {{ panel_link }}

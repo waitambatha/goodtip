@@ -10,11 +10,10 @@ from accounts import waitlist_views
 from accounts.forms import RegisteredEmailPasswordResetForm
 from accounts.views import (
     boss_progress_view, coming_soon_view, contact_submit_view, dashboard_view,
-    home_view, how_it_works_view, tell_the_boss_view,
+    home_view, tell_the_boss_view,
 )
 from admin_panel.views import news_detail, news_index
 from goodtip.sitemaps import SITEMAPS
-from data_sync.public_board import ladder_board_view
 from billing.views import good_list_view, sponsorship_view, stripe_webhook
 from billing.pricing import (
     FOUNDING_WINDOW_CLOSES, founding_seasons, founding_stub_ends, public_cards,
@@ -23,7 +22,6 @@ from goodtip.legal import TERMS_TOP_THREE, TERMS_VERSION
 from goodtip.staging_gate import gate_view, robots_view
 from orgs.views import join_view, public_wall_reply, public_wall_view
 from sysadmin.invite_views import accept as admin_invite_accept
-from tipping.views import tipping_ladder_view
 
 
 # THE PRICING FACTS, ONCE, FOR EVERY PAGE THAT QUOTES THEM.
@@ -58,16 +56,15 @@ urlpatterns = [
     # "Tell me when it's ready" form (client, 22 Sep 2026). It reads the same
     # PRICING_FACTS below — see accounts.views.home_view.
     path("", home_view, name="landing"),
-    path("ladder-board/", ladder_board_view, name="ladder_board"),
-    path("how-it-works/", how_it_works_view, name="how_it_works"),
+    path("how-it-works/", TemplateView.as_view(
+        template_name="public/how_it_works.html",
+        extra_context={"active": "how"},
+    ), name="how_it_works"),
     # The Wall — live cross-group feed of posts members chose to share.
     path("wall/", public_wall_view, name="wall"),
     path("wall/<int:post_id>/reply/", public_wall_reply, name="public_wall_reply"),
     # The Good List — live, privacy-gated data (no placeholder figures).
     path("leaderboard/", good_list_view, name="good_list"),
-    # The Industry / National tipping ladder — the org-vs-org counterpart to
-    # the Good List above, same opt-in pool, ranked on points instead of $.
-    path("tipping-ladder/", tipping_ladder_view, name="tipping_ladder"),
     # About and Privacy are ordinary TemplateViews like their neighbours —
     # every word on them is a CMS slot, so the client edits the copy from
     # Manage → Public pages and the view never has to know. See
@@ -92,12 +89,6 @@ urlpatterns = [
             "terms_version": TERMS_VERSION,
         },
     ), name="terms"),
-    # Charities, a page of its own rather than the home page's section
-    # (client, 6 Oct 2026). The partner plate is shared with home.
-    path("charities/", TemplateView.as_view(
-        template_name="public/charities.html",
-        extra_context={"active": "charities"},
-    ), name="charities"),
     path("pricing/", TemplateView.as_view(
         template_name="public/pricing.html",
         extra_context={"active": "pricing", "price_cards": public_cards(), **PRICING_FACTS},

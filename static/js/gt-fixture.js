@@ -106,51 +106,6 @@
   });
 })();
 
-/* Pressing a locked fixture (client, 14 Oct 2026: "when you try to tip it,
- * it vibrates and says locked"). The side itself is a plain, non-focusable
- * div — there is no button to be disabled — so the only way to answer a
- * press is to listen for it here and react: a shake on the card, a short
- * pill naming why, and a real haptic buzz on a phone that supports one.
- * Delegated, like everything else in this file, so it survives an htmx swap.
- */
-(function () {
-  'use strict';
-
-  var tip = null;
-  var hideTimer = null;
-
-  function ensureTip() {
-    if (tip) return tip;
-    tip = document.createElement('span');
-    tip.className = 'fxc-locktip';
-    tip.innerHTML = '<svg viewBox="0 0 24 24"><use href="#ic-lock"/></svg><span></span>';
-    document.body.appendChild(tip);
-    return tip;
-  }
-
-  document.addEventListener('click', function (e) {
-    var side = e.target.closest('.fxc-team.is-locked-pick');
-    if (!side) return;
-    var card = side.closest('.fxc.is-pending-lock');
-    if (!card) return;
-
-    if (navigator.vibrate) { try { navigator.vibrate(60); } catch (err) { /* unsupported */ } }
-
-    card.classList.remove('is-shaking');
-    void card.offsetWidth;   /* restart the animation on a second press */
-    card.classList.add('is-shaking');
-
-    var t = ensureTip();
-    t.querySelector('span').textContent = card.getAttribute('data-locked-msg') || 'Locked.';
-    var rect = card.getBoundingClientRect();
-    t.style.left = (rect.left + rect.width / 2 + window.scrollX) + 'px';
-    t.style.top = (rect.top + window.scrollY) + 'px';
-    t.classList.add('is-on');
-    if (hideTimer) clearTimeout(hideTimer);
-    hideTimer = setTimeout(function () { t.classList.remove('is-on'); }, 1800);
-  });
-})();
-
 /* Picking a team on the dashboard.
  *
  * Delegated from the document, not bound per row at load. The dashboard used

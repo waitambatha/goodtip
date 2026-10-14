@@ -388,8 +388,7 @@ class _ScrapeSyncService:
                 "competition only."
             )
 
-    def _series_rows(self, series_name: str, round_number: int, year: int,
-                     *, use_cache: bool = True) -> tuple[Series | None, list[dict]]:
+    def _series_rows(self, series_name: str, round_number: int, year: int) -> tuple[Series | None, list[dict]]:
         series = Series.objects.filter(name=series_name).first()
         if series is None:
             return None, []
@@ -402,19 +401,9 @@ class _ScrapeSyncService:
         # what lets a brand-new org be given its draw with no network in the
         # request: the wizard warms this as soon as the competitions are
         # picked (see prewarm_fixtures).
-        #
-        # FOR THE DRAW ONLY. Live scores and results pass use_cache=False:
-        # FixtureCache is "fresh" for thirty minutes, and reading it here made
-        # every live poll inside that window replay the score from whenever a
-        # page was last cached — production's history showed each league
-        # getting about two score changes an hour during games, and a final
-        # score waiting up to half an hour to grade. Within one run the
-        # scraper's own in-memory cache still means thirty leagues cost one
-        # fetch, so nothing is lost by going to the feed every time here.
-        if use_cache:
-            cached = fixture_cache_get(self.SOURCE, key, year, round_number)
-            if cached is not None:
-                return series, cached
+        cached = fixture_cache_get(self.SOURCE, key, year, round_number)
+        if cached is not None:
+            return series, cached
 
         try:
             rows = self._scraper.fixtures(
@@ -473,34 +462,6 @@ class _ScrapeSyncService:
         if external_id and external_id in by_ext:
             return by_ext[external_id]
         return by_pair.get((home.id, away.id))
-
-    # ---- reading the feed for the feed check ----------------------------
-    #
-    # data_sync.feedcheck compares what the feed publishes with what every
-    # league holds. These are the same readers the syncs use, exposed so the
-    # check cannot drift into a second, subtly different way of reading a page.
-
-    def published_rounds(self, series_name: str, year: int, *, full_season: bool) -> list[int]:
-        key = self._scraper_key(series_name)
-        if full_season:
-            return self._scraper.available_rounds(series=key, season=year)
-        # Wider than the sync window on purpose: a fortnight back catches a
-        # result that never graded, four weeks ahead catches a round the
-        # fixtures run has not reached yet.
-        return self._scraper.rounds_in_window(series=key, season=year,
-                                              horizon_days=28, back_days=14)
-
-    def feed_rows(self, series_name: str, round_number: int, year: int, *, fresh: bool):
-        return self._series_rows(series_name, round_number, year, use_cache=not fresh)
-
-    def resolve_team(self, series: Series, name: str, external_id: str) -> Team | None:
-        return self._resolve(series, name, external_id)
-
-    def match_index(self, round_obj: Round) -> tuple[dict, dict]:
-        return self._match_index(round_obj)
-
-    def lookup(self, index: tuple[dict, dict], external_id: str, home: Team, away: Team) -> Match | None:
-        return self._lookup(index[0], index[1], external_id, home, away)
 
     # ---- warming, ahead of any organisation -----------------------------
 
@@ -643,19 +604,10 @@ class _ScrapeSyncService:
                 home = self._resolve(series, r["home_name"], r["home_external_id"])
                 away = self._resolve(series, r["away_name"], r["away_external_id"])
                 if not home or not away:
-                    # A club name the feed uses that we cannot place. This used
-                    # to be a log line and a silent skip — the game simply never
-                    # appeared, in every league, with every run reading ok. It
-                    # fails the run now (after the other games are written), so
-                    # it shows on /manage/sync/ and in the feed check's alert.
                     logger.warning(
                         "Skip %s game %s: unresolved teams %s/%s",
                         self.SOURCE, r["external_id"], r["home_name"], r["away_name"],
                     )
-                    problem = (f"{name} round {round_number}: unknown club "
-                               f"{r['home_name'] if not home else r['away_name']!r}")
-                    if problem not in self._problems:
-                        self._problems.append(problem)
                     continue
                 match = self._lookup(by_ext, by_pair, r["external_id"], home, away)
                 if match is None:
@@ -693,29 +645,17 @@ class _ScrapeSyncService:
     # ---- live -----------------------------------------------------------
 
     def sync_live(self, *, competition: str, round_number: int, org: Organisation) -> int:
-        """In-play score and clock. Deliberately does NOT grade tips itself —
-        but a game that just blew the final whistle gets graded within this
-        same call, rather than waiting for the next scheduled results tick.
+        """In-play score and clock. Deliberately does NOT grade tips.
 
         A score mid-game is provisional, and grading on it would award points
-        that a later correction takes away. Grading happens once, when the
-        game is over — which this is now the FIRST to find out, since it
-        polls every two minutes and the old results cadence was fifteen.
-
-        THE WHISTLE TRIGGER (client, 14 Oct 2026: "every second has to be up
-        to date and realtime"). Previously the only thing standing between a
-        full-time whistle and a graded tip was the fifteen-minute results
-        schedule — a real gap for whoever is refreshing their leaderboard
-        mid-afternoon. Chasing it here instead, the moment this poll is the
-        one that first sees a match turn "complete", collapses that gap to
-        however long this request itself takes.
+        that a later correction takes away. Grading happens once, in
+        sync_results, when the game is over.
         """
         self._check(competition)
         year = org.season.year
         written = 0
-        just_finished: set[int] = set()
         for name in self.SERIES:
-            series, rows = self._series_rows(name, round_number, year, use_cache=False)
+            series, rows = self._series_rows(name, round_number, year)
             if not rows:
                 continue
             round_obj = self._round_for(org, series, round_number)
@@ -746,8 +686,6 @@ class _ScrapeSyncService:
                     # every quiet poll look like a score change to anything
                     # watching freshness.
                     continue
-                if wanted["status"] == Match.STATUS_COMPLETE and match.status != Match.STATUS_COMPLETE:
-                    just_finished.add(round_obj.round_number)
                 for field, value in wanted.items():
                     setattr(match, field, value)
                 match.live_updated_at = timezone.now()
@@ -756,26 +694,6 @@ class _ScrapeSyncService:
 
             refresh_round_state(round_obj)
         self._raise_problems()
-
-        for rn in just_finished:
-            # Recorded as its own SyncRun, the same way the scheduled results
-            # and ladder ticks are — so a whistle-triggered grade shows up on
-            # /manage/sync/ exactly like any other, not as an invisible side
-            # effect of the live poll.
-            from .models import SyncRun
-
-            try:
-                with SyncRun.record(kind=SyncRun.KIND_RESULTS, competition=competition,
-                                    org=org, round_number=rn) as run:
-                    run.matches_touched = self.sync_results(
-                        competition=competition, round_number=rn, org=org)
-                with SyncRun.record(kind=SyncRun.KIND_LADDER, competition=competition, org=org) as run:
-                    run.matches_touched = self.sync_ladder(competition=competition, org=org)
-            except SyncError:
-                # Logged inside sync_results/sync_ladder already — the live
-                # sync itself still succeeded, and the normal 15-minute
-                # results tick remains the backstop for this round.
-                pass
         return written
 
     # ---- results --------------------------------------------------------
@@ -829,7 +747,7 @@ class _ScrapeSyncService:
         year = org.season.year
         written = 0
         for name in self.SERIES:
-            series, rows = self._series_rows(name, round_number, year, use_cache=False)
+            series, rows = self._series_rows(name, round_number, year)
             if not rows:
                 continue
             round_obj = self._round_for(org, series, round_number)

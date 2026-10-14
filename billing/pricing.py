@@ -32,14 +32,6 @@ GROWTH = "growth"
 PRO = "pro"
 ENTERPRISE = "enterprise"
 ENTERPRISE_PLUS = "enterprise_plus"
-# A price negotiated for one organisation, outside the five published plans
-# (client, 11 Oct 2026: "the super admin... will be able to create a custom
-# price for that specific organisation"). Deliberately never a key in TIERS —
-# it is data (billing.models.CustomPriceRequest), set per organisation, not a
-# sixth row in a dict every other org's plans page also reads. tier_config()
-# and TIER_ORDER never see it; anything that needs its price or seat limit
-# reads the subscription or the request itself, not this module.
-CUSTOM = "custom"
 
 # A very large seat ceiling stands in for the deck's "500+" tier.
 UNLIMITED_SEATS = 100_000
@@ -50,7 +42,7 @@ TIERS = {
         "price": 99,
         "seat_limit": 20,
         "audience": "Small business, small sports club",
-        "features": ["1 league", "All four competitions", "Charity vote", "Invite link", "Live ladder"],
+        "features": ["1 league", "All four codes", "Charity vote", "Invite link", "Live ladder"],
         # See GROUPS_MIN_SEATS below for why this is False on the two small
         # plans and what a locked group control has to do.
         "groups": False,
@@ -107,28 +99,10 @@ TIERS = {
     },
 }
 
-TIER_CHOICES = [(key, cfg["label"]) for key, cfg in TIERS.items()] + [(CUSTOM, "Custom")]
+TIER_CHOICES = [(key, cfg["label"]) for key, cfg in TIERS.items()]
 
 # Plans in size order — used wherever "the next plan up" has to be worked out.
 TIER_ORDER = [STARTER, GROWTH, PRO, ENTERPRISE, ENTERPRISE_PLUS]
-
-# One colour per plan (client, 9 Oct 2026: "the colours we have used in the
-# competition"): the same four the certificates and comp chips already use —
-# AFL blue, AFLW rose, NRL orange, NRLW purple (tipping.certificates.ACCENTS)
-# — plus slate for Enterprise+, which has no competition of its own. Matches
-# static/css/goodtip.css's .plk-tab:nth-child(N) { --ink-ac } exactly, so the
-# plan tabs, the subscription summary and the success page all read the same
-# plan as the same colour.
-TIER_ACCENT = {
-    STARTER: "#1F6FD1",
-    GROWTH: "#C2306B",
-    PRO: "#C9700A",
-    ENTERPRISE: "#6B34B8",
-    ENTERPRISE_PLUS: "#5A6B7A",
-    # The house green rather than a sixth hue — a custom plan is not another
-    # rung on the same ladder, so it does not compete for a place in it.
-    CUSTOM: "#2A7337",
-}
 
 # ---------------------------------------------------------------------------
 # GROUPS — the gate, and where it sits
@@ -188,34 +162,6 @@ FOUNDING_EXTRA_SEASONS = 2
 FOUNDING_LOCK_SEASONS = 1 + FOUNDING_EXTRA_SEASONS
 
 
-# WHEN THE FIRST CHARGE LANDS (client, 3 Oct 2026). Organisations subscribe
-# now and their card is saved, but nothing is charged until this day; from
-# then on the plan renews yearly on it. MIDDAY in Melbourne, not midnight:
-# Stripe prints the date in the viewer's own time zone, and midnight in
-# Melbourne is still the 30th everywhere west of it — the checkout page read
-# "January 30" from Nairobi. Midday is the 31st from Australia to Europe and
-# Africa. Once the date has passed, a new subscription is charged at once.
-FIRST_BILLING_DATE = date(2027, 1, 31)
-BILLING_TZ = "Australia/Melbourne"
-
-
-def first_billing_at(now=None):
-    """The moment the first yearly charge is taken, or None to charge today.
-
-    None once the date is less than an hour away: Stripe will not anchor a
-    subscription to a moment that has as good as arrived.
-    """
-    from datetime import datetime, timedelta
-    from zoneinfo import ZoneInfo
-
-    from django.utils import timezone
-
-    now = now or timezone.now()
-    at = datetime(FIRST_BILLING_DATE.year, FIRST_BILLING_DATE.month, FIRST_BILLING_DATE.day, 12,
-                  tzinfo=ZoneInfo(BILLING_TZ))
-    return at if at - now > timedelta(hours=1) else None
-
-
 def founding_window_open(on: date | None = None) -> bool:
     """Whether an organisation signing up today gets the founding rate."""
     return (on or date.today()) <= FOUNDING_WINDOW_CLOSES
@@ -262,10 +208,6 @@ def tier_price(tier: str) -> Decimal:
 
 def tier_has_groups(tier: str | None) -> bool:
     """Whether this plan includes groups. An org with no plan does not."""
-    if tier == CUSTOM:
-        # Bespoke by definition — nobody negotiates a one-off price for an
-        # organisation that would then find its core feature locked.
-        return True
     cfg = TIERS.get(tier or "")
     return bool(cfg and cfg["groups"])
 

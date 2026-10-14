@@ -82,10 +82,9 @@ def current_tier(org) -> tuple[str, bool]:
     — which is the right direction to err when the alternative is telling a
     paying customer their feature has disappeared.
     """
-    from .services import current_subscription
+    from .services import active_subscription
 
-    # Subscribed counts, not only paid: the plan follows the commitment.
-    sub = current_subscription(org)
+    sub = active_subscription(org)
     if sub is not None:
         return sub.tier, True
     size = max(org.team_size or 0, org.members.count())

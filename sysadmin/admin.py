@@ -398,7 +398,7 @@ def _get_urls():
     # answer to the super admin, so they live here now.
     from admin_panel import views as manage_views
 
-    from . import custom_pricing_views, hub_views, media_views, services_views, team_views, waitlist_views
+    from . import hub_views, media_views, services_views, team_views, waitlist_views
 
     custom = [
         path("system-report/", admin.site.admin_view(system_report_view), name="system_report"),
@@ -442,14 +442,6 @@ def _get_urls():
              name="hq_waitlist_invitation"),
         path("waitlist/invitation/preview/", admin.site.admin_view(waitlist_views.invitation_preview),
              name="hq_waitlist_preview"),
-
-        # CUSTOM PRICING, 11 Oct 2026 — organisations asking for a price
-        # outside the five published plans, see sysadmin/custom_pricing_views.py.
-        path("custom-pricing/", admin.site.admin_view(custom_pricing_views.custom_pricing_hub),
-             name="hq_custom_pricing"),
-        path("custom-pricing/<int:request_id>/decide/",
-             admin.site.admin_view(custom_pricing_views.custom_pricing_decide),
-             name="hq_custom_pricing_decide"),
 
         path("sync/", admin.site.admin_view(manage_views.sync_panel), name="hq_sync"),
 

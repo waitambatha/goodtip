@@ -2780,30 +2780,3 @@ html[data-theme="dark"] .gta-shell .object-tools a.addlink { color: #0C2417; bac
   .gta-wl-preview { position: static; }
 }
 @media (max-width: 560px) { .gta-wl-stats { grid-template-columns: repeat(2, 1fr); } }
-
-/* ===========================================================================
-   CUSTOM PRICING (11 Oct 2026) — sysadmin/custom_pricing_views.py
-   Each pending request is a <details> so an approve-or-decline form opens
-   next to the row it belongs to rather than everybody's boxes being open at
-   once. Reuses .gta-wl-table/.gta-wl-pill/.gta-wl-btn for the decided list.
-   =========================================================================== */
-.gta-cpr-row { background: var(--gt-surface); border: 1px solid var(--border-color); border-radius: var(--gt-r-card); margin-bottom: 10px; padding: 0 18px; }
-.gta-cpr-row summary { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 0; cursor: pointer; list-style: none; }
-.gta-cpr-row summary::-webkit-details-marker { display: none; }
-.gta-cpr-row summary div { display: flex; flex-direction: column; gap: 2px; }
-.gta-cpr-row summary b { font-size: 14px; color: var(--body-loud-color); }
-.gta-cpr-row summary span { font-size: 12.5px; color: var(--body-quiet-color); }
-.gta-cpr-msg { margin: 0 0 14px; padding: 12px 16px; border-radius: var(--gt-r-ctl); background: var(--gt-surface-3); font-size: 13.5px; line-height: 1.55; color: var(--body-fg); }
-.gta-cpr-forms { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; padding-bottom: 16px; }
-.gta-cpr-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; align-content: start; }
-.gta-cpr-form label { display: block; font-size: 12px; font-weight: 700; color: var(--body-loud-color); }
-.gta-cpr-form label.full { grid-column: 1 / -1; }
-.gta-cpr-form input, .gta-cpr-form textarea {
-  display: block; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 8px 10px;
-  border: 1px solid var(--border-color); border-radius: var(--gt-r-ctl);
-  background: var(--gt-surface); color: var(--body-fg); font: 13.5px/1.5 var(--gt-body);
-}
-.gta-cpr-form textarea { resize: vertical; }
-.gta-cpr-form button { grid-column: 1 / -1; justify-self: start; margin-top: 4px; }
-.gta-cpr-h2 { margin: 24px 0 10px; font-size: 16px; color: var(--body-loud-color); }
-@media (max-width: 760px) { .gta-cpr-forms { grid-template-columns: 1fr; } }
