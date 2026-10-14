@@ -4029,6 +4029,40 @@ html[data-theme="dark"] .gt-app .wiz-card .opt-card:has(input:checked) { backgro
 .avatar-remove { background: none; border: 0; cursor: pointer; font-size: 12px; font-weight: 700; color: #9a2b2b; padding: 0; margin-top: 8px; }
 .avatar-remove:hover { text-decoration: underline; }
 
+/* ---- the photo cropper (13 Oct 2026): drag and zoom, before a profile
+   photo is ever saved, so what gets uploaded is what was framed up. ---- */
+.avcrop {
+  position: fixed; inset: 0; z-index: 400; display: grid; place-items: center;
+  padding: 20px; background: rgba(7,24,16,.72); backdrop-filter: blur(3px);
+}
+.avcrop[hidden] { display: none; }
+.avcrop-box {
+  width: min(360px, 100%); background: var(--gt-card, #FFFFFF); border-radius: 20px;
+  padding: 22px 22px 18px; box-shadow: 0 40px 80px -30px rgba(0,0,0,.6);
+  text-align: center;
+}
+.avcrop-box h3 { margin: 0 0 4px; font-family: var(--display); font-size: 19px; color: var(--ink, #0F2E22); }
+.avcrop-hint { margin: 0 0 16px; font-size: 13px; color: var(--muted, #5C6A5A); }
+.avcrop-stage {
+  position: relative; width: min(300px, 82vw); aspect-ratio: 1 / 1; margin: 0 auto;
+  border-radius: 14px; overflow: hidden; background: #0B2416; cursor: grab;
+  touch-action: none; user-select: none;
+}
+.avcrop-stage:active { cursor: grabbing; }
+.avcrop-stage img {
+  position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none;
+  max-width: none;
+}
+/* darkens everything outside the circle the avatar is actually cropped to —
+   a percentage inset, so it stays in proportion as the stage itself resizes */
+.avcrop-mask {
+  position: absolute; inset: 5.7%; pointer-events: none; border-radius: 50%;
+  box-shadow: 0 0 0 2000px rgba(5, 20, 13, .58), inset 0 0 0 2px rgba(255,255,255,.85);
+}
+.avcrop-zoom { display: block; width: 100%; margin: 18px 0 4px; accent-color: var(--lime, #CFF93A); }
+.avcrop-actions { display: flex; gap: 10px; margin-top: 10px; }
+.avcrop-actions .abtn { flex: 1; justify-content: center; }
+
 /* ==========================================================================
    ======== DASHBOARD v2 — comp picker, fixtures slate, locking strip =======
    ========================================================================== */
@@ -11458,6 +11492,7 @@ body.dept-modal-open { overflow: hidden; }
    -------------------------------------------------------------------------- */
 
 .fxc {
+  position: relative;
   background: var(--gt-card); border: 1px solid var(--gt-hair);
   border-left: 3px solid var(--gt-hair); border-radius: var(--gt-r-sm);
   padding: 14px 16px 16px; display: grid; gap: 12px;
@@ -11466,6 +11501,71 @@ body.dept-modal-open { overflow: hidden; }
 .fxc:hover { box-shadow: 0 14px 30px -24px rgba(15,46,34,.5); }
 .fxc.is-picked { border-left-color: var(--lime); }
 .fxc.phase-live { border-left-color: #c0392b; }
+
+/* A FIXTURE CARD NEVER GREYS OUT (client, 14 Oct 2026: "I do not want to see
+   that ... if it's locked let it be seen just like the other fixtures"). The
+   shared .is-locked rule a few hundred lines up fades and desaturates a gated
+   control — right for an upgrade prompt, wrong here: a card full of real
+   teams and a real kickoff time going flat grey read as broken or missing,
+   which is the exact complaint ("I'm only seeing AFLW, the rest are not
+   being seen") when every OTHER competition's cards happened to be locked at
+   once. Cancelled for fixture cards specifically; the padlock badge below
+   carries "locked" instead of the whole card doing it. */
+.fxc.is-locked,
+.fxc.is-locked:hover {
+  opacity: 1;
+  filter: none;
+  box-shadow: none;
+  cursor: default;
+}
+/* Sits ON the card's own top-right corner, outside the meta row's own
+   right-aligned state chip — the two would collide if this lived inside the
+   card's padding box instead. */
+.fxc-padlock {
+  position: absolute; top: -9px; right: -9px; z-index: 3;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--gt-deep); color: var(--lime);
+  border: 2px solid var(--gt-card);
+  box-shadow: 0 4px 10px -3px rgba(0,0,0,.4);
+  display: grid; place-items: center;
+}
+.fxc-padlock svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+
+/* A locked side stays full colour and still looks like the team it is — it
+   simply is not a button right now. */
+.fxc-team.is-locked-pick { cursor: not-allowed; }
+.fxc-team.is-locked-pick:hover { background: inherit; border-color: inherit; }
+
+/* THE SHAKE (client, 14 Oct 2026: "when you try to tip it vibrates and says
+   ... locked"). Pressing a locked side wiggles the whole card and drops a
+   small pill naming why, instead of doing nothing — which read as the site
+   not responding at all. */
+@keyframes fxcShake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+.fxc.is-shaking { animation: fxcShake .45s; }
+.fxc-locktip {
+  position: absolute; left: 50%; bottom: calc(100% + 8px); z-index: 3;
+  transform: translate(-50%, 4px); transform-origin: 50% 100%;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 13px; border-radius: 999px; white-space: nowrap;
+  background: var(--gt-deep); color: #fff; font-size: 12.5px; font-weight: 700;
+  box-shadow: 0 14px 28px -12px rgba(0,0,0,.5);
+  opacity: 0; pointer-events: none;
+  transition: opacity .16s var(--ease), transform .16s var(--ease);
+}
+.fxc-locktip svg { width: 13px; height: 13px; stroke: var(--lime); fill: none; stroke-width: 2.2; flex: none; }
+.fxc-locktip::after {
+  content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  border: 6px solid transparent; border-top-color: var(--gt-deep);
+}
+.fxc-locktip.is-on { opacity: 1; transform: translate(-50%, 0); }
+@media (max-width: 480px) {
+  .fxc-locktip { white-space: normal; max-width: 86vw; text-align: center; }
+}
 
 .fxc-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
 .fxc-when { font-weight: 600; color: var(--forest); }
@@ -12140,6 +12240,25 @@ body.fxh-open { overflow: hidden; }
   letter-spacing: .1em; text-transform: uppercase; color: var(--lime); margin-bottom: 6px;
 }
 .gta-item small { display: block; font-size: 12.5px; color: rgba(232,228,213,.7); line-height: 1.5; }
+
+/* The feed check (13 Oct 2026): "is it right?", not just "did it run?". */
+.fc-card { border-radius: 18px; padding: 20px 22px; margin-bottom: 22px; background: #FFFFFF; border: 1px solid rgba(15,46,34,.12); border-left: 6px solid #8DA394; }
+.fc-card.is-good { border-left-color: #2A7337; }
+.fc-card.is-bad { border-left-color: #C8372D; background: #FFF7F5; }
+.fc-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.fc-head h3 { margin: 0 0 4px; font-family: var(--mark); font-size: 13px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; color: #0F2E22; }
+.fc-head p { margin: 0; font-size: 14px; line-height: 1.55; color: #3F4A3E; max-width: 70ch; }
+.fc-head p b { color: #0F2E22; }
+.fc-card.is-bad .fc-head p b { color: #9A2B22; }
+.fc-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 8px; }
+.fc-list li { padding: 10px 14px; border-radius: 10px; background: #F6F4EA; border-left: 4px solid #C8372D; font-size: 13.5px; color: #1A1A14; }
+.fc-list li.fc-warning { border-left-color: #D99A1E; }
+.fc-list li b { margin-right: 8px; }
+.fc-list li span { color: #5C6A5A; }
+.fc-list li small { display: block; margin-top: 3px; color: #4A5649; line-height: 1.5; }
+.fc-history { margin: 14px 0 0; font-size: 12px; color: #5C6A5A; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.fc-pip { width: 10px; height: 18px; border-radius: 3px; display: inline-block; background: #2A7337; }
+.fc-pip.bad { background: #C8372D; }
 
 .gt-subhead {
   font-family: var(--mark); font-size: 12px; font-weight: 800;
@@ -18688,6 +18807,9 @@ html[data-theme="light"] .gt-app .sp-foot b { color: var(--forest); }
   color: var(--code-ink, var(--ink)); line-height: 1;
 }
 .sp-donut-mid span { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+/* The fifth panel's own fixed colour — never the competition accent, so a
+   comp-filter switch cannot also recolour "where you stand". */
+.statpanel-standing { --code-ink: #7A4FC9; }
 
 /* ---- the season as a strip of results ------------------------------------ */
 .formrun { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 22px; }
@@ -24890,27 +25012,104 @@ html[data-theme="light"] .app .abtn.is-locked[disabled] {
 .bl-demo-btn { font: inherit; font-weight: 900; font-size: 14.5px; padding: 12px 22px; border-radius: 999px; border: 0; cursor: pointer; background: #6B34B8; color: #FFFFFF; }
 .bl-demo-btn:hover { background: #4E2290; }
 
-.bl-done { max-width: 680px; margin: 0 auto; text-align: center; }
-.bl-tick { width: 64px; height: 64px; border-radius: 50%; background: var(--lime); display: grid; place-items: center; margin: 12px auto 20px; }
-.bl-tick .cic { width: 34px; height: 34px; stroke: var(--deep); stroke-width: 2.4; }
+.bl-done { max-width: 680px; margin: 0 auto; text-align: center; --ac: var(--ac, #2A7337); }
+.bl-h2 { font-family: var(--display); font-size: clamp(24px, 3vw, 32px); color: var(--deep); margin: 4px 0 10px; }
+.bl-tick { width: 64px; height: 64px; border-radius: 50%; background: var(--ac); display: grid; place-items: center; margin: 12px auto 20px; }
+.bl-tick.is-sm { width: 48px; height: 48px; margin: 0; }
+.bl-tick .cic { width: 34px; height: 34px; stroke: #FFFFFF; stroke-width: 2.4; }
+.bl-tick.is-sm .cic { width: 24px; height: 24px; }
+.bl-tick[hidden], .bl-ring[hidden] { display: none; }
 .bl-lede { font-size: 16px; }
 .bl-steps { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 24px 0 0; padding: 0; }
 .bl-steps li { display: flex; flex-direction: column; gap: 3px; padding: 14px 12px; border-radius: 14px; background: #FFFFFF; border: 1px solid rgba(15,46,34,.14); color: #0F2E22; }
 .bl-steps li b { font-size: 14px; color: #0F2E22; }
 .bl-steps li span { font-size: 13px; color: #3F4A3E; }
-.bl-steps li.done { background: #CFF93A; border-color: #CFF93A; }
-.bl-steps li.done b, .bl-steps li.done span { color: #072F1E; }
-.bl-steps li.next { border: 2px dashed #6B34B8; }
+.bl-steps li.done { background: var(--ac); border-color: var(--ac); }
+.bl-steps li.done b, .bl-steps li.done span { color: #FFFFFF; }
+.bl-steps li.next { border: 2px dashed var(--ac); }
 .bl-demo-run { text-align: center; }
 .bl-demo-big { margin: 14px 0 8px; font-family: var(--display); font-size: 24px; color: #0F2E22; }
-.bl-demo-big b { color: #6B34B8; }
+.bl-demo-big b { color: var(--ac); }
 .bl-demo-run.is-paid { border-style: solid; border-color: #2A7337; }
 .bl-demo-run.is-paid .bl-demo-big b { color: #2A7337; }
-.bl-bar { height: 8px; margin-top: 14px; border-radius: 4px; background: rgba(107,52,184,.15); overflow: hidden; }
-.bl-bar i { display: block; height: 100%; width: 0; background: #6B34B8; border-radius: 4px; transition: width 1s linear; }
+.bl-bar { height: 8px; margin-top: 14px; border-radius: 4px; background: color-mix(in srgb, var(--ac) 15%, transparent); overflow: hidden; }
+.bl-bar i { display: block; height: 100%; width: 0; background: var(--ac); border-radius: 4px; transition: width 1s linear; }
 .bl-demo-run.is-paid .bl-bar i { width: 100% !important; background: #2A7337; }
 .bl-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 24px; }
 .bl-actions [hidden] { display: none; }
+.bl-btn-main { width: auto; }
+.bl-btn-ghost { display: inline-flex; align-items: center; padding: 13px 20px; border-radius: 999px; border: 1.5px solid rgba(15,46,34,.18); color: var(--ink); background: transparent; font-weight: 700; font-size: 14px; text-decoration: none; transition: border-color .15s var(--ease), color .15s var(--ease), background .15s var(--ease); }
+.bl-btn-ghost:hover { border-color: var(--ac); color: var(--ac); background: color-mix(in srgb, var(--ac) 6%, transparent); }
+
+/* ---------- The billing-period ring (client, 10 Oct 2026: "something nice
+   like it's 100%... when the subscription is about to end, where it
+   started"). Real dates from Stripe, not a guess — billing.views.
+   _period_progress. 100%-filled with a tick where no real period exists yet
+   (a SCHEDULED subscription, nothing charged, so sign-up itself is the only
+   thing that is genuinely complete). Shared by success.html's hero and the
+   Plans page's subscription-summary card (.is-sm) — templates/billing/
+   _period_ring.html. ---------- */
+.bl-ring { position: relative; width: 112px; height: 112px; margin: 0 auto 8px; display: grid; place-items: center; }
+.bl-ring.is-sm { width: 64px; height: 64px; margin: 0; flex: none; }
+.bl-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.bl-ring circle { fill: none; stroke-width: 10; }
+.bl-ring.is-sm circle { stroke-width: 12; }
+.bl-ring .r-bg { stroke: rgba(15,46,34,.1); }
+.bl-ring .r-fg { stroke: var(--ac); stroke-linecap: round; stroke-dasharray: 314.159; transition: stroke-dashoffset 1s var(--ease); }
+.bl-ring-n { position: absolute; font-family: var(--display); font-size: 22px; color: var(--deep); }
+.bl-ring.is-sm .bl-ring-n { font-size: 15px; }
+
+/* ---------- Payment history (client, 10 Oct 2026: "the history of
+   payments"). Real Stripe invoices — billing.services.sync_from_stripe's
+   "history" key — full list on success.html, the last four in the Plans
+   page's subscription card (.is-compact), which links out to the rest. ---------- */
+.bl-hist { margin-top: 26px; text-align: left; }
+.bl-hist-h { margin: 0 0 10px; font-size: 12.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.bl-hist-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.bl-hist-list li { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 12px; background: #FFFFFF; border: 1px solid rgba(15,46,34,.1); font-size: 13.5px; }
+.bl-hist-list.is-compact li { padding: 9px 12px; font-size: 13px; }
+.bl-hist-date { color: var(--ink); font-weight: 600; min-width: 80px; }
+.bl-hist-amt { font-family: var(--display); font-size: 15px; color: var(--deep); }
+.bl-hist-status { margin-left: auto; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; background: rgba(15,46,34,.08); color: var(--muted); }
+.bl-hist-status.is-paid { background: rgba(42,115,55,.14); color: #1c5e30; }
+.bl-hist-status.is-open { background: rgba(217,154,0,.16); color: #8a6200; }
+.bl-hist-status.is-void, .bl-hist-status.is-uncollectible { background: rgba(178,52,52,.12); color: #9a2b2b; }
+.bl-hist-link { font-size: 12.5px; font-weight: 700; color: var(--ac); text-decoration: none; }
+.bl-hist-link:hover { text-decoration: underline; }
+.bl-hist-link.is-muted { color: var(--muted); font-weight: 600; }
+
+/* ---------- Your subscription (client, 10 Oct 2026: "if I've subscribed I
+   should see the current plan... upgrade, downgrade, opt out"). Sits above
+   the plan picker on /billing/<id>/plans/, in the subscribed tier's own
+   colour (billing.pricing.TIER_ACCENT — the same one its tab wears below). ---------- */
+.bl-card { --ac: var(--ac, #2A7337); margin-bottom: 22px; padding: 22px 24px; border-radius: 20px; background: #FFFFFF; border: 1px solid rgba(15,46,34,.08); border-top: 4px solid var(--ac); box-shadow: 0 24px 50px -34px rgba(0,0,0,.3); text-align: left; }
+.bl-card-top { display: flex; align-items: center; gap: 16px; }
+.bl-card-head { min-width: 0; }
+.bl-card-eyebrow { margin: 0; font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ac); }
+.bl-card-name { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 3px 0 4px; font-family: var(--display); font-size: 22px; color: var(--deep); }
+.bl-pill { font-family: var(--body); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 3px 10px; border-radius: 999px; background: rgba(15,46,34,.08); color: var(--muted); }
+.bl-pill.is-active { background: color-mix(in srgb, var(--ac) 16%, transparent); color: var(--ac); }
+.bl-pill.is-scheduled { background: rgba(217,154,0,.16); color: #8a6200; }
+.bl-pill.is-ending { background: rgba(178,52,52,.12); color: #9a2b2b; }
+.bl-card-price { margin: 0; font-size: 14px; font-weight: 700; color: var(--ink); }
+.bl-card-note { margin: 4px 0 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.bl-card-row { margin-top: 16px; padding-top: 16px; border-top: 1px dashed rgba(15,46,34,.12); }
+.bl-card-ending { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13.5px; color: #9a2b2b; }
+.bl-card-paynow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13.5px; color: var(--muted); }
+.bl-card-foot { margin-top: 18px; padding-top: 16px; border-top: 1px dashed rgba(15,46,34,.12); display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.bl-card-hint { font-size: 12.5px; color: var(--muted); }
+.bl-card-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+/* The upgrade/downgrade filter sits beside Cancel here, not centred and
+   full-width like its other use further down the page (client, 12 Oct 2026:
+   "it has to be there... where we have the rest of the options"). */
+.bl-card-actions .plk-dirfilter { justify-content: flex-start; margin: 0; }
+.bl-card-link { font: inherit; background: none; border: 0; padding: 0; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--ac); text-decoration: underline; }
+.bl-card-cancel { font: inherit; background: none; border: 1.5px solid rgba(178,52,52,.3); color: #9a2b2b; padding: 9px 16px; border-radius: 999px; font-size: 13px; font-weight: 700; cursor: pointer; transition: background .15s var(--ease); }
+.bl-card-cancel:hover { background: rgba(178,52,52,.08); }
+@media (max-width: 560px) {
+  .bl-card-top { flex-direction: column; align-items: flex-start; }
+  .bl-card-foot { flex-direction: column; align-items: flex-start; }
+}
 @media (max-width: 600px) { .bl-steps { grid-template-columns: minmax(0, 1fr); } }
 
 /* ==========================================================================
@@ -25035,7 +25234,12 @@ html[data-theme="light"] .app .abtn.is-locked[disabled] {
 .cert-state { margin-left: auto; padding: 5px 12px; border-radius: 999px; background: #EEF0E8; color: #3F4A3E; font-size: 12.5px; font-weight: 800; }
 .cert-state.is-final { background: #DFF5C4; color: #1C4A12; }
 .cert-wait { margin: 14px 0 0; font-size: 14.5px; line-height: 1.55; color: #3F4A3E; }
-.cert-co { margin: 12px 0 0; font-size: 13.5px; font-weight: 700; color: #3F4A3E; }
+.cert-season-link { margin: 14px 0 0; display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 14px; background: #F4F8EF; border: 1px solid rgba(15,46,34,.1); text-decoration: none; transition: background .2s var(--ease), transform .2s var(--ease); }
+.cert-season-link:hover { background: #E9F3DD; transform: translateY(-1px); }
+.cert-season-txt { display: grid; gap: 3px; }
+.cert-season-txt b { font-size: 14.5px; color: #0F2E22; }
+.cert-season-txt i { font-style: normal; font-size: 13px; color: #5C6A5A; line-height: 1.5; }
+.cert-season-go { margin-left: auto; flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--ca); color: #FFFFFF; display: grid; place-items: center; font-size: 16px; }
 .cert-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 16px; }
 .cert-card { border: 1px solid rgba(15,46,34,.12); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .cert-thumb img { display: block; width: 100%; height: auto; border-radius: 10px; }
@@ -25044,9 +25248,6 @@ html[data-theme="light"] .app .abtn.is-locked[disabled] {
 .cert-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .cert-btn { flex: 1 1 auto; text-align: center; padding: 9px 12px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 800; text-decoration: none; cursor: pointer; background: #072F1E; color: #CFF93A; border: 1px solid #072F1E; }
 .cert-btn:hover { background: #2A7337; color: #FFFFFF; text-decoration: none; }
-.cert-btn-ghost { background: #FFFFFF; color: #0F2E22; border-color: rgba(15,46,34,.2); }
-.cert-share { background: var(--ca); border-color: var(--ca); color: #FFFFFF; }
-.cert-share[hidden] { display: none; }
 .lb-cert { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 0 16px; padding: 14px 18px; border-radius: 14px; background: #CFF93A; color: #072F1E; }
 .lb-cert b { font-size: 15px; }
 .lb-cert a { margin-left: auto; padding: 8px 16px; border-radius: 999px; background: #072F1E; color: #CFF93A; font-weight: 800; font-size: 13px; text-decoration: none; }
@@ -25054,20 +25255,9 @@ html[data-theme="light"] .app .abtn.is-locked[disabled] {
    left, the champion's photo, name, title and downloads on the right */
 .cert-mark { font-family: var(--display); font-size: 30px; line-height: 1; color: #FFFFFF; margin-bottom: 10px; }
 .cert-mark span { color: #CFF93A; }
-.cert-rows { display: grid; gap: 18px; margin-top: 16px; }
-.cert-row { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: clamp(18px, 3vw, 36px); align-items: center; }
 .cert-hero { display: block; border-radius: 14px; padding: 6px; background: linear-gradient(135deg, #F3D27A, #B8862B 45%, #F6E3A1 70%, #A5741F); box-shadow: 0 0 0 1px rgba(184,134,43,.4), 0 18px 40px -16px rgba(184,134,43,.75), 0 0 34px -6px rgba(233,185,73,.55); transition: transform .25s var(--ease); }
 .cert-hero:hover { transform: translateY(-3px); }
 .cert-hero img { display: block; width: 100%; height: auto; border-radius: 9px; }
-.cert-side { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
-.cert-face { width: 168px; height: 168px; border-radius: 50%; overflow: hidden; margin-bottom: 10px; display: grid; place-items: center; background: #072F1E; box-shadow: 0 0 0 5px #FFFFFF, 0 0 0 7px var(--ca), 0 18px 34px -16px rgba(0,0,0,.6); }
-.cert-face img { width: 100%; height: 100%; object-fit: cover; }
-.cert-face span { font-family: var(--display); font-size: 56px; color: #CFF93A; }
-.cert-name { font-family: var(--display); font-size: 24px; color: #0F2E22; }
-.cert-title { font-size: 15px; color: #3F4A3E; }
-.cert-side .cert-actions { width: min(360px, 100%); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-.cert-side .cert-btn { padding: 12px 14px; font-size: 14px; box-shadow: 0 6px 16px -10px rgba(0,0,0,.6); }
-.cert-side .cert-wide { grid-column: 1 / -1; }
 .cert-photo { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; }
 .cert-photo-pick { position: relative; cursor: pointer; }
 .cert-photo-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
@@ -25076,6 +25266,147 @@ html[data-theme="light"] .app .abtn.is-locked[disabled] {
 .cert-photo-pick:focus-within span { outline: 3px solid var(--ca); outline-offset: 2px; }
 .cert-photo-note { margin: 4px 0 0; font-size: 12.5px; color: #5C6A5A; }
 @media (max-width: 820px) { .cert-row { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---- beyond one organisation: industry, national, the top individual tipper (12 Oct 2026) ---- */
+.cert-beyond { margin-top: 22px; padding-top: 20px; border-top: 1px solid rgba(15,46,34,.1); }
+.cert-beyond-h { margin: 0 0 12px; font-family: var(--display); font-size: 16px; color: #0F2E22; }
+.cert-beyond-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.cert-beyond-card { display: flex; flex-direction: column; gap: 8px; }
+.cert-beyond-card .cert-hero { padding: 4px; }
+.cert-beyond-t { font-size: 14px; color: #0F2E22; }
+.cert-beyond-s { font-size: 12.5px; color: #5C6A5A; line-height: 1.45; }
+.cert-beyond-card .cert-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
+.cert-beyond-card .cert-btn { padding: 9px 10px; font-size: 12.5px; }
+
+/* ==========================================================================
+   The competition picker, to the client's mock-up (13 Oct 2026, "Champion
+   Certificates 2026 Dashboard"): landscape cards in each competition's own
+   colours, two to a row, the code in a glowing pill, the certificate's own
+   trophy tinted to match, the season's state, and "View Certificate".
+   ========================================================================== */
+.cc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 30px; max-width: 1240px; margin: 34px auto 0; }
+.cc-card {
+  --cc-a: #1E63E0; --cc-b: #0A2A86; --cc-light: #5AB4FF; --cc-hue: 135deg;
+  position: relative; overflow: hidden; isolation: isolate;
+  aspect-ratio: 600 / 365; border-radius: 24px; padding: 5.2% 6.5% 4.6%;
+  display: flex; flex-direction: column; align-items: flex-start;
+  color: #FFFFFF; text-decoration: none;
+  background:
+    linear-gradient(135deg, transparent 52%, rgba(255,255,255,.06) 52%, rgba(255,255,255,.06) 68%, transparent 68%),
+    linear-gradient(150deg, var(--cc-a) 0%, var(--cc-b) 100%);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--cc-light) 55%, transparent),
+              0 26px 50px -26px color-mix(in srgb, var(--cc-b) 85%, #000);
+  transition: transform .22s var(--ease), box-shadow .22s var(--ease);
+}
+.cc-card:hover { transform: translateY(-5px); box-shadow: 0 0 0 2px var(--cc-light), 0 34px 60px -26px color-mix(in srgb, var(--cc-b) 85%, #000); }
+.cc-card[data-code="AFLW"] { --cc-a: #D21E66; --cc-b: #6E0B33; --cc-light: #FF7BB0; --cc-hue: 245deg; }
+.cc-card[data-code="NRL"]  { --cc-a: #146A30; --cc-b: #06331A; --cc-light: #7BE35A; --cc-hue: 0deg; }
+.cc-card[data-code="NRLW"] { --cc-a: #7B4BE0; --cc-b: #3A1C8C; --cc-light: #B79BFF; --cc-hue: 160deg; }
+.cc-ball { position: absolute; left: 44%; bottom: -14%; width: 30%; color: #FFFFFF; opacity: .2; transform: rotate(-18deg); z-index: 0; }
+.cc-trophy {
+  position: absolute; right: 6%; top: 15%; width: 27%; height: auto; z-index: 0;
+  filter: hue-rotate(var(--cc-hue)) saturate(1.15) drop-shadow(0 0 18px color-mix(in srgb, var(--cc-light) 55%, transparent));
+}
+.cc-card[data-code="NRLW"] .cc-trophy,
+.cc-card[data-code="AFLW"] .cc-trophy { filter: hue-rotate(var(--cc-hue)) saturate(.9) brightness(1.1) drop-shadow(0 0 18px color-mix(in srgb, var(--cc-light) 55%, transparent)); }
+.cc-chip {
+  position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 12px;
+  padding: 9px 24px 9px 14px; border-radius: 999px;
+  background: color-mix(in srgb, var(--cc-light) 32%, var(--cc-a));
+  border: 2px solid color-mix(in srgb, var(--cc-light) 70%, #FFFFFF);
+  box-shadow: 0 0 22px -4px var(--cc-light);
+  font-family: var(--display); font-size: clamp(15px, 1.7vw, 21px); letter-spacing: .02em;
+}
+.cc-chip svg { width: 30px; height: 30px; color: var(--cc-b); }
+.cc-card h2 {
+  position: relative; z-index: 2; margin: 4.5% 0 0; max-width: 68%;
+  font-family: var(--display); font-size: clamp(18px, 2.35vw, 31px); line-height: 1.14; color: #FFFFFF;
+  text-shadow: 0 2px 10px rgba(0,0,0,.25);
+}
+.cc-nw { white-space: nowrap; }
+.cc-foot {
+  position: relative; z-index: 2; margin-top: auto; width: 100%;
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+}
+.cc-state {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 9px 20px 9px 14px; border-radius: 999px;
+  background: rgba(0,0,0,.32); border: 1.5px solid color-mix(in srgb, var(--cc-light) 45%, transparent);
+  font-size: clamp(12px, 1.25vw, 16px); font-weight: 700;
+}
+.cc-state svg { width: 22px; height: 22px; flex: none; }
+.cc-go {
+  flex: none; display: inline-flex; align-items: center; gap: 18px;
+  font-size: clamp(13px, 1.3vw, 17px); font-weight: 800;
+}
+.cc-go i {
+  width: clamp(40px, 4.2vw, 54px); aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center;
+  background: #C6F04A; color: #0F2E22; box-shadow: 0 8px 18px -8px rgba(0,0,0,.55);
+  transition: transform .2s var(--ease);
+}
+.cc-go svg { width: 46%; height: 46%; }
+.cc-card:hover .cc-go i { transform: translateX(4px); }
+@media (max-width: 760px) { .cc-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; } }
+
+/* The heading over the picker, to the same mock-up: the wordmark, the
+   organisation and season large and dark, "CHAMPION CERTIFICATES" spaced out
+   in lime between two rules. */
+.cert-page .page-sheet .cc-head .cert-mark { font-size: clamp(26px, 2.8vw, 34px); margin-bottom: 6px; }
+.cert-page .page-sheet .cc-head .cert-mark span { color: #8DD62F; }
+.cert-page .page-sheet .app-head.is-orgfirst.cc-head .app-eyebrow { font-size: clamp(30px, 4.4vw, 54px); color: #0B2E1C; letter-spacing: -.02em; }
+.cert-page .page-sheet .app-head.is-orgfirst.cc-head .app-h1 {
+  display: flex; align-items: center; justify-content: center; gap: 28px; margin-top: 14px;
+  font-family: var(--body); font-weight: 700; font-size: clamp(13px, 1.4vw, 17px); letter-spacing: .42em; color: #8DD62F;
+}
+.cert-page .page-sheet .app-head.is-orgfirst.cc-head .app-h1::before,
+.cert-page .page-sheet .app-head.is-orgfirst.cc-head .app-h1::after { content: ""; width: clamp(40px, 9vw, 118px); height: 2px; background: #B6E84A; }
+.cert-page .page-sheet .app-head.cc-head .app-sub { color: #4A5E52; font-size: 16px; line-height: 1.75; margin-top: 14px; }
+
+/* ---- the competition's own page: the certificate, full size, one download control ---- */
+.certdet-card { max-width: 1180px; margin: 0 auto 14px; }
+.certdet-img { display: block; width: 100%; height: auto; border-radius: 12px; box-shadow: 0 30px 60px -32px rgba(0,0,0,.55); }
+.certdet-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 16px auto 0; max-width: 1180px; justify-content: center; }
+/* The download menu (client, 13 Oct 2026: "not quite visible — a better
+   dropdown"): a white card under the button, one row per format with its
+   badge, name and what it's for. */
+.certdet-actions .dl-panel {
+  left: 50%; right: auto; transform: translateX(-50%); top: calc(100% + 12px);
+  min-width: 300px; padding: 8px; border-radius: 16px;
+  background: #FFFFFF; border: 1px solid rgba(15,46,34,.12);
+  box-shadow: 0 28px 60px -22px rgba(7,47,30,.45), 0 4px 14px -6px rgba(7,47,30,.2);
+}
+.certdet-actions .dl-panel::before {
+  content: ""; position: absolute; top: -7px; left: 50%; width: 14px; height: 14px;
+  background: #FFFFFF; border-left: 1px solid rgba(15,46,34,.12); border-top: 1px solid rgba(15,46,34,.12);
+  transform: translateX(-50%) rotate(45deg);
+}
+.dl-head { display: block; padding: 6px 10px 8px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #5C6A5A; }
+.certdet-actions .dl-panel a { flex-direction: row; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; }
+.certdet-actions .dl-panel a:hover { background: #F1F7E6; }
+.dl-ic { flex: none; width: 42px; height: 42px; border-radius: 10px; display: grid; place-items: center; font-size: 11px; font-weight: 900; letter-spacing: .04em; color: #FFFFFF; }
+.dl-ic.is-pdf { background: #C8372D; }
+.dl-ic.is-png { background: #2A7337; }
+.dl-txt { display: flex; flex-direction: column; gap: 2px; text-align: left; }
+.certdet-actions .dl-panel a b { font-size: 14.5px; font-weight: 800; color: #0F2E22; }
+.certdet-actions .dl-panel a i { font-style: normal; font-size: 12.5px; color: #5C6A5A; }
+.certdet-actions .an-menu-btn { padding: 12px 22px; border-radius: 999px; background: #072F1E; color: #CFF93A; opacity: 1; font-weight: 800; }
+.certdet-actions .an-menu-btn:hover,
+.certdet-actions .an-menu-btn[aria-expanded="true"] { background: #2A7337; color: #FFFFFF; }
+.certdet-photo { display: flex; align-items: center; gap: 8px; }
+.certdet-note { text-align: center; font-size: 12.5px; color: var(--muted); max-width: 1180px; margin: 10px auto 0; }
+.certdet-co { text-align: center; font-size: 13.5px; font-weight: 700; color: var(--muted); margin: 0 0 14px; }
+
+/* The certificate pages sit on a white sheet (client, 13 Oct 2026: "the
+   centre part has to be white"), so the header reads dark-on-white there. */
+.cert-page .page-sheet { background: #FFFFFF; border-color: rgba(15,46,34,.08); }
+.cert-page .page-sheet .app-head.is-orgfirst .app-eyebrow { color: #0F2E22; }
+.cert-page .page-sheet .app-head.is-orgfirst .app-h1 { color: #2A7337; }
+.cert-page .page-sheet .app-head .app-sub { color: #4A5649; opacity: 1; }
+.cert-page .page-sheet .cert-mark { color: #0F2E22; }
+.cert-page .page-sheet .cert-mark span { color: #2A7337; }
+.cert-page .page-sheet .abtn-ghost { background: #FFFFFF; color: #0F2E22; border-color: rgba(15,46,34,.22); }
+.cert-page .page-sheet .abtn-ghost:hover { color: #2A7337; border-color: #2A7337; }
+
 /* the team ladder: places moved since the previous round (4 Oct 2026) */
 /* a small white pill, so the arrow reads on the green and the light theme alike */
 .lad-move { display: inline-block; margin-left: 6px; padding: 1px 5px; border-radius: 6px; font-style: normal; font-size: 11px; font-weight: 900; line-height: 1.4; background: #FFFFFF; color: #4A5649; vertical-align: middle; }
@@ -25148,3 +25479,1079 @@ html[data-theme="light"] .app .abtn.is-locked[disabled] {
 .hiw-ladder-head h3 { margin: 0; font-family: var(--display); font-size: clamp(20px, 2vw, 26px); color: var(--deep); }
 .hiw-ladder-head .eyebrow { text-align: center; max-width: none; margin-left: auto; margin-right: auto; }
 .hiw-ladder-head h3 { text-align: center; }
+
+/* ---------- 6 Oct 2026 (client): home "How it works" cards in purple, blue
+   and red — the same three the How It Works page's ladder cards use — before
+   and while they turn (the panel each one opens takes the same colour). Only
+   the home section (#how); other .hw pages keep their own. ---------- */
+#how.hw .s1 { --hw-bg: #6B34B8; --hw-ink: #FFFFFF; --hw-line: #E4D4FF; }
+#how.hw .s2 { --hw-bg: #1F6FD1; --hw-ink: #FFFFFF; --hw-line: #DCEBFF; }
+#how.hw .s3 { --hw-bg: #D63A2F; --hw-ink: #FFFFFF; --hw-line: #FFE1DD; }
+#how.hw .step-icon { background: #FFFFFF; }
+/* .step-flow .step.sN (the pale sage/mint/stone tints) outranks the
+   section.hw paint, so the colours never reached these cards; say it here. */
+#how.hw .step-flow .hw-card { background: var(--hw-bg); color: var(--hw-ink); border-left-color: var(--hw-line); }
+#how.hw .step-flow .hw-card .step-num { color: var(--hw-line); }
+
+/* ---------- 6 Oct 2026 (client): the centred form, bigger, and its dropdowns
+   spacious — "the drop down looks squeezed". A form's menu may now be wider
+   and taller than its button (gt-ui.js reads --ddx-min-w / --ddx-max-h when it
+   lifts the menu out), so the pair of half-width dropdowns open into a full,
+   readable list instead of a 250px sliver. ---------- */
+[data-form-shell].ff-active.ff-centered { width: min(720px, 94vw); max-height: 92vh; }
+[data-form-shell].ff-active .tmw-form { gap: 22px; }
+[data-form-shell].ff-active .tmw-rows { gap: 18px; }
+[data-form-shell].ff-active .tmw-pair { gap: 16px; }
+[data-form-shell].ff-active .tmw-lab { font-size: 13px; }
+[data-form-shell].ff-active .tmw-field input,
+[data-form-shell].ff-active .tmw-field select,
+[data-form-shell].ff-active input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+[data-form-shell].ff-active textarea { font-size: 16px; padding: 15px 17px; }
+[data-form-shell].ff-active .tmw-submit { font-size: 16px; padding: 17px 24px; }
+
+[data-form-shell] .ddx-btn { padding: 14px 17px; font-size: 15.5px; border-radius: 13px; min-height: 52px; }
+[data-form-shell].ff-active .ddx-btn { padding: 15px 18px; font-size: 16px; }
+[data-form-shell] .ddx-chev { width: 22px; height: 22px; border-radius: 7px; padding: 3px; }
+[data-form-shell] .ddx-menu {
+  --ddx-min-w: 340px; --ddx-max-h: 420px;
+  min-width: 100%; max-height: var(--ddx-max-h);
+  padding: 10px; border-radius: 18px;
+  background: #FFFFFF; border: 1px solid rgba(15,46,34,.10);
+  box-shadow: 0 34px 70px -28px rgba(7,18,12,.55), 0 6px 18px -10px rgba(15,46,34,.3);
+}
+[data-form-shell] .ddx-menu::before {
+  content: ""; display: block; height: 4px; margin: -10px -10px 8px; border-radius: 18px 18px 0 0;
+  background: linear-gradient(90deg, var(--lime), var(--green) 55%, var(--lime));
+}
+[data-form-shell] .ddx-opt {
+  position: relative; padding: 14px 16px 14px 20px; margin: 2px 0;
+  font-size: 15px; font-weight: 600; line-height: 1.3; border-radius: 11px;
+  white-space: normal; transition: background .14s var(--ease), color .14s var(--ease), padding-left .18s var(--ease);
+}
+[data-form-shell] .ddx-opt + .ddx-opt { box-shadow: 0 -1px 0 rgba(15,46,34,.06); }
+[data-form-shell] .ddx-opt::before {
+  content: ""; position: absolute; left: 7px; top: 50%; width: 4px; height: 0; border-radius: 4px;
+  background: var(--forest); transform: translateY(-50%); transition: height .18s var(--ease);
+}
+[data-form-shell] .ddx-opt:hover, [data-form-shell] .ddx-opt:focus-visible { outline: none;  background: rgba(45,122,58,.08); color: var(--forest); padding-left: 24px; }
+[data-form-shell] .ddx-opt:hover::before, [data-form-shell] .ddx-opt:focus-visible::before { height: 22px; }
+[data-form-shell] .ddx-opt.on { background: linear-gradient(90deg, rgba(200,241,53,.42), rgba(200,241,53,.14)); color: var(--deep); font-weight: 700; }
+[data-form-shell] .ddx-opt.on::before { height: 22px; background: var(--deep); }
+[data-form-shell] .ddx-opt.on::after {
+  content: "✓"; display: grid; place-items: center; flex: none;
+  width: 24px; height: 24px; border-radius: 50%; font-size: 13px;
+  background: var(--deep); color: var(--lime);
+}
+/* Options arrive one after another as the menu opens. */
+@keyframes ddxOptIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+[data-form-shell] .ddx.open .ddx-opt { animation: ddxOptIn .26s var(--ease) both; }
+[data-form-shell] .ddx.open .ddx-opt:nth-child(2) { animation-delay: .03s; }
+[data-form-shell] .ddx.open .ddx-opt:nth-child(3) { animation-delay: .06s; }
+[data-form-shell] .ddx.open .ddx-opt:nth-child(4) { animation-delay: .09s; }
+[data-form-shell] .ddx.open .ddx-opt:nth-child(5) { animation-delay: .12s; }
+[data-form-shell] .ddx.open .ddx-opt:nth-child(6) { animation-delay: .15s; }
+[data-form-shell] .ddx.open .ddx-opt:nth-child(n+7) { animation-delay: .18s; }
+
+/* ---------- 6 Oct 2026, round 2 (client): "the drop down let it big as well,
+   and give it a nice design that I can scroll in", and "the second form that
+   is green, its text can not be seen". Bigger options in a list about five
+   and a half rows tall, so a longer list visibly scrolls (the half row says
+   "there is more"), with a lime scrollbar that is always on show rather than
+   the hairline the OS hides. ---------- */
+[data-form-shell] .ddx-menu {
+  --ddx-min-w: 420px; --ddx-max-h: 340px;
+  padding: 10px 8px 10px 10px;
+  scrollbar-width: thin; scrollbar-color: var(--forest) rgba(15,46,34,.08);
+  overscroll-behavior: contain; scroll-behavior: smooth;
+}
+[data-form-shell] .ddx-menu::-webkit-scrollbar { width: 10px; }
+[data-form-shell] .ddx-menu::-webkit-scrollbar-track { background: rgba(15,46,34,.06); border-radius: 100px; margin: 14px 0; }
+[data-form-shell] .ddx-menu::-webkit-scrollbar-thumb { background: linear-gradient(180deg, var(--lime), var(--forest)); border-radius: 100px; border: 2px solid #FFFFFF; }
+[data-form-shell] .ddx-opt { padding: 16px 18px 16px 22px; font-size: 16px; min-height: 54px; color: var(--ink); }
+[data-form-shell] .ddx-opt:hover, [data-form-shell] .ddx-opt:focus-visible { padding-left: 26px; }
+
+/* The green "Get in touch" form: a deep-green menu with white words, so the
+   list belongs to the form it opened from (cream text on the white menu was
+   all but invisible). */
+#contact-form .ddx-menu {
+  background: #0B3B26; border-color: rgba(200,241,53,.28);
+  box-shadow: 0 34px 70px -24px rgba(0,0,0,.75), 0 0 0 1px rgba(200,241,53,.08);
+  scrollbar-color: var(--lime) rgba(255,255,255,.08);
+}
+#contact-form .ddx-menu::-webkit-scrollbar-track { background: rgba(255,255,255,.07); }
+#contact-form .ddx-menu::-webkit-scrollbar-thumb { background: var(--lime); border-color: #0B3B26; }
+#contact-form .ddx-opt { color: #FFFFFF; }
+#contact-form .ddx-opt + .ddx-opt { box-shadow: 0 -1px 0 rgba(255,255,255,.08); }
+#contact-form .ddx-opt::before { background: var(--lime); }
+#contact-form .ddx-opt:hover, #contact-form .ddx-opt:focus-visible { background: rgba(200,241,53,.12); color: var(--lime); }
+#contact-form .ddx-opt.on { background: linear-gradient(90deg, rgba(200,241,53,.30), rgba(200,241,53,.10)); color: #FFFFFF; }
+#contact-form .ddx-opt.on::before { background: var(--lime); }
+#contact-form .ddx-opt.on::after { background: var(--lime); color: var(--deep); }
+
+/* Its fields: labels and typed text that can actually be read on the green. */
+#contact-form .field label { color: rgba(255,255,255,.86); }
+#contact-form .field input, #contact-form .field textarea, #contact-form .ddx-btn {
+  background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.28); color: #FFFFFF;
+}
+#contact-form .field input:hover, #contact-form .field textarea:hover, #contact-form .ddx-btn:hover { border-color: rgba(200,241,53,.6); }
+#contact-form .field input:focus, #contact-form .field textarea:focus, #contact-form .ddx.open .ddx-btn {
+  background: rgba(255,255,255,.13); border-color: var(--lime); box-shadow: 0 0 0 3px rgba(200,241,53,.22);
+}
+#contact-form .ddx-val, #contact-form .ddx-val.is-placeholder { color: #FFFFFF; }
+#contact-form .ddx-chev { background: rgba(200,241,53,.18); color: var(--lime); }
+#contact-form .ddx.open .ddx-chev { background: var(--lime); color: var(--deep); }
+
+/* The centred form lets its dropdown out. A menu inside a form shell cannot be
+   lifted to position:fixed (gt-ui.js explains: the shell's centring transform
+   makes "fixed" relative to the shell), so with the shell's overflow:auto the
+   open menu was cut off at the form's edge and as narrow as its button. The
+   shell shows its overflow instead — a form that fits needs no scroll — and
+   only a screen too short for the form keeps the scroll. */
+[data-form-shell].ff-active.ff-centered { overflow: visible; }
+@media (max-height: 760px) { [data-form-shell].ff-active.ff-centered { overflow: auto; } }
+.tmw-card.ff-active::before { border-radius: 20px 20px 0 0; }
+[data-form-shell] .ddx-menu { min-width: max(100%, min(var(--ddx-min-w), calc(100vw - 32px))); right: auto; }
+/* The right-hand dropdown of a pair opens leftwards, so it stays on the card. */
+[data-form-shell] .tmw-pair > :last-child .ddx-menu:not(.is-fixed) { left: auto; right: 0; }
+
+/* ---------- /charities/ (6 Oct 2026): the Charity Vote in three cards, in the
+   home page's purple, blue and red. Same .role-card object as the How It
+   Works page's roles, three across instead of two. ---------- */
+.ch-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 34px; }
+@media (max-width: 900px) { .ch-steps { grid-template-columns: 1fr; } }
+.chv .role-card { color: #FFFFFF; border-color: rgba(255,255,255,.14); }
+.chv .ch-s1 { background: #6B34B8; }
+.chv .ch-s2 { background: #1F6FD1; }
+.chv .ch-s3 { background: #D63A2F; }
+.chv .role-card h3, .chv .role-card p { color: #FFFFFF; }
+.chv .role-card p { opacity: .92; }
+.chv .role-tag { color: #FFFFFF; background: rgba(255,255,255,.16); }
+.chv .role-ic { background: #FFFFFF; }
+.chv .ch-s1 .role-ic .cic { stroke: #6B34B8; }
+.chv .ch-s2 .role-ic .cic { stroke: #1F6FD1; }
+.chv .ch-s3 .role-ic .cic { stroke: #D63A2F; }
+
+/* ---------- /charities/ The Charity Vote as a show (6 Oct 2026, client: the
+   card "expands, does a 360, then I see the votes being done; the other one
+   will not do a 360 but another style, and showcase what it's talking
+   about"). gt-how.js turns each card into its panel — spin, flap, zoom — and
+   gt-charity-demo.js plays the step inside. Panels take the cards' colours. ---------- */
+.chv .s1 { --hw-bg: #6B34B8; --hw-ink: #FFFFFF; --hw-line: #E4D4FF; }
+.chv .s2 { --hw-bg: #1F6FD1; --hw-ink: #FFFFFF; --hw-line: #DCEBFF; }
+.chv .s3 { --hw-bg: #D63A2F; --hw-ink: #FFFFFF; --hw-line: #FFE1DD; }
+.chv .ch-steps { margin-top: 30px; }
+.chv .hw-copy .role-tag { align-self: flex-start; }
+.chv .hw-copy h3, .chv .hw-copy p { color: #FFFFFF; }
+.chv .hw-media { background: rgba(0,0,0,.2); }
+.chv .hw-on .hw-card:focus-visible, .chv.hw-on .hw-card:focus-visible { outline-color: var(--lime); }
+
+.hw-demo { position: absolute; inset: 0; display: grid; place-items: center; padding: 22px; overflow: hidden; }
+.dm-app { position: relative; width: min(470px, 100%); background: #FFFFFF; color: var(--ink); border-radius: 18px; padding: 18px 20px 20px; box-shadow: 0 30px 60px -24px rgba(0,0,0,.6); }
+.dm-top { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid rgba(15,46,34,.1); font-size: 15px; }
+.dm-top b { font-family: var(--display); font-size: 17px; color: var(--deep); }
+.dm-meta { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--muted); }
+.dm-meta b { font-family: var(--body); font-size: 13px; color: var(--forest); }
+.dm-live { width: 10px; height: 10px; border-radius: 50%; background: #E0352B; box-shadow: 0 0 0 4px rgba(224,53,43,.18); animation: dmBlink 1.4s ease-in-out infinite; }
+.dm-eg { position: absolute; top: 14px; right: 14px; font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.75); }
+
+/* 1 — the vote */
+.dm-opts { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.dm-opts li { display: grid; grid-template-columns: 96px 1fr 28px; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 11px; transition: background .4s var(--ease), opacity .4s var(--ease), transform .4s var(--ease); }
+.dm-name { font-weight: 700; font-size: 14px; color: var(--ink); }
+.dm-track { height: 10px; border-radius: 10px; background: rgba(15,46,34,.08); overflow: hidden; }
+.dm-track i { display: block; height: 100%; width: var(--w); border-radius: 10px; background: linear-gradient(90deg, #6B34B8, #9B6BE0); }
+.dm-opts li b { text-align: right; font-size: 14px; color: var(--deep); }
+.dm-voters { display: flex; gap: 6px; margin-top: 14px; }
+.dm-voters i { font-style: normal; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #EFE7FB; color: #4A2287; font-size: 11px; font-weight: 800; }
+.dm-voters i:last-child { width: auto; padding: 0 10px; border-radius: 100px; background: #6B34B8; color: #FFFFFF; }
+.dm-stamp { position: absolute; right: 18px; bottom: 16px; padding: 8px 16px; border-radius: 10px; border: 3px solid #17703C; color: #17703C; background: #FFFFFF; font-family: var(--display); font-size: 16px; text-transform: uppercase; letter-spacing: .04em; transform: rotate(-6deg); }
+.dm-vote .dm-win { background: rgba(200,241,53,.28); }
+
+/* 2 — the round and the total */
+.dm-games { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 8px; }
+.dm-games li { display: grid; grid-template-columns: 1fr 28px 1fr; align-items: center; gap: 6px; }
+.dm-team { text-align: center; padding: 9px 8px; border-radius: 10px; border: 1.5px solid rgba(15,46,34,.12); font-weight: 700; font-size: 14px; color: var(--ink); background: #FAFBF8; }
+.dm-team.dm-pick { background: #1F6FD1; border-color: #1F6FD1; color: #FFFFFF; }
+.dm-vs { text-align: center; font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; }
+.dm-total { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; padding: 12px 14px; border-radius: 14px; background: var(--deep); color: #FFFFFF; }
+.dm-total span { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.8); }
+.dm-total b { grid-row: span 2; font-family: var(--display); font-size: 30px; color: var(--lime); }
+.dm-up { font-style: normal; font-size: 12px; font-weight: 800; color: var(--lime); }
+
+/* 3 — the report and the donation */
+.dm-rows { margin: 0; display: grid; gap: 8px; }
+.dm-rows div { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 12px; border-radius: 10px; background: #FBF4F3; }
+.dm-rows dt { font-size: 13px; font-weight: 700; color: var(--muted); }
+.dm-rows dd { margin: 0; font-family: var(--display); font-size: 17px; color: var(--deep); }
+.dm-rows div:first-child dd { font-size: 24px; color: #B42A20; }
+.dm-gift .dm-app { padding-bottom: 72px; }
+.dm-gift .dm-stamp { right: 50%; bottom: 16px; transform: translateX(50%) rotate(-4deg); }
+.dm-confetti { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+.dm-confetti i { position: absolute; top: -12px; width: 9px; height: 14px; border-radius: 2px; background: var(--lime); }
+.dm-confetti i:nth-child(3n+1) { background: #FFFFFF; }
+.dm-confetti i:nth-child(3n+2) { background: #FFB25C; }
+.dm-confetti i:nth-child(1) { left: 6%; --cd: .0s; } .dm-confetti i:nth-child(2) { left: 14%; --cd: .25s; }
+.dm-confetti i:nth-child(3) { left: 22%; --cd: .1s; } .dm-confetti i:nth-child(4) { left: 31%; --cd: .4s; }
+.dm-confetti i:nth-child(5) { left: 40%; --cd: .15s; } .dm-confetti i:nth-child(6) { left: 49%; --cd: .35s; }
+.dm-confetti i:nth-child(7) { left: 58%; --cd: .05s; } .dm-confetti i:nth-child(8) { left: 66%; --cd: .3s; }
+.dm-confetti i:nth-child(9) { left: 74%; --cd: .2s; } .dm-confetti i:nth-child(10) { left: 82%; --cd: .45s; }
+.dm-confetti i:nth-child(11) { left: 89%; --cd: .12s; } .dm-confetti i:nth-child(12) { left: 95%; --cd: .38s; }
+
+/* The show. Written out finished (above) for no-JS and small screens; inside
+   a running section each demo starts from its first frame and plays a step
+   at a time. */
+.hw-on .hw-demo:not(.go) .dm-app > * { opacity: 0; }
+.hw-on .dm-vote:not([data-step="result"]) .dm-stamp,
+.hw-on .dm-gift:not([data-step="sent"]) .dm-stamp { opacity: 0; }
+.hw-on .dm-vote:not([data-step="result"]) .dm-win { background: transparent; }
+.hw-on .dm-tips:not([data-step="total"]) .dm-up { opacity: 0; }
+
+.dm-vote.go[data-step="ballot"] .dm-opts li { animation: dmIn .5s var(--ease) var(--d) both; }
+.dm-vote.go[data-step="ballot"] .dm-track i { animation: dmGrow 3.4s cubic-bezier(.3,.7,.2,1) var(--d) both; }
+.dm-vote.go[data-step="ballot"] .dm-voters i { animation: dmPop .45s cubic-bezier(.3,1.6,.5,1) var(--d) both; }
+.dm-vote.go[data-step="result"] .dm-win { transform: scale(1.03); box-shadow: 0 10px 22px -14px rgba(15,46,34,.6); }
+.dm-vote.go[data-step="result"] .dm-opts li:not(.dm-win) { opacity: .45; }
+.dm-vote.go[data-step="result"] .dm-stamp { animation: dmStamp .55s cubic-bezier(.3,1.5,.5,1) .15s both; }
+.dm-gift.go[data-step="sent"] .dm-stamp { animation: dmStampC .55s cubic-bezier(.3,1.5,.5,1) .15s both; }
+
+.dm-tips.go[data-step="tips"] .dm-games li { animation: dmIn .45s var(--ease) calc(var(--d) - .25s) both; }
+.dm-tips.go[data-step="tips"] .dm-pick { animation: dmPick .4s var(--ease) calc(var(--d) + .35s) both; }
+.dm-tips.go[data-step="total"] .dm-total { animation: dmPulse 1.2s var(--ease) .2s both; }
+.dm-tips.go[data-step="total"] .dm-up { animation: dmIn .4s var(--ease) .3s both; }
+
+.dm-gift.go[data-step="report"] .dm-rows div { animation: dmIn .5s var(--ease) var(--d) both; }
+.dm-gift.go[data-step="sent"] .dm-confetti { opacity: 1; }
+.dm-gift.go[data-step="sent"] .dm-confetti i { animation: dmFall 2.6s cubic-bezier(.3,.6,.4,1) var(--cd) both; }
+
+@keyframes dmIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes dmGrow { from { width: 0; } to { width: var(--w); } }
+@keyframes dmPop { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: none; } }
+@keyframes dmStamp { from { opacity: 0; transform: rotate(-6deg) scale(2.2); } to { opacity: 1; transform: rotate(-6deg) scale(1); } }
+@keyframes dmPick { from { background: #FAFBF8; border-color: rgba(15,46,34,.12); color: var(--ink); transform: scale(1); } 60% { transform: scale(1.08); } to { background: #1F6FD1; border-color: #1F6FD1; color: #FFFFFF; transform: scale(1); } }
+@keyframes dmPulse { 0% { transform: scale(1); } 30% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(200,241,53,.35); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(200,241,53,0); } }
+@keyframes dmFall { from { transform: translateY(0) rotate(0); opacity: 1; } to { transform: translateY(420px) rotate(540deg); opacity: 0; } }
+@keyframes dmBlink { 50% { opacity: .35; } }
+@keyframes dmStampC { from { opacity: 0; transform: translateX(50%) rotate(-4deg) scale(2.2); } to { opacity: 1; transform: translateX(50%) rotate(-4deg) scale(1); } }
+
+/* The demo card is scaled to the panel it opens in (gt-charity-demo.js sets
+   --dm-s): the panel's height follows the section's, and a card cut off at
+   the bottom hides the very thing it is showing. */
+.dm-app { transform: scale(var(--dm-s, 1)); transform-origin: center center; }
+
+/* ---------- Billing → Plans (client concept, 6 Oct 2026, plan1.jpg) ----------
+   Top: the five plans fanned out as a showcase. Bottom: the pay cards, three
+   slender then two wide on a six-column grid, so both rows end flush. Each
+   plan has one colour, used for its fan card and its pay card's stripe. */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* The wide two lay out sideways: name and price on the left, what's in it on the right. */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ---------- Plans, round 2 (client, 6 Oct 2026): "make the cards at the
+   bottom have matching colours with the top" and the top ones "in a 3D vibe,
+   more sharp". One palette for both rows — deep enough that white words on
+   it read (green and orange went darker for that) — and the fan cards become
+   slabs: a solid edge built from stacked shadows on each card's outer side,
+   a gloss across the face, tighter corners, a deeper perspective. ---------- */
+
+/* the fan, as slabs */
+
+
+
+/* the gloss: a hard-edged sheen across the top, the way light sits on a slab */
+
+
+
+
+
+/* the pay cards, in the same colours */
+
+
+
+
+
+
+
+
+
+
+
+/* ---------- Plans: the test-mode switch (6 Oct 2026; test keys only) ---------- */
+.pl-test { max-width: 1080px; margin: 4px auto 18px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; padding: 12px 18px; border-radius: 14px; border: 1.5px dashed rgba(255,255,255,.28); background: rgba(255,255,255,.05); transition: background .25s var(--ease), border-color .25s var(--ease); }
+.pl-test.on { border-style: solid; border-color: #FFC53D; background: rgba(255,197,61,.12); }
+.pl-test-switch { display: inline-flex; align-items: center; gap: 12px; cursor: pointer; color: #FFFFFF; }
+.pl-test-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.pl-test-track { position: relative; flex: none; width: 46px; height: 26px; border-radius: 100px; background: rgba(255,255,255,.22); transition: background .2s var(--ease); }
+.pl-test-track i { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 2px 6px rgba(0,0,0,.35); transition: transform .2s var(--ease); }
+.pl-test-switch input:checked + .pl-test-track { background: #FFC53D; }
+.pl-test-switch input:checked + .pl-test-track i { transform: translateX(20px); }
+.pl-test-switch input:focus-visible + .pl-test-track { outline: 3px solid var(--lime); outline-offset: 3px; }
+.pl-test-label b { font-size: 15px; }
+.pl-test-label span { font-size: 13px; color: rgba(255,255,255,.85); margin-left: 6px; }
+.pl-test-help { margin: 0; font-size: 13px; color: rgba(255,255,255,.85); }
+
+
+
+/* ---------- Plans, round 3 (Ian, 7 Oct 2026): "the green, red and all the
+   colours too strong — dim them a little". The same five hues, muted, still
+   deep enough for white words. Scoped to the plans page's own cards: the
+   unscoped [data-plan] palette before this also reached the public pricing
+   table's rows (tr[data-plan]) and overrode their colours. ---------- */
+
+
+
+
+
+
+
+
+/* ---------- Plans, round 4 (client, 8 Oct 2026): "do some crazy design ...
+   colours not too bright that blend with the green background". One accent
+   per plan, chosen to sit on deep green — coral, sky, lime, lavender, amber —
+   and used only as light: a glow, a hairline, the ticks. Every surface is
+   smoked glass, so the page's own green is what you see through them. ---------- */
+
+
+
+
+
+
+/* the orbit */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* the pay cards, as glass */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Workplace: a light that travels round its border */
+
+
+
+
+
+/* the orbit, measured: a front card grows ~25% with the perspective, so the
+   stage is tall enough for it and the ring sits in its middle. */
+
+
+
+
+/* the orbit as a coverflow (gt: --p is the card's place, -2 … 2; --ap its distance) */
+
+
+
+
+
+
+/* stacked in depth, the orbit's glass has to be near-solid or the cards
+   behind read through the one in front; and tall enough for its words */
+
+
+
+/* the cards further back are darker, never see-through */
+
+
+/* ---------- Billing → Plans: the plan picker (client, 8 Oct 2026: "redo the
+   whole page with a new design and feel"). One question (team size), one row
+   of plan tabs, one panel for the chosen plan. One palette: deep green
+   surfaces, lime for what matters, nothing else competing. ---------- */
+.plk { max-width: 1060px; margin: 8px auto 0; display: grid; gap: 18px; color: #FFFFFF; }
+/* .plk-pick / .plk-custom-row / .plk-panels used to be .plk's own direct
+   grid-item children, spaced by its gap:18px; wrapped in .plk-switcher now
+   so the three can hide together (client, 12 Oct 2026), so the same grid and
+   gap is repeated one level down to keep the spacing it already had. */
+.plk-switcher { display: grid; gap: 18px; }
+.plk-switcher[hidden] { display: none; }
+.plk-step { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: #CFF93A; color: #072F1E; font-weight: 900; font-size: 14px; }
+.plk-step-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-size: 17px; }
+/* Its own row, centred like the rest of this page — not squeezed into
+   .plk-step-row with a margin-left:auto, which on a narrow sheet pushed it
+   past the edge instead of wrapping (found 11 Oct 2026, live: the buttons
+   existed with correct data but rendered off the visible page entirely). */
+.plk-dirfilter { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin: -4px 0 14px; }
+/* Dark-on-light, not light-on-dark — unlike .plk-tab below, this row sits
+   directly on the page's own white sheet, not a dark panel, so .plk's usual
+   white-on-translucent button colours were nearly invisible here (found
+   11 Oct 2026, live: rgba(255,255,255,.75) text on a 5%-white background,
+   both on white). Matches .plk-step-row b's var(--deep) on this page. */
+.plk-dir-btn { font: inherit; font-size: 13px; font-weight: 700; color: var(--muted); background: #FFFFFF; border: 1px solid rgba(15,46,34,.14);
+  border-radius: 999px; padding: 7px 14px; cursor: pointer; transition: background .2s var(--ease), border-color .2s var(--ease), color .2s var(--ease); }
+.plk-dir-btn:hover { background: rgba(15,46,34,.05); color: var(--deep); }
+.plk-dir-btn.is-on { background: #CFF93A; border-color: #CFF93A; color: #072F1E; }
+/* .plk-tab's own display:flex otherwise beats the UA [hidden] rule, same
+   fix as .bl-tick needed for the ring/tick swap on the success page. */
+.plk-tab[hidden] { display: none; }
+
+/* A CUSTOM PRICE, OUTSIDE THE FIVE — A THIN CARD AMONG THE OTHERS (client,
+   11 and 12 Oct 2026: "even if I've not subscribed to anything I should see
+   it as a package... a small thin card... starts where we have Team and
+   ends in Organisation"). .plk-custom-row shares .plk-tabs' own grid
+   template and gap so the two line up without guessing a pixel width;
+   grid-column: 2 / 5 on the card itself spans Team/Workplace/Organisation
+   exactly. Same card language as .bl-card above it (white, --ac top
+   border), since this is back on the sheet's own backdrop, not the dark
+   picker — just one row tall rather than a full plan card. */
+/* margin:auto on a grid item overrides stretch and shrinks it to content
+   width instead of filling the cell — found 12 Oct 2026, live: the card sat
+   centred and ~230px narrower than .plk-tabs above it rather than lined up
+   with it. No horizontal margin needed anyway: .plk's own single-column grid
+   already stretches a plain block child to its full width, same as
+   .plk-pick and .plk-panels either side of this one. */
+.plk-custom-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 10px 0 22px; }
+/* A wine-red card (client, 12 Oct 2026: "let's have the background as red
+   wine" — a second pass on the first fix, a light tint, which still read as
+   "majority white"). Dark now like the five tabs above it, not the white
+   sheet, so text flips to a light ink; the button stays the lime it already
+   was and was asked to keep. */
+.plk-custom { grid-column: 2 / 5; display: flex; align-items: center; gap: 16px; text-align: left;
+  padding: 14px 20px; border-radius: 16px; background: linear-gradient(165deg, #5C1A28, #3A0F1C);
+  border: 1px solid rgba(255,255,255,.08); border-top: 3px solid var(--ac); box-shadow: 0 18px 40px -30px rgba(0,0,0,.5); }
+.plk-custom-ic { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(255,255,255,.12); color: #FFFFFF; }
+.plk-custom-ic svg { width: 17px; height: 17px; }
+.plk-custom-body { flex: 1; min-width: 0; }
+/* --ac here (billing/plans.html's inline style) is a dark gold/forest tone
+   chosen to sit on white — too low-contrast as text on this now-dark card,
+   so it's lightened rather than used neat. The top border uses it unmixed,
+   where a darker accent is exactly right. */
+.plk-custom-eyebrow { margin: 0; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--ac) 55%, #FFFFFF); }
+.plk-custom-msg { margin: 2px 0 0; font-size: 13.5px; line-height: 1.4; color: rgba(255,255,255,.9); }
+.plk-custom-msg b { color: #FFFFFF; }
+.plk-custom-cta { flex: none; }
+.plk-custom-pill { display: inline-block; padding: 5px 12px; border-radius: 999px; font-size: 11.5px; font-weight: 800;
+  letter-spacing: .04em; text-transform: uppercase; background: rgba(255,255,255,.14); color: #FFFFFF; }
+/* A real button, not muted text (client, 12 Oct 2026: "the button is not
+   quite clearly seen... I've struggled to see it"). Lime, like every other
+   call to action on this page, so it reads as something to press rather
+   than as a caption under the plan cards. */
+.plk-custom-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; font-weight: 700; white-space: nowrap;
+  color: #072F1E; background: #CFF93A; border: 0; border-radius: 999px; padding: 10px 16px; cursor: pointer;
+  box-shadow: 0 10px 22px -12px rgba(207,249,58,.7); transition: transform .15s var(--ease), box-shadow .15s var(--ease); }
+.plk-custom-btn:hover { transform: translateY(-1px); box-shadow: 0 14px 26px -12px rgba(207,249,58,.8); }
+/* Decline, quieter than Subscribe — a way out of the offer, not a second
+   call to action competing with it (client, 12 Oct 2026: "either accept it
+   or reject it"). */
+.plk-custom-reject { display: block; margin: 6px auto 0; font: inherit; font-size: 11.5px; font-weight: 700;
+  color: rgba(255,255,255,.55); background: none; border: 0; cursor: pointer; text-decoration: underline; text-align: center; }
+.plk-custom-reject:hover { color: rgba(255,255,255,.85); }
+.plk-custom-form { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.plk-custom-form textarea { width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(15,46,34,.14);
+  font: inherit; font-size: 14px; resize: vertical; color: var(--deep); }
+@media (max-width: 760px) {
+  .plk-custom-row { grid-template-columns: 1fr; }
+  .plk-custom { grid-column: 1; flex-wrap: wrap; }
+}
+
+/* THE POPUP ITSELF (client, 12 Oct 2026: "a nice pop-up... they can enter
+   their why they want a custom whatever"). Same overlay-and-panel shape as
+   gt-confirm.js's dialog, drawn separately rather than reused — that one is
+   built around a single yes/no question and a form with a textarea does not
+   fit its markup, but the look should read as the same kind of thing. */
+.plk-cmodal { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 20px; }
+.plk-cmodal-scrim { position: absolute; inset: 0; background: rgba(7,30,20,.55); backdrop-filter: blur(2px); }
+.plk-cmodal-panel { position: relative; width: 100%; max-width: 480px; background: #FFFFFF; border-radius: 20px; padding: 28px 26px 24px;
+  box-shadow: 0 40px 80px -30px rgba(0,0,0,.5); text-align: left; }
+.plk-cmodal-panel h2 { margin: 0 0 8px; font-family: var(--display); font-size: 21px; color: var(--deep); }
+.plk-cmodal-panel p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.plk-cmodal-x { position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border: 0; border-radius: 50%;
+  background: rgba(15,46,34,.06); color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer; }
+.plk-cmodal-x:hover { background: rgba(15,46,34,.1); color: var(--deep); }
+
+/* 1 — team size */
+.plk-size { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; align-items: center; gap: 18px 28px;
+  padding: 22px 26px; border-radius: 22px; background: linear-gradient(160deg, rgba(255,255,255,.07), rgba(255,255,255,.02)); border: 1px solid rgba(255,255,255,.1); }
+.plk-size-q { display: flex; gap: 12px; align-items: flex-start; }
+.plk-size-q b { display: block; font-size: 17px; }
+.plk-size-q div span { display: block; font-size: 13px; color: rgba(255,255,255,.7); margin-top: 3px; }
+.plk-size-n { display: block; font-size: 14px; color: rgba(255,255,255,.75); margin-bottom: 8px; }
+.plk-size-n b { font-family: var(--display); font-size: 30px; color: #FFFFFF; margin-right: 4px; }
+.plk-size-ctl input[type="range"] { --fill: 50%; -webkit-appearance: none; appearance: none; width: 100%; height: 8px; border-radius: 8px; outline: none; cursor: pointer;
+  background: linear-gradient(90deg, #CFF93A var(--fill), rgba(255,255,255,.14) var(--fill)); }
+.plk-size-ctl input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: #FFFFFF; border: 5px solid #CFF93A; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+.plk-size-ctl input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #FFFFFF; border: 5px solid #CFF93A; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+.plk-size-ctl input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(207,249,58,.35); }
+.plk-size-scale { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; font-weight: 700; color: rgba(255,255,255,.55); }
+.plk-rec { margin: 0; padding: 10px 16px; border-radius: 14px; background: rgba(207,249,58,.12); border: 1px solid rgba(207,249,58,.35); font-size: 13px; color: rgba(255,255,255,.85); white-space: nowrap; }
+.plk-rec b { display: block; font-family: var(--display); font-size: 20px; color: #CFF93A; }
+
+/* 2 — the plan tabs */
+.plk-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.plk-tab { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 16px 16px 14px; border-radius: 16px; cursor: pointer; text-align: left;
+  font: inherit; color: #FFFFFF; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
+  transition: background .2s var(--ease), border-color .2s var(--ease), transform .2s var(--ease), box-shadow .2s var(--ease); }
+.plk-tab:hover { background: rgba(255,255,255,.09); transform: translateY(-2px); }
+.plk-tab:focus-visible { outline: 3px solid #CFF93A; outline-offset: 3px; }
+.plk-tab-name { font-family: var(--display); font-size: 17px; }
+.plk-tab-price { font-family: var(--display); font-size: 24px; line-height: 1.1; }
+.plk-tab-price small { font-family: var(--body); font-size: 12px; font-weight: 700; opacity: .7; margin-left: 2px; }
+.plk-tab-size { font-size: 12px; color: rgba(255,255,255,.65); }
+.plk-tab-badge { position: absolute; top: 12px; right: 12px; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; background: rgba(207,249,58,.16); color: #CFF93A; }
+.plk-tab-badge.is-current { background: #FFFFFF; color: #072F1E; }
+.plk-fit { display: none; position: absolute; left: 50%; bottom: -11px; transform: translateX(-50%); padding: 2px 10px; border-radius: 999px; background: #072F1E; border: 1px solid #CFF93A; color: #CFF93A; font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; }
+.plk-tab.is-fit .plk-fit { display: block; }
+.plk-tab.on { background: #CFF93A; border-color: #CFF93A; color: #072F1E; box-shadow: 0 16px 34px -18px rgba(207,249,58,.8); transform: translateY(-3px); }
+.plk-tab.on .plk-tab-size { color: rgba(7,47,30,.75); }
+.plk-tab.on .plk-tab-badge { background: #072F1E; color: #CFF93A; }
+.plk-tab.on .plk-tab-badge.is-current { background: #072F1E; color: #FFFFFF; }
+
+/* 3 — the chosen plan */
+.plk-panels { position: relative; }
+.plk-panel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); border-radius: 26px; overflow: hidden; margin-bottom: 16px;
+  background: linear-gradient(160deg, #0F3C29 0%, #082A1C 100%); border: 1px solid rgba(207,249,58,.18);
+  box-shadow: 0 40px 80px -40px rgba(0,0,0,.9); }
+.plk-js .plk-panel { display: none; margin-bottom: 0; }
+.plk-js .plk-panel.on { display: grid; }
+
+
+
+
+@keyframes ppIn { from { opacity: 0; transform: translateY(12px); } }
+.plk-main { position: relative; padding: clamp(26px, 3.4vw, 44px); display: flex; flex-direction: column; align-items: flex-start;
+  background: radial-gradient(120% 80% at 0% 0%, rgba(207,249,58,.12), transparent 60%); }
+.plk-tags { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; }
+.plk-tag { padding: 4px 11px; border-radius: 999px; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; background: #CFF93A; color: #072F1E; }
+.plk-tag.is-soft { background: rgba(255,255,255,.1); color: #FFFFFF; }
+.plk-tag.is-current { background: #FFFFFF; color: #072F1E; }
+.plk-name { font-family: var(--display); font-size: clamp(30px, 3.4vw, 44px); line-height: 1; margin: 16px 0 8px; color: #FFFFFF; }
+.plk-for { font-size: 15px; color: rgba(255,255,255,.75); margin: 0; }
+.plk-price { display: flex; align-items: baseline; gap: 8px; margin: 22px 0 4px; }
+.plk-price b { font-family: var(--display); font-size: clamp(54px, 6vw, 76px); line-height: .95; color: #FFFFFF; }
+.plk-price span { font-size: 16px; font-weight: 700; color: #CFF93A; }
+.plk-was { margin: 4px 0 0; font-size: 13px; color: rgba(255,255,255,.75); }
+.plk-was s { margin-right: 4px; }
+.plk-pay { width: 100%; margin-top: auto; padding-top: 26px; display: grid; gap: 8px; }
+.plk-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 18px 22px; border: 0; border-radius: 16px; cursor: pointer;
+  background: #CFF93A; color: #072F1E; font-family: var(--display); font-size: 18px; letter-spacing: .02em;
+  box-shadow: 0 18px 34px -16px rgba(207,249,58,.7); transition: transform .15s var(--ease), box-shadow .15s var(--ease), filter .15s var(--ease); }
+.plk-btn span { transition: transform .2s var(--ease); }
+.plk-btn:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.04); box-shadow: 0 24px 40px -16px rgba(207,249,58,.8); }
+.plk-btn:hover:not(:disabled) span { transform: translateX(4px); }
+.plk-btn:focus-visible { outline: 3px solid #FFFFFF; outline-offset: 3px; }
+.plk-btn:disabled { cursor: default; background: rgba(255,255,255,.12); color: #FFFFFF; box-shadow: none; }
+.plk-when { text-align: center; font-size: 12.5px; color: rgba(255,255,255,.7); }
+.plk.is-test .plk-btn:not(:disabled) { background: #FFC53D; box-shadow: 0 18px 34px -16px rgba(255,197,61,.7); }
+
+
+
+
+.plk-feats li::before { content: "✓"; position: absolute; left: 0; top: -1px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: #CFF93A; color: #072F1E; font-size: 12px; font-weight: 900; }
+
+
+
+.plk-note { margin: 18px 0 0; font-size: 13px; color: rgba(255,255,255,.65); }
+.plk .pl-test { margin: 0; max-width: none; }
+
+@media (max-width: 900px) {
+  .plk-size { grid-template-columns: 1fr; }
+  .plk-rec { white-space: normal; }
+  .plk-tabs { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 2px 16px; }
+  .plk-tab { flex: 0 0 150px; scroll-snap-align: start; }
+  .plk-panel, .plk-js .plk-panel.on { grid-template-columns: 1fr; }
+  
+}
+
+/* the tab's badge sits centred on its top edge (client, 10 Oct 2026: it was
+   "a little bit on the right corner", wanted centred over the price). */
+.plk-tab-badge { top: -10px; left: 50%; right: auto; transform: translateX(-50%); box-shadow: 0 4px 10px -4px rgba(0,0,0,.6); }
+.plk-tab-badge:not(.is-current) { background: #0F3C29; border: 1px solid rgba(207,249,58,.45); }
+.plk-tab.on .plk-tab-badge:not(.is-current) { background: #072F1E; border-color: #072F1E; }
+
+/* ---------- Plan picker, refined (client, 9 Oct 2026: "more elegant ...
+   different shades of colours that blend well with green"). Each plan takes
+   one shade from the green family — mint, aqua, lime, soft gold, pearl —
+   and that shade runs through its tab and its panel: the glow, the ticks,
+   the price's unit and its Pay button. Selected tabs glow in their own shade
+   instead of every one turning lime. ---------- */
+.plk-tab:nth-child(1), .plk-panel:nth-child(1) { --ac: #86E3B8; --ac-deep: #12402F; }
+.plk-tab:nth-child(2), .plk-panel:nth-child(2) { --ac: #7CCFE0; --ac-deep: #103B3E; }
+.plk-tab:nth-child(3), .plk-panel:nth-child(3) { --ac: #CFF93A; --ac-deep: #1F3E14; }
+.plk-tab:nth-child(4), .plk-panel:nth-child(4) { --ac: #E9CF7C; --ac-deep: #3A3A1A; }
+.plk-tab:nth-child(5), .plk-panel:nth-child(5) { --ac: #DCE9E2; --ac-deep: #22362D; }
+
+/* the tabs: tinted glass cards */
+.plk-tabs { gap: 12px; }
+.plk-tab { padding: 18px 18px 16px; border-radius: 18px; gap: 4px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--ac) 12%, #0C3123), #082A1C 85%);
+  border: 1px solid color-mix(in srgb, var(--ac) 22%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 14px 26px -22px rgba(0,0,0,.9); }
+.plk-tab:hover { background: linear-gradient(160deg, color-mix(in srgb, var(--ac) 18%, #0C3123), #082A1C 85%); border-color: color-mix(in srgb, var(--ac) 45%, transparent); transform: translateY(-3px); }
+.plk-tab-dot { width: 26px; height: 3px; border-radius: 3px; background: var(--ac); opacity: .8; margin-bottom: 8px; }
+.plk-tab-name { font-size: 16px; color: #FFFFFF; }
+.plk-tab-price { color: #FFFFFF; }
+.plk-tab-price small { color: var(--ac); opacity: 1; }
+.plk-tab-size { color: rgba(255,255,255,.62); }
+.plk-tab.on { color: #FFFFFF; transform: translateY(-4px);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--ac) 30%, #0C3123), color-mix(in srgb, var(--ac) 8%, #082A1C) 90%);
+  border-color: var(--ac);
+  box-shadow: 0 0 0 1px var(--ac), 0 22px 40px -22px color-mix(in srgb, var(--ac) 80%, transparent), inset 0 1px 0 rgba(255,255,255,.14); }
+.plk-tab.on .plk-tab-name { color: var(--ac); }
+.plk-tab.on .plk-tab-size { color: rgba(255,255,255,.78); }
+.plk-tab.on .plk-tab-dot { width: 40px; opacity: 1; box-shadow: 0 0 10px var(--ac); }
+.plk-tab-badge:not(.is-current), .plk-tab.on .plk-tab-badge:not(.is-current) { background: #0B2E20; color: var(--ac); border: 1px solid color-mix(in srgb, var(--ac) 55%, transparent); }
+.plk-fit { border-color: var(--ac); color: var(--ac); background: #0B2E20; }
+
+/* the panel, in its plan's shade */
+.plk-panel { border-radius: 28px; border: 1px solid color-mix(in srgb, var(--ac) 30%, transparent);
+  background:
+    radial-gradient(70% 90% at 0% 0%, color-mix(in srgb, var(--ac) 16%, transparent), transparent 60%),
+    radial-gradient(60% 70% at 100% 100%, color-mix(in srgb, var(--ac) 7%, transparent), transparent 65%),
+    linear-gradient(160deg, #0F3C29 0%, #072619 100%);
+  box-shadow: 0 50px 90px -46px rgba(0,0,0,.95), inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 6px color-mix(in srgb, var(--ac) 5%, transparent); }
+.plk-main { background: none; overflow: hidden; }
+
+
+.plk-tag { background: var(--ac); color: #072F1E; }
+.plk-tag.is-soft { background: color-mix(in srgb, var(--ac) 14%, transparent); color: var(--ac); border: 1px solid color-mix(in srgb, var(--ac) 35%, transparent); }
+.plk-name { letter-spacing: -.01em; }
+.plk-price b { display: inline-flex; align-items: flex-start; letter-spacing: -.02em; }
+.plk-price b sup { font-size: .42em; line-height: 1; margin: .14em .06em 0 0; color: var(--ac); }
+.plk-price span { color: var(--ac); }
+.plk-btn { background: var(--ac); color: #072F1E; border-radius: 999px; padding: 18px 26px;
+  box-shadow: 0 18px 34px -16px color-mix(in srgb, var(--ac) 75%, transparent), inset 0 -3px 0 rgba(0,0,0,.1); }
+.plk-btn:hover:not(:disabled) { box-shadow: 0 26px 44px -16px color-mix(in srgb, var(--ac) 85%, transparent); }
+.plk.is-test .plk-btn:not(:disabled) { background: #FFC53D; }
+
+
+.plk-feats li { padding-left: 34px; }
+.plk-feats li::before { background: color-mix(in srgb, var(--ac) 18%, transparent); color: var(--ac); border: 1px solid color-mix(in srgb, var(--ac) 50%, transparent); }
+
+
+/* the size question, quieter, so the plans are the stage */
+.plk-size { border-radius: 24px; background: linear-gradient(160deg, rgba(255,255,255,.055), rgba(255,255,255,.015)); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
+
+/* the plan number sits up in the panel's corner, clear of the price and button */
+
+
+/* ---------- Plan cards, in their own colours (client, 9 Oct 2026: "the
+   background is green, why then have the cards be green"). Each plan takes a
+   hue of its own — coral, sky, amber, lavender, rose — on a deep surface
+   tinted with that same hue, so a card reads as its own object against the
+   page's green instead of disappearing into it. Muted and dark enough that
+   five of them sit together without shouting. ---------- */
+.plk-tab:nth-child(1), .plk-panel:nth-child(1) { --ac: #F0A58C; --sf: #30201A; --sf2: #1D1310; }  /* coral    */
+.plk-tab:nth-child(2), .plk-panel:nth-child(2) { --ac: #8FBEEC; --sf: #182838; --sf2: #0E1824; }  /* sky      */
+.plk-tab:nth-child(3), .plk-panel:nth-child(3) { --ac: #F3C25C; --sf: #332715; --sf2: #1F180C; }  /* amber    */
+.plk-tab:nth-child(4), .plk-panel:nth-child(4) { --ac: #B9A2EC; --sf: #251D3A; --sf2: #161027; }  /* lavender */
+.plk-tab:nth-child(5), .plk-panel:nth-child(5) { --ac: #EFA0BA; --sf: #321B26; --sf2: #1E1018; }  /* rose     */
+
+.plk-tab { background: linear-gradient(165deg, var(--sf), var(--sf2)); border-color: color-mix(in srgb, var(--ac) 26%, transparent); }
+.plk-tab:hover { background: linear-gradient(165deg, color-mix(in srgb, var(--ac) 12%, var(--sf)), var(--sf2)); border-color: color-mix(in srgb, var(--ac) 55%, transparent); }
+.plk-tab.on { background: linear-gradient(165deg, color-mix(in srgb, var(--ac) 22%, var(--sf)), var(--sf) 90%);
+  box-shadow: 0 0 0 1px var(--ac), 0 22px 42px -22px color-mix(in srgb, var(--ac) 75%, transparent), inset 0 1px 0 rgba(255,255,255,.12); }
+.plk-tab-badge:not(.is-current), .plk-tab.on .plk-tab-badge:not(.is-current), .plk-fit { background: var(--sf2); color: var(--ac); border: 1px solid color-mix(in srgb, var(--ac) 55%, transparent); }
+
+.plk-panel { border-color: color-mix(in srgb, var(--ac) 32%, transparent);
+  background:
+    radial-gradient(75% 95% at 0% 0%, color-mix(in srgb, var(--ac) 14%, transparent), transparent 62%),
+    linear-gradient(155deg, var(--sf) 0%, var(--sf2) 100%);
+  box-shadow: 0 50px 90px -46px rgba(0,0,0,.95), inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 6px color-mix(in srgb, var(--ac) 5%, transparent); }
+.plk-feats { margin: 22px 0 0; gap: 10px; }
+.plk-feats li { font-size: 14.5px; }
+.plk-note { margin: 12px 0 0; font-size: 12.5px; }
+
+/* the showcase: what this plan buys, playing */
+.plk-show { position: relative; margin: clamp(18px, 2vw, 26px); border-radius: 20px; overflow: hidden;
+  background: var(--sf2); border: 1px solid color-mix(in srgb, var(--ac) 28%, transparent);
+  box-shadow: 0 24px 50px -28px rgba(0,0,0,.9), inset 0 0 0 1px rgba(255,255,255,.04); }
+.plk-shot { position: absolute; inset: 0; margin: 0; opacity: 0; transition: opacity .7s var(--ease); }
+.plk-shot:first-child { position: relative; }
+.plk-shot.on { opacity: 1; }
+.plk-shot img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* the plan's colour washed over the frame, so the five showcases differ too */
+.plk-show::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ac) 12%, transparent) 0%, transparent 32%, rgba(0,0,0,.1) 62%, rgba(0,0,0,.72) 100%); }
+.plk-show-foot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; }
+.plk-cap { font-size: 13.5px; font-weight: 700; color: #FFFFFF; text-shadow: 0 2px 8px rgba(0,0,0,.8); }
+.plk-dots { display: flex; gap: 7px; }
+.plk-dots i { width: 22px; height: 5px; border-radius: 4px; background: rgba(255,255,255,.35); cursor: pointer; transition: width .3s var(--ease), background .3s var(--ease); }
+.plk-dots i.on { width: 34px; background: var(--ac); }
+@media (max-width: 900px) { .plk-show { min-height: 260px; } }
+/* the feature list (it shared its rule with the list the showcase replaced) */
+.plk-feats { list-style: none; padding: 0; display: grid; }
+.plk-feats li { position: relative; padding-left: 32px; line-height: 1.4; color: rgba(255,255,255,.92); }
+.plk-feats li::before { content: "✓"; position: absolute; left: 0; top: -1px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 900; }
+/* the showcase fills its half of the panel, whatever the plan's wording needs */
+.plk-show { min-height: 360px; }
+.plk-shot, .plk-shot:first-child { position: absolute; inset: 0; }
+/* product screenshots: framed just right of centre-left. Dead centre cuts
+   the app's headings off both edges; hard left fills a third of the frame
+   with the page backdrop the app is sitting on. */
+.plk-shot img { object-position: 28% center; }
+
+/* ---------- Plan cards in the competition colours (client, 9 Oct 2026: "let
+   it be the colours we have used in the competition"). The four are the ones
+   the certificates and the comp chips already use — AFL blue, AFLW rose, NRL
+   orange, NRLW purple (tipping.certificates.ACCENTS) — lightened for text on
+   a dark card, over a surface tinted with the same hue. The fifth plan has no
+   competition of its own, so it takes platinum: the same treatment, no new
+   colour. ---------- */
+.plk-tab:nth-child(1), .plk-panel:nth-child(1) { --ac: #8FBEEC; --sf: #16293F; --sf2: #0D1A2A; }  /* AFL blue    */
+.plk-tab:nth-child(2), .plk-panel:nth-child(2) { --ac: #F09BBC; --sf: #351A28; --sf2: #210F19; }  /* AFLW rose   */
+.plk-tab:nth-child(3), .plk-panel:nth-child(3) { --ac: #F0B96A; --sf: #37260F; --sf2: #221709; }  /* NRL orange  */
+.plk-tab:nth-child(4), .plk-panel:nth-child(4) { --ac: #BCA2EE; --sf: #271D40; --sf2: #181128; }  /* NRLW purple */
+.plk-tab:nth-child(5), .plk-panel:nth-child(5) { --ac: #D4DEEA; --sf: #212B36; --sf2: #141A22; }  /* platinum    */
+
+/* The pictures drift as they show, so a still panel still feels alive. */
+.plk-shot.on img { animation: plkDrift 5.6s ease-out both; }
+@keyframes plkDrift { from { transform: scale(1.05); } to { transform: scale(1); } }
+
+/* ---------- Plans on a white sheet (client, 9 Oct 2026: "let the background
+   be white instead of green"). The page around it keeps the deep green and
+   its side scenes; the sheet the plans sit on turns white, so the five
+   competition-coloured cards read as objects laid on paper. Only the chrome
+   outside the cards flips to dark type — the cards are already dark and
+   stay exactly as they are. ---------- */
+.page-plans .page-sheet {
+  background: #FFFFFF;
+  border: 1px solid rgba(15,46,34,.08);
+  box-shadow: 0 50px 100px -40px rgba(0,0,0,.55);
+}
+.page-plans .page-sheet .app-h1 { color: var(--deep); }
+.page-plans .page-sheet .app-eyebrow { color: var(--forest); }
+.page-plans .page-sheet .app-sub { color: var(--muted); }
+.page-plans .page-sheet .app-sub a { color: var(--forest); }
+.plk { color: var(--ink); }
+
+/* 1 — the size question */
+.page-plans .plk-size { background: #F4F7F3; border-color: rgba(15,46,34,.1); box-shadow: inset 0 1px 0 #FFFFFF; }
+.page-plans .plk-size-q b, .page-plans .plk-size-n b, .page-plans .plk-step-row b { color: var(--deep); }
+.page-plans .plk-size-q div span, .page-plans .plk-size-n, .page-plans .plk-size-scale { color: var(--muted); }
+.page-plans .plk-size-ctl input[type="range"] { background: linear-gradient(90deg, var(--forest) var(--fill), rgba(15,46,34,.14) var(--fill)); }
+.page-plans .plk-size-ctl input[type="range"]::-webkit-slider-thumb { border-color: var(--forest); box-shadow: 0 3px 10px rgba(15,46,34,.35); }
+.page-plans .plk-size-ctl input[type="range"]::-moz-range-thumb { border-color: var(--forest); box-shadow: 0 3px 10px rgba(15,46,34,.35); }
+.page-plans .plk-rec { background: rgba(42,115,55,.08); border-color: rgba(42,115,55,.28); color: var(--muted); }
+.page-plans .plk-rec b { color: var(--forest); }
+
+/* test mode, on paper */
+.page-plans .pl-test { background: rgba(15,46,34,.03); border-color: rgba(15,46,34,.2); }
+.page-plans .pl-test.on { background: rgba(255,197,61,.14); border-color: #D99A00; }
+.page-plans .pl-test-switch { color: var(--deep); }
+.page-plans .pl-test-track { background: rgba(15,46,34,.18); }
+.page-plans .pl-test-label span, .page-plans .pl-test-help { color: var(--muted); }
+
+/* 2 — the tabs sit on paper now, so their focus ring has to show on it */
+.page-plans .plk-tab:focus-visible { outline-color: var(--forest); }
+
+/* notices on the white sheet read as paper, not as the dark page's cards */
+.page-plans .flash {
+  background: #F4F7F3; border: 1px solid rgba(15,46,34,.12); color: var(--ink);
+  box-shadow: none;
+}
+.page-plans .flash a { color: var(--forest); }
+.page-plans .flash.success { --flash-accent: #2A7337; }
+.page-plans .flash.error   { --flash-accent: #B23434; }
+.page-plans .flash.info    { --flash-accent: #2E6E7A; }
+.page-plans .flash .flash-ic { color: var(--flash-accent); background: color-mix(in srgb, var(--flash-accent) 14%, transparent); }
+.page-plans .flash-close:hover { background: rgba(15,46,34,.08); }
+/* The page title is painted by `.app.page-deep .app-head.is-orgfirst ...`,
+   which outranks the sheet rules above — so the white sheet has to say it at
+   that weight or the organisation's name stays white on white. */
+.app.page-deep.page-plans .app-head.is-orgfirst .app-eyebrow { color: var(--deep); }
+.app.page-deep.page-plans .app-head.is-orgfirst .app-h1 { color: var(--forest); }
+
+/* ---------- Plan picker, laid out again (client, 9 Oct 2026). The question
+   is asked above its control and centred, so the box under it is a thin
+   strip. "Choose your plan" is centred too. The plan panel becomes a hero
+   split: half the words, half a photograph, both the same height. ---------- */
+.plk-ask { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 12px; margin: 2px 0 12px; text-align: center; }
+.plk-ask b { font-size: 19px; color: var(--deep); }
+.plk-ask > span:last-child { font-size: 14px; color: var(--muted); }
+
+/* the strip: number, slider, the plan it lands on */
+.plk-size { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px 22px; padding: 12px 20px; border-radius: 16px; }
+.plk-size-n { margin: 0; white-space: nowrap; }
+.plk-size-n b { font-size: 24px; }
+.plk-size-ctl { min-width: 0; }
+.plk-size-scale { margin-top: 5px; font-size: 10.5px; }
+.plk-rec { display: flex; align-items: baseline; gap: 8px; padding: 7px 14px; border-radius: 999px; font-size: 12.5px; }
+.plk-rec b { display: inline; font-size: 15px; }
+
+.plk-step-row { justify-content: center; margin-bottom: 14px; }
+
+/* the tabs carry more weight now that they share the page with one panel */
+.plk-tab { min-height: 132px; justify-content: center; padding: 20px 18px; }
+
+/* the panel as a hero split: equal halves, the photograph reaching the edge */
+.plk-panel { grid-template-columns: 1fr 1fr; }
+.plk-show { margin: 0; min-height: 440px; border: 0; border-radius: 0 26px 26px 0; box-shadow: none; }
+.plk-show::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(90deg, var(--sf) 0%, transparent 22%); }
+.plk-shot img { object-position: center center; }
+.plk-main { justify-content: center; }
+@media (max-width: 900px) {
+  .plk-size { grid-template-columns: 1fr; }
+  .plk-rec { justify-content: center; }
+  .plk-show { border-radius: 0 0 26px 26px; min-height: 280px; }
+  .plk-show::before { background: linear-gradient(180deg, var(--sf) 0%, transparent 18%); }
+}
+
+/* ---------- Plan picker, balanced (client, 9 Oct 2026). The question stands
+   on its own line with the organisation's count under it. The five plan
+   cards grow — they were too slight against the panel below — and the panel
+   gives that height back by tightening, so the pair reads as a quarter and
+   three quarters rather than a sliver and a slab. ---------- */
+.plk-ask { flex-direction: column; gap: 4px; margin: 4px 0 14px; }
+.plk-ask p { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 0; }
+.plk-ask b { font-size: 21px; }
+
+/* the five cards, taller */
+.plk-tab { min-height: 172px; padding: 24px 20px; }
+.plk-tab-dot { margin-bottom: 12px; }
+.plk-tab-name { font-size: 17px; }
+.plk-tab-price { font-size: 27px; }
+
+/* the panel gives the height back */
+.plk-main { padding: clamp(22px, 2.6vw, 34px); }
+.plk-detail, .plk-show { min-height: 0; }
+.plk-name { font-size: clamp(28px, 3vw, 38px); margin: 12px 0 6px; }
+.plk-price { margin: 16px 0 2px; }
+.plk-price b { font-size: clamp(46px, 5vw, 62px); }
+.plk-feats { margin-top: 18px; gap: 8px; }
+.plk-feats li { font-size: 14px; }
+.plk-note { margin-top: 10px; }
+.plk-pay { padding-top: 18px; }
+.plk-btn { padding: 15px 24px; font-size: 17px; }
+
+/* ---------- Paying, on GoodTip (client, 9 Oct 2026). Stripe's embedded card
+   form sits in our own page; everything here is the frame around it. ---------- */
+
+
+
+
+
+
+
+
+
+
+/* ---------- The size slider wears the plan's colour (client, 9 Oct 2026).
+   On the white sheet the card accents are too pale to be a bar, so each plan
+   also carries the competition's own ink — the colour the certificates and
+   comp chips use — and the slider, its handle and the "best fit" chip take
+   that as the number moves between plans. ---------- */
+.plk-tab:nth-child(1) { --ink-ac: #1F6FD1; }   /* AFL    */
+.plk-tab:nth-child(2) { --ink-ac: #C2306B; }   /* AFLW   */
+.plk-tab:nth-child(3) { --ink-ac: #C9700A; }   /* NRL    */
+.plk-tab:nth-child(4) { --ink-ac: #6B34B8; }   /* NRLW   */
+.plk-tab:nth-child(5) { --ink-ac: #5A6B7A; }   /* slate  */
+
+.page-plans .plk-size { border-color: color-mix(in srgb, var(--fit-ink, var(--forest)) 24%, rgba(15,46,34,.1)); transition: border-color .4s var(--ease); }
+.page-plans .plk-size-ctl input[type="range"] {
+  background: linear-gradient(90deg, var(--fit-ink, var(--forest)) var(--fill), rgba(15,46,34,.14) var(--fill));
+  transition: background-color .4s var(--ease);
+}
+.page-plans .plk-size-ctl input[type="range"]::-webkit-slider-thumb { border-color: var(--fit-ink, var(--forest)); transition: border-color .4s var(--ease); }
+.page-plans .plk-size-ctl input[type="range"]::-moz-range-thumb { border-color: var(--fit-ink, var(--forest)); }
+.page-plans .plk-size-n b { color: var(--fit-ink, var(--deep)); transition: color .4s var(--ease); }
+.page-plans .plk-rec {
+  background: color-mix(in srgb, var(--fit-ink, var(--forest)) 9%, transparent);
+  border-color: color-mix(in srgb, var(--fit-ink, var(--forest)) 32%, transparent);
+  transition: background .4s var(--ease), border-color .4s var(--ease);
+}
+.page-plans .plk-rec b { color: var(--fit-ink, var(--forest)); transition: color .4s var(--ease); }
+
+/* ---------- Paying, on GoodTip (client, 9 Oct 2026). Stripe's embedded card
+   form is as tall as Stripe makes it, so rather than stack our own heading
+   and summary on top of it — "too long going downwards" — they sit beside
+   it in a panel that stays put while the form scrolls. ---------- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* the form's own column: a quiet frame, and a skeleton while Stripe boots */
+
+
+
+
+
+
+
+/* ---------- Paying, on GoodTip. Stripe's Payment Element sits in our own
+   page; everything here is the frame around it, plus the three states
+   GoodTip now draws itself (client, 10 Oct 2026: a loader on Subscribe, a
+   decline animation, a success animation — static/js/gt-pay.js). The
+   two-column layout tried on 9 Oct was reverted the same day ("the new
+   design does not look good"), so this stays the plain single column. ---------- */
+.pay-wrap { max-width: 560px; margin: 0 auto; }
+.pay-plan { display: grid; gap: 4px; text-align: center; margin: 0 0 22px; }
+.pay-plan b { font-family: var(--display); font-size: 26px; color: var(--deep); }
+.pay-plan span { font-size: 16px; font-weight: 700; color: var(--forest); }
+.pay-plan em { font-style: normal; font-size: 13.5px; color: var(--muted); }
+.pay-fallback { padding: 26px; border-radius: 16px; background: rgba(178,52,52,.08); border: 1px solid rgba(178,52,52,.3); color: #9a2b2b; font-size: 14.5px; text-align: center; }
+.pay-back { text-align: center; margin: 22px 0 0; font-size: 14px; }
+.pay-back a { color: var(--forest); font-weight: 700; }
+
+/* the stage: the card form and the three overlays occupy the same box, so
+   neither the form nor an overlay ever shoves the other around the page */
+.pay-stage { position: relative; }
+.pay-el-form { display: grid; gap: 18px; }
+.pay-el { min-height: 220px; }
+
+.pay-btn {
+  width: 100%; padding: 16px 22px; border: 0; border-radius: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: var(--lime); color: var(--deep);
+  font-family: var(--display); font-size: 17px; letter-spacing: .01em;
+  box-shadow: 0 16px 30px -16px rgba(120,160,0,.85), inset 0 -3px 0 rgba(0,0,0,.08);
+  transition: transform .15s var(--ease), box-shadow .15s var(--ease), filter .15s var(--ease), opacity .15s var(--ease);
+}
+.pay-btn:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.04); }
+.pay-btn:focus-visible { outline: 3px solid var(--deep); outline-offset: 3px; }
+.pay-btn:disabled { cursor: default; opacity: .6; }
+.pay-btn-spinner {
+  width: 16px; height: 16px; border-radius: 50%; display: none;
+  border: 2.5px solid rgba(7,46,34,.3); border-top-color: var(--deep);
+}
+.pay-btn:disabled .pay-btn-spinner { display: inline-block; animation: paySpin .8s linear infinite; }
+@keyframes paySpin { to { transform: rotate(360deg); } }
+
+.pay-secure { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-size: 12px; line-height: 1.45; color: var(--muted); }
+.pay-secure .cic { flex: none; width: 15px; height: 15px; margin-top: 1px; stroke: currentColor; stroke-width: 1.8; fill: none; }
+
+/* the three overlays: one box, swapped by [hidden] rather than stacked, so
+   nothing behind a visible one can be tabbed to by accident */
+.pay-overlay {
+  position: absolute; inset: 0; z-index: 4;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  padding: 36px 28px; border-radius: 18px;
+  background: var(--white); border: 1px solid rgba(15,46,34,.08);
+  box-shadow: 0 30px 60px -30px rgba(0,0,0,.35);
+  animation: payOverlayIn .25s var(--ease) both;
+}
+@keyframes payOverlayIn { from { opacity: 0; transform: translateY(6px); } }
+.pay-overlay h2 { font-family: var(--display); font-size: 24px; margin: 4px 0 6px; color: var(--deep); }
+.pay-overlay p { margin: 0; font-size: 14.5px; color: var(--muted); line-height: 1.5; }
+.pay-overlay-label { font-family: var(--mark); font-weight: 800; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--forest); margin-top: 18px; }
+
+/* busy: three coins tossing in sequence — money changing hands, not a spinner */
+.pay-coin { display: flex; gap: 10px; height: 44px; align-items: flex-end; }
+.pay-coin span {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: linear-gradient(155deg, var(--lime), #9FCF1E);
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,.18), 0 6px 14px -6px rgba(0,0,0,.3);
+  animation: payCoinToss 1.1s ease-in-out infinite;
+}
+.pay-coin span:nth-child(2) { animation-delay: .15s; }
+.pay-coin span:nth-child(3) { animation-delay: .3s; }
+@keyframes payCoinToss { 0%, 100% { transform: translateY(0) rotate(0deg); } 35% { transform: translateY(-20px) rotate(180deg); } 70% { transform: translateY(0) rotate(360deg); } }
+
+/* decline: a shaking red badge, then it settles while the countdown runs */
+.pay-badge { width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center; margin-bottom: 14px; }
+.pay-badge.is-bad { background: rgba(178,52,52,.12); color: #B23434; animation: payShake .5s var(--ease); }
+.pay-badge.is-bad svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
+@keyframes payShake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(7px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
+.pay-badge.is-good { background: var(--lime); animation: payPop .4s cubic-bezier(.3,1.6,.5,1); }
+.pay-badge.is-good .cic { width: 30px; height: 30px; stroke: var(--deep); stroke-width: 2.8; }
+@keyframes payPop { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.pay-again { margin-top: 16px !important; font-size: 13.5px !important; }
+.pay-again b { color: var(--ink); }
+.pay-bar { width: 160px; height: 4px; border-radius: 100px; background: rgba(15,46,34,.1); overflow: hidden; margin: 10px auto 0; }
+.pay-bar > i { display: block; height: 100%; width: 0; background: #B23434; transition: width 1s linear; }
+.pay-again-btn { margin-top: 14px; padding: 9px 18px; border-radius: 999px; border: 1px solid rgba(15,46,34,.18); background: transparent; color: var(--ink); font-size: 13px; font-weight: 700; cursor: pointer; transition: background .15s var(--ease); }
+.pay-again-btn:hover { background: rgba(15,46,34,.06); }
+
+/* No reduced-motion rule needed here: the sitewide sweep (goodtip.css, "the
+   reduced motion sweep") already strips animation from anything without an
+   exemption class once a visitor has opted out with ?motion=0 — these are
+   plainly decorative, so none of .pay-coin/.pay-badge/.pay-overlay carry one. */

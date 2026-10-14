@@ -19,9 +19,9 @@ stacking context, so a strip rendered inside it paints over the sheet.
       <form method="post" action="{% url 'profile' %}" enctype="multipart/form-data" id="avatarForm">
         {% csrf_token %}
         <label class="avatar-edit" data-coach="profile-photo" title="Add or update your profile photo">
-          <span class="av-face">{% if user.avatar %}<img src="{{ user.avatar.url }}" alt="Your profile photo">{% else %}{{ user.display_name|slice:":1"|upper }}{% endif %}</span>
+          <span class="av-face" id="avFace">{% if user.avatar %}<img src="{{ user.avatar.url }}" alt="Your profile photo">{% else %}{{ user.display_name|slice:":1"|upper }}{% endif %}</span>
           <span class="av-badge" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
-          <input type="file" name="avatar" accept="image/*" hidden onchange="document.getElementById('avatarForm').submit()">
+          <input type="file" name="avatar" id="avFile" accept="image/*" hidden>
         </label>
       </form>
       {% if user.avatar %}
@@ -137,4 +137,188 @@ stacking context, so a strip rendered inside it paints over the sheet.
   <p class="app-sub" style="margin:0;">You're not in any comps yet. <a href="{% url 'orgs:create' %}" class="flink" style="color:var(--forest);font-weight:700;">Start a league</a>.</p>
   {% endif %}
 </div>
+
+{% comment %}
+THE PHOTO CROPPER (client, 13 Oct 2026: "when I select my image I can move
+the image as it shows me the part that will be cropped... when I press send
+it shows what I have cropped in"). Picking a file used to submit it as-is —
+whatever shape the phone or camera produced, with no say over which part of
+it became the avatar. This stages it instead: drag to pan, pinch/scroll/the
+slider to zoom, inside a square the same shape the avatar is eventually
+cropped to. "Use this photo" draws exactly that square onto a canvas and
+submits THAT, so what was dragged into view is what gets saved — never the
+original file.
+{% endcomment %}
+<div class="avcrop" id="avcropOverlay" hidden>
+  <div class="avcrop-box">
+    <h3>Position your photo</h3>
+    <p class="avcrop-hint">Drag to move it. Scroll, pinch, or use the slider to zoom.</p>
+    <div class="avcrop-stage" id="avcropStage">
+      <img id="avcropImg" alt="" draggable="false">
+      <div class="avcrop-mask" aria-hidden="true"></div>
+    </div>
+    <input type="range" id="avcropZoom" class="avcrop-zoom" min="100" max="320" value="100">
+    <div class="avcrop-actions">
+      <button type="button" class="abtn abtn-ghost" id="avcropCancel">Cancel</button>
+      <button type="button" class="abtn abtn-primary" id="avcropSave">Use this photo</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var fileInput = document.getElementById('avFile');
+  var form = document.getElementById('avatarForm');
+  var overlay = document.getElementById('avcropOverlay');
+  var stage = document.getElementById('avcropStage');
+  var img = document.getElementById('avcropImg');
+  var zoomSlider = document.getElementById('avcropZoom');
+  var saveBtn = document.getElementById('avcropSave');
+  var cancelBtn = document.getElementById('avcropCancel');
+  var avFace = document.getElementById('avFace');
+  if (!fileInput || !overlay) return;
+
+  var OUT = 640;     // the exported photo's own size, in pixels — the crop
+                      // box itself is read live (STAGE()), since it's sized
+                      // in CSS to fit the screen rather than pinned to one px count.
+  function STAGE() { return stage.clientWidth; }
+
+  var nw = 0, nh = 0, baseScale = 1, scale = 1, tx = 0, ty = 0;
+  var objectUrl = null;
+  var pointers = {};     // active pointers, for drag and pinch
+  var dragLast = null;   // {x, y} of the single-pointer drag
+  var pinchDist = null;
+
+  function clamp() {
+    var dw = nw * scale, dh = nh * scale, S = STAGE();
+    tx = Math.min(0, Math.max(S - dw, tx));
+    ty = Math.min(0, Math.max(S - dh, ty));
+  }
+
+  function render() {
+    clamp();
+    img.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
+  }
+
+  function setZoom(pct) {
+    pct = Math.min(320, Math.max(100, pct));
+    zoomSlider.value = pct;
+    // Zoom on the stage's own centre, so the spot under the pointer doesn't
+    // leap away from it as the picture grows.
+    var S = STAGE();
+    var cx = S / 2, cy = S / 2;
+    var ux = (cx - tx) / scale, uy = (cy - ty) / scale;
+    scale = baseScale * (pct / 100);
+    tx = cx - ux * scale;
+    ty = cy - uy * scale;
+    render();
+  }
+
+  function openCropper(file) {
+    objectUrl = URL.createObjectURL(file);
+    // The overlay has to be visible, and laid out, BEFORE the image loads —
+    // STAGE() reads clientWidth, which is 0 on a [hidden] element, and an
+    // onload attached after assigning .src can simply be too late.
+    overlay.hidden = false;
+    img.onload = function () {
+      nw = img.naturalWidth; nh = img.naturalHeight;
+      var S = STAGE();
+      baseScale = Math.max(S / nw, S / nh);
+      scale = baseScale;
+      tx = (S - nw * scale) / 2;
+      ty = (S - nh * scale) / 2;
+      zoomSlider.value = 100;
+      render();
+    };
+    img.onerror = function () {
+      // A format the browser can't decode (HEIC, say) — fall back to
+      // uploading the original file untouched rather than leaving the
+      // cropper open on a picture that will never load.
+      overlay.hidden = true;
+      if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+      form.submit();
+    };
+    img.src = objectUrl;
+  }
+
+  function closeCropper() {
+    overlay.hidden = true;
+    if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+    fileInput.value = '';   // so picking the same file again still fires 'change'
+  }
+
+  fileInput.addEventListener('change', function () {
+    var f = fileInput.files && fileInput.files[0];
+    if (f) openCropper(f);
+  });
+
+  cancelBtn.addEventListener('click', closeCropper);
+
+  zoomSlider.addEventListener('input', function () { setZoom(Number(zoomSlider.value)); });
+
+  stage.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    setZoom(Number(zoomSlider.value) - e.deltaY * 0.2);
+  }, { passive: false });
+
+  stage.addEventListener('pointerdown', function (e) {
+    stage.setPointerCapture(e.pointerId);
+    pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var ids = Object.keys(pointers);
+    if (ids.length === 1) {
+      dragLast = { x: e.clientX, y: e.clientY };
+    } else if (ids.length === 2) {
+      var a = pointers[ids[0]], b = pointers[ids[1]];
+      pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+    }
+  });
+
+  stage.addEventListener('pointermove', function (e) {
+    if (!pointers[e.pointerId]) return;
+    pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var ids = Object.keys(pointers);
+    if (ids.length === 1 && dragLast) {
+      tx += e.clientX - dragLast.x;
+      ty += e.clientY - dragLast.y;
+      dragLast = { x: e.clientX, y: e.clientY };
+      render();
+    } else if (ids.length === 2 && pinchDist) {
+      var a = pointers[ids[0]], b = pointers[ids[1]];
+      var dist = Math.hypot(a.x - b.x, a.y - b.y);
+      setZoom(Number(zoomSlider.value) * (dist / pinchDist));
+      pinchDist = dist;
+    }
+  });
+
+  function endPointer(e) {
+    delete pointers[e.pointerId];
+    var ids = Object.keys(pointers);
+    dragLast = ids.length === 1 ? pointers[ids[0]] : null;
+    pinchDist = null;
+  }
+  stage.addEventListener('pointerup', endPointer);
+  stage.addEventListener('pointercancel', endPointer);
+
+  saveBtn.addEventListener('click', function () {
+    var canvas = document.createElement('canvas');
+    canvas.width = OUT; canvas.height = OUT;
+    var ctx = canvas.getContext('2d');
+    var f = OUT / STAGE();
+    ctx.drawImage(img, 0, 0, nw, nh, tx * f, ty * f, nw * scale * f, nh * scale * f);
+    canvas.toBlob(function (blob) {
+      if (!blob) return;
+      var cropped = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
+      var dt = new DataTransfer();
+      dt.items.add(cropped);
+      fileInput.files = dt.files;
+      // So the small avatar on this same page already shows the crop, not
+      // just the next one after the form round-trips.
+      avFace.innerHTML = '<img src="' + URL.createObjectURL(blob) + '" alt="Your profile photo">';
+      overlay.hidden = true;
+      form.submit();
+    }, 'image/jpeg', 0.92);
+  });
+})();
+</script>
 {% endblock %}
