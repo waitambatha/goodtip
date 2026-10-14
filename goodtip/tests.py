@@ -83,35 +83,74 @@ class HoldingModeTests(TestCase):
         self.assertContains(resp, "tr-hero")
         self.assertContains(resp, 'name="org_type"')
 
-    def test_the_real_pages_send_a_visitor_to_their_showcase(self):
+    def test_the_showcased_pages_still_send_a_visitor_to_their_showcase(self):
         # A shared link or an old bookmark lands on the trailer with that
-        # page's showcase open, not on a password box.
+        # page's showcase open, not on a password box. The blog is the one
+        # exception — see test_the_blog_renders_for_real below.
         for path, slug in (
-            ("/how-it-works/", "how-it-works"), ("/news/", "blog"), ("/news/some-story/", "blog"),
-            ("/wall/", "wall"), ("/about/", "about"), ("/terms/", "terms"), ("/privacy/", "privacy"),
+            ("/how-it-works/", "how-it-works"), ("/wall/", "wall"),
+            ("/about/", "about"), ("/terms/", "terms"), ("/privacy/", "privacy"),
         ):
             with self.subTest(path=path):
                 resp = self.client.get(path)
                 self.assertEqual(resp.status_code, 302)
                 self.assertEqual(resp.url, f"/coming-soon/#{slug}")
 
-    def test_the_menu_and_footer_open_showcases_and_offer_no_login_or_signup(self):
+    def test_the_blog_renders_for_real(self):
+        # The blog is no longer a filmed stand-in (client, 14 Oct 2026: real
+        # access to the blog for marketing) — the actual page renders,
+        # wearing its own stripped nav rather than the showcase or the full
+        # site menu.
+        for path in ("/news/",):
+            with self.subTest(path=path):
+                resp = self.client.get(path)
+                self.assertEqual(resp.status_code, 200)
+                self.assertContains(resp, 'href="/coming-soon/"')
+                self.assertNotContains(resp, "/dashboard/")
+                self.assertNotContains(resp, "/login/")
+                self.assertNotContains(resp, "/signup/")
+
+    def test_the_blog_links_back_to_the_trailer_and_nowhere_else(self):
+        body = self.client.get("/news/").content.decode()
+        nav = body[body.index('<nav class="nav"'):body.index("</nav>")]
+        self.assertIn('href="/coming-soon/"', nav)
+        for other in ("/about/", "/terms/", "/privacy/", "/pricing/", "/how-it-works/", "/wall/"):
+            self.assertNotIn(f'href="{other}"', nav)
+
+    def test_the_menu_and_footer_offer_the_blog_and_still_showcase_the_rest(self):
         body = self.client.get("/").content.decode()
         nav = body[body.index('<nav class="nav"'):body.index("</nav>")]
         self.assertNotIn("/login/", nav)
         self.assertNotIn("/signup/", nav)
         self.assertIn("#join", nav)
         foot = body[body.index('<footer class="footer"'):body.index("</footer>")]
-        for slug in ("how-it-works", "blog", "wall", "about", "terms", "privacy"):
+        for slug in ("how-it-works", "wall", "about", "terms", "privacy"):
             with self.subTest(slug=slug):
                 self.assertIn(f'href="#{slug}"', nav + foot)
                 self.assertContains(self.client.get("/"), f'data-peek="{slug}"')
+        self.assertIn('href="/news/"', nav + foot)
 
-    def test_a_visitor_is_not_offered_the_real_pages_from_a_showcase(self):
+    def test_a_visitor_is_not_offered_the_showcased_pages_as_real_links(self):
         body = self.client.get("/").content.decode()
         self.assertNotIn("Open the live page", body)
-        for href in ("/how-it-works/", "/news/", "/wall/", "/about/", "/terms/", "/privacy/"):
+        for href in ("/how-it-works/", "/wall/", "/about/", "/terms/", "/privacy/"):
             self.assertNotIn(f'href="{href}"', body)
+
+    def test_a_real_story_renders_with_the_stripped_reader_chrome(self):
+        # news_reader.html owns its own <head> and chrome rather than
+        # extending public/base.html (admin_panel.views.news_detail's own
+        # docstring explains why), so it needs its own check that is_holding
+        # actually stripped it — the nav/footer swap in base.html alone
+        # would not have caught a regression here.
+        from admin_panel.models import NewsPost
+
+        NewsPost.objects.create(title="Finals Loom", slug="finals-loom", is_published=True)
+        resp = self.client.get("/news/finals-loom/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'href="/coming-soon/"')
+        self.assertNotContains(resp, "/dashboard/")
+        self.assertNotContains(resp, "Sign up free")
+        self.assertNotContains(resp, "/login/")
 
     def test_everything_else_is_still_gated(self):
         for path in ("/login/", "/signup/", "/dashboard/", "/pricing/", "/media/messages/x.pdf", "/media/news/x.jpg"):
@@ -181,9 +220,15 @@ class HoldingLockdownTests(TestCase):
                 self.assertEqual(resp.url, "/coming-soon/")
 
     def test_the_showcased_pages_still_open_their_showcase(self):
-        for path, slug in (("/news/", "blog"), ("/news/some-story/", "blog"), ("/about/", "about")):
+        for path, slug in (("/how-it-works/", "how-it-works"), ("/about/", "about")):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).url, f"/coming-soon/#{slug}")
+
+    def test_the_blog_renders_under_lockdown_too(self):
+        # Lockdown is "the trailer and nothing else" — but the blog IS
+        # something else, deliberately, same as plain holding mode above
+        # (client, 14 Oct 2026).
+        self.assertEqual(self.client.get("/news/").status_code, 200)
 
     def test_the_gate_password_opens_nothing(self):
         self.unlock()

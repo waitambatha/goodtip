@@ -1,0 +1,18 @@
+{% comment %}
+The footer for the blog when it's shown during lockdown or holding mode — see
+_nav_lockdown_page.html for why this is not _footer_holding.html: that one's
+links open a showcase over the trailer, which only makes sense ON the
+trailer page itself. Here there is just the brand, the one way back, and the
+legal line — no site map, no socials, no other locked page to click into.
+{% endcomment %}
+<footer class="footer">
+  <div class="footer-top">
+    <div class="footer-brand">
+      <a href="{% url 'coming_soon' %}" class="footer-logo wordmark">GOOD<span>TIP</span><span class="dot">.</span></a>
+      <p>Footy tipping, for good.</p>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p class="footer-legal">&copy; 2026 GoodTip Pty Ltd &middot; goodtip.com.au &middot; &ldquo;Good Tip, Mate.&rdquo;<br>Not affiliated with the AFL or NRL.</p>
+  </div>
+</footer>

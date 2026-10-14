@@ -1,8 +1,11 @@
 {% comment %}
 The footer for the holding page. The full footer is the whole site map
-(pricing, charities, firms, ...) and none of that is open yet, so a visitor gets
-the brand, the pages on the menu and the two legal pills. Every one of them
-opens its showcase over the trailer (gt-trailer.js) rather than leaving it.
+(pricing, charities, firms, ...) and none of that is open yet, so a visitor
+gets the brand, the pages on the menu and the two legal pills. How It Works,
+The Wall, About Us, Terms and Privacy still open their showcase over the
+trailer (gt-trailer.js); Blog is a real link now (client, 14 Oct 2026) — see
+_nav_holding.html for why that is enough on its own to stop gt-trailer.js
+intercepting the click.
 {% endcomment %}
 <footer class="footer">
   <div class="footer-top">
@@ -23,7 +26,7 @@ opens its showcase over the trailer (gt-trailer.js) rather than leaving it.
         <h4>Explore</h4>
         <ul>
           <li><a href="#how-it-works">How It Works</a></li>
-          <li><a href="#blog">News &amp; blog</a></li>
+          <li><a href="{% url 'news_index' %}">News &amp; blog</a></li>
           <li><a href="#wall">The Wall</a></li>
           <li><a href="#about">About Us</a></li>
           <li><a href="#join" data-wl-open="join">Join the waiting list</a></li>

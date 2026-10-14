@@ -1,10 +1,16 @@
 {% comment %}
-The bar for the holding page. Its four pages do not leave the trailer: each is
-a hash that opens that page's showcase (a filmed tour of it) over the trailer,
-see gt-trailer.js. Same markup and classes as _nav.html, so the drawer, the
-glyphs and the narrow layouts all come for free; only the list is shorter. The
-product's own Log in and Sign up are not offered: nobody outside the team can
-use either yet. "Sign in" here is the waiting list's, a pop-up with no code.
+The bar for the holding page. How It Works, The Wall and About Us stay a
+hash that opens that page's showcase (a filmed tour of it) over the trailer,
+see gt-trailer.js. Blog is a real link now (client, 14 Oct 2026: real access
+to the blog for marketing) — staging_gate.py's HOLDING_REAL_PAGES lets the
+actual page render, wearing its own stripped nav/footer
+(_nav_lockdown_page.html), rather than opening a video in place. gt-trailer.js's
+click handler only intercepts a[href^="#"], so a real href here simply
+navigates — nothing to wire up on that end. Same markup and classes as
+_nav.html, so the drawer, the glyphs and the narrow layouts all come for
+free; only the list is shorter. The product's own Log in and Sign up are not
+offered: nobody outside the team can use either yet. "Sign in" here is the
+waiting list's, a pop-up with no code.
 {% endcomment %}
 <nav class="nav" data-open="false">
   <div class="nav-inner">
@@ -14,7 +20,7 @@ use either yet. "Sign in" here is the waiting list's, a pop-up with no code.
     </button>
     <ul class="nav-links" id="nav-menu">
       <li><a href="#how-it-works"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-lifebuoy"/></svg><span>How It Works</span></a></li>
-      <li><a href="#blog"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-doc"/></svg><span>Blog</span></a></li>
+      <li><a href="{% url 'news_index' %}"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-doc"/></svg><span>Blog</span></a></li>
       <li><a href="#wall"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-msg"/></svg><span>The Wall</span></a></li>
       <li><a href="#about"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-spark"/></svg><span>About Us</span></a></li>
       <li class="nav-sep" aria-hidden="true"></li>

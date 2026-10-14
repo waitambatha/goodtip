@@ -47,34 +47,48 @@ EXEMPT_PREFIXES = (GATE_PATH, settings.STATIC_URL, "/stripe/webhook/", ROBOTS_PA
 # page itself with its waiting-list form. Everything else still goes to the
 # gate. A visitor WITH access sees the real site as before.
 #
-# The trailer's menu and footer (How It Works, Blog, The Wall, About Us, Terms,
-# Privacy) do not lead to those pages. Each opens a showcase on the trailer
-# page: a filmed tour and stills of the page, so the visitor sees what it is
-# but cannot click around inside it (client, 25 Sep 2026). A visitor who
-# arrives at one of the real addresses (a shared link, an old bookmark, the
-# back button) is sent to its showcase rather than to the password box.
+# The trailer's menu and footer named six pages (How It Works, Blog, The Wall,
+# About Us, Terms, Privacy) that did not lead to those pages at first: each
+# opened a showcase on the trailer page instead, a filmed tour and stills, so
+# the visitor saw what it was but could not click around inside it (client,
+# 25 Sep 2026). A visitor who arrived at one of the real addresses (a shared
+# link, an old bookmark, the back button) was sent to its showcase rather
+# than to the password box.
+#
+# THE BLOG IS REAL NOW (client, 14 Oct 2026) — see HOLDING_REAL_PAGES below.
+# The rest are still a filmed stand-in.
 #
 # Deliberately nothing else is opened: no /media/, no login, signup or
 # dashboard. Message attachments and change-request uploads live under /media/.
 HOLDING_HOME_PATH = "/coming-soon/"
 HOLDING_SHOWCASES = (
     ("/how-it-works/", "how-it-works"),
-    ("/news/", "blog"),
     ("/wall/", "wall"),
     ("/about/", "about"),
     ("/terms/", "terms"),
     ("/privacy/", "privacy"),
 )
 
+# THE REAL PAGE (client, 14 Oct 2026): "we want them to have access to the
+# real blogs... to help with marketing... Ian keeps on posting" — rather than
+# the trailer's filmed stand-in for it. Only the blog, for now; everything
+# else named in HOLDING_SHOWCASES above stays a video. is_holding still reads
+# true for this request (goodtip.context_processors.environment), which is
+# what tells public/base.html and news_reader.html to wear the stripped
+# lockdown nav rather than the site's full menu — the one way out of the real
+# page is back to the trailer, not sideways into login or signup.
+HOLDING_REAL_PAGES = ("/news/",)
+
 # LOCKDOWN (HOLDING_LOCKDOWN=true): the trailer and nothing else, for everyone.
 #
 # Holding mode still lets anyone with the gate password through to the real
 # site. The client wants goodtip.com.au to show the trailer only until launch
-# (25 Sep 2026): a visitor who watches the trailer's tours and then types the
-# addresses they saw (/news, /pricing) must not reach a page, and must not be
-# shown a password box either. So under lockdown the gate cookie opens nothing,
-# /gate/ itself is closed, and every path outside /coming-soon/ is sent to the
-# trailer. The team works on staging, which has no lockdown.
+# (25 Sep 2026): a visitor who watches the trailer's tours and then types an
+# address they saw must not reach a page the client has not opened, and must
+# not be shown a password box either. So under lockdown the gate cookie opens
+# nothing, /gate/ itself is closed, and every path outside /coming-soon/ and
+# HOLDING_REAL_PAGES is sent to the trailer. The team works on staging, which
+# has no lockdown.
 #
 # Static files stay open (the trailer's videos and styles are there), as do
 # robots.txt and the Stripe webhook, which is server-to-server, not a page.
@@ -153,6 +167,12 @@ class StagingGateMiddleware:
             request.path = request.path_info = HOLDING_HOME_PATH
             return self.get_response(request)
         if request.path.startswith(HOLDING_HOME_PATH):
+            return self.get_response(request)
+        # The blog (client, 14 Oct 2026) — let the actual view render.
+        # is_holding_visitor still reads true for this same request, so
+        # public/base.html wears the stripped lockdown nav rather than the
+        # site's full menu; nothing here has to know that to get it right.
+        if request.path.startswith(HOLDING_REAL_PAGES) and request.method in ("GET", "HEAD"):
             return self.get_response(request)
         slug = _showcase_for(request.path)
         if slug and request.method in ("GET", "HEAD"):

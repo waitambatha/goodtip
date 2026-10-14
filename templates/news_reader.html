@@ -70,11 +70,17 @@ gradient over the whole article.
   {% endcomment %}
   <header class="rd-bar">
     <div class="rd-bar-in">
-      <a href="/" class="rd-mark">GOOD<span>TIP</span><span class="dot">.</span></a>
+      <a href="{% if is_holding %}{% url 'coming_soon' %}{% else %}/{% endif %}" class="rd-mark">GOOD<span>TIP</span><span class="dot">.</span></a>
       <a href="{% url 'news_index' %}" class="rd-back">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
         <span>All news &amp; blog</span>
       </a>
+      {% comment %}
+      During lockdown or holding mode this slot is empty — no login, no
+      sign-up, no dashboard, same as everywhere else a holding visitor can
+      reach (client, 14 Oct 2026).
+      {% endcomment %}
+      {% if not is_holding %}
       <div class="rd-bar-end">
         {% if user.is_authenticated %}
         <a href="{% url 'dashboard' %}" class="rd-ghost">Back to my dashboard</a>
@@ -83,6 +89,7 @@ gradient over the whole article.
         <a href="{% url 'accounts:signup' %}" class="rd-cta">Sign up free</a>
         {% endif %}
       </div>
+      {% endif %}
     </div>
   </header>
 
@@ -295,8 +302,10 @@ gradient over the whole article.
   The site's own footer, socials and all — the client asked for it here
   specifically, and it is what makes this feel like a page on a site rather
   than a document that ends. Same include the marketing pages use, so it
-  cannot drift from them.
+  cannot drift from them. During lockdown or holding mode it is the stripped
+  footer instead (client, 14 Oct 2026) — the full site map is exactly the
+  set of other pages a holding visitor must not be able to click into.
   {% endcomment %}
-  {% include "public/partials/_footer.html" %}
+  {% if is_holding %}{% include "public/partials/_footer_lockdown_page.html" %}{% else %}{% include "public/partials/_footer.html" %}{% endif %}
 </body>
 </html>
