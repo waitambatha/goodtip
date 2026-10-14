@@ -1,0 +1,99 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}Pay for {{ sub.get_tier_display }}, {{ org.name }}{% endblock %}
+{% block loader_task %}Opening the payment form{% endblock %}
+{% comment %}
+PAYING, ON GOODTIP (client, 9 Oct 2026: "whatever happens in GoodTip stays in
+GoodTip ... we enter the cards, the card number, the expiry date, the CVC").
+
+Stripe ELEMENTS, not Checkout (client, 10 Oct 2026, the very next thing asked
+for: "when I press subscribe, let me see some kind of loader ... a nice
+animation that says the card has declined ... if it's gone through, a nice
+successful message"). The embedded-Checkout version of this page (9 Oct)
+drew its OWN button and handled every outcome inside its own iframe, with no
+event the parent page could see — there was no hook to put GoodTip's own
+animations on. A Stripe Payment Element, confirmed with
+``stripe.confirmSetup()``, hands the result back as a promise instead, so
+static/js/gt-pay.js owns the whole sequence: a busy overlay while Stripe is
+asked, a decline overlay with a ten-second countdown back to the card form,
+a success overlay that counts down to the billing page.
+
+What this does and does not change about where the card goes:
+  * The organisation stays on goodtip.com.au the whole way through.
+  * The card fields are still Stripe's own, drawn inside their iframe by the
+    Payment Element. A card number never reaches this server and never
+    appears in a request we handle — which is what keeps GoodTip out of a
+    PCI audit it does not need to be in.
+  * The card is only SAVED here (a SetupIntent). The actual Stripe
+    Subscription — same billing_cycle_anchor, same proration rules — is
+    created server-side once the save succeeds (billing.views.pay_confirm_view).
+
+Stripe.js is loaded from js.stripe.com by requirement — it has to be fetched
+live so Stripe can patch it, and self-hosting it voids the PCI exemption
+above. Without it the page shows the fallback below rather than an empty box.
+{% endcomment %}
+{% block body_class %}page-deep sheet-page page-plans{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+{% block extra_head %}<script src="https://js.stripe.com/v3/" defer></script><script src="{% static 'js/gt-pay.js' %}" defer></script>{% endblock %}
+{% block app_content %}
+<div class="app-head is-centred is-orgfirst"><div>
+  <div class="app-eyebrow">{{ org.name }} &middot; billing</div>
+  <h1 class="app-h1">Payment</h1>
+</div></div>
+
+<div class="pay-wrap">
+  <p class="pay-plan">
+    <b>{{ sub.get_tier_display }}</b>
+    <span>${{ sub.price_aud|floatformat:0 }}{% if sub.is_test_daily %} a day &middot; test mode{% else %} a year{% endif %}</span>
+    {% if sub.is_test_daily %}
+    <em>Test money only. Use the card 4242&nbsp;4242&nbsp;4242&nbsp;4242, any future expiry, any CVC.</em>
+    {% elif sub.starts_at %}
+    <em>Your card is saved today. The first payment is taken on {{ sub.starts_at|date:"j F Y" }}.</em>
+    {% endif %}
+  </p>
+
+  <div class="pay-stage" data-pay-stage>
+    <form id="pay-form" class="pay-el-form"
+          data-key="{{ publishable_key }}" data-secret="{{ client_secret }}"
+          data-confirm-url="{{ confirm_url }}" data-success-url="{{ success_url }}"
+          data-csrf="{{ csrf_token }}">
+      <noscript><p class="pay-fallback">Paying needs JavaScript switched on. Turn it on and reload this page.</p></noscript>
+      <div id="payment-element" class="pay-el"></div>
+      <button type="submit" class="pay-btn" data-pay-btn>
+        <span class="pay-btn-spinner" aria-hidden="true"></span>
+        <span class="pay-btn-label">Subscribe to {{ sub.get_tier_display }}</span>
+      </button>
+      <p class="pay-secure">
+        <svg class="cic" aria-hidden="true"><use href="#ic-lock"/></svg>
+        <span>Card details go straight to Stripe. GoodTip never sees your card number.</span>
+      </p>
+    </form>
+
+    {% comment %} Busy: shown the instant Subscribe is pressed, while Stripe is asked. {% endcomment %}
+    <div class="pay-overlay pay-overlay-busy" data-pay-busy hidden aria-hidden="true">
+      <div class="pay-coin" aria-hidden="true"><span></span><span></span><span></span></div>
+      <p class="pay-overlay-label">Processing your payment&hellip;</p>
+    </div>
+
+    {% comment %} Declined: the exact message Stripe gave, a countdown back to the form, a way to skip it. {% endcomment %}
+    <div class="pay-overlay pay-overlay-bad" data-pay-bad hidden aria-hidden="true">
+      <div class="pay-badge is-bad" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></div>
+      <h2>Card declined</h2>
+      <p data-pay-bad-msg>Your card couldn't be used for this payment.</p>
+      <p class="pay-again">Back to your card details in <b data-pay-count>10</b>s&hellip;</p>
+      <div class="pay-bar"><i data-pay-bar></i></div>
+      <button type="button" class="pay-again-btn" data-pay-retry>Try again now</button>
+    </div>
+
+    {% comment %} Success: the subscription is real (confirmed server-side) before this shows. {% endcomment %}
+    <div class="pay-overlay pay-overlay-good" data-pay-good hidden aria-hidden="true">
+      <div class="pay-badge is-good" aria-hidden="true"><svg class="cic"><use href="#ic-check"/></svg></div>
+      <h2>You're subscribed!</h2>
+      <p>{{ org.name }} is on the {{ sub.get_tier_display }} plan.</p>
+      <p class="pay-again">Taking you to billing in <b data-pay-good-count>3</b>s&hellip;</p>
+    </div>
+  </div>
+
+  <p class="pay-back"><a href="{% url 'billing:plans' org.id %}">&larr; Back to the plans</a></p>
+</div>
+{% endblock %}

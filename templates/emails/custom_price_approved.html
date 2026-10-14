@@ -1,0 +1,33 @@
+{% extends "emails/_base.html" %}
+{% comment %}
+The answer to a custom price request, approved. Goes to whoever asked
+(req.requested_by) — not to every admin of the organisation, the same way the
+checkout flow itself only ever deals with the one person who clicked Pay.
+{% endcomment %}
+{% block title %}A price for {{ org.name }}{% endblock %}
+{% block eyebrow %}From the GoodTip team{% endblock %}
+{% block badge %}&#10003;{% endblock %}
+{% block preheader %}{{ org.name }} has a custom price ready to subscribe to.{% endblock %}
+{% block content %}
+  <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">Hi {{ req.requested_by.display_name|default:req.requested_by.email }},</p>
+  <p style="margin:0 0 22px;font-size:16px;line-height:1.6;color:#1A1A14;">
+    We've put a price together for {{ org.name }} — <b>{{ req.label }}</b>, ${{ req.price_aud|floatformat:0 }} a year
+    {% if req.seat_limit %}for up to {{ req.seat_limit }} people{% endif %}.
+  </p>
+
+  {% if req.decision_note %}
+  {% include "emails/_bits.html" with bit="eyebrow" label="A note from the team" %}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
+    <tr><td style="padding:16px 20px;background:#F2F1E7;border-left:4px solid #C8F135;border-radius:0 10px 10px 0;font-size:15px;line-height:1.65;color:#1A1A14;">
+      {{ req.decision_note|linebreaksbr }}
+    </td></tr>
+  </table>
+  {% endif %}
+
+  <p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#1A1A14;">
+    It's waiting on your plans page whenever you're ready — nothing is charged until you subscribe to it.
+  </p>
+
+  {% include "emails/_bits.html" with bit="button" url=plans_link label="View your plan" %}
+{% endblock %}
+{% block footnote %}Custom price, approved{% endblock %}

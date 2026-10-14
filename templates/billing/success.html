@@ -2,34 +2,56 @@
 {% block title %}You're set, {{ org.name }}{% endblock %}
 {% block loader_task %}Confirming your subscription{% endblock %}
 {% comment %}
-The rotating side strips. Standard on every member page (client request,
-Aug 2026) — these were the last screens without them. Outside the sheet,
-never inside it: the strips belong to the page background, and a sheet
-drawn over them is the whole point of the look.
+THE BILLING PAGE'S OWN LOOK (client, 10 Oct 2026: "let it look like the
+billing page"). Was its own dark, centred screen; now the same white sheet
+and header as /billing/<id>/plans/, so paying and landing here read as one
+place rather than two different designs stitched together.
 
-3 OCT 2026: the plan is a yearly subscription now (billing.services). This
-page reads the subscription's real state straight back from Stripe, says
-which of the two it is — subscribed and waiting for its first charge, or
-paid — and for the DEMO (test keys only) runs the start in front of you: a
-ten-second count, then the subscription's test clock is moved to the first
-billing date and the page watches Stripe raise and take the payment.
+3 OCT 2026: the plan is a yearly subscription (billing.services). This page
+reads the subscription's real state straight back from Stripe, says which of
+the two it is — subscribed and waiting for its first charge, or paid — and
+for the DEMO (test keys only) runs the start in front of you: a ten-second
+count, then the subscription's test clock is moved to the first billing date
+and the page watches Stripe raise and take the payment.
+
+10 OCT 2026: once a season is genuinely under way (ACTIVE, with a real
+current_period_start/end from Stripe), the tick becomes a ring showing how
+far through it the organisation is and when it renews — "something nice...
+when the subscription is about to end, where it started" — real dates, not a
+guess at what a yearly plan's dates probably are. Still SCHEDULED (signed up,
+nothing charged yet), the ring just reads 100%: the one thing that is
+genuinely complete at that point is the sign-up itself. Either way the ring
+takes the subscribed plan's own colour (billing.pricing.TIER_ACCENT) — the
+same one its tab wears on the Plans page.
 {% endcomment %}
+{% block body_class %}page-deep sheet-page page-plans{% endblock %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% block app_content %}
+<div class="app-head is-centred is-orgfirst"><div>
+  <div class="app-eyebrow">{{ org.name }} &middot; billing</div>
+  <h1 class="app-h1">Your subscription</h1>
+</div></div>
+
 <div class="bl-done" data-bl-done
      data-status-url="{% url 'billing:subscription_status' org.id %}"
      {% if is_demo %}data-demo-url="{% url 'billing:demo_start' org.id %}"{% endif %}
-     data-status="{{ sub.status|default:'none' }}">
-  <div class="bl-tick"><svg class="cic"><use href="#ic-check"/></svg></div>
+     data-status="{{ sub.status|default:'none' }}"
+     style="{% if accent %}--ac: {{ accent }};{% endif %}">
+
+  {% include "billing/_period_ring.html" with period=period %}
 
   {% if sub and sub.is_active %}
-    <h1 class="app-h1" data-bl-title>Subscription active.</h1>
+    <h2 class="bl-h2" data-bl-title>Subscription active.</h2>
+    {% if period %}
+    <p class="app-sub bl-lede" data-bl-lede>{{ period.pct }}% through this season &middot; started {{ period.start|date:"j F Y" }}, renews {{ period.end|date:"j F Y" }}{% if period.days_left %} ({{ period.days_left }} day{{ period.days_left|pluralize }} left){% endif %}.</p>
+    {% else %}
     <p class="app-sub bl-lede" data-bl-lede>{{ org.name }} is on the <strong>{{ sub.get_tier_display }}</strong> plan, {{ sub.seat_limit_label }}. The first year's ${{ sub.price_aud|floatformat:0 }} has been paid, and it renews yearly.</p>
+    {% endif %}
   {% elif sub and sub.is_scheduled %}
-    <h1 class="app-h1" data-bl-title>You're subscribed.</h1>
+    <h2 class="bl-h2" data-bl-title>You're subscribed.</h2>
     <p class="app-sub bl-lede" data-bl-lede>{{ org.name }} is on the <strong>{{ sub.get_tier_display }}</strong> plan. Your card is saved and nothing was charged today; the first yearly payment of ${{ sub.price_aud|floatformat:0 }} is taken on <strong>{{ sub.starts_at|date:"j F Y" }}</strong>.</p>
   {% else %}
-    <h1 class="app-h1" data-bl-title>Thanks, we're confirming it.</h1>
+    <h2 class="bl-h2" data-bl-title>Thanks, we're confirming it.</h2>
     <p class="app-sub bl-lede" data-bl-lede>Stripe is finishing up; your plan will show on the dashboard in a moment.</p>
   {% endif %}
 
@@ -50,10 +72,31 @@ billing date and the page watches Stripe raise and take the payment.
   </div>
   {% endif %}
 
+  {% comment %}
+  Real invoices only (client, 10 Oct 2026: "the history of payments") — empty
+  until Stripe has actually raised one, which a SCHEDULED subscription never
+  has yet.
+  {% endcomment %}
+  {% if history %}
+  <div class="bl-hist">
+    <p class="bl-hist-h">Payment history</p>
+    <ul class="bl-hist-list">
+      {% for h in history %}
+      <li>
+        <span class="bl-hist-date">{{ h.date|date:"j M Y" }}</span>
+        <span class="bl-hist-amt">${{ h.amount|floatformat:0 }}</span>
+        <span class="bl-hist-status is-{{ h.status }}">{{ h.status }}</span>
+        {% if h.url %}<a href="{{ h.url }}" target="_blank" rel="noopener" class="bl-hist-link">Invoice{% if h.number %} {{ h.number }}{% endif %}</a>{% else %}<span class="bl-hist-link is-muted">{{ h.number }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
   <div class="bl-actions">
-    <a href="{% url 'dashboard' %}" class="abtn abtn-primary">Go to dashboard</a>
-    <a href="{{ sub.stripe_invoice_url|default:'#' }}" class="abtn abtn-ghost" data-bl-invoice target="_blank" rel="noopener" {% if not sub.stripe_invoice_url %}hidden{% endif %}>View the Stripe invoice</a>
-    <a href="{% url 'billing:plans' org.id %}" class="abtn abtn-ghost">Back to plans</a>
+    <a href="{% url 'dashboard' %}" class="plk-btn bl-btn-main">Go to dashboard</a>
+    <a href="{{ sub.stripe_invoice_url|default:'#' }}" class="bl-btn-ghost" data-bl-invoice target="_blank" rel="noopener" {% if not sub.stripe_invoice_url %}hidden{% endif %}>View the Stripe invoice</a>
+    <a href="{% url 'billing:plans' org.id %}" class="bl-btn-ghost">Back to plans</a>
   </div>
 </div>
 
@@ -67,10 +110,29 @@ billing date and the page watches Stripe raise and take the payment.
   function $(s) { return box.querySelector(s); }
   function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
+  /* A ring the same way billing/views.py's _period_progress works out —
+     client-side once, when a poll hands back real period dates the page did
+     not have at render time (a SetupIntent-era page landing before the
+     first real billing period exists yet). */
+  function paintRing(startIso, endIso) {
+    if (!startIso || !endIso) return;
+    var start = new Date(startIso).getTime(), end = new Date(endIso).getTime(), now = Date.now();
+    var span = end - start;
+    if (span <= 0) return;
+    var pct = Math.round(Math.max(0, Math.min(span, now - start)) / span * 100);
+    var ring = $('[data-bl-ring]'), fg = $('[data-bl-ring-fg]'), n = $('[data-bl-ring-n]'), tick = $('[data-bl-tick]');
+    if (!ring) return;
+    ring.hidden = false;
+    if (tick) tick.hidden = true;
+    if (fg) fg.style.strokeDashoffset = (314.159 * (1 - pct / 100)).toFixed(1);
+    if (n) n.textContent = pct + '%';
+  }
+
   function paint(info) {
     if (!info || !info.paid) return false;
     $('[data-bl-title]').textContent = 'Subscription active.';
     $('[data-bl-lede]').innerHTML = 'The first yearly payment of <strong>$' + Math.round(+info.amount) + '</strong> has been taken by Stripe. The plan renews every year from here.';
+    paintRing(info.current_period_start, info.current_period_end);
     var s1 = $('[data-bl-step-start]'), s2 = $('[data-bl-step-paid]');
     if (s1) { s1.className = 'done'; }
     if (s2) { s2.className = 'done'; $('[data-bl-paid-note]').textContent = '$' + Math.round(+info.amount) + ' paid'; }

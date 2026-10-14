@@ -1,0 +1,9 @@
+Hi {{ req.requested_by.display_name|default:req.requested_by.email }},
+
+We've had a look at {{ org.name }}'s request for a custom price. For now, the five published plans are the
+best fit — have a look and pick whichever one suits.
+{% if req.decision_note %}
+A NOTE FROM THE TEAM
+{{ req.decision_note }}
+{% endif %}
+See the plans: {{ plans_link }}

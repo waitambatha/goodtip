@@ -1,10 +1,12 @@
 import logging
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
@@ -13,12 +15,19 @@ from orgs.models import OrgMember, Organisation
 from orgs.services import is_creator_admin
 
 from . import donations, goodlist, services
-from .models import DonationPledge, PlanSubscription, SponsorshipApplication
+from .models import CustomPriceRequest, DonationPledge, PlanSubscription, SponsorshipApplication
 from .pricing import (
     FOUNDING_WINDOW_CLOSES,
     first_billing_at,
+    CUSTOM,
+    ENTERPRISE,
+    ENTERPRISE_PLUS,
     GROUPS_MIN_TIER,
+    GROWTH,
+    PRO,
     STARTER,
+    TIER_ACCENT,
+    TIER_ORDER,
     TIERS,
     founding_stub_ends,
     founding_window_open,
@@ -89,6 +98,65 @@ def _require_owner(user, org):
     ).exists()
 
 
+def _period_progress(sub_info: dict) -> dict | None:
+    """How far through the current billing period a subscription is — real
+    dates from Stripe (client, 10 Oct 2026: "when the subscription is about
+    to end, where it started"), not a guess at what a yearly plan's dates
+    probably are. None until there is a real, started period to measure."""
+    from datetime import datetime as _dt
+
+    start = sub_info.get("current_period_start") if sub_info else ""
+    end = sub_info.get("current_period_end") if sub_info else ""
+    if not (start and end):
+        return None
+    start_dt, end_dt = _dt.fromisoformat(start), _dt.fromisoformat(end)
+    now = timezone.now()
+    span = (end_dt - start_dt).total_seconds()
+    if span <= 0:
+        return None
+    elapsed = max(0, min(span, (now - start_dt).total_seconds()))
+    pct = round(elapsed / span * 100)
+    # The ring's SVG circumference (r=50 — see .bl-ring in goodtip.css),
+    # computed here rather than in the template: Django's template language
+    # has no multiplication, only the {% widthratio %} tag, and this needs
+    # the same number twice (the dash-offset and the plain percentage).
+    circumference = 314.159
+    return {
+        "pct": pct,
+        "offset": round(circumference * (1 - pct / 100), 1),
+        "start": start_dt,
+        "end": end_dt,
+        "days_left": max(0, (end_dt.date() - now.date()).days),
+    }
+
+
+# What each plan's showcase shows (client, 9 Oct 2026). Not app screenshots —
+# "the images we have been uploading, forget about the screenshots" — but the
+# photographs the public pages' hero splits are built from, so the billing
+# screen looks like the rest of GoodTip rather than a product tour.
+PLAN_MEDIA = {
+    STARTER: [("img/scenes/afl-goal-posts.jpg", "One shared ladder"),
+              ("img/scenes/afl-ball-grass.jpg", "All four competitions"),
+              ("img/scenes/aussie-crowd-flag.jpg", "The charity your people pick")],
+    GROWTH: [("img/scenes/nrl-players-fans.jpg", "Your name and logo on it"),
+             ("img/scenes/afl-training.jpg", "Round by round, all season"),
+             ("img/scenes/mcg-match.jpg", "Up to 50 tipping together")],
+    PRO: [("img/scenes/mcg-stadium.jpg", "A group for each team"),
+          ("img/scenes/nrl-posts-sunset.jpg", "Every group on its own ladder"),
+          ("img/scenes/stadium-lights-grass.jpg", "Priority support")],
+    ENTERPRISE: [("img/scenes/stadium-panorama.jpg", "Departments and sub-groups"),
+                 ("img/scenes/afl-posts-mcg.jpg", "A dedicated account manager"),
+                 ("img/scenes/nrl-ground-dusk.jpg", "Onboarding built around you")],
+    ENTERPRISE_PLUS: [("img/stadium-night.jpg", "Multi-league setup"),
+                      ("img/scenes/nrl-scoreboard.jpg", "Every result, as it lands"),
+                      ("img/scenes/mcg-match.jpg", "Flexible payment terms")],
+}
+
+
+def _media_for(tier: str):
+    return [{"img": path, "cap": cap} for path, cap in PLAN_MEDIA.get(tier, [])]
+
+
 def _tier_cards(org=None):
     """The five plans as the template wants them.
 
@@ -104,6 +172,8 @@ def _tier_cards(org=None):
             "label": cfg["label"],
             "price": cfg["price"],
             "seat_label": seat_limit_label(cfg["seat_limit"]),
+            "seat_limit": cfg["seat_limit"],
+            "media": _media_for(key),
             "audience": cfg["audience"],
             "features": cfg["features"],
             "popular": cfg["popular"],
@@ -124,10 +194,88 @@ def plans_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _require_owner(request.user, org):
         return HttpResponseForbidden()
+    current = services.current_subscription(org)
+    # The organisation's own subscription, read straight back from Stripe —
+    # not only for a test-mode daily charge (so a tester refreshing the page
+    # sees each day's charge land without a webhook, which a laptop or a
+    # firewalled server may not receive) but for anyone already subscribed:
+    # the "your subscription" panel below needs the real billing dates and
+    # the real payment history, not a guess at what a yearly plan's dates
+    # probably are (client, 10 Oct 2026: "the level of... when the
+    # subscription is about to end, where it started... history of payments").
+    sub_info = None
+    test_charges = None
+    if current and services.is_configured():
+        try:
+            sub_info = services.sync_from_stripe(current)
+            test_charges = sub_info.get("paid_count", 0)
+            current.refresh_from_db()
+        except Exception:  # noqa: BLE001 — the page must render whatever Stripe says
+            logger.exception("Could not read the subscription back from Stripe")
+    # Nothing current to show — but there may be something worth still
+    # saying (client, 12 Oct 2026): a plan that ran out, or one cancelled
+    # before it ever charged. Synced the same way as `current` above, so
+    # "covered through" is Stripe's real date, not a guess.
+    past = None
+    past_info = None
+    if not current:
+        past = services.past_subscription(org)
+        if past and past.stripe_subscription_id and services.is_configured():
+            try:
+                past_info = services.sync_from_stripe(past)
+            except Exception:  # noqa: BLE001 — the page must render regardless
+                logger.exception("Could not read the past subscription back from Stripe")
+
+    tiers = _tier_cards(org)
+    if current:
+        here = TIER_ORDER.index(current.tier) if current.tier in TIER_ORDER else -1
+        for card in tiers:
+            there = TIER_ORDER.index(card["key"]) if card["key"] in TIER_ORDER else -1
+            card["switch_direction"] = (
+                "current" if card["key"] == current.tier
+                else "upgrade" if there > here else "downgrade"
+            )
+    # The custom-pricing offer — the most recent APPROVED request, or (for
+    # the quieter "we're looking at it" / "here's why not" states) the most
+    # recent request of any status, read in that order of preference so an
+    # organisation always sees its *latest* word on this, not its first.
+    custom_offer = services.current_custom_offer(org)
+    latest_custom_request = (
+        CustomPriceRequest.objects.filter(org=org).order_by("-created_at").first()
+    )
+    custom_pending = bool(latest_custom_request and latest_custom_request.is_pending)
+    custom_declined = (
+        latest_custom_request
+        if latest_custom_request and latest_custom_request.status == CustomPriceRequest.STATUS_DECLINED
+        else None
+    )
+    # The organisation's OWN "no" to a price Ian offered (client, 12 Oct
+    # 2026) — distinct from custom_declined above, which is Ian's "no" to
+    # their request. Both end the same way on screen (a reason, and a way to
+    # ask again) but the reason belongs to a different person each time.
+    org_declined_offer = (
+        latest_custom_request if latest_custom_request and latest_custom_request.is_declined_by_org else None
+    )
+
     return render(request, "billing/plans.html", {
         "org": org,
-        "tiers": _tier_cards(org),
-        "current": services.current_subscription(org),
+        "tiers": tiers,
+        "current": current,
+        "sub_info": sub_info,
+        "current_accent": TIER_ACCENT.get(current.tier) if current else None,
+        "period": _period_progress(sub_info) if sub_info else None,
+        "history": (sub_info or {}).get("history") or [],
+        "test_charges": test_charges,
+        "past_subscription": past,
+        "past_accent": TIER_ACCENT.get(past.tier) if past else None,
+        "past_period": _period_progress(past_info) if past_info else None,
+        "custom_offer": custom_offer if not (current and current.tier == CUSTOM) else None,
+        "custom_pending": custom_pending,
+        "custom_declined": custom_declined,
+        "org_declined_offer": org_declined_offer,
+        "on_custom_plan": bool(current and current.tier == CUSTOM),
+        # Where the "how many people will tip?" slider starts.
+        "member_count": OrgMember.objects.filter(org=org).count(),
         "stripe_configured": services.is_configured(),
         "stripe_test_mode": services.is_test_mode(),
         "first_billing_at": first_billing_at(),
@@ -169,21 +317,298 @@ def checkout_view(request, org_id: int):
     # The demo (test keys only): the same subscription, run on a Stripe test
     # clock so the success page can jump it to the first billing date.
     demo = request.POST.get("demo") == "1" and services.is_test_mode()
+    # Test mode's switch on the plans page (client, 6 Oct 2026): a daily
+    # subscription charged from about a day from now. Test keys only — on live
+    # keys the field is ignored, never honoured.
+    test_daily = request.POST.get("test_daily") == "1" and services.is_test_mode()
     sub = services.create_subscription(org, tier)
-    success_url = request.build_absolute_uri(
-        reverse("billing:success", args=[org.id])
-    ) + "?session_id={CHECKOUT_SESSION_ID}"
-    cancel_url = request.build_absolute_uri(reverse("billing:plans", args=[org.id]))
     try:
-        session = services.create_checkout_session(
-            sub, success_url=success_url, cancel_url=cancel_url,
-            email=request.user.email or "", demo=demo,
+        services.create_setup_intent(
+            sub, email=request.user.email or "", demo=demo, test_daily=test_daily,
         )
     except Exception:  # noqa: BLE001 — surface any Stripe error gracefully
-        logger.exception("Stripe checkout session creation failed")
+        logger.exception("Stripe setup intent creation failed")
         messages.error(request, "Couldn't start checkout. Please try again.")
         return redirect("billing:plans", org_id=org.id)
-    return redirect(session.url)
+    # Paying happens on our own page now, not at checkout.stripe.com. The
+    # POST only opens the intent; the card form lives behind a GET so it
+    # survives a reload.
+    return redirect("billing:pay", org_id=org.id)
+
+
+@login_required
+@require_POST
+def request_custom_price_view(request, org_id: int):
+    """"None of these quite fit" (client, 11 Oct 2026) — an organisation asks
+    for a price outside the five published plans. Saved first, emailed
+    second, same ordering as the sponsorship application and for the same
+    reason: a mail outage must never lose the request."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_owner(request.user, org):
+        return HttpResponseForbidden()
+
+    if CustomPriceRequest.objects.filter(org=org, status=CustomPriceRequest.STATUS_PENDING).exists():
+        messages.error(request, "There's already a custom price request with the team for this organisation.")
+        return redirect("billing:plans", org_id=org.id)
+
+    message = (request.POST.get("message") or "").strip()[:2000]
+    cpr = CustomPriceRequest.objects.create(org=org, requested_by=request.user, message=message)
+
+    from goodtip.mail import send_template, site_url
+    from sysadmin import access as admin_access
+    from accounts.models import User
+
+    try:
+        staff_emails = [
+            u.email for u in User.objects.filter(is_staff=True, is_active=True).exclude(email="")
+            if admin_access.can(u, "billing.custom_pricing")
+        ]
+        if staff_emails:
+            send_template(
+                "custom_price_requested",
+                subject=f"Custom price request — {org.name}",
+                to=staff_emails,
+                context={"req": cpr, "org": org, "queue_link": site_url(reverse("admin:hq_custom_pricing"))},
+                reply_to=[request.user.email] if request.user.email else None,
+            )
+    except Exception:  # noqa: BLE001 — the request is saved; a mail hiccup must not look like a failure
+        logger.exception("Custom price request %s saved, but its staff email failed", cpr.pk)
+
+    messages.success(request, "Sent. The team will come back to you about a custom price.")
+    return redirect("billing:plans", org_id=org.id)
+
+
+@login_required
+@require_POST
+def decline_custom_offer_view(request, org_id: int):
+    """The other half of the negotiation (client, 12 Oct 2026: "you can
+    either accept it or reject it... give a reason why"). Accepting an
+    offer is already the existing "Subscribe" button on it; this is
+    saying no, with a reason the team actually sees — not silence."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_owner(request.user, org):
+        return HttpResponseForbidden()
+
+    offer = services.current_custom_offer(org)
+    if offer is None:
+        messages.error(request, "There's no custom price offer here to decline.")
+        return redirect("billing:plans", org_id=org.id)
+
+    reason = (request.POST.get("reason") or "").strip()[:2000]
+    services.decline_custom_offer(offer, reason=reason)
+
+    from goodtip.mail import send_template, site_url
+    from sysadmin import access as admin_access
+    from accounts.models import User
+
+    try:
+        staff_emails = [
+            u.email for u in User.objects.filter(is_staff=True, is_active=True).exclude(email="")
+            if admin_access.can(u, "billing.custom_pricing")
+        ]
+        if staff_emails:
+            send_template(
+                "custom_price_org_declined",
+                subject=f"{org.name} declined the custom price — {offer.label}",
+                to=staff_emails,
+                context={"req": offer, "org": org, "queue_link": site_url(reverse("admin:hq_custom_pricing"))},
+            )
+    except Exception:  # noqa: BLE001 — the decision is saved; a mail hiccup must not look like a failure
+        logger.exception("Custom price offer %s declined by org, but the staff email failed", offer.pk)
+
+    messages.success(request, "Sent — the team will know you'd like a different price.")
+    return redirect("billing:plans", org_id=org.id)
+
+
+@login_required
+@require_POST
+def custom_checkout_view(request, org_id: int):
+    """Pay for the custom price just approved for this organisation — same
+    card-on-GoodTip's-own-page flow as the five published plans
+    (billing.services.create_setup_intent doesn't care which tier it's
+    saving a card for)."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_owner(request.user, org):
+        return HttpResponseForbidden()
+
+    offer = services.current_custom_offer(org)
+    if offer is None:
+        messages.error(request, "There's no custom price to subscribe to right now.")
+        return redirect("billing:plans", org_id=org.id)
+
+    if not services.is_configured():
+        messages.error(
+            request,
+            "Payments aren't switched on yet — Stripe keys haven't been added. "
+            "Your plan choice is saved; check back once billing is configured.",
+        )
+        services.create_custom_subscription(org, offer)
+        return redirect("billing:plans", org_id=org.id)
+
+    sub = services.create_custom_subscription(org, offer)
+    try:
+        services.create_setup_intent(sub, email=request.user.email or "")
+    except Exception:  # noqa: BLE001 — surface any Stripe error gracefully
+        logger.exception("Stripe setup intent creation failed (custom price)")
+        messages.error(request, "Couldn't start checkout. Please try again.")
+        return redirect("billing:plans", org_id=org.id)
+    return redirect("billing:pay", org_id=org.id)
+
+
+@login_required
+def pay_view(request, org_id: int):
+    """The card form, on GoodTip (client, 9 and 10 Oct 2026).
+
+    Stripe Elements mounts into this page — the organisation never leaves the
+    site to pay — and billing/checkout.html drives the loading, decline and
+    success states itself around it. The card fields are still Stripe's,
+    inside their iframe: this server never sees a card number.
+    """
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_owner(request.user, org):
+        return HttpResponseForbidden()
+    sub = services.latest_subscription(org)
+    intent = services.open_setup_intent(sub) if sub else None
+    if intent is None:
+        # Nothing to pay for — either it is already done or the intent has
+        # lapsed. Either way the plans page is the honest place to land.
+        return redirect("billing:plans", org_id=org.id)
+    return render(request, "billing/checkout.html", {
+        "org": org,
+        "sub": sub,
+        "client_secret": intent.client_secret,
+        "publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
+        "confirm_url": reverse("billing:pay_confirm", args=[org.id]),
+        "success_url": reverse("billing:success", args=[org.id]),
+    })
+
+
+@login_required
+@require_POST
+def pay_confirm_view(request, org_id: int):
+    """Called from the pay page once Stripe's own confirmSetup() has resolved
+    with a succeeded SetupIntent. Turns that saved card into the real
+    subscription and reports back so the page can play its success animation
+    knowing the subscription genuinely exists, not just that the browser
+    thinks the card was accepted."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_owner(request.user, org):
+        return HttpResponseForbidden()
+    sub = services.latest_subscription(org)
+    setup_intent_id = request.POST.get("setup_intent_id", "")
+    if sub is None or not setup_intent_id:
+        return JsonResponse({"ok": False, "error": "Nothing to confirm."}, status=400)
+    try:
+        services.finalize_subscription(sub, setup_intent_id)
+    except services.BillingNotConfigured as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=409)
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not finalise subscription %s", sub.pk)
+        return JsonResponse({"ok": False, "error": "Something went wrong finishing your subscription."}, status=502)
+    return JsonResponse({"ok": True, "redirect": reverse("billing:success", args=[org.id])})
+
+
+@login_required
+@require_POST
+def switch_tier_view(request, org_id: int):
+    """Upgrade or downgrade an existing subscription (client, 10 Oct 2026:
+    "the option of either upgrading or downgrading"). The card on file is
+    reused — this never touches the pay page."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_owner(request.user, org):
+        return HttpResponseForbidden()
+    current = services.current_subscription(org)
+    tier = request.POST.get("tier")
+    if current is None or not current.stripe_subscription_id:
+        messages.error(request, "There's no subscription here to change yet.")
+        return redirect("billing:plans", org_id=org.id)
+    if tier not in TIERS:
+        messages.error(request, "Please choose a real plan.")
+        return redirect("billing:plans", org_id=org.id)
+    try:
+        updated = services.switch_tier(current, tier)
+    except Exception:  # noqa: BLE001 — surface it, don't 500 on a Stripe hiccup
+        logger.exception("Plan switch failed for subscription %s", current.pk)
+        messages.error(request, "Couldn't change plans just then. Please try again.")
+        return redirect("billing:plans", org_id=org.id)
+    messages.success(request, f"{org.name} is now on the {updated.get_tier_display()} plan.")
+    return redirect("billing:plans", org_id=org.id)
+
+
+@login_required
+@require_POST
+def cancel_subscription_view(request, org_id: int):
+    """Opt out (client, 10 Oct 2026). The confirmation is in the template
+    (data-confirm), not here — this runs the moment the request arrives."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_owner(request.user, org):
+        return HttpResponseForbidden()
+    current = services.current_subscription(org)
+    if current is None or not current.stripe_subscription_id:
+        messages.error(request, "There's no subscription here to cancel.")
+        return redirect("billing:plans", org_id=org.id)
+    try:
+        updated = services.cancel_subscription(current)
+    except Exception:  # noqa: BLE001
+        logger.exception("Cancel failed for subscription %s", current.pk)
+        messages.error(request, "Couldn't cancel just then. Please try again.")
+        return redirect("billing:plans", org_id=org.id)
+    if updated.is_active:
+        messages.success(
+            request,
+            f"{org.name}'s {updated.get_tier_display()} plan won't renew — "
+            f"you keep it through the season you've already paid for.",
+        )
+    else:
+        messages.success(request, f"{org.name}'s subscription has been cancelled.")
+    return redirect("billing:plans", org_id=org.id)
+
+
+@login_required
+@require_POST
+def resume_subscription_view(request, org_id: int):
+    """Undo a cancel-at-period-end before it takes effect."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_owner(request.user, org):
+        return HttpResponseForbidden()
+    current = services.current_subscription(org)
+    if current is None:
+        messages.error(request, "There's no subscription here to resume.")
+        return redirect("billing:plans", org_id=org.id)
+    try:
+        services.resume_subscription(current)
+    except Exception:  # noqa: BLE001
+        logger.exception("Resume failed for subscription %s", current.pk)
+        messages.error(request, "Couldn't undo the cancellation just then. Please try again.")
+        return redirect("billing:plans", org_id=org.id)
+    messages.success(request, f"{org.name}'s plan will keep renewing after all.")
+    return redirect("billing:plans", org_id=org.id)
+
+
+@login_required
+@require_POST
+def pay_now_view(request, org_id: int):
+    """Charge the current subscription's price right now, ahead of schedule
+    (client, 12 Oct 2026: "the capacity of paying the next subscription...
+    even before the time that it's due to be auto-deducted")."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_owner(request.user, org):
+        return HttpResponseForbidden()
+    current = services.current_subscription(org)
+    if current is None:
+        messages.error(request, "There's no subscription here to pay.")
+        return redirect("billing:plans", org_id=org.id)
+    try:
+        services.pay_now(current)
+    except services.BillingNotConfigured as exc:
+        messages.error(request, str(exc))
+        return redirect("billing:plans", org_id=org.id)
+    except Exception:  # noqa: BLE001
+        logger.exception("Pay-now failed for subscription %s", current.pk)
+        messages.error(request, "Couldn't take the payment just then. Please try again.")
+        return redirect("billing:plans", org_id=org.id)
+    messages.success(request, f"${current.price_aud:,.0f} taken — {org.name}'s plan renews a year from today.")
+    return redirect("billing:plans", org_id=org.id)
 
 
 # pledge_view and topup_view were removed on 18 Aug 2026 with the wording
@@ -307,6 +732,9 @@ def success_view(request, org_id: int):
     return render(request, "billing/success.html", {
         "org": org, "sub": sub, "info": info,
         "is_demo": bool(sub and sub.is_demo and services.is_test_mode()),
+        "accent": TIER_ACCENT.get(sub.tier) if sub else None,
+        "period": _period_progress(info) if info else None,
+        "history": info.get("history") or [],
     })
 
 

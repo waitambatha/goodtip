@@ -32,6 +32,14 @@ GROWTH = "growth"
 PRO = "pro"
 ENTERPRISE = "enterprise"
 ENTERPRISE_PLUS = "enterprise_plus"
+# A price negotiated for one organisation, outside the five published plans
+# (client, 11 Oct 2026: "the super admin... will be able to create a custom
+# price for that specific organisation"). Deliberately never a key in TIERS —
+# it is data (billing.models.CustomPriceRequest), set per organisation, not a
+# sixth row in a dict every other org's plans page also reads. tier_config()
+# and TIER_ORDER never see it; anything that needs its price or seat limit
+# reads the subscription or the request itself, not this module.
+CUSTOM = "custom"
 
 # A very large seat ceiling stands in for the deck's "500+" tier.
 UNLIMITED_SEATS = 100_000
@@ -99,10 +107,28 @@ TIERS = {
     },
 }
 
-TIER_CHOICES = [(key, cfg["label"]) for key, cfg in TIERS.items()]
+TIER_CHOICES = [(key, cfg["label"]) for key, cfg in TIERS.items()] + [(CUSTOM, "Custom")]
 
 # Plans in size order — used wherever "the next plan up" has to be worked out.
 TIER_ORDER = [STARTER, GROWTH, PRO, ENTERPRISE, ENTERPRISE_PLUS]
+
+# One colour per plan (client, 9 Oct 2026: "the colours we have used in the
+# competition"): the same four the certificates and comp chips already use —
+# AFL blue, AFLW rose, NRL orange, NRLW purple (tipping.certificates.ACCENTS)
+# — plus slate for Enterprise+, which has no competition of its own. Matches
+# static/css/goodtip.css's .plk-tab:nth-child(N) { --ink-ac } exactly, so the
+# plan tabs, the subscription summary and the success page all read the same
+# plan as the same colour.
+TIER_ACCENT = {
+    STARTER: "#1F6FD1",
+    GROWTH: "#C2306B",
+    PRO: "#C9700A",
+    ENTERPRISE: "#6B34B8",
+    ENTERPRISE_PLUS: "#5A6B7A",
+    # The house green rather than a sixth hue — a custom plan is not another
+    # rung on the same ladder, so it does not compete for a place in it.
+    CUSTOM: "#2A7337",
+}
 
 # ---------------------------------------------------------------------------
 # GROUPS — the gate, and where it sits
@@ -236,6 +262,10 @@ def tier_price(tier: str) -> Decimal:
 
 def tier_has_groups(tier: str | None) -> bool:
     """Whether this plan includes groups. An org with no plan does not."""
+    if tier == CUSTOM:
+        # Bespoke by definition — nobody negotiates a one-off price for an
+        # organisation that would then find its core feature locked.
+        return True
     cfg = TIERS.get(tier or "")
     return bool(cfg and cfg["groups"])
 
