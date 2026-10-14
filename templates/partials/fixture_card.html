@@ -31,9 +31,24 @@ data-code/data-cat put the competition's colour on the card — the tag below,
 and the hairline down its leading edge. See "competition colours" in
 goodtip.css. Both callers select_related round__series, so this costs no query.
 {% endcomment %}
-<article class="fxc phase-{{ match.phase }}{% if selection %} is-picked{% endif %}{% if not editable %} is-locked{% endif %}"
+{% comment %}
+is-pending-lock: not editable, and not yet graded — a round or a fixture that
+simply has not opened. Full colour (see the CSS: a fixture card no longer
+greys out at all), a padlock badge top-right, and a shake + "Locked" message
+when someone presses a side anyway (client, 14 Oct 2026). Graded fixtures
+(match.result set) are their own, already-informative state and carry none of
+this — a finished game is not "locked", it is over.
+{% endcomment %}
+<article class="fxc phase-{{ match.phase }}{% if selection %} is-picked{% endif %}{% if not editable %} is-locked{% endif %}{% if not editable and not match.result %} is-pending-lock{% endif %}"
          data-code="{{ match.round.series.slug }}" data-cat="{{ match.round.series.category }}"
+         {% if not editable and not match.result %}data-locked-msg="{% if round_locked %}{{ round_locked }}{% elif lock_note %}{{ lock_note }}{% else %}Locked — not open to tip yet.{% endif %}"{% endif %}
          id="fxc-{{ match.id }}">
+
+  {% if not editable and not match.result %}
+  <span class="fxc-padlock" aria-hidden="true" title="Locked">
+    <svg viewBox="0 0 24 24"><use href="#ic-lock"/></svg>
+  </span>
+  {% endif %}
 
   <div class="fxc-meta">
     <span class="fxc-code">{{ match.round.series.name }}</span>
