@@ -153,11 +153,19 @@ class HoldingModeTests(TestCase):
         self.assertNotContains(resp, "/login/")
 
     def test_everything_else_is_still_gated(self):
-        for path in ("/login/", "/signup/", "/dashboard/", "/media/messages/x.pdf", "/media/news/x.jpg"):
+        for path in ("/login/", "/signup/", "/dashboard/", "/media/messages/x.pdf"):
             with self.subTest(path=path):
                 resp = self.client.get(path)
                 self.assertEqual(resp.status_code, 302)
                 self.assertTrue(resp.url.startswith("/gate/"))
+
+    def test_a_storys_own_pictures_are_not_gated(self):
+        # A story's pictures live under /media/news/ — gating them the same
+        # as every other /media/ path left every card showing a blank box
+        # instead (client, 15 Oct 2026). Everything ELSE under /media/ —
+        # message attachments, avatars — stays exactly as gated as it was.
+        resp = self.client.get("/media/news/x.jpg")
+        self.assertNotEqual(resp.status_code, 302)
 
     def test_only_a_read_is_redirected_to_a_showcase(self):
         resp = self.client.post("/wall/1/reply/", {})
@@ -213,11 +221,15 @@ class HoldingLockdownTests(TestCase):
     def test_every_other_page_goes_to_the_trailer_not_to_a_password_box(self):
         for path in ("/login/", "/signup/", "/dashboard/", "/admin/",
                      "/manage/", "/gate/", "/gate/?next=/dashboard/", "/sitemap.xml",
-                     "/media/news/x.jpg", "/no-such-page/"):
+                     "/media/messages/x.pdf", "/no-such-page/"):
             with self.subTest(path=path):
                 resp = self.client.get(path)
                 self.assertEqual(resp.status_code, 302)
                 self.assertEqual(resp.url, "/coming-soon/")
+
+    def test_a_storys_own_pictures_are_not_gated_under_lockdown_either(self):
+        resp = self.client.get("/media/news/x.jpg")
+        self.assertNotEqual(resp.url if resp.status_code == 302 else None, "/coming-soon/")
 
     def test_the_showcased_pages_still_open_their_showcase(self):
         for path, slug in (("/how-it-works/", "how-it-works"), ("/wall/", "wall")):
