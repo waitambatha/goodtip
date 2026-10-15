@@ -36,6 +36,7 @@ from tipping.services import record_match_result
 # this rather than a blanket superuser check — see sysadmin/capabilities.py for
 # why the unit is a job rather than a model permission. superuser_required
 # stays for the screens that are genuinely owner-only and never delegated.
+from sysadmin import access
 from sysadmin.guards import requires
 
 logger = logging.getLogger(__name__)
@@ -1083,6 +1084,21 @@ def news_announce(request, post_id: int):
 def news_delete(request, post_id: int):
     post = get_object_or_404(NewsPost, pk=post_id)
     if request.method == "POST":
+        # ON STAGING ONLY (client, 15 Oct 2026): every post here is also a
+        # backup copy of whatever's live, since sync_newsposts mirrors both
+        # ways — "so we make sure the blogs and news are safe, kinda like a
+        # security measure". Deleting on live is ordinary and open to any
+        # admin with news.delete; deleting the backup sitting on staging
+        # needs the same can_delete_real flag the real/testing account data
+        # uses, same reasoning, same AdminAccess field.
+        if settings.IS_STAGING and not access.can_delete_real(request.user):
+            messages.error(
+                request,
+                "Deleting a post here deletes staging's backup copy too — "
+                "only an admin with that specific permission can do that. "
+                "Delete it from goodtip.com.au instead, or ask for that access.",
+            )
+            return redirect("admin:hq_news")
         post.delete()
         messages.success(request, "Post deleted.")
     return redirect("admin:hq_news")

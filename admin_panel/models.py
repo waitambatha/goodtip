@@ -208,6 +208,15 @@ class NewsPost(SeoFieldsMixin, models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="news_posts",
     )
+    # Not shown anywhere yet — added for sync_newsposts (client, 15 Oct
+    # 2026: a post written on either side reaches the other "immediately").
+    # Live and staging each have their own copy of this table; matching is
+    # by `slug` (unique here and nowhere shared between the two databases
+    # otherwise) and whichever side was edited more recently wins on a
+    # conflict. `published_at` can't do that job — it's deliberately
+    # editable for backdating and scheduling, so it says nothing about when
+    # a row last changed.
+    updated_at = models.DateTimeField(auto_now=True)
 
     objects = models.Manager()
     # Everything a reader is allowed to see, at this moment. Used by every
@@ -449,6 +458,37 @@ class NewsPost(SeoFieldsMixin, models.Model):
             slug = f"{base}-{suffix}"
             suffix += 1
         return slug
+
+
+class NewsPostTombstone(models.Model):
+    """A post deleted on THIS database, so sync_newsposts knows not to bring
+    it back from the other side next run.
+
+    Live and staging each keep their own copy of every post (sync_newsposts,
+    client 15 Oct 2026) and the merge only ever fills in a slug that's
+    MISSING on one side — which "a slug that never reached this side yet"
+    and "a slug that was here and got deleted" both look like, from a bare
+    row count. Deleting a post writes one of these (see the post_delete
+    signal below) so the sync can tell the two apart: a tombstone means stay
+    deleted, here, nowhere else — deleting from live never touches staging's
+    copy, and deleting from staging (Ian-only, see AdminAccess.can_delete_real)
+    never touches live's.
+    """
+
+    slug = models.SlugField(max_length=220)
+    deleted_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        indexes = [models.Index(fields=["slug"])]
+
+
+def _tombstone_deleted_post(sender, instance, **kwargs):
+    NewsPostTombstone.objects.create(slug=instance.slug)
+
+
+models.signals.post_delete.connect(
+    _tombstone_deleted_post, sender=NewsPost, dispatch_uid="newspost_tombstone",
+)
 
 
 class NewsMedia(models.Model):
