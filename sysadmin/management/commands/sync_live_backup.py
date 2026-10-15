@@ -93,7 +93,13 @@ class Command(BaseCommand):
 
     def _open_live_connection(self):
         live_url = os.environ["LIVE_BACKUP_DATABASE_URL"]
-        config = dj_database_url.config(default=live_url, conn_max_age=0)
+        # dj_database_url.parse(), NOT .config() — .config() reads
+        # os.environ["DATABASE_URL"] itself and only falls back to its
+        # `default=` argument when that var is ABSENT. It is always present
+        # (staging's own connection string), so .config(default=live_url)
+        # silently opened staging's own database under this alias instead
+        # of live's — caught by the check below, which is why it exists.
+        config = dj_database_url.parse(live_url, conn_max_age=0)
         config["OPTIONS"] = {**config.get("OPTIONS", {}), "options": "-c default_transaction_read_only=on"}
         connections.databases[LIVE_ALIAS] = config
         if connections[LIVE_ALIAS].settings_dict.get("NAME") not in PRODUCTION_DB_NAMES:
