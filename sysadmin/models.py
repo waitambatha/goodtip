@@ -218,6 +218,18 @@ class AdminAccess(models.Model):
         max_length=200, blank=True,
         help_text="What this person is here to do. Shown in the admin list.",
     )
+    # Deliberately NOT a Capability, and NOT covered by is_full_access (client,
+    # 14 Oct 2026: "only Ian can do so or give authorisation"). Full access
+    # means every power the code ships — this is the one power the code
+    # itself never hands out, to anyone, until a human ticks this box for
+    # them. See goodtip.origin: a "real" (origin=live) row can only be
+    # deleted by whoever holds this flag; "testing" rows are unaffected.
+    can_delete_real = models.BooleanField(
+        default=False,
+        help_text="Can delete a 'real' (live-origin) record. Off by default for everyone, "
+                   "including full access — tick it for whoever is authorised to, same as "
+                   "granting any other one-off power.",
+    )
 
     class Meta:
         verbose_name_plural = "admin access"

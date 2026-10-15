@@ -4,7 +4,10 @@ from datetime import timedelta
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
+
+from goodtip.origin import OriginMixin
 
 
 class UserManager(BaseUserManager):
@@ -35,7 +38,7 @@ class UserManager(BaseUserManager):
         return self._create_user(email, password, **extra_fields)
 
 
-class User(AbstractUser):
+class User(AbstractUser, OriginMixin):
     email = models.EmailField(unique=True)
     display_name = models.CharField(max_length=100)
     avatar = models.ImageField(upload_to="avatars/", blank=True)
@@ -130,6 +133,14 @@ class User(AbstractUser):
     REQUIRED_FIELDS = ["display_name"]
 
     objects = UserManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["live_id"], condition=Q(live_id__isnull=False),
+                name="unique_live_id_user",
+            ),
+        ]
 
     def __str__(self):
         return self.display_name or self.email
@@ -233,7 +244,7 @@ class LoginCode(models.Model):
         return True
 
 
-class LaunchSignup(models.Model):
+class LaunchSignup(OriginMixin, models.Model):
     """A pre-launch "tell me when it's ready" lead.
 
     Stored, not mailed: the launch announcement goes out as a single batch
@@ -332,6 +343,12 @@ class LaunchSignup(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["live_id"], condition=Q(live_id__isnull=False),
+                name="unique_live_id_launchsignup",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.name} <{self.email}>"

@@ -7,10 +7,13 @@ from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
+from goodtip.origin import OriginMixin
 
-class Organisation(models.Model):
+
+class Organisation(OriginMixin, models.Model):
     name = models.CharField(max_length=200)
     # The org's own logo. Search is where this earns its place: names collide
     # ("Acme Footy Tips" exists three times across three states), and a member
@@ -163,6 +166,12 @@ class Organisation(models.Model):
 
     class Meta:
         ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["live_id"], condition=Q(live_id__isnull=False),
+                name="unique_live_id_organisation",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.season})"
@@ -313,7 +322,7 @@ class Organisation(models.Model):
         ])
 
 
-class OrgMember(models.Model):
+class OrgMember(OriginMixin, models.Model):
     # Per the customer-journey deck: a member's base role can be manager,
     # captain, both, or participant. League Owner is a separate permission flag.
     ROLE_MANAGER = "manager"
@@ -343,6 +352,12 @@ class OrgMember(models.Model):
     class Meta:
         unique_together = ("user", "org")
         ordering = ["joined_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["live_id"], condition=Q(live_id__isnull=False),
+                name="unique_live_id_orgmember",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.user} @ {self.org} ({self.role})"
@@ -375,7 +390,7 @@ class OrgMember(models.Model):
         return labels
 
 
-class Group(models.Model):
+class Group(OriginMixin, models.Model):
     """A sub-unit inside one organisation — Marketing, IT, Sales.
 
     WHY THIS IS NOT A CHILD ORGANISATION
@@ -484,6 +499,10 @@ class Group(models.Model):
             models.UniqueConstraint(
                 fields=["org", "name"], name="uniq_group_name_per_org",
             ),
+            models.UniqueConstraint(
+                fields=["live_id"], condition=Q(live_id__isnull=False),
+                name="unique_live_id_group",
+            ),
         ]
 
     def __str__(self):
@@ -559,7 +578,7 @@ class Group(models.Model):
         return country.segment if country else ""
 
 
-class GroupMember(models.Model):
+class GroupMember(OriginMixin, models.Model):
     """Someone's place in a group.
 
     Separate from OrgMember rather than a column on it, because being in a
@@ -584,6 +603,10 @@ class GroupMember(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["group", "user"], name="uniq_group_member",
+            ),
+            models.UniqueConstraint(
+                fields=["live_id"], condition=Q(live_id__isnull=False),
+                name="unique_live_id_groupmember",
             ),
         ]
 

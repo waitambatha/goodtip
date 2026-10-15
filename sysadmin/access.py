@@ -50,6 +50,23 @@ def can(user, capability: str) -> bool:
     return row.can(capability)
 
 
+def can_delete_real(user) -> bool:
+    """Whether this admin may delete an origin=live ('real') record.
+
+    Deliberately not folded into is_full_access or can() — see
+    AdminAccess.can_delete_real's own docstring: it is the one power the
+    code hands out to nobody by default, including full access and
+    including the founding-admin backwards-compatible superuser this module
+    otherwise treats as owning everything. A human has to tick the box.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    row = access_for(user)
+    if row is None:
+        return False
+    return row.is_active and row.can_delete_real
+
+
 def needs_approval(user, capability: str) -> bool:
     row = access_for(user)
     if row is None:

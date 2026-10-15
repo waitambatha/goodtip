@@ -3,12 +3,13 @@ from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.utils import timezone
 
 from sysadmin.models import LoginEvent
+from sysadmin.origin_admin import OriginAdminMixin
 
 from .models import LaunchSignup, User
 
 
 @admin.register(LaunchSignup)
-class LaunchSignupAdmin(admin.ModelAdmin):
+class LaunchSignupAdmin(OriginAdminMixin, admin.ModelAdmin):
     """The "tell me when it's ready" list.
 
     THE EXPORT IS THE POINT. This list exists to be mailed once, in a batch, on
@@ -75,7 +76,7 @@ class LoginEventInline(admin.TabularInline):
 
 
 @admin.register(User)
-class UserAdmin(DjangoUserAdmin):
+class UserAdmin(OriginAdminMixin, DjangoUserAdmin):
     """Not registered at all before this — a superuser had no way to browse
     or manage accounts through the default admin, which is the one control
     plane this app is meant to have."""

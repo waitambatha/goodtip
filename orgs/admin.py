@@ -4,6 +4,10 @@ from django.db.models import Count
 from django.urls import reverse
 from django.utils.html import format_html
 
+from goodtip.origin import ORIGIN_LIVE
+from sysadmin import access
+from sysadmin.origin_admin import OriginAdminMixin
+
 from .models import (
     CharityVote,
     CharityVoteBallot,
@@ -40,6 +44,15 @@ class OrgMemberInline(admin.TabularInline):
     model = OrgMember
     extra = 0
     raw_id_fields = ("user", "invited_by")
+    readonly_fields = ("origin",)
+
+    def has_delete_permission(self, request, obj=None):
+        # No standalone list page for OrgMember to carry the origin_badge/
+        # filter — see OriginAdminMixin's docstring — but a real one still
+        # needs the same delete gate as everything else carrying the label.
+        if obj is not None and obj.origin == ORIGIN_LIVE and not access.can_delete_real(request.user):
+            return False
+        return super().has_delete_permission(request, obj)
 
 
 class GroupInline(admin.TabularInline):
@@ -77,7 +90,7 @@ class GroupInline(admin.TabularInline):
 
 
 @admin.register(Organisation)
-class OrganisationAdmin(admin.ModelAdmin):
+class OrganisationAdmin(OriginAdminMixin, admin.ModelAdmin):
     list_display = (
         "name", "parent", "child_count", "group_count", "organisation_type", "category_label", "state",
         "is_charity_partner", "is_public_listed", "season", "charity", "created_at",
@@ -207,7 +220,7 @@ class GroupMemberInline(admin.TabularInline):
 
 
 @admin.register(Group)
-class GroupAdmin(admin.ModelAdmin):
+class GroupAdmin(OriginAdminMixin, admin.ModelAdmin):
     """GoodTip's own groups — Marketing, IT, Sales — one per row.
 
     Every row names its parent organisation, because that is the constraint
@@ -281,7 +294,7 @@ class GroupAdmin(admin.ModelAdmin):
 
 
 @admin.register(GroupMember)
-class GroupMemberAdmin(admin.ModelAdmin):
+class GroupMemberAdmin(OriginAdminMixin, admin.ModelAdmin):
     """Standalone because the question is asked from both ends: "who is in
     Marketing" is the inline above, "which groups is this person in" is a
     search here."""

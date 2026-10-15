@@ -10,7 +10,27 @@ from django.utils import timezone
 from django.utils.html import format_html
 from django.views.generic import RedirectView
 
-from .models import AuditLog, LoginEvent, StressTestRun
+from .models import AdminAccess, AuditLog, LoginEvent, StressTestRun
+
+
+@admin.register(AdminAccess)
+class AdminAccessAdmin(admin.ModelAdmin):
+    """Where ``can_delete_real`` actually gets granted (client, 14 Oct
+    2026: "only Ian can do so or give authorisation"). Deliberately plain
+    Django admin rather than a page in the bespoke "your team" hub
+    (team_views.py) — that flow already manages is_full_access and
+    capability grants with its own audit trail, and bolting a differently-
+    scoped, non-capability flag onto it was a bigger, riskier change than
+    this feature needed. Changing it here is itself an admin action any
+    full-access admin can already see in the audit log.
+    """
+
+    list_display = ("user", "is_full_access", "can_delete_real", "is_active", "note")
+    list_editable = ("can_delete_real",)
+    list_filter = ("is_full_access", "can_delete_real", "is_active")
+    search_fields = ("user__email", "user__display_name")
+    readonly_fields = ("user", "is_full_access", "created_by", "created_at")
+    fields = ("user", "is_full_access", "can_delete_real", "is_active", "note", "created_by", "created_at")
 
 
 @admin.register(LoginEvent)
