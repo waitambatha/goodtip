@@ -79,6 +79,15 @@ HOLDING_SHOWCASES = (
 # page is back to the trailer, not sideways into login or signup.
 HOLDING_REAL_PAGES = ("/news/",)
 
+# A story's own pictures live under /media/news/, which "no /media/" (above)
+# otherwise blocks outright — the blog rendering for real and then showing a
+# blank box for every picture is the bug this is fixing (client, 15 Oct
+# 2026: goodtip.com.au/news/ not looking like the real thing). Scoped to
+# just this one subfolder: everything else under /media/ — message
+# attachments, avatars, org logos — is exactly the private material "no
+# /media/" was written to keep closed, and stays closed.
+NEWS_MEDIA_PREFIX = "/media/news/"
+
 # LOCKDOWN (HOLDING_LOCKDOWN=true): the trailer and nothing else, for everyone.
 #
 # Holding mode still lets anyone with the gate password through to the real
@@ -173,6 +182,8 @@ class StagingGateMiddleware:
         # public/base.html wears the stripped lockdown nav rather than the
         # site's full menu; nothing here has to know that to get it right.
         if request.path.startswith(HOLDING_REAL_PAGES) and request.method in ("GET", "HEAD"):
+            return self.get_response(request)
+        if request.path.startswith(NEWS_MEDIA_PREFIX) and request.method in ("GET", "HEAD"):
             return self.get_response(request)
         slug = _showcase_for(request.path)
         if slug and request.method in ("GET", "HEAD"):
