@@ -101,6 +101,16 @@ class Command(BaseCommand):
         # of live's — caught by the check below, which is why it exists.
         config = dj_database_url.parse(live_url, conn_max_age=0)
         config["OPTIONS"] = {**config.get("OPTIONS", {}), "options": "-c default_transaction_read_only=on"}
+        # ConnectionHandler.configure_settings fills in these defaults for
+        # every alias declared in settings.DATABASES, the one time it runs —
+        # an alias added directly to connections.databases afterwards, like
+        # this one, never goes through it, and Django's own connection code
+        # assumes TIME_ZONE in particular is always a key, not just a value.
+        config.setdefault("ATOMIC_REQUESTS", False)
+        config.setdefault("AUTOCOMMIT", True)
+        config.setdefault("CONN_HEALTH_CHECKS", False)
+        config.setdefault("TIME_ZONE", None)
+        config.setdefault("TEST", {})
         connections.databases[LIVE_ALIAS] = config
         if connections[LIVE_ALIAS].settings_dict.get("NAME") not in PRODUCTION_DB_NAMES:
             self._close_live_connection()
