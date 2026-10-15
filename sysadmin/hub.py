@@ -246,6 +246,31 @@ SECURITY_TABLES = [
           PLUM, "ic-flask"),
 ]
 
+# Everything carrying goodtip.origin.OriginMixin — client, 15 Oct 2026: "two
+# cards, staging and live... each independent... with their tables and
+# models". Not every table, just the ones a record's origin actually means
+# something on: who signed up, which organisation, which group, and the
+# waiting list behind them. The Live and Staging hub screens (hub_views.py's
+# tables_origin) list exactly this set, each row's count filtered to that
+# origin and each card's link pre-filtered the same way.
+ORIGIN_TABLES = [
+    Table("accounts.user",
+          "Every account on GoodTip — members, staff and administrators alike.",
+          GREEN, "ic-users"),
+    Table("accounts.launchsignup",
+          "Addresses left on the pre-launch page, before accounts existed.",
+          TEAL, "ic-send"),
+    Table("orgs.organisation",
+          "Every organisation, its type, its state and who runs it.",
+          GOLD, "ic-org"),
+    Table("orgs.group",
+          "The smaller rooms inside an organisation — a department, a team, a year level.",
+          TEAL, "ic-people"),
+    Table("orgs.groupmember",
+          "Who sits in which of those rooms.",
+          OCEAN, "ic-users"),
+]
+
 # ---------------------------------------------------------------------------
 # The two hubs that are screens rather than tables
 # ---------------------------------------------------------------------------
@@ -458,6 +483,51 @@ def category(available_apps, key, path=""):
         if cat["key"] == key:
             return cat
     return None
+
+
+# Live and Staging as origin filters (goodtip.origin.ORIGIN_LIVE/ORIGIN_STAGING),
+# not as database connections — both read the one database the request is
+# already answering from, filtered by the label every ORIGIN_TABLES row
+# carries. See sysadmin.management.commands.sync_live_backup for how a LIVE
+# row gets there at all on staging.
+ORIGIN_META = {
+    "live": {"label": "Live", "icon": "ic-shield", "accent": GREEN,
+             "blurb": "Real — signed up or created on goodtip.com.au itself."},
+    "staging": {"label": "Staging", "icon": "ic-flask", "accent": AMBER,
+                "blurb": "Testing — made right here on staging, trying something out."},
+}
+
+
+def origin_category(available_apps, origin, path=""):
+    """ORIGIN_TABLES as a category dict, cards pre-filtered to one origin.
+
+    Same shape _card()/categories() already produce, so tables_category.html
+    renders this with no changes — it has no idea this isn't an ordinary
+    category.
+    """
+    meta = ORIGIN_META.get(origin)
+    if meta is None:
+        return None
+    flat = flatten(available_apps)
+    cards = []
+    for table in ORIGIN_TABLES:
+        row = flat.get(table.ref)
+        if row is None:
+            continue
+        card = _card(row, table, path)
+        if card["url"]:
+            sep = "&" if "?" in card["url"] else "?"
+            card["url"] = f"{card['url']}{sep}origin={origin}"
+        card["add_url"] = ""  # adding a labelled row isn't a workflow here
+        cards.append(card)
+    if not cards:
+        return None
+    return {
+        "key": f"origin-{origin}", "label": meta["label"], "blurb": meta["blurb"],
+        "icon": meta["icon"], "accent": meta["accent"],
+        "tables": cards, "count": len(cards),
+        "is_current": any(c["is_current"] for c in cards),
+    }
 
 
 def security_tables(available_apps, path=""):

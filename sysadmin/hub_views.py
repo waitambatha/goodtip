@@ -46,7 +46,7 @@ def _url(name, *args):
         return ""
 
 
-def _row_count(ref):
+def _row_count(ref, **filters):
     """How many rows a table holds, or None if it cannot be counted right now.
 
     Guarded rather than trusted: a hub screen must still render while a model
@@ -57,7 +57,7 @@ def _row_count(ref):
 
     try:
         app_label, model_name = ref.split(".", 1)
-        return apps.get_model(app_label, model_name).objects.count()
+        return apps.get_model(app_label, model_name).objects.filter(**filters).count()
     except Exception:
         return None
 
@@ -80,7 +80,8 @@ def tables_hub(request):
     model mid-migration costs a number rather than the page.
     """
     ctx = admin.site.each_context(request)
-    cats = hub.categories(ctx.get("available_apps"), request.path)
+    available = ctx.get("available_apps")
+    cats = hub.categories(available, request.path)
     for cat in cats:
         cat["href"] = _url("admin:hq_tables_category", cat["key"])
         counted = [_row_count(t["ref"]) for t in cat["tables"]]
@@ -89,8 +90,24 @@ def tables_hub(request):
         # about the data, and this would be a claim about the database being
         # unavailable.
         cat["rows"] = sum(known) if known else None
+
+    # Live and Staging, as their own two cards at the front (client, 15 Oct
+    # 2026) — not a category of tables that only exist in one place, but a
+    # filter on the handful that carry goodtip.origin.OriginMixin, wherever
+    # this request is answering from. See hub.origin_category.
+    origin_cats = []
+    for origin in ("live", "staging"):
+        ocat = hub.origin_category(available, origin, request.path)
+        if ocat is None:
+            continue
+        ocat["href"] = _url("admin:hq_tables_origin", origin)
+        counted = [_row_count(t["ref"], origin=origin) for t in ocat["tables"]]
+        known = [n for n in counted if n is not None]
+        ocat["rows"] = sum(known) if known else None
+        origin_cats.append(ocat)
+
     ctx.update(
-        title="Tables & models", categories=cats,
+        title="Tables & models", categories=origin_cats + cats,
         total_tables=sum(c["count"] for c in cats),
         total_rows=sum(c["rows"] or 0 for c in cats),
     )
@@ -104,6 +121,23 @@ def tables_category(request, key):
         raise Http404("No such category")
     for table in cat["tables"]:
         table["rows"] = _row_count(table["ref"])
+    ctx.update(
+        title=cat["label"], category=cat,
+        back_url=_url("admin:hq_tables"), back_label="Tables & models",
+    )
+    return render(request, "admin/hub/tables_category.html", ctx)
+
+
+def tables_origin(request, origin):
+    """Live or Staging, as their own hub screen — the same ORIGIN_TABLES
+    the two front-page cards summarise, each count and each link filtered to
+    this one origin."""
+    ctx = admin.site.each_context(request)
+    cat = hub.origin_category(ctx.get("available_apps"), origin, request.path)
+    if cat is None:
+        raise Http404("No such origin")
+    for table in cat["tables"]:
+        table["rows"] = _row_count(table["ref"], origin=origin)
     ctx.update(
         title=cat["label"], category=cat,
         back_url=_url("admin:hq_tables"), back_label="Tables & models",

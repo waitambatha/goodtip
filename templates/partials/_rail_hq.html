@@ -94,6 +94,18 @@ did.
     {% endif %}
     <a href="{% safe_url 'admin:hq_tables' %}" title="Tables &amp; models">
       <svg><use href="#ic-f-sliders"/></svg><span class="lbl">Tables &amp; models</span></a>
+    {% comment %}
+    Live and Staging, each their own link to their own hub of cards — same
+    one-item-one-page pattern as everything else in this rail (client, 15
+    Oct 2026: a card and its own list of tables for each). Not a database
+    switch: both read whichever database this request is already answering
+    from, filtered to goodtip.origin's real/testing label. See
+    sysadmin.hub.origin_category.
+    {% endcomment %}
+    <a href="{% safe_url 'admin:hq_tables_origin' 'live' %}" title="Live">
+      <svg><use href="#ic-shield"/></svg><span class="lbl">Live</span></a>
+    <a href="{% safe_url 'admin:hq_tables_origin' 'staging' %}" title="Staging">
+      <svg><use href="#ic-flask"/></svg><span class="lbl">Staging</span></a>
     {% if is_full_access %}
     <a href="{% safe_url 'admin:hq_security' %}" title="Security">
       <svg><use href="#ic-shield-check"/></svg><span class="lbl">Security</span></a>

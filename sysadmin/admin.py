@@ -427,6 +427,10 @@ def _get_urls():
         # cards, one click to the thing itself — see sysadmin/hub_views.py for
         # why the rail stopped carrying ten disclosure groups.
         path("tables/", admin.site.admin_view(hub_views.tables_hub), name="hq_tables"),
+        # Two extra segments, not a <str:key> value — "live"/"staging" never
+        # collide with an ordinary category key, whichever line runs first.
+        path("tables/origin/<str:origin>/", admin.site.admin_view(hub_views.tables_origin),
+             name="hq_tables_origin"),
         path("tables/<str:key>/", admin.site.admin_view(hub_views.tables_category),
              name="hq_tables_category"),
         path("security/", admin.site.admin_view(hub_views.security_hub), name="hq_security"),
