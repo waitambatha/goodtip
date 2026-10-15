@@ -162,10 +162,16 @@ class Command(BaseCommand):
         from catalog.models import Charity
         return self._match(Charity, slug=live_charity.slug)
 
-    def _local_user(self, live_user):
-        if not live_user:
+    def _local_user(self, live_user_id):
+        """The staging-local copy of a live user, found by id — not by
+        select_related, since that would join and SELECT every column on
+        accounts_user, including origin/live_id, which live's own schema
+        does not have (this backup is staging-only; main never gets these
+        migrations). `_id` attributes need no join at all, so every lookup
+        below is by id rather than by the related object."""
+        if not live_user_id:
             return None
-        return User.objects.filter(live_id=live_user.id).first()
+        return User.objects.filter(live_id=live_user_id).first()
 
     # ---- the six syncs, in dependency order -----------------------------
 
@@ -174,9 +180,8 @@ class Command(BaseCommand):
         # Parent is deliberately not set in this first pass at all (see the
         # second pass below), so fetch order here doesn't matter — nothing
         # depends on a parent already existing locally yet.
-        rows = list(Organisation.objects.using(LIVE_ALIAS).select_related(
+        rows = list(Organisation.objects.using(LIVE_ALIAS).defer("origin", "live_id").select_related(
             "organisation_type", "country", "state", "season", "charity",
-            "created_by", "approved_by", "terms_accepted_by", "public_consent_by",
         ))
         # Season is a required FK (PROTECT, not nullable) — an org whose
         # season doesn't exist on staging's catalog cannot be saved at all,
@@ -199,10 +204,10 @@ class Command(BaseCommand):
                     state=self._match_state(row.state),
                     season=season,
                     charity=self._match_charity(row.charity),
-                    created_by=self._local_user(row.created_by),
-                    approved_by=self._local_user(row.approved_by),
-                    terms_accepted_by=self._local_user(row.terms_accepted_by),
-                    public_consent_by=self._local_user(row.public_consent_by),
+                    created_by=self._local_user(row.created_by_id),
+                    approved_by=self._local_user(row.approved_by_id),
+                    terms_accepted_by=self._local_user(row.terms_accepted_by_id),
+                    public_consent_by=self._local_user(row.public_consent_by_id),
                     **self._plain_fields(row, Organisation, skip={
                         "id", "origin", "live_id", "parent", "organisation_type",
                         "country", "state", "season", "charity", "created_by",
@@ -242,7 +247,7 @@ class Command(BaseCommand):
         # the existing row (sets its live_id, promotes it to real) instead.
         n = 0
         skip = {"id", "origin", "live_id", "password", "last_login", "groups", "user_permissions"}
-        for row in User.objects.using(LIVE_ALIAS).all():
+        for row in User.objects.using(LIVE_ALIAS).defer("origin", "live_id"):
             local = User.objects.filter(live_id=row.id).first() or User.objects.filter(email=row.email).first()
             fields = dict(origin=ORIGIN_LIVE, live_id=row.id, password=row.password,
                           **self._plain_fields(row, User, skip=skip))
@@ -258,8 +263,8 @@ class Command(BaseCommand):
     def _sync_groups(self):
         n = 0
         from catalog.models import GroupType
-        for row in Group.objects.using(LIVE_ALIAS).select_related(
-            "org", "kind", "country", "charity", "created_by", "approved_by",
+        for row in Group.objects.using(LIVE_ALIAS).defer("origin", "live_id").select_related(
+            "kind", "country", "charity",
         ):
             org = Organisation.objects.filter(live_id=row.org_id).first()
             if org is None:
@@ -277,8 +282,8 @@ class Command(BaseCommand):
                     kind=kind,
                     country=self._match_country(row.country),
                     charity=self._match_charity(row.charity),
-                    created_by=self._local_user(row.created_by),
-                    approved_by=self._local_user(row.approved_by),
+                    created_by=self._local_user(row.created_by_id),
+                    approved_by=self._local_user(row.approved_by_id),
                     **self._plain_fields(row, Group, skip={
                         "id", "origin", "live_id", "org", "kind", "country",
                         "charity", "created_by", "approved_by",
@@ -290,8 +295,8 @@ class Command(BaseCommand):
 
     def _sync_org_members(self):
         n = 0
-        for row in OrgMember.objects.using(LIVE_ALIAS).select_related("user", "org", "invited_by"):
-            user = self._local_user(row.user)
+        for row in OrgMember.objects.using(LIVE_ALIAS).defer("origin", "live_id"):
+            user = self._local_user(row.user_id)
             org = Organisation.objects.filter(live_id=row.org_id).first()
             if user is None or org is None:
                 continue
@@ -301,7 +306,7 @@ class Command(BaseCommand):
                     origin=ORIGIN_LIVE,
                     user=user,
                     org=org,
-                    invited_by=self._local_user(row.invited_by),
+                    invited_by=self._local_user(row.invited_by_id),
                     **self._plain_fields(row, OrgMember, skip={
                         "id", "origin", "live_id", "user", "org", "invited_by",
                     }),
@@ -312,8 +317,8 @@ class Command(BaseCommand):
 
     def _sync_group_members(self):
         n = 0
-        for row in GroupMember.objects.using(LIVE_ALIAS).select_related("user", "group"):
-            user = self._local_user(row.user)
+        for row in GroupMember.objects.using(LIVE_ALIAS).defer("origin", "live_id"):
+            user = self._local_user(row.user_id)
             group = Group.objects.filter(live_id=row.group_id).first()
             if user is None or group is None:
                 continue
@@ -338,7 +343,7 @@ class Command(BaseCommand):
         # then collide on that same uniqueness.
         n = 0
         skip = {"id", "origin", "live_id"}
-        for row in LaunchSignup.objects.using(LIVE_ALIAS).all():
+        for row in LaunchSignup.objects.using(LIVE_ALIAS).defer("origin", "live_id"):
             local = (
                 LaunchSignup.objects.filter(live_id=row.id).first()
                 or LaunchSignup.objects.filter(email=row.email).first()
