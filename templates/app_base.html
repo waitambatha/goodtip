@@ -565,7 +565,11 @@ goodtip.css.
         {% include "partials/_app_theme_switch.html" %}
       </div>
       {# Profile is the header — a second row for it would point at the panel's own top #}
+      {% if is_holding %}
+      <span class="sheet-logout"><svg class="an-ic" aria-hidden="true"><use href="#ic-logout"/></svg><span>Log out</span></span>
+      {% else %}
       <a href="{% url 'accounts:logout' %}" class="sheet-logout"><svg class="an-ic" aria-hidden="true"><use href="#ic-logout"/></svg><span>Log out</span></a>
+      {% endif %}
     </div>
   </div>
 
