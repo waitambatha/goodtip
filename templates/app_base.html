@@ -67,7 +67,11 @@ goodtip.css.
       keeps the width, because which one you are standing in decides what every
       other item in this bar means.
       {% endcomment %}
+      {% if is_holding %}
+      <a href="{% url 'coming_soon' %}" class="an-brand" aria-label="GoodTip, back to the trailer">GOOD<span>TIP</span></a>
+      {% else %}
       <a href="{% url 'dashboard' %}" class="an-brand" aria-label="GoodTip, back to the dashboard">GOOD<span>TIP</span></a>
+      {% endif %}
       {% comment %}
       WHERE YOU ARE, on every page.
 
@@ -217,6 +221,26 @@ goodtip.css.
       </div>
       {% endif %}
       <div class="an-links">
+        {% if is_holding %}
+        {% comment %}
+        THE REAL NAV, SHOWN, NOT WIRED (client, 15 Oct 2026: the coming-soon
+        blog should "look exactly as" the signed-in one, same menu, "but when
+        they click it they should take them nowhere" — the rest of the
+        product isn't open yet). Same items, same icons, same order as the
+        real nav below — copied, not redesigned — as spans rather than links,
+        so there is nothing to navigate to by construction rather than by a
+        click handler that could be bypassed. See .an-navlink in goodtip.css
+        for why they still look identical to the real thing.
+        {% endcomment %}
+        <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-home"/></svg><span>Dashboard</span></span>
+        <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-vote"/></svg><span>My Tips</span></span>
+        <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>Leaderboard</span></span>
+        <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg><span>Ladder</span></span>
+        <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-msg"/></svg><span>The Wall</span></span>
+        <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-mail"/></svg><span>Messages</span></span>
+        <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-sliders"/></svg><span>Manage</span></span>
+        <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Admin</span></span>
+        {% else %}
         <a href="{% url 'dashboard' %}" class="{% block nav_dash %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-home"/></svg><span>Dashboard</span></a>
         {% if primary_org %}
           {% comment %}
@@ -333,6 +357,7 @@ goodtip.css.
           {% endif %}
         {% endif %}
         {% if user.is_staff %}<a href="{% url 'manage:overview' %}" class="{% block nav_admin %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Admin</span></a>{% endif %}
+        {% endif %}
       </div>
       <div class="an-right">
         {% comment %}
@@ -389,8 +414,13 @@ goodtip.css.
         an avatar and a door are both unambiguous at this size, and the words
         were costing the row ~90px that the link bar needed.
         {% endcomment %}
+        {% if is_holding %}
+        <span class="an-iconbtn an-profile" title="Profile"><span class="an-avatar">G</span></span>
+        <span class="an-iconbtn an-logout" title="Log out"><svg aria-hidden="true"><use href="#ic-logout"/></svg></span>
+        {% else %}
         <a href="{% url 'profile' %}" class="an-iconbtn an-profile" title="Profile" aria-label="Profile">{% if user.avatar %}<span class="an-avatar has-img"><img src="{{ user.avatar.url }}" alt=""></span>{% else %}<span class="an-avatar">{{ user.display_name|slice:":1"|upper }}</span>{% endif %}</a>
         <a href="{% url 'accounts:logout' %}" class="an-iconbtn an-logout" title="Log out" aria-label="Log out"><svg aria-hidden="true"><use href="#ic-logout"/></svg></a>
+        {% endif %}
         <button class="an-burger" aria-label="Menu" aria-expanded="false" aria-controls="appSheet" data-sheet-open><svg><use href="#ic-menu"/></svg></button>
       </div>
     </div>
@@ -476,6 +506,12 @@ goodtip.css.
       unlabelled taps beside the burger.
       {% endcomment %}
       <div class="sheet-head">
+        {% if is_holding %}
+        <span class="sheet-me">
+          <span class="an-avatar">G</span>
+          <span class="sheet-me-txt"><b>GoodTip</b></span>
+        </span>
+        {% else %}
         <a href="{% url 'profile' %}" class="sheet-me">
           {% if user.avatar %}<span class="an-avatar has-img"><img src="{{ user.avatar.url }}" alt=""></span>{% else %}<span class="an-avatar">{{ user.display_name|slice:":1"|upper }}</span>{% endif %}
           <span class="sheet-me-txt">
@@ -483,9 +519,25 @@ goodtip.css.
             {% if primary_org %}<i>{{ primary_org.name }}</i>{% endif %}
           </span>
         </a>
+        {% endif %}
         {# ic-cross is the medical plus, not a dismiss glyph — this one is its own #}
         <button type="button" class="sheet-x" aria-label="Close menu" data-sheet-close><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
       </div>
+      {% if is_holding %}
+      {# Same reasoning as the desktop bar above — shown, not wired. #}
+      <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-home"/></svg><span>Dashboard</span></span>
+      <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-vote"/></svg><span>My Tips</span></span>
+      <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>Leaderboard</span></span>
+      <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg><span>Ladder</span></span>
+      <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-msg"/></svg><span>The Wall</span></span>
+      <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-mail"/></svg><span>Messages</span></span>
+      <span class="sheet-label">Manage</span>
+      <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-users"/></svg><span>Members</span></span>
+      <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-coins"/></svg><span>Season summary</span></span>
+      <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>Certificates</span></span>
+      <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-heart"/></svg><span>Charities</span></span>
+      <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Admin</span></span>
+      {% else %}
       <a href="{% url 'dashboard' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-home"/></svg><span>Dashboard</span></a>
       {% if primary_org %}
         <a href="{% url 'tipping:my_tips' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-vote"/></svg><span>My Tips</span></a>
@@ -502,6 +554,7 @@ goodtip.css.
         {% endif %}
       {% endif %}
       {% if user.is_staff %}<a href="{% url 'manage:overview' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Admin</span></a>{% endif %}
+      {% endif %}
       {% comment %}
       The theme switch again, because the bar's copy is hidden at the widths
       where this panel exists — and a phone is where somebody is most likely to

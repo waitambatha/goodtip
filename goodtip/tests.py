@@ -152,6 +152,45 @@ class HoldingModeTests(TestCase):
         self.assertNotContains(resp, "Sign up free")
         self.assertNotContains(resp, "/login/")
 
+    def test_a_real_story_is_shown_in_full_not_the_preview(self):
+        # The 1/3-and-a-gated-tease split (admin_panel.views._story_preview)
+        # is what the LAUNCHED site teases an anonymous reader with — the
+        # opposite job to a page whose point is drawing someone INTO the
+        # waiting list in the first place (client, 15 Oct 2026: "I should
+        # see the whole blog").
+        from admin_panel.models import NewsPost
+
+        NewsPost.objects.create(
+            title="Finals Loom", slug="finals-loom-full", is_published=True,
+            body="<p>" + "word " * 600 + "</p>",
+        )
+        resp = self.client.get("/news/finals-loom-full/")
+        self.assertNotContains(resp, "rd-tease")
+        self.assertContains(resp, "word word word")
+
+    def test_the_blog_list_uses_the_signed_in_page_not_the_marketing_one(self):
+        # "Copy it... same template... look exactly as" (client, 15 Oct
+        # 2026) — the index page members see, deck and all, not
+        # public/news_index.html's lighter marketing layout.
+        resp = self.client.get("/news/")
+        self.assertContains(resp, "News &amp; blog")
+        self.assertNotContains(resp, "News that moves")
+
+    def test_the_real_nav_is_shown_but_nothing_in_it_goes_anywhere(self):
+        # Same menu a signed-in member sees — Dashboard, My Tips,
+        # Leaderboard, Ladder, The Wall, Messages, Manage, Admin — shown as
+        # spans rather than links (app_base.html's is_holding branch), so
+        # there is nothing to navigate to by construction (client, 15 Oct
+        # 2026: "when they click it... take them nowhere").
+        resp = self.client.get("/news/")
+        body = resp.content.decode()
+        for label in ("My Tips", "Leaderboard", "Ladder", "The Wall", "Messages", "Manage", "Admin"):
+            with self.subTest(label=label):
+                self.assertIn(label, body)
+        for path in ("/dashboard/", "/profile/", "/accounts/logout/"):
+            with self.subTest(path=path):
+                self.assertNotIn(f'href="{path}"', body)
+
     def test_everything_else_is_still_gated(self):
         for path in ("/login/", "/signup/", "/dashboard/", "/media/messages/x.pdf"):
             with self.subTest(path=path):
