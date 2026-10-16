@@ -1072,7 +1072,16 @@ def news_index(request):
         posts = posts.filter(Q(tags__contains=[active_tag]) | Q(tag=active_tag))
     else:
         active_tag = ""
-    tpl = "news_index.html" if request.user.is_authenticated else "public/news_index.html"
+    # The coming-soon visitor gets the member page too, not the marketing
+    # one — client, 15 Oct 2026: "look exactly as" the signed-in page,
+    # "the cards moving, the cards switching", as a deliberate marketing
+    # draw into the waiting list. is_holding is already how the lockdown
+    # nav itself tells a real page from the showcase one; app_base.html
+    # reads the same flag to show the real nav unwired rather than wrongly
+    # wired to an org that does not exist for this visitor.
+    from goodtip.staging_gate import is_holding_visitor
+
+    tpl = "news_index.html" if (request.user.is_authenticated or is_holding_visitor(request)) else "public/news_index.html"
     # Both news pages, member and public, are the dashboard's turning deck
     # at three rows: the newest stories under the same filter, nine at a
     # time, turning every five seconds, the dots under it paging back through
@@ -1209,7 +1218,15 @@ def news_detail(request, slug: str):
         # A story typed as plain text. Made into paragraphs first, so the
         # truncator has structure to cut on and the preview is not one wall.
         body = linebreaks(body)
-    if request.user.is_authenticated:
+    from goodtip.staging_gate import is_holding_visitor
+
+    if request.user.is_authenticated or is_holding_visitor(request):
+        # Full story, no gate, while the product itself is still behind the
+        # waiting list (client, 15 Oct 2026: "when I click a certain blog I
+        # should see the whole blog") — the 1/3 preview is what the launched
+        # site teases an anonymous visitor with; it was never meant to be
+        # the thing drawing somebody INTO the waiting list in the first
+        # place, which is the opposite job.
         shown, teased, gated = body, "", False
     else:
         shown, teased, gated = _story_preview(body)
