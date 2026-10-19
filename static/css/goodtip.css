@@ -1843,6 +1843,20 @@ img, svg, video { max-width: 100%; }
 /* only the menu sticks; the charity strip lives under it and scrolls away */
 .app-nav { position: sticky; top: 0; z-index: 50; }
 .app-nav { background: var(--deep); border-bottom: 1px solid rgba(255,255,255,.08); }
+/* The real way back into the rest of the trailer, under the member nav's
+   own unwired bar (client, 19 Oct 2026). Plain small links, not dressed up
+   as app chrome — this strip is deliberately a different register from the
+   bar above it, so the two are never mistaken for one one menu. */
+.an-holding-links {
+  display: flex; flex-wrap: wrap; gap: 4px 18px; justify-content: center;
+  padding: 10px 16px; background: transparent;
+  border-bottom: 1px solid var(--app-line, rgba(15,46,34,.12));
+}
+.an-holding-links a {
+  font-size: 13px; font-weight: 600; color: var(--ink); opacity: .72;
+  text-decoration: none;
+}
+.an-holding-links a:hover { opacity: 1; text-decoration: underline; }
 .app-nav .an-inner { max-width: 1160px; margin: 0 auto; height: 60px; display: flex; align-items: center; gap: 16px; padding: 0 20px; }
 .an-brand { font-family: var(--mark); font-weight: 900; font-size: 20px; color: #fff; text-transform: uppercase; letter-spacing: .02em; text-decoration: none; }
 .an-brand span { color: var(--lime); }

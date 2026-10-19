@@ -414,6 +414,24 @@ goodtip.css.
       </div>
     </div>
   </nav>
+  {% if is_holding %}
+  {% comment %}
+  REAL WAY BACK INTO THE REST OF THE TRAILER (client, 19 Oct 2026: "I have
+  noticed there is no buttons that can make me move from the other pages in
+  the coming soon"). The bar above is the member app's own, shown but
+  deliberately unwired (nothing there to link to for a visitor who isn't in
+  it yet) — this strip is the opposite: real links, same destinations
+  goodtip.staging_gate sends a showcase or real-page visit to from anywhere
+  else, so leaving the blog for How It Works or The Wall is one click
+  instead of back-to-the-trailer-then-click-again.
+  {% endcomment %}
+  <div class="an-holding-links">
+    <a href="{% url 'coming_soon' %}#how-it-works">How It Works</a>
+    <a href="{% url 'coming_soon' %}#wall">The Wall</a>
+    <a href="{% url 'coming_soon' %}#about">About Us</a>
+    <a href="{% url 'coming_soon' %}#join" data-wl-open="join">Join the waiting list</a>
+  </div>
+  {% endif %}
   {% comment %}
   THE BAR FITS THE SCREEN IT IS ON (Sep 2026) — see the block of that name at
   the end of goodtip.css for why. It steps the bar down one tier at a time
