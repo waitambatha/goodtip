@@ -191,6 +191,20 @@ class HoldingModeTests(TestCase):
             with self.subTest(path=path):
                 self.assertNotIn(f'href="{path}"', body)
 
+    def test_a_real_way_back_into_the_rest_of_the_trailer(self):
+        # The nav above is unwired on purpose — this strip is the opposite:
+        # real links to the same showcases/pages goodtip.staging_gate sends
+        # a visit to from anywhere else (client, 19 Oct 2026: "I have
+        # noticed there is no buttons that can make me move from the other
+        # pages in the coming soon").
+        body = self.client.get("/news/").content.decode()
+        self.assertIn("an-holding-links", body)
+        self.assertIn('href="/coming-soon/#how-it-works"', body)
+        self.assertIn('href="/coming-soon/#wall"', body)
+        for path in ("/about/", "/pricing/", "/terms/", "/privacy/"):
+            with self.subTest(path=path):
+                self.assertIn(f'href="{path}"', body)
+
     def test_everything_else_is_still_gated(self):
         for path in ("/login/", "/signup/", "/dashboard/", "/media/messages/x.pdf"):
             with self.subTest(path=path):
