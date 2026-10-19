@@ -1813,6 +1813,12 @@ img, svg, video { max-width: 100%; }
 :root { --app-bg:#EBE7DA; --app-card:#FCFBF5; --app-card-2:#F4F1E6; --app-line:rgba(15,46,34,.12); --app-line-2:rgba(15,46,34,.07); }
 
 .app { background: var(--app-bg); min-height: 100vh; color: var(--ink); font-family: var(--body); }
+/* The blog's own background, white rather than the app's default warm
+   paper tone (client, 19 Oct 2026: "the background of that whole section
+   is cream, make it white, that is for all") — scoped to this page alone
+   so the rest of the member app, which earned that cream tone on its own
+   merits, is untouched. */
+.app.page-news-member { background: #FFFFFF; }
 .app-main { max-width: 1160px; margin: 0 auto; padding: 26px 20px 72px; }
 .app-h1 { font-family: var(--display); font-size: clamp(22px,2.8vw,30px); color: var(--ink); letter-spacing: -.01em; }
 .app-sub { color: var(--muted); font-size: 15px; margin-top: 4px; }
@@ -15322,7 +15328,9 @@ html[data-theme="light"] .gt-app.page-deep .nd-title { color: var(--lt-ink); }
 .news-all-h { text-align: center; font-size: 22px; margin: 30px 0 16px; }
 
 /* ---- the dots ------------------------------------------------------------ */
-.nd-foot { display: flex; justify-content: center; margin-top: 16px; }
+.nd-foot { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 16px; }
+.nd-pagelabel { font-size: 13px; font-weight: 600; color: var(--muted, #5C6A5A); }
+.page-deep .nd-pagelabel { color: rgba(232,228,213,.7); }
 .nd-dots { display: flex; align-items: center; gap: 8px; }
 .nd-dot {
   width: 9px; height: 9px; padding: 0; border: 0; border-radius: 100px;
@@ -20080,6 +20088,16 @@ html[data-theme="dark"] .gts-theme button:not(.on) { color: #B4C4B8; }
 .compfilter.is-centred { flex-wrap: wrap; row-gap: 12px; }
 .compfilter.is-centred .cf-chips { flex: 1 1 100%; justify-content: center; }
 .compfilter.is-centred .cf-pick { flex: 1 1 100%; justify-content: center; }
+/* The news page's own filter wants the dropdown back on the chips' own line
+   (client, 19 Oct 2026) — scoped to .newsfilter alone so the ladder and
+   leaderboard's own centred filters, which share .compfilter.is-centred,
+   are untouched. */
+.compfilter.newsfilter.is-centred { flex-wrap: nowrap; row-gap: 0; }
+.compfilter.newsfilter.is-centred .cf-chips { flex: 1 1 auto; justify-content: center; }
+.compfilter.newsfilter.is-centred .cf-pick { flex: none; justify-content: center; }
+@media (max-width: 720px) {
+  .compfilter.newsfilter.is-centred { flex-wrap: wrap; row-gap: 12px; }
+}
 
 /* ==========================================================================
    THE RECOMMENDED PLAN, INSIDE THE SIGN-UP WIZARD

@@ -949,7 +949,15 @@ def news_upload_image(request):
         if f.size > NEWS_IMAGE_MAX_BYTES:
             return JsonResponse({"error": "That picture is over 10 MB."}, status=400)
         folder = "news/featured" if featured else "news/body"
-        path = default_storage.save(f"{folder}/{f.name}", f)
+        # Resized and recompressed before it ever touches disk — see
+        # admin_panel.image_opt for why. Falls back to the original upload
+        # if Pillow can't make sense of it, so an unusual format still saves
+        # rather than 400ing on something that would have worked unoptimized.
+        from .image_opt import optimize_image
+
+        optimized = optimize_image(f, name=f.name)
+        to_save = optimized or f
+        path = default_storage.save(f"{folder}/{to_save.name}", to_save)
         # `path` as well as `url`: the featured manager posts the storage path
         # back, and a URL is not something to derive a storage path from.
         return JsonResponse({"url": default_storage.url(path), "path": path, "kind": "image"})

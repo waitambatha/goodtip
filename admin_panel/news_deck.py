@@ -15,10 +15,11 @@ ROW_CARDS = 3
 DECK_ROWS = 2
 DECK_STORIES = 18
 
-#: The news pages' deck: three rows, and enough turns that the dots under it
-#: are the way back to older stories — five pages of nine.
-NEWS_PAGE_ROWS = 3
-NEWS_PAGE_STORIES = 45
+#: The news pages' deck: four rows, and enough turns that the dots under it
+#: are the way back to older stories — five pages of twelve (client, 19 Oct
+#: 2026: "I would want for both the staging and coming soon to have 4").
+NEWS_PAGE_ROWS = 4
+NEWS_PAGE_STORIES = 60
 
 
 def deal_news_deck(posts, rows=DECK_ROWS):

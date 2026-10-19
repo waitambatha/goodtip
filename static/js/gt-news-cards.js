@@ -232,12 +232,15 @@
       });
     }
 
+    var pageLabel = deck.querySelector('[data-news-pagelabel]');
+
     function markDots(n) {
       dots.forEach(function (d, k) {
         d.classList.toggle('on', k === n);
         if (k === n) d.setAttribute('aria-current', 'true');
         else d.removeAttribute('aria-current');
       });
+      if (pageLabel) pageLabel.textContent = 'Page ' + (n + 1) + ' of ' + dots.length;
     }
 
     /* THE ALTERNATION. Each tick moves one row on to the next story. The page
