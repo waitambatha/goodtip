@@ -152,9 +152,15 @@ class Command(BaseCommand):
     # ---- copying one post, with its media and files ------------------------
 
     def _match_user_by_email(self, email, dest_alias):
+        # .only("id") — live's own accounts_user table doesn't carry
+        # origin/live_id at all (deliberately: that split is staging-only,
+        # see goodtip.origin), and all this needs is something with a valid
+        # .pk to assign as created_by. A plain .filter().first() selects
+        # every column on the model and breaks the same way
+        # sync_live_backup's did before it learned to defer.
         if not email:
             return None
-        return User.objects.using(dest_alias).filter(email=email).first()
+        return User.objects.using(dest_alias).only("id").filter(email=email).first()
 
     def _copy_file(self, field_file, src_root, dest_root):
         """Copy one FieldFile's bytes across, same relative path either side."""
