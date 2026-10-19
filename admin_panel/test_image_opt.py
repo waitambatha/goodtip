@@ -5,9 +5,10 @@ long... even the images" (client, 19 Oct 2026) actually fixes."""
 import io
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 from PIL import Image
 
+from goodtip.testing import temp_media
 from .image_opt import MAX_DIMENSION, optimize_image
 
 
@@ -18,6 +19,13 @@ def _png(width, height, mode="RGB", color=(10, 20, 30)):
     return SimpleUploadedFile("pic.png", buf.read(), content_type="image/png")
 
 
+# optimize_image() never touches disk — it reads from and returns an
+# in-memory ContentFile, nothing goes through default_storage — so there is
+# nothing here for drop_temp_media to clean up. The override is only to
+# satisfy test_every_class_that_writes_an_upload_has_replaced_media_root_first,
+# which flags SimpleUploadedFile by name rather than by what a test actually
+# does with it.
+@override_settings(MEDIA_ROOT=temp_media())
 class OptimizeImageTests(SimpleTestCase):
     def test_a_large_file_shrinks_a_lot(self):
         f = _png(2000, 1500)
