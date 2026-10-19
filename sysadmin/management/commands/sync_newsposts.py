@@ -173,11 +173,19 @@ class Command(BaseCommand):
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src_path, dest_path)
 
+    def _author_email(self, src):
+        """The author's email, read with the same care _match_user_by_email
+        takes — `src.created_by.email` would lazy-load the FK with no defer
+        at all, selecting origin/live_id on whichever side `src` came from
+        and failing on live's own accounts_user exactly the same way."""
+        if not src.created_by_id:
+            return None
+        row = User.objects.using(src._state.db).only("email").filter(pk=src.created_by_id).first()
+        return row.email if row else None
+
     def _copy_post(self, src, dest_alias, src_root, dest_root):
         """Write `src` (from whichever side just won) onto `dest_alias`."""
-        created_by = self._match_user_by_email(
-            src.created_by.email if src.created_by_id else None, dest_alias,
-        )
+        created_by = self._match_user_by_email(self._author_email(src), dest_alias)
 
         for f in (src.image, src.og_image):
             self._copy_file(f, src_root, dest_root)
