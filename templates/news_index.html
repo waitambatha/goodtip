@@ -3,6 +3,7 @@
 {% load humanize %}
 {% block title %}News &amp; blog &middot; GoodTip{% endblock %}
 {% block loader_task %}Fetching the latest stories{% endblock %}
+{% block body_class %}page-news-member{% endblock %}
 {% comment %}
 The rotating side strips. Standard on every member page (client request,
 Aug 2026) — these were the last screens without them. Outside the sheet,
@@ -49,36 +50,6 @@ so the archive is still all here, nine at a time.
   {% endif %}
 </div>
 {% endif %}
-
-<!-- Julie's Tips — one everyday tipper in the spotlight each round -->
-<div class="card pad-lg" style="margin-top:26px;display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;border-left:4px solid var(--forest);">
-  <div style="max-width:56ch;">
-    <div class="app-eyebrow">Julie's Tips</div>
-    <div class="card-h" style="font-size:20px;margin-top:4px;">Meet this round's featured tipper.</div>
-    <p class="card-lead" style="margin-top:6px;">Julie's Tips puts one everyday tipper in the spotlight each round. Real instinct, not analyst credentials. The first feature runs once the season kicks off.</p>
-  </div>
-  <a class="abtn abtn-primary" href="mailto:hello@goodtip.com.au?subject=Julie%27s%20Tips%20nomination">Nominate a tipper &rarr;</a>
-</div>
-
-<!-- From the community — the stories only GoodTip organisations can tell -->
-<div style="margin-top:26px;">
-  <div class="app-eyebrow">From the community</div>
-  <h2 class="card-h" style="font-size:20px;margin:4px 0 14px;">The stories only GoodTip organisations can tell.</h2>
-  <div class="grid-app g-2">
-    <div class="card pad-lg">
-      <div class="app-eyebrow">Preview &middot; illustrative example</div>
-      <div class="card-h" style="font-size:17px;margin-top:6px;">The tips comp finally means something.</div>
-      <p class="card-lead" style="margin-top:8px;">&ldquo;We've run this comp for six years. The loser still shouts the office a case of beer. But this year $340 <span class="illus-tag">Example</span> went to youth mental health, and that's the bit everyone's actually proud of.&rdquo;</p>
-      <p class="app-sub" style="margin-top:10px;font-size:12.5px;">A GoodTip organisation, once the season starts</p>
-    </div>
-    <div class="card pad-lg">
-      <div class="app-eyebrow">Preview &middot; illustrative example</div>
-      <div class="card-h" style="font-size:17px;margin-top:6px;">Bragging rights, plus something that lasts.</div>
-      <p class="card-lead" style="margin-top:8px;">&ldquo;The ladder still gets screenshotted every Monday. The difference is what happens at the end of the season. This year it's not a trophy, it's a donation the whole organisation picked.&rdquo;</p>
-      <p class="app-sub" style="margin-top:10px;font-size:12.5px;">A GoodTip organisation, once the season starts</p>
-    </div>
-  </div>
-</div>
 
 <!-- Your move -->
 <div class="card pad-lg news-cta" style="margin-top:18px;text-align:center;">

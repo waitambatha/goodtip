@@ -41,6 +41,12 @@ Expects news_rows and news_turns — see admin_panel.news_deck.deal_news_deck.
   {% endcomment %}
   {% if news_turns > 1 %}
   <div class="nd-foot">
+    {% comment %}
+    A visible count, not just the dots' own aria-labels — client, 19 Oct
+    2026: "pagination so I can know how many they are". gt-news-cards.js's
+    markDots() keeps this in step with whichever dot is current.
+    {% endcomment %}
+    <span class="nd-pagelabel" data-news-pagelabel>Page 1 of {{ news_turns }}</span>
     <div class="nd-dots" role="group" aria-label="News pages">
       {% for p in news_rows.0.0 %}
       <button type="button" class="nd-dot{% if forloop.first %} on{% endif %}" data-news-dot="{{ forloop.counter0 }}"
