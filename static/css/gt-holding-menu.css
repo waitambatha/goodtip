@@ -1,0 +1,246 @@
+/* ==========================================================================
+   THE COMING-SOON PAGES' ONE MENU (client, 23 Oct 2026: "need one clear menu
+   for the coming soon pages... let's go crazy").
+
+   Two parts, one list (goodtip.holding_menu):
+     .hm-bar  the bar every coming-soon page wears — its row of places, plus
+              a "Menu" button that is the only way in on a narrow screen
+     .hm      the programme: the same places full screen, big and numbered,
+              each saying whether it opens a filmed tour or the real page,
+              with its picture turning up in a frame as the pointer finds it
+
+   Everything prefixed hm-. Nothing in it moves on its own: the rows arrive
+   once when the visitor opens it, and the picture changes because they
+   pointed at a row (client, 20 Oct 2026: things to press, at their leisure).
+   ========================================================================== */
+
+/* ---- the bar ---- */
+.hm-bar .nav-links a { position: relative; }
+.hm-bar .nav-links a.is-current { color: var(--lime); }
+/* The small play mark: this one opens a filmed tour, not a page. */
+.hm-tourmark { display: inline-block; width: 0; height: 0; margin-left: 6px; vertical-align: middle;
+  border-left: 6px solid var(--lime); border-top: 4px solid transparent; border-bottom: 4px solid transparent; opacity: .85; }
+.hm-open {
+  flex: none; display: inline-flex; align-items: center; gap: 10px; margin-left: 14px; padding: 9px 16px 9px 12px;
+  border-radius: 999px; border: 1px solid rgba(207,249,58,.45); background: rgba(207,249,58,.08); color: #fff; cursor: pointer;
+  font: 800 13px/1 var(--mark); letter-spacing: .16em; text-transform: uppercase;
+  transition: background .25s var(--ease), color .25s var(--ease), border-color .25s var(--ease);
+}
+.hm-open:hover, .hm-open:focus-visible { background: var(--lime); color: var(--deep); border-color: var(--lime); outline: none; }
+.hm-burger { display: grid; gap: 3px; width: 16px; }
+.hm-burger i { display: block; height: 2px; border-radius: 2px; background: currentColor; transition: transform .3s var(--ease), width .3s var(--ease); }
+.hm-burger i:nth-child(2) { width: 70%; }
+.hm-burger i:nth-child(3) { width: 45%; }
+.hm-open:hover .hm-burger i { width: 100%; }
+@media (max-width: 1120px) {
+  .hm-bar .nav-inner { justify-content: space-between; }
+  .hm-open { margin-left: auto; }
+}
+
+/* ---- the programme ---- */
+.hm-lock, .hm-lock body { overflow: hidden; }
+.hm {
+  position: fixed; inset: 0; z-index: 400; overflow-y: auto; overscroll-behavior: contain;
+  background:
+    radial-gradient(60% 50% at 85% 20%, rgba(207,249,58,.12), transparent 70%),
+    radial-gradient(70% 60% at 0% 100%, rgba(42,115,55,.45), transparent 70%),
+    var(--deep-2);
+  color: #fff; opacity: 0; transition: opacity .3s var(--ease);
+}
+.hm.is-open { opacity: 1; }
+.hm[hidden] { display: none; }
+/* a little grain, standing still */
+.hm::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .05;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+.hm-in { position: relative; min-height: 100%; max-width: 1360px; margin: 0 auto; padding: 22px clamp(20px, 4vw, 56px) 32px;
+  display: grid; grid-template-rows: auto 1fr auto; gap: clamp(20px, 3vh, 40px); }
+
+.hm-top { display: flex; align-items: center; gap: 20px; }
+.hm-mark { font-size: 26px; }
+.hm-kicker { margin: 0 auto 0 0; display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 999px;
+  border: 1px solid rgba(207,249,58,.45); background: rgba(207,249,58,.08); color: var(--lime);
+  font: 800 12px/1 var(--mark); letter-spacing: .16em; text-transform: uppercase; }
+.hm-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4d3d; }
+.hm-close { display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px 10px 18px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,.28); background: rgba(255,255,255,.06); color: #fff;
+  font: 800 13px/1 var(--mark); letter-spacing: .16em; text-transform: uppercase; transition: background .2s var(--ease), color .2s var(--ease); }
+.hm-close svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.hm-close:hover, .hm-close:focus-visible { background: var(--lime); color: var(--deep); outline: none; }
+
+.hm-body { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: clamp(24px, 4vw, 64px); align-items: center; }
+
+/* the places, big and numbered */
+.hm-list { list-style: none; margin: 0; padding: 0; counter-reset: none; }
+.hm-list li { border-top: 1px solid rgba(255,255,255,.1); }
+.hm-list li:last-child { border-bottom: 1px solid rgba(255,255,255,.1); }
+.hm.is-open .hm-list li { animation: hmRow .55s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i) * 55ms + 80ms); }
+@keyframes hmRow { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+.hm-item { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: clamp(14px, 2vw, 28px);
+  padding: clamp(12px, 1.8vh, 20px) 6px; color: #fff; text-decoration: none; outline: none; }
+.hm-item::before { content: ""; position: absolute; left: -12px; right: -12px; top: 4px; bottom: 4px; border-radius: 18px; z-index: -1;
+  background: rgba(207,249,58,.07); opacity: 0; transition: opacity .25s var(--ease); }
+.hm-n { font: 900 clamp(15px, 1.3vw, 18px)/1 var(--mark); letter-spacing: .08em; color: rgba(255,255,255,.45);
+  padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.18); transition: all .25s var(--ease); }
+.hm-text { display: grid; gap: 6px; min-width: 0; }
+.hm-label { font: 400 clamp(30px, 4.4vw, 62px)/.95 var(--display); letter-spacing: -.025em; color: #fff;
+  transition: color .25s var(--ease), transform .35s cubic-bezier(.2,.8,.2,1); }
+.hm-blurb { font-size: clamp(13px, 1.1vw, 15px); line-height: 1.45; color: rgba(255,255,255,.62); max-width: 52ch;
+  max-height: 0; opacity: 0; overflow: hidden; transition: max-height .35s var(--ease), opacity .3s var(--ease); }
+.hm-kind { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; padding: 8px 12px; border-radius: 999px;
+  font: 800 12px/1 var(--mark); letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.7);
+  border: 1px solid rgba(255,255,255,.2); transition: all .25s var(--ease); }
+.hm-kind svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.hm-kind.is-tour svg { fill: currentColor; stroke: none; }
+
+/* the one the pointer or keyboard is on */
+.hm-item.is-lit::before, .hm-item:focus-visible::before { opacity: 1; }
+.hm-item.is-lit .hm-n, .hm-item:focus-visible .hm-n { background: var(--lime); border-color: var(--lime); color: var(--deep); }
+.hm-item.is-lit .hm-label, .hm-item:focus-visible .hm-label { color: var(--lime); transform: translateX(8px); }
+.hm-item.is-lit .hm-blurb, .hm-item:focus-visible .hm-blurb { max-height: 3.2em; opacity: 1; }
+.hm-item.is-lit .hm-kind, .hm-item:focus-visible .hm-kind { background: var(--lime); border-color: var(--lime); color: var(--deep); }
+.hm-item.is-current .hm-label::after { content: ""; display: inline-block; width: .28em; height: .28em; margin-left: .25em; vertical-align: .15em;
+  border-radius: 50%; background: var(--lime); }
+
+/* the picture of it, in a browser frame, tilted like a programme cover */
+.hm-peek { margin: 0; position: relative; transform: rotate(2deg); }
+.hm.is-open .hm-peek { animation: hmPeek .7s cubic-bezier(.2,.8,.2,1) .15s both; }
+@keyframes hmPeek { from { opacity: 0; transform: rotate(6deg) translateY(30px) scale(.94); } to { opacity: 1; transform: rotate(2deg); } }
+.hm-frame { border-radius: 16px; overflow: hidden; background: #061a11;
+  box-shadow: 0 50px 100px -40px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.14), 0 0 80px -20px rgba(207,249,58,.3); }
+.hm-frame-bar { display: flex; align-items: center; gap: 6px; padding: 10px 14px; background: rgba(255,255,255,.06); border-bottom: 1px solid rgba(255,255,255,.08); }
+.hm-frame-bar i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.25); }
+.hm-frame-bar i:first-child { background: #ff5f57; } .hm-frame-bar i:nth-child(2) { background: #febc2e; } .hm-frame-bar i:nth-child(3) { background: #28c840; }
+.hm-frame-bar span { margin-left: 10px; padding: 4px 12px; border-radius: 999px; background: rgba(0,0,0,.25); font-size: 12px; color: rgba(255,255,255,.7); }
+.hm-frame-screen { position: relative; aspect-ratio: 16 / 10; }
+.hm-frame-screen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center;
+  opacity: 0; transform: scale(1.03); transition: opacity .45s var(--ease), transform .6s var(--ease); }
+.hm-frame-screen img.is-on { opacity: 1; transform: none; }
+.hm-cap { position: absolute; left: -14px; bottom: -18px; display: inline-flex; align-items: center; gap: 10px; padding: 8px 16px 8px 8px;
+  border-radius: 999px; background: var(--lime); color: var(--deep); transform: rotate(-4deg);
+  box-shadow: 0 16px 30px -12px rgba(0,0,0,.7); font: 400 clamp(14px, 1.2vw, 17px)/1 var(--display); }
+.hm-cap b { font: 900 13px/1 var(--mark); letter-spacing: .06em; padding: 6px 9px; border-radius: 999px; background: var(--deep); color: var(--lime); }
+
+/* the way in, and the small print */
+.hm-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px 28px;
+  padding-top: 22px; border-top: 1px solid rgba(255,255,255,.1); }
+.hm-foot-main { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 22px; }
+.hm-join { display: inline-flex; align-items: center; gap: 10px; padding: 16px 24px; border-radius: 999px; text-decoration: none;
+  background: var(--lime); color: var(--deep); font: 400 clamp(16px, 1.4vw, 19px)/1 var(--display);
+  box-shadow: 0 20px 40px -18px rgba(207,249,58,.7); transition: transform .2s var(--ease), box-shadow .2s var(--ease); }
+.hm-join svg, .hm-quiet svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.hm-join:hover, .hm-join:focus-visible { transform: translateY(-2px); box-shadow: 0 26px 46px -18px rgba(207,249,58,.85); outline: none; }
+.hm-quiet { display: inline-flex; align-items: center; gap: 8px; color: rgba(255,255,255,.8); text-decoration: none; font-weight: 600; font-size: 15px; }
+.hm-quiet svg { width: 14px; height: 14px; fill: currentColor; stroke: none; }
+.hm-quiet:hover, .hm-quiet:focus-visible { color: var(--lime); outline: none; }
+.hm-legal { display: flex; flex-wrap: wrap; gap: 8px; }
+.hm-legal a { padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,.18); color: rgba(255,255,255,.75);
+  text-decoration: none; font-size: 13px; font-weight: 600; transition: all .2s var(--ease); }
+.hm-legal a:hover, .hm-legal a:focus-visible, .hm-legal a[aria-current="page"] { border-color: var(--lime); color: var(--lime); outline: none; }
+
+@media (max-width: 900px) {
+  .hm-body { grid-template-columns: 1fr; }
+  .hm-peek { display: none; }
+  .hm-kicker { display: none; }
+  .hm-blurb { max-height: 3.2em; opacity: 1; }
+  .hm-kind { padding: 6px 10px; font-size: 11px; }
+}
+@media (max-width: 560px) {
+  .hm-item { grid-template-columns: auto minmax(0, 1fr); }
+  .hm-kind { grid-column: 2; justify-self: start; }
+  .hm-label { font-size: 30px; }
+}
+
+/* The same Menu button on the blog's light strip (app_base.html), where the
+   bar's white-on-green would vanish. */
+.an-holding-links { align-items: center; }
+.an-holding-links a[aria-current="page"] { opacity: 1; color: var(--forest); text-decoration: underline; text-underline-offset: 4px; }
+.an-holding-links .hm-open { margin-left: 6px; padding: 6px 12px 6px 10px; font-size: 11px; color: var(--deep);
+  border-color: rgba(15,46,34,.25); background: #fff; }
+.an-holding-links .hm-open:hover, .an-holding-links .hm-open:focus-visible { background: var(--deep); color: var(--lime); border-color: var(--deep); }
+/* and on the story reader's bar */
+.rd-bar .hm-open { margin-left: 0; }
+
+/* On the trailer the bar turns lime while the film plays or a tour is open
+   (gt-trailer.css); the Menu button turns deep green with it. */
+body:is(.tr-on-air, .tr-peek-open) .hm-open { color: var(--deep); border-color: rgba(7,47,30,.45); }
+body:is(.tr-on-air, .tr-peek-open) .hm-open:hover,
+body:is(.tr-on-air, .tr-peek-open) .hm-open:focus-visible { background: var(--deep); color: var(--lime); border-color: var(--deep); }
+
+/* ---- the footer (_holding_footer.html) ----
+   Three bands instead of a column of links (client, 24 Oct 2026: "do not
+   line everything up and down"): the call, the places as cards side by
+   side, and a slim base. */
+.hf { padding: clamp(40px, 5vw, 72px) clamp(18px, 4vw, 56px) 28px;
+  background:
+    radial-gradient(50% 60% at 100% 0%, rgba(207,249,58,.10), transparent 70%),
+    radial-gradient(60% 70% at 0% 100%, rgba(42,115,55,.35), transparent 70%),
+    var(--deep-2); }
+.hf-in { max-width: 1360px; margin: 0 auto; display: grid; gap: clamp(28px, 4vw, 48px); }
+
+.hf-call { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px 40px;
+  padding-bottom: clamp(24px, 3vw, 40px); border-bottom: 1px solid rgba(255,255,255,.1); }
+.hf-call-copy { display: grid; gap: 12px; max-width: 760px; }
+.hf-kick { margin: 0; display: inline-flex; align-items: center; gap: 10px; justify-self: start; padding: 7px 13px; border-radius: 999px;
+  border: 1px solid rgba(207,249,58,.45); background: rgba(207,249,58,.08); color: var(--lime);
+  font: 800 11.5px/1 var(--mark); letter-spacing: .16em; text-transform: uppercase; }
+.hf-h { margin: 0; color: #fff; font: 400 clamp(28px, 3.6vw, 50px)/1 var(--display); letter-spacing: -.02em; }
+.hf-h em { font-style: normal; color: var(--lime); }
+.hf-call-do { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 22px; }
+
+/* the places: numbered picture cards in one row */
+.hf-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; }
+.hf-card { position: relative; display: grid; grid-template-rows: auto auto auto; align-content: start; gap: 6px; padding: 10px 10px 14px;
+  border-radius: 18px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); color: #fff; text-decoration: none;
+  transition: transform .25s var(--ease), border-color .25s var(--ease), background .25s var(--ease); }
+.hf-pic { display: block; aspect-ratio: 16 / 9; border-radius: 11px; overflow: hidden; margin-bottom: 6px; background: #061a11; }
+.hf-pic img { width: 100%; height: 100%; object-fit: cover; object-position: top center; opacity: .78;
+  transition: opacity .3s var(--ease), transform .5s var(--ease); }
+.hf-n { position: absolute; top: 18px; left: 18px; padding: 5px 8px; border-radius: 8px; background: var(--deep); color: var(--lime);
+  font: 900 12px/1 var(--mark); letter-spacing: .06em; }
+.hf-label { padding: 0 4px; font: 400 clamp(19px, 1.6vw, 23px)/1.05 var(--display); letter-spacing: -.01em; }
+.hf-kind { padding: 0 4px; display: inline-flex; align-items: center; gap: 6px; font: 800 11px/1.2 var(--mark); letter-spacing: .14em;
+  text-transform: uppercase; color: rgba(255,255,255,.62); }
+.hf-kind svg { width: 11px; height: 11px; fill: var(--lime); }
+.hf-card:hover, .hf-card:focus-visible { transform: translateY(-4px); border-color: var(--lime); background: rgba(207,249,58,.07); outline: none; }
+.hf-card:hover .hf-pic img, .hf-card:focus-visible .hf-pic img { opacity: 1; transform: scale(1.04); }
+.hf-card:hover .hf-label, .hf-card:focus-visible .hf-label { color: var(--lime); }
+.hf-card.is-current { border-color: rgba(207,249,58,.55); }
+.hf-card.is-current .hf-kind { color: var(--lime); }
+/* the trailer card: no picture, a big play button on lime */
+.hf-card.is-trailer { background: var(--lime); border-color: var(--lime); color: var(--deep); align-content: end; }
+.hf-card.is-trailer .hf-kind { color: rgba(7,47,30,.75); }
+.hf-play { justify-self: start; display: grid; place-items: center; width: 54px; height: 54px; margin-bottom: auto; border-radius: 50%; background: var(--deep); }
+.hf-play svg { width: 22px; height: 22px; fill: var(--lime); margin-left: 3px; }
+.hf-card.is-trailer:hover, .hf-card.is-trailer:focus-visible { background: #fff; border-color: #fff; }
+.hf-card.is-trailer:hover .hf-label { color: var(--deep); }
+
+/* the base: brand, socials, small print */
+.hf-base { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px 28px;
+  padding-top: 22px; border-top: 1px solid rgba(255,255,255,.1); }
+.hf-brand { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.hf-brand .footer-logo.wordmark { font-size: 26px; }
+.hf-brand p { margin: 0; font-size: 14px; color: rgba(255,255,255,.72); }
+.hf-socials { display: flex; gap: 8px; }
+.hf-socials a { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; color: #fff;
+  border: 1px solid rgba(255,255,255,.2); transition: all .2s var(--ease); }
+.hf-socials svg { width: 17px; height: 17px; fill: currentColor; }
+.hf-socials a:hover, .hf-socials a:focus-visible { background: var(--lime); border-color: var(--lime); color: var(--deep); outline: none; }
+.hf-small { flex-basis: 100%; margin: 0; font-size: 12.5px; color: rgba(255,255,255,.6); }
+@media (max-width: 760px) {
+  .hf-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hf-card.is-trailer { grid-column: 1 / -1; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 14px; align-items: center; }
+  .hf-card.is-trailer .hf-play { grid-row: span 2; margin: 0; }
+  .hf-call-do .hm-join { width: 100%; justify-content: center; }
+}
+
+/* A link to a page that is not open yet, on a page that is (client, 24 Oct
+   2026: "when it's clicked, it does not take the user anywhere"). The
+   script marks it; a click shows a note instead of leaving. */
+a.hm-soon { cursor: not-allowed; }
+.hm-soon-tip { position: fixed; z-index: 500; transform: translate(-50%, -100%); padding: 9px 14px; border-radius: 999px;
+  background: var(--deep); color: var(--lime); border: 1px solid rgba(207,249,58,.5); pointer-events: none;
+  box-shadow: 0 14px 30px -12px rgba(0,0,0,.6); font: 800 12px/1 var(--mark); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap;
+  opacity: 0; transition: opacity .2s var(--ease); }
+.hm-soon-tip.is-on { opacity: 1; }

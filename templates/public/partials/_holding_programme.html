@@ -1,0 +1,74 @@
+{% load static %}
+{% comment %}
+THE PROGRAMME — the coming-soon pages' menu opened full screen, like the
+programme you are handed at the gate (client, 23 Oct 2026: "one clear
+menu... let's go crazy"). The same places as the bar, from the same list
+(goodtip.holding_menu), but each one big and numbered, saying whether it opens
+a filmed tour or the real page, with a line about it — and a picture of it
+that turns up in the frame on the right as the pointer or keyboard finds it.
+Nothing in here moves until the visitor does something: the rows arrive once
+when it is opened, and the picture changes because they pointed at a row.
+
+Opened by the bar's "Menu" (data-hm-open), closed by Close, Escape, or by
+choosing a place. Script and styles are its own, loaded here, so every page
+that includes the bar gets the whole thing without its own <head> knowing.
+{% endcomment %}
+<link rel="stylesheet" href="{% static 'css/gt-holding-menu.css' %}">
+<div class="hm" id="hm-programme" data-hm{% if is_holding %} data-hm-paths="{{ holding_menu.open_paths }}"{% endif %} role="dialog" aria-modal="true" aria-labelledby="hm-title" hidden>
+  <div class="hm-in">
+    <header class="hm-top">
+      <a href="{{ holding_menu.home_href }}" class="wordmark hm-mark">GOOD<span>TIP</span><span class="dot">.</span></a>
+      <p class="hm-kicker" id="hm-title"><span class="hm-dot" aria-hidden="true"></span>The programme &middot; coming soon</p>
+      <button type="button" class="hm-close" data-hm-close aria-label="Close the menu">
+        <span>Close</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </header>
+
+    <div class="hm-body">
+      <ol class="hm-list">
+        {% for i in holding_menu.main %}
+        <li style="--i: {{ forloop.counter0 }}">
+          <a class="hm-item{% if i.current %} is-current{% endif %}" href="{{ i.href }}" data-hm-item="{{ forloop.counter0 }}"{% if i.current %} aria-current="page"{% endif %}>
+            <span class="hm-n" aria-hidden="true">{{ forloop.counter|stringformat:"02d" }}</span>
+            <span class="hm-text">
+              <span class="hm-label">{{ i.label }}</span>
+              <span class="hm-blurb">{{ i.blurb }}</span>
+            </span>
+            <span class="hm-kind{% if i.kind == 'tour' %} is-tour{% endif %}">
+              {% if i.kind == "tour" %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>Filmed tour{% elif i.current %}You are here{% else %}Open the page<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>{% endif %}
+            </span>
+          </a>
+        </li>
+        {% endfor %}
+      </ol>
+
+      <figure class="hm-peek" aria-hidden="true">
+        <div class="hm-frame">
+          <div class="hm-frame-bar"><i></i><i></i><i></i><span data-hm-url>goodtip.com.au</span></div>
+          <div class="hm-frame-screen">
+            {% for i in holding_menu.main %}
+            <img src="{{ i.picture }}" alt="" loading="lazy" decoding="async" data-hm-pic="{{ forloop.counter0 }}" data-url="goodtip.com.au{% if i.kind == 'page' %}{{ i.href }}{% else %}/{{ i.slug }}{% endif %}"{% if forloop.first %} class="is-on"{% endif %}>
+            {% endfor %}
+          </div>
+        </div>
+        <figcaption class="hm-cap"><b data-hm-capn>01</b><span data-hm-capt>{{ holding_menu.main.0.label }}</span></figcaption>
+      </figure>
+    </div>
+
+    <footer class="hm-foot">
+      <div class="hm-foot-main">
+        {% if wl_member %}
+        <a class="hm-join" href="{% url 'waitlist_home' %}">Your place on the list <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        {% else %}
+        <a class="hm-join" href="{{ holding_menu.join_href }}"{% if holding_menu.on_trailer %} data-wl-open="join"{% endif %}>Join the waiting list <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="hm-quiet" href="{{ holding_menu.signin_href }}"{% if holding_menu.on_trailer %} data-wl-open="signin"{% endif %}>Already on the list? Sign in</a>
+        {% endif %}
+        <a class="hm-quiet" href="{{ holding_menu.trailer_href }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>Watch the trailer</a>
+      </div>
+      <nav class="hm-legal" aria-label="Legal">
+        {% for l in holding_menu.legal %}<a href="{{ l.href }}"{% if l.current %} aria-current="page"{% endif %}>{{ l.label }}</a>{% endfor %}
+      </nav>
+    </footer>
+  </div>
+</div>
+<script src="{% static 'js/gt-holding-menu.js' %}" defer></script>

@@ -25,14 +25,23 @@ def environment(request):
     ``is_holding`` is the other thing every public template may need to ask:
     whether THIS visitor is the one lockdown or holding mode is standing in
     front of the real site for (goodtip.staging_gate.is_holding_visitor). Only
-    the blog is ever let through to render at all while that is true (see
-    staging_gate.py's HOLDING_REAL_PAGES), and when it is, it wears the
-    stripped nav and footer rather than the full site map (client, 14 Oct
-    2026).
+    a handful of pages are ever let through to render at all while that is
+    true (see staging_gate.py's
+    HOLDING_REAL_PAGES), and when one is, it wears the coming-soon pages'
+    own menu rather than the full site map.
+
+    ``holding_menu`` is that menu — one list for the trailer's bar, its
+    footer, the showcases and every real page let through (client, 23 Oct
+    2026: "need one clear menu for the coming soon pages"). Built lazily, so
+    the many pages that never show it do not pay for it.
     """
+    from django.utils.functional import SimpleLazyObject
+
+    from .holding_menu import holding_menu
     from .staging_gate import is_holding_visitor
 
     return {
         "is_staging": getattr(settings, "IS_STAGING", False),
         "is_holding": is_holding_visitor(request),
+        "holding_menu": SimpleLazyObject(lambda: holding_menu(request)),
     }

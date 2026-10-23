@@ -4,6 +4,13 @@
 
    Three parts: a split hero (photographs left, the product right, growing to
    fill its half), a grid of scene cards, and a split waiting-list section.
+
+   STILL UNTIL ASKED (client, 20 Oct 2026: "too much happening and moving all
+   at once"). Nothing here loops or drifts on its own any more — no blinking
+   record dot, no slow zoom on the photographs, no pulsing play button, no
+   bobbing badges, no film-grain flicker, no cinema bars on arrival. Motion
+   happens because the visitor pressed something: the trailer, a scene card,
+   a showcase.
    Everything is prefixed tr-. Nothing here restyles a shared class, so the
    home page and the rest of the public site are untouched.
 
@@ -40,16 +47,14 @@
   border: 1px solid rgba(207,249,58,.55); background: rgba(207,249,58,.1); color: var(--lime);
   font: 800 12px/1 var(--mark); letter-spacing: .14em; text-transform: uppercase;
 }
-.tr-rec { width: 8px; height: 8px; border-radius: 50%; background: #ff4d3d; animation: trRec 1.4s ease-in-out infinite; }
-@keyframes trRec { 50% { opacity: .25; } }
+.tr-rec { width: 8px; height: 8px; border-radius: 50%; background: #ff4d3d; }
 
 /* the crossfading photographs, shared by the hero and the join section */
 .tr-shot {
   position: absolute; inset: 0; background-size: cover; background-position: center;
-  opacity: 0; transform: scale(1.06); transition: opacity 1.4s var(--ease);
+  opacity: 0; transition: opacity 1.4s var(--ease);
 }
-.tr-shot.is-on { opacity: 1; animation: trKen 10s linear forwards; }
-@keyframes trKen { from { transform: scale(1.06); } to { transform: scale(1.17) translate(-1.5%, -1%); } }
+.tr-shot.is-on { opacity: 1; }
 .tr-veil { position: absolute; inset: 0; pointer-events: none; }
 
 /* ---------- HERO ---------- */
@@ -169,17 +174,46 @@
 }
 .tr-vid.is-on { opacity: 1; }
 
-/* the play badge the hand aims at */
-.tr-play {
-  position: absolute; left: 50%; top: 50%; width: 74px; height: 74px; margin: -37px 0 0 -37px; border-radius: 50%;
-  background: var(--lime); display: grid; place-items: center;
-  box-shadow: 0 0 0 10px rgba(207,249,58,.22), 0 20px 40px -10px rgba(0,0,0,.6);
-  animation: trPulse 1.8s ease-in-out infinite; transition: opacity .35s var(--ease), transform .3s var(--ease);
+/* The framed product is the play button. It waits, still — no pulse — and
+   answers the pointer instead: the frame lifts, the badge grows, the footage
+   behind it brightens. */
+.tr-stagebox { cursor: pointer; }
+.tr-stagebox:focus-visible { outline: 3px solid var(--lime); outline-offset: 4px; }
+/* At rest the screen behind the badge is a cover: softened and dimmed so
+   the badge reads first. Pointing at it brings the screen into focus. */
+.tr-stagebox::after {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: radial-gradient(70% 70% at 50% 50%, rgba(4,35,22,.55), rgba(4,35,22,.8));
+  -webkit-backdrop-filter: blur(4px) saturate(.8); backdrop-filter: blur(4px) saturate(.8);
+  transition: opacity .45s var(--ease), -webkit-backdrop-filter .45s var(--ease), backdrop-filter .45s var(--ease);
 }
-.tr-play svg { width: 32px; height: 32px; fill: var(--deep); margin-left: 4px; }
-.tr-stagebox:not(.is-framed) .tr-play { opacity: 0; transform: scale(.6); animation: none; }
-.tr-stagebox.is-tap .tr-play { transform: scale(.86); }
-@keyframes trPulse { 50% { box-shadow: 0 0 0 20px rgba(207,249,58,.07), 0 20px 40px -10px rgba(0,0,0,.6); } }
+.tr-stagebox:not(.is-framed)::after { opacity: 0; }
+.tr-play {
+  position: absolute; left: 50%; top: 50%; z-index: 2; width: 84px; height: 84px; margin: -66px 0 0 -42px; border-radius: 50%;
+  background: var(--lime); display: grid; place-items: center;
+  box-shadow: 0 0 0 10px rgba(207,249,58,.18), 0 20px 40px -10px rgba(0,0,0,.6);
+  transition: opacity .35s var(--ease), transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s var(--ease);
+}
+.tr-play svg { width: 34px; height: 34px; fill: var(--deep); margin-left: 5px; }
+.tr-play-label {
+  position: absolute; left: 50%; top: 50%; z-index: 2; margin-top: 32px; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; white-space: nowrap; text-align: center; pointer-events: none;
+  transition: opacity .35s var(--ease), transform .35s var(--ease);
+}
+.tr-play-label { padding: 10px 18px 11px; border-radius: 16px; background: rgba(4,35,22,.88); border: 1px solid rgba(207,249,58,.35);
+  box-shadow: 0 16px 34px -14px rgba(0,0,0,.8); }
+.tr-play-label b { font: 400 clamp(17px, 1.6vw, 22px)/1 var(--display); color: #fff; }
+.tr-play-label small { font: 800 11px/1 var(--mark); letter-spacing: .16em; text-transform: uppercase; color: var(--lime); }
+.tr-stagebox.is-framed:hover::after, .tr-stagebox.is-framed:focus-visible::after {
+  background: radial-gradient(70% 70% at 50% 50%, rgba(4,35,22,.3), rgba(4,35,22,.6));
+  -webkit-backdrop-filter: blur(0) saturate(1); backdrop-filter: blur(0) saturate(1); }
+.tr-stagebox.is-framed:hover .tr-play { transform: scale(1.1); box-shadow: 0 0 0 16px rgba(207,249,58,.22), 0 26px 50px -12px rgba(0,0,0,.7); }
+.tr-stagebox.is-framed:hover .tr-play-label { transform: translate(-50%, 4px); }
+.tr-stagebox:not(.is-framed) .tr-play, .tr-stagebox:not(.is-framed) .tr-play-label { opacity: 0; transform: scale(.6); }
+.tr-stagebox:not(.is-framed) .tr-play-label { transform: translate(-50%, 10px); }
+/* Mid-trailer, between scenes, the badge is a pause that has not happened:
+   it says "watching" rather than inviting a first press. */
+.tr-hero:not(.is-idle) .tr-play-label { opacity: 0; }
 
 /* the scene title already sits on the left; the tag would only cover the footage */
 .tr-cap {
@@ -194,69 +228,53 @@
 .tr-float {
   position: absolute; z-index: 4; padding: 9px 15px; border-radius: 999px; pointer-events: none;
   background: var(--lime); color: var(--deep); font: 900 13px/1 var(--mark); letter-spacing: .08em; text-transform: uppercase;
-  box-shadow: 0 14px 30px -10px rgba(0,0,0,.6); animation: trFloat 5s ease-in-out infinite;
+  box-shadow: 0 14px 30px -10px rgba(0,0,0,.6);
   opacity: 0; transition: opacity .5s var(--ease);
 }
 .tr-stagebox.is-framed ~ .tr-float { opacity: 1; }
 .tr-float.f1 { top: 12%; right: 9%; }
-.tr-float.f3 { bottom: 13%; right: 6%; animation-delay: -3.1s; }
-@keyframes trFloat { 50% { transform: translateY(-9px); } }
-
-/* the hand. Its origin is the tip of the finger, so --hx/--hy place the press. */
-.tr-hand {
-  position: absolute; left: 0; top: 0; z-index: 5; width: 0; height: 0; pointer-events: none; opacity: 0;
-  transform: translate(var(--hx, 0px), var(--hy, 0px));
-  transition: transform 1.15s cubic-bezier(.45,.05,.25,1), opacity .35s var(--ease);
-}
-.tr-hand.is-in { opacity: 1; }
-.tr-hand svg {
-  position: absolute; left: -26px; top: -3px; width: 60px; height: 60px; max-width: none; overflow: visible;
-  fill: #fff; stroke: var(--deep-2); stroke-width: 1.3; stroke-linejoin: round; filter: drop-shadow(0 10px 14px rgba(0,0,0,.5));
-  transform-origin: 26px 3px; transform: rotate(-14deg); transition: transform .18s var(--ease);
-}
-.tr-hand.is-press svg { transform: rotate(-14deg) scale(.84) translateY(4px); }
-.tr-hand::before {
-  content: ""; position: absolute; left: -36px; top: -36px; width: 72px; height: 72px; border-radius: 50%;
-  border: 3px solid var(--lime); opacity: 0;
-}
-.tr-hand.is-press::before { animation: trTap .6s ease-out; }
-@keyframes trTap { from { transform: scale(.2); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
+.tr-float.f3 { bottom: 13%; right: 6%; }
 
 .tr-tools { position: absolute; top: 18px; right: 18px; z-index: 6; display: flex; gap: 8px; }
 .tr-tool .i-play { fill: currentColor; stroke: none; }
 [data-pause] .i-play, [data-pause][aria-pressed="true"] .i-pause { display: none; }
 [data-pause][aria-pressed="true"] .i-play { display: block; }
+/* At rest the big play button is the only control; the trailer's own
+   buttons appear once it is running, with a Stop to bring it back to rest. */
+.tr-hero.is-idle .tr-tools { display: none; }
 
 
 /* fourteen steps along the foot of the hero: where we are, and a way to jump */
 .tr-steps { position: absolute; left: var(--gutter); right: clamp(16px, 2.4vw, 34px); bottom: 10px; z-index: 6; display: flex; gap: 6px; }
 .tr-step { flex: 1; height: 18px; padding: 0; border: 0; background: none; cursor: pointer; position: relative; }
-.tr-step::before, .tr-step::after { content: ""; position: absolute; left: 0; right: 0; bottom: 7px; height: 4px; border-radius: 2px; }
-.tr-step::before { background: rgba(4,35,22,.55); box-shadow: 0 0 0 1px rgba(255,255,255,.34); transition: background .25s; }
-.tr-step::after { background: var(--lime); transform: scaleX(var(--p, 0)); transform-origin: left; }
-.tr-step:hover::before { background: rgba(4,35,22,.85); }
-
-/* cinema bars that slide away on load, and a little grain */
-.tr-letterbox { position: absolute; inset: 0; z-index: 8; pointer-events: none; }
-.tr-letterbox::before, .tr-letterbox::after {
-  content: ""; position: absolute; left: 0; right: 0; height: 12vh; background: #000;
+.tr-step::before {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 7px; height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--lime) calc(var(--p, 0) * 100%), rgba(4,35,22,.55) 0);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.34); transition: height .2s var(--ease), bottom .2s var(--ease);
 }
-/* held shut behind the page loader, then they part */
-body:not(.loading) .tr-letterbox::before, body:not(.loading) .tr-letterbox::after { animation: trBars 1.5s .2s var(--ease) forwards; }
-.tr-letterbox::before { top: 0; }
-.tr-letterbox::after { bottom: 0; --d: 100%; }
-@keyframes trBars { to { transform: translateY(var(--d, -100%)); } }
+.tr-step:hover::before, .tr-step:focus-visible::before { height: 8px; bottom: 5px; background: linear-gradient(90deg, var(--lime) calc(var(--p, 0) * 100%), rgba(207,249,58,.45) 0); }
+.tr-step:focus-visible { outline: none; }
+/* Each marker names its scene when the pointer finds it: a way to pick one
+   at leisure, not just a progress bar. */
+.tr-step::after {
+  content: attr(data-tag); position: absolute; left: 50%; bottom: 24px; transform: translate(-50%, 6px);
+  padding: 7px 12px; border-radius: 999px; white-space: nowrap; pointer-events: none;
+  background: var(--lime); color: var(--deep); font: 800 11px/1 var(--mark); letter-spacing: .1em; text-transform: uppercase;
+  box-shadow: 0 10px 24px -8px rgba(0,0,0,.6); opacity: 0; transition: opacity .2s var(--ease), transform .2s var(--ease);
+}
+.tr-step:first-child::after { left: 0; transform: translate(0, 6px); }
+.tr-step:last-child::after { left: auto; right: 0; transform: translate(0, 6px); }
+.tr-step:hover::after, .tr-step:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+.tr-step:first-child:hover::after, .tr-step:first-child:focus-visible::after,
+.tr-step:last-child:hover::after, .tr-step:last-child:focus-visible::after { transform: none; }
+
+/* a little grain, standing still */
 .tr-hero::after {
-  content: ""; position: absolute; inset: -50%; z-index: 7; pointer-events: none; opacity: .07;
+  content: ""; position: absolute; inset: 0; z-index: 7; pointer-events: none; opacity: .06;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-  animation: trGrain .9s steps(6) infinite;
-}
-@keyframes trGrain {
-  0% { transform: translate(0,0); } 20% { transform: translate(-3%,2%); } 40% { transform: translate(2%,-3%); }
-  60% { transform: translate(-2%,-1%); } 80% { transform: translate(3%,3%); } 100% { transform: translate(0,0); }
 }
 
-/* ---------- SCENE CARDS: one big card and seven small; the next scene takes the big place every few seconds ---------- */
+/* ---------- SCENE CARDS: one big card and seven small; pick one and it takes the big place ---------- */
 .tr-cards { background: var(--cream-2); }
 .tr-cards > .wrap { max-width: min(1640px, 100%); }
 .tr-cards { padding: clamp(24px, 3vw, 44px) clamp(16px, 2.4vw, 40px) clamp(36px, 4vw, 64px); }
@@ -525,15 +543,7 @@ html.tr-peek-lock { overflow: hidden; }
 @keyframes trPeekIn { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
 
 .tr-peek-bar { display: flex; align-items: center; gap: 18px; margin-bottom: clamp(14px, 2vw, 26px); }
-.tr-peek-k { display: inline-flex; align-items: center; gap: 10px; font: 800 12px/1 var(--mark); letter-spacing: .16em; text-transform: uppercase; color: var(--lime); white-space: nowrap; }
-.tr-peek-jump { display: flex; gap: 8px; flex: 1; overflow-x: auto; scrollbar-width: none; padding: 2px; }
-.tr-peek-jump::-webkit-scrollbar { display: none; }
-.tr-peek-jump a {
-  flex: none; padding: 9px 15px; border-radius: 999px; border: 1.5px solid rgba(255,255,255,.22); color: rgba(255,255,255,.86);
-  font: 700 13px/1 var(--body); text-decoration: none; transition: background .2s var(--ease), color .2s var(--ease), border-color .2s var(--ease);
-}
-.tr-peek-jump a:hover { border-color: var(--lime); color: #fff; }
-.tr-peek-jump a[aria-current] { background: var(--lime); border-color: var(--lime); color: var(--deep); }
+.tr-peek-k { flex: 1; display: inline-flex; align-items: center; gap: 10px; font: 800 12px/1 var(--mark); letter-spacing: .16em; text-transform: uppercase; color: var(--lime); white-space: nowrap; }
 .tr-peek-x {
   flex: none; display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 16px 0 12px; border-radius: 999px; cursor: pointer;
   border: 1.5px solid rgba(255,255,255,.3); background: transparent; color: #fff; font: 800 13px/1 var(--body);
@@ -587,10 +597,8 @@ html.tr-peek-lock { overflow: hidden; }
   .tr-peek-sub { max-width: none; }
 }
 @media (max-width: 640px) {
-  .tr-peek-bar { flex-wrap: wrap; gap: 10px; }
-  .tr-peek-k { order: 1; flex: 1; }
-  .tr-peek-x { order: 2; }
-  .tr-peek-jump { order: 3; flex: 0 0 100%; }
+  .tr-peek-bar { gap: 10px; }
+  .tr-peek-k { white-space: normal; line-height: 1.3; }
   .tr-peek-x span { display: none; } .tr-peek-x { padding: 0 12px; }
   .tr-peek-shots { grid-template-columns: 1fr; }
   .tr-peek-cta .tr-submit { width: 100%; }

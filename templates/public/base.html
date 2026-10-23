@@ -43,20 +43,21 @@
   </div>
 
   {% comment %}
-  THE BLOG wears the stripped nav and footer, not the site's full menu
-  (client, 14 Oct 2026: real access to the blog for marketing, nothing else
-  reachable alongside it). is_holding (goodtip.context_processors.environment)
-  is only ever true here for /news/, the one page staging_gate.HOLDING_REAL_PAGES
-  lets through at all while lockdown or holding mode is on — everything else
-  still never reaches this template while it holds.
+  LOCKDOWN'S REAL PAGES wear the coming-soon pages' one bar and footer, not
+  the site's full menu (client, 23 Oct 2026: "one clear menu for the coming
+  soon pages" — the same places as the trailer's own, from
+  goodtip.holding_menu). is_holding (goodtip.context_processors.environment)
+  is only ever true here for the pages staging_gate.HOLDING_REAL_PAGES lets
+  through at all — everything else never reaches this template while it
+  holds.
   {% endcomment %}
-  {% block nav %}{% if is_holding %}{% include "public/partials/_nav_lockdown_page.html" %}{% else %}{% include "public/partials/_nav.html" %}{% endif %}{% endblock %}
+  {% block nav %}{% if is_holding %}{% include "public/partials/_holding_nav.html" %}{% else %}{% include "public/partials/_nav.html" %}{% endif %}{% endblock %}
 
   <main>
     {% block content %}{% endblock %}
   </main>
 
-  {% block footer %}{% if is_holding %}{% include "public/partials/_footer_lockdown_page.html" %}{% else %}{% include "public/partials/_footer.html" %}{% endif %}{% endblock %}
+  {% block footer %}{% if is_holding %}{% include "public/partials/_holding_footer.html" %}{% else %}{% include "public/partials/_footer.html" %}{% endif %}{% endblock %}
 
   <script>
   (function () {

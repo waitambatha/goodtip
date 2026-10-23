@@ -76,11 +76,17 @@ gradient over the whole article.
         <span>All news &amp; blog</span>
       </a>
       {% comment %}
-      During lockdown or holding mode this slot is empty — no login, no
-      sign-up, no dashboard, same as everywhere else a holding visitor can
-      reach (client, 14 Oct 2026).
+      During lockdown or holding mode: no login, no sign-up, no dashboard —
+      just the coming-soon pages' one menu (client, 23 Oct 2026: "one clear
+      menu"), the same programme every other coming-soon page opens.
       {% endcomment %}
-      {% if not is_holding %}
+      {% if is_holding %}
+      <div class="rd-bar-end">
+        <button type="button" class="hm-open" data-hm-open aria-haspopup="dialog" aria-controls="hm-programme" aria-expanded="false">
+          <span class="hm-burger" aria-hidden="true"><i></i><i></i><i></i></span><span class="hm-open-t">Menu</span>
+        </button>
+      </div>
+      {% else %}
       <div class="rd-bar-end">
         {% if user.is_authenticated %}
         <a href="{% url 'dashboard' %}" class="rd-ghost">Back to my dashboard</a>
@@ -92,6 +98,7 @@ gradient over the whole article.
       {% endif %}
     </div>
   </header>
+  {% if is_holding %}{% include "public/partials/_holding_programme.html" %}{% endif %}
 
   <main class="rd-main">
     <article class="rd-art">
@@ -306,6 +313,6 @@ gradient over the whole article.
   footer instead (client, 14 Oct 2026) — the full site map is exactly the
   set of other pages a holding visitor must not be able to click into.
   {% endcomment %}
-  {% if is_holding %}{% include "public/partials/_footer_lockdown_page.html" %}{% else %}{% include "public/partials/_footer.html" %}{% endif %}
+  {% if is_holding %}{% include "public/partials/_holding_footer.html" %}{% else %}{% include "public/partials/_footer.html" %}{% endif %}
 </body>
 </html>

@@ -37,7 +37,7 @@ GoodTip is a paragraph, and the cards are what you remember it by afterwards.
     <h1>The comp you already run, <em>doing something else as well.</em></h1>
     <p class="hero-sub">GoodTip started with a simple observation: hundreds of thousands of Australians already tip the footy at work every winter, and none of it goes anywhere.</p>
     <div class="hero-ctas" style="justify-content:flex-start;">
-      <a href="/how-it-works/" class="btn-primary">See how it works &rarr;</a>
+      <a href="{% if is_holding %}/coming-soon/#how-it-works{% else %}/how-it-works/{% endif %}" class="btn-primary">See how it works &rarr;</a>
       <a href="/leaderboard/" class="btn-ghost">The Good List</a>
     </div>
   </div>

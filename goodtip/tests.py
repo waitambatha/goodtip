@@ -124,11 +124,12 @@ class HoldingModeTests(TestCase):
 
     def test_the_menu_and_footer_offer_the_blog_and_still_showcase_the_rest(self):
         body = self.client.get("/").content.decode()
-        nav = body[body.index('<nav class="nav"'):body.index("</nav>")]
+        nav = body[body.index('<nav class="nav hm-bar"'):body.index("</nav>")]
         self.assertNotIn("/login/", nav)
         self.assertNotIn("/signup/", nav)
         self.assertIn("#join", nav)
-        foot = body[body.index('<footer class="footer"'):body.index("</footer>")]
+        start = body.index('<footer class="footer')
+        foot = body[start:body.index("</footer>", start)]
         for slug in ("how-it-works", "wall", "about", "terms", "privacy"):
             with self.subTest(slug=slug):
                 self.assertIn(f'href="#{slug}"', nav + foot)
