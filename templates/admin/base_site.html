@@ -211,6 +211,10 @@ that they were not given that job.
 {% gta_can 'waitlist.view' as may_waitlist %}
 {% safe_url 'admin:hq_custom_pricing' as u_custom_pricing %}
 {% gta_can 'billing.custom_pricing' as may_custom_pricing %}
+{% safe_url 'admin:hq_plan_admin' as u_plan_admin %}
+{% gta_can 'billing.plan_admin' as may_plan_admin %}
+{% safe_url 'admin:hq_org_admin' as u_org_admin %}
+{% gta_can 'orgs.create_with_admin' as may_org_admin %}
 {% gta_is_full_access as is_full_access %}
 {% gta_security_visible as may_security %}
 {% gta_on_table_screen as on_table %}
@@ -293,6 +297,16 @@ that they were not given that job.
       {% if u_custom_pricing and may_custom_pricing %}
       <li><a href="{{ u_custom_pricing }}" class="gta-nav-a{% if u_custom_pricing in request.path %} on{% endif %}" data-jump="Custom pricing — requests outside the five plans">
         <svg class="ic"><use href="#ic-f-org"/></svg><span class="lbl">Custom pricing</span></a></li>
+      {% endif %}
+
+      {% if u_plan_admin and may_plan_admin %}
+      <li><a href="{{ u_plan_admin }}" class="gta-nav-a{% if u_plan_admin in request.path %} on{% endif %}" data-jump="Plans — prices, seat and org limits, discounts, custom packages">
+        <svg class="ic"><use href="#ic-sliders"/></svg><span class="lbl">Plans</span></a></li>
+      {% endif %}
+
+      {% if u_org_admin and may_org_admin %}
+      <li><a href="{{ u_org_admin }}" class="gta-nav-a{% if u_org_admin in request.path %} on{% endif %}" data-jump="Set up an organisation for someone else, and invite its admin">
+        <svg class="ic"><use href="#ic-f-org"/></svg><span class="lbl">New organisation</span></a></li>
       {% endif %}
 
       {% if u_teamhub %}

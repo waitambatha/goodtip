@@ -15,10 +15,8 @@ from accounts.views import (
 from admin_panel.views import news_detail, news_index
 from goodtip.sitemaps import SITEMAPS
 from data_sync.public_board import ladder_board_view
-from billing.views import good_list_view, sponsorship_view, stripe_webhook
-from billing.pricing import (
-    FOUNDING_WINDOW_CLOSES, founding_seasons, founding_stub_ends, public_cards,
-)
+from billing.views import good_list_view, pricing_view, sponsorship_view, stripe_webhook
+from billing.pricing import FOUNDING_WINDOW_CLOSES, founding_seasons, founding_stub_ends
 from goodtip.legal import TERMS_TOP_THREE, TERMS_VERSION
 from goodtip.staging_gate import gate_view, robots_view
 from orgs.views import join_view, public_wall_reply, public_wall_view
@@ -98,10 +96,9 @@ urlpatterns = [
         template_name="public/charities.html",
         extra_context={"active": "charities"},
     ), name="charities"),
-    path("pricing/", TemplateView.as_view(
-        template_name="public/pricing.html",
-        extra_context={"active": "pricing", "price_cards": public_cards(), **PRICING_FACTS},
-    ), name="pricing"),
+    # A real view, not a TemplateView — see billing.views.pricing_view for why
+    # (Ian's PlanOverride edits have to be read fresh on every request).
+    path("pricing/", pricing_view, name="pricing"),
     # A PUBLIC path, not one under /billing/. Somebody applying for a sponsored
     # place has usually just read /pricing/ and stopped, and may have no account
     # at all — so it sits with the other pages a visitor can reach rather than

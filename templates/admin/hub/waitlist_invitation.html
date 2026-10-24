@@ -1,130 +1,287 @@
-{% extends "admin/hub/base.html" %}
+{% extends "admin/hub/gx_base.html" %}
 {% load i18n %}
 
 {% comment %}
-THE LAUNCH INVITATION (client, 25 Sep 2026). A composer with the drafted
-message already in it, a live preview of the real email beside it, a test send
-to yourself, and the two ways of sending: now, or at a time. The wording is
-plain text — paragraphs on blank lines, {first_name} and {name} filled in per
-person — so nothing typed here can break the layout of the email.
+THE LAUNCH INVITATION (client, 25 Sep 2026; rebuilt on the pitch 24 Oct
+2026: "work on the design of the launch invitation... the preview something
+I can see via that white section... instead of the background being cream...
+let's make it white").
 
-WHAT MAKES THE BIG BUTTONS SAFE: each needs a tick box, the button says how many
-people it will email, and a person is only ever invited once no matter how many
-times this runs. The page says so, because "what if I press it twice" is the
-first thing anybody asks of a button that emails a list.
+One form across three tabs, so nothing typed in one is lost moving to
+another:
+  Write        subject, heading, message, button — with the real email
+               beside it in a mail-client frame, redrawn as you type, at
+               desktop or phone width
+  Send         everyone not invited yet, once: now, or at a time
+  Launch date  the countdown the waiting list sees on their page
+The wording is plain text — paragraphs on blank lines, {first_name} and
+{name} filled in per person — so nothing typed here can break the email.
+
+WHAT MAKES THE BIG BUTTONS SAFE: a tick box, the button says how many people
+it emails, and a person is only ever invited once however often this runs.
 {% endcomment %}
 
-{% block hub_accent %}var(--gt-c3){% endblock %}
-{% block hub_ic %}ic-f-mail{% endblock %}
-
-{% block hub_body %}
-
-{% if holding_on %}
-<p class="gta-wl-warn"><b>{% translate "The holding page is still on." %}</b>
-  {% translate "The button in this email goes to the sign-up page, and while the holding page is on, visitors are shown the coming-soon page instead. Turn it off (HOLDING_PAGE) before this goes out." %}</p>
-{% endif %}
-{% if is_staging %}
-<p class="gta-wl-warn"><b>{% translate "This is staging." %}</b>
-  {% translate "The list here is a copy of the real one — sending will email real people. Use “Send me a test” unless you mean it." %}</p>
-{% endif %}
-
-<div class="gta-wl-status">
-  <span class="gta-wl-state is-{{ campaign.status }}">{{ campaign.get_status_display }}</span>
-  {% if campaign.status == 'scheduled' and campaign.scheduled_for %}
-    <span>{% blocktranslate with when=campaign.scheduled_for|date:"l j F, g:i A" %}Set to go out {{ when }} ({{ tz_name }}).{% endblocktranslate %}</span>
-  {% elif campaign.status == 'sending' %}
-    <span>{% translate "Sending — whatever is left goes out on the next automatic run." %}</span>
-  {% elif campaign.status == 'sent' %}
-    <span>{% blocktranslate with n=campaign.sent_count %}{{ n }} sent{% endblocktranslate %}{% if campaign.failed_count %}, {{ campaign.failed_count }} {% translate "could not be delivered" %}{% endif %}.</span>
-  {% endif %}
-  <span class="gta-wl-audience"><b>{{ waiting }}</b> {% translate "not invited yet" %}</span>
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_waitlist' %}">{% translate "Waiting list" %}</a></li>{% endblock %}
+{% block gx_kicker %}{% translate "Waiting list" %} &middot; {% translate "launch invitation" %}{% endblock %}
+{% block gx_title %}{% translate "The email that says" %} <em>{% translate "we're open" %}</em>{% endblock %}
+{% block gx_lead %}{% if campaign.status == 'scheduled' and campaign.scheduled_for %}{% blocktranslate with when=campaign.scheduled_for|date:"l j F, g:i A" %}Set to go out {{ when }} ({{ tz_name }}).{% endblocktranslate %}{% elif campaign.status == 'sending' %}{% translate "Sending now — whatever is left goes out on the next automatic run." %}{% elif campaign.status == 'sent' %}{% blocktranslate with n=campaign.sent_count %}Sent to {{ n }} people.{% endblocktranslate %}{% if campaign.failed_count %} {{ campaign.failed_count }} {% translate "could not be delivered." %}{% endif %}{% else %}{% translate "Written and ready to edit. Nothing has been sent." %}{% endif %}{% endblock %}
+{% block gx_below %}
+{% if holding_on or is_staging %}
+<div class="gx-alerts">
+  {% if holding_on %}<p class="gx-alert"><svg aria-hidden="true"><use href="#ic-flag"/></svg><span><b>{% translate "The holding page is still on." %}</b> {% translate "The email's button goes to sign-up, which visitors can't reach yet. Turn HOLDING_PAGE off before this goes out." %}</span></p>{% endif %}
+  {% if is_staging %}<p class="gx-alert"><svg aria-hidden="true"><use href="#ic-shield"/></svg><span><b>{% translate "This is staging." %}</b> {% translate "The list is a copy of the real one — sending emails real people. Use “Send me a test” unless you mean it." %}</span></p>{% endif %}
 </div>
+{% endif %}
+{% endblock %}
+{% block gx_board %}
+<div class="gx-score"><b>{{ campaign.get_status_display }}</b><span>{% translate "Status" %}</span></div>
+<div class="gx-score"><b>{{ waiting }}</b><span>{% translate "Will receive it" %}</span></div>
+<div class="gx-score"><b>{{ campaign.sent_count|default:0 }}</b><span>{% translate "Sent so far" %}</span></div>
+{% endblock %}
 
-<div class="gta-wl-compose">
-  <form method="post" class="gta-wl-form" id="wl-form" action="">
-    {% csrf_token %}
-    <label for="wl-subject">{% translate "Subject line" %}</label>
-    <input id="wl-subject" name="subject" type="text" maxlength="200" value="{{ campaign.subject }}" {% if not can_invite %}readonly{% endif %}>
-
-    <label for="wl-heading">{% translate "Big heading in the email" %}</label>
-    <input id="wl-heading" name="heading" type="text" maxlength="120" value="{{ campaign.heading }}" {% if not can_invite %}readonly{% endif %}>
-
-    <label for="wl-body">{% translate "Message" %}</label>
-    <textarea id="wl-body" name="body" rows="17" {% if not can_invite %}readonly{% endif %}>{{ campaign.body }}</textarea>
-    <p class="gta-wl-hint">{% translate "A blank line starts a new paragraph. {first_name} and {name} are replaced with each person's own name. Plain text only." %}</p>
-
-    <label for="wl-button">{% translate "Button label" %}</label>
-    <input id="wl-button" name="button_label" type="text" maxlength="60" value="{{ campaign.button_label }}" {% if not can_invite %}readonly{% endif %}>
-    <p class="gta-wl-hint">{% blocktranslate %}The button opens{% endblocktranslate %} <code>{{ signup_link }}</code>.</p>
-
+{% block gx_body %}
+<form method="post" id="wl-form" action="">
+{% csrf_token %}
+<section class="gx-sheet" data-gx-tabs>
+  <div class="gx-tabs" role="tablist">
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="write" aria-selected="true">{% translate "Write" %}</button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="send">{% translate "Send" %} <em>{{ waiting }}</em></button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="launch">{% translate "Launch date" %}</button>
     {% if can_invite %}
-    <div class="gta-wl-row">
-      <button class="gta-wl-btn" type="submit" name="action" value="save">{% translate "Save changes" %}</button>
-      <button class="gta-wl-btn" type="submit" name="action" value="test">{% blocktranslate %}Send me a test{% endblocktranslate %}</button>
-      <button class="gta-wl-btn ghost" type="submit" name="action" value="reset" formnovalidate
-              onclick="return confirm('Put the wording back to the original draft? Your edits will be lost.');">{% translate "Reset to the original draft" %}</button>
+    <div class="gx-tabs-end">
+      <button class="gx-btn is-ghost" type="submit" name="action" value="test"><svg aria-hidden="true"><use href="#ic-send"/></svg>{% translate "Send me a test" %}</button>
     </div>
+    {% endif %}
+  </div>
 
-    <div class="gta-wl-send">
-      <h2>{% translate "Launch date" %}</h2>
-      <p>{% translate "Shows the waiting list a countdown on their page. It is only a date they see: it does not send anything, and it can differ from the time the email goes out. Leave it empty to hide the countdown." %}</p>
-      <div class="gta-wl-when">
-        <label for="wl-launch">{% blocktranslate with tz=tz_name %}Launch ({{ tz }}){% endblocktranslate %}</label>
-        <input id="wl-launch" type="datetime-local" name="launch_at" value="{{ launch_local }}">
-      </div>
-      <div class="gta-wl-row">
-        <button class="gta-wl-btn" type="submit" name="action" value="launch_date" formnovalidate>{% translate "Save launch date" %}</button>
-      </div>
-    </div>
+  {# ---------------- write ---------------- #}
+  <div class="gx-pane" data-gx-pane="write">
+    <div class="gx-inv" data-gx-inv data-mode="split">
+      <button type="button" class="gx-inv-show" data-gx-mode="split"><svg aria-hidden="true"><use href="#ic-eye"/></svg>{% translate "Show the preview" %}</button>
+      <div class="gx-stack">
+        <div class="gx-form">
+          <label class="full">{% translate "Subject line" %}<input id="wl-subject" name="subject" type="text" maxlength="200" value="{{ campaign.subject }}" {% if not can_invite %}readonly{% endif %}></label>
+          <label class="full">{% translate "Big heading in the email" %}<input id="wl-heading" name="heading" type="text" maxlength="120" value="{{ campaign.heading }}" {% if not can_invite %}readonly{% endif %}></label>
+          <label class="full">{% translate "Message" %}<textarea id="wl-body" name="body" rows="14" {% if not can_invite %}readonly{% endif %}>{{ campaign.body }}</textarea></label>
+          <p class="gx-note full">{% translate "A blank line starts a new paragraph." %} <code class="gx-code">{first_name}</code> {% translate "and" %} <code class="gx-code">{name}</code> {% translate "become each person's own name. Plain text only." %}</p>
+          <label class="full">{% translate "Button label" %}<input id="wl-button" name="button_label" type="text" maxlength="60" value="{{ campaign.button_label }}" {% if not can_invite %}readonly{% endif %}></label>
+          <p class="gx-note full">{% translate "The button opens" %} <code class="gx-code">{{ signup_link }}</code></p>
+        </div>
 
-    <div class="gta-wl-send">
-      <h2>{% translate "Send it" %}</h2>
-      <p>{% blocktranslate %}Everyone who has not been invited yet gets it — once. Pressing a button twice, or a schedule running twice, cannot email anyone a second time.{% endblocktranslate %}</p>
-
-      <label class="gta-wl-check"><input type="checkbox" name="confirm" value="yes">
-        {% blocktranslate with n=waiting %}Yes — email the {{ n }} people who haven't been invited yet.{% endblocktranslate %}</label>
-
-      <div class="gta-wl-when">
-        <label for="wl-when">{% blocktranslate with tz=tz_name %}Send at ({{ tz }}){% endblocktranslate %}</label>
-        <input id="wl-when" type="datetime-local" name="scheduled_for" value="{{ scheduled_local }}">
-      </div>
-
-      <div class="gta-wl-row">
-        <button class="gta-wl-btn primary" type="submit" name="action" value="send_now" {% if not waiting %}disabled{% endif %}
-                onclick="return confirm('Send this to {{ waiting }} people now? This cannot be recalled.');">{% translate "Send now" %}</button>
-        <button class="gta-wl-btn gold" type="submit" name="action" value="schedule" {% if not waiting %}disabled{% endif %}>{% translate "Schedule for that time" %}</button>
-        {% if campaign.status == 'scheduled' or campaign.status == 'sending' %}
-        <button class="gta-wl-btn ghost" type="submit" name="action" value="unschedule" formnovalidate>{% translate "Cancel the schedule" %}</button>
+        <fieldset class="gx-bgpick">
+          <legend>{% translate "The picture behind it" %} <small>{% translate "— the photograph across the top of the email" %}</small></legend>
+          <div class="gx-bgpick-grid" role="radiogroup">
+            <label class="gx-bg is-rotate">
+              <input type="radio" name="background" value=""{% if not campaign.background %} checked{% endif %}{% if not can_invite %} disabled{% endif %}>
+              <span class="gx-bg-img"><span class="gx-bg-mix">{% for b in backgrounds|slice:":3" %}<i style="background-image:url('{{ b.url }}')"></i>{% endfor %}</span></span>
+              <span class="gx-bg-cap">{% translate "Mix it up" %}<small>{% translate "a different one each send" %}</small></span>
+            </label>
+            {% for b in backgrounds %}
+            <label class="gx-bg">
+              <input type="radio" name="background" value="{{ b.path }}"{% if campaign.background == b.path %} checked{% endif %}{% if not can_invite %} disabled{% endif %}>
+              <span class="gx-bg-img" style="background-image:url('{{ b.url }}')"></span>
+              <span class="gx-bg-cap">{{ b.label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        {% if can_invite %}
+        <div class="gx-actions">
+          <button class="gx-btn" type="submit" name="action" value="save"><svg aria-hidden="true"><use href="#ic-check"/></svg>{% translate "Save changes" %}</button>
+          <button class="gx-btn is-ghost" type="submit" name="action" value="reset" formnovalidate data-gx-confirm="{% translate 'Put the wording back to the original draft? Your edits will be lost.' %}">{% translate "Reset to the original draft" %}</button>
+        </div>
+        {% else %}
+        <p class="gx-note">{% translate "You can read the invitation, but you don't have permission to edit or send it." %}</p>
         {% endif %}
       </div>
-      <p class="gta-wl-hint">{% translate "Scheduled sends are picked up by an automatic job that runs every ten minutes, so it lands within ten minutes after the time you choose." %}</p>
+
+      <div class="gx-mail" aria-label="{% translate 'Preview of the email' %}">
+        <div class="gx-mail-bar">
+          <span class="gx-mail-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <div class="gx-device" role="group" aria-label="{% translate 'Preview width' %}">
+            <button type="button" aria-pressed="true" data-gx-device="desktop">{% translate "Desktop" %}</button>
+            <button type="button" aria-pressed="false" data-gx-device="phone">{% translate "Phone" %}</button>
+          </div>
+          <div class="gx-mail-modes">
+            <button type="button" class="gx-iconbtn is-expand" data-gx-mode="preview" title="{% translate 'Preview only' %}" aria-label="{% translate 'Show only the preview' %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button type="button" class="gx-iconbtn is-shrink" data-gx-mode="split" title="{% translate 'Back to editing' %}" aria-label="{% translate 'Back to the editor and preview side by side' %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button type="button" class="gx-iconbtn" data-gx-mode="write" title="{% translate 'Close the preview' %}" aria-label="{% translate 'Close the preview and write full width' %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+          </div>
+        </div>
+        <div class="gx-mail-head">
+          <span class="gx-avatar" aria-hidden="true">G</span>
+          <div>
+            <b data-gx-mail-subject>{{ campaign.subject }}</b>
+            <span>GoodTip &lt;hello@goodtip.com.au&gt; &middot; {% translate "to" %} Alex Sample</span>
+          </div>
+          <span class="gx-mail-live"><i></i>{% translate "Live" %}</span>
+        </div>
+        <div class="gx-mail-body" data-gx-mail-body>
+          <iframe id="wl-frame" title="{% translate 'Email preview' %}" sandbox="" data-url="{% url 'admin:hq_waitlist_preview' %}"></iframe>
+        </div>
+        <p class="gx-note gx-mail-note">{% translate "Exactly what lands in an inbox, with “Alex Sample” as the reader. Redrawn as you type." %}</p>
+      </div>
+    </div>
+  </div>
+
+  {# ---------------- send ---------------- #}
+  <div class="gx-pane" data-gx-pane="send">
+    {% if can_invite %}
+    <div class="gx-split">
+      <div class="gx-stack">
+        <div class="gx-sendcard">
+          <span class="gx-sendcard-n">{{ waiting }}</span>
+          <div>
+            <b>{% blocktranslate count n=waiting %}person will get it{% plural %}people will get it{% endblocktranslate %}</b>
+            <p class="gx-note">{% translate "Everyone not invited yet — once. Pressing a button twice, or a schedule running twice, can't email anyone a second time." %}</p>
+          </div>
+        </div>
+        <label class="gx-confirm" data-gx-confirmbox><input type="checkbox" name="confirm" value="yes" data-gx-sendok>
+          <span>{% blocktranslate count n=waiting %}Yes — email the {{ n }} person who hasn't been invited yet.{% plural %}Yes — email the {{ n }} people who haven't been invited yet.{% endblocktranslate %}</span>
+          <em class="gx-confirm-need">{% translate "Tick this first — then send or schedule." %}</em></label>
+        <div class="gx-sendways">
+          <div class="gx-way">
+            <p class="gx-label">{% translate "Right now" %}</p>
+            <p class="gx-note">{% translate "Goes straight away. It can't be recalled." %}</p>
+            <button class="gx-btn is-block" type="submit" name="action" value="send_now" {% if not waiting %}disabled{% endif %} data-gx-needs-ok
+                    data-gx-confirm="{% blocktranslate with n=waiting %}Send this to {{ n }} people now? This cannot be recalled.{% endblocktranslate %}"><svg aria-hidden="true"><use href="#ic-send"/></svg>{% translate "Send now" %}</button>
+          </div>
+          <div class="gx-way">
+            <p class="gx-label">{% translate "At a time" %}</p>
+            <label class="gx-form" style="display:block"><span class="gx-note">{% blocktranslate with tz=tz_name %}Send at ({{ tz }}){% endblocktranslate %}</span>
+              <input id="wl-when" class="gx-in" type="datetime-local" name="scheduled_for" value="{{ scheduled_local }}" data-gx-cal data-gx-cal-future></label>
+            <button class="gx-btn is-ghost is-block" type="submit" name="action" value="schedule" {% if not waiting %}disabled{% endif %} data-gx-needs-ok><svg aria-hidden="true"><use href="#ic-calendar"/></svg>{% translate "Schedule it" %}</button>
+            {% if campaign.status == 'scheduled' or campaign.status == 'sending' %}
+            <button class="gx-btn is-danger is-block" type="submit" name="action" value="unschedule" formnovalidate style="margin-top:8px">{% translate "Cancel the schedule" %}</button>
+            {% endif %}
+          </div>
+        </div>
+        <p class="gx-note">{% translate "Scheduled sends are picked up by a job that runs every ten minutes, so it lands within ten minutes of the time you choose." %}</p>
+      </div>
+      <div class="gx-card is-dark">
+        <p class="gx-label">{% translate "Before you send" %}</p>
+        <ol class="gx-neworg-steps">
+          <li><b>{% translate "Read it on the Write tab" %}</b><span>{% translate "the preview is the real email." %}</span></li>
+          <li><b>{% translate "Send yourself a test" %}</b><span>{% translate "it goes to your own address only." %}</span></li>
+          <li><b>{% translate "Tick the box, then send" %}</b><span>{% translate "now, or at the time you pick." %}</span></li>
+        </ol>
+      </div>
     </div>
     {% else %}
-    <p class="gta-wl-hint">{% translate "You can read the invitation, but you don't have permission to edit or send it." %}</p>
+    <div class="gx-empty"><svg aria-hidden="true"><use href="#ic-lock"/></svg><b>{% translate "Sending isn't yours to do" %}</b><span>{% translate "Ask someone who holds the waiting-list invite permission." %}</span></div>
     {% endif %}
-  </form>
+  </div>
 
-  <aside class="gta-wl-preview" aria-label="{% translate 'Preview of the email' %}">
-    <h2>{% translate "Preview" %}</h2>
-    <p class="gta-wl-hint">{% translate "Exactly how it will look, using “Alex Sample” as the reader. Updates as you type." %}</p>
-    <iframe id="wl-frame" title="{% translate 'Email preview' %}" sandbox="" data-url="{% url 'admin:hq_waitlist_preview' %}"></iframe>
-  </aside>
-</div>
+  {# ---------------- launch date ---------------- #}
+  <div class="gx-pane" data-gx-pane="launch">
+    <div class="gx-split">
+      <div class="gx-stack">
+        <div>
+          <p class="gx-label">{% translate "The countdown" %}</p>
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.6">{% translate "The waiting list sees a countdown to this on their own page. It's only a date they see — it doesn't send anything, and it can differ from when the email goes out. Leave it empty to hide the countdown." %}</p>
+          <label class="gx-form" style="display:block;max-width:360px"><span class="gx-note">{% blocktranslate with tz=tz_name %}Launch ({{ tz }}){% endblocktranslate %}</span>
+            <input id="wl-launch" class="gx-in" type="datetime-local" name="launch_at" value="{{ launch_local }}" data-gx-cal data-gx-cal-future></label>
+        </div>
+        {% if can_invite %}<div class="gx-actions"><button class="gx-btn" type="submit" name="action" value="launch_date" formnovalidate><svg aria-hidden="true"><use href="#ic-calendar"/></svg>{% translate "Save launch date" %}</button></div>{% endif %}
+      </div>
+      <div class="gx-count" data-gx-count="{{ launch_local }}">
+        <p class="gx-label">{% translate "What they see" %}</p>
+        <div class="gx-count-row">
+          <div><b data-c="d">–</b><span>{% translate "days" %}</span></div>
+          <div><b data-c="h">–</b><span>{% translate "hours" %}</span></div>
+          <div><b data-c="m">–</b><span>{% translate "mins" %}</span></div>
+        </div>
+        <p class="gx-note" data-c-note>{% if not launch_local %}{% translate "No launch date — the countdown is hidden." %}{% endif %}</p>
+      </div>
+    </div>
+  </div>
+</section>
+</form>
 
 <script>
 (function () {
   var form = document.getElementById('wl-form'), frame = document.getElementById('wl-frame'), t;
-  if (!form || !frame) return;
+  if (!form) return;
+
+  // The preview: the real email, redrawn a moment after typing stops.
+  var subj = document.querySelector('[data-gx-mail-subject]');
   function draw() {
+    if (!frame) return;
     var fd = new FormData();
     ['subject', 'heading', 'body', 'button_label'].forEach(function (n) { fd.append(n, form.elements[n].value); });
+    var bg = form.querySelector('input[name=background]:checked');
+    fd.append('background', bg ? bg.value : '');
     fd.append('csrfmiddlewaretoken', form.elements.csrfmiddlewaretoken.value);
+    frame.parentNode.classList.add('is-drawing');
     fetch(frame.dataset.url, { method: 'POST', body: fd, credentials: 'same-origin' })
       .then(function (r) { return r.text(); })
-      .then(function (html) { frame.srcdoc = html; });
+      .then(function (html) { frame.srcdoc = html; frame.parentNode.classList.remove('is-drawing'); });
   }
-  form.addEventListener('input', function () { clearTimeout(t); t = setTimeout(draw, 450); });
+  form.addEventListener('input', function (e) {
+    if (subj && e.target.name === 'subject') subj.textContent = e.target.value || '…';
+    if (['subject', 'heading', 'body', 'button_label', 'background'].indexOf(e.target.name) > -1) { clearTimeout(t); t = setTimeout(draw, e.target.name === 'background' ? 60 : 450); }
+  });
   draw();
+
+  // Desktop / phone width.
+  var body = document.querySelector('[data-gx-mail-body]');
+  document.querySelectorAll('[data-gx-device]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('[data-gx-device]').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+      body.classList.toggle('is-phone', b.getAttribute('data-gx-device') === 'phone');
+    });
+  });
+
+  // Preview: side by side, closed (write full width), or on its own. Kept
+  // between visits.
+  var inv = document.querySelector('[data-gx-inv]');
+  function mode(m) {
+    if (!inv) return;
+    inv.setAttribute('data-mode', m);
+    try { localStorage.setItem('gxInvMode', m); } catch (e) {}
+    if (m !== 'write') { clearTimeout(t); t = setTimeout(draw, 80); }
+  }
+  document.querySelectorAll('[data-gx-mode]').forEach(function (b) {
+    b.addEventListener('click', function () { mode(b.getAttribute('data-gx-mode')); });
+  });
+  try { var saved = localStorage.getItem('gxInvMode'); if (saved) mode(saved); } catch (e) {}
+
+  // Sending: the buttons always answer. Without the tick they say so (the
+  // box shakes and asks); Schedule without a date opens the calendar; a
+  // button with data-gx-confirm asks before it goes.
+  var ok = form.querySelector('[data-gx-sendok]'), box = form.querySelector('[data-gx-confirmbox]');
+  form.querySelectorAll('[data-gx-needs-ok]').forEach(function (b) {
+    b.addEventListener('click', function (e) {
+      if (ok && !ok.checked) {
+        e.preventDefault(); e.stopImmediatePropagation();
+        box.classList.remove('is-need'); void box.offsetWidth; box.classList.add('is-need');
+        box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      if (b.value === 'schedule' && !form.elements.scheduled_for.value) {
+        e.preventDefault(); e.stopImmediatePropagation();
+        var cal = form.elements.scheduled_for.closest('.gx-cal');
+        if (cal) cal.querySelector('.gx-cal-btn').click();
+      }
+    });
+  });
+  if (ok) ok.addEventListener('change', function () { if (ok.checked) box.classList.remove('is-need'); });
+  form.querySelectorAll('[data-gx-confirm]').forEach(function (b) {
+    b.addEventListener('click', function (e) { if (!e.defaultPrevented && !window.confirm(b.getAttribute('data-gx-confirm'))) e.preventDefault(); });
+  });
+
+  // The countdown, as the waiting list will see it.
+  var cd = document.querySelector('[data-gx-count]'), launch = form.elements.launch_at;
+  function tick() {
+    var v = launch.value, note = cd.querySelector('[data-c-note]');
+    if (!v) { ['d', 'h', 'm'].forEach(function (k) { cd.querySelector('[data-c="' + k + '"]').textContent = '–'; }); note.textContent = 'No launch date — the countdown is hidden.'; return; }
+    var ms = Math.max(0, new Date(v).getTime() - Date.now());
+    cd.querySelector('[data-c="d"]').textContent = Math.floor(ms / 864e5);
+    cd.querySelector('[data-c="h"]').textContent = Math.floor(ms / 36e5) % 24;
+    cd.querySelector('[data-c="m"]').textContent = Math.floor(ms / 6e4) % 60;
+    note.textContent = ms ? '' : 'That moment has passed — the countdown shows zero.';
+  }
+  if (cd && launch) { launch.addEventListener('input', tick); tick(); setInterval(tick, 30000); }
 })();
 </script>
 {% endblock %}

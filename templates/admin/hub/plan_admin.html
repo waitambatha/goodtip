@@ -1,0 +1,87 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n %}
+
+{% comment %}
+PLANS (client, 19 Oct 2026; rebuilt on the pitch 24 Oct 2026). The hero is
+the scoreboard; the sheet has three tabs — the five plans as cards, the five
+side by side, and the ready-made packages. Every card opens its own page
+(plan_detail.html / package_detail.html) with everything about it and its
+editor.
+{% endcomment %}
+
+{% block gx_kicker %}{% translate "Plans" %}{% endblock %}
+{% block gx_title %}{% translate "Five plans," %} <em>{% translate "and the extras" %}</em>{% endblock %}
+{% block gx_lead %}{% translate "What each published plan costs and holds, and the ready-made packages for groups the five don't fit. Open one to change it — /pricing/ follows straight away." %}{% endblock %}
+{% block gx_board %}
+<div class="gx-score"><b>{{ orgs_paying }}</b><span>{% translate "On a plan" %}</span></div>
+<div class="gx-score{% if overridden %} is-warn{% else %} is-cool{% endif %}"><b>{{ overridden }}</b><span>{% translate "Plans changed" %}</span></div>
+<div class="gx-score"><b>{{ active_packages }}</b><span>{% translate "Packages on offer" %}</span></div>
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet" data-gx-tabs>
+  <div class="gx-tabs" role="tablist">
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="plans" aria-selected="true">{% translate "The five plans" %}</button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="compare">{% translate "Side by side" %}</button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="packages">{% translate "Packages" %} <em>{{ packages|length }}</em></button>
+    <div class="gx-tabs-end"><a class="gx-btn is-ghost" href="{% url 'admin:hq_custom_package_new' %}"><svg aria-hidden="true"><use href="#ic-spark"/></svg>{% translate "New package" %}</a></div>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="plans">
+    <div class="gx-plans">
+      {% for row in tiers %}
+      <a class="gx-plan" style="--ac: {{ row.accent }}" href="{% url 'admin:hq_plan_detail' row.tier %}">
+        <span class="gx-plan-top" data-n="{{ row.step }}">
+          {% if row.changed %}<span class="gx-flag">{% translate "Changed" %}</span>{% elif row.popular %}<span class="gx-flag">{% translate "Popular" %}</span>{% endif %}
+          <span class="gx-plan-k">{% blocktranslate with n=row.step %}Plan {{ n }}{% endblocktranslate %}</span>
+          <span class="gx-plan-name">{{ row.label }}</span>
+          <span class="gx-plan-price"><b>${{ row.effective.price|floatformat:"0g" }}</b>{% if row.effective.discount_amount %}<s>${{ row.effective.original_price|floatformat:"0g" }}</s>{% endif %}<span>/{% translate "yr" %}</span></span>
+        </span>
+        <span class="gx-plan-body">
+          <span class="gx-plan-for">{{ row.audience }}</span>
+          <span class="gx-meter"><span class="gx-meter-h"><span>{% translate "Holds" %}</span><b>{{ row.effective.seat_limit|floatformat:"0g" }} {% translate "people" %}</b></span><span class="gx-meter-bar"><i style="width: {{ row.cap_pct }}%"></i></span></span>
+          <span class="gx-plan-foot"><span>{{ row.orgs_on }} {% translate "on it" %}</span><span>{% translate "Open" %} &rarr;</span></span>
+        </span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="compare">
+    <div class="gx-cmp">
+      <div class="gx-cmp-row is-head"><span>{% translate "Plan" %}</span><span>{% translate "Price a year" %}</span><span>{% translate "A person, at full size" %}</span></div>
+      {% for row in tiers %}
+      <a class="gx-cmp-row" style="--ac: {{ row.accent }}" href="{% url 'admin:hq_plan_detail' row.tier %}">
+        <b>{{ row.label }}</b>
+        <span class="gx-cmp-cell"><span class="gx-mb"><i style="width: {{ row.price_pct }}%"></i></span><em>${{ row.effective.price|floatformat:"0g" }}</em></span>
+        <span class="gx-cmp-cell"><span class="gx-mb"><i style="width: {{ row.pp_pct }}%"></i></span><em>${{ row.per_person|floatformat:2 }}</em></span>
+      </a>
+      {% endfor %}
+    </div>
+    <p class="gx-note" style="margin-top:14px">{% translate "The bigger the plan, the more it costs a year — and the less each person costs." %}</p>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="packages">
+    <div class="gx-packs">
+      {% for p in packages %}
+      <a class="gx-pack{% if not p.pkg.is_active %} is-off{% endif %}" style="--ac: {{ p.accent }}" href="{% url 'admin:hq_custom_package_detail' p.pkg.pk %}">
+        <span class="gx-pack-h">
+          <span class="gx-pack-ic" aria-hidden="true"><svg><use href="#{{ p.icon }}"/></svg></span>
+          <span><b>{{ p.pkg.name }}</b><span>{% if p.pkg.is_active %}{% translate "On offer" %}{% else %}{% translate "Hidden" %}{% endif %} &middot; {% if p.taken %}{% blocktranslate count n=p.taken %}taken once{% plural %}taken {{ n }} times{% endblocktranslate %}{% else %}{% translate "not taken yet" %}{% endif %}</span></span>
+        </span>
+        <span class="gx-pack-price">${{ p.pkg.price_aud|floatformat:"0g" }} <small>/{% translate "yr" %}</small></span>
+        <p>{{ p.pkg.description|default:"—" }}</p>
+        <span class="gx-meter-h"><span>{{ p.pkg.seat_limit_label }} {% translate "people" %}</span><b>{{ p.pkg.child_org_limit }} {% translate "org" %}{{ p.pkg.child_org_limit|pluralize }}</b></span>
+      </a>
+      {% endfor %}
+      <a class="gx-pack is-new" href="{% url 'admin:hq_custom_package_new' %}">
+        <span style="display:grid;justify-items:center;gap:12px">
+          <span class="gx-pack-ic" aria-hidden="true"><svg><use href="#ic-spark"/></svg></span>
+          <b style="font:400 18px var(--gt-display)">{% translate "Add a package" %}</b>
+          <span class="gx-note">{% translate "for a kind of group the five don't fit" %}</span>
+        </span>
+      </a>
+    </div>
+  </div>
+</section>
+{% endblock %}

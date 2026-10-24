@@ -25966,14 +25966,15 @@ html[data-theme="light"] .app .abtn.is-locked[disabled] {
    whole page with a new design and feel"). One question (team size), one row
    of plan tabs, one panel for the chosen plan. One palette: deep green
    surfaces, lime for what matters, nothing else competing. ---------- */
-.plk { max-width: 1060px; margin: 8px auto 0; display: grid; gap: 18px; color: #FFFFFF; }
-/* .plk-pick / .plk-custom-row / .plk-panels used to be .plk's own direct
-   grid-item children, spaced by its gap:18px; wrapped in .plk-switcher now
-   so the three can hide together (client, 12 Oct 2026), so the same grid and
-   gap is repeated one level down to keep the spacing it already had. */
-.plk-switcher { display: grid; gap: 18px; }
-.plk-switcher[hidden] { display: none; }
-.plk-step { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: #CFF93A; color: #072F1E; font-weight: 900; font-size: 14px; }
+.plk { max-width: 1060px; margin: 8px auto 0; display: grid; gap: 18px; color: #FFFFFF;
+  /* minmax(0, 1fr), not the implicit auto column: an auto track grows to
+     its widest child's content, which pushed the strip, the cards and the
+     panels out past the white sheet (21 Oct 2026). */
+  grid-template-columns: minmax(0, 1fr); }
+/* The tab row and the panels each carry data-pp-switcher (hidden for a
+   subscribed org until Upgrade/Downgrade — client, 12 Oct 2026), with the
+   tiles row between them always on show; see billing/plans.html. */
+[data-pp-switcher][hidden] { display: none; }
 .plk-step-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-size: 17px; }
 /* Its own row, centred like the rest of this page — not squeezed into
    .plk-step-row with a margin-left:auto, which on a narrow sheet pushed it
@@ -25993,66 +25994,162 @@ html[data-theme="light"] .app .abtn.is-locked[disabled] {
    fix as .bl-tick needed for the ring/tick swap on the success page. */
 .plk-tab[hidden] { display: none; }
 
-/* A CUSTOM PRICE, OUTSIDE THE FIVE — A THIN CARD AMONG THE OTHERS (client,
-   11 and 12 Oct 2026: "even if I've not subscribed to anything I should see
-   it as a package... a small thin card... starts where we have Team and
-   ends in Organisation"). .plk-custom-row shares .plk-tabs' own grid
-   template and gap so the two line up without guessing a pixel width;
-   grid-column: 2 / 5 on the card itself spans Team/Workplace/Organisation
-   exactly. Same card language as .bl-card above it (white, --ac top
-   border), since this is back on the sheet's own backdrop, not the dark
-   picker — just one row tall rather than a full plan card. */
-/* margin:auto on a grid item overrides stretch and shrinks it to content
-   width instead of filling the cell — found 12 Oct 2026, live: the card sat
-   centred and ~230px narrower than .plk-tabs above it rather than lined up
-   with it. No horizontal margin needed anyway: .plk's own single-column grid
-   already stretches a plain block child to its full width, same as
-   .plk-pick and .plk-panels either side of this one. */
-.plk-custom-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 10px 0 22px; }
-/* A wine-red card (client, 12 Oct 2026: "let's have the background as red
-   wine" — a second pass on the first fix, a light tint, which still read as
-   "majority white"). Dark now like the five tabs above it, not the white
-   sheet, so text flips to a light ink; the button stays the lime it already
-   was and was asked to keep. */
-.plk-custom { grid-column: 2 / 5; display: flex; align-items: center; gap: 16px; text-align: left;
-  padding: 14px 20px; border-radius: 16px; background: linear-gradient(165deg, #5C1A28, #3A0F1C);
-  border: 1px solid rgba(255,255,255,.08); border-top: 3px solid var(--ac); box-shadow: 0 18px 40px -30px rgba(0,0,0,.5); }
-.plk-custom-ic { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
-  background: rgba(255,255,255,.12); color: #FFFFFF; }
-.plk-custom-ic svg { width: 17px; height: 17px; }
-.plk-custom-body { flex: 1; min-width: 0; }
-/* --ac here (billing/plans.html's inline style) is a dark gold/forest tone
-   chosen to sit on white — too low-contrast as text on this now-dark card,
-   so it's lightened rather than used neat. The top border uses it unmixed,
-   where a darker accent is exactly right. */
-.plk-custom-eyebrow { margin: 0; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
-  color: color-mix(in srgb, var(--ac) 55%, #FFFFFF); }
-.plk-custom-msg { margin: 2px 0 0; font-size: 13.5px; line-height: 1.4; color: rgba(255,255,255,.9); }
-.plk-custom-msg b { color: #FFFFFF; }
-.plk-custom-cta { flex: none; }
-.plk-custom-pill { display: inline-block; padding: 5px 12px; border-radius: 999px; font-size: 11.5px; font-weight: 800;
-  letter-spacing: .04em; text-transform: uppercase; background: rgba(255,255,255,.14); color: #FFFFFF; }
-/* A real button, not muted text (client, 12 Oct 2026: "the button is not
-   quite clearly seen... I've struggled to see it"). Lime, like every other
-   call to action on this page, so it reads as something to press rather
-   than as a caption under the plan cards. */
-.plk-custom-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; font-weight: 700; white-space: nowrap;
-  color: #072F1E; background: #CFF93A; border: 0; border-radius: 999px; padding: 10px 16px; cursor: pointer;
-  box-shadow: 0 10px 22px -12px rgba(207,249,58,.7); transition: transform .15s var(--ease), box-shadow .15s var(--ease); }
-.plk-custom-btn:hover { transform: translateY(-1px); box-shadow: 0 14px 26px -12px rgba(207,249,58,.8); }
+/* THE STRIP (client, 21 Oct 2026). Subscription, custom pricing and the
+   team-size filter on one row at the top. Only the filter stretches —
+   right-to-left, to three-quarters of the row (flex-grow 6 against 1 + 1):
+   "the expansion sideways was to be for the filter... the others is the
+   minimal expansion". The other two only lift on hover. --tone is each
+   card's colour; the filter borrows the slider's own --fit-ink, so it
+   turns the colour of whichever plan the number lands on.
+
+   Stacked cards with everything showing is the base; the strip behaviour
+   only switches on once the script has added .is-js, and only on a screen
+   wide enough to hold it. */
+.plk-strip { display: grid; gap: 12px; }
+.plk-pane { --tone: var(--forest); position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0;
+  padding: 18px 20px 16px; border-radius: 22px; overflow: hidden; color: var(--ink); background: #FFFFFF;
+  border: 1px solid rgba(15,46,34,.09); box-shadow: 0 1px 0 rgba(15,46,34,.04), 0 16px 32px -26px rgba(15,46,34,.35);
+  transition: transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s var(--ease), border-color .3s var(--ease), background .4s var(--ease); }
+.plk-pane::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--tone); transition: background .4s var(--ease); }
+.plk-pane.is-custom { --tone: #C9700A; }
+.plk-pane.is-sub { --tone: #5A6B7A; }
+.plk-pane.is-sub.is-active { --tone: #2A7337; }
+.plk-pane.is-sub.is-scheduled { --tone: #B98500; }
+.plk-pane.is-sub.is-ending, .plk-pane.is-sub.is-ended { --tone: #B23434; }
+
+/* The whole card is its link: the anchor covers it, and everything drawn
+   on top lets clicks fall through to it except the controls themselves. */
+.plk-pane-hit { position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+.plk-pane-hit:focus-visible { outline: 3px solid color-mix(in srgb, var(--tone) 55%, transparent); outline-offset: -3px; }
+.plk-pane > :not(.plk-pane-hit) { position: relative; z-index: 2; }
+.plk-pane:has(.plk-pane-hit) > :not(.plk-pane-hit) { pointer-events: none; }
+.plk-pane:has(.plk-pane-hit) :is(a, button, input, form) { pointer-events: auto; }
+.plk-pane:has(.plk-pane-hit) { cursor: pointer; }
+
+/* The minimal expansion: a lift, a deeper shadow, a tinted edge. */
+.plk-pane:has(.plk-pane-hit):hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--tone) 35%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tone) 6%, #FFFFFF), #FFFFFF 60%);
+  box-shadow: 0 1px 0 rgba(15,46,34,.04), 0 24px 40px -24px rgba(15,46,34,.45); }
+
+.plk-pane-h { display: flex; align-items: center; gap: 8px; min-width: 0; margin-bottom: 4px; }
+.plk-pane-ic { flex: none; width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--tone) 12%, #FFFFFF); color: var(--tone); transition: color .4s var(--ease), background .4s var(--ease); }
+.plk-pane-ic svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.plk-pane-label { min-width: 0; font-size: 10.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plk-pane-pill { flex: none; margin-left: auto; padding: 3px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .03em;
+  white-space: nowrap; background: color-mix(in srgb, var(--tone) 12%, #FFFFFF); color: color-mix(in srgb, var(--tone) 72%, #0F2E22); }
+.plk-pane-pill.is-ok { --tone: #2A7337; }
+.plk-pane-pill.is-wait { --tone: #B98500; }
+.plk-pane-value { margin: 0; font-family: var(--display); font-size: 19px; line-height: 1.2; color: var(--deep);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plk-pane-sub { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--muted);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.plk-pane-foot { margin-top: auto; padding-top: 8px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.plk-pane-foot:empty { display: none; }
+.plk-pane-foot form { margin: 0; }
+.plk-pane .plk-dirfilter { margin: 0; justify-content: flex-start; }
+.plk-pane .plk-dir-btn { padding: 5px 11px; font-size: 12px; }
+.plk-pane-go { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 700; white-space: nowrap;
+  color: color-mix(in srgb, var(--tone) 72%, #0F2E22); }
+.plk-pane-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px; font-weight: 700; white-space: nowrap;
+  color: #FFFFFF; background: var(--deep); border: 0; border-radius: 999px; padding: 7px 14px; cursor: pointer;
+  transition: transform .15s var(--ease), background .15s var(--ease); }
+.plk-pane-btn:hover { background: var(--forest); transform: translateY(-1px); }
+.plk-pane-link { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px; font-weight: 700; white-space: nowrap;
+  text-decoration: underline; text-underline-offset: 3px; color: var(--forest); background: none; border: 0; padding: 0; cursor: pointer; }
+.plk-pane-link:hover { color: var(--deep); }
 /* Decline, quieter than Subscribe — a way out of the offer, not a second
-   call to action competing with it (client, 12 Oct 2026: "either accept it
-   or reject it"). */
-.plk-custom-reject { display: block; margin: 6px auto 0; font: inherit; font-size: 11.5px; font-weight: 700;
-  color: rgba(255,255,255,.55); background: none; border: 0; cursor: pointer; text-decoration: underline; text-align: center; }
-.plk-custom-reject:hover { color: rgba(255,255,255,.85); }
+   call to action competing with it (client, 12 Oct 2026). */
+.plk-pane-link.is-quiet { color: var(--muted); font-weight: 600; }
+.plk-pane-go span, .plk-pane-btn span { display: inline-block; transition: transform .25s var(--ease); }
+.plk-pane:hover .plk-pane-go span, .plk-pane-btn:hover span { transform: translateX(4px); }
+
+/* ---- the filter ---- */
+.plk-filter { --tone: var(--fit-ink, var(--forest)); }
+.plk-filter-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.plk-filter-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.plk-filter-sub { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plk-filter-today { flex: none; font: inherit; font-size: 12px; font-weight: 700; color: var(--muted); background: #FFFFFF;
+  border: 1px solid rgba(15,46,34,.14); border-radius: 999px; padding: 5px 11px; cursor: pointer;
+  transition: color .2s var(--ease), border-color .2s var(--ease), background .2s var(--ease); }
+.plk-filter-today:hover { color: var(--deep); border-color: color-mix(in srgb, var(--tone) 45%, transparent); background: color-mix(in srgb, var(--tone) 6%, #FFFFFF); }
+.plk-filter-count { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.plk-filter-n { font-size: 12.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.plk-filter-n b { font-family: var(--display); font-size: 30px; line-height: 1; margin-right: 3px;
+  color: color-mix(in srgb, var(--tone) 80%, #0F2E22); transition: color .4s var(--ease); }
+.plk-filter-fit { padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap;
+  color: color-mix(in srgb, var(--tone) 72%, #0F2E22); background: color-mix(in srgb, var(--tone) 12%, #FFFFFF);
+  transition: color .4s var(--ease), background .4s var(--ease); }
+.plk-filter-fit b { font-weight: 800; }
+.plk-filter-fit[hidden] { display: none; }
+
+/* The dial: the five plans' own colours behind the handle, dimmed past it. */
+.plk-dial { --fill: 0%; position: relative; height: 30px; margin-top: 12px; }
+.plk-dial-track { position: absolute; left: 0; right: 0; top: 50%; height: 10px; transform: translateY(-50%);
+  border-radius: 999px; overflow: hidden; background: rgba(15,46,34,.08); }
+.plk-dial-zones i { position: absolute; top: 0; bottom: 0; box-shadow: inset -2px 0 0 #FFFFFF; }
+.plk-dial-dim { position: absolute; top: 0; bottom: 0; left: var(--fill); right: 0; background: rgba(255,255,255,.74); }
+.plk-dial input[type="range"] { position: relative; z-index: 2; display: block; width: 100%; height: 30px; margin: 0;
+  -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; outline: none; }
+.plk-dial input[type="range"]::-webkit-slider-runnable-track { height: 30px; background: transparent; }
+.plk-dial input[type="range"]::-moz-range-track { height: 30px; background: transparent; }
+.plk-dial input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; margin-top: 2px; border-radius: 50%;
+  background: #FFFFFF; border: 6px solid var(--tone); box-shadow: 0 4px 12px -2px rgba(15,46,34,.45);
+  transition: border-color .4s var(--ease), transform .2s var(--ease); }
+.plk-dial input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%;
+  background: #FFFFFF; border: 6px solid var(--tone); box-shadow: 0 4px 12px -2px rgba(15,46,34,.45); }
+.plk-dial input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.12); }
+.plk-dial input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 5px color-mix(in srgb, var(--tone) 28%, transparent), 0 4px 12px -2px rgba(15,46,34,.45); }
+.plk-dial input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 5px color-mix(in srgb, var(--tone) 28%, transparent); }
+
+/* Each plan's name under its stretch of the dial — a button that jumps there. */
+.plk-dial-legend { display: none; position: relative; height: 32px; margin-top: 4px; }
+.plk-dial-stop { position: absolute; top: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 2px 6px; font: inherit; background: none; border: 0; border-radius: 8px; cursor: pointer; white-space: nowrap;
+  color: var(--muted); transition: color .2s var(--ease), background .2s var(--ease); }
+.plk-dial-stop b { font-size: 11.5px; font-weight: 800; }
+.plk-dial-stop small { font-size: 10px; font-weight: 600; opacity: .8; }
+.plk-dial-stop:hover { color: var(--deep); background: color-mix(in srgb, var(--stop-ink) 8%, transparent); }
+.plk-dial-stop.is-on { color: color-mix(in srgb, var(--stop-ink) 80%, #0F2E22); }
+.plk-dial-stop.is-on::before { content: ""; position: absolute; top: -6px; left: 50%; width: 6px; height: 6px; margin-left: -3px;
+  border-radius: 50%; background: var(--stop-ink); }
+
+@media (min-width: 761px) {
+  .plk-strip.is-js { display: flex; height: 178px; }
+  .plk-strip.is-js .plk-pane { flex: 1 1 0; transition: flex-grow .6s cubic-bezier(.2,.8,.2,1), transform .3s cubic-bezier(.2,.8,.2,1),
+    box-shadow .3s var(--ease), border-color .3s var(--ease), background .4s var(--ease); }
+
+  /* The filter at rest: a third of the row, the dial a coloured preview. */
+  .plk-strip.is-js .plk-filter { cursor: pointer; }
+  .plk-strip.is-js .plk-filter-today { display: none; }
+  .plk-strip.is-js .plk-dial { margin-top: auto; }
+  .plk-strip.is-js .plk-filter:hover { border-color: color-mix(in srgb, var(--tone) 35%, transparent); }
+
+  /* Open: three-quarters of the row, the full dial with its plan stops. */
+  .plk-strip.is-js .plk-filter.is-wide { flex-grow: 6; cursor: default;
+    background: linear-gradient(105deg, color-mix(in srgb, var(--tone) 8%, #FFFFFF), #FFFFFF 55%);
+    border-color: color-mix(in srgb, var(--tone) 32%, transparent);
+    box-shadow: 0 1px 0 rgba(15,46,34,.04), 0 26px 46px -28px rgba(15,46,34,.5); }
+  .plk-strip.is-js .plk-filter.is-wide .plk-filter-today { display: block; animation: plkFadeIn .4s var(--ease) .15s both; }
+  .plk-strip.is-js .plk-filter.is-wide .plk-dial { margin-top: 14px; }
+  .plk-strip.is-js .plk-filter.is-wide .plk-dial-legend { display: block; animation: plkFadeIn .4s var(--ease) .2s both; }
+
+  /* The other two, squeezed while the filter is open: just the icon and
+     the one word that matters. */
+  .plk-strip.is-js.has-wide .plk-pane:not(.plk-filter) :is(.plk-pane-label, .plk-pane-pill, .plk-pane-sub, .plk-pane-foot) { display: none; }
+  .plk-strip.is-js.has-wide .plk-pane:not(.plk-filter) { padding: 16px 12px; justify-content: center; align-items: center; text-align: center; gap: 10px; }
+  .plk-strip.is-js.has-wide .plk-pane:not(.plk-filter) .plk-pane-h { margin: 0; }
+  .plk-strip.is-js.has-wide .plk-pane:not(.plk-filter) .plk-pane-ic { width: 38px; height: 38px; border-radius: 12px; }
+  .plk-strip.is-js.has-wide .plk-pane:not(.plk-filter) .plk-pane-ic svg { width: 18px; height: 18px; }
+  .plk-strip.is-js.has-wide .plk-pane:not(.plk-filter) .plk-pane-value { font-size: 14px; white-space: normal;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; animation: plkFadeIn .35s var(--ease) both; }
+}
+@keyframes plkFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
 .plk-custom-form { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
 .plk-custom-form textarea { width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(15,46,34,.14);
   font: inherit; font-size: 14px; resize: vertical; color: var(--deep); }
-@media (max-width: 760px) {
-  .plk-custom-row { grid-template-columns: 1fr; }
-  .plk-custom { grid-column: 1; flex-wrap: wrap; }
-}
 
 /* THE POPUP ITSELF (client, 12 Oct 2026: "a nice pop-up... they can enter
    their why they want a custom whatever"). Same overlay-and-panel shape as
@@ -26069,22 +26166,83 @@ html[data-theme="light"] .app .abtn.is-locked[disabled] {
   background: rgba(15,46,34,.06); color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer; }
 .plk-cmodal-x:hover { background: rgba(15,46,34,.1); color: var(--deep); }
 
+/* ---------- Billing → Custom packages, a page of its own (client, 21 Oct
+   2026: "it should be the whole page, not a section that pushes the whole
+   page"). Same white sheet as Plans (body.page-plans). Each card takes a
+   competition colour in turn, like the five plan cards, so a row of them
+   reads as more choices rather than one block of grey. ---------- */
+.pkx { max-width: 1060px; margin: 0 auto; display: grid; gap: 22px; color: var(--ink); }
+.pkx-intro { margin: -6px auto 0; max-width: 620px; text-align: center; font-size: 15px; line-height: 1.6; color: var(--muted); }
+.pkx-claim { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 16px;
+  background: rgba(217,154,0,.1); border: 1px solid rgba(217,154,0,.3); }
+.pkx-claim.is-ok { background: rgba(42,115,55,.08); border-color: rgba(42,115,55,.28); }
+.pkx-claim-ic { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: #FFFFFF; color: #8a6200; }
+.pkx-claim.is-ok .pkx-claim-ic { color: #2A7337; }
+.pkx-claim-ic svg, .pkx-specs svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.pkx-claim b { display: block; font-size: 15px; color: var(--deep); }
+.pkx-claim span { font-size: 13.5px; color: var(--muted); }
+
+.pkx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.pkx-card { --tone: var(--forest); position: relative; display: flex; flex-direction: column; padding: 26px 22px 20px; border-radius: 22px;
+  background: #FFFFFF; border: 1px solid rgba(15,46,34,.09); box-shadow: 0 18px 40px -30px rgba(15,46,34,.4); overflow: hidden;
+  transition: transform .2s var(--ease), box-shadow .2s var(--ease), border-color .2s var(--ease); }
+.pkx-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 5px; background: var(--tone); }
+.pkx-card:nth-child(4n+1) { --tone: #1F6FD1; }
+.pkx-card:nth-child(4n+2) { --tone: #C2306B; }
+.pkx-card:nth-child(4n+3) { --tone: #C9700A; }
+.pkx-card:nth-child(4n+4) { --tone: #6B34B8; }
+.pkx-card:hover { transform: translateY(-4px); border-color: color-mix(in srgb, var(--tone) 35%, transparent); box-shadow: 0 30px 50px -30px rgba(15,46,34,.5); }
+.pkx-card.is-taken { border-color: color-mix(in srgb, var(--tone) 55%, transparent); }
+.pkx-name { margin: 0 0 6px; font-family: var(--display); font-size: 20px; color: var(--deep); }
+.pkx-desc { margin: 0; min-height: 40px; font-size: 13.5px; line-height: 1.5; color: var(--muted); }
+.pkx-price { margin: 18px 0 0; display: flex; align-items: baseline; gap: 4px; }
+.pkx-price b { font-family: var(--display); font-size: 38px; line-height: 1; color: var(--tone); }
+.pkx-price span { font-size: 13px; font-weight: 700; color: var(--muted); }
+.pkx-per { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+.pkx-specs { list-style: none; margin: 16px 0 20px; padding: 14px 0 0; border-top: 1px dashed rgba(15,46,34,.12); display: grid; gap: 8px; }
+.pkx-specs li { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; color: var(--ink); }
+.pkx-specs svg { color: var(--tone); }
+.pkx-card form { margin-top: auto; }
+.pkx-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; font: inherit; font-size: 14px; font-weight: 700;
+  color: #FFFFFF; background: var(--deep); border: 0; border-radius: 999px; padding: 12px 18px; cursor: pointer;
+  transition: background .15s var(--ease), transform .15s var(--ease); }
+.pkx-btn:hover { background: var(--tone, var(--forest)); transform: translateY(-1px); }
+.pkx-btn span { transition: transform .2s var(--ease); }
+.pkx-btn:hover span { transform: translateX(3px); }
+.pkx-taken { margin-top: auto; padding: 11px; border-radius: 999px; text-align: center; font-size: 13.5px; font-weight: 800;
+  color: var(--tone); background: color-mix(in srgb, var(--tone) 10%, #FFFFFF); }
+.pkx-empty { margin: 0; padding: 30px; text-align: center; color: var(--muted); border: 1px dashed rgba(15,46,34,.18); border-radius: 18px; }
+
+/* "Nothing here fits?" — the negotiated ask, in the deep green so it reads
+   as the way out of the grid rather than one more card in it. */
+.pkx-ask { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 28px; align-items: center;
+  padding: 28px 30px; border-radius: 24px; background: linear-gradient(150deg, #0F3C29, #072F1E); color: #FFFFFF; }
+.pkx-ask h2 { margin: 0 0 8px; font-family: var(--display); font-size: 24px; color: #FFFFFF; }
+.pkx-ask p { margin: 0; font-size: 14.5px; line-height: 1.6; color: rgba(255,255,255,.78); }
+.pkx-ask .pkx-ask-state { margin: 0 0 12px; color: #FFFFFF; }
+.pkx-form { display: grid; gap: 10px; }
+.pkx-form textarea { width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,.2);
+  background: rgba(255,255,255,.08); color: #FFFFFF; font: inherit; font-size: 14px; resize: vertical; }
+.pkx-form textarea::placeholder { color: rgba(255,255,255,.5); }
+.pkx-ask .pkx-btn { color: #072F1E; background: #CFF93A; width: auto; }
+.pkx-ask .pkx-btn:hover { background: #DFFF6A; }
+.pkx-ask-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.pkx-ask-row form { margin: 0; }
+/* Declining, quieter than Subscribe (client, 12 Oct 2026) — a <details>
+   disclosure rather than a popup, since this ask page is itself the
+   "bigger, more detailed" place that replaced the popup. */
+.pkx-decline summary { font-size: 13px; font-weight: 700; color: rgba(255,255,255,.65); text-decoration: underline; cursor: pointer; list-style: none; }
+.pkx-decline summary:hover { color: rgba(255,255,255,.9); }
+.pkx-decline[open] summary { margin-bottom: 10px; }
+.pkx-decline form { display: flex; gap: 10px; align-items: flex-start; }
+.pkx-decline textarea { flex: 1; box-sizing: border-box; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.2);
+  background: rgba(255,255,255,.08); color: #FFFFFF; font: inherit; font-size: 13px; resize: vertical; }
+.pkx-decline textarea::placeholder { color: rgba(255,255,255,.5); }
+.pkx-btn.is-ghost { width: auto; color: #FFFFFF; background: rgba(255,255,255,.12); white-space: nowrap; }
+.pkx-btn.is-ghost:hover { background: rgba(255,255,255,.22); }
+@media (max-width: 760px) { .pkx-ask { grid-template-columns: 1fr; padding: 22px; } }
+
 /* 1 — team size */
-.plk-size { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; align-items: center; gap: 18px 28px;
-  padding: 22px 26px; border-radius: 22px; background: linear-gradient(160deg, rgba(255,255,255,.07), rgba(255,255,255,.02)); border: 1px solid rgba(255,255,255,.1); }
-.plk-size-q { display: flex; gap: 12px; align-items: flex-start; }
-.plk-size-q b { display: block; font-size: 17px; }
-.plk-size-q div span { display: block; font-size: 13px; color: rgba(255,255,255,.7); margin-top: 3px; }
-.plk-size-n { display: block; font-size: 14px; color: rgba(255,255,255,.75); margin-bottom: 8px; }
-.plk-size-n b { font-family: var(--display); font-size: 30px; color: #FFFFFF; margin-right: 4px; }
-.plk-size-ctl input[type="range"] { --fill: 50%; -webkit-appearance: none; appearance: none; width: 100%; height: 8px; border-radius: 8px; outline: none; cursor: pointer;
-  background: linear-gradient(90deg, #CFF93A var(--fill), rgba(255,255,255,.14) var(--fill)); }
-.plk-size-ctl input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: #FFFFFF; border: 5px solid #CFF93A; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
-.plk-size-ctl input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #FFFFFF; border: 5px solid #CFF93A; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
-.plk-size-ctl input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(207,249,58,.35); }
-.plk-size-scale { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; font-weight: 700; color: rgba(255,255,255,.55); }
-.plk-rec { margin: 0; padding: 10px 16px; border-radius: 14px; background: rgba(207,249,58,.12); border: 1px solid rgba(207,249,58,.35); font-size: 13px; color: rgba(255,255,255,.85); white-space: nowrap; }
-.plk-rec b { display: block; font-family: var(--display); font-size: 20px; color: #CFF93A; }
 
 /* 2 — the plan tabs */
 .plk-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
@@ -26154,8 +26312,6 @@ html[data-theme="light"] .app .abtn.is-locked[disabled] {
 .plk .pl-test { margin: 0; max-width: none; }
 
 @media (max-width: 900px) {
-  .plk-size { grid-template-columns: 1fr; }
-  .plk-rec { white-space: normal; }
   .plk-tabs { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 2px 16px; }
   .plk-tab { flex: 0 0 150px; scroll-snap-align: start; }
   .plk-panel, .plk-js .plk-panel.on { grid-template-columns: 1fr; }
@@ -26229,7 +26385,6 @@ html[data-theme="light"] .app .abtn.is-locked[disabled] {
 
 
 /* the size question, quieter, so the plans are the stage */
-.plk-size { border-radius: 24px; background: linear-gradient(160deg, rgba(255,255,255,.055), rgba(255,255,255,.015)); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
 
 /* the plan number sits up in the panel's corner, clear of the price and button */
 
@@ -26325,14 +26480,7 @@ html[data-theme="light"] .app .abtn.is-locked[disabled] {
 .plk { color: var(--ink); }
 
 /* 1 — the size question */
-.page-plans .plk-size { background: #F4F7F3; border-color: rgba(15,46,34,.1); box-shadow: inset 0 1px 0 #FFFFFF; }
-.page-plans .plk-size-q b, .page-plans .plk-size-n b, .page-plans .plk-step-row b { color: var(--deep); }
-.page-plans .plk-size-q div span, .page-plans .plk-size-n, .page-plans .plk-size-scale { color: var(--muted); }
-.page-plans .plk-size-ctl input[type="range"] { background: linear-gradient(90deg, var(--forest) var(--fill), rgba(15,46,34,.14) var(--fill)); }
-.page-plans .plk-size-ctl input[type="range"]::-webkit-slider-thumb { border-color: var(--forest); box-shadow: 0 3px 10px rgba(15,46,34,.35); }
-.page-plans .plk-size-ctl input[type="range"]::-moz-range-thumb { border-color: var(--forest); box-shadow: 0 3px 10px rgba(15,46,34,.35); }
-.page-plans .plk-rec { background: rgba(42,115,55,.08); border-color: rgba(42,115,55,.28); color: var(--muted); }
-.page-plans .plk-rec b { color: var(--forest); }
+.page-plans .plk-step-row b { color: var(--deep); }
 
 /* test mode, on paper */
 .page-plans .pl-test { background: rgba(15,46,34,.03); border-color: rgba(15,46,34,.2); }
@@ -26365,18 +26513,7 @@ html[data-theme="light"] .app .abtn.is-locked[disabled] {
    is asked above its control and centred, so the box under it is a thin
    strip. "Choose your plan" is centred too. The plan panel becomes a hero
    split: half the words, half a photograph, both the same height. ---------- */
-.plk-ask { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 12px; margin: 2px 0 12px; text-align: center; }
-.plk-ask b { font-size: 19px; color: var(--deep); }
-.plk-ask > span:last-child { font-size: 14px; color: var(--muted); }
-
 /* the strip: number, slider, the plan it lands on */
-.plk-size { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px 22px; padding: 12px 20px; border-radius: 16px; }
-.plk-size-n { margin: 0; white-space: nowrap; }
-.plk-size-n b { font-size: 24px; }
-.plk-size-ctl { min-width: 0; }
-.plk-size-scale { margin-top: 5px; font-size: 10.5px; }
-.plk-rec { display: flex; align-items: baseline; gap: 8px; padding: 7px 14px; border-radius: 999px; font-size: 12.5px; }
-.plk-rec b { display: inline; font-size: 15px; }
 
 .plk-step-row { justify-content: center; margin-bottom: 14px; }
 
@@ -26391,23 +26528,18 @@ html[data-theme="light"] .app .abtn.is-locked[disabled] {
 .plk-shot img { object-position: center center; }
 .plk-main { justify-content: center; }
 @media (max-width: 900px) {
-  .plk-size { grid-template-columns: 1fr; }
-  .plk-rec { justify-content: center; }
   .plk-show { border-radius: 0 0 26px 26px; min-height: 280px; }
   .plk-show::before { background: linear-gradient(180deg, var(--sf) 0%, transparent 18%); }
 }
 
-/* ---------- Plan picker, balanced (client, 9 Oct 2026). The question stands
-   on its own line with the organisation's count under it. The five plan
-   cards grow — they were too slight against the panel below — and the panel
-   gives that height back by tightening, so the pair reads as a quarter and
-   three quarters rather than a sliver and a slab. ---------- */
-.plk-ask { flex-direction: column; gap: 4px; margin: 4px 0 14px; }
-.plk-ask p { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 0; }
-.plk-ask b { font-size: 21px; }
+/* ---------- Plan picker, balanced (client, 9 Oct 2026). The five plan cards
+   grow — they were too slight against the panel below — and the panel gives
+   that height back by tightening, so the pair reads as a quarter and three
+   quarters rather than a sliver and a slab. ---------- */
 
-/* the five cards, taller */
-.plk-tab { min-height: 172px; padding: 24px 20px; }
+/* the five cards, taller still (client, 21 Oct 2026: taller top-to-bottom,
+   width left alone) */
+.plk-tab { min-height: 230px; padding: 28px 20px; }
 .plk-tab-dot { margin-bottom: 12px; }
 .plk-tab-name { font-size: 17px; }
 .plk-tab-price { font-size: 27px; }
@@ -26447,20 +26579,6 @@ html[data-theme="light"] .app .abtn.is-locked[disabled] {
 .plk-tab:nth-child(4) { --ink-ac: #6B34B8; }   /* NRLW   */
 .plk-tab:nth-child(5) { --ink-ac: #5A6B7A; }   /* slate  */
 
-.page-plans .plk-size { border-color: color-mix(in srgb, var(--fit-ink, var(--forest)) 24%, rgba(15,46,34,.1)); transition: border-color .4s var(--ease); }
-.page-plans .plk-size-ctl input[type="range"] {
-  background: linear-gradient(90deg, var(--fit-ink, var(--forest)) var(--fill), rgba(15,46,34,.14) var(--fill));
-  transition: background-color .4s var(--ease);
-}
-.page-plans .plk-size-ctl input[type="range"]::-webkit-slider-thumb { border-color: var(--fit-ink, var(--forest)); transition: border-color .4s var(--ease); }
-.page-plans .plk-size-ctl input[type="range"]::-moz-range-thumb { border-color: var(--fit-ink, var(--forest)); }
-.page-plans .plk-size-n b { color: var(--fit-ink, var(--deep)); transition: color .4s var(--ease); }
-.page-plans .plk-rec {
-  background: color-mix(in srgb, var(--fit-ink, var(--forest)) 9%, transparent);
-  border-color: color-mix(in srgb, var(--fit-ink, var(--forest)) 32%, transparent);
-  transition: background .4s var(--ease), border-color .4s var(--ease);
-}
-.page-plans .plk-rec b { color: var(--fit-ink, var(--forest)); transition: color .4s var(--ease); }
 
 /* ---------- Paying, on GoodTip (client, 9 Oct 2026). Stripe's embedded card
    form is as tall as Stripe makes it, so rather than stack our own heading

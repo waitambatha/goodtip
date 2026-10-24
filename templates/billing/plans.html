@@ -27,140 +27,13 @@ the deep sheet over the rotating strips.
 6 Oct 2026 (client): the intro line, the Founding Member banner and the
 "Subscribe today, pay from 31 January" banner are gone from this screen. The
 founding price still shows on the cards (struck-through list price), and
-each Pay button still says when the first charge lands. What remains here is
-only the organisation's own status once it has subscribed.
+each Pay button still says when the first charge lands.
 
-SUBSCRIBE NOW, BILLED FROM 31 JANUARY (client, 3 Oct 2026). The plan is a
-yearly Stripe subscription: the card is saved today and the first charge
-lands on billing.pricing.FIRST_BILLING_DATE. Said here, before the button,
-because "why wasn't I charged?" and "why was I charged in January?" are the
-same support email from two directions.
+THE SUBSCRIPTION ITSELF moved to its own page, 21 Oct 2026 (client: "a small
+notification... instead of this large message... the subscription will now
+have its own page") — see the subscription pane (.plk-pane.is-sub) below, and
+billing.views.subscription_view for the full detail it links to.
 {% endcomment %}
-{% if not current and past_subscription %}
-{% comment %}
-NOT SUBSCRIBED, BUT WAS (client, 12 Oct 2026: "have that place where it
-tells me that you have not auto-subscribed to any subscription... when this
-ends"). A cancelled plan used to just vanish from this page the moment its
-status flipped to EXPIRED — immediately, for one cancelled before its first
-charge; later, once a paid one's period actually ran out — leaving nothing
-to say what had been here. Two true sentences instead of one guess: whether
-anything was ever actually charged (past_subscription.paid_at) decides
-which one.
-{% endcomment %}
-<div class="bl-card bl-card-past" style="--ac: {{ past_accent }};">
-  <p class="bl-card-eyebrow">Not subscribed</p>
-  <h2 class="bl-card-name">{{ past_subscription.get_tier_display }}<span class="bl-pill is-ending">Ended</span></h2>
-  {% if past_subscription.paid_at %}
-  <p class="bl-card-note">
-    {% if past_period %}Covered through {{ past_period.end|date:"j F Y" }}{% else %}Last payment ${{ past_subscription.price_aud|floatformat:0 }}{% endif %}
-    &middot; cancelled {{ past_subscription.canceled_at|date:"j F Y" }}. You're not auto-subscribed to anything now &mdash; pick a plan below whenever you're ready.
-  </p>
-  {% else %}
-  <p class="bl-card-note">Cancelled {{ past_subscription.canceled_at|date:"j F Y" }}, before the first payment &mdash; nothing was charged. You're not auto-subscribed to anything now; pick a plan below whenever you're ready.</p>
-  {% endif %}
-</div>
-{% endif %}
-
-{% if current %}
-{% comment %}
-YOUR SUBSCRIPTION (client, 10 Oct 2026: "if I've subscribed I should see the
-current plan... the level of... when the subscription is about to end, where
-it started... history of payments... upgrade, downgrade, opt out"). Replaces
-the old one-line flash banner — plan, status, the real billing-period ring,
-recent payments and the cancel/resume action, all read straight back from
-Stripe (sub_info, billing.views.plans_view) rather than guessed from the
-plan's own numbers.
-{% endcomment %}
-<div class="bl-card" style="--ac: {{ current_accent }};">
-  <div class="bl-card-top">
-    {% include "billing/_period_ring.html" with period=period size="sm" %}
-    <div class="bl-card-head">
-      <p class="bl-card-eyebrow">Your subscription</p>
-      <h2 class="bl-card-name">{{ current.get_tier_display }}
-        <span class="bl-pill{% if current.is_active and not current.cancel_at_period_end %} is-active{% elif current.cancel_at_period_end %} is-ending{% else %} is-scheduled{% endif %}">
-          {% if current.is_test_daily %}Test mode{% elif current.is_active and current.cancel_at_period_end %}Active &middot; won't renew{% elif current.is_active %}Active{% else %}Scheduled{% endif %}
-        </span>
-      </h2>
-      <p class="bl-card-price">${{ current.price_aud|floatformat:0 }}{% if current.is_test_daily %}/day{% else %}/year{% endif %} &middot; {{ current.seat_limit_label }} people</p>
-      {% if current.is_test_daily %}
-        <p class="bl-card-note">{% if current.is_active %}{% if test_charges %}{{ test_charges }} daily test charge{{ test_charges|pluralize }} taken so far.{% else %}Active.{% endif %}{% else %}First test charge lands around {{ current.starts_at|date:"j M, g:i a" }}, then every day.{% endif %} Test money only.</p>
-      {% elif period %}
-        <p class="bl-card-note">{{ period.pct }}% through this season &middot; started {{ period.start|date:"j M Y" }} &middot; renews {{ period.end|date:"j F Y" }}{% if period.days_left %} ({{ period.days_left }} day{{ period.days_left|pluralize }} left){% endif %}.</p>
-      {% elif current.is_scheduled %}
-        <p class="bl-card-note">Card saved. First payment of ${{ current.price_aud|floatformat:0 }} on {{ current.starts_at|date:"j F Y" }}.</p>
-      {% endif %}
-    </div>
-  </div>
-
-  {% if current.stripe_subscription_id and not current.is_test_daily and not current.cancel_at_period_end %}
-  {% comment %}
-  PAY NOW (client, 12 Oct 2026: "the capacity of paying the next
-  subscription even before the time that it's due to be auto-deducted...
-  flagged as I've already paid"). Charges the full price today and moves the
-  renewal clock to today — see billing.services.pay_now for why that is two
-  Stripe calls and not the obvious one.
-  {% endcomment %}
-  <div class="bl-card-row bl-card-paynow">
-    <span>{% if period %}Next charge {{ period.end|date:"j F Y" }}{% elif current.starts_at %}First charge {{ current.starts_at|date:"j F Y" }}{% endif %} &mdash; pay it today instead and it's done.</span>
-    <form method="post" action="{% url 'billing:pay_now' org.id %}"
-          data-confirm="Charges ${{ current.price_aud|floatformat:0 }} to the card on file right now, and {{ current.get_tier_display }} then renews a year from today instead of on its original date."
-          data-confirm-title="Pay ${{ current.price_aud|floatformat:0 }} now?" data-confirm-ok="Pay now">
-      {% csrf_token %}<button type="submit" class="bl-card-link">Pay now</button>
-    </form>
-  </div>
-  {% endif %}
-
-  {% if current.cancel_at_period_end %}
-  <div class="bl-card-row bl-card-ending">
-    <span>Won't renew after {% if period %}{{ period.end|date:"j F Y" }}{% else %}this season{% endif %} &mdash; {{ current.get_tier_display }} stays on until then.</span>
-    <form method="post" action="{% url 'billing:resume_subscription' org.id %}">{% csrf_token %}<button type="submit" class="bl-card-link">Keep subscription</button></form>
-  </div>
-  {% endif %}
-
-  {% if history %}
-  <div class="bl-card-row bl-card-hist">
-    <p class="bl-hist-h">Recent payments</p>
-    <ul class="bl-hist-list is-compact">
-      {% for h in history|slice:":4" %}
-      <li>
-        <span class="bl-hist-date">{{ h.date|date:"j M Y" }}</span>
-        <span class="bl-hist-amt">${{ h.amount|floatformat:0 }}</span>
-        <span class="bl-hist-status is-{{ h.status }}">{{ h.status }}</span>
-        {% if h.url %}<a href="{{ h.url }}" target="_blank" rel="noopener" class="bl-hist-link">Invoice</a>{% endif %}
-      </li>
-      {% endfor %}
-    </ul>
-    {% if history|length > 4 %}<a href="{% url 'billing:success' org.id %}" class="bl-card-link">See all {{ history|length }} payments &rarr;</a>{% endif %}
-  </div>
-  {% endif %}
-
-  <div class="bl-card-foot">
-    <span class="bl-card-hint">Change plans below &mdash; your card on file is reused, nobody re-enters it.</span>
-    <div class="bl-card-actions">
-      {% comment %}
-      UPGRADE / DOWNGRADE, HERE (client, 12 Oct 2026: "it's not quite clearly
-      seen... it has to be there... where we have the rest of the options and
-      packages"). Was its own small row above the tab picker, further down
-      the page — moved up next to Cancel, the one action on this card nobody
-      has trouble finding, so these read the same way. Filters the tab row
-      below by switch_direction (billing.views.plans_view) and scrolls to it;
-      see the script at the foot of this page for pickDir/applyDir.
-      {% endcomment %}
-      <div class="plk-dirfilter" data-pp-dirfilter>
-        <button type="button" class="plk-dir-btn" data-pp-dir="upgrade">Upgrade</button>
-        <button type="button" class="plk-dir-btn" data-pp-dir="downgrade">Downgrade</button>
-      </div>
-      {% if not current.cancel_at_period_end %}
-      <form method="post" action="{% url 'billing:cancel_subscription' org.id %}"
-            data-confirm="{% if current.is_active %}{{ org.name }} keeps the {{ current.get_tier_display }} plan through {% if period %}{{ period.end|date:"j F Y" }}{% else %}the season already paid for{% endif %} and will not be charged again.{% else %}Nothing has been charged yet, so this cancels right away with nothing lost.{% endif %}"
-            data-confirm-title="Cancel the {{ current.get_tier_display }} subscription?" data-confirm-ok="Cancel subscription" data-confirm-danger>
-        {% csrf_token %}<button type="submit" class="bl-card-cancel">Cancel subscription</button>
-      </form>
-      {% endif %}
-    </div>
-  </div>
-</div>
-{% endif %}
 
 {% comment %}
 THE PLAN PICKER (client, 8 Oct 2026: "redo the whole page with a new design
@@ -184,24 +57,17 @@ coach-tour hooks (data-coach) carry over.
 <div class="plk" data-pp data-start="{% if current %}{{ current.tier }}{% endif %}">
 
   {% comment %}
-  The question is asked above the control and in the middle (client, 9 Oct
-  2026: "have that centered and outside"), leaving the box itself a thin
-  strip: the number, the slider, the plan it lands on.
+  SWITCHED OFF ON PURPOSE (client, 19 Oct 2026): "no demo testing, so just
+  real... I want to see how the design will look just real life" — the
+  client wants to preview the plans page the way a real customer will see
+  it once launched, with nothing on screen hinting this is still a test
+  environment. The condition below is the real one
+  ({% templatetag openblock %} if stripe_configured and stripe_test_mode
+  {% templatetag closeblock %}) — flip it back to test end-to-end before
+  launch; the mechanism itself (daily test billing) is untouched, only its
+  visible switch is hidden.
   {% endcomment %}
-  <div class="plk-ask">
-    <p><span class="plk-step">1</span><b>How many people will tip?</b></p>
-    <span>{{ org.name }} has {{ member_count }} member{{ member_count|pluralize }} today.</span>
-  </div>
-  <div class="plk-size">
-    <output class="plk-size-n"><b data-pp-count>{{ member_count }}</b> people</output>
-    <div class="plk-size-ctl">
-      <input type="range" min="0" max="1000" value="0" data-pp-range data-members="{{ member_count }}" aria-label="How many people will tip">
-      <div class="plk-size-scale"><span>1</span><span>20</span><span>50</span><span>150</span><span>500</span><span>2,499</span></div>
-    </div>
-    <p class="plk-rec" data-pp-rec hidden>Best fit: <b data-pp-rec-name></b></p>
-  </div>
-
-  {% if stripe_configured and stripe_test_mode %}
+  {% if False %}
   {% comment %}
   TEST MODE (client, 6 Oct 2026). Only on Stripe TEST keys. Switched on, Pay
   takes the plan as a DAILY test subscription — first charge about a day
@@ -218,18 +84,132 @@ coach-tour hooks (data-coach) carry over.
   {% endif %}
 
   {% comment %}
+  THE STRIP (client, 21 Oct 2026). Subscription, custom pricing and team
+  size, one row at the top. Only the team-size filter stretches sideways —
+  "the expansion sideways was to be for the filter... the others is the
+  minimal expansion" — growing right-to-left to three-quarters of the row
+  (flex-grow 6 against 1 + 1) when hovered, focused, or pinned by a click
+  or drag; the other two only lift a little on hover. The filter is the
+  detailed one: the slider runs over the five plans' own coloured zones, on
+  the same log scale the slider uses, with each plan's name under its zone
+  as a button that jumps there, and "Today" back to the real member count.
+
+  Subscription and custom pricing are links as a whole (billing:subscription,
+  billing:packages) through .plk-pane-hit; the buttons inside them still
+  work on their own. Upgrade/Downgrade live in the subscription card, which
+  is why this row stays visible when the cards below are hidden. Without
+  JavaScript, or on a narrow screen, the three stack. Script: "THE STRIP".
+  {% endcomment %}
+  <div class="plk-strip" data-pp-strip>
+
+    {% comment %}Team size first, on the left (client, 24 Oct 2026: "let it be the one that it's starting"), so it opens rightwards over the other two.{% endcomment %}
+    <section class="plk-pane is-size plk-filter" data-pp-filter tabindex="0" aria-label="Team size — how many people will tip">
+      <header class="plk-filter-head">
+        <span class="plk-pane-ic" aria-hidden="true"><svg><use href="#ic-users"/></svg></span>
+        <div class="plk-filter-title">
+          <span class="plk-pane-label">Team size</span>
+          <span class="plk-filter-sub">{{ org.name }} has {{ member_count }} member{{ member_count|pluralize }} today</span>
+        </div>
+        <button type="button" class="plk-filter-today" data-pp-today="{{ member_count }}">Today &middot; {{ member_count }}</button>
+        <div class="plk-filter-count">
+          <span class="plk-filter-n"><b data-pp-count>{{ member_count }}</b> people</span>
+          <span class="plk-filter-fit" data-pp-rec hidden>Best fit <b data-pp-rec-name></b></span>
+        </div>
+      </header>
+      <div class="plk-dial">
+        <div class="plk-dial-track" aria-hidden="true">
+          <div class="plk-dial-zones" data-pp-zones></div>
+          <div class="plk-dial-dim"></div>
+        </div>
+        <input type="range" min="0" max="1000" value="0" data-pp-range data-members="{{ member_count }}" aria-label="How many people will tip">
+      </div>
+      <div class="plk-dial-legend" data-pp-legend></div>
+    </section>
+
+    <section class="plk-pane is-sub{% if current %}{% if current.cancel_at_period_end %} is-ending{% elif current.is_active %} is-active{% else %} is-scheduled{% endif %}{% elif past_subscription %} is-ended{% endif %}">
+      <a class="plk-pane-hit" href="{% url 'billing:subscription' org.id %}" aria-label="Open {{ org.name }}'s subscription"></a>
+      <header class="plk-pane-h">
+        <span class="plk-pane-ic" aria-hidden="true"><svg><use href="#ic-calendar"/></svg></span>
+        <span class="plk-pane-label">Subscription</span>
+        <span class="plk-pane-pill">{% if current %}{% if current.is_test_daily %}Test mode{% elif current.cancel_at_period_end %}Won&rsquo;t renew{% elif current.is_active %}Active{% else %}Scheduled{% endif %}{% elif past_subscription %}Ended{% else %}None yet{% endif %}</span>
+      </header>
+      <p class="plk-pane-value">{% if current %}{{ current.get_tier_display }}{% elif past_subscription %}Not subscribed{% else %}Not subscribed yet{% endif %}</p>
+      <p class="plk-pane-sub">{% if current %}${{ current.price_aud|floatformat:0 }}{% if current.is_test_daily %}/day{% else %}/year{% endif %} &middot; {{ current.seat_limit_label }} people{% elif past_subscription %}{{ past_subscription.get_tier_display }} ended {{ past_subscription.canceled_at|date:"j M Y" }}{% if not past_subscription.paid_at %} &mdash; nothing was charged{% endif %}{% else %}Pick a plan below to get started{% endif %}</p>
+      <footer class="plk-pane-foot">
+        {% if current %}
+        <div class="plk-dirfilter" data-pp-dirfilter>
+          <button type="button" class="plk-dir-btn" data-pp-dir="upgrade">Upgrade</button>
+          <button type="button" class="plk-dir-btn" data-pp-dir="downgrade">Downgrade</button>
+        </div>
+        <span class="plk-pane-go" aria-hidden="true">View <span>&rarr;</span></span>
+        {% elif past_subscription %}
+        <span class="plk-pane-go">History &amp; details <span>&rarr;</span></span>
+        {% else %}
+        <span class="plk-pane-go">See what you&rsquo;d get <span>&rarr;</span></span>
+        {% endif %}
+      </footer>
+    </section>
+
+    {% if not on_custom_plan %}
+    <section class="plk-pane is-custom">
+      <a class="plk-pane-hit" href="{% url 'billing:packages' org.id %}" aria-label="Custom packages and pricing"></a>
+      <header class="plk-pane-h">
+        <span class="plk-pane-ic" aria-hidden="true"><svg><use href="#ic-spark"/></svg></span>
+        <span class="plk-pane-label">Custom pricing</span>
+        {% if package_claim %}<span class="plk-pane-pill{% if package_claim.is_ready %} is-ok{% else %} is-wait{% endif %}">{% if package_claim.is_ready %}Approved{% else %}Reviewing{% endif %}</span>
+        {% elif custom_offer %}<span class="plk-pane-pill is-ok">Offer ready</span>
+        {% elif custom_pending %}<span class="plk-pane-pill is-wait">Pending</span>
+        {% elif custom_declined or org_declined_offer %}<span class="plk-pane-pill">Declined</span>{% endif %}
+      </header>
+      {% if package_claim %}
+        <p class="plk-pane-value">{{ package_claim.package.name }}</p>
+        {% if package_claim.is_ready %}
+        <p class="plk-pane-sub">${{ package_claim.package.price_aud|floatformat:0 }}/yr &middot; up to {{ package_claim.package.seat_limit }} people. We'll be in touch to finish setting it up.</p>
+        {% else %}
+        <p class="plk-pane-sub" data-pkg-reviewing data-ready-at="{{ package_claim.ready_at|date:'c' }}">We're looking it over &mdash; ready in a few minutes. This page updates on its own.</p>
+        {% endif %}
+        <footer class="plk-pane-foot"><span class="plk-pane-go">See all packages <span>&rarr;</span></span></footer>
+      {% elif custom_offer %}
+        <p class="plk-pane-value">{{ custom_offer.label }}</p>
+        <p class="plk-pane-sub">A price just for {{ org.name }} &middot; ${{ custom_offer.price_aud|floatformat:0 }}/yr &middot; up to {{ custom_offer.seat_limit }} people</p>
+        <footer class="plk-pane-foot">
+          <form method="post" action="{% url 'billing:custom_checkout' org.id %}">{% csrf_token %}
+            <button class="plk-pane-btn" type="submit">Subscribe <span>&rarr;</span></button>
+          </form>
+          <a href="{% url 'billing:packages' org.id %}#track" class="plk-pane-link is-quiet">Decline or reply</a>
+        </footer>
+      {% elif custom_pending %}
+        <p class="plk-pane-value">Request sent</p>
+        <p class="plk-pane-sub">With the team now &mdash; you&rsquo;ll get a notification when they reply.</p>
+        <footer class="plk-pane-foot"><span class="plk-pane-go">Open the conversation <span>&rarr;</span></span></footer>
+      {% else %}
+        <p class="plk-pane-value">{% if custom_declined or org_declined_offer %}Let&rsquo;s try again{% else %}Something different?{% endif %}</p>
+        <p class="plk-pane-sub">{% if org_declined_offer %}You turned down {{ org_declined_offer.label }}{% if org_declined_offer.org_decline_reason %} &mdash; &ldquo;{{ org_declined_offer.org_decline_reason }}&rdquo;{% endif %}. Happy to try again.{% elif custom_declined %}{{ custom_declined.decision_note|default:"We had a look, and for now the five plans below are the best fit." }}{% else %}Packages for schools, clubs and multi-site groups &mdash; or a price made for you.{% endif %}</p>
+        <footer class="plk-pane-foot">
+          {% if custom_packages %}<span class="plk-pane-go">See custom packages <span>&rarr;</span></span>{% endif %}
+          <a href="{% url 'billing:packages' org.id %}#ask" class="plk-pane-link">{% if custom_declined or org_declined_offer %}Ask again{% else %}Request a custom price{% endif %}</a>
+        </footer>
+      {% endif %}
+    </section>
+    {% endif %}
+
+  </div>
+
+  {% comment %}
   HIDDEN UNTIL ASKED FOR (client, 12 Oct 2026: "I do not want to see the
   starter, team, workplace... when I am basically already subscribed... when
-  I press upgrade or downgrade, then I should see the other options"). An
-  organisation with a current plan gets the monitoring card above and
-  nothing else until it presses Upgrade or Downgrade (billing's own, in
-  .bl-card-actions) — which un-hides this whole block AND applies the
-  direction filter in the same click (see applyDir in the script below). One
-  not yet subscribed still sees everything immediately, same as always.
+  I press upgrade or downgrade, then I should see the other options"). The
+  tab row here and the panels further down both carry data-pp-switcher, so
+  an organisation with a current plan sees only the strip above until it
+  presses Upgrade or Downgrade (in the subscription pane) — which un-hides
+  both AND applies the direction filter in the same click (see applyDir in
+  the script below). One not yet subscribed sees everything immediately.
+
+  ONE HEADING, NOT TWO (client, 21 Oct 2026) — the page's own <h1> already
+  says "Choose your plan"; this row used to repeat it immediately above the
+  cards.
   {% endcomment %}
-  <div class="plk-switcher" data-pp-switcher{% if current %} hidden{% endif %}>
-  <div class="plk-pick">
-    <div class="plk-step-row"><span class="plk-step">2</span><b>Choose your plan</b></div>
+  <div class="plk-pick" data-pp-switcher{% if current %} hidden{% endif %}>
     <div class="plk-tabs" role="tablist" aria-label="Plans" data-coach="plan-tiers">
       {% for t in tiers %}
       <button type="button" class="plk-tab{% if t.popular %} is-popular{% endif %}" role="tab" data-pp-tab="{{ t.key }}" data-max="{{ t.seat_limit }}" data-direction="{{ t.switch_direction|default:'' }}" aria-controls="plan-{{ t.key }}">
@@ -244,70 +224,14 @@ coach-tour hooks (data-coach) carry over.
     </div>
   </div>
 
-  {% if not on_custom_plan %}
   {% comment %}
-  A CUSTOM PRICE, OUTSIDE THE FIVE (client, 11 and 12 Oct 2026). A thin card
-  now, not a caption — "even if I've not subscribed to anything I should see
-  it as a package" — the same width as .plk-tabs and spanning Team through
-  Organisation (grid-column: 2 / 5 on a grid sharing .plk-tabs' own template
-  and gap, below it, so the two line up without guessing a pixel width).
-  Every state (ask, pending, declined, approved) wears the same shape so it
-  reads as one place to look regardless of where the request is.
+  REQUESTING A CUSTOM PRICE NO LONGER OPENS A POPUP HERE (client, 21 Oct
+  2026: "the whole form [should be] on a more detailed [page], rather than
+  using a small square box") — the custom-pricing pane links straight to the ask
+  section of billing:packages instead. Declining an existing offer stays a
+  popup: it is one optional "why", not a multi-field ask.
   {% endcomment %}
-  <div class="plk-custom-row">
-    <div class="plk-custom" style="--ac: {% if custom_offer %}#2A7337{% else %}#8a6200{% endif %};">
-      <div class="plk-custom-ic" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-      </div>
-      <div class="plk-custom-body">
-        {% if custom_offer %}
-        <p class="plk-custom-eyebrow">A price just for {{ org.name }}</p>
-        <p class="plk-custom-msg"><b>{{ custom_offer.label }}</b> &middot; ${{ custom_offer.price_aud|floatformat:0 }}/yr &middot; up to {{ custom_offer.seat_limit }} people</p>
-        {% elif custom_pending %}
-        <p class="plk-custom-eyebrow">Custom price</p>
-        <p class="plk-custom-msg">Your request is with the team &mdash; we'll be in touch.</p>
-        {% elif org_declined_offer %}
-        <p class="plk-custom-eyebrow">Custom price</p>
-        <p class="plk-custom-msg">You turned down {{ org_declined_offer.label }}{% if org_declined_offer.org_decline_reason %} &mdash; &ldquo;{{ org_declined_offer.org_decline_reason }}&rdquo;{% endif %}. Happy to try again.</p>
-        {% elif custom_declined %}
-        <p class="plk-custom-eyebrow">Custom price</p>
-        <p class="plk-custom-msg">{% if custom_declined.decision_note %}{{ custom_declined.decision_note }}{% else %}We had a look, and for now the five plans above are the best fit.{% endif %}</p>
-        {% else %}
-        <p class="plk-custom-eyebrow">Bigger, smaller, or just different?</p>
-        <p class="plk-custom-msg">We'll put a price together just for {{ org.name }}.</p>
-        {% endif %}
-      </div>
-      <div class="plk-custom-cta">
-        {% if custom_offer %}
-        <form method="post" action="{% url 'billing:custom_checkout' org.id %}">{% csrf_token %}
-          <button class="plk-custom-btn" type="submit">Subscribe <span>&rarr;</span></button>
-        </form>
-        <button type="button" class="plk-custom-reject" data-pp-decline-open>Decline</button>
-        {% elif custom_pending %}
-        <span class="plk-custom-pill">Pending</span>
-        {% else %}
-        <button type="button" class="plk-custom-btn" data-pp-custom-open>{% if custom_declined or org_declined_offer %}Ask again{% else %}Request a custom price{% endif %} <span>&rarr;</span></button>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  {% if not custom_offer and not custom_pending %}
-  <div class="plk-cmodal" data-pp-custom-modal hidden>
-    <div class="plk-cmodal-scrim" data-pp-custom-close></div>
-    <div class="plk-cmodal-panel" role="dialog" aria-modal="true" aria-labelledby="pcmTitle">
-      <button type="button" class="plk-cmodal-x" data-pp-custom-close aria-label="Close">&times;</button>
-      <h2 id="pcmTitle">Request a custom price</h2>
-      <p>Tell us about {{ org.name }} &mdash; how many people, what you need, anything the five plans don't cover.</p>
-      <form method="post" action="{% url 'billing:request_custom_price' org.id %}" class="plk-custom-form">
-        {% csrf_token %}
-        <textarea name="message" rows="4" placeholder="How many people, what you need, anything the five plans don't cover." maxlength="2000" required data-pp-custom-focus></textarea>
-        <button class="plk-btn" type="submit">Ask the team</button>
-      </form>
-    </div>
-  </div>
-  {% endif %}
-
+  {% if not on_custom_plan %}
   {% if custom_offer %}
   {% comment %}
   DECLINING AN OFFER (client, 12 Oct 2026: "you can either accept it or
@@ -331,7 +255,7 @@ coach-tour hooks (data-coach) carry over.
   {% endif %}
   {% endif %}
 
-  <div class="plk-panels">
+  <div class="plk-panels" data-pp-switcher{% if current %} hidden{% endif %}>
     {% for t in tiers %}
     <section class="plk-panel" id="plan-{{ t.key }}" role="tabpanel" data-pp-panel="{{ t.key }}">
       <div class="plk-main">
@@ -400,7 +324,6 @@ coach-tour hooks (data-coach) carry over.
     </section>
     {% endfor %}
   </div>
-  </div>
 </div>
 
 <script>
@@ -454,7 +377,8 @@ coach-tour hooks (data-coach) carry over.
      than scoped to [data-pp]. A direction with nothing in it (already on the
      top or bottom tier) loses its button entirely rather than opening onto
      an empty row; clicking the active one again clears back to every plan. */
-  var switcher = root.querySelector('[data-pp-switcher]');
+  // The tab row and the panels — both hidden for a subscribed org until asked.
+  var switchers = [].slice.call(root.querySelectorAll('[data-pp-switcher]'));
   var dirWrap = document.querySelector('[data-pp-dirfilter]');
   if (dirWrap) {
     var dirBtns = [].slice.call(dirWrap.querySelectorAll('[data-pp-dir]'));
@@ -487,10 +411,47 @@ coach-tour hooks (data-coach) carry over.
         // Once asked for, stays open — Upgrade/Downgrade reveal the picker
         // the first time and only ever filter it after that, never hide it
         // again (client, 12 Oct 2026).
-        if (switcher && switcher.hidden) switcher.hidden = false;
+        switchers.forEach(function (s) { s.hidden = false; });
         applyDir(dir);
-        if (switcher) switcher.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (switchers.length) switchers[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
+    });
+  }
+
+  /* THE STRIP (client, 21 Oct 2026: "the expansion sideways was to be for
+     the filter... the others is the minimal expansion"). Only the team-size
+     filter widens — on hover or keyboard focus, and it stays open once you
+     press into it (dragging the slider must not snap it shut the moment the
+     mouse drifts off). A press anywhere else, or Escape, closes it again.
+     The other two cards only lift on hover, in CSS. .is-js is what switches
+     the CSS from stacked cards to the strip, so without this script
+     everything simply shows. */
+  var strip = root.querySelector('[data-pp-strip]');
+  var filter = strip && strip.querySelector('[data-pp-filter]');
+  if (filter) {
+    var pinned = false;
+    var widen = function (on) {
+      filter.classList.toggle('is-wide', on);
+      strip.classList.toggle('has-wide', on);
+    };
+    strip.classList.add('is-js');
+    filter.addEventListener('mouseenter', function () { widen(true); });
+    filter.addEventListener('mouseleave', function () {
+      if (!pinned && !filter.contains(document.activeElement)) widen(false);
+    });
+    filter.addEventListener('focusin', function () { widen(true); });
+    filter.addEventListener('focusout', function (e) {
+      if (!pinned && !filter.contains(e.relatedTarget) && !filter.matches(':hover')) widen(false);
+    });
+    filter.addEventListener('pointerdown', function () { pinned = true; widen(true); });
+    document.addEventListener('pointerdown', function (e) {
+      if (pinned && !filter.contains(e.target)) { pinned = false; widen(false); }
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape' || !filter.classList.contains('is-wide')) return;
+      pinned = false;
+      if (filter.contains(document.activeElement)) document.activeElement.blur();
+      widen(false);
     });
   }
 
@@ -501,12 +462,53 @@ coach-tour hooks (data-coach) carry over.
   var MAX = 2499, LOG = Math.log(MAX);
   function toPeople(v) { return Math.max(1, Math.round(Math.exp(v / 1000 * LOG))); }
   function toRange(n) { return Math.round(Math.log(Math.max(1, Math.min(MAX, n))) / LOG * 1000); }
+  /* The filter's dial: each plan's own stretch of the slider, in its own
+     colour, on the slider's own log scale — so where the handle sits reads
+     straight off as a plan. Each plan's name under its stretch is a button
+     that jumps there (pickTab), and "Today" goes back to the real member
+     count. Built here rather than in the template because the boundaries
+     come from the same toRange the slider uses. */
+  var zonesEl = root.querySelector('[data-pp-zones]'), legendEl = root.querySelector('[data-pp-legend]');
+  var legendBtns = [];
+  if (zonesEl && legendEl) {
+    var from = 0;
+    tabs.forEach(function (t) {
+      var to = toRange(parseInt(t.getAttribute('data-max'), 10)) / 10;
+      var ink = getComputedStyle(t).getPropertyValue('--ink-ac').trim() || 'var(--forest)';
+      var z = document.createElement('i');
+      z.style.left = from + '%'; z.style.width = (to - from) + '%'; z.style.background = ink;
+      zonesEl.appendChild(z);
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'plk-dial-stop';
+      b.setAttribute('data-tier', t.getAttribute('data-pp-tab'));
+      b.style.left = ((from + to) / 2) + '%';
+      b.style.setProperty('--stop-ink', ink);
+      b.innerHTML = '<b></b><small></small>';
+      b.querySelector('b').textContent = t.querySelector('.plk-tab-name').textContent;
+      b.querySelector('small').textContent = 'up to ' + parseInt(t.getAttribute('data-max'), 10).toLocaleString('en-AU');
+      b.addEventListener('click', function () { pickTab(t.getAttribute('data-pp-tab')); });
+      legendEl.appendChild(b);
+      legendBtns.push(b);
+      from = to;
+    });
+  }
+  var today = root.querySelector('[data-pp-today]');
+  if (today && range) {
+    today.addEventListener('click', function () {
+      var n = parseInt(today.getAttribute('data-pp-today'), 10) || 1;
+      range.value = toRange(n);
+      fit(n, true);
+    });
+  }
   function fit(n, open) {
     out.textContent = n.toLocaleString('en-AU');
-    range.style.setProperty('--fill', (range.value / 10) + '%');
+    // On the dial, not just the input, so the zones behind it can dim past the handle.
+    range.parentElement.style.setProperty('--fill', (range.value / 10) + '%');
     var best = tabs.find(function (t) { return n <= parseInt(t.getAttribute('data-max'), 10); }) || tabs[tabs.length - 1];
     tabs.forEach(function (t) { t.classList.toggle('is-fit', t === best); });
     rec.hidden = false; recName.textContent = best.querySelector('.plk-tab-name').textContent;
+    legendBtns.forEach(function (b) { b.classList.toggle('is-on', b.getAttribute('data-tier') === best.getAttribute('data-pp-tab')); });
     /* The slider wears the colour of the plan it has landed on (client,
        9 Oct 2026), so pushing the number up reads as moving between plans
        rather than as one green bar growing. */
@@ -572,13 +574,11 @@ coach-tour hooks (data-coach) carry over.
     t.addEventListener('change', sync); sync();
   }
 
-  /* The custom-price popups (client, 12 Oct 2026: "a nice pop-up... they
-     can enter their why they want a custom whatever" — and later the same
-     day, declining one: "give a reason why"). One small wiring function,
-     called once per popup (request, decline) rather than copied twice —
-     they are identical except which data-pp-* prefix they answer to.
-     Replaces the earlier inline <details> box, which read as part of the
-     page furniture rather than something to click. */
+  /* Declining a custom-price offer (client, 12 Oct 2026: "give a reason
+     why"). Requesting one no longer pops up here at all — see the comment
+     by billing:packages's link above — so this wiring only ever answers to
+     the "decline" prefix now, but stays general in case another small
+     popup needs the same open/close/Escape handling later. */
   function wireModal(prefix) {
     var modal = document.querySelector('[data-pp-' + prefix + '-modal]');
     var openers = [].slice.call(document.querySelectorAll('[data-pp-' + prefix + '-open]'));
@@ -602,8 +602,16 @@ coach-tour hooks (data-coach) carry over.
       if (e.key === 'Escape' && !modal.hidden) close();
     });
   }
-  wireModal('custom');
   wireModal('decline');
+
+  // A claim under review reloads itself once it's actually ready, rather
+  // than leaving the page saying "reviewing" after it no longer is.
+  var reviewing = document.querySelector('[data-pkg-reviewing]');
+  if (reviewing) {
+    var readyAt = new Date(reviewing.getAttribute('data-ready-at')).getTime();
+    var wait = Math.min(Math.max(readyAt - Date.now(), 0) + 1000, 5 * 60 * 1000 + 5000);
+    setTimeout(function () { location.reload(); }, wait);
+  }
 })();
 </script>
 

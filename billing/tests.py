@@ -1123,7 +1123,14 @@ class YearlySubscriptionCheckoutTests(TestCase):
             reverse("billing:pay_confirm", args=[self.org.id]), {"setup_intent_id": "seti_x"})
         self.assertEqual(resp.status_code, 403)
 
-    def test_the_plans_page_offers_test_mode_only_on_test_keys(self):
+    def test_the_plans_page_hides_the_test_mode_switch_even_on_test_keys(self):
+        """Client, 19 Oct 2026: "no demo testing, so just real... I want to
+        see how the design will look just real life" — the switch is now
+        commented out in templates/billing/plans.html regardless of which
+        kind of Stripe key is configured. The mechanism underneath (daily
+        test billing) is untouched for whoever flips that template block
+        back for their own end-to-end testing; only its visible control is
+        gone from a page a client or prospect might actually see."""
         from django.test import override_settings
 
         owner = get_user_model().objects.create_user(email="own@x.com", password="x")
@@ -1132,7 +1139,7 @@ class YearlySubscriptionCheckoutTests(TestCase):
         url = reverse("billing:plans", args=[self.org.id])
         with override_settings(STRIPE_SECRET_KEY="sk_test_x"):
             page = self.client.get(url)
-        self.assertContains(page, "class=\"pl-test-switch\"")
+        self.assertNotContains(page, "class=\"pl-test-switch\"")
         self.assertNotContains(page, "Run the demo")
         with override_settings(STRIPE_SECRET_KEY="sk_live_x"):
             self.assertNotContains(self.client.get(url), "class=\"pl-test-switch\"")
@@ -1395,11 +1402,16 @@ class SubscriptionManagementTests(TestCase):
         # a subscription id ("sub_x") that was never really created there.
         with patch.object(services, "sync_from_stripe", return_value={}):
             resp = self.client.get(reverse("billing:plans", args=[self.org.id]))
-        self.assertContains(resp, "bl-card-eyebrow")
+        # The full card moved to its own page (client, 21 Oct 2026) — the
+        # Plans page keeps only the small notice pointing at it.
+        self.assertContains(resp, "plk-pane is-sub")
         self.assertContains(resp, "You're on Workplace")
         self.assertContains(resp, "Upgrade to Organisation")
         self.assertContains(resp, "Downgrade to Starter")
         self.assertContains(resp, "switch-tier/")
+        with patch.object(services, "sync_from_stripe", return_value={}):
+            sub_resp = self.client.get(reverse("billing:subscription", args=[self.org.id]))
+        self.assertContains(sub_resp, "sx-hero")
 
     def test_a_cancelled_but_still_active_sub_shows_resume_not_cancel(self):
         from unittest.mock import patch
@@ -1410,7 +1422,7 @@ class SubscriptionManagementTests(TestCase):
         sub.cancel_at_period_end = True
         sub.save()
         with patch.object(services, "sync_from_stripe", return_value={}):
-            resp = self.client.get(reverse("billing:plans", args=[self.org.id]))
+            resp = self.client.get(reverse("billing:subscription", args=[self.org.id]))
         self.assertContains(resp, "Keep subscription")
         self.assertNotContains(resp, "bl-card-cancel\">Cancel subscription")
 
@@ -1579,7 +1591,7 @@ class CustomPricingTests(TestCase):
                 reverse("billing:request_custom_price", args=[self.org.id]),
                 {"message": "We need 800 seats and a dedicated ladder."},
             )
-        self.assertRedirects(resp, reverse("billing:plans", args=[self.org.id]))
+        self.assertRedirects(resp, reverse("billing:packages", args=[self.org.id]) + "#track", fetch_redirect_response=False)
         req = CustomPriceRequest.objects.get(org=self.org)
         self.assertEqual(req.status, CustomPriceRequest.STATUS_PENDING)
         self.assertEqual(req.message, "We need 800 seats and a dedicated ladder.")
@@ -1593,7 +1605,7 @@ class CustomPricingTests(TestCase):
         resp = self.client.post(
             reverse("billing:request_custom_price", args=[self.org.id]), {"message": "again"},
         )
-        self.assertRedirects(resp, reverse("billing:plans", args=[self.org.id]))
+        self.assertRedirects(resp, reverse("billing:packages", args=[self.org.id]) + "#track", fetch_redirect_response=False)
         self.assertEqual(CustomPriceRequest.objects.filter(org=self.org).count(), 1)
 
     def test_only_the_owner_can_request_a_custom_price(self):
@@ -1643,7 +1655,7 @@ class CustomPricingTests(TestCase):
 
         CustomPriceRequest.objects.create(org=self.org, requested_by=self.owner)
         resp = self.client.get(reverse("billing:plans", args=[self.org.id]))
-        self.assertContains(resp, "is with the team")
+        self.assertContains(resp, "With the team now")
 
     def test_plans_page_shows_a_decline_note_and_still_offers_to_ask_again(self):
         from .models import CustomPriceRequest
@@ -1678,6 +1690,123 @@ class CustomPricingTests(TestCase):
         self.assertNotContains(resp, "plk-custom-row")
 
 
+class CustomPackageTests(TestCase):
+    """Standing custom packages (client, 19 Oct 2026): pre-made offers an
+    organisation can take without asking first, each with a simulated
+    review wait before it reads as approved. Sits above the negotiated
+    CustomPricingTests flow, which stays the fallback for "none of these
+    fit"."""
+
+    def setUp(self):
+        from .models import CustomPackage
+
+        self.season, _ = Season.objects.get_or_create(year=2098, defaults={"label": "Package Season"})
+        self.org = Organisation.objects.create(name="Schooltown PS", season=self.season)
+        self.owner = User.objects.create_user(email="schooltown@x.com", password="x")
+        OrgMember.objects.create(user=self.owner, org=self.org, is_league_owner=True)
+        self.client.force_login(self.owner)
+        self.package = CustomPackage.objects.create(
+            name="Schools Plan", description="For schools.",
+            price_aud=Decimal("499"), seat_limit=300, child_org_limit=5,
+        )
+
+    def test_the_plans_page_links_to_the_packages_page(self):
+        """Client, 21 Oct 2026: packages open as a page of their own, not a
+        grid that unfolds on the Plans page and pushes it down."""
+        resp = self.client.get(reverse("billing:plans", args=[self.org.id]))
+        self.assertContains(resp, "See custom packages")
+        self.assertContains(resp, reverse("billing:packages", args=[self.org.id]))
+        self.assertNotContains(resp, "Schools Plan")
+
+    def test_the_packages_page_lists_active_packages(self):
+        resp = self.client.get(reverse("billing:packages", args=[self.org.id]))
+        self.assertContains(resp, "Schools Plan")
+        self.assertContains(resp, "Take this package")
+        self.assertContains(resp, "Ask for your own price")
+
+    def test_an_inactive_package_is_not_offered(self):
+        self.package.is_active = False
+        self.package.save(update_fields=["is_active"])
+        resp = self.client.get(reverse("billing:packages", args=[self.org.id]))
+        self.assertNotContains(resp, "Schools Plan")
+        plans = self.client.get(reverse("billing:plans", args=[self.org.id]))
+        self.assertNotContains(plans, "See custom packages")
+
+    def test_only_the_owner_can_see_the_packages_page(self):
+        other = User.objects.create_user(email="not-owner-pk@x.com", password="x")
+        OrgMember.objects.create(user=other, org=self.org)
+        self.client.force_login(other)
+        resp = self.client.get(reverse("billing:packages", args=[self.org.id]))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_taking_a_package_creates_a_claim(self):
+        from .models import CustomPackageClaim
+
+        resp = self.client.post(reverse("billing:take_custom_package", args=[self.org.id, self.package.id]))
+        self.assertRedirects(resp, reverse("billing:plans", args=[self.org.id]))
+        claim = CustomPackageClaim.objects.get(org=self.org)
+        self.assertEqual(claim.package, self.package)
+        self.assertEqual(claim.requested_by, self.owner)
+        self.assertFalse(claim.is_ready)
+
+    def test_only_the_owner_can_take_a_package(self):
+        other = User.objects.create_user(email="not-owner@x.com", password="x")
+        OrgMember.objects.create(user=other, org=self.org)
+        self.client.force_login(other)
+        resp = self.client.post(reverse("billing:take_custom_package", args=[self.org.id, self.package.id]))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_an_inactive_package_cannot_be_taken_directly(self):
+        self.package.is_active = False
+        self.package.save(update_fields=["is_active"])
+        resp = self.client.post(reverse("billing:take_custom_package", args=[self.org.id, self.package.id]))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_the_plans_page_shows_a_claim_as_reviewing_while_not_ready(self):
+        from .models import CustomPackageClaim
+
+        CustomPackageClaim.objects.create(package=self.package, org=self.org, requested_by=self.owner)
+        resp = self.client.get(reverse("billing:plans", args=[self.org.id]))
+        self.assertContains(resp, "Reviewing")
+        self.assertContains(resp, "Schools Plan")
+        self.assertNotContains(resp, "See custom packages")
+        pk = self.client.get(reverse("billing:packages", args=[self.org.id]))
+        self.assertContains(pk, "Reviewing Schools Plan")
+        self.assertContains(pk, "Being reviewed")
+
+    def test_the_plans_page_shows_a_ready_claim_as_approved(self):
+        from .models import CustomPackageClaim
+
+        claim = CustomPackageClaim.objects.create(package=self.package, org=self.org, requested_by=self.owner)
+        claim.requested_at = timezone.now() - CustomPackageClaim.REVIEW_WAIT
+        claim.save(update_fields=["requested_at"])
+        resp = self.client.get(reverse("billing:plans", args=[self.org.id]))
+        self.assertContains(resp, "Schools Plan")
+        self.assertContains(resp, "Approved")
+        self.assertContains(resp, "We'll be in touch")
+
+    def test_an_org_already_on_the_custom_plan_is_not_offered_packages(self):
+        from unittest.mock import patch
+
+        from . import services
+        from .models import CustomPriceRequest
+
+        request = CustomPriceRequest.objects.create(
+            org=self.org, requested_by=self.owner, status=CustomPriceRequest.STATUS_APPROVED,
+            price_aud=Decimal("1000"), seat_limit=100, decided_at=timezone.now(),
+        )
+        sub = services.create_custom_subscription(self.org, request)
+        sub.stripe_customer_id = "cus_x"
+        sub.stripe_subscription_id = "sub_x"
+        sub.status = PlanSubscription.STATUS_ACTIVE
+        sub.save()
+        with patch.object(services, "sync_from_stripe", return_value={}):
+            resp = self.client.get(reverse("billing:plans", args=[self.org.id]))
+            pk = self.client.get(reverse("billing:packages", args=[self.org.id]))
+        self.assertNotContains(resp, "See custom packages")
+        self.assertRedirects(pk, reverse("billing:plans", args=[self.org.id]), fetch_redirect_response=False)
+
+
 class PastSubscriptionTests(TestCase):
     """Once there is no current subscription, the Plans page still says
     something true about the one that was here (client, 12 Oct 2026: "have
@@ -1700,8 +1829,10 @@ class PastSubscriptionTests(TestCase):
         sub.save()
         resp = self.client.get(reverse("billing:plans", args=[self.org.id]))
         self.assertContains(resp, "Not subscribed")
-        self.assertContains(resp, "before the first payment")
-        self.assertContains(resp, "nothing was charged")
+        # The full sentence moved to its own page (client, 21 Oct 2026).
+        sub_resp = self.client.get(reverse("billing:subscription", args=[self.org.id]))
+        self.assertContains(sub_resp, "before the first payment")
+        self.assertContains(sub_resp, "nothing was charged")
 
     def test_cancelled_after_paying_says_what_it_covered(self):
         from . import services
@@ -1714,8 +1845,9 @@ class PastSubscriptionTests(TestCase):
         sub.save()
         resp = self.client.get(reverse("billing:plans", args=[self.org.id]))
         self.assertContains(resp, "Not subscribed")
-        self.assertContains(resp, "Last payment $799")
-        self.assertNotContains(resp, "before the first payment")
+        sub_resp = self.client.get(reverse("billing:subscription", args=[self.org.id]))
+        self.assertContains(sub_resp, "Last payment $799")
+        self.assertNotContains(sub_resp, "before the first payment")
 
     def test_a_current_subscription_hides_the_past_one(self):
         from . import services
@@ -1732,7 +1864,12 @@ class PastSubscriptionTests(TestCase):
 
     def test_with_no_subscription_ever_nothing_past_shows(self):
         resp = self.client.get(reverse("billing:plans", args=[self.org.id]))
-        self.assertNotContains(resp, "Not subscribed")
+        # The Subscription tile is always there now (client, 21 Oct 2026),
+        # but for an organisation that never had one it says so neutrally —
+        # no "ended" state and no link to the details of a plan that wasn't.
+        self.assertContains(resp, "Not subscribed yet")
+        self.assertNotContains(resp, "is-ended")
+        self.assertNotContains(resp, "View details")
 
 
 class PayNowTests(TestCase):
@@ -1899,12 +2036,12 @@ class PayNowTests(TestCase):
         resp = self.client.post(reverse("billing:pay_now", args=[self.org.id]))
         self.assertEqual(resp.status_code, 403)
 
-    def test_plans_page_offers_pay_now_for_a_scheduled_subscription(self):
+    def test_subscription_page_offers_pay_now_for_a_scheduled_subscription(self):
         self._subscribed(active=False)
-        resp = self.client.get(reverse("billing:plans", args=[self.org.id]))
+        resp = self.client.get(reverse("billing:subscription", args=[self.org.id]))
         self.assertContains(resp, "Pay now")
 
-    def test_plans_page_hides_pay_now_once_cancelling(self):
+    def test_subscription_page_hides_pay_now_once_cancelling(self):
         sub = self._subscribed(active=True)
         sub.cancel_at_period_end = True
         sub.save()
@@ -1913,7 +2050,7 @@ class PayNowTests(TestCase):
         from . import services
 
         with patch.object(services, "sync_from_stripe", return_value={}):
-            resp = self.client.get(reverse("billing:plans", args=[self.org.id]))
+            resp = self.client.get(reverse("billing:subscription", args=[self.org.id]))
         self.assertNotContains(resp, "Pay now")
 
 
@@ -1950,7 +2087,7 @@ class DeclineCustomOfferTests(TestCase):
                 reverse("billing:decline_custom_offer", args=[self.org.id]),
                 {"reason": "We need 500 seats, not 300."},
             )
-        self.assertRedirects(resp, reverse("billing:plans", args=[self.org.id]))
+        self.assertRedirects(resp, reverse("billing:packages", args=[self.org.id]) + "#track", fetch_redirect_response=False)
         offer.refresh_from_db()
         self.assertTrue(offer.is_declined_by_org)
         self.assertEqual(offer.org_decline_reason, "We need 500 seats, not 300.")
@@ -2009,4 +2146,101 @@ class DeclineCustomOfferTests(TestCase):
         resp = self.client.post(
             reverse("billing:request_custom_price", args=[self.org.id]), {"message": "Let's try again."},
         )
-        self.assertRedirects(resp, reverse("billing:plans", args=[self.org.id]))
+        self.assertRedirects(resp, reverse("billing:packages", args=[self.org.id]) + "#track", fetch_redirect_response=False)
+
+
+class CustomPriceConversationTests(TestCase):
+    """The custom-price conversation, from the organisation's side (client,
+    24 Oct 2026: "being able to custom request a price... see some
+    notifications... follow-up... me being able to reach back")."""
+
+    def setUp(self):
+        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "Convo Season"})
+        self.org = Organisation.objects.create(name="Talkative Org", season=self.season)
+        self.owner = User.objects.create_user(email="talk@x.com", password="x")
+        OrgMember.objects.create(user=self.owner, org=self.org, is_league_owner=True)
+        self.client.force_login(self.owner)
+
+    def test_the_request_form_keeps_the_numbers_and_writes_them_into_the_message(self):
+        from unittest.mock import patch
+
+        from .models import CustomPriceRequest
+
+        with patch("goodtip.mail.send_template"):
+            self.client.post(reverse("billing:request_custom_price", args=[self.org.id]), {
+                "org_kind": "school", "people_count": "320", "sites_count": "3",
+                "budget_aud": "900", "message": "Starting term two.",
+            })
+        req = CustomPriceRequest.objects.get(org=self.org)
+        self.assertEqual((req.people_count, req.sites_count, req.budget_aud, req.org_kind), (320, 3, 900, "school"))
+        self.assertIn("320 people", req.message)
+        self.assertIn("3 sites", req.message)
+        self.assertIn("Starting term two.", req.message)
+
+    def test_a_request_with_neither_a_size_nor_a_note_is_refused(self):
+        from .models import CustomPriceRequest
+
+        self.client.post(reverse("billing:request_custom_price", args=[self.org.id]), {"message": ""})
+        self.assertFalse(CustomPriceRequest.objects.filter(org=self.org).exists())
+
+    def test_writing_back_adds_to_the_thread_and_tells_the_team(self):
+        from unittest.mock import patch
+
+        from .models import CustomPriceRequest
+
+        User.objects.create_user(email="ian-convo@x.com", password="x", is_staff=True, is_superuser=True)
+        req = CustomPriceRequest.objects.create(org=self.org, requested_by=self.owner, message="Hi")
+        with patch("goodtip.mail.send_template") as mocked:
+            resp = self.client.post(reverse("billing:custom_price_reply", args=[self.org.id, req.id]),
+                                    {"body": "Can we start in March?"})
+        self.assertRedirects(resp, reverse("billing:packages", args=[self.org.id]) + "#track",
+                             fetch_redirect_response=False)
+        msg = req.thread.get()
+        self.assertFalse(msg.from_team)
+        self.assertEqual(msg.body, "Can we start in March?")
+        mocked.assert_called_once()
+        self.assertIn("ian-convo@x.com", mocked.call_args.kwargs["to"])
+
+    def test_someone_elses_request_cannot_be_written_to(self):
+        from .models import CustomPriceRequest
+
+        other_org = Organisation.objects.create(name="Other Org", season=self.season)
+        req = CustomPriceRequest.objects.create(org=other_org, requested_by=self.owner, message="x")
+        resp = self.client.post(reverse("billing:custom_price_reply", args=[self.org.id, req.id]), {"body": "hi"})
+        self.assertEqual(resp.status_code, 404)
+
+    def test_the_page_shows_the_offer_and_the_conversation(self):
+        from .models import CustomPriceMessage, CustomPriceRequest
+
+        req = CustomPriceRequest.objects.create(
+            org=self.org, requested_by=self.owner, message="We need 300 seats",
+            status=CustomPriceRequest.STATUS_APPROVED, price_aud=Decimal("1200"), seat_limit=300,
+            label="Talkative deal", decided_at=timezone.now(),
+        )
+        CustomPriceMessage.objects.create(request=req, from_team=True, body="Happy to help.")
+        resp = self.client.get(reverse("billing:packages", args=[self.org.id]))
+        self.assertContains(resp, "Your offer is ready")
+        self.assertContains(resp, "Accept &amp; subscribe")
+        self.assertContains(resp, "We need 300 seats")
+        self.assertContains(resp, "Happy to help.")
+
+    def test_accepting_an_offer_stamps_it(self):
+        from unittest.mock import patch
+
+        from .models import CustomPriceRequest
+
+        req = CustomPriceRequest.objects.create(
+            org=self.org, requested_by=self.owner, status=CustomPriceRequest.STATUS_APPROVED,
+            price_aud=Decimal("1200"), seat_limit=300, label="Deal", decided_at=timezone.now(),
+        )
+        with patch("goodtip.mail.send_template"):
+            self.client.post(reverse("billing:custom_checkout", args=[self.org.id]))
+        req.refresh_from_db()
+        self.assertIsNotNone(req.accepted_at)
+        self.assertEqual(req.stage, "accepted")
+
+    def test_the_subscription_page_draws_four_charts_without_a_plan(self):
+        resp = self.client.get(reverse("billing:subscription", args=[self.org.id]))
+        self.assertContains(resp, 'id="c3d-data"')
+        self.assertEqual(resp.content.decode().count('data-c3d="'), 4)
+        self.assertContains(resp, "has no plan right now")

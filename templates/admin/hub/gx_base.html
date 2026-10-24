@@ -1,0 +1,71 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% comment %}
+THE BILLING AND WAITING-LIST SCREENS' OWN SHELL (client, 24 Oct 2026: "the
+small section that houses the content let it be white, the whole background
+at large can retain its green theme... go crazy with it").
+
+The page is the pitch: deep green, a floodlight glow, the oval's lines drawn
+faintly underneath. On it, a hero that reads like a scoreboard — what this
+screen is, and its numbers in lime — and under that one white sheet that
+holds the work. A sheet with tabs (data-gx-tabs) shows one part at a time;
+the tab is kept in the address (#people, #conversation...) so a reload or a
+shared link opens the same part.
+
+Blocks:
+  gx_crumbs    extra breadcrumb items between Dashboard and the title
+  gx_nav       right of the breadcrumbs: previous / next, page actions
+  gx_kicker    the small line over the title
+  gx_title     the title (defaults to the page title)
+  gx_lead      a line under it
+  gx_board     the scoreboard on the right of the hero
+  gx_below     anything in the hero under the title (a tracker, a button)
+  gx_body      the sheet(s)
+Styles: static/css/gt-admin-gx.css; tabs: static/js/gt-admin-gx.js.
+{% endcomment %}
+
+{% block bodyclass %}{{ block.super }} gta-hub-page gx-page{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/gt-admin-gx.css' %}">{% endblock %}
+{% block nav-breadcrumbs %}{% endblock %}
+{% block content_title %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+<script>document.documentElement.classList.add('gx-js');</script>
+<div class="gx" style="--gx-ac: {% block gx_accent %}var(--gx-lime){% endblock %}">
+  <svg class="gx-pitch" viewBox="0 0 1200 700" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
+    <ellipse cx="600" cy="350" rx="560" ry="320"/>
+    <ellipse cx="600" cy="350" rx="70" ry="70"/>
+    <rect x="530" y="280" width="140" height="140"/>
+    <path d="M40 350 A 260 230 0 0 1 300 120 M40 350 A 260 230 0 0 0 300 580 M1160 350 A 260 230 0 0 0 900 120 M1160 350 A 260 230 0 0 1 900 580"/>
+    <line x1="600" y1="30" x2="600" y2="670"/>
+  </svg>
+
+  <div class="gx-bar">
+    <a class="gx-back" href="{% if back_url %}{{ back_url }}{% else %}{% url 'admin:index' %}{% endif %}">
+      <svg aria-hidden="true"><use href="#ic-arrow-left"/></svg>
+      <span>{% if back_url %}{% blocktranslate %}Back to {{ back_label }}{% endblocktranslate %}{% else %}{% translate "Dashboard" %}{% endif %}</span>
+    </a>
+    <ol class="gx-crumbs">
+      <li><a href="{% url 'admin:index' %}">{% translate "Dashboard" %}</a></li>
+      {% block gx_crumbs %}{% endblock %}
+      <li aria-current="page">{{ title }}</li>
+    </ol>
+    <div class="gx-bar-end">{% block gx_nav %}{% endblock %}</div>
+  </div>
+
+  <header class="gx-hero">
+    <div class="gx-hero-copy">
+      <p class="gx-kicker"><i aria-hidden="true"></i>{% block gx_kicker %}{% endblock %}</p>
+      <h1 class="gx-title">{% block gx_title %}{{ title }}{% endblock %}</h1>
+      <p class="gx-lead">{% block gx_lead %}{% endblock %}</p>
+      {% block gx_below %}{% endblock %}
+    </div>
+    <div class="gx-board">{% block gx_board %}{% endblock %}</div>
+  </header>
+
+  {% block gx_body %}{% endblock %}
+</div>
+<script src="{% static 'js/gt-admin-gx.js' %}" defer></script>
+{% endblock %}

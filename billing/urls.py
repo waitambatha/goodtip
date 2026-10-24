@@ -7,10 +7,14 @@ app_name = "billing"
 
 urlpatterns = [
     path("<int:org_id>/plans/", views.plans_view, name="plans"),
+    path("<int:org_id>/subscription/", views.subscription_view, name="subscription"),
+    path("<int:org_id>/packages/", views.custom_packages_view, name="packages"),
     path("<int:org_id>/checkout/", views.checkout_view, name="checkout"),
     path("<int:org_id>/request-custom-price/", views.request_custom_price_view, name="request_custom_price"),
+    path("<int:org_id>/custom-price/<int:request_id>/reply/", views.custom_price_reply_view, name="custom_price_reply"),
     path("<int:org_id>/decline-custom-offer/", views.decline_custom_offer_view, name="decline_custom_offer"),
     path("<int:org_id>/custom-checkout/", views.custom_checkout_view, name="custom_checkout"),
+    path("<int:org_id>/take-package/<int:package_id>/", views.take_custom_package_view, name="take_custom_package"),
     # Paying happens here, on GoodTip, with Stripe's embedded card form.
     path("<int:org_id>/pay/", views.pay_view, name="pay"),
     path("<int:org_id>/pay/confirm/", views.pay_confirm_view, name="pay_confirm"),

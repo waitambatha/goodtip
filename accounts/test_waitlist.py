@@ -321,6 +321,16 @@ class AdminScreenTests(TestCase):
         self.assertIn("Bo Baker", body)
         self.assertNotIn("Ann Able", body)
 
+    def test_each_person_has_a_page_of_their_own(self):
+        # client, 24 Oct 2026: "click it and now that whole page is
+        # everything and anything to do with it".
+        body = self.client.get("/admin/waitlist/").content.decode()
+        self.assertIn(f"/admin/waitlist/{self.a.pk}/", body)
+        page = self.client.get(f"/admin/waitlist/{self.a.pk}/")
+        self.assertContains(page, "Ann Able")
+        self.assertContains(page, "in the queue of 2")
+        self.assertContains(page, f"/admin/waitlist/{self.b.pk}/")
+
     def test_csv_export(self):
         r = self.client.get("/admin/waitlist/", {"export": "csv"})
         self.assertEqual(r["Content-Type"], "text/csv")
@@ -461,3 +471,43 @@ class ScheduledSendTests(TestCase):
         html = next(c for c, m in msg.alternatives if m == "text/html")
         self.assertIn("/signup/", html)
         self.assertIn("Hi Ann,", msg.body)
+
+
+class InvitationBackgroundTests(TestCase):
+    """Choosing the picture behind the launch invitation (client, 24 Oct 2026)."""
+
+    def setUp(self):
+        from sysadmin.test_control_plane import sign_in_to_admin
+
+        self.boss = get_user_model().objects.create_superuser(email="bg@goodtip.test", password="x", display_name="Boss")
+        sign_in_to_admin(self.client, self.boss)
+
+    def _post(self, background):
+        from accounts.models import WaitlistCampaign
+
+        c = WaitlistCampaign.current()
+        return self.client.post("/admin/waitlist/invitation/", {
+            "action": "save", "subject": c.subject, "heading": c.heading, "body": c.body,
+            "button_label": c.button_label, "background": background,
+        })
+
+    def test_a_chosen_picture_is_saved_and_used(self):
+        from accounts import waitlist
+        from accounts.models import WaitlistCampaign
+
+        choice = waitlist.invitation_backgrounds()[0]["path"]
+        self._post(choice)
+        campaign = WaitlistCampaign.current()
+        self.assertEqual(campaign.background, choice)
+        msg = waitlist.build_invitation(campaign, LaunchSignup(name="Alex Sample", email="a@x.com"))
+        html = next(c for c, m in msg.alternatives if m == "text/html")
+        self.assertIn(choice.split("/")[-1].split(".")[0], html)
+
+    def test_a_picture_that_is_not_on_offer_is_ignored(self):
+        from accounts.models import WaitlistCampaign
+
+        self._post("../../etc/passwd")
+        self.assertEqual(WaitlistCampaign.current().background, "")
+
+    def test_saving_lands_back_on_the_write_tab_and_sending_on_the_send_tab(self):
+        self.assertTrue(self._post("").url.endswith("#write"))

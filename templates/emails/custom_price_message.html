@@ -1,0 +1,27 @@
+{% extends "emails/_base.html" %}
+{% comment %}
+A new message in a custom-price conversation (client, 24 Oct 2026: "me being
+able to reach back"). One template, both directions — billing.custom_pricing
+passes queue_link when it goes to the team and plans_link when it goes to the
+organisation, and the button follows whichever is there.
+{% endcomment %}
+{% block title %}Custom price{% endblock %}
+{% block eyebrow %}{% if queue_link %}{{ org.name }} wrote about their custom price{% else %}A reply from the GoodTip team{% endif %}{% endblock %}
+{% block badge %}&#9733;{% endblock %}
+{% block preheader %}{{ msg.body|truncatechars:90 }}{% endblock %}
+{% block content %}
+  <p style="margin:0 0 18px;font-size:16px;line-height:1.6;color:#1A1A14;">
+    {% if queue_link %}<b>{{ org.name }}</b> has written about their custom price request.{% else %}Hi {{ req.requested_by.display_name|default:req.requested_by.email }}, the team has replied about {{ org.name }}&rsquo;s custom price.{% endif %}
+  </p>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+    <tr><td style="padding:16px 20px;background:#F2F1E7;border-left:4px solid #C8F135;border-radius:0 10px 10px 0;font-size:15px;line-height:1.65;color:#1A1A14;">
+      {{ msg.body|linebreaksbr }}
+    </td></tr>
+  </table>
+  {% if queue_link %}
+  {% include "emails/_bits.html" with bit="button" url=queue_link label="Open the custom pricing queue" %}
+  {% else %}
+  {% include "emails/_bits.html" with bit="button" url=plans_link label="Read and reply" %}
+  {% endif %}
+{% endblock %}
+{% block footnote %}Custom price{% endblock %}

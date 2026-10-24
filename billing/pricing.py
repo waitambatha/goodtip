@@ -49,6 +49,14 @@ TIERS = {
         "label": "Starter",
         "price": 99,
         "seat_limit": 20,
+        # How many organisations (locations/departments) one subscription
+        # covers — new, 19 Oct 2026: "give me a rough estimate... I leave
+        # that up to you". One each for the two plans with no groups feature
+        # at all; Pro and up track the "departments and sub-groups"/"multi-
+        # site" language the feature lists already use. Ian can edit every
+        # one of these from the admin (billing.models.PlanOverride) without
+        # asking for a deploy.
+        "child_org_limit": 1,
         "audience": "Small business, small sports club",
         "features": ["1 league", "All four competitions", "Charity vote", "Invite link", "Live ladder"],
         # See GROUPS_MIN_SEATS below for why this is False on the two small
@@ -60,6 +68,7 @@ TIERS = {
         "label": "Team",
         "price": 299,
         "seat_limit": 50,
+        "child_org_limit": 1,
         "audience": "Growing teams, community clubs",
         "features": [
             "Everything in Starter", "Your name and logo on it",
@@ -72,6 +81,7 @@ TIERS = {
         "label": "Workplace",
         "price": 799,
         "seat_limit": 150,
+        "child_org_limit": 3,
         "audience": "Mid-size organisations",
         "features": [
             "Everything in Team", "Groups, each with its own ladder",
@@ -85,6 +95,7 @@ TIERS = {
         "label": "Organisation",
         "price": 1299,
         "seat_limit": 500,
+        "child_org_limit": 10,
         "audience": "Large organisations",
         "features": [
             "Everything in Workplace", "Departments and sub-groups",
@@ -97,6 +108,7 @@ TIERS = {
         "label": "Enterprise+",
         "price": 1999,
         "seat_limit": 2499,
+        "child_org_limit": 100,
         "audience": "Large enterprise, multi-site",
         "features": [
             "Everything in Organisation", "Multi-league setup",
@@ -250,6 +262,46 @@ def tier_config(tier: str) -> dict:
     return TIERS[tier]
 
 
+def effective_tier_config(tier: str) -> dict:
+    """``TIERS[tier]`` with Ian's own edits (billing.models.PlanOverride)
+    laid on top — new, 19 Oct 2026: a super-admin "Plans" page where editing
+    a tier's price, member limit or organisation limit updates the public
+    pricing page without a deploy.
+
+    Lazy import of PlanOverride: models.py already imports constants from
+    this module, so importing it back at module scope would be circular.
+
+    Adds ``original_price`` and ``discount_amount`` for a template that wants
+    to show a strikethrough price next to the discounted one; ``price`` is
+    always the number a customer actually pays. A discount is only ever
+    applied via ``discount_amount_aud`` — PlanOverride keeps a percentage
+    around purely as the other half of the admin's input widget, converting
+    it to an amount (and vice versa) at save time, so by the time a row is
+    read here the amount is always the authoritative figure.
+    """
+    from .models import PlanOverride
+
+    cfg = dict(TIERS[tier])
+    cfg["original_price"] = Decimal(cfg["price"])
+    cfg["discount_amount"] = None
+
+    override = PlanOverride.objects.filter(tier=tier).first()
+    if override:
+        if override.price_aud is not None:
+            cfg["original_price"] = override.price_aud
+        if override.seat_limit is not None:
+            cfg["seat_limit"] = override.seat_limit
+        if override.child_org_limit is not None:
+            cfg["child_org_limit"] = override.child_org_limit
+        if override.discount_amount_aud is not None:
+            cfg["discount_amount"] = override.discount_amount_aud
+
+    cfg["price"] = cfg["original_price"]
+    if cfg["discount_amount"] is not None:
+        cfg["price"] = max(cfg["original_price"] - cfg["discount_amount"], Decimal("0"))
+    return cfg
+
+
 def tier_label(tier: str) -> str:
     """The product name for a stored key, safe for a key no longer offered."""
     cfg = TIERS.get(tier)
@@ -257,7 +309,7 @@ def tier_label(tier: str) -> str:
 
 
 def tier_price(tier: str) -> Decimal:
-    return Decimal(TIERS[tier]["price"])
+    return Decimal(effective_tier_config(tier)["price"])
 
 
 def tier_has_groups(tier: str | None) -> bool:
@@ -282,7 +334,7 @@ def tier_for_team_size(team_size: int | None) -> str:
     if not team_size:
         return STARTER
     for key in TIER_ORDER:
-        if team_size <= TIERS[key]["seat_limit"]:
+        if team_size <= effective_tier_config(key)["seat_limit"]:
             return key
     return ENTERPRISE_PLUS
 
@@ -331,7 +383,7 @@ def recommendation(team_size: int | None, *, wants_groups: bool = False) -> dict
     tier = by_size
     if wants_groups and not tier_has_groups(tier):
         tier = next_tier_with_groups(tier)
-    cfg = TIERS[tier]
+    cfg = effective_tier_config(tier)
     return {
         "tier": tier,
         "label": cfg["label"],
@@ -413,7 +465,7 @@ def per_person(tier: str) -> str:
     precision the number does not have. The largest plan says "from" instead:
     at 2,499 people it is under a dollar, and "~$1" would undersell it.
     """
-    cfg = TIERS[tier]
+    cfg = effective_tier_config(tier)
     at_ceiling = cfg["price"] / cfg["seat_limit"]
     lead = "from ~" if tier in (ENTERPRISE, ENTERPRISE_PLUS) else "~"
     return f"{lead}${max(1, round(at_ceiling))} per person"
@@ -428,14 +480,18 @@ def public_cards(limit: int | None = None) -> list[dict]:
     """
     cards = []
     for key in TIER_ORDER:
-        cfg = TIERS[key]
+        cfg = effective_tier_config(key)
         cards.append({
             "tier": key,
             "label": cfg["label"],
             "audience": cfg["audience"],
-            "price": f"${cfg['price']:,}",
+            "price": f"${cfg['price']:,.0f}",
+            "original_price": (
+                f"${cfg['original_price']:,.0f}" if cfg["discount_amount"] else None
+            ),
             "seats": seat_limit_label(cfg["seat_limit"]),
             "seat_limit": cfg["seat_limit"],
+            "child_org_limit": cfg["child_org_limit"],
             "per_person": per_person(key),
             "blurb": CARD_BLURBS[key],
             "icon": CARD_ICONS[key],

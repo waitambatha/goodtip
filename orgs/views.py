@@ -24,7 +24,7 @@ from accounts.views import JOIN_INVITER_SESSION_KEY, JOIN_SESSION_KEY
 # three separate paths on this module need it — the directory, the on/off
 # toggle and the create POST — and an import three deep in a function body is
 # how the fourth one gets forgotten.
-from billing.entitlements import GroupsLocked, groups_context, groups_gate
+from billing.entitlements import GroupsLocked, SeatLimitReached, groups_context, groups_gate
 from billing import pricing
 from billing.pricing import GROUPS_MIN_TIER, TIERS, tier_label
 from catalog.models import Charity, Country, GroupType
@@ -779,6 +779,27 @@ def create_org_view(request):
                 return _render_wizard(
                     request, draft, form, step, parent_org, duplicates=duplicates,
                 )
+            # A CHILD ORGANISATION NEEDS ROOM ON ITS PARENT'S PLAN (client, 19
+            # Oct 2026) — same enforcement as the member-seat limit, checked
+            # here rather than in the form's own clean() so it does not
+            # pre-empt the duplicate-name confirmation above: that is a "are
+            # you sure" a person can sail through on resubmit, this is a hard
+            # no that depends on nothing they typed.
+            parent = form.cleaned_data.get("parent")
+            if parent:
+                from billing.entitlements import child_org_gate
+
+                gate = child_org_gate(parent)
+                if not gate.allowed:
+                    return _render_wizard(
+                        request, draft, form, step, parent_org,
+                        errors={"__all__": [
+                            f"{parent.name} is on {gate.current_label}, which covers "
+                            f"{gate.org_limit} organisation"
+                            f"{'s' if gate.org_limit != 1 else ''} and already has "
+                            f"{gate.org_count}. Upgrade {parent.name}'s plan to add another.",
+                        ]},
+                    )
             org = form.save()
             org.created_by = request.user
             # The form stamped WHEN they agreed and to WHICH version; only the
@@ -1250,7 +1271,16 @@ def join_view(request, org_id: int, token: str):
     inviter_id = parsed["inviter_id"]
     if request.user.is_authenticated:
         already_member = _is_member(request.user, org)
-        member = add_member(request.user, org, inviter_id=inviter_id)
+        try:
+            member = add_member(request.user, org, inviter_id=inviter_id)
+        except SeatLimitReached:
+            messages.error(
+                request,
+                f"{org.name} isn't taking new members right now — it's "
+                "reached the limit for its current plan. Whoever invited "
+                "you can sort it out from there.",
+            )
+            return redirect("dashboard")
         # Stand them IN the organisation they just accepted an invitation to.
         # Without this, joining wrote a membership row and nothing else, so
         # somebody who already belonged to other organisations followed an

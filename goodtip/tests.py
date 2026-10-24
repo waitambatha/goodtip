@@ -108,20 +108,30 @@ class HoldingModeTests(TestCase):
                 self.assertNotContains(resp, "/login/")
                 self.assertNotContains(resp, "/signup/")
 
-    def test_a_real_page_links_back_to_the_trailer_and_nowhere_else(self):
+    def test_a_real_page_wears_the_same_menu_as_the_trailer(self):
+        # One menu for every coming-soon page (client, 23 Oct 2026): a real
+        # page offers the same places, its tours going back to the trailer,
+        # and the programme — never the product's sign-in or sign-up.
         body = self.client.get("/about/").content.decode()
-        nav = body[body.index('<nav class="nav"'):body.index("</nav>")]
+        nav = body[body.index('<nav class="nav hm-bar"'):body.index("</nav>")]
         self.assertIn('href="/coming-soon/"', nav)
-        for other in ("/news/", "/terms/", "/privacy/", "/pricing/", "/how-it-works/", "/wall/"):
-            self.assertNotIn(f'href="{other}"', nav)
+        self.assertIn('href="/coming-soon/#how-it-works"', nav)
+        self.assertIn('href="/coming-soon/#wall"', nav)
+        self.assertIn('href="/coming-soon/#join"', nav)
+        self.assertIn('aria-current="page"', nav)
+        self.assertIn("data-hm-open", nav)
+        self.assertIn('id="hm-programme"', body)
+        for other in ("/login/", "/signup/", "/dashboard/", "/how-it-works/", "/wall/"):
+            self.assertNotIn(f'href="{other}"', body)
 
     def test_the_menu_and_footer_offer_the_real_pages_and_still_showcase_the_rest(self):
         body = self.client.get("/").content.decode()
-        nav = body[body.index('<nav class="nav"'):body.index("</nav>")]
+        nav = body[body.index('<nav class="nav hm-bar"'):body.index("</nav>")]
         self.assertNotIn("/login/", nav)
         self.assertNotIn("/signup/", nav)
         self.assertIn("#join", nav)
-        foot = body[body.index('<footer class="footer"'):body.index("</footer>")]
+        start = body.index('<footer class="footer')
+        foot = body[start:body.index("</footer>", start)]
         for slug in ("how-it-works", "wall"):
             with self.subTest(slug=slug):
                 self.assertIn(f'href="#{slug}"', nav + foot)

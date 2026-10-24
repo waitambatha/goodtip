@@ -8,10 +8,11 @@ import stripe
 from django.conf import settings
 from django.utils import timezone
 
-from .models import CustomPriceRequest, FoundingRate, PlanSubscription
+from .models import CustomPackageClaim, CustomPriceRequest, FoundingRate, PlanSubscription
 from .pricing import (
     CUSTOM,
     TIERS,
+    effective_tier_config,
     first_billing_at,
     founding_locked_until,
     founding_window_open,
@@ -77,7 +78,7 @@ def grant_founding_rate(org, tier: str, *, note: str = "") -> FoundingRate | Non
     existing = FoundingRate.objects.filter(org=org).first()
     if existing is not None:
         return existing
-    cfg = tier_config(tier)
+    cfg = effective_tier_config(tier)
     return FoundingRate.objects.create(
         org=org,
         tier=tier,
@@ -103,7 +104,7 @@ def price_for(org, tier: str) -> tuple[Decimal, bool, Decimal]:
     somebody's locked amount they pay the list price, because a loyalty rate
     that costs more than walking in off the street is not a loyalty rate.
     """
-    list_price = Decimal(tier_config(tier)["price"])
+    list_price = Decimal(effective_tier_config(tier)["price"])
     rate = founding_rate_for(org)
     if rate is None or rate.tier != tier or rate.price_aud >= list_price:
         return list_price, False, list_price
@@ -116,7 +117,7 @@ def create_subscription(org, tier: str) -> PlanSubscription:
     Also the moment the founding rate is granted — see grant_founding_rate for
     why choosing the plan, rather than paying for it, is the right trigger.
     """
-    cfg = tier_config(tier)
+    cfg = effective_tier_config(tier)
     grant_founding_rate(org, tier)
     price, founding, list_price = price_for(org, tier)
     sub, created = PlanSubscription.objects.get_or_create(
@@ -162,6 +163,15 @@ def current_custom_offer(org) -> CustomPriceRequest | None:
         )
         .order_by("-decided_at").first()
     )
+
+
+def current_package_claim(org) -> CustomPackageClaim | None:
+    """The organisation's most recent standing-package claim, if it has made
+    one — new, 19 Oct 2026, alongside CustomPackage. Taking a different
+    package later just creates another row (Meta.ordering is newest-first),
+    so this always reflects the latest choice without needing to delete
+    anything a claim before it."""
+    return CustomPackageClaim.objects.filter(org=org).select_related("package").first()
 
 
 def decline_custom_offer(offer: CustomPriceRequest, *, reason: str = "") -> CustomPriceRequest:
@@ -440,7 +450,7 @@ def switch_tier(sub: PlanSubscription, new_tier: str) -> PlanSubscription:
     if new_tier == sub.tier:
         return sub
     client = _client()
-    cfg = tier_config(new_tier)
+    cfg = effective_tier_config(new_tier)
     price_aud, founding, list_price = price_for(sub.org, new_tier)
 
     stripe_sub = client.Subscription.retrieve(sub.stripe_subscription_id)

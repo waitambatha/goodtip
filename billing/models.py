@@ -1,7 +1,9 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from .pricing import CUSTOM, TIER_CHOICES, seat_limit_label, tier_label
 
@@ -479,6 +481,15 @@ class CustomPriceRequest(models.Model):
         blank=True, help_text="What the organisation is asking for, in their own words.",
     )
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    # What the request form asks for, kept as numbers as well as in the
+    # message (client, 24 Oct 2026: "being able to custom request a price...
+    # things are well organized") — so the team's queue can show the size of
+    # the ask at a glance and suggest a price for it, instead of reading it
+    # out of a paragraph. All optional: an older request has only `message`.
+    people_count = models.PositiveIntegerField(null=True, blank=True)
+    sites_count = models.PositiveIntegerField(null=True, blank=True)
+    budget_aud = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    org_kind = models.CharField(max_length=40, blank=True, help_text="School, club, franchise... as the form offers.")
     created_at = models.DateTimeField(auto_now_add=True)
 
     # Set only on approval — what the organisation is being offered.
@@ -509,6 +520,9 @@ class CustomPriceRequest(models.Model):
     org_decline_reason = models.TextField(
         blank=True, help_text="Sent back to the team by email — why the organisation said no to the offer.",
     )
+    # When the organisation said yes — pressed Accept on the offer, which
+    # makes its subscription (billing.views.custom_checkout_view).
+    accepted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-created_at"]
@@ -523,3 +537,162 @@ class CustomPriceRequest(models.Model):
     @property
     def is_declined_by_org(self) -> bool:
         return self.status == self.STATUS_APPROVED and self.org_declined_at is not None
+
+    @property
+    def org_kind_label(self) -> str:
+        from .custom_pricing import org_kind_label
+
+        return org_kind_label(self.org_kind)
+
+    @property
+    def stage(self) -> str:
+        """Where the conversation is, as one word both screens draw from:
+        waiting, offer, declined (by the team), refused (by the org),
+        accepted (a subscription was made from it)."""
+        if self.status == self.STATUS_PENDING:
+            return "waiting"
+        if self.status == self.STATUS_DECLINED:
+            return "declined"
+        if self.org_declined_at:
+            return "refused"
+        if self.accepted_at:
+            return "accepted"
+        return "offer"
+
+
+class CustomPackage(models.Model):
+    """A pre-made custom offer, browsable without asking first.
+
+    CLIENT, 19 OCT 2026: "he wanted us to... share a various custom prices
+    that we can hard code" — but rather than literally hard-coding them, Ian
+    gets a place to create and edit these himself (the super admin), same
+    reasoning as everywhere else prices live in an editable row rather than
+    in a deploy. Distinct from CustomPriceRequest on purpose: a request is
+    one organisation's negotiation, decided once; a package is a standing
+    offer — "for schools", say — anyone can see and take without writing in
+    first. The two can still meet: a visitor who takes none of these can
+    fall through to "request a custom price" (the existing flow).
+    """
+
+    name = models.CharField(max_length=80, help_text='Shown as the plan\'s name, e.g. "Schools Plan".')
+    description = models.CharField(
+        max_length=240, blank=True, help_text="One line under the name, said to the person deciding.",
+    )
+    price_aud = models.DecimalField(max_digits=8, decimal_places=2)
+    seat_limit = models.PositiveIntegerField(help_text="How many people an organisation on this package may have.")
+    child_org_limit = models.PositiveIntegerField(
+        default=1,
+        help_text="How many organisations (locations/departments) one subscription to this package covers.",
+    )
+    is_active = models.BooleanField(
+        default=True, help_text="Unchecked hides it from the pricing page without deleting it.",
+    )
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "price_aud"]
+
+    def __str__(self):
+        return f"{self.name} (${self.price_aud:,.0f})"
+
+    @property
+    def seat_limit_label(self) -> str:
+        return seat_limit_label(self.seat_limit)
+
+
+class CustomPackageClaim(models.Model):
+    """One organisation taking a CustomPackage, with a simulated review wait.
+
+    CLIENT, 19 OCT 2026: "we can just have a simulation of the approvals
+    just happening automatic, but giving the impression that it's taking
+    time... maybe it can take 5 minutes, and then it will say your custom
+    [package] has been approved." Nobody actually reviews this — `is_ready`
+    is a plain elapsed-time check, not a job or a queue, so there is nothing
+    to run and nothing that can get stuck. Ends in a handoff to the team
+    rather than a charge: Stripe is not live yet (CLAUDE.md), so this is
+    honest about what happens next instead of pretending to collect payment
+    it cannot actually take.
+    """
+
+    REVIEW_WAIT = timedelta(minutes=5)
+
+    package = models.ForeignKey(CustomPackage, on_delete=models.PROTECT, related_name="claims")
+    org = models.ForeignKey("orgs.Organisation", on_delete=models.CASCADE, related_name="custom_package_claims")
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="custom_package_claims",
+    )
+    requested_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-requested_at"]
+
+    def __str__(self):
+        return f"{self.org.name} — {self.package.name}"
+
+    @property
+    def is_ready(self) -> bool:
+        return timezone.now() >= self.requested_at + self.REVIEW_WAIT
+
+    @property
+    def ready_at(self):
+        return self.requested_at + self.REVIEW_WAIT
+
+
+class PlanOverride(models.Model):
+    """Ian's own edits on top of the five published plans — billing.pricing's
+    TIERS dict stays the seed and the fallback, this is the editable layer.
+
+    CLIENT, 19 OCT 2026: "he can now be able to manually change it himself
+    via the admin... we don't have to keep on going back and forth to the
+    script." TIERS itself stays code (billing.pricing explains why: the key
+    is an identifier used across the codebase, and nothing here renames
+    one) — only the numbers next to each key move into a row Ian can edit
+    without a deploy. A blank field here means "use the published default";
+    billing.pricing.effective_tier_config is what merges the two.
+    """
+
+    tier = models.CharField(max_length=20, choices=TIER_CHOICES[:-1], unique=True)  # excludes CUSTOM
+    price_aud = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    seat_limit = models.PositiveIntegerField(null=True, blank=True)
+    child_org_limit = models.PositiveIntegerField(null=True, blank=True)
+    # Either one drives the other — see static/js/gt-plan-admin.js. Stored
+    # separately rather than derived at read time because the relationship
+    # is only invertible one way at a time: whichever the admin typed last
+    # is the one that is exact, and rounding the other on every page load
+    # would make a saved 10% discount drift by a cent against a changing
+    # list price.
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    discount_amount_aud = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{tier_label(self.tier)} override"
+
+
+class CustomPriceMessage(models.Model):
+    """One message in a custom-price conversation, from either side.
+
+    CLIENT, 24 OCT 2026: "being able to see some notifications, being able
+    to see some follow-up if they have accepted... me being able to reach
+    back". A request used to be one message and one decision; now either
+    side can write again before or after it is decided — a question about
+    the ask, a counter to an offer — and the other side is told (the team
+    by email, the organisation in its bell panel and by email).
+    """
+
+    request = models.ForeignKey(CustomPriceRequest, on_delete=models.CASCADE, related_name="thread")
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="custom_price_messages",
+    )
+    from_team = models.BooleanField(default=False)
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"{'Team' if self.from_team else self.request.org.name}: {self.body[:40]}"

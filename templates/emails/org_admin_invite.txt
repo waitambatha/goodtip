@@ -1,0 +1,17 @@
+Hello {{ name }},
+
+{{ org.name }} has been set up on GoodTip, and you've been made its
+administrator — you'll run the comp: inviting your people, picking a
+charity, keeping things moving each round.
+{% if link %}
+Set your password here to get started:
+{{ link }}
+{% else %}
+You already have a GoodTip account, so there's nothing to set up — just
+log in as usual and {{ org.name }} will be there waiting for you:
+{{ login_url }}
+{% endif %}
+If you weren't expecting this, you can ignore this email — no action is
+taken until that link is used.
+
+— GoodTip

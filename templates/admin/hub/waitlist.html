@@ -1,108 +1,130 @@
-{% extends "admin/hub/base.html" %}
+{% extends "admin/hub/gx_base.html" %}
 {% load i18n %}
 
 {% comment %}
-THE WAITING LIST (client, 25 Sep 2026): who signed up from the holding page, how
-many have confirmed their email, how many have been told GoodTip is open, and
-the way into the invitation.
+THE WAITING LIST (client, 25 Sep 2026; rebuilt on the pitch 24 Oct 2026:
+"when has a search bar ever been at the bottom").
 
-The filters are plain links, like the media library's, so every state of the
-screen is an address that can be sent to somebody. The place number is the
-person's position in the WHOLE queue whatever the filter is showing — it is the
-same number they see on their own page.
+The hero is the scoreboard — on the list, confirmed, invited, still waiting
+— with the launch invitation's state and the way into it. The sheet has two
+tabs: People (search and filters first, then one line per person, each
+opening their own page) and Insights (the funnel, signups per day, who they
+are). Filters and search are plain GET, so every view is an address.
 {% endcomment %}
 
-{% block hub_accent %}var(--gt-c2){% endblock %}
-{% block hub_ic %}ic-f-people{% endblock %}
-
-{% block hub_aside %}
-<div class="gta-media-tally">
-  <b>{{ total }}</b><span>{% translate "on the list" %}</span>
-  <b>{{ waiting }}</b><span>{% translate "not invited yet" %}</span>
+{% block gx_kicker %}{% translate "Waiting list" %}{% endblock %}
+{% block gx_title %}{% blocktranslate count n=total %}{{ n }} person <em>waiting</em> for GoodTip{% plural %}{{ n }} people <em>waiting</em> for GoodTip{% endblocktranslate %}{% endblock %}
+{% block gx_lead %}{% if campaign.status == 'scheduled' and campaign.scheduled_for %}{% blocktranslate with when=campaign.scheduled_for|date:"D j M, g:i A" %}The launch invitation goes out by itself on {{ when }}.{% endblocktranslate %}{% elif campaign.status == 'sending' %}{% translate "The launch invitation is sending now." %}{% elif campaign.status == 'sent' %}{% blocktranslate with n=campaign.sent_count %}The launch invitation has gone to {{ n }} people.{% endblocktranslate %}{% else %}{% blocktranslate count n=waiting %}The launch invitation is written and ready — nothing has been sent. It would go to {{ n }} confirmed person.{% plural %}The launch invitation is written and ready — nothing has been sent. It would go to {{ n }} confirmed people.{% endblocktranslate %}{% endif %}{% endblock %}
+{% block gx_below %}
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px">
+  <a class="gx-btn is-lime" href="{% url 'admin:hq_waitlist_invitation' %}"><svg aria-hidden="true"><use href="#ic-mail"/></svg>{% if can_invite %}{% translate "Write &amp; send the invitation" %}{% else %}{% translate "See the invitation" %}{% endif %}</a>
+  <a class="gx-btn is-glass" href="?show={{ show }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}&amp;export=csv"><svg aria-hidden="true"><use href="#ic-doc"/></svg>{% translate "Download CSV" %}</a>
 </div>
 {% endblock %}
+{% block gx_board %}
+<a class="gx-score{% if show == 'all' %} is-on{% endif %}" href="?show=all"><b>{{ total }}</b><span>{% translate "On the list" %}</span></a>
+<a class="gx-score{% if show == 'verified' %} is-on{% endif %}" href="?show=verified"><b>{{ confirmed }}</b><span>{% translate "Confirmed" %}</span></a>
+<a class="gx-score{% if show == 'invited' %} is-on{% endif %}" href="?show=invited"><b>{{ invited }}</b><span>{% translate "Invited" %}</span></a>
+<a class="gx-score is-warn{% if show == 'waiting' %} is-on{% endif %}" href="?show=waiting"><b>{{ waiting }}</b><span>{% translate "Still to invite" %}</span></a>
+{% endblock %}
 
-{% block hub_body %}
-
-<section class="gta-wl-bar">
-  <div class="gta-wl-stats">
-    <div><b>{{ total }}</b><span>{% translate "signed up" %}</span></div>
-    <div><b>{{ confirmed }}</b><span>{% translate "confirmed their email" %}</span></div>
-    <div><b>{{ invited }}</b><span>{% translate "invited" %}</span></div>
-    <div><b>{{ waiting }}</b><span>{% translate "still waiting" %}</span></div>
+{% block gx_body %}
+<section class="gx-sheet" data-gx-tabs>
+  <div class="gx-tabs" role="tablist">
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="people" aria-selected="true">{% translate "People" %} <em>{{ page.paginator.count }}</em></button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="insights">{% translate "Insights" %}</button>
   </div>
-  <div class="gta-wl-invite">
-    <div>
-      <b>{% translate "Launch invitation" %}</b>
-      <span class="gta-wl-state is-{{ campaign.status }}">{{ campaign.get_status_display }}</span>
-      <p>
-        {% if campaign.status == 'scheduled' and campaign.scheduled_for %}
-          {% blocktranslate with when=campaign.scheduled_for|date:"D j M, g:i A" %}Goes out {{ when }}.{% endblocktranslate %}
-        {% elif campaign.status == 'sending' %}
-          {% translate "Sending now — the rest follows automatically." %}
-        {% elif campaign.status == 'sent' %}
-          {% blocktranslate with n=campaign.sent_count %}{{ n }} sent.{% endblocktranslate %}
-        {% else %}
-          {% translate "Written and ready to edit. Nothing has been sent." %}
-        {% endif %}
-        {% if campaign.failed_count %}<em>{% blocktranslate with n=campaign.failed_count %}{{ n }} could not be delivered.{% endblocktranslate %}</em>{% endif %}
-      </p>
+
+  <div class="gx-pane" data-gx-pane="people">
+    <form class="gx-toolbar" method="get" action="">
+      <input type="hidden" name="show" value="{{ show }}">
+      <label class="gx-search"><svg aria-hidden="true"><use href="#ic-search"/></svg>
+        <input type="search" name="q" value="{{ q }}" placeholder="{% translate 'Search by name or email' %}" aria-label="{% translate 'Search the list' %}"></label>
+      {% if q %}<a class="gx-btn is-ghost" href="?show={{ show }}">{% translate "Clear" %}</a>{% endif %}
+    </form>
+    <nav class="gx-chips" aria-label="{% translate 'Filter the list' %}" style="margin-bottom:14px">
+      {% for key, label in filters %}<a class="gx-chip{% if show == key %} on{% endif %}" href="?show={{ key }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}">{{ label }}</a>{% endfor %}
+    </nav>
+
+    {% if rows %}
+    <div class="gx-tablewrap">
+      <table class="gx-table" data-gx-rowlinks>
+        <thead><tr>
+          <th scope="col">#</th>
+          <th scope="col">{% translate "Name" %}</th>
+          <th scope="col">{% translate "Email" %}</th>
+          <th scope="col">{% translate "Organisation" %}</th>
+          <th scope="col">{% translate "Tips on now" %}</th>
+          <th scope="col">{% translate "Joined" %}</th>
+          <th scope="col">{% translate "Email confirmed" %}</th>
+          <th scope="col">{% translate "Invited" %}</th>
+          <th scope="col"><span class="gx-sr">{% translate "Open" %}</span></th>
+        </tr></thead>
+        <tbody>
+        {% for place, r in rows %}
+        <tr data-href="{% url 'admin:hq_waitlist_person' r.pk %}">
+          <td class="is-num"><span class="gx-person-place{% if place <= 10 %} is-top{% endif %}">{{ place }}</span></td>
+          <td class="is-name"><a href="{% url 'admin:hq_waitlist_person' r.pk %}">{{ r.name }}</a></td>
+          <td class="is-email">{{ r.email }}</td>
+          <td>{{ r.org_type_label|default:"—" }}</td>
+          <td>{{ r.platform_label|default:"—" }}</td>
+          <td class="is-date">{{ r.created_at|date:"j M Y" }}<small>{{ r.created_at|date:"g:i a" }}</small></td>
+          <td>{% if r.is_verified %}<span class="gx-pill is-ok"><i></i>{% translate "Yes" %}</span>{% else %}<span class="gx-pill is-wait"><i></i>{% translate "Not yet" %}</span>{% endif %}</td>
+          <td>{% if r.notified_at %}<span class="gx-pill is-offer"><i></i>{{ r.notified_at|date:"j M" }}</span>{% else %}<span class="gx-pill"><i></i>{% translate "Not yet" %}</span>{% endif %}</td>
+          <td class="is-go"><svg aria-hidden="true"><use href="#ic-chev-right"/></svg></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
     </div>
-    <a class="gta-wl-btn primary" href="{% url 'admin:hq_waitlist_invitation' %}">
-      {% if can_invite %}{% translate "Write &amp; send invitation" %}{% else %}{% translate "See the invitation" %}{% endif %}
-    </a>
+    {% if page.paginator.num_pages > 1 %}
+    <nav class="gx-pager" aria-label="{% translate 'Pages' %}">
+      {% if page.has_previous %}<a class="gx-btn is-ghost" href="?show={{ show }}&amp;q={{ q|urlencode }}&amp;page={{ page.previous_page_number }}">&larr; {% translate "Earlier" %}</a>{% endif %}
+      <span>{% blocktranslate with n=page.number of=page.paginator.num_pages %}Page {{ n }} of {{ of }}{% endblocktranslate %}</span>
+      {% if page.has_next %}<a class="gx-btn is-ghost" href="?show={{ show }}&amp;q={{ q|urlencode }}&amp;page={{ page.next_page_number }}">{% translate "Later" %} &rarr;</a>{% endif %}
+    </nav>
+    {% endif %}
+    {% else %}
+    <div class="gx-empty"><svg aria-hidden="true"><use href="#ic-search"/></svg><b>{% translate "Nobody matches that" %}</b><span>{% translate "Try another filter, or clear the search." %}</span></div>
+    {% endif %}
+  </div>
+
+  <div class="gx-pane" data-gx-pane="insights">
+    <div class="gx-split">
+      <div class="gx-stack">
+        <div class="gx-card is-line">
+          <div class="gx-h"><h3>{% translate "Signups, the last 30 days" %}</h3><p>{% blocktranslate count n=last30 %}{{ n }} signup{% plural %}{{ n }} signups{% endblocktranslate %}</p></div>
+          <div class="gx-days" role="img" aria-label="{% translate 'Signups per day over the last 30 days' %}">
+            {% for d in days %}<i class="{% if not d.n %}is-zero{% endif %}" style="height: {% if d.n %}{{ d.h }}{% else %}2{% endif %}%" title="{{ d.d|date:'D j M' }}: {{ d.n }}"></i>{% endfor %}
+          </div>
+          <div class="gx-axis"><span>{{ days.0.d|date:"j M" }}</span><span>{% translate "today" %}</span></div>
+        </div>
+        <div class="gx-grid3">
+          <div class="gx-card is-line" style="--ac: var(--gx-teal)">
+            <p class="gx-label">{% translate "What kind of organisation" %}</p>
+            {% for r in by_type %}<div class="gx-hbar"><span>{{ r.label }}</span><b>{{ r.n }}</b><span class="gx-mb"><i style="width: {{ r.pct }}%"></i></span></div>
+            {% empty %}<p class="gx-note">{% translate "Nobody has said yet." %}</p>{% endfor %}
+          </div>
+          <div class="gx-card is-line" style="--ac: #7A4FA3">
+            <p class="gx-label">{% translate "What they tip on now" %}</p>
+            {% for r in by_platform %}<div class="gx-hbar"><span>{{ r.label }}</span><b>{{ r.n }}</b><span class="gx-mb"><i style="width: {{ r.pct }}%"></i></span></div>
+            {% empty %}<p class="gx-note">{% translate "Nobody has said yet." %}</p>{% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="gx-card is-line">
+        <div class="gx-h"><h3>{% translate "From signing up to invited" %}</h3></div>
+        <div class="gx-funnel">
+          {% for f in funnel %}
+          <div class="gx-funnel-row">
+            <div><span>{{ f.label }}</span><b>{{ f.n }}{% if not forloop.first %} &middot; {{ f.pct }}%{% endif %}</b></div>
+            <div class="gx-funnel-bar" style="--k: {% if forloop.first %}var(--gx-teal){% elif forloop.counter == 2 %}var(--gx-green){% else %}#8DB82A{% endif %}"><i style="width: {{ f.pct }}%">{% if f.n %}{{ f.n }}{% endif %}</i></div>
+          </div>
+          {% endfor %}
+        </div>
+        <p class="gx-note" style="margin-top:16px">{% translate "Only confirmed addresses are invited — an unconfirmed one may be a typo, and a bounce hurts every later email." %}</p>
+      </div>
+    </div>
   </div>
 </section>
-
-<form class="gta-media-find" method="get" action="">
-  <input type="hidden" name="show" value="{{ show }}">
-  <input type="search" name="q" value="{{ q }}" placeholder="{% translate 'Find someone by name or email' %}" aria-label="{% translate 'Search the list' %}">
-  <button type="submit" class="gta-wl-btn">{% translate "Search" %}</button>
-  {% if q %}<a class="gta-media-clear" href="?show={{ show }}">{% translate "Clear" %}</a>{% endif %}
-  <a class="gta-wl-btn" href="?show={{ show }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}&amp;export=csv">{% translate "Download CSV" %}</a>
-</form>
-
-<div class="gta-media-filters">
-  <div class="gta-chipset" role="group" aria-label="{% translate 'Filter the list' %}">
-    {% for key, label in filters %}
-    <a class="gta-chip{% if show == key %} on{% endif %}" href="?show={{ key }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}">{{ label }}</a>
-    {% endfor %}
-  </div>
-</div>
-
-{% if rows %}
-<div class="gta-wl-tablewrap">
-<table class="gta-wl-table">
-  <thead><tr>
-    <th>#</th><th>{% translate "Name" %}</th><th>{% translate "Email" %}</th><th>{% translate "Organisation" %}</th>
-    <th>{% translate "Tipping with" %}</th><th>{% translate "Joined" %}</th><th>{% translate "Email" %}</th><th>{% translate "Invited" %}</th>
-  </tr></thead>
-  <tbody>
-  {% for place, r in rows %}
-  <tr>
-    <td class="num">{{ place }}</td>
-    <td><b>{{ r.name }}</b></td>
-    <td>{{ r.email }}</td>
-    <td>{{ r.org_type_label|default:"—" }}</td>
-    <td>{{ r.platform_label|default:"—" }}</td>
-    <td>{{ r.created_at|date:"j M Y, g:i A" }}</td>
-    <td>{% if r.is_verified %}<i class="gta-wl-pill ok">{% translate "Confirmed" %}</i>{% else %}<i class="gta-wl-pill">{% translate "Not confirmed" %}</i>{% endif %}</td>
-    <td>{% if r.notified_at %}<i class="gta-wl-pill ok">{{ r.notified_at|date:"j M, g:i A" }}</i>{% else %}<i class="gta-wl-pill">{% translate "Not yet" %}</i>{% endif %}</td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
-</div>
-
-{% if page.paginator.num_pages > 1 %}
-<nav class="gta-wl-pager" aria-label="{% translate 'Pages' %}">
-  {% if page.has_previous %}<a href="?show={{ show }}&amp;q={{ q|urlencode }}&amp;page={{ page.previous_page_number }}">&larr; {% translate "Earlier" %}</a>{% endif %}
-  <span>{% blocktranslate with n=page.number of=page.paginator.num_pages %}Page {{ n }} of {{ of }}{% endblocktranslate %}</span>
-  {% if page.has_next %}<a href="?show={{ show }}&amp;q={{ q|urlencode }}&amp;page={{ page.next_page_number }}">{% translate "Later" %} &rarr;</a>{% endif %}
-</nav>
-{% endif %}
-{% else %}
-<p class="gta-empty">{% translate "Nobody matches that." %}</p>
-{% endif %}
-
 {% endblock %}

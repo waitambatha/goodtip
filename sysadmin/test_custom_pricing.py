@@ -56,7 +56,7 @@ class CustomPricingQueueTests(TestCase):
             reverse("admin:hq_custom_pricing_decide", args=[req.id]),
             {"action": "approve", "price_aud": "1500", "seat_limit": "300", "label": "Bespoke deal"},
         )
-        self.assertRedirects(resp, reverse("admin:hq_custom_pricing"))
+        self.assertRedirects(resp, reverse("admin:hq_custom_pricing_detail", args=[req.id]))
         req.refresh_from_db()
         self.assertEqual(req.status, CustomPriceRequest.STATUS_APPROVED)
         self.assertEqual(req.price_aud, Decimal("1500"))
@@ -83,7 +83,7 @@ class CustomPricingQueueTests(TestCase):
             reverse("admin:hq_custom_pricing_decide", args=[req.id]),
             {"action": "decline", "decision_note": "Workplace already covers this."},
         )
-        self.assertRedirects(resp, reverse("admin:hq_custom_pricing"))
+        self.assertRedirects(resp, reverse("admin:hq_custom_pricing_detail", args=[req.id]))
         req.refresh_from_db()
         self.assertEqual(req.status, CustomPriceRequest.STATUS_DECLINED)
         self.assertEqual(req.decision_note, "Workplace already covers this.")
@@ -112,3 +112,59 @@ class CustomPricingQueueTests(TestCase):
         self.assertEqual(resp.status_code, 404)
         req.refresh_from_db()
         self.assertEqual(req.status, CustomPriceRequest.STATUS_PENDING)
+
+
+@override_settings(STAGING_GATE=False)
+class CustomPricingConversationTests(TestCase):
+    """The team's side of the conversation (client, 24 Oct 2026): writing
+    back without deciding, and the organisation being told in the app."""
+
+    def setUp(self):
+        from orgs.models import OrgMember
+
+        self.boss = User.objects.create_superuser(email="boss2@example.com", password="pw", display_name="Boss")
+        AdminAccess.objects.create(user=self.boss, is_full_access=True)
+        self.season, _ = Season.objects.get_or_create(year=2099, defaults={"label": "CPR Season"})
+        self.org = Organisation.objects.create(name="Chatty Org", season=self.season)
+        self.requester = User.objects.create_user(email="owner@chatty.com", password="x")
+        OrgMember.objects.create(user=self.requester, org=self.org, is_league_owner=True)
+        self.req = CustomPriceRequest.objects.create(org=self.org, requested_by=self.requester, message="300 people")
+        sign_in(self.client, self.boss)
+
+    def test_a_reply_lands_in_the_thread_and_the_organisations_bell(self):
+        from orgs.models import Notification
+
+        resp = self.client.post(reverse("admin:hq_custom_pricing_reply", args=[self.req.id]),
+                                {"body": "Which sites are these?"})
+        self.assertEqual(resp.status_code, 302)
+        msg = self.req.thread.get()
+        self.assertTrue(msg.from_team)
+        self.assertTrue(Notification.objects.filter(user=self.requester, org=self.org).exists())
+        self.req.refresh_from_db()
+        self.assertTrue(self.req.is_pending)
+
+    def test_an_offer_reaches_the_organisations_bell(self):
+        from orgs.models import Notification
+
+        self.client.post(reverse("admin:hq_custom_pricing_decide", args=[self.req.id]),
+                         {"action": "approve", "price_aud": "900", "seat_limit": "300"})
+        note = Notification.objects.get(user=self.requester)
+        self.assertIn("custom price is ready", note.title)
+
+    def test_the_queue_suggests_what_the_five_plans_would_charge(self):
+        self.req.people_count = 120
+        self.req.save(update_fields=["people_count"])
+        resp = self.client.get(reverse("admin:hq_custom_pricing_detail", args=[self.req.id]))
+        self.assertContains(resp, "the five plans would charge")
+        self.assertContains(resp, "Keep to the five")
+
+    def test_the_dashboard_lists_tiles_that_open_each_request(self):
+        resp = self.client.get(reverse("admin:hq_custom_pricing"))
+        self.assertContains(resp, reverse("admin:hq_custom_pricing_detail", args=[self.req.id]))
+        self.assertContains(resp, "Chatty Org")
+        self.assertNotContains(resp, "Send the offer")
+
+    def test_each_filter_opens(self):
+        for show in ("waiting", "offer", "accepted", "closed", "all", "nonsense"):
+            with self.subTest(show=show):
+                self.assertEqual(self.client.get(reverse("admin:hq_custom_pricing") + f"?show={show}").status_code, 200)

@@ -62,8 +62,19 @@ def complete_boss_invites(org, creator) -> int:
         # It is still idempotent: the sender may have joined under their own
         # steam while waiting, and add_member's get_or_create covers that the
         # same way, without double-counting them on the ladder.
+        from billing.entitlements import SeatLimitReached
+
         before = OrgMember.objects.filter(user=invite.sender, org=org).exists()
-        add_member(invite.sender, org, role=OrgMember.ROLE_BOTH)
+        try:
+            add_member(invite.sender, org, role=OrgMember.ROLE_BOTH)
+        except SeatLimitReached:
+            # The plan filled up between the note being sent and the league
+            # going live. Leave this one JOINED rather than COMPLETE — it is
+            # not done, and the next run (another boss note settling, an
+            # upgrade) finds it again instead of it being silently lost.
+            logger.warning(
+                "Boss invite %s not added to %s: plan is full", invite.id, org.id)
+            continue
         created = not before
         invite.status = BossInvite.STATUS_COMPLETE
         invite.completed_at = timezone.now()

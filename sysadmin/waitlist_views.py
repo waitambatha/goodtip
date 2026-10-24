@@ -94,6 +94,54 @@ def _places() -> dict:
     return {pk: n for n, pk in enumerate(ordered, 1)}
 
 
+def _charts(total: int, confirmed: int, invited: int) -> dict:
+    """The waiting list as pictures (client, 24 Oct 2026: the screen was
+    "not quite giving... not self-explanatory"): the funnel from signing up
+    to being invited, signups per day over the last 30 days, and who they
+    are — what kind of organisation, and what they tip on now."""
+    from datetime import timedelta
+
+    from django.db.models import Count
+    from django.db.models.functions import TruncDate
+
+    def pct(n):
+        return round(n / total * 100) if total else 0
+
+    funnel = [
+        {"label": "Signed up", "n": total, "pct": 100 if total else 0, "k": "var(--gt-c4)"},
+        {"label": "Confirmed their email", "n": confirmed, "pct": pct(confirmed), "k": "var(--gt-c2)"},
+        {"label": "Invited", "n": invited, "pct": pct(invited), "k": "var(--gt-c1)"},
+    ]
+    today = timezone.localdate()
+    since = today - timedelta(days=29)
+    per_day = dict(
+        LaunchSignup.objects.filter(created_at__date__gte=since)
+        .annotate(d=TruncDate("created_at")).values_list("d").annotate(n=Count("pk")).values_list("d", "n")
+    )
+    days = [{"d": since + timedelta(days=i), "n": per_day.get(since + timedelta(days=i), 0)} for i in range(30)]
+    top = max([d["n"] for d in days] or [0]) or 1
+    for d in days:
+        d["h"] = round(d["n"] / top * 100)
+
+    def split(field, choices):
+        labels = dict(choices)
+        rows = (LaunchSignup.objects.exclude(**{field: ""}).values_list(field)
+                .annotate(n=Count("pk")).order_by("-n").values_list(field, "n"))
+        rows = [{"label": labels.get(k, k), "n": n} for k, n in rows][:6]
+        most = max([r["n"] for r in rows] or [1])
+        for r in rows:
+            r["pct"] = round(r["n"] / most * 100)
+        return rows
+
+    return {
+        "funnel": funnel,
+        "days": days,
+        "last30": sum(d["n"] for d in days),
+        "by_type": split("org_type", LaunchSignup.ORG_TYPE_CHOICES),
+        "by_platform": split("current_platform", LaunchSignup.PLATFORM_CHOICES),
+    }
+
+
 def waitlist_hub(request):
     _guard_view(request)
     qs, show, q = _filtered(request)
@@ -122,19 +170,78 @@ def waitlist_hub(request):
     rows = [(places.get(r.pk), r) for r in page.object_list]
 
     campaign = WaitlistCampaign.current()
+    confirmed = LaunchSignup.objects.filter(email_verified_at__isnull=False).count()
+    invited = LaunchSignup.objects.filter(notified_at__isnull=False).count()
     return render(request, "admin/hub/waitlist.html", _ctx(
         request, "Waiting list",
         rows=rows, page=page, show=show, q=q, filters=FILTERS,
         total=total,
-        confirmed=LaunchSignup.objects.filter(email_verified_at__isnull=False).count(),
-        invited=LaunchSignup.objects.filter(notified_at__isnull=False).count(),
+        confirmed=confirmed,
+        invited=invited,
         waiting=waitlist.audience().count(),
+        **_charts(total, confirmed, invited),
         campaign=campaign,
         can_invite=access.can(request.user, "waitlist.invite"),
         hub_title="Waiting list",
         hub_lead="Everyone who asked to be told when GoodTip opens — and the "
                  "invitation that tells them it has.",
         hub_icon="ic-f-people",
+    ))
+
+
+def waitlist_person(request, pk: int):
+    """One person on the list, the whole page (client, 24 Oct 2026: "click
+    it and now that whole page is everything and anything to do with it"):
+    their place, what they told us, each step from joining to being invited,
+    their waiting-list account, and who joined either side of them."""
+    from django.shortcuts import get_object_or_404
+
+    _guard_view(request)
+    person = get_object_or_404(LaunchSignup, pk=pk)
+    ordered = list(LaunchSignup.objects.order_by("created_at", "pk").values_list("pk", flat=True))
+    i = ordered.index(person.pk)
+    near_ids = ordered[max(0, i - 3):i] + ordered[i + 1:i + 4]
+    near = {r.pk: r for r in LaunchSignup.objects.filter(pk__in=near_ids)}
+    places = {pk_: n for n, pk_ in enumerate(ordered, 1)}
+    # Each stage carries what the hover card says about it (client, 24 Oct
+    # 2026: "hover a stage and get more nice looking info").
+    first = (person.name or "").split(" ")[0] or "They"
+    steps = [
+        {"label": "Joined the list", "icon": "ic-users", "at": person.created_at, "done": True,
+         "big": f"Number {i + 1} in the queue",
+         "detail": (f"{first} signed up from {person.source_page}." if person.source_page
+                    else f"{first} signed up from the coming-soon page.")
+                   + (f" They run a {person.org_type_label.lower()}." if person.org_type_label else "")},
+        {"label": "Confirmed their email", "icon": "ic-mail", "at": person.email_verified_at,
+         "done": bool(person.email_verified_at),
+         "big": "Address confirmed" if person.email_verified_at else "Waiting on the code",
+         "detail": ("Their address is real, so the launch invitation can reach them."
+                    if person.email_verified_at else
+                    "They haven't entered the code we emailed. Only confirmed addresses are invited — an "
+                    "unconfirmed one may be a typo.")},
+        {"label": "Signed in to their place", "icon": "ic-login", "at": person.last_signin_at,
+         "done": bool(person.last_signin_at),
+         "big": "Came back to check" if person.last_signin_at else "Not signed in yet",
+         "detail": ("They set a password and have looked at their place in the queue since joining."
+                    if person.last_signin_at else
+                    "They can sign in from the coming-soon page to see their place and the countdown. Optional.")},
+        {"label": "Invited to GoodTip", "icon": "ic-send", "at": person.notified_at, "done": bool(person.notified_at),
+         "big": "Told we're open" if person.notified_at else "Next: the invitation",
+         "detail": ("The launch invitation went to them. From here they sign up for real."
+                    if person.notified_at else
+                    "They'll get the launch invitation when it goes out — once, and only if confirmed.")},
+    ]
+    done = sum(1 for st in steps if st["done"])
+    for n, st in enumerate(steps):
+        st["next"] = not st["done"] and all(x["done"] for x in steps[:n])
+    progress = max(0, max([n for n, st in enumerate(steps) if st["done"]] or [0])) / (len(steps) - 1)
+    return render(request, "admin/hub/waitlist_person.html", _ctx(
+        request, person.name,
+        person=person, place=i + 1, total=len(ordered), steps=steps, done=done, progress=progress,
+        neighbours=[(places[pk_], near[pk_]) for pk_ in near_ids if pk_ in near],
+        prev_id=ordered[i - 1] if i > 0 else None,
+        next_id=ordered[i + 1] if i + 1 < len(ordered) else None,
+        back_url=reverse("admin:hq_waitlist"), back_label="the waiting list",
     ))
 
 
@@ -178,6 +285,7 @@ def invitation(request):
         holding_on=getattr(settings, "HOLDING_PAGE", False),
         is_staging=getattr(settings, "IS_STAGING", False),
         signup_link=waitlist.invitation_link(),
+        backgrounds=waitlist.invitation_backgrounds(),
         back_url=reverse("admin:hq_waitlist"),
         back_label="the waiting list",
         hub_title="Launch invitation",
@@ -190,7 +298,9 @@ def invitation(request):
 def _invitation_action(request, campaign):
     action = request.POST.get("action") or "save"
     fields = _read_fields(request.POST)
-    here = redirect("admin:hq_waitlist_invitation")
+    # Back onto the tab the button was on, not always the first one.
+    tab = {"send_now": "send", "schedule": "send", "unschedule": "send", "launch_date": "launch"}.get(action, "write")
+    here = redirect(reverse("admin:hq_waitlist_invitation") + f"#{tab}")
 
     if action == "reset":
         for k, v in waitlist.default_campaign_fields().items():
@@ -234,6 +344,7 @@ def _invitation_action(request, campaign):
         return here
     for k, v in fields.items():
         setattr(campaign, k, v)
+    campaign.background = waitlist.valid_background(request.POST.get("background") or "")
     campaign.updated_by = request.user
 
     if action == "save":
@@ -312,6 +423,7 @@ def invitation_preview(request):
     _guard_view(request)
     fields = _read_fields(request.POST)
     campaign = WaitlistCampaign(**{k: v or "…" for k, v in fields.items()})
+    campaign.background = waitlist.valid_background(request.POST.get("background") or "")
     sample = LaunchSignup(name="Alex Sample", email="alex@example.com")
     msg = waitlist.build_invitation(campaign, sample)
     html = ""

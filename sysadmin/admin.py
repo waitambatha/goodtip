@@ -418,7 +418,10 @@ def _get_urls():
     # answer to the super admin, so they live here now.
     from admin_panel import views as manage_views
 
-    from . import custom_pricing_views, hub_views, media_views, services_views, team_views, waitlist_views
+    from . import (
+        custom_pricing_views, hub_views, media_views, org_admin_views, plan_admin_views,
+        services_views, team_views, waitlist_views,
+    )
 
     custom = [
         path("system-report/", admin.site.admin_view(system_report_view), name="system_report"),
@@ -462,6 +465,8 @@ def _get_urls():
         # page, and the one email that tells them GoodTip is open — written
         # here, sent now or at a time chosen, see sysadmin/waitlist_views.py.
         path("waitlist/", admin.site.admin_view(waitlist_views.waitlist_hub), name="hq_waitlist"),
+        path("waitlist/<int:pk>/", admin.site.admin_view(waitlist_views.waitlist_person),
+             name="hq_waitlist_person"),
         path("waitlist/invitation/", admin.site.admin_view(waitlist_views.invitation),
              name="hq_waitlist_invitation"),
         path("waitlist/invitation/preview/", admin.site.admin_view(waitlist_views.invitation_preview),
@@ -471,9 +476,40 @@ def _get_urls():
         # outside the five published plans, see sysadmin/custom_pricing_views.py.
         path("custom-pricing/", admin.site.admin_view(custom_pricing_views.custom_pricing_hub),
              name="hq_custom_pricing"),
+        path("custom-pricing/<int:request_id>/",
+             admin.site.admin_view(custom_pricing_views.custom_pricing_detail),
+             name="hq_custom_pricing_detail"),
         path("custom-pricing/<int:request_id>/decide/",
              admin.site.admin_view(custom_pricing_views.custom_pricing_decide),
              name="hq_custom_pricing_decide"),
+        path("custom-pricing/<int:request_id>/reply/",
+             admin.site.admin_view(custom_pricing_views.custom_pricing_reply),
+             name="hq_custom_pricing_reply"),
+
+        # PLANS, 19 Oct 2026 — Ian's own edits to the five published plans
+        # and the standing custom packages, see sysadmin/plan_admin_views.py.
+        path("plans/", admin.site.admin_view(plan_admin_views.plan_admin_hub), name="hq_plan_admin"),
+        # The two literal "packages/" routes have to come before the
+        # catch-all <str:tier> one below — "plans/<str:tier>/save/" would
+        # otherwise match "plans/packages/save/" first, with tier="packages".
+        path("plans/packages/new/",
+             admin.site.admin_view(plan_admin_views.package_new), name="hq_custom_package_new"),
+        path("plans/packages/<int:pk>/",
+             admin.site.admin_view(plan_admin_views.package_detail), name="hq_custom_package_detail"),
+        path("plans/packages/save/",
+             admin.site.admin_view(plan_admin_views.custom_package_save), name="hq_custom_package_save"),
+        path("plans/packages/<int:pk>/save/",
+             admin.site.admin_view(plan_admin_views.custom_package_save), name="hq_custom_package_edit"),
+
+        # SET UP AN ORGANISATION FOR SOMEONE ELSE, 19 Oct 2026 — see
+        # sysadmin/org_admin_views.py.
+        path("orgs/new/", admin.site.admin_view(org_admin_views.org_admin_hub), name="hq_org_admin"),
+        path("orgs/new/create/", admin.site.admin_view(org_admin_views.org_admin_create),
+             name="hq_org_admin_create"),
+        path("plans/<str:tier>/",
+             admin.site.admin_view(plan_admin_views.plan_detail), name="hq_plan_detail"),
+        path("plans/<str:tier>/save/",
+             admin.site.admin_view(plan_admin_views.plan_override_save), name="hq_plan_override_save"),
 
         path("sync/", admin.site.admin_view(manage_views.sync_panel), name="hq_sync"),
 

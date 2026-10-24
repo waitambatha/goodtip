@@ -1,0 +1,96 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n %}
+
+{% comment %}
+ONE PERSON ON THE WAITING LIST (client, 24 Oct 2026), on the pitch. The hero
+is who they are and their place in the queue — the same number they see on
+their own page. The sheet: Journey (each step from joining to being invited)
+and Details (what they told us, their waiting-list account, who joined either
+side of them). Read only — the one thing that writes to these people is the
+launch invitation. Built by sysadmin.waitlist_views.waitlist_person.
+{% endcomment %}
+
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_waitlist' %}">{% translate "Waiting list" %}</a></li>{% endblock %}
+{% block gx_nav %}
+{% if prev_id %}<a class="gx-btn is-glass" href="{% url 'admin:hq_waitlist_person' prev_id %}"><svg aria-hidden="true"><use href="#ic-chev-left"/></svg>#{{ place|add:-1 }}</a>{% endif %}
+{% if next_id %}<a class="gx-btn is-glass" href="{% url 'admin:hq_waitlist_person' next_id %}">#{{ place|add:1 }}<svg aria-hidden="true"><use href="#ic-chev-right"/></svg></a>{% endif %}
+{% endblock %}
+{% block gx_kicker %}{% translate "Waiting list" %} &middot; {% translate "joined" %} {{ person.created_at|date:"j M Y" }}{% endblock %}
+{% block gx_title %}{{ person.name }}{% endblock %}
+{% block gx_lead %}<a href="mailto:{{ person.email }}">{{ person.email }}</a>{% if person.org_type_label %} &middot; {{ person.org_type_label }}{% endif %}{% endblock %}
+{% block gx_board %}
+<div class="gx-score is-wide"><b>#{{ place }}</b><span>{% blocktranslate with n=total %}in the queue of {{ n }}{% endblocktranslate %}</span></div>
+<div class="gx-score{% if not person.notified_at and not person.is_verified %} is-warn{% endif %}"><b>{% if person.notified_at %}&#10003;{% elif person.is_verified %}{% translate "Ready" %}{% else %}{% translate "Not yet" %}{% endif %}</b><span>{% if person.notified_at %}{% translate "Invited" %}{% elif person.is_verified %}{% translate "To invite" %}{% else %}{% translate "Confirmed" %}{% endif %}</span></div>
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet" data-gx-tabs>
+  <div class="gx-tabs" role="tablist">
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="journey" aria-selected="true">{% translate "Journey" %}</button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="details">{% translate "Details" %}</button>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="journey">
+    <div class="gx-h"><h3>{% blocktranslate with n=done %}{{ n }} of 4 steps done{% endblocktranslate %}</h3><p>{% translate "Point at a stage for the story behind it." %}</p></div>
+    <ol class="gx-hj" style="--n: {{ steps|length }}; --p: {{ progress|stringformat:'.3f' }}">
+      {% for st in steps %}
+      <li class="gx-hj-st{% if st.done %} is-done{% elif st.next %} is-next{% endif %}" tabindex="0">
+        <span class="gx-hj-node" aria-hidden="true">{% if st.done %}<svg><use href="#{{ st.icon }}"/></svg>{% else %}<svg><use href="#{{ st.icon }}"/></svg>{% endif %}</span>
+        <b>{{ st.label }}</b>
+        <span>{% if st.at %}{{ st.at|date:"j M Y" }}{% elif st.next %}{% translate "Up next" %}{% else %}{% translate "Not yet" %}{% endif %}</span>
+        <div class="gx-hj-tip" role="tooltip">
+          <span class="k">{% blocktranslate with n=forloop.counter %}Stage {{ n }}{% endblocktranslate %} &middot; {% if st.done %}{% translate "done" %}{% elif st.next %}{% translate "up next" %}{% else %}{% translate "to come" %}{% endif %}</span>
+          <span class="big">{{ st.big }}</span>
+          <p>{{ st.detail }}</p>
+          {% if st.at %}<span class="when">{{ st.at|date:"l j F Y, g:i a" }} &middot; {% blocktranslate with t=st.at|timesince %}{{ t }} ago{% endblocktranslate %}</span>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+
+    <div class="gx-hj-below gx-split">
+      <div class="gx-card" style="background:#F1F4F8">
+        <p class="gx-label">{% translate "Their answers when they joined" %}</p>
+        <div class="gx-facts">
+          <div class="gx-fact"><span>{% translate "Organisation" %}</span><b style="font-size:17px;line-height:1.2">{{ person.org_type_label|default:"—" }}</b></div>
+          <div class="gx-fact"><span>{% translate "Tips on now" %}</span><b style="font-size:17px;line-height:1.2">{{ person.platform_label|default:"—" }}</b></div>
+        </div>
+      </div>
+      <div class="gx-card is-dark" style="background:#17202D">
+        <p class="gx-label" style="color:var(--cc-1)">{% translate "What happens next" %}</p>
+        <p style="margin:0;font-size:15px;line-height:1.6">
+          {% if person.notified_at %}{% translate "They've been told GoodTip is open. Nothing more to do here." %}
+          {% elif person.is_verified %}{% translate "They're confirmed, so the launch invitation will reach them when it goes out." %}
+          {% else %}{% translate "They haven't confirmed their email, so the launch invitation will skip them until they do." %}{% endif %}
+        </p>
+        <a class="gx-btn is-block" style="margin-top:16px;background:var(--cc-1);color:#151C27 !important" href="{% url 'admin:hq_waitlist_invitation' %}">{% translate "Open the invitation" %}</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="details">
+    <div class="gx-facts" style="margin-bottom:20px">
+      <div class="gx-fact"><span>{% translate "Organisation" %}</span><b style="font-size:18px;line-height:1.2">{{ person.org_type_label|default:"—" }}</b></div>
+      <div class="gx-fact"><span>{% translate "Tips on now" %}</span><b style="font-size:18px;line-height:1.2">{{ person.platform_label|default:"—" }}</b></div>
+      <div class="gx-fact"><span>{% translate "Joined from" %}</span><b style="font-size:18px;line-height:1.2">{{ person.source_page|default:"—" }}</b></div>
+    </div>
+    <div class="gx-grid3">
+      <div>
+        <p class="gx-label">{% translate "Their waiting-list account" %}</p>
+        <ul class="gx-list">
+          <li><b>{% translate "Password set" %}</b><span>{% if person.has_account %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</span></li>
+          <li><b>{% translate "Last signed in" %}</b><span>{{ person.last_signin_at|date:"j M Y, g:i a"|default:"Never" }}</span></li>
+          <li><b>{% translate "Failed sign-ins" %}</b><span>{{ person.failed_signins }}{% if person.locked_until %} &middot; {% translate "locked until" %} {{ person.locked_until|date:"j M, g:i a" }}{% endif %}</span></li>
+        </ul>
+      </div>
+      <div>
+        <p class="gx-label">{% translate "Joined around them" %}</p>
+        <ul class="gx-list">
+          {% for n, r in neighbours %}<li><a href="{% url 'admin:hq_waitlist_person' r.pk %}"><b>#{{ n }} &middot; {{ r.name }}</b></a><span>{{ r.created_at|date:"j M Y" }}</span></li>
+          {% empty %}<li><span>{% translate "Nobody else yet" %}</span></li>{% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

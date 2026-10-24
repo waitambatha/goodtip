@@ -1,0 +1,5 @@
+{% if queue_link %}{{ org.name }} has written about their custom price request.{% else %}Hi {{ req.requested_by.display_name|default:req.requested_by.email }}, the team has replied about {{ org.name }}'s custom price.{% endif %}
+
+{{ msg.body }}
+
+{% if queue_link %}Open the custom pricing queue: {{ queue_link }}{% else %}Read and reply: {{ plans_link }}{% endif %}

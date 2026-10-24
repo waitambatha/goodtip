@@ -144,6 +144,14 @@ ORGS = Group("orgs", "Organisations", "The groups running a season.", [
         "Let a waiting organisation or member through.",
         "orgs",
     ),
+    Capability(
+        "orgs.create_with_admin", "Set up an organisation for someone else",
+        "Create a new organisation for a school, club or business you've "
+        "already spoken to, name who runs it, and send that person an "
+        "email to log in and take it from there. You are not added to it "
+        "yourself.",
+        "orgs", reviewable=False, sensitive=True,
+    ),
 ])
 
 PEOPLE = Group("people", "People", "The accounts of everyone using GoodTip.", [
@@ -206,12 +214,21 @@ WAITLIST = Group("waitlist", "Waiting list", "The people who asked to be told wh
     ),
 ])
 
-BILLING = Group("billing", "Custom pricing", "Organisations asking for a price outside the five published plans.", [
+BILLING = Group("billing", "Pricing", "Custom pricing requests, and the published plans themselves.", [
     Capability(
         "billing.custom_pricing", "Respond to custom pricing requests",
         "See who has asked for a custom price, and set one for them — or "
         "decline and point them back at the five published plans. The reply "
         "goes to the organisation by email.",
+        "billing", reviewable=False, sensitive=True,
+    ),
+    Capability(
+        "billing.plan_admin", "Edit the published plans and custom packages",
+        "Change what each of the five plans costs, how many people or "
+        "organisations it allows, and apply a discount — and create the "
+        "standing custom packages the pricing page offers people who don't "
+        "fit one of the five. Changes are live on the pricing page the "
+        "moment they are saved, with no deploy.",
         "billing", reviewable=False, sensitive=True,
     ),
 ])

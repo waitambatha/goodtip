@@ -1,0 +1,360 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% comment %}
+CUSTOM PRICING, A PAGE OF ITS OWN (client, 21 Oct 2026; rebuilt 24 Oct 2026:
+"when somebody clicks on the custom request, is able to know what is it
+about, things are well organized, I can be able to make my request, I can be
+able to see the other custom plans... see some notifications, see some
+follow-up... me being able to reach back").
+
+Four parts, top to bottom, each answering one question:
+  .cp-hero    what is custom pricing, and how does it go (the four steps,
+              lit up to where this organisation's own request has got)
+  .cp-track   where is OUR request — its stage, the offer with Accept and
+              Decline, and the whole conversation with a box to write back
+  .cp-packs   the ready-made packages Ian has set up, each saying who it is
+              for, what a person costs, and what the five plans would charge
+  .cp-ask     the form to ask for a price of your own
+Built in billing.views.custom_packages_view; the conversation itself is
+billing.custom_pricing. Styles: static/css/gt-custom-pricing.css.
+{% endcomment %}
+{% block title %}Custom pricing, {{ org.name }}{% endblock %}
+{% block loader_task %}Loading custom pricing{% endblock %}
+{% block body_class %}page-deep sheet-page page-plans{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/gt-custom-pricing.css' %}">{% endblock %}
+{% block app_content %}
+<div class="app-head is-centred is-orgfirst"><div><div class="app-eyebrow">{{ org.name }} &middot; billing</div><h1 class="app-h1">Custom pricing</h1></div>
+  <a href="{% url 'billing:plans' org.id %}" class="abtn abtn-ghost abtn-sm">&larr; Back to plans</a>
+</div>
+
+<div class="cp">
+
+  {# ---------------- 1. what this is ---------------- #}
+  <section class="cp-hero">
+    <div class="cp-hero-copy">
+      <p class="cp-kick"><svg aria-hidden="true"><use href="#ic-spark"/></svg>When the five plans don&rsquo;t fit</p>
+      <h2 class="cp-hero-h">A price made for <em>{{ org.name }}</em>.</h2>
+      <p class="cp-hero-p">Schools, clubs, franchises and organisations across several sites often need something between the lines. Take a ready-made package below, or tell us what you need and the GoodTip team will put a price together &mdash; you can talk it through with us here before you say yes.</p>
+      <div class="cp-hero-go">
+        <a class="cp-btn" href="#packs">See the packages <span>&darr;</span></a>
+        {% if can_ask %}<a class="cp-btn is-ghost" href="#ask">Ask for your own price</a>{% else %}<a class="cp-btn is-ghost" href="#track">Your request</a>{% endif %}
+      </div>
+    </div>
+    <ol class="cp-steps" aria-label="How custom pricing works">
+      {% for st in steps %}
+      <li class="cp-step{% if st.done %} is-done{% endif %}{% if st.now %} is-now{% endif %}">
+        <span class="cp-step-n">{% if st.done %}<svg aria-hidden="true"><use href="#ic-check"/></svg>{% else %}{{ forloop.counter }}{% endif %}</span>
+        <span class="cp-step-t">
+          <b>{{ st.label }}</b>
+          <small>{% if forloop.counter == 1 %}Pick a package, or tell us your size{% elif forloop.counter == 2 %}Usually within a working day{% elif forloop.counter == 3 %}A price for you &mdash; or why the five fit{% else %}Accept, decline, or write back{% endif %}</small>
+        </span>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  {# ---------------- 2. our request ---------------- #}
+  {% if active_request %}
+  {% with r=active_request %}
+  <section class="cp-track is-{{ r.stage }}" id="track">
+    <header class="cp-track-h">
+      <div>
+        <p class="cp-label">Your request</p>
+        <h2 class="cp-track-title">
+          {% if r.stage == "waiting" %}With the team now
+          {% elif r.stage == "offer" %}Your offer is ready
+          {% elif r.stage == "declined" %}The team has answered
+          {% elif r.stage == "refused" %}You turned this offer down
+          {% else %}Accepted{% endif %}
+        </h2>
+        <p class="cp-track-sub">Sent {{ r.created_at|timesince }} ago by {{ r.requested_by.display_name|default:r.requested_by.email }}{% if r.decided_at %} &middot; answered {{ r.decided_at|timesince }} ago{% endif %}</p>
+      </div>
+      <span class="cp-stage">
+        <i aria-hidden="true"></i>
+        {% if r.stage == "waiting" %}Waiting for review{% elif r.stage == "offer" %}Offer ready{% elif r.stage == "declined" %}Answered{% elif r.stage == "refused" %}Declined by you{% else %}Accepted{% endif %}
+      </span>
+    </header>
+
+    {% if r.people_count or r.sites_count or r.budget_aud or r.org_kind %}
+    <ul class="cp-ask-facts" aria-label="What you asked for">
+      {% if r.org_kind %}<li><svg aria-hidden="true"><use href="#ic-org"/></svg>{{ r.org_kind_label|default:r.org_kind|capfirst }}</li>{% endif %}
+      {% if r.people_count %}<li><svg aria-hidden="true"><use href="#ic-users"/></svg>{{ r.people_count }} people</li>{% endif %}
+      {% if r.sites_count %}<li><svg aria-hidden="true"><use href="#ic-pin"/></svg>{{ r.sites_count }} site{{ r.sites_count|pluralize }}</li>{% endif %}
+      {% if r.budget_aud %}<li><svg aria-hidden="true"><use href="#ic-coins"/></svg>About ${{ r.budget_aud|floatformat:"0g" }}/yr</li>{% endif %}
+    </ul>
+    {% endif %}
+
+    {% if r.stage == "offer" %}
+    <div class="cp-offer">
+      <div class="cp-offer-main">
+        <p class="cp-label">Made for {{ org.name }}</p>
+        <h3 class="cp-offer-name">{{ r.label }}</h3>
+        <p class="cp-offer-price"><b>${{ r.price_aud|floatformat:"0g" }}</b><span>/year</span></p>
+        <ul class="cp-offer-specs">
+          <li><svg aria-hidden="true"><use href="#ic-users"/></svg>Up to {{ r.seat_limit }} people</li>
+          <li><svg aria-hidden="true"><use href="#ic-coins"/></svg>About ${% widthratio r.price_aud r.seat_limit 1 %} a person</li>
+          <li><svg aria-hidden="true"><use href="#ic-shield-check"/></svg>Nothing charged until you accept</li>
+        </ul>
+        {% if r.decision_note %}<blockquote class="cp-offer-note">{{ r.decision_note|linebreaksbr }}<cite>&mdash; {{ r.decided_by.display_name|default:"The GoodTip team" }}</cite></blockquote>{% endif %}
+      </div>
+      <div class="cp-offer-act">
+        <form method="post" action="{% url 'billing:custom_checkout' org.id %}"
+              data-confirm="{{ org.name }} moves onto {{ r.label }} at ${{ r.price_aud|floatformat:"0g" }} a year, for up to {{ r.seat_limit }} people."
+              data-confirm-title="Accept {{ r.label }}?" data-confirm-ok="Accept">
+          {% csrf_token %}
+          <button class="cp-btn is-big" type="submit"><svg aria-hidden="true"><use href="#ic-check"/></svg>Accept &amp; subscribe</button>
+        </form>
+        <details class="cp-decline">
+          <summary>Decline this offer</summary>
+          <form method="post" action="{% url 'billing:decline_custom_offer' org.id %}">
+            {% csrf_token %}
+            <label for="cp-decline-why">What would work better? <small>(the team reads this)</small></label>
+            <textarea id="cp-decline-why" name="reason" rows="3" maxlength="2000" placeholder="A lower price, more people, a different start date&hellip;"></textarea>
+            <button class="cp-btn is-ghost" type="submit">Send and decline</button>
+          </form>
+        </details>
+        <p class="cp-offer-or">Not sure yet? Ask a question below &mdash; the offer stays open.</p>
+      </div>
+    </div>
+    {% elif r.stage == "declined" %}
+    <div class="cp-answer">
+      <p>{{ r.decision_note|default:"We had a look, and for now one of the five plans is the best fit — but ask again any time."|linebreaksbr }}</p>
+      <a class="cp-btn" href="#ask">Ask again <span>&rarr;</span></a>
+      <a class="cp-btn is-ghost" href="{% url 'billing:plans' org.id %}">See the five plans</a>
+    </div>
+    {% elif r.stage == "refused" %}
+    <div class="cp-answer">
+      <p>You turned down <b>{{ r.label }}</b> (${{ r.price_aud|floatformat:"0g" }}/yr){% if r.org_decline_reason %} &mdash; &ldquo;{{ r.org_decline_reason }}&rdquo;{% endif %}. The team has been told. Write to them below, or ask for a new price.</p>
+      <a class="cp-btn" href="#ask">Ask for a new price <span>&rarr;</span></a>
+    </div>
+    {% elif r.stage == "accepted" %}
+    <div class="cp-answer is-ok">
+      <p><b>{{ r.label }}</b> is yours &mdash; ${{ r.price_aud|floatformat:"0g" }}/yr for up to {{ r.seat_limit }} people.</p>
+      <a class="cp-btn" href="{% url 'billing:subscription' org.id %}">Open your subscription <span>&rarr;</span></a>
+    </div>
+    {% endif %}
+
+    <div class="cp-convo">
+      <p class="cp-label">The conversation</p>
+      <ol class="cp-feed">
+        {% for e in active_timeline %}
+        <li class="cp-ev is-{{ e.kind }} by-{{ e.side }}">
+          <span class="cp-ev-dot" aria-hidden="true">
+            {% if e.kind == "sent" %}<svg><use href="#ic-send"/></svg>{% elif e.kind == "offer" %}<svg><use href="#ic-coins"/></svg>{% elif e.kind == "accepted" %}<svg><use href="#ic-check"/></svg>{% elif e.kind == "declined" or e.kind == "refused" %}<svg><use href="#ic-cross"/></svg>{% else %}<svg><use href="#ic-msg"/></svg>{% endif %}
+          </span>
+          <div class="cp-ev-bubble">
+            <p class="cp-ev-h"><b>{{ e.title }}</b>{% if e.who and e.kind == "message" %}<span>{{ e.who }}</span>{% endif %}<time datetime="{{ e.at|date:'c' }}">{{ e.at|date:"j M, g:i a" }}</time></p>
+            {% if e.offer %}<p class="cp-ev-offer">${{ e.offer.price|floatformat:"0g" }}/yr &middot; up to {{ e.offer.seats }} people</p>{% endif %}
+            {% if e.body %}<p class="cp-ev-body">{{ e.body|linebreaksbr }}</p>{% endif %}
+          </div>
+        </li>
+        {% endfor %}
+        {% if r.stage == "waiting" %}
+        <li class="cp-ev is-typing by-team" aria-label="The team has it">
+          <span class="cp-ev-dot" aria-hidden="true"><svg><use href="#ic-clock"/></svg></span>
+          <div class="cp-ev-bubble"><p class="cp-ev-h"><b>GoodTip team</b><span>reviewing &mdash; you&rsquo;ll get a notification and an email</span></p></div>
+        </li>
+        {% endif %}
+      </ol>
+      <form class="cp-reply" method="post" action="{% url 'billing:custom_price_reply' org.id r.id %}">
+        {% csrf_token %}
+        <label class="cp-sr" for="cp-reply-body">Write to the team</label>
+        <textarea id="cp-reply-body" name="body" rows="2" maxlength="2000" required placeholder="{% if r.stage == 'offer' %}A question about the offer, or a counter-offer&hellip;{% else %}Add a detail, ask a question&hellip;{% endif %}"></textarea>
+        <button class="cp-btn" type="submit"><svg aria-hidden="true"><use href="#ic-send"/></svg>Send</button>
+      </form>
+    </div>
+  </section>
+  {% endwith %}
+  {% endif %}
+
+  {% if package_claim %}
+  <div class="cp-claim{% if package_claim.is_ready %} is-ok{% endif %}">
+    <span class="cp-claim-ic" aria-hidden="true"><svg><use href="#{% if package_claim.is_ready %}ic-check{% else %}ic-clock{% endif %}"/></svg></span>
+    <div>
+      {% if package_claim.is_ready %}
+      <b>{{ package_claim.package.name }} is approved.</b>
+      <span>We&rsquo;ll be in touch to finish setting it up for {{ org.name }}.</span>
+      {% else %}
+      <b>Reviewing {{ package_claim.package.name }}</b>
+      <span data-pkg-reviewing data-ready-at="{{ package_claim.ready_at|date:'c' }}">We&rsquo;re looking it over &mdash; ready in a few minutes. This page updates on its own.</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# ---------------- 3. ready-made packages ---------------- #}
+  <section class="cp-packs" id="packs">
+    <header class="cp-sec-h">
+      <div>
+        <p class="cp-label">Ready-made packages</p>
+        <h2>Already priced, ready to take</h2>
+      </div>
+      <p>Set up by the GoodTip team for groups the five plans don&rsquo;t quite fit. The bar shows how many people each one holds &mdash; the marker is {{ org.name }} today ({{ people_today }}).</p>
+    </header>
+    {% if packages %}
+    <div class="cp-grid">
+      {% for c in packages %}
+      {% with pkg=c.pkg %}
+      <article class="cp-pack{% if package_claim and package_claim.package_id == pkg.id %} is-taken{% endif %}" style="--ac: {{ c.accent }}">
+        <div class="cp-pack-top">
+          <span class="cp-pack-ic" aria-hidden="true"><svg><use href="#{{ c.icon }}"/></svg></span>
+          <span class="cp-pack-no">Package {{ forloop.counter }}</span>
+          {% if c.fits_today %}<span class="cp-pack-fit">Fits you today</span>{% endif %}
+        </div>
+        <h3 class="cp-pack-name">{{ pkg.name }}</h3>
+        <p class="cp-pack-desc">{{ pkg.description|default:"A standing custom package." }}</p>
+        <p class="cp-pack-price"><b>${{ pkg.price_aud|floatformat:"0g" }}</b><span>/year</span></p>
+        <p class="cp-pack-pp">${{ c.per_person|floatformat:2 }} a person at full size</p>
+
+        <div class="cp-meter" aria-label="Holds up to {{ pkg.seat_limit }} people">
+          <div class="cp-meter-h"><span>People</span><b>{{ pkg.seat_limit_label }}</b></div>
+          <div class="cp-meter-bar"><i style="width: {{ c.reach_pct }}%"></i><em class="cp-you" style="left: {{ c.you_pct }}%" title="{{ org.name }} today: {{ people_today }}"></em></div>
+        </div>
+        <div class="cp-sites" aria-label="{{ pkg.child_org_limit }} organisation{{ pkg.child_org_limit|pluralize }} on one subscription">
+          <div class="cp-meter-h"><span>Sites / organisations</span><b>{{ pkg.child_org_limit }}</b></div>
+          <div class="cp-sites-dots">{% for _ in c.sites %}<i></i>{% endfor %}{% if c.more_sites %}<em>+{{ c.more_sites }}</em>{% endif %}</div>
+        </div>
+
+        {% if c.std %}
+        <p class="cp-pack-vs">
+          {% if c.saving %}<b>${{ c.saving|floatformat:"0g" }} less</b> than {{ c.std.label }} (${{ c.std.price|floatformat:"0g" }}), the standard plan for this size.
+          {% else %}The standard plan for this size is {{ c.std.label }} at ${{ c.std.price|floatformat:"0g" }} &mdash; this one adds {% if pkg.child_org_limit > 1 %}{{ pkg.child_org_limit }} sites on one bill{% else %}terms made for this kind of group{% endif %}.{% endif %}
+        </p>
+        {% endif %}
+
+        <div class="cp-pack-foot">
+          {% if package_claim and package_claim.package_id == pkg.id %}
+          <span class="cp-pack-taken"><svg aria-hidden="true"><use href="#{% if package_claim.is_ready %}ic-check{% else %}ic-clock{% endif %}"/></svg>{% if package_claim.is_ready %}Approved{% else %}Being reviewed{% endif %}</span>
+          {% else %}
+          <form method="post" action="{% url 'billing:take_custom_package' org.id pkg.id %}"
+                data-confirm="We'll review {{ pkg.name }} for {{ org.name }} (${{ pkg.price_aud|floatformat:"0g" }}/yr, up to {{ pkg.seat_limit }} people) and confirm it with you. Nothing is charged now."
+                data-confirm-title="Take {{ pkg.name }}?" data-confirm-ok="Take this package">
+            {% csrf_token %}
+            <button class="cp-btn" type="submit">{% if package_claim %}Take this instead{% else %}Take this package{% endif %} <span>&rarr;</span></button>
+          </form>
+          {% endif %}
+        </div>
+      </article>
+      {% endwith %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="cp-empty">No ready-made packages right now &mdash; tell us what you need below and we&rsquo;ll put a price together.</p>
+    {% endif %}
+  </section>
+
+  {# ---------------- 4. ask ---------------- #}
+  <section class="cp-askbox" id="ask">
+    {% if can_ask %}
+    <form class="cp-form" method="post" action="{% url 'billing:request_custom_price' org.id %}" data-cp-form>
+      {% csrf_token %}
+      <header class="cp-sec-h is-tight">
+        <div>
+          <p class="cp-label">Ask for your own price</p>
+          <h2>{% if active_request %}Try again with a new ask{% else %}Tell us what {{ org.name }} needs{% endif %}</h2>
+        </div>
+      </header>
+
+      <fieldset class="cp-kinds">
+        <legend>What kind of organisation?</legend>
+        {% for key, label in org_kinds %}
+        <label class="cp-kind"><input type="radio" name="org_kind" value="{{ key }}" data-cp-kind><span>{{ label }}</span></label>
+        {% endfor %}
+      </fieldset>
+
+      <div class="cp-fields">
+        <label class="cp-field"><span>People who&rsquo;ll tip</span>
+          <input type="number" name="people_count" min="1" max="100000" inputmode="numeric" value="{{ people_today }}" data-cp-people required></label>
+        <label class="cp-field"><span>Sites or organisations</span>
+          <input type="number" name="sites_count" min="1" max="500" inputmode="numeric" value="1" data-cp-sites></label>
+        <label class="cp-field"><span>Budget a year <small>(optional, AUD)</small></span>
+          <input type="number" name="budget_aud" min="1" inputmode="numeric" placeholder="e.g. 900" data-cp-budget></label>
+      </div>
+      <label class="cp-field is-wide"><span>Anything else the team should know</span>
+        <textarea name="message" rows="4" maxlength="1600" placeholder="When you'd like to start, how your sites are split, anything the packages don't cover&hellip;"></textarea></label>
+
+      <div class="cp-form-foot">
+        <p class="cp-summary" data-cp-summary aria-live="polite">You&rsquo;re asking for {{ people_today }} people on 1 site.</p>
+        <button class="cp-btn is-big" type="submit"><svg aria-hidden="true"><use href="#ic-send"/></svg>Send to the team</button>
+      </div>
+    </form>
+    <aside class="cp-next">
+      <p class="cp-label">What happens next</p>
+      <ol>
+        <li><b>The team gets it straight away</b><span>by email, with everything you put here.</span></li>
+        <li><b>They reply on this page</b><span>you get a notification in GoodTip and an email.</span></li>
+        <li><b>You decide</b><span>accept, decline with a reason, or keep talking. Nothing is charged until you accept.</span></li>
+      </ol>
+      <p class="cp-next-std" data-cp-std hidden>For comparison: the standard plan for <b data-cp-std-n></b> people is <b data-cp-std-plan></b>.</p>
+    </aside>
+    {% else %}
+    <div class="cp-waitnote">
+      <svg aria-hidden="true"><use href="#ic-clock"/></svg>
+      <p><b>Your request is with the team.</b> Add a detail or ask a question in the conversation above &mdash; one request at a time keeps it simple.</p>
+    </div>
+    {% endif %}
+  </section>
+
+  {% if earlier_requests %}
+  <section class="cp-history">
+    <p class="cp-label">Earlier requests</p>
+    <ul>
+      {% for r in earlier_requests %}
+      <li class="cp-hist is-{{ r.stage }}">
+        <span class="cp-hist-date">{{ r.created_at|date:"j M Y" }}</span>
+        <span class="cp-hist-what">{{ r.message|truncatechars:90|default:"Custom price request" }}</span>
+        <span class="cp-hist-stage">{% if r.stage == "offer" %}Offer{% elif r.stage == "waiting" %}Waiting{% elif r.stage == "declined" %}Answered{% elif r.stage == "refused" %}You declined{% else %}Accepted{% endif %}{% if r.price_aud %} &middot; ${{ r.price_aud|floatformat:"0g" }}{% endif %}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</div>
+
+<script>
+(function () {
+  {% if package_claim and not package_claim.is_ready %}
+  // Reload once the simulated review is over, rather than leaving the page
+  // saying "reviewing" after it no longer is.
+  var el = document.querySelector('[data-pkg-reviewing]');
+  if (el) {
+    var wait = new Date(el.getAttribute('data-ready-at')).getTime() - Date.now();
+    setTimeout(function () { location.reload(); }, Math.min(Math.max(wait, 0) + 1000, 5 * 60 * 1000 + 5000));
+  }
+  {% endif %}
+
+  // The ask, read back as one sentence while it is filled in — and the
+  // standard plan for that size beside it, so the ask is made knowing it.
+  var form = document.querySelector('[data-cp-form]');
+  if (form) {
+    var STD = [{% for c in std_ladder %}{n: {{ c.seats }}, label: "{{ c.label|escapejs }}", price: {{ c.price|floatformat:"0g" }}}{% if not forloop.last %}, {% endif %}{% endfor %}];
+    var people = form.querySelector('[data-cp-people]'), sites = form.querySelector('[data-cp-sites]');
+    var budget = form.querySelector('[data-cp-budget]'), out = form.querySelector('[data-cp-summary]');
+    var std = document.querySelector('[data-cp-std]');
+    var fmt = function (n) { return Number(n).toLocaleString('en-AU'); };
+    var read = function () {
+      var p = parseInt(people.value, 10) || 0, s = parseInt(sites.value, 10) || 1, b = parseInt(budget.value, 10) || 0;
+      var kind = form.querySelector('[data-cp-kind]:checked');
+      var bits = 'You’re asking for ' + fmt(p) + ' people on ' + s + ' site' + (s === 1 ? '' : 's');
+      if (kind) bits = kind.nextElementSibling.textContent + ' · ' + bits.charAt(0).toLowerCase() + bits.slice(1);
+      if (b) bits += ', around $' + fmt(b) + ' a year';
+      out.textContent = bits + '.';
+      var hit = null;
+      for (var i = 0; i < STD.length; i++) { if (p <= STD[i].n) { hit = STD[i]; break; } }
+      if (std) {
+        std.hidden = !(hit && p);
+        if (hit) {
+          std.querySelector('[data-cp-std-n]').textContent = fmt(p);
+          std.querySelector('[data-cp-std-plan]').textContent = hit.label + ' at $' + fmt(hit.price) + '/yr';
+        }
+      }
+    };
+    form.addEventListener('input', read);
+    form.addEventListener('change', read);
+    read();
+    if (location.hash === '#ask') people.focus({ preventScroll: true });
+  }
+})();
+</script>
+{% endblock %}

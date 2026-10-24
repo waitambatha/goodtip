@@ -735,6 +735,33 @@ class ChildOrgCreationTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertNotContains(resp, "Part of ")
 
+    def test_a_second_child_is_refused_once_the_parents_plan_is_full(self):
+        """Client, 19 Oct 2026: a plan's org limit is enforced for real, not
+        just displayed. The parent here has no subscription, so it is sized
+        as Starter (billing.pricing), which covers one child organisation by
+        default — the first create_post already used it up."""
+        Organisation.objects.create(
+            name="National Tiles Mitcham", season=self.season,
+            charity=self.charity, parent=self.parent,
+        )
+        resp = self.create_post("National Tiles Preston", parent=self.parent.pk)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Upgrade")
+        self.assertFalse(Organisation.objects.filter(name="National Tiles Preston").exists())
+
+    def test_a_second_child_is_allowed_once_the_parent_is_overridden_up(self):
+        from billing.models import PlanOverride
+        from billing.pricing import STARTER
+
+        PlanOverride.objects.create(tier=STARTER, child_org_limit=2)
+        Organisation.objects.create(
+            name="National Tiles Mitcham", season=self.season,
+            charity=self.charity, parent=self.parent,
+        )
+        resp = self.create_post("National Tiles Preston", parent=self.parent.pk)
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(Organisation.objects.filter(name="National Tiles Preston").exists())
+
 
 class ChildAdminManagementTests(TestCase):
     """Org-structure note §6: parent org admins can remove or reassign a
@@ -8240,6 +8267,81 @@ class GroupsPlanGateTests(TestCase):
 
         self.assertIsNone(org.team_size)
         self.assertTrue(groups_gate(org).allowed)
+
+
+class SeatPlanGateTests(TestCase):
+    """A plan's member limit, enforced for real (client, 19 Oct 2026) —
+    same "render the control, refuse the action" shape as groups above,
+    but there is no single feature that unlocks more seats, only a bigger
+    plan, so add_member is the one choke point rather than a dedicated
+    create_* service."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.season = Season.objects.create(year=2093, label="2093")
+        self.admin = User.objects.create_user(
+            email="seat-admin@example.com", password="x", display_name="Admin",
+        )
+
+    def _org(self, *, team_size=None):
+        org = Organisation.objects.create(name="Seat Org", season=self.season, team_size=team_size)
+        OrgMember.objects.create(
+            user=self.admin, org=org, role=OrgMember.ROLE_BOTH, is_league_owner=True,
+        )
+        return org
+
+    def _fill(self, org, n):
+        User = get_user_model()
+        for i in range(n):
+            user = User.objects.create_user(email=f"seat{i}@example.com", password="x")
+            OrgMember.objects.create(user=user, org=org)
+
+    def test_joining_past_the_starter_cap_is_refused(self):
+        from billing.entitlements import SeatLimitReached
+        from orgs.services import add_member
+
+        User = get_user_model()
+        org = self._org()  # no team_size -> sized as Starter, 20 seats
+        self._fill(org, 19)  # + self.admin already = 20, at the cap
+        newcomer = User.objects.create_user(email="newcomer@example.com", password="x")
+        with self.assertRaises(SeatLimitReached):
+            add_member(newcomer, org)
+        self.assertFalse(OrgMember.objects.filter(user=newcomer, org=org).exists())
+
+    def test_a_member_rejoining_is_never_blocked(self):
+        """The limit stops the NEXT member, never one already in."""
+        from orgs.services import add_member
+
+        org = self._org()
+        self._fill(org, 19)
+        # self.admin is already a member — re-adding them must not count as
+        # a new seat even when the org is already exactly at its cap.
+        member = add_member(self.admin, org)
+        self.assertEqual(member.user_id, self.admin.id)
+
+    def test_a_bigger_team_size_sizes_the_org_up_and_lifts_the_cap(self):
+        from orgs.services import add_member
+
+        User = get_user_model()
+        org = self._org(team_size=100)  # sized as Workplace, 150 seats
+        self._fill(org, 19)
+        newcomer = User.objects.create_user(email="newcomer2@example.com", password="x")
+        member = add_member(newcomer, org)
+        self.assertTrue(OrgMember.objects.filter(pk=member.pk).exists())
+
+    def test_an_admin_override_lowering_the_limit_is_honoured(self):
+        from billing.entitlements import SeatLimitReached
+        from billing.models import PlanOverride
+        from billing.pricing import STARTER
+        from orgs.services import add_member
+
+        User = get_user_model()
+        PlanOverride.objects.create(tier=STARTER, seat_limit=5)
+        org = self._org()
+        self._fill(org, 4)  # + self.admin = 5, at the overridden cap
+        newcomer = User.objects.create_user(email="newcomer3@example.com", password="x")
+        with self.assertRaises(SeatLimitReached):
+            add_member(newcomer, org)
 
 
 class WizardPlanRecommendationTests(CreateWizardTests):

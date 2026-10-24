@@ -446,6 +446,11 @@ class WaitlistCampaign(models.Model):
     heading = models.CharField(max_length=120)
     body = models.TextField()
     button_label = models.CharField(max_length=60)
+    # The photograph behind the email (client, 24 Oct 2026: "browse the images
+    # and choose what will be the image that comes as background"). A static
+    # path under img/scenes/, or blank for the old behaviour — one of the
+    # invitation's own set, picked at random per send (goodtip.mail.EMAIL_SCENES).
+    background = models.CharField(max_length=200, blank=True)
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_DRAFT)
     scheduled_for = models.DateTimeField(null=True, blank=True)
     # The launch date the list is told about. Separate from `scheduled_for` (when

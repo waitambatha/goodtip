@@ -46,11 +46,11 @@ class Gate:
 
     @property
     def required_price(self) -> int:
-        return pricing.TIERS[self.required_tier]["price"]
+        return pricing.effective_tier_config(self.required_tier)["price"]
 
     @property
     def required_seats(self) -> int:
-        return pricing.TIERS[self.required_tier]["seat_limit"]
+        return pricing.effective_tier_config(self.required_tier)["seat_limit"]
 
     # Truthiness is the allowed flag, so `if gate:` reads the way a caller
     # expects and a template can write `{% if gate %}` without reaching for
@@ -172,3 +172,123 @@ def require_groups(org) -> Gate:
     if not gate.allowed:
         raise GroupsLocked(gate, org)
     return gate
+
+
+@dataclass(frozen=True)
+class SeatGate:
+    """One organisation, one answer to "is there room for one more member".
+
+    New, 19 Oct 2026: plan seat limits existed in pricing.TIERS and on every
+    PlanSubscription row from the start, but nothing ever refused a join over
+    them — an organisation could out-grow its plan and nobody would be told.
+    Same "render the control, refuse the action" shape as Gate above, just
+    without a required_tier: there is no single plan that unlocks "more
+    people", only a bigger one, so the sentence names the org's own plan and
+    leaves the upgrade screen to show what is available.
+    """
+
+    allowed: bool
+    current_tier: str
+    seat_limit: int
+    seat_count: int
+    from_subscription: bool
+
+    @property
+    def current_label(self) -> str:
+        return pricing.tier_label(self.current_tier)
+
+    @property
+    def seats_left(self) -> int:
+        return max(self.seat_limit - self.seat_count, 0)
+
+    def __bool__(self) -> bool:
+        return self.allowed
+
+
+def seat_gate(org) -> SeatGate:
+    """Whether ``org`` has room for one more member, and what to say if not.
+
+    A paid or scheduled subscription's OWN seat_limit is authoritative — it is
+    the number that plan actually promised, including a custom plan's (whose
+    limit lives on the row itself, since pricing.CUSTOM is deliberately absent
+    from TIERS — see that module's own note). An organisation with nothing
+    current is sized the same way current_tier() already sizes it for every
+    other gate: by its stated team size or its real headcount, whichever is
+    larger, read through effective_tier_config so an admin-edited limit
+    (billing.models.PlanOverride) is honoured here too.
+    """
+    from .services import current_subscription
+
+    tier, paid = current_tier(org)
+    if paid:
+        limit = current_subscription(org).seat_limit
+    else:
+        limit = pricing.effective_tier_config(tier)["seat_limit"]
+    count = org.members.count()
+    return SeatGate(
+        allowed=count < limit, current_tier=tier, seat_limit=limit,
+        seat_count=count, from_subscription=paid,
+    )
+
+
+class SeatLimitReached(ValueError):
+    """Raised by orgs.services.add_member when the organisation's plan has no
+    room left. A ValueError on purpose, like GroupsLocked above — every
+    add_member caller already catches ValueError and shows str(e), so a
+    caller that has not been taught about seat limits still shows a correct
+    sentence instead of a 500."""
+
+    def __init__(self, gate: SeatGate, org):
+        self.gate = gate
+        self.org = org
+        super().__init__(
+            f"{org.name} is on {gate.current_label} ({gate.seat_limit} people) "
+            f"and already has {gate.seat_count}. Upgrade the plan to add more."
+        )
+
+
+def require_seats(org) -> SeatGate:
+    """Gate the write path. Raises SeatLimitReached rather than returning False."""
+    gate = seat_gate(org)
+    if not gate.allowed:
+        raise SeatLimitReached(gate, org)
+    return gate
+
+
+@dataclass(frozen=True)
+class ChildOrgGate:
+    """One top-level organisation, one answer to "is there room for one more
+    department/location under it".
+
+    New, 19 Oct 2026, alongside the member-seat limit — same idea, a size the
+    client left to GoodTip to set rather than naming a number itself (see
+    pricing.TIERS's own "child_org_limit" comment). ``org_limit`` is None for
+    a bespoke (pricing.CUSTOM) plan: nobody negotiates a one-off price for an
+    organisation that would then find a department count capped on them,
+    same reasoning tier_has_groups already uses for CUSTOM.
+    """
+
+    allowed: bool
+    current_tier: str
+    org_limit: int | None
+    org_count: int
+    from_subscription: bool
+
+    @property
+    def current_label(self) -> str:
+        return pricing.tier_label(self.current_tier)
+
+    def __bool__(self) -> bool:
+        return self.allowed
+
+
+def child_org_gate(parent_org) -> ChildOrgGate:
+    """Whether ``parent_org`` (a top-level organisation) may take on one more
+    child organisation under it."""
+    tier, paid = current_tier(parent_org)
+    limit = None if tier == pricing.CUSTOM else pricing.effective_tier_config(tier)["child_org_limit"]
+    count = parent_org.children.count()
+    return ChildOrgGate(
+        allowed=limit is None or count < limit, current_tier=tier,
+        org_limit=limit, org_count=count, from_subscription=paid,
+    )

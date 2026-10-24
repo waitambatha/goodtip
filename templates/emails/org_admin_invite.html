@@ -1,0 +1,33 @@
+{% extends "emails/_base.html" %}
+{% comment %}
+The invitation sent when Ian (or another full-access admin) creates an
+organisation for someone he's already talked to and makes them its admin,
+without being a member himself — new, 19 Oct 2026. Reuses Django's own
+password-reset flow for a brand-new account rather than a bespoke code, so
+there is one "set a password" mechanism in the codebase, not two; an email
+that already has a GoodTip account just gets told to log in as usual.
+{% endcomment %}
+{% block title %}You're the admin of {{ org.name }} on GoodTip{% endblock %}
+{% block eyebrow %}Organisation invitation{% endblock %}
+{% block badge %}&#127942;{% endblock %}
+{% block preheader %}{{ org.name }} is set up on GoodTip and you're its administrator.{% endblock %}
+{% block content %}
+
+  <p style="margin:0 0 10px;font-size:19px;font-weight:bold;color:#0F2E22;text-align:center;line-height:1.3;">
+    Hello <span style="color:#7FA828;">{{ name }}</span>,
+  </p>
+  <p style="margin:0 0 18px;font-size:14.5px;line-height:1.6;color:#4a4a41;text-align:center;">
+    <b style="color:#0F2E22;">{{ org.name }}</b> has been set up on GoodTip,
+    and you've been made its administrator &mdash; you'll run the comp:
+    inviting your people, picking a charity, keeping things moving each round.
+  </p>
+
+  {% if link %}
+  {% include "emails/_bits.html" with bit="button" url=link label="Set your password" %}
+  {% include "emails/_bits.html" with bit="note" note_label="Before you start" note_body="This link can only be used once and expires in a few days. If you weren't expecting this, you can ignore it — nothing happens to the organisation until it's used." %}
+  {% else %}
+  {% include "emails/_bits.html" with bit="button" url=login_url label="Log in" %}
+  {% include "emails/_bits.html" with bit="note" note_label="Already have an account" note_body="You already have a GoodTip account under this address, so there's nothing to set up — just log in as usual and {{ org.name }} will be there waiting for you." %}
+  {% endif %}
+
+{% endblock %}

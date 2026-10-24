@@ -1,97 +1,88 @@
-{% extends "admin/hub/base.html" %}
+{% extends "admin/hub/gx_base.html" %}
 {% load i18n %}
 
 {% comment %}
-CUSTOM PRICING (client, 11 Oct 2026): organisations asking for a price
-outside the five published plans. Approving sets the price, the seat limit
-and the name the organisation sees — billing.services.current_custom_offer
-reads the latest approved row straight back on their own Plans page, so
-there is nothing else to wire up once this form is submitted.
+CUSTOM PRICING — THE INBOX (client, 11 Oct 2026; rebuilt on the pitch,
+24 Oct 2026: "see one at a time... its own dashboard where i click see
+everything in whatever i click").
 
-Each pending request opens its own approve-or-decline form in a <details> —
-no JS needed, and only one is ever open at a time by default, which keeps a
-queue of several requests from reading as one long wall of empty text boxes.
+The scoreboard says how the queue stands; the white sheet is an inbox — tabs
+for where a request is, a search, and one line per request. A line opens the
+request's own page (custom_pricing_detail.html). Tabs and search are plain
+links/GET, so every view of the queue is an address.
 {% endcomment %}
 
-{% block hub_accent %}var(--gt-c1){% endblock %}
-{% block hub_ic %}ic-f-org{% endblock %}
-
-{% block hub_aside %}
-<div class="gta-media-tally">
-  <b>{{ pending.count }}</b><span>{% translate "waiting for review" %}</span>
-</div>
+{% block gx_kicker %}{% translate "Custom pricing" %}{% endblock %}
+{% block gx_title %}{% translate "Prices made for" %} <em>{% translate "one organisation" %}</em>{% endblock %}
+{% block gx_lead %}{% translate "Organisations asking for something the five plans don't cover. Open one to read it, talk it through, and answer it." %}{% endblock %}
+{% block gx_board %}
+<a class="gx-score is-warn{% if show == 'waiting' %} is-on{% endif %}" href="?show=waiting"><b>{{ stats.waiting }}</b><span>{% translate "Waiting for you" %}</span></a>
+<a class="gx-score{% if show == 'offer' %} is-on{% endif %}" href="?show=offer"><b>{{ stats.offer }}</b><span>{% translate "Offers out" %}</span></a>
+<a class="gx-score{% if show == 'accepted' %} is-on{% endif %}" href="?show=accepted"><b>{{ stats.accepted }}</b><span>{% translate "Accepted" %}</span></a>
+<div class="gx-score is-cool"><b>{{ stats.avg_reply }}</b><span>{% translate "Average answer" %}</span></div>
 {% endblock %}
 
-{% block hub_body %}
+{% block gx_body %}
+<section class="gx-sheet">
+  <nav class="gx-tabs" aria-label="{% translate 'Requests' %}">
+    {% for key, label in filters %}
+    <a class="gx-tab{% if show == key %} on{% endif %}" href="?show={{ key }}"{% if show == key %} aria-current="page"{% endif %}>{{ label }}
+      <em>{% if key == "waiting" %}{{ stats.waiting }}{% elif key == "offer" %}{{ stats.offer }}{% elif key == "accepted" %}{{ stats.accepted }}{% elif key == "closed" %}{{ stats.closed }}{% elif key == "all" %}{{ stats.all }}{% else %}{{ claims|length }}{% endif %}</em></a>
+    {% endfor %}
+  </nav>
 
-{% if pending %}
-<div class="gta-wl-tablewrap">
-  {% for req in pending %}
-  <details class="gta-cpr-row">
-    <summary>
-      <div>
-        <b>{{ req.org.name }}</b>
-        <span>{{ req.requested_by.display_name|default:req.requested_by.email }} &middot; {{ req.created_at|date:"j M Y, g:i A" }}</span>
+  <div class="gx-pane">
+    {% if show == "packages" %}
+      {% if claims %}
+      <div class="gx-rows">
+        {% for c in claims %}
+        <a class="gx-row {% if c.is_ready %}is-ok{% else %}is-wait{% endif %}" href="{% url 'admin:hq_custom_package_detail' c.package_id %}">
+          <span class="gx-avatar" aria-hidden="true">{{ c.org.name|first|upper }}</span>
+          <span class="gx-row-main"><b>{{ c.org.name }}</b><span>{{ c.requested_by.display_name|default:c.requested_by.email }}</span></span>
+          <span class="gx-row-mid"><span class="gx-tag">{{ c.package.name }}</span><span class="gx-tag">${{ c.package.price_aud|floatformat:"0g" }}/yr</span></span>
+          {% if c.is_ready %}<span class="gx-pill is-ok"><i></i>{% translate "Approved" %}</span>{% else %}<span class="gx-pill is-wait"><i></i>{% translate "Reviewing" %}</span>{% endif %}
+          <span class="gx-row-when">{{ c.requested_at|date:"j M Y" }}</span>
+          <svg class="gx-row-go" aria-hidden="true"><use href="#ic-chev-right"/></svg>
+        </a>
+        {% endfor %}
       </div>
-      <i class="gta-wl-pill">{% translate "Waiting" %}</i>
-    </summary>
-
-    {% if req.message %}<p class="gta-cpr-msg">{{ req.message|linebreaksbr }}</p>{% endif %}
-
-    <div class="gta-cpr-forms">
-      <form method="post" action="{% url 'admin:hq_custom_pricing_decide' req.id %}" class="gta-cpr-form">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="approve">
-        <label>{% translate "Price (AUD/yr)" %} <input type="number" name="price_aud" min="1" step="1" required></label>
-        <label>{% translate "Seats" %} <input type="number" name="seat_limit" min="1" step="1" required></label>
-        <label>{% translate "Plan name" %} <input type="text" name="label" maxlength="80" placeholder="{{ req.org.name }} custom plan"></label>
-        <label class="full">{% translate "Note to the organisation (optional)" %} <textarea name="decision_note" rows="2"></textarea></label>
-        <button type="submit" class="gta-wl-btn primary">{% translate "Approve this price" %}</button>
+      {% else %}
+      <div class="gx-empty"><svg aria-hidden="true"><use href="#ic-spark"/></svg><b>{% translate "No packages taken yet" %}</b><span>{% translate "When an organisation takes a ready-made package it shows here." %}</span></div>
+      {% endif %}
+    {% else %}
+      <form class="gx-toolbar" method="get" action="">
+        <input type="hidden" name="show" value="{{ show }}">
+        <label class="gx-search"><svg aria-hidden="true"><use href="#ic-search"/></svg>
+          <input type="search" name="q" value="{{ q }}" placeholder="{% translate 'Search by organisation or person' %}" aria-label="{% translate 'Search requests' %}"></label>
+        {% if q %}<a class="gx-btn is-ghost" href="?show={{ show }}">{% translate "Clear" %}</a>{% endif %}
       </form>
 
-      <form method="post" action="{% url 'admin:hq_custom_pricing_decide' req.id %}" class="gta-cpr-form">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="decline">
-        <label class="full">{% translate "Note to the organisation (optional)" %} <textarea name="decision_note" rows="2" placeholder="{% translate 'We can work with the five published plans.' %}"></textarea></label>
-        <button type="submit" class="gta-wl-btn">{% translate "Decline" %}</button>
-      </form>
-    </div>
-  </details>
-  {% endfor %}
-</div>
-{% else %}
-<p class="gta-empty">{% translate "Nothing waiting for review." %}</p>
-{% endif %}
-
-{% if decided %}
-<h2 class="gta-cpr-h2">{% translate "Decided" %}</h2>
-<div class="gta-wl-tablewrap">
-<table class="gta-wl-table">
-  <thead><tr>
-    <th>{% translate "Organisation" %}</th><th>{% translate "Asked by" %}</th><th>{% translate "Decision" %}</th>
-    <th>{% translate "Offer" %}</th><th>{% translate "By" %}</th><th>{% translate "When" %}</th>
-  </tr></thead>
-  <tbody>
-  {% for req in decided %}
-  <tr>
-    <td><b>{{ req.org.name }}</b></td>
-    <td>{{ req.requested_by.display_name|default:req.requested_by.email }}</td>
-    <td>
-      <i class="gta-wl-pill{% if req.status == 'approved' and not req.is_declined_by_org %} ok{% endif %}">{{ req.get_status_display }}</i>
-      {% if req.is_declined_by_org %}<i class="gta-wl-pill">{% translate "Org said no" %}</i>{% endif %}
-    </td>
-    <td>
-      {% if req.status == 'approved' %}{{ req.label }} &middot; ${{ req.price_aud|floatformat:0 }}/yr &middot; {{ req.seat_limit }} seats
-        {% if req.is_declined_by_org and req.org_decline_reason %}<br><span style="color:var(--body-quiet-color);font-size:12px;">&ldquo;{{ req.org_decline_reason }}&rdquo;</span>{% endif %}
-      {% else %}&mdash;{% endif %}
-    </td>
-    <td>{{ req.decided_by.display_name|default:req.decided_by.email|default:"—" }}</td>
-    <td>{{ req.decided_at|date:"j M Y, g:i A" }}</td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
-</div>
-{% endif %}
-
+      {% if rows %}
+      <div class="gx-rows">
+        {% for r in rows %}
+        <a class="gx-row is-{% if r.stage == 'waiting' %}wait{% elif r.stage == 'offer' %}offer{% elif r.stage == 'accepted' %}ok{% else %}no{% endif %}" href="{% url 'admin:hq_custom_pricing_detail' r.id %}?show={{ show }}">
+          <span class="gx-avatar" aria-hidden="true">{{ r.org.name|first|upper }}</span>
+          <span class="gx-row-main"><b>{{ r.org.name }}</b><span>{{ r.last_word|default:"—"|truncatechars:90 }}</span></span>
+          <span class="gx-row-mid">
+            {% if r.people_count %}<span class="gx-tag"><svg aria-hidden="true"><use href="#ic-users"/></svg>{{ r.people_count }}</span>{% endif %}
+            {% if r.sites_count %}<span class="gx-tag"><svg aria-hidden="true"><use href="#ic-pin"/></svg>{{ r.sites_count }}</span>{% endif %}
+            {% if r.price_aud %}<span class="gx-tag">${{ r.price_aud|floatformat:"0g" }}/yr</span>{% endif %}
+          </span>
+          {% if r.stage == "waiting" %}<span class="gx-pill is-wait"><i></i>{% translate "Waiting" %}</span>
+          {% elif r.stage == "offer" %}<span class="gx-pill is-offer"><i></i>{% translate "Offer out" %}</span>
+          {% elif r.stage == "accepted" %}<span class="gx-pill is-ok"><i></i>{% translate "Accepted" %}</span>
+          {% elif r.stage == "refused" %}<span class="gx-pill is-no"><i></i>{% translate "They said no" %}</span>
+          {% else %}<span class="gx-pill"><i></i>{% translate "Kept to the five" %}</span>{% endif %}
+          <span class="gx-row-when">{% if r.stage == "waiting" %}{{ r.created_at|timesince }}{% else %}{{ r.created_at|date:"j M Y" }}{% endif %}</span>
+          <svg class="gx-row-go" aria-hidden="true"><use href="#ic-chev-right"/></svg>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="gx-empty"><svg aria-hidden="true"><use href="#ic-check"/></svg><b>{% if q %}{% translate "Nothing matches that" %}{% elif show == "waiting" %}{% translate "You're all caught up" %}{% else %}{% translate "Nothing here yet" %}{% endif %}</b>
+        <span>{% if show == "waiting" and not q %}{% translate "Every request has an answer. New ones land here, and you're emailed as they arrive." %}{% else %}{% translate "Try another tab or search." %}{% endif %}</span></div>
+      {% endif %}
+    {% endif %}
+  </div>
+</section>
 {% endblock %}

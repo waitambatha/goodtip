@@ -95,8 +95,17 @@ def add_member(user, org, *, inviter_id=None, role=OrgMember.ROLE_PARTICIPANT) -
     dealt with exactly once, in one place, and it used to be dealt with in
     some of them.
     """
+    from billing.entitlements import require_seats
     from tipping.carry import carry_existing_tips
     from tipping.services import backdate_missed_tips
+
+    # A new seat, not somebody re-confirming one they already have — the
+    # whole point of a limit is to stop the org's NEXT member, never to
+    # evict somebody already in it (client, 19 Oct 2026: enforce the plan's
+    # member cap "for real", which this does at the one place every join
+    # goes through rather than the five screens that call here).
+    if not OrgMember.objects.filter(user=user, org=org).exists():
+        require_seats(org)
 
     inviter = _resolve_inviter(org, inviter_id, user)
     member, created = OrgMember.objects.get_or_create(

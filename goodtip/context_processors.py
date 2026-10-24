@@ -27,13 +27,21 @@ def environment(request):
     front of the real site for (goodtip.staging_gate.is_holding_visitor). Only
     a handful of pages are ever let through to render at all while that is
     true (About, Terms, Privacy, Pricing, the blog — see staging_gate.py's
-    HOLDING_REAL_PAGES), and when one is, it wears the stripped nav and
-    footer rather than the full site map (client, 12 Oct 2026: "remove any
-    other type of menu... just see the blogs").
+    HOLDING_REAL_PAGES), and when one is, it wears the coming-soon pages'
+    own menu rather than the full site map.
+
+    ``holding_menu`` is that menu — one list for the trailer's bar, its
+    footer, the showcases and every real page let through (client, 23 Oct
+    2026: "need one clear menu for the coming soon pages"). Built lazily, so
+    the many pages that never show it do not pay for it.
     """
+    from django.utils.functional import SimpleLazyObject
+
+    from .holding_menu import holding_menu
     from .staging_gate import is_holding_visitor
 
     return {
         "is_staging": getattr(settings, "IS_STAGING", False),
         "is_holding": is_holding_visitor(request),
+        "holding_menu": SimpleLazyObject(lambda: holding_menu(request)),
     }

@@ -282,20 +282,56 @@ def invitation_link() -> str:
     return site_url("/signup/")
 
 
+#: Where the invitation's background photographs come from.
+BACKGROUND_DIR = "img/scenes"
+
+
+def invitation_backgrounds() -> list[dict]:
+    """Every photograph the invitation can sit on, for the picker (client,
+    24 Oct 2026). Read from the folder rather than listed here, so a picture
+    added to img/scenes/ turns up without a code change."""
+    from django.contrib.staticfiles import finders
+    from django.templatetags.static import static
+
+    folder = finders.find(BACKGROUND_DIR)
+    if not folder:
+        return []
+    import os
+
+    names = sorted(n for n in os.listdir(folder) if n.lower().endswith((".jpg", ".jpeg", ".png", ".webp")))
+    return [{"path": f"{BACKGROUND_DIR}/{n}", "url": static(f"{BACKGROUND_DIR}/{n}"),
+             "label": os.path.splitext(n)[0].replace("-", " ").capitalize()} for n in names]
+
+
+def valid_background(path: str) -> str:
+    """`path` if it is one of the pictures on offer, else blank (= rotate)."""
+    return path if path in {b["path"] for b in invitation_backgrounds()} else ""
+
+
 def build_invitation(campaign: WaitlistCampaign, signup, to=None):
     """One recipient's copy of the invitation."""
     body = fill(campaign.body, signup)
+    context = {
+        "heading": fill(campaign.heading, signup),
+        "paragraphs": paragraphs(body),
+        "body_text": body,
+        "button_label": campaign.button_label,
+        "button_url": invitation_link(),
+    }
+    if campaign.background:
+        # The picture chosen on the invitation screen, instead of a random one
+        # from the invitation's set (goodtip.mail.build lets a caller override).
+        try:
+            from accounts.templatetags.email_extras import email_image
+
+            context["scene_url"] = email_image(campaign.background)
+        except Exception:  # noqa: BLE001 — decoration only; fall back to the rotation
+            pass
     return build(
         "waitlist_invite",
         subject=fill(campaign.subject, signup),
         to=to or signup.email,
-        context={
-            "heading": fill(campaign.heading, signup),
-            "paragraphs": paragraphs(body),
-            "body_text": body,
-            "button_label": campaign.button_label,
-            "button_url": invitation_link(),
-        },
+        context=context,
     )
 
 

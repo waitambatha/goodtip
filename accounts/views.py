@@ -53,10 +53,24 @@ def _consume_pending_join(request):
         org = Organisation.objects.get(pk=org_id)
     except Organisation.DoesNotExist:
         return None
+    from billing.entitlements import SeatLimitReached
     from orgs.context import set_current_org
     from orgs.services import add_member
 
-    add_member(request.user, org, inviter_id=inviter_id)
+    try:
+        add_member(request.user, org, inviter_id=inviter_id)
+    except SeatLimitReached:
+        # The plan filled up between the invite being sent and this signup
+        # completing. The account itself is still created and signed in —
+        # only the join is refused — so the caller's "nothing pending" path
+        # (straight to the dashboard) is exactly the right fallback.
+        messages.error(
+            request,
+            f"{org.name} isn't taking new members right now — it's reached "
+            "the limit for its current plan. Whoever invited you can sort "
+            "it out from there.",
+        )
+        return None
     # Same reason as orgs.views.join_view: the organisation they were invited
     # to has to become the one they are standing in, or the dashboard they
     # land on names a different one.
@@ -1412,13 +1426,21 @@ def coming_soon_view(request):
         locked_in, error = record_launch_signup(request)
         if wants_json(request):
             return json_ok("launch") if locked_in else json_error(error)
-    from goodtip.staging_gate import is_holding_visitor
+    from goodtip.staging_gate import HOLDING_REAL_PAGES, is_holding_visitor
 
     from . import waitlist
     from .trailer import TRAILER_CHAPTERS, TRAILER_HERO_CLIPS, TRAILER_PEEKS
 
+    # Only the places that are still a filmed tour get one (client, 23 Oct
+    # 2026: one menu). A page let through for real is a real link in the menu
+    # now; a tour of it as well was a second, different way to the same name.
+    tours = [dict(p) for p in TRAILER_PEEKS if p["real"] not in HOLDING_REAL_PAGES]
+    for i, p in enumerate(tours):
+        p["prev"] = tours[i - 1]["slug"]
+        p["next"] = tours[(i + 1) % len(tours)]["slug"]
+
     return render(request, "public/coming_soon.html", {
-        "peeks": TRAILER_PEEKS,
+        "peeks": tours,
         # Signed in to the waiting list (not the product): the page offers their place.
         "wl_member": waitlist.current_member(request),
         # The real pages are only offered to people who can open them.

@@ -1,5 +1,5 @@
 {% extends "public/base.html" %}
-{% load static %}
+{% load static humanize %}
 
 {% block title %}Pricing &middot; GoodTip{% endblock %}
 {% block loader_task %}Loading the pricing{% endblock %}
@@ -77,13 +77,13 @@
             <td data-label="Tier" class="tt-tier"><span class="tt-name">Starter</span><span class="tt-sub">Small teams</span></td>
             <td data-label="Team size">Up to 20 people</td>
             <td data-label="What changes">Full platform. Choose AFL, NRL or both. Women's competitions included. Charity Vote. Live leaderboard. Email support. One shared ladder.</td>
-            <td data-label="Annual price" class="tt-priced"><span class="tt-price">$99<span>/yr</span></span><span class="tt-per">~$5 per person</span></td>
+            <td data-label="Annual price" class="tt-priced"><span class="tt-price">{% if plan_numbers.starter.original_price %}<s>{{ plan_numbers.starter.original_price }}</s> {% endif %}{{ plan_numbers.starter.price }}<span>/yr</span></span><span class="tt-per">{{ plan_numbers.starter.per_person }}</span></td>
           </tr>
           <tr data-plan="team" data-fx="flip">
             <td data-label="Tier" class="tt-tier"><span class="tt-name">Team</span><span class="tt-sub">Growing teams</span></td>
             <td data-label="Team size">21 to 50 people</td>
             <td data-label="What changes">Everything in Starter, plus custom organisation branding and a round-by-round participation dashboard. Still one shared ladder.</td>
-            <td data-label="Annual price" class="tt-priced"><span class="tt-price">$299<span>/yr</span></span><span class="tt-per">~$6 per person</span></td>
+            <td data-label="Annual price" class="tt-priced"><span class="tt-price">{% if plan_numbers.team.original_price %}<s>{{ plan_numbers.team.original_price }}</s> {% endif %}{{ plan_numbers.team.price }}<span>/yr</span></span><span class="tt-per">{{ plan_numbers.team.per_person }}</span></td>
           </tr>
           {% comment %}
           FROM HERE DOWN, THE PLANS THAT CARRY GROUPS.
@@ -102,19 +102,19 @@
             <td data-label="Tier" class="tt-tier"><span class="tt-name">Workplace <span class="tier-badge">Most popular</span> <span class="tier-badge tier-badge--groups">Groups</span></span><span class="tt-sub">Mid-size organisations</span></td>
             <td data-label="Team size">51 to 150 people</td>
             <td data-label="What changes">Everything in Team, plus <b>groups</b> &mdash; each team or department gets its own ladder alongside the organisation's &mdash; priority support and a full CSR Impact Report at season end.</td>
-            <td data-label="Annual price" class="tt-priced"><span class="tt-price">$799<span>/yr</span></span><span class="tt-per">~$5&ndash;$16 per person</span></td>
+            <td data-label="Annual price" class="tt-priced"><span class="tt-price">{% if plan_numbers.workplace.original_price %}<s>{{ plan_numbers.workplace.original_price }}</s> {% endif %}{{ plan_numbers.workplace.price }}<span>/yr</span></span><span class="tt-per">{{ plan_numbers.workplace.per_person }}</span></td>
           </tr>
           <tr class="has-groups" data-plan="organisation" data-fx="swing">
             <td data-label="Tier" class="tt-tier"><span class="tt-name">Organisation <span class="tier-badge tier-badge--groups">Groups</span></span><span class="tt-sub">Large organisations</span></td>
             <td data-label="Team size">151 to 500 people</td>
             <td data-label="What changes">Everything in Workplace, including groups and sub-groups, plus a dedicated account manager and priority onboarding support.</td>
-            <td data-label="Annual price" class="tt-priced"><span class="tt-price">$1,299<span>/yr</span></span><span class="tt-per">~$3&ndash;$9 per person</span></td>
+            <td data-label="Annual price" class="tt-priced"><span class="tt-price">{% if plan_numbers.organisation.original_price %}<s>{{ plan_numbers.organisation.original_price }}</s> {% endif %}{{ plan_numbers.organisation.price }}<span>/yr</span></span><span class="tt-per">{{ plan_numbers.organisation.per_person }}</span></td>
           </tr>
           <tr class="has-groups" data-plan="enterprise" data-fx="rise">
             <td data-label="Tier" class="tt-tier"><span class="tt-name">Enterprise+ <span class="tier-badge tier-badge--groups">Groups</span></span><span class="tt-sub">Large enterprise</span></td>
             <td data-label="Team size">501 to 2,499 people</td>
             <td data-label="What changes">Everything in Organisation, including groups and sub-groups. Full bespoke configuration, multi-league setup, API access, flexible payment terms.</td>
-            <td data-label="Annual price" class="tt-priced"><span class="tt-price">$1,999<span>/yr</span></span><span class="tt-per">from ~$1 per person</span></td>
+            <td data-label="Annual price" class="tt-priced"><span class="tt-price">{% if plan_numbers.enterprise.original_price %}<s>{{ plan_numbers.enterprise.original_price }}</s> {% endif %}{{ plan_numbers.enterprise.price }}<span>/yr</span></span><span class="tt-per">{{ plan_numbers.enterprise.per_person }}</span></td>
           </tr>
         </tbody>
       </table>
@@ -129,23 +129,23 @@
       {% endcomment %}
       <div class="pt-details" hidden>
         <div data-plan-detail="starter">
-          <div class="pd-top"><span class="pd-k">Small teams</span><h3>Starter</h3><p class="pd-price">$99<span>/yr</span></p><p class="pd-per">Up to 20 people &middot; about $5 a person</p></div>
+          <div class="pd-top"><span class="pd-k">Small teams</span><h3>Starter</h3><p class="pd-price">{{ plan_numbers.starter.price }}<span>/yr</span></p><p class="pd-per">Up to {{ plan_numbers.starter.seat_limit|intcomma }} people &middot; {{ plan_numbers.starter.per_person }}</p></div>
           <div class="pd-body">
             <p class="pd-lead">Everything you need to run a proper comp for a small office, a crew or a club committee.</p>
             <ul class="pd-list"><li>The full platform, all four competitions</li><li>AFL, NRL or both &mdash; women's competitions included</li><li>Charity Vote</li><li>Live leaderboard</li><li>Email support</li><li>One shared ladder</li></ul>
-            <div class="pd-seats"><span>Team size</span><i style="--w:8%"></i><b>up to 20</b></div>
+            <div class="pd-seats"><span>Team size</span><i style="--w:8%"></i><b>up to {{ plan_numbers.starter.seat_limit|intcomma }}</b></div>
           </div>
         </div>
         <div data-plan-detail="team">
-          <div class="pd-top"><span class="pd-k">Growing teams</span><h3>Team</h3><p class="pd-price">$299<span>/yr</span></p><p class="pd-per">21 to 50 people &middot; about $6 a person</p></div>
+          <div class="pd-top"><span class="pd-k">Growing teams</span><h3>Team</h3><p class="pd-price">{{ plan_numbers.team.price }}<span>/yr</span></p><p class="pd-per">Up to {{ plan_numbers.team.seat_limit|intcomma }} people &middot; {{ plan_numbers.team.per_person }}</p></div>
           <div class="pd-body">
             <p class="pd-lead">Make it yours: your organisation's name and logo on the comp, and a view of who is turning up each round.</p>
             <ul class="pd-list"><li>Everything in Starter</li><li>Your organisation's name and logo</li><li>Round-by-round participation dashboard</li><li>One shared ladder</li></ul>
-            <div class="pd-seats"><span>Team size</span><i style="--w:20%"></i><b>up to 50</b></div>
+            <div class="pd-seats"><span>Team size</span><i style="--w:20%"></i><b>up to {{ plan_numbers.team.seat_limit|intcomma }}</b></div>
           </div>
         </div>
         <div data-plan-detail="workplace">
-          <div class="pd-top"><span class="pd-k pd-crown">&#9733; Most popular</span><h3>Workplace</h3><p class="pd-price">$799<span>/yr</span></p><p class="pd-per">51 to 150 people &middot; about $5&ndash;$16 a person</p></div>
+          <div class="pd-top"><span class="pd-k pd-crown">&#9733; Most popular</span><h3>Workplace</h3><p class="pd-price">{{ plan_numbers.workplace.price }}<span>/yr</span></p><p class="pd-per">Up to {{ plan_numbers.workplace.seat_limit|intcomma }} people &middot; {{ plan_numbers.workplace.per_person }}</p></div>
           <div class="pd-body">
             <p class="pd-lead">Why it's the most popular: it's the size where an organisation stops being one team and starts being several.</p>
             <div class="pd-why">
@@ -153,23 +153,23 @@
               <div><b>CSR Impact Report</b><span>A full report at season end that your board and ESG team can use.</span></div>
               <div><b>Priority support</b><span>Questions answered first, all season.</span></div>
             </div>
-            <div class="pd-seats"><span>Team size</span><i style="--w:45%"></i><b>up to 150</b></div>
+            <div class="pd-seats"><span>Team size</span><i style="--w:45%"></i><b>up to {{ plan_numbers.workplace.seat_limit|intcomma }}</b></div>
           </div>
         </div>
         <div data-plan-detail="organisation">
-          <div class="pd-top"><span class="pd-k">Large organisations</span><h3>Organisation</h3><p class="pd-price">$1,299<span>/yr</span></p><p class="pd-per">151 to 500 people &middot; about $3&ndash;$9 a person</p></div>
+          <div class="pd-top"><span class="pd-k">Large organisations</span><h3>Organisation</h3><p class="pd-price">{{ plan_numbers.organisation.price }}<span>/yr</span></p><p class="pd-per">Up to {{ plan_numbers.organisation.seat_limit|intcomma }} people &middot; {{ plan_numbers.organisation.per_person }}</p></div>
           <div class="pd-body">
             <p class="pd-lead">For organisations with departments inside departments, and someone at GoodTip who knows yours by name.</p>
             <ul class="pd-list"><li>Everything in Workplace</li><li>Groups and sub-groups</li><li>A dedicated account manager</li><li>Priority onboarding support</li></ul>
-            <div class="pd-seats"><span>Team size</span><i style="--w:72%"></i><b>up to 500</b></div>
+            <div class="pd-seats"><span>Team size</span><i style="--w:72%"></i><b>up to {{ plan_numbers.organisation.seat_limit|intcomma }}</b></div>
           </div>
         </div>
         <div data-plan-detail="enterprise">
-          <div class="pd-top"><span class="pd-k">Large enterprise</span><h3>Enterprise+</h3><p class="pd-price">$1,999<span>/yr</span></p><p class="pd-per">501 to 2,499 people &middot; from about $1 a person</p></div>
+          <div class="pd-top"><span class="pd-k">Large enterprise</span><h3>Enterprise+</h3><p class="pd-price">{{ plan_numbers.enterprise.price }}<span>/yr</span></p><p class="pd-per">Up to {{ plan_numbers.enterprise.seat_limit|intcomma }} people &middot; {{ plan_numbers.enterprise.per_person }}</p></div>
           <div class="pd-body">
             <p class="pd-lead">Configured around you: several sites, several leagues, and the systems you already run.</p>
             <ul class="pd-list"><li>Everything in Organisation</li><li>Full bespoke configuration</li><li>Multi-league setup</li><li>API access</li><li>Flexible payment terms</li></ul>
-            <div class="pd-seats"><span>Team size</span><i style="--w:100%"></i><b>up to 2,499</b></div>
+            <div class="pd-seats"><span>Team size</span><i style="--w:100%"></i><b>up to {{ plan_numbers.enterprise.seat_limit|intcomma }}</b></div>
           </div>
         </div>
       </div>

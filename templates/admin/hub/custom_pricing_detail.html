@@ -1,0 +1,188 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n %}
+
+{% comment %}
+ONE CUSTOM PRICE REQUEST (client, 24 Oct 2026: "if its a request click it
+and now that whole page is everything and anything to do with it" — and,
+seeing the first go: "why am i having all of this at once").
+
+The hero says who and where it stands (the four steps, lit). The sheet shows
+one thing at a time:
+  Overview      what they asked for — only what they actually filled in —
+                beside the one thing to do next: answer it, or (once
+                answered) the outcome and a way to follow up
+  Conversation  every message and decision, as a chat, with a box to write
+  Organisation  who they are: people, who runs it, plans, other requests
+Built by sysadmin.custom_pricing_views.custom_pricing_detail.
+{% endcomment %}
+
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_custom_pricing' %}?show={{ show }}">{% translate "Custom pricing" %}</a></li>{% endblock %}
+{% block gx_nav %}
+{% if prev_id %}<a class="gx-btn is-glass" href="{% url 'admin:hq_custom_pricing_detail' prev_id %}?show={{ show }}"><svg aria-hidden="true"><use href="#ic-chev-left"/></svg>{% translate "Previous" %}</a>{% endif %}
+<span style="color:rgba(255,255,255,.6);font-size:13px">{{ position }} / {{ count }}</span>
+{% if next_id %}<a class="gx-btn is-glass" href="{% url 'admin:hq_custom_pricing_detail' next_id %}?show={{ show }}">{% translate "Next" %}<svg aria-hidden="true"><use href="#ic-chev-right"/></svg></a>{% endif %}
+{% endblock %}
+
+{% block gx_kicker %}{% blocktranslate with n=req.id %}Request #{{ n }}{% endblocktranslate %} &middot; {{ req.created_at|date:"j M Y" }}{% endblock %}
+{% block gx_title %}{{ req.org.name }}{% endblock %}
+{% block gx_lead %}{% translate "Asked by" %} {{ req.requested_by.display_name|default:req.requested_by.email }} &middot; <a href="mailto:{{ req.requested_by.email }}">{{ req.requested_by.email }}</a>{% endblock %}
+{% block gx_below %}
+<ol class="gx-track" aria-label="{% translate 'Where this request is' %}">
+  {% for st in steps %}<li class="{% if st.done %}is-done{% elif st.now %}is-now{% endif %}"><i>{% if st.done %}&#10003;{% else %}{{ forloop.counter }}{% endif %}</i><span>{{ st.label }}</span></li>{% endfor %}
+</ol>
+{% endblock %}
+{% block gx_board %}
+{% if req.stage == "waiting" %}
+<div class="gx-score is-warn is-wide"><b>{{ waited }}</b><span>{% translate "Waiting for your answer" %}</span></div>
+{% elif req.stage == "offer" %}
+<div class="gx-score is-wide"><b>${{ req.price_aud|floatformat:"0g" }}</b><span>{% translate "Offer out — their move" %}</span></div>
+{% elif req.stage == "accepted" %}
+<div class="gx-score is-wide"><b>${{ req.price_aud|floatformat:"0g" }}</b><span>{% translate "Accepted" %} {{ req.accepted_at|date:"j M" }}</span></div>
+{% elif req.stage == "refused" %}
+<div class="gx-score is-wide is-warn"><b>{% translate "No" %}</b><span>{% translate "They turned the offer down" %}</span></div>
+{% else %}
+<div class="gx-score is-wide is-cool"><b>{% translate "The five" %}</b><span>{% translate "You pointed them to the plans" %}</span></div>
+{% endif %}
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet" data-gx-tabs>
+  <div class="gx-tabs" role="tablist">
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="overview" aria-selected="true">{% translate "Overview" %}</button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="conversation">{% translate "Conversation" %} <em>{{ events|length }}</em></button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="organisation">{% translate "Organisation" %}</button>
+  </div>
+
+  {# ---------------- overview ---------------- #}
+  <div class="gx-pane" data-gx-pane="overview">
+    <div class="gx-split">
+      <div class="gx-stack">
+        <div>
+          <p class="gx-label">{% translate "What they asked for" %}</p>
+          {% if req.people_count or req.sites_count or req.budget_aud or req.org_kind %}
+          <div class="gx-facts" style="margin-bottom:12px">
+            {% if req.people_count %}<div class="gx-fact"><span>{% translate "People" %}</span><b>{{ req.people_count|floatformat:"0g" }}</b><small>{% blocktranslate with n=members %}{{ n }} in GoodTip today{% endblocktranslate %}</small></div>{% endif %}
+            {% if req.sites_count %}<div class="gx-fact"><span>{% translate "Sites" %}</span><b>{{ req.sites_count }}</b></div>{% endif %}
+            {% if req.budget_aud %}<div class="gx-fact"><span>{% translate "Budget" %}</span><b>${{ req.budget_aud|floatformat:"0g" }}</b><small>{% translate "a year" %}</small></div>{% endif %}
+            {% if req.org_kind %}<div class="gx-fact"><span>{% translate "Kind" %}</span><b style="font-size:18px;line-height:1.2">{{ req.org_kind_label }}</b></div>{% endif %}
+          </div>
+          {% endif %}
+          {% if req.message %}<blockquote class="gx-quote">{{ req.message|linebreaksbr }}<cite>{{ req.requested_by.display_name|default:req.requested_by.email }}, {{ req.created_at|date:"j M Y" }}</cite></blockquote>{% endif %}
+        </div>
+        {% if std %}
+        <div class="gx-yard" style="--c: {{ std.accent }}">
+          <i aria-hidden="true"><svg><use href="#ic-sliders"/></svg></i>
+          <span>{% blocktranslate with n=size_for_std plan=std.label price=std.price|floatformat:"0g" %}For <b>{{ n }}</b> people the five plans would charge <b>{{ plan }}</b>, <b>${{ price }}</b> a year.{% endblocktranslate %}{% if not req.people_count %} <span style="color:var(--gx-muted)">{% translate "(sized by the members they have today — they didn't give a number)" %}</span>{% endif %}</span>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if req.stage == "waiting" %}
+      <div class="gx-card is-dark gx-answer" data-gx-answer>
+        <p class="gx-label">{% translate "Your answer" %}</p>
+        <div class="gx-seg" role="tablist">
+          <button type="button" role="tab" aria-selected="true" data-gx-choice="offer">{% translate "Offer a price" %}</button>
+          <button type="button" role="tab" aria-selected="false" class="is-no" data-gx-choice="no">{% translate "Keep to the five" %}</button>
+        </div>
+        <div data-gx-choice-pane="offer" class="gx-answer">
+          {% if std %}
+          <div class="gx-quick" aria-label="{% translate 'Quick prices' %}">
+            <button type="button" data-gx-fill="{{ std.price|floatformat:0 }}" data-gx-seats="{{ size_for_std }}">{{ std.label }} &middot; ${{ std.price|floatformat:"0g" }}</button>
+            <button type="button" data-gx-fill="{% widthratio std.price 10 9 %}" data-gx-seats="{{ size_for_std }}">&minus;10%</button>
+            <button type="button" data-gx-fill="{% widthratio std.price 10 8 %}" data-gx-seats="{{ size_for_std }}">&minus;20%</button>
+            {% if req.budget_aud %}<button type="button" data-gx-fill="{{ req.budget_aud|floatformat:0 }}" data-gx-seats="{{ size_for_std }}">{% translate "Their budget" %}</button>{% endif %}
+          </div>
+          {% endif %}
+          <form method="post" action="{% url 'admin:hq_custom_pricing_decide' req.id %}" class="gx-form" data-gx-offer>
+            {% csrf_token %}
+            <input type="hidden" name="action" value="approve">
+            <label>{% translate "Price a year" %}<input type="number" name="price_aud" min="1" step="1" required placeholder="$"></label>
+            <label>{% translate "People" %}<input type="number" name="seat_limit" min="1" step="1" required value="{{ req.people_count|default:'' }}"></label>
+            <label class="full">{% translate "Plan name they'll see" %}<input type="text" name="label" maxlength="80" placeholder="{{ req.org.name }} custom plan"></label>
+            <label class="full">{% translate "A note with it" %} <small>{% translate "optional" %}</small><textarea name="decision_note" rows="2"></textarea></label>
+            <p class="gx-live full" data-gx-live>{% translate "Type a price to see it per person." %}</p>
+            <button type="submit" class="gx-btn is-lime is-block full"><svg aria-hidden="true"><use href="#ic-send"/></svg>{% translate "Send the offer" %}</button>
+          </form>
+        </div>
+        <div data-gx-choice-pane="no" hidden>
+          <form method="post" action="{% url 'admin:hq_custom_pricing_decide' req.id %}" class="gx-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="decline">
+            <label class="full">{% translate "Why the five plans fit them" %}<textarea name="decision_note" rows="5" placeholder="{% translate 'Workplace covers your size at $799 a year…' %}"></textarea></label>
+            <p class="gx-live full">{% translate "They can still write back or ask again." %}</p>
+            <button type="submit" class="gx-btn is-ghost is-block full">{% translate "Send this answer" %}</button>
+          </form>
+        </div>
+      </div>
+      {% else %}
+      <div class="gx-card is-dark gx-result">
+        <p class="gx-label">{% if req.stage == "offer" %}{% translate "Your offer — waiting on them" %}{% elif req.stage == "accepted" %}{% translate "Accepted" %}{% elif req.stage == "refused" %}{% translate "Your offer — turned down" %}{% else %}{% translate "Your answer" %}{% endif %}</p>
+        {% if req.status == "approved" %}
+        <p class="gx-result-price">${{ req.price_aud|floatformat:"0g" }}<small> /{% translate "yr" %}</small></p>
+        <p>{{ req.label }} &middot; {{ req.seat_limit }} {% translate "people" %} &middot; ${% widthratio req.price_aud req.seat_limit 1 %} {% translate "a person" %}</p>
+        {% else %}
+        <p style="font-size:18px;color:#fff">{% translate "Kept to the five published plans." %}</p>
+        {% endif %}
+        {% if req.decision_note %}<blockquote>{{ req.decision_note|linebreaksbr }}</blockquote>{% endif %}
+        {% if req.stage == "refused" and req.org_decline_reason %}<blockquote style="border-color:#FF8A7A">&ldquo;{{ req.org_decline_reason }}&rdquo;</blockquote>{% endif %}
+        <p style="font-size:12.5px;color:rgba(255,255,255,.55)">{% blocktranslate with by=req.decided_by.display_name|default:req.decided_by.email|default:"—" t=req.decided_at|date:"j M Y" %}By {{ by }} on {{ t }}{% endblocktranslate %}</p>
+        <a class="gx-btn is-lime is-block" href="#conversation" data-gx-open="conversation"><svg aria-hidden="true"><use href="#ic-msg"/></svg>{% translate "Follow up with them" %}</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ---------------- conversation ---------------- #}
+  <div class="gx-pane" data-gx-pane="conversation">
+    <ol class="gx-chat">
+      {% for e in events %}
+      {% if e.kind == "accepted" %}
+      <li class="gx-msg is-event"><div class="gx-msg-b">&#10003; {% translate "They accepted the offer" %} &middot; {{ e.at|date:"j M, g:i a" }}</div></li>
+      {% else %}
+      <li class="gx-msg by-{{ e.side }}">
+        <span class="gx-msg-dot" aria-hidden="true">{% if e.side == "team" %}<svg><use href="#ic-shield"/></svg>{% else %}{{ req.org.name|first|upper }}{% endif %}</span>
+        <div class="gx-msg-b">
+          <p class="gx-msg-h"><b>{% if e.kind == "message" %}{% if e.side == "team" %}{% translate "GoodTip team" %}{% else %}{{ req.org.name }}{% endif %}{% else %}{{ e.title }}{% endif %}</b>{% if e.who and e.kind == "message" %}<span>{{ e.who }}</span>{% endif %}<time>{{ e.at|date:"j M, g:i a" }}</time></p>
+          {% if e.offer %}<p class="gx-msg-offer">${{ e.offer.price|floatformat:"0g" }}<small style="font:600 14px var(--gt-body)"> /yr &middot; {{ e.offer.seats }} {% translate "people" %}</small></p>{% endif %}
+          {% if e.body %}<p class="gx-msg-body">{{ e.body|linebreaksbr }}</p>{% endif %}
+        </div>
+      </li>
+      {% endif %}
+      {% endfor %}
+    </ol>
+    <form class="gx-compose" method="post" action="{% url 'admin:hq_custom_pricing_reply' req.id %}">
+      {% csrf_token %}
+      <textarea name="body" rows="2" required aria-label="{% translate 'Your message' %}" placeholder="{% blocktranslate with org=req.org.name %}Write to {{ org }} — they see it in their notifications and by email{% endblocktranslate %}"></textarea>
+      <button class="gx-btn is-lime" type="submit"><svg aria-hidden="true"><use href="#ic-send"/></svg>{% translate "Send" %}</button>
+    </form>
+  </div>
+
+  {# ---------------- organisation ---------------- #}
+  <div class="gx-pane" data-gx-pane="organisation">
+    <div class="gx-facts" style="margin-bottom:20px">
+      <div class="gx-fact"><span>{% translate "Members today" %}</span><b>{{ members }}</b></div>
+      <div class="gx-fact"><span>{% translate "Season" %}</span><b>{{ req.org.season }}</b></div>
+      <div class="gx-fact"><span>{% translate "Plans so far" %}</span><b>{{ past_plans|length }}</b></div>
+      <div class="gx-fact"><span>{% translate "Requests" %}</span><b>{{ other_requests|length|add:1 }}</b></div>
+    </div>
+    <div class="gx-grid3">
+      <div>
+        <p class="gx-label">{% translate "Who runs it" %}</p>
+        <ul class="gx-list">{% for u in runners %}<li><b>{{ u.display_name|default:u.email }}</b><a href="mailto:{{ u.email }}">{{ u.email }}</a></li>{% empty %}<li><span>{% translate "Nobody listed" %}</span></li>{% endfor %}</ul>
+      </div>
+      <div>
+        <p class="gx-label">{% translate "Their plans" %}</p>
+        <ul class="gx-list">{% for p in past_plans %}<li><b>{{ p.get_tier_display }} &middot; ${{ p.price_aud|floatformat:"0g" }}</b><span>{% if p.canceled_at %}{% translate "cancelled" %}{% else %}{{ p.get_status_display|lower }}{% endif %} &middot; {{ p.created_at|date:"j M Y" }}</span></li>{% empty %}<li><span>{% translate "Never had a plan" %}</span></li>{% endfor %}</ul>
+      </div>
+      <div>
+        <p class="gx-label">{% translate "Other requests &amp; packages" %}</p>
+        <ul class="gx-list">
+          {% for o in other_requests %}<li><a href="{% url 'admin:hq_custom_pricing_detail' o.id %}"><b>{% translate "Request" %} #{{ o.id }}</b></a><span>{{ o.stage|capfirst }} &middot; {{ o.created_at|date:"j M Y" }}</span></li>{% endfor %}
+          {% for c in claims %}<li><b>{{ c.package.name }}</b><span>{% translate "package" %} &middot; {{ c.requested_at|date:"j M Y" }}</span></li>{% endfor %}
+          {% if not other_requests and not claims %}<li><span>{% translate "Just this one" %}</span></li>{% endif %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

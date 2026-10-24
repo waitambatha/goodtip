@@ -427,24 +427,22 @@ goodtip.css.
   </nav>
   {% if is_holding %}
   {% comment %}
-  REAL WAY BACK INTO THE REST OF THE TRAILER (client, 19 Oct 2026: "I have
-  noticed there is no buttons that can make me move from the other pages in
-  the coming soon"). The bar above is the member app's own, shown but
-  deliberately unwired (nothing there to link to for a visitor who isn't in
-  it yet) — this strip is the opposite: real links, the same destinations
-  goodtip.staging_gate sends a showcase or real-page visit to from anywhere
-  else (HOLDING_REAL_PAGES/HOLDING_SHOWCASES), so leaving the blog for any
-  of them is one click instead of back-to-the-trailer-then-click-again.
+  THE COMING-SOON PAGES' ONE MENU, under the member bar (client, 19 Oct 2026:
+  "there is no buttons that can make me move from the other pages in the
+  coming soon"; and 23 Oct 2026: "one clear menu"). The bar above is the
+  member app's own, shown but deliberately unwired — this strip is the real
+  way out: the same places as every other coming-soon page, from the same
+  list (goodtip.holding_menu), and "Menu" opens the same programme.
   {% endcomment %}
   <div class="an-holding-links">
-    <a href="{% url 'coming_soon' %}#how-it-works">How It Works</a>
-    <a href="{% url 'coming_soon' %}#wall">The Wall</a>
-    <a href="{% url 'about' %}">About Us</a>
-    <a href="{% url 'pricing' %}">Pricing</a>
-    <a href="{% url 'terms' %}">Terms</a>
-    <a href="{% url 'privacy' %}">Privacy</a>
-    <a href="{% url 'coming_soon' %}#join" data-wl-open="join">Join the waiting list</a>
+    {% for i in holding_menu.main %}<a href="{{ i.href }}"{% if i.current %} aria-current="page"{% endif %}>{{ i.label }}</a>{% endfor %}
+    {% for l in holding_menu.legal %}<a href="{{ l.href }}">{{ l.label }}</a>{% endfor %}
+    <a href="{{ holding_menu.join_href }}">Join the waiting list</a>
+    <button type="button" class="hm-open" data-hm-open aria-haspopup="dialog" aria-controls="hm-programme" aria-expanded="false">
+      <span class="hm-burger" aria-hidden="true"><i></i><i></i><i></i></span><span class="hm-open-t">Menu</span>
+    </button>
   </div>
+  {% include "public/partials/_holding_programme.html" %}
   {% endif %}
   {% comment %}
   THE BAR FITS THE SCREEN IT IS ON (Sep 2026) — see the block of that name at

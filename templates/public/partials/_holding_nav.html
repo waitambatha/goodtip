@@ -1,0 +1,39 @@
+{% comment %}
+THE COMING-SOON PAGES' ONE BAR (client, 23 Oct 2026: "need one clear menu for
+the coming soon pages"). The trailer and every real page let through during
+holding (About, Pricing, the blog, Terms, Privacy) wear this same bar, built
+from the same list — goodtip.holding_menu, through the `holding_menu` context
+variable — so a page can no longer offer a different set of places from the
+one before it.
+
+An item is a real link when its page is let through, and opens its filmed
+tour over the trailer when it is not (that is what the small play mark on an
+item means). "Menu" opens the full programme (_holding_programme.html): the
+same places, big, with a picture of each — and on a narrow screen it is the
+only way in, since the row of links has no room.
+
+Sign in and Join are the waiting list's, never the product's: nobody outside
+the team can log in or sign up yet. Off the trailer page they go back to it,
+where the address hash opens the pop-up.
+{% endcomment %}
+<nav class="nav hm-bar" data-open="false" aria-label="Main">
+  <div class="nav-inner">
+    <a href="{{ holding_menu.home_href }}" class="wordmark">GOOD<span>TIP</span><span class="dot">.</span></a>
+    <ul class="nav-links" id="nav-menu">
+      {% for i in holding_menu.main %}
+      <li><a href="{{ i.href }}"{% if i.current %} aria-current="page" class="is-current"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#{{ i.icon }}"/></svg><span>{{ i.label }}</span>{% if i.kind == "tour" %}<i class="hm-tourmark" title="Opens a filmed tour" aria-hidden="true"></i>{% endif %}</a></li>
+      {% endfor %}
+      <li class="nav-sep" aria-hidden="true"></li>
+      {% if wl_member %}
+      <li class="nav-auth"><a href="{% url 'waitlist_home' %}" class="btn-nav"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-people"/></svg><span>Your place on the list</span></a></li>
+      {% else %}
+      <li><a href="{{ holding_menu.signin_href }}"{% if holding_menu.on_trailer %} data-wl-open="signin"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-login"/></svg><span>Sign in</span></a></li>
+      <li class="nav-auth"><a href="{{ holding_menu.join_href }}"{% if holding_menu.on_trailer %} data-wl-open="join"{% endif %} class="btn-nav"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-people"/></svg><span>Join the waiting list</span></a></li>
+      {% endif %}
+    </ul>
+    <button type="button" class="hm-open" data-hm-open aria-haspopup="dialog" aria-controls="hm-programme" aria-expanded="false">
+      <span class="hm-burger" aria-hidden="true"><i></i><i></i><i></i></span><span class="hm-open-t">Menu</span>
+    </button>
+  </div>
+</nav>
+{% include "public/partials/_holding_programme.html" %}

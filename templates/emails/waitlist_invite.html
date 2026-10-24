@@ -10,6 +10,8 @@ break inside a paragraph is kept, so a short numbered list survives.
 {% block eyebrow %}GoodTip is on{% endblock %}
 {% block badge %}&#9733;{% endblock %}
 {% block preheader %}{{ heading }}{% endblock %}
+{% block card_bg %}#FFFFFF{% endblock %}
+{% block card_bg_css %}#FFFFFF{% endblock %}
 {% block content %}
   <p style="margin:0 0 18px;font-size:24px;font-weight:bold;line-height:1.25;color:#0F2E22;">{{ heading }}</p>
   {% for p in paragraphs %}

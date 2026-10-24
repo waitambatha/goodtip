@@ -1,0 +1,151 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n %}
+
+{% comment %}
+SET UP AN ORGANISATION FOR SOMEONE ELSE (client, 19 Oct 2026; rebuilt on the
+pitch 24 Oct 2026: "that form, that design horrible, we will need to work on
+it based on what we have been doing").
+
+"He's already talked to a school... he creates the organisation, puts in the
+future admin's name and email, the system creates the org, makes them its
+admin, and sends them an invitation to log in." Ian is deliberately not
+added as a member of what he creates — see sysadmin/org_admin_views.py.
+
+Two tabs. New organisation: the form in two numbered parts (the
+organisation; who runs it), with a card beside it that reads the form back
+as it is filled in and says exactly what pressing the button does. Set up
+so far: everything created this way, as the tinted table, with each one's
+admin and whether they have signed in yet.
+{% endcomment %}
+
+{% block gx_kicker %}{% translate "New organisation" %}{% endblock %}
+{% block gx_title %}{% translate "Set one up" %} <em>{% translate "for someone else" %}</em>{% endblock %}
+{% block gx_lead %}{% translate "For a school, club or business you've already spoken to. Create it, name who runs it, and they take it from there — you aren't added to it." %}{% endblock %}
+{% block gx_board %}
+<a class="gx-score" href="#set-up"><b>{{ recent|length }}</b><span>{% translate "Set up by you" %}</span></a>
+<div class="gx-score"><b>{{ signed_in }}</b><span>{% translate "Admins signed in" %}</span></div>
+<div class="gx-score"><b>{{ people }}</b><span>{% translate "People in them" %}</span></div>
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet" data-gx-tabs>
+  <div class="gx-tabs" role="tablist">
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="new" aria-selected="true">{% translate "New organisation" %}</button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="set-up">{% translate "Set up so far" %} <em>{{ recent|length }}</em></button>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="new">
+    <form method="post" action="{% url 'admin:hq_org_admin_create' %}" class="gx-split" data-gx-neworg>
+      {% csrf_token %}
+      <div class="gx-stack">
+        <fieldset class="gx-step">
+          <legend><i>1</i>{% translate "The organisation" %}</legend>
+          <div class="gx-form">
+            <label class="full">{% translate "Name" %}<input type="text" name="name" maxlength="200" required placeholder="{% translate 'e.g. Westfield High School' %}" data-no="name"></label>
+            <label>{% translate "Kind" %} <small>{% translate "optional" %}</small>
+              <select name="organisation_type" class="gx-in" data-no="kind">
+                <option value="">{% translate "Choose…" %}</option>
+                {% for t in organisation_types %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+              </select></label>
+            <label>{% translate "State" %} <small>{% translate "optional" %}</small>
+              <select name="state" class="gx-in" data-no="state">
+                <option value="">{% translate "Choose…" %}</option>
+                {% for s in states %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+              </select></label>
+            <label class="full">{% translate "How many people, roughly" %} <small>{% translate "optional — helps them pick a plan" %}</small>
+              <input type="number" name="team_size" min="1" step="1" placeholder="e.g. 120" data-no="size"></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="gx-step">
+          <legend><i>2</i>{% translate "Who runs it" %}</legend>
+          <div class="gx-form">
+            <label>{% translate "Their name" %}<input type="text" name="admin_name" maxlength="150" required placeholder="{% translate 'e.g. Sam Taylor' %}" data-no="admin"></label>
+            <label>{% translate "Their email" %}<input type="email" name="admin_email" maxlength="254" required placeholder="sam@school.edu.au" class="gx-in" data-no="email"></label>
+          </div>
+          <p class="gx-note" style="margin-top:12px">{% translate "If that email already has a GoodTip account, they're simply told to log in — nothing about their password changes." %}</p>
+        </fieldset>
+      </div>
+
+      <aside class="gx-card is-dark gx-neworg-preview">
+        <p class="gx-label">{% translate "What happens when you press the button" %}</p>
+        <div class="gx-neworg-card">
+          <span class="gx-avatar" data-no-out="initial" aria-hidden="true">?</span>
+          <div><b data-no-out="name">{% translate "Organisation name" %}</b><span><span data-no-out="kind">{% translate "Kind" %}</span> &middot; <span data-no-out="state">{% translate "State" %}</span>{% if season %} &middot; {{ season }}{% endif %}</span></div>
+        </div>
+        <ol class="gx-neworg-steps">
+          <li><b>{% translate "It's created" %}</b><span><span data-no-out="name2">{% translate "The organisation" %}</span> {% translate "appears on GoodTip, ready for its first season." %}</span></li>
+          <li><b><span data-no-out="admin">{% translate "Their admin" %}</span> {% translate "runs it" %}</b><span>{% translate "as its owner — they can invite people, set up the comp and pick a plan." %}</span></li>
+          <li><b>{% translate "They're emailed" %}</b><span>{% translate "at" %} <span data-no-out="email">{% translate "their address" %}</span>, {% translate "with a link to set a password and log in." %}</span></li>
+        </ol>
+        <button type="submit" class="gx-btn is-lime is-block" disabled data-no-go><svg aria-hidden="true"><use href="#ic-send"/></svg>{% translate "Create and invite" %}</button>
+        <p class="gx-live" data-no-hint>{% translate "Fill in the name, and who runs it." %}</p>
+      </aside>
+    </form>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="set-up">
+    {% if recent %}
+    <div class="gx-tablewrap">
+      <table class="gx-table">
+        <thead><tr>
+          <th scope="col">{% translate "Organisation" %}</th>
+          <th scope="col">{% translate "Admin" %}</th>
+          <th scope="col">{% translate "Admin's email" %}</th>
+          <th scope="col">{% translate "Kind" %}</th>
+          <th scope="col">{% translate "Members" %}</th>
+          <th scope="col">{% translate "Created" %}</th>
+          <th scope="col">{% translate "Admin signed in" %}</th>
+        </tr></thead>
+        <tbody>
+        {% for r in recent %}
+        <tr style="cursor:default">
+          <td class="is-name"><b>{{ r.org.name }}</b></td>
+          <td>{{ r.admin.display_name|default:"—" }}</td>
+          <td class="is-email">{% if r.admin %}<a href="mailto:{{ r.admin.email }}">{{ r.admin.email }}</a>{% else %}—{% endif %}</td>
+          <td>{{ r.org.organisation_type.name|default:"—" }}</td>
+          <td>{{ r.members }}</td>
+          <td class="is-date">{{ r.org.created_at|date:"j M Y" }}<small>{{ r.org.created_at|date:"g:i a" }}</small></td>
+          <td>{% if r.admin and r.admin.last_login %}<span class="gx-pill is-ok"><i></i>{{ r.admin.last_login|date:"j M" }}</span>{% else %}<span class="gx-pill is-wait"><i></i>{% translate "Not yet" %}</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="gx-empty"><svg aria-hidden="true"><use href="#ic-org"/></svg><b>{% translate "Nothing set up yet" %}</b><span>{% translate "Organisations you create for someone else appear here, with whether their admin has signed in." %}</span></div>
+    {% endif %}
+  </div>
+</section>
+
+<script>
+(function () {
+  // The card beside the form reads it back as it is filled in, and the
+  // button wakes once there is enough to create something.
+  var form = document.querySelector('[data-gx-neworg]');
+  if (!form) return;
+  var go = form.querySelector('[data-no-go]'), hint = form.querySelector('[data-no-hint]');
+  function val(k) {
+    var f = form.querySelector('[data-no="' + k + '"]');
+    if (!f) return '';
+    return f.tagName === 'SELECT' ? (f.value ? f.options[f.selectedIndex].text : '') : f.value.trim();
+  }
+  function put(k, v, fallback) {
+    form.querySelectorAll('[data-no-out="' + k + '"]').forEach(function (o) { o.textContent = v || fallback; });
+  }
+  function read() {
+    var name = val('name'), admin = val('admin'), email = val('email');
+    put('name', name, 'Organisation name'); put('name2', name, 'The organisation');
+    put('initial', name ? name.charAt(0).toUpperCase() : '', '?');
+    put('kind', val('kind'), 'Kind'); put('state', val('state'), 'State');
+    put('admin', admin, 'Their admin'); put('email', email, 'their address');
+    var ok = name && admin && /.+@.+\..+/.test(email);
+    go.disabled = !ok;
+    hint.textContent = ok ? 'Ready — this creates it and sends the email straight away.' : 'Fill in the name, and who runs it.';
+  }
+  form.addEventListener('input', read);
+  form.addEventListener('change', read);
+  read();
+})();
+</script>
+{% endblock %}

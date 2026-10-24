@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 
 from django.conf import settings
 from django.contrib import messages
@@ -15,7 +16,10 @@ from orgs.models import OrgMember, Organisation
 from orgs.services import is_creator_admin
 
 from . import donations, goodlist, services
-from .models import CustomPriceRequest, DonationPledge, PlanSubscription, SponsorshipApplication
+from .models import (
+    CustomPackage, CustomPackageClaim, CustomPriceRequest, DonationPledge, PlanSubscription,
+    SponsorshipApplication,
+)
 from .pricing import (
     FOUNDING_WINDOW_CLOSES,
     first_billing_at,
@@ -29,8 +33,10 @@ from .pricing import (
     TIER_ACCENT,
     TIER_ORDER,
     TIERS,
+    effective_tier_config,
     founding_stub_ends,
     founding_window_open,
+    public_cards,
     seat_limit_label,
     tier_label,
 )
@@ -166,7 +172,8 @@ def _tier_cards(org=None):
     problem the lock was built to fix.
     """
     cards = []
-    for key, cfg in TIERS.items():
+    for key in TIER_ORDER:
+        cfg = effective_tier_config(key)
         card = {
             "key": key,
             "label": cfg["label"],
@@ -189,20 +196,22 @@ def _tier_cards(org=None):
     return cards
 
 
-@login_required
-def plans_view(request, org_id: int):
-    org = get_object_or_404(Organisation, pk=org_id)
-    if not _require_owner(request.user, org):
-        return HttpResponseForbidden()
+def _subscription_status(org) -> dict:
+    """The organisation's own subscription, read straight back from Stripe —
+    not only for a test-mode daily charge (so a tester refreshing the page
+    sees each day's charge land without a webhook, which a laptop or a
+    firewalled server may not receive) but for anyone already subscribed:
+    the "your subscription" panel needs the real billing dates and the real
+    payment history, not a guess at what a yearly plan's dates probably are
+    (client, 10 Oct 2026: "the level of... when the subscription is about to
+    end, where it started... history of payments").
+
+    Shared by plans_view (the small notice — see .plk-subnote) and
+    subscription_view (the full page it links to — client, 21 Oct 2026: "the
+    subscription will now have its own page"), so the two can never read
+    Stripe back differently for the same organisation.
+    """
     current = services.current_subscription(org)
-    # The organisation's own subscription, read straight back from Stripe —
-    # not only for a test-mode daily charge (so a tester refreshing the page
-    # sees each day's charge land without a webhook, which a laptop or a
-    # firewalled server may not receive) but for anyone already subscribed:
-    # the "your subscription" panel below needs the real billing dates and
-    # the real payment history, not a guess at what a yearly plan's dates
-    # probably are (client, 10 Oct 2026: "the level of... when the
-    # subscription is about to end, where it started... history of payments").
     sub_info = None
     test_charges = None
     if current and services.is_configured():
@@ -225,6 +234,41 @@ def plans_view(request, org_id: int):
                 past_info = services.sync_from_stripe(past)
             except Exception:  # noqa: BLE001 — the page must render regardless
                 logger.exception("Could not read the past subscription back from Stripe")
+    return {
+        "current": current, "sub_info": sub_info, "test_charges": test_charges,
+        "past": past, "past_info": past_info,
+    }
+
+
+def _custom_request_state(org, *, on_custom_plan: bool) -> dict:
+    """Where this organisation's negotiated custom price stands — shared by
+    the Plans page's custom-pricing tile and the packages page's foot.
+
+    The most recent APPROVED request is the offer; otherwise the most recent
+    request of any status decides the quieter states, so an organisation
+    always sees its *latest* word on this, not its first. org_declined_offer
+    is the organisation's OWN "no" to a price Ian offered (client, 12 Oct
+    2026) — distinct from custom_declined, which is Ian's "no" to their
+    request; both end the same way on screen, but the reason belongs to a
+    different person each time.
+    """
+    custom_offer = services.current_custom_offer(org)
+    latest = CustomPriceRequest.objects.filter(org=org).order_by("-created_at").first()
+    return {
+        "custom_offer": None if on_custom_plan else custom_offer,
+        "custom_pending": bool(latest and latest.is_pending),
+        "custom_declined": latest if latest and latest.status == CustomPriceRequest.STATUS_DECLINED else None,
+        "org_declined_offer": latest if latest and latest.is_declined_by_org else None,
+    }
+
+
+@login_required
+def plans_view(request, org_id: int):
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_owner(request.user, org):
+        return HttpResponseForbidden()
+    status = _subscription_status(org)
+    current, sub_info, past = status["current"], status["sub_info"], status["past"]
 
     tiers = _tier_cards(org)
     if current:
@@ -235,45 +279,24 @@ def plans_view(request, org_id: int):
                 "current" if card["key"] == current.tier
                 else "upgrade" if there > here else "downgrade"
             )
-    # The custom-pricing offer — the most recent APPROVED request, or (for
-    # the quieter "we're looking at it" / "here's why not" states) the most
-    # recent request of any status, read in that order of preference so an
-    # organisation always sees its *latest* word on this, not its first.
-    custom_offer = services.current_custom_offer(org)
-    latest_custom_request = (
-        CustomPriceRequest.objects.filter(org=org).order_by("-created_at").first()
-    )
-    custom_pending = bool(latest_custom_request and latest_custom_request.is_pending)
-    custom_declined = (
-        latest_custom_request
-        if latest_custom_request and latest_custom_request.status == CustomPriceRequest.STATUS_DECLINED
-        else None
-    )
-    # The organisation's OWN "no" to a price Ian offered (client, 12 Oct
-    # 2026) — distinct from custom_declined above, which is Ian's "no" to
-    # their request. Both end the same way on screen (a reason, and a way to
-    # ask again) but the reason belongs to a different person each time.
-    org_declined_offer = (
-        latest_custom_request if latest_custom_request and latest_custom_request.is_declined_by_org else None
-    )
+    on_custom_plan = bool(current and current.tier == CUSTOM)
+    # The standing custom packages (CustomPackage) — a different thing from
+    # the negotiated offer: these are pre-made, browsable without asking
+    # first, and "taking" one creates a CustomPackageClaim with its own
+    # simulated review wait rather than a request Ian has to answer. Listed
+    # on their own page (custom_packages_view); this screen only needs to
+    # know whether there are any to link to.
+    package_claim = services.current_package_claim(org)
+    has_packages = not package_claim and CustomPackage.objects.filter(is_active=True).exists()
 
     return render(request, "billing/plans.html", {
         "org": org,
         "tiers": tiers,
         "current": current,
-        "sub_info": sub_info,
-        "current_accent": TIER_ACCENT.get(current.tier) if current else None,
         "period": _period_progress(sub_info) if sub_info else None,
-        "history": (sub_info or {}).get("history") or [],
-        "test_charges": test_charges,
         "past_subscription": past,
-        "past_accent": TIER_ACCENT.get(past.tier) if past else None,
-        "past_period": _period_progress(past_info) if past_info else None,
-        "custom_offer": custom_offer if not (current and current.tier == CUSTOM) else None,
-        "custom_pending": custom_pending,
-        "custom_declined": custom_declined,
-        "org_declined_offer": org_declined_offer,
-        "on_custom_plan": bool(current and current.tier == CUSTOM),
+        **_custom_request_state(org, on_custom_plan=on_custom_plan),
+        "on_custom_plan": on_custom_plan,
         # Where the "how many people will tip?" slider starts.
         "member_count": OrgMember.objects.filter(org=org).count(),
         "stripe_configured": services.is_configured(),
@@ -291,7 +314,233 @@ def plans_view(request, org_id: int):
         # cover twelve months (client, 22 Sep 2026).
         "founding_stub_ends": founding_stub_ends(),
         "groups_min_label": tier_label(GROUPS_MIN_TIER),
+        "custom_packages": has_packages,
+        "package_claim": package_claim,
     })
+
+
+#: Each ready-made package's colour and mark, by position — fixed order, so a
+#: package keeps its colour when another is hidden around it would not hold;
+#: keyed on the row's own sort position instead (see _package_cards).
+PACKAGE_LOOKS = [
+    ("#2A7337", "ic-users"), ("#1F7A63", "ic-org"), ("#C9700A", "ic-spark"),
+    ("#6B34B8", "ic-heart"), ("#2E6E7A", "ic-trophy"), ("#B23434", "ic-flame"),
+]
+
+
+def _package_cards(packages, people_today: int):
+    """The packages as the page draws them: what each costs a person, what
+    the published plans would charge for the same size, and how far it
+    stretches next to the others (client, 24 Oct 2026: "when I click the
+    starter, I need to know what starter is about")."""
+    from . import custom_pricing
+
+    packages = list(packages)
+    biggest = max([p.seat_limit for p in packages] or [1])
+    cards = []
+    for i, pkg in enumerate(packages):
+        accent, icon = PACKAGE_LOOKS[i % len(PACKAGE_LOOKS)]
+        std = custom_pricing.standard_equivalent(pkg.seat_limit)
+        per_person = pkg.price_aud / pkg.seat_limit if pkg.seat_limit else None
+        cards.append({
+            "pkg": pkg, "accent": accent, "icon": icon,
+            "per_person": per_person,
+            "std": std,
+            "saving": (std["price"] - pkg.price_aud) if std and std["price"] > pkg.price_aud else None,
+            "reach_pct": max(6, round(pkg.seat_limit / biggest * 100)),
+            "you_pct": min(100, round(people_today / biggest * 100, 1)),
+            "fits_today": people_today <= pkg.seat_limit,
+            "sites": range(min(pkg.child_org_limit, 12)),
+            "more_sites": max(0, pkg.child_org_limit - 12),
+        })
+    return cards
+
+
+@login_required
+def custom_packages_view(request, org_id: int):
+    """Custom pricing, a page of its own (client, 21 Oct 2026; rebuilt 24 Oct
+    2026: "when somebody clicks on the custom request, is able to know what
+    is it about, things are well organized, I can be able to make my request,
+    I can be able to see the other custom plans"). Four parts, top to bottom:
+    how custom pricing works, where this organisation's own request stands
+    (with the whole conversation and a way to write back), the ready-made
+    packages, and the form to ask for a price of your own."""
+    from . import custom_pricing
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_owner(request.user, org):
+        return HttpResponseForbidden()
+    current = services.current_subscription(org)
+    on_custom_plan = bool(current and current.tier == CUSTOM)
+    if on_custom_plan:
+        # Already on a price made for them — nothing here to choose between.
+        return redirect("billing:plans", org_id=org.id)
+
+    people_today = OrgMember.objects.filter(org=org).count()
+    requests = list(
+        CustomPriceRequest.objects.filter(org=org)
+        .select_related("requested_by", "decided_by").prefetch_related("thread__author")
+        .order_by("-created_at")
+    )
+    active = requests[0] if requests else None
+    return render(request, "billing/packages.html", {
+        "org": org,
+        "packages": _package_cards(CustomPackage.objects.filter(is_active=True), people_today),
+        "package_claim": services.current_package_claim(org),
+        "people_today": people_today,
+        "active_request": active,
+        "active_timeline": custom_pricing.timeline(active) if active else [],
+        "steps": custom_pricing.steps_for(active),
+        "earlier_requests": requests[1:],
+        "org_kinds": custom_pricing.ORG_KINDS,
+        "can_ask": not (active and active.is_pending),
+        # The five, smallest first, for the form's "standard plan for this
+        # size" line.
+        "std_ladder": [
+            {"seats": effective_tier_config(k)["seat_limit"], "label": effective_tier_config(k)["label"],
+             "price": effective_tier_config(k)["price"]}
+            for k in TIER_ORDER
+        ],
+        **_custom_request_state(org, on_custom_plan=False),
+    })
+
+
+def _member_growth(org, months: int = 6) -> list[dict]:
+    """People in the organisation at the end of each of the last `months`
+    months — cumulative, so the bars read as "how big we were", not "how
+    many joined". The current month is "so far"."""
+    from datetime import date
+
+    today = timezone.localdate()
+    joined = list(OrgMember.objects.filter(org=org).values_list("joined_at", flat=True))
+    out = []
+    for back in range(months - 1, -1, -1):
+        y, m = today.year, today.month - back
+        while m <= 0:
+            m += 12
+            y -= 1
+        ny, nm = (y + 1, 1) if m == 12 else (y, m + 1)
+        cut = date(ny, nm, 1)
+        out.append({
+            "label": date(y, m, 1).strftime("%b"),
+            "value": sum(1 for j in joined if timezone.localtime(j).date() < cut),
+            "now": back == 0,
+        })
+    return out
+
+
+def _plan_ladder(team: int, highlight: str | None) -> list[dict]:
+    """The five plans' yearly prices, each in its own colour, with the one
+    this organisation is on (or would fit) marked."""
+    rows = []
+    for key in TIER_ORDER:
+        cfg = effective_tier_config(key)
+        rows.append({
+            "key": key, "label": cfg["label"], "value": float(cfg["price"]),
+            "seats": cfg["seat_limit"], "color": TIER_ACCENT.get(key),
+            "per_person": round(float(cfg["price"]) / cfg["seat_limit"], 2) if cfg["seat_limit"] else None,
+            "on": key == highlight, "fits": team <= cfg["seat_limit"],
+        })
+    return rows
+
+
+@login_required
+def subscription_view(request, org_id: int):
+    """The whole subscription, on its own page (client, 21 Oct 2026; made
+    "more detailed... seeing the history, seeing the charts... four
+    visualizations... in 3D" on 24 Oct 2026). Status and the actions that
+    act on it; four charts — seats used, where the season is, how the
+    organisation has grown, and what each plan costs — then every plan this
+    organisation has ever had, and its payments. An organisation with no
+    plan sees the same four, measured against the plan that would fit it.
+    Upgrade/Downgrade stay on Plans, since they act on the tab row there."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_owner(request.user, org):
+        return HttpResponseForbidden()
+    status = _subscription_status(org)
+    current, sub_info, test_charges = status["current"], status["sub_info"], status["test_charges"]
+    past, past_info = status["past"], status["past_info"]
+
+    from .pricing import tier_for_team_size
+
+    members = OrgMember.objects.filter(org=org).count()
+    fit_key = tier_for_team_size(members)
+    fit = effective_tier_config(fit_key)
+    on_key = current.tier if current and current.tier in TIER_ORDER else None
+    seat_limit = current.seat_limit if current else fit["seat_limit"]
+    period = _period_progress(sub_info) if sub_info else None
+
+    # The season clock: real billing dates when Stripe has them; otherwise
+    # the first charge still ahead (scheduled), or — with no plan — the day
+    # billing starts for anyone who signs up now.
+    clock = None
+    if period:
+        clock = {"pct": period["pct"], "big": f"{period['days_left']}", "unit": "days left",
+                 "line": f"Renews {period['end']:%-d %B %Y}"}
+    elif current and current.starts_at:
+        days = max(0, (timezone.localtime(current.starts_at).date() - timezone.localdate()).days)
+        clock = {"pct": max(4, 100 - round(days / 365 * 100)), "big": f"{days}", "unit": "days to go",
+                 "line": f"First charge {timezone.localtime(current.starts_at):%-d %B %Y}"}
+    else:
+        fb = first_billing_at()
+        if fb:
+            days = max(0, (timezone.localtime(fb).date() - timezone.localdate()).days)
+            clock = {"pct": max(4, 100 - round(days / 365 * 100)), "big": f"{days}", "unit": "days",
+                     "line": f"until billing starts, {fb:%-d %B %Y}"}
+
+    plans_history = list(PlanSubscription.objects.filter(org=org).order_by("-created_at"))
+    paid_total = sum((p.price_aud for p in plans_history if p.paid_at), Decimal("0"))
+    history = (sub_info or {}).get("history") or []
+
+    charts = {
+        "growth": _member_growth(org),
+        "ladder": _plan_ladder(members, on_key or fit_key),
+    }
+    for row in charts["ladder"]:
+        row["tag"] = "yours" if on_key else "fits you"
+        row["note"] = f"{row['seats']:,} people · ${row['per_person']} a person at full size"
+    return render(request, "billing/subscription.html", {
+        "org": org,
+        "current": current,
+        "current_accent": TIER_ACCENT.get(current.tier) if current else None,
+        "period": period,
+        "history": history,
+        "test_charges": test_charges,
+        "past_subscription": past,
+        "past_accent": TIER_ACCENT.get(past.tier) if past else None,
+        "past_period": _period_progress(past_info) if past_info else None,
+        "members": members,
+        "seat_limit": seat_limit,
+        "seat_pct": min(100, round(members / seat_limit * 100)) if seat_limit else 0,
+        "seats_left": max(0, seat_limit - members) if seat_limit else 0,
+        "fit": {"key": fit_key, "label": fit["label"], "price": fit["price"], "seats": fit["seat_limit"],
+                "accent": TIER_ACCENT.get(fit_key)},
+        "clock": clock,
+        "plans_history": plans_history,
+        "paid_total": paid_total,
+        "charts": charts,
+        "growth_rows": charts["growth"],
+        "ladder_rows": charts["ladder"],
+        "growth_now": charts["growth"][-1]["value"] if charts["growth"] else members,
+        "growth_from": charts["growth"][0]["value"] if charts["growth"] else members,
+    })
+
+
+@login_required
+@require_POST
+def take_custom_package_view(request, org_id: int, package_id: int):
+    """"Take" a standing custom package (client, 19 Oct 2026) — creates the
+    claim, plans_view then shows the simulated review state until
+    CustomPackageClaim.is_ready. No real charge happens here: Stripe is not
+    live (CLAUDE.md), so this ends in a handoff message, same as the
+    negotiated custom-price flow does when there is nothing to check out to."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_owner(request.user, org):
+        return HttpResponseForbidden()
+    package = get_object_or_404(CustomPackage, pk=package_id, is_active=True)
+    CustomPackageClaim.objects.create(package=package, org=org, requested_by=request.user)
+    messages.success(request, f"Taking {package.name} — we're reviewing it now.")
+    return redirect("billing:plans", org_id=org.id)
 
 
 @login_required
@@ -342,40 +591,76 @@ def request_custom_price_view(request, org_id: int):
     """"None of these quite fit" (client, 11 Oct 2026) — an organisation asks
     for a price outside the five published plans. Saved first, emailed
     second, same ordering as the sponsorship application and for the same
-    reason: a mail outage must never lose the request."""
+    reason: a mail outage must never lose the request.
+
+    The form asks for the size of the thing as numbers too (client, 24 Oct
+    2026: "things are well organized") — people, sites, a budget, what kind
+    of organisation — so the team's queue can weigh it at a glance. They are
+    written into the message as well, so the email reads whole on its own."""
+    from . import custom_pricing
+
     org = get_object_or_404(Organisation, pk=org_id)
     if not _require_owner(request.user, org):
         return HttpResponseForbidden()
+    back = redirect(reverse("billing:packages", args=[org.id]) + "#track")
 
     if CustomPriceRequest.objects.filter(org=org, status=CustomPriceRequest.STATUS_PENDING).exists():
-        messages.error(request, "There's already a custom price request with the team for this organisation.")
-        return redirect("billing:plans", org_id=org.id)
+        messages.error(request, "There's already a custom price request with the team — add to it below instead.")
+        return back
 
-    message = (request.POST.get("message") or "").strip()[:2000]
-    cpr = CustomPriceRequest.objects.create(org=org, requested_by=request.user, message=message)
+    def _int(name):
+        try:
+            v = int((request.POST.get(name) or "").strip())
+            return v if v > 0 else None
+        except ValueError:
+            return None
 
-    from goodtip.mail import send_template, site_url
-    from sysadmin import access as admin_access
-    from accounts.models import User
+    people, sites = _int("people_count"), _int("sites_count")
+    budget = _int("budget_aud")
+    kind = (request.POST.get("org_kind") or "").strip()
+    if kind not in dict(custom_pricing.ORG_KINDS):
+        kind = ""
+    note = (request.POST.get("message") or "").strip()[:1600]
+    if not (note or people):
+        messages.error(request, "Tell us at least how many people, or a line about what you need.")
+        return redirect(reverse("billing:packages", args=[org.id]) + "#ask")
 
-    try:
-        staff_emails = [
-            u.email for u in User.objects.filter(is_staff=True, is_active=True).exclude(email="")
-            if admin_access.can(u, "billing.custom_pricing")
-        ]
-        if staff_emails:
-            send_template(
-                "custom_price_requested",
-                subject=f"Custom price request — {org.name}",
-                to=staff_emails,
-                context={"req": cpr, "org": org, "queue_link": site_url(reverse("admin:hq_custom_pricing"))},
-                reply_to=[request.user.email] if request.user.email else None,
-            )
-    except Exception:  # noqa: BLE001 — the request is saved; a mail hiccup must not look like a failure
-        logger.exception("Custom price request %s saved, but its staff email failed", cpr.pk)
+    facts = []
+    if kind:
+        facts.append(custom_pricing.org_kind_label(kind))
+    if people:
+        facts.append(f"{people:,} people")
+    if sites:
+        facts.append(f"{sites} site{'s' if sites != 1 else ''}")
+    if budget:
+        facts.append(f"budget about ${budget:,}/yr")
+    message = (" · ".join(facts) + ("\n\n" if facts and note else "") + note)[:2000]
 
-    messages.success(request, "Sent. The team will come back to you about a custom price.")
-    return redirect("billing:plans", org_id=org.id)
+    cpr = CustomPriceRequest.objects.create(
+        org=org, requested_by=request.user, message=message,
+        people_count=people, sites_count=sites, budget_aud=budget, org_kind=kind,
+    )
+    custom_pricing.tell_team(cpr, template="custom_price_requested", subject=f"Custom price request — {org.name}")
+    messages.success(request, "Sent. You'll get a notification here and an email as soon as the team replies.")
+    return back
+
+
+@login_required
+@require_POST
+def custom_price_reply_view(request, org_id: int, request_id: int):
+    """Writing back to the team about a request, before or after it is
+    decided (client, 24 Oct 2026: "me being able to reach back")."""
+    from . import custom_pricing
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_owner(request.user, org):
+        return HttpResponseForbidden()
+    req = get_object_or_404(CustomPriceRequest, pk=request_id, org=org)
+    body = (request.POST.get("body") or "").strip()
+    if body:
+        custom_pricing.post_message(req, author=request.user, body=body, from_team=False)
+        messages.success(request, "Sent to the team. Their reply will land here and in your notifications.")
+    return redirect(reverse("billing:packages", args=[org.id]) + "#track")
 
 
 @login_required
@@ -397,27 +682,12 @@ def decline_custom_offer_view(request, org_id: int):
     reason = (request.POST.get("reason") or "").strip()[:2000]
     services.decline_custom_offer(offer, reason=reason)
 
-    from goodtip.mail import send_template, site_url
-    from sysadmin import access as admin_access
-    from accounts.models import User
+    from . import custom_pricing
 
-    try:
-        staff_emails = [
-            u.email for u in User.objects.filter(is_staff=True, is_active=True).exclude(email="")
-            if admin_access.can(u, "billing.custom_pricing")
-        ]
-        if staff_emails:
-            send_template(
-                "custom_price_org_declined",
-                subject=f"{org.name} declined the custom price — {offer.label}",
-                to=staff_emails,
-                context={"req": offer, "org": org, "queue_link": site_url(reverse("admin:hq_custom_pricing"))},
-            )
-    except Exception:  # noqa: BLE001 — the decision is saved; a mail hiccup must not look like a failure
-        logger.exception("Custom price offer %s declined by org, but the staff email failed", offer.pk)
-
+    custom_pricing.tell_team(offer, template="custom_price_org_declined",
+                             subject=f"{org.name} declined the custom price — {offer.label}")
     messages.success(request, "Sent — the team will know you'd like a different price.")
-    return redirect("billing:plans", org_id=org.id)
+    return redirect(reverse("billing:packages", args=[org.id]) + "#track")
 
 
 @login_required
@@ -435,6 +705,9 @@ def custom_checkout_view(request, org_id: int):
     if offer is None:
         messages.error(request, "There's no custom price to subscribe to right now.")
         return redirect("billing:plans", org_id=org.id)
+    from . import custom_pricing
+
+    custom_pricing.mark_accepted(offer)
 
     if not services.is_configured():
         messages.error(
@@ -964,5 +1237,43 @@ def sponsorship_view(request):
         "error": error,
         "form": form,
         "countries": Country.objects.filter(is_active=True),
-        "starter_price": TIERS[STARTER]["price"],
+        "starter_price": effective_tier_config(STARTER)["price"],
+    })
+
+
+def pricing_view(request):
+    """The public /pricing/ page.
+
+    Used to be a bare TemplateView with its price cards computed once into
+    extra_context at urls.py import time — fine while TIERS was a fixed
+    dict, but now that Ian can edit a tier's price/seat/org limit from the
+    admin (billing.models.PlanOverride) that would freeze whatever was true
+    when gunicorn last started. Converted to a real view for the same
+    reason accounts.views.home_view was: it has to read effective_tier_
+    config fresh on every request, not once per process.
+    """
+    from goodtip.urls import PRICING_FACTS
+
+    cards = public_cards()
+    by_tier = {c["tier"]: c for c in cards}
+    # The hand-built hero table on public/pricing.html keys its rows by the
+    # product NAME (client-facing, see billing.pricing's own note on why the
+    # dict key and the label disagree), not by pricing.TIERS's key — this is
+    # the one place that table reads a real number rather than a hand-typed
+    # one: its price, and the struck-through price above it when Ian has
+    # set a discount (billing.models.PlanOverride).
+    plan_numbers = {
+        "starter": by_tier[STARTER],
+        "team": by_tier[GROWTH],
+        "workplace": by_tier[PRO],
+        "organisation": by_tier[ENTERPRISE],
+        "enterprise": by_tier[ENTERPRISE_PLUS],
+    }
+
+    return render(request, "public/pricing.html", {
+        "active": "pricing",
+        "price_cards": cards,
+        "plan_numbers": plan_numbers,
+        "custom_packages": CustomPackage.objects.filter(is_active=True),
+        **PRICING_FACTS,
     })

@@ -1,0 +1,67 @@
+{% comment %}
+THE COMING-SOON PAGES' ONE FOOTER (client, 23 Oct 2026: "one clear menu";
+and 24 Oct 2026: the Explore column "lined up going downwards like a ladder...
+be creative with it"). The trailer and every real page let through during
+holding wear this same footer, and its places are the bar's places — the same
+list, goodtip.holding_menu — so the footer can never offer a page the bar
+does not.
+
+Three bands, read top to bottom like the back page of a match-day programme:
+  .hf-call   the one thing to do — join the waiting list (or sign in to it)
+  .hf-cards  the places, side by side as numbered picture cards, each saying
+             whether it opens a filmed tour or the real page
+  .hf-base   who we are, where to follow us, and the small print
+Styles live in gt-holding-menu.css, loaded by the programme the bar includes.
+{% endcomment %}
+<footer class="footer hf">
+  <div class="hf-in">
+    <section class="hf-call" aria-label="The waiting list">
+      <div class="hf-call-copy">
+        <p class="hf-kick"><span class="hm-dot" aria-hidden="true"></span>Coming soon &middot; the waiting list is open</p>
+        <h2 class="hf-h">Get your comp on the list <em>before the first bounce.</em></h2>
+      </div>
+      <div class="hf-call-do">
+        {% if wl_member %}
+        <a class="hm-join" href="{% url 'waitlist_home' %}">Your place on the list <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        {% else %}
+        <a class="hm-join" href="{{ holding_menu.join_href }}"{% if holding_menu.on_trailer %} data-wl-open="join"{% endif %}>Join the waiting list <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="hm-quiet" href="{{ holding_menu.signin_href }}"{% if holding_menu.on_trailer %} data-wl-open="signin"{% endif %}>Already on the list? Sign in</a>
+        {% endif %}
+      </div>
+    </section>
+
+    <nav class="hf-cards" aria-label="Explore">
+      {% for i in holding_menu.main %}
+      <a class="hf-card{% if i.current %} is-current{% endif %}" href="{{ i.href }}"{% if i.current %} aria-current="page"{% endif %}>
+        <span class="hf-pic"><img src="{{ i.picture }}" alt="" loading="lazy" decoding="async"></span>
+        <span class="hf-n" aria-hidden="true">{{ forloop.counter|stringformat:"02d" }}</span>
+        <span class="hf-label">{{ i.label }}</span>
+        <span class="hf-kind">{% if i.kind == "tour" %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>Filmed tour{% elif i.current %}You are here{% else %}Open the page{% endif %}</span>
+      </a>
+      {% endfor %}
+      <a class="hf-card is-trailer" href="{{ holding_menu.trailer_href }}">
+        <span class="hf-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg></span>
+        <span class="hf-label">Watch the trailer</span>
+        <span class="hf-kind">Two minutes, from the top</span>
+      </a>
+    </nav>
+
+    <div class="hf-base">
+      <div class="hf-brand">
+        <a href="{{ holding_menu.home_href }}" class="footer-logo wordmark">GOOD<span>TIP</span><span class="dot">.</span></a>
+        <p>Footy tipping, for good.</p>
+      </div>
+      <div class="hf-socials" aria-label="Follow us">
+        <a href="mailto:hello@goodtip.com.au" aria-label="Email" title="Email"><svg><use href="#s-mail"/></svg></a>
+        <a href="https://www.linkedin.com/company/good-tip-australia/" target="_blank" rel="noopener" aria-label="LinkedIn" title="LinkedIn"><svg><use href="#s-linkedin"/></svg></a>
+        <a href="https://www.facebook.com/profile.php?id=61593478288209" target="_blank" rel="noopener" aria-label="Facebook" title="Facebook"><svg><use href="#s-facebook"/></svg></a>
+        <a href="https://www.instagram.com/goodtip_mate?igsh=MTZibnM2YWtyM3lrcg%3D%3D&amp;utm_source=qr" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram"><svg><use href="#s-instagram"/></svg></a>
+        <a href="https://www.youtube.com/@GoodTip_Australia" target="_blank" rel="noopener" aria-label="YouTube" title="YouTube"><svg><use href="#s-youtube"/></svg></a>
+      </div>
+      <nav class="hm-legal hf-legal" aria-label="Legal">
+        {% for l in holding_menu.legal %}<a href="{{ l.href }}"{% if l.current %} aria-current="page"{% endif %}>{{ l.label }}</a>{% endfor %}
+      </nav>
+      <p class="hf-small">&copy; 2026 GoodTip Pty Ltd &middot; &ldquo;Good Tip, Mate.&rdquo; &middot; Not affiliated with the AFL or NRL.</p>
+    </div>
+  </div>
+</footer>

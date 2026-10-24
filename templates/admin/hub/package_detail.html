@@ -1,0 +1,97 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n %}
+
+{% comment %}
+ONE READY-MADE PACKAGE (client, 24 Oct 2026), on the pitch — and, with
+is_new, the page for setting one up. The sheet: Overview (the card
+organisations see, how it compares with the five plans, who has taken it)
+and Edit (the form, with that card rebuilt beside it as it is typed).
+Built by sysadmin.plan_admin_views.package_detail / package_new.
+{% endcomment %}
+
+{% block gx_accent %}{% if row %}{{ row.accent }}{% else %}var(--gx-lime){% endif %}{% endblock %}
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_plan_admin' %}#packages">{% translate "Plans" %}</a></li>{% endblock %}
+{% block gx_nav %}
+{% if prev %}<a class="gx-btn is-glass" href="{% url 'admin:hq_custom_package_detail' prev.pkg.pk %}"><svg aria-hidden="true"><use href="#ic-chev-left"/></svg>{{ prev.pkg.name|truncatechars:18 }}</a>{% endif %}
+{% if next %}<a class="gx-btn is-glass" href="{% url 'admin:hq_custom_package_detail' next.pkg.pk %}">{{ next.pkg.name|truncatechars:18 }}<svg aria-hidden="true"><use href="#ic-chev-right"/></svg></a>{% endif %}
+{% endblock %}
+{% block gx_kicker %}{% if is_new %}{% translate "New ready-made package" %}{% else %}{% blocktranslate with n=row.n %}Package {{ n }}{% endblocktranslate %} &middot; {% if pkg.is_active %}{% translate "on offer" %}{% else %}{% translate "hidden" %}{% endif %}{% endif %}{% endblock %}
+{% block gx_title %}{% if is_new %}{% translate "A package for" %} <em>{% translate "a new kind of group" %}</em>{% else %}{{ pkg.name }}{% endif %}{% endblock %}
+{% block gx_lead %}{% if is_new %}{% translate "A standing offer organisations can take from their Custom pricing page, without asking first." %}{% else %}{{ pkg.description }}{% endif %}{% endblock %}
+{% block gx_board %}
+{% if not is_new %}
+<div class="gx-score is-wide"><b>${{ pkg.price_aud|floatformat:"0g" }}</b><span>{% translate "a year" %} &middot; ${{ row.per_person|floatformat:2 }} {% translate "a person" %}</span></div>
+<div class="gx-score is-cool"><b>{{ pkg.seat_limit|floatformat:"0g" }}</b><span>{% translate "People" %}</span></div>
+<div class="gx-score is-cool"><b>{{ row.taken }}</b><span>{% translate "Taken" %}</span></div>
+{% endif %}
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet" data-gx-tabs>
+  <div class="gx-tabs" role="tablist">
+    {% if not is_new %}<button type="button" class="gx-tab" role="tab" data-gx-tab="overview" aria-selected="true">{% translate "Overview" %}</button>{% endif %}
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="edit"{% if is_new %} aria-selected="true"{% endif %}>{% if is_new %}{% translate "Set it up" %}{% else %}{% translate "Edit" %}{% endif %}</button>
+  </div>
+
+  {% if not is_new %}
+  <div class="gx-pane" data-gx-pane="overview">
+    <div class="gx-split">
+      <div class="gx-stack">
+        {% if std %}
+        <div class="gx-yard" style="--c: {{ std.accent }}">
+          <i aria-hidden="true"><svg><use href="#ic-sliders"/></svg></i>
+          <span>{% blocktranslate with n=pkg.seat_limit plan=std.label price=std.price|floatformat:"0g" %}For <b>{{ n }}</b> people the five plans would charge <b>{{ plan }}</b>, <b>${{ price }}</b> a year.{% endblocktranslate %}
+          {% if saving %}{% blocktranslate with d=saving|floatformat:"0g" %}This package is <b>${{ d }} less</b>.{% endblocktranslate %}{% elif std.price < pkg.price_aud %}{% translate "This package costs more — worth it for what it adds, like several sites on one bill." %}{% endif %}</span>
+        </div>
+        {% endif %}
+        <div>
+          <p class="gx-label">{% translate "Organisations that took it" %}</p>
+          <ul class="gx-list">
+            {% for c in claims %}<li><b>{{ c.org.name }}</b><span>{{ c.requested_at|date:"j M Y" }} &middot; {% if c.is_ready %}{% translate "approved" %}{% else %}{% translate "reviewing" %}{% endif %}</span></li>
+            {% empty %}<li><span>{% translate "Nobody yet." %}</span></li>{% endfor %}
+          </ul>
+        </div>
+      </div>
+      <div class="gx-stack">
+        <p class="gx-label">{% translate "What organisations see" %}</p>
+        <div class="gx-preview" style="--ac: {{ row.accent }}">
+          <span class="gx-pack-ic" aria-hidden="true"><svg><use href="#{{ row.icon }}"/></svg></span>
+          <b>{{ pkg.name }}</b>
+          <span>{{ pkg.description|default:"—" }}</span>
+          <strong>${{ pkg.price_aud|floatformat:"0g" }}<small>/year</small></strong>
+          <em>{{ pkg.seat_limit_label }} people &middot; {{ pkg.child_org_limit }} organisation{{ pkg.child_org_limit|pluralize }}</em>
+        </div>
+        <a class="gx-btn is-block" href="#edit" data-gx-open="edit">{% translate "Edit this package" %}</a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="gx-pane" data-gx-pane="edit">
+    <div class="gx-split">
+      <form method="post" action="{% if is_new %}{% url 'admin:hq_custom_package_save' %}{% else %}{% url 'admin:hq_custom_package_edit' pkg.pk %}{% endif %}" class="gx-form" data-gx-pkg>
+        {% csrf_token %}
+        <label class="full">{% translate "Name" %}<input type="text" name="name" maxlength="80" value="{{ pkg.name|default:'' }}" placeholder="{% translate 'Schools Plan' %}" required data-pv="name"></label>
+        <label class="full">{% translate "Who it's for" %} <small>{% translate "one line, organisations read it" %}</small><input type="text" name="description" maxlength="240" value="{{ pkg.description|default:'' }}" data-pv="desc"></label>
+        <label>{% translate "Price a year (AUD)" %}<input type="number" name="price_aud" min="1" step="1" value="{% if pkg %}{{ pkg.price_aud|floatformat:0 }}{% endif %}" required data-pv="price"></label>
+        <label>{% translate "People" %}<input type="number" name="seat_limit" min="1" step="1" value="{{ pkg.seat_limit|default:'' }}" required data-pv="seats"></label>
+        <label>{% translate "Organisations" %}<input type="number" name="child_org_limit" min="1" step="1" value="{{ pkg.child_org_limit|default:1 }}" data-pv="orgs"></label>
+        <label>{% translate "Order on the page" %}<input type="number" name="sort_order" step="1" value="{{ pkg.sort_order|default:0 }}"></label>
+        <label class="gx-check full"><input type="checkbox" name="is_active" {% if is_new or pkg.is_active %}checked{% endif %}> {% translate "On offer — organisations can see and take it" %}</label>
+        <p class="gx-live full" data-gx-pp></p>
+        <div class="full"><button type="submit" class="gx-btn is-lime"><svg aria-hidden="true"><use href="#ic-check"/></svg>{% if is_new %}{% translate "Create package" %}{% else %}{% translate "Save changes" %}{% endif %}</button></div>
+      </form>
+      <div class="gx-stack">
+        <p class="gx-label">{% translate "Live preview" %}</p>
+        <div class="gx-preview" style="--ac: {% if row %}{{ row.accent }}{% else %}#1F7A63{% endif %}">
+          <span class="gx-pack-ic" aria-hidden="true"><svg><use href="#{% if row %}{{ row.icon }}{% else %}ic-spark{% endif %}"/></svg></span>
+          <b data-pv-out="name">{{ pkg.name|default:"Package name" }}</b>
+          <span data-pv-out="desc">{{ pkg.description|default:"Who it's for." }}</span>
+          <strong>$<span data-pv-out="price">{% if pkg %}{{ pkg.price_aud|floatformat:"0g" }}{% else %}0{% endif %}</span><small>/year</small></strong>
+          <em><span data-pv-out="seats">{{ pkg.seat_limit|default:0 }}</span> people &middot; <span data-pv-out="orgs">{{ pkg.child_org_limit|default:1 }}</span> organisation(s)</em>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

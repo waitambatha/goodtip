@@ -1,0 +1,106 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n static %}
+
+{% comment %}
+ONE PUBLISHED PLAN (client, 24 Oct 2026), on the pitch in the plan's own
+colour. The hero: name, who it is for, and its numbers on the scoreboard.
+The sheet: Overview (what it includes, where it sits among the five, who is
+on it) and Edit (published against live, then the form). A blank field
+still means "use the published number" (billing.pricing.effective_tier_config).
+Built by sysadmin.plan_admin_views.plan_detail.
+{% endcomment %}
+
+{% block gx_accent %}{{ row.accent }}{% endblock %}
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_plan_admin' %}">{% translate "Plans" %}</a></li>{% endblock %}
+{% block gx_nav %}
+{% if prev %}<a class="gx-btn is-glass" href="{% url 'admin:hq_plan_detail' prev.tier %}"><svg aria-hidden="true"><use href="#ic-chev-left"/></svg>{{ prev.label }}</a>{% endif %}
+{% if next %}<a class="gx-btn is-glass" href="{% url 'admin:hq_plan_detail' next.tier %}">{{ next.label }}<svg aria-hidden="true"><use href="#ic-chev-right"/></svg></a>{% endif %}
+{% endblock %}
+{% block gx_kicker %}{% blocktranslate with n=row.step %}Plan {{ n }} of 5{% endblocktranslate %}{% if row.popular %} &middot; {% translate "most popular" %}{% endif %}{% if row.changed %} &middot; {% translate "your own numbers" %}{% endif %}{% endblock %}
+{% block gx_title %}{{ row.label }}{% endblock %}
+{% block gx_lead %}{{ row.audience }}{% endblock %}
+{% block gx_board %}
+<div class="gx-score is-wide"><b>${{ row.effective.price|floatformat:"0g" }}</b><span>{% translate "a year" %}{% if row.effective.discount_amount %} &middot; {% translate "was" %} ${{ row.effective.original_price|floatformat:"0g" }}{% endif %}</span></div>
+<div class="gx-score is-cool"><b>{{ row.effective.seat_limit|floatformat:"0g" }}</b><span>{% translate "People" %}</span></div>
+<div class="gx-score is-cool"><b>{{ row.orgs_on }}</b><span>{% translate "On it now" %}</span></div>
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet" data-gx-tabs style="--ac: {{ row.accent }}">
+  <div class="gx-tabs" role="tablist">
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="overview" aria-selected="true">{% translate "Overview" %}</button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="edit">{% translate "Edit" %}</button>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="overview">
+    <div class="gx-split">
+      <div class="gx-stack">
+        <div>
+          <p class="gx-label">{% translate "What it includes" %}</p>
+          <ul class="gx-feats">{% for f in row.features %}<li><svg aria-hidden="true"><use href="#ic-check"/></svg>{{ f }}</li>{% endfor %}</ul>
+        </div>
+        <div class="gx-facts">
+          <div class="gx-fact"><span>{% translate "Organisations" %}</span><b>{{ row.effective.child_org_limit }}</b><small>{% translate "on one subscription" %}</small></div>
+          <div class="gx-fact"><span>{% translate "A person" %}</span><b>${{ row.per_person|floatformat:2 }}</b><small>{% translate "at full size" %}</small></div>
+          <div class="gx-fact"><span>{% translate "Groups" %}</span><b>{% if row.groups %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</b></div>
+        </div>
+        <div>
+          <p class="gx-label">{% translate "Where it sits among the five" %}</p>
+          <div class="gx-cmp">
+            {% for t in tiers %}
+            <a class="gx-cmp-row{% if t.tier == row.tier %} is-here{% endif %}" style="--ac: {{ t.accent }}" href="{% url 'admin:hq_plan_detail' t.tier %}">
+              <b>{{ t.label }}</b>
+              <span class="gx-cmp-cell"><span class="gx-mb"><i style="width: {{ t.price_pct }}%"></i></span><em>${{ t.effective.price|floatformat:"0g" }}</em></span>
+              <span class="gx-cmp-cell"><span class="gx-mb"><i style="width: {{ t.pp_pct }}%"></i></span><em>${{ t.per_person|floatformat:2 }}</em></span>
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="gx-card is-dark">
+        <p class="gx-label">{% translate "On this plan now" %}</p>
+        {% if live_subs %}
+        <ul class="gx-list">{% for s in live_subs %}<li><b>{{ s.org.name }}</b><span>${{ s.price_aud|floatformat:"0g" }} &middot; {{ s.get_status_display }}</span></li>{% endfor %}</ul>
+        {% else %}<p style="margin:0;color:rgba(255,255,255,.75)">{% translate "No organisation is on it right now." %}</p>{% endif %}
+        {% if past_subs %}
+        <p class="gx-label" style="margin-top:18px">{% translate "Have been on it" %}</p>
+        <ul class="gx-list">{% for s in past_subs %}<li><b>{{ s.org.name }}</b><span>{% if s.canceled_at %}{% translate "left" %} {{ s.canceled_at|date:"j M Y" }}{% else %}{{ s.created_at|date:"j M Y" }}{% endif %}</span></li>{% endfor %}</ul>
+        {% endif %}
+        <a class="gx-btn is-lime is-block" style="margin-top:18px" href="#edit" data-gx-open="edit">{% blocktranslate with name=row.label %}Change {{ name }}{% endblocktranslate %}</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="edit">
+    <div class="gx-h"><h3>{% blocktranslate with name=row.label %}Change {{ name }}{% endblocktranslate %}</h3><span class="gx-pill{% if row.override %} is-wait{% else %} is-ok{% endif %}"><i></i>{% if row.override %}{% translate "Your own numbers are live" %}{% else %}{% translate "Published numbers are live" %}{% endif %}</span></div>
+    <div class="gx-diff" style="margin-bottom:22px">
+      <div>{% translate "Price a year" %}<b>${{ row.effective.price|floatformat:"0g" }}</b>{% if row.effective.price != row.base_price %}<em>{% translate "published" %} ${{ row.base_price|floatformat:"0g" }}</em>{% else %}{% translate "as published" %}{% endif %}</div>
+      <div>{% translate "People" %}<b>{{ row.effective.seat_limit|floatformat:"0g" }}</b>{% if row.effective.seat_limit != row.base_seat_limit %}<em>{% translate "published" %} {{ row.base_seat_limit }}</em>{% else %}{% translate "as published" %}{% endif %}</div>
+      <div>{% translate "Organisations" %}<b>{{ row.effective.child_org_limit }}</b>{% if row.effective.child_org_limit != row.base_child_org_limit %}<em>{% translate "published" %} {{ row.base_child_org_limit }}</em>{% else %}{% translate "as published" %}{% endif %}</div>
+      <div>{% translate "Discount" %}<b>{% if row.effective.discount_amount %}${{ row.effective.discount_amount|floatformat:"0g" }}{% else %}{% translate "None" %}{% endif %}</b>{% if row.override.discount_percent %}{{ row.override.discount_percent|floatformat:0 }}%{% endif %}</div>
+    </div>
+    <form method="post" action="{% url 'admin:hq_plan_override_save' row.tier %}" class="gx-form gta-plan-form" data-base-price="{{ row.base_price }}" style="grid-template-columns: repeat(auto-fit, minmax(170px, 1fr))">
+      {% csrf_token %}
+      <label>{% translate "Price a year (AUD)" %} <small>{% translate "blank = published" %}</small>
+        <input type="number" name="price_aud" min="1" step="1" class="gta-plan-price" placeholder="{{ row.base_price|floatformat:0 }}"
+               value="{% if row.override.price_aud %}{{ row.override.price_aud|floatformat:0 }}{% endif %}"></label>
+      <label>{% translate "Member limit" %}
+        <input type="number" name="seat_limit" min="1" step="1" placeholder="{{ row.base_seat_limit }}"
+               value="{% if row.override.seat_limit %}{{ row.override.seat_limit }}{% endif %}"></label>
+      <label>{% translate "Organisation limit" %}
+        <input type="number" name="child_org_limit" min="1" step="1" placeholder="{{ row.base_child_org_limit }}"
+               value="{% if row.override.child_org_limit %}{{ row.override.child_org_limit }}{% endif %}"></label>
+      <label>{% translate "Discount %" %}
+        <input type="number" name="discount_percent" min="0" max="100" step="0.01" class="gta-plan-discount-pct"
+               value="{% if row.override.discount_percent %}{{ row.override.discount_percent|floatformat:2 }}{% endif %}"></label>
+      <label>{% translate "Discount $" %}
+        <input type="number" name="discount_amount_aud" min="0" step="0.01" class="gta-plan-discount-amt"
+               value="{% if row.override.discount_amount_aud %}{{ row.override.discount_amount_aud|floatformat:2 }}{% endif %}"></label>
+      <input type="hidden" name="discount_mode" class="gta-plan-discount-mode" value="">
+      <p class="gx-note full">{% translate "Type either discount and the other follows. Saving updates /pricing/ and every Plans page straight away; organisations already on it keep what they agreed to." %}</p>
+      <div class="full"><button type="submit" class="gx-btn is-lime"><svg aria-hidden="true"><use href="#ic-check"/></svg>{% blocktranslate with name=row.label %}Save {{ name }}{% endblocktranslate %}</button></div>
+    </form>
+  </div>
+</section>
+<script src="{% static 'js/gt-plan-admin.js' %}" defer></script>
+{% endblock %}

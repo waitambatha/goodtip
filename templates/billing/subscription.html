@@ -1,0 +1,178 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% comment %}
+THE SUBSCRIPTION, ON ITS OWN PAGE (client, 21 Oct 2026; rebuilt 24 Oct 2026:
+"more detailed, being able to click, seeing the history, seeing the charts...
+four visualizations... let it be in 3D, something that is a little bit
+stylish").
+
+Top to bottom:
+  .sx-hero    the plan (or "no plan yet" and the one that would fit), its
+              state, and the actions that act on it
+  .sx-charts  four 3D charts — seats used (a tank), the season clock (a
+              tilted ring), the organisation's growth (bars) and what each
+              plan costs (bars in the plans' own colours) — each with its
+              numbers in a table underneath (static/js/gt-charts3d.js)
+  .sx-hist    every plan this organisation has had, newest first, each one
+              opening to its details; and the payments Stripe has on record
+Everything comes from billing.views.subscription_view, which shares
+_subscription_status with the Plans page so the two never disagree.
+{% endcomment %}
+{% block title %}Subscription, {{ org.name }}{% endblock %}
+{% block loader_task %}Loading your subscription{% endblock %}
+{% block body_class %}page-deep sheet-page page-plans{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/gt-custom-pricing.css' %}"><link rel="stylesheet" href="{% static 'css/gt-subscription.css' %}">{% endblock %}
+{% block app_content %}
+<div class="app-head is-centred is-orgfirst"><div><div class="app-eyebrow">{{ org.name }} &middot; billing</div><h1 class="app-h1">Subscription</h1></div>
+  <a href="{% url 'billing:plans' org.id %}" class="abtn abtn-ghost abtn-sm">Change plan</a>
+</div>
+
+<div class="sx">
+
+  {# ---------------- the plan ---------------- #}
+  {% if current %}
+  <section class="sx-hero" style="--ac: {{ current_accent|default:'#2A7337' }}">
+    <div class="sx-hero-main">
+      <p class="sx-kick"><i aria-hidden="true"></i>Your subscription</p>
+      <h2 class="sx-plan">{{ current.get_tier_display }}</h2>
+      <p class="sx-price"><b>${{ current.price_aud|floatformat:"0g" }}</b><span>{% if current.is_test_daily %}/day{% else %}/year{% endif %}</span></p>
+      <ul class="sx-facts">
+        <li><span>Status</span><b class="sx-state{% if current.is_active and not current.cancel_at_period_end %} is-ok{% elif current.cancel_at_period_end %} is-end{% else %} is-wait{% endif %}">{% if current.is_test_daily %}Test mode{% elif current.is_active and current.cancel_at_period_end %}Active &middot; won&rsquo;t renew{% elif current.is_active %}Active{% else %}Scheduled{% endif %}</b></li>
+        <li><span>People</span><b>{{ members }} of {{ current.seat_limit_label }}</b></li>
+        {% if period %}<li><span>Renews</span><b>{{ period.end|date:"j M Y" }}</b></li>
+        {% elif current.starts_at %}<li><span>First charge</span><b>{{ current.starts_at|date:"j M Y" }}</b></li>{% endif %}
+        {% if current.is_founding_rate %}<li><span>Rate</span><b>Founding member</b></li>{% endif %}
+      </ul>
+    </div>
+    <div class="sx-hero-act">
+      {% if current.stripe_subscription_id and not current.is_test_daily and not current.cancel_at_period_end %}
+      <form method="post" action="{% url 'billing:pay_now' org.id %}"
+            data-confirm="Charges ${{ current.price_aud|floatformat:"0g" }} to the card on file right now, and {{ current.get_tier_display }} then renews a year from today instead of on its original date."
+            data-confirm-title="Pay ${{ current.price_aud|floatformat:"0g" }} now?" data-confirm-ok="Pay now">
+        {% csrf_token %}<button type="submit" class="cp-btn is-light">Pay now</button>
+      </form>
+      {% endif %}
+      {% if current.cancel_at_period_end %}
+      <form method="post" action="{% url 'billing:resume_subscription' org.id %}">{% csrf_token %}<button type="submit" class="cp-btn is-light">Keep subscription</button></form>
+      {% endif %}
+      <a class="cp-btn is-ghost-light" href="{% url 'billing:plans' org.id %}">Upgrade or downgrade</a>
+      {% if not current.cancel_at_period_end %}
+      <form method="post" action="{% url 'billing:cancel_subscription' org.id %}"
+            data-confirm="{% if current.is_active %}{{ org.name }} keeps the {{ current.get_tier_display }} plan through {% if period %}{{ period.end|date:"j F Y" }}{% else %}the season already paid for{% endif %} and will not be charged again.{% else %}Nothing has been charged yet, so this cancels right away with nothing lost.{% endif %}"
+            data-confirm-title="Cancel the {{ current.get_tier_display }} subscription?" data-confirm-ok="Cancel subscription" data-confirm-danger>
+        {% csrf_token %}<button type="submit" class="sx-cancel">Cancel subscription</button>
+      </form>
+      {% endif %}
+    </div>
+  </section>
+  {% else %}
+  <section class="sx-hero is-none" style="--ac: {{ fit.accent }}">
+    <div class="sx-hero-main">
+      <p class="sx-kick"><i aria-hidden="true"></i>{% if past_subscription %}Not subscribed &middot; {{ past_subscription.get_tier_display }} ended {{ past_subscription.canceled_at|date:"j M Y" }}{% else %}Not subscribed yet{% endif %}</p>
+      <h2 class="sx-plan">{{ org.name }} has no plan right now</h2>
+      <p class="sx-lead">With {{ members }} member{{ members|pluralize }} today, the plan that fits is <b>{{ fit.label }}</b> &mdash; ${{ fit.price|floatformat:"0g" }} a year for {{ fit.seats|floatformat:"0g" }} people.{% if past_subscription %}{% if past_subscription.paid_at %} Last payment ${{ past_subscription.price_aud|floatformat:0 }} for {{ past_subscription.get_tier_display }}{% if past_period %}, covered through {{ past_period.end|date:"j F Y" }}{% endif %}.{% else %} {{ past_subscription.get_tier_display }} was cancelled before the first payment &mdash; nothing was charged.{% endif %}{% endif %} The charts below are measured against it.</p>
+    </div>
+    <div class="sx-hero-act">
+      <a class="cp-btn is-light" href="{% url 'billing:plans' org.id %}">Choose {{ fit.label }} <span>&rarr;</span></a>
+      <a class="cp-btn is-ghost-light" href="{% url 'billing:plans' org.id %}">Compare all plans</a>
+      <a class="cp-btn is-ghost-light" href="{% url 'billing:packages' org.id %}">Custom pricing</a>
+    </div>
+  </section>
+  {% endif %}
+
+  {# ---------------- four charts ---------------- #}
+  {{ charts|json_script:"c3d-data" }}
+  <section class="sx-charts" aria-label="Your subscription in charts">
+
+    <article class="sx-chart">
+      <header><p class="cp-label">01 &middot; Places used</p><h3>{{ seat_pct }}% full</h3>
+        <p>{{ members }} people in a plan for {{ seat_limit|floatformat:"0g" }}{% if not current %} ({{ fit.label }}){% endif %} &mdash; {{ seats_left|floatformat:"0g" }} place{{ seats_left|pluralize }} left.</p></header>
+      <div class="sx-viz is-tank" data-c3d="tank" data-used="{{ members }}" data-cap="{{ seat_limit }}" data-color="{{ current_accent|default:fit.accent }}"></div>
+      <details class="sx-table"><summary>Show as numbers</summary>
+        <table><tr><th>People today</th><td>{{ members }}</td></tr><tr><th>Places in the plan</th><td>{{ seat_limit }}</td></tr><tr><th>Left</th><td>{{ seats_left }}</td></tr></table></details>
+    </article>
+
+    <article class="sx-chart">
+      <header><p class="cp-label">02 &middot; The season clock</p>
+        <h3>{% if clock %}{{ clock.big }} {{ clock.unit }}{% else %}No dates yet{% endif %}</h3>
+        <p>{% if clock %}{{ clock.line }}.{% else %}Dates appear once a plan is taken.{% endif %}{% if period %} {{ period.pct }}% of this season used.{% endif %}</p></header>
+      <div class="sx-viz is-ring" data-c3d="ring" data-pct="{{ clock.pct|default:0 }}" data-color="{{ current_accent|default:fit.accent }}" data-note="{% if clock %}{{ clock.line }}{% endif %}">
+        <div class="sx-ring-mid"><b>{% if period %}{{ period.pct }}%{% elif clock %}{{ clock.big }}{% else %}&ndash;{% endif %}</b><span>{% if period %}through{% elif clock %}{{ clock.unit }}{% endif %}</span></div>
+      </div>
+      <details class="sx-table"><summary>Show as numbers</summary>
+        <table>{% if period %}<tr><th>Started</th><td>{{ period.start|date:"j M Y" }}</td></tr><tr><th>Renews</th><td>{{ period.end|date:"j M Y" }}</td></tr><tr><th>Through the season</th><td>{{ period.pct }}%</td></tr>{% elif clock %}<tr><th>{{ clock.line|capfirst }}</th><td>{{ clock.big }} {{ clock.unit }}</td></tr>{% else %}<tr><td>No dates yet</td></tr>{% endif %}</table></details>
+    </article>
+
+    <article class="sx-chart is-wide">
+      <header><p class="cp-label">03 &middot; Your organisation, month by month</p>
+        <h3>{{ growth_now }} member{{ growth_now|pluralize }}</h3>
+        <p>{% if growth_now > growth_from %}Up from {{ growth_from }} six months ago.{% elif growth_now == growth_from %}The same as six months ago.{% else %}Down from {{ growth_from }} six months ago.{% endif %} Each bar is everyone in {{ org.name }} at the end of that month.</p></header>
+      <div class="sx-viz is-bars" data-c3d="bars" data-key="growth" data-unit="people" data-color="{{ current_accent|default:'#2A7337' }}" aria-label="Members at the end of each of the last six months"></div>
+      <details class="sx-table"><summary>Show as numbers</summary>
+        <table><tr><th>Month</th><th>Members</th></tr>{% for g in growth_rows %}<tr><td>{{ g.label }}</td><td>{{ g.value }}</td></tr>{% endfor %}</table></details>
+    </article>
+
+    <article class="sx-chart is-wide">
+      <header><p class="cp-label">04 &middot; What each plan costs a year</p>
+        <h3>{% if current and current.tier != "custom" %}{{ current.get_tier_display }} is yours{% else %}{{ fit.label }} fits you{% endif %}</h3>
+        <p>Each bar is one plan&rsquo;s yearly price, in its own colour. Faded bars hold fewer people than {{ org.name }} has today.</p></header>
+      <div class="sx-viz is-bars" data-c3d="bars" data-key="ladder" data-prefix="$" aria-label="Yearly price of each of the five plans"></div>
+      <details class="sx-table"><summary>Show as numbers</summary>
+        <table><tr><th>Plan</th><th>A year</th><th>People</th><th>A person, full</th></tr>{% for p in ladder_rows %}<tr><td>{{ p.label }}{% if p.on %} &larr;{% endif %}</td><td>${{ p.value|floatformat:"0g" }}</td><td>{{ p.seats|floatformat:"0g" }}</td><td>${{ p.per_person }}</td></tr>{% endfor %}</table></details>
+    </article>
+  </section>
+
+  {# ---------------- history ---------------- #}
+  <section class="sx-hist">
+    <header class="cp-sec-h">
+      <div><p class="cp-label">History</p><h2>Every plan {{ org.name }} has had</h2></div>
+      <p>{{ plans_history|length }} plan{{ plans_history|length|pluralize }} on record{% if paid_total %} &middot; ${{ paid_total|floatformat:"0g" }} paid in total{% endif %}. Open one to see its details.</p>
+    </header>
+    {% if plans_history %}
+    <ol class="sx-line">
+      {% for p in plans_history %}
+      <li class="sx-item is-{{ p.status }}{% if p.canceled_at %} is-cancelled{% endif %}">
+        <details{% if forloop.first and current %} open{% endif %}>
+          <summary>
+            <span class="sx-item-dot" aria-hidden="true"></span>
+            <span class="sx-item-name">{{ p.get_tier_display }}</span>
+            <span class="sx-item-price">${{ p.price_aud|floatformat:"0g" }}{% if p.is_test_daily %}/day{% else %}/yr{% endif %}</span>
+            <span class="sx-item-when">{{ p.created_at|date:"j M Y" }}</span>
+            <span class="sx-item-state">{% if p.canceled_at %}Cancelled{% elif p.status == "active" %}Active{% elif p.status == "scheduled" %}Scheduled{% elif p.status == "pending" %}Not paid{% else %}Ended{% endif %}</span>
+          </summary>
+          <dl class="sx-item-body">
+            <div><dt>Plan</dt><dd>{{ p.get_tier_display }}</dd></div>
+            <div><dt>Price</dt><dd>${{ p.price_aud|floatformat:"0g" }}{% if p.is_founding_rate and p.list_price_aud %} <s>${{ p.list_price_aud|floatformat:"0g" }}</s> founding rate{% endif %}</dd></div>
+            <div><dt>People</dt><dd>{{ p.seat_limit_label }}</dd></div>
+            <div><dt>Season</dt><dd>{{ p.season }}</dd></div>
+            <div><dt>Started</dt><dd>{{ p.created_at|date:"j M Y, g:i a" }}</dd></div>
+            <div><dt>Paid</dt><dd>{% if p.paid_at %}{{ p.paid_at|date:"j M Y" }}{% else %}Never charged{% endif %}</dd></div>
+            {% if p.canceled_at %}<div><dt>Cancelled</dt><dd>{{ p.canceled_at|date:"j M Y, g:i a" }}</dd></div>{% endif %}
+            {% if p.stripe_invoice_url %}<div><dt>Invoice</dt><dd><a href="{{ p.stripe_invoice_url }}" target="_blank" rel="noopener">Open</a></dd></div>{% endif %}
+          </dl>
+        </details>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="cp-empty">No plans yet &mdash; the first one you take will appear here.</p>
+    {% endif %}
+
+    {% if history %}
+    <div class="sx-pay">
+      <p class="cp-label">Payments</p>
+      <table>
+        <thead><tr><th>Date</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        {% for h in history %}
+        <tr><td>{{ h.date|date:"j M Y" }}</td><td>${{ h.amount|floatformat:"0g" }}</td><td><span class="sx-pay-st is-{{ h.status }}">{{ h.status }}</span></td><td>{% if h.url %}<a href="{{ h.url }}" target="_blank" rel="noopener">Invoice</a>{% endif %}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </section>
+</div>
+<script src="{% static 'js/gt-charts3d.js' %}" defer></script>
+{% endblock %}
