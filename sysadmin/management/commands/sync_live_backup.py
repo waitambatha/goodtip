@@ -491,7 +491,7 @@ class Command(BaseCommand):
 
     def _live(self, model_cls):
         """Live's rows of an origin table, asking only for columns live has."""
-        return model_cls.objects.using(LIVE_ALIAS).defer("origin", "live_id", *self._missing(model_cls))
+        return model_cls.objects.using(LIVE_ALIAS).defer("origin", "live_id", *self._missing(model_cls)).order_by()
 
     def _plain_fields(self, row, model_cls, skip):
         """Every concrete, non-relational field on `row` except `skip` — and

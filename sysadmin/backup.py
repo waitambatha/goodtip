@@ -362,7 +362,7 @@ class Mapper:
         fields = [model._meta.get_field(k) for k in keys]
         if self.live_columns(model) is None:
             return {}
-        live_vals = model._base_manager.using(self.source).values_list("pk", *[f.attname for f in fields])
+        live_vals = model._base_manager.using(self.source).order_by().values_list("pk", *[f.attname for f in fields])
         local = {}
         for row in model._base_manager.values_list("pk", *[f.attname for f in fields]):
             local[tuple(str(v) for v in row[1:])] = row[0]
@@ -460,7 +460,7 @@ def _copy_table(model, source, mapper, pending, now, say) -> int:
     new_objs = []
     changed = skipped = 0
     live_total = 0
-    for row in model._base_manager.using(source).values(*attnames).iterator():
+    for row in model._base_manager.using(source).order_by().values(*attnames).iterator():
         live_total += 1
         live_pk = row[pk_att]
         data, ok = {}, True
@@ -524,7 +524,7 @@ def _copy_table(model, source, mapper, pending, now, say) -> int:
         dst = m2m.m2m_reverse_field_name()
         src_f, dst_f = through._meta.get_field(src), through._meta.get_field(dst)
         links = []
-        for a, b in through._base_manager.using(source).values_list(src_f.attname, dst_f.attname):
+        for a, b in through._base_manager.using(source).order_by().values_list(src_f.attname, dst_f.attname):
             la, lb = mapper.translate(src_f, a), mapper.translate(dst_f, b)
             if la is not None and lb is not None:
                 links.append(through(**{src_f.attname: la, dst_f.attname: lb}))
