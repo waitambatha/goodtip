@@ -334,9 +334,13 @@ class Command(BaseCommand):
                     for s in row.sub_categories.all()
                 ) if sc
             )
-            org.competitions.set(
+            # Added, never taken away: staging offers competitions live does
+            # not yet (the ESPN leagues), and an admin who added the Premier
+            # League here lost it on the next pass when this was a set()
+            # (29 Oct 2026).
+            org.competitions.add(*(
                 c for c in (self._match_competition(c) for c in row.competitions.all()) if c
-            )
+            ))
         # Second pass: parents now exist locally, so remap self-FK.
         for row in rows:
             if not row.parent_id:
