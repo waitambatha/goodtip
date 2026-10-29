@@ -138,3 +138,34 @@ that will not compile.
   </p>
 </div>
 {% endif %}
+
+{% comment %}
+THE ROUND'S RESULTS (client, 28 Oct 2026: "when I go to the ladder... I can
+click this round, this team won by this point"). The games of the round on
+screen — the latest when none is picked — each with both scores, the winner
+lit, and the margin. Moves with the round strip above, because it is inside
+the pane the strip swaps. tipping.views.ladder_view builds it from the results
+store (matchreader.HistoricalMatch).
+{% endcomment %}
+{% if round_results %}
+<section class="lrr" style="--code: {{ selected_series.colour }}">
+  <header class="lrr-h">
+    <span class="lrr-k">{{ selected_series.name }}</span>
+    <h3>Round {{ results_round }} results</h3>
+    <span class="lrr-n">{{ round_results|length }} game{{ round_results|length|pluralize }}</span>
+  </header>
+  <ol class="lrr-list">
+    {% for r in round_results %}
+    <li class="lrr-game">
+      <span class="lrr-when">{{ r.m.kickoff_at|date:"D j M" }}</span>
+      <span class="lrr-side is-home{% if r.winner == 'home' %} won{% endif %}">
+        <b>{{ r.m.home_team.name }}</b><em>{{ r.m.home_score }}</em></span>
+      <span class="lrr-v" aria-hidden="true">v</span>
+      <span class="lrr-side is-away{% if r.winner == 'away' %} won{% endif %}">
+        <em>{{ r.m.away_score }}</em><b>{{ r.m.away_team.name }}</b></span>
+      <span class="lrr-margin">{% if r.winner == 'draw' %}Draw{% elif r.winner == 'home' %}{{ r.m.home_team.name }} by {{ r.margin }}{% else %}{{ r.m.away_team.name }} by {{ r.margin }}{% endif %}</span>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+{% endif %}

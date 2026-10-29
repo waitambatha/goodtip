@@ -1,0 +1,93 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n %}
+
+{% comment %}
+HOW THE SITE SHOWS UP IN GOOGLE, ON THE PITCH (was manage/seo.html — the
+page the client found still wearing the old HQ menu). What needs doing
+first, worst-first (sh-card, one per health check — a passing check still
+shows, so nobody wonders whether it ran); then every page and every story,
+as tabs. View: admin_panel.views.seo_list.
+{% endcomment %}
+
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_home' %}">HQ</a></li>{% endblock %}
+{% block gx_kicker %}HQ &middot; SEO{% endblock %}
+{% block gx_title %}{% translate "How the site shows up" %} <em>{% translate "in Google" %}</em>{% endblock %}
+{% block gx_lead %}{% translate "Titles, descriptions, share previews, addresses and what gets indexed — every one of them editable here." %}{% endblock %}
+{% block gx_board %}
+<a class="gx-score" href="#pages" data-gx-open="pages"><b>{{ pages|length }}</b><span>{% translate "Pages" %}</span></a>
+<div class="gx-score"><b>{{ noindex_count }}</b><span>{% translate "Kept out of Google" %}</span></div>
+<a class="gx-score" href="#stories" data-gx-open="stories"><b>{{ posts|length }}</b><span>{% translate "Stories" %}</span></a>
+<a class="gx-score" href="{% url 'admin:hq_redirects' %}"><b>{{ redirect_count }}</b><span>{% translate "Redirects" %}</span></a>
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet" data-gx-tabs>
+  <div class="gx-tabs" role="tablist">
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="health" aria-selected="true">{% translate "What needs doing" %}</button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="pages">{% translate "Pages" %} <em>{{ pages|length }}</em></button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="stories">{% translate "Stories" %} <em>{{ posts|length }}</em></button>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="health">
+    <div class="gx-h"><h2>{% translate "What needs doing" %}</h2><p>{% translate "Checked against every public page and every published story, each time this page opens." %}</p></div>
+    <div class="gx-grid3">
+      {% for row in health %}
+      <div class="gx-card sh-card gx-health is-{% if row.count %}{{ row.level }}{% else %}ok{% endif %}">
+        <div class="gx-health-top"><b class="gx-health-n">{{ row.count }}</b><div><b>{{ row.title }}</b><small>{{ row.why }}</small></div></div>
+        {% if row.count %}
+        <ul class="gx-health-items">{% for item in row.shown %}<li>{{ item }}</li>{% endfor %}{% if row.more %}<li><em>{% blocktranslate with n=row.more %}and {{ n }} more{% endblocktranslate %}</em></li>{% endif %}</ul>
+        <p class="gx-note">{{ row.fix }}</p>
+        {% else %}<p class="gx-note">&#10003; {% translate "Nothing to do here." %}</p>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <p class="gx-note" style="margin-top:18px"><b>{% translate "The sitemap looks after itself." %}</b>
+      <a href="/sitemap.xml" target="_blank" rel="noopener">/sitemap.xml</a> {% translate "is generated from these pages and the published stories every time it is asked for. Anything not indexed, or with a canonical pointing elsewhere, is left out." %}</p>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="pages">
+    <div class="gx-tablewrap">
+      <table class="gx-table" data-gx-rowlinks>
+        <thead><tr><th>{% translate "Page" %}</th><th>{% translate "Address" %}</th><th>{% translate "State" %}</th><th></th></tr></thead>
+        <tbody>
+        {% for row in pages %}
+        <tr data-href="{% url 'admin:hq_seo_edit' row.page.key %}">
+          <td class="is-name"><a href="{% url 'admin:hq_seo_edit' row.page.key %}">{{ row.page.label }}</a><small class="gx-tlabel" style="font-family:inherit">{{ row.page.blurb|truncatechars:90 }}</small></td>
+          <td>{% if row.path %}<code class="gx-code">{{ row.path }}</code>{% else %}<em>{% translate "inside a group" %}</em>{% endif %}{% if row.moved %} <span class="gx-pill is-offer"><i></i>{% translate "moved" %}</span>{% endif %}</td>
+          <td>{% if not row.page.is_public %}<span class="gx-pill"><i></i>{% translate "signed in" %}</span> {% endif %}
+            {% if row.noindex %}<span class="gx-pill is-wait"><i></i>{% translate "not indexed" %}</span>
+            {% elif row.customised %}<span class="gx-pill is-ok"><i></i>{% translate "set" %}</span>
+            {% else %}<span class="gx-pill"><i></i>{% translate "defaults" %}</span>{% endif %}</td>
+          <td class="gx-acts"><a class="gx-mini" href="{% url 'admin:hq_seo_edit' row.page.key %}">{% translate "Edit" %}</a></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="stories">
+    <p class="gx-note" style="margin-bottom:14px">{% translate "A story's search and social settings live in its own editor, under Search & social — beside the headline and teaser they fall back to." %}</p>
+    {% if posts %}
+    <div class="gx-tablewrap">
+      <table class="gx-table" data-gx-rowlinks>
+        <thead><tr><th>{% translate "Story" %}</th><th>{% translate "Address" %}</th><th>{% translate "State" %}</th><th></th></tr></thead>
+        <tbody>
+        {% for p in posts %}
+        <tr data-href="{% url 'admin:hq_news_edit' p.id %}">
+          <td class="is-name"><a href="{% url 'admin:hq_news_edit' p.id %}">{{ p.title }}</a><small class="gx-tlabel" style="font-family:inherit">{% if p.meta_description %}{{ p.meta_description|truncatechars:90 }}{% elif p.excerpt %}{{ p.excerpt|truncatechars:90 }}{% else %}{% translate "No description — Google will pick its own." %}{% endif %}</small></td>
+          <td><code class="gx-code">/news/{{ p.slug }}/</code></td>
+          <td>{% if p.is_scheduled %}<span class="gx-pill is-wait"><i></i>{% translate "scheduled" %}</span> {% elif not p.is_published %}<span class="gx-pill"><i></i>{% translate "draft" %}</span> {% endif %}
+            {% if not p.robots_index %}<span class="gx-pill is-wait"><i></i>{% translate "not indexed" %}</span>
+            {% elif p.meta_title or p.meta_description %}<span class="gx-pill is-ok"><i></i>{% translate "set" %}</span>
+            {% else %}<span class="gx-pill"><i></i>{% translate "defaults" %}</span>{% endif %}</td>
+          <td class="gx-acts"><a class="gx-mini" href="{% url 'admin:hq_news_edit' p.id %}">{% translate "Edit" %}</a></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}<div class="gx-empty"><b>{% translate "No stories yet" %}</b></div>{% endif %}
+  </div>
+</section>
+{% endblock %}

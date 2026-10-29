@@ -51,7 +51,8 @@ this — a finished game is not "locked", it is over.
   {% endif %}
 
   <div class="fxc-meta">
-    <span class="fxc-code">{{ match.round.series.name }}</span>
+    <span class="fxc-code" style="--code: {{ match.round.series.colour }}">{{ match.round.series.name }}</span>
+    <span class="fxc-rnd">{{ match.round.label }}</span>
     <span class="fxc-when">{{ match.kickoff_at|date:"D j M · g:i A" }}</span>
     {% if match.venue %}<span class="fxc-venue"><svg><use href="#ic-pin"/></svg>{{ match.venue }}</span>{% endif %}
     {% comment %}
@@ -124,7 +125,11 @@ this — a finished game is not "locked", it is over.
     <input type="radio" name="match_{{ match.id }}" value="none" hidden data-no-tip>
     {% endif %}
     {% include "partials/_fixture_team.html" with team=match.home_team form=reader.home pick="home" side="home" %}
+    {% if match.round.series.sport.draw_tips %}
+    {% include "partials/_fixture_draw.html" %}
+    {% else %}
     <span class="fxc-v" aria-hidden="true">vs</span>
+    {% endif %}
     {% include "partials/_fixture_team.html" with team=match.away_team form=reader.away pick="away" side="away" %}
   </div>
 

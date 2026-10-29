@@ -13,8 +13,31 @@ class Sport(models.Model):
     name = models.CharField(max_length=50, unique=True)
     slug = models.SlugField(max_length=50, unique=True)
 
+    # SPORTS THE ADMIN SWITCHES ON AND OFF (client, 27 Oct 2026: "add the
+    # top 10 sports... the admin should be able to say turn off this and turn
+    # on this like golf, then if it's turned on we see it"). Off hides a sport
+    # from everything members choose from; the rounds and tips an
+    # organisation already has are untouched. AFL and the NRL are the defaults.
+    is_active = models.BooleanField(default=True)
+    # How a sport is tipped. MATCH: two sides, pick the winner (football,
+    # basketball, tennis...). EVENT: a whole field competes and there is one
+    # winner (golf, motor racing) — tipped by picking from the field.
+    FORMAT_MATCH = "match"
+    FORMAT_EVENT = "event"
+    FORMAT_CHOICES = [(FORMAT_MATCH, "Head to head"), (FORMAT_EVENT, "Field event")]
+    format = models.CharField(max_length=8, choices=FORMAT_CHOICES, default=FORMAT_MATCH)
+    # Whether a member may tip a DRAW, and be paid as for a winner when it
+    # comes (client, 27 Oct 2026: "in things like football the user should be
+    # able to tip home or away or draw... if they tip draw points is given
+    # also as a win"). Off for the codes where a draw is rare enough to be a
+    # fixture-level ruling instead (AFL, NRL: see Round.points_per_draw).
+    draw_tips = models.BooleanField(default=False)
+    icon = models.CharField(max_length=8, blank=True, help_text="An emoji for the sports menu.")
+    sort_order = models.PositiveSmallIntegerField(default=100)
+    blurb = models.CharField(max_length=200, blank=True)
+
     class Meta:
-        ordering = ["name"]
+        ordering = ["sort_order", "name"]
 
     def __str__(self):
         return self.name
@@ -51,10 +74,48 @@ class Series(models.Model):
     representation_type = models.CharField(
         max_length=10, choices=REPRESENTATION_CHOICES, default=REPRESENTATION_FULL
     )
+    # Switched on and off in the admin, inside its sport (see Sport.is_active).
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveSmallIntegerField(default=100)
+    # Where its fixtures and results come from — said in the admin so a
+    # competition is never switched on in the belief that games will arrive
+    # when nothing is connected to fetch them.
+    feed_source = models.CharField(max_length=80, blank=True)
+    region = models.CharField(max_length=40, blank=True)
 
     class Meta:
-        ordering = ["name"]
+        ordering = ["sort_order", "name"]
         verbose_name_plural = "series"
+
+    # EVERY COMPETITION WEARS ITS OWN COLOUR (client, 28 Oct 2026: "the other
+    # sports do not have their colours... when we pin it, it does look
+    # different"). The four the product launched with keep theirs; every other
+    # competition takes a fixed shade from this palette — chosen by its slug,
+    # so a pinned La Liga is the same red on every screen and every visit.
+    # One each, chosen to stay apart from one another (client, 28 Oct 2026:
+    # "make sure the sports have different colours, I see some are similar").
+    # Deep enough for white text on every one.
+    COLOURS = {
+        "afl": "#2F5D8C", "aflw": "#8C2F55", "nrl": "#8A5A1E", "nrlw": "#5B3A8C",
+        "state-of-origin": "#1F6E5A", "super-league": "#5C6B2E", "super-netball": "#B0306E",
+        "epl": "#3D195B", "la-liga": "#C8102E", "serie-a": "#0B5FA5", "bundesliga": "#D4021D",
+        "ucl": "#0E1E5B", "a-league-men": "#E35205", "a-league-women": "#9B2D7F", "wsl": "#6E2C91",
+        "nba": "#1D428A", "wnba": "#E0571F", "nbl": "#0F7B6C", "wnbl": "#AD1F5C",
+        "bbl": "#1B8A3A", "wbbl": "#7A1FA2", "test-cricket": "#7B5E2A",
+        "super-rugby": "#0B4F6C", "super-rugby-w": "#B5446E", "six-nations": "#2E4A9E",
+        "slams-men": "#2C7A3F", "slams-women": "#8E3B8C",
+        "golf-majors-men": "#1F5E3A", "golf-majors-women": "#A04A75",
+        "f1": "#C1121F", "supercars": "#D9480F",
+        "nfl": "#013369", "nhl": "#1A1A1A", "pwhl": "#5E35B1", "mlb": "#0C2C56",
+    }
+    PALETTE = ["#C0392B", "#16794C", "#1F5FA8", "#B8541A", "#6B3FA0", "#0E7C86",
+               "#A2264B", "#3D6B1E", "#2B4C9B", "#8E5B14", "#7A2E8E", "#1B6A5E"]
+
+    @property
+    def colour(self) -> str:
+        if self.slug in self.COLOURS:
+            return self.COLOURS[self.slug]
+        return self.PALETTE[sum(map(ord, self.slug or self.name)) % len(self.PALETTE)]
 
     def __str__(self):
         return self.name

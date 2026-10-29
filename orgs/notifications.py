@@ -256,9 +256,7 @@ def _round_result_messages(round_obj, org, room, matches) -> list:
             tip = user_tips.get(match.id)
             picked_name = ""
             if tip:
-                picked_name = (
-                    match.home_team.name if tip.selection == "home" else match.away_team.name
-                )
+                picked_name = tip.pick_name
                 if tip.is_correct is not None:
                     graded += 1
                     if tip.is_correct:

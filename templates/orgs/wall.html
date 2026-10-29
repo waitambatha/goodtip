@@ -187,7 +187,7 @@ with no room chosen starts on the list.
             <select name="tip" class="gwr-pick" aria-label="Attach one of your picks (optional)">
               <option value="">Attach a pick (optional)</option>
               {% for t in my_tips %}
-              <option value="{{ t.id }}">{% if t.selection == 'home' %}{{ t.match.home_team.name }}{% else %}{{ t.match.away_team.name }}{% endif %}, v {% if t.selection == 'home' %}{{ t.match.away_team.name }}{% else %}{{ t.match.home_team.name }}{% endif %}</option>
+              <option value="{{ t.id }}">{{ t.pick_text }}</option>
               {% empty %}
               <option value="" disabled>Tip this round and your picks appear here</option>
               {% endfor %}

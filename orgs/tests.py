@@ -3295,7 +3295,10 @@ class ContextChipTests(TestCase):
             self.reverse("orgs:switch_group", args=[self.org.id, self.marketing.id])
         )
         html = self.client.get(self.reverse("dashboard")).content.decode()
-        self.assertIn(self.reverse("orgs:leave_group_context"), html)
+        # Since 28 Oct 2026 the way back is the top bar's menu — its "The
+        # whole organisation" row — the dashboard's own strip having gone.
+        self.assertIn(self.reverse("orgs:switch_org", args=[self.org.id]), html)
+        self.assertIn("The whole organisation", html)
 
     def test_a_group_you_have_not_joined_is_not_offered(self):
         Group.objects.create(org=self.org, name="Sales")

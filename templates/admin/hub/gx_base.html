@@ -14,6 +14,7 @@ the tab is kept in the address (#people, #conversation...) so a reload or a
 shared link opens the same part.
 
 Blocks:
+  gx_back      the "Back to …" link (defaults to back_url / back_label)
   gx_crumbs    extra breadcrumb items between Dashboard and the title
   gx_nav       right of the breadcrumbs: previous / next, page actions
   gx_kicker    the small line over the title
@@ -43,10 +44,13 @@ Styles: static/css/gt-admin-gx.css; tabs: static/js/gt-admin-gx.js.
   </svg>
 
   <div class="gx-bar">
+    {% include "admin/hub/_history.html" %}
+    {% block gx_back %}
     <a class="gx-back" href="{% if back_url %}{{ back_url }}{% else %}{% url 'admin:index' %}{% endif %}">
       <svg aria-hidden="true"><use href="#ic-arrow-left"/></svg>
       <span>{% if back_url %}{% blocktranslate %}Back to {{ back_label }}{% endblocktranslate %}{% else %}{% translate "Dashboard" %}{% endif %}</span>
     </a>
+    {% endblock %}
     <ol class="gx-crumbs">
       <li><a href="{% url 'admin:index' %}">{% translate "Dashboard" %}</a></li>
       {% block gx_crumbs %}{% endblock %}

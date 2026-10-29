@@ -215,46 +215,56 @@ def security_hub(request):
 # ---------------------------------------------------------------------------
 
 def hq_hub(request):
-    """GoodTip's own work: the site's words, its inbox, its fixtures.
+    """GoodTip's own work: the site's words, its inbox, its fixtures — on the
+    pitch since 26 Oct 2026 ("let it have the design we have been working
+    on"). WHAT is in the section still comes from hub.HQ_SCREENS, the list
+    the rail reads; each card now also carries the numbers that say whether
+    it needs opening today. News & blog left for its own row in the menu.
 
-    WHAT is in the section comes from hub.HQ_SCREENS — the same list the rail
-    reads, so the menu and this page cannot disagree about what HQ contains.
-    What is WAITING is counted here, because a count is a fact about this
-    minute and the rail draws itself on every screen in the admin.
-
-    Each screen asks the capability it leads to rather than `is_superuser`. A
-    restricted administrator is not a superuser, and hiding these from them
-    would hide the very screens their account was created to use.
+    Each screen asks the capability it leads to rather than `is_superuser`.
     """
-    from admin_panel.models import Enquiry, NewsPost
+    from django.apps import apps as django_apps
 
     cards = hub.screens(hub.HQ_SCREENS, lambda key: access.can(request.user, key))
 
-    try:
-        open_enquiries = Enquiry.objects.filter(status=Enquiry.STATUS_NEW).count()
-    except Exception:
-        open_enquiries = None
-    try:
-        drafts = NewsPost.objects.filter(is_published=False).count()
-    except Exception:
-        drafts = None
+    def safe(fn, default=None):
+        try:
+            return fn()
+        except Exception:  # noqa: BLE001 — a number missing costs the number, not the page
+            return default
 
-    notes = {
-        "news": (f"{drafts} draft{'' if drafts == 1 else 's'}", False) if drafts else None,
-        "enquiries": (f"{open_enquiries} open", True) if open_enquiries else None,
+    Enquiry = django_apps.get_model("admin_panel", "Enquiry")
+    PageEdit = django_apps.get_model("admin_panel", "PageEdit")
+    PageSEO = django_apps.get_model("admin_panel", "PageSEO")
+    Redirect = django_apps.get_model("admin_panel", "Redirect")
+    SyncRun = django_apps.get_model("data_sync", "SyncRun")
+
+    open_enq = safe(lambda: Enquiry.objects.filter(status=Enquiry.STATUS_NEW).count(), 0)
+    latest_enq = safe(lambda: Enquiry.objects.order_by("-pk").first())
+    last_sync = safe(lambda: SyncRun.objects.filter(finished_at__isnull=False).order_by("-started_at").first())
+    stats = {
+        "enquiries": {"big": open_enq, "unit": "open", "hot": bool(open_enq),
+                      "line": (f"Latest from {latest_enq.name}" if latest_enq else "No enquiries yet"),
+                      "sub": safe(lambda: f"{Enquiry.objects.count()} in all", "")},
+        "pages": {"big": safe(lambda: PageEdit.objects.count(), 0), "unit": "edits",
+                  "line": "Words and pictures changed from the site's defaults", "sub": ""},
+        "seo": {"big": safe(lambda: PageSEO.objects.count(), 0), "unit": "pages tuned",
+                "line": "Titles, descriptions and share images", "sub": ""},
+        "redirects": {"big": safe(lambda: Redirect.objects.count(), 0), "unit": "redirects",
+                      "line": "Old addresses still landing somewhere", "sub": ""},
+        "sync": {"big": ("OK" if last_sync and last_sync.ok else "Check" if last_sync else "—"), "unit": "last fixture sync",
+                 "hot": bool(last_sync and not last_sync.ok),
+                 "line": (f"{last_sync.get_kind_display() if hasattr(last_sync, 'get_kind_display') else 'Sync'} "
+                          f"· {last_sync.competition}" if last_sync else "Not run yet"),
+                 "when": last_sync.finished_at if last_sync else None, "sub": ""},
     }
-    for card in cards:
-        note = notes.get(card["key"])
-        if note:
-            card["note"], card["hot"] = note
+    for c in cards:
+        c["stats"] = stats.get(c["key"], {})
 
-    return render(request, "admin/hub/cards.html", _ctx(
+    return render(request, "admin/hub/hq.html", _ctx(
         request, "HQ",
-        cards=cards,
-        hub_title="HQ",
-        hub_lead="GoodTip's own work — the company's words, its inbox and its "
-                 "fixtures. None of it belongs to any one organisation.",
-        hub_icon="ic-f-org",
+        cards=cards, open_enquiries=open_enq, last_sync=last_sync,
+        page_edits=stats["pages"]["big"], redirects=stats["redirects"]["big"],
     ))
 
 

@@ -34,6 +34,7 @@ here fails the whole sync over a decorative attribute. The three core facts
 import os
 
 import dj_database_url
+from django.apps import apps
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, connections, transaction
@@ -50,24 +51,131 @@ PRODUCTION_DB_NAMES = {"goodtip_db"}
 class Command(BaseCommand):
     help = "Copy real (live) accounts, orgs, groups and the waiting list onto staging. Staging only."
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--watch", type=int, default=0, metavar="SECONDS",
+            help="Keep running, checking live every SECONDS seconds — the backup as it "
+                 "happens rather than once an hour (client, 26 Oct 2026). Without it, one pass.",
+        )
+
     def handle(self, *args, **options):
+        import time
+
+        from django.db import close_old_connections
+
         self._refuse_unless_staging()
+        every = options.get("watch") or 0
+        if not every:
+            self._one_pass()
+            return
+        # WATCHING (client, 26 Oct 2026: "when it is created in live we
+        # immediately have it also backed up"). One pass, a short rest, again
+        # — run by its own long-lived service. A pass that fails is logged and
+        # the next one tries again; nothing here exits on a bad minute.
+        self.stdout.write(f"Watching live, every {every}s.")
+        started_on = self._code_version()
+        while True:
+            try:
+                self._one_pass()
+            except Exception as exc:  # noqa: BLE001 — recorded on the run; keep watching
+                self.stderr.write(f"backup pass failed: {exc}")
+            close_old_connections()
+            # A deploy changes the code under a process that never ends. When
+            # the checkout moves on, stop; the service starts us again on the
+            # new code (Restart=always).
+            if self._code_version() != started_on:
+                self.stdout.write("New code deployed — restarting the watcher.")
+                return
+            time.sleep(every)
+
+    @staticmethod
+    def _code_version():
+        import subprocess
+
+        try:
+            return subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True,
+                                  cwd=settings.BASE_DIR, timeout=5).stdout.strip()
+        except Exception:  # noqa: BLE001 — no git, no restarts; the watch carries on
+            return ""
+
+    def _one_pass(self):
+        from django.utils import timezone
+
+        from sysadmin import backup
+        from sysadmin.models import BackupRun
+
+        run = BackupRun.objects.create()
         self._open_live_connection()
         try:
             counts = {}
             with transaction.atomic():
-                counts["organisations"] = self._sync_organisations()
-                counts["users"] = self._sync_users()
-                counts["groups"] = self._sync_groups()
-                counts["org memberships"] = self._sync_org_members()
-                counts["group memberships"] = self._sync_group_members()
-                counts["waiting list"] = self._sync_launch_signups()
+                # Per table, {"new", "updated"} — the backup history shows
+                # what arrived in each run. For these six, "new" is how many
+                # more real rows staging holds after the run than before (they
+                # are re-saved on every pass, so "updated" would mean nothing).
+                for label, step in (
+                    ("orgs.organisation", self._sync_organisations),
+                    ("accounts.user", self._sync_users),
+                    ("orgs.group", self._sync_groups),
+                    ("orgs.orgmember", self._sync_org_members),
+                    ("orgs.groupmember", self._sync_group_members),
+                    ("accounts.launchsignup", self._sync_launch_signups),
+                ):
+                    model = apps.get_model(label)
+                    before = model.objects.filter(origin=ORIGIN_LIVE).count()
+                    step()
+                    new = model.objects.filter(origin=ORIGIN_LIVE).count() - before
+                    live_total = model._base_manager.using(LIVE_ALIAS).count()
+                    counts[label] = {"new": max(0, new), "updated": 0, "live": live_total}
+                backup.record_origin_backups()
+                # EVERY OTHER TABLE (client, 25 Oct 2026: "if something has
+                # been posted in live, I expect to see it in staging, but
+                # under backup") — see sysadmin.backup.copy_everything.
+                counts.update(backup.copy_everything(LIVE_ALIAS, log=self.stdout.write))
+        except Exception as exc:
+            run.error, run.finished_at = str(exc)[:4000], timezone.now()
+            run.save(update_fields=["error", "finished_at"])
+            raise
         finally:
             self._close_live_connection()
 
-        width = max(len(name) for name in counts)
+        run.ok, run.finished_at, run.counts = True, timezone.now(), counts
+        run.save(update_fields=["ok", "finished_at", "counts"])
+        backup.fold_quiet_run(run)
+
+        # Deletions Ian has approved on live — the one thing this job writes
+        # to live, over its own connection (LIVE_WRITE_DATABASE_URL), opened
+        # only if there is something to do and only if it is configured.
+        self._run_live_deletions()
+
         for name, n in counts.items():
-            self.stdout.write(f"  {name.ljust(width)}  {n:>6,}")
+            if isinstance(n, dict) and (n.get("new") or n.get("updated")):
+                self.stdout.write(f"  {name}: {n.get('new', 0)} new, {n.get('updated', 0)} updated")
+
+    def _run_live_deletions(self):
+        from sysadmin import backup
+        from sysadmin.models import DeletionRequest
+
+        if not DeletionRequest.objects.filter(database=DeletionRequest.DB_LIVE,
+                                              status=DeletionRequest.APPROVED).exists():
+            return
+        url = os.environ.get("LIVE_WRITE_DATABASE_URL")
+        if not url:
+            backup.run_live_deletions(None, log=self.stdout.write)
+            return
+        alias = "live_backup_write"
+        config = dj_database_url.parse(url, conn_max_age=0)
+        for k, v in (("ATOMIC_REQUESTS", False), ("AUTOCOMMIT", True), ("CONN_HEALTH_CHECKS", False),
+                     ("TIME_ZONE", None), ("TEST", {})):
+            config.setdefault(k, v)
+        connections.databases[alias] = config
+        try:
+            if connections[alias].settings_dict.get("NAME") not in PRODUCTION_DB_NAMES:
+                raise CommandError("LIVE_WRITE_DATABASE_URL does not point at live (goodtip_db) — refusing.")
+            backup.run_live_deletions(alias, log=self.stdout.write)
+        finally:
+            connections[alias].close()
+            del connections.databases[alias]
 
     # ---- safety -------------------------------------------------------
 

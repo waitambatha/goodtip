@@ -372,6 +372,16 @@ if "test" in sys.argv:
     STORAGES["staticfiles"] = {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
     }
+    # A second database standing in for LIVE, for sysadmin.test_backup only:
+    # the generic backup copies from it into the default one. Tests only —
+    # nothing outside a test run ever sees this alias.
+    DATABASES["backup_source"] = {
+        **DATABASES["default"],
+        # Tables straight from the models, not the migration history: some
+        # data migrations write without naming a database, and would land in
+        # the default one.
+        "TEST": {"NAME": "test_goodtip_backup_source", "MIGRATE": False},
+    }
 
 LOGGING = {
     "version": 1,

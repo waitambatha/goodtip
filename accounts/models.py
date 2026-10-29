@@ -111,6 +111,13 @@ class User(AbstractUser, OriginMixin):
     # i want"). A column rather than a cookie, so it follows them to their phone.
     recap_codes = models.JSONField(default=list, blank=True)
 
+    # THE COMPETITIONS THIS PERSON HAS PINNED, as Series slugs ("epl",
+    # "golf-majors-men"), in the order pinned (client, 27 Oct 2026: "pin my
+    # favourite sport... I can pin golf, I can pin football"). They sit beside
+    # the four defaults above the fixtures. A column, like recap_codes, so a
+    # pin follows them to their phone.
+    pinned_series = models.JSONField(default=list, blank=True)
+
     def has_seen_tour(self, key: str) -> bool:
         return key in (self.onboarding_pages_seen or [])
 

@@ -165,7 +165,7 @@ def tip_round_confirm(request, org_id: int, round_id: int):
             except ValueError:
                 skipped += 1
             continue
-        if selection not in ("home", "away"):
+        if selection not in ("home", "away", "draw"):
             continue
         try:
             submit_tip(user=request.user, match=match, org=org, selection=selection,
@@ -444,7 +444,7 @@ def _posted_picks(request, org) -> dict:
     """
     ids = []
     for key, value in request.POST.items():
-        if not key.startswith("match_") or value not in ("home", "away"):
+        if not key.startswith("match_") or value not in ("home", "away", "draw"):
             continue
         raw = key[len("match_"):]
         if raw.isdigit():
@@ -1170,8 +1170,29 @@ def ladder_view(request, org_id: int):
     # partial, so the fragment cannot drift from what a reload would produce.
     # The href on every control is unchanged, so a copied address, a new tab
     # and a browser with no JavaScript all still work.
+    # THE ROUND'S RESULTS, under the table (client, 28 Oct 2026: "when I go
+    # to the ladder, I can click this round — this team won by this point").
+    # Read from the results store (matchreader.HistoricalMatch, one row per
+    # real game, no organisation), for the round on screen — the latest when
+    # none is picked.
+    round_results, results_round = [], None
+    if selected and rounds_available:
+        from matchreader.models import HistoricalMatch
+
+        results_round = at_round if at_round is not None else max(rounds_available)
+        for hm in (HistoricalMatch.objects.filter(series=selected, season=org.season.year,
+                                                  round_number=results_round)
+                   .select_related("home_team", "away_team").order_by("kickoff_at")):
+            margin = abs((hm.home_score or 0) - (hm.away_score or 0))
+            round_results.append({
+                "m": hm, "margin": margin,
+                "winner": "home" if hm.home_score > hm.away_score else "away" if hm.away_score > hm.home_score else "draw",
+            })
+
     ctx = {
         "org": org,
+        "round_results": round_results,
+        "results_round": results_round,
         "series_options": ordered,
         "selected_series": selected,
         "entries": entries,

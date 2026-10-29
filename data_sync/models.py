@@ -19,6 +19,9 @@ class SyncRun(models.Model):
     KIND_LADDER = "ladder"
     KIND_BACKFILL = "backfill"
     KIND_CHECK = "check"
+    # GoodTip's own fixture library (27 Oct 2026): every competition with a
+    # feed, kept current whether or not any organisation tips it yet.
+    KIND_LIBRARY = "library"
     KIND_CHOICES = [
         (KIND_FIXTURES, "Fixtures"),
         (KIND_RESULTS, "Results"),
@@ -26,10 +29,12 @@ class SyncRun(models.Model):
         (KIND_LADDER, "Ladder"),
         (KIND_BACKFILL, "Full-season backfill"),
         (KIND_CHECK, "Feed check"),
+        (KIND_LIBRARY, "Fixture library"),
     ]
 
     kind = models.CharField(max_length=10, choices=KIND_CHOICES)
-    competition = models.CharField(max_length=20)
+    # Room for a league's full name ("English Premier League", 27 Oct 2026).
+    competition = models.CharField(max_length=60)
     org = models.ForeignKey(
         "orgs.Organisation", on_delete=models.CASCADE, related_name="sync_runs",
         null=True, blank=True,

@@ -2909,6 +2909,87 @@ def leave_group_view(request):
 # ---------------------------------------------------------------------------
 
 
+def _sync_org_soon(org_id: int) -> None:
+    """Discover and fetch one organisation's fixtures and results, off the
+    request — a sweep reads the feeds and must not hold the page."""
+    import threading
+
+    from django.core.management import call_command
+    from django.db import connections
+
+    def work():
+        try:
+            # From GoodTip's own fixture library first — no network, seconds —
+            # then the regular syncs bring it to the minute.
+            from data_sync.library import seed_org
+            from orgs.models import Organisation
+
+            seed_org(Organisation.objects.select_related("season").get(pk=org_id))
+            call_command("sync_matches", fixtures=True, discover=True, org=org_id)
+            call_command("sync_matches", results=True, discover=True, org=org_id)
+        except Exception:  # noqa: BLE001 — the timer will catch up
+            logger.exception("Immediate sync for org %s failed", org_id)
+        finally:
+            connections.close_all()
+
+    import sys
+    if sys.argv[1:2] == ["test"]:
+        return      # no network and no second connection under the test runner
+    threading.Thread(target=work, daemon=True, name=f"org-sync-{org_id}").start()
+
+
+@login_required
+def org_sports_view(request, org_id: int):
+    """WHAT THIS ORGANISATION TIPS ON, as its admin chooses it (client, 28 Oct
+    2026: "the admin of the organisation... a place where they can select the
+    sports they want their people to see... a good design, similar to the
+    super admin... I can just click add").
+
+    Every competition GoodTip has switched on and is fetching (Sports &
+    competitions in the super admin; orgs.forms.fed_competitions), grouped by
+    sport. Add one and its games are there at once — built from GoodTip's
+    fixture library (data_sync.library), not fetched for this organisation —
+    and members see it in their sports menu, can pin it and tip it. Removing
+    deletes nothing: its rounds and tips stay, and adding it back restores them.
+    """
+    from catalog.models import Sport
+
+    org = get_object_or_404(Organisation, pk=org_id, parent__isnull=True)
+    if not _is_creator_admin(request.user, org):
+        return HttpResponseForbidden()
+
+    offered = {c.pk: c for c in fed_competitions() if c.season_id == org.season_id}
+    chosen = set(org.competitions.values_list("pk", flat=True))
+
+    if request.method == "POST":
+        comp = offered.get(int(request.POST.get("competition") or 0))
+        if comp is None:
+            messages.error(request, "That competition isn't available right now.")
+        elif comp.pk in chosen:
+            if len(chosen) == 1:
+                messages.error(request, "Keep at least one competition — members need something to tip.")
+            else:
+                org.competitions.remove(comp)
+                messages.info(request, f"{comp.name} removed. Nothing was deleted — add it back and its rounds and tips return.")
+        else:
+            org.competitions.add(comp)
+            _sync_org_soon(org.pk)
+            messages.success(request, f"{comp.name} added. Its games are on your members' dashboards now.")
+        return redirect(f"{reverse('orgs:sports', args=[org.pk])}#comp-{comp.pk if comp else ''}")
+
+    sports = []
+    for sport in Sport.objects.filter(is_active=True):
+        comps = sorted((c for c in offered.values() if c.sport_id == sport.id), key=lambda c: c.name)
+        if not comps:
+            continue
+        sports.append({"sport": sport, "comps": [
+            {"comp": c, "on": c.pk in chosen, "series": list(c.series.all())} for c in comps
+        ]})
+    return render(request, "orgs/sports.html", {
+        "org": org, "sports": sports, "chosen_count": len(chosen & set(offered)),
+    })
+
+
 @login_required
 def org_settings_view(request, org_id: int):
     """Change what an organisation picked when it was created.
@@ -2941,6 +3022,11 @@ def org_settings_view(request, org_id: int):
         after = {c.pk for c in chosen}
 
         added = [c.name for c in chosen if c.pk not in before]
+        if added:
+            # Fetch the new competition's draw now rather than on the next
+            # timer tick, so a sport switched on and added (27 Oct 2026) shows
+            # its fixtures the moment the admin goes back to the dashboard.
+            _sync_org_soon(org.pk)
         # Removing is not a delete. The rounds, the tips and the ladder for a
         # competition that has been dropped all stay exactly where they are —
         # a season half-played is still a season people remember. It stops

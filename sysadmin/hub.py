@@ -310,10 +310,9 @@ class Screen:
 
 
 HQ_SCREENS = [
-    Screen("news", "News & blog",
-           "Write, publish and email stories. Everything here reaches every "
-           "member's dashboard.",
-           "ic-f-doc", TEAL, "admin:hq_news", "news.write"),
+    # News & blog left HQ on 26 Oct 2026 — it has its own row in the menu
+    # and its own place under Databases ("on the HQ you can remove the news
+    # and blogs couse we already have it in the database and on the menu").
     Screen("enquiries", "Enquiries inbox",
            "Messages sent through the public contact form, and what was replied.",
            "ic-f-mail", GOLD, "admin:hq_enquiries", "enquiries.read"),

@@ -1,0 +1,20 @@
+[Unit]
+Description=GoodTip staging — back up live into staging as it happens (watches live every 15 seconds)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mbatha-goodtip
+WorkingDirectory=/home/mbatha-goodtip/projects/goodtip-staging
+# The live connection strings live only here, never in staging's .env (CLAUDE.md).
+EnvironmentFile=/home/mbatha-goodtip/projects/goodtip-staging/.env.live-backup
+ExecStart=/home/mbatha-goodtip/projects/goodtip-staging/venv/bin/python manage.py sync_live_backup --watch 15
+# It exits on its own when a deploy changes the code; come straight back on the new code.
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

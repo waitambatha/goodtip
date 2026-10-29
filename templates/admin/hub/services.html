@@ -1,144 +1,190 @@
-{% extends "admin/hub/base.html" %}
-{% load i18n %}
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n humanize gtadmin %}
 
 {% comment %}
-SERVICES — what the system does on its own, and how it has been getting on.
+SERVICES, AS A LIVE STATUS BOARD (client, 27 Oct 2026: "be creative with it,
+need to see how things are working on real time and say it's okay, and not
+everything been started").
 
-Client, 20 Sep 2026: "in the super admin we also need to add Services ...
-things like email services where we monitor the email services and such, your
-traffic and such — kind of services that our system does. And the AI, like the
-Prefect; monitor things like the MatchReader, Group Recap, see how they
-perform."
+What the system does on its own — email, the sports feeds, the live→staging
+backup, Prefect, MatchReader, the recap writer, sign-ins — read like a
+status page:
 
-EVERY PANEL IS THE SAME SHAPE and that is the point of the screen. A dashboard
-whose six cards each report health their own way is six things to learn; here
-every one says a word for its state, one headline number, three figures under
-it, and then whatever is specific to that service. Somebody who has read one
-panel can read all six.
+  the banner     one sentence for all of it ("All systems operational"),
+                 how many are running, and "live · updated 4s ago"
+  one row each   its state in a word (Operational, Needs a look, Failing,
+                 Stalled, Quiet, Not started), what it did, when it last did
+                 anything, and a strip of bars — its history over the window,
+                 slot by slot (green worked, amber some failed, red all
+                 failed, grey nothing ran)
+  click a row    its figures, facts, recent failures and notes; one open at
+                 a time (<details name="svc">)
 
-ONE WINDOW ACROSS ALL OF THEM, for the same reason. "Were the emails failing
-while the syncs were?" is the question people open this page with, and it can
-only be answered if the panels are describing the same hours.
-
-THE NOTES ARE PART OF THE DATA. Where a number is a proxy rather than a
-measurement — Prefect's "acted on" rate — or where there is no measurement at
-all — page views — the panel says so in full. A monitoring screen earns its
-figures by being honest about the ones it has not got.
+Every number is read from a table something actually wrote
+(sysadmin.services_views). The page re-reads itself every
+{{ refresh }} seconds from the same view (?format=json) and updates in place;
+the "ago" times tick every second.
 {% endcomment %}
 
-{% block hub_accent %}var(--gt-c2){% endblock %}
-{% block hub_ic %}ic-chart{% endblock %}
-
-{% block hub_aside %}
-<div class="gta-chipset gta-svc-window" role="group" aria-label="{% translate 'Period' %}">
-  {% for key, label, days in windows %}
-  <a class="gta-chip{% if window == key %} on{% endif %}" href="?window={{ key }}">{{ label }}</a>
-  {% endfor %}
-</div>
+{% block gx_kicker %}{% translate "Services" %}{% endblock %}
+{% block gx_title %}{% translate "How everything" %} <em>{% translate "is running" %}</em>{% endblock %}
+{% block gx_lead %}{% translate "Everything GoodTip does on its own, watched live. Open a service to see what it has been doing." %}{% endblock %}
+{% block gx_board %}
+<div class="gx-score"><b data-sv-running>{{ overall.running }}/{{ panels|length }}</b><span>{% translate "Running" %}</span></div>
+<div class="gx-score"><b>{{ overall.hot|length }}</b><span>{% translate "Need attention" %}</span></div>
+<div class="gx-score"><b>{{ overall.off|length }}</b><span>{% translate "Not started" %}</span></div>
 {% endblock %}
 
-{% block hub_body %}
-<div class="gta-svc-grid">
-  {% for p in panels %}
-  <section class="gta-svc is-{{ p.state }}">
+{% block gx_body %}
+<div class="sv" data-sv data-sv-refresh="{{ refresh }}" data-sv-url="?window={{ window }}&amp;format=json">
 
-    <header class="gsv-head">
-      <span class="gsv-ic"><svg aria-hidden="true"><use href="#{{ p.icon }}"/></svg></span>
-      <div class="gsv-title">
-        <h2>{{ p.label }}</h2>
-        <p>{{ p.blurb }}</p>
+  <section class="sv-banner is-{{ overall.level }}" data-sv-banner>
+    <span class="sv-orb" aria-hidden="true"><i></i><i></i><i></i></span>
+    <div class="sv-banner-t">
+      <h2 data-sv-title>{{ overall.title }}</h2>
+      <p>{% blocktranslate with r=overall.running n=panels|length %}{{ r }} of {{ n }} services running{% endblocktranslate %}{% if overall.off %} &middot; {% blocktranslate count n=overall.off|length %}{{ n }} not started yet{% plural %}{{ n }} not started yet{% endblocktranslate %}{% endif %} &middot; {{ window_label|lower }}</p>
+    </div>
+    <div class="sv-banner-end">
+      <span class="sv-live"><i class="gx-live-dot"></i>{% translate "Live" %} &middot; <span data-sv-ago>{% translate "just now" %}</span></span>
+      <div class="gd-seg" role="group" aria-label="{% translate 'Window' %}">
+        {% for key, label, days in windows %}<a class="{% if window == key %}on{% endif %}" href="?window={{ key }}">{{ key }}</a>{% endfor %}
       </div>
-      {% comment %}
-      One word for the state, and the same four words everywhere: good, watch,
-      bad, idle. A dot alone cannot be read by somebody who cannot separate
-      green from amber, and a percentage alone needs working out.
-      {% endcomment %}
-      <span class="gsv-state">
-        <i aria-hidden="true"></i>
-        {% if p.state == 'good' %}{% translate "Healthy" %}
-        {% elif p.state == 'watch' %}{% translate "Worth a look" %}
-        {% elif p.state == 'bad' %}{% translate "Needs attention" %}
-        {% else %}{% translate "Idle" %}{% endif %}
-      </span>
+    </div>
+  </section>
+
+  <section class="sv-board">
+    <header class="sv-board-h">
+      <span>{% translate "Service" %}</span>
+      <span>{% translate "Status" %}</span>
+      <span>{{ window_label }}</span>
+      <span>{% translate "Last active" %}</span>
     </header>
 
-    <div class="gsv-headline">
-      <b>{{ p.headline }}</b>
-      {% if p.headline_sub %}<span>{{ p.headline_sub }}</span>{% endif %}
-      <i>{{ window_label|lower }}</i>
-    </div>
+    {% for p in panels %}
+    <details class="sv-row is-{{ p.status }}" name="svc" data-sv-row="{{ p.key }}"{% if p.status == "bad" or p.status == "stalled" %} open{% endif %}>
+      <summary>
+        <span class="sv-name">
+          <span class="sv-ic" aria-hidden="true"><svg><use href="#{{ p.icon }}"/></svg></span>
+          <span><b>{{ p.label }}</b><small data-sv-f="headline">{{ p.headline }}{% if p.headline_sub %} &middot; {{ p.headline_sub }}{% endif %}</small></span>
+        </span>
+        <span class="sv-pill" data-sv-pill><i></i><span data-sv-word>{{ p.word }}</span></span>
+        <span class="sv-bars" data-sv-bars aria-label="{% translate 'History' %}">
+          {% for h in p.history %}<i class="is-{{ h.state }}" title="{{ h.at|date:'D j M, g a' }} — {% if h.n %}{{ h.good }} of {{ h.n }} worked{% else %}nothing ran{% endif %}"></i>{% endfor %}
+        </span>
+        <span class="sv-last"{% if p.last.isoformat %} data-sv-last="{{ p.last|date:'c' }}"{% endif %}>{% if p.last.isoformat %}{{ p.last|timesince }} {% translate "ago" %}{% else %}{% translate "never" %}{% endif %}</span>
+        <span class="sv-chev" aria-hidden="true"><svg><use href="#ic-chev-down"/></svg></span>
+      </summary>
 
-    {% if p.stats %}
-    <dl class="gsv-stats">
-      {% for label, value in p.stats %}
-      <div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>
-      {% endfor %}
-    </dl>
-    {% endif %}
+      <div class="sv-body">
+        <p class="sv-blurb">{{ p.blurb }}</p>
+        {% if p.status == "off" %}<p class="sv-callout is-off"><b>{% translate "Not started." %}</b> {{ p.empty|default:_("It has never run.") }}</p>
+        {% elif p.status == "stalled" %}<p class="sv-callout is-bad"><b>{% translate "Stalled." %}</b> {% translate "It runs on a timer, and the timer has gone quiet — it last ran" %} {{ p.last|timesince }} {% translate "ago" %}.</p>
+        {% elif p.status == "quiet" %}<p class="sv-callout"><b>{% translate "Quiet." %}</b> {{ p.empty }}</p>{% endif %}
 
-    {% if p.facts %}
-    <ul class="gsv-facts">
-      {% for label, value in p.facts %}
-      <li><b>{{ label }}</b><span>{{ value }}</span></li>
-      {% endfor %}
-    </ul>
-    {% endif %}
+        <div class="sv-grid">
+          {% if p.stats %}
+          <div class="sv-stats">
+            {% for label, value in p.stats %}<div class="gd-stat"><span>{{ label }}</span><b>{{ value }}</b></div>{% endfor %}
+          </div>
+          {% endif %}
+          {% if p.facts or p.schedule %}
+          <dl class="sv-facts">
+            {% for label, value in p.facts %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endfor %}
+            {% for s in p.schedule %}<dt>{{ s.kind|title }} {% translate "next" %}</dt><dd>{% if s.next_run_at %}{{ s.next_run_at|timeuntil }}{% else %}&mdash;{% endif %}</dd>{% endfor %}
+          </dl>
+          {% endif %}
+        </div>
 
-    {% comment %}
-    MatchReader's own table. Accuracy on its own is meaningless here — 58% is
-    a good model in a code where always picking the home side gets 55% and a
-    bad one where it gets 62% — so the baseline is printed beside it and the
-    gap between them is the column that actually matters.
-    {% endcomment %}
-    {% if p.edges %}
-    <table class="gsv-table">
-      <thead><tr>
-        <th>{% translate "Competition" %}</th>
-        <th>{% translate "Accuracy" %}</th>
-        <th>{% translate "Always home" %}</th>
-        <th>{% translate "Edge" %}</th>
-        <th>{% translate "Tested on" %}</th>
-      </tr></thead>
-      <tbody>
-        {% for e in p.edges %}
-        <tr>
-          <td>{{ e.series }}</td>
-          <td>{{ e.accuracy }}%</td>
-          <td>{{ e.baseline }}%</td>
-          <td class="{% if e.beats_baseline %}gsv-up{% else %}gsv-down{% endif %}">
-            {% if e.beats_baseline %}+{% endif %}{{ e.edge }} pts
-          </td>
-          <td>{{ e.samples }} {% translate "games" %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% endif %}
+        {% if p.edges %}
+        <div class="gd-tablewrap sv-table">
+          <table class="gd-table">
+            <thead><tr><th>{% translate "Competition" %}</th><th>{% translate "Accuracy" %}</th><th>{% translate "Always home" %}</th><th>{% translate "Edge" %}</th><th>{% translate "Tested on" %}</th></tr></thead>
+            <tbody>{% for e in p.edges %}<tr><td><b>{{ e.series }}</b></td><td>{{ e.accuracy }}%</td><td>{{ e.baseline }}%</td><td class="{% if e.beats_baseline %}gd-ok{% else %}gd-bad{% endif %}">{% if e.beats_baseline %}+{% endif %}{{ e.edge }} pts</td><td>{{ e.samples }} {% translate "games" %}</td></tr>{% endfor %}</tbody>
+          </table>
+        </div>
+        {% endif %}
 
-    {% if p.schedule %}
-    <ul class="gsv-facts">
-      {% for s in p.schedule %}
-      <li><b>{{ s.kind|title }}</b><span>{% translate "next" %} {{ s.next_run_at|default:"—" }}</span></li>
-      {% endfor %}
-    </ul>
-    {% endif %}
+        {% if p.recent %}
+        <div class="sv-recent">
+          <p class="sv-k">{{ p.recent_label }}</p>
+          <ul>{% for r in p.recent %}<li><span class="gd-dot is-hot"></span><span><b>{{ r.what }}</b>{% if r.why %}<small>{{ r.why|truncatechars:160 }}</small>{% endif %}</span><time>{% if r.when %}{{ r.when|compact_since }}{% endif %}</time></li>{% endfor %}</ul>
+        </div>
+        {% endif %}
 
-    {% if p.recent %}
-    <div class="gsv-recent">
-      <h3>{{ p.recent_label }}</h3>
-      <ul>
-        {% for r in p.recent %}
-        <li>
-          <span class="gsv-r-txt"><b>{{ r.what }}</b>{% if r.why %}<em>{{ r.why }}</em>{% endif %}</span>
-          <i>{{ r.when }}</i>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% endif %}
+        {% if p.note %}<p class="sv-note">{{ p.note }}</p>{% endif %}
+        {% if p.link %}<p style="margin:14px 0 0"><a class="gd-link" href="{% safe_url p.link.1 %}">{{ p.link.0 }} &rarr;</a></p>{% endif %}
+      </div>
+    </details>
+    {% endfor %}
 
-    {% if p.note %}<p class="gsv-note">{{ p.note }}</p>{% endif %}
+    <footer class="sv-legend">
+      <span><i class="is-ok"></i>{% translate "Worked" %}</span>
+      <span><i class="is-warn"></i>{% translate "Some failed" %}</span>
+      <span><i class="is-bad"></i>{% translate "All failed" %}</span>
+      <span><i class="is-none"></i>{% translate "Nothing ran" %}</span>
+    </footer>
   </section>
-  {% endfor %}
 </div>
+
+<script>
+(function () {
+  /* Live: tick every "ago" each second; re-read the board every N seconds
+     and update it in place (states, headlines, bars, the banner). */
+  var root = document.querySelector('[data-sv]');
+  if (!root) return;
+  var every = (+root.getAttribute('data-sv-refresh') || 20) * 1000;
+  var url = root.getAttribute('data-sv-url');
+  var stamp = Date.now();
+  var WORDS = {ok: 'Operational', warn: 'Needs a look', bad: 'Failing', stalled: 'Stalled', off: 'Not started', quiet: 'Quiet'};
+
+  function ago(ms) {
+    var s = Math.max(0, Math.round(ms / 1000));
+    if (s < 60) return s + 's ago';
+    var m = Math.floor(s / 60); if (m < 60) return m + ' min ago';
+    var h = Math.floor(m / 60); if (h < 48) return h + ' h ago';
+    return Math.floor(h / 24) + ' days ago';
+  }
+  function tick() {
+    var a = root.querySelector('[data-sv-ago]');
+    if (a) a.textContent = 'updated ' + ago(Date.now() - stamp);
+    root.querySelectorAll('[data-sv-last]').forEach(function (el) {
+      el.textContent = ago(Date.now() - new Date(el.getAttribute('data-sv-last')).getTime());
+    });
+  }
+  function apply(d) {
+    stamp = Date.now();
+    var b = root.querySelector('[data-sv-banner]');
+    b.className = 'sv-banner is-' + d.overall.level;
+    root.querySelector('[data-sv-title]').textContent = d.overall.title;
+    var run = document.querySelector('[data-sv-running]');
+    if (run) run.textContent = d.overall.running + '/' + d.overall.total;
+    d.services.forEach(function (s) {
+      var row = root.querySelector('[data-sv-row="' + s.key + '"]');
+      if (!row) return;
+      row.className = 'sv-row is-' + s.status;
+      row.querySelector('[data-sv-word]').textContent = s.word || WORDS[s.status] || '';
+      var hl = row.querySelector('[data-sv-f="headline"]');
+      if (hl) hl.textContent = s.headline + (s.sub ? ' · ' + s.sub : '');
+      var last = row.querySelector('.sv-last');
+      if (last && s.last) last.setAttribute('data-sv-last', s.last);
+      var bars = row.querySelectorAll('[data-sv-bars] i');
+      s.history.forEach(function (st, i) {
+        if (bars[i] && bars[i].className !== 'is-' + st) { bars[i].className = 'is-' + st + ' is-new'; }
+      });
+    });
+    tick();
+  }
+  function poll() {
+    if (document.hidden) return;
+    fetch(url, {headers: {'Accept': 'application/json'}, credentials: 'same-origin'})
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d) { root.classList.add('is-pulse'); apply(d); setTimeout(function () { root.classList.remove('is-pulse'); }, 900); } })
+      .catch(function () {});
+  }
+  tick();
+  setInterval(tick, 1000);
+  setInterval(poll, every);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+})();
+</script>
 {% endblock %}

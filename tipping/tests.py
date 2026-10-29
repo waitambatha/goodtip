@@ -18,6 +18,16 @@ from tipping.services import (
 )
 
 
+
+def _known_before_kickoff(match):
+    """A fixture these tests build in the past was, in the story they tell,
+    synced before it was played — say so, or the late-arrival rule (no
+    missed-tip default on a game nobody could tip) applies to it."""
+    Match.objects.filter(pk=match.pk).update(created_at=match.kickoff_at - timedelta(days=3))
+    match.refresh_from_db()
+    return match
+
+
 class WeightedScoringTests(TestCase):
     """Ambrose Hierarchy brief, slide 6: regular=1, finals=2, Origin=4."""
 
@@ -965,10 +975,10 @@ class MidSeasonJoinerTests(TestCase):
                 org=self.org, round_number=n, series=self.series,
                 lockout_at=self.now - timedelta(days=40 - n),
             )
-            m = Match.objects.create(
+            m = _known_before_kickoff(Match.objects.create(
                 round=rnd, home_team=self.home, away_team=self.away,
                 kickoff_at=self.now - timedelta(days=40 - n),
-            )
+            ))
             # Away wins both, so a backdated pick is worth something and the
             # test can tell scored from merely written.
             record_match_result(m, 10, 30)
@@ -1761,7 +1771,9 @@ class RoundNumberIsNotARoundTests(TestCase):
 
     def test_this_week_shows_only_the_rounds_actually_on(self):
         games, _ = self._games()
-        numbers = {(g.round.series.slug, g.round.round_number) for g in games}
+        # Since 28 Oct 2026 the default slate is a feed: what is coming up,
+        # then results. A long-played round can be a result, never "coming up".
+        numbers = {(g.round.series.slug, g.round.round_number) for g in games if not g.feed_done}
         self.assertNotIn(("tc-mens", 4), numbers)
         self.assertIn(("tc-womens", 4), numbers)
         self.assertIn(("tc-mens", 26), numbers)
@@ -1790,7 +1802,7 @@ class RoundNumberIsNotARoundTests(TestCase):
         _, resp = self._games()
         nav = resp.context["round_nav"]
         self.assertTrue(nav["multi"])
-        labels = [label for label, _ in nav["groups"]]
+        labels = [label for label, _opts, _colour in nav["groups"]]
         self.assertEqual(sorted(labels), ["TC Mens", "TC Womens"])
 
     def test_the_arrows_step_inside_one_code(self):
@@ -3176,10 +3188,11 @@ class CarryIntoNewRoomTests(TestCase):
             org=org, round_number=1, series=self.series,
             defaults={"competition": self.comp, "lockout_at": kickoff},
         )
-        return Match.objects.create(
+        m = Match.objects.create(
             round=rnd, home_team=self.home, away_team=self.away,
             kickoff_at=kickoff, external_id=external_id, result=result,
         )
+        return _known_before_kickoff(m)
 
     def _played_pair(self, external_id="g1", *, result="home"):
         """One finished game, present in both organisations."""

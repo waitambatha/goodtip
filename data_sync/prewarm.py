@@ -51,8 +51,12 @@ def _decode(rows: list[dict]) -> list[dict]:
     return out
 
 
-def fixture_cache_get(source, series_key, season_year, round_number):
-    """A still-fresh copy of this feed page, or None to go and fetch it."""
+def fixture_cache_get(source, series_key, season_year, round_number, *, any_age=False):
+    """A still-fresh copy of this feed page, or None to go and fetch it.
+
+    ``any_age`` reads the fixture library as it stands, however old — for
+    building an organisation's rounds from what GoodTip already holds, with
+    the regular syncs bringing it current afterwards."""
     try:
         row = FixtureCache.objects.filter(
             source=source, series_key=series_key,
@@ -61,7 +65,7 @@ def fixture_cache_get(source, series_key, season_year, round_number):
     except Exception:  # noqa: BLE001 — a cache miss is always survivable
         logger.exception("fixture cache read failed")
         return None
-    if row is None or not row.is_fresh:
+    if row is None or (not any_age and not row.is_fresh):
         return None
     return _decode(row.payload or [])
 

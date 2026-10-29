@@ -107,6 +107,82 @@ def _state(ok_ratio, *, warn=90, bad=70):
 
 
 # ---------------------------------------------------------------------------
+# The status board's two extra readings (client, 27 Oct 2026: "need to see
+# how things are working on real time and say it's okay, and not everything
+# been started")
+# ---------------------------------------------------------------------------
+
+def _buckets(since, now):
+    """The history strip's slots: hourly over a day, six-hourly over a week,
+    daily over a month — about thirty bars whichever window is chosen."""
+    # A minute of slack: `since` was taken a moment before `now`.
+    span = now - since - timedelta(minutes=1)
+    if span <= timedelta(days=1):
+        step = timedelta(hours=1)
+    elif span <= timedelta(days=7):
+        step = timedelta(hours=6)
+    else:
+        step = timedelta(days=1)
+    edges, t = [], since
+    while t < now:
+        edges.append(t)
+        t += step
+    return edges, step
+
+
+def _history(qs, when_field, since, ok_field=None, ok_value=True):
+    """One bar per slot: "ok" (it ran and everything worked), "warn" (some
+    of it failed), "bad" (all of it failed) or "none" (nothing ran). Read
+    from the same rows as the panel's figures — one query, bucketed here."""
+    now = timezone.now()
+    edges, step = _buckets(since, now)
+    fields = [when_field] + ([ok_field] if ok_field else [])
+    counts = [[0, 0] for _ in edges]           # [total, good]
+    for row in qs.filter(**{f"{when_field}__gte": since}).values_list(*fields):
+        when = row[0]
+        if when is None:
+            continue
+        i = min(int((when - since) / step), len(edges) - 1)
+        counts[i][0] += 1
+        if not ok_field or row[1] == ok_value:
+            counts[i][1] += 1
+    out = []
+    for start, (total, good) in zip(edges, counts):
+        if not total:
+            state = "none"
+        elif good == total:
+            state = "ok"
+        elif good:
+            state = "warn"
+        else:
+            state = "bad"
+        out.append({"state": state, "n": total, "good": good, "at": start})
+    return out
+
+
+def _beat(panel, last, expect=None):
+    """When the service last did anything, and whether that is late.
+
+    `expect` is how often it is meant to run, for the services on a timer; a
+    service that has gone quiet for more than three of its own intervals is
+    STALLED, which no ratio of past successes would ever show. A service with
+    no activity at all is NOT STARTED rather than "idle", and the panel says
+    so in words."""
+    now = timezone.now()
+    panel["last"] = last
+    panel["stalled"] = bool(last and expect and now - last > expect * 3)
+    if last is None:
+        panel["status"] = "off"
+    elif panel["stalled"]:
+        panel["status"] = "stalled"
+    else:
+        # "idle" — it has run before, just not in this window — is QUIET,
+        # which is not a fault and is not reported as one.
+        panel["status"] = {"good": "ok", "watch": "warn", "bad": "bad", "idle": "quiet"}.get(panel.get("state"), "ok")
+    return panel
+
+
+# ---------------------------------------------------------------------------
 # 1. Email
 # ---------------------------------------------------------------------------
 
@@ -383,6 +459,120 @@ def _traffic_panel(since):
 
 
 # ---------------------------------------------------------------------------
+# 7. The backup: live copied into staging
+# ---------------------------------------------------------------------------
+
+def _backup_panel(since):
+    from . import backup
+    from .database_views import BACKUP_EVERY, sync_status
+    from .models import BackupRun
+
+    rows = BackupRun.objects.filter(started_at__gte=since, finished_at__isnull=False)
+    total = rows.count()
+    ok = rows.filter(ok=True).count()
+    sync = sync_status()
+    ratio = _pct(ok, total)
+    return {
+        "key": "backup",
+        "label": "Live → staging backup",
+        "icon": "ic-cloud-sync",
+        "blurb": "Watches goodtip.com.au and copies everything real into "
+                 "staging within seconds, labelled Backup.",
+        "state": _state(ratio),
+        "headline": "watching" if sync.get("watching") else ("paused" if sync.get("last") else "not started"),
+        "headline_sub": (f"last new: {sync['last_new']} item{'' if sync['last_new'] == 1 else 's'}"
+                         if sync.get("last_change") else "nothing new yet"),
+        "stats": [
+            ("Passes", total),
+            ("Failed", total - ok),
+            ("Success rate", f"{ratio}%" if ratio is not None else "—"),
+        ],
+        "facts": [("Checks live every", f"{int(BACKUP_EVERY.total_seconds())} seconds")],
+        "recent": _recent(rows.filter(ok=False)[:6], "started_at", "error"),
+        "recent_label": "Recent failures",
+        "link": ("See the sync", "admin:hq_backup_history"),
+        "empty": "The watcher has not run in this window.",
+        "_history": (BackupRun.objects.filter(finished_at__isnull=False), "started_at", "ok"),
+        "_last": backup.last_run().finished_at if backup.last_run() else None,
+        "_expect": BACKUP_EVERY,
+    }
+
+
+# How each service's history and heartbeat are read: the rows, their time
+# field, the field that says it worked, and how often it is meant to run
+# (None for services that act when something happens, not on a clock).
+def _sources():
+    from data_sync.models import SyncRun
+    from matchreader.models import ModelVersion
+    from orgs.models import ChatFlag, RoundRecap
+
+    from .models import LoginEvent, MailLog
+
+    return {
+        "email": (MailLog.objects.all(), "created_at", "ok", None),
+        "sync": (SyncRun.objects.all(), "started_at", "ok", timedelta(minutes=15)),
+        "prefect": (ChatFlag.objects.all(), "created_at", None, None),
+        "matchreader": (ModelVersion.objects.all(), "created_at", None, None),
+        "recaps": (RoundRecap.objects.all(), "created_at", "fallback_used", None),
+        "traffic": (LoginEvent.objects.all(), "created_at", "success", None),
+    }
+
+
+def _live(panel, since):
+    """Give a panel its history strip and heartbeat."""
+    if panel.get("_history"):
+        qs, field, ok = panel.pop("_history")
+        panel["history"] = _history(qs, field, since, ok)
+        return _beat(panel, panel.pop("_last", None), panel.pop("_expect", None))
+    qs, field, ok, expect = _sources()[panel["key"]]
+    # A recap that fell back is still a recap written: its "ok" is False here.
+    ok_value = False if panel["key"] == "recaps" else True
+    panel["history"] = _history(qs, field, since, ok, ok_value)
+    last = qs.order_by(f"-{field}").values_list(field, flat=True).first()
+    return _beat(panel, last, expect)
+
+
+STATUS_WORDS = {"ok": "Operational", "warn": "Needs a look", "bad": "Failing",
+                "stalled": "Stalled", "off": "Not started", "quiet": "Quiet"}
+REFRESH_SECONDS = 20
+
+
+def _overall(panels):
+    hot = [p for p in panels if p.get("status") in ("bad", "stalled")]
+    warn = [p for p in panels if p.get("status") == "warn"]
+    off = [p for p in panels if p.get("status") == "off"]
+    if hot:
+        level, title = "bad", f"{len(hot)} service{'' if len(hot) == 1 else 's'} need{'s' if len(hot) == 1 else ''} attention"
+    elif warn:
+        names = " and ".join(p["label"] for p in warn[:2])
+        level, title = "warn", f"Running — {names} {'wants' if len(warn) == 1 else 'want'} a look"
+    else:
+        level, title = "ok", "All systems operational"
+    return {"level": level, "title": title, "hot": hot, "warn": warn, "off": off,
+            "running": len(panels) - len(off)}
+
+
+def _as_json(panels):
+    from django.http import JsonResponse
+    from django.utils.timesince import timesince
+
+    overall = _overall(panels)
+    return JsonResponse({
+        "at": timezone.now().isoformat(),
+        "overall": {"level": overall["level"], "title": overall["title"],
+                    "running": overall["running"], "total": len(panels)},
+        "services": [{
+            "key": p["key"], "status": p.get("status", "ok"),
+            "word": STATUS_WORDS.get(p.get("status", "ok"), ""),
+            "headline": p.get("headline", ""), "sub": p.get("headline_sub", ""),
+            "last": p["last"].isoformat() if p.get("last") and hasattr(p["last"], "isoformat") else None,
+            "since": timesince(p["last"]) if p.get("last") and hasattr(p["last"], "isoformat") else None,
+            "history": [h["state"] for h in p.get("history", [])],
+        } for p in panels],
+    })
+
+
+# ---------------------------------------------------------------------------
 
 WINDOWS = [("24h", "Last 24 hours", 1), ("7d", "Last 7 days", 7), ("30d", "Last 30 days", 30)]
 
@@ -402,10 +592,10 @@ def services_hub(request):
     since = timezone.now() - timedelta(days=days)
 
     panels = []
-    for build in (_email_panel, _sync_panel, _prefect_panel,
+    for build in (_email_panel, _sync_panel, _backup_panel, _prefect_panel,
                   _matchreader_panel, _recap_panel, _traffic_panel):
         try:
-            panels.append(build(since))
+            panels.append(_live(build(since), since))
         except Exception as exc:  # noqa: BLE001
             # ONE PANEL FAILING MUST NOT TAKE THE PAGE. This is the screen
             # somebody opens BECAUSE something is wrong, and a 500 here would
@@ -415,7 +605,14 @@ def services_hub(request):
                 "icon": "ic-shield-check", "state": "bad",
                 "blurb": str(exc)[:200], "stats": [], "recent": [],
                 "headline": "unavailable", "headline_sub": "",
+                "status": "bad", "history": [], "last": None,
             })
+
+    for p in panels:
+        p["word"] = STATUS_WORDS.get(p.get("status"), "")
+
+    if request.GET.get("format") == "json":
+        return _as_json(panels)
 
     return render(request, "admin/hub/services.html", _ctx(
         request, "Services",
@@ -428,4 +625,6 @@ def services_hub(request):
                  "the moderator and the two writers. How each has been getting "
                  "on, and when it last did anything.",
         hub_icon="ic-chart",
+        overall=_overall(panels),
+        refresh=REFRESH_SECONDS,
     ))

@@ -1,34 +1,41 @@
-{% extends "admin/hub/base.html" %}
+{% extends "admin/hub/gx_base.html" %}
 {% load i18n %}
 
 {% comment %}
-The generic hub: a grid of destination cards, used by HQ and by Your team.
-
-Each card is a link — the whole card, not a "Go" button in the corner — so the
-target is the size of the thing you are looking at. The sentence under the
-title is the reason it exists: "Enquiries inbox" tells you a screen is there,
-"Messages sent through the public contact form, and what was replied" tells
-you whether it is the one you want. The number in the corner appears only when
-something is actually waiting, because a badge showing 0 trains people to stop
-reading badges.
+A HUB OF SCREENS, ON THE PITCH — Your team (sysadmin.hub_views.team_hub).
+Each card is a link, the whole card; the sentence under the name says
+whether it is the one you want; the number shows only when something is
+actually waiting, because a badge showing 0 trains people to stop reading
+badges. Same cards as HQ (hq.html), sized to the work.
 {% endcomment %}
 
-{% block hub_body %}
-{% if cards %}
-<div class="gta-cards">
-  {% for c in cards %}
-  <a href="{{ c.href }}" class="gta-dcard" style="--card-accent:{{ c.accent }}">
-    <span class="gta-card-ic"><svg aria-hidden="true"><use href="#{{ c.icon }}"/></svg></span>
-    <span class="gta-card-txt">
-      <b>{{ c.label }}</b>
-      <small>{{ c.blurb }}</small>
-    </span>
-    {% if c.note %}<span class="gta-card-n{% if c.hot %} hot{% endif %}">{{ c.note }}</span>{% endif %}
-    <svg class="gta-card-go" aria-hidden="true"><use href="#ic-arrow-right"/></svg>
-  </a>
-  {% endfor %}
-</div>
-{% else %}
-<p class="gta-empty">{% translate "There is nothing here you have been given access to." %}</p>
-{% endif %}
+{% block gx_kicker %}{{ hub_kicker|default:hub_title|default:title }}{% endblock %}
+{% block gx_title %}{{ hub_title|default:title }}{% endblock %}
+{% block gx_lead %}{{ hub_lead }}{% endblock %}
+{% block gx_board %}
+{% for c in cards %}{% if c.note %}<a class="gx-score" href="{{ c.href }}"><b>{{ c.note }}</b><span>{{ c.label }}</span></a>{% endif %}{% endfor %}
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet">
+  <div class="gx-pane">
+    {% if cards %}
+    <div class="gx-hq">
+      {% for c in cards %}
+      <a class="gx-hqcard{% if c.hot %} is-hot{% endif %}" href="{{ c.href }}" style="--cc: {% cycle 'var(--cc-1)' 'var(--cc-2)' 'var(--cc-3)' 'var(--cc-4)' 'var(--cc-5)' %}">
+        <span class="gx-hqcard-top">
+          <span class="gx-hqcard-ic" aria-hidden="true"><svg><use href="#{{ c.icon }}"/></svg></span>
+          {% if c.note %}<span class="gx-pill{% if c.hot %} is-wait{% endif %}"><i></i>{{ c.note }}</span>{% endif %}
+        </span>
+        <b class="gx-hqcard-name">{{ c.label }}</b>
+        <span class="gx-hqcard-blurb">{{ c.blurb }}</span>
+        <span class="gx-hqcard-go">{% translate "Open" %} &rarr;</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="gx-empty"><b>{% translate "There is nothing here you have been given access to." %}</b></div>
+    {% endif %}
+  </div>
+</section>
 {% endblock %}

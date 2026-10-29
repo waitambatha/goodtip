@@ -1,0 +1,107 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n humanize %}
+
+{% comment %}
+ONE DATABASE (client, 25 Oct 2026: "when I click on live, I should see all
+the tables"). Its tables, one tab per kind of work (hub.CATEGORIES), each a
+row with what it holds and how many rows — on Staging split into Backup and
+Testing. Built by sysadmin.database_views.database_detail.
+{% endcomment %}
+
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_tables' %}">{% translate "Databases" %}</a></li>{% endblock %}
+{% block gx_nav %}
+{% if db.key == "live" %}<a class="gx-btn is-glass" href="{% url 'admin:hq_database' 'staging' %}">{% translate "Staging" %}<svg aria-hidden="true"><use href="#ic-chev-right"/></svg></a>
+{% else %}<a class="gx-btn is-glass" href="{% url 'admin:hq_database' 'live' %}"><svg aria-hidden="true"><use href="#ic-chev-left"/></svg>{% translate "Live" %}</a>{% endif %}
+{% endblock %}
+{% block gx_kicker %}{% translate "Database" %} &middot; {{ db.host }}{% endblock %}
+{% block gx_title %}{{ db.label }}{% if db.key == "live" %} <em>{% translate "· real" %}</em>{% else %} <em>{% translate "· backup & testing" %}</em>{% endif %}{% endblock %}
+{% block gx_lead %}{{ db.lead }}{% if db.key == "live" %} {% if last_run %}{% blocktranslate with t=last_run.finished_at|timesince %}Last backup {{ t }} ago.{% endblocktranslate %}{% endif %}{% endif %}{% endblock %}
+{% block gx_board %}
+<a class="gx-score" href="#all" data-gx-open="all"><b>{{ table_count }}</b><span>{% translate "Tables" %}</span></a>
+{% if db.key == "live" %}
+<a class="gx-score" href="#all" data-gx-open="all"><b>{{ total_rows|intcomma }}</b><span>{% translate "Real rows" %}</span></a>
+{% else %}
+<a class="gx-score" href="#all" data-gx-open="all"><b>{{ total_backup|intcomma }}</b><span>{% translate "Backup" %}</span></a>
+<a class="gx-score" href="#all" data-gx-open="all"><b>{{ total_testing|intcomma }}</b><span>{% translate "Testing" %}</span></a>
+{% endif %}
+<a class="gx-score" href="{% url 'admin:hq_backup_history' %}" data-gx-countdown="{% if sync.next_at and sync.watching %}{{ sync.next_at|date:'c' }}{% endif %}" data-every="{{ every }}"><b data-gx-left>{% if sync.watching %}--{% else %}{% translate "paused" %}{% endif %}</b><span>{% translate "Next check" %}</span></a>
+<a class="gx-score" href="{% url 'admin:hq_deletions' %}"><b>{{ pending }}</b><span>{% translate "Waiting for Ian" %}</span></a>
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet" data-gx-tabs>
+  <div class="gx-tabs" role="tablist">
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="all" aria-selected="true">{% translate "All tables" %} <em>{{ table_count }}</em></button>
+    {% for g in groups %}<button type="button" class="gx-tab" role="tab" data-gx-tab="{{ g.key }}">{{ g.label }} <em>{{ g.tables|length }}</em></button>{% endfor %}
+  </div>
+  <div class="gx-pane" data-gx-pane="all">
+    <div class="gx-tablewrap">
+      <table class="gx-table" data-gx-rowlinks>
+        <thead><tr>
+          <th scope="col">{% translate "Table" %}</th>
+          <th scope="col">{% translate "What it holds" %}</th>
+          {% if db.key == "live" %}<th scope="col">{% translate "Real rows" %}</th>
+          {% else %}<th scope="col">{% translate "Rows" %}</th><th scope="col">{% translate "Backup · Testing" %}</th>{% endif %}
+          <th scope="col"><span class="gx-sr">{% translate "Open" %}</span></th>
+        </tr></thead>
+        <tbody>
+        {% for g in groups %}{% for t in g.tables %}
+        <tr data-href="{{ t.url }}">
+          <td class="is-name"><a href="{{ t.url }}">{{ t.name }}</a><small class="gx-tlabel">{{ t.label }}</small></td>
+          <td class="gx-blurb">{% if t.blurb %}{{ t.blurb }}{% elif t.kind == "reference" %}{% translate "A shared list — loaded on both databases from the feeds, matched rather than copied." %}{% elif t.kind == "skip" %}{% translate "Staging's own — not part of the backup." %}{% else %}—{% endif %}</td>
+          {% if db.key == "live" %}
+          <td><b>{{ t.rows|default_if_none:"—"|intcomma }}</b>{% if t.kind == "reference" %}<small class="gx-tlabel">{% translate "shared list" %}</small>{% endif %}</td>
+          {% else %}
+          <td><b>{{ t.rows|default_if_none:"—"|intcomma }}</b></td>
+          <td>{% if t.backup is not None %}
+            <span class="gx-split-bar" title="{{ t.backup }} backup · {{ t.testing }} testing">
+              <i class="is-backup" style="flex: {{ t.backup|default:0 }}"></i><i class="is-testing" style="flex: {{ t.testing|default:0 }}"></i>
+            </span>
+            <small class="gx-tlabel">{{ t.backup|intcomma }} &middot; {{ t.testing|intcomma }}</small>
+            {% elif t.kind == "reference" %}<span class="gx-lab is-shared">{% translate "Shared" %}</span>{% else %}<span class="gx-lab is-local">{% translate "Staging only" %}</span>{% endif %}</td>
+          {% endif %}
+          <td class="is-go"><svg aria-hidden="true"><use href="#ic-chev-right"/></svg></td>
+        </tr>
+        {% endfor %}{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% for g in groups %}
+  <div class="gx-pane" data-gx-pane="{{ g.key }}">
+    {% if g.blurb %}<p class="gx-note" style="margin:0 0 14px">{{ g.blurb }}</p>{% endif %}
+    <div class="gx-tablewrap">
+      <table class="gx-table" data-gx-rowlinks>
+        <thead><tr>
+          <th scope="col">{% translate "Table" %}</th>
+          <th scope="col">{% translate "What it holds" %}</th>
+          {% if db.key == "live" %}<th scope="col">{% translate "Real rows" %}</th>
+          {% else %}<th scope="col">{% translate "Rows" %}</th><th scope="col">{% translate "Backup · Testing" %}</th>{% endif %}
+          <th scope="col"><span class="gx-sr">{% translate "Open" %}</span></th>
+        </tr></thead>
+        <tbody>
+        {% for t in g.tables %}
+        <tr data-href="{{ t.url }}">
+          <td class="is-name"><a href="{{ t.url }}">{{ t.name }}</a><small class="gx-tlabel">{{ t.label }}</small></td>
+          <td class="gx-blurb">{% if t.blurb %}{{ t.blurb }}{% elif t.kind == "reference" %}{% translate "A shared list — loaded on both databases from the feeds, matched rather than copied." %}{% elif t.kind == "skip" %}{% translate "Staging's own — not part of the backup." %}{% else %}—{% endif %}</td>
+          {% if db.key == "live" %}
+          <td><b>{{ t.rows|default_if_none:"—"|intcomma }}</b>{% if t.kind == "reference" %}<small class="gx-tlabel">{% translate "shared list" %}</small>{% endif %}</td>
+          {% else %}
+          <td><b>{{ t.rows|default_if_none:"—"|intcomma }}</b></td>
+          <td>{% if t.backup is not None %}
+            <span class="gx-split-bar" title="{{ t.backup }} backup · {{ t.testing }} testing">
+              <i class="is-backup" style="flex: {{ t.backup|default:0 }}"></i><i class="is-testing" style="flex: {{ t.testing|default:0 }}"></i>
+            </span>
+            <small class="gx-tlabel">{{ t.backup|intcomma }} &middot; {{ t.testing|intcomma }}</small>
+            {% elif t.kind == "reference" %}<span class="gx-lab is-shared">{% translate "Shared" %}</span>{% else %}<span class="gx-lab is-local">{% translate "Staging only" %}</span>{% endif %}</td>
+          {% endif %}
+          <td class="is-go"><svg aria-hidden="true"><use href="#ic-chev-right"/></svg></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+</section>
+{% endblock %}

@@ -857,8 +857,10 @@ class PagesScopeTests(TestCase):
         scroll back with it, silently and only at certain widths.
         """
         html = self._get().content.decode()
-        self.assertIn("gt-shell-single", html)
+        # One full-width gx sheet since 26 Oct 2026; no split of any kind.
+        self.assertIn("gx-sheet", html)
         self.assertNotIn("gt-shell-wide", html)
+        self.assertNotIn("gx-split", html)
 
 
 class SystemReportTilesTests(TestCase):
@@ -1318,11 +1320,14 @@ class ConfirmAndBusyContractTests(TestCase):
     def test_email_members_is_a_guarded_form_and_so_is_delete(self):
         """If either loses its guard this contract stops mattering — and if
         either keeps it, the two rules above are what make it work."""
-        html = (Path(settings.BASE_DIR) / "templates" / "manage" / "news.html").read_text(
+        # The story list moved to the admin's own frame (26 Oct 2026);
+        # its confirm is data-gx-confirm there.
+        html = (Path(settings.BASE_DIR) / "templates" / "admin" / "hub" / "blog_list.html").read_text(
             encoding="utf-8",
         )
         self.assertIn("hq_news_announce", html)
-        self.assertIn("data-confirm", html)
+        self.assertIn("hq_news_delete", html)
+        self.assertIn("data-gx-confirm", html)
 
 
 class SeoHealthTests(TestCase):
@@ -1440,8 +1445,8 @@ class SchedulerLookTests(TestCase):
         published and waiting on a clock" were the same grey pill."""
         self._post(timezone.now() + timedelta(days=2))
         html = self.client.get(reverse("admin:hq_news")).content.decode()
-        self.assertIn('gt-chip sched', html)
-        self.assertNotIn('gt-chip draft">Scheduled', html)
+        self.assertIn('gx-pill is-wait"><i></i>Scheduled', html)
+        self.assertNotIn('gx-pill"><i></i>Scheduled', html)
 
     def test_the_editor_offers_a_calendar_behind_a_button(self):
         """The times people actually pick — in an hour, tonight, tomorrow
@@ -2081,7 +2086,7 @@ class StoryCardRenderTests(TestCase):
         self.assertIn('data-every="3000"', card)
         self.assertIn("ndc-pips", card)
 
-    def test_the_public_list_and_the_dashboard_render_the_same_card(self):
+    def test_the_news_page_renders_the_story_card(self):
         """One story card in the product. It was three, kept looking alike by
         hand, and only two of them ever got a change."""
         from catalog.models import Season
@@ -2095,10 +2100,11 @@ class StoryCardRenderTests(TestCase):
         OrgMember.objects.create(user=self.user, org=org)
 
         NewsPost.objects.create(title="Shared", tags=["NRL"])
-        for url in (reverse("news_index"), reverse("dashboard")):
-            html = self.client.get(url).content.decode()
-            self.assertIn('<article class="nd-card', html, url)
-            self.assertIn("ndc-more", html, url)
+        # Since 27 Oct 2026 the deck is the News page's alone; the dashboard
+        # shows stories as strips between its fixtures.
+        html = self.client.get(reverse("news_index")).content.decode()
+        self.assertIn('<article class="nd-card', html)
+        self.assertIn("ndc-more", html)
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="gt-featured-"))

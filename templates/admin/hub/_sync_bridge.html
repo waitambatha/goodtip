@@ -1,0 +1,44 @@
+{% load i18n %}
+{% comment %}
+THE BACKUP, AS A THING YOU CAN WATCH (client, 26 Oct 2026: "being able to
+visualize the syncing... I'd like to see a timer... so I can know how long do
+I have before the next sync happens... if I click it, let me see the history").
+
+Packets flow from Live to Staging along the pipe; the ring counts down to the
+next check (the backup watches live — `sync_live_backup --watch` — and checks
+again a few seconds after each pass) and fills as it gets closer; under it,
+the last time something new came across. If the watcher stops, the ring says
+"paused" and when it last checked, rather than counting down to nothing.
+The whole bridge links to the backup history. Ticks in gt-admin-gx.js
+([data-gx-countdown]).
+{% endcomment %}
+<a class="gx-bridge{% if sync.running %} is-running{% endif %}{% if sync.watching %} is-watching{% else %} is-paused{% endif %}{% if compact %} is-compact{% endif %}" href="{% url 'admin:hq_backup_history' %}"
+   data-gx-countdown="{% if sync.next_at and sync.watching %}{{ sync.next_at|date:'c' }}{% endif %}" data-every="{{ every }}"
+   aria-label="{% translate 'The backup — open its history' %}">
+  <span class="gx-pipe" aria-hidden="true">
+    <i class="p1"><svg><use href="#ic-users"/></svg></i>
+    <i class="p2"><svg><use href="#ic-msg"/></svg></i>
+    <i class="p3"><svg><use href="#ic-target"/></svg></i>
+    <i class="p4"><svg><use href="#ic-heart"/></svg></i>
+  </span>
+  <span class="gx-bridge-core">
+    <span class="gx-ring" aria-hidden="true">
+      <svg viewBox="0 0 120 120"><circle class="trk" cx="60" cy="60" r="52"/><circle class="arc" cx="60" cy="60" r="52" data-gx-ring/></svg>
+      <span class="gx-ring-mid">
+        <small>{% if sync.watching %}{% translate "next check" %}{% else %}{% translate "backup" %}{% endif %}</small>
+        <b data-gx-left>{% if sync.watching %}--{% elif sync.last %}{% translate "paused" %}{% else %}{% translate "soon" %}{% endif %}</b>
+      </span>
+    </span>
+    <span class="gx-bridge-title">{% translate "Backup" %} <em>{% if sync.watching %}<i class="gx-live-dot"></i>{% translate "live → staging, as it happens" %}{% else %}{% translate "live → staging" %}{% endif %}</em></span>
+    <span class="gx-bridge-last">
+      {% if sync.last_change %}
+        {% blocktranslate count n=sync.last_new %}Last new: {{ n }} item{% plural %}Last new: {{ n }} items{% endblocktranslate %}
+        &middot; {% blocktranslate with t=sync.last_change.finished_at|timesince %}{{ t }} ago{% endblocktranslate %}
+      {% elif sync.last %}{% translate "Nothing new yet" %}
+      {% else %}{% translate "Waiting for its first check" %}{% endif %}
+      {% if sync.last and not sync.watching %}<br>{% blocktranslate with t=sync.last.finished_at|timesince %}last check {{ t }} ago{% endblocktranslate %}{% endif %}
+    </span>
+    {% if sync.last_items %}<span class="gx-bridge-chips">{% for i in sync.last_items %}<span>+{{ i.new }} {{ i.name|lower }}</span>{% endfor %}</span>{% endif %}
+    <span class="gx-bridge-go">{% translate "History" %} &rarr;</span>
+  </span>
+</a>

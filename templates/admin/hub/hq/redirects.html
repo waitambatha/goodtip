@@ -1,0 +1,67 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n %}
+
+{% comment %}
+OLD ADDRESSES, KEPT ALIVE (was manage/redirects.html). Every redirect as an
+editable row with how often it is followed — one with hits is load-bearing,
+one nothing has followed can go — and a form to add one. They only fire on
+an address that does not exist (RedirectFallbackMiddleware), which the page
+says, because that is the first question anybody asks. View:
+admin_panel.views.redirects_list.
+{% endcomment %}
+
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_home' %}">HQ</a></li>{% endblock %}
+{% block gx_kicker %}HQ &middot; {% translate "redirects" %}{% endblock %}
+{% block gx_title %}{% translate "Old links" %} <em>{% translate "still land" %}</em>{% endblock %}
+{% block gx_lead %}{% translate "When an address changes, point the old one at the new so the links already out in the world keep working." %}{% endblock %}
+{% block gx_board %}
+<div class="gx-score"><b>{{ rows|length }}</b><span>{% translate "Redirects" %}</span></div>
+<div class="gx-score"><b>{{ used }}</b><span>{% translate "In use" %}</span></div>
+<div class="gx-score"><b>{{ unused }}</b><span>{% translate "Never followed" %}</span></div>
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet">
+  <div class="gx-pane">
+    <div class="gx-split">
+      <div class="gx-stack">
+        <div class="gx-h"><h2>{% translate "Every redirect" %}</h2><p>{% translate "These only fire on an address that does not exist — a redirect can never shadow a real page." %}</p></div>
+        {% for r in rows %}
+        <form method="post" action="{% url 'admin:hq_redirect_save' %}" class="gx-redir">
+          {% csrf_token %}
+          <input type="hidden" name="id" value="{{ r.id }}">
+          <div class="gx-redir-paths">
+            <input class="gx-in" type="text" name="old_path" value="{{ r.old_path }}" spellcheck="false" aria-label="{% translate 'Old address' %}">
+            <span aria-hidden="true">&rarr;</span>
+            <input class="gx-in" type="text" name="new_path" value="{{ r.new_path }}" spellcheck="false" aria-label="{% translate 'New address' %}">
+          </div>
+          <div class="gx-redir-foot">
+            <input class="gx-in" type="text" name="note" value="{{ r.note }}" placeholder="{% translate 'Why this exists' %}" aria-label="{% translate 'Note' %}">
+            <label class="gx-check" title="{% translate 'Permanent (301) moves the search ranking. Temporary (302) does not.' %}"><input type="checkbox" name="is_permanent" value="1"{% if r.is_permanent %} checked{% endif %}> 301</label>
+            <span class="gx-pill{% if r.hits %} is-ok{% endif %}" title="{% if r.last_hit_at %}{% translate 'Last followed' %} {{ r.last_hit_at|date:'j M Y, g:i a' }}{% else %}{% translate 'Never followed' %}{% endif %}"><i></i>{% blocktranslate count n=r.hits %}{{ n }} hit{% plural %}{{ n }} hits{% endblocktranslate %}</span>
+            <button type="submit" class="gx-mini">{% translate "Save" %}</button>
+            <button type="submit" class="gx-mini is-danger" formaction="{% url 'admin:hq_redirect_delete' r.id %}" data-gx-ask="{% translate 'Delete this redirect? Anyone following the old address will get a 404 again.' %}">{% translate "Delete" %}</button>
+          </div>
+        </form>
+        {% empty %}
+        <div class="gx-empty"><svg aria-hidden="true"><use href="#ic-link"/></svg><b>{% translate "Nothing redirected yet" %}</b><span>{% translate "Renaming a page or a story adds one here on its own." %}</span></div>
+        {% endfor %}
+      </div>
+
+      <div class="gx-card is-dark">
+        <p class="gx-label">{% translate "Add one" %}</p>
+        <form method="post" action="{% url 'admin:hq_redirect_save' %}" class="gx-form">
+          {% csrf_token %}
+          <label class="full">{% translate "Old address" %}<input type="text" name="old_path" placeholder="/old-pricing/" spellcheck="false" required>
+            <small>{% translate "Paste a whole URL if it's easier — the domain is stripped." %}</small></label>
+          <label class="full">{% translate "Goes to" %}<input type="text" name="new_path" placeholder="/pricing/" spellcheck="false" required>
+            <small>{% translate "A path on this site, or a full https:// address." %}</small></label>
+          <label class="full">{% translate "Note" %}<input type="text" name="note" placeholder="{% translate 'Pricing page renamed, Sept 2026' %}"></label>
+          <label class="full gx-check"><input type="checkbox" name="is_permanent" value="1" checked> {% translate "Permanent (301) — moves the search ranking" %}</label>
+          <div class="full"><button type="submit" class="gx-btn is-lime">{% translate "Add redirect" %}</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

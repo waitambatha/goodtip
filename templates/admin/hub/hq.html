@@ -1,0 +1,55 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n %}
+
+{% comment %}
+HQ, ON THE PITCH (client, 26 Oct 2026: "let's also move to the option HQ and
+work on it, let it have the design we have been working on... remove the
+news and blogs"). GoodTip's own work — the inbox, the site's words, how it
+shows in Google, old links, and the fixtures feed — as cards that each say
+whether they need opening today. The list is hub.HQ_SCREENS (the rail reads
+the same one); the numbers come from sysadmin.hub_views.hq_hub.
+{% endcomment %}
+
+{% block gx_kicker %}HQ{% endblock %}
+{% block gx_title %}{% translate "GoodTip's" %} <em>{% translate "own work" %}</em>{% endblock %}
+{% block gx_lead %}{% translate "The company's inbox, the words on the site, how it shows up in Google, old links kept alive, and the fixtures feed. None of it belongs to any one organisation." %}{% endblock %}
+{% block gx_board %}
+<a class="gx-score" href="{% url 'admin:hq_enquiries' %}"><b>{{ open_enquiries }}</b><span>{% translate "Open enquiries" %}</span></a>
+<a class="gx-score" href="{% url 'admin:hq_pages' %}"><b>{{ page_edits }}</b><span>{% translate "Page edits" %}</span></a>
+<a class="gx-score" href="{% url 'admin:hq_redirects' %}"><b>{{ redirects }}</b><span>{% translate "Redirects" %}</span></a>
+<a class="gx-score" href="{% url 'admin:hq_sync' %}"><b>{% if last_sync %}{% if last_sync.ok %}OK{% else %}!{% endif %}{% else %}&ndash;{% endif %}</b><span>{% translate "Fixtures feed" %}</span></a>
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet">
+  <div class="gx-pane">
+    {% if cards %}
+    <div class="gx-hq">
+      {% for c in cards %}
+      <a class="gx-hqcard{% if c.stats.hot %} is-hot{% endif %}" href="{{ c.href }}" style="--cc: {% cycle 'var(--cc-1)' 'var(--cc-2)' 'var(--cc-3)' 'var(--cc-4)' 'var(--cc-5)' %}">
+        <span class="gx-hqcard-top">
+          <span class="gx-hqcard-ic" aria-hidden="true"><svg><use href="#{{ c.icon }}"/></svg></span>
+          {% if c.stats.hot %}<span class="gx-pill is-wait"><i></i>{% translate "Needs a look" %}</span>{% endif %}
+        </span>
+        <b class="gx-hqcard-name">{{ c.label }}</b>
+        <span class="gx-hqcard-blurb">{{ c.blurb }}</span>
+        {% if c.stats %}
+        <span class="gx-hqcard-stat"><b>{{ c.stats.big }}</b><span>{{ c.stats.unit }}</span></span>
+        <span class="gx-hqcard-line">{{ c.stats.line }}{% if c.stats.when %} &middot; {{ c.stats.when|timesince }} {% translate "ago" %}{% endif %}{% if c.stats.sub %} &middot; {{ c.stats.sub }}{% endif %}</span>
+        {% endif %}
+        <span class="gx-hqcard-go">{% translate "Open" %} &rarr;</span>
+      </a>
+      {% endfor %}
+      <a class="gx-hqcard is-elsewhere" href="{% url 'admin:hq_news' %}">
+        <span class="gx-hqcard-top"><span class="gx-hqcard-ic" aria-hidden="true"><svg><use href="#ic-doc"/></svg></span></span>
+        <b class="gx-hqcard-name">{% translate "Looking for the blog?" %}</b>
+        <span class="gx-hqcard-blurb">{% translate "Stories have their own place now — Blog & news, in the menu." %}</span>
+        <span class="gx-hqcard-go">{% translate "Go to Blog & news" %} &rarr;</span>
+      </a>
+    </div>
+    {% else %}
+    <div class="gx-empty"><b>{% translate "There is nothing here you have been given access to." %}</b></div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

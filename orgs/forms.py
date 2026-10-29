@@ -47,9 +47,12 @@ def fed_competitions():
     """
     from data_sync.services import competition_for_series
 
+    # And only what the admin has switched on (Sports & competitions, 27 Oct
+    # 2026): a sport switched off offers nothing, and inside one that is on,
+    # only its switched-on competitions count.
     ok = [
-        c.pk for c in Competition.objects.prefetch_related("series")
-        if any(competition_for_series(s.name) for s in c.series.all())
+        c.pk for c in Competition.objects.filter(sport__is_active=True).prefetch_related("series")
+        if any(s.is_active and competition_for_series(s.name) for s in c.series.all())
     ]
     return Competition.objects.filter(pk__in=ok).select_related("sport", "season")
 

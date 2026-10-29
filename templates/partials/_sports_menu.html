@@ -1,0 +1,151 @@
+{% comment %}
+THE SPORTS COLUMN (client, 27 Oct 2026: "in sites like stake, 1xbet... I did
+see those sports in the right as another column menu... I can click football,
+we can have La Liga, all types of the football, and women and men... still
+want that aspect of both images been seen left to right").
+
+Glass over the page, sticky beside the fixtures. Two parts:
+  Your competitions   what this organisation tips, each with its games to
+                      come; pressing one filters the fixtures in place (the
+                      same link the competition chips use — ?series=…)
+  All sports          every sport the admin has switched on (Sports &
+                      competitions), opening to its competitions, men's and
+                      women's on their own tabs. One this organisation does
+                      not tip says so — or, for its admin, offers to add it.
+
+Expects: menu (accounts.views._sports_menu), org.
+{% endcomment %}
+{% if menu.sports %}
+{% url 'dashboard' as dash_url %}
+<aside class="dash-sports" id="dashSports" aria-label="Sports">
+  <script>try{if(localStorage.getItem('gtSportsShut')==='1')document.getElementById('dashSports').classList.add('is-shut')}catch(e){}</script>
+  <div class="ds-head">
+    <b>Sports</b>
+    <span>{{ menu.sports|length }} on GoodTip</span>
+    {% comment %}
+    The tab that folds the column to its icons and back (client, 27 Oct 2026:
+    "a menu tab that I can click to expand and also close; when it closes I
+    only see their icons"). Remembered per browser.
+    {% endcomment %}
+    <button type="button" class="ds-fold" data-ds-fold aria-expanded="true" aria-label="Fold the sports menu">
+      <svg aria-hidden="true"><use href="#ic-chev-left"/></svg>
+    </button>
+  </div>
+
+  <p class="ds-cap">Your competitions</p>
+  <ul class="ds-list">
+    <li><a class="ds-row{% if not active_slugs %} on{% endif %}" data-ds-filter
+           href="{{ dash_url }}?org={{ org.id }}"
+           hx-get="{{ dash_url }}?slate=1&amp;org={{ org.id }}" hx-target="#slipPanel" hx-swap="outerHTML show:none"
+           hx-push-url="{{ dash_url }}?org={{ org.id }}">
+      <span class="ds-ic" aria-hidden="true">&#9733;</span><span class="ds-name">Everything you tip</span></a></li>
+    {% for c in menu.yours %}
+    <li><a class="ds-row{% if c.on %} on{% endif %}" data-ds-filter data-code="{{ c.series.slug }}" data-cat="{{ c.series.category }}" title="{{ c.series.name }}" style="--code: {{ c.series.colour }}"
+           href="{{ dash_url }}?org={{ org.id }}&amp;series={{ c.series.slug }}"
+           hx-get="{{ dash_url }}?slate=1&amp;org={{ org.id }}&amp;series={{ c.series.slug }}" hx-target="#slipPanel" hx-swap="outerHTML show:none"
+           hx-push-url="{{ dash_url }}?org={{ org.id }}&amp;series={{ c.series.slug }}">
+      <span class="ds-dot" aria-hidden="true"></span><span class="ds-name">{{ c.series.name }}</span>
+      {% if c.upcoming %}<span class="ds-n">{{ c.upcoming }}</span>{% endif %}</a></li>
+    {% endfor %}
+  </ul>
+
+  <p class="ds-cap">All sports</p>
+  <div class="ds-sports">
+    {% for s in menu.sports %}
+    <details class="ds-sport"{% if s.open %} open{% endif %}>
+      <summary class="ds-row" title="{{ s.sport.name }}">
+        <span class="ds-emoji" aria-hidden="true">{{ s.sport.icon|default:"🏅" }}</span>
+        <span class="ds-name">{{ s.sport.name }}</span>
+        {% if s.count %}<span class="ds-n">{{ s.count }}</span>{% endif %}
+        <svg class="ds-chev" aria-hidden="true"><use href="#ic-chev-down"/></svg>
+      </summary>
+      <div class="ds-body" data-ds-tabs>
+        {% if s.groups|length > 1 %}
+        <div class="ds-tabs" role="tablist">
+          {% for label, items in s.groups %}<button type="button" role="tab" data-ds-tab="{{ forloop.counter }}"{% if forloop.first %} aria-selected="true"{% endif %}>{{ label }}</button>{% endfor %}
+        </div>
+        {% endif %}
+        {% for label, items in s.groups %}
+        <ul class="ds-comps" data-ds-pane="{{ forloop.counter }}"{% if not forloop.first %} hidden{% endif %}>
+          {% for c in items %}
+          <li>
+            {% if c.in_org %}
+            <a class="ds-comp{% if c.on %} on{% endif %}" data-ds-filter
+               href="{{ dash_url }}?org={{ org.id }}&amp;series={{ c.series.slug }}"
+               hx-get="{{ dash_url }}?slate=1&amp;org={{ org.id }}&amp;series={{ c.series.slug }}" hx-target="#slipPanel" hx-swap="outerHTML show:none"
+               hx-push-url="{{ dash_url }}?org={{ org.id }}&amp;series={{ c.series.slug }}">
+              <span class="ds-name">{{ c.series.name }}</span>{% if c.upcoming %}<span class="ds-n">{{ c.upcoming }}</span>{% endif %}</a>
+            {% elif menu.is_admin %}
+            <a class="ds-comp is-add" href="{% url 'orgs:sports' org.root.id %}#sport-{{ s.sport.slug }}" title="Add {{ c.series.name }} to {{ org.name }}">
+              <span class="ds-name">{{ c.series.name }}</span><span class="ds-add">+ Add</span></a>
+            {% else %}
+            <span class="ds-comp is-off" title="{{ org.name }} doesn't tip {{ c.series.name }}">
+              <span class="ds-name">{{ c.series.name }}</span><span class="ds-off">Not tipped here</span></span>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% endfor %}
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+</aside>
+<script>
+(function () {
+  /* "Change" beside "Tipping in" opens the top bar's organisation menu. */
+  document.querySelectorAll('[data-open-ctx]').forEach(function (b) {
+    b.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var btn = document.querySelector('.an-ctx-btn');
+      if (btn) { window.scrollTo({top: 0, behavior: 'smooth'}); setTimeout(function () { btn.click(); btn.focus(); }, 60); }
+    });
+  });
+  /* Pop-overs on this page (the pin panel): one open at a time, closed by a
+     click elsewhere or Escape. Delegated, because the chip row is swapped. */
+  document.addEventListener('click', function (e) {
+    document.querySelectorAll('details[data-pop][open]').forEach(function (d) {
+      if (!d.contains(e.target)) d.open = false;
+    });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') document.querySelectorAll('details[data-pop][open]').forEach(function (d) { d.open = false; });
+  });
+
+  var box = document.querySelector('.dash-sports');
+  if (!box) return;
+  function fold(shut) {
+    box.classList.toggle('is-shut', shut);
+    var b = box.querySelector('[data-ds-fold]');
+    if (b) { b.setAttribute('aria-expanded', String(!shut)); b.setAttribute('aria-label', shut ? 'Open the sports menu' : 'Fold the sports menu'); }
+    try { localStorage.setItem('gtSportsShut', shut ? '1' : '0'); } catch (e) {}
+  }
+  fold(box.classList.contains('is-shut'));
+  box.querySelector('[data-ds-fold]').addEventListener('click', function () { fold(!box.classList.contains('is-shut')); });
+  /* Folded, a sport's icon opens the column rather than a dropdown nobody
+     can see. */
+  box.addEventListener('click', function (e) {
+    if (!box.classList.contains('is-shut')) return;
+    var sum = e.target.closest('.ds-sport > summary');
+    if (sum) { e.preventDefault(); fold(false); sum.parentElement.open = true; }
+  }, true);
+  /* Men / Women tabs inside a sport. */
+  box.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-ds-tab]');
+    if (t) {
+      var body = t.closest('[data-ds-tabs]'), n = t.getAttribute('data-ds-tab');
+      body.querySelectorAll('[data-ds-tab]').forEach(function (b) { b.setAttribute('aria-selected', b === t ? 'true' : 'false'); });
+      body.querySelectorAll('[data-ds-pane]').forEach(function (p) { p.hidden = p.getAttribute('data-ds-pane') !== n; });
+      return;
+    }
+    /* A filter press marks itself as the one showing — the fixtures swap in
+       place (htmx), and this column is outside what is swapped. */
+    var f = e.target.closest('[data-ds-filter]');
+    if (f) {
+      box.querySelectorAll('[data-ds-filter].on').forEach(function (x) { x.classList.remove('on'); });
+      box.querySelectorAll('[data-ds-filter][href="' + f.getAttribute('href') + '"]').forEach(function (x) { x.classList.add('on'); });
+    }
+  });
+})();
+</script>
+{% endif %}

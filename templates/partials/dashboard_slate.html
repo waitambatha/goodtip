@@ -26,6 +26,171 @@ Expects: c (the selected org card), games, open_games, org_series,
       lockout — its FIRST kickoff — so this banner appeared while most of the
       round was still days away and perfectly tippable.
       {% endcomment %}
+
+      {% comment %}
+      Competition filter. A member in a two-code league gets both slates
+      interleaved by kickoff; this narrows the list to the one they came for.
+      Carries the org through, or switching code would bounce them to whatever
+      the default league is.
+      {% endcomment %}
+      {% url 'dashboard' as dash_url %}
+      {% comment %}
+      swap_target makes the chips swap this panel rather than reload the page.
+      The round is deliberately NOT carried in `keep`: changing code should land
+      you on that code's current round, not on round 22 of a competition whose
+      season is at round 4.
+      {% endcomment %}
+      {% include "partials/_chip_row.html" with row=chip_row base=dash_url %}
+
+      {% comment %}
+      ROUND NAVIGATOR.
+      The fixtures list used to run across every round still to play, ordered
+      by kickoff. For a league tipping two codes that interleaves two round
+      numberings, so you scrolled past "Round 2, Round 24, Round 26, Round 25"
+      with games one after another and no way to orient yourself — and a round
+      already played was not in the list at all, so "how did I go last week"
+      meant leaving for My Tips.
+
+      Arrows for the neighbours, a dropdown for the jump.
+
+      Every control is a REAL link or a real GET form carrying the full query
+      string, with htmx layered on top: hx-get swaps this panel in place and
+      hx-push-url keeps the address bar honest, so the round you are looking at
+      stays bookmarkable, shareable and reachable with the back button. With
+      JavaScript off they are ordinary navigations that still work.
+      {% endcomment %}
+      {% comment %}
+      ROUNDS, BEHIND A BUTTON (client, 28 Oct 2026: "the round selection, let
+      it be a button that I click and then it comes through... popping up in a
+      nice elegant way... if it's in All, I want to scroll down, see what is yet
+      to be played, what was played"). Only with ONE competition picked — under
+      All there is no round that means anything across codes, so the feed is
+      the whole story there. The button is on the Competitions panel; the
+      drawer is here, open on arrival when a round is already chosen.
+      {% endcomment %}
+      {% if round_nav and active_slugs|length == 1 or round_nav and org_series|length == 1 %}
+      <div class="rdrawer{% if not round_nav.is_week %} is-open{% endif %}" id="roundDrawer" {% if round_nav.is_week %}hidden{% endif %}>
+      <div class="deck-row rnav">
+        <span class="deck-k">Rounds</span>
+        {% if round_nav.next %}
+        <a class="rnav-arrow"
+           href="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.next }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+           hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}&amp;round={{ round_nav.next }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+           hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
+           hx-push-url="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.next }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+           aria-label="Newer round" title="The newer round">
+          <svg><use href="#ic-arrow-left"/></svg>
+        </a>
+        {% else %}
+        <span class="rnav-arrow is-off" aria-hidden="true"><svg><use href="#ic-arrow-left"/></svg></span>
+        {% endif %}
+
+        {% comment %}
+        NOT A <form>. This whole panel renders inside the tip-confirm form, and
+        HTML forbids nesting one form in another — the parser does not error,
+        it silently DELETES the inner <form> tag and hoists its children into
+        the outer one. Which is exactly what happened: the round dropdown's
+        hx-get went with the discarded element, so changing it did nothing at
+        all, and its hidden org/series/slate inputs quietly became part of the
+        tip submission.
+
+        So the select carries its own htmx attributes. htmx sends a named
+        control's value with the request, so `round` rides along without any
+        wrapper; everything else is already in the URL.
+
+        Without JavaScript the arrows either side are the way through — they
+        are real links and always were. A lone <select> cannot submit itself,
+        and the alternative was a form that browsers refuse to build here.
+
+        No visible "Round" label: every option already begins with the word, so
+        a caption beside it said the same thing twice and cost the width that
+        left the bar looking half-empty. aria-label carries the accessible name.
+        {% endcomment %}
+        {% comment %}
+        THE ROUND RAIL (client, 28 Oct 2026: "the drop down — this week, next
+        week, last week — is not quite attractive... we need a much better
+        design"). Every round as a pill on one sideways strip: "This week"
+        first, then each competition's rounds under its own coloured tag, the
+        one on screen lit and scrolled into view. Each pill is a real link
+        with the same htmx swap the arrows use, so it works without script,
+        and is bookmarkable — and it is not a <select>, which could not live
+        in this form anyway (see the note that used to be here: a nested form
+        is silently dropped by the parser).
+        {% endcomment %}
+        <div class="rrail" data-rrail>
+          <a class="rrail-pill is-week{% if round_nav.is_week %} on{% endif %}"
+             href="{{ dash_url }}?org={{ c.org.id }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+             hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+             hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
+             hx-push-url="{{ dash_url }}?org={{ c.org.id }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+             {% if round_nav.is_week %}aria-current="true"{% endif %}><i class="rrail-live" aria-hidden="true"></i>All fixtures</a>
+          {% if round_nav.multi %}
+            {% for label, opts, colour in round_nav.groups %}
+            <span class="rrail-grp" style="--code: {{ colour }}">
+            <span class="rrail-code">{{ label }}</span>
+            {% for value, n in opts reversed %}
+            <a class="rrail-pill{% if not round_nav.is_week and value == round_nav.current %} on{% endif %}"
+               href="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ value }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+               hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}&amp;round={{ value }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+               hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
+               hx-push-url="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ value }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+               title="{{ label }} round {{ n }}"{% if not round_nav.is_week and value == round_nav.current %} aria-current="true"{% endif %}>R{{ n }}</a>
+            {% endfor %}
+            </span>
+            {% endfor %}
+          {% else %}
+            {% for n in round_nav.numbers reversed %}
+            <a class="rrail-pill{% if not round_nav.is_week and n|stringformat:"s" == round_nav.current %} on{% endif %}"
+               href="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ n }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+               hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}&amp;round={{ n }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+               hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
+               hx-push-url="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ n }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+               title="Round {{ n }}">R{{ n }}</a>
+            {% endfor %}
+          {% endif %}
+        </div>
+
+        {% if round_nav.prev %}
+        <a class="rnav-arrow"
+           href="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.prev }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+           hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}&amp;round={{ round_nav.prev }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+           hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
+           hx-push-url="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.prev }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
+           aria-label="Older round" title="The older round">
+          <svg><use href="#ic-arrow-right"/></svg>
+        </a>
+        {% else %}
+        <span class="rnav-arrow is-off" aria-hidden="true"><svg><use href="#ic-arrow-right"/></svg></span>
+        {% endif %}
+
+        {% comment %}
+        The result strip. Only for a round with graded tips — showing "0 points"
+        against a round that has not been played would read as a bad week
+        rather than as one that has not happened.
+        {% endcomment %}
+        {% if round_nav.played %}
+        <div class="rnav-score">
+          <span class="rns-hit">{{ round_nav.correct }}<span>/{{ round_nav.graded }}</span></span>
+          <span class="rns-lab">correct</span>
+          <span class="rns-pts">{{ round_nav.points }}<span>pts</span></span>
+        </div>
+        {% endif %}
+        {% comment %}
+        The way home, shown whenever you have navigated away — including on a
+        played round, which is the most likely place to be. Stepping back
+        through six rounds and then having to step forward six times to return
+        is the kind of thing that makes a navigator feel like a trap.
+        {% endcomment %}
+        {% comment %}
+        The way home. It carries NO round parameter — "this week" is the
+        default view, not a numbered round, so naming a number here would land
+        on the very screen this link exists to escape: one live round stacked
+        on top of every other code's round of the same number.
+        {% endcomment %}
+      </div>
+      </div>{# .rdrawer #}
+      {% endif %}
+
       {% if not open_games %}
       <div class="slip-bar locked">
         <div class="slip-info"><b>Every game in this round has started</b><span>Tips are final and shown read-only below.</span></div>
@@ -86,220 +251,24 @@ Expects: c (the selected org card), games, open_games, org_series,
       </div>
       <div class="pbar slim" style="margin-bottom:14px;"><i id="slipBar" style="width:{% widthratio slate_done slate_total|default:1 100 %}%"></i></div>
       {% endif %}
-
-      {% comment %}
-      Competition filter. A member in a two-code league gets both slates
-      interleaved by kickoff; this narrows the list to the one they came for.
-      Carries the org through, or switching code would bounce them to whatever
-      the default league is.
-      {% endcomment %}
-      {% url 'dashboard' as dash_url %}
-      {% comment %}
-      swap_target makes the chips swap this panel rather than reload the page.
-      The round is deliberately NOT carried in `keep`: changing code should land
-      you on that code's current round, not on round 22 of a competition whose
-      season is at round 4.
-      {% endcomment %}
-      {% include "partials/series_filter.html" with base=dash_url keep="org="|add:c.org.id keep_org=c.org.id swap_target="#slipPanel" %}
-
-      {% comment %}
-      ROUND NAVIGATOR.
-      The fixtures list used to run across every round still to play, ordered
-      by kickoff. For a league tipping two codes that interleaves two round
-      numberings, so you scrolled past "Round 2, Round 24, Round 26, Round 25"
-      with games one after another and no way to orient yourself — and a round
-      already played was not in the list at all, so "how did I go last week"
-      meant leaving for My Tips.
-
-      Arrows for the neighbours, a dropdown for the jump.
-
-      Every control is a REAL link or a real GET form carrying the full query
-      string, with htmx layered on top: hx-get swaps this panel in place and
-      hx-push-url keeps the address bar honest, so the round you are looking at
-      stays bookmarkable, shareable and reachable with the back button. With
-      JavaScript off they are ordinary navigations that still work.
-      {% endcomment %}
-      {% if round_nav %}
-      <div class="rnav">
-        {% if round_nav.prev %}
-        <a class="rnav-arrow"
-           href="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.prev }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-           hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}&amp;round={{ round_nav.prev }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-           hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
-           hx-push-url="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.prev }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-           aria-label="Previous round" title="The round before this one">
-          <svg><use href="#ic-arrow-left"/></svg>
-        </a>
-        {% else %}
-        <span class="rnav-arrow is-off" aria-hidden="true"><svg><use href="#ic-arrow-left"/></svg></span>
-        {% endif %}
-
-        {% comment %}
-        NOT A <form>. This whole panel renders inside the tip-confirm form, and
-        HTML forbids nesting one form in another — the parser does not error,
-        it silently DELETES the inner <form> tag and hoists its children into
-        the outer one. Which is exactly what happened: the round dropdown's
-        hx-get went with the discarded element, so changing it did nothing at
-        all, and its hidden org/series/slate inputs quietly became part of the
-        tip submission.
-
-        So the select carries its own htmx attributes. htmx sends a named
-        control's value with the request, so `round` rides along without any
-        wrapper; everything else is already in the URL.
-
-        Without JavaScript the arrows either side are the way through — they
-        are real links and always were. A lone <select> cannot submit itself,
-        and the alternative was a form that browsers refuse to build here.
-
-        No visible "Round" label: every option already begins with the word, so
-        a caption beside it said the same thing twice and cost the width that
-        left the bar looking half-empty. aria-label carries the accessible name.
-        {% endcomment %}
-        <span class="rnav-pick">
-          <select name="round" id="rnavSel" aria-label="Choose a round"
-                  hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-                  hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
-                  hx-trigger="change" hx-push-url="true">
-            {% comment %}
-            "This week" is its own destination, not a number. Round numbers are
-            per (org, series), so in a four-code league one number names up to
-            five rounds — one live, the rest played out months ago. Selecting
-            the number showed all five. This option shows the current open
-            round of EACH competition instead, which is what "this week"
-            actually means to a member.
-
-            Its value is empty, so choosing it drops ?round= from the URL and
-            lands on the default view.
-            {% endcomment %}
-            <option value="" {% if round_nav.is_week %}selected{% endif %}>This week</option>
-            {% comment %}
-            GROUPED BY CODE IN A MULTI-CODE LEAGUE.
-
-            A round number is not a round: "round 4" in a league tipping four
-            codes names up to four of them, one live and the rest played out
-            months ago. The list used to be bare numbers and picking one showed
-            every code's round at once — the client opened AFLW round 4 to tip
-            and found April's AFL round 4 stacked underneath it.
-
-            So the options carry the code, and the value carries it too
-            ("aflw-4"), which is what lets the view narrow the fixtures to the
-            one code. A league tipping one code has nothing to disambiguate and
-            keeps plain numbers.
-            {% endcomment %}
-            {% if round_nav.multi %}
-            {% for label, opts in round_nav.groups %}
-            <optgroup label="{{ label }}">
-              {% for value, n in opts %}
-              <option value="{{ value }}" {% if not round_nav.is_week and value == round_nav.current %}selected{% endif %}>
-                {{ label }} round {{ n }}
-              </option>
-              {% endfor %}
-            </optgroup>
-            {% endfor %}
-            {% else %}
-            {% for n in round_nav.numbers %}
-            <option value="{{ n }}" {% if not round_nav.is_week and n|stringformat:"s" == round_nav.current %}selected{% endif %}>
-              Round {{ n }}
-            </option>
-            {% endfor %}
-            {% endif %}
-          </select>
-        </span>
-
-        {% if round_nav.next %}
-        <a class="rnav-arrow"
-           href="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.next }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-           hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}&amp;round={{ round_nav.next }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-           hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
-           hx-push-url="{{ dash_url }}?org={{ c.org.id }}&amp;round={{ round_nav.next }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-           aria-label="Next round" title="The round after this one">
-          <svg><use href="#ic-arrow-right"/></svg>
-        </a>
-        {% else %}
-        <span class="rnav-arrow is-off" aria-hidden="true"><svg><use href="#ic-arrow-right"/></svg></span>
-        {% endif %}
-
-        {% comment %}
-        The result strip. Only for a round with graded tips — showing "0 points"
-        against a round that has not been played would read as a bad week
-        rather than as one that has not happened.
-        {% endcomment %}
-        {% if round_nav.played %}
-        <div class="rnav-score">
-          <span class="rns-hit">{{ round_nav.correct }}<span>/{{ round_nav.graded }}</span></span>
-          <span class="rns-lab">correct</span>
-          <span class="rns-pts">{{ round_nav.points }}<span>pts</span></span>
-        </div>
-        {% endif %}
-        {% comment %}
-        The way home, shown whenever you have navigated away — including on a
-        played round, which is the most likely place to be. Stepping back
-        through six rounds and then having to step forward six times to return
-        is the kind of thing that makes a navigator feel like a trap.
-        {% endcomment %}
-        {% comment %}
-        The way home. It carries NO round parameter — "this week" is the
-        default view, not a numbered round, so naming a number here would land
-        on the very screen this link exists to escape: one live round stacked
-        on top of every other code's round of the same number.
-        {% endcomment %}
-        {% if not round_nav.is_week %}
-        <a class="rnav-now{% if round_nav.played %} is-quiet{% endif %}"
-           href="{{ dash_url }}?org={{ c.org.id }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-           hx-get="{{ dash_url }}?slate=1&amp;org={{ c.org.id }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}"
-           hx-target="#slipPanel" hx-swap="outerHTML show:none" data-veil-for="#roundFixtures"
-           hx-push-url="{{ dash_url }}?org={{ c.org.id }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}">
-          This week
-        </a>
-        {% endif %}
-      </div>
-      {% endif %}
-
       {# the round's fixtures scroll in place, keeping Confirm reachable below #}
       <div class="fixtures gt-scroll" id="roundFixtures" data-veil-label="Loading fixtures">
-        {% regroup games by round as round_groups %}
+        {% comment %}
+        GROUPED BY DAY, NOT BY ROUND (client, 28 Oct 2026: "why am I seeing
+        this week 4, finals week 5... I should see all"). The feed runs
+        soonest-first through what is coming up, then newest-first through the
+        results; each card still says its competition and round.
+        {% endcomment %}
+        {% comment %}
+        ONE FLOW, IN TIME ORDER (client, 28 Oct 2026: "don't need that green
+        thing... let it just flow... arranged on time... from the latest to the
+        ones that are going to be played... then what has already been
+        played"). No day or round bars: each card says its day, time,
+        competition and round. One quiet line marks where the results begin.
+        {% endcomment %}
+        {% regroup games by feed_done as round_groups %}
         {% for grp in round_groups %}
-        {% comment %}
-        The list runs in kickoff order across rounds, so without a heading a
-        member cannot tell where one round ends and the next begins — which
-        matters, because points and ladders are counted per round.
-        {% endcomment %}
-        {% comment %}
-        A round outside the tipping window is still listed — seeing what is
-        coming is the point of the list — but it says plainly that it is not
-        open yet, rather than offering controls that would be refused on
-        submit.
-        {% endcomment %}
-        <div class="fx-roundhead{% if not grp.list.0.round_open %} is-shut{% endif %}"
-             data-code="{{ grp.grouper.series.slug }}" data-cat="{{ grp.grouper.series.category }}">
-          <span class="fxr-n">{{ grp.grouper.label }}</span>
-          {% comment %}
-          The code wears its own colour here too, not only on the filter chip.
-          A slate of AFL and AFLW interleaved by kickoff is the case this is
-          for: the two headings are one letter apart, and the letter is the
-          part that decides which ladder the round below it counts toward.
-          {% endcomment %}
-          <span class="fxr-series is-code">{{ grp.grouper.series }}</span>
-          {% if grp.list.0.round_open %}
-          {% comment %}
-          A round whose games have all been played must not advertise a lock
-          time. "Locks Thu 12 Mar" sat above eight finished NRL fixtures in
-          August — a date five months gone, phrased as though tipping were
-          about to close, over teams that could not be clicked. That reads as a
-          broken screen rather than as a round that is over.
-          {% endcomment %}
-          {% if grp.grouper.status == "complete" %}
-          <span class="fxr-locks done">Completed &middot; {{ grp.grouper.lockout_at|date:"j M" }}</span>
-          {% elif grp.list.0.is_locked %}
-          <span class="fxr-locks done">Started {{ grp.grouper.lockout_at|date:"D j M" }} &middot; read-only</span>
-          {% else %}
-          <span class="fxr-locks">Locks {{ grp.grouper.lockout_at|date:"D j M, g:i A" }}</span>
-          {% endif %}
-          {% else %}
-          {# names the round it waits on, so "locked" is an explanation #}
-          <span class="fxr-locks shut"><svg><use href="#ic-lock"/></svg> {{ grp.list.0.lock_note }}</span>
-          {% endif %}
-        </div>
+        {% if grp.grouper %}<p class="fx-divider"><span>Already played</span></p>{% endif %}
         {% for g in grp.list %}
         {% comment %}
         The same card My Tips uses, in "form" mode: the picks ride hidden
@@ -310,5 +279,14 @@ Expects: c (the selected org card), games, open_games, org_series,
         {% include "partials/fixture_card.html" with match=g reader=g.reader selection=g.my_tip editable=g.can_tip lock_note=g.lock_note mode="form" %}
         {% endfor %}
         {% endfor %}
+        {% if feed_more %}
+        {% url 'dashboard' as dash_url_more %}
+        <div class="fx-more">
+          <a class="fx-more-btn" data-keep-scroll
+             href="{{ dash_url_more }}?org={{ c.org.id }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}&amp;older={{ feed_more }}"
+             hx-get="{{ dash_url_more }}?slate=1&amp;org={{ c.org.id }}{% for s in active_slugs %}&amp;series={{ s }}{% endfor %}&amp;older={{ feed_more }}"
+             hx-target="#slipPanel" hx-swap="outerHTML show:none">Show more results</a>
+        </div>
+        {% endif %}
       </div>
 </div>

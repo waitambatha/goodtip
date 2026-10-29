@@ -1,0 +1,59 @@
+{% extends "app_base.html" %}
+{% block title %}Sports, {{ org.name }}{% endblock %}
+{% block loader_task %}Opening sports{% endblock %}
+{% block nav_manage %}on{% endblock %}
+{% block body_class %}page-deep sheet-page{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+{% comment %}
+WHAT YOUR ORGANISATION TIPS ON (client, 28 Oct 2026). The admin's own sports
+screen, in the same shape as the super admin's: a card per sport, each
+competition a row with Add — or Added — in its own colour. Adding is instant
+(the games come from GoodTip's fixture library), and members then find it in
+their sports menu, can pin it and tip it. View: orgs.views.org_sports_view.
+{% endcomment %}
+{% block app_content %}
+<div class="osp">
+  <header class="osp-hero">
+    <p class="osp-k">{{ org.name }} &middot; {% if org.season %}{{ org.season }}{% endif %}</p>
+    <h1>What your members <em>tip on</em></h1>
+    <p class="osp-lead">Add a competition and its games are on everyone's dashboard straight away — fixtures, live scores, results and its ladder. Remove one and nothing is deleted.</p>
+    <p class="osp-count"><b>{{ chosen_count }}</b> competition{{ chosen_count|pluralize }} on</p>
+  </header>
+
+  {% if sports %}
+  <div class="osp-grid">
+    {% for s in sports %}
+    <section class="osp-card" id="sport-{{ s.sport.slug }}">
+      <header class="osp-card-h">
+        <span class="osp-emoji" aria-hidden="true">{{ s.sport.icon|default:"🏅" }}</span>
+        <div><h2>{{ s.sport.name }}</h2><p>{{ s.sport.blurb }}</p>
+          {% if s.sport.draw_tips %}<span class="osp-tag">Home · Draw · Away</span>{% endif %}</div>
+      </header>
+      <ul class="osp-comps">
+        {% for row in s.comps %}
+        <li class="osp-comp{% if row.on %} is-on{% endif %}" id="comp-{{ row.comp.pk }}" style="--code: {{ row.series.0.colour }}">
+          <span class="osp-dot" aria-hidden="true"></span>
+          <span class="osp-name">
+            <b>{{ row.comp.name }}</b>
+            <small>{% for se in row.series %}{% if se.category == "womens" %}Women{% elif se.category == "representative" %}Representative{% else %}Men{% endif %}{% if not forloop.last %} + {% endif %}{% endfor %}{% if row.series.0.region %} &middot; {{ row.series.0.region }}{% endif %}</small>
+          </span>
+          <form method="post">
+            {% csrf_token %}<input type="hidden" name="competition" value="{{ row.comp.pk }}">
+            {% if row.on %}
+            <button type="submit" class="osp-btn is-on" data-on="Added" data-off="Remove" title="Remove {{ row.comp.name }}">
+              <span class="osp-btn-on">&#10003; Added</span><span class="osp-btn-off">Remove</span></button>
+            {% else %}
+            <button type="submit" class="osp-btn">+ Add</button>
+            {% endif %}
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="osp-none">No sports are switched on for GoodTip right now.</p>
+  {% endif %}
+</div>
+{% endblock %}

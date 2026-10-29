@@ -27,9 +27,9 @@ Expects: plan (a tipping.carry.RoomPlan).
     <span class="cc-body">
       <span class="cc-teams">{{ row.match.home_team.name }} v {{ row.match.away_team.name }}</span>
       <span class="cc-swap">
-        <span class="cc-was">{% if row.existing == 'home' %}{{ row.match.home_team.name }}{% else %}{{ row.match.away_team.name }}{% endif %}</span>
+        <span class="cc-was">{% if row.existing == 'home' %}{{ row.match.home_team.name }}{% elif row.existing == 'draw' %}Draw{% else %}{{ row.match.away_team.name }}{% endif %}</span>
         <svg aria-hidden="true"><use href="#ic-arrow-right"/></svg>
-        <span class="cc-now">{% if row.selection == 'home' %}{{ row.match.home_team.name }}{% else %}{{ row.match.away_team.name }}{% endif %}</span>
+        <span class="cc-now">{% if row.selection == 'home' %}{{ row.match.home_team.name }}{% elif row.selection == 'draw' %}Draw{% else %}{{ row.match.away_team.name }}{% endif %}</span>
       </span>
     </span>
   </label>

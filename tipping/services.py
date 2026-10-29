@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.db.models import Count, Exists, OuterRef, Q, Sum, Value
+from django.db.models import F, Count, Exists, OuterRef, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
@@ -167,6 +167,12 @@ def _fill_missed_tips(match: Match) -> int:
     """
     from orgs.models import Group, GroupMember, OrgMember
 
+    # Nobody could tip a game that reached GoodTip after it kicked off — a
+    # competition an organisation added part-way through the season — so
+    # nobody is defaulted onto it: an "away" pick there would be free points.
+    if match.arrived_after_kickoff:
+        return 0
+
     org_id = match.round.org_id
     eligible = set(
         OrgMember.objects.filter(org_id=org_id)
@@ -267,6 +273,9 @@ def backdate_missed_tips(user, org, *, group=None) -> int:
     missed = (
         Match.objects.filter(round__org=org, kickoff_at__lte=now)
         .exclude(pk__in=already)
+        # Games that arrived after kick-off were tippable by nobody; nobody
+        # is defaulted onto them, joiners included (see _fill_missed_tips).
+        .exclude(created_at__gt=F("kickoff_at") + Match.LATE_ARRIVAL_GRACE)
         .select_related("round")
     )
     written = []
@@ -291,6 +300,13 @@ def backdate_missed_tips(user, org, *, group=None) -> int:
     return len(written)
 
 
+def draw_tippable(match: Match) -> bool:
+    """Whether a member may tip this match a DRAW — the sport says so
+    (catalog.Sport.draw_tips: football and cricket)."""
+    series = match.round.series
+    return bool(series and series.sport.draw_tips)
+
+
 def _recalculate_tips_for_match(match: Match) -> int:
     if match.result is None:
         return 0
@@ -298,7 +314,13 @@ def _recalculate_tips_for_match(match: Match) -> int:
     # what a draw pays (0, except State of Origin's 2).
     points = match.round.points_per_correct
     updated = 0
-    if match.result == "draw":
+    if match.result == "draw" and draw_tippable(match):
+        # A sport where the draw is a pick (client, 27 Oct 2026: "if they tip
+        # draw points is given also as a win"): tipping it is a correct tip,
+        # paid like any winner; home and away were wrong.
+        updated += match.tips.filter(selection="draw").update(is_correct=True, points_awarded=points)
+        updated += match.tips.exclude(selection="draw").update(is_correct=False, points_awarded=0)
+    elif match.result == "draw":
         # is_correct stays False: nobody picked the winner, because there was
         # not one. The points are a property of the fixture, not of the pick,
         # which is why they are awarded to every tip alike.
@@ -435,8 +457,10 @@ def submit_tip(*, user, match: Match, org, selection: str, group=None) -> Tip:
     """
     if match.is_locked:
         raise ValueError("Match is locked")
-    if selection not in ("home", "away"):
+    if selection not in ("home", "away", "draw"):
         raise ValueError("Invalid selection")
+    if selection == "draw" and not draw_tippable(match):
+        raise ValueError("You can't tip a draw in this sport.")
     if match.round_id not in tippable_round_ids(org):
         raise ValueError(
             f"That round isn't open yet. You can tip {TIP_WINDOW_ROUNDS} rounds "

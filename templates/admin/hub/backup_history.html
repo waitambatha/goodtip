@@ -1,0 +1,154 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n humanize %}
+
+{% comment %}
+THE BACKUP'S HISTORY (client, 26 Oct 2026: "let me see the history of the
+backup. So it says in this hour we have backed up this number of people,
+this number of items... and if that hour reaches and no data... I can see
+this specific hour time this amount of data was backed up").
+
+The countdown to the next run, the last day's runs as bars, then every run
+as a line in a timeline: when, how long it took, and what arrived — "+2
+users, +5 Wall posts" — or, plainly, that there was nothing new. Built by
+sysadmin.database_views.backup_history.
+{% endcomment %}
+
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_tables' %}">{% translate "Databases" %}</a></li>{% endblock %}
+{% block gx_kicker %}{% translate "Databases" %} &middot; {% translate "sync" %}{% endblock %}
+{% block gx_title %}{% translate "Live and staging," %} <em>{% translate "in step" %}</em>{% endblock %}
+{% block gx_lead %}{% translate "Whenever something real is created on goodtip.com.au — a person, an organisation, a Wall post, a tip — it is copied into staging within seconds and labelled Backup. Here is the proof, table by table and item by item." %}{% endblock %}
+{% block gx_board %}
+<div class="gx-score"><b>{{ in_sync }}/{{ compare|length }}</b><span>{% translate "Tables matching" %}</span></div>
+<div class="gx-score"><b>{{ today_new|intcomma }}</b><span>{% translate "New items today" %}</span></div>
+<div class="gx-score" data-gx-countdown="{% if sync.next_at and sync.watching %}{{ sync.next_at|date:'c' }}{% endif %}" data-every="{{ every }}"><b data-gx-left>{% if sync.watching %}--{% else %}{% translate "paused" %}{% endif %}</b><span>{% translate "Next check" %}</span></div>
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet gx-syncsheet">
+  <div class="gx-syncvis">
+    <div class="gx-syncside is-live">
+      <p class="gx-syncside-h"><span class="gx-db-cyl" aria-hidden="true"><i></i><i></i><i></i></span><b>{% translate "Live" %}</b><small>goodtip.com.au</small></p>
+      <ol>
+        {% for f in feed|slice:":5" %}<li><span class="gx-lab is-real">{{ f.kind }}</span><b>{{ f.text }}</b><small>{% if f.made %}{% translate "created" %} {{ f.made|date:"j M, g:i a" }}{% else %}{% translate "on live" %}{% endif %}</small></li>
+        {% empty %}<li class="is-empty">{% translate "Nothing real has come across yet." %}</li>{% endfor %}
+      </ol>
+    </div>
+    <div class="gx-syncpipe{% if sync.watching %} is-on{% endif %}" aria-hidden="true">
+      <span class="gx-pipe"><i class="p1"><svg><use href="#ic-users"/></svg></i><i class="p2"><svg><use href="#ic-msg"/></svg></i><i class="p3"><svg><use href="#ic-target"/></svg></i><i class="p4"><svg><use href="#ic-heart"/></svg></i></span>
+      <span class="gx-syncpipe-tag">{% if sync.watching %}<i class="gx-live-dot"></i>{% translate "copying as it happens" %}{% else %}{% translate "paused" %}{% endif %}</span>
+    </div>
+    <div class="gx-syncside is-staging">
+      <p class="gx-syncside-h"><span class="gx-db-cyl" aria-hidden="true"><i></i><i></i><i></i></span><b>{% translate "Staging" %}</b><small>staging.goodtip.com.au</small></p>
+      <ol>
+        {% for f in feed|slice:":5" %}<li><span class="gx-lab is-backup">{% translate "Backup" %}</span><a href="{{ f.url }}">{{ f.text }}</a><small>&#10003; {% translate "in staging" %} {{ f.synced|date:"j M, g:i a" }}</small></li>
+        {% empty %}<li class="is-empty">{% translate "Copies appear here the moment they land." %}</li>{% endfor %}
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section class="gx-sheet" data-gx-tabs>
+  <div class="gx-tabs" role="tablist">
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="compare" aria-selected="true">{% translate "In sync" %} <em>{{ in_sync }}/{{ compare|length }}</em></button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="feed">{% translate "Just backed up" %} <em>{{ feed|length }}</em></button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="runs">{% translate "History" %} <em>{{ runs|length }}</em></button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="day">{% translate "Recent runs" %}</button>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="compare">
+    {% if compare %}
+    <div class="gx-tablewrap">
+      <table class="gx-table">
+        <thead><tr><th>{% translate "Table" %}</th><th>{% translate "On live" %}</th><th>{% translate "Backed up in staging" %}</th><th>{% translate "State" %}</th><th></th></tr></thead>
+        <tbody>
+        {% for r in compare %}
+        <tr style="cursor:default">
+          <td class="is-name"><b>{{ r.name }}</b><small class="gx-tlabel">{{ r.label }}</small></td>
+          <td><b>{{ r.live|default_if_none:"—" }}</b></td>
+          <td><b>{{ r.staging }}</b></td>
+          <td>{% if r.state == "match" %}<span class="gx-pill is-ok"><i></i>{% translate "In sync" %}</span>
+            {% elif r.state == "kept" %}<span class="gx-pill is-offer"><i></i>{% blocktranslate with n=r.diff %}In sync · {{ n }} kept after live deleted them{% endblocktranslate %}</span>
+            {% elif r.state == "behind" %}<span class="gx-pill is-wait"><i></i>{% blocktranslate with n=r.diff %}{{ n }} not copied yet{% endblocktranslate %}</span>
+            {% else %}<span class="gx-pill"><i></i>{% translate "Waiting for a check" %}</span>{% endif %}</td>
+          <td class="gx-acts"><a class="gx-mini" href="{{ r.url }}">{% translate "See them" %}</a></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="gx-empty"><svg aria-hidden="true"><use href="#ic-sync"/></svg><b>{% translate "Nothing to compare yet" %}</b><span>{% translate "After the first check, every table appears here with live's count beside staging's." %}</span></div>
+    {% endif %}
+  </div>
+
+  <div class="gx-pane" data-gx-pane="feed">
+    {% if feed %}
+    <ol class="gx-feedlist">
+      {% for f in feed %}
+      <li>
+        <span class="gx-feed-dot" aria-hidden="true">&#10003;</span>
+        <div><p><span class="gx-lab is-backup">{{ f.kind }}</span> <a href="{{ f.url }}">{{ f.text }}</a></p>
+          <small>{% if f.made %}{% translate "Created on live" %} {{ f.made|date:"j M Y, g:i a" }} &rarr; {% endif %}{% translate "backed up in staging" %} {{ f.synced|date:"j M Y, g:i a" }}</small></div>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <div class="gx-empty"><b>{% translate "Nothing has come across yet" %}</b></div>
+    {% endif %}
+  </div>
+
+  <div class="gx-pane" data-gx-pane="runs">
+    <div class="gx-split">
+      <div>
+        {% if runs %}
+        <ol class="gx-runs">
+          {% for r in runs %}
+          <li class="gx-run{% if not r.run.ok %} is-bad{% elif r.new %} is-new{% else %} is-quiet{% endif %}">
+            <span class="gx-run-dot" aria-hidden="true">{% if not r.run.ok %}!{% elif r.new %}+{% else %}&middot;{% endif %}</span>
+            <div class="gx-run-b">
+              <p class="gx-run-h">
+                <b>{{ r.run.started_at|date:"l j M" }} &middot; {{ r.run.started_at|date:"g:i a" }}{% if r.quiet and r.run.finished_at %} &ndash; {{ r.run.finished_at|date:"g:i a" }}{% endif %}</b>
+                <span>{% if r.run.ok %}{% if r.took is not None %}{% blocktranslate with s=r.took|floatformat:0 %}took {{ s }}s{% endblocktranslate %}{% endif %}{% elif r.run.finished_at %}{% translate "failed" %}{% else %}{% translate "running…" %}{% endif %}</span>
+              </p>
+              {% if not r.run.ok and r.run.error %}
+              <p class="gx-run-err">{{ r.run.error|truncatechars:240 }}</p>
+              {% elif r.new %}
+              <p class="gx-run-sum">{% blocktranslate count n=r.new %}{{ n }} new item backed up{% plural %}{{ n }} new items backed up{% endblocktranslate %}{% if r.updated %} &middot; {% blocktranslate with n=r.updated %}{{ n }} brought up to date{% endblocktranslate %}{% endif %}</p>
+              <div class="gx-run-chips">{% for i in r.items %}<a href="{% url 'admin:hq_database_table' 'staging' i.label %}?show=backup" class="gx-run-chip">+{{ i.new|intcomma }} <span>{{ i.name|lower }}</span></a>{% endfor %}</div>
+              {% elif r.quiet %}
+              <p class="gx-run-sum is-quiet">{% blocktranslate count n=r.checks %}Quiet — checked live once, nothing new.{% plural %}Quiet — checked live {{ n }} times, nothing new.{% endblocktranslate %}</p>
+              {% else %}
+              <p class="gx-run-sum is-quiet">{% translate "Nothing new to back up." %}</p>
+              {% endif %}
+              {% if r.errors %}<p class="gx-run-err">{% blocktranslate count n=r.errors|length %}{{ n }} table could not be copied{% plural %}{{ n }} tables could not be copied{% endblocktranslate %}: {% for i in r.errors %}{{ i.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+            </div>
+          </li>
+          {% endfor %}
+        </ol>
+        {% else %}
+        <div class="gx-empty"><svg aria-hidden="true"><use href="#ic-sync"/></svg><b>{% translate "No backups yet" %}</b><span>{% translate "The first run appears here as soon as it finishes." %}</span></div>
+        {% endif %}
+      </div>
+      <div class="gx-stack">
+        {% include "admin/hub/_sync_bridge.html" with compact=1 %}
+      </div>
+    </div>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="day">
+    <div class="gx-h"><h3>{% translate "New items per run" %}</h3><p>{% translate "The last 24 entries, oldest on the left. Point at a bar for the time." %}</p></div>
+    {% if chart %}
+    <div class="gx-runbars" role="img" aria-label="{% translate 'New items per backup run' %}">
+      {% for r in chart %}
+      <div class="gx-runbar{% if not r.run.ok %} is-bad{% endif %}" title="{{ r.run.started_at|date:'D j M, g:i a' }} — {{ r.new }} new">
+        <i style="height: {% if r.new %}{{ r.h }}{% else %}3{% endif %}%"></i>
+        <span>{{ r.run.started_at|date:"ga" }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="gx-empty"><b>{% translate "Nothing to chart yet" %}</b></div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

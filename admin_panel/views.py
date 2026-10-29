@@ -440,7 +440,8 @@ def sync_panel(request):
             messages.error(request, str(e))
         return redirect("admin:hq_sync")
     orgs = Organisation.objects.select_related("season").all()
-    return render(request, "manage/sync.html", {
+    return _hq_page(request, "admin/hub/hq/sync.html", {
+        "title": "Fixtures feed",
         "orgs": orgs,
         # No feed needs a key any more — both sources are scraped. Kept true so
         # the template's "feed configured" branch stays correct without needing
@@ -844,6 +845,19 @@ def _editor_body_html(body: str) -> str:
     return linebreaks(body)
 
 
+def _hq_page(request, template, ctx):
+    """Render an HQ screen in the admin's own frame (admin/hub/gx_base.html
+    needs admin.site.each_context). The Blog & news screens moved there on
+    26 Oct 2026, and the rest of HQ the same day — enquiries, pages, SEO,
+    redirects, the fixtures feed — so the admin has one look and one menu."""
+    from django.contrib import admin as dj_admin
+
+    full = dj_admin.site.each_context(request)
+    full.update(ctx)
+    full.setdefault("title", "Blog & news")
+    return render(request, template, full)
+
+
 @requires("news.write")
 def news_list(request):
     # Each row carries the story's own public URL so it can be copied straight
@@ -852,12 +866,16 @@ def news_list(request):
     posts = list(NewsPost.objects.all())
     for post in posts:
         post.share_url = request.build_absolute_uri(post.get_absolute_url())
-    return render(request, "manage/news.html", {
+    published = [p for p in posts if p.is_live]
+    scheduled = [p for p in posts if p.is_scheduled]
+    drafts = [p for p in posts if not p.is_published]
+    return _hq_page(request, "admin/hub/blog_list.html", {
         "posts": posts,
-        # Counted here rather than in the template so the banner can be shown
-        # once at the top: a queued story is invisible on the site, and the
-        # list is the only place anyone would find out it is coming.
-        "scheduled_count": sum(1 for p in posts if p.is_scheduled),
+        "groups": [("all", "All stories", posts), ("published", "Published", published),
+                   ("scheduled", "Scheduled", scheduled), ("drafts", "Drafts", drafts)],
+        "counts": {"published": len(published), "scheduled": len(scheduled), "drafts": len(drafts),
+                   "emailed": sum(1 for p in posts if p.announced_at)},
+        "scheduled_count": len(scheduled),
     })
 
 
@@ -903,7 +921,7 @@ def news_new(request):
         if not _headline_text(request):
             messages.error(request, "Give the story a headline before saving.")
             draft = _fill_news_post(request, NewsPost())
-            return render(request, "manage/news_editor.html", {
+            return _hq_page(request, "admin/hub/blog_editor.html", {
                 **_editor_context(draft, is_new=True,
                                   featured=_parse_featured(request.POST)),
                 "initial_body": draft.body,
@@ -920,7 +938,7 @@ def news_new(request):
                 request, "Post published." if post.is_published else "Post saved as a draft.",
             )
         return redirect("admin:hq_news")
-    return render(request, "manage/news_editor.html", _editor_context(None, is_new=True))
+    return _hq_page(request, "admin/hub/blog_editor.html", {**_editor_context(None, is_new=True), "title": "New story"})
 
 
 @requires("news.write", lambda r: f"Edit story: {_headline_text(r) or 'untitled'}")
@@ -930,7 +948,7 @@ def news_edit(request, post_id: int):
         if not _headline_text(request):
             messages.error(request, "Give the story a headline before saving.")
             draft = _fill_news_post(request, post)
-            return render(request, "manage/news_editor.html", {
+            return _hq_page(request, "admin/hub/blog_editor.html", {
                 **_editor_context(draft, is_new=False,
                                   featured=(_parse_featured(request.POST)
                                             if "featured_media" in request.POST else None)),
@@ -944,8 +962,8 @@ def news_edit(request, post_id: int):
         else:
             messages.success(request, "Post updated.")
         return redirect("admin:hq_news")
-    return render(request, "manage/news_editor.html", {
-        **_editor_context(post, is_new=False),
+    return _hq_page(request, "admin/hub/blog_editor.html", {
+        **_editor_context(post, is_new=False), "title": post.title,
         "initial_body": _editor_body_html(post.body),
         "share_url": request.build_absolute_uri(post.get_absolute_url()),
     })
@@ -1366,7 +1384,8 @@ def enquiries(request):
     keep = request.GET.copy()
     keep.pop("page", None)
 
-    return render(request, "manage/enquiries.html", {
+    return _hq_page(request, "admin/hub/hq/enquiries.html", {
+        "title": "Enquiries",
         "enquiries": page.object_list,
         "page": page,
         "page_range": page.paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1),
@@ -1455,7 +1474,7 @@ def enquiry_detail(request, enquiry_id):
         messages.success(request, f"Replied to {enquiry.name} at {enquiry.email}.")
         return redirect("admin:hq_enquiries")
 
-    return render(request, "manage/enquiry_detail.html", {"enquiry": enquiry})
+    return _hq_page(request, "admin/hub/hq/enquiry_detail.html", {"enquiry": enquiry, "title": enquiry.name})
 
 
 # ---------------------------------------------------------------------------
@@ -1590,7 +1609,8 @@ def seo_list(request):
             "customised": bool(row and row.is_customised),
         })
     posts = list(NewsPost.objects.all()[:200])
-    return render(request, "manage/seo.html", {
+    return _hq_page(request, "admin/hub/hq/seo.html", {
+        "title": "SEO",
         "pages": pages,
         "posts": posts,
         "public_count": sum(1 for p in pages if p["page"].is_public),
@@ -1717,7 +1737,8 @@ def seo_edit(request, page_key: str):
         messages.success(request, note or "SEO settings saved.")
         return redirect("admin:hq_seo")
 
-    return render(request, "manage/seo_edit.html", {
+    return _hq_page(request, "admin/hub/hq/seo_edit.html", {
+        "title": page.label,
         "page": page,
         "seo": row,
         "default_path": default_path,
@@ -1771,7 +1792,8 @@ def _apply_path_override(request, row, default_path: str) -> str:
 def redirects_list(request):
     """Old addresses and where they go now, plus how often they are used."""
     rows = list(Redirect.objects.all())
-    return render(request, "manage/redirects.html", {
+    return _hq_page(request, "admin/hub/hq/redirects.html", {
+        "title": "Redirects",
         "rows": rows,
         "used": sum(1 for r in rows if r.hits),
         # A redirect nothing has followed since it was made is the one that can
@@ -1846,7 +1868,8 @@ def pages_list(request):
         page_registry.GROUP_PUBLIC if scope == "public"
         else page_registry.GROUP_PRIVATE
     )
-    return render(request, "manage/pages.html", {
+    return _hq_page(request, "admin/hub/hq/pages.html", {
+        "title": "Pages",
         "scope": scope,
         "rows": _page_rows(request, group),
         # Both counts, always — the tab that is not showing still has to be
@@ -1868,7 +1891,8 @@ def page_edits(request, page_key: str):
     page = page_registry.BY_KEY.get(page_key)
     if page is None:
         raise Http404("No such page.")
-    return render(request, "manage/page_edits.html", {
+    return _hq_page(request, "admin/hub/hq/page_edits.html", {
+        "title": page.label,
         "page": page,
         "edits": PageEdit.objects.filter(page=page_key),
     })

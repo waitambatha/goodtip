@@ -5,7 +5,7 @@
 {% block title %}Dashboard &middot; GoodTip{% endblock %}
 {% block nav_dash %}on{% endblock %}
 {% block loader_task %}Opening your dashboard{% endblock %}
-{% block body_class %}page-deep sheet-page{% endblock %}
+{% block body_class %}page-deep sheet-page page-dash{% endblock %}
 {% block page_backdrop %}
 {% comment %}Side imagery lives outside the sheet: .gt-sheet creates a
 stacking context, so a strip rendered inside it paints over the sheet.
@@ -134,7 +134,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
     <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
   </div>
   <div class="veil"></div>
-  <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;">
+  <div class="db-row" style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;">
     <div style="min-width:0;flex:1;">
       {% if c.round %}<div class="app-eyebrow db-eyebrow">{{ c.round.label }} &middot; {{ c.round.series }}</div>{% endif %}
 
@@ -162,6 +162,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
         {% endfor %}
       </div>
       <div class="dp-dots" data-prompt-dots aria-hidden="true"></div>
+      <div class="dbn-roles">{% for label in c.role_labels %}<span class="pill-role {{ label|lower }}">{{ label }}</span>{% endfor %}</div>
       {% else %}
       <h1 class="app-h1 db-h1">Welcome back, {{ user.display_name }}</h1>
       {% if c.rank %}
@@ -169,53 +170,60 @@ stacking context, so a strip rendered inside it paints over the sheet.
       {% endif %}
       {% endif %}
     </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-      {% for label in c.role_labels %}<span class="pill-role {{ label|lower }}">{{ label }}</span>{% endfor %}
+    {% comment %}
+    THE BANNER, SPLIT (client, 28 Oct 2026: "one shows those info that you're
+    trying to pass... and on the right... those blogs are currently just
+    changing, one blog at a time"). The messages turn on the left; on the
+    right, the latest stories turn over one at a time, each a link. Paused
+    while pointed at. The member's roles moved under the messages.
+    {% endcomment %}
+    {% if news_latest %}
+    <div class="dbn" data-dbn aria-label="Latest news" aria-live="off">
+      <p class="dbn-k"><span>News &amp; blog</span><a href="{% url 'news_index' %}">All &rarr;</a></p>
+      <div class="dbn-stage">
+        {% for p in news_latest|slice:":8" %}
+        {% with sl=p.card_slides.0 %}
+        <a class="dbn-card{% if forloop.first %} on{% endif %}" href="{{ p.get_absolute_url }}" data-dbn-card style="--code: {{ p.code_colour }}">
+          <span class="dbn-pic" style="background-image:url('{% if sl.kind == 'scene' %}{% static sl.url %}{% else %}{{ sl.url }}{% endif %}'), url('{% static p.fallback_scenes.0 %}')"></span>
+          <span class="dbn-b">
+            <small>{% for code, label in p.tag_pairs %}<i class="dbn-tag" data-code="{{ code }}">{{ label }}</i>{% endfor %} {{ p.published_at|date:"j M Y" }}</small>
+            <b>{{ p.title|truncatechars:90 }}</b>
+            {% if p.excerpt %}<span class="dbn-ex">{{ p.excerpt|truncatechars:120 }}</span>
+            <span class="dbn-more">{{ p.excerpt|truncatechars:420 }}</span>{% endif %}
+            <span class="dbn-read">Read the story &rarr;</span>
+          </span>
+        </a>
+        {% endwith %}
+        {% endfor %}
+      </div>
+      <div class="dbn-dots" aria-hidden="true">{% for p in news_latest|slice:":8" %}<i{% if forloop.first %} class="on"{% endif %}></i>{% endfor %}</div>
     </div>
+    {% endif %}
   </div>
 </div>
 
-<!-- comp picker + create -->
-<div class="dash-ctl">
-  <form method="get" action="" class="dc-pick">
-    {% comment %}
-    One option per organisation, and nothing else crammed into the label. It
-    used to read "masterclass › IT, 0 of 9 matches tipped" — three different
-    facts (which org, which room, how far through the round) welded into a
-    single line of a control whose only job is picking the first one. The room
-    is stated by the room bar on the card below, and the tip count by the
-    "Tips this round" tile, so both say it once, in the place that explains it.
-    {% endcomment %}
-    <span class="dc-lab">Your organisation</span>
-    <select name="org" id="dashOrg" aria-label="Choose an organisation" onchange="this.form.submit()">
-      {% for oc in cards %}
-      <option value="{{ oc.org.id }}" {% if oc.org.id == c.org.id %}selected{% endif %}>{{ oc.org.name }}</option>
-      {% endfor %}
-    </select>
-    <noscript><button type="submit" class="abtn abtn-dark abtn-sm">Go</button></noscript>
-  </form>
-  {% comment %}
-  Groups, for everyone. This is the control an ordinary member needs most
-  and the one they had no route to: the organisation they joined might have
-  twenty thousand people in it, and the twelve they actually want to tip
-  against are in their own group. Sits beside the org picker because it
-  belongs to the org you have selected, not to the platform.
-  {% endcomment %}
-  {% if c.org.groups_enabled %}
-  <a href="{% url 'orgs:groups' c.org.root.id %}" class="abtn abtn-ghost abtn-xl">
-    <svg style="width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.9;" aria-hidden="true"><use href="#ic-org"/></svg>
-    Groups
-  </a>
-  {% endif %}
-  <a href="{% url 'orgs:search' %}" class="abtn abtn-ghost abtn-xl">Find an organisation</a>
-  <a href="{% url 'orgs:create' %}" class="abtn abtn-primary abtn-xl">+ Create an organisation</a>
-</div>
-
+{% comment %}
+The organisation picker, Groups, Find and Create used to sit here as a row of
+buttons between the welcome and the fixtures. They live in the top bar's
+organisation menu now (client, 27 Oct 2026: "the top dropdown that shows the
+list of organisations and groups — we will add + create organisation there...
+then we have that pulled up so we see those fixtures").
+{% endcomment %}
+<div class="dash-layout">
+{% include "partials/_sports_menu.html" with menu=sports_menu org=c.org %}
+<div class="dash-main">
 <!-- selected comp -->
 <div class="card pad-lg" style="margin-bottom:18px;">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
-    <div><div class="card-h" style="font-size:20px;">{{ c.org.name }}</div><div class="card-lead">{{ c.org.sport_label }} &middot; {{ c.org.season }} &middot; raising for {{ c.org.charity_display }}</div></div>
-  </div>
+  {% comment %}
+  Where these tips go, in one line — which organisation, which group — with
+  the switch one press away in the top bar's menu (it opens from here). The
+  room bar that used to fill this space is that menu's job now.
+  {% endcomment %}
+  {% comment %}
+  The "Tipping in" strip was removed on 28 Oct 2026 (client: "the user already
+  knows where he is"). The organisation and group are named in the top bar's
+  menu, which is also where you change them.
+  {% endcomment %}
 
   {% comment %}
   Which room you are tipping in. This was only ever said in the nav's context
@@ -231,7 +239,6 @@ stacking context, so a strip rendered inside it paints over the sheet.
   is the dark sheet. Same control as the one on My Tips, the Leaderboard and
   the Ladder, so switching room looks and works identically wherever you do it.
   {% endcomment %}
-  {% include "partials/room_switch.html" with noun="round" surface="light" %}
 
 
   {% if c.charity_vote %}
@@ -262,32 +269,15 @@ stacking context, so a strip rendered inside it paints over the sheet.
   {% endif %}{% endwith %}{% endif %}
 
   {% if c.round %}
-  <div class="card" style="background:var(--app-card-2);margin-top:16px;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
-      <div>
-        <span class="badge-live">{% if not open_games %}All started{% elif c.round.is_locked %}Part-locked{% else %}Live &middot; locks soon{% endif %}</span>
-        <div class="card-h" style="margin-top:8px;">{{ c.round.label }} &middot; {{ c.round.series }}</div>
-        {% comment %}The org name headlines the card directly above this one —
-        repeating it here just pushed the countdown further down.{% endcomment %}
-        <div class="card-lead">{{ c.round.get_stage_display }}</div>
-      </div>
-      <div id="countdown-{{ c.org.id }}" hx-get="{% url 'accounts:dashboard_countdown' c.org.id %}" hx-trigger="every 60s" hx-swap="innerHTML">
-        {% include "partials/countdown.html" with round=c.round %}
-      </div>
-    </div>
-
+  <div class="dash-slatecard">
     {% comment %}
-    Your standing sits under the round it belongs to. Above the round card it
-    was answering "how am I going?" before the page had said which round we are
-    even in — and "Tips this round 0 / 9" is meaningless until the reader knows
-    that the round is 22 and it locks in a day.
+    The round's header, its countdown and the three stat tiles (points, rank,
+    tips this round) used to sit here, between "Tipping in" and the fixtures.
+    They are said by the banner now, one at a time (accounts.views.
+    _dashboard_prompts) — client, 27 Oct 2026: "the top section... that is
+    where I want this information to be popping up" — so the fixtures start
+    straight under the chips.
     {% endcomment %}
-    <div class="grid-app g-3 dash-stats">
-      <div class="stat-card accent"><svg class="s-ic" aria-hidden="true"><use href="#ic-trophy"/></svg><div class="s-lab">Season points</div><div class="s-num">{{ c.points }}</div><div class="s-sub">across the season</div></div>
-      <div class="stat-card"><svg class="s-ic" aria-hidden="true"><use href="#ic-ribbon"/></svg><div class="s-lab">Your rank</div><div class="s-num">{{ c.rank|default:"-" }}</div><div class="s-sub">of all tippers</div></div>
-      <div class="stat-card"><svg class="s-ic" aria-hidden="true"><use href="#ic-target"/></svg><div class="s-lab">Tips this round</div><div class="s-num">{{ c.tips_done }}<span style="font-size:18px;color:var(--muted);"> / {{ c.tips_total }}</span></div><div class="s-sub">{% if c.tips_total > c.tips_done %}still open{% else %}all in{% endif %}</div></div>
-    </div>
-
     <!-- this round's games: pick your teams right here, then confirm -->
     {% comment %}
     Posts to the org, not to a round: the slate below spans whatever rounds still
@@ -481,67 +471,58 @@ is the part members care about and the part that is still true.
   so it moved into the Manage menu (see app_base.html) instead of sitting in
   the page an owner opens every day to tip.
   {% endcomment %}
-</div>
-
-<!-- news & blog — six cards that turn over, each click through to the full story -->
-{% if news_any %}
-{% comment %}
-TWO ROWS THAT TAKE IT IN TURNS (Sep 2026, third pass).
-
-The client on the second version: "the 360 degree auto change is not working,
-it's just getting longer — I do not want that. Make sure it turns, and when it
-turns I see another blog. So the user turns, then the lower one turns, so it
-should happen alternating."
-
-Three changes, and they are the three halves of that sentence:
-
-  * IT TURNS. The card is a front and a back on one element that flips half a
-    turn on its upright; the next story is put on the back before the flip
-    starts, so the thing that faces you when it lands is a different story.
-    Half a turn, not a full one — a 360 ends facing the way it started, which
-    is a lot of motion to end where it began, and the swap had to be smuggled
-    in behind the reader's back half way round for it to have changed at all.
-
-  * IT DOES NOT GET LONGER. Every part of a card is fixed or clamped now (see
-    _news_deck_card.html), so a card cannot grow when the story on its back is
-    longer than the story on its front — which is what "just getting longer"
-    was: the two faces share one grid cell, the cell takes the height of the
-    taller of them, and with the animation suppressed that growth was the only
-    thing that happened.
-
-  * THEY ALTERNATE. One clock, five seconds, and each tick turns ONE row. The
-    top row turns, then five seconds later the bottom row turns, then the top
-    again — so each row changes every ten seconds, which is the cadence asked
-    for originally, and something on the deck moves every five without all six
-    cards ever moving at once.
-
-Both rows are the same card in the same size now; the "picture beside words"
-shape the bottom row had is gone ("why is it small, have all of them same
-size").
-
-"Remove this Play, it should all be automatic" — so there is no pause button.
-It still stops for somebody reading: hovering or tabbing into the deck holds
-it. Each place renders its first story as a real link and the rest wait in a
-<template>, which is inert — not rendered, not focusable, not read aloud — so
-with JavaScript off this is simply the six newest stories. See news_slots in
-accounts.views.dashboard for how the stories are dealt to the places.
-{% endcomment %}
-<div class="nd-head">
-  <h2 class="nd-title">News &amp; blog</h2>
+  {% if news_latest %}
   {% comment %}
-  "On the dashboard where we have all the blog it looks like words that is a
-  link — I need it to be in its box and look like a link." So it is both: a
-  box you can see the edges of, with an underlined link inside it rather than
-  the solid filled button it had become.
+  THE STORIES, UNDER THE FIXTURES (client, 28 Oct 2026: "under it now we can
+  have all the blogs... 3 rows and 4 columns... then that option of All blogs
+  button"). The latest twelve, then the way to the rest.
   {% endcomment %}
-  <a class="nd-all" href="{% url 'news_index' %}">
-    <svg aria-hidden="true"><use href="#ic-f-doc"/></svg>
-    <span class="nd-all-lab">All news &amp; blog</span>
-    <span class="nd-all-go" aria-hidden="true">&rarr;</span>
-  </a>
+  <section class="dng" aria-label="News and blog" data-dng>
+    <div class="dng-h">
+      <h2>News &amp; blog</h2>
+      <a href="{% url 'news_index' %}" class="dng-allbtn">All news &amp; blogs</a>
+    </div>
+    {% comment %}
+    Twelve to a page, in pages that turn by themselves every few seconds and
+    can be swiped or stepped through (client, 28 Oct 2026: "the animations
+    that it had... they kept on changing after a while... bring in
+    pagination so someone can scroll"). Each card wears its competition's
+    colour (NewsPost.code_colour). See gt-dash-extras.js.
+    {% endcomment %}
+    <div class="dng-pages" data-dng-track>
+      {% for p in news_latest %}
+      {% if forloop.counter0|divisibleby:12 %}<div class="dng-grid" data-dng-page>{% endif %}
+      {% with sl=p.card_slides.0 %}
+      <a class="dng-card" href="{{ p.get_absolute_url }}" style="--code: {{ p.code_colour }}">
+        <span class="dng-pic" style="background-image:url('{% if sl.kind == 'scene' %}{% static sl.url %}{% else %}{{ sl.url }}{% endif %}'), url('{% static p.fallback_scenes.0 %}')"></span>
+        <span class="dng-b">
+          <small>{% for code, label in p.tag_pairs %}<i class="dbn-tag" data-code="{{ code }}">{{ label }}</i>{% endfor %} {{ p.published_at|date:"j M Y" }}</small>
+          <b>{{ p.title|truncatechars:84 }}</b>
+          {% if p.excerpt %}<span>{{ p.excerpt|truncatechars:110 }}</span>{% endif %}
+        </span>
+      </a>
+      {% endwith %}
+      {% if forloop.counter|divisibleby:12 or forloop.last %}</div>{% endif %}
+      {% endfor %}
+    </div>
+    <div class="dng-nav">
+      <button type="button" class="dng-arrow" data-dng-prev aria-label="Previous stories"><svg aria-hidden="true"><use href="#ic-chev-left"/></svg></button>
+      <div class="dng-dots" data-dng-dots aria-hidden="true"></div>
+      <button type="button" class="dng-arrow" data-dng-next aria-label="More stories"><svg aria-hidden="true"><use href="#ic-chev-right"/></svg></button>
+    </div>
+  </section>
+  {% endif %}
 </div>
-{% include "partials/_news_deck.html" %}
-{% endif %}
+</div>{# .dash-main #}
+</div>{# .dash-layout #}
+
+{% comment %}
+The news deck that used to follow the fixtures went on 27 Oct 2026 (client:
+"news and blog has to come in as a page... not coming down below the
+fixtures"). Stories now turn over one at a time in the banner, and the
+latest twelve sit as a grid under the fixtures, with All news beneath.
+{% endcomment %}
+
 
 {% endwith %}
 {% endif %}
@@ -784,7 +765,7 @@ any one card.
           rows().forEach(function(row){
             var chosen = row.querySelector('input:checked');
             if (!chosen) { missing++; return; }
-            var teams = row.querySelectorAll('.fxc-team');
+            var teams = row.querySelectorAll('.fxc-team:not(.fxc-draw)');  /* the two sides — not the Draw between them */
             /* :not(.crest) matters, the crest tag emits its own <span> before
                the name, and plain querySelector('span') returns that one (which
                holds only an <img>), so the names came out blank. */
@@ -803,7 +784,7 @@ any one card.
             item.className = 'ts-item';
 
             picked++;
-            var pickName = chosen.value === 'home' ? homeName : awayName;
+            var pickName = chosen.value === 'home' ? homeName : (chosen.value === 'draw' ? 'Draw' : awayName);
 
             var vsLine = homeName + ' v ' + awayName;
             var when = meta ? meta.textContent.trim() : '';
@@ -969,4 +950,5 @@ that ran once over the original six could not do that.
 {% endcomment %}
 {% block scripts %}
 {% if news_any %}<script src="{% static 'js/gt-news-cards.js' %}" defer></script>{% endif %}
+<script src="{% static 'js/gt-dash-extras.js' %}" defer></script>
 {% endblock %}

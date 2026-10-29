@@ -1,0 +1,104 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n %}
+
+{% comment %}
+SPORTS & COMPETITIONS (client, 27 Oct 2026: "the admin should be able to say
+turn off this and turn on this like golf, then if it's turned on we see it").
+
+One card per sport, its switch in the corner; inside, each competition with
+men's / women's, where it is played, where its games come from — and a
+switch. A competition is offered to organisations when its sport is on, it is
+on, AND its feed is connected; the card says which of those is missing, so
+"I switched golf on and nothing happened" has its answer on the screen.
+Built by sysadmin.sports_views.
+{% endcomment %}
+
+{% block gx_kicker %}{% translate "Sports &amp; competitions" %}{% endblock %}
+{% block gx_title %}{% translate "What GoodTip" %} <em>{% translate "can be tipped on" %}</em>{% endblock %}
+{% block gx_lead %}{% translate "Switch a sport on, then the competitions inside it. Organisations can choose a competition once it is on and its fixtures feed is connected. Switching off hides it from new choices; tips already made are kept." %}{% endblock %}
+{% block gx_board %}
+<div class="gx-score"><b>{{ sports_on }}/{{ sports|length }}</b><span>{% translate "Sports on" %}</span></div>
+<div class="gx-score"><b>{{ comps_on }}</b><span>{% translate "Competitions on" %}</span></div>
+<div class="gx-score"><b>{{ live_total }}</b><span>{% translate "Live with a feed" %}</span></div>
+<div class="gx-score"><b>{{ lib_ok }}/{{ lib_total }}</b><span>{% translate "Library healthy" %}</span></div>
+{% endblock %}
+
+{% block gx_body %}
+{% comment %}
+GOODTIP'S FIXTURE LIBRARY (client, 28 Oct 2026: "when they turn on the tap the
+water is already there... as a super admin I can know that we're currently
+getting fixtures... based on each and every sport"). Every competition with a
+feed is kept current here whether or not any organisation tips it
+(data_sync.library) — the line under each competition says how it stands.
+{% endcomment %}
+<div class="sp-lib">
+  <div>
+    <b>{% translate "Fixture library" %}</b>
+    <span>{% blocktranslate with g=lib_games ok=lib_ok n=lib_total %}{{ g }} games held for this season · {{ ok }} of {{ n }} competitions refreshed cleanly. Refreshed hourly around today, and fully every six hours for this season and last — so adding a sport to an organisation is instant.{% endblocktranslate %}</span>
+  </div>
+  <form method="post" action="{% url 'admin:hq_library_refresh' %}">{% csrf_token %}
+    <button type="submit" class="gx-btn is-lime">{% translate "Refresh the library now" %}</button></form>
+</div>
+<div class="sp-legend">
+  <span><i class="sp-dot is-live"></i>{% translate "On, feed connected — organisations can choose it" %}</span>
+  <span><i class="sp-dot is-wait"></i>{% translate "On, waiting for its feed" %}</span>
+  <span><i class="sp-dot is-off"></i>{% translate "Off" %}</span>
+</div>
+
+<div class="sp-grid">
+  {% for s in sports %}
+  <section class="sp-card{% if s.obj.is_active %} is-on{% endif %}" id="sport-{{ s.obj.slug }}">
+    <header class="sp-head">
+      <span class="sp-emoji" aria-hidden="true">{{ s.obj.icon|default:"🏅" }}</span>
+      <div class="sp-title">
+        <h2>{{ s.obj.name }}{% if s.default %} <span class="sp-tag is-default">{% translate "Default" %}</span>{% endif %}</h2>
+        <p>{{ s.obj.blurb }}</p>
+        <p class="sp-chips">
+          <span class="sp-tag">{{ s.obj.get_format_display }}</span>
+          {% if s.obj.draw_tips %}<span class="sp-tag is-draw">{% translate "Home · Draw · Away" %}</span>{% endif %}
+          <span class="sp-tag is-quiet">{% blocktranslate count n=s.comps|length %}{{ n }} competition{% plural %}{{ n }} competitions{% endblocktranslate %}</span>
+        </p>
+      </div>
+      <form method="post" action="{% url 'admin:hq_sports_toggle' %}" class="sp-switchform">
+        {% csrf_token %}<input type="hidden" name="kind" value="sport"><input type="hidden" name="pk" value="{{ s.obj.pk }}"><input type="hidden" name="next" value="{{ request.path }}">
+        <button type="submit" class="sp-switch{% if s.obj.is_active %} on{% endif %}" role="switch" aria-checked="{% if s.obj.is_active %}true{% else %}false{% endif %}"
+                aria-label="{% if s.obj.is_active %}{% blocktranslate with n=s.obj.name %}Switch {{ n }} off{% endblocktranslate %}{% else %}{% blocktranslate with n=s.obj.name %}Switch {{ n }} on{% endblocktranslate %}{% endif %}"><i></i></button>
+      </form>
+    </header>
+
+    <ul class="sp-comps">
+      {% for c in s.comps %}
+      {% with o=c.obj %}
+      <li class="sp-comp{% if not s.obj.is_active or not o.is_active %} is-off{% elif c.connected %} is-live{% else %} is-wait{% endif %}">
+        <span class="sp-dot" aria-hidden="true"></span>
+        <span class="sp-comp-t">
+          <b>{{ o.name }}</b>
+          <small>
+            <span class="sp-gender is-{{ o.category }}">{% if o.category == "womens" %}{% translate "Women" %}{% elif o.category == "representative" %}{% translate "Representative" %}{% else %}{% translate "Men" %}{% endif %}</span>
+            {% if o.region %}&middot; {{ o.region }}{% endif %}
+            &middot; {% if c.connected %}<span class="sp-feed is-on">{% translate "Feed connected" %}</span>{% else %}<span class="sp-feed">{{ o.feed_source|default:_("No feed yet") }} &middot; {% translate "not connected yet" %}</span>{% endif %}
+          </small>
+          {% if c.lib %}
+          <small class="sp-lib-line{% if not c.lib.ok %} is-bad{% endif %}">
+            <i aria-hidden="true"></i>
+            {{ c.lib.played }} {% translate "played" %} &middot; {{ c.lib.upcoming }} {% translate "to come" %}
+            {% if c.lib.next %}&middot; {% translate "next" %} {{ c.lib.next|date:"D j M, g:i a" }}{% endif %}
+            &middot; {% if c.lib.refreshed %}{% translate "refreshed" %} {{ c.lib.refreshed|timesince }} {% translate "ago" %}{% else %}{% translate "not refreshed yet" %}{% endif %}
+            {% if c.lib.run and not c.lib.ok %}&middot; {% translate "last refresh failed" %}{% endif %}
+          </small>
+          {% endif %}
+        </span>
+        <form method="post" action="{% url 'admin:hq_sports_toggle' %}">
+          {% csrf_token %}<input type="hidden" name="kind" value="series"><input type="hidden" name="pk" value="{{ o.pk }}"><input type="hidden" name="next" value="{{ request.path }}">
+          <button type="submit" class="sp-switch is-sm{% if o.is_active %} on{% endif %}" role="switch" aria-checked="{% if o.is_active %}true{% else %}false{% endif %}"
+                  aria-label="{% if o.is_active %}{% blocktranslate with n=o.name %}Switch {{ n }} off{% endblocktranslate %}{% else %}{% blocktranslate with n=o.name %}Switch {{ n }} on{% endblocktranslate %}{% endif %}"><i></i></button>
+        </form>
+      </li>
+      {% endwith %}
+      {% endfor %}
+    </ul>
+    {% if not s.obj.is_active and s.on %}<p class="sp-note">{% blocktranslate count n=s.on %}{{ n }} competition inside is on, but the sport is off — nobody sees it until the sport is switched on.{% plural %}{{ n }} competitions inside are on, but the sport is off — nobody sees them until the sport is switched on.{% endblocktranslate %}</p>{% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% comment %}
+THE COMPETITIONS ROW OF THE CONTROL DECK (client, 27–28 Oct 2026: the four
+default competitions above the round picker, then "pin my favourite sport...
+I can pin golf, football"; "let their background be green... a scroll bar to
+be able to scroll sideways... go crazy").
+
+One green row: a label, the chips on a strip with its own scrollbar (and
+arrows when it overflows), and the pin button at the end. All, then AFL,
+AFLW, NRL, NRLW, then this member's pins (accounts.User.pinned_series), each
+in its competition's own colour (catalog.Series.colour). A chip this
+organisation tips filters the fixtures in place; one it does not tip is an
+outline — for its admin, with a + that leads to settings to add it.
+
+The pin panel: search, then every competition this member may pin by sport,
+each a toggle in its colour. Pinning is accounts.views.pin_series.
+
+Expects: row (accounts.views._chip_row), base (the dashboard URL), c.
+{% endcomment %}
+{% if row.chips %}
+<div class="deck-row crow">
+  <span class="deck-k">Competitions</span>
+  <button type="button" class="crow-arrow is-left" data-crow-step="-1" aria-label="Scroll competitions left" hidden><svg aria-hidden="true"><use href="#ic-chev-left"/></svg></button>
+  <div class="crow-chips" role="group" aria-label="Filter by competition" data-crow-scroll>
+    <a class="crow-chip is-all{% if not active_slugs %} on{% endif %}"
+       href="{{ base }}?org={{ c.org.id }}"
+       hx-get="{{ base }}?slate=1&amp;org={{ c.org.id }}" hx-target="#slipPanel" hx-swap="outerHTML show:none"
+       hx-push-url="{{ base }}?org={{ c.org.id }}" data-veil-for="#roundFixtures"{% if not active_slugs %} aria-current="true"{% endif %}>
+      <span class="crow-mark" aria-hidden="true">{% if not active_slugs %}&#10003;{% else %}&#9733;{% endif %}</span>All</a>
+    {% for ch in row.chips %}
+      {% if ch.in_org %}
+      <a class="crow-chip{% if ch.on %} on{% endif %}{% if ch.pinned %} is-pin{% endif %}" style="--code: {{ ch.series.colour }}"
+         href="{{ base }}?org={{ c.org.id }}&amp;series={{ ch.series.slug }}"
+         hx-get="{{ base }}?slate=1&amp;org={{ c.org.id }}&amp;series={{ ch.series.slug }}" hx-target="#slipPanel" hx-swap="outerHTML show:none"
+         hx-push-url="{{ base }}?org={{ c.org.id }}&amp;series={{ ch.series.slug }}" data-veil-for="#roundFixtures"{% if ch.on %} aria-current="true"{% endif %}>
+        <span class="crow-mark" aria-hidden="true">{% if ch.on %}&#10003;{% else %}{{ ch.series.sport.icon }}{% endif %}</span>{{ ch.series.name }}</a>
+      {% elif row.is_admin %}
+      <a class="crow-chip is-out" style="--code: {{ ch.series.colour }}" href="{% url 'orgs:sports' c.org.root.id %}#sport-{{ ch.series.sport.slug }}"
+         title="{{ c.org.name }} doesn't tip {{ ch.series.name }} yet — add it in settings">
+        <span class="crow-mark" aria-hidden="true">{{ ch.series.sport.icon }}</span>{{ ch.series.name }}<span class="crow-add" aria-label="add">+</span></a>
+      {% else %}
+      <span class="crow-chip is-out" style="--code: {{ ch.series.colour }}" title="{{ c.org.name }} doesn't tip {{ ch.series.name }}">
+        <span class="crow-mark" aria-hidden="true">{{ ch.series.sport.icon }}</span>{{ ch.series.name }}</span>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <button type="button" class="crow-arrow is-right" data-crow-step="1" aria-label="Scroll competitions right" hidden><svg aria-hidden="true"><use href="#ic-chev-right"/></svg></button>
+
+  {% if active_slugs|length == 1 or org_series|length == 1 %}
+  <button type="button" class="crow-rounds" data-rounds-toggle aria-controls="roundDrawer" aria-expanded="false">
+    <svg aria-hidden="true"><use href="#ic-calendar"/></svg><span>Rounds</span></button>
+  {% endif %}
+  {% if row.pinnable %}
+  <details class="crow-pin" data-pop>
+    <summary class="crow-pinbtn" aria-label="Pin a sport"><span class="crow-pinplus" aria-hidden="true">+</span><span>Pin a sport</span>{% if row.pins %}<em>{{ row.pins|length }}</em>{% endif %}</summary>
+    <div class="pinx" role="dialog" aria-label="Pin your favourite sports">
+      <div class="pinx-head">
+        <div><b>Your favourites</b><span>Pinned competitions sit beside the four defaults, here and on every visit.</span></div>
+        <label class="pinx-search"><svg aria-hidden="true"><use href="#ic-search"/></svg>
+          <input type="search" placeholder="Find a competition" data-pinx-filter aria-label="Find a competition"></label>
+      </div>
+      <div class="pinx-body">
+        {% for grp in row.pinnable %}
+        <section class="pinx-sport" data-pinx-sport>
+          <p class="pinx-sport-h"><span class="pinx-emoji" aria-hidden="true">{{ grp.sport.icon }}</span>{{ grp.sport.name }}</p>
+          <div class="pinx-opts">
+            {% for s in grp.series %}
+            <form method="post" action="{% url 'accounts:pin_series' %}" data-pinx-item="{{ s.name|lower }} {{ grp.sport.name|lower }}">
+              {% csrf_token %}<input type="hidden" name="series" value="{{ s.slug }}"><input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button type="submit" class="pinx-opt{% if s.slug in row.pins %} on{% endif %}" style="--code: {{ s.colour }}"
+                      aria-pressed="{% if s.slug in row.pins %}true{% else %}false{% endif %}">
+                <span class="pinx-tick" aria-hidden="true">{% if s.slug in row.pins %}&#10003;{% else %}+{% endif %}</span>
+                <span class="pinx-name">{{ s.name }}</span>
+                {% if s.category == "womens" %}<span class="pinx-w">Women</span>{% endif %}
+              </button>
+            </form>
+            {% endfor %}
+          </div>
+        </section>
+        {% endfor %}
+        <p class="pinx-none" data-pinx-none hidden>Nothing matches that.</p>
+      </div>
+    </div>
+  </details>
+  {% endif %}
+</div>
+{% endif %}

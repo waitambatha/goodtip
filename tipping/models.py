@@ -15,6 +15,10 @@ class Team(models.Model):
     # falls back to a bundled static file (static/img/teams/<slug>.png) and
     # finally to the generated monogram badge.
     logo = models.ImageField(upload_to="team_logos/", blank=True, null=True)
+    # The badge the feed publishes (ESPN's, for the sports added 27 Oct 2026),
+    # used when nothing has been uploaded — clubs from twenty leagues would
+    # otherwise all be monograms.
+    logo_url = models.URLField(max_length=300, blank=True)
 
     class Meta:
         unique_together = ("slug", "series")
@@ -188,6 +192,12 @@ class Match(models.Model):
     # 0–100. Squiggle reports this directly; other feeds can derive it.
     progress = models.PositiveSmallIntegerField(default=0)
     live_updated_at = models.DateTimeField(null=True, blank=True)
+    # When this fixture first reached GoodTip. A game that arrived AFTER it
+    # kicked off — a competition added part-way through a season — was never
+    # tippable by anyone, so it gets no missed-tip default (see
+    # tipping.services._fill_missed_tips). Null on rows from before 27 Oct
+    # 2026, which keep the old behaviour.
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     class Meta:
         ordering = ["kickoff_at"]
@@ -206,6 +216,16 @@ class Match(models.Model):
     @property
     def is_locked(self) -> bool:
         return timezone.now() >= self.kickoff_at
+
+    #: Slack before a fixture counts as having arrived late: a draw that lands
+    #: a few minutes before or after the first bounce (a slow sync) was still
+    #: in front of members in time to matter.
+    LATE_ARRIVAL_GRACE = timedelta(hours=1)
+
+    @property
+    def arrived_after_kickoff(self) -> bool:
+        """Never tippable: it reached GoodTip well after the game had started."""
+        return bool(self.created_at and self.created_at > self.kickoff_at + self.LATE_ARRIVAL_GRACE)
 
     @property
     def is_open(self) -> bool:
@@ -335,7 +355,9 @@ class Match(models.Model):
 
 
 class Tip(models.Model):
-    SELECTION_CHOICES = [("home", "Home"), ("away", "Away")]
+    # "draw" only where the sport allows it (Sport.draw_tips — football,
+    # cricket); submit_tip refuses it everywhere else.
+    SELECTION_CHOICES = [("home", "Home"), ("away", "Away"), ("draw", "Draw")]
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tips")
     match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name="tips")
@@ -387,6 +409,25 @@ class Tip(models.Model):
 
     def __str__(self):
         return f"{self.user} → {self.selection} for {self.match}"
+
+    @property
+    def pick_name(self) -> str:
+        """What was picked, in words: the team, or "Draw"."""
+        if self.selection == "draw":
+            return "Draw"
+        m = self.match
+        return m.home_team.name if self.selection == "home" else m.away_team.name
+
+    @property
+    def pick_text(self) -> str:
+        """The pick as a sentence — "Swans to beat Cats", or "a draw, Arsenal v
+        Chelsea" where the sport lets a draw be tipped."""
+        m = self.match
+        if self.selection == "draw":
+            return f"a draw, {m.home_team.name} v {m.away_team.name}"
+        mine, other = ((m.home_team, m.away_team) if self.selection == "home"
+                       else (m.away_team, m.home_team))
+        return f"{mine.name} to beat {other.name}"
 
 
 class LadderEntry(models.Model):

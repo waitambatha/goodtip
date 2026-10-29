@@ -38,6 +38,7 @@ INTERVALS = {
     "fixtures": 3600,  # discovery: new rounds and games, around today
     "ladder": 1800,    # standings only move when a game finishes
     "check": 3600,     # feed vs every league, fix what it can, alert the rest
+    "library": 3600,   # GoodTip's own fixture library — every competition with a feed
 }
 
 # The full-season sweep, on its own cadence and its own systemd unit.

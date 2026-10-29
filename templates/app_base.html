@@ -145,6 +145,9 @@ goodtip.css.
               <input type="text" class="an-ctx-filter" data-anctx-filter placeholder="Filter organisations…" aria-label="Filter organisations">
             </div>
             {% endif %}
+            <a href="{% url 'orgs:create' %}" class="an-ctx-create">
+              <span class="an-ctx-plus" aria-hidden="true">+</span><span class="mi-txt"><b>Create an organisation</b><i>Start your own competition</i></span>
+            </a>
             <div class="an-ctx-listwrap">
               <div class="an-ctx-scroll" data-anctx-list>
                 {% for o in nav_orgs %}
@@ -209,14 +212,31 @@ goodtip.css.
                   {% endfor %}
                 </div>
               </div>
+              {% if o.nav_is_admin %}
+              <a href="{% url 'orgs:groups' o.id %}#new" class="an-ctx-create is-group">
+                <span class="an-ctx-plus" aria-hidden="true">+</span><span class="mi-txt"><b>Create a group</b><i>Inside {{ o.name }}</i></span>
+              </a>
+              {% endif %}
               <a href="{% url 'orgs:groups' o.id %}" class="an-ctx-more">All groups &rarr;</a>
               {% else %}
               <p class="an-ctx-empty">{{ o.name }} doesn't use groups.</p>
+              {% if o.nav_is_admin %}<a href="{% url 'orgs:groups' o.id %}#new" class="an-ctx-create is-group">
+                <span class="an-ctx-plus" aria-hidden="true">+</span><span class="mi-txt"><b>Create a group</b><i>Split {{ o.name }} into groups</i></span>
+              </a>{% endif %}
               {% endif %}
             </div>
             {% endfor %}
           </div>
           {% endif %}
+          {% comment %}
+          Moved up from the dashboard (client, 27 Oct 2026: "the top dropdown
+          that shows the list of organisations and groups — we will add +
+          create organisation there"), where they sat as a row of buttons
+          between the welcome and the fixtures.
+          {% endcomment %}
+          <div class="an-ctx-foot">
+            <a href="{% url 'orgs:search' %}" class="an-ctx-act">Find an organisation</a>
+          </div>
         </div>
       </div>
       {% endif %}
@@ -258,6 +278,8 @@ goodtip.css.
           {% endcomment %}
           <a href="{% url 'tipping:ladder' primary_org.id %}" data-coach="ladder" class="{% block nav_ladder %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg><span>Ladder</span></a>
           <a href="{% url 'orgs:wall' primary_org.id %}" data-coach="wall" class="{% block nav_wall %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-msg"/></svg><span>The Wall</span></a>
+          {# News & blog as a page of its own (client, 27 Oct 2026), not a deck under the fixtures. #}
+          <a href="{% url 'news_index' %}" class="{% block nav_news %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-doc"/></svg><span>News</span></a>
           {% comment %}
           The Wall is the room; this is the quiet word with whoever runs it.
           Separate on purpose — a member with a problem about their own
@@ -295,9 +317,15 @@ goodtip.css.
                 <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-users"/></svg></span>
                 <span class="mi-txt"><b>Members</b><i>Invites, join requests and roles</i></span>
               </a>
+              {% if not primary_org.parent_id %}
+              <a href="{% url 'orgs:sports' primary_org.id %}">
+                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-trophy"/></svg></span>
+                <span class="mi-txt"><b>Sports</b><i>Add or remove what your members tip on</i></span>
+              </a>
+              {% endif %}
               <a href="{% url 'orgs:settings' primary_org.id %}">
                 <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-sliders"/></svg></span>
-                <span class="mi-txt"><b>Settings</b><i>What you tip on</i></span>
+                <span class="mi-txt"><b>Settings</b><i>Your organisation's details</i></span>
               </a>
               {# groups live inside a top-level organisation only #}
               {% if not primary_org.parent_id %}
@@ -563,6 +591,7 @@ goodtip.css.
         <a href="{% url 'tipping:leaderboard' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>Leaderboard</span></a>
         <a href="{% url 'tipping:ladder' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg><span>Ladder</span></a>
         <a href="{% url 'orgs:wall' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-msg"/></svg><span>The Wall</span></a>
+        <a href="{% url 'news_index' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-doc"/></svg><span>News</span></a>
         <a href="{% url 'orgs:member_messages' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-mail"/></svg><span>Messages</span>{% if unread_message_count %}<span class="an-count">{{ unread_message_count }}</span>{% endif %}</a>
         {% if primary_org_is_admin %}
           <span class="sheet-label">Manage</span>

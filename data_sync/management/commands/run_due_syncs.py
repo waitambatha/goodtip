@@ -45,13 +45,17 @@ class Command(BaseCommand):
         # two-minute live poller behind it for as long as it took.
         # The feed check last of all: it judges what the others just wrote,
         # and re-syncs whatever they left wrong.
-        order = ["fixtures", "results", "live", "ladder", "check"]
+        # The library last: live scores and results must never wait on it.
+        order = ["fixtures", "results", "live", "ladder", "check", "library"]
         ran = []
         for kind in order:
             if not opts["force"] and not claim(kind):
                 continue
             if kind == "check":
                 call_command("check_feeds", verbosity=opts["verbosity"])
+            elif kind == "library":
+                # Every competition with a feed, tipped or not — data_sync.library.
+                call_command("refresh_library", auto=True, verbosity=opts["verbosity"])
             else:
                 call_command("sync_matches", **{kind: True}, verbosity=opts["verbosity"])
             ran.append(kind)

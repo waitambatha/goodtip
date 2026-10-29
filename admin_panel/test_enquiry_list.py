@@ -39,9 +39,9 @@ class EnquiryListTests(TestCase):
 
     def test_the_tabs_carry_their_counts(self):
         html = self.client.get(self.url).content.decode()
-        self.assertIn('Open <span class="hq-n">2</span>', html)
-        self.assertIn('Replied <span class="hq-n">1</span>', html)
-        self.assertIn('All <span class="hq-n">3</span>', html)
+        self.assertIn('Open <em>2</em>', html)
+        self.assertIn('Replied <em>1</em>', html)
+        self.assertIn('All <em>3</em>', html)
 
     def test_search_reads_the_message_and_the_organisation(self):
         self.assertEqual(self.names("?show=all&q=charity"), ["Bob"])
@@ -68,7 +68,7 @@ class EnquiryListTests(TestCase):
 
     def test_every_row_has_reply_and_its_menu(self):
         html = self.client.get(self.url).content.decode()
-        self.assertIn('class="hq-reply"', html)
+        self.assertIn('gx-reply"', html)
         self.assertIn("Close without a reply", html)
         self.assertIn(reverse("admin:hq_enquiry_detail", args=[self.ann.id]), html)
 
@@ -80,11 +80,13 @@ class HqAccountMenuTests(TestCase):
     def test_the_menu_is_on_every_hq_page(self):
         boss = User.objects.create_superuser(email="menu@example.com", password="pw", display_name="Menu Boss")
         sign_in_to_admin(self.client, boss)
-        for name in ("admin:hq_enquiries", "admin:hq_news", "admin:hq_team"):
+        # (Blog & news moved into the admin's own frame on 26 Oct 2026.)
+        for name in ("admin:hq_enquiries", "admin:hq_team"):
             html = self.client.get(reverse(name)).content.decode()
-            self.assertIn('class="gts-acct"', html)
+            # The admin's own account menu since the HQ screens joined it.
+            self.assertIn('class="gta-acct"', html)
             self.assertIn(reverse("admin:logout"), html)
             self.assertIn(reverse("profile"), html)
             self.assertIn("View site", html)
             self.assertIn("menu@example.com", html)
-            self.assertIn('class="gts-hero"', html)
+            self.assertIn('class="gx-hero"', html)

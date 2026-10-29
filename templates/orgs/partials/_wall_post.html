@@ -57,7 +57,7 @@ the rooms list, the header and every other post stay legible and stay put.
     {% endif %}
   </div>
   {% if p.tip %}
-  <span class="gpt-pick">&#9733; {% if p.tip.selection == 'home' %}{{ p.tip.match.home_team.name }}{% else %}{{ p.tip.match.away_team.name }}{% endif %} to beat {% if p.tip.selection == 'home' %}{{ p.tip.match.away_team.name }}{% else %}{{ p.tip.match.home_team.name }}{% endif %}{% if p.tip.is_correct is not None %} &middot; {% if p.tip.is_correct %}<b class="hit">got it &#10003;</b>{% else %}<b class="miss">didn't land</b>{% endif %}{% endif %}</span>
+  <span class="gpt-pick">&#9733; {{ p.tip.pick_text }}{% if p.tip.is_correct is not None %} &middot; {% if p.tip.is_correct %}<b class="hit">got it &#10003;</b>{% else %}<b class="miss">didn't land</b>{% endif %}{% endif %}</span>
   {% endif %}
   {% if p.body %}<p class="gpt-body">{{ p.body|linebreaksbr }}{% if p.edited_at %} <i class="chat-edited" title="Edited {{ p.edited_at|date:'l j F Y, g:i a' }}">edited</i>{% endif %}</p>{% endif %}
   {% if p.can_edit %}

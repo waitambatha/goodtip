@@ -1,0 +1,29 @@
+{% comment %}
+THE DRAW, AS A PICK (client, 27 Oct 2026: "in things like football the user
+should be able to tip home or away or draw... if they tip draw points is
+given also as a win"). Takes the place of "vs" between the two sides, only
+where the sport allows it (catalog.Sport.draw_tips). Built exactly like a
+side — the same .fxc-team control in the same three save styles — so
+gt-fixture.js picks and un-picks it with no code of its own, and it posts
+"draw" where a side posts "home" or "away".
+{% endcomment %}
+<div class="fxc-drawcol">
+{% if editable and mode == "htmx" %}
+  <button type="button" class="fxc-team fxc-draw{% if selection == 'draw' %} sel{% endif %}"
+          hx-post="{% url 'tipping:tip_save' org.id match.round_id match.id %}"
+          hx-vals='{"selection":"{% if selection == 'draw' %}none{% else %}draw{% endif %}","view":"mytips"}'
+          hx-target="#fxc-{{ match.id }}" hx-swap="outerHTML"
+          aria-pressed="{% if selection == 'draw' %}true{% else %}false{% endif %}">
+    <span class="fxc-draw-x" aria-hidden="true">=</span><span class="fxc-name">Draw</span>
+  </button>
+{% elif editable %}
+  <label class="fxc-team fxc-draw{% if selection == 'draw' %} sel{% endif %}">
+    <input type="radio" name="match_{{ match.id }}" value="draw" hidden{% if selection == 'draw' %} checked{% endif %}>
+    <span class="fxc-draw-x" aria-hidden="true">=</span><span class="fxc-name">Draw</span>
+  </label>
+{% else %}
+  <div class="fxc-team fxc-draw{% if selection == 'draw' %} sel{% elif match.result %} is-dim{% else %} is-locked-pick{% endif %}{% if match.result == 'draw' %} is-drawn{% endif %}">
+    <span class="fxc-draw-x" aria-hidden="true">=</span><span class="fxc-name">{% if match.result == 'draw' %}Drew{% else %}Draw{% endif %}</span>
+  </div>
+{% endif %}
+</div>

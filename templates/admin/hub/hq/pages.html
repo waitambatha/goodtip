@@ -1,0 +1,68 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n %}
+
+{% comment %}
+THE WORDS ON THE SITE, ON THE PITCH (was manage/pages.html). One group at a
+time — public or signed-in — as tabs that are links, so "the private pages"
+is something you can send somebody and a save comes back to the side you
+were on. View: admin_panel.views.pages_list.
+{% endcomment %}
+
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_home' %}">HQ</a></li>{% endblock %}
+{% block gx_kicker %}HQ &middot; {% translate "pages" %}{% endblock %}
+{% block gx_title %}{% translate "The words" %} <em>{% translate "on the site" %}</em>{% endblock %}
+{% block gx_lead %}{% translate "Open a page, click Edit wording, change it, save. It goes live straight away." %}{% endblock %}
+{% block gx_board %}
+<a class="gx-score{% if scope == 'public' %} is-on{% endif %}" href="?scope=public"><b>{{ public_count }}</b><span>{% translate "Public pages" %}</span></a>
+<a class="gx-score{% if scope == 'private' %} is-on{% endif %}" href="?scope=private"><b>{{ private_count }}</b><span>{% translate "Private pages" %}</span></a>
+<div class="gx-score"><b>{{ total_edits }}</b><span>{% translate "Edits saved" %}</span></div>
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet">
+  <nav class="gx-tabs" aria-label="{% translate 'Which pages' %}">
+    <a class="gx-tab{% if scope == 'public' %} on{% endif %}" href="?scope=public">{% translate "Public pages" %} <em>{{ public_count }}</em></a>
+    <a class="gx-tab{% if scope == 'private' %} on{% endif %}" href="?scope=private">{% translate "Private pages" %} <em>{{ private_count }}</em></a>
+  </nav>
+  <div class="gx-pane">
+    {% if stale_edits %}
+    <div class="gx-yard" style="--c: var(--gx-amber); margin-bottom:16px"><i>!</i>
+      <span><b>{% blocktranslate count n=stale_edits %}{{ n }} edit is no longer showing.{% plural %}{{ n }} edits are no longer showing.{% endblocktranslate %}</b>
+        {% translate "The wording they replaced has since changed in the site itself, so readers see the new original. Open the page's edits to see which, and make the change again." %}</span>
+    </div>
+    {% endif %}
+    <p class="gx-note" style="margin-bottom:14px">{% if scope == 'public' %}{% translate "Anyone can reach these without signing in." %}{% else %}{% translate "Only visible to a member who has signed in." %}{% endif %}</p>
+    <div class="gx-tablewrap">
+      <table class="gx-table">
+        <thead><tr><th>{% translate "Page" %}</th><th>{% translate "Address" %}</th><th>{% translate "Edits" %}</th><th style="text-align:right">{% translate "Actions" %}</th></tr></thead>
+        <tbody>
+        {% for row in rows %}
+        <tr style="cursor:default">
+          <td class="is-name"><b>{{ row.page.label }}</b><small class="gx-tlabel" style="font-family:inherit">{{ row.page.blurb }}</small></td>
+          <td>{% if row.url %}<code class="gx-code">{{ row.url }}</code>{% else %}<span class="gx-note">{{ row.blocked }}</span>{% endif %}</td>
+          <td>{% if row.edit_count %}<a class="gx-mini" href="{% url 'admin:hq_page_edits' row.page.key %}">{% blocktranslate count n=row.edit_count %}{{ n }} edit{% plural %}{{ n }} edits{% endblocktranslate %}</a>
+            {% if row.has_stale %}<span class="gx-pill is-wait"><i></i>{% translate "some not showing" %}</span>{% endif %}{% else %}&mdash;{% endif %}</td>
+          <td class="gx-acts">{% if row.url %}
+            <a class="gx-mini" href="{{ row.url }}" target="_blank" rel="noopener">{% translate "View" %}</a>
+            <a class="gx-mini is-go" href="{{ row.edit_url }}" target="_blank" rel="noopener">{% translate "Edit wording" %}</a>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="gx-sheet" style="margin-top:22px">
+  <div class="gx-pane">
+    <div class="gx-h"><h2>{% translate "How editing a page works" %}</h2></div>
+    <div class="gx-grid3 gx-howto">
+      <div class="gx-card"><b>{% translate "Everything on the page is editable." %}</b> {% translate "Every heading, paragraph, caption, button label and picture. Click the words to type over them, click a picture to swap it." %}</div>
+      <div class="gx-card"><b>{% translate "Nothing is live until you press Save" %}</b> {% translate "— except pictures, which save as soon as they finish uploading. Ctrl+Z undoes." %}</div>
+      <div class="gx-card"><b>{% translate "An edit is tied to the wording it replaced." %}</b> {% translate "If that wording later changes in the site itself, the edit stops applying and is listed above rather than pasted over something new." %}</div>
+      <div class="gx-card"><b>{% translate "Shared furniture is edited per page." %}</b> {% translate "Change the menu on Home and Home is what changes." %}</div>
+      <div class="gx-card"><b>{% translate "Worked-out numbers and names" %}</b> {% translate "— a member's name, a ladder position, a total raised — are recalculated on every visit, so typing over them will not stick." %}</div>
+    </div>
+  </div>
+</section>
+{% endblock %}

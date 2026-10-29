@@ -1,0 +1,234 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n humanize %}
+
+{% comment %}
+ONE RECORD, ON ONE DATABASE (client, 26 Oct 2026: "when I click a specific
+thing in that table and it opens up, I need a modern UI that we're currently
+having" — in place of Django's own change form, for every table).
+
+  hero      what it is, its label (Real / Backup / Testing), its neighbours
+  Details   the record read like a card, not a form: its main facts, its
+            pictures and long text, what it points at (each a link to that
+            record), its switches and its dates. A blog post shows as the
+            story itself; a Wall post as the post; an organisation with its
+            logo.
+  Connected everything that points at it — an organisation's members, a
+            post's replies — each a link to those rows
+  Edit      on staging, for someone allowed: the same fields its admin lets
+            you change, as a form in this page's style
+Built by sysadmin.database_views.database_record.
+{% endcomment %}
+
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_tables' %}">{% translate "Databases" %}</a></li><li><a href="{% url 'admin:hq_database' db.key %}">{{ db.label }}</a></li><li><a href="{% url 'admin:hq_database_table' db.key label %}">{{ table_name }}</a></li>{% endblock %}
+{% block gx_nav %}
+{% if prev_pk %}<a class="gx-btn is-glass" href="{% url 'admin:hq_database_record' db.key label prev_pk %}"><svg aria-hidden="true"><use href="#ic-chev-left"/></svg>{% translate "Newer" %}</a>{% endif %}
+{% if next_pk %}<a class="gx-btn is-glass" href="{% url 'admin:hq_database_record' db.key label next_pk %}">{% translate "Older" %}<svg aria-hidden="true"><use href="#ic-chev-right"/></svg></a>{% endif %}
+{% endblock %}
+{% block gx_kicker %}{{ db.label }} &middot; {{ model_name }} #{{ pk }}{% endblock %}
+{% block gx_title %}{% if special.kind == "story" %}{{ special.title }}{% else %}{{ title }}{% endif %}{% endblock %}
+{% block gx_lead %}{% if blurb %}{{ blurb }}{% endif %}{% if when %} {% blocktranslate with t=when|date:"j F Y, g:i a" %}Created {{ t }}.{% endblocktranslate %}{% endif %}{% endblock %}
+{% block gx_below %}
+<div class="gx-rec-tags">
+  {% if lab == "real" %}<span class="gx-lab is-real gx-lab-lg">{% translate "Real — on live" %}</span>
+  {% elif lab == "backup" %}<span class="gx-lab is-backup gx-lab-lg">{% translate "Backup — a copy of real data" %}</span>
+  {% elif lab == "testing" %}<span class="gx-lab is-testing gx-lab-lg">{% translate "Testing — made on staging" %}</span>
+  {% elif kind == "reference" %}<span class="gx-lab is-shared gx-lab-lg">{% translate "Shared list" %}</span>{% endif %}
+  <span class="gx-rec-id">{{ label }} &middot; #{{ pk }}</span>
+</div>
+{% endblock %}
+{% block gx_board %}
+<div class="gx-score"><b>{{ field_count }}</b><span>{% translate "Fields" %}</span></div>
+<div class="gx-score"><b>{{ connected|length }}</b><span>{% translate "Connected tables" %}</span></div>
+{% if rule == "delete" %}
+<form method="post" action="{% url 'admin:hq_database_delete' db.key label pk %}" class="gx-score gx-score-act is-danger"
+      data-gx-confirm="{% if db.key == 'live' %}{% translate 'Delete this from LIVE? It goes on the next backup run; the backup copy on staging is kept.' %}{% else %}{% translate 'Delete this from staging? This cannot be undone.' %}{% endif %}">
+  {% csrf_token %}<button type="submit"><b>&times;</b><span>{% translate "Delete" %}</span></button>
+</form>
+{% elif rule == "ask" %}
+<a class="gx-score gx-score-act" href="#ask" data-gx-open="ask"><b>?</b><span>{% translate "Ask Ian to delete" %}</span></a>
+{% endif %}
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet" data-gx-tabs>
+  <div class="gx-tabs" role="tablist">
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="details"{% if open_tab != "edit" %} aria-selected="true"{% endif %}>{% translate "Details" %}</button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="connected">{% translate "Connected" %} <em>{{ connected|length }}</em></button>
+    {% if form %}<button type="button" class="gx-tab" role="tab" data-gx-tab="edit"{% if open_tab == "edit" %} aria-selected="true"{% endif %}>{% translate "Edit" %}</button>{% endif %}
+    {% if rule == "ask" %}<button type="button" class="gx-tab" role="tab" data-gx-tab="ask">{% translate "Ask Ian" %}</button>{% endif %}
+    {% if special.edit or special.view %}
+    <div class="gx-tabs-end">
+      {% if special.view %}<a class="gx-btn is-ghost" href="{{ special.view }}" target="_blank" rel="noopener">{% translate "See it on the site" %}</a>{% endif %}
+      {% if special.edit %}<a class="gx-btn" href="{{ special.edit }}"><svg aria-hidden="true"><use href="#ic-doc"/></svg>{% translate "Edit this story" %}</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {# ---------------- details ---------------- #}
+  <div class="gx-pane" data-gx-pane="details">
+    {% if special.kind == "story" %}
+    <article class="gx-story">
+      {% if special.cover %}<img class="gx-story-cover" src="{{ special.cover }}" alt="">{% endif %}
+      <div class="gx-story-in">
+        <p class="gx-story-k">{% if special.published %}<span class="gx-pill is-ok"><i></i>{% translate "Published" %}</span>{% else %}<span class="gx-pill is-wait"><i></i>{% translate "Draft" %}</span>{% endif %}</p>
+        <h2 class="gx-story-h">{{ special.title }}</h2>
+        {% if special.excerpt %}<p class="gx-story-ex">{{ special.excerpt }}</p>{% endif %}
+        {% if special.body %}<iframe class="gx-story-body" sandbox="allow-same-origin" title="{% translate 'The story' %}" data-gx-autoheight
+                srcdoc="{{ special.doc }}"></iframe>{% endif %}
+      </div>
+    </article>
+    {% elif special.kind == "post" %}
+    <article class="gx-wallcard">
+      <span class="gx-avatar" aria-hidden="true">{{ special.author|first|upper }}</span>
+      <div><b>{{ special.author }}</b><span>{% translate "on" %} {{ special.org }}{% if when %} &middot; {{ when|date:"j M Y, g:i a" }}{% endif %}</span>
+        <p>{{ special.body|linebreaksbr }}</p></div>
+    </article>
+    {% elif special.kind == "org" %}
+    <div class="gx-orgcard">
+      {% if special.logo %}<img src="{{ special.logo }}" alt="">{% else %}<span class="gx-avatar is-xl" aria-hidden="true">{{ special.name|first|upper }}</span>{% endif %}
+      <div><b>{{ special.name }}</b><span>{{ model_name }} #{{ pk }}</span></div>
+    </div>
+    {% endif %}
+
+    <div class="gx-rec">
+      {% if sections.main %}
+      <section class="gx-rec-sec">
+        <p class="gx-label">{% translate "The facts" %}</p>
+        <dl class="gx-rec-grid">
+          {% for f in sections.main %}
+          <div class="gx-rec-f"><dt>{{ f.label }}</dt><dd>
+            {% if f.value.kind == "chip" %}<span class="gx-pill"><i></i>{{ f.value.text }}</span>
+            {% elif f.value.kind == "email" %}<a href="mailto:{{ f.value.text }}">{{ f.value.text }}</a>
+            {% elif f.value.kind == "url" %}<a href="{{ f.value.text }}" target="_blank" rel="noopener">{{ f.value.text|truncatechars:60 }}</a>
+            {% elif f.value.kind == "number" %}<b class="gx-rec-num">{{ f.value.text }}</b>
+            {% else %}{{ f.value.text }}{% endif %}
+          </dd></div>
+          {% endfor %}
+        </dl>
+      </section>
+      {% endif %}
+
+      {% if sections.media %}
+      <section class="gx-rec-sec">
+        <p class="gx-label">{% translate "Pictures &amp; files" %}</p>
+        <div class="gx-rec-media">
+          {% for f in sections.media %}
+          <figure>{% if f.value.kind == "image" and f.value.url %}<img src="{{ f.value.url }}" alt="">{% else %}<span class="gx-rec-file"><svg aria-hidden="true"><use href="#ic-doc"/></svg></span>{% endif %}
+            <figcaption><b>{{ f.label }}</b>{% if f.value.url %}<a href="{{ f.value.url }}" target="_blank" rel="noopener">{{ f.value.text }}</a>{% else %}{{ f.value.text }}{% endif %}</figcaption></figure>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      {% if sections.long and special.kind != "story" %}
+      <section class="gx-rec-sec">
+        {% for f in sections.long %}
+        <p class="gx-label">{{ f.label }}</p>
+        {% if f.value.kind == "json" %}<pre class="gx-rec-json">{{ f.value.text }}</pre>
+        {% else %}<div class="gx-rec-long">{{ f.value.text|striptags|linebreaksbr }}</div>{% endif %}
+        {% endfor %}
+      </section>
+      {% endif %}
+
+      {% if sections.links %}
+      <section class="gx-rec-sec">
+        <p class="gx-label">{% translate "Points to" %}</p>
+        <div class="gx-rec-links">
+          {% for f in sections.links %}
+          <div class="gx-rec-link"><span>{{ f.label }}</span>
+            {% if f.value.kind == "link" %}{% if f.value.url %}<a href="{{ f.value.url }}">{{ f.value.text }} &rarr;</a>{% else %}<b>{{ f.value.text }}</b>{% endif %}
+            {% else %}<span class="gx-rec-many">{% for i in f.value.items %}{% if i.url %}<a href="{{ i.url }}">{{ i.text }}</a>{% else %}<b>{{ i.text }}</b>{% endif %}{% empty %}—{% endfor %}</span>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      {% if sections.flags %}
+      <section class="gx-rec-sec">
+        <p class="gx-label">{% translate "Switches" %}</p>
+        <div class="gx-rec-flags">{% for f in sections.flags %}<span class="gx-flag-chip{% if f.value.value %} is-on{% endif %}"><i></i>{{ f.label }}</span>{% endfor %}</div>
+      </section>
+      {% endif %}
+
+      {% if sections.dates %}
+      <section class="gx-rec-sec">
+        <p class="gx-label">{% translate "When" %}</p>
+        <ol class="gx-rec-dates">
+          {% for f in sections.dates %}<li><b>{{ f.label }}</b><span>{% if f.value.kind == "date" %}{{ f.value.value|date:"j F Y" }}{% else %}{{ f.value.value|date:"j F Y, g:i a" }} &middot; {{ f.value.value|naturaltime }}{% endif %}</span></li>{% endfor %}
+        </ol>
+      </section>
+      {% endif %}
+
+      {% if sections.other %}
+      <details class="gx-rec-empty"><summary>{% blocktranslate count n=sections.other|length %}{{ n }} empty field{% plural %}{{ n }} empty fields{% endblocktranslate %}</summary>
+        <p>{% for f in sections.other %}{{ f.label }}{% if not forloop.last %} &middot; {% endif %}{% endfor %}</p></details>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ---------------- connected ---------------- #}
+  <div class="gx-pane" data-gx-pane="connected">
+    {% if connected %}
+    <div class="gx-conn">
+      {% for c in connected %}
+      <a class="gx-conn-card" href="{{ c.url }}" style="--cc: {% cycle 'var(--cc-1)' 'var(--cc-2)' 'var(--cc-3)' 'var(--cc-4)' 'var(--cc-5)' %}">
+        <span class="gx-conn-n">{{ c.n|intcomma }}</span>
+        <span class="gx-conn-name">{{ c.name }}</span>
+        <span class="gx-conn-via">{% blocktranslate with via=c.via %}by {{ via }}{% endblocktranslate %}</span>
+        <span class="gx-conn-sample">{% for s in c.sample %}<span>{{ s.text }}</span>{% endfor %}</span>
+        <span class="gx-conn-go">{% translate "See them" %} &rarr;</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="gx-empty"><svg aria-hidden="true"><use href="#ic-link"/></svg><b>{% translate "Nothing points here" %}</b><span>{% translate "No other table has rows that refer to this one." %}</span></div>
+    {% endif %}
+  </div>
+
+  {# ---------------- edit ---------------- #}
+  {% if form %}
+  <div class="gx-pane" data-gx-pane="edit">
+    {% if lab == "backup" %}<p class="gx-alert-in"><b>{% translate "This is a backup of real data." %}</b> {% translate "You can change it here, but the next backup run puts live's version back. Change it on live to change it for good." %}</p>{% endif %}
+    <form method="post" enctype="multipart/form-data" class="gx-form gx-editform">
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="gx-formerr full">{{ form.non_field_errors }}</div>{% endif %}
+      {% for field in form %}
+      <label class="gx-ef{% if field.field.widget.input_type == 'checkbox' %} is-check{% endif %}{% if not field.field.widget.input_type %} full{% endif %}{% if field.errors %} has-err{% endif %}">
+        {% if field.field.widget.input_type == 'checkbox' %}{{ field }}<span>{{ field.label }}</span>
+        {% else %}<span>{{ field.label }}{% if field.field.required %} <i>*</i>{% endif %}</span>{{ field }}{% endif %}
+        {% if field.help_text %}<small>{{ field.help_text|striptags }}</small>{% endif %}
+        {% for e in field.errors %}<em>{{ e }}</em>{% endfor %}
+      </label>
+      {% endfor %}
+      <div class="full gx-ef-foot">
+        <button type="submit" class="gx-btn is-lime"><svg aria-hidden="true"><use href="#ic-check"/></svg>{% translate "Save changes" %}</button>
+        <a class="gx-btn is-ghost" href="{% url 'admin:hq_database_record' db.key label pk %}">{% translate "Cancel" %}</a>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  {% if rule == "ask" %}
+  <div class="gx-pane" data-gx-pane="ask">
+    <form method="post" action="{% url 'admin:hq_database_delete' db.key label pk %}" class="gx-split">
+      {% csrf_token %}
+      <div class="gx-stack">
+        <div class="gx-h"><h3>{% translate "Ask Ian to delete this" %}</h3><p>{% if lab == "real" %}{% translate "It's real data on live." %}{% else %}{% translate "It's a backup of real data." %}{% endif %}</p></div>
+        <label class="gx-form" style="display:block"><span class="gx-note">{% translate "Why should it go?" %}</span>
+          <textarea name="reason" rows="5" required class="gx-in" style="width:100%;box-sizing:border-box;margin-top:6px"></textarea></label>
+        <div><button class="gx-btn" type="submit"><svg aria-hidden="true"><use href="#ic-send"/></svg>{% translate "Send to Ian" %}</button></div>
+      </div>
+      <div class="gx-card is-dark" style="background:#17202D">
+        <p class="gx-label" style="color:var(--cc-4)">{% translate "What happens" %}</p>
+        <ol class="gx-neworg-steps">
+          <li><b>{% translate "Ian is emailed" %}</b><span>{% translate "and it waits under Approvals." %}</span></li>
+          <li><b>{% translate "He approves or declines" %}</b><span>{% translate "you see his answer there too." %}</span></li>
+          <li><b>{% translate "Nothing goes until he says so" %}</b><span>{% if db.key == "live" %}{% translate "a live deletion happens on the next backup run." %}{% else %}{% translate "a staging deletion happens the moment he approves." %}{% endif %}</span></li>
+        </ol>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

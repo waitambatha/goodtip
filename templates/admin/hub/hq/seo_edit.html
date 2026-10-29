@@ -1,0 +1,55 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n static %}
+
+{% comment %}
+ONE PAGE'S SEO (was manage/seo_edit.html): its address, and the seven
+search & social boxes — the same partial a story's editor uses
+(manage/_seo_fields.html), dressed by gt-blog-editor.css inside .gx-bed.
+View: admin_panel.views.seo_edit.
+{% endcomment %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/gt-blog-editor.css' %}">{% endblock %}
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_home' %}">HQ</a></li><li><a href="{% url 'admin:hq_seo' %}">SEO</a></li>{% endblock %}
+{% block gx_kicker %}SEO &middot; {% translate "one page" %}{% endblock %}
+{% block gx_title %}{{ page.label }}{% endblock %}
+{% block gx_lead %}{{ page.blurb }}{% endblock %}
+{% block gx_below %}
+{% if default_path %}
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;align-items:center">
+  <span class="gx-pill"><i></i>{% translate "Currently at" %} <code style="color:inherit">{{ seo.path_override|default:default_path }}</code></span>
+  <a class="gx-btn is-glass" href="{{ seo.path_override|default:default_path }}" target="_blank" rel="noopener"><svg aria-hidden="true"><use href="#ic-eye"/></svg>{% translate "View" %}</a>
+  <a class="gx-btn is-glass" href="{{ seo.path_override|default:default_path }}?gt_edit=1" target="_blank" rel="noopener"><svg aria-hidden="true"><use href="#ic-doc"/></svg>{% translate "Edit wording" %}</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block gx_body %}
+<form method="post" enctype="multipart/form-data" class="gx-bed">
+  {% csrf_token %}
+  <section class="gx-sheet">
+    <div class="gx-pane">
+      <div class="gx-h"><h2>{% translate "Address" %}</h2><p>{% translate "Where this page lives. Changing it leaves a permanent redirect behind." %}</p></div>
+      {% if page.needs %}
+      <p class="gx-note">{% translate "This page exists once per group, so it has no single address to change. Everything below still applies to all of them." %}</p>
+      {% else %}
+      <div class="fld">
+        <label for="seo_path">{% translate "Address" %}</label>
+        <input type="text" name="path_override" id="seo_path" value="{{ seo.path_override }}" placeholder="{{ default_path }}" spellcheck="false">
+        <small class="fld-hint">{% blocktranslate %}Built in as <code>{{ default_path }}</code>. Type a different one to move the page there — the old address redirects to the new one permanently. Clear the box to move it back.{% endblocktranslate %}</small>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="gx-sheet" style="margin-top:22px">
+    <div class="gx-pane">
+      <div class="gx-h"><h2>{% translate "Search &amp; social" %}</h2><p>{% translate "Every box is an override. Leave one blank and the page keeps saying what it says now." %}</p></div>
+      {% include "manage/_seo_fields.html" with seo=seo open_seo=1 %}
+      <div class="gx-ef-foot" style="justify-content:space-between;align-items:center;margin-top:18px">
+        <span class="gx-note">{% if seo.updated_at and seo.pk %}{% translate "Last changed" %} {{ seo.updated_at|date:"j M Y, g:i a" }}{% if seo.updated_by %} {% translate "by" %} {{ seo.updated_by.display_name }}{% endif %}.{% endif %}</span>
+        <button type="submit" class="gx-btn">{% translate "Save settings" %}</button>
+      </div>
+    </div>
+  </section>
+</form>
+{% endblock %}

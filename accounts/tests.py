@@ -267,9 +267,9 @@ class DashboardRoundNavTests(TestCase):
 
     def test_the_navigator_lists_every_round(self):
         body = self.client.get(f"/dashboard/?org={self.org.id}").content.decode()
-        self.assertIn('id="rnavSel"', body)
+        self.assertIn("data-rrail", body)
         for n in (1, 2, 3, 4):
-            self.assertIn(f'value="{n}"', body)
+            self.assertIn(f"&amp;round={n}", body)
 
     def test_an_htmx_request_returns_only_the_slate(self):
         """The swap must not carry the nav, the news column or a <head>.
@@ -301,7 +301,9 @@ class DashboardRoundNavTests(TestCase):
         r = self.client.get(
             f"/dashboard/?slate=1&org={self.org.id}&round=3", HTTP_HX_REQUEST="true",
         )
-        self.assertIn('value="3" selected', r.content.decode())
+        # The lit pill on the round rail is round 3.
+        self.assertIn('title="Round 3"', r.content.decode())
+        self.assertRegex(r.content.decode(), r'rrail-pill on"[^>]*round=3')
 
     def test_a_round_outside_the_window_is_shown_but_shut(self):
         """The two-round rule, visible rather than merely enforced on submit.
@@ -321,7 +323,8 @@ class DashboardRoundNavTests(TestCase):
         """A stale bookmark should land somewhere useful, not on a 404."""
         r = self.client.get(f"/dashboard/?org={self.org.id}&round=99")
         self.assertEqual(r.status_code, 200)
-        self.assertIn('id="rnavSel"', r.content.decode())
+        # The round rail (28 Oct 2026) replaced the dropdown.
+        self.assertIn("data-rrail", r.content.decode())
 
 
 class DashboardThisWeekTests(TestCase):
@@ -388,26 +391,33 @@ class DashboardThisWeekTests(TestCase):
         self.client.force_login(self.user)
 
     def _round_headings(self, body):
+        """(round number, competition) for every fixture card on the slate.
+
+        Read off the cards since 28 Oct 2026: the slate is grouped by DAY now
+        (client: "I should see all and not like weeks"), and each card names
+        its own competition and round."""
         import re
 
-        # `fxr-series[^"]*`, not `fxr-series` exactly: the competition's colour
-        # is carried by an `is-code` modifier on that same span (see
-        # "competition colours" in goodtip.css), so pinning the full class
-        # attribute made a styling change look like four broken rounds.
-        return re.findall(
-            r'<span class="fxr-n">Round (\d+)</span>\s*'
-            r'<span class="fxr-series[^"]*">([^<]+)</span>',
-            body,
-        )
+        return [(n, s) for s, n in re.findall(
+            r'<span class="fxc-code"[^>]*>([^<]+)</span>\s*'
+            r'<span class="fxc-rnd">Round (\d+)</span>', body)]
+
+    def _coming_up(self, body):
+        """The part of the feed before its results begin."""
+        cut = body.find("fx-divider")
+        return body if cut < 0 else body[:cut]
 
     def test_this_week_shows_the_open_round_of_each_competition(self):
-        body = self.client.get(f"/dashboard/?org={self.org.id}").content.decode()
+        body = self._coming_up(self.client.get(f"/dashboard/?org={self.org.id}").content.decode())
         shown = {(n, s.strip()) for n, s in self._round_headings(body)}
-        self.assertEqual(shown, {("3", "Early"), ("20", "Late")})
+        # Each competition's open round is coming up — and, since the feed
+        # shows ALL that is coming (28 Oct 2026), so may later ones.
+        self.assertLessEqual({("3", "Early"), ("20", "Late")}, shown)
 
     def test_this_week_does_not_show_a_finished_round_of_the_same_number(self):
-        """The bug itself: Late's round 3 was played and must stay away."""
-        body = self.client.get(f"/dashboard/?org={self.org.id}").content.decode()
+        """The bug itself: Late's round 3 was played — it is a result now,
+        and never sits among what is coming up."""
+        body = self._coming_up(self.client.get(f"/dashboard/?org={self.org.id}").content.decode())
         self.assertNotIn(("3", "Late"), self._round_headings(body))
 
     def test_each_round_is_one_contiguous_block(self):
@@ -456,18 +466,21 @@ class DashboardThisWeekTests(TestCase):
         shown = {s.strip() for _n, s in self._round_headings(body)}
         self.assertEqual(shown, {"Early"})
 
-    def test_the_dropdown_offers_this_week_as_its_own_destination(self):
-        body = self.client.get(f"/dashboard/?org={self.org.id}").content.decode()
-        self.assertIn('<option value="" selected>This week</option>', body)
+    def test_the_rail_offers_this_week_as_its_own_destination(self):
+        # The round rail is offered once ONE competition is picked (28 Oct 2026).
+        body = self.client.get(f"/dashboard/?org={self.org.id}&series=early").content.decode()
+        self.assertIn('rrail-pill is-week on', body)
 
     def test_leaving_this_week_offers_a_way_back_without_a_round(self):
         """The return link must drop ?round= entirely — pointing it at a
         number would land back on the mixed-code screen it exists to escape."""
         body = self.client.get(
-            f"/dashboard/?org={self.org.id}&round=1"
+            f"/dashboard/?org={self.org.id}&series=early&round=1"
         ).content.decode()
-        self.assertIn("rnav-now", body)
-        self.assertIn(f'href="/dashboard/?org={self.org.id}"', body)
+        # The "This week" pill is the way back, and carries no round.
+        self.assertIn("rrail-pill is-week", body)
+        self.assertNotIn("rrail-pill is-week on", body)
+        self.assertIn(f'href="/dashboard/?org={self.org.id}&amp;series=early"', body)
 
 
 class OnboardingWalkthroughTests(TestCase):
@@ -703,8 +716,8 @@ class CompetitionColourTests(TestCase):
         filter is where you choose a code, the slate is where you confuse
         two."""
         body = self._body()
-        self.assertIn("fxr-series is-code", body)
-        self.assertIn('class="fxc-code"', body)
+        # Grouped by day since 28 Oct 2026, so the colour rides on each card.
+        self.assertIn('class="fxc-code" style="--code:', body)
         # One card per code, each labelled with its own competition.
         self.assertIn(">AFLW</span>", body)
 
@@ -1169,7 +1182,11 @@ class ConfirmOnlyWhenSomethingIsUnsavedTests(TestCase):
 
 class DashboardNewsDeckTests(TestCase):
     """The news deck (Sep 2026, third pass): two rows of the same card that
-    take it in turns to flip, five seconds apart, with no pause button."""
+    take it in turns to flip, five seconds apart, with no pause button.
+
+    It lives on the News page since 27 Oct 2026 — the dashboard carries a
+    strip of each competition's stories between its fixtures instead (client:
+    "news and blog has to come in as a page")."""
 
     def setUp(self):
         from admin_panel.models import NewsPost
@@ -1193,18 +1210,14 @@ class DashboardNewsDeckTests(TestCase):
             )
 
     def _body(self):
-        return self.client.get(reverse("dashboard")).content.decode()
+        return self.client.get(reverse("news_index")).content.decode()
 
-    def test_the_heading_is_a_heading_and_all_news_is_a_boxed_link(self):
-        """"I need it to be in its box and look like a link" — so it is its own
-        component rather than the solid filled button it had become. A filled
-        button reads as an action; this goes to a page."""
+    def test_the_dashboard_leaves_news_to_its_page(self):
+        """No deck under the fixtures; News is in the top menu instead."""
         self._stories(3)
-        body = self._body()
-        self.assertIn('<h2 class="nd-title">News &amp; blog</h2>', body)
-        self.assertIn('class="nd-all"', body)
-        self.assertIn('class="nd-all-lab"', body)
-        self.assertNotIn("abtn-primary nd-all", body)
+        body = self.client.get(reverse("dashboard")).content.decode()
+        self.assertNotIn('<article class="nd-card', body)
+        self.assertIn(f'href="{reverse("news_index")}"', body)
 
     def test_there_is_no_play_or_pause_button(self):
         self._stories(12)
@@ -1232,13 +1245,18 @@ class DashboardNewsDeckTests(TestCase):
         self.assertNotIn("is-wide", body)
         self.assertNotIn('data-news-place="spin"', body)
 
-    def test_eight_stories_make_two_full_turns_with_no_empty_places(self):
-        self._stories(8)
+    def test_more_stories_than_places_make_full_turns_with_no_empty_places(self):
+        # The News page deals four rows of three (admin_panel.news_deck):
+        # sixteen stories over twelve places is two full turns.
+        from admin_panel.news_deck import NEWS_PAGE_ROWS, ROW_CARDS
+
+        places = NEWS_PAGE_ROWS * ROW_CARDS
+        self._stories(places + 4)
         body = self._body()
         self.assertIn('data-turns="2"', body)
         queues = re.findall(r"<template data-news-queue>(.*?)</template>", body, re.S)
-        self.assertEqual(len(queues), 6)
-        self.assertEqual([q.count('class="nd-card') for q in queues], [2] * 6)
+        self.assertEqual(len(queues), places)
+        self.assertEqual([q.count('class="nd-card') for q in queues], [2] * places)
 
     def test_six_or_fewer_stories_do_not_turn(self):
         self._stories(4)

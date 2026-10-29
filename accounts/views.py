@@ -370,7 +370,8 @@ def _dashboard_prompts(user, card, games):
         kick = timezone.localtime(nxt.kickoff_at).strftime("%a %-I:%M%p").replace("AM", "am").replace("PM", "pm")
         where = f" at {nxt.venue}" if nxt.venue else ""
         if nxt.tipped:
-            backing = nxt.home_team.name if nxt.my_tip == "home" else nxt.away_team.name
+            backing = (nxt.home_team.name if nxt.my_tip == "home"
+                       else "a draw" if nxt.my_tip == "draw" else nxt.away_team.name)
             text = f"{who}, {nxt.home_team.name} v {nxt.away_team.name} plays {kick}{where} — you're backing {backing}."
         else:
             text = f"{who}, {nxt.home_team.name} v {nxt.away_team.name} plays {kick}{where}. Get your tip in and lock it."
@@ -381,11 +382,28 @@ def _dashboard_prompts(user, card, games):
             "url": reverse("tipping:my_tips", args=[org.id]),
         })
 
+    # 3b. The round and its clock (client, 27 Oct 2026: the round card's
+    # facts — round, lock time, points, rank, tips — come up here, in the
+    # banner, rather than as a block above the fixtures).
+    if rnd and rnd.lockout_at and rnd.lockout_at >= now:
+        gap = rnd.lockout_at - now
+        days, hours = gap.days, gap.seconds // 3600
+        mins = (gap.seconds % 3600) // 60
+        clock = (f"{days} day{'s' if days != 1 else ''}, {hours} hr{'s' if hours != 1 else ''}" if days
+                 else f"{hours} hr{'s' if hours != 1 else ''} {mins} min")
+        prompts.append({
+            "icon": "ic-clock",
+            "text": f"{rnd.label} · {rnd.series} locks in {clock}. "
+                    f"You've tipped {card['tips_done'] or 0} of {card['tips_total'] or 0}.",
+            "cta": "Tip now" if (card["tips_total"] or 0) > (card["tips_done"] or 0) else "",
+            "url": "#roundFixtures",
+        })
+
     # 4. Where they sit.
     if card["rank"]:
         prompts.append({
             "icon": "ic-trophy",
-            "text": f"You're {card['rank']}{_ordinal_suffix(card['rank'])} on the {org.name} ladder on {card['points']} points.",
+            "text": f"{who}, you're ranked {card['rank']}{_ordinal_suffix(card['rank'])} in {org.name}, on {card['points']} points this season.",
             "cta": "See the ladder",
             "url": reverse("tipping:leaderboard", args=[org.id]),
         })
@@ -654,6 +672,7 @@ def dashboard_view(request):
     # window are shown but shut, which is the honest picture of a season rather
     # than a scroll of everything at once.
     games = []
+    feed_more = None
     open_games = 0
     slate_done = 0
     slate_total = 0
@@ -759,6 +778,27 @@ def dashboard_view(request):
             week_round_ids = [r.id for r in week_rounds]
             open_numbers = sorted(r.round_number for r in week_rounds)
 
+            # ALL MEANS ALL (client, 28 Oct 2026: "when I click all, I should
+            # see the AFL, the NRL, the AFLW, the NRLW... I'm clicking each
+            # independent and I'm seeing they are coming"). A competition with
+            # nothing open — its season over, or not yet begun — used to drop
+            # out of "this week" entirely, so All showed only AFLW while each
+            # chip on its own showed its latest round. Now each competition in
+            # view brings what it would show on its own: its open round, or
+            # failing that its most recent one.
+            covered = {r.series_id for r in week_rounds}
+            latest_closed = {}
+            for rnd in (org_rounds.exclude(series_id__in=covered)
+                        # Not State of Origin: three representative games a
+                        # year are not "where that competition is up to".
+                        .exclude(series_id__in=rep_series_ids)
+                        .filter(matches__isnull=False).distinct()
+                        .order_by("series_id", "-round_number")
+                        .only("id", "series_id", "round_number")):
+                latest_closed.setdefault(rnd.series_id, rnd)
+            if week_round_ids:
+                week_round_ids += [r.id for r in latest_closed.values()]
+
             # The number the arrows and the "this week" link step from. With
             # several codes open at different numbers there is no single right
             # answer, so the earliest is used — it is the one a member is most
@@ -845,7 +885,8 @@ def dashboard_view(request):
                 # [(code label, [(value, number), ...]), ...] for the grouped
                 # dropdown a multi-code league gets.
                 "groups": [
-                    (code_names[slug], [(_value(slug, n), n) for n in numbers_by_code[slug]])
+                    (code_names[slug], [(_value(slug, n), n) for n in numbers_by_code[slug]],
+                     _series_colour(slug))
                     for slug in series_order
                 ] if multi else [],
                 "current": _value(current_code, current_no),
@@ -866,23 +907,51 @@ def dashboard_view(request):
         )
         if active_series:
             upcoming = upcoming.filter(round__series__in=active_series)
-        if round_nav and round_nav["is_week"]:
-            upcoming = upcoming.filter(round_id__in=week_round_ids)
-        elif round_nav:
-            upcoming = upcoming.filter(round__round_number=round_nav["current_number"])
+        # THE FEED (client, 28 Oct 2026: "when I click the fixtures I should see
+        # all and not like weeks... see the latest as we scroll down... like
+        # 1xbet or footytips, you just see the latest and when the game is
+        # going to be played"). With no round picked, the slate is every game
+        # still to come in the competitions in view, soonest first, then the
+        # latest results, newest first — grouped by day, not by round number.
+        # Picking a round on the rail still shows exactly that round.
+        live_from = now - timezone.timedelta(hours=4)
+        feed_more = None
+        base = upcoming.select_related("home_team", "away_team", "round", "round__series")
+        if round_nav and not round_nav["is_week"]:
+            games_q = base.filter(round__round_number=round_nav["current_number"])
             # THE LINE THAT FIXES THE CLIENT'S SCREEN. Without it, "round 4" in
             # a league tipping four codes is four rounds, three of them months
             # dead, all rendered one under the other.
             if round_nav["current_code"]:
-                upcoming = upcoming.filter(round__series__slug=round_nav["current_code"])
+                games_q = games_q.filter(round__series__slug=round_nav["current_code"])
+            upcoming = list(games_q.order_by("kickoff_at", "id")[:UPCOMING_LIMIT * 2])
         else:
-            upcoming = upcoming.filter(kickoff_at__gt=now)
-        upcoming = (
-            upcoming
-            .select_related("home_team", "away_team", "round", "round__series")
-            .order_by("kickoff_at", "id")[:UPCOMING_LIMIT]
-        )
-        upcoming = list(upcoming)
+            coming = list(base.filter(kickoff_at__gte=live_from, result__isnull=True)
+                          .order_by("kickoff_at", "id")[:UPCOMING_LIMIT * 2])
+            # Results page further back with ?older=N ("Show more results").
+            try:
+                older = max(0, min(int(request.GET.get("older") or 0), 20))
+            except ValueError:
+                older = 0
+            done_limit = UPCOMING_LIMIT * (older + 1)
+            done = list(base.exclude(pk__in=[g.pk for g in coming]).filter(kickoff_at__lt=now)
+                        .order_by("-kickoff_at", "-id")[:done_limit + 1])
+            feed_more = older + 1 if len(done) > done_limit else None
+            done = done[:done_limit]
+            upcoming = coming + done
+        today = timezone.localdate()
+        for g in upcoming:
+            day = timezone.localtime(g.kickoff_at).date()
+            g.feed_done = g.result is not None or (g.kickoff_at < live_from)
+            if day == today:
+                label = "Today"
+            elif day == today + timezone.timedelta(days=1):
+                label = "Tomorrow"
+            elif day == today - timezone.timedelta(days=1):
+                label = "Yesterday"
+            else:
+                label = day.strftime("%a %-d %b") + ("" if day.year == today.year else f" {day.year}")
+            g.feed_group = f"{'Results' if g.feed_done else 'Coming up'} · {label}"
         # The tip itself, plus how it went. Grading writes is_correct and
         # points_awarded onto the Tip, so a past round can report your result
         # without recomputing anything — which is what lets the dashboard
@@ -1006,11 +1075,11 @@ def dashboard_view(request):
         # Rounds are ordered by when they START (still-tippable ones first),
         # and chronology is preserved inside each — which is what the previous
         # sort was reaching for and did not quite express.
+        # The feed (28 Oct 2026) groups by DAY, so the order is the feed's own:
+        # what is coming up, soonest first; then the results, newest first.
         games.sort(key=lambda g: (
-            played_round.get(g.round_id, False),
-            round_start.get(g.round_id, g.kickoff_at),
-            g.round_id,
-            g.kickoff_at,
+            1 if g.feed_done else 0,
+            -g.kickoff_at.timestamp() if g.feed_done else g.kickoff_at.timestamp(),
             g.id,
         ))
 
@@ -1050,6 +1119,8 @@ def dashboard_view(request):
         return render(request, "partials/dashboard_slate.html", {
             "c": selected,
             "selected": selected,
+            "chip_row": _chip_row(request.user, selected, org_series, active_slugs),
+            "feed_more": feed_more,
             "games": games,
             "open_games": open_games,
             "slate_done": slate_done,
@@ -1139,7 +1210,157 @@ def dashboard_view(request):
         # all — the heading and button go with it).
         **news_deck,
         "prompts": _dashboard_prompts(request.user, selected, games),
+        "sports_menu": _sports_menu(selected, org_series, active_slugs),
+        "chip_row": _chip_row(request.user, selected, org_series, active_slugs),
+        "feed_more": feed_more,
+        # Stories, twice (client, 28 Oct 2026): one at a time on the right of
+        # the banner, and the latest twelve as a grid under the fixtures.
+        "news_latest": _full_pages(list(NewsPost.live.prefetch_related("media").order_by("-published_at")[:36])),
     })
+
+
+def _sports_menu(selected, org_series, active_slugs):
+    """The sports column on the dashboard (client, 27 Oct 2026: "like stake,
+    1xbet... the sports in the right as another column menu... I can click
+    football, we can have La Liga... women and men").
+
+    Every sport the admin has switched on (Sports & competitions), each with
+    its switched-on competitions split men's / women's, and for each: whether
+    this organisation tips it, and how many of its games are still to come.
+    One query for the counts.
+
+        {"yours": [...], "sports": [{"sport", "open", "groups": [(label, [comp])]}]}
+        comp = {"series", "in_org", "upcoming", "on"}
+    """
+    from django.db.models import Count
+
+    from catalog.models import Sport
+
+    if not selected:
+        return {}
+    org = selected["org"]
+    # What the organisation signed up for — a whole Competition brings its
+    # series (NRL brings NRLW and Origin) — not only what has rounds yet.
+    mine = {s.id for s in org_series} | set(
+        org.root.competitions.values_list("series__id", flat=True))
+    counts = dict(
+        Match.objects.filter(round__org=org, kickoff_at__gte=timezone.now(),
+                             kickoff_at__lte=timezone.now() + timezone.timedelta(days=14))
+        .values_list("round__series").annotate(n=Count("id")).values_list("round__series", "n")
+    )
+
+    def comp(series):
+        return {"series": series, "in_org": series.id in mine,
+                "upcoming": counts.get(series.id, 0), "on": series.slug in active_slugs}
+
+    sports = []
+    for sport in Sport.objects.filter(is_active=True).prefetch_related("series"):
+        live = [s for s in sport.series.all() if s.is_active]
+        if not live:
+            continue
+        live.sort(key=lambda s: (s.sort_order, s.name))
+        # A member sees what their organisation tips — what its admin added
+        # (client, 28 Oct 2026: "the members... find and see the sports added
+        # by their admin"). The admin sees everything switched on, to add it.
+        if not selected.get("is_admin"):
+            live = [s for s in live if s.id in mine]
+            if not live:
+                continue
+        men = [comp(s) for s in live if s.category != "womens"]
+        women = [comp(s) for s in live if s.category == "womens"]
+        groups = [(label, items) for label, items in (("Men", men), ("Women", women)) if items]
+        sports.append({
+            "sport": sport, "groups": groups,
+            "count": sum(c["upcoming"] for _l, items in groups for c in items),
+            "open": any(c["on"] for _l, items in groups for c in items)
+                    or (not active_slugs and any(c["in_org"] for _l, items in groups for c in items)),
+        })
+    return {
+        "yours": [comp(s) for s in org_series],
+        "sports": sports,
+        "is_admin": selected.get("is_admin"),
+    }
+
+
+DEFAULT_CHIPS = ("afl", "aflw", "nrl", "nrlw")
+
+
+def _full_pages(stories, per=12):
+    """The stories, padded so the last page of the news carousel is full —
+    it continues from the newest rather than ending three cards into an empty
+    page (client, 28 Oct 2026). Fewer than a page is left alone."""
+    if len(stories) <= per or len(stories) % per == 0:
+        return stories
+    need = per - len(stories) % per
+    return stories + stories[:need]
+
+
+def _series_colour(slug: str) -> str:
+    """A competition's own colour, by slug (catalog.Series.colour)."""
+    from catalog.models import Series
+
+    return Series(slug=slug).colour
+
+
+def _chip_row(user, selected, org_series, active_slugs):
+    """The chips above the round picker (client, 27 Oct 2026: "above it we
+    should see all the four default competitions... then something called pin
+    my favourite sport... I can pin golf, football").
+
+    The four defaults first, then whatever this person has pinned, in the
+    order they pinned it. A chip this organisation tips filters the fixtures;
+    one it does not tip says so (and, for its admin, offers to add it).
+
+        {"chips": [{"series", "pinned", "in_org", "on"}], "pinnable": [(sport, [series])]}
+    """
+    from catalog.models import Series, Sport
+
+    if not selected:
+        return {}
+    org = selected["org"]
+    in_org = {s.id for s in org_series} | set(
+        org.root.competitions.values_list("series__id", flat=True))
+    pins = [p for p in (getattr(user, "pinned_series", None) or []) if p not in DEFAULT_CHIPS]
+    by_slug = {s.slug: s for s in Series.objects.filter(slug__in=list(DEFAULT_CHIPS) + pins)}
+    chips = []
+    for slug in list(DEFAULT_CHIPS) + pins:
+        s = by_slug.get(slug)
+        if s is None or (slug not in DEFAULT_CHIPS and not (s.is_active and s.sport.is_active)):
+            continue
+        chips.append({"series": s, "pinned": slug in pins, "in_org": s.id in in_org,
+                      "on": slug in active_slugs})
+    pinnable = []
+    admin = selected.get("is_admin")
+    for sport in Sport.objects.filter(is_active=True).prefetch_related("series"):
+        # Members pin from what their organisation tips; its admin from
+        # everything switched on (and can add what they pin).
+        items = sorted((x for x in sport.series.all() if x.is_active and x.slug not in DEFAULT_CHIPS
+                        and (admin or x.id in in_org)),
+                       key=lambda x: (x.sort_order, x.name))
+        if items:
+            pinnable.append({"sport": sport, "series": items})
+    return {"chips": chips, "pinnable": pinnable, "pins": pins, "is_admin": selected.get("is_admin")}
+
+
+@login_required
+@require_POST
+def pin_series(request):
+    """Pin or unpin a competition (Series slug) for this member."""
+    from catalog.models import Series
+
+    slug = (request.POST.get("series") or "").strip()
+    if Series.objects.filter(slug=slug).exists() and slug not in DEFAULT_CHIPS:
+        pins = list(request.user.pinned_series or [])
+        if slug in pins:
+            pins.remove(slug)
+        else:
+            pins.append(slug)
+        request.user.pinned_series = pins[:12]
+        request.user.save(update_fields=["pinned_series"])
+    nxt = request.POST.get("next") or reverse("dashboard")
+    if not nxt.startswith("/"):
+        nxt = reverse("dashboard")
+    return redirect(nxt)
 
 
 @login_required

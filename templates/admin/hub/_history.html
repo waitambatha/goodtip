@@ -1,0 +1,14 @@
+{% load i18n %}
+{% comment %}
+PREVIOUS AND NEXT PAGE (client, 26 Oct 2026: "I need to be able to move back
+to the previous page... and forward again... in each and every page"). The
+browser's own history, as two buttons, beside the "Back to …" link — which
+stays, because that one goes UP a level, and these go to wherever you were.
+On every gx page (gx_base.html) and every Django page (base_site.html's
+crumb bar). Forward greys out when there is nothing to go forward to, where
+the browser can say so (gt-rail.js).
+{% endcomment %}
+<span class="gta-hist" role="group" aria-label="{% translate 'Page history' %}">
+  <button type="button" class="gta-hist-b" data-hist="back" title="{% translate 'Previous page' %}" aria-label="{% translate 'Previous page' %}"><svg aria-hidden="true"><use href="#ic-chev-left"/></svg></button>
+  <button type="button" class="gta-hist-b" data-hist="forward" title="{% translate 'Next page' %}" aria-label="{% translate 'Next page' %}"><svg aria-hidden="true"><use href="#ic-chev-right"/></svg></button>
+</span>

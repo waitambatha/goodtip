@@ -199,7 +199,7 @@ class TeamHubTests(TestCase):
 
     def _rail(self, url):
         html = self.client.get(url).content.decode()
-        return html[html.index('class="gts-rail"'):html.index("</nav>")]
+        return html[html.index('id="nav-sidebar"'):html.index("gta-rail-foot")]
 
     def test_the_rail_carries_one_team_entry_and_not_four(self):
         """The point of the change. Four peers cost four lines of the rail on
@@ -209,11 +209,12 @@ class TeamHubTests(TestCase):
         being paid — inside it the four are listed on purpose, and that is the
         test below.
         """
+        # Since 26 Oct 2026 the four sit in a dropdown under the one entry
+        # ("when you click... a dropdown"): present, but closed out here.
         self._sign_in(self.client, self.owner)
-        rail = self._rail(reverse("admin:hq_news"))
+        rail = self._rail(reverse("admin:hq_enquiries"))
         self.assertIn(reverse("admin:hq_team_home"), rail)
-        for gone in ("hq_reviews", "hq_activity"):
-            self.assertNotIn(reverse(f"admin:{gone}"), rail, gone)
+        self.assertIn('data-tree="team">', rail)
 
     def test_inside_the_section_the_rail_is_about_the_section(self):
         """The client: "when I click it, its menu should be about the other
@@ -229,8 +230,9 @@ class TeamHubTests(TestCase):
         rail = self._rail(reverse("admin:hq_my_work"))
         for there in ("hq_my_work", "hq_reviews", "hq_team", "hq_activity"):
             self.assertIn(reverse(f"admin:{there}"), rail, there)
-        # And it says which one you are on.
-        self.assertIn('class="gts-sub on"', rail)
+        # The dropdown is open here, and says which one you are on.
+        self.assertIn('data-tree="team" open>', rail)
+        self.assertIn('class="gta-twig-a on"', rail)
 
     def test_the_section_menu_shows_only_what_its_viewer_may_open(self):
         """A restricted administrator gets a shorter list, never a link that
@@ -245,7 +247,7 @@ class TeamHubTests(TestCase):
         open the hub must still be able to reach their own work."""
         self._sign_in(self.client, self.helper)
         html = self.client.get(reverse("admin:hq_my_work")).content.decode()
-        rail = html[html.index('class="gts-rail"'):html.index("</nav>")]
+        rail = html[html.index('id="nav-sidebar"'):html.index("gta-rail-foot")]
         self.assertIn(reverse("admin:hq_my_work"), rail)
 
     def test_the_hub_counts_what_is_waiting(self):

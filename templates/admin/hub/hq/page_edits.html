@@ -1,0 +1,48 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n %}
+
+{% comment %}
+EVERY EDIT ON ONE PAGE (was manage/page_edits.html): what it said, what it
+says now, who changed it, and whether it is still showing. View:
+admin_panel.views.page_edits.
+{% endcomment %}
+
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_home' %}">HQ</a></li><li><a href="{% url 'admin:hq_pages' %}">{% translate "Pages" %}</a></li>{% endblock %}
+{% block gx_kicker %}{% translate "Pages" %} &middot; {% translate "edits" %}{% endblock %}
+{% block gx_title %}{{ page.label }}{% endblock %}
+{% block gx_lead %}{{ page.blurb }}{% endblock %}
+{% block gx_board %}<div class="gx-score"><b>{{ edits|length }}</b><span>{% translate "Edits" %}</span></div>{% endblock %}
+{% block gx_below %}
+{% if edits %}
+<form method="post" action="{% url 'admin:hq_page_revert' page.key %}" style="margin-top:20px"
+      data-gx-confirm="{% translate 'Every edit on this page will be removed and the original wording comes back.' %}">
+  {% csrf_token %}<button type="submit" class="gx-btn is-glass">{% translate "Put the whole page back" %}</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet">
+  <div class="gx-pane">
+    {% if edits %}
+    <div class="gx-tablewrap">
+      <table class="gx-table">
+        <thead><tr><th>{% translate "Was" %}</th><th>{% translate "Now" %}</th><th>{% translate "Changed" %}</th><th>{% translate "Showing" %}</th></tr></thead>
+        <tbody>
+        {% for e in edits %}
+        <tr style="cursor:default">
+          <td class="gx-blurb" style="text-decoration:line-through;text-decoration-color:rgba(178,52,52,.4)">{{ e.original_html|striptags|truncatechars:180 }}</td>
+          <td class="gx-blurb">{% if e.kind == "image" %}{% if e.image %}<img src="{{ e.image.url }}" alt="" style="max-width:160px;border-radius:12px">{% else %}{% translate "Picture missing" %}{% endif %}{% else %}<b>{{ e.html|striptags|truncatechars:180 }}</b>{% endif %}</td>
+          <td class="is-date">{{ e.updated_at|date:"j M Y" }}<small>{{ e.updated_at|date:"g:i a" }} &middot; {{ e.updated_by.display_name|default:"—" }}</small></td>
+          <td>{% if e.is_live %}<span class="gx-pill is-ok"><i></i>{% translate "Live" %}</span>{% else %}<span class="gx-pill is-wait" title="{% translate 'The original wording this replaced has changed.' %}"><i></i>{% translate "Not showing" %}</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="gx-empty"><svg aria-hidden="true"><use href="#ic-doc"/></svg><b>{% translate "Nothing has been changed on this page yet" %}</b></div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

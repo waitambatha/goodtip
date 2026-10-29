@@ -58,6 +58,41 @@
      nothing reads. The rail's OTHER preference, whether it is collapsed, is
      `gtAdminRailCollapsed` and is still live at the top of this file. */
 
+  /* ---- The dropdowns, with the menu collapsed -----------------------------
+     A dropdown has nowhere to open into when the rail is only icons wide, so
+     its row goes to the section's overview instead (the summary's data-go). */
+  document.addEventListener("click", function (e) {
+    var sum = e.target.closest && e.target.closest(".gta-tree > summary[data-go]");
+    if (!sum || !document.documentElement.classList.contains("gta-rail-collapsed")) return;
+    e.preventDefault();
+    window.location.href = sum.getAttribute("data-go");
+  });
+
+  /* The tree opened at the page you are on: bring that row into view inside
+     the menu's own scroll, so a table far down Staging's list is not hidden. */
+  var on = document.querySelector(".gta-leaves .gta-leaf.on, .gta-twig .gta-twig-a.on");
+  if (on && on.scrollIntoView) on.scrollIntoView({ block: "nearest" });
+
+  /* ---- Previous / next page (admin/hub/_history.html) ------------------- */
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest("[data-hist]");
+    if (!b || b.disabled) return;
+    if (b.getAttribute("data-hist") === "back") history.back(); else history.forward();
+  });
+  var nav = window.navigation;
+  function histState() {
+    document.querySelectorAll("[data-hist]").forEach(function (b) {
+      var back = b.getAttribute("data-hist") === "back";
+      // The Navigation API knows; without it, assume back works once there
+      // is history and leave forward available.
+      var ok = nav && "canGoBack" in nav ? (back ? nav.canGoBack : nav.canGoForward) : (back ? history.length > 1 : true);
+      b.disabled = !ok;
+    });
+  }
+  histState();
+  if (nav && nav.addEventListener) nav.addEventListener("currententrychange", histState);
+  window.addEventListener("pageshow", histState);
+
   /* ---- Selects that are really links --------------------------------------
      The dashboard's window picker is a GET form. Submitting it on change is
      what everyone expects from a control that looks like this; the <noscript>

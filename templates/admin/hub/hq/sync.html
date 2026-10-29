@@ -1,0 +1,154 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n gtadmin %}
+
+{% comment %}
+FIXTURES, RESULTS & LIVE SCORES, ON THE PITCH (was manage/sync.html). Not to
+be confused with Databases → Sync, which copies live into staging: this is
+the sports feeds. It leads with the fact that everything runs by itself, then
+the feed check — "are the fixtures actually right?" (fc-card, client 13 Oct
+2026) — then freshness and coverage, and the manual sync last, as the
+fallback it is. View: admin_panel.views.sync_panel.
+{% endcomment %}
+
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_home' %}">HQ</a></li>{% endblock %}
+{% block gx_kicker %}HQ &middot; {% translate "fixtures feed" %}{% endblock %}
+{% block gx_title %}{% translate "Fixtures, results" %} <em>{% translate "&amp; live scores" %}</em>{% endblock %}
+{% block gx_lead %}{% translate "Everything here runs by itself, on the server's own clock. The manual controls are a fallback, not the way this works." %}{% endblock %}
+{% block gx_board %}
+<div class="gx-score"><b>{% if last_live %}{{ last_live.started_at|compact_since|cut:" ago" }}{% else %}&ndash;{% endif %}</b><span>{% translate "Since live scores" %}</span></div>
+<div class="gx-score"><b>{% if last_results %}{{ last_results.started_at|compact_since|cut:" ago" }}{% else %}&ndash;{% endif %}</b><span>{% translate "Since results" %}</span></div>
+<div class="gx-score"><b>{% if not last_check %}&ndash;{% elif check_overdue or not last_check.ok %}!{% else %}OK{% endif %}</b><span>{% translate "Feed check" %}</span></div>
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet" data-gx-tabs>
+  <div class="gx-tabs" role="tablist">
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="auto" aria-selected="true">{% translate "Running by itself" %}</button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="fresh">{% translate "Freshness &amp; coverage" %}</button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="manual">{% translate "Manual sync" %}</button>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="auto">
+    <div class="gx-card is-line fc-card{% if not last_check %} is-none{% elif check_overdue or not last_check.ok %} is-bad{% else %} is-good{% endif %}" style="margin-bottom:20px">
+      <div class="gx-h" style="margin-bottom:8px">
+        <h3>{% translate "Feed check" %}</h3>
+        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="check"><button type="submit" class="gx-btn">{% translate "Check now" %}</button></form>
+      </div>
+      {% if not last_check %}
+        <p class="gx-note">{% translate "Not run yet. It runs on its own every hour; you can start one now." %}</p>
+      {% elif check_overdue %}
+        <p class="gx-note"><b>{% blocktranslate with t=last_check.started_at|date:"D j M, g:i A" %}The hourly check has not run since {{ t }}.{% endblocktranslate %}</b> {% translate "The server's sync timer may have stopped — nothing on this page is being kept up to date." %}</p>
+      {% elif last_check.ok %}
+        <p class="gx-note"><span class="gx-pill is-ok"><i></i>{% translate "Everything matches the feeds" %}</span> {{ last_check.games_checked }} {% translate "games compared" %} {{ last_check.started_at|timesince }} {% translate "ago" %}{% if last_check.healed %}; {{ last_check.healed }} {% translate "rounds re-synced to get there" %}{% endif %}.</p>
+      {% else %}
+        <p class="gx-note"><span class="gx-pill is-no"><i></i>{% blocktranslate count n=last_check.unresolved_errors|length %}{{ n }} problem the check could not fix{% plural %}{{ n }} problems the check could not fix{% endblocktranslate %}</span>
+          {{ last_check.games_checked }} {% translate "games compared" %} {{ last_check.started_at|timesince }} {% translate "ago" %}{% if last_check.healed %}, {{ last_check.healed }} {% translate "rounds re-synced" %}{% endif %}.{% if last_check.alerted %} {% translate "The team has been emailed." %}{% endif %}</p>
+      {% endif %}
+      {% if last_check and last_check.unresolved %}
+      <ul class="gx-health-items" style="margin-top:12px">
+        {% for i in last_check.unresolved %}<li><b>{{ i.label }}</b> &middot; {% if i.series %}{{ i.series }} {{ i.year }}{% endif %}{% if i.round %} &middot; {% translate "round" %} {{ i.round }}{% endif %}{% if i.orgs %} &middot; {{ i.orgs|length }} {% translate "leagues" %}{% endif %}{% if i.detail %}<br><small>{{ i.detail }}</small>{% endif %}</li>{% endfor %}
+      </ul>
+      {% endif %}
+      {% if recent_checks %}
+      <p class="gx-checkpips">{% translate "Recent" %}: {% for c in recent_checks %}<i class="{% if c.ok %}ok{% else %}bad{% endif %}" title="{{ c.started_at|date:'D j M, g:i A' }} · {{ c.get_scope_display }} · {{ c.found|length }} found, {{ c.healed }} re-synced, {{ c.unresolved_errors|length }} left"></i>{% endfor %}</p>
+      {% endif %}
+    </div>
+
+    <div class="gx-h"><h3>{% translate "What runs, and how often" %}</h3><p>{% translate "Whether or not anybody is on the site — a visitor at 3am finds last night's results already in." %}</p></div>
+    <div class="gx-grid3">
+      <div class="gx-fact"><span>{% translate "Fixtures" %}</span><b>{% translate "hourly" %}</b><small>{% translate "New games and changed kickoffs, every competition." %}</small></div>
+      <div class="gx-fact"><span>{% translate "Live scores" %}</span><b>{% translate "2 min" %}</b><small>{% translate "Score, period and clock in play — a result is pulled the moment a game turns final." %}</small></div>
+      <div class="gx-fact"><span>{% translate "Results" %}</span><b>{% translate "15 min" %}</b><small>{% translate "Final scores; what grades tips and awards points." %}</small></div>
+      <div class="gx-fact"><span>{% translate "Ladders" %}</span><b>{% translate "30 min" %}</b><small>{% translate "Computed from our own results — no outside source to fail." %}</small></div>
+      <div class="gx-fact"><span>{% translate "Full-season sweep" %}</span><b>{% translate "6 hours" %}</b><small>{% translate "Re-reads every round, so a missed round is picked up without anyone asking." %}</small></div>
+      <div class="gx-fact"><span>{% translate "Feed check" %}</span><b>{% translate "hourly" %}</b><small>{% translate "Compares every game with the AFL and NRL sites, re-syncs differences, emails about the rest." %}</small></div>
+    </div>
+
+    <div class="gx-h" style="margin-top:24px"><h3>{% translate "Where the data comes from" %}</h3></div>
+    <div class="gx-grid3">
+      <div class="gx-card is-line"><b>afl.com.au</b> <span class="gx-pill is-ok"><i></i>{% translate "Automatic" %}</span><p class="gx-note" style="margin-top:8px">{% translate "AFL & AFLW, read from the AFL's own site. No key, nothing to expire." %}</p></div>
+      <div class="gx-card is-line"><b>nrl.com</b> <span class="gx-pill is-ok"><i></i>{% translate "Automatic" %}</span><p class="gx-note" style="margin-top:8px">{% translate "NRL, NRLW & State of Origin, read from the NRL's own draw. No key." %}</p></div>
+      <div class="gx-card is-line"><b>{% translate "Ladders" %}</b> <span class="gx-pill is-offer"><i></i>{% translate "Derived" %}</span><p class="gx-note" style="margin-top:8px">{% translate "Computed from the results already stored here. No third-party call." %}</p></div>
+    </div>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="fresh">
+    <div class="gx-split">
+      <div class="gx-stack">
+        <div class="gx-h"><h3>{% translate "Coverage this season" %}</h3><p>{% translate "A sync can succeed every time and still leave rounds unfetched — this is where that shows." %}</p></div>
+        <div class="gx-tablewrap">
+          <table class="gx-table">
+            <thead><tr><th>{% translate "Series" %}</th><th>{% translate "Rounds" %}</th><th>{% translate "Results" %}</th><th>{% translate "On ladder" %}</th><th>{% translate "State" %}</th></tr></thead>
+            <tbody>
+            {% for c in coverage %}
+            <tr style="cursor:default">
+              <td class="is-name"><b>{{ c.series.name }}</b></td>
+              <td>{{ c.rounds }}</td><td>{{ c.results }}</td><td>{{ c.ladder }}</td>
+              <td>{% if not c.feed %}<span class="gx-pill is-no"><i></i>{% translate "No feed" %}</span>{% elif c.missing %}<span class="gx-pill is-wait"><i></i>{% translate "Missing rounds" %} {{ c.missing|join:", " }}</span>{% else %}<span class="gx-pill is-ok"><i></i>{% translate "Complete" %}</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="gx-stack">
+        <div class="gx-card">
+          <p class="gx-label">{% translate "Last success" %}</p>
+          <dl class="gx-kv">
+            <dt>{% translate "Live scores" %}</dt><dd>{% if last_live %}{{ last_live.started_at|timesince }} {% translate "ago" %}{% else %}{% translate "never" %}{% endif %}</dd>
+            <dt>{% translate "Results" %}</dt><dd>{% if last_results %}{{ last_results.started_at|timesince }} {% translate "ago" %}{% else %}{% translate "never" %}{% endif %}</dd>
+            <dt>{% translate "Fixtures" %}</dt><dd>{% if last_fixtures %}{{ last_fixtures.started_at|timesince }} {% translate "ago" %}{% else %}{% translate "never" %}{% endif %}</dd>
+            <dt>{% translate "Ladder" %}</dt><dd>{% if last_ladder %}{{ last_ladder.started_at|timesince }} {% translate "ago" %}{% else %}{% translate "never" %}{% endif %}</dd>
+            <dt>{% translate "Full-season sweep" %}</dt><dd>{% if last_backfill %}{{ last_backfill.started_at|timesince }} {% translate "ago" %}{% else %}{% translate "never" %}{% endif %}</dd>
+          </dl>
+        </div>
+        {% if schedules %}
+        <div class="gx-card">
+          <p class="gx-label">{% translate "Next due" %}</p>
+          <dl class="gx-kv">{% for s in schedules %}<dt>{{ s.get_kind_display }}</dt><dd>{{ s.next_run_at|timeuntil }}</dd>{% endfor %}</dl>
+        </div>
+        {% endif %}
+        {% if recent_runs %}
+        <div class="gx-card">
+          <p class="gx-label">{% translate "Recent runs" %}</p>
+          <dl class="gx-kv">
+            {% for run in recent_runs %}
+            <dt>{{ run.started_at|date:"j M H:i" }} &middot; {{ run.get_kind_display }} {{ run.competition }}{% if run.round_number %} R{{ run.round_number }}{% endif %}</dt>
+            <dd>{% if run.state == "ok" %}<b>{{ run.matches_touched }}</b>{% elif run.is_stuck %}<span class="gx-pill is-no"><i></i>{% translate "stalled" %}</span>{% elif run.state == "running" %}{% translate "running" %}{% else %}<span class="gx-pill is-no" title="{{ run.message }}"><i></i>{% translate "failed" %}</span>{% endif %}</dd>
+            {% endfor %}
+          </dl>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="manual">
+    <div class="gx-split">
+      <div class="gx-card is-dark">
+        <p class="gx-label">{% translate "Manual sync · not normally needed" %}</p>
+        <p class="gx-live">{% translate "Pull one round immediately — after a fixture change, or to check a feed is answering." %}</p>
+        <form method="post" action="{% url 'admin:hq_sync' %}" class="gx-form" style="margin-top:14px">
+          {% csrf_token %}
+          <label class="full">{% translate "Organisation" %}
+            <select name="org_id" class="gx-in" required>{% for o in orgs %}<option value="{{ o.id }}">{{ o.name }} ({{ o.season }})</option>{% empty %}<option value="">{% translate "No orgs yet" %}</option>{% endfor %}</select></label>
+          <label>{% translate "Competition" %}
+            <select name="competition" class="gx-in"><option value="AFL">AFL &middot; incl. AFLW</option><option value="NRL">NRL &middot; incl. NRLW &amp; Origin</option></select></label>
+          <label>{% translate "Round number" %}<input type="number" name="round_number" required value="1" min="1"></label>
+          <div class="full gx-chips" role="radiogroup" aria-label="{% translate 'What to sync' %}">
+            <label class="gx-check"><input type="radio" name="kind" value="fixtures" checked> {% translate "Fixtures" %}</label>
+            <label class="gx-check"><input type="radio" name="kind" value="results"> {% translate "Results (grades tips)" %}</label>
+            <label class="gx-check"><input type="radio" name="kind" value="live"> {% translate "Live scores" %}</label>
+          </div>
+          <div class="full"><button type="submit" class="gx-btn is-lime"><svg aria-hidden="true"><use href="#ic-sync"/></svg>{% translate "Run sync" %}</button></div>
+        </form>
+      </div>
+      <div class="gx-stack">
+        <div class="gx-card"><b>{% translate "Choose the org and round" %}</b><p class="gx-note">{% translate "Select the organisation, competition and round to update." %}</p></div>
+        <div class="gx-card"><b>{% translate "Choose what to sync" %}</b><p class="gx-note">{% translate "Fixtures brings in upcoming games; results brings in completed scores and grades tips." %}</p></div>
+        <div class="gx-card"><b>{% translate "Safe" %}</b><p class="gx-note">{% translate "Nothing outside the round you pick is touched, and results only grade tips already submitted." %}</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

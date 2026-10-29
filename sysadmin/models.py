@@ -664,3 +664,106 @@ class AdminAuditEvent(models.Model):
             summary=summary[:300],
             detail=detail or {},
         )
+
+
+# ---------------------------------------------------------------------------
+# THE TWO DATABASES (client, 25 Oct 2026: "I want to see two databases...
+# everything created in the live we will have it backed up in the staging
+# database... everything created in the staging will be labelled as testing").
+#
+# Six models carry their own origin label (goodtip.origin.OriginMixin). Every
+# other table is tracked here instead, so "is this staging row a backup of a
+# live one?" has an answer for all of them without a migration on each.
+# ---------------------------------------------------------------------------
+
+class BackupRecord(models.Model):
+    """One staging row that is a copy of a live row.
+
+    Written only by sysadmin.backup.copy_everything (inside the staging-only
+    sync_live_backup command). A staging row with a record here is BACKUP —
+    real data, kept in case live is ever lost; one without is TESTING.
+    Primary keys are kept as text so a table keyed by anything still fits.
+    """
+
+    model_label = models.CharField(max_length=100)
+    staging_pk = models.CharField(max_length=64)
+    live_pk = models.CharField(max_length=64)
+    synced_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["model_label", "live_pk"], name="backup_unique_live_row"),
+            models.UniqueConstraint(fields=["model_label", "staging_pk"], name="backup_unique_staging_row"),
+        ]
+
+    def __str__(self):
+        return f"{self.model_label} staging #{self.staging_pk} = live #{self.live_pk}"
+
+
+class BackupRun(models.Model):
+    """One run of the live → staging backup, for "last synced" on the
+    Databases screens and a record of what each run did."""
+
+    started_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    ok = models.BooleanField(default=False)
+    counts = models.JSONField(default=dict, blank=True)
+    error = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-started_at"]
+
+    def __str__(self):
+        return f"Backup run {self.started_at:%Y-%m-%d %H:%M} ({'ok' if self.ok else 'failed'})"
+
+
+class DeletionRequest(models.Model):
+    """Asking Ian to delete something real (client, 25 Oct 2026: "any super
+    admin has to get approval from Ian to be able to delete anything that is
+    in the live database... the backed up data in staging, again, you will
+    need approval from one super admin, that is Ian").
+
+    Real means: any row on the Live database, or a BACKUP row on staging.
+    TESTING rows on staging need no approval. "Ian" is whoever holds
+    AdminAccess.can_delete_real — see sysadmin.access.can_delete_real.
+
+    A staging deletion is carried out the moment it is approved. A live one
+    is queued: the staging site never writes to live, so the backup job
+    (sync_live_backup) deletes it on live on its next run and marks it done.
+    """
+
+    DB_LIVE = "live"
+    DB_STAGING = "staging"
+    DB_CHOICES = [(DB_LIVE, "Live"), (DB_STAGING, "Staging")]
+
+    PENDING = "pending"
+    APPROVED = "approved"   # live only: waiting for the backup job
+    DONE = "done"
+    DECLINED = "declined"
+    FAILED = "failed"
+    STATUS_CHOICES = [
+        (PENDING, "Waiting for approval"), (APPROVED, "Approved — deleting on the next sync"),
+        (DONE, "Deleted"), (DECLINED, "Declined"), (FAILED, "Could not delete"),
+    ]
+
+    database = models.CharField(max_length=10, choices=DB_CHOICES)
+    model_label = models.CharField(max_length=100)
+    object_pk = models.CharField(max_length=64, help_text="The row's key on the database it is being deleted from.")
+    object_repr = models.CharField(max_length=300)
+    reason = models.TextField(blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=PENDING)
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+                                     related_name="deletion_requests")
+    requested_at = models.DateTimeField(default=timezone.now)
+    decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name="deletion_decisions")
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_note = models.TextField(blank=True)
+    done_at = models.DateTimeField(null=True, blank=True)
+    error = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-requested_at"]
+
+    def __str__(self):
+        return f"Delete {self.object_repr} from {self.get_database_display()} ({self.get_status_display()})"

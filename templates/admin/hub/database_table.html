@@ -1,0 +1,113 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n humanize %}
+
+{% comment %}
+ONE TABLE ON ONE DATABASE (client, 25 Oct 2026). Every row labelled — Real
+on Live; Backup or Testing on Staging — with what may be done to it by the
+person looking: Delete, or Ask Ian (with a reason) where the row is real.
+The rule is sysadmin.backup.delete_rule; the view is
+sysadmin.database_views.database_table. Tabs and search are plain links/GET.
+{% endcomment %}
+
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_tables' %}">{% translate "Databases" %}</a></li><li><a href="{% url 'admin:hq_database' db.key %}">{{ db.label }}</a></li>{% endblock %}
+{% block gx_kicker %}{{ db.label }} &middot; {{ label }}{% endblock %}
+{% block gx_title %}{{ title }}{% endblock %}
+{% block gx_lead %}{% if blurb %}{{ blurb }}{% elif kind == "reference" %}{% translate "A shared list, loaded on both databases from the feeds — matched rather than copied." %}{% elif kind == "skip" %}{% translate "Staging's own table — not part of the backup." %}{% endif %}{% if db.key == "live" and tracked %} {% translate "Shown from the backup, as of its last run." %}{% endif %}{% endblock %}
+{% block gx_board %}
+{% if db.key == "live" %}
+<div class="gx-score is-wide"><b>{{ page.paginator.count|intcomma }}</b><span>{% translate "Real rows" %}</span></div>
+{% elif tracked %}
+<a class="gx-score{% if show == 'all' %} is-on{% endif %}" href="?show=all"><b>{{ counts.total|intcomma }}</b><span>{% translate "All rows" %}</span></a>
+<a class="gx-score{% if show == 'backup' %} is-on{% endif %}" href="?show=backup"><b>{{ counts.backup|intcomma }}</b><span>{% translate "Backup" %}</span></a>
+<a class="gx-score{% if show == 'testing' %} is-on{% endif %}" href="?show=testing"><b>{{ counts.testing|intcomma }}</b><span>{% translate "Testing" %}</span></a>
+{% else %}
+<div class="gx-score is-wide"><b>{{ counts.total|intcomma }}</b><span>{% translate "Rows" %}</span></div>
+{% endif %}
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet">
+  {% if db.key == "staging" and tracked %}
+  <nav class="gx-tabs" aria-label="{% translate 'Which rows' %}">
+    <a class="gx-tab{% if show == 'all' %} on{% endif %}" href="?show=all{% if q %}&amp;q={{ q|urlencode }}{% endif %}{% if where %}&amp;where={{ where|urlencode }}{% endif %}">{% translate "All" %} <em>{{ counts.total }}</em></a>
+    <a class="gx-tab{% if show == 'backup' %} on{% endif %}" href="?show=backup{% if q %}&amp;q={{ q|urlencode }}{% endif %}{% if where %}&amp;where={{ where|urlencode }}{% endif %}">{% translate "Backup" %} <em>{{ counts.backup }}</em></a>
+    <a class="gx-tab{% if show == 'testing' %} on{% endif %}" href="?show=testing{% if q %}&amp;q={{ q|urlencode }}{% endif %}{% if where %}&amp;where={{ where|urlencode }}{% endif %}">{% translate "Testing" %} <em>{{ counts.testing }}</em></a>
+  </nav>
+  {% else %}
+  <div class="gx-tabs"><span class="gx-tab on">{% if db.key == "live" %}{% translate "Real rows" %}{% else %}{% translate "Rows" %}{% endif %} <em>{{ page.paginator.count }}</em></span></div>
+  {% endif %}
+
+  <div class="gx-pane">
+    <form class="gx-toolbar" method="get" action="">
+      <input type="hidden" name="show" value="{{ show }}">
+      {% if comp %}<input type="hidden" name="comp" value="{{ comp }}">{% endif %}
+      {% if where %}<input type="hidden" name="where" value="{{ where }}">{% endif %}
+      <label class="gx-search"><svg aria-hidden="true"><use href="#ic-search"/></svg>
+        <input type="search" name="q" value="{{ q }}" placeholder="{% translate 'Search this table' %}" aria-label="{% translate 'Search this table' %}"></label>
+      {% if q %}<a class="gx-btn is-ghost" href="?show={{ show }}{% if where %}&amp;where={{ where|urlencode }}{% endif %}">{% translate "Clear" %}</a>{% endif %}
+    </form>
+    {% if comps|length > 1 or comp %}
+    <nav class="gx-chips" aria-label="{% translate 'Competition' %}" style="margin:-4px 0 14px">
+      <a class="gx-chip{% if not comp %} on{% endif %}" href="?show={{ show }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}">{% translate "Every competition" %}</a>
+      {% for slug, name in comps %}<a class="gx-chip{% if comp == slug %} on{% endif %}" href="?show={{ show }}&amp;comp={{ slug }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}">{{ name }}</a>{% endfor %}
+    </nav>
+    {% endif %}
+    {% if where_text %}<p class="gx-where"><span>{% translate "Only rows where" %} <b>{{ where_text }}</b></span><a href="?show={{ show }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}" aria-label="{% translate 'Show every row' %}">&times;</a></p>{% endif %}
+
+    {% if rows %}
+    <div class="gx-tablewrap">
+      <table class="gx-table">
+        <thead><tr>
+          <th scope="col">{% translate "ID" %}</th>
+          <th scope="col">{% translate "Row" %}</th>
+          {% if has_comp %}<th scope="col">{% translate "Competition" %}</th>{% endif %}
+          {% if date_field %}<th scope="col">{{ date_label }}</th>{% endif %}
+          <th scope="col">{% translate "Label" %}</th>
+          <th scope="col" style="text-align:right">{% translate "Actions" %}</th>
+        </tr></thead>
+        <tbody>
+        {% for r in rows %}
+        <tr style="cursor:default">
+          <td class="is-num"><span class="gx-person-place">{{ r.pk }}</span></td>
+          <td class="is-name">{% if r.open %}<a href="{{ r.open }}">{{ r.text }}</a>{% else %}<b>{{ r.text }}</b>{% endif %}</td>
+          {% if has_comp %}<td>{% if r.comp %}<span class="gx-comp">{{ r.comp }}</span>{% else %}&mdash;{% endif %}</td>{% endif %}
+          {% if date_field %}<td class="is-date">{% if r.when %}{{ r.when|date:"j M Y" }}<small>{{ r.when|date:"g:i a" }}</small>{% else %}—{% endif %}</td>{% endif %}
+          <td>{% if r.label == "real" %}<span class="gx-lab is-real">{% translate "Real" %}</span>{% elif r.label == "backup" %}<span class="gx-lab is-backup">{% translate "Backup" %}</span>{% elif r.label == "testing" %}<span class="gx-lab is-testing">{% translate "Testing" %}</span>{% else %}<span class="gx-lab is-shared">{% translate "Shared" %}</span>{% endif %}</td>
+          <td class="gx-acts">
+            {% if r.open %}<a class="gx-mini" href="{{ r.open }}">{% translate "Open" %}</a>{% endif %}
+            {% if r.rule == "delete" %}
+            <form method="post" action="{% url 'admin:hq_database_delete' db.key label r.pk %}?show={{ show }}" data-gx-confirm="{% if db.key == 'live' %}{% blocktranslate with t=r.text %}Delete “{{ t }}” from LIVE? It goes on the next backup run. The backup copy on staging is kept.{% endblocktranslate %}{% else %}{% blocktranslate with t=r.text %}Delete “{{ t }}” from staging? This can't be undone.{% endblocktranslate %}{% endif %}">
+              {% csrf_token %}<button class="gx-mini is-danger" type="submit">{% translate "Delete" %}</button>
+            </form>
+            {% elif r.rule == "ask" %}
+            <details class="gx-ask">
+              <summary class="gx-mini is-ask">{% translate "Ask Ian" %}</summary>
+              <form method="post" action="{% url 'admin:hq_database_delete' db.key label r.pk %}?show={{ show }}" class="gx-ask-pop">
+                {% csrf_token %}
+                <b>{% translate "Ask Ian to delete this" %}</b>
+                <span>{% if r.label == "real" %}{% translate "It's real data on live." %}{% else %}{% translate "It's a backup of real data." %}{% endif %} {% translate "Nothing goes until he approves." %}</span>
+                <textarea name="reason" rows="3" required placeholder="{% translate 'Why should it go?' %}"></textarea>
+                <button class="gx-btn" type="submit"><svg aria-hidden="true"><use href="#ic-send"/></svg>{% translate "Send to Ian" %}</button>
+              </form>
+            </details>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if page.paginator.num_pages > 1 %}
+    <nav class="gx-pager" aria-label="{% translate 'Pages' %}">
+      {% if page.has_previous %}<a class="gx-btn is-ghost" href="?show={{ show }}&amp;q={{ q|urlencode }}{% if comp %}&amp;comp={{ comp }}{% endif %}&amp;page={{ page.previous_page_number }}">&larr; {% translate "Newer" %}</a>{% endif %}
+      <span>{% blocktranslate with n=page.number of=page.paginator.num_pages %}Page {{ n }} of {{ of }}{% endblocktranslate %}</span>
+      {% if page.has_next %}<a class="gx-btn is-ghost" href="?show={{ show }}&amp;q={{ q|urlencode }}{% if comp %}&amp;comp={{ comp }}{% endif %}&amp;page={{ page.next_page_number }}">{% translate "Older" %} &rarr;</a>{% endif %}
+    </nav>
+    {% endif %}
+    {% else %}
+    <div class="gx-empty"><svg aria-hidden="true"><use href="#ic-search"/></svg><b>{% if q %}{% translate "Nothing matches that" %}{% else %}{% translate "No rows here" %}{% endif %}</b>
+      <span>{% if db.key == "live" %}{% translate "Nothing real in this table yet — or the backup hasn't copied it." %}{% else %}{% translate "Try another tab, or clear the search." %}{% endif %}</span></div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

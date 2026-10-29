@@ -1,0 +1,92 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n gtadmin %}
+
+{% comment %}
+THE ENQUIRIES INBOX, ON THE PITCH (client, 26 Oct 2026: "when I click
+enquire inbox... it still takes me to the old design... everything head to
+toe has the new design"). Was manage/enquiries.html in the HQ shell, with a
+second menu of its own. Same view (admin_panel.views.enquiries), same
+behaviour: open first, search and order ride along on every tab and page.
+{% endcomment %}
+
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_home' %}">HQ</a></li>{% endblock %}
+{% block gx_kicker %}HQ &middot; {% translate "inbox" %}{% endblock %}
+{% block gx_title %}{% translate "Customer" %} <em>{% translate "enquiries" %}</em>{% endblock %}
+{% block gx_lead %}{% translate "Messages from the contact form on the public site. Reply here and the answer is emailed straight back." %}{% endblock %}
+{% block gx_board %}
+<a class="gx-score{% if show == 'open' %} is-on{% endif %}" href="?show=open"><b>{{ open_count }}</b><span>{% translate "Open" %}</span></a>
+<a class="gx-score{% if show == 'replied' %} is-on{% endif %}" href="?show=replied"><b>{{ replied_count }}</b><span>{% translate "Replied" %}</span></a>
+<a class="gx-score{% if show == 'all' %} is-on{% endif %}" href="?show=all"><b>{{ total_count }}</b><span>{% translate "All" %}</span></a>
+{% endblock %}
+
+{% block gx_body %}
+{% gta_can 'enquiries.reply' as may_reply %}
+<section class="gx-sheet">
+  <nav class="gx-tabs" aria-label="{% translate 'Which enquiries' %}">
+    <a class="gx-tab{% if show == 'open' %} on{% endif %}" href="?show=open{% if q %}&amp;q={{ q|urlencode }}{% endif %}&amp;sort={{ sort }}">{% translate "Open" %} <em>{{ open_count }}</em></a>
+    <a class="gx-tab{% if show == 'replied' %} on{% endif %}" href="?show=replied{% if q %}&amp;q={{ q|urlencode }}{% endif %}&amp;sort={{ sort }}">{% translate "Replied" %} <em>{{ replied_count }}</em></a>
+    <a class="gx-tab{% if show == 'all' %} on{% endif %}" href="?show=all{% if q %}&amp;q={{ q|urlencode }}{% endif %}&amp;sort={{ sort }}">{% translate "All" %} <em>{{ total_count }}</em></a>
+  </nav>
+  <div class="gx-pane">
+    <form class="gx-toolbar" method="get" role="search">
+      <input type="hidden" name="show" value="{{ show }}">
+      <label class="gx-search"><svg aria-hidden="true"><use href="#ic-search"/></svg>
+        <input type="search" name="q" value="{{ q }}" placeholder="{% translate 'Search by name, email or what they wrote' %}" aria-label="{% translate 'Search enquiries' %}"></label>
+      <select name="sort" class="gx-in" data-autosubmit aria-label="{% translate 'Sort enquiries' %}" style="width:auto">
+        {% for key, label in sorts %}<option value="{{ key }}"{% if key == sort %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      {% if q %}<a class="gx-btn is-ghost" href="?show={{ show }}">{% translate "Clear" %}</a>{% endif %}
+    </form>
+
+    {% if enquiries %}
+    <div class="gx-rows">
+      {% for e in enquiries %}
+      <div class="gx-row gx-enq{% if e.status == 'new' %} is-wait{% elif e.status == 'replied' %} is-ok{% endif %}">
+        <span class="gx-avatar" style="--c: var(--cc-{{ e.tone|add:1|default:1 }}, var(--gx-ink))" aria-hidden="true">{{ e.name|slice:":1"|upper }}</span>
+        <a class="gx-row-main" href="{% url 'admin:hq_enquiry_detail' e.id %}">
+          <b>{{ e.name }}</b>
+          <span>{{ e.email }}{% if e.organisation %} &middot; {{ e.organisation }}{% endif %}</span>
+        </a>
+        <a class="gx-row-main" href="{% url 'admin:hq_enquiry_detail' e.id %}">
+          <b>{% firstof e.interest "General enquiry" %}</b>
+          <span>{{ e.message|truncatechars:110 }}</span>
+        </a>
+        <span class="gx-row-when">{{ e.created_at|date:"j M Y" }}<br>{{ e.created_at|date:"g:i a" }}</span>
+        <span>{% if e.status == 'new' %}<span class="gx-pill is-wait"><i></i>{% translate "Open" %}</span>
+          {% elif e.status == 'replied' %}<span class="gx-pill is-ok"><i></i>{% translate "Replied" %}</span>
+          {% else %}<span class="gx-pill"><i></i>{% translate "Closed" %}</span>{% endif %}</span>
+        <span class="gx-acts">
+          <a class="gx-mini is-go gx-reply" href="{% url 'admin:hq_enquiry_detail' e.id %}">{% if e.status == 'new' %}{% translate "Reply" %}{% else %}{% translate "View" %}{% endif %}</a>
+          {% if may_reply %}
+          <form method="post" action="{% url 'admin:hq_enquiry_detail' e.id %}">
+            {% csrf_token %}
+            {% if e.status == 'new' %}<input type="hidden" name="action" value="close"><button class="gx-mini" type="submit" title="{% translate 'Close without a reply' %}">{% translate "Close" %}</button>
+            {% else %}<input type="hidden" name="action" value="reopen"><button class="gx-mini" type="submit">{% translate "Reopen" %}</button>{% endif %}
+          </form>
+          {% endif %}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="gx-pager">
+      <span>Showing {{ page.start_index }} to {{ page.end_index }} of {{ page.paginator.count }} enquir{{ page.paginator.count|pluralize:"y,ies" }}</span>
+      {% if page.has_other_pages %}
+        {% if page.has_previous %}<a class="gx-btn is-ghost" href="?{% if keep %}{{ keep }}&amp;{% endif %}page={{ page.previous_page_number }}">&larr; {% translate "Newer" %}</a>{% endif %}
+        {% for n in page_range %}
+          {% if n == page.paginator.ELLIPSIS %}<span>&hellip;</span>
+          {% elif n == page.number %}<span class="gx-chip on">{{ n }}</span>
+          {% else %}<a class="gx-chip" href="?{% if keep %}{{ keep }}&amp;{% endif %}page={{ n }}">{{ n }}</a>{% endif %}
+        {% endfor %}
+        {% if page.has_next %}<a class="gx-btn is-ghost" href="?{% if keep %}{{ keep }}&amp;{% endif %}page={{ page.next_page_number }}">{% translate "Older" %} &rarr;</a>{% endif %}
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="gx-empty"><svg aria-hidden="true"><use href="#ic-mail"/></svg>
+      <b>{% if q %}{% blocktranslate %}Nothing matches “{{ q }}”{% endblocktranslate %}{% elif show == 'open' %}{% translate "All caught up" %}{% elif show == 'replied' %}{% translate "Nothing replied to yet" %}{% else %}{% translate "No enquiries yet" %}{% endif %}</b>
+      <span>{% if q %}<a href="?show={{ show }}">{% translate "Clear the search" %}</a>{% elif show == 'open' %}{% translate "No enquiries waiting on a reply." %}{% else %}{% translate "They arrive here from the contact form on the public site." %}{% endif %}</span>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

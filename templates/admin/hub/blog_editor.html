@@ -1,38 +1,31 @@
-{% extends "hq_base.html" %}
-{% block back_url %}{% url 'admin:hq_news' %}{% endblock %}
-{% block back_label %}news &amp; blog{% endblock %}
-{% load static %}
-{% block title %}{% if is_new %}New post{% else %}Edit post{% endif %} &middot; Manage{% endblock %}
-{% block nav_news %}on{% endblock %}
-{% block hero_title %}{% if is_new %}Write a new story{% else %}Edit story{% endif %}{% endblock %}
-{% block hero_icon %}ic-doc{% endblock %}
-{% block hero_lead %}{% if is_new %}A full page to write in — headline, body, images, formatting, all of it.{% else %}{{ post.title }}{% endif %}{% endblock %}
-{% block extra_head %}
-<script src="{% static 'js/gt-news-editor.js' %}" defer></script>
-<script src="{% static 'js/gt-share.js' %}" defer></script>
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n static %}
+
+{% comment %}
+THE STORY EDITOR, ON THE PITCH (client, 26 Oct 2026: "I clicked a blog,
+clicked edit... I did see things like <p>... make sure it's human and I can
+edit, and edit must be full from left to right... let's all have the new
+pages"). The one place a story is written or changed — the menu's Blog &
+news, a story's record under Databases, and the story list all lead here.
+
+The editing itself is the story editor everyone already knows (gt-news-
+editor.js): a page you type into, with formatting, pictures, slideshows,
+featured media, tags and the publishing calendar — never raw HTML. Only the
+frame is new: full width on the white sheet, the address in the hero, and a
+save bar that stays at the bottom of the screen. Views:
+admin_panel.views.news_new / news_edit.
+{% endcomment %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/gt-blog-editor.css' %}">{% endblock %}
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_news' %}">{% translate "Blog &amp; news" %}</a></li>{% endblock %}
+{% block gx_nav %}
+{% if not is_new %}<a class="gx-btn is-glass" href="{{ post.get_absolute_url }}" target="_blank" rel="noopener"><svg aria-hidden="true"><use href="#ic-eye"/></svg>{% translate "View on the site" %}</a>{% endif %}
 {% endblock %}
-{% block admin_content %}
-
-<div class="ned-shell">
-  <div class="ned-topbar">
-    <a href="{% url 'admin:hq_news' %}" class="ned-back">&larr; All posts</a>
-
-    {% comment %}
-    THE STORY'S OWN ADDRESS.
-
-    Built from the headline on the first save, and EDITABLE after that. It used
-    to be frozen, on the reasoning that a link already sent to somebody must
-    keep working — which was right about the risk and wrong about the fix. The
-    address is the one piece of a story an SEO team most wants control of, and
-    freezing it meant a headline typed in a hurry became a permanent URL.
-
-    So it moves, and the old address is written into the redirect table
-    pointing here (`admin_panel.views._apply_news_slug`). Every link already
-    shared still lands on the story; it just arrives via a 301.
-
-    Before the first save this is still a live preview of what the address is
-    going to be — there is nothing to rename yet.
-    {% endcomment %}
+{% block gx_kicker %}{% translate "Blog &amp; news" %} &middot; {% if is_new %}{% translate "new story" %}{% else %}{% translate "editing" %}{% endif %}{% endblock %}
+{% block gx_title %}{% if is_new %}{% translate "Write a" %} <em>{% translate "new story" %}</em>{% else %}{{ post.title|default:"Untitled story" }}{% endif %}{% endblock %}
+{% block gx_lead %}{% translate "Type straight into the page — headline, teaser, pictures and the story itself. What you see is what readers get." %}{% endblock %}
+{% block gx_below %}
+<div class="gx-bed-url">
     <div class="ned-url">
       <span class="ned-url-k">{% if is_new %}Will publish at{% else %}Address{% endif %}</span>
       {% if is_new %}
@@ -52,13 +45,18 @@
       </a>
       {% endif %}
     </div>
-  </div>
+</div>
+{% endblock %}
+{% block gx_board %}
+{% if not is_new %}
+<div class="gx-score"><b>{% if post.is_scheduled %}{% translate "Later" %}{% elif post.is_live %}{% translate "Live" %}{% else %}{% translate "Draft" %}{% endif %}</b><span>{% translate "Status" %}</span></div>
+<div class="gx-score"><b>{% if post.announced_at %}&#10003;{% else %}&ndash;{% endif %}</b><span>{% translate "Emailed" %}</span></div>
+{% endif %}
+{% endblock %}
 
-  {% comment %}
-  Named, because the address field above sits OUTSIDE this form — it belongs
-  visually with the link it edits, in the top bar — and `form="newsForm"` is
-  how an input submits with a form it is not inside.
-  {% endcomment %}
+{% block gx_body %}
+<section class="gx-sheet gx-bed">
+  <div class="gx-pane">
   <form method="post" id="newsForm"
         action="{% if is_new %}{% url 'admin:hq_news_new' %}{% else %}{% url 'admin:hq_news_edit' post.id %}{% endif %}"
         enctype="multipart/form-data" data-busy="Saving">
@@ -428,15 +426,18 @@
       {% include "manage/_seo_fields.html" with seo=post default_title=post.title default_description=post.excerpt default_image_url=post.image %}
     </div>
 
-    <div class="ned-publish-row" style="margin-top:28px;">
-      <label for="np_pub">
-        <input type="checkbox" name="is_published" id="np_pub" {% if post %}{% if post.is_published %}checked{% endif %}{% else %}checked{% endif %}>
-        Published &mdash; visible on the site from its publish date above
+    <div class="gx-bed-save">
+      <label class="gx-check" for="np_pub">
+        <input type="checkbox" name="is_published" id="np_pub" {% if post.pk %}{% if post.is_published %}checked{% endif %}{% else %}checked{% endif %}>
+        {% translate "Published — on the site from its publish date" %}
       </label>
-      <div class="ned-actions">
-        <button type="submit" class="gt-go-btn" style="width:auto;">{% if is_new %}Save post{% else %}Save changes{% endif %} <svg><use href="#ic-check"/></svg></button>
-      </div>
+      <span class="gx-bed-save-note">{% translate "Saved here, it's on goodtip.com.au too within two minutes." %}</span>
+      <a class="gx-btn is-ghost" href="{% url 'admin:hq_news' %}">{% translate "Cancel" %}</a>
+      <button type="submit" class="gx-btn is-lime"><svg aria-hidden="true"><use href="#ic-check"/></svg>{% if is_new %}{% translate "Save story" %}{% else %}{% translate "Save changes" %}{% endif %}</button>
     </div>
   </form>
-</div>
+  </div>
+</section>
+<script src="{% static 'js/gt-news-editor.js' %}" defer></script>
+<script src="{% static 'js/gt-share.js' %}" defer></script>
 {% endblock %}

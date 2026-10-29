@@ -152,6 +152,9 @@ def get_sync_service(competition: str) -> DataSyncService:
         return AflScrapeSyncService()       # afl.com.au, covers AFL and AFLW
     if comp == "NRL":
         return NrlScrapeSyncService()       # nrl.com, covers NRL, NRLW, Origin
+    from .scrapers.espn import LEAGUES
+    if competition in LEAGUES:
+        return EspnSyncService(competition)  # ESPN's public scoreboards
     raise SyncError(f"Unsupported competition: {competition}")
 
 
@@ -178,6 +181,12 @@ def competition_for_series(series_name: str) -> str | None:
     ):
         if wanted in {s.upper() for s in service.SERIES}:
             return competition
+    # Every other sport: one ESPN league per competition, keyed by its own
+    # name (data_sync.scrapers.espn.LEAGUES).
+    from .scrapers.espn import LEAGUES
+    for name in LEAGUES:
+        if name.upper() == wanted:
+            return name
     return None
 
 
@@ -348,6 +357,9 @@ class _ScrapeSyncService:
     COMPETITION = ""
     #: Named in the error a caller sees, so "which feed?" needs no lookup.
     SOURCE = ""
+    #: Build only from GoodTip's fixture library, never the network
+    #: (data_sync.library.seed_org).
+    library_only = False
 
     def __init__(self):
         self._scraper = self._build_scraper()
@@ -411,10 +423,12 @@ class _ScrapeSyncService:
         # score waiting up to half an hour to grade. Within one run the
         # scraper's own in-memory cache still means thirty leagues cost one
         # fetch, so nothing is lost by going to the feed every time here.
-        if use_cache:
-            cached = fixture_cache_get(self.SOURCE, key, year, round_number)
+        if use_cache or self.library_only:
+            cached = fixture_cache_get(self.SOURCE, key, year, round_number, any_age=self.library_only)
             if cached is not None:
                 return series, cached
+            if self.library_only:
+                return series, []       # the library has no such round: nothing to build
 
         try:
             rows = self._scraper.fixtures(
@@ -974,3 +988,88 @@ class AflScrapeSyncService(_ScrapeSyncService):
 
     def _resolve(self, series, name, external_id):
         return _resolve_team(series, name, external_id)
+
+
+class EspnSyncService(_ScrapeSyncService):
+    """Every sport beyond the AFL and the NRL (client, 27 Oct 2026), from
+    ESPN's public scoreboards — see data_sync.scrapers.espn.
+
+    One service per competition: each league is its own Series and its own
+    Competition, named alike ("English Premier League"). Three differences
+    from the two scraped codes:
+
+      * clubs are CREATED as the feed names them, badge and all — twenty
+        leagues of clubs are not hand-seeded the way the AFL's eighteen were;
+      * a round is a calendar week, and is always a regular round: finals
+        inference (matchreader.stages) reads the shape of AFL / NRL seasons
+        and would misread a quiet week as a final;
+      * the ladder follows each sport's own rules (data_sync.ladder.RULES).
+    """
+
+    SOURCE = "ESPN"
+
+    def __init__(self, competition: str):
+        self.SERIES = [competition]
+        self.COMPETITION = competition
+        super().__init__()
+
+    def _build_scraper(self):
+        from .scrapers.espn import EspnScraper
+        return EspnScraper()
+
+    @property
+    def _error(self):
+        from .scrapers.espn import EspnError
+        return EspnError
+
+    def _resolve(self, series, name, external_id):
+        team = _resolve_team(series, name, external_id)
+        if team is None and name:
+            slug = _normalise_team_name(name)[:100] or (external_id or "team").replace(":", "-")
+            team, _ = Team.objects.get_or_create(
+                series=series, slug=slug,
+                defaults={"name": name[:100], "external_id": external_id[:100]},
+            )
+        return team
+
+    def _series_rows(self, series_name, round_number, year, *, use_cache=True):
+        series, rows = super()._series_rows(series_name, round_number, year, use_cache=use_cache)
+        # Badges ride along with the rows; store each club's once.
+        if series is not None:
+            seen = set()
+            for r in rows:
+                for side in ("home", "away"):
+                    ext, logo = r.get(f"{side}_external_id"), r.get(f"{side}_logo")
+                    if ext and logo and ext not in seen:
+                        seen.add(ext)
+                        Team.objects.filter(series=series, external_id=ext, logo_url="").update(logo_url=logo[:300])
+        return series, rows
+
+    def _ensure_round(self, org, series, round_number, rows):
+        earliest = min(r["kickoff_at"] for r in rows)
+        round_obj, created = Round.objects.get_or_create(
+            org=org, round_number=round_number, series=series,
+            defaults={"lockout_at": earliest, "status": "upcoming", "stage": Round.STAGE_REGULAR,
+                      "competition": Competition.for_series(series, org.season)},
+        )
+        if not created and round_obj.lockout_at != earliest:
+            round_obj.lockout_at = earliest
+            round_obj.save(update_fields=["lockout_at"])
+        _ensure_round_competition(round_obj, series, org)
+        return round_obj
+
+    def _restage(self, series, season):
+        return None
+
+    def _record_history(self, series, season, round_number, home, away, row):
+        """Filed under the league's own season (row["league_season"]) where the
+        feed gives one — a Premier League game in March 2026 belongs to
+        2025-26 — so ladders are single real seasons."""
+        super()._record_history(series, row.get("league_season") or season, round_number, home, away, row)
+
+    def sync_ladder(self, *, competition, org, **kw):
+        """The table from our own results, by the sport's rules
+        (data_sync.ladder.RULES — three a win in football, wins in the NBA)."""
+        from .ladder import rebuild_for_competition
+
+        return rebuild_for_competition(competition, season=org.season)

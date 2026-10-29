@@ -1,0 +1,92 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n humanize %}
+
+{% comment %}
+DATABASES (client, 25–26 Oct 2026: "two databases... live and staging...
+make the live and staging look quite great... the sync... I want it to be
+something that it's like a button where we can click and find those info").
+
+The two databases are the page: one card each, in their own colour (Live
+blue, Staging purple — the same as the menu), with what they hold and their
+fullest tables one click away. Sync is not a third database, so it is not a
+third card: it is a button in the header, ticking down to the next check,
+that opens the sync page. Built by sysadmin.database_views.databases_hub.
+{% endcomment %}
+
+{% block gx_kicker %}{% translate "Databases" %}{% endblock %}
+{% block gx_title %}{% translate "Two databases," %} <em>{% translate "one truth" %}</em>{% endblock %}
+{% block gx_lead %}{% translate "Live holds everything real. Staging keeps a copy of it the moment it happens — and the team's testing beside it." %}{% endblock %}
+{% block gx_below %}
+<div class="gx-dbhead-acts">
+  <a class="gx-syncbtn{% if sync.watching %} is-on{% endif %}" href="{% url 'admin:hq_backup_history' %}"
+     data-gx-countdown="{% if sync.next_at and sync.watching %}{{ sync.next_at|date:'c' }}{% endif %}" data-every="{{ every }}">
+    <span class="gx-syncbtn-ic" aria-hidden="true">
+      <svg viewBox="0 0 120 120" class="gx-syncbtn-ring"><circle class="trk" cx="60" cy="60" r="52"/><circle class="arc" cx="60" cy="60" r="52" data-gx-ring/></svg>
+      <svg viewBox="0 0 24 24" class="gx-syncbtn-arrows"><path d="M20 11a8 8 0 0 0-14.9-3.9M4 4v4h4M4 13a8 8 0 0 0 14.9 3.9M20 20v-4h-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </span>
+    <span class="gx-syncbtn-txt">
+      <b>{% translate "Sync" %}</b>
+      <small>{% if sync.watching %}{% translate "in step · next check" %} <span data-gx-left>--</span>{% elif sync.last %}{% translate "paused" %}{% else %}{% translate "waiting for its first check" %}{% endif %}</small>
+    </span>
+    <span class="gx-syncbtn-go" aria-hidden="true">&rarr;</span>
+  </a>
+  {% if pending %}<a class="gx-btn is-glass" href="{% url 'admin:hq_deletions' %}">{% blocktranslate count n=pending %}{{ n }} deletion waiting for Ian{% plural %}{{ n }} deletions waiting for Ian{% endblocktranslate %}</a>{% endif %}
+</div>
+{% endblock %}
+{% block gx_board %}
+<a class="gx-score" href="{% url 'admin:hq_database' 'live' %}"><b>{{ live.rows|intcomma }}</b><span>{% translate "Real rows on live" %}</span></a>
+<a class="gx-score" href="{% url 'admin:hq_database' 'staging' %}"><b>{{ staging.backup|intcomma }}</b><span>{% translate "Backed up" %}</span></a>
+<a class="gx-score" href="{% url 'admin:hq_database' 'staging' %}"><b>{{ staging.testing|intcomma }}</b><span>{% translate "Testing" %}</span></a>
+<a class="gx-score" href="{% url 'admin:hq_deletions' %}"><b>{{ pending }}</b><span>{% translate "Waiting for Ian" %}</span></a>
+{% endblock %}
+
+{% block gx_body %}
+<div class="gx-twin">
+  <article class="gx-dbc is-live">
+    <a class="gx-dbc-head" href="{% url 'admin:hq_database' 'live' %}">
+      <span class="gx-dbc-art" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="gx-dbc-k"><i class="gx-dbc-dot"></i>{% translate "Production" %} &middot; {{ live.host }}</span>
+      <b class="gx-dbc-name">{% translate "Live" %}</b>
+      <span class="gx-dbc-lead">{% translate "Everything real — what members, organisations and the waiting list create on goodtip.com.au." %}</span>
+    </a>
+    <div class="gx-dbc-body">
+      <div class="gx-dbc-nums">
+        <span><b>{{ live.rows|intcomma }}</b>{% translate "real rows" %}</span>
+        <span><b>{{ live.tables }}</b>{% translate "tables" %}</span>
+      </div>
+      <div class="gx-dbc-meter" aria-hidden="true"><i class="is-real" style="width:100%"></i></div>
+      <p class="gx-dbc-legend"><span class="gx-lab is-real">{% translate "Real" %}</span> {% translate "Only Ian may delete it." %}</p>
+      {% if live.top %}
+      <ul class="gx-dbc-top">
+        {% for t in live.top %}<li><a href="{{ t.url }}"><span>{{ t.name }}</span><b>{{ t.rows|intcomma }}</b></a></li>{% endfor %}
+      </ul>
+      {% endif %}
+      <a class="gx-dbc-go" href="{% url 'admin:hq_database' 'live' %}">{% translate "Open Live" %} <span aria-hidden="true">&rarr;</span></a>
+    </div>
+  </article>
+
+  <article class="gx-dbc is-staging">
+    <a class="gx-dbc-head" href="{% url 'admin:hq_database' 'staging' %}">
+      <span class="gx-dbc-art" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="gx-dbc-k"><i class="gx-dbc-dot"></i>{% translate "The team's" %} &middot; {{ staging.host }}</span>
+      <b class="gx-dbc-name">{% translate "Staging" %}</b>
+      <span class="gx-dbc-lead">{% translate "A copy of everything real, labelled Backup — and the team's own work, labelled Testing." %}</span>
+    </a>
+    <div class="gx-dbc-body">
+      <div class="gx-dbc-nums">
+        <span><b>{{ staging.backup|intcomma }}</b>{% translate "backup" %}</span>
+        <span><b>{{ staging.testing|intcomma }}</b>{% translate "testing" %}</span>
+        <span><b>{{ staging.tables }}</b>{% translate "tables" %}</span>
+      </div>
+      <div class="gx-dbc-meter" aria-hidden="true"><i class="is-backup" style="width:{{ staging.backup_pc }}%"></i><i class="is-testing"></i></div>
+      <p class="gx-dbc-legend"><span class="gx-lab is-backup">{% translate "Backup" %}</span> <span class="gx-lab is-testing">{% translate "Testing" %}</span></p>
+      {% if staging.top %}
+      <ul class="gx-dbc-top">
+        {% for t in staging.top %}<li><a href="{{ t.url }}"><span>{{ t.name }}</span><b>{{ t.rows|intcomma }}</b></a></li>{% endfor %}
+      </ul>
+      {% endif %}
+      <a class="gx-dbc-go" href="{% url 'admin:hq_database' 'staging' %}">{% translate "Open Staging" %} <span aria-hidden="true">&rarr;</span></a>
+    </div>
+  </article>
+</div>
+{% endblock %}

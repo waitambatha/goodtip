@@ -1,0 +1,77 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n %}
+
+{% comment %}
+APPROVALS (client, 25 Oct 2026: "any super admin has to get approval from
+Ian to be able to delete anything that is in the live database... the backed
+up data in staging... you will need approval"). Ian sees everything waiting
+and approves or declines; anyone else sees their own requests and where they
+got to. Built by sysadmin.database_views.deletion_requests.
+{% endcomment %}
+
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_tables' %}">{% translate "Databases" %}</a></li>{% endblock %}
+{% block gx_kicker %}{% translate "Databases" %} &middot; {% translate "approvals" %}{% endblock %}
+{% block gx_title %}{% if is_ian %}{% translate "Waiting for" %} <em>{% translate "you" %}</em>{% else %}{% translate "Your requests to" %} <em>Ian</em>{% endif %}{% endblock %}
+{% block gx_lead %}{% translate "Real data — anything on live, and the backup of it on staging — is only deleted once Ian approves. A deletion on live is carried out by the next backup run; the backup copy is kept." %}{% endblock %}
+{% block gx_board %}
+<div class="gx-score"><b>{{ pending|length }}</b><span>{% translate "Waiting" %}</span></div>
+<div class="gx-score"><b>{{ waiting_live }}</b><span>{% translate "Approved, going from live" %}</span></div>
+<div class="gx-score"><b>{{ decided|length }}</b><span>{% translate "Decided" %}</span></div>
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet" data-gx-tabs>
+  <div class="gx-tabs" role="tablist">
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="waiting" aria-selected="true">{% translate "Waiting" %} <em>{{ pending|length }}</em></button>
+    <button type="button" class="gx-tab" role="tab" data-gx-tab="decided">{% translate "Decided" %} <em>{{ decided|length }}</em></button>
+  </div>
+
+  <div class="gx-pane" data-gx-pane="waiting">
+    {% for r in pending %}
+    <article class="gx-req">
+      <div class="gx-req-main">
+        <p class="gx-req-k"><span class="gx-lab {% if r.database == 'live' %}is-real{% else %}is-backup{% endif %}">{% if r.database == 'live' %}{% translate "Real · Live" %}{% else %}{% translate "Backup · Staging" %}{% endif %}</span> <span>{{ r.model_label }} #{{ r.object_pk }}</span></p>
+        <b class="gx-req-what">{{ r.object_repr }}</b>
+        <p class="gx-req-who">{% blocktranslate with who=r.requested_by.display_name|default:r.requested_by.email t=r.requested_at|timesince %}{{ who }} asked {{ t }} ago{% endblocktranslate %}</p>
+        {% if r.reason %}<blockquote class="gx-quote" style="font-size:15px;padding:14px 18px 14px 48px">{{ r.reason|linebreaksbr }}</blockquote>{% endif %}
+      </div>
+      {% if is_ian %}
+      <form method="post" action="{% url 'admin:hq_deletion_decide' r.pk %}" class="gx-req-act">
+        {% csrf_token %}
+        <textarea name="note" rows="2" class="gx-in" placeholder="{% translate 'A note back (optional)' %}"></textarea>
+        <button class="gx-btn is-danger is-block" type="submit" name="action" value="approve" data-gx-ask="{% if r.database == 'live' %}{% translate 'Approve deleting this from LIVE? It goes on the next backup run.' %}{% else %}{% translate 'Approve and delete this backup from staging now?' %}{% endif %}">{% translate "Approve — delete it" %}</button>
+        <button class="gx-btn is-ghost is-block" type="submit" name="action" value="decline">{% translate "Decline — keep it" %}</button>
+      </form>
+      {% else %}
+      <div class="gx-req-act"><span class="gx-pill is-wait"><i></i>{% translate "Waiting for Ian" %}</span></div>
+      {% endif %}
+    </article>
+    {% empty %}
+    <div class="gx-empty"><svg aria-hidden="true"><use href="#ic-check"/></svg><b>{% translate "Nothing waiting" %}</b><span>{% translate "Requests to delete real data land here." %}</span></div>
+    {% endfor %}
+  </div>
+
+  <div class="gx-pane" data-gx-pane="decided">
+    {% if decided %}
+    <div class="gx-tablewrap">
+      <table class="gx-table">
+        <thead><tr><th>{% translate "Row" %}</th><th>{% translate "Database" %}</th><th>{% translate "Asked by" %}</th><th>{% translate "Decision" %}</th><th>{% translate "When" %}</th></tr></thead>
+        <tbody>
+        {% for r in decided %}
+        <tr style="cursor:default">
+          <td class="is-name"><b>{{ r.object_repr }}</b><small class="gx-tlabel">{{ r.model_label }} #{{ r.object_pk }}</small></td>
+          <td>{{ r.get_database_display }}</td>
+          <td>{{ r.requested_by.display_name|default:r.requested_by.email|default:"—" }}</td>
+          <td><span class="gx-pill {% if r.status == 'done' %}is-ok{% elif r.status == 'approved' %}is-offer{% elif r.status == 'failed' %}is-no{% endif %}"><i></i>{{ r.get_status_display }}</span>{% if r.error %}<small class="gx-tlabel">{{ r.error|truncatechars:90 }}</small>{% endif %}</td>
+          <td class="is-date">{{ r.decided_at|date:"j M Y"|default:"—" }}<small>{{ r.decided_by.display_name|default:"" }}</small></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="gx-empty"><b>{% translate "Nothing decided yet" %}</b></div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

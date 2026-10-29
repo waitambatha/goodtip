@@ -1,0 +1,60 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n %}
+
+{% comment %}
+ONE ENQUIRY (was manage/enquiry_detail.html). Their message on the left,
+the reply on the right — or, once answered, what was said, so a second
+person opening it reads the answer rather than writing another. This is
+where the notification email's link lands. View: admin_panel.views.enquiry_detail.
+{% endcomment %}
+
+{% block gx_crumbs %}<li><a href="{% url 'admin:hq_home' %}">HQ</a></li><li><a href="{% url 'admin:hq_enquiries' %}">{% translate "Enquiries" %}</a></li>{% endblock %}
+{% block gx_kicker %}{% translate "Enquiry" %} &middot; {{ enquiry.created_at|date:"j M Y, g:i a" }}{% endblock %}
+{% block gx_title %}{{ enquiry.name }}{% endblock %}
+{% block gx_lead %}<a href="mailto:{{ enquiry.email }}" style="color:inherit">{{ enquiry.email }}</a>{% if enquiry.organisation %} &middot; {{ enquiry.organisation }}{% endif %}{% endblock %}
+{% block gx_board %}
+<div class="gx-score"><b>{% if enquiry.status == 'new' %}{% translate "Open" %}{% elif enquiry.status == 'replied' %}{% translate "Replied" %}{% else %}{% translate "Closed" %}{% endif %}</b><span>{% translate "Status" %}</span></div>
+{% endblock %}
+
+{% block gx_body %}
+<section class="gx-sheet">
+  <div class="gx-pane">
+    <div class="gx-split">
+      <div class="gx-stack">
+        <div class="gx-h"><h2>{% translate "Their message" %}</h2>
+          <p>{% if enquiry.interest %}{{ enquiry.interest }}{% endif %}{% if enquiry.source_page %} &middot; {% translate "from" %} {{ enquiry.source_page }}{% endif %}</p></div>
+        <blockquote class="gx-quote">{{ enquiry.message|linebreaksbr }}<cite>{{ enquiry.name }} &middot; {{ enquiry.created_at|date:"j M Y, g:i a" }}</cite></blockquote>
+        <div class="gx-facts">
+          <div class="gx-fact"><span>{% translate "Name" %}</span><b style="font-size:18px">{{ enquiry.name }}</b></div>
+          <div class="gx-fact"><span>{% translate "Email" %}</span><b style="font-size:15px;word-break:break-all"><a href="mailto:{{ enquiry.email }}">{{ enquiry.email }}</a></b></div>
+          {% if enquiry.organisation %}<div class="gx-fact"><span>{% translate "Organisation" %}</span><b style="font-size:18px">{{ enquiry.organisation }}</b></div>{% endif %}
+          {% if enquiry.interest %}<div class="gx-fact"><span>{% translate "Interested in" %}</span><b style="font-size:18px">{{ enquiry.interest }}</b></div>{% endif %}
+        </div>
+      </div>
+
+      <div class="gx-card is-dark">
+        {% if enquiry.status == 'replied' %}
+        <p class="gx-label">{% translate "Our reply" %}</p>
+        <p class="gx-live">{% translate "Sent" %} <b>{{ enquiry.replied_at|date:"j M Y, g:i a" }}</b>{% if enquiry.replied_by %} {% translate "by" %} {{ enquiry.replied_by.display_name|default:enquiry.replied_by.email }}{% endif %}</p>
+        <div class="gx-result" style="margin-top:12px"><blockquote>{{ enquiry.reply_body|linebreaksbr }}</blockquote></div>
+        <form method="post" style="margin-top:16px">{% csrf_token %}<input type="hidden" name="action" value="reopen">
+          <button type="submit" class="gx-btn is-glass">{% translate "Reopen this enquiry" %}</button></form>
+        {% else %}
+        <p class="gx-label">{% translate "Reply" %}</p>
+        <p class="gx-live">{% blocktranslate with e=enquiry.email %}This goes to {{ e }} as an email from GoodTip, with their message quoted underneath.{% endblocktranslate %}</p>
+        <form method="post" class="gx-form" style="margin-top:14px">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="reply">
+          <label class="full" for="reply_body">{% blocktranslate with n=enquiry.name %}Your reply to {{ n }}{% endblocktranslate %}
+            <textarea name="reply_body" id="reply_body" rows="10" placeholder="{% blocktranslate with n=enquiry.name %}Hi {{ n }}, thanks for getting in touch…{% endblocktranslate %}" required></textarea></label>
+          <div class="full" style="display:flex;gap:10px;flex-wrap:wrap">
+            <button type="submit" class="gx-btn is-lime">{% translate "Send reply" %} &rarr;</button>
+            <button type="submit" name="action" value="close" class="gx-btn is-glass" formnovalidate>{% translate "Close without replying" %}</button>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

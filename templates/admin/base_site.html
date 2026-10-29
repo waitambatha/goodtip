@@ -175,22 +175,11 @@ the admin. Signing out is last, alone, and the only red thing in the menu.
 {% endblock %}
 
 {% comment %}
-THE MENU.
-
-Six links, flat. No disclosure triangles.
-
-It used to carry ten <details> groups over the model tables plus two more
-bands of screens, and that arrangement had three problems the client named.
-The menu was taller than the window before anything was opened. A name could
-appear twice — "News & blog" was both the HQ editor and the `newspost` table,
-side by side, with nothing to say which one published a story. And a rail row
-has space for a label and nothing else, so every group was a guess: you opened
-it to find out what was in it, and closed it again when it was the wrong one.
-
-Depth moved into hub screens instead. Each of the four lower items opens a
-page of cards, and a card has room for the icon, the sentence saying what the
-thing is for and the number waiting inside it — which is the information that
-decides the click. See sysadmin/hub_views.py.
+THE MENU. One, on every admin page — the HQ screens used to carry a second,
+older one of their own (client, 26 Oct 2026: "we should not have multiple
+menus in that super admin"). Dashboard and the system report on top; under
+them the platform, with the sections that hold several screens as dropdowns
+that open themselves when you are inside them. See the comment over the tree.
 
 Every item still asks the capability it leads to. A restricted administrator
 seeing a link they cannot open learns that the product is broken rather than
@@ -247,37 +236,92 @@ that they were not given that job.
         <svg class="ic"><use href="#ic-chart"/></svg><span class="lbl">System report</span></a></li>
     </ul>
 
+    {% comment %}
+    THE MENU IS THE ARCHITECTURE (client, 26 Oct 2026: "when you click
+    databases, a dropdown... you choose between live and staging... then I
+    should see the tables... the menu should be quite clear and honest...
+    showcase the architecture... we should not have multiple menus").
+
+    One menu for every admin page. The sections that hold more than one
+    screen are dropdowns (<details>) that open on their own when the page
+    you are on is inside them: Databases → Live / Staging → their tables
+    (the same table screen the Databases pages open), Sync, Approvals;
+    Blog & news → write, or the stories as Live and Staging hold them; HQ,
+    Your team and Security → their screens. Collapsed to icons, a dropdown's
+    row goes straight to its overview (gt-rail.js). The structure is built
+    by gta_tree in sysadmin/templatetags/gtadmin.py; the palette (/) indexes
+    every [data-jump] in here, the closed dropdowns' rows included.
+    {% endcomment %}
+    {% gta_tree as tree %}
     <p class="gta-rail-title">{% translate 'Run the platform' %}</p>
     <ul class="gta-nav">
-      {% comment %}
-      Tables & models is marked current for every changelist and change form
-      under it, not only for the hub itself — those screens are reached
-      through it and have no other home in the menu, so leaving the rail blank
-      while you are on one is how people lose track of where they are.
-      {% endcomment %}
       {% if u_tables %}
-      <li><a href="{{ u_tables }}" class="gta-nav-a{% if u_tables in request.path or on_table %} on{% endif %}" data-jump="Tables &amp; models">
-        <svg class="ic"><use href="#ic-f-sliders"/></svg><span class="lbl">Tables &amp; models</span></a></li>
+      <li><details class="gta-tree" data-tree="databases"{% if tree.databases.open %} open{% endif %}>
+        <summary class="gta-nav-a{% if tree.databases.open %} is-in{% endif %}" data-go="{{ u_tables }}">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V5.5M4.5 12v6.5c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V12"/></svg><span class="lbl">Databases</span>
+          {% if alerts.deletions %}<span class="gta-sec-n alert">{{ alerts.deletions }}</span>{% endif %}
+          <svg class="gta-chev" aria-hidden="true"><use href="#ic-chev-down"/></svg>
+        </summary>
+        <ul class="gta-twig">
+          <li><a href="{{ u_tables }}" class="gta-twig-a{% if tree.databases.on %} on{% endif %}" data-jump="Databases — live and staging"><span class="gta-twig-ic is-all" aria-hidden="true"></span><span class="lbl">{% translate "Both, side by side" %}</span></a></li>
+          {% for key, db in tree.databases.items %}{% if key == "live" or key == "staging" %}
+          <li><details class="gta-tree is-db is-{{ key }}" data-tree="db-{{ key }}"{% if db.open %} open{% endif %}>
+            <summary class="gta-twig-a{% if db.open %} is-in{% endif %}">
+              <span class="gta-twig-ic is-{{ key }}" aria-hidden="true"></span>
+              <span class="lbl">{% if key == "live" %}{% translate "Live" %}<small>{% translate "real" %}</small>{% else %}{% translate "Staging" %}<small>{% translate "backup + testing" %}</small>{% endif %}</span>
+              <svg class="gta-chev" aria-hidden="true"><use href="#ic-chev-down"/></svg>
+            </summary>
+            <ul class="gta-leaves">
+              <li><a href="{{ db.href }}" class="gta-leaf is-all{% if request.path == db.href %} on{% endif %}" data-jump="{% if key == 'live' %}Live{% else %}Staging{% endif %} — every table">{% translate "Every table" %}</a></li>
+              {% for g in db.groups %}
+              <li class="gta-leaf-cap">{{ g.label }}</li>
+              {% for t in g.tables %}<li><a href="{{ t.href }}" class="gta-leaf{% if t.on %} on{% endif %}" data-jump="{% if key == 'live' %}Live{% else %}Staging{% endif %} &rsaquo; {{ t.name }}">{{ t.name }}</a></li>{% endfor %}
+              {% endfor %}
+            </ul>
+          </details></li>
+          {% endif %}{% endfor %}
+          <li><a href="{{ tree.databases.sync.href }}" class="gta-twig-a{% if tree.databases.sync.on %} on{% endif %}" data-jump="Sync — live to staging, and its history"><span class="gta-twig-ic is-sync" aria-hidden="true"></span><span class="lbl">{% translate "Sync" %}<small>{% translate "live → staging" %}</small></span></a></li>
+          <li><a href="{{ tree.databases.approvals.href }}" class="gta-twig-a{% if tree.databases.approvals.on %} on{% endif %}" data-jump="Deletions waiting for Ian"><span class="gta-twig-ic is-ask" aria-hidden="true"></span><span class="lbl">{% translate "Deletions" %}<small>{% translate "Ian approves" %}</small></span>{% if alerts.deletions %}<span class="gta-sec-n alert">{{ alerts.deletions }}</span>{% endif %}</a></li>
+        </ul>
+      </details></li>
       {% endif %}
 
-      {% if u_hq %}{% if may_sync or may_enq or may_news or may_pages or may_seo %}
-      <li><a href="{{ u_hq }}" class="gta-nav-a{% if u_hq in request.path %} on{% endif %}" data-jump="HQ — the site's own words and inbox">
-        <svg class="ic"><use href="#ic-f-org"/></svg><span class="lbl">HQ</span>
-        {% if alerts.enquiries %}<span class="gta-sec-n alert">{{ alerts.enquiries }}</span>{% endif %}</a></li>
+      {% if is_full_access %}{% safe_url 'admin:hq_sports' as u_sports %}{% if u_sports %}
+      <li><a href="{{ u_sports }}" class="gta-nav-a{% if u_sports in request.path %} on{% endif %}" data-jump="Sports &amp; competitions — switch sports on and off">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="m12 7 4 3-1.5 4.5h-5L8 10z"/><path d="M12 7V3M16 10l3.6-1.5M14.5 14.5 17 18M9.5 14.5 7 18M8 10 4.4 8.5"/></svg><span class="lbl">Sports</span></a></li>
       {% endif %}{% endif %}
 
+      {% if may_news %}
+      <li><details class="gta-tree" data-tree="blog"{% if tree.blog.open %} open{% endif %}>
+        <summary class="gta-nav-a{% if tree.blog.open %} is-in{% endif %}" data-go="{{ tree.blog.write.href }}">
+          <svg class="ic"><use href="#ic-doc"/></svg><span class="lbl">Blog &amp; news</span>
+          <svg class="gta-chev" aria-hidden="true"><use href="#ic-chev-down"/></svg>
+        </summary>
+        <ul class="gta-twig">
+          <li><a href="{{ tree.blog.write.href }}" class="gta-twig-a{% if tree.blog.write.on %} on{% endif %}" data-jump="Blog &amp; news — write, edit, publish"><span class="gta-twig-ic is-all" aria-hidden="true"></span><span class="lbl">{% translate "Write &amp; edit" %}</span></a></li>
+          {% if tree.blog.live.href %}<li><a href="{{ tree.blog.live.href }}" class="gta-twig-a{% if tree.blog.live.on %} on{% endif %}" data-jump="Blog &amp; news &rsaquo; on Live"><span class="gta-twig-ic is-live" aria-hidden="true"></span><span class="lbl">{% translate "On Live" %}<small>{% translate "real" %}</small></span></a></li>{% endif %}
+          {% if tree.blog.staging.href %}<li><a href="{{ tree.blog.staging.href }}" class="gta-twig-a{% if tree.blog.staging.on %} on{% endif %}" data-jump="Blog &amp; news &rsaquo; on Staging"><span class="gta-twig-ic is-staging" aria-hidden="true"></span><span class="lbl">{% translate "On Staging" %}<small>{% translate "backup" %}</small></span></a></li>{% endif %}
+        </ul>
+      </details></li>
+      {% endif %}
+
+      {% if u_hq and tree.hq.items %}
+      <li><details class="gta-tree" data-tree="hq"{% if tree.hq.open %} open{% endif %}>
+        <summary class="gta-nav-a{% if tree.hq.open %} is-in{% endif %}" data-go="{{ u_hq }}">
+          <svg class="ic"><use href="#ic-f-org"/></svg><span class="lbl">HQ</span>
+          {% if alerts.enquiries %}<span class="gta-sec-n alert">{{ alerts.enquiries }}</span>{% endif %}
+          <svg class="gta-chev" aria-hidden="true"><use href="#ic-chev-down"/></svg>
+        </summary>
+        <ul class="gta-twig">
+          <li><a href="{{ u_hq }}" class="gta-twig-a{% if tree.hq.on %} on{% endif %}" data-jump="HQ — the site's own words and inbox"><span class="gta-twig-ic is-all" aria-hidden="true"></span><span class="lbl">{% translate "Overview" %}</span></a></li>
+          {% for i in tree.hq.items %}<li><a href="{{ i.href }}" class="gta-twig-a{% if i.on %} on{% endif %}" data-jump="HQ &rsaquo; {{ i.label }}"><svg class="gta-twig-svg" aria-hidden="true"><use href="#{{ i.icon }}"/></svg><span class="lbl">{{ i.label }}</span>{% if i.key == "enquiries" and alerts.enquiries %}<span class="gta-sec-n alert">{{ alerts.enquiries }}</span>{% endif %}</a></li>{% endfor %}
+        </ul>
+      </details></li>
+      {% endif %}
+
       {% comment %}
-      IMAGES & VIDEOS and SERVICES, added 20 Sep 2026 at the client's request.
-
-      Both sit in "Run the platform" rather than inside HQ, and deliberately:
-      HQ is GoodTip's own WORDS — the stories, the pages, the inbox — while
-      these two are about the machine. A picture belongs to whichever page
-      happens to use it, and a sync belongs to no page at all.
-
-      Each asks the capability it leads to. Media asks pages.images, because
-      finding out what changing a photograph would affect is only useful to
-      somebody who may change one; Services asks data.report, which is the
-      permission for looking at how the platform is running.
+      Images & videos, Services, the waiting list and the billing screens are
+      one screen each, so they stay plain rows.
       {% endcomment %}
       {% if u_media and may_images %}
       <li><a href="{{ u_media }}" class="gta-nav-a{% if u_media in request.path %} on{% endif %}" data-jump="Images &amp; videos">
@@ -308,96 +352,37 @@ that they were not given that job.
       <li><a href="{{ u_org_admin }}" class="gta-nav-a{% if u_org_admin in request.path %} on{% endif %}" data-jump="Set up an organisation for someone else, and invite its admin">
         <svg class="ic"><use href="#ic-f-org"/></svg><span class="lbl">New organisation</span></a></li>
       {% endif %}
+    </ul>
 
+    <p class="gta-rail-title">{% translate 'People & safety' %}</p>
+    <ul class="gta-nav">
       {% if u_teamhub %}
-      <li><a href="{{ u_teamhub }}" class="gta-nav-a{% if u_teamhub in request.path %} on{% endif %}" data-jump="Your team">
-        <svg class="ic"><use href="#ic-f-shield-star"/></svg><span class="lbl">Your team</span>
-        {% if waiting.total %}<span class="gta-sec-n alert">{{ waiting.total }}</span>{% endif %}</a></li>
+      <li><details class="gta-tree" data-tree="team"{% if tree.team.open %} open{% endif %}>
+        <summary class="gta-nav-a{% if tree.team.open %} is-in{% endif %}" data-go="{{ u_teamhub }}">
+          <svg class="ic"><use href="#ic-f-shield-star"/></svg><span class="lbl">Your team</span>
+          {% if waiting.total %}<span class="gta-sec-n alert">{{ waiting.total }}</span>{% endif %}
+          <svg class="gta-chev" aria-hidden="true"><use href="#ic-chev-down"/></svg>
+        </summary>
+        <ul class="gta-twig">
+          <li><a href="{{ u_teamhub }}" class="gta-twig-a{% if tree.team.on %} on{% endif %}" data-jump="Your team"><span class="gta-twig-ic is-all" aria-hidden="true"></span><span class="lbl">{% translate "Overview" %}</span></a></li>
+          {% for i in tree.team.items %}<li><a href="{{ i.href }}" class="gta-twig-a{% if i.on %} on{% endif %}" data-jump="Your team &rsaquo; {{ i.label }}"><svg class="gta-twig-svg" aria-hidden="true"><use href="#{{ i.icon }}"/></svg><span class="lbl">{{ i.label }}</span></a></li>{% endfor %}
+        </ul>
+      </details></li>
       {% endif %}
 
       {% if u_security and may_security %}
-      <li><a href="{{ u_security }}" class="gta-nav-a{% if u_security in request.path %} on{% endif %}" data-jump="Security — sign-ins and the audit log">
-        <svg class="ic"><use href="#ic-shield-check"/></svg><span class="lbl">Security</span></a></li>
+      <li><details class="gta-tree" data-tree="security"{% if tree.security.open %} open{% endif %}>
+        <summary class="gta-nav-a{% if tree.security.open %} is-in{% endif %}" data-go="{{ u_security }}">
+          <svg class="ic"><use href="#ic-shield-check"/></svg><span class="lbl">Security</span>
+          <svg class="gta-chev" aria-hidden="true"><use href="#ic-chev-down"/></svg>
+        </summary>
+        <ul class="gta-twig">
+          <li><a href="{{ u_security }}" class="gta-twig-a{% if tree.security.on %} on{% endif %}" data-jump="Security — sign-ins and the audit log"><span class="gta-twig-ic is-all" aria-hidden="true"></span><span class="lbl">{% translate "Overview" %}</span></a></li>
+          {% for i in tree.security.items %}<li><a href="{{ i.href }}" class="gta-twig-a{% if i.on %} on{% endif %}" data-jump="Security &rsaquo; {{ i.label }}"><svg class="gta-twig-svg" aria-hidden="true"><use href="#{{ i.icon }}"/></svg><span class="lbl">{{ i.label }}</span></a></li>{% endfor %}
+        </ul>
+      </details></li>
       {% endif %}
     </ul>
-
-    {% comment %}
-    WHERE YOU ARE, AND EVERYTHING ELSE THAT IS IN HERE.
-
-    The client: "when I click it, its menu should be about the other pages
-    that were in its dashboard — if I click Models and tables and see all of
-    the tables, that menu should be about the tables and models, so I do not
-    have the need to go to the main dashboard."
-
-    The six items above are how you change section. This is how you move
-    inside the one you are in, and it is one click: from Tips to Matches was
-    rail, hub, category, table — four clicks to go sideways by one — and is
-    now a single row in the menu you are already looking at.
-
-    IT IS NOT A DROPDOWN. Nothing here has to be opened before it can be read,
-    which was the whole complaint about the ten <details> groups this replaced;
-    it is simply the contents of where you are standing, and it is not there
-    at all on the two screens that are not inside anything.
-
-    Two levels deep in Tables & models the list becomes that category's tables
-    and gains a way back up to the categories — so the rail never shows more
-    than one screenful, and the level above is always one row away. See
-    gta_section in sysadmin/templatetags/gtadmin.py.
-    {% endcomment %}
-    {% gta_section as section %}
-    {% if section.items %}
-    <p class="gta-rail-title gta-rail-here">
-      <svg aria-hidden="true"><use href="#{{ section.icon }}"/></svg>
-      <span>{{ section.label }}</span>
-    </p>
-    <ul class="gta-nav gta-subnav" style="--sec-accent:{{ section.accent }}">
-      {% if section.up %}
-      <li><a href="{{ section.up.href }}" class="gta-nav-a gta-nav-up" data-jump="{{ section.up.label }}">
-        <svg class="ic"><use href="#ic-arrow-left"/></svg><span class="lbl">{{ section.up.label }}</span></a></li>
-      {% endif %}
-      {% for item in section.items %}
-      <li><a href="{{ item.href }}" class="gta-nav-a gta-sub-a{% if item.on %} on{% endif %}"
-             style="--row-accent:{{ item.accent }}" data-jump="{{ section.label }} &rsaquo; {{ item.label }}">
-        <svg class="ic"><use href="#{{ item.icon }}"/></svg><span class="lbl">{{ item.label }}</span></a></li>
-      {% endfor %}
-    </ul>
-    {% endif %}
-
-    {% comment %}
-    THE JUMP INDEX.
-
-    gt-palette.js builds its index from `[data-jump]` inside this rail, which
-    was free while the rail listed all thirty tables. Now that it lists six
-    sections, the box would only ever find six things — and "type / and go
-    straight to Tips" is the fastest route in the whole admin, so it is not
-    something a tidier menu is allowed to cost.
-
-    So the destinations the rail no longer spells out are listed here instead:
-    hidden from sight, indexed by the palette, and still built from
-    `available_apps`, so a link this administrator was never going to be shown
-    is still one they cannot jump to.
-    {% endcomment %}
-    <div class="gta-jumpindex" hidden>
-      {% gta_categories as jump_cats %}
-      {% for c in jump_cats %}
-        <a href="{{ c.href }}" data-jump="Tables &rsaquo; {{ c.label }}"></a>
-        {% for t in c.tables %}{% if t.url %}
-        <a href="{{ t.url }}" data-jump="{{ c.label }} &rsaquo; {{ t.name }}"></a>
-        {% endif %}{% endfor %}
-      {% endfor %}
-      {% if may_sync %}<a href="{% safe_url 'admin:hq_sync' %}" data-jump="HQ &rsaquo; Sync panel"></a>{% endif %}
-      {% if may_enq %}<a href="{% safe_url 'admin:hq_enquiries' %}" data-jump="HQ &rsaquo; Enquiries inbox"></a>{% endif %}
-      {% if may_news %}<a href="{% safe_url 'admin:hq_news' %}" data-jump="HQ &rsaquo; News &amp; blog"></a>{% endif %}
-      {% if may_pages %}<a href="{% safe_url 'admin:hq_pages' %}" data-jump="HQ &rsaquo; Pages"></a>{% endif %}
-      {% if may_seo %}<a href="{% safe_url 'admin:hq_seo' %}" data-jump="HQ &rsaquo; SEO"></a>
-      <a href="{% safe_url 'admin:hq_redirects' %}" data-jump="HQ &rsaquo; Redirects"></a>{% endif %}
-      <a href="{% safe_url 'admin:hq_my_work' %}" data-jump="Your team &rsaquo; Your work"></a>
-      {% if is_full_access %}
-      <a href="{% safe_url 'admin:hq_reviews' %}" data-jump="Your team &rsaquo; Waiting for review"></a>
-      <a href="{% safe_url 'admin:hq_team' %}" data-jump="Your team &rsaquo; Administrators"></a>
-      <a href="{% safe_url 'admin:hq_activity' %}" data-jump="Your team &rsaquo; Activity log"></a>
-      {% endif %}
-    </div>
   </div>
 
   <div class="gta-rail-foot">
@@ -423,6 +408,7 @@ threaded through from the card that was clicked to reach it.
 {% block nav-breadcrumbs %}
 {% gta_up as up %}
 <div class="gta-crumbbar">
+  {% include "admin/hub/_history.html" %}
   {% if up.url %}
   <a href="{{ up.url }}" class="gta-back">
     <svg aria-hidden="true"><use href="#ic-arrow-left"/></svg>

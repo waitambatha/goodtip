@@ -267,6 +267,18 @@ class NewsPost(SeoFieldsMixin, models.Model):
         return [(t.lower(), labels.get(t, t)) for t in self.tag_list]
 
     @property
+    def code_colour(self) -> str:
+        """The colour of the competition this story is about — its first
+        competition tag (client, 28 Oct 2026: "if it's a blog of the NRL, let
+        it have that colour") — or the brand's deep green for general news."""
+        from catalog.models import Series
+
+        for t in self.tag_list:
+            if t.lower() in Series.COLOURS:
+                return Series.COLOURS[t.lower()]
+        return "#1F3A2C"
+
+    @property
     def is_scheduled(self) -> bool:
         """Published, but not yet. The editor says so rather than showing a
         green Published dot against something no reader can reach."""

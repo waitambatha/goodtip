@@ -192,6 +192,27 @@ class ServicesScreenTests(_AdminBase):
                       "MatchReader", "Group recaps", "Traffic"):
             self.assertIn(label, body, label)
 
+    def test_the_board_reads_itself_live(self):
+        """Client, 27 Oct 2026: "see how things are working on real time".
+        The page re-reads ?format=json every few seconds: one entry per
+        service, each with a state, a word for it and its history strip."""
+        r = self.client.get(reverse("admin:hq_services") + "?window=24h&format=json")
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        keys = [s["key"] for s in data["services"]]
+        self.assertIn("backup", keys)
+        self.assertEqual(len(keys), 7)
+        for svc in data["services"]:
+            self.assertIn(svc["status"], ("ok", "warn", "bad", "stalled", "off", "quiet"))
+            self.assertTrue(svc["word"])
+            self.assertGreaterEqual(len(svc["history"]), 23)   # hourly over a day
+        self.assertIn(data["overall"]["level"], ("ok", "warn", "bad"))
+
+    def test_a_service_that_never_ran_says_not_started(self):
+        """"Not everything been started" — said in words, not shown as a zero."""
+        body = self.client.get(reverse("admin:hq_services")).content.decode()
+        self.assertIn("Not started", body)
+
     def test_the_window_is_shared_by_all_of_them(self):
         """Six panels each with their own period is six numbers that cannot be
         put beside one another."""

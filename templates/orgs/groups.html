@@ -463,6 +463,9 @@ submit is a form somebody will eventually find a way to submit.
     document.querySelectorAll('[data-group-open]').forEach(function (b) {
       b.addEventListener('click', open);
     });
+    /* "+ Create a group" in the top bar's organisation menu lands here with
+       #new, and the form is already open. */
+    if (location.hash === '#new') { open(); history.replaceState(null, '', location.pathname + location.search); }
     modal.querySelectorAll('[data-group-close]').forEach(function (b) {
       b.addEventListener('click', close);
     });

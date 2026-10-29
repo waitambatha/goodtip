@@ -175,12 +175,12 @@ def gta_up(context):
                     }
             if ref in {t.ref for t in hub.SECURITY_TABLES}:
                 return {"url": safe_url("admin:hq_security"), "label": "Security"}
-            return {"url": tables, "label": "Tables & models"}
+            return {"url": tables, "label": "Databases"}
         if path.startswith(url):
             return {"url": url, "label": row.get("name") or "the table"}
 
     if path.startswith(tables) and path != tables:
-        return {"url": tables, "label": "Tables & models"}
+        return {"url": tables, "label": "Databases"}
     return {"url": index, "label": "the dashboard"}
 
 
@@ -255,7 +255,7 @@ def gta_section(context):
         }
     if here(tables_url):
         return {
-            "key": "tables", "label": "Tables & models",
+            "key": "tables", "label": "Databases",
             "icon": "ic-f-sliders", "accent": hub.GREEN, "href": tables_url,
             "up": None,
             "items": [
@@ -308,6 +308,113 @@ def gta_section(context):
             }
 
     return {}
+
+
+@register.simple_tag(takes_context=True)
+def gta_tree(context):
+    """THE MENU AS THE ARCHITECTURE (client, 26 Oct 2026: "when you click
+    databases, a dropdown... you choose between live and staging... then I
+    should see the tables... the menu should be quite clear and honest...
+    showcase the architecture").
+
+    One structure for the rail's dropdowns, each marked `open` when the page
+    you are on is inside it:
+
+        databases  {"open", "live"/"staging": {"open", "href", "groups":
+                    [{"label", "tables": [{"name", "href", "on"}]}]},
+                    "sync": {"href", "on"}, "approvals": {"href", "on"}}
+        blog       {"open", "write": {...}, "live": {...}, "staging": {...}}
+        hq, team, security   {"open", "href", "items": [{"label", "href", "on", "icon"}]}
+
+    No counts — this renders on every admin page, and thirty COUNT(*)s twice
+    over is not something a menu is allowed to cost. The tables come from
+    `available_apps`, already filtered by permission, so nobody is shown a
+    table they would be refused.
+    """
+    from django.apps import apps as django_apps
+
+    from sysadmin import access, backup, hub
+
+    path = _path(context)
+    request = context.get("request")
+    user = getattr(request, "user", None)
+
+    def here(url):
+        return bool(url) and path.startswith(url)
+
+    allowed = set()
+    for app in _apps(context):
+        for m in app.get("models", []):
+            allowed.add(f"{app['app_label']}.{m['object_name'].lower()}")
+
+    names, kinds = {}, {}
+    for model in django_apps.get_models():
+        label = backup.label_of(model)
+        if label in allowed:
+            names[label] = str(model._meta.verbose_name_plural).capitalize()
+            kinds[label] = backup.kind_of(model)
+
+    def database(key):
+        home = safe_url("admin:hq_database", key)
+        groups, claimed = [], set()
+        for cat in hub.CATEGORIES:
+            refs = [t.ref for t in cat.tables if t.ref in names]
+            if key == "live":
+                refs = [r for r in refs if kinds[r] != "skip"]
+            if refs:
+                groups.append({"label": cat.label, "refs": refs})
+                claimed.update(refs)
+        rest = sorted((r for r in names if r not in claimed
+                       and not (key == "live" and kinds[r] == "skip")), key=names.get)
+        if rest:
+            groups.append({"label": "Everything else", "refs": rest})
+        for g in groups:
+            g["tables"] = []
+            for ref in g.pop("refs"):
+                href = safe_url("admin:hq_database_table", key, ref)
+                # A record's own page is inside its table, so it lights the row too.
+                g["tables"].append({"name": names[ref], "href": href, "on": here(href)})
+        return {"href": home, "open": here(home), "groups": groups}
+
+    tables_url = safe_url("admin:hq_tables")
+    live, staging = database("live"), database("staging")
+    sync = {"href": safe_url("admin:hq_backup_history")}
+    sync["on"] = here(sync["href"])
+    approvals = {"href": safe_url("admin:hq_deletions")}
+    approvals["on"] = here(approvals["href"])
+    out = {"databases": {
+        "href": tables_url, "on": path == tables_url,
+        "open": here(tables_url) or gta_on_table_screen(context),
+        "live": live, "staging": staging, "sync": sync, "approvals": approvals,
+    }}
+
+    news = safe_url("admin:hq_news")
+    blog = {"write": {"href": news, "on": here(news)}}
+    for key in ("live", "staging"):
+        href = safe_url("admin:hq_database_table", key, "admin_panel.newspost")
+        blog[key] = {"href": href, "on": bool(href) and here(href)}
+    blog["open"] = any(blog[k]["on"] for k in ("write", "live", "staging"))
+    out["blog"] = blog
+
+    def can(key):
+        return access.can(user, key) if user else False
+
+    full = bool(user) and access.is_full_access(user)
+    for key, home, which in (("hq", "admin:hq_home", hub.HQ_SCREENS),
+                             ("team", "admin:hq_team_home", hub.TEAM_SCREENS)):
+        home_url = safe_url(home)
+        items = hub.screens(which, can, full=full)
+        for item in items:
+            item["on"] = here(item["href"])
+        out[key] = {"href": home_url, "on": path == home_url, "items": items,
+                    "open": here(home_url) or any(i["on"] for i in items)}
+
+    security_url = safe_url("admin:hq_security")
+    sec = [{"label": t["name"], "href": t["url"], "on": t["is_current"], "icon": t["icon"]}
+           for t in hub.security_tables(_apps(context), path) if t["url"]]
+    out["security"] = {"href": security_url, "on": path == security_url, "items": sec,
+                       "open": here(security_url) or any(i["on"] for i in sec)}
+    return out
 
 
 @register.simple_tag(takes_context=True)
@@ -456,21 +563,21 @@ def gta_dashboard_stats(context):
             "label": "Members", "value": User.objects.count(),
             "icon": "ic-f-users", "accent": "var(--gt-c1)", "tone": "green",
             "delta": delta(users_now, users_was), "sub": window_label,
-            "url": "admin:accounts_user_changelist",
+            "url": safe_url("admin:hq_database_table", "staging", "accounts.user"),
             "spark": _spark(signups, "--gt-c1"),
         },
         {
             "label": "Organisations", "value": Organisation.objects.count(),
             "icon": "ic-f-org", "accent": "var(--gt-gold)", "tone": "gold",
             "delta": delta(orgs_now, orgs_was), "sub": window_label,
-            "url": "admin:orgs_organisation_changelist",
+            "url": safe_url("admin:hq_database_table", "staging", "orgs.organisation"),
             "spark": _spark(new_orgs, "--gt-gold"),
         },
         {
             "label": "Sign-ins today", "value": logins_now,
             "icon": "ic-f-login", "accent": "var(--gt-c1)", "tone": "green",
             "delta": delta(logins_now, logins_was), "sub": "vs yesterday",
-            "url": "admin:sysadmin_loginevent_changelist",
+            "url": safe_url("admin:hq_database_table", "staging", "sysadmin.loginevent"),
             "spark": _spark(sign_ins, "--gt-c1"),
         },
         {
@@ -515,6 +622,18 @@ def gta_dashboard_stats(context):
         },
     ]
     out["waiting_total"] = waiting
+
+    # The Databases card: whether the backup is watching live, and how much
+    # real data it last counted there. Guarded like everything else here.
+    try:
+        from sysadmin import backup
+        from sysadmin.database_views import BACKUP_EVERY, sync_status
+
+        out["sync"] = sync_status()
+        out["sync_every"] = int(BACKUP_EVERY.total_seconds())
+        out["live_rows"] = sum(v or 0 for v in backup.live_totals().values())
+    except Exception:
+        out["sync"] = {}
     return out
 
 
@@ -538,9 +657,20 @@ def gta_alerts(context):
                 status=MembershipRequest.STATUS_PENDING,
             ).count(),
             "enquiries": Enquiry.objects.filter(status=Enquiry.STATUS_NEW).count(),
+            # Deletions of real data waiting for Ian — shown on Databases.
+            "deletions": _pending_deletions(user),
         }
     except Exception:
         return {}
+
+
+def _pending_deletions(user):
+    from sysadmin import backup
+    from sysadmin.models import DeletionRequest
+
+    if not backup.is_ian(user):
+        return 0
+    return DeletionRequest.objects.filter(status=DeletionRequest.PENDING).count()
 
 
 @register.filter

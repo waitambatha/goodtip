@@ -19,7 +19,7 @@ from django.utils import timezone
 
 from sysadmin import hub
 from sysadmin.templatetags.gtadmin import (
-    compact_since, gta_categories, gta_dashboard_stats,
+    compact_since, gta_dashboard_stats,
 )
 
 
@@ -55,28 +55,19 @@ class SectionMapTests(TestCase):
 
         Walks admin.site's own registry rather than a hand-written list, so a
         model added next year is covered by this test the day it is registered.
-        It walks the hubs rather than the dashboard now: the rail stopped
-        listing thirty tables when it went flat, and Tables & models plus
-        Security are between them the only route left. If a table is reachable
-        from neither, it is unreachable.
+        Since 26 Oct 2026 the menu names every table again, under Databases →
+        Staging (client: "when I clicked on it, I should see the tables"), so
+        that is where each one must be.
         """
         sign_in_to_admin(self.client, self.boss)
-
-        pages = [self.client.get(reverse("admin:hq_tables")).content.decode(),
-                 self.client.get(reverse("admin:hq_security")).content.decode()]
-        for cat in hub.CATEGORIES:
-            pages.append(self.client.get(
-                reverse("admin:hq_tables_category", args=[cat.key])
-            ).content.decode())
-        html = "\n".join(pages)
+        html = self.client.get(reverse("admin:index")).content.decode()
+        rail = html[html.index('id="nav-sidebar"'):html.index("gta-rail-foot")]
 
         for model in admin.site._registry:
             meta = model._meta
-            url = reverse(
-                f"admin:{meta.app_label}_{meta.model_name}_changelist"
-            )
+            url = reverse("admin:hq_database_table", args=["staging", meta.label_lower])
             self.assertIn(
-                f'href="{url}"', html,
+                f'href="{url}"', rail,
                 f"{meta.app_label}.{meta.model_name} is reachable from nowhere",
             )
 
@@ -140,13 +131,13 @@ class SectionMapTests(TestCase):
         self.assertEqual(accent, hub.BY_REF["tipping.tip"].accent)
         self.assertEqual(hub.accent_for_path(apps, "/admin/"), "")
 
-    def test_the_dashboard_card_links_to_every_category(self):
+    def test_the_dashboard_card_links_to_both_databases_and_the_sync(self):
         sign_in_to_admin(self.client, self.boss)
         res = self.client.get(reverse("admin:index"))
-        context = {"available_apps": res.context["available_apps"],
-                   "request": res.wsgi_request}
-        for cat in gta_categories(context):
-            self.assertContains(res, cat["href"])
+        for url in (reverse("admin:hq_database", args=["live"]),
+                    reverse("admin:hq_database", args=["staging"]),
+                    reverse("admin:hq_backup_history")):
+            self.assertContains(res, f'href="{url}"')
 
 
 class MenuTests(TestCase):
@@ -157,13 +148,23 @@ class MenuTests(TestCase):
             email="boss@example.com", password="pw", display_name="Boss",
         )
 
-    def test_the_rail_is_flat(self):
-        """No disclosure triangles. The client asked for one click per menu
-        item, and a <details> in the rail is the thing that was removed."""
+    def test_the_dropdowns_open_where_you_are(self):
+        """The menu is dropdowns since 26 Oct 2026 ("when you click
+        databases, a dropdown... you choose between live and staging") — and
+        one opens by itself when the page is inside it, closed everywhere
+        else, so the rail is never taller than it needs to be."""
         sign_in_to_admin(self.client, self.boss)
-        html = self.client.get(reverse("admin:index")).content.decode()
-        rail = html[html.index('id="nav-sidebar"'):html.index("gta-rail-foot")]
-        self.assertNotIn("<details", rail)
+
+        def rail(url):
+            html = self.client.get(url).content.decode()
+            return html[html.index('id="nav-sidebar"'):html.index("gta-rail-foot")]
+
+        home = rail(reverse("admin:index"))
+        self.assertIn('data-tree="databases">', home)
+        inside = rail(reverse("admin:hq_database_table", args=["live", "tipping.tip"]))
+        self.assertIn('data-tree="databases" open>', inside)
+        self.assertIn('data-tree="db-live" open>', inside)
+        self.assertIn('data-tree="db-staging">', inside)
 
     def test_the_four_hubs_are_in_the_menu(self):
         sign_in_to_admin(self.client, self.boss)
@@ -184,11 +185,13 @@ class MenuTests(TestCase):
 
     def test_news_and_blog_appears_once_in_the_menu(self):
         """It used to be two rail entries with one name — the HQ editor and
-        the `newspost` table — which is what the client actually reported."""
+        the `newspost` table — which is what the client actually reported.
+        Since 26 Oct 2026 it is ONE entry, the story list ("on the menu... the
+        admin can go fast and see the blogs"), and never the raw table."""
         sign_in_to_admin(self.client, self.boss)
         html = self.client.get(reverse("admin:index")).content.decode()
-        rail = html[html.index('id="nav-sidebar"'):html.index("gta-jumpindex")]
-        self.assertNotIn(reverse("admin:hq_news"), rail)
+        rail = html[html.index('id="nav-sidebar"'):html.index("gta-rail-foot")]
+        self.assertEqual(rail.count(f'href="{reverse("admin:hq_news")}"'), 1)
         self.assertNotIn(reverse("admin:admin_panel_newspost_changelist"), rail)
 
     def test_the_jump_box_can_still_reach_a_table(self):
@@ -197,8 +200,11 @@ class MenuTests(TestCase):
         menu does not get to cost it."""
         sign_in_to_admin(self.client, self.boss)
         html = self.client.get(reverse("admin:index")).content.decode()
-        self.assertIn(reverse("admin:tipping_tip_changelist"), html)
-        self.assertIn("gta-jumpindex", html)
+        # Since 26 Oct 2026 the menu names every table again, under Databases
+        # → Live / Staging, and the palette indexes those rows.
+        rail = html[html.index('id="nav-sidebar"'):html.index("gta-rail-foot")]
+        self.assertIn(reverse("admin:hq_database_table", args=["staging", "tipping.tip"]), rail)
+        self.assertIn(reverse("admin:hq_database_table", args=["live", "tipping.tip"]), rail)
 
     def test_staff_who_are_not_superusers_get_no_hq_band(self):
         """HQ is the platform owner's, and site content is superuser-only in
@@ -302,12 +308,15 @@ class HubTests(TestCase):
             with self.subTest(name):
                 self.assertEqual(self.client.get(reverse(name)).status_code, 200)
 
-    def test_each_category_card_opens_its_own_page(self):
+    def test_each_database_card_opens_its_own_page(self):
+        # Tables & models became Databases (client, 25 Oct 2026): the hub is
+        # the two databases, each opening onto all of its tables.
         res = self.client.get(reverse("admin:hq_tables"))
-        for cat in res.context["categories"]:
-            with self.subTest(cat["key"]):
-                self.assertContains(res, cat["href"])
-                self.assertEqual(self.client.get(cat["href"]).status_code, 200)
+        for db in ("live", "staging"):
+            with self.subTest(db):
+                href = reverse("admin:hq_database", args=[db])
+                self.assertContains(res, href)
+                self.assertEqual(self.client.get(href).status_code, 200)
 
     def test_a_category_that_does_not_exist_is_a_404_not_a_500(self):
         res = self.client.get(reverse("admin:hq_tables_category", args=["banana"]))
@@ -350,7 +359,9 @@ class HubTests(TestCase):
         for path, parent in cases:
             with self.subTest(path):
                 res = self.client.get(path)
-                self.assertContains(res, f'class="gta-back"')
+                html = res.content.decode()
+                # The hub screens draw the gx shell's back link since 26 Oct 2026.
+                self.assertTrue('class="gta-back"' in html or 'class="gx-back"' in html)
                 self.assertContains(res, f'href="{parent}"')
 
     def test_a_table_screen_is_tinted_and_the_dashboard_is_not(self):
@@ -369,12 +380,14 @@ class HubTests(TestCase):
         writer.is_staff = True
         writer.save(update_fields=["is_staff"])
         access = AdminAccess.objects.create(user=writer, is_full_access=False)
-        AdminGrant.objects.create(access=access, capability="news.write")
+        # News & blog left HQ for its own menu row (26 Oct 2026), so the
+        # inbox is the one HQ screen this admin is given here.
+        AdminGrant.objects.create(access=access, capability="enquiries.read")
         sign_in_to_admin(self.client, writer)
 
         labels = [c["label"] for c in
                   self.client.get(reverse("admin:hq_home")).context["cards"]]
-        self.assertEqual(labels, ["News & blog"])
+        self.assertEqual(labels, ["Enquiries inbox"])
 
         labels = [c["label"] for c in
                   self.client.get(reverse("admin:hq_team_home")).context["cards"]]

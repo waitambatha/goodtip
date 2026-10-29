@@ -1,0 +1,8 @@
+{{ req.requested_by.display_name|default:req.requested_by.email }} has asked to delete {{ req.object_repr }} from the {{ req.get_database_display }} database.
+{% if req.reason %}
+WHY
+{{ req.reason }}
+{% endif %}
+Nothing is deleted until you approve it.
+
+Review it: {{ link }}

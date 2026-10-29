@@ -1,6 +1,6 @@
 """Defence-in-depth cleanup for HTML that comes out of the story editor.
 
-The editor (templates/manage/news_editor.html + static/js/gt-news-editor.js)
+The editor (templates/admin/hub/blog_editor.html + static/js/gt-news-editor.js)
 is only reachable by superusers, so this isn't the primary control — it's a
 second layer in case an account is compromised or a future caller feeds this
 something less trusted.

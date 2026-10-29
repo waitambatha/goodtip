@@ -1,269 +1,252 @@
-{% extends "admin/base_site.html" %}
-{% load static humanize %}
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n static humanize gtadmin %}
+
+{% comment %}
+THE SYSTEM REPORT (client, 27 Oct 2026: "a dashboard should look like a
+dashboard, the report as well"). The dashboard's own build (.gd-* in
+gt-admin-gx.css): a short header with the window picker, four KPI cards,
+then a switcher for four sections — each a grid of the same white cards —
+so the page is a dashboard, one section at a time:
+
+  Overview                 growth chart · the platform's counts · waiting · enquiries
+  Sign-ins                 the last day · per-day chart · the latest attempts
+  Tipping & organisations  tips per day · sizes · the biggest eight
+  Server                   disk and load · stress-test runs
+
+The section is kept in the address (#signins). Built by
+sysadmin.admin.system_report_view; charts by gt-charts.js, which redraws a
+chart once its section gives it a width.
+{% endcomment %}
 
 {% block extrahead %}{{ block.super }}
 <script src="{% static 'gtadmin/js/gt-charts.js' %}" defer></script>
 {% endblock %}
 
-{% block breadcrumbs %}
-<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Home</a> &rsaquo; System report</div>
-{% endblock %}
-
 {% block content %}
-<p class="gta-stamp">
-  Live figures, computed when this page loaded &mdash; {{ generated_at|date:"j M Y, g:i a" }}.
-</p>
-
-{# ---- headline numbers ---- #}
-{% comment %}
-EIGHT TILES, IN TWO READINGS.
-
-The first four are the platform: people, organisations, memberships, tips.
-The second four are the things an admin actually opens during a week — news,
-pages, enquiries, the team — and none of them had a number anywhere, so
-"is there anything in News?" or "how many people can get into HQ?" meant
-opening the page to find out.
-
-Tips became a link — it was a plain div on a screen whose whole job is to be
-the way in. Memberships stays a tile because OrgMember is not registered in
-the admin, so there is no list to send anybody to.
-
-The glyphs are chosen to be told apart at a glance rather than to be literal:
-Members and Memberships are the same noun twice, so one is a person and the
-other is a crowd; News is a single document and Pages is a stack of
-them, because the difference between them is that one is a story and the
-other is the whole site.
-{% endcomment %}
-<div class="gta-kpis">
-  <a href="{% url 'admin:accounts_user_changelist' %}" class="gta-kpi" style="--tile-accent:var(--gt-c1)">
-    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-f-users"/></svg></span><span class="gta-kpi-label">Members</span></div>
-    <div class="gta-kpi-num">{{ counts.users|intcomma }}</div>
-    <div class="gta-kpi-sub">+{{ counts.users_last_7d }} in the last 7 days</div>
-  </a>
-  <a href="{% url 'admin:orgs_organisation_changelist' %}" class="gta-kpi" style="--tile-accent:var(--gt-c2)">
-    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-f-org"/></svg></span><span class="gta-kpi-label">Organisations</span></div>
-    <div class="gta-kpi-num">{{ counts.orgs|intcomma }}</div>
-    <div class="gta-kpi-sub">{{ counts.orgs_last_7d }} this week &middot; {{ counts.orgs_last_30d }} this month</div>
-  </a>
-  {% comment %}
-  OrgMember is not registered in the admin, so this one has nowhere to go and
-  stays a tile rather than pretending to be a link.
-  {% endcomment %}
-  <div class="gta-kpi" style="--tile-accent:var(--gt-c4)">
-    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-f-people"/></svg></span><span class="gta-kpi-label">Memberships</span></div>
-    <div class="gta-kpi-num">{{ counts.memberships|intcomma }}</div>
-    <div class="gta-kpi-sub">across {{ counts.groups|intcomma }} group{{ counts.groups|pluralize }}</div>
+{% safe_url 'admin:hq_database_table' 'staging' 'accounts.user' as u_users %}
+{% safe_url 'admin:hq_database_table' 'staging' 'orgs.organisation' as u_orgs %}
+{% safe_url 'admin:hq_database_table' 'staging' 'tipping.tip' as u_tips %}
+{% safe_url 'admin:hq_database_table' 'staging' 'sysadmin.loginevent' as u_logins %}
+<script>document.documentElement.classList.add('gx-js');</script>
+<div class="gx gd" style="--gx-ac: var(--gx-lime)">
+  <div class="gx-bar">
+    {% include "admin/hub/_history.html" %}
+    <a class="gx-back" href="{% url 'admin:index' %}"><svg aria-hidden="true"><use href="#ic-arrow-left"/></svg><span>{% translate "Back to the dashboard" %}</span></a>
+    <ol class="gx-crumbs"><li><a href="{% url 'admin:index' %}">{% translate "Dashboard" %}</a></li><li aria-current="page">{% translate "System report" %}</li></ol>
   </div>
-  <a href="{% url 'admin:tipping_tip_changelist' %}" class="gta-kpi" style="--tile-accent:var(--gt-c3)">
-    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-f-vote"/></svg></span><span class="gta-kpi-label">Tips</span></div>
-    <div class="gta-kpi-num">{{ counts.tips|intcomma }}</div>
-    <div class="gta-kpi-sub">{{ counts.tips_last_7d|intcomma }} in the last 7 days</div>
-  </a>
 
-  <a href="{% url 'admin:hq_news' %}" class="gta-kpi" style="--tile-accent:var(--gt-c2)">
-    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-f-doc"/></svg></span><span class="gta-kpi-label">News &amp; blog</span></div>
-    <div class="gta-kpi-num">{{ counts.news|default:0|intcomma }}</div>
-    <div class="gta-kpi-sub">
-      {{ counts.news_published|default:0 }} published
-      {% if counts.news_last_30d %}&middot; {{ counts.news_last_30d }} this month{% endif %}
-    </div>
-  </a>
-  <a href="{% url 'admin:hq_pages' %}" class="gta-kpi" style="--tile-accent:var(--gt-c1)">
-    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-f-pages"/></svg></span><span class="gta-kpi-label">Pages</span></div>
-    <div class="gta-kpi-num">{{ counts.pages|default:0|intcomma }}</div>
-    <div class="gta-kpi-sub">
-      {{ counts.pages_public|default:0 }} public &middot;
-      {{ counts.page_edits|default:0 }} edit{{ counts.page_edits|default:0|pluralize }} saved
-    </div>
-  </a>
-  <a href="{% url 'admin:hq_enquiries' %}" class="gta-kpi" style="--tile-accent:var(--gt-c3)">
-    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-f-mail"/></svg></span><span class="gta-kpi-label">Enquiries</span></div>
-    <div class="gta-kpi-num">{{ counts.enquiries|default:0|intcomma }}</div>
-    <div class="gta-kpi-sub">
-      {% if counts.open_enquiries %}<b class="gta-kpi-hot">{{ counts.open_enquiries }} waiting</b>
-      {% else %}all answered{% endif %}
-      {% if counts.enquiries_last_7d %}&middot; {{ counts.enquiries_last_7d }} this week{% endif %}
-    </div>
-  </a>
-  <a href="{% url 'admin:hq_team' %}" class="gta-kpi" style="--tile-accent:var(--gt-c4)">
-    <div class="gta-kpi-top"><span class="gta-kpi-ic"><svg><use href="#ic-f-shield-star"/></svg></span><span class="gta-kpi-label">Your team</span></div>
-    <div class="gta-kpi-num">{{ counts.team|default:0|intcomma }}</div>
-    <div class="gta-kpi-sub">
-      {{ counts.team_active|default:0 }} active
-      {% if counts.team and counts.team_active < counts.team %}&middot; {{ counts.team|add:"-"|add:counts.team_active }} switched off{% endif %}
-    </div>
-  </a>
-</div>
-
-{# ---- trend charts ---- #}
-<div class="gta-card">
-  <div class="gta-card-head">
+  <header class="gd-head">
     <div>
-      <h2>Growth</h2>
-      <p>New members and new organisations, one point per day. Hover for a single day; click a name to hide that line.</p>
+      <p class="gd-kicker"><i class="gx-live-dot"></i>{% translate "Worked out" %} {{ generated_at|date:"j M Y, g:i a" }}</p>
+      <h1 class="gd-title">{% translate "System report" %}</h1>
     </div>
-    <div class="gta-range">
-      {% for opt in span_options %}
-      <a href="?days={{ opt }}" class="{% if span == opt %}on{% endif %}">{{ opt }} days</a>
-      {% endfor %}
-    </div>
-  </div>
-  <div class="gta-card-body">
-    <div class="gt-chart" id="c-growth"></div>
-    {{ growth_chart|json_script:"c-growth-data" }}
-  </div>
-</div>
-
-<div class="gta-grid-2">
-  <div class="gta-card">
-    <div class="gta-card-head">
-      <div>
-        <h2>Sign-ins</h2>
-        <p>Stacked per day: who got in, and who didn't.</p>
-      </div>
-      <span class="gta-pill {% if login_counts.fail_rate_7d > 25 %}bad{% elif login_counts.fail_rate_7d > 10 %}warn{% else %}ok{% endif %}">
-        {{ login_counts.fail_rate_7d }}% failed this week
-      </span>
-    </div>
-    <div class="gta-card-body">
-      <div class="gt-chart" id="c-logins"></div>
-      {{ login_chart|json_script:"c-logins-data" }}
-    </div>
-  </div>
-
-  <div class="gta-card">
-    <div class="gta-card-head">
-      <div>
-        <h2>Tipping activity</h2>
-        <p>Tips submitted per day &mdash; the shape of a round.</p>
+    <div class="gd-head-end">
+      <div class="gd-seg" role="group" aria-label="{% translate 'Window' %}">
+        {% for opt in span_options %}<a class="{% if span == opt %}on{% endif %}" href="?days={{ opt }}" data-keep-hash>{{ opt }}d</a>{% endfor %}
       </div>
     </div>
-    <div class="gta-card-body">
-      <div class="gt-chart" id="c-tips"></div>
-      {{ tips_chart|json_script:"c-tips-data" }}
-    </div>
-  </div>
-</div>
+  </header>
 
-<div class="gta-grid-2">
-  <div class="gta-card">
-    <div class="gta-card-head">
-      <div><h2>Organisation sizes</h2><p>How many members each organisation has.</p></div>
-    </div>
-    <div class="gta-card-body">
-      <div class="gt-chart" id="c-sizes"></div>
-      {{ size_chart|json_script:"c-sizes-data" }}
-    </div>
+  <div class="gd-kpis">
+    <a href="{{ u_users }}" class="gd-card gd-kpi" style="--k: var(--cc-1)">
+      <span class="gd-kpi-top"><span class="gd-kpi-ic" aria-hidden="true"><svg><use href="#ic-f-users"/></svg></span><span class="gd-kpi-label">{% translate "Members" %}</span>
+        {% if counts.users_last_7d %}<span class="gd-delta up">+{{ counts.users_last_7d }}</span>{% endif %}</span>
+      <b class="gd-kpi-num">{{ counts.users|intcomma }}</b><span class="gd-kpi-sub">+{{ counts.users_last_7d }} {% translate "in the last 7 days" %}</span>
+    </a>
+    <a href="{{ u_orgs }}" class="gd-card gd-kpi" style="--k: var(--cc-3)">
+      <span class="gd-kpi-top"><span class="gd-kpi-ic" aria-hidden="true"><svg><use href="#ic-f-org"/></svg></span><span class="gd-kpi-label">{% translate "Organisations" %}</span>
+        {% if counts.orgs_last_30d %}<span class="gd-delta up">+{{ counts.orgs_last_30d }}</span>{% endif %}</span>
+      <b class="gd-kpi-num">{{ counts.orgs|intcomma }}</b><span class="gd-kpi-sub">{{ counts.orgs_last_7d }} {% translate "this week" %} &middot; {{ counts.orgs_last_30d }} {% translate "this month" %}</span>
+    </a>
+    <a href="{{ u_tips }}" class="gd-card gd-kpi" style="--k: var(--cc-5)">
+      <span class="gd-kpi-top"><span class="gd-kpi-ic" aria-hidden="true"><svg><use href="#ic-f-vote"/></svg></span><span class="gd-kpi-label">{% translate "Tips" %}</span>
+        {% if counts.tips_last_7d %}<span class="gd-delta up">+{{ counts.tips_last_7d|intcomma }}</span>{% endif %}</span>
+      <b class="gd-kpi-num">{{ counts.tips|intcomma }}</b><span class="gd-kpi-sub">{{ counts.tips_last_7d|intcomma }} {% translate "in the last 7 days" %}</span>
+    </a>
+    <a href="#signins" data-gx-open="signins" class="gd-card gd-kpi" style="--k: var(--cc-2)">
+      <span class="gd-kpi-top"><span class="gd-kpi-ic" aria-hidden="true"><svg><use href="#ic-f-login"/></svg></span><span class="gd-kpi-label">{% translate "Sign-ins failed" %}</span>
+        <span class="gd-delta {% if login_counts.fail_rate_7d > 25 %}down{% elif login_counts.fail_rate_7d <= 10 %}up{% endif %}">{% if login_counts.fail_rate_7d > 25 %}{% translate "high" %}{% elif login_counts.fail_rate_7d > 10 %}{% translate "watch" %}{% else %}{% translate "normal" %}{% endif %}</span></span>
+      <b class="gd-kpi-num">{{ login_counts.fail_rate_7d }}%</b><span class="gd-kpi-sub">{% translate "of attempts, last 7 days" %}</span>
+    </a>
   </div>
 
-  <div class="gta-card">
-    <div class="gta-card-head">
-      <div><h2>Biggest organisations</h2><p>Top eight by member count.</p></div>
-      <a class="gtc-view" href="{% url 'admin:orgs_organisation_changelist' %}">All organisations</a>
+  <div data-gx-tabs>
+    <div class="gd-tabs" role="tablist">
+      <button type="button" role="tab" data-gx-tab="overview" aria-selected="true">{% translate "Overview" %}</button>
+      <button type="button" role="tab" data-gx-tab="signins">{% translate "Sign-ins" %}</button>
+      <button type="button" role="tab" data-gx-tab="tipping">{% translate "Tipping &amp; organisations" %}</button>
+      <button type="button" role="tab" data-gx-tab="server">{% translate "Server" %}</button>
     </div>
-    <div class="gta-card-body">
-      <div class="gt-chart" id="c-toporgs"></div>
-      {{ top_orgs_chart|json_script:"c-toporgs-data" }}
-    </div>
-  </div>
-</div>
 
-{# ---- attention + machine ---- #}
-<div class="gta-grid-2">
-  <div class="gta-card">
-    <div class="gta-card-head"><div><h2>Waiting on you</h2></div></div>
-    <div class="gta-card-body">
-      <ul class="gta-defs">
-        <li><span class="k">Pending join requests</span><span class="v">{{ counts.pending_join_requests }}</span></li>
-        <li><span class="k">Open enquiries</span><span class="v">{{ counts.open_enquiries }}</span></li>
-        <li><span class="k">Failed sign-ins, last 24h</span><span class="v">{{ login_counts.failed_last_24h }}</span></li>
-        <li><span class="k">Successful sign-ins, last 24h</span><span class="v">{{ login_counts.last_24h }}</span></li>
-      </ul>
-      <div style="margin-top:16px;">
-        <div class="gt-chart" id="c-enquiries"></div>
-        {{ enquiry_chart|json_script:"c-enquiries-data" }}
+    {# ---- Overview ---- #}
+    <div class="gd-pane" data-gx-pane="overview">
+      <div class="gd-grid">
+        <section class="gd-card gd-span-2">
+          <header class="gd-card-h"><div><h2>{% translate "Growth" %}</h2><p>{% blocktranslate with n=span %}New members and new organisations per day, last {{ n }} days{% endblocktranslate %}</p></div></header>
+          <div class="gd-card-b"><div class="gt-chart gd-chart" id="c-growth"></div>{{ growth_chart|json_script:"c-growth-data" }}</div>
+        </section>
+        <section class="gd-card">
+          <header class="gd-card-h"><div><h2>{% translate "The platform" %}</h2><p>{% translate "Everything, counted" %}</p></div></header>
+          <ul class="gd-list">
+            <li><a href="#tipping" data-gx-open="tipping"><span class="gd-dot" style="background:var(--cc-4)"></span><span class="gd-list-t">{% translate "Memberships" %} <small style="color:#98A2B3;font-weight:500">&middot; {{ counts.groups|intcomma }} {% translate "groups" %}</small></span><b class="gd-n" style="color:#121A26">{{ counts.memberships|intcomma }}</b></a></li>
+            <li><a href="{% url 'admin:hq_news' %}"><span class="gd-dot" style="background:var(--cc-2)"></span><span class="gd-list-t">{% translate "Stories" %} <small style="color:#98A2B3;font-weight:500">&middot; {{ counts.news_published|default:0 }} {% translate "published" %}</small></span><b class="gd-n" style="color:#121A26">{{ counts.news|default:0|intcomma }}</b><span class="gd-go" aria-hidden="true">&rsaquo;</span></a></li>
+            <li><a href="{% url 'admin:hq_pages' %}"><span class="gd-dot" style="background:var(--cc-1)"></span><span class="gd-list-t">{% translate "Pages" %} <small style="color:#98A2B3;font-weight:500">&middot; {{ counts.page_edits|default:0 }} {% translate "edits" %}</small></span><b class="gd-n" style="color:#121A26">{{ counts.pages|default:0|intcomma }}</b><span class="gd-go" aria-hidden="true">&rsaquo;</span></a></li>
+            <li><a href="{% url 'admin:hq_enquiries' %}"><span class="gd-dot" style="background:var(--cc-3)"></span><span class="gd-list-t">{% translate "Enquiries" %} <small style="color:#98A2B3;font-weight:500">&middot; {{ counts.enquiries_last_7d|default:0 }} {% translate "this week" %}</small></span><b class="gd-n" style="color:#121A26">{{ counts.enquiries|default:0|intcomma }}</b><span class="gd-go" aria-hidden="true">&rsaquo;</span></a></li>
+            <li><a href="{% safe_url 'admin:hq_team' %}"><span class="gd-dot" style="background:var(--cc-5)"></span><span class="gd-list-t">{% translate "Administrators" %} <small style="color:#98A2B3;font-weight:500">&middot; {{ counts.team_active|default:0 }} {% translate "active" %}</small></span><b class="gd-n" style="color:#121A26">{{ counts.team|default:0|intcomma }}</b><span class="gd-go" aria-hidden="true">&rsaquo;</span></a></li>
+          </ul>
+        </section>
+        <section class="gd-card">
+          <header class="gd-card-h"><div><h2>{% translate "Waiting on the team" %}</h2><p>{% translate "Queues that need a person" %}</p></div></header>
+          <ul class="gd-list">
+            <li><a href="{% safe_url 'admin:orgs_membershiprequest_changelist' %}?status__exact=pending"><span class="gd-dot{% if counts.pending_join_requests %} is-hot{% endif %}"></span><span class="gd-list-t">{% translate "Pending join requests" %}</span><b class="gd-n{% if counts.pending_join_requests %} is-hot{% endif %}">{{ counts.pending_join_requests }}</b><span class="gd-go" aria-hidden="true">&rsaquo;</span></a></li>
+            <li><a href="{% url 'admin:hq_enquiries' %}"><span class="gd-dot{% if counts.open_enquiries %} is-hot{% endif %}"></span><span class="gd-list-t">{% translate "Open enquiries" %}</span><b class="gd-n{% if counts.open_enquiries %} is-hot{% endif %}">{{ counts.open_enquiries }}</b><span class="gd-go" aria-hidden="true">&rsaquo;</span></a></li>
+            <li><a href="#signins" data-gx-open="signins"><span class="gd-dot{% if login_counts.failed_last_24h %} is-hot{% endif %}"></span><span class="gd-list-t">{% translate "Refused sign-ins, 24h" %}</span><b class="gd-n{% if login_counts.failed_last_24h %} is-hot{% endif %}">{{ login_counts.failed_last_24h }}</b><span class="gd-go" aria-hidden="true">&rsaquo;</span></a></li>
+          </ul>
+        </section>
+        <section class="gd-card">
+          <header class="gd-card-h"><div><h2>{% translate "Enquiries" %}</h2><p>{% translate "From the contact form, by status" %}</p></div><a class="gd-link" href="{% url 'admin:hq_enquiries' %}">{% translate "Inbox" %}</a></header>
+          <div class="gd-card-b"><div class="gt-chart gd-chart is-short" id="c-enquiries"></div>{{ enquiry_chart|json_script:"c-enquiries-data" }}</div>
+        </section>
+        <section class="gd-card">
+          <header class="gd-card-h"><div><h2>{% translate "Server health" %}</h2><p>{% translate "The box serving this page" %}</p></div><a class="gd-link" href="#server" data-gx-open="server">{% translate "Details" %}</a></header>
+          {% if system.disk_total_gb %}
+          <div class="gd-meter{% if system.disk_used_pct > 90 %} is-bad{% elif system.disk_used_pct > 75 %} is-warn{% endif %}">
+            <div class="gd-meter-h"><span>{% translate "Disk" %}</span><b>{{ system.disk_used_pct }}%</b></div>
+            <div class="gd-meter-bar"><i style="width:{{ system.disk_used_pct }}%"></i></div>
+            <small>{{ system.disk_free_gb }} GB {% translate "free" %}</small>
+          </div>
+          {% endif %}
+          {% if system.load_avg %}
+          <div class="gd-meter{% if system.load_pct > 90 %} is-bad{% elif system.load_pct > 60 %} is-warn{% endif %}">
+            <div class="gd-meter-h"><span>{% translate "Load" %}</span><b>{{ system.load_pct }}%</b></div>
+            <div class="gd-meter-bar"><i style="width:{{ system.load_pct }}%"></i></div>
+            <small>{{ system.cpu_count }} {% translate "cores" %}</small>
+          </div>
+          {% endif %}
+          {% if not system.disk_total_gb and not system.load_avg %}<div class="gd-empty">{% translate "Not available on this platform." %}</div>{% endif %}
+        </section>
+      </div>
+    </div>
+
+    {# ---- Sign-ins ---- #}
+    <div class="gd-pane" data-gx-pane="signins">
+      <div class="gd-grid">
+        <section class="gd-card">
+          <header class="gd-card-h"><div><h2>{% translate "The last day" %}</h2><p>{% translate "Sign-in attempts in the last 24 hours" %}</p></div></header>
+          <div class="gd-stats">
+            <div class="gd-stat"><span>{% translate "Signed in" %}</span><b>{{ login_counts.last_24h }}</b></div>
+            <div class="gd-stat{% if login_counts.failed_last_24h %} is-hot{% endif %}"><span>{% translate "Refused" %}</span><b>{{ login_counts.failed_last_24h }}</b></div>
+          </div>
+          <div class="gd-meter{% if login_counts.fail_rate_7d > 25 %} is-bad{% elif login_counts.fail_rate_7d > 10 %} is-warn{% endif %}">
+            <div class="gd-meter-h"><span>{% translate "Failure rate, 7 days" %}</span><b>{{ login_counts.fail_rate_7d }}%</b></div>
+            <div class="gd-meter-bar"><i style="width:{{ login_counts.fail_rate_7d }}%"></i></div>
+            <small>{% translate "Above 10% is worth a look; above 25% usually means someone is guessing." %}</small>
+          </div>
+        </section>
+        <section class="gd-card gd-span-2">
+          <header class="gd-card-h"><div><h2>{% translate "Sign-ins per day" %}</h2><p>{% translate "Who got in, and who didn't" %}</p></div></header>
+          <div class="gd-card-b"><div class="gt-chart gd-chart" id="c-logins"></div>{{ login_chart|json_script:"c-logins-data" }}</div>
+        </section>
+        <section class="gd-card gd-span-3">
+          <header class="gd-card-h"><div><h2>{% translate "Latest attempts" %}</h2><p>{% translate "Newest first" %}</p></div>{% if u_logins %}<a class="gd-link" href="{{ u_logins }}">{% translate "Full history" %}</a>{% endif %}</header>
+          {% if recent_logins %}
+          <div class="gd-tablewrap">
+            <table class="gd-table">
+              <thead><tr><th>{% translate "When" %}</th><th>{% translate "Email" %}</th><th>{% translate "Result" %}</th><th>IP</th></tr></thead>
+              <tbody>
+              {% for ev in recent_logins %}
+              <tr>
+                <td>{{ ev.created_at|date:"j M, g:i a" }}</td>
+                <td>{% if ev.user_id %}<a href="{% safe_url 'admin:hq_database_record' 'staging' 'accounts.user' ev.user_id %}">{{ ev.email }}</a>{% else %}{{ ev.email }}{% endif %}</td>
+                <td>{% if ev.success %}<span class="gd-ok">&#10003; {% translate "Signed in" %}</span>{% else %}<span class="gd-bad">&times; {% translate "Refused" %}</span>{% endif %}</td>
+                <td>{{ ev.ip_address|default:"—" }}</td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}<div class="gd-empty">{% translate "No sign-ins recorded yet." %}</div>{% endif %}
+        </section>
+      </div>
+    </div>
+
+    {# ---- Tipping & organisations ---- #}
+    <div class="gd-pane" data-gx-pane="tipping">
+      <div class="gd-grid">
+        <section class="gd-card gd-span-2">
+          <header class="gd-card-h"><div><h2>{% translate "Tips per day" %}</h2><p>{% translate "The shape of a round" %}</p></div></header>
+          <div class="gd-card-b"><div class="gt-chart gd-chart" id="c-tips"></div>{{ tips_chart|json_script:"c-tips-data" }}</div>
+        </section>
+        <section class="gd-card">
+          <header class="gd-card-h"><div><h2>{% translate "Tipping" %}</h2><p>{% translate "All time, and this week" %}</p></div>{% if u_tips %}<a class="gd-link" href="{{ u_tips }}">{% translate "Tips" %}</a>{% endif %}</header>
+          <div class="gd-stats">
+            <div class="gd-stat"><span>{% translate "All time" %}</span><b>{{ counts.tips|intcomma }}</b></div>
+            <div class="gd-stat"><span>{% translate "Last 7 days" %}</span><b>{{ counts.tips_last_7d|intcomma }}</b></div>
+            <div class="gd-stat"><span>{% translate "Groups" %}</span><b>{{ counts.groups|intcomma }}</b></div>
+            <div class="gd-stat"><span>{% translate "Memberships" %}</span><b>{{ counts.memberships|intcomma }}</b></div>
+          </div>
+        </section>
+        <section class="gd-card">
+          <header class="gd-card-h"><div><h2>{% translate "Organisation sizes" %}</h2><p>{% translate "Members per organisation" %}</p></div></header>
+          <div class="gd-card-b"><div class="gt-chart gd-chart is-short" id="c-sizes"></div>{{ size_chart|json_script:"c-sizes-data" }}</div>
+        </section>
+        <section class="gd-card gd-span-2">
+          <header class="gd-card-h"><div><h2>{% translate "The biggest eight" %}</h2><p>{% translate "By member count" %}</p></div>{% if u_orgs %}<a class="gd-link" href="{{ u_orgs }}">{% translate "All organisations" %}</a>{% endif %}</header>
+          <div class="gd-card-b"><div class="gt-chart gd-chart is-short" id="c-toporgs"></div>{{ top_orgs_chart|json_script:"c-toporgs-data" }}</div>
+        </section>
+      </div>
+    </div>
+
+    {# ---- Server ---- #}
+    <div class="gd-pane" data-gx-pane="server">
+      <div class="gd-grid">
+        <section class="gd-card">
+          <header class="gd-card-h"><div><h2>{% translate "The machine" %}</h2><p>{% translate "The box serving this page" %}</p></div></header>
+          {% if system.disk_total_gb %}
+          <div class="gd-meter{% if system.disk_used_pct > 90 %} is-bad{% elif system.disk_used_pct > 75 %} is-warn{% endif %}">
+            <div class="gd-meter-h"><span>{% translate "Disk" %}</span><b>{{ system.disk_used_pct }}%</b></div>
+            <div class="gd-meter-bar"><i style="width:{{ system.disk_used_pct }}%"></i></div>
+            <small>{{ system.disk_used_gb }} GB {% translate "used of" %} {{ system.disk_total_gb }} GB &middot; {{ system.disk_free_gb }} GB {% translate "free" %}</small>
+          </div>
+          {% endif %}
+          {% if system.load_avg %}
+          <div class="gd-meter{% if system.load_pct > 90 %} is-bad{% elif system.load_pct > 60 %} is-warn{% endif %}">
+            <div class="gd-meter-h"><span>{% translate "Load, 1 minute" %}</span><b>{{ system.load_avg.0 }}</b></div>
+            <div class="gd-meter-bar"><i style="width:{{ system.load_pct }}%"></i></div>
+            <small>{{ system.load_avg.0 }} / {{ system.load_avg.1 }} / {{ system.load_avg.2 }} {% translate "over 1/5/15 min" %} &middot; {{ system.cpu_count }} {% translate "cores" %}</small>
+          </div>
+          {% endif %}
+          {% if not system.disk_total_gb and not system.load_avg %}<div class="gd-empty">{% translate "Not available on this platform." %}</div>{% endif %}
+        </section>
+        <section class="gd-card gd-span-2">
+          <header class="gd-card-h"><div><h2>{% translate "Stress tests" %}</h2><p>{% translate "Recorded load-test runs" %}</p></div><a class="gd-link" href="{% url 'admin:sysadmin_stresstestrun_add' %}">{% translate "Record a run" %}</a></header>
+          {% if recent_stress_tests %}
+          <div class="gd-tablewrap">
+            <table class="gd-table">
+              <thead><tr><th>{% translate "Label" %}</th><th>{% translate "Started" %}</th><th>{% translate "Requests" %}</th><th>OK</th><th>{% translate "Failed" %}</th><th>{% translate "Avg ms" %}</th><th>{% translate "Req/s" %}</th></tr></thead>
+              <tbody>
+              {% for run in recent_stress_tests %}
+              <tr>
+                <td><a href="{% url 'admin:sysadmin_stresstestrun_change' run.pk %}">{{ run.label }}</a></td>
+                <td>{{ run.started_at|date:"j M, g:i a" }}</td>
+                <td>{{ run.total_requests|intcomma }}</td><td class="gd-ok">{{ run.success_count|intcomma }}</td><td{% if run.failure_count %} class="gd-bad"{% endif %}>{{ run.failure_count|intcomma }}</td>
+                <td>{{ run.avg_response_ms|default:"—" }}</td><td>{{ run.requests_per_sec|default:"—" }}</td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}<div class="gd-empty">{% translate "No runs yet — record one, or pipe results in with manage.py record_stress_test_run." %}</div>{% endif %}
+        </section>
       </div>
     </div>
   </div>
-
-  <div class="gta-card">
-    <div class="gta-card-head"><div><h2>The machine</h2><p>Disk and load on the box serving this page.</p></div></div>
-    <div class="gta-card-body">
-      {% if system.disk_total_gb %}
-      <div class="gta-meter" style="--meter-accent:{% if system.disk_used_pct > 90 %}var(--gt-c6){% elif system.disk_used_pct > 75 %}var(--gt-c3){% else %}var(--gt-c1){% endif %}">
-        <div class="gta-meter-top"><span class="k">Disk</span><span class="v">{{ system.disk_used_pct }}%</span></div>
-        <div class="gta-meter-bar"><i style="width:{{ system.disk_used_pct }}%"></i></div>
-        <p class="gta-meter-note">{{ system.disk_used_gb }} GB used of {{ system.disk_total_gb }} GB &middot; {{ system.disk_free_gb }} GB free</p>
-      </div>
-      {% endif %}
-      {% if system.load_avg %}
-      <div class="gta-meter" style="--meter-accent:{% if system.load_pct > 90 %}var(--gt-c6){% elif system.load_pct > 60 %}var(--gt-c3){% else %}var(--gt-c1){% endif %}">
-        <div class="gta-meter-top"><span class="k">Load, 1 minute</span><span class="v">{{ system.load_avg.0 }}</span></div>
-        <div class="gta-meter-bar"><i style="width:{{ system.load_pct }}%"></i></div>
-        <p class="gta-meter-note">{{ system.load_avg.0 }} / {{ system.load_avg.1 }} / {{ system.load_avg.2 }} over 1/5/15 min, across {{ system.cpu_count }} core{{ system.cpu_count|pluralize }}</p>
-      </div>
-      {% endif %}
-      {% if not system.disk_total_gb and not system.load_avg %}
-      <p class="gta-empty" style="padding:0;">Not available on this platform.</p>
-      {% endif %}
-    </div>
-  </div>
 </div>
-
-{# ---- tables ---- #}
-<div class="gta-card">
-  <div class="gta-card-head">
-    <div><h2>Recent sign-ins</h2></div>
-    <a class="gtc-view" href="{% url 'admin:sysadmin_loginevent_changelist' %}">Full history</a>
-  </div>
-  <div class="gta-card-body flush">
-    {% if recent_logins %}
-    <table class="gta-table">
-      <thead><tr><th>When</th><th>Email</th><th>Account</th><th>Result</th><th>IP</th></tr></thead>
-      <tbody>
-        {% for ev in recent_logins %}
-        <tr>
-          <td>{{ ev.created_at|date:"j M, g:i a" }}</td>
-          <td>{{ ev.email }}</td>
-          <td>{% if ev.user %}<a href="{% url 'admin:accounts_user_change' ev.user_id %}">{{ ev.user }}</a>{% else %}&mdash;{% endif %}</td>
-          <td><span class="gta-pill {% if ev.success %}ok{% else %}bad{% endif %}">{% if ev.success %}Signed in{% else %}Failed{% endif %}</span></td>
-          <td>{{ ev.ip_address|default:"—" }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p class="gta-empty">No sign-ins recorded yet.</p>
-    {% endif %}
-  </div>
-</div>
-
-<div class="gta-card">
-  <div class="gta-card-head">
-    <div><h2>Stress tests</h2></div>
-    <a class="gtc-view" href="{% url 'admin:sysadmin_stresstestrun_add' %}">Record a run</a>
-  </div>
-  <div class="gta-card-body flush">
-    {% if recent_stress_tests %}
-    <table class="gta-table">
-      <thead><tr><th>Label</th><th>Started</th><th>Requests</th><th>OK</th><th>Failed</th><th>Avg ms</th><th>Req/s</th></tr></thead>
-      <tbody>
-        {% for run in recent_stress_tests %}
-        <tr>
-          <td><a href="{% url 'admin:sysadmin_stresstestrun_change' run.pk %}">{{ run.label }}</a></td>
-          <td>{{ run.started_at|date:"j M, g:i a" }}</td>
-          <td>{{ run.total_requests|intcomma }}</td>
-          <td>{{ run.success_count|intcomma }}</td>
-          <td>{{ run.failure_count|intcomma }}</td>
-          <td>{{ run.avg_response_ms|default:"—" }}</td>
-          <td>{{ run.requests_per_sec|default:"—" }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p class="gta-empty">No stress test runs recorded yet &mdash; record one above, or pipe results in with <code>manage.py record_stress_test_run</code>.</p>
-    {% endif %}
-  </div>
-</div>
+<script>
+  /* The window picker keeps the section you were looking at. */
+  document.querySelectorAll('[data-keep-hash]').forEach(function (a) {
+    a.addEventListener('click', function () { if (location.hash) a.href = a.getAttribute('href').split('#')[0] + location.hash; }, true);
+  });
+</script>
+<script src="{% static 'js/gt-admin-gx.js' %}" defer></script>
 {% endblock %}

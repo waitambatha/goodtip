@@ -1,0 +1,110 @@
+{% extends "admin/hub/gx_base.html" %}
+{% load i18n static gtadmin %}
+
+{% comment %}
+BLOG & NEWS — THE ONE PLACE FOR STORIES (client, 26 Oct 2026: "the admin can
+go fast and see the blogs, create a new one, edit an existing one or even
+delete... any other page that does that... let's remove and have one").
+
+Reached from the menu and from Databases alike. Every story is real: posts
+written here go to goodtip.com.au too (sync_newsposts, both ways, every two
+minutes), so on staging they are labelled Backup and on Live, Real.
+
+Tabs for where a story stands; search; one card per story with what can be
+done to it — edit, view, publish or unpublish, email members (once), delete.
+The actions are admin_panel.views' own (news_toggle / news_announce /
+news_delete), each still asking its own capability.
+{% endcomment %}
+
+{% block gx_kicker %}{% translate "Blog &amp; news" %}{% endblock %}
+{% block gx_title %}{% translate "Stories," %} <em>{% translate "all in one place" %}</em>{% endblock %}
+{% block gx_lead %}{% translate "Write, edit, publish and email stories. Everything written here appears on goodtip.com.au too, within two minutes." %}{% endblock %}
+{% block gx_below %}
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px">
+  <a class="gx-btn is-lime" href="{% url 'admin:hq_news_new' %}"><svg aria-hidden="true"><use href="#ic-doc"/></svg>{% translate "Write a new story" %}</a>
+  <a class="gx-btn is-glass" href="{% url 'admin:hq_database_table' 'staging' 'admin_panel.newspost' %}">{% translate "See them as a table" %}</a>
+</div>
+{% endblock %}
+{% block gx_board %}
+<a class="gx-score" href="#published" data-gx-open="published"><b>{{ counts.published }}</b><span>{% translate "Published" %}</span></a>
+<a class="gx-score" href="#scheduled" data-gx-open="scheduled"><b>{{ counts.scheduled }}</b><span>{% translate "Scheduled" %}</span></a>
+<a class="gx-score" href="#drafts" data-gx-open="drafts"><b>{{ counts.drafts }}</b><span>{% translate "Drafts" %}</span></a>
+<div class="gx-score"><b>{{ counts.emailed }}</b><span>{% translate "Emailed to members" %}</span></div>
+{% endblock %}
+
+{% block gx_body %}
+{% gta_can 'news.publish' as may_publish %}
+{% gta_can 'news.email' as may_email %}
+{% gta_can 'news.delete' as may_delete %}
+<section class="gx-sheet" data-gx-tabs>
+  <div class="gx-tabs" role="tablist">
+    {% for key, label, items in groups %}<button type="button" class="gx-tab" role="tab" data-gx-tab="{{ key }}"{% if forloop.first %} aria-selected="true"{% endif %}>{{ label }} <em>{{ items|length }}</em></button>{% endfor %}
+    <div class="gx-tabs-end"><a class="gx-btn is-ghost" href="{% url 'admin:hq_news_new' %}">+ {% translate "New story" %}</a></div>
+  </div>
+
+  {% for key, label, items in groups %}
+  <div class="gx-pane" data-gx-pane="{{ key }}">
+    <label class="gx-search" style="margin-bottom:16px"><svg aria-hidden="true"><use href="#ic-search"/></svg>
+      <input type="search" placeholder="{% translate 'Search stories by headline' %}" data-gx-filter="{{ key }}" aria-label="{% translate 'Search stories' %}"></label>
+    {% if items %}
+    <div class="gx-stories" data-gx-filter-list="{{ key }}">
+      {% for p in items %}
+      <article class="gx-storycard" data-gx-filter-text="{{ p.title|lower }}">
+        <a class="gx-storycard-pic" href="{% url 'admin:hq_news_edit' p.id %}" {% if p.image %}style="background-image:url('{{ p.image.url }}')"{% endif %}>
+          {% if not p.image %}<span><svg aria-hidden="true"><use href="#ic-image"/></svg></span>{% endif %}
+          <span class="gx-storycard-state">
+            {% if p.is_scheduled %}<span class="gx-pill is-wait"><i></i>{% translate "Scheduled" %}</span>
+            {% elif p.is_live %}<span class="gx-pill is-ok"><i></i>{% translate "Published" %}</span>
+            {% else %}<span class="gx-pill"><i></i>{% translate "Draft" %}</span>{% endif %}
+          </span>
+        </a>
+        <div class="gx-storycard-b">
+          <p class="gx-storycard-tags">{% for t in p.tag_list %}<span class="t-{{ t|lower }}">{{ t }}</span>{% endfor %}<span class="gx-lab is-backup" title="{% translate 'Real — also on goodtip.com.au' %}">{% translate "Backup" %}</span></p>
+          <a class="gx-storycard-h" href="{% url 'admin:hq_news_edit' p.id %}">{{ p.title }}</a>
+          <p class="gx-storycard-when">{% if p.is_scheduled %}{% translate "Goes out" %} {{ p.published_at|date:"j M Y, g:i a" }}{% else %}{{ p.published_at|date:"j M Y" }}{% endif %}{% if p.announced_at %} &middot; {% translate "emailed" %} {{ p.announced_at|date:"j M" }}{% endif %}</p>
+          <div class="gx-storycard-acts">
+            <a class="gx-mini" href="{% url 'admin:hq_news_edit' p.id %}">{% translate "Edit" %}</a>
+            {% if p.is_live %}<a class="gx-mini" href="{{ p.get_absolute_url }}" target="_blank" rel="noopener">{% translate "View" %}</a>{% endif %}
+            {% if p.is_live %}<button type="button" class="gx-mini" data-copy-link="{{ p.share_url }}" data-label="{% translate 'Copy link' %}"><span data-copy-label>{% translate "Copy link" %}</span></button>{% endif %}
+            {% if may_publish %}
+            <form method="post" action="{% url 'admin:hq_news_toggle' p.id %}">{% csrf_token %}<button class="gx-mini" type="submit">{% if p.is_published %}{% translate "Unpublish" %}{% else %}{% translate "Publish" %}{% endif %}</button></form>
+            {% endif %}
+            {% if may_email and p.is_live and not p.announced_at %}
+            <form method="post" action="{% url 'admin:hq_news_announce' p.id %}" data-gx-confirm="{% translate 'Email this story to every member? It can only be sent once.' %}">{% csrf_token %}<button class="gx-mini is-ask" type="submit">{% translate "Email members" %}</button></form>
+            {% endif %}
+            {% if may_delete %}
+            <form method="post" action="{% url 'admin:hq_news_delete' p.id %}" data-gx-confirm="{% blocktranslate with t=p.title %}Delete “{{ t }}”? It's real — the copy on goodtip.com.au is kept.{% endblocktranslate %}">{% csrf_token %}<button class="gx-mini is-danger" type="submit">{% translate "Delete" %}</button></form>
+            {% endif %}
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    <div class="gx-empty" data-gx-filter-empty="{{ key }}" hidden><b>{% translate "No story matches that" %}</b></div>
+    {% else %}
+    <div class="gx-empty"><svg aria-hidden="true"><use href="#ic-doc"/></svg><b>{% translate "Nothing here yet" %}</b><span><a href="{% url 'admin:hq_news_new' %}">{% translate "Write a story" %}</a></span></div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</section>
+<script src="{% static 'js/gt-share.js' %}" defer></script>
+<script>
+(function () {
+  // Search the cards as you type, per tab.
+  document.querySelectorAll('[data-gx-filter]').forEach(function (inp) {
+    var key = inp.getAttribute('data-gx-filter');
+    var list = document.querySelector('[data-gx-filter-list="' + key + '"]');
+    var empty = document.querySelector('[data-gx-filter-empty="' + key + '"]');
+    if (!list) return;
+    inp.addEventListener('input', function () {
+      var q = inp.value.trim().toLowerCase(), shown = 0;
+      list.querySelectorAll('[data-gx-filter-text]').forEach(function (c) {
+        var on = !q || c.getAttribute('data-gx-filter-text').indexOf(q) > -1;
+        c.hidden = !on; if (on) shown++;
+      });
+      if (empty) empty.hidden = shown > 0;
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -21,7 +21,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.http import Http404, HttpResponseForbidden, JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -30,6 +30,7 @@ from . import access, capabilities, review
 from .models import (
     AdminAccess, AdminAuditEvent, AdminGrant, AdminInvite, AdminTask, ChangeRequest,
 )
+from .guards import admin_render
 from .notify import notify_task_assigned, send_access_granted, send_admin_invite
 
 User = get_user_model()
@@ -59,7 +60,7 @@ def team(request):
         .prefetch_related("grants")
         .all()
     )
-    return render(request, "hq/team.html", {
+    return admin_render(request, "hq/team.html", title="Administrators", context={
         "rows": rows,
         "pending_invites": AdminInvite.objects.filter(
             consumed_at__isnull=True, expires_at__gt=timezone.now()
@@ -75,7 +76,7 @@ def team_new(request):
     if request.method == "POST":
         return _create_admin(request)
 
-    return render(request, "hq/team_new.html", {
+    return admin_render(request, "hq/team_new.html", title="Add an administrator", context={
         "groups": capabilities.GROUPS,
         "reviewable": capabilities.REVIEWABLE,
     })
@@ -133,7 +134,7 @@ def _create_admin(request):
     if errors or (existing is not None and not confirmed):
         for e in errors:
             messages.error(request, e)
-        return render(request, "hq/team_new.html", {
+        return admin_render(request, "hq/team_new.html", title="Add an administrator", context={
             "groups": capabilities.GROUPS,
             "reviewable": capabilities.REVIEWABLE,
             "existing": existing,
@@ -359,7 +360,7 @@ def team_edit(request, access_id: int):
         return redirect("admin:hq_team")
 
     held = {g.capability: g.requires_approval for g in row.grants.all()}
-    return render(request, "hq/team_edit.html", {
+    return admin_render(request, "hq/team_edit.html", title="Change access", context={
         "row": row,
         "groups": capabilities.GROUPS,
         "reviewable": capabilities.REVIEWABLE,
@@ -410,7 +411,7 @@ def reviews(request):
     guard = _require_full(request)
     if guard:
         return guard
-    return render(request, "hq/reviews.html", {
+    return admin_render(request, "hq/reviews.html", title="Waiting for review", context={
         "waiting": ChangeRequest.objects.filter(status=ChangeRequest.PENDING)
                    .select_related("requested_by"),
         "decided": ChangeRequest.objects.exclude(status=ChangeRequest.PENDING)
@@ -447,7 +448,7 @@ def review_detail(request, request_id: int):
         }
         for k, v in sorted(data.items())
     ]
-    return render(request, "hq/review_detail.html", {
+    return admin_render(request, "hq/review_detail.html", title="Review", context={
         "cr": cr,
         "fields": fields,
         "files": cr.files.all(),
@@ -516,7 +517,7 @@ def my_work(request):
     if not access.is_admin(request.user):
         return HttpResponseForbidden("Administrators only.")
     row = access.access_for(request.user)
-    return render(request, "hq/my_work.html", {
+    return admin_render(request, "hq/my_work.html", title="Your work", context={
         "row": row,
         "is_full": access.is_full_access(request.user),
         "grants": row.grants.all() if row else [],
@@ -593,7 +594,7 @@ def activity(request):
         events = events.filter(subject_id=who)
     if what:
         events = events.filter(action=what)
-    return render(request, "hq/activity.html", {
+    return admin_render(request, "hq/activity.html", title="Activity", context={
         "events": events[:300],
         "actions": AdminAuditEvent.ACTION_CHOICES,
         "people": User.objects.filter(admin_audit_subject_of__isnull=False).distinct(),

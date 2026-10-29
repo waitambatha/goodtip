@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib import admin
 from django.contrib.admin.models import ADDITION, CHANGE, DELETION
 from django.urls import path
+from django.shortcuts import redirect
 from django.utils import timezone
 from django.utils.html import format_html
 from django.views.generic import RedirectView
@@ -419,8 +420,8 @@ def _get_urls():
     from admin_panel import views as manage_views
 
     from . import (
-        custom_pricing_views, hub_views, media_views, org_admin_views, plan_admin_views,
-        services_views, team_views, waitlist_views,
+        custom_pricing_views, database_views, hub_views, media_views, org_admin_views, plan_admin_views,
+        services_views, sports_views, team_views, waitlist_views,
     )
 
     custom = [
@@ -429,13 +430,33 @@ def _get_urls():
         # The hub screens the flat menu opens onto. One menu item, one page of
         # cards, one click to the thing itself — see sysadmin/hub_views.py for
         # why the rail stopped carrying ten disclosure groups.
-        path("tables/", admin.site.admin_view(hub_views.tables_hub), name="hq_tables"),
+        # DATABASES (client, 25 Oct 2026) — "instead of tables and models... I
+        # see two databases". The hub, a database, a table, deleting (or
+        # asking Ian to), and Ian's approvals. The literal routes come before
+        # tables/<str:key>/ below, which would otherwise swallow "approvals".
+        path("tables/", admin.site.admin_view(database_views.databases_hub), name="hq_tables"),
+        path("tables/approvals/", admin.site.admin_view(database_views.deletion_requests), name="hq_deletions"),
+        path("tables/backups/", admin.site.admin_view(database_views.backup_history), name="hq_backup_history"),
+        path("tables/approvals/<int:pk>/decide/", admin.site.admin_view(database_views.deletion_decide),
+             name="hq_deletion_decide"),
+        path("tables/db/<str:db>/", admin.site.admin_view(database_views.database_detail), name="hq_database"),
+        path("tables/db/<str:db>/<str:label>/", admin.site.admin_view(database_views.database_table),
+             name="hq_database_table"),
+        path("tables/db/<str:db>/<str:label>/<str:pk>/delete/", admin.site.admin_view(database_views.database_delete),
+             name="hq_database_delete"),
+        path("tables/db/<str:db>/<str:label>/<str:pk>/", admin.site.admin_view(database_views.database_record),
+             name="hq_database_record"),
         # Two extra segments, not a <str:key> value — "live"/"staging" never
         # collide with an ordinary category key, whichever line runs first.
-        path("tables/origin/<str:origin>/", admin.site.admin_view(hub_views.tables_origin),
+        # The old Live / Staging filter cards now open the two databases.
+        path("tables/origin/<str:origin>/",
+             admin.site.admin_view(lambda request, origin: redirect("admin:hq_database", db="live" if origin == "live" else "staging")),
              name="hq_tables_origin"),
         path("tables/<str:key>/", admin.site.admin_view(hub_views.tables_category),
              name="hq_tables_category"),
+        path("sports/", admin.site.admin_view(sports_views.sports_hub), name="hq_sports"),
+        path("sports/toggle/", admin.site.admin_view(sports_views.sports_toggle), name="hq_sports_toggle"),
+        path("sports/library/refresh/", admin.site.admin_view(sports_views.library_refresh), name="hq_library_refresh"),
         path("security/", admin.site.admin_view(hub_views.security_hub), name="hq_security"),
         path("hq/", admin.site.admin_view(hub_views.hq_hub), name="hq_home"),
         path("your-team/", admin.site.admin_view(hub_views.team_hub), name="hq_team_home"),

@@ -75,6 +75,25 @@ RULES = {
     "NRLW": LadderRules(win=2, draw=1, loss=0, bye=2, separator="differential"),
 }
 
+# THE SPORTS ADDED 27 OCT 2026, by how each scores a table. Football: three
+# for a win, one for a draw, goal difference between equals. Rugby union:
+# four and two. The American leagues rank on wins, so a win is the only
+# thing that scores, and the margin separates equals. Cricket's Big Bash:
+# two a win. Names are the catalog Series names, upper-cased.
+_FOOTBALL = LadderRules(win=3, draw=1, loss=0, bye=0, separator="differential")
+_RUGBY_UNION = LadderRules(win=4, draw=2, loss=0, bye=0, separator="differential")
+_WINS = LadderRules(win=1, draw=0, loss=0, bye=0, separator="differential")
+_CRICKET = LadderRules(win=2, draw=1, loss=0, bye=0, separator="differential")
+for _name in ("ENGLISH PREMIER LEAGUE", "LA LIGA", "SERIE A", "BUNDESLIGA", "UEFA CHAMPIONS LEAGUE",
+              "A-LEAGUE MEN", "A-LEAGUE WOMEN", "WOMEN'S SUPER LEAGUE"):
+    RULES[_name] = _FOOTBALL
+for _name in ("SUPER RUGBY PACIFIC", "SIX NATIONS"):
+    RULES[_name] = _RUGBY_UNION
+for _name in ("NBA", "WNBA", "NBL", "NFL", "NHL", "MLB"):
+    RULES[_name] = _WINS
+for _name in ("BIG BASH LEAGUE",):
+    RULES[_name] = _CRICKET
+
 # Series that have no ladder. Origin is a three-game series, not a season, and
 # a table of it would be meaningless.
 NO_LADDER = {"STATE OF ORIGIN"}
@@ -451,7 +470,8 @@ def rebuild_for_competition(competition: str, *, season) -> int:
     from catalog.models import Series
 
     comp = (competition or "").strip().upper()
-    wanted = [name for name in RULES if name == comp or name.startswith(comp)]
+    bundles = comp in ("AFL", "NRL")      # AFL covers AFLW, NRL covers NRLW
+    wanted = [name for name in RULES if name == comp or (bundles and name.startswith(comp))]
     if not wanted:
         return 0
 

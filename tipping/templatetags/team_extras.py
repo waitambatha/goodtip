@@ -32,6 +32,9 @@ def _logo_url(team):
             return logo.url
         except ValueError:
             pass
+    feed_logo = getattr(team, "logo_url", "")
+    if feed_logo:
+        return feed_logo
     slug = _slug(team)
     if not slug:
         return None

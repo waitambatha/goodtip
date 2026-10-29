@@ -28,6 +28,18 @@
   spin.innerHTML = '<i aria-hidden="true"></i><span>Loading…</span>';
   document.body.appendChild(spin);
   function busy() { root.classList.add('gx-loading'); }
+
+  /* Asking first: a form with data-gx-confirm, or a button with
+     data-gx-ask, confirms before it goes. Listened for in the capture phase
+     so a "no" stops the loader too. */
+  document.addEventListener('submit', function (e) {
+    var f = e.target, msg = f.getAttribute && f.getAttribute('data-gx-confirm');
+    if (msg && !window.confirm(msg)) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-gx-ask]');
+    if (b && !window.confirm(b.getAttribute('data-gx-ask'))) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
   document.addEventListener('click', function (e) {
     var a = e.target.closest && e.target.closest('a[href]');
     if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -279,6 +291,74 @@
     wrap.addEventListener('keydown', function (e) { if (e.key === 'Escape' && wrap.classList.contains('is-open')) { e.preventDefault(); close(); btn.focus(); } });
     document.addEventListener('pointerdown', function (e) { if (!wrap.contains(e.target)) close(); });
     paint();
+  });
+
+  /* THE BACKUP COUNTDOWN ([data-gx-countdown] — the sync bridge and the
+     "Next backup" tiles). Ticks every second: mm:ss to the next run, the ring
+     filling as it gets closer. At zero it says so rather than going
+     negative — the timer has a two-minute random delay, so the run lands a
+     little after. */
+  var CIRC = 2 * Math.PI * 52;
+  function tickAll() {
+    document.querySelectorAll('[data-gx-countdown]').forEach(function (el) {
+      var at = el.getAttribute('data-gx-countdown'), out = el.querySelector('[data-gx-left]');
+      if (!at || !out) return;
+      var every = (+el.getAttribute('data-every') || 3600) * 1000;
+      var left = new Date(at).getTime() - Date.now();
+      var ring = el.querySelector('[data-gx-ring]');
+      if (left <= 0) {
+        out.textContent = 'due now';
+        el.classList.add('is-due');
+        if (ring) ring.style.strokeDashoffset = 0;
+        return;
+      }
+      var m = Math.floor(left / 60000), sec = Math.floor(left / 1000) % 60;
+      out.textContent = (m >= 60 ? Math.floor(m / 60) + ':' + ('0' + (m % 60)).slice(-2) + ':' : m + ':') + ('0' + sec).slice(-2);
+      if (ring) {
+        ring.style.strokeDasharray = CIRC;
+        ring.style.strokeDashoffset = CIRC * Math.max(0, Math.min(1, left / every));
+      }
+    });
+  }
+  if (document.querySelector('[data-gx-countdown]')) { tickAll(); setInterval(tickAll, 1000); }
+
+  /* HTML IN A PLAIN FORM ([data-gx-rich] — a textarea holding markup, on a
+     record's Edit tab): edited as formatted words, with a small toolbar,
+     and written back into the textarea as it changes. */
+  document.querySelectorAll('textarea[data-gx-rich]').forEach(function (ta) {
+    var box = document.createElement('div');
+    box.className = 'gx-rich';
+    box.innerHTML =
+      '<div class="gx-rich-bar" role="toolbar">' +
+      '<button type="button" data-c="bold" title="Bold"><b>B</b></button>' +
+      '<button type="button" data-c="italic" title="Italic"><i>I</i></button>' +
+      '<button type="button" data-c="underline" title="Underline"><u>U</u></button>' +
+      '<button type="button" data-c="formatBlock" data-v="H2" title="Subtitle">H2</button>' +
+      '<button type="button" data-c="formatBlock" data-v="P" title="Paragraph">¶</button>' +
+      '<button type="button" data-c="insertUnorderedList" title="Bullet list">• list</button>' +
+      '<button type="button" data-c="createLink" title="Link">Link</button>' +
+      '<button type="button" data-c="removeFormat" title="Clear formatting">Clear</button></div>' +
+      '<div class="gx-rich-surface" contenteditable="true"></div>';
+    ta.parentNode.insertBefore(box, ta.nextSibling);
+    ta.hidden = true;
+    var surf = box.querySelector('.gx-rich-surface');
+    surf.innerHTML = ta.value;
+    function sync() { ta.value = surf.innerHTML; }
+    surf.addEventListener('input', sync);
+    box.querySelector('.gx-rich-bar').addEventListener('mousedown', function (e) { e.preventDefault(); });
+    box.querySelectorAll('[data-c]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var c = b.getAttribute('data-c'), v = b.getAttribute('data-v') || null;
+        if (c === 'createLink') { v = window.prompt('Link address', 'https://'); if (!v) return; }
+        surf.focus(); document.execCommand(c, false, v); sync();
+      });
+    });
+  });
+
+  /* A sandboxed preview (a blog story's own HTML) grows to its content. */
+  document.querySelectorAll('iframe[data-gx-autoheight]').forEach(function (f) {
+    function fit() { try { f.style.height = (f.contentDocument.documentElement.scrollHeight + 4) + 'px'; } catch (e) {} }
+    f.addEventListener('load', function () { fit(); setTimeout(fit, 400); });
   });
 
   /* A table whose rows open a page (data-gx-rowlinks): the whole row is the

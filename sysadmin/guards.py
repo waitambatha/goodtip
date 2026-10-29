@@ -21,6 +21,20 @@ from . import access, capabilities
 from .review import HeldForReview, NotAllowed, guard
 
 
+def admin_render(request, template, context=None, *, title="", status=None):
+    """render(), with the admin's own context (the menu, the site URL, which
+    environment) merged in — every control-plane screen now sits in the one
+    admin frame (admin/hub/gx_base.html, or hq_base.html over it), and that
+    frame cannot draw its menu without it."""
+    from django.contrib import admin as dj_admin
+
+    full = dj_admin.site.each_context(request)
+    full.update(context or {})
+    if title:
+        full.setdefault("title", title)
+    return render(request, template, full, status=status)
+
+
 def requires(capability: str, summary=None, *, to_submit=None):
     """Guard a control-plane screen with one capability.
 
@@ -56,9 +70,9 @@ def requires(capability: str, summary=None, *, to_submit=None):
             try:
                 guard(request, needed, make_summary)
             except NotAllowed:
-                return render(request, "hq/not_allowed.html", {
+                return admin_render(request, "hq/not_allowed.html", {
                     "capability": capabilities.get(needed),
-                }, status=403)
+                }, title="Not your area", status=403)
             except HeldForReview as held:
                 messages.success(
                     request,
