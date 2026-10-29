@@ -99,6 +99,7 @@ class Command(BaseCommand):
             return ""
 
     def _one_pass(self):
+        self._missing_cache = {}      # live may have been migrated since the last pass
         from django.utils import timezone
 
         from sysadmin import backup
@@ -288,7 +289,7 @@ class Command(BaseCommand):
         # Parent is deliberately not set in this first pass at all (see the
         # second pass below), so fetch order here doesn't matter — nothing
         # depends on a parent already existing locally yet.
-        rows = list(Organisation.objects.using(LIVE_ALIAS).defer("origin", "live_id").select_related(
+        rows = list(self._live(Organisation).select_related(
             "organisation_type", "country", "state", "season", "charity",
         ))
         # Season is a required FK (PROTECT, not nullable) — an org whose
@@ -355,7 +356,7 @@ class Command(BaseCommand):
         # the existing row (sets its live_id, promotes it to real) instead.
         n = 0
         skip = {"id", "origin", "live_id", "password", "last_login", "groups", "user_permissions"}
-        for row in User.objects.using(LIVE_ALIAS).defer("origin", "live_id"):
+        for row in self._live(User):
             local = User.objects.filter(live_id=row.id).first() or User.objects.filter(email=row.email).first()
             fields = dict(origin=ORIGIN_LIVE, live_id=row.id, password=row.password,
                           **self._plain_fields(row, User, skip=skip))
@@ -371,7 +372,7 @@ class Command(BaseCommand):
     def _sync_groups(self):
         n = 0
         from catalog.models import GroupType
-        for row in Group.objects.using(LIVE_ALIAS).defer("origin", "live_id").select_related(
+        for row in self._live(Group).select_related(
             "kind", "country", "charity",
         ):
             org = Organisation.objects.filter(live_id=row.org_id).first()
@@ -403,7 +404,7 @@ class Command(BaseCommand):
 
     def _sync_org_members(self):
         n = 0
-        for row in OrgMember.objects.using(LIVE_ALIAS).defer("origin", "live_id"):
+        for row in self._live(OrgMember):
             user = self._local_user(row.user_id)
             org = Organisation.objects.filter(live_id=row.org_id).first()
             if user is None or org is None:
@@ -425,7 +426,7 @@ class Command(BaseCommand):
 
     def _sync_group_members(self):
         n = 0
-        for row in GroupMember.objects.using(LIVE_ALIAS).defer("origin", "live_id"):
+        for row in self._live(GroupMember):
             user = self._local_user(row.user_id)
             group = Group.objects.filter(live_id=row.group_id).first()
             if user is None or group is None:
@@ -451,7 +452,7 @@ class Command(BaseCommand):
         # then collide on that same uniqueness.
         n = 0
         skip = {"id", "origin", "live_id"}
-        for row in LaunchSignup.objects.using(LIVE_ALIAS).defer("origin", "live_id"):
+        for row in self._live(LaunchSignup):
             local = (
                 LaunchSignup.objects.filter(live_id=row.id).first()
                 or LaunchSignup.objects.filter(email=row.email).first()
@@ -468,10 +469,35 @@ class Command(BaseCommand):
 
     # ---- shared ---------------------------------------------------------
 
-    @staticmethod
-    def _plain_fields(row, model_cls, skip):
-        """Every concrete, non-relational field on `row` except `skip`."""
+    def _missing(self, model_cls) -> set[str]:
+        """Fields this code has that LIVE's table does not.
+
+        Staging runs ahead of live: a field added here (accounts.User's
+        pinned_series, 27 Oct 2026) has no column on live until production is
+        migrated, and asking live for it fails the whole pass ("column
+        accounts_user.pinned_series does not exist"). So each origin table's
+        columns are read off live itself, once per run, and anything live
+        lacks is neither selected nor copied — the staging row keeps its own
+        value for it.
+        """
+        cache = self.__dict__.setdefault("_missing_cache", {})
+        key = model_cls._meta.db_table
+        if key not in cache:
+            conn = connections[LIVE_ALIAS]
+            with conn.cursor() as cur:
+                cols = {c.name for c in conn.introspection.get_table_description(cur, key)}
+            cache[key] = {f.name for f in model_cls._meta.concrete_fields if f.column not in cols}
+        return cache[key]
+
+    def _live(self, model_cls):
+        """Live's rows of an origin table, asking only for columns live has."""
+        return model_cls.objects.using(LIVE_ALIAS).defer("origin", "live_id", *self._missing(model_cls))
+
+    def _plain_fields(self, row, model_cls, skip):
+        """Every concrete, non-relational field on `row` except `skip` — and
+        except any live does not have (see _missing)."""
         out = {}
+        skip = set(skip) | self._missing(model_cls)
         for f in model_cls._meta.concrete_fields:
             if f.name in skip or f.is_relation:
                 continue
