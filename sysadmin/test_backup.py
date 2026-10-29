@@ -329,3 +329,29 @@ class SportsScreenTests(TestCase):
         self.assertTrue(r.context["has_comp"])
         r = self.client.get(reverse("admin:hq_database_table", args=["staging", "accounts.user"]))
         self.assertFalse(r.context["has_comp"])
+
+
+class AdoptTests(TestCase):
+    """Staging began as a clone of live: a live row already here under its own
+    id is adopted, never copied beside itself (30 organisations twice in the
+    menu, 29 Oct 2026)."""
+
+    def setUp(self):
+        from catalog.models import Season
+        from orgs.models import Organisation
+        season = Season.objects.create(year=2097)
+        self.org = Organisation.objects.create(name="AquaFlow Water Co", season=season)
+
+    def test_same_id_and_name_takes_the_live_id(self):
+        from sysadmin.management.commands.sync_live_backup import Command
+        from orgs.models import Organisation
+        Command._adopt(Organisation, self.org.pk, name="AquaFlow Water Co")
+        self.org.refresh_from_db()
+        self.assertEqual(self.org.live_id, self.org.pk)
+
+    def test_a_different_name_is_not_the_same_row(self):
+        from sysadmin.management.commands.sync_live_backup import Command
+        from orgs.models import Organisation
+        Command._adopt(Organisation, self.org.pk, name="Someone Else")
+        self.org.refresh_from_db()
+        self.assertIsNone(self.org.live_id)

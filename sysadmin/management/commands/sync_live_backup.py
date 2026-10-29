@@ -305,6 +305,7 @@ class Command(BaseCommand):
                     f"no Season {row.season.year} on staging's catalog"
                 )
                 continue
+            self._adopt(Organisation, row.id, name=row.name)
             org, _ = Organisation.objects.update_or_create(
                 live_id=row.id,
                 defaults=dict(
@@ -384,6 +385,7 @@ class Command(BaseCommand):
                 )
                 continue
             kind = self._match(GroupType, slug=row.kind.slug) if row.kind_id else None
+            self._adopt(Group, row.id, org=org, name=row.name)
             Group.objects.update_or_create(
                 live_id=row.id,
                 defaults=dict(
@@ -410,6 +412,7 @@ class Command(BaseCommand):
             org = Organisation.objects.filter(live_id=row.org_id).first()
             if user is None or org is None:
                 continue
+            self._adopt(OrgMember, row.id, user=user, org=org)
             OrgMember.objects.update_or_create(
                 live_id=row.id,
                 defaults=dict(
@@ -432,6 +435,7 @@ class Command(BaseCommand):
             group = Group.objects.filter(live_id=row.group_id).first()
             if user is None or group is None:
                 continue
+            self._adopt(GroupMember, row.id, user=user, group=group)
             GroupMember.objects.update_or_create(
                 live_id=row.id,
                 defaults=dict(
@@ -489,6 +493,22 @@ class Command(BaseCommand):
                 cols = {c.name for c in conn.introspection.get_table_description(cur, key)}
             cache[key] = {f.name for f in model_cls._meta.concrete_fields if f.column not in cols}
         return cache[key]
+
+    @staticmethod
+    def _adopt(model_cls, live_pk, **same):
+        """Link the row staging already has for a live row, before syncing it.
+
+        Staging began as a verbatim clone of live, so a live organisation,
+        group or membership is usually already here under live's own id, with
+        no live_id yet. Syncing on live_id alone missed every one of those and
+        made a second copy beside it — 30 organisations twice in the top-bar
+        menu (29 Oct 2026). Same id and the same name (or the same member and
+        organisation) is the same row; it takes the live_id and the sync below
+        updates it rather than creating a twin.
+        """
+        if model_cls.objects.filter(live_id=live_pk).exists():
+            return
+        model_cls.objects.filter(pk=live_pk, live_id__isnull=True, **same).update(live_id=live_pk)
 
     def _live(self, model_cls):
         """Live's rows of an origin table, asking only for columns live has."""
