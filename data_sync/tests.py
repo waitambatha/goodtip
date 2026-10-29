@@ -88,6 +88,15 @@ class ResolveMatchTests(_FixtureBase):
     def test_returns_none_when_nothing_matches(self):
         self.assertIsNone(_resolve_match(self.round, "1", self.home, self.away))
 
+    def test_same_pair_twice_in_a_round_is_two_games(self):
+        """An ESPN round is a week; an MLB series meets three times in it. A
+        game with a different id is another game, never the one to overwrite."""
+        Match.objects.create(
+            round=self.round, home_team=self.home, away_team=self.away,
+            kickoff_at=timezone.now(), external_id="espn:1",
+        )
+        self.assertIsNone(_resolve_match(self.round, "espn:2", self.home, self.away))
+
 
 class LiveSyncTests(_FixtureBase):
     """The AFL sync, driven by a stubbed scraper.

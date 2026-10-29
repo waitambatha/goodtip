@@ -457,6 +457,7 @@ def _copy_table(model, source, mapper, pending, now, say) -> int:
     if mapping:
         for row in model._base_manager.filter(pk__in=list(mapping.values())).values(*attnames):
             existing_rows[str(row[pk_att])] = row
+    file_atts = {f.attname for f in fields if isinstance(f, models.FileField)}
     new_objs = []
     changed = skipped = 0
     live_total = 0
@@ -488,12 +489,15 @@ def _copy_table(model, source, mapper, pending, now, say) -> int:
                 continue                           # deleted on staging since; leave it gone
             # Compared as text: a translated key may come back as "12"
             # where the row holds 12, and that is not a change.
-            diff = {k: v for k, v in data.items() if str(current.get(k)) != str(v)}
+            # A file field keeps staging's own value: live's uploads are not on
+            # this server, so its path would replace a working picture with a
+            # dead one.
+            diff = {k: v for k, v in data.items() if k not in file_atts and str(current.get(k)) != str(v)}
             if diff:
                 model._base_manager.filter(pk=staging_pk).update(**diff)
                 changed += 1
         else:
-            new_objs.append((live_pk, data))
+            new_objs.append((live_pk, {**data, **dict.fromkeys(file_atts, "")}))
 
     created = 0
     for live_pk, data in new_objs:

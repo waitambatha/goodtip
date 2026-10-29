@@ -38,6 +38,7 @@ from django.apps import apps
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, connections, transaction
+from django.db.models import FileField
 
 from accounts.models import LaunchSignup, User
 from catalog.models import Competition, Country, OrganisationType, State
@@ -495,11 +496,13 @@ class Command(BaseCommand):
 
     def _plain_fields(self, row, model_cls, skip):
         """Every concrete, non-relational field on `row` except `skip` — and
-        except any live does not have (see _missing)."""
+        except any live does not have (see _missing), and its file fields
+        (avatars, logos): live's uploads are not on this server, so live's path
+        would replace a picture uploaded here with a dead one every pass."""
         out = {}
         skip = set(skip) | self._missing(model_cls)
         for f in model_cls._meta.concrete_fields:
-            if f.name in skip or f.is_relation:
+            if f.name in skip or f.is_relation or isinstance(f, FileField):
                 continue
             out[f.name] = getattr(row, f.attname)
         return out

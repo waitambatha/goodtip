@@ -183,8 +183,37 @@ class AvatarForm(forms.ModelForm):
         model = User
         fields = ["avatar"]
 
+    SIZE = 640   # the stored photo, square — the same size the cropper exports
+
     def clean_avatar(self):
         avatar = self.cleaned_data.get("avatar")
         if avatar and avatar.size > self.MAX_BYTES:
             raise forms.ValidationError("Please choose an image under 5 MB.")
+        if avatar and hasattr(avatar, "content_type"):   # a fresh upload, not the stored one
+            avatar = self._square(avatar)
         return avatar
+
+    @classmethod
+    def _square(cls, upload):
+        """Every stored photo upright, square and 640px, whatever arrived.
+
+        The profile page crops in the browser first, but a picture the browser
+        cannot preview is sent as it is — a phone photo on its side, or a wide
+        screenshot every avatar circle then crops to a sliver. This puts the
+        phone's own rotation right, takes the centred square, and shrinks it.
+        """
+        from io import BytesIO
+
+        from django.core.files.uploadedfile import InMemoryUploadedFile
+        from PIL import Image, ImageOps
+
+        try:
+            upload.seek(0)
+            im = ImageOps.exif_transpose(Image.open(upload))
+            im = ImageOps.fit(im.convert("RGB"), (cls.SIZE, cls.SIZE), Image.LANCZOS)
+        except Exception as exc:  # noqa: BLE001 — anything Pillow cannot read
+            raise forms.ValidationError("That picture couldn't be read — please try a JPG or PNG.") from exc
+        out = BytesIO()
+        im.save(out, "JPEG", quality=90, optimize=True)
+        name = (upload.name.rsplit(".", 1)[0] or "avatar") + ".jpg"
+        return InMemoryUploadedFile(out, "avatar", name, "image/jpeg", out.tell(), None)

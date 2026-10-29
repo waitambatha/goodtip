@@ -37,6 +37,7 @@
   <script src="{% static 'js/gt-fixture.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
   {% include "partials/_analytics.html" %}
+{% include "partials/_avatar_fallback.html" %}
 </head>
 {% comment %}
 `gt-app` marks the member app, and only the member app. /admin/, /manage/ and

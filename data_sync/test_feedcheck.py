@@ -40,7 +40,7 @@ class _FakeSvc:
     def match_index(self, round_obj):
         matches = list(round_obj.matches.all())
         by_ext = {m.external_id: m for m in matches if m.external_id}
-        by_pair = {(m.home_team_id, m.away_team_id): m for m in matches}
+        by_pair = {(m.home_team_id, m.away_team_id): m for m in matches if not m.external_id}
         return by_ext, by_pair
 
     def lookup(self, index, external_id, home, away):

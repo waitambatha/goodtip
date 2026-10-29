@@ -98,8 +98,12 @@ def _resolve_match(round_obj: Round, external_id: str, home: Team, away: Team) -
         m = Match.objects.filter(round=round_obj, external_id=external_id).first()
         if m:
             return m
-    m = Match.objects.filter(round=round_obj, home_team=home, away_team=away).first()
-    if m and external_id and m.external_id != external_id:
+    # Only a game with no id of its own. One already carrying a different id is
+    # a different game: an ESPN round is a calendar week, and an MLB, NBA or
+    # NHL pair can meet two or three times in one — taking the pair alone
+    # folded a whole series into one row, each game overwriting the last.
+    m = Match.objects.filter(round=round_obj, home_team=home, away_team=away, external_id="").first()
+    if m and external_id:
         m.external_id = external_id
         m.save(update_fields=["external_id"])
     return m
@@ -473,7 +477,9 @@ class _ScrapeSyncService:
         """
         matches = list(Match.objects.filter(round=round_obj))
         by_ext = {m.external_id: m for m in matches if m.external_id}
-        by_pair = {(m.home_team_id, m.away_team_id): m for m in matches}
+        # Pairs only for games without an id (see _resolve_match): two teams
+        # can meet more than once in a round.
+        by_pair = {(m.home_team_id, m.away_team_id): m for m in matches if not m.external_id}
         return by_ext, by_pair
 
     @staticmethod
@@ -680,7 +686,6 @@ class _ScrapeSyncService:
                         venue=r["venue"], venue_city=r["venue_city"],
                     )
                     by_ext[match.external_id] = match
-                    by_pair[(home.id, away.id)] = match
                     written += 1
                     continue
 

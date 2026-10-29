@@ -1,0 +1,32 @@
+{% comment %}
+A PROFILE PHOTO WHOSE FILE IS GONE (client, 29 Oct 2026: "the profile picture
+getting lost and looking bad"). The database can name a file the disk no longer
+has — staging's copy of live does, since live's uploads were never on this
+server. Rather than the browser's broken-image icon, the circle shows a person.
+In the head, so it is listening before the first avatar loads; images that had
+already failed are swept up once the page is parsed.
+{% endcomment %}
+<style>
+.av-gone { position: relative; }
+.av-gone::before {
+  content: ""; position: absolute; inset: 20%; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4.2'/%3E%3Cpath d='M3.5 21c.8-4.4 4.3-7 8.5-7s7.7 2.6 8.5 7z'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4.2'/%3E%3Cpath d='M3.5 21c.8-4.4 4.3-7 8.5-7s7.7 2.6 8.5 7z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+</style>
+<script>
+(function () {
+  function gone(img) {
+    if (!img || img.tagName !== 'IMG' || !/\/media\/avatars\//.test(img.getAttribute('src') || '')) return;
+    var box = img.parentNode;
+    img.remove();
+    if (box && box.classList) box.classList.add('av-gone');
+  }
+  document.addEventListener('error', function (e) { gone(e.target); }, true);
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('img[src*="/media/avatars/"]').forEach(function (img) {
+      if (img.complete && img.naturalWidth === 0) gone(img);
+    });
+  });
+})();
+</script>

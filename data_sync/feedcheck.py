@@ -157,7 +157,8 @@ def _compare_round(svc, competition, series, year, round_number, rows, org_ids, 
         # A game we hold that the feed no longer lists in this round — moved to
         # another round, or something seeded by hand. Worth seeing; not
         # something a re-sync can decide on its own.
-        extra = [m for m in index[1].values()
+        held = {m.id: m for part in index for m in part.values()}
+        extra = [m for m in held.values()
                  if m.id not in seen and m.status != Match.STATUS_POSTPONED]
         for m in extra:
             per_kind[("orphan_match", f"{m.home_team.name} v {m.away_team.name}")].append(org_id)
