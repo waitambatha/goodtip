@@ -10,6 +10,7 @@ reports an accuracy nobody will ever get in production.
 from __future__ import annotations
 
 import logging
+import math
 
 from catalog.models import Series
 
@@ -17,6 +18,8 @@ from .algorithm import FORM_WINDOW, recent_form
 from .models import HistoricalMatch
 
 logger = logging.getLogger(__name__)
+
+MIN_TEST_GAMES = 100
 
 
 def _form_before(history: list[HistoricalMatch], team_id: int, index: int) -> float:
@@ -61,6 +64,33 @@ def build_dataset(series: Series):
     return X, y, rows
 
 
+def fit_logistic(X: list[list[float]], y: list[int], *, l2: float = 1.0, steps: int = 25):
+    """(intercept, coef) of a one-feature logistic regression, by Newton's method.
+
+    The same fit scikit-learn's LogisticRegression() gives (L2 of strength 1 on
+    the coefficient, none on the intercept), written out because sklearn is in
+    neither server's venv: every refit died on its import and no competition
+    past the first four ever got a model.
+    """
+    b0, b1 = 0.0, 0.0
+    for _ in range(steps):
+        g0, g1, h00, h01, h11 = 0.0, l2 * b1, 1e-9, 0.0, l2
+        for (x,), yi in zip(X, y):
+            p = 1 / (1 + math.exp(-(b0 + b1 * x)))
+            w = p * (1 - p)
+            g0 += p - yi
+            g1 += (p - yi) * x
+            h00 += w
+            h01 += w * x
+            h11 += w * x * x
+        det = h00 * h11 - h01 * h01
+        if abs(det) < 1e-12:
+            break
+        b0 -= (h11 * g0 - h01 * g1) / det
+        b1 -= (h00 * g1 - h01 * g0) / det
+    return b0, b1
+
+
 def fit_and_score(series_name: str, *, test_seasons: int = 1):
     """Fit on the older seasons, score on the most recent ones.
 
@@ -69,8 +99,6 @@ def fit_and_score(series_name: str, *, test_seasons: int = 1):
     accuracy of simply always picking the home side. Home advantage is real
     and free, so a model that cannot beat it is not a model.
     """
-    from sklearn.linear_model import LogisticRegression
-
     series = Series.objects.get(name=series_name)
     X, y, rows = build_dataset(series)
     if len(X) < 100:
@@ -87,24 +115,28 @@ def fit_and_score(series_name: str, *, test_seasons: int = 1):
             "needs at least two so the model can be tested on one it never saw."
         )
     holdout = set(seasons[-test_seasons:])
+    # A season a few weeks old is no test: 15 games decide nothing. Hold back
+    # the season before it as well, where one can still be spared to fit on.
+    while (sum(1 for m in rows if m.season in holdout) < MIN_TEST_GAMES
+           and len(holdout) < len(seasons) - 1):
+        holdout.add(seasons[-len(holdout) - 1])
     train_idx = [i for i, m in enumerate(rows) if m.season not in holdout]
     test_idx = [i for i, m in enumerate(rows) if m.season in holdout]
 
     Xtr = [X[i] for i in train_idx]; ytr = [y[i] for i in train_idx]
     Xte = [X[i] for i in test_idx];  yte = [y[i] for i in test_idx]
 
-    model = LogisticRegression()
-    model.fit(Xtr, ytr)
+    intercept, form_coef = fit_logistic(Xtr, ytr)
 
-    correct = sum(1 for xi, yi in zip(Xte, yte) if int(model.predict([xi])[0]) == yi)
+    correct = sum(1 for xi, yi in zip(Xte, yte) if int(intercept + form_coef * xi[0] > 0) == yi)
     accuracy = correct / len(yte) if yte else 0.0
     # The bar: home advantage costs nothing to exploit.
     baseline = sum(yte) / len(yte) if yte else 0.0
 
     return {
         "series": series,
-        "intercept": float(model.intercept_[0]),
-        "form_coef": float(model.coef_[0][0]),
+        "intercept": intercept,
+        "form_coef": form_coef,
         "exp_coef": None,          # no lineup feed yet — see algorithm.py
         "train_seasons": ",".join(str(s) for s in seasons if s not in holdout),
         "test_seasons": ",".join(str(s) for s in sorted(holdout)),

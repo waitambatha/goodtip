@@ -279,6 +279,24 @@ class NewsPost(SeoFieldsMixin, models.Model):
         return "#1F3A2C"
 
     @property
+    def tag_chips(self) -> list:
+        """(label, colour) for every tag, each in its competition's colour."""
+        from catalog.models import Series
+
+        return [(label, Series.COLOURS.get(code, "#1F3A2C")) for code, label in self.tag_pairs]
+
+    @property
+    def code_fill(self) -> str:
+        """The story's colour as a CSS background: its competition's, or those
+        of every competition it covers running into one another (client, 31
+        Oct 2026: "the blog card match the colour... even if we have 3 or 4")."""
+        from catalog.models import Series
+
+        colours = [Series.COLOURS[t.lower()] for t in self.tag_list if t.lower() in Series.COLOURS]
+        colours = list(dict.fromkeys(colours)) or ["#1F3A2C"]
+        return colours[0] if len(colours) == 1 else f"linear-gradient(115deg, {', '.join(colours)})"
+
+    @property
     def is_scheduled(self) -> bool:
         """Published, but not yet. The editor says so rather than showing a
         green Published dot against something no reader can reach."""

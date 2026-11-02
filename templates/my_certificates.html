@@ -1,0 +1,69 @@
+{% extends "app_base.html" %}
+{% block title %}Certificates, {{ org.name }}{% endblock %}
+{% block loader_task %}Fetching your certificates{% endblock %}
+{% block nav_board %}on{% endblock %}
+{% block body_class %}page-deep sheet-page page-dash page-tips page-board{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+
+{% block app_content %}
+{% comment %}
+A member's certificates, on their own page (client, 2 Nov 2026). Only the top
+three of a season earn one, and only once it has ended; until then each
+competition says where you stand and what it would take.
+{% endcomment %}
+<section class="cp-head">
+  <a class="cp-back" href="{% url 'tipping:leaderboard' org.id %}">Leaderboard</a>
+  <h1>Certificates</h1>
+  <p>Finish a season in the top three and a certificate is yours. It unlocks when the season ends.</p>
+  <div class="cp-places">
+    <span class="is-1">{% include "partials/_rank_badge.html" with place=1 kind="person" %}Champion</span>
+    <span class="is-2">{% include "partials/_rank_badge.html" with place=2 kind="person" %}Runner-up</span>
+    <span class="is-3">{% include "partials/_rank_badge.html" with place=3 kind="person" %}Third</span>
+  </div>
+</section>
+
+<div class="cp-grid">
+  {% for p in progress %}
+  <section class="cp-card{% if p.certificates %} has-cert{% endif %}" style="--code: {{ p.series.colour }}">
+    <header>
+      <span class="cp-logo" aria-hidden="true">{% include "partials/_series_logo.html" with s=p.series %}</span>
+      <h2>{{ p.series.name }}</h2>
+      <span class="cp-state{% if p.final %} is-final{% endif %}">{% if p.final %}Season over{% else %}In progress{% endif %}</span>
+    </header>
+    {% if p.final %}
+      {% if p.rank %}<p class="cp-where">You finished <b>#{{ p.rank }}</b> of {{ p.of }}.</p>{% else %}<p class="cp-where">You didn't tip this season.</p>{% endif %}
+      {% if not p.certificates %}<p class="cp-note">Certificates went to the top three.</p>{% endif %}
+      {% for c in p.certificates %}
+      <div class="cp-row">
+        {% include "partials/_rank_badge.html" with place=c.cert.place kind="person" %}
+        <div><b>{{ c.cert.place_label }}</b><span>{{ c.where }}</span></div>
+        {% if c.national %}
+        <a href="{% url 'tipping:certificate_scope_file' org.id c.cert.series 'individual' 'pdf' %}?user={{ c.cert.user_id }}">PDF</a>
+        <a href="{% url 'tipping:certificate_scope_file' org.id c.cert.series 'individual' 'png' %}?user={{ c.cert.user_id }}">Image</a>
+        {% else %}
+        <a href="{% url 'tipping:certificate_file' org.id c.cert.series c.cert.user_id 'pdf' %}{% if c.group %}?group={{ c.group.id }}{% endif %}">PDF</a>
+        <a href="{% url 'tipping:certificate_file' org.id c.cert.series c.cert.user_id 'png' %}{% if c.group %}?group={{ c.group.id }}{% endif %}">Image</a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% elif p.place %}
+      <p class="cp-where">You're <b>#{{ p.rank }}</b> of {{ p.of }}.</p>
+      <p class="cp-note">Stay in the top three until the season ends and it's yours.</p>
+    {% elif p.to_top3 %}
+      <p class="cp-where">You're <b>#{{ p.rank }}</b> of {{ p.of }}.</p>
+      <p class="cp-note">You need <b>{{ p.to_top3 }} more point{{ p.to_top3|pluralize }}</b> to reach the top three before the season ends.</p>
+    {% elif p.rank %}
+      <p class="cp-where">You're <b>#{{ p.rank }}</b> of {{ p.of }}.</p>
+      <p class="cp-note">Finish in the top three before the season ends.</p>
+    {% else %}
+      <p class="cp-where">You haven't tipped this one yet.</p>
+      <p class="cp-note">Finish in the top three before the season ends.</p>
+    {% endif %}
+  </section>
+  {% empty %}
+  <section class="cp-card"><p class="cp-where">No competition here awards a certificate yet.</p></section>
+  {% endfor %}
+</div>
+
+{% if can_certify %}<p class="cp-admin"><a href="{% url 'tipping:certificates' org.id %}">Manage this organisation's certificates</a></p>{% endif %}
+{% endblock %}

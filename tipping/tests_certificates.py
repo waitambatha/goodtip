@@ -155,11 +155,48 @@ class CertificateTests(CertFixture):
             self.client.get(reverse("tipping:certificate_file", args=base + ["square"])).status_code, 404,
         )
 
-    def test_nobody_else_can_be_certified(self):
+    def test_the_top_three_get_a_certificate_and_only_they_do(self):
         self._finished_season(ann=3, bob=1)
         self.client.force_login(self.boss)
         url = reverse("tipping:certificate_file", args=[self.org.id, "NRL", self.bob.id, "pdf"])
+        self.assertEqual(self.client.get(url).status_code, 200)
+        url = reverse("tipping:certificate_file", args=[self.org.id, "NRL", self.boss.id, "pdf"])
         self.assertEqual(self.client.get(url).status_code, 404)
+
+    def test_a_placegetter_can_download_their_own(self):
+        from .certificates import member_certificates
+
+        self._finished_season(ann=3, bob=1)
+        self.assertEqual(member_certificates(self.bob, self.org)[0]["cert"].place, 2)
+        self.client.force_login(self.bob)
+        url = reverse("tipping:certificate_file", args=[self.org.id, "NRL", self.bob.id, "png"])
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_a_small_group_awards_nothing(self):
+        from orgs.models import Group, GroupMember
+
+        from .certificates import member_certificates, placegetters
+
+        self._finished_season(ann=3, bob=1)
+        group = Group.objects.create(org=self.org, name="Tiny")
+        GroupMember.objects.create(group=group, user=self.ann)
+        self.assertEqual(placegetters(self.org, self.nrl, group=group), [])
+        self.assertEqual({c["where"] for c in member_certificates(self.ann, self.org)}, {self.org.name})
+
+    def test_finishing_outside_the_top_three_downloads_nothing(self):
+        self._finished_season(ann=3, bob=1)
+        self.client.force_login(self.boss)
+        page = self.client.get(reverse("tipping:my_certificates", args=[self.org.id]))
+        self.assertContains(page, "Certificates went to the top three")
+        self.assertNotContains(page, "/pdf/")
+
+    def test_mid_season_the_panel_says_what_it_would_take(self):
+        from .certificates import certificate_progress
+
+        self._tip(self.ann, self._match(1), 1)
+        row = certificate_progress(self.ann, self.org)[0]
+        self.assertFalse(row["final"])
+        self.assertEqual((row["place"], row["certificates"]), (1, []))
 
     def test_mid_season_there_is_no_file(self):
         self._tip(self.ann, self._match(1), 1)
@@ -170,8 +207,8 @@ class CertificateTests(CertFixture):
     def test_the_leaderboard_points_the_captain_at_them(self):
         self._finished_season()
         self.client.force_login(self.cap)
-        resp = self.client.get(reverse("tipping:leaderboard", args=[self.org.id]))
-        self.assertContains(resp, "Season champion certificates are ready")
+        resp = self.client.get(reverse("tipping:my_certificates", args=[self.org.id]))
+        self.assertContains(resp, reverse("tipping:certificates", args=[self.org.id]))
 
 
 @override_settings(MEDIA_ROOT=temp_media())
@@ -377,74 +414,6 @@ class CrossOrgCertificateTests(TestCase):
         )
         return user
 
-    def test_not_final_until_every_consenting_org_is_final(self):
-        from tipping.certificates import industry_champion
-
-        a = self.make_org("A Co")
-        b = self.make_org("B Co")
-        match = self.finish_season(a)
-        self.score(a, match, 10)
-        # b's own season is not final yet — nothing can be named for the pool.
-        self.assertIsNone(industry_champion(a, self.nrl))
-
-    def test_a_private_organisation_is_excluded_from_the_pool(self):
-        from tipping.certificates import industry_champion
-
-        a = self.make_org("A Co")
-        private = self.make_org("Private Co", public=False)
-        ma = self.finish_season(a)
-        self.finish_season(private)
-        self.score(a, ma, 10)
-        # Only one CONSENTING org runs this competition — a field of one is
-        # not a comparison, whatever the private organisation scored.
-        self.assertIsNone(industry_champion(a, self.nrl))
-
-    def test_the_organisation_with_the_better_average_tops_the_industry(self):
-        from tipping.certificates import industry_champion
-
-        a = self.make_org("A Co")
-        b = self.make_org("B Co")
-        ma, mb = self.finish_season(a), self.finish_season(b)
-        self.score(a, ma, 10)
-        self.score(b, mb, 1)
-        cert = industry_champion(a, self.nrl)
-        self.assertIsNotNone(cert)
-        self.assertEqual(cert.winner, "A Co")
-        self.assertEqual(cert.scope, "industry")
-        self.assertEqual(cert.scope_label, "Business")
-        # The organisation that did NOT top it gets nothing.
-        self.assertIsNone(industry_champion(b, self.nrl))
-
-    def test_a_different_type_does_not_enter_the_industry_pool(self):
-        from tipping.certificates import industry_champion
-
-        a = self.make_org("A Co", organisation_type=self.business)
-        b = self.make_org("B Co", organisation_type=self.business)
-        c = self.make_org("C Charity", organisation_type=self.community)
-        ma, mb, mc = self.finish_season(a), self.finish_season(b), self.finish_season(c)
-        self.score(a, ma, 10)
-        self.score(b, mb, 1)
-        self.score(c, mc, 999)
-        # C would win outright, but it is not a Business organisation, so it
-        # never enters A and B's industry pool.
-        cert = industry_champion(a, self.nrl)
-        self.assertIsNotNone(cert)
-        self.assertEqual(cert.winner, "A Co")
-
-    def test_national_tops_every_consenting_organisation_regardless_of_type(self):
-        from tipping.certificates import national_org_champion
-
-        a = self.make_org("A Co", organisation_type=self.business)
-        c = self.make_org("C Charity", organisation_type=self.community)
-        ma, mc = self.finish_season(a), self.finish_season(c)
-        self.score(a, ma, 1)
-        self.score(c, mc, 10)
-        self.assertIsNone(national_org_champion(a, self.nrl))
-        cert = national_org_champion(c, self.nrl)
-        self.assertIsNotNone(cert)
-        self.assertEqual(cert.winner, "C Charity")
-        self.assertEqual(cert.scope, "national")
-
     def test_the_top_individual_is_attributed_to_their_own_organisation(self):
         from tipping.certificates import national_individual_champion
 
@@ -459,19 +428,3 @@ class CrossOrgCertificateTests(TestCase):
         self.assertEqual(cert_a.scope, "individual_national")
         # B never tipped with this person — B does not get to show their cert.
         self.assertIsNone(national_individual_champion(b, self.nrl))
-
-    def test_the_certificates_page_shows_the_wider_wins(self):
-        a = self.make_org("A Co")
-        b = self.make_org("B Co")
-        ma, mb = self.finish_season(a), self.finish_season(b)
-        boss = self._user()
-        from orgs.models import OrgMember
-
-        OrgMember.objects.create(user=boss, org=a, role=OrgMember.ROLE_MANAGER)
-        self.score(a, ma, 10)
-        self.score(b, mb, 1)
-        self.client.force_login(boss)
-        page = self.client.get(reverse("tipping:certificate_competition", args=[a.id, "NRL"])).content.decode()
-        self.assertIn("Beyond A Co", page)
-        self.assertIn("Best Business organisation", page)
-        self.assertIn("Best organisation nationwide", page)

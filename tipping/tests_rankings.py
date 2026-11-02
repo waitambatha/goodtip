@@ -104,8 +104,6 @@ class RankingsTests(TestCase):
         self.client.force_login(self.me)
         url = reverse("tipping:leaderboard", args=[self.mine.id])
         resp = self.client.get(url)
-        self.assertContains(resp, "You nationally")
-        self.assertContains(resp, 'class="lb-filters"')
         for view, text in (("industry", "How My Small Office compares"), ("national", "Every organisation on GoodTip"),
                            ("everyone", "Everyone on GoodTip")):
             self.assertContains(self.client.get(url, {"view": view}), text)

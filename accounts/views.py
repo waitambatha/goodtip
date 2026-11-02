@@ -1005,9 +1005,10 @@ def dashboard_view(request):
             g.round_open = state["open"]
             g.can_tip = g.round_open and not g.is_locked
             g.lock_note = ""
+            g.lock_opens = state.get("opens_at")
             if not g.round_open and state["waits_for"] is not None:
                 g.lock_note = (
-                    f"Locked. You can tip this once round "
+                    f"You can tip this once round "
                     f"{state['waits_for'].round_number} is over."
                 )
             # How this pick went, for a round already played. None means not
@@ -1313,6 +1314,8 @@ def _chip_row(user, selected, org_series, active_slugs):
 
         {"chips": [{"series", "pinned", "in_org", "on"}], "pinnable": [(sport, [series])]}
     """
+    from django.db.models import Count
+
     from catalog.models import Series, Sport
 
     if not selected:
@@ -1322,13 +1325,19 @@ def _chip_row(user, selected, org_series, active_slugs):
         org.root.competitions.values_list("series__id", flat=True))
     pins = [p for p in (getattr(user, "pinned_series", None) or []) if p not in DEFAULT_CHIPS]
     by_slug = {s.slug: s for s in Series.objects.filter(slug__in=list(DEFAULT_CHIPS) + pins)}
+    now = timezone.now()
+    upcoming = dict(
+        Match.objects.filter(round__org=org, kickoff_at__gte=now,
+                             kickoff_at__lte=now + timezone.timedelta(days=14))
+        .values_list("round__series").annotate(n=Count("id")).values_list("round__series", "n")
+    )
     chips = []
     for slug in list(DEFAULT_CHIPS) + pins:
         s = by_slug.get(slug)
         if s is None or (slug not in DEFAULT_CHIPS and not (s.is_active and s.sport.is_active)):
             continue
         chips.append({"series": s, "pinned": slug in pins, "in_org": s.id in in_org,
-                      "on": slug in active_slugs})
+                      "on": slug in active_slugs, "upcoming": upcoming.get(s.id, 0)})
     pinnable = []
     admin = selected.get("is_admin")
     for sport in Sport.objects.filter(is_active=True).prefetch_related("series"):

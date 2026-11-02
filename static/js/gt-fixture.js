@@ -256,3 +256,49 @@
     });
   });
 })();
+
+/* Clocks that move (client, 31 Oct 2026: "see the time counting"). Anything
+ * carrying data-gt-until counts down to that moment, data-gt-since counts up
+ * from it. Read afresh each second, so cards htmx swapped in tick by themselves. */
+(function () {
+  function two(n) { return (n < 10 ? '0' : '') + n; }
+  function span(ms) {
+    var s = Math.floor(ms / 1000), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600),
+        m = Math.floor(s % 3600 / 60), sec = s % 60;
+    if (d) return d + 'd ' + two(h) + 'h ' + two(m) + 'm ' + two(sec) + 's';
+    return (h ? h + ':' + two(m) : m) + ':' + two(sec);
+  }
+  function tick() {
+    var now = Date.now();
+    document.querySelectorAll('[data-gt-until]').forEach(function (el) {
+      var left = Date.parse(el.getAttribute('data-gt-until')) - now;
+      if (!isNaN(left)) el.textContent = left > 0 ? span(left) : (el.getAttribute('data-gt-done') || 'now');
+    });
+    document.querySelectorAll('[data-gt-since]').forEach(function (el) {
+      var gone = now - Date.parse(el.getAttribute('data-gt-since'));
+      if (!isNaN(gone) && gone >= 0) el.textContent = span(gone);
+    });
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+
+/* Switching organisation or group reloads the page, so say so across the whole
+ * screen: the room's name in a ring, until the next page arrives. */
+document.addEventListener('submit', function (e) {
+  var form = e.target;
+  if (!form.matches || !form.matches('[data-switch-to]') || document.querySelector('.gt-switching')) return;
+  var box = document.createElement('div');
+  box.className = 'gt-switching';
+  box.setAttribute('role', 'status');
+  var ring = document.createElement('i');
+  ring.className = 'gt-switching-ring busy-run';
+  var text = document.createElement('b');
+  text.textContent = 'Switching to ' + form.getAttribute('data-switch-to');
+  box.appendChild(ring);
+  box.appendChild(text);
+  document.body.appendChild(box);
+});
+window.addEventListener('pageshow', function () {
+  document.querySelectorAll('.gt-switching').forEach(function (b) { b.remove(); });
+});

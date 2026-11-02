@@ -36,15 +36,15 @@ Expects: menu (accounts.views._sports_menu), org.
   <ul class="ds-list">
     <li><a class="ds-row{% if not active_slugs %} on{% endif %}" data-ds-filter
            href="{{ dash_url }}?org={{ org.id }}"
-           hx-get="{{ dash_url }}?slate=1&amp;org={{ org.id }}" hx-target="#slipPanel" hx-swap="outerHTML show:none"
+           hx-get="{{ dash_url }}?slate=1&amp;org={{ org.id }}" hx-target="#slipPanel" hx-swap="outerHTML show:none swap:500ms"
            hx-push-url="{{ dash_url }}?org={{ org.id }}">
       <span class="ds-ic" aria-hidden="true">&#9733;</span><span class="ds-name">Everything you tip</span></a></li>
     {% for c in menu.yours %}
     <li><a class="ds-row{% if c.on %} on{% endif %}" data-ds-filter data-code="{{ c.series.slug }}" data-cat="{{ c.series.category }}" title="{{ c.series.name }}" style="--code: {{ c.series.colour }}"
            href="{{ dash_url }}?org={{ org.id }}&amp;series={{ c.series.slug }}"
-           hx-get="{{ dash_url }}?slate=1&amp;org={{ org.id }}&amp;series={{ c.series.slug }}" hx-target="#slipPanel" hx-swap="outerHTML show:none"
-           hx-push-url="{{ dash_url }}?org={{ org.id }}&amp;series={{ c.series.slug }}">
-      <span class="ds-dot" aria-hidden="true"></span><span class="ds-name">{{ c.series.name }}</span>
+           hx-get="{{ dash_url }}?slate=1&amp;org={{ org.id }}&amp;series={{ c.series.slug }}" hx-target="#slipPanel" hx-swap="outerHTML show:none swap:500ms"
+           hx-push-url="{{ dash_url }}?org={{ org.id }}&amp;series={{ c.series.slug }}" data-veil-for="#roundFixtures" {% include "partials/_veil_attrs.html" with s=c.series %}>
+      <span class="ds-logo" aria-hidden="true"><em>{% include "partials/_series_logo.html" with s=c.series %}</em><i>{{ c.series.short }}</i></span><span class="ds-name">{{ c.series.name }}</span>
       {% if c.upcoming %}<span class="ds-n">{{ c.upcoming }}</span>{% endif %}</a></li>
     {% endfor %}
   </ul>
@@ -54,7 +54,7 @@ Expects: menu (accounts.views._sports_menu), org.
     {% for s in menu.sports %}
     <details class="ds-sport"{% if s.open %} open{% endif %}>
       <summary class="ds-row" title="{{ s.sport.name }}">
-        <span class="ds-emoji" aria-hidden="true">{{ s.sport.icon|default:"🏅" }}</span>
+        <span class="ds-logo" style="--code: {{ s.sport.colour }}" aria-hidden="true"><em>{% include "partials/_series_logo.html" with s=s.sport %}</em></span>
         <span class="ds-name">{{ s.sport.name }}</span>
         {% if s.count %}<span class="ds-n">{{ s.count }}</span>{% endif %}
         <svg class="ds-chev" aria-hidden="true"><use href="#ic-chev-down"/></svg>
@@ -72,15 +72,15 @@ Expects: menu (accounts.views._sports_menu), org.
             {% if c.in_org %}
             <a class="ds-comp{% if c.on %} on{% endif %}" data-ds-filter
                href="{{ dash_url }}?org={{ org.id }}&amp;series={{ c.series.slug }}"
-               hx-get="{{ dash_url }}?slate=1&amp;org={{ org.id }}&amp;series={{ c.series.slug }}" hx-target="#slipPanel" hx-swap="outerHTML show:none"
-               hx-push-url="{{ dash_url }}?org={{ org.id }}&amp;series={{ c.series.slug }}">
-              <span class="ds-name">{{ c.series.name }}</span>{% if c.upcoming %}<span class="ds-n">{{ c.upcoming }}</span>{% endif %}</a>
+               hx-get="{{ dash_url }}?slate=1&amp;org={{ org.id }}&amp;series={{ c.series.slug }}" hx-target="#slipPanel" hx-swap="outerHTML show:none swap:500ms"
+               hx-push-url="{{ dash_url }}?org={{ org.id }}&amp;series={{ c.series.slug }}" data-veil-for="#roundFixtures" {% include "partials/_veil_attrs.html" with s=c.series %}>
+              <span class="ds-minilogo" aria-hidden="true">{% include "partials/_series_logo.html" with s=c.series %}</span><span class="ds-name">{{ c.series.name }}</span>{% if c.upcoming %}<span class="ds-n">{{ c.upcoming }}</span>{% endif %}</a>
             {% elif menu.is_admin %}
             <a class="ds-comp is-add" href="{% url 'orgs:sports' org.root.id %}#sport-{{ s.sport.slug }}" title="Add {{ c.series.name }} to {{ org.name }}">
-              <span class="ds-name">{{ c.series.name }}</span><span class="ds-add">+ Add</span></a>
+              <span class="ds-minilogo" aria-hidden="true">{% include "partials/_series_logo.html" with s=c.series %}</span><span class="ds-name">{{ c.series.name }}</span><span class="ds-add">+ Add</span></a>
             {% else %}
             <span class="ds-comp is-off" title="{{ org.name }} doesn't tip {{ c.series.name }}">
-              <span class="ds-name">{{ c.series.name }}</span><span class="ds-off">Not tipped here</span></span>
+              <span class="ds-minilogo" aria-hidden="true">{% include "partials/_series_logo.html" with s=c.series %}</span><span class="ds-name">{{ c.series.name }}</span><span class="ds-off">Not tipped here</span></span>
             {% endif %}
           </li>
           {% endfor %}

@@ -1,0 +1,44 @@
+{% load team_extras %}
+{% comment %}
+One game in the history. Same parts as a fixture card, so the two read as one
+product: the competition's tag, the two clubs either side of the score
+medallion. The side you picked is ringed green or red once it is decided.
+Expects: r ({match, tip, outcome, points}), m (r.match), org.
+{% endcomment %}
+<article class="tk is-{{ r.outcome }}" style="--code: {{ m.round.series.colour }}; --code-ink: {{ m.round.series.colour }}; --code-on: #fff">
+  <div class="fxc-meta">
+    <span class="fxc-code"><span class="fxc-code-logo" aria-hidden="true">{% include "partials/_series_logo.html" with s=m.round.series %}</span>{{ m.round.series.name }}</span>
+    <span class="fxc-when">{{ m.kickoff_at|date:"g:i A" }}</span>
+    <span class="fxc-rnd">{{ m.round.label }}</span>
+    {% if m.phase == "live" %}{% include "components/_match_state.html" with match=m %}{% endif %}
+    <span class="tk-res is-{{ r.outcome }}">{% if r.outcome == "won" %}Correct{% elif r.outcome == "lost" %}Wrong{% elif r.outcome == "missed" %}{% if m.phase == "live" %}Not tipped{% else %}Missed{% endif %}{% else %}Pending{% endif %}</span>
+  </div>
+
+  <div class="tk-match">
+    <div class="tk-team{% if r.tip.selection == 'home' %} is-pick{% endif %}{% if m.result == 'home' %} is-winner{% endif %}">
+      <span class="tk-crest">{% crest m.home_team %}</span><b>{{ m.home_team.name }}</b>
+    </div>
+    <div class="fxc-drawcol tk-mid{% if r.tip.selection == 'draw' %} is-pick{% endif %}">
+      {% if m.phase == "upcoming" %}<span class="fxc-draw-face tk-vs"><span class="fxc-name">vs</span></span>
+      {% else %}{% include "partials/_draw_face.html" with match=m %}{% endif %}
+    </div>
+    <div class="tk-team is-away{% if r.tip.selection == 'away' %} is-pick{% endif %}{% if m.result == 'away' %} is-winner{% endif %}">
+      <span class="tk-crest">{% crest m.away_team %}</span><b>{{ m.away_team.name }}</b>
+    </div>
+  </div>
+
+  <div class="tk-foot">
+    {% if r.tip %}
+    <span class="tk-pick">Your tip <b>{{ r.tip.pick_name }}</b>{% if r.tip.is_auto %}<i>Picked for you</i>{% endif %}</span>
+    {% else %}
+    <span class="tk-pick">You didn't tip this one</span>
+    {% endif %}
+    {% if r.outcome == "pending" and m.phase == "upcoming" %}
+    <a class="tk-change" href="{% url 'dashboard' %}?org={{ org.id }}" hx-boost="false">Change it</a>
+    {% elif r.outcome == "won" %}
+    <span class="tk-pts is-won">+{{ r.points }} {% if r.points == 1 %}point{% else %}points{% endif %}</span>
+    {% elif r.outcome == "lost" %}
+    <span class="tk-pts">0 points</span>
+    {% endif %}
+  </div>
+</article>

@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.db.models import F, Count, Exists, OuterRef, Q, Sum, Value
+from django.db.models import F, Count, Exists, Max, OuterRef, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
@@ -439,6 +439,17 @@ def tip_window(org) -> dict[int, dict]:
                 window[rnd.id] = {"open": True, "waits_for": None}
             else:
                 window[rnd.id] = {"open": False, "waits_for": rounds[i - TIP_WINDOW_ROUNDS]}
+    # When it opens: the moment the round it waits for has no game left to
+    # start, which is that round's last kick-off (the test in `live` above).
+    waited = {st["waits_for"].id for st in window.values() if st["waits_for"] is not None}
+    if waited:
+        last = dict(
+            Match.objects.filter(round_id__in=waited).values_list("round_id")
+            .annotate(at=Max("kickoff_at")).values_list("round_id", "at")
+        )
+        for st in window.values():
+            if st["waits_for"] is not None:
+                st["opens_at"] = last.get(st["waits_for"].id)
     return window
 
 
@@ -553,6 +564,10 @@ def _leaderboard(org_ids, tip_filter):
         points=Coalesce(Sum("tips__points_awarded", filter=tip_filter), Value(0)),
         tips_total=Count("tips", filter=tip_filter & real & Q(tips__is_correct__isnull=False)),
         tips_correct=Count("tips", filter=tip_filter & real & Q(tips__is_correct=True)),
+        # Every graded tip, auto-picks included: what the leaderboard's table
+        # shows, so a row's numbers account for its points.
+        graded_all=Count("tips", filter=tip_filter & Q(tips__is_correct__isnull=False)),
+        correct_all=Count("tips", filter=tip_filter & Q(tips__is_correct=True)),
     ).order_by("-points", "display_name")
 
 

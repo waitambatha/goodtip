@@ -3,8 +3,10 @@
 from io import BytesIO
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from PIL import Image
+
+from goodtip.testing import temp_media
 
 from .forms import AvatarForm
 
@@ -15,6 +17,7 @@ def _upload(w, h, fmt="PNG"):
     return SimpleUploadedFile(f"wide.{fmt.lower()}", buf.getvalue(), content_type=f"image/{fmt.lower()}")
 
 
+@override_settings(MEDIA_ROOT=temp_media())
 class AvatarSquareTests(TestCase):
     def test_a_wide_screenshot_is_stored_as_a_square_jpeg(self):
         out = AvatarForm._square(_upload(1600, 400))

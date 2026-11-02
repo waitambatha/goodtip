@@ -26,8 +26,8 @@ one picture, drawn once in tipping/certificates.py, so the two cannot differ.
 </div></div>
 
 {% if champions %}
-  {% if champions|length > 1 %}<p class="certdet-co">Co-champions. Each gets their own certificate, same title and wording.</p>{% endif %}
   {% for cert in champions %}
+  <h3 class="certdet-place">{{ cert.place_label }} &middot; {{ cert.winner }}</h3>
   <div class="certdet-card">
     <img class="certdet-img" src="{% url 'tipping:certificate_file' org.id cert.series cert.user_id 'png' %}?view=1" alt="{{ cert.headline }}: {{ cert.winner }}, {{ cert.org_name }}" width="2508" height="1412">
   </div>
@@ -92,7 +92,7 @@ one picture, drawn once in tipping/certificates.py, so the two cannot differ.
   <p class="cert-wait" style="text-align:center;">The season is final, but nobody scored a point in it, so there's no champion to certify.</p>
 {% endif %}
 
-{% if industry or national or individual_national %}
+{% if individual_national %}
 {% comment %}
 BEYOND ONE ORGANISATION (client, 12 Oct 2026): "if my organisation is the
 best... if it's me... irrespective of the type of organisation... we should
@@ -102,32 +102,6 @@ and only for the organisation (or person) that topped it.
 <div class="cert-beyond" style="max-width:1180px;margin-left:auto;margin-right:auto;border-top:none;">
   <h3 class="cert-beyond-h">Beyond {{ org.name }}</h3>
   <div class="cert-beyond-grid">
-    {% if industry %}
-    <article class="cert-beyond-card">
-      <a class="cert-hero" href="{% url 'tipping:certificate_scope_file' org.id industry.series 'industry' 'png' %}?view=1" target="_blank" rel="noopener" title="Open full size">
-        <img src="{% url 'tipping:certificate_scope_file' org.id industry.series 'industry' 'png' %}?view=1" alt="{{ industry.headline }}" width="2508" height="1412">
-      </a>
-      <b class="cert-beyond-t">Best {{ industry.scope_label }} organisation</b>
-      <span class="cert-beyond-s">{{ org.name }} topped every consenting {{ industry.scope_label }} organisation on GoodTip.</span>
-      <div class="cert-actions">
-        <a class="cert-btn" href="{% url 'tipping:certificate_scope_file' org.id industry.series 'industry' 'pdf' %}">PDF (to print)</a>
-        <a class="cert-btn" href="{% url 'tipping:certificate_scope_file' org.id industry.series 'industry' 'png' %}">Image (PNG)</a>
-      </div>
-    </article>
-    {% endif %}
-    {% if national %}
-    <article class="cert-beyond-card">
-      <a class="cert-hero" href="{% url 'tipping:certificate_scope_file' org.id national.series 'national' 'png' %}?view=1" target="_blank" rel="noopener" title="Open full size">
-        <img src="{% url 'tipping:certificate_scope_file' org.id national.series 'national' 'png' %}?view=1" alt="{{ national.headline }}" width="2508" height="1412">
-      </a>
-      <b class="cert-beyond-t">Best organisation nationwide</b>
-      <span class="cert-beyond-s">{{ org.name }} topped every consenting organisation on GoodTip, of any type.</span>
-      <div class="cert-actions">
-        <a class="cert-btn" href="{% url 'tipping:certificate_scope_file' org.id national.series 'national' 'pdf' %}">PDF (to print)</a>
-        <a class="cert-btn" href="{% url 'tipping:certificate_scope_file' org.id national.series 'national' 'png' %}">Image (PNG)</a>
-      </div>
-    </article>
-    {% endif %}
     {% if individual_national %}
     <article class="cert-beyond-card">
       <a class="cert-hero" href="{% url 'tipping:certificate_scope_file' org.id individual_national.series 'individual' 'png' %}?view=1" target="_blank" rel="noopener" title="Open full size">

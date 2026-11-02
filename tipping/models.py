@@ -200,6 +200,12 @@ class Match(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["round", "external_id"], condition=~models.Q(external_id=""),
+                name="uniq_match_external_per_round",
+            ),
+        ]
         ordering = ["kickoff_at"]
         # Django pluralises by adding an "s", which makes this table "Matchs"
         # wherever the admin names it — the rail, the hub card, the breadcrumb

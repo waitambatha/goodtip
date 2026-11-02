@@ -185,6 +185,22 @@
     return el.getAttribute('data-veil-label') || 'Loading';
   }
 
+  /* A competition's own loader: its logo held in a ring of its colour. */
+  function logoNode(url) {
+    var wrap = document.createElement('span');
+    wrap.className = 'bv-logo';
+    wrap.setAttribute('aria-hidden', 'true');
+    var ring = document.createElement('i');
+    ring.className = 'bv-logo-ring busy-run';
+    var img = document.createElement('img');
+    img.className = 'busy-run';
+    img.alt = '';
+    img.src = url;
+    wrap.appendChild(ring);
+    wrap.appendChild(img);
+    return wrap;
+  }
+
   /* The box a person would say is loading. */
   function scopeFor(evt) {
     var el = evt.detail && evt.detail.elt;
@@ -219,7 +235,7 @@
     return !!trigger && trigger.indexOf('every') !== -1;
   }
 
-  function show(scope, text, shape, code) {
+  function show(scope, text, shape, code, logo, colour) {
     if (!scope || scope.querySelector(':scope > .busy-veil')) return;
 
     var veil = document.createElement('div');
@@ -230,6 +246,7 @@
        var(--code), so one attribute colours the whole thing and no shape ever
        names a colour. */
     if (code) veil.setAttribute('data-code', code);
+    if (colour) veil.style.setProperty('--code', colour);
 
     /* A SMALL REGION GETS THE SHAPE AND NOT THE SENTENCE.
      *
@@ -245,7 +262,7 @@
 
     var inner = document.createElement('div');
     inner.className = 'bv-inner';
-    inner.appendChild(shapeNode(shape));
+    inner.appendChild(logo && !tight ? logoNode(logo) : shapeNode(shape));
 
     if (!tight) {
       var caption = document.createElement('span');
@@ -292,7 +309,9 @@
        quick presses would leave the next slow one showing the shape you last
        actually saw. */
     var shape = nextShape(code);
-    var timer = setTimeout(function () { show(scope, label(el), shape, code); }, SHOW_AFTER);
+    var logo = el.getAttribute('data-veil-logo') || '';
+    var colour = el.getAttribute('data-veil-colour') || '';
+    var timer = setTimeout(function () { show(scope, label(el), shape, code, logo, colour); }, logo ? 0 : SHOW_AFTER);
     pending.set(el, { timer: timer, scope: scope });
   });
 

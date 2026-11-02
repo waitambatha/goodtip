@@ -1,0 +1,7 @@
+{% load static %}{% comment %}
+A top-three crest (client, 2 Nov 2026): the Lion in gold for first, the Elephant
+in silver for second, the Eagle in bronze for third. A person's is round, an
+organisation's a shield. Read from the live rank, so it moves when the order
+does. Artwork credit: static/img/badges/CREDITS.txt.
+Expects: place (1-3), kind ("person"|"org").
+{% endcomment %}<span class="rb rb-{{ place }}{% if kind == 'org' %} rb-org{% endif %}" title="{% if place == 1 %}Lion: first{% elif place == 2 %}Elephant: second{% else %}Eagle: third{% endif %}"><img src="{% if place == 1 %}{% static 'img/badges/lion.svg' %}{% elif place == 2 %}{% static 'img/badges/elephant.svg' %}{% else %}{% static 'img/badges/eagle.svg' %}{% endif %}" alt=""></span>

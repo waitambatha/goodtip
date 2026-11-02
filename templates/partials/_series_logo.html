@@ -1,0 +1,4 @@
+{% comment %}
+A competition's or a sport's logo, or its letters where it has none or the
+image fails to load. Expects: s (a catalog.Series or catalog.Sport).
+{% endcomment %}{% if s.logo %}<img class="lg-img" src="{{ s.logo }}" alt="" loading="lazy" data-short="{{ s.short }}" onerror="this.outerHTML='<span class=lg-mono>'+this.dataset.short+'</span>'">{% else %}<span class="lg-mono">{{ s.short }}</span>{% endif %}

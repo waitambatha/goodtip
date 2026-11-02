@@ -1,0 +1,10 @@
+{% comment %}One page of tickets, then the way to the next. The button swaps itself for the next page.{% endcomment %}
+<div class="tk-chunk">
+  {% for r in rows %}
+  {% if r.new_day %}<h2 class="tk-day">{{ r.match.kickoff_at|date:"l j F Y" }}</h2>{% endif %}
+  {% include "partials/_tip_ticket.html" with m=r.match %}
+  {% endfor %}
+  {% if next_query %}
+  <a class="tk-more" href="?{{ next_query }}" hx-boost="false" hx-get="?{{ next_query }}" hx-target="closest .tk-more" hx-select=".tk-chunk" hx-swap="outerHTML" hx-push-url="false">Show more</a>
+  {% endif %}
+</div>

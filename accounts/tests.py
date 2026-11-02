@@ -399,8 +399,8 @@ class DashboardThisWeekTests(TestCase):
         import re
 
         return [(n, s) for s, n in re.findall(
-            r'<span class="fxc-code"[^>]*>([^<]+)</span>\s*'
-            r'<span class="fxc-rnd">Round (\d+)</span>', body)]
+            r'<span class="fxc-code"[^>]*><span class="fxc-code-logo".*?</span>([^<]+)</span>.*?'
+            r'<span class="fxc-rnd">Round (\d+)</span>', body, re.S)]
 
     def _coming_up(self, body):
         """The part of the feed before its results begin."""

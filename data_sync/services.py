@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Protocol
 
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils.text import slugify
 from django.utils import timezone
 
@@ -679,15 +679,22 @@ class _ScrapeSyncService:
                     continue
                 match = self._lookup(by_ext, by_pair, r["external_id"], home, away)
                 if match is None:
-                    match = Match.objects.create(
-                        round=round_obj, external_id=r["external_id"],
-                        home_team=home, away_team=away,
-                        kickoff_at=r["kickoff_at"],
-                        venue=r["venue"], venue_city=r["venue_city"],
-                    )
-                    by_ext[match.external_id] = match
-                    written += 1
-                    continue
+                    try:
+                        with transaction.atomic():
+                            match = Match.objects.create(
+                                round=round_obj, external_id=r["external_id"],
+                                home_team=home, away_team=away,
+                                kickoff_at=r["kickoff_at"],
+                                venue=r["venue"], venue_city=r["venue_city"],
+                            )
+                    except IntegrityError:
+                        # Another sync of this organisation got here first.
+                        match = Match.objects.get(round=round_obj, external_id=r["external_id"])
+                        by_ext[match.external_id] = match
+                    else:
+                        by_ext[match.external_id] = match
+                        written += 1
+                        continue
 
                 wanted = {
                     "external_id": r["external_id"],

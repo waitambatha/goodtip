@@ -39,6 +39,26 @@ class Sport(models.Model):
     class Meta:
         ordering = ["sort_order", "name"]
 
+    # A sport has no logo of its own, so the menu shows its leading competition's
+    # (client, 31 Oct 2026: no emoji under All sports), or failing that its
+    # letters on that competition's colour.
+    @property
+    def lead(self):
+        series = list(self.series.all())
+        return next((s for s in series if s.logo), series[0] if series else None)
+
+    @property
+    def logo(self) -> str:
+        return self.lead.logo if self.lead else ""
+
+    @property
+    def colour(self) -> str:
+        return self.lead.colour if self.lead else "#2B4A3B"
+
+    @property
+    def short(self) -> str:
+        return self.name[:3].upper()
+
     def __str__(self):
         return self.name
 
@@ -96,17 +116,45 @@ class Series(models.Model):
     # "make sure the sports have different colours, I see some are similar").
     # Deep enough for white text on every one.
     COLOURS = {
-        "afl": "#2F5D8C", "aflw": "#8C2F55", "nrl": "#8A5A1E", "nrlw": "#5B3A8C",
-        "state-of-origin": "#1F6E5A", "super-league": "#5C6B2E", "super-netball": "#B0306E",
-        "epl": "#3D195B", "la-liga": "#C8102E", "serie-a": "#0B5FA5", "bundesliga": "#D4021D",
-        "ucl": "#0E1E5B", "a-league-men": "#E35205", "a-league-women": "#9B2D7F", "wsl": "#6E2C91",
-        "nba": "#1D428A", "wnba": "#E0571F", "nbl": "#0F7B6C", "wnbl": "#AD1F5C",
-        "bbl": "#1B8A3A", "wbbl": "#7A1FA2", "test-cricket": "#7B5E2A",
-        "super-rugby": "#0B4F6C", "super-rugby-w": "#B5446E", "six-nations": "#2E4A9E",
-        "slams-men": "#2C7A3F", "slams-women": "#8E3B8C",
-        "golf-majors-men": "#1F5E3A", "golf-majors-women": "#A04A75",
-        "f1": "#C1121F", "supercars": "#D9480F",
-        "nfl": "#013369", "nhl": "#1A1A1A", "pwhl": "#5E35B1", "mlb": "#0C2C56",
+        "afl": "#0B57D0", "aflw": "#DB2777", "nrl": "#15803D", "nrlw": "#7C3AED",
+        "state-of-origin": "#0F766E", "super-league": "#65761B", "super-netball": "#A21CAF",
+        "epl": "#3B0A5E", "la-liga": "#DC2626", "serie-a": "#0369A1", "bundesliga": "#7F1D1D",
+        "ucl": "#1E1B4B", "a-league-men": "#EA580C", "a-league-women": "#BE123C", "wsl": "#9333EA",
+        "nba": "#C2410C", "wnba": "#A16207", "nbl": "#0E7490", "wnbl": "#86198F",
+        "bbl": "#4D7C0F", "wbbl": "#C026D3", "test-cricket": "#78350F",
+        "super-rugby": "#164E63", "super-rugby-w": "#9D174D", "six-nations": "#334155",
+        "slams-men": "#047857", "slams-women": "#C2417C",
+        "golf-majors-men": "#365314", "golf-majors-women": "#854D0E",
+        "f1": "#B00020", "supercars": "#92400E",
+        "nfl": "#172554", "nhl": "#111827", "pwhl": "#4338CA", "mlb": "#075985",
+    }
+    # The league's own logo, from the ESPN CDN the club crests already come
+    # from (each feed's scoreboard names it). The women's AFL and NRL carry the
+    # code's logo; a competition without one shows its sport's icon.
+    _ESPN = "https://a.espncdn.com/i"
+    LOGOS = {
+        "afl": f"{_ESPN}/teamlogos/leagues/500/afl.png", "aflw": f"{_ESPN}/teamlogos/leagues/500/afl.png",
+        "nrl": f"{_ESPN}/teamlogos/leagues/500/nrl.png", "nrlw": f"{_ESPN}/teamlogos/leagues/500/nrl.png",
+        "state-of-origin": f"{_ESPN}/teamlogos/leagues/500/nrl.png",
+        "epl": f"{_ESPN}/leaguelogos/soccer/500/23.png", "la-liga": f"{_ESPN}/leaguelogos/soccer/500/15.png",
+        "serie-a": f"{_ESPN}/leaguelogos/soccer/500/12.png", "bundesliga": f"{_ESPN}/leaguelogos/soccer/500/10.png",
+        "ucl": f"{_ESPN}/leaguelogos/soccer/500/2.png", "a-league-men": f"{_ESPN}/leaguelogos/soccer/500/1308.png",
+        "a-league-women": f"{_ESPN}/leaguelogos/soccer/500/2402.png", "wsl": f"{_ESPN}/leaguelogos/soccer/500/2314.png",
+        "nba": f"{_ESPN}/teamlogos/leagues/500/nba.png", "wnba": f"{_ESPN}/teamlogos/leagues/500/wnba.png",
+        "nbl": f"{_ESPN}/teamlogos/leagues/500/nbl.png", "nfl": f"{_ESPN}/teamlogos/leagues/500/nfl.png",
+        "nhl": f"{_ESPN}/teamlogos/leagues/500/nhl.png", "mlb": f"{_ESPN}/teamlogos/leagues/500/mlb.png",
+        "bbl": f"{_ESPN}/leaguelogos/cricket/500/8044.png", "f1": f"{_ESPN}/teamlogos/leagues/500/f1.png",
+        "golf-majors-men": f"{_ESPN}/teamlogos/leagues/500/pgatour.png",
+        "golf-majors-women": f"{_ESPN}/teamlogos/leagues/500/lpga.png",
+        "six-nations": "https://a.espncdn.com/guid/3c68c9b2-7e7c-3a78-9f96-cb954d22809d/logos/default-dark.png",
+    }
+    # The few letters under its icon when the sports menu is folded.
+    SHORTS = {
+        "state-of-origin": "SOO", "super-league": "SL", "super-netball": "SSN", "la-liga": "LIGA",
+        "serie-a": "SERA", "bundesliga": "BUND", "a-league-men": "ALM", "a-league-women": "ALW",
+        "test-cricket": "TEST", "super-rugby": "SRP", "super-rugby-w": "SRW", "six-nations": "6N",
+        "slams-men": "SLAM", "slams-women": "SLAM", "golf-majors-men": "GOLF",
+        "golf-majors-women": "GOLF", "supercars": "SC",
     }
     PALETTE = ["#C0392B", "#16794C", "#1F5FA8", "#B8541A", "#6B3FA0", "#0E7C86",
                "#A2264B", "#3D6B1E", "#2B4C9B", "#8E5B14", "#7A2E8E", "#1B6A5E"]
@@ -116,6 +164,14 @@ class Series(models.Model):
         if self.slug in self.COLOURS:
             return self.COLOURS[self.slug]
         return self.PALETTE[sum(map(ord, self.slug or self.name)) % len(self.PALETTE)]
+
+    @property
+    def logo(self) -> str:
+        return self.LOGOS.get(self.slug, "")
+
+    @property
+    def short(self) -> str:
+        return self.SHORTS.get(self.slug) or (self.slug or self.name)[:4].upper()
 
     def __str__(self):
         return self.name

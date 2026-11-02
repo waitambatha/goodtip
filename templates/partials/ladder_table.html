@@ -32,13 +32,7 @@ the {% templatetag openblock %} endif {% templatetag closeblock %} in here split
 that will not compile.
 {% endcomment %}
 {% if entries %}
-<p class="lad-foot lad-head-key is-centred">
-  <span class="lad-all">{{ selected_series.name }} &middot; every club, this season</span>
-  <span class="lad-key"><i class="k-finals"></i> shaded rows are the finals places</span>
-  {% if updated_at %}<span class="lad-when">Updated {{ updated_at|timesince }} ago</span>
-  {% elif at_round %}<span class="lad-when">As it stood after round {{ at_round }}</span>{% endif %}
-  {% if prev_round %}<span class="lad-when">&#9650;&#9660; places moved since round {{ prev_round }}</span>{% endif %}
-</p>
+<p class="lad-note">{% if selected_series.name in "AFL AFLW NRL NRLW" %}Shaded rows are the finals places. {% endif %}{% if updated_at %}Updated {{ updated_at|timesince }} ago.{% endif %}</p>
 
 <div class="gt-listwrap" id="ladderTable" data-veil data-veil-label="Loading the ladder">
   {# The competition's colour, on the table that is about it. #}
@@ -82,7 +76,7 @@ that will not compile.
       Top 8 play finals in the AFL, so the cut is drawn there rather than left
       for the reader to count — it is the line the whole table is read against.
       {% endcomment %}
-      <div class="gb-row lad-row{% if e.rank <= 8 %} in-finals{% endif %}{% if e.rank == 1 %} is-top{% endif %}">
+      <div class="gb-row lad-row{% if e.rank <= 8 and selected_series.name in "AFL AFLW NRL NRLW" %} in-finals{% endif %}{% if e.rank == 1 %} is-top{% endif %}">
         <span class="gb-rank">{{ e.rank }}{% if prev_round %}<i class="lad-move{% if e.move > 0 %} is-up{% elif e.move < 0 %} is-down{% endif %}" title="{% if e.prev_rank %}Was {{ e.prev_rank }} after round {{ prev_round }}{% endif %}">{% if e.move > 0 %}&#9650;{{ e.move }}{% elif e.move < 0 %}&#9660;{{ e.move|stringformat:"d"|slice:"1:" }}{% else %}&ndash;{% endif %}</i>{% endif %}</span>
         <span class="gb-who">
           {% comment %}
@@ -121,7 +115,7 @@ that will not compile.
         {% endcomment %}
         <a class="lad-stats" href="{% url 'tipping:team_stats' org.id e.team.id %}"
            aria-label="{{ e.team.name }} statistics">
-          <svg aria-hidden="true"><use href="#ic-f-chart"/></svg><span>Stats</span>
+          <span>Stats</span>
         </a>
       </div>
       {% endfor %}
@@ -130,12 +124,9 @@ that will not compile.
 </div>
 
 {% else %}
-<div class="card pad-lg" style="text-align:center;">
-  <div class="card-h" style="font-size:20px;">No ladder yet for {{ selected_series }}</div>
-  <p class="card-lead" style="margin:6px 0 0;">
-    Standings arrive with the results feed and refresh after every game. If this
-    stays empty, the competition's feed is not connected yet.
-  </p>
+<div class="tk-empty">
+  <b>No ladder yet for {{ selected_series }}</b>
+  <span>Standings arrive with the results feed and refresh after every game.</span>
 </div>
 {% endif %}
 
@@ -148,22 +139,15 @@ the pane the strip swaps. tipping.views.ladder_view builds it from the results
 store (matchreader.HistoricalMatch).
 {% endcomment %}
 {% if round_results %}
-<section class="lrr" style="--code: {{ selected_series.colour }}">
-  <header class="lrr-h">
-    <span class="lrr-k">{{ selected_series.name }}</span>
-    <h3>Round {{ results_round }} results</h3>
-    <span class="lrr-n">{{ round_results|length }} game{{ round_results|length|pluralize }}</span>
-  </header>
+<section class="lrr">
+  <h3>Round {{ results_round }} results</h3>
   <ol class="lrr-list">
     {% for r in round_results %}
     <li class="lrr-game">
       <span class="lrr-when">{{ r.m.kickoff_at|date:"D j M" }}</span>
-      <span class="lrr-side is-home{% if r.winner == 'home' %} won{% endif %}">
-        <b>{{ r.m.home_team.name }}</b><em>{{ r.m.home_score }}</em></span>
-      <span class="lrr-v" aria-hidden="true">v</span>
-      <span class="lrr-side is-away{% if r.winner == 'away' %} won{% endif %}">
-        <em>{{ r.m.away_score }}</em><b>{{ r.m.away_team.name }}</b></span>
-      <span class="lrr-margin">{% if r.winner == 'draw' %}Draw{% elif r.winner == 'home' %}{{ r.m.home_team.name }} by {{ r.margin }}{% else %}{{ r.m.away_team.name }} by {{ r.margin }}{% endif %}</span>
+      <span class="lrr-side is-home{% if r.winner == 'home' %} won{% endif %}"><b>{{ r.m.home_team.name }}</b>{% crest r.m.home_team %}</span>
+      <span class="lrr-score"><em>{{ r.m.home_score }}</em><i>&ndash;</i><em>{{ r.m.away_score }}</em></span>
+      <span class="lrr-side is-away{% if r.winner == 'away' %} won{% endif %}">{% crest r.m.away_team %}<b>{{ r.m.away_team.name }}</b></span>
     </li>
     {% endfor %}
   </ol>

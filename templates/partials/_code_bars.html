@@ -1,0 +1,13 @@
+{% comment %}
+Accuracy per competition as 3D columns, each in its own colour under its own
+logo. Expects: codes (tipping.views._code_chart).
+{% endcomment %}<div class="b3d" role="img" aria-label="Accuracy in each competition">
+  {% for c in codes %}
+  <div class="b3d-col" style="--code: {{ c.series.colour }}" title="{{ c.name }}: {{ c.right }} of {{ c.played }}">
+    <b>{% if c.accuracy is not None %}{{ c.accuracy }}%{% else %}&ndash;{% endif %}</b>
+    <i class="b3d-bar" style="height: {{ c.accuracy|default:2 }}%"></i>
+    <span class="b3d-logo" aria-hidden="true">{% include "partials/_series_logo.html" with s=c.series %}</span>
+    <small>{{ c.name }}</small>
+  </div>
+  {% endfor %}
+</div>

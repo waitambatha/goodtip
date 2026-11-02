@@ -1,326 +1,93 @@
 {% extends "app_base.html" %}
 {% load team_extras %}
 {% block title %}Leaderboard, {{ org.name }}{% endblock %}
-{% block loader_task %}Loading the leaderboard{% endblock %}
-{% block nav_board %}on{% endblock %}
-{% block body_class %}page-deep sheet-page{% endblock %}
+{% block loader_task %}Fetching the leaderboard{% endblock %}
+{% block nav_leaderboard %}on{% endblock %}
+{% block body_class %}page-deep sheet-page page-dash page-tips page-board{% endblock %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 
 {% block app_content %}
-{% if certs_ready %}
-<div class="lb-cert" role="status"><b>&#127942; Season champion certificates are ready</b><span>{{ certs_ready|join:", " }} &mdash; print them or post them.</span><a href="{% url 'tipping:certificates' org.id %}">Get the certificates &rarr;</a></div>
+{% comment %}
+THE LEADERBOARD, in My Tips' language (client, 2 Nov 2026): the room, a white
+summary of where you stand, competitions down the side, the board on a sheet.
+Badges come from the live ranks; the top three finish with a certificate, and
+the line under them shows everyone else how far off it they are.
+{% endcomment %}
+{% if board_view == 'org' %}
+{% include "partials/room_switch.html" with noun="leaderboard" surface="light" align="centre" %}
 {% endif %}
-{% comment %}
-ORDER OF THE PAGE, and it is not the order it was in.
 
-"I think this should be at the top — Leaderboard, Compete Climb Make an impact,
-Round, All competitions... hierarchy of information. Then the group and
-organisation filter, these two can be at the bottom, so the table is not
-squeezed."
-
-What the page is, then the two controls that decide what it shows, then the
-board itself at full width. Everything that is context rather than content —
-which room you are standing in, the season summary, the charity — follows the
-table instead of flanking it. The room switcher opened the page for months on
-the reasoning that you should know which ladder you are looking at before you
-read it; that was right about the fact and wrong about the position, because it
-put a five-option control above the title on every visit.
-{% endcomment %}
-{% comment %}
-Centred, because there is nothing beside it any more. The header used to be a
-two-column row with the round picker in its right-hand corner; with both filters
-moved to their own bar below, a left-aligned title with empty space to its right
-reads as a layout that lost something.
-
-THE ORGANISATION IS THE BIG LINE, NOT THE WORD "LEADERBOARD" — "this AquaFlow
-Water Co · AFL + NRL 2026 should be bigger than the bottom text, that is
-Leaderboard."
-
-The two have swapped jobs rather than swapped places. The comp's name is what a
-member came to look at and it is the only line on the page that differs between
-one organisation and the next; "Leaderboard" is a label for the screen, and the
-nav already says which screen you are on. So the organisation takes the display
-face at title size, and the word takes the small lime capitals the organisation
-used to have. Nothing new in the palette, and the same two lines in the same
-order — the emphasis is the only thing that moved. See .gt-head.is-orgfirst.
-{% endcomment %}
-<div class="gt-head is-centred is-orgfirst">
-  <div>
-    <div class="gh-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div>
-    <h1>Leaderboard</h1>
-    <p class="gh-lead">Compete. Climb. Make an impact.</p>
-  </div>
-</div>
-
-{% comment %}
-THE TWO FILTERS, side by side and the same size, because they are the same kind
-of decision: which slice of the season, and which competition.
-
-ROUND STEPS AS WELL AS DROPS. "It should not only be a dropdown, but a nice way
-I can press arrow left and right the way we have it on the fixtures on the
-dashboard." Stepping is what people do with this — last round, the one before,
-back again — and a dropdown makes each of those a click, a read and an aim, on
-a list eighty rounds long in a league that has been running a while.
-
-The arrows are real links (bookmarkable, shareable, work with JavaScript off)
-with htmx layered on to swap the table in place; the select keeps the same
-htmx it always had. "All rounds" is the first stop rather than a separate
-control, so stepping back from round 1 lands on the season.
-
-The comp rides on every one of these URLs, or changing round would silently
-widen the board back to every competition — the table changing under a filter
-still drawn as selected.
-{% endcomment %}
 {% url 'tipping:leaderboard' org.id as lb_url %}
-{% with cq=selected_comp.slug|default:"" %}
-{% comment %}
-WHERE YOU STAND (client, 4 Oct 2026): "I'm number 2 in my organisation but
-number 20 nationally". Five positions at a glance — you in your organisation
-(and your group), your organisation in its industry and nationally, and you
-against every tipper on GoodTip. Each one opens the board behind it.
-{% endcomment %}
-<div class="lb-stand" aria-label="Where you stand">
-  <a class="lbs-tile{% if board_view == 'org' %} on{% endif %}" href="{{ lb_url }}{% if cq %}?comp={{ cq }}{% endif %}">
-    <span class="lbs-k">You in {{ org.name }}</span>
-    <b>{% if standing.me_org.rank %}#{{ standing.me_org.rank }}{% else %}&ndash;{% endif %}</b>
-    <span class="lbs-of">of {{ standing.me_org.of }} tipper{{ standing.me_org.of|pluralize }}</span>
-  </a>
-  {% if standing.me_group %}
-  <a class="lbs-tile" href="{{ lb_url }}{% if cq %}?comp={{ cq }}{% endif %}">
-    <span class="lbs-k">You in {{ standing.me_group.name }}</span>
-    <b>{% if standing.me_group.rank %}#{{ standing.me_group.rank }}{% else %}&ndash;{% endif %}</b>
-    <span class="lbs-of">of {{ standing.me_group.of }} in the group</span>
-  </a>
-  {% endif %}
-  <a class="lbs-tile{% if board_view == 'industry' %} on{% endif %}" href="{{ lb_url }}?view=industry{% if cq %}&amp;comp={{ cq }}{% endif %}">
-    <span class="lbs-k">{{ org.name }} in {{ standing.org_industry.label|default:"its industry" }}</span>
-    <b>{% if standing.org_industry.rank %}#{{ standing.org_industry.rank }}{% else %}&ndash;{% endif %}</b>
-    <span class="lbs-of">of {{ standing.org_industry.of }} organisation{{ standing.org_industry.of|pluralize }}</span>
-  </a>
-  <a class="lbs-tile{% if board_view == 'national' %} on{% endif %}" href="{{ lb_url }}?view=national{% if cq %}&amp;comp={{ cq }}{% endif %}">
-    <span class="lbs-k">{{ org.name }} nationally</span>
-    <b>{% if standing.org_national.rank %}#{{ standing.org_national.rank }}{% else %}&ndash;{% endif %}</b>
-    <span class="lbs-of">of {{ standing.org_national.of }} organisation{{ standing.org_national.of|pluralize }}</span>
-  </a>
-  <a class="lbs-tile{% if board_view == 'everyone' %} on{% endif %}" href="{{ lb_url }}?view=everyone{% if cq %}&amp;comp={{ cq }}{% endif %}">
-    <span class="lbs-k">You nationally</span>
-    <b>{% if standing.me_national.rank %}#{{ standing.me_national.rank }}{% else %}&ndash;{% endif %}</b>
-    <span class="lbs-of">of {{ standing.me_national.of }} tippers on GoodTip</span>
-  </a>
-</div>
+<div id="boardPage" hx-boost="true" hx-target="#boardPage" hx-select="#boardPage" hx-swap="outerHTML show:none swap:500ms">
+  <div class="dash-layout">
+    {% if comp_options %}
+    <aside class="dash-sports tk-side-menu" aria-label="Competitions">
+      <div class="ds-head"><b>Competitions</b></div>
+      <ul class="ds-list">
+        <li><a class="ds-row{% if not selected_comp %} on{% endif %}" href="{{ lb_url }}{% if board_view != 'org' %}?view={{ board_view }}{% endif %}" data-veil-for="#boardList">
+          <span class="ds-ic" aria-hidden="true">&#9733;</span><span class="ds-name">All competitions</span></a></li>
+        {% for s in comp_options %}
+        <li><a class="ds-row{% if selected_comp == s %} on{% endif %}" style="--code: {{ s.colour }}" title="{{ s.name }}"
+               href="{{ lb_url }}?comp={{ s.slug }}{% if board_view != 'org' %}&amp;view={{ board_view }}{% endif %}" data-veil-for="#boardList" {% include "partials/_veil_attrs.html" with s=s %}>
+          <span class="ds-logo" aria-hidden="true"><em>{% include "partials/_series_logo.html" with s=s %}</em></span>
+          <span class="ds-name">{{ s.name }}</span></a></li>
+        {% endfor %}
+      </ul>
+    </aside>
+    {% endif %}
 
-<nav class="lb-views" aria-label="Which leaderboard">
-  <a href="{{ lb_url }}{% if cq %}?comp={{ cq }}{% endif %}" class="{% if board_view == 'org' %}on{% endif %}">Your organisation</a>
-  <a href="{{ lb_url }}?view=industry{% if cq %}&amp;comp={{ cq }}{% endif %}" class="{% if board_view == 'industry' %}on{% endif %}">Industry{% if standing.org_industry.label %} &middot; {{ standing.org_industry.label }}{% endif %}</a>
-  <a href="{{ lb_url }}?view=national{% if cq %}&amp;comp={{ cq }}{% endif %}" class="{% if board_view == 'national' %}on{% endif %}">National</a>
-  <a href="{{ lb_url }}?view=everyone{% if cq %}&amp;comp={{ cq }}{% endif %}" class="{% if board_view == 'everyone' %}on{% endif %}">Everyone</a>
-</nav>
-
-{% comment %}
-THE FILTERS, ON WHITE (client, 4 Oct 2026): the room (organisation or group),
-the competition and the round sit together on one white panel, and the
-competition dropdown stays on the same line as the competition chips.
-{% endcomment %}
-<div class="lb-filters">
-{% comment %}
-WHICH ROOM THIS BOARD IS, straight after the title and before the filters.
-
-It was moved to the foot and sent back — "this should not be at the bottom, it
-should come after Leaderboard, Compete Climb Make an impact" — the same
-correction as the ladder's, and right for the same reason: the board is OF a
-room, so which room has to be settled before the filters that narrow it mean
-anything. Above the title it was worse; below the standings it was too late.
-{% endcomment %}
-{% comment %}
-MY STATISTICS RIDES INSIDE THE ROOM SWITCHER — "this button should be above this
-AquaFlow Water Co / Everyone / ... / All groups, at the furthest right, not
-centre."
-
-So it sits in the gap between the sentence and the row of rooms, hard right. It
-has been in three places across three passes and this is the one that reads: the
-sentence says whose board this is, the button offers you yours, and the rooms
-below still start at the left edge where a list is expected to start.
-{% endcomment %}
-{% if board_view == 'org' %}
-{% include "partials/room_switch.html" with noun="leaderboard" surface="light" align="centre" action_url=my_stats_url action_label="My statistics" action_icon="ic-f-chart" %}
-
-{% comment %}
-THE SAME BUTTON, FOR AN ORGANISATION WITH GROUPS SWITCHED OFF. The switcher
-above draws nothing at all in that case (see room_switch.html), and the action
-would go with it — so it is repeated here under the condition that hides the
-other. Not a duplicate on screen: exactly one of the two ever renders.
-{% endcomment %}
-{% if not current_org.groups_enabled %}
-<div class="gh-actions gh-after-room">
-  <a class="abtn abtn-primary" href="{{ my_stats_url }}">
-    <svg class="abtn-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg> My statistics
-  </a>
-</div>
-{% endif %}
-
-{% comment %}
-TWO ROWS, COMPETITION FIRST. Asked for in exactly that order — "do not do that,
-have the round and competition in a separate row, so this will come first in
-their own row, All competition... and in that row beside it we can have the
-dropdown."
-
-It is the right order for a second reason: the competition decides which rounds
-exist. Round 26 of the NRL and round 26 of the AFLW are different rounds and one
-of them may not have been played, so choosing the code first and the round
-second is the sequence the data itself is in.
-{% endcomment %}
-{% endif %}
-<div class="boardbar">
-  {% include "partials/comp_filter.html" with options=comp_options selected=selected_comp param="comp" base=lb_url keep=comp_keep keep_pairs=comp_keep_pairs all_label="All competitions" veil_for="#lbtable" centred=1 %}
-</div>
-
-{% if board_view == 'org' %}
-<div class="boardbar boardbar-round">
-  <div class="bb-round" role="group" aria-label="Choose a round">
-    <span class="bb-lab">Round</span>
-    {% if round_nav.prev %}
-    <a class="bb-arrow" href="{{ lb_url }}?round={{ round_nav.prev }}&amp;scope={{ scope }}{% if cq %}&amp;comp={{ cq }}{% endif %}"
-       hx-get="{{ lb_url }}?round={{ round_nav.prev }}&amp;scope={{ scope }}{% if cq %}&amp;comp={{ cq }}{% endif %}"
-       hx-target="#lbtable" hx-swap="outerHTML show:none" data-veil-for="#lbtable"
-       hx-push-url="true" aria-label="{{ round_nav.prev_label }}" title="{{ round_nav.prev_label }}">
-      <svg><use href="#ic-arrow-left"/></svg>
-    </a>
-    {% else %}<span class="bb-arrow is-off" aria-hidden="true"><svg><use href="#ic-arrow-left"/></svg></span>{% endif %}
-
-    <select name="round" class="gt-select bb-select"
-            hx-get="{{ lb_url }}?scope={{ scope }}{% if cq %}&amp;comp={{ cq }}{% endif %}"
-            {# show:none stops htmx scrolling the swapped table into view #}
-            hx-target="#lbtable" hx-swap="outerHTML show:none" hx-trigger="change"
-            hx-push-url="true" aria-label="Choose a round">
-      <option value="all" {% if selected_round_id == 'all' %}selected{% endif %}>All rounds</option>
-      {% for r in rounds %}<option value="{{ r.id }}" {% if selected_round_id == r.id|stringformat:'s' %}selected{% endif %}>{{ r.label }}</option>{% endfor %}
-    </select>
-
-    {% if round_nav.next %}
-    <a class="bb-arrow" href="{{ lb_url }}?round={{ round_nav.next }}&amp;scope={{ scope }}{% if cq %}&amp;comp={{ cq }}{% endif %}"
-       hx-get="{{ lb_url }}?round={{ round_nav.next }}&amp;scope={{ scope }}{% if cq %}&amp;comp={{ cq }}{% endif %}"
-       hx-target="#lbtable" hx-swap="outerHTML show:none" data-veil-for="#lbtable"
-       hx-push-url="true" aria-label="{{ round_nav.next_label }}" title="{{ round_nav.next_label }}">
-      <svg><use href="#ic-arrow-right"/></svg>
-    </a>
-    {% else %}<span class="bb-arrow is-off" aria-hidden="true"><svg><use href="#ic-arrow-right"/></svg></span>{% endif %}
-  </div>
-
-  {% comment %}
-  The five most recent rounds, beside the dropdown that says "all". Clicking
-  one shows that round's ranking; the window walks backwards through the season
-  a page at a time.
-  {% endcomment %}
-  {% include "partials/round_strip.html" with strip=round_strip base=lb_url param="round" keep=comp_keep_round all_label="All rounds" veil_for="#lbtable" %}
-</div>
-{% endif %}
-</div>
-{% endwith %}
-
-{% if is_family %}
-{# §8: same competition, two views — local standings and the national board #}
-<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
-  <a href="?scope=local" data-coach="board-scope" class="gt-pill {% if scope == 'local' %}solid{% endif %}">{{ org.name }}</a>
-  <a href="?scope=national" class="gt-pill {% if scope == 'national' %}solid{% endif %}">National &middot; {{ org.root.name }}</a>
-</div>
-{% if scope == 'national' %}<p class="gh-lead" style="margin:-10px 0 20px;">Every tipper across {{ org.root.name }} and all its child organisations, ranked together.</p>{% endif %}
-{% endif %}
-
-{% if board_view == 'org' %}
-{% if ranked %}
-<div class="gt-podium">
-  {% with a=ranked.0 b=ranked.1 c=ranked.2 %}
-  {% if b %}
-  <div class="gt-pod p2">
-    <span class="gp-medal">Silver</span>
-    <div class="gp-avwrap">
-      <span class="gp-av">{% if b.user.avatar %}<img src="{{ b.user.avatar.url }}" alt="">{% else %}{{ b.user.display_name|slice:":1"|upper }}{% endif %}</span>
-      <span class="gp-rank">2</span>
-    </div>
-    <div class="gp-name">{{ b.user.display_name }}</div>
-    <div class="gp-pts">{{ b.points }}<small>pts</small></div>
-    <span class="gp-chip">{{ b.tips_correct }}/{{ b.tips_total }} correct</span>
-  </div>
-  {% else %}<div></div>{% endif %}
-  {% if a %}
-  <div class="gt-pod p1">
-    <span class="gp-medal">Gold</span>
-    <span class="crown"><svg><use href="#ic-trophy"/></svg></span>
-    <div class="gp-avwrap">
-      <span class="gp-av">{% if a.user.avatar %}<img src="{{ a.user.avatar.url }}" alt="">{% else %}{{ a.user.display_name|slice:":1"|upper }}{% endif %}</span>
-      <span class="gp-rank">1</span>
-    </div>
-    <div class="gp-name">{{ a.user.display_name }}</div>
-    <div class="gp-pts">{{ a.points }}<small>pts</small></div>
-    <span class="gp-chip">{{ a.tips_correct }}/{{ a.tips_total }} correct</span>
-  </div>
-  {% endif %}
-  {% if c %}
-  <div class="gt-pod p3">
-    <span class="gp-medal">Bronze</span>
-    <div class="gp-avwrap">
-      <span class="gp-av">{% if c.user.avatar %}<img src="{{ c.user.avatar.url }}" alt="">{% else %}{{ c.user.display_name|slice:":1"|upper }}{% endif %}</span>
-      <span class="gp-rank">3</span>
-    </div>
-    <div class="gp-name">{{ c.user.display_name }}</div>
-    <div class="gp-pts">{{ c.points }}<small>pts</small></div>
-    <span class="gp-chip">{{ c.tips_correct }}/{{ c.tips_total }} correct</span>
-  </div>
-  {% else %}<div></div>{% endif %}
-  {% endwith %}
-</div>
-{% endif %}
-
-{% comment %}
-THE TABLE GETS THE PAGE. It sat in the left column of a two-column shell with
-a 320px sidebar beside it, so the four columns that matter — rank, tipper,
-correct, points — were squeezed into two thirds of the width while a charity
-card and a pull quote held the rest on every visit. "So the table is not
-squeezed."
-
-The sidebar is not deleted, it is moved: summary, cause and quote become a row
-of cards under the board, where they are still read and no longer compete with
-it.
-{% endcomment %}
-<div data-coach="board-table">
-  <div>
-    {% include "partials/leaderboard_table.html" with ranked=ranked me=request.user %}
-    <div class="gt-note">
-      <svg><use href="#ic-shield-check"/></svg>
-      Ties share a rank. Correct counts tips right out of graded tips this {% if selected_round_id == 'all' %}season{% else %}round{% endif %}.
-    </div>
-  </div>
-
-  <aside class="gt-side board-foot">
-    <section class="gt-scard dark">
-      <div class="gsc-head"><svg><use href="#ic-chart"/></svg><span>Leaderboard summary</span></div>
-      <div class="gsc-row"><span>Total tippers</span><b>{{ total_tippers }}</b></div>
-      <div class="gsc-row"><span>Perfect scores</span><b>{{ perfect_scores }}</b></div>
-      <div class="gsc-row"><span>Total rounds</span><b>{{ total_rounds }}</b></div>
-      {% if current_round %}<div class="gsc-row"><span>Latest round</span><b>{{ current_round.round_number }}</b></div>{% endif %}
-    </section>
-
-    <section class="gt-scard">
-      <div class="gsc-head"><svg><use href="#ic-heart"/></svg><span>Your impact</span></div>
-      <div class="gt-cause">
-        <span class="gcz-ic"><svg><use href="#ic-heart"/></svg></span>
-        <div>
-          <b>{{ org.charity_display }}</b>
-          <small>{% if donation.raised %}${{ donation.raised|floatformat:0 }} raised so far{% else %}Every tip makes a difference.{% endif %}</small>
+    <div class="dash-main">
+      <div class="tk-sheet lb-sheet is-{{ board_view }}" id="boardList" data-veil-label="Loading the leaderboard">
+        <div class="lb-bar">
+          <nav class="lb-tabs" aria-label="Which leaderboard">
+            {% with cq=selected_comp.slug|default:"" %}
+            <a class="lb-tab is-org{% if board_view == 'org' %} on{% endif %}" href="{{ lb_url }}{% if cq %}?comp={{ cq }}{% endif %}" data-veil-for="#boardList">Your organisation</a>
+            <a class="lb-tab is-industry{% if board_view == 'industry' %} on{% endif %}" href="{{ lb_url }}?view=industry{% if cq %}&amp;comp={{ cq }}{% endif %}" data-veil-for="#boardList">Industry</a>
+            <a class="lb-tab is-national{% if board_view == 'national' %} on{% endif %}" href="{{ lb_url }}?view=national{% if cq %}&amp;comp={{ cq }}{% endif %}" data-veil-for="#boardList">National</a>
+            <a class="lb-tab is-everyone{% if board_view == 'everyone' %} on{% endif %}" href="{{ lb_url }}?view=everyone{% if cq %}&amp;comp={{ cq }}{% endif %}" data-veil-for="#boardList">Everyone</a>
+            {% endwith %}
+            <a class="lb-tab is-stats" hx-boost="false" href="{{ my_stats_url }}">My stats</a>
+          </nav>
+          <a class="lbc-btn" hx-boost="false" href="{% url 'tipping:my_certificates' org.id %}">Certificates{% if cert_ready %}<em>{{ cert_ready }}</em>{% endif %}</a>
         </div>
+
+        {% if board_view == 'org' %}
+          {% with cq=selected_comp.slug|default:"" %}
+          {% if is_family %}
+          <div class="lb-roundbar">
+            <a class="tk-tab{% if scope == 'local' %} on{% endif %}" href="?scope=local{% if cq %}&amp;comp={{ cq }}{% endif %}">{{ org.name }}</a>
+            <a class="tk-tab{% if scope == 'national' %} on{% endif %}" href="?scope=national{% if cq %}&amp;comp={{ cq }}{% endif %}">All of {{ org.root.name }}</a>
+          </div>
+          {% if scope == 'national' %}<p class="tk-roundnote">Every tipper across {{ org.root.name }}, ranked together.</p>{% endif %}
+          {% endif %}
+          <div class="lb-roundbar">
+            {% if round_nav.prev %}<a class="lb-arrow" href="{{ lb_url }}?round={{ round_nav.prev }}&amp;scope={{ scope }}{% if cq %}&amp;comp={{ cq }}{% endif %}" aria-label="{{ round_nav.prev_label }}" data-veil-for="#boardList"><svg aria-hidden="true"><use href="#ic-chev-left"/></svg></a>{% endif %}
+            <b>{{ round_nav.label }}</b>
+            {% if round_nav.next %}<a class="lb-arrow" href="{{ lb_url }}?round={{ round_nav.next }}&amp;scope={{ scope }}{% if cq %}&amp;comp={{ cq }}{% endif %}" aria-label="{{ round_nav.next_label }}" data-veil-for="#boardList"><svg aria-hidden="true"><use href="#ic-chev-right"/></svg></a>{% endif %}
+          </div>
+          {% endwith %}
+
+          {% if podium %}
+          <div class="lb-podium">
+            {% for p in podium %}
+            <div class="lb-pod lb-pod-{{ p.place }}{% if p.user.id == me.id %} is-me{% endif %}">
+              <span class="lb-pod-face">
+                <span class="lb-pod-av">{% if p.user.avatar %}<img src="{{ p.user.avatar.url }}" alt="">{% else %}{{ p.user.display_name|slice:":1"|upper }}{% endif %}</span>
+                {% include "partials/_rank_badge.html" with place=p.place kind="person" %}
+              </span>
+              <span class="lb-pod-n">{{ p.place }}</span>
+              <b>{{ p.user.display_name }}</b>
+              <em>{{ p.points }} pts</em>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% include "partials/leaderboard_table.html" with ranked=ranked me=request.user %}
+        {% else %}
+          {% include "partials/leaderboard_wide.html" with board=wide_board view=board_view %}
+        {% endif %}
       </div>
-    </section>
-
-    <section class="gt-quote">
-      <span class="qm">&ldquo;</span>
-      <p>Great tips. Greater cause. Game on.</p>
-      <svg class="swoosh" viewBox="0 0 110 8"><path d="M2 6C25 2 85 2 108 5"/></svg>
-    </section>
-  </aside>
+    </div>
+  </div>
 </div>
-
-{% else %}
-{% include "partials/leaderboard_wide.html" with board=wide_board view=board_view %}
-{% endif %}
-
 {% endblock %}

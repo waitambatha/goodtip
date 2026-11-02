@@ -3,7 +3,7 @@
 {% block title %}Ladder, {{ org.name }}{% endblock %}
 {% block loader_task %}Loading the ladder{% endblock %}
 {% block nav_ladder %}on{% endblock %}
-{% block body_class %}page-deep sheet-page{% endblock %}
+{% block body_class %}page-deep sheet-page page-dash page-tips page-ladder{% endblock %}
 {% block page_backdrop %}
 {% comment %}Side imagery lives outside the sheet: .page-sheet creates a
 stacking context, so a strip rendered inside it paints over the sheet.
@@ -13,121 +13,45 @@ stacking context, so a strip rendered inside it paints over the sheet.
 
 {% block app_content %}
 {% comment %}
-ORDER OF THE PAGE. Title, then which room, then which competition, then the
-table. The room switcher was moved to the foot with the leaderboard's and sent
-straight back — "on the ladder, this should not be at the bottom" — and that is
-right for a reason the leaderboard does not share: the ladder's own subtitle
-says "this ladder is all of Waita Realty Group", so the control that changes
-which room it means has to be next to the sentence making the claim, not eight
-hundred pixels below it.
-
-The eyebrow is set at the title's own size. "Waita Realty Group · 2026" in
-10-point capitals over a 40-point Ladder made the league look like a footnote to
-the word, when the league is the whole point of the page — "that should be the
-same size as the Ladder, otherwise it is not making sense".
+THE LADDER, in the leaderboard's language (client, 2 Nov 2026): the room, the
+competitions down the side, a sheet in the chosen competition's colour with a
+plain table and the round's results. Clubs here; people are on the leaderboard.
+A filter swaps #ladderPage in place, so the side column, the heading and the
+table always change together. The table itself is partials/ladder_table.html.
 {% endcomment %}
-<div class="gt-head is-centred">
-  <div>
-    <div class="gh-eyebrow is-title">{{ org.name }} &middot; {{ org.season }}</div>
-    <h1 class="gh-title">Ladder</h1>
-    {% comment %}
-    Said plainly, because "the table" means both things in conversation and the
-    two are one nav item apart. This one ranks clubs; Leaderboard ranks people.
-    {% endcomment %}
-    <p class="gh-sub">Where the clubs sit this season. Looking for where <em>you</em> sit?
-      <a href="{% url 'tipping:leaderboard' org.id %}">That's the leaderboard &rarr;</a></p>
-  </div>
+{% include "partials/room_switch.html" with noun="ladder" surface="light" align="centre" %}
 
-</div>
-
-{% comment %}
-Which room this ladder is, directly under the sentence that says so.
-{% endcomment %}
-{% include "partials/room_switch.html" with noun="ladder" surface="dark" align="centre" %}
-
-{% comment %}
-WHICH COMPETITION'S LADDER. It was a bare <select> tucked into the top-right of
-the header — "that button is too small and far end" — for the control that
-decides what the entire table below is about. It is a row of chips now, across
-the page, each in its competition's own colour, with the select kept beside them
-for anyone who would rather pick from a list.
-
-No "all" chip: a ladder is a table OF one competition. Clubs from four codes
-ranked in one column would be a list, not a ladder.
-
-data-veil-for points at the TABLE rather than at the control, because the
-control sits up here and the thing it rebuilds is further down — without it the
-veil would land on a picker while the stale table below carried on looking
-current.
-{% endcomment %}
 {% url 'tipping:ladder' org.id as ladder_url %}
-<div class="compfilter-wrap">
-  {% include "partials/comp_filter.html" with options=series_options selected=selected_series param="series" base=ladder_url veil_for="#ladderPane" swap_into="#ladderPane" centred=1 %}
-  {% comment %}
-  THE WHOLE COMPETITION, not one club of it. The ladder rows lead to a single
-  club's season; this leads to all of them at once — who scores, who concedes,
-  whether home advantage is real this year. Each of those is a comparison and
-  none of them fits on a club's own page.
-  {% endcomment %}
-  <a class="abtn abtn-primary comp-stats-btn"
-     href="{% url 'tipping:comp_stats' org.id %}?series={{ selected_series.slug }}">
-    <svg class="abtn-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg> Statistics
-  </a>
+<div id="ladderPage" hx-boost="true" hx-target="#ladderPage" hx-select="#ladderPage" hx-swap="outerHTML show:none swap:500ms">
+  <div class="dash-layout">
+    <aside class="dash-sports tk-side-menu" aria-label="Competitions">
+      <div class="ds-head"><b>Competitions</b></div>
+      <ul class="ds-list">
+        {% for s in series_options %}
+        <li><a class="ds-row{% if selected_series == s %} on{% endif %}" style="--code: {{ s.colour }}" title="{{ s.name }}"
+               href="{{ ladder_url }}?series={{ s.slug }}" data-veil-for="#ladderPane" {% include "partials/_veil_attrs.html" with s=s %}>
+          <span class="ds-logo" aria-hidden="true"><em>{% include "partials/_series_logo.html" with s=s %}</em></span>
+          <span class="ds-name">{{ s.name }}</span></a></li>
+        {% endfor %}
+      </ul>
+    </aside>
+
+    <div class="dash-main">
+      <div class="tk-sheet lad-sheet" style="--board: {{ selected_series.colour|default:'#176B45' }}">
+        <header class="lad-top">
+          {% if selected_series %}<span class="lad-logo" aria-hidden="true">{% include "partials/_series_logo.html" with s=selected_series %}</span>{% endif %}
+          <div>
+            <h1>{{ selected_series.name|default:"Ladder" }}</h1>
+            <p>{% if at_round %}As it stood after round {{ at_round }}{% else %}{{ org.season }} ladder{% endif %}</p>
+          </div>
+          {% if selected_series %}<a class="lad-allstats" hx-boost="false" href="{% url 'tipping:comp_stats' org.id %}?series={{ selected_series.slug }}">Statistics</a>{% endif %}
+        </header>
+        {% include "partials/round_strip.html" with strip=round_strip base=ladder_url param="round" keep=ladder_keep all_label="Latest" veil_for="#ladderPane" %}
+        <div id="ladderPane">
+          {% include "partials/ladder_table.html" %}
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
-
-{% comment %}
-THE LADDER AT A PAST ROUND. "Users might want to see, let's say last month,
-round 10 — who was on top." A ladder is a running total, so that is a question
-it can answer; the standing table only ever knew today.
-
-Same control as the leaderboard's, and the same five-at-a-time window. It
-carries ?series= so stepping through rounds cannot silently change which
-competition's ladder is on screen.
-{% endcomment %}
-<div class="boardbar boardbar-round is-centred">
-  {% include "partials/round_strip.html" with strip=round_strip base=ladder_url param="round" keep=ladder_keep all_label="Latest" veil_for="#ladderPane" swap_into="#ladderPane" %}
-</div>
-{% if at_round %}
-<p class="ladder-asat">Showing the ladder as it stood after <b>round {{ at_round }}</b>.
-  <a href="{{ ladder_url }}{% if ladder_keep %}?{{ ladder_keep }}{% endif %}">Back to the latest &rarr;</a></p>
-{% endif %}
-
-{% comment %}
-data-veil marks the whole table as the thing that goes translucent while a
-competition change loads — see gt-veil.js. The filter swaps the rows, but what
-a reader watches is the table, so veiling only the rows would leave the header
-sitting bright above a blank space.
-{% endcomment %}
-{% comment %}
-ABOVE THE TABLE, NOT UNDER IT. "This should be at the top of the table, not at
-the bottom." Both halves are things you need BEFORE reading the rows: what the
-shading on the top eight means, and how old the figures are. Underneath, they
-were an explanation arriving after the thing it explains.
-{% endcomment %}
-{% comment %}
-THE KEY SAYS WHAT THE SHADING IS, NOT HOW MANY ROWS THERE ARE.
-
-"Remove 'Top 8, finals places' — it will give a user the impression we have only
-displayed 8 teams on the list. Find something else that speaks that it's a
-listing of all, let it be short and centred, and it should start with the
-competition, like AFL ………"
-
-Right: a line reading "Top 8" above a table is read as a description OF the
-table. It was only ever labelling the shading on the first eight rows. So it
-names the competition and says the table is all of it, and the shading keeps its
-own short gloss where it cannot be mistaken for a row count.
-{% endcomment %}
-{% comment %}
-THE SWAP TARGET. The chips and the round strip htmx-swap the table into this
-wrapper, so it has to sit OUTSIDE the fragment they replace — a target that
-replaces itself cannot be aimed at twice.
-
-data-veil-for on the controls points here too, so the loader covers the table
-and nothing else, and it takes the pressed chip's competition colour. See
-gt-veil.js.
-{% endcomment %}
-<div id="ladderPane">
-  {% include "partials/ladder_table.html" %}
-</div>
-
 {% endblock %}

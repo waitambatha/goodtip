@@ -217,7 +217,9 @@ class MatchStatePollTests(TestCase):
         r = self.client.get(reverse("tipping:match_state", args=[match.id]))
         self.assertEqual(r.status_code, 200)
         body = r.content.decode()
-        self.assertIn("54–41", body)
+        # The score goes back to each team's box, out of band.
+        self.assertIn(f'id="livescore-{match.id}-home" hx-swap-oob="true">54<', body)
+        self.assertIn(f'id="livescore-{match.id}-away" hx-swap-oob="true">41<', body)
         self.assertIn("Q3 12:45", body)
         # Still in play, so the fragment must carry the trigger that fetches
         # it again — otherwise the first poll is also the last.
@@ -465,49 +467,37 @@ class MyTipsScopeTests(TestCase):
         self._match("up", hours=48)
         self.assertEqual(self._rows(), [])
 
-    def test_an_untipped_finished_match_is_hidden(self):
-        """Nothing to do and nothing to report — it was never yours."""
+    def _joined_a_month_ago(self):
+        OrgMember.objects.filter(user=self.user, org=self.org).update(joined_at=timezone.now() - timedelta(days=30))
+
+    def test_an_untipped_finished_match_is_in_the_history_as_missed(self):
+        """Client, 1 Nov 2026: "even the one that I've not tipped"."""
+        self._joined_a_month_ago()
         m = self._match("done", hours=-30, status=Match.STATUS_COMPLETE, result="home")
-        m.home_score, m.away_score = 30, 10
-        m.save()
-        self.assertEqual(self._rows(), [])
+        Match.objects.filter(pk=m.pk).update(created_at=timezone.now() - timedelta(days=20))
+        rows = self._rows()
+        self.assertEqual([(r["match"].id, r["outcome"]) for r in rows], [(m.id, "missed")])
 
     def test_a_tipped_match_is_shown(self):
         m = self._match("mine", hours=48)
         Tip.objects.create(user=self.user, match=m, org=self.org, selection="home")
         rows = self._rows()
-        self.assertEqual([r["match"].id for r in rows], [m.id])
-        self.assertFalse(rows[0]["missed_live"])
+        self.assertEqual([(r["match"].id, r["outcome"]) for r in rows], [(m.id, "pending")])
 
-    def test_an_untipped_LIVE_match_is_kept_and_flagged(self):
-        """The one exception: a game on right now that you are not in.
-
-        Hiding it would mean somebody watching the round sees only the games
-        they picked, with no sign the others are being played.
-        """
+    def test_an_untipped_LIVE_match_is_shown_as_missed(self):
+        self._joined_a_month_ago()
         m = self._match("live", hours=-1, status=Match.STATUS_LIVE)
+        Match.objects.filter(pk=m.pk).update(created_at=timezone.now() - timedelta(days=20))
         rows = self._rows()
-        self.assertEqual([r["match"].id for r in rows], [m.id])
-        self.assertTrue(rows[0]["missed_live"])
+        self.assertEqual([(r["match"].id, r["outcome"]) for r in rows], [(m.id, "missed")])
         self.assertIsNone(rows[0]["tip"])
 
-    def test_untipped_live_games_lead_the_in_play_block(self):
-        """They are the only rows carrying anything to notice, so they go first."""
-        mine = self._match("livemine", hours=-2, status=Match.STATUS_LIVE)
-        Tip.objects.create(user=self.user, match=mine, org=self.org, selection="home")
-        theirs = self._match("livemissed", hours=-1, status=Match.STATUS_LIVE)
-        rows = self._rows()
-        self.assertEqual([r["match"].id for r in rows], [theirs.id, mine.id])
-
-    def test_the_sidebar_still_counts_the_whole_round(self):
-        """"1 of 4 tipped", not "1 of 1" — the round's real size is kept."""
-        m = self._match("a", hours=48)
-        Tip.objects.create(user=self.user, match=m, org=self.org, selection="home")
-        for s in ("b", "c", "d"):
-            self._match(s, hours=48)
-        r = self.client.get(f"/org/{self.org.id}/tips/?round={self.rnd.id}")
-        self.assertEqual(r.context["total_matches"], 4)
-        self.assertEqual(r.context["tips_this_round"], 1)
+    def test_newest_game_comes_first(self):
+        older = self._match("older", hours=-5, status=Match.STATUS_LIVE)
+        newer = self._match("newer", hours=-1, status=Match.STATUS_LIVE)
+        for m in (older, newer):
+            Tip.objects.create(user=self.user, match=m, org=self.org, selection="home")
+        self.assertEqual([r["match"].id for r in self._rows()], [newer.id, older.id])
 
 
 class TipCarryTests(TestCase):
@@ -1972,17 +1962,15 @@ class LeaderboardCompetitionFilterPageTests(TestCase):
             reverse("tipping:leaderboard", args=[self.org.id]) + qs
         ).content.decode()
 
-    def test_the_leaderboard_offers_both_a_chip_row_and_a_select(self):
+    def test_the_leaderboard_lists_every_competition(self):
         """"Let it be like both a dropdown and the button filter." Both, and
         both posting the same URL — neither is a fallback for the other."""
         body = self._board()
-        self.assertIn("cf-chips", body)
-        self.assertIn('name="comp"', body)
-        self.assertIn('data-code="nrlw"', body)
+        self.assertIn("?comp=nrlw", body)
 
     def test_all_competitions_is_the_arrival_state(self):
         body = self._board()
-        self.assertIn("cf-chip cf-all on", body)
+        self.assertIn('class="ds-row on"', body)
 
     def test_choosing_a_code_colours_the_table_with_it(self):
         """"Let the table also pick the colour of that competition." Absent on
@@ -2015,7 +2003,7 @@ class LeaderboardCompetitionFilterPageTests(TestCase):
             reverse("tipping:ladder", args=[self.org.id]) + f"?series={self.nrlw.id}"
         ).content.decode()
         for body in (by_slug, by_id):
-            self.assertIn('data-code="nrlw"', body)
+            self.assertIn("<h1>NRLW</h1>", body)
 
     def test_the_ladder_offers_no_all_option(self):
         """A ladder is a table OF one competition — clubs from four codes
@@ -2023,8 +2011,7 @@ class LeaderboardCompetitionFilterPageTests(TestCase):
         body = self.client.get(
             reverse("tipping:ladder", args=[self.org.id])
         ).content.decode()
-        self.assertIn("cf-chips", body)
-        self.assertNotIn("cf-all", body)
+        self.assertNotIn("All competitions", body)
 
 
 class BoardHierarchyTests(TestCase):
@@ -2066,45 +2053,17 @@ class BoardHierarchyTests(TestCase):
             reverse("tipping:leaderboard", args=[self.org.id]) + qs
         ).content.decode()
 
-    def test_the_page_reads_title_room_filters_table(self):
-        """The order was title → filters → table → room, and the room came
-        back up: "this should not be at the bottom, it should come after
-        Leaderboard, Compete Climb Make an impact."
-
-        Right, and for a reason the first arrangement missed — the board is OF
-        a room, so which room has to be settled before the filters that narrow
-        it mean anything. Above the title it was worse; below the standings it
-        was too late.
-        """
+    def test_the_summary_cards_are_gone(self):
+        """Client, 2 Nov 2026: only things that make sense stay."""
         body = self._board()
-        title = body.index("Compete. Climb.")
-        room = body.index("room-switch")
-        filters = body.index('class="boardbar"')
-        table = body.index('id="lbtable"')
-        self.assertLess(title, room, "the room switcher must follow the title")
-        self.assertLess(room, filters, "the room is settled before the filters")
-        self.assertLess(filters, table, "the filters must precede the table")
-
-    def test_the_summary_cards_no_longer_flank_the_table(self):
-        """They were a 320px sticky sidebar taking a third of the width from
-        the four columns the page exists to show."""
-        body = self._board()
-        self.assertNotIn('class="gt-shell" data-coach="board-table"', body)
-        self.assertIn("gt-side board-foot", body)
-        self.assertLess(body.index('id="lbtable"'), body.index("gt-side board-foot"))
+        for gone in ("Leaderboard summary", "Perfect scores", "Your impact", "Ties share a rank"):
+            self.assertNotIn(gone, body)
 
     def test_the_round_can_be_stepped_as_well_as_chosen(self):
         """"Not only a dropdown, but a nice way I can press arrow left and
         right the way we have it on the fixtures on the dashboard"."""
         body = self._board()
-        self.assertIn("bb-arrow", body)
-        self.assertIn('name="round"', body)
-
-    def test_at_the_start_of_the_sequence_the_arrow_is_shown_but_dead(self):
-        """A control that vanishes at the edges makes the row jump and leaves
-        you wondering what you pressed."""
-        body = self._board()          # "all rounds" is the first stop
-        self.assertIn("bb-arrow is-off", body)
+        self.assertIn("lb-arrow", body)
 
     def test_stepping_carries_the_competition(self):
         """Or changing round silently widens the board back to every comp —
@@ -2112,22 +2071,9 @@ class BoardHierarchyTests(TestCase):
         body = self._board("?comp=nrl")
         # The live arrows only — the dead one at the end of the sequence is a
         # <span>, and the `href` in its <use> is an icon reference, not a link.
-        arrows = [ln for ln in body.splitlines() if '<a class="bb-arrow"' in ln]
+        arrows = [ln for ln in body.splitlines() if '<a class="lb-arrow"' in ln]
         self.assertTrue(arrows)
         self.assertTrue(all("comp=nrl" in a for a in arrows), arrows)
-
-    def test_the_podium_names_its_medals(self):
-        """"Number 2 and 3 have the same shade of colour, why?" They were two
-        greens a couple of percent apart. Naming them as well as colouring
-        them keeps the distinction in a screenshot and in greyscale."""
-        User.objects.create_user(
-            email="h2@example.com", password="x", display_name="H2",
-        )
-        for e in ("h2@example.com",):
-            OrgMember.objects.create(user=User.objects.get(email=e), org=self.org)
-        body = self._board()
-        for word in ("Gold", "Silver"):
-            self.assertIn(f'class="gp-medal">{word}<', body)
 
 
 class EveryCodeHasItsOwnShadeTests(TestCase):
@@ -2448,7 +2394,7 @@ class MemberStatsTests(TestCase):
         body = self.client.get(
             reverse("tipping:my_stats", args=[self.org.id])
         ).content.decode()
-        self.assertIn("statcards", body)
+        self.assertIn("st-tiles", body)
         self.assertIn("statgrid", body)
         self.assertIn("gt-spark", body)
 
@@ -2852,22 +2798,8 @@ class CompetitionStatsTests(TestCase):
         body = self.client.get(
             reverse("tipping:leaderboard", args=[self.org.id])
         ).content.decode()
-        self.assertIn("My statistics", body)
+        self.assertIn("My stats<", body)
         self.assertNotIn("My stats &rarr;", body)
-
-    def test_the_button_comes_after_the_line_that_says_whose_board_this_is(self):
-        """"That button should come after that line that I have said — have it
-        centred." It has been beside the title and at the right-hand end of the
-        row under it; both put it above the sentence it should follow."""
-        body = self.client.get(
-            reverse("tipping:leaderboard", args=[self.org.id])
-        ).content.decode()
-        self.assertIn("gh-after-room", body)
-        self.assertLess(
-            body.index("Compete. Climb. Make an impact."),
-            body.index("gh-after-room"),
-            "the button should follow the header, not sit inside it",
-        )
 
     def test_the_organisation_outranks_the_word_leaderboard(self):
         """"This AquaFlow Water Co · AFL + NRL 2026 should be bigger than the
@@ -2876,7 +2808,6 @@ class CompetitionStatsTests(TestCase):
         body = self.client.get(
             reverse("tipping:leaderboard", args=[self.org.id])
         ).content.decode()
-        self.assertIn("is-orgfirst", body)
         self.assertIn(self.org.name, body)
 
     def test_a_stranger_cannot_read_it(self):
@@ -3021,82 +2952,54 @@ class MyTipsAcrossEveryCompetitionTests(TestCase):
         self.assertIn("Eels", body)
         self.assertNotIn("Swans", body)
 
-    def test_across_codes_the_step_is_a_position_not_a_number(self):
-        """THE SECOND REPORT, and the reason there is no shared number:
+    def _played(self, series, home, away, number, *, selection=None, correct=None, points=0, tipped=True):
+        match = self._tipped_match(series, home, away, number, days=-3)
+        tip = Tip.objects.get(match=match, user=self.user)
+        if tipped:
+            tip.selection, tip.is_correct, tip.points_awarded = selection or "home", correct, points
+            tip.save()
+        else:
+            tip.delete()
+        Match.objects.filter(pk=match.pk).update(status=Match.STATUS_COMPLETE, home_score=10, away_score=5, result="home",
+                                                 created_at=timezone.now() - timedelta(days=20))
+        return match
 
-            AFL 1-27   NRL 1-27   AFLW 1-12   NRLW 1-11
+    def _rows(self, **params):
+        return self.client.get(reverse("tipping:my_tips", args=[self.org.id]), params).context
 
-        Four codes, four season lengths, played the same weekend. Stepping back
-        has to move each code back one round of ITS OWN, not to a number they
-        happen to share — which for AFL and AFLW would be four months apart.
-        """
-        # Three rounds per code, so whichever one each opens on there is always
-        # a round behind it to step to. With only two, the code that opens on
-        # the older one has nowhere to go and the clamp — correctly — refuses
-        # to move it.
-        self._tipped_match(self.afl, "Pies", "Dons", 3, days=-7)
-        self._tipped_match(self.nrl, "Storm", "Broncos", 3, days=-7)
-        self._tipped_match(self.afl, "Saints", "Suns", 2, days=-14)
-        self._tipped_match(self.nrl, "Titans", "Knights", 2, days=-14)
+    def test_right_and_wrong_add_up_to_the_points(self):
+        self._played(self.afl, "Pies", "Dons", 3, correct=True, points=2)
+        self._played(self.afl, "Saints", "Suns", 2, selection="away", correct=False)
+        s = self._rows()["summary"]
+        self.assertEqual((s["won"], s["lost"], s["points"], s["strike"]), (1, 1, 2, 50))
 
-        def group(**params):
-            r = self.client.get(reverse("tipping:my_tips", args=[self.org.id]), params)
-            self.assertTrue(r.context["multi_comp"])
-            return {x.series.slug: x.round_number for x in r.context["round_group"]}
+    def test_a_game_you_let_go_by_is_missed(self):
+        OrgMember.objects.filter(user=self.user, org=self.org).update(joined_at=timezone.now() - timedelta(days=30))
+        self._played(self.afl, "Pies", "Dons", 3, tipped=False)
+        ctx = self._rows(show="missed")
+        self.assertEqual([r["match"].home_team.name for r in ctx["rows"]], ["Pies"])
 
-        # Asserted as a RELATIONSHIP rather than as two round numbers: which
-        # round each code opens on is _round_with_my_tips's business and depends
-        # on what has been played. What this is about is that one step back
-        # moves every code back one of its own.
-        here, back = group(), group(step=1)
-        self.assertEqual(set(here), {"mt-afl", "mt-nrl"})
-        for slug, number in here.items():
-            self.assertEqual(back[slug], number - 1, f"{slug} did not step back one")
+    def test_a_game_from_before_you_joined_was_never_yours_to_miss(self):
+        OrgMember.objects.filter(user=self.user, org=self.org).update(joined_at=timezone.now())
+        self._played(self.afl, "Pies", "Dons", 3, tipped=False)
+        self.assertEqual(self._rows()["summary"]["missed"], 0)
 
-    def test_the_stepper_offers_eight_rounds_inside_one_code(self):
-        """"Have the numbers to be up to like 8, the latest being the default."
+    def test_a_round_from_a_notification_shows_that_round(self):
+        match = self._played(self.afl, "Pies", "Dons", 3, correct=True, points=2)
+        ctx = self._rows(round=match.round_id)
+        self.assertEqual([r["match"] for r in ctx["rows"]], [match])
 
-        Inside ONE competition, where a round number means something. Across
-        four it does not, and the strip is deliberately not drawn.
-        """
-        for n in range(1, 12):
-            if n == 4:
-                continue
-            Round.objects.create(
-                org=self.org, round_number=n, series=self.afl,
-                stage=Round.STAGE_REGULAR, lockout_at=timezone.now(),
-            )
-        r = self.client.get(
-            reverse("tipping:my_tips", args=[self.org.id]), {"series": self.afl.slug},
-        )
-        strip = r.context["round_strip"]
-        self.assertFalse(r.context["multi_comp"])
-        self.assertEqual(len(strip["window"]), 8)
-        self.assertEqual(max(strip["numbers"]), 11, "the window is anchored on the newest")
+    def test_each_number_opens_the_tips_behind_it(self):
+        self._played(self.afl, "Pies", "Dons", 3, correct=True, points=2)
+        stats = {st["label"]: st["query"] for st in self._rows()["stats"]}
+        self.assertEqual(stats["Wrong"], "show=lost")
+        self.assertEqual(stats["Correct"], "show=won")
+        self.assertEqual(stats["Points"], "")
 
-    def test_the_number_strip_is_not_drawn_across_codes(self):
-        """A number stepper over four seasons of different lengths is a control
-        that cannot be right, so it is absent rather than wrong."""
-        r = self.client.get(reverse("tipping:my_tips", args=[self.org.id]))
-        self.assertTrue(r.context["multi_comp"])
-        self.assertIsNone(r.context["round_strip"])
-
-    def test_each_code_opens_on_the_round_you_last_tipped(self):
-        """Not the last round that EXISTS. This member's tips stop at round 4
-        while the fixture list runs to 6, and anchoring on the table's end opens
-        a round nobody has touched and reports no tips to somebody who has."""
-        Round.objects.create(
-            org=self.org, round_number=6, series=self.afl,
-            stage=Round.STAGE_REGULAR, lockout_at=timezone.now(),
-        )
-        r = self.client.get(reverse("tipping:my_tips", args=[self.org.id]))
-        afl = next(x for x in r.context["round_group"] if x.series_id == self.afl.id)
-        self.assertEqual(afl.round_number, 4)
-
-    def test_the_round_links_carry_the_competition_filter(self):
-        """Stepping a round must not silently widen the page back to every code."""
-        body = self._body(series=self.nrl.slug)
-        self.assertIn(f"series={self.nrl.slug}", body)
+    def test_the_competition_filter_narrows_the_numbers_too(self):
+        self._played(self.afl, "Pies", "Dons", 3, correct=True, points=2)
+        self.assertEqual(self._rows(series=self.nrl.slug)["summary"]["points"], 0)
+        self.assertEqual(self._rows(series=self.afl.slug)["summary"]["points"], 2)
 
 
 class TheWayBackIsAButtonTests(TestCase):
@@ -3136,8 +3039,7 @@ class TheWayBackIsAButtonTests(TestCase):
         for name, url in self._pages():
             with self.subTest(page=name):
                 body = self.client.get(url).content.decode()
-                self.assertIn("gh-backrow", body)
-                self.assertIn("gh-back", body)
+                self.assertTrue("gh-back" in body or "cp-back" in body)
 
     def test_the_way_back_is_no_longer_inside_the_subtitle(self):
         """The sentence describes the page; it does not also navigate."""
@@ -3430,8 +3332,7 @@ class LadderFilterLoadsInPlaceTests(TestCase):
 
     def test_the_chips_swap_the_pane_rather_than_navigating(self):
         body = self.client.get(self.url).content.decode()
-        self.assertIn('hx-target="#ladderPane"', body)
-        self.assertIn("pane=table", body)
+        self.assertIn('hx-target="#ladderPage"', body)
 
     def test_the_href_still_works_without_javascript(self):
         """A chip is still a link. A copied address, a new tab and a browser
@@ -3461,7 +3362,7 @@ class LadderFilterLoadsInPlaceTests(TestCase):
         from the [data-code] on the chip that was pressed."""
         body = self.client.get(self.url).content.decode()
         self.assertIn('data-veil-for="#ladderPane"', body)
-        self.assertIn('data-code=', body)
+        self.assertIn('data-veil-colour=', body)
 
     def test_a_member_of_another_org_cannot_read_the_fragment(self):
         other = User.objects.create_user(

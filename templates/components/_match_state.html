@@ -2,7 +2,10 @@
 Match state, betting-board style. Expects `match`.
 
 Three shapes, one per phase:
-  live      — pulsing dot, the clock ("Q3 12:45"), and the running score
+  live      — a pulsing dot, the clock ("Q3 12:45") and time since kick-off, in
+              the card's top line beside the tip state. The score itself lives
+              in each team's box (client, 31 Oct 2026), so the poll sends those
+              two numbers back out-of-band (`oob`, tipping.views).
   complete  — final score plus when it finished
   upcoming  — kickoff day/time and how long until it starts
 
@@ -27,9 +30,7 @@ never more than one poll behind the sync, slow enough to stay cheap.
      {% if match.phase == "live" %}hx-get="{% url 'tipping:match_state' match.id %}"
      hx-trigger="every 30s" hx-swap="outerHTML"{% endif %}>
   {% if match.phase == "live" %}
-    <span class="ms-badge live"><i class="ms-dot"></i>{% if match.live_label %}{{ match.live_label }}{% else %}Live{% endif %}</span>
-    {% if match.score_line %}<span class="ms-score">{{ match.score_line }}</span>{% endif %}
-    {% if match.progress %}<span class="ms-prog" aria-hidden="true"><i style="width:{{ match.progress }}%"></i></span>{% endif %}
+    <span class="ms-badge live"><i class="ms-dot"></i>Live{% if match.live_label %} <b class="ms-label">{{ match.live_label }}</b>{% endif %} <span class="ms-ticker" data-gt-since="{{ match.kickoff_at|date:'c' }}">{{ match.kickoff_at|timesince }}</span></span>
 
   {% elif match.phase == "complete" %}
     {% if match.score_line %}
@@ -42,10 +43,14 @@ never more than one poll behind the sync, slow enough to stay cheap.
 
   {% else %}
     <span class="ms-badge soon"><svg><use href="#ic-clock"/></svg>{{ match.kickoff_at|date:"D j M, g:i A" }}</span>
-    <span class="ms-when">Starts in {{ match.kickoff_at|timeuntil }}</span>
+    <span class="ms-when ms-count">Starts in <b data-gt-until="{{ match.kickoff_at|date:'c' }}" data-gt-done="moments">{{ match.kickoff_at|timeuntil }}</b></span>
   {% endif %}
 
-  {% if match.venue_label %}
+  {% if match.venue_label and match.phase != "live" %}
     <span class="ms-venue"><svg><use href="#ic-pin"/></svg>{{ match.venue_label }}</span>
   {% endif %}
 </div>
+{% if oob and match.phase == "live" %}
+<span id="livescore-{{ match.id }}-home" hx-swap-oob="true">{{ match.home_score|default_if_none:"–" }}</span>
+<span id="livescore-{{ match.id }}-away" hx-swap-oob="true">{{ match.away_score|default_if_none:"–" }}</span>
+{% endif %}

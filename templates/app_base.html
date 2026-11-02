@@ -158,7 +158,7 @@ goodtip.css.
                   {% include "partials/_role_badge.html" with org=o %}
                 </div>
                 {% else %}
-                <form method="post" action="{% url 'orgs:switch_org' o.id %}" data-anctx-row-form>
+                <form method="post" action="{% url 'orgs:switch_org' o.id %}" data-anctx-row-form data-switch-to="{{ o.name }}">
                   {% csrf_token %}
                   <input type="hidden" name="next" value="{{ request.path }}">
                   {% comment %}
@@ -195,7 +195,7 @@ goodtip.css.
               {% if o.groups_enabled %}
               <div class="an-ctx-listwrap">
                 <div class="an-ctx-scroll">
-                  <form method="post" action="{% url 'orgs:switch_org' o.id %}">
+                  <form method="post" action="{% url 'orgs:switch_org' o.id %}" data-switch-to="{{ o.name }}">
                     {% csrf_token %}
                     <input type="hidden" name="next" value="{{ request.path }}">
                     <button type="submit" class="an-ctx-row{% if o.id == current_org.id and not current_group %} on{% endif %}">
@@ -203,7 +203,7 @@ goodtip.css.
                     </button>
                   </form>
                   {% for g in o.nav_groups %}
-                  <form method="post" action="{% url 'orgs:switch_group' o.id g.id %}">
+                  <form method="post" action="{% url 'orgs:switch_group' o.id g.id %}" data-switch-to="{{ g.name }}">
                     {% csrf_token %}
                     <input type="hidden" name="next" value="{{ request.path }}">
                     <button type="submit" class="an-ctx-row{% if o.id == current_org.id and current_group.id == g.id %} on{% endif %}">
@@ -519,23 +519,6 @@ goodtip.css.
   {% endcomment %}
   {{ ticker_notifications|json_script:"bellTickData" }}
 
-  {% block charity_strip %}
-  {% if primary_org %}
-  <div class="charity-strip">
-    <div class="cs-inner">
-      {% if primary_donation %}
-        <span class="cs-label"><svg><use href="#ic-heart"/></svg> Raised for {{ primary_donation.charity.name|default:primary_org.charity_display }}</span>
-        <span class="cs-amt">${{ primary_donation.raised|floatformat:0 }}</span>
-        <span class="cs-bar"><i style="width:{{ primary_donation.pct }}%"></i></span>
-        {% if primary_donation.goal %}<span class="cs-amt" style="opacity:.6;font-weight:400;">Goal ${{ primary_donation.goal|floatformat:0 }}</span>{% endif %}
-      {% else %}
-        <span class="cs-label"><svg><use href="#ic-heart"/></svg> Raising for {{ primary_org.charity_display }}</span>
-      {% endif %}
-      <span class="cs-right">{{ primary_org.season }} &middot; {{ primary_org.sport_label }}</span>
-    </div>
-  </div>
-  {% endif %}
-  {% endblock %}
 
   {% comment %}
   ---- mobile sheet ----

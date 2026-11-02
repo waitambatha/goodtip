@@ -1,11 +1,14 @@
 import logging
 from types import SimpleNamespace
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from billing.donations import donation_summary
@@ -63,7 +66,7 @@ def match_state_partial(request, match_id: int):
     match = get_object_or_404(
         Match.objects.select_related("home_team", "away_team"), pk=match_id,
     )
-    return render(request, "components/_match_state.html", {"match": match})
+    return render(request, "components/_match_state.html", {"match": match, "oob": True})
 
 
 @login_required
@@ -583,349 +586,129 @@ def _readers_for(matches) -> dict:
         return {}
 
 
-def _round_with_my_tips(user, org, rounds, group):
-    """Which round My Tips should open on when the URL does not say.
+TIPS_PER_PAGE = 30
+TIP_TABS = (("all", "All"), ("won", "Correct"), ("lost", "Wrong"), ("missed", "Missed"), ("pending", "Pending"))
 
-    THE ROUND IN PLAY IS THE RIGHT ANSWER RIGHT UP UNTIL IT IS EMPTY.
 
-    `current_round` picks the round the competition is in, which is what you
-    want the moment you have tipped it. But an organisation running four codes
-    has four sets of rounds interleaved, and the dashboard's slate deliberately
-    spans every round that still has unplayed games — so a member tips rounds
-    25 and 26 of the AFL and NRL on Tuesday, opens My Tips, and lands on round
-    4 of the AFLW because that is the round "in play". The page then tells them
-    they have not tipped, which is the one thing it should never say to
-    somebody who has: reported as "I made tips on masterclass but on going to
-    my tips I did not find them".
+def _tip_history(user, org, group):
+    """Every game this member has a story on, newest first: what they tipped
+    and how it went, and what they let go by.
 
-    So: the round in play if there is anything of theirs in it, otherwise the
-    most recent round they actually tipped. Only ever a DEFAULT — `?round=`
-    still wins, and the navigator still reaches every round either way.
-
-    One query, and only when the first choice comes up empty.
+    A game counts as missed only if they could have tipped it: played since
+    they joined, and on GoodTip before it kicked off (a league added to an
+    organisation mid-season brings weeks of results nobody was ever offered).
     """
-    played = current_round(rounds)
-    if not rounds:
-        return played
-
-    def _mine_in(rnd):
-        if rnd is None:
-            return False
-        return Tip.objects.filter(
-            user=user, org=org, group=group, match__round=rnd,
-        ).exists()
-
-    if _mine_in(played):
-        return played
-
-    # `rounds` is already newest-first and already narrowed by the competition
-    # filter, so the first one carrying a tip of theirs is the latest one.
-    tipped_ids = set(
-        Tip.objects.filter(
-            user=user, org=org, group=group, match__round__in=rounds,
-        ).values_list("match__round_id", flat=True)
+    now = timezone.now()
+    tips = {t.match_id: t for t in Tip.objects.filter(user=user, org=org, group=group)}
+    member = OrgMember.objects.filter(user=user, org=org).first()
+    joined = member.joined_at if member else now
+    matches = (
+        Match.objects.filter(round__org=org)
+        .filter(Q(id__in=list(tips)) | Q(kickoff_at__lte=now, kickoff_at__gte=joined))
+        .select_related("round__series__sport", "home_team", "away_team")
+        .order_by("-kickoff_at", "-id")
     )
-    return next((r for r in rounds if r.id in tipped_ids), played)
+    rows = []
+    for m in matches:
+        tip = tips.get(m.id)
+        if tip is not None:
+            outcome = {True: "won", False: "lost"}.get(tip.is_correct, "pending")
+        elif m.phase == "upcoming" or m.arrived_after_kickoff:
+            continue
+        else:
+            outcome = "missed"
+        rows.append({"match": m, "tip": tip, "outcome": outcome,
+                     "points": tip.points_awarded if tip else 0})
+    return rows
 
+
+def _tip_summary(rows) -> dict:
+    """The numbers at the top of My Tips, over whichever rows are in view."""
+    counts = {key: sum(1 for r in rows if r["outcome"] == key) for key, _label in TIP_TABS[1:]}
+    graded = counts["won"] + counts["lost"]
+    streak = 0
+    for r in rows:
+        if r["outcome"] in ("pending", "missed"):
+            continue
+        if r["outcome"] != "won":
+            break
+        streak += 1
+    return {
+        **counts, "all": len(rows), "points": sum(r["points"] for r in rows),
+        "strike": round(counts["won"] / graded * 100) if graded else None, "streak": streak,
+        # Oldest first, so it reads left to right into the latest result.
+        "recent": [r["outcome"] for r in rows if r["outcome"] in ("won", "lost")][:10][::-1],
+    }
 
 
 @login_required
 def my_tips_view(request, org_id: int):
+    """MY TIPS IS A HISTORY (client, 1 Nov 2026: "just the way we have bet
+    history, where you can see the bets that you did, the points earned, what
+    did you get right, what did you get wrong"). Tipping is the dashboard's job;
+    this page keeps the record: ?series= narrows it to a competition, ?show= to
+    an outcome, and ?round= to one round, which is where notifications land.
+    """
     org = get_object_or_404(Organisation, pk=org_id)
     if not _require_member(request.user, org):
         return HttpResponseForbidden()
-    # Annotated so current_round can pick the round in play without a query per
-    # round. Kept newest-first: the prev/next sidebar below indexes into this
-    # list and depends on that order.
-    # ---- competition filter.
-    # A Round belongs to exactly one Series, so filtering by competition here
-    # means narrowing the ROUND LIST: an org tipping AFL and NRL has two sets
-    # of rounds interleaved by number, and "round 3" is ambiguous until you
-    # say which code. The filter therefore also scopes prev/next, so paging
-    # through NRL rounds never lands on an AFL one.
-    org_series, active_series = competition_filter(org, request.GET.getlist("series"))
-    active_slugs = [s.slug for s in active_series if s in org_series]
+    every = _tip_history(request.user, org, _group(request, org))
 
-    round_qs = Round.objects.filter(org=org)
-    if active_series:
-        round_qs = round_qs.filter(series__in=active_series)
-    rounds = list(annotate_play_state(round_qs).order_by("-round_number"))
+    by_series: dict[int, dict] = {}
+    for r in every:
+        series = r["match"].round.series
+        entry = by_series.setdefault(series.id, {"series": series, "points": 0, "count": 0})
+        entry["points"] += r["points"]
+        entry["count"] += 1
+    competitions = sorted(by_series.values(), key=lambda c: (-c["points"], c["series"].name))
 
-    # ---- WHICH ROUNDS ARE ON SCREEN.
-    #
-    # REPORTED TWICE. First: "when I pick them I see the respective tips of,
-    # let's say, NRL — but when I pick all competitions I only see AFLW." Then,
-    # after a fix that matched on round NUMBER: "all are AFLW, why am I not
-    # getting all, from AFL to NRL to NRLW?"
-    #
-    # The number was the wrong axis, and this organisation says why in one line:
-    #
-    #     AFL 1-27   NRL 1-27   AFLW 1-12   NRLW 1-11
-    #
-    # Four codes, four different lengths, all being played in the same week. AFL
-    # is at round 26 while AFLW is at round 4 — so "round 4 in every code" means
-    # this weekend's AFLW alongside an AFL round from four months ago, which
-    # nobody tipped, which the "my tips means my tips" filter then dropped. One
-    # code on screen again, for a new reason.
-    #
-    # THERE IS NO SHARED NUMBER. There is a shared position: the round each code
-    # is UP TO. So the two modes are genuinely different questions and are
-    # answered differently.
-    #
-    #   one competition   a round of that code. ?round=<id>, and the eight-wide
-    #                     number stepper, because 26 and 25 mean something here.
-    #   all competitions  the same position in every code — the current round of
-    #                     each, then the one before that in each. ?step=<n>,
-    #                     counted back from each code's own latest, because a
-    #                     number stepper across four seasons of different
-    #                     lengths is a control that cannot be right.
-    by_series = {}
-    for r in rounds:
-        by_series.setdefault(r.series_id, []).append(r)   # already newest-first
-    multi = len(by_series) > 1
+    slug = request.GET.get("series", "")
+    chosen = next((c["series"] for c in competitions if c["series"].slug == slug), None)
+    rows = [r for r in every if chosen is None or r["match"].round.series_id == chosen.id]
+    the_round = None
+    raw_round = request.GET.get("round", "")
+    if raw_round.isdigit():
+        the_round = next((r["match"].round for r in rows if r["match"].round_id == int(raw_round)), None)
+        if the_round is not None:
+            rows = [r for r in rows if r["match"].round_id == the_round.id]
 
-    selected_round_id = request.GET.get("round")
-    round_step = 0
-    if multi:
-        # WHERE STEP 0 IS, PER CODE. Not "the newest round that exists" — the
-        # newest round YOU TIPPED, which is the same rule the single-code page
-        # has always used to choose its opening round (_round_with_my_tips) and
-        # for the same reason: this member's tips are at AFL 26 while the AFL
-        # fixture list runs to 27, so anchoring on the last round in the table
-        # opens on a round nobody has touched and reports no tips to somebody
-        # who has plenty.
-        #
-        # Worked out once per code, then stepped within that code's own list.
-        anchors = {}
-        for sid, rs in by_series.items():
-            pick = _round_with_my_tips(request.user, org, rs, _group(request, org))
-            anchors[sid] = rs.index(pick) if pick in rs else 0
-        # HOW MANY ROUNDS BACK, in every code at once. Clamped so no code runs
-        # off the end of its own season: stepping past the start of AFLW would
-        # drop it and leave the reader looking at three codes wondering where
-        # the fourth went.
-        raw = (request.GET.get("step") or "0").strip()
-        round_step = int(raw) if raw.isdigit() else 0
-        deepest = min(len(rs) - 1 - anchors[sid] for sid, rs in by_series.items())
-        round_step = min(round_step, max(0, deepest))
-        round_group = [rs[anchors[sid] + round_step] for sid, rs in by_series.items()]
-        # The anchor is only for the things that need ONE round: the lock time
-        # and the round-summary card. The one that locks last, because that is
-        # the one still open to be tipped.
-        selected_round = max(round_group, key=lambda r: r.lockout_at) if round_group else None
-    else:
-        if selected_round_id:
-            try:
-                selected_round = next(r for r in rounds if str(r.id) == selected_round_id)
-            except StopIteration:
-                selected_round = current_round(rounds)
-        else:
-            selected_round = _round_with_my_tips(request.user, org, rounds, _group(request, org))
-        round_group = [selected_round] if selected_round is not None else []
-    all_rows = []
-    round_open, round_lock_note = True, ""
-    if round_group:
-        matches = list(
-            Match.objects
-            .filter(round__in=round_group)
-            .select_related("home_team", "away_team", "round__series")
-        )
-        tips = {
-            t.match_id: t
-            for t in Tip.objects.filter(user=request.user, match__in=matches, org=org, group=_group(request, org))
-        }
-        # One batched read for the round rather than three queries per fixture.
-        readers = _readers_for(matches)
-        # THE WINDOW IS PER ROUND, and there can now be several on screen —
-        # AFL's round 4 may be open while NRL's is still waiting on round 3.
-        # So the verdict is looked up per fixture, and the banner above the
-        # list reports the anchor's, which is the one the round picker names.
-        windows = tip_window(org)
-        states = {
-            r.id: windows.get(r.id, {"open": True, "waits_for": None})
-            for r in round_group
-        }
-        anchor_state = states.get(selected_round.id, {"open": True, "waits_for": None})
-        # Open if ANY of them is: the composer is per fixture, and telling a
-        # member the round is shut while three of its games still take a tip
-        # would be the same bug in the other direction.
-        round_open = any(st["open"] for st in states.values())
-        if not anchor_state["open"] and anchor_state["waits_for"] is not None:
-            round_lock_note = (
-                f"Locked. You can tip round {selected_round.round_number} once "
-                f"round {anchor_state['waits_for'].round_number} is over."
-            )
-        for m in matches:
-            all_rows.append({
-                "match": m,
-                "tip": tips.get(m.id),
-                # A pick can change until THIS match kicks off, and only while
-                # its OWN round is inside the tipping window. The round's own
-                # lockout is its first kickoff, so gating on it closed games
-                # that had not started yet.
-                "editable": not m.is_locked and states.get(m.round_id, {}).get("open", True),
-                # upcoming / live / complete — drives the state filter below
-                "phase": m.phase,
-                # MatchReader's read. None whenever there is no fitted model
-                # for this series or too little form behind either side, and
-                # the template simply shows nothing rather than a hedge.
-                "reader": readers.get(m.id),
-            })
+    summary = _tip_summary(rows)
+    show = request.GET.get("show", "all")
+    if show not in dict(TIP_TABS):
+        show = "all"
+    listed = rows if show == "all" else [r for r in rows if r["outcome"] == show]
+    day = None
+    for r in listed:
+        this_day = timezone.localtime(r["match"].kickoff_at).date()
+        r["new_day"] = this_day != day
+        day = this_day
 
-    # MY TIPS MEANS MY TIPS.
-    #
-    # This screen listed every fixture in the round and left the ones you had
-    # not picked sitting there blank. On a nine-game round where somebody
-    # tipped three, six of the nine rows were empty — so the page answering
-    # "how am I going" was two-thirds filled with matches that had nothing to
-    # do with them. The dashboard is where you tip; this is where you review
-    # what you tipped.
-    #
-    # A row survives if there is a Tip on it, whoever made it: an auto-assigned
-    # pick still scores, so hiding it would hide points from the very screen
-    # that accounts for them. The card marks which ones were not yours.
-    #
-    # ONE EXCEPTION: a match being played right now stays, tipped or not.
-    #
-    # Everywhere else an untipped fixture is noise — nothing to do about an
-    # upcoming game you have not picked except go to the dashboard, and nothing
-    # at all about a finished one. In play is different: it is the only state
-    # where an untipped match still tells you something you want to know, which
-    # is that it is happening and you have no stake in it. Hiding those would
-    # mean a member watching the round sees three of the six games on and no
-    # sign the others exist.
-    #
-    # Captured BEFORE the filter: the sidebar reports progress as "3 of 9
-    # tipped", which needs the round's real size. Measuring it after would make
-    # it read "3 of 3" — permanently complete, however much was missed.
-    round_match_count = len(all_rows)
-    all_rows = [
-        r for r in all_rows
-        if r["tip"] is not None or r["phase"] == "live"
-    ]
-    for r in all_rows:
-        # Drives the "you didn't tip this one" treatment on the card.
-        r["missed_live"] = r["tip"] is None and r["phase"] == "live"
+    raw_page = request.GET.get("page", "1")
+    page = max(int(raw_page), 1) if raw_page.isdigit() else 1
+    end = page * TIPS_PER_PAGE
+    keep = {k: v for k, v in (("series", chosen.slug if chosen else ""), ("show", show if show != "all" else ""),
+                              ("round", str(the_round.id) if the_round else "")) if v}
+    def tab_query(key):
+        return urlencode({a: b for a, b in {**keep, "show": key}.items() if key != "all" or a != "show"})
 
-    # ---- state filter. Counts are always over the whole round, so the tab
-    # labels don't change as you move between them.
-    #
-    # Ordered upcoming → live → complete: still to play is what you can still
-    # act on, in progress is what you are watching, and finished is the record.
-    # That is the order of decreasing urgency, and the order people read in.
-    STATES = ("upcoming", "live", "complete")
-    phase_counts = {s: sum(1 for r in all_rows if r["phase"] == s) for s in STATES}
-    state = request.GET.get("state", "all")
-    if state not in STATES:
-        state = "all"
-    tip_rows = all_rows if state == "all" else [r for r in all_rows if r["phase"] == state]
-    if state == "all":
-        order = {s: i for i, s in enumerate(STATES)}
-        # Inside the in-play block, the ones you have NOT tipped come first.
-        # They are the only rows on this page carrying anything to act on —
-        # the round is running and you are not in these — so they lead, and
-        # the games you did pick follow underneath.
-        tip_rows = sorted(
-            tip_rows,
-            key=lambda r: (
-                order.get(r["phase"], 99),
-                0 if r.get("missed_live") else 1,
-                r["match"].kickoff_at,
-                r["match"].id,
-            ),
-        )
-
-    stats = user_org_stats(request.user, org, group=_group(request, org))
-    if request.headers.get("HX-Request"):
-        return render(request, "partials/my_tips_round.html", {
-            "org": org, "round": selected_round, "rows": tip_rows,
-            "state": state, "phase_counts": phase_counts, "total_all": len(all_rows),
-            "org_series": org_series, "active_slugs": active_slugs,
-            "round_open": round_open, "round_lock_note": round_lock_note,
-        })
-
-    # ---- the round picker, in whichever of its two shapes applies.
-    #
-    # ONE CODE: an eight-wide strip of round NUMBERS — "have the numbers to be
-    # up to like 8, the latest being the one that will be default, so I can see
-    # the 25, 24, going downwards." Anchored on the newest round, and the chosen
-    # one is always inside the window, so a link to round 3 in August opens with
-    # round 3 on screen rather than leaving the reader to hunt for it.
-    #
-    # EVERY CODE: no numbers at all, because no number means the same thing in
-    # all of them. Just how far back you are, in rounds, from what each code is
-    # up to. Every fixture card names its own code and round, so nothing on
-    # screen is ambiguous.
-    #
-    # `anchor_for` maps a number to the Round its link carries: the URL has
-    # always been ?round=<id> and every notification ever sent uses it.
-    tips_strip = None
-    numbers_desc, anchor_for = [], {}
-    prev_round = next_round = None
-    prev_step = next_step = None
-    if multi:
-        prev_step = round_step + 1 if round_step < deepest else None
-        next_step = round_step - 1 if round_step > 0 else None
-    else:
-        for r in rounds:
-            if r.round_number not in anchor_for:
-                anchor_for[r.round_number] = r
-                numbers_desc.append(r.round_number)
-        # round_strip walks its window backwards from the END of the list, so
-        # it wants them ascending.
-        numbers_asc = list(reversed(numbers_desc))
-        selected_number = selected_round.round_number if selected_round else None
-        tips_strip = round_strip(
-            numbers_asc, selected_number, request.GET.get("back"),
-            size=8, values={n: anchor_for[n].id for n in numbers_asc},
-        )
-        if selected_number is not None:
-            at = numbers_desc.index(selected_number)
-            prev_round = anchor_for[numbers_desc[at + 1]] if at + 1 < len(numbers_desc) else None
-            next_round = anchor_for[numbers_desc[at - 1]] if at > 0 else None
-
-    # Round-level stats describe the whole round, not the filtered view.
-    total_matches = round_match_count
-    tips_this_round = len(all_rows)
-    total_tippers = len(leaderboard_for_org(org, group=_group(request, org)))
-    rank = user_rank_in_org(request.user, org, group=_group(request, org))
-    # Percentile = share of the field this member is ahead of or level with.
-    percentile = None
-    if rank and total_tippers:
-        percentile = round((total_tippers - rank + 1) / total_tippers * 100)
-
+    strike = "–" if summary["strike"] is None else f'{summary["strike"]}%'
     return render(request, "my_tips.html", {
-        "org": org, "rounds": rounds, "selected_round": selected_round,
-        "rows": tip_rows, "points": stats["points"],
-        # Competition filter: the org's series, and which are selected.
-        "org_series": org_series, "active_slugs": active_slugs,
-        # Tipping window: whether this round is open, and why not.
-        "round_open": round_open, "round_lock_note": round_lock_note,
-        "state": state, "phase_counts": phase_counts, "total_all": len(all_rows),
-        "prev_round": prev_round, "next_round": next_round,
-        # Which shape the round picker is in, and what that shape needs.
-        "multi_comp": multi,
-        "round_step": round_step, "prev_step": prev_step, "next_step": next_step,
-        "round_group": round_group,
-        # What the round links must carry so stepping a round never silently
-        # widens the page back to every competition.
-        "tips_keep": "&".join(f"series={sl}" for sl in active_slugs),
-        # Counted in numbers, not rows: with four codes on the page "of 80" was
-        # four times the length of the season. Both are empty in
-        # all-competitions mode, where there is no single number to count.
-        "round_strip": tips_strip, "round_numbers": numbers_desc,
-        "round_anchors": [anchor_for[n] for n in numbers_desc],
-        "round_position": (
-            len(numbers_desc) - numbers_desc.index(selected_round.round_number)
-            if not multi and selected_round is not None else 0
-        ),
-        "round_total": len(numbers_desc),
-        "total_matches": total_matches,
-        "tips_this_round": tips_this_round,
-        "tips_remaining": total_matches - tips_this_round,
-        "round_pct": round(tips_this_round / total_matches * 100) if total_matches else 0,
-        "rank": rank, "total_tippers": total_tippers, "percentile": percentile,
-        "donation": donation_summary(org),
+        "org": org, "rows": listed[end - TIPS_PER_PAGE:end], "summary": summary,
+        # Each number opens the tips behind it.
+        "stats": [
+            {"value": summary["points"], "label": "Points", "tone": "points", "key": "all", "query": tab_query("all")},
+            {"value": strike, "label": "Strike rate", "tone": "strike", "key": "", "query": tab_query("all")},
+            {"value": summary["won"], "label": "Correct", "tone": "won", "key": "won", "query": tab_query("won")},
+            {"value": summary["lost"], "label": "Wrong", "tone": "lost", "key": "lost", "query": tab_query("lost")},
+            {"value": summary["missed"], "label": "Missed", "tone": "missed", "key": "missed", "query": tab_query("missed")},
+            {"value": summary["streak"], "label": "In a row", "tone": "streak", "key": "", "query": tab_query("won")},
+        ],
+        "competitions": competitions, "chosen": chosen, "the_round": the_round, "show": show,
+        "tabs": [{"key": k, "label": v, "count": summary[k],
+                  "query": tab_query(k)}
+                 for k, v in TIP_TABS],
+        "show_query": urlencode({k: v for k, v in keep.items() if k == "show"}),
+        "next_query": urlencode({**keep, "page": page + 1}) if end < len(listed) else "",
     })
 
 
@@ -1213,6 +996,29 @@ def ladder_view(request, org_id: int):
     return render(request, "ladder.html", ctx)
 
 
+def _code_chart(season, options) -> list[dict]:
+    """A member's accuracy per competition, with each one's colour and logo."""
+    by_slug = {s.slug: s for s in options}
+    return [dict(c, series=by_slug.get(c["slug"])) for c in season["codes"] if by_slug.get(c["slug"])]
+
+
+@login_required
+def my_certificates_view(request, org_id: int):
+    """Where a member stands against a certificate, competition by competition:
+    what it would take while the season runs, and the download once it has
+    ended (client, 2 Nov 2026). Top three only."""
+    from . import certificates as certs
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_member(request.user, org):
+        return HttpResponseForbidden()
+    return render(request, "my_certificates.html", {
+        "org": org,
+        "progress": certs.certificate_progress(request.user, org),
+        "can_certify": _can_certify(request.user, org),
+    })
+
+
 @login_required
 def my_stats_view(request, org_id: int):
     """A member's own season, in more detail than a row of a table can hold.
@@ -1258,7 +1064,7 @@ def my_stats_view(request, org_id: int):
             [r["accuracy"] for r in st["run"]], floor=0, ceiling=100,
         ),
         "chart_points": bars(st["run"], key="points"),
-        "chart_codes": bars(st["codes"], key="accuracy"),
+        "chart_codes": _code_chart(st, options),
         "chart_split": donut(st["right"], st["played"]),
         "chart_standing": donut(total_rankers - rank + 1, total_rankers) if rank else None,
     })
@@ -1408,22 +1214,25 @@ def leaderboard_view(request, org_id: int):
     top_points = board[0].points if board else 0
     ranked = [
         {"rank": u.rank, "user": u, "points": u.points,
-         "tips_correct": u.tips_correct, "tips_total": u.tips_total,
+         "tips_correct": u.correct_all, "tips_total": u.graded_all,
          "is_tied": u.is_tied,
-         "accuracy": round(u.tips_correct / u.tips_total * 100) if u.tips_total else None,
-         "behind": top_points - u.points}
+         "accuracy": round(u.correct_all / u.graded_all * 100) if u.graded_all else None,
+         "behind": top_points - u.points,
+         # The badge belongs to whoever is on the spot right now, so it is read
+         # off the live board and moves the moment the order does.
+         "place": u.rank if u.rank <= 3 and u.points > 0 else None}
         for u in board
     ]
-    if request.headers.get("HX-Request"):
+    # THE CERTIFICATE LINE (client, 2 Nov 2026): the top three finish with a
+    # certificate, so everyone else can see how far off it they are.
+    podium = [r for r in ranked if r["place"]]
+    third = podium[-1]["points"] if len(podium) >= 3 else None
+    for r in ranked:
+        r["to_top3"] = third - r["points"] + 1 if third is not None and not r["place"] else None
+    if request.headers.get("HX-Request") and not request.headers.get("HX-Boosted"):
         return render(request, "partials/leaderboard_table.html", {
             "ranked": ranked, "me": request.user, "selected_comp": selected_comp,
         })
-    # ---- sidebar summary. "Perfect scores" counts tippers who got every
-    # graded tip right in the view being shown, so it tracks the round filter.
-    perfect = sum(
-        1 for r in ranked if r["tips_total"] and r["tips_correct"] == r["tips_total"]
-    )
-    current_round = rounds.first()
     # What the competition filter must carry through, and what it must not.
     #
     # Scope: yes — "the national board, for the NRL" is a sentence, and losing
@@ -1490,14 +1299,6 @@ def leaderboard_view(request, org_id: int):
         "prev_label": labels.get(steps[at - 1]) if at > 0 else "",
         "next_label": labels.get(steps[at + 1]) if at < len(steps) - 1 else "",
     }
-    # Season champion certificates ready for this org, for the people who can
-    # hand them out (spec addendum 14 Aug 2026) — a captain has no Manage
-    # menu, so this is how they find them.
-    certs_ready = []
-    if _can_certify(request.user, org):
-        from . import certificates as _certs
-        certs_ready = [s.name for s in _certs.competitions_for(org) if _certs.season_state(org, s).final]
-
     # BEYOND YOUR OWN ORGANISATION (client, 4 Oct 2026). The Industry and
     # National boards were under the Ladder menu, which is for teams; they rank
     # people and organisations, so they are views of this page. See
@@ -1507,17 +1308,20 @@ def leaderboard_view(request, org_id: int):
     board_view = request.GET.get("view", "org")
     if board_view not in ("org", "industry", "national", "everyone"):
         board_view = "org"
-    standing = rankings.standing(request.user, org, series=selected_comp, group=group)
     wide_board = None
     if board_view in ("industry", "national"):
         wide_board = rankings.org_board(org, board_view, series=selected_comp)
     elif board_view == "everyone":
         wide_board = rankings.everyone_board(request.user, org, series=selected_comp)
+    from . import certificates as certs
+
+    progress = certs.certificate_progress(request.user, org)
     return render(request, "leaderboard.html", {
+        # Gold in the middle, whatever the places either side of it are.
+        "podium": ([podium[1], podium[0], *podium[2:3]] if len(podium) > 1 else podium),
+        "cert_ready": sum(len(p["certificates"]) for p in progress),
         "board_view": board_view,
-        "standing": standing,
         "wide_board": wide_board,
-        "certs_ready": certs_ready,
         "org": org, "rounds": rounds, "selected_round_id": selected_round_id or "all",
         # Built here rather than in the template. The button now rides inside
         # the room switcher, which takes its href as an `action_url` argument —
@@ -1535,10 +1339,6 @@ def leaderboard_view(request, org_id: int):
         "ranked": ranked, "me": request.user,
         "scope": scope, "is_family": is_family,
         "total_tippers": len(ranked),
-        "perfect_scores": perfect,
-        "total_rounds": rounds.count(),
-        "current_round": current_round,
-        "donation": donation_summary(org),
     })
 
 
@@ -1667,7 +1467,7 @@ def certificate_competition_view(request, org_id: int, series: str):
     if series_obj not in certs.competitions_for(org):
         raise Http404
     state = certs.season_state(org, series_obj)
-    champions = certs.champions(org, series_obj) if state.final else []
+    champions = certs.placegetters(org, series_obj) if state.final else []
     _attach_photos(org, series_obj, champions)
     preview = request.GET.get("preview") == "1"
     sample = None
@@ -1683,8 +1483,6 @@ def certificate_competition_view(request, org_id: int, series: str):
         "preview": preview,
         "accent": certs.ACCENTS.get(series_obj.name, certs.FOREST),
         "year": org.season.year if org.season_id else "",
-        "industry": certs.industry_champion(org, series_obj) if state.final else None,
-        "national": certs.national_org_champion(org, series_obj) if state.final else None,
         "individual_national": certs.national_individual_champion(org, series_obj) if state.final else None,
     })
 
@@ -1827,14 +1625,19 @@ def certificate_file(request, org_id: int, series: str, user_id: int, fmt: str):
     from . import certificates as certs
 
     org = get_object_or_404(Organisation, pk=org_id)
-    if not _can_certify(request.user, org):
+    # Your own certificate is yours to download; the org side can fetch anyone's.
+    if not _can_certify(request.user, org) and request.user.id != user_id:
         return HttpResponseForbidden()
     if series not in certs.CERT_SERIES or fmt not in ("pdf", "png"):
         raise Http404
     series_obj = get_object_or_404(Series, name=series)
-    cert = next((c for c in certs.champions(org, series_obj) if c.user_id == user_id), None)
+    group = None
+    raw_group = request.GET.get("group", "")
+    if raw_group.isdigit():
+        group = get_object_or_404(Group, pk=int(raw_group), org=org)
+    cert = next((c for c in certs.placegetters(org, series_obj, group=group) if c.user_id == user_id), None)
     if cert is None:
-        raise Http404("No certificate — the season is not final, or this member is not its champion.")
+        raise Http404("No certificate — the season is not final, or this member did not finish in the top three.")
     photo = _champion_photo_field(org, series_obj, user_id)
     if fmt == "pdf":
         body, ctype, name = certs.render_pdf(cert, photo), "application/pdf", cert.filename("pdf")
@@ -1847,45 +1650,34 @@ def certificate_file(request, org_id: int, series: str, user_id: int, fmt: str):
     return resp
 
 
-_SCOPE_COMPUTE = {
-    "industry": "industry_champion",
-    "national": "national_org_champion",
-    "individual": "national_individual_champion",
-}
-
-
 @login_required
 def certificate_scope_file(request, org_id: int, series: str, scope: str, fmt: str):
-    """A certificate beyond this organisation's own champion (12 Oct 2026):
-    best in its industry, best on all of GoodTip, or the top individual
-    tipper nationwide. Re-derived fresh, like the per-member one — the
-    moment the wider field stops being final, this stops existing too."""
+    """A top-three place across all of GoodTip (scope "individual").
+    Re-derived fresh, like the per-member one — the moment the wider field
+    stops being final, this stops existing too. ``?user=`` picks the person;
+    without it, the national champion."""
     from django.http import Http404, HttpResponse, HttpResponseForbidden
 
+    from accounts.models import User
     from catalog.models import Series
     from orgs.models import Organisation
 
     from . import certificates as certs
 
     org = get_object_or_404(Organisation, pk=org_id)
-    if not _can_certify(request.user, org):
+    if not _require_member(request.user, org):
         return HttpResponseForbidden()
-    if series not in certs.CERT_SERIES or fmt not in ("pdf", "png") or scope not in _SCOPE_COMPUTE:
+    if series not in certs.CERT_SERIES or fmt not in ("pdf", "png") or scope != "individual":
         raise Http404
     series_obj = get_object_or_404(Series, name=series)
-    cert = getattr(certs, _SCOPE_COMPUTE[scope])(org, series_obj)
+    top = certs.national_top_three(org, series_obj)
+    raw_user = request.GET.get("user", "")
+    cert = next((c for c in top if str(c.user_id) == raw_user), None) if raw_user.isdigit() else (top[0] if top else None)
     if cert is None:
-        raise Http404("No certificate — that wider field isn't final, or this organisation didn't top it.")
-    # The org's own logo stands in for a photo on an organisation's
-    # certificate; the individual one is a person, so it's their profile
-    # photo — there's no per-org override to look up, since this spans every
-    # organisation on the board, not just this one.
-    if cert.scope == certs.SCOPE_INDIVIDUAL_NATIONAL:
-        from accounts.models import User
-
-        photo = getattr(User.objects.filter(id=cert.user_id).first(), "avatar", None)
-    else:
-        photo = org.logo
+        raise Http404("No certificate — that wider field isn't final, or this person isn't in its top three.")
+    if not _can_certify(request.user, org) and request.user.id != cert.user_id:
+        return HttpResponseForbidden()
+    photo = getattr(User.objects.filter(id=cert.user_id).first(), "avatar", None)
     if fmt == "pdf":
         body, ctype, name = certs.render_pdf(cert, photo), "application/pdf", cert.filename("pdf")
     else:

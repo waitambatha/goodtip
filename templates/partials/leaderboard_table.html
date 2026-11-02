@@ -38,20 +38,21 @@ table in one code's colour would be claiming to be that code's table.
   </div>
   <div class="gt-scroll gb-rows">
   {% for row in ranked %}
-    <div class="gb-row {% if row.user.id == me.id %}me{% endif %}">
+    <div class="gb-row{% if row.place %} is-p{{ row.place }}{% endif %}{% if row.user.id == me.id %} me{% endif %}">
       <span class="gb-rank">{{ row.rank }}</span>
       <span class="gb-who">
         <span class="gb-av">{% if row.user.avatar %}<img src="{{ row.user.avatar.url }}" alt="" loading="lazy">{% else %}{{ row.user.display_name|slice:":1"|upper }}{% endif %}</span>
-        <span class="gb-name">{{ row.user.display_name }}{% if row.user.id == me.id %} <span class="pill-role">You</span>{% endif %}</span>
+        <span class="gb-name">{{ row.user.display_name }}</span>
+        {% if row.place %}{% include "partials/_rank_badge.html" with place=row.place kind="person" %}{% endif %}
       </span>
-      <span class="gb-correct">{{ row.tips_correct }} <span>/ {{ row.tips_total }}</span></span>
+      <span class="gb-correct">{% if row.tips_total %}{{ row.tips_correct }} <span>/ {{ row.tips_total }}</span>{% else %}<i>&ndash;</i>{% endif %}</span>
       {% comment %}
       A dash, not a nought. Nobody with no graded tips has an accuracy of zero
       per cent — they have no accuracy yet, and printing 0% beside a new
       member's name is a scoreline they never earned.
       {% endcomment %}
       <span class="gb-acc">{% if row.accuracy is not None %}{{ row.accuracy }}%{% else %}<i>&ndash;</i>{% endif %}</span>
-      <span class="gb-behind">{% if row.behind %}&minus;{{ row.behind }}{% else %}<i>&ndash;</i>{% endif %}</span>
+      <span class="gb-behind">{% if row.behind %}&minus;{{ row.behind }}{% else %}0{% endif %}</span>
       <span class="gb-pts">{{ row.points }}</span>
     </div>
   {% empty %}

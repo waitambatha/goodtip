@@ -72,7 +72,7 @@ the mistake has to be typed rather than merely forgotten.
     {% comment %} The organisation is always the first segment — it is the room you are
        in until you choose otherwise, so it holds the leftmost position rather
        than being an escape hatch tacked on the end. {% endcomment %}
-    <form method="post" action="{% url 'orgs:leave_group_context' %}" data-busy="Switching">
+    <form method="post" action="{% url 'orgs:leave_group_context' %}" data-busy="Switching" data-switch-to="{{ current_org.name }}">
       {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
       <button type="submit" class="rw-opt{% if not current_group %} on{% endif %}"
               {% if not current_group %}aria-current="true"{% endif %}>
@@ -82,12 +82,12 @@ the mistake has to be typed rather than merely forgotten.
     </form>
 
     {% for g in current_org_groups %}
-    <form method="post" action="{% url 'orgs:switch_group' current_org.id g.id %}" data-busy="Switching">
+    <form method="post" action="{% url 'orgs:switch_group' current_org.id g.id %}" data-busy="Switching" data-switch-to="{{ g.name }}">
       {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
       <button type="submit" class="rw-opt{% if current_group.id == g.id %} on{% endif %}"
               {% if current_group.id == g.id %}aria-current="true"{% endif %}>
         <b>{{ g.name }}</b>
-        <i>{% if g.kind_label %}{{ g.kind_label }}{% else %}Group{% endif %}</i>
+        <i>{% if g.kind_label and g.kind_label != g.name %}{{ g.kind_label }}{% else %}Group{% endif %}</i>
       </button>
     </form>
     {% endfor %}

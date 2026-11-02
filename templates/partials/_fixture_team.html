@@ -82,7 +82,6 @@ Expects: team, form (a reader row, optional), pick ("home"|"away"),
     {% endcomment %}
     {% if match.result %}
     <span class="fxc-outcome{% if match.result == pick %} is-won{% elif match.result == 'draw' %} is-drew{% else %} is-lost{% endif %}">
-      <b class="fxc-pts">{% if pick == 'home' %}{{ match.home_score|default_if_none:"–" }}{% else %}{{ match.away_score|default_if_none:"–" }}{% endif %}</b>
       <i>{% if match.result == 'draw' %}Drew{% elif match.result == pick %}Won{% else %}Lost{% endif %}</i>
     </span>
     {% endif %}

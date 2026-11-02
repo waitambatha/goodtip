@@ -1,4 +1,4 @@
-{% load team_extras %}
+{% load static team_extras %}
 {% comment %}
 One fixture, one card. Used by the dashboard, My Tips and the confirmation
 screen so the three cannot drift apart.
@@ -41,20 +41,21 @@ this — a finished game is not "locked", it is over.
 {% endcomment %}
 <article class="fxc phase-{{ match.phase }}{% if selection %} is-picked{% endif %}{% if not editable %} is-locked{% endif %}{% if not editable and not match.result %} is-pending-lock{% endif %}"
          data-code="{{ match.round.series.slug }}" data-cat="{{ match.round.series.category }}"
+         style="--code: {{ match.round.series.colour }}; --code-ink: {{ match.round.series.colour }}; --code-on: #fff"
          {% if not editable and not match.result %}data-locked-msg="{% if round_locked %}{{ round_locked }}{% elif lock_note %}{{ lock_note }}{% else %}Locked — not open to tip yet.{% endif %}"{% endif %}
          id="fxc-{{ match.id }}">
 
-  {% if not editable and not match.result %}
+  {% if not editable and not match.result and match.phase == "upcoming" %}
   <span class="fxc-padlock" aria-hidden="true" title="Locked">
     <svg viewBox="0 0 24 24"><use href="#ic-lock"/></svg>
   </span>
   {% endif %}
 
   <div class="fxc-meta">
-    <span class="fxc-code" style="--code: {{ match.round.series.colour }}">{{ match.round.series.name }}</span>
-    <span class="fxc-rnd">{{ match.round.label }}</span>
+    <span class="fxc-code" style="--code: {{ match.round.series.colour }}"><span class="fxc-code-logo" aria-hidden="true">{% include "partials/_series_logo.html" with s=match.round.series %}</span>{{ match.round.series.name }}</span>
     <span class="fxc-when">{{ match.kickoff_at|date:"D j M · g:i A" }}</span>
-    {% if match.venue %}<span class="fxc-venue"><svg><use href="#ic-pin"/></svg>{{ match.venue }}</span>{% endif %}
+    <span class="fxc-rnd">{{ match.round.label }}</span>
+    {% if match.phase == "live" %}{% include "components/_match_state.html" with match=match %}{% endif %}
     {% comment %}
     Three ways a card can be un-tippable and they must not look alike.
     "No tip" is a reproach — you had the chance and did not take it. A round
@@ -85,6 +86,17 @@ this — a finished game is not "locked", it is over.
     {% endcomment %}
     {% elif not editable %}<span class="fxc-state is-missed">Not tipped</span>
     {% else %}<span class="fxc-state is-open">Open</span>{% endif %}
+    {% comment %}
+    Everything about the game, once, up here (client, 31 Oct 2026: "let's just
+    have the details at the top... we do not repeat"). Under the competition,
+    where it is played (client, 1 Nov 2026).
+    {% endcomment %}
+    <div class="fxc-details">
+      {% if match.venue_label %}<span class="fxc-venue"><img src="{% static 'img/stadium.svg' %}" alt="" width="38" height="26">{{ match.venue_label }}</span>{% endif %}
+      {% if match.phase == "upcoming" %}
+      <span class="fxc-count">Starts in <b data-gt-until="{{ match.kickoff_at|date:'c' }}" data-gt-done="moments">{{ match.kickoff_at|timeuntil }}</b></span>
+      {% endif %}
+    </div>
   </div>
 
   {% comment %}
@@ -92,10 +104,26 @@ this — a finished game is not "locked", it is over.
   which is the dashboard. My Tips shows one round at a time, so it carries the
   same sentence once above the list rather than nine times down it.
   {% endcomment %}
-  {% if lock_note %}
-  <div class="fxc-shut">
-    <svg aria-hidden="true"><use href="#ic-lock"/></svg>
-    <span>{{ lock_note }}</span>
+  {% comment %}
+  WHY IT IS LOCKED AND WHEN IT OPENS (client, 31 Oct 2026: "make it a little
+  bigger for visibility and give info on why it's locked and when it will be
+  opened"). The opening time is real: a round opens when the one it waits for
+  has no game left to start (tipping.services). A game in play explains itself
+  in its live band; this is for the ones that have not started.
+  {% endcomment %}
+  {% if not editable and not match.result and match.phase == "upcoming" %}
+  <div class="fxc-lockbar">
+    <span class="fxc-lockbar-ic" aria-hidden="true"><svg><use href="#ic-lock"/></svg></span>
+    <div class="fxc-lockbar-t">
+      <b>Locked for now</b>
+      <span>{% if round_locked %}{{ round_locked }}{% elif lock_note %}{{ lock_note }}{% else %}This game isn't open to tip yet.{% endif %}</span>
+    </div>
+    {% if lock_opens %}
+    <div class="fxc-lockbar-when">
+      <small>Opens {{ lock_opens|date:"D j M, g:i A" }}</small>
+      <b data-gt-until="{{ lock_opens|date:'c' }}" data-gt-done="Opening now">{{ lock_opens|timeuntil }}</b>
+    </div>
+    {% endif %}
   </div>
   {% endif %}
 
@@ -127,6 +155,8 @@ this — a finished game is not "locked", it is over.
     {% include "partials/_fixture_team.html" with team=match.home_team form=reader.home pick="home" side="home" %}
     {% if match.round.series.sport.draw_tips %}
     {% include "partials/_fixture_draw.html" %}
+    {% elif match.phase != "upcoming" %}
+    <div class="fxc-drawcol"><div class="fxc-team fxc-draw">{% include "partials/_draw_face.html" %}</div></div>
     {% else %}
     <span class="fxc-v" aria-hidden="true">vs</span>
     {% endif %}
@@ -177,5 +207,4 @@ this — a finished game is not "locked", it is over.
   </div>
   {% endif %}
 
-  {% include "components/_match_state.html" with match=match %}
 </article>

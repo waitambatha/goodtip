@@ -3,7 +3,7 @@
 {% block title %}{{ team.name }} stats, {{ series.name }}{% endblock %}
 {% block loader_task %}Working out {{ team.name }}'s season{% endblock %}
 {% block nav_ladder %}on{% endblock %}
-{% block body_class %}page-deep sheet-page{% endblock %}
+{% block body_class %}page-deep sheet-page page-dash page-tips page-stats page-clubstats{% endblock %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 
 {% block app_content %}
@@ -20,47 +20,25 @@ HistoricalMatch for the same reason the ladder is: tipping.Match is org-scoped
 and partial, so a tally taken from it multiplies every result by the number of
 leagues tipping the game.
 {% endcomment %}
-<div class="gt-head is-centred" data-code="{{ series.slug }}" data-cat="{{ series.category }}">
-  <div>
-    <div class="gh-eyebrow is-title">{{ series.name }} &middot; {{ org.season }}</div>
-    <h1 class="gh-title">{{ team.name }}</h1>
-    {% if entry %}<p class="gh-sub">Ladder position {{ entry.rank }}</p>{% endif %}
-  </div>
-</div>
+<div class="st-page" style="--board: {{ series.colour }}">
+<section class="cp-head club-head">
+  <a class="cp-back" href="{% url 'tipping:ladder' org.id %}?series={{ series.slug }}">Ladder</a>
+  <span class="st-crest">{% crest team %}</span>
+  <h1>{{ team.name }}</h1>
+  <p>{{ series.name }} &middot; {{ org.season }}{% if entry %} &middot; Ladder position {{ entry.rank }}{% endif %}</p>
+</section>
 
-{% comment %}
-The way back, as a button at the right-hand end. What is left of the subtitle
-is a fact about the club rather than half a sentence and half a link.
-{% endcomment %}
-<div class="gh-backrow">
-  <a class="abtn abtn-ghost gh-back" href="{% url 'tipping:ladder' org.id %}?series={{ series.slug }}">
-    Back to the ladder
-    <svg class="gh-back-ic" aria-hidden="true"><use href="#ic-arrow-right"/></svg>
-  </a>
-</div>
-
+<div class="tk-sheet lad-sheet">
 {% if stats.played %}
-<div class="statcards" data-code="{{ series.slug }}" data-cat="{{ series.category }}">
-  <div class="statcard">
-    <span class="sc-lab">Played</span>
-    <b class="sc-fig">{{ stats.played }}</b>
-    <span class="sc-note">{{ stats.won }}W &middot; {{ stats.lost }}L{% if stats.drawn %} &middot; {{ stats.drawn }}D{% endif %}</span>
-  </div>
-  <div class="statcard">
-    <span class="sc-lab">Win rate</span>
-    <b class="sc-fig">{{ stats.win_pct }}<small>%</small></b>
-    <span class="sc-note">{{ stats.won }} from {{ stats.played }}</span>
-  </div>
-  <div class="statcard">
-    <span class="sc-lab">Differential</span>
-    <b class="sc-fig">{% if stats.differential > 0 %}+{% endif %}{{ stats.differential }}</b>
-    <span class="sc-note">{{ stats.scored }} for, {{ stats.conceded }} against</span>
-  </div>
-  <div class="statcard">
-    <span class="sc-lab">Ladder</span>
-    <b class="sc-fig">{% if entry %}{{ entry.rank }}{% else %}&ndash;{% endif %}</b>
-    <span class="sc-note">{% if entry %}{{ entry.points }} competition points{% else %}not on the table yet{% endif %}</span>
-  </div>
+<div class="statcards tk-stats st-tiles">
+  <div class="tk-stat is-won"><b>{{ stats.played }}</b><span>Played</span>
+    <small>{{ stats.won }} won, {{ stats.lost }} lost{% if stats.drawn %}, {{ stats.drawn }} drawn{% endif %}</small></div>
+  <div class="tk-stat is-points"><b>{{ stats.win_pct }}%</b><span>Win rate</span>
+    <small>{{ stats.won }} from {{ stats.played }}</small></div>
+  <div class="tk-stat is-strike"><b>{% if stats.differential > 0 %}+{% endif %}{{ stats.differential }}</b><span>Differential</span>
+    <small>{{ stats.scored }} for, {{ stats.conceded }} against</small></div>
+  <div class="tk-stat is-streak"><b>{% if entry %}#{{ entry.rank }}{% else %}&ndash;{% endif %}</b><span>Ladder</span>
+    <small>{% if entry %}{{ entry.points }} competition points{% else %}not on the table yet{% endif %}</small></div>
 </div>
 
 {% if stats.trend %}
@@ -156,10 +134,11 @@ as the form strip on a fixture card, because they are the same fact.
 </div>
 
 {% else %}
-<div class="card pad-lg" style="text-align:center;">
-  <div class="card-h">No completed games yet</div>
-  <p class="card-lead">{{ team.name }}'s season fills in here as results arrive.</p>
-  <a href="{% url 'tipping:ladder' org.id %}?series={{ series.slug }}" class="abtn abtn-primary" style="margin-top:14px;">Back to the ladder &rarr;</a>
+<div class="tk-empty">
+  <b>No completed games yet</b>
+  <span>{{ team.name }}'s season fills in here as results arrive.</span>
 </div>
 {% endif %}
+</div>
+</div>
 {% endblock %}

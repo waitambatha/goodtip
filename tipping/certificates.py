@@ -134,15 +134,17 @@ def season_state(org, series) -> SeasonState:
     return SeasonState(True, "", last.kickoff_at, "Grand Final")
 
 
-#: Beyond the one organisation's own champion (client, 12 Oct 2026: "if my
-#: organisation is the best... if it's me... irrespective of the type of
-#: organisation... we should also get a certificate"). The scope decides who
-#: "winner" names and how the headline reads; "org" is the original, unscoped
-#: default so every certificate built before this addendum is unaffected.
+#: Certificates are for people (Ian and the client, 2 Nov 2026): the top three
+#: in an organisation, in a group, and on all of GoodTip. An organisation earns
+#: a badge on the leaderboard instead. "org" covers an organisation and a group.
 SCOPE_ORG = "org"
-SCOPE_INDUSTRY = "industry"
-SCOPE_NATIONAL = "national"
 SCOPE_INDIVIDUAL_NATIONAL = "individual_national"
+
+#: A group needs this many tippers to award anything: with three or fewer,
+#: everyone who plays is in the top three, and second of two is not an honour.
+MIN_GROUP_FIELD = 4
+
+PLACES = {1: "Season Champion", 2: "Season Runner-Up", 3: "Season Third Place"}
 
 
 @dataclass
@@ -160,22 +162,22 @@ class Certificate:
     # downloaded preview can never pass for a real champion's certificate.
     sample: bool = False
     scope: str = SCOPE_ORG
-    #: The organisation type's name, for a SCOPE_INDUSTRY headline ("Best
-    #: Community Organisation"). Unused by every other scope.
-    scope_label: str = ""
+    place: int = 1
+    #: The group this was earned in, if it was earned in one.
+    group_name: str = ""
+
+    @property
+    def place_label(self) -> str:
+        return PLACES.get(self.place, PLACES[1])
 
     @property
     def headline(self) -> str:
-        """§3 for the org's own champion; the wider scopes name what they
-        beat instead of a round, since there is no single season to cite
-        across organisations that each run their own."""
-        if self.scope == SCOPE_INDUSTRY:
-            return f"Best {self.scope_label} Organisation · {self.year} {self.series}"
-        if self.scope == SCOPE_NATIONAL:
-            return f"Best Organisation Nationwide · {self.year} {self.series}"
+        """§3 for a season inside one organisation or group; nationally it
+        names the field instead, there being no single season to cite."""
         if self.scope == SCOPE_INDIVIDUAL_NATIONAL:
-            return f"Top Tipper Nationwide · {self.year} {self.series}"
-        return f"{self.year} {self.series} Season Champion"
+            title = {1: "Top Tipper Nationwide", 2: "Second Nationwide", 3: "Third Nationwide"}[self.place]
+            return f"{title} · {self.year} {self.series}"
+        return f"{self.year} {self.series} {self.place_label}"
 
     @property
     def accent(self) -> str:
@@ -190,7 +192,8 @@ class Certificate:
 
         slug = re.sub(r"[^a-z0-9]+", "-", self.winner.lower()).strip("-") or "champion"
         tail = "-sample" if self.sample else ""
-        return f"goodtip-{self.year}-{self.series.lower()}-champion-{slug}{tail}.{ext}"
+        place = {1: "champion", 2: "runner-up", 3: "third"}[self.place]
+        return f"goodtip-{self.year}-{self.series.lower()}-{place}-{slug}{tail}.{ext}"
 
     @property
     def footer_line(self) -> str:
@@ -199,35 +202,42 @@ class Certificate:
         return f"SEASON CLOSED {self.closed_label.upper()}  ·  {self.last_round_label.upper()}"
 
 
-def champions(org, series) -> list[Certificate]:
-    """Every season champion of ``series`` in ``org`` — one Certificate each.
+def placegetters(org, series, group=None) -> list[Certificate]:
+    """The top three of ``series`` in ``org`` (or one of its groups), one
+    Certificate each. Empty until the season is final (§4).
 
-    Empty until the season is final (§4). Uses the organisation's own ladder
-    for that competition with the tiebreakers already specified (points, the
-    paired comp, countback); anyone still sharing first after all of them is a
-    co-champion and gets their own certificate, identical to the others (§2).
-    Nobody is champion on zero points.
+    Uses that board's own ladder with the tiebreakers already specified; anyone
+    still level after all of them shares the place and gets their own
+    certificate (§2). Nobody places on zero points.
     """
     from tipping.services import leaderboard_for_org
 
     state = season_state(org, series)
     if not state.final:
         return []
-    board = leaderboard_for_org(org, series=series)
-    top = [u for u in board if getattr(u, "rank", None) == 1 and (u.points or 0) > 0]
+    board = leaderboard_for_org(org, series=series, group=group)
+    if group is not None and sum(1 for u in board if u.points or u.tips_total) < MIN_GROUP_FIELD:
+        return []
     year = org.season.year if org.season_id else timezone.localtime(state.closed_on).year
     return [
         Certificate(
-            org_name=org.name,
+            org_name=f"{group.name} · {org.name}" if group else org.name,
             winner=(u.display_name or u.email.split("@")[0]),
             series=series.name,
             year=year,
             closed_on=state.closed_on,
             last_round_label=state.last_round_label,
             user_id=u.id,
+            place=u.rank,
+            group_name=group.name if group else "",
         )
-        for u in top
+        for u in board if (getattr(u, "rank", 9) or 9) <= 3 and (u.points or 0) > 0
     ]
+
+
+def champions(org, series) -> list[Certificate]:
+    """Every season champion of ``series`` in ``org``: first place only."""
+    return [c for c in placegetters(org, series) if c.place == 1]
 
 
 def sample_certificate(org, series, viewer) -> Certificate:
@@ -276,14 +286,11 @@ def sample_certificate(org, series, viewer) -> Certificate:
 # worth printing.
 # ---------------------------------------------------------------------------
 
-def _consenting_orgs_for(series, organisation_type=None):
-    """Consenting organisations that actually run ``series``, optionally
-    narrowed to one organisation type (the "industry" scope)."""
+def _consenting_orgs_for(series):
+    """Consenting organisations that actually run ``series``."""
     from orgs.models import Organisation
 
     qs = Organisation.objects.filter(is_public_listed=True).select_related("organisation_type", "season")
-    if organisation_type is not None:
-        qs = qs.filter(organisation_type=organisation_type)
     return [o for o in qs if o.season_id and series in competitions_for(o)]
 
 
@@ -295,125 +302,100 @@ def _scope_is_final(orgs, series) -> bool:
     return all(season_state(o, series).final for o in orgs)
 
 
-def _org_standings(orgs, series, year):
-    """Each organisation's season for ``series``/``year``: points and active
-    tippers, ranked the same way ``national_ladder.ladder()`` ranks them —
-    average points per tipper first, so a bigger roster does not just win by
-    volume."""
-    from django.db.models import Count, Sum, Value
-    from django.db.models.functions import Coalesce
-
-    from .models import Tip
-
-    org_ids = [o.id for o in orgs]
-    rows = {
-        r["org"]: r
-        for r in Tip.objects.filter(
-            org_id__in=org_ids, group__isnull=True,
-            match__round__series=series, match__round__competition__season__year=year,
-            is_correct__isnull=False,
-        ).values("org").annotate(
-            points=Coalesce(Sum("points_awarded"), Value(0)),
-            tippers=Count("user", distinct=True),
-        )
-    }
-    out = []
-    for o in orgs:
-        r = rows.get(o.id)
-        points = r["points"] if r else 0
-        tippers = r["tippers"] if r else 0
-        if points <= 0 or not tippers:
-            continue
-        out.append({"org": o, "points": points, "tippers": tippers, "avg": points / tippers})
-    out.sort(key=lambda r: (-r["avg"], -r["points"], r["org"].name))
-    return out
-
-
-def _org_scope_champion(org, series, *, organisation_type=None, scope, scope_label="") -> Certificate | None:
-    """``org``'s own certificate for a wider scope, or ``None`` when that
-    scope is not yet final, ``org`` is not in the consenting pool, or ``org``
-    is not the one that topped it."""
-    if not org.is_public_listed or org.organisation_type_id is None:
-        return None
-    pool = _consenting_orgs_for(series, organisation_type)
-    if org.id not in {o.id for o in pool} or not _scope_is_final(pool, series):
-        return None
-    year = org.season.year
-    standings = _org_standings(pool, series, year)
-    if not standings or standings[0]["org"].id != org.id:
-        return None
-    state = season_state(org, series)
-    return Certificate(
-        org_name=scope_label or "GoodTip",
-        winner=org.name,
-        series=series.name,
-        year=year,
-        closed_on=state.closed_on,
-        last_round_label=state.last_round_label,
-        scope=scope,
-        scope_label=scope_label,
-    )
-
-
-def industry_champion(org, series) -> Certificate | None:
-    """``org``'s certificate for topping every consenting organisation of
-    its own type, once that whole pool is final — or ``None``."""
-    label = org.organisation_type.name if org.organisation_type_id else ""
-    return _org_scope_champion(
-        org, series, organisation_type=org.organisation_type, scope=SCOPE_INDUSTRY, scope_label=label,
-    )
-
-
-def national_org_champion(org, series) -> Certificate | None:
-    """``org``'s certificate for topping every consenting organisation on
-    GoodTip, once that whole pool is final — or ``None``."""
-    return _org_scope_champion(org, series, scope=SCOPE_NATIONAL, scope_label="GoodTip")
-
-
-def national_individual_champion(org, series) -> Certificate | None:
-    """The certificate for whoever has the most points for ``series`` across
-    EVERY consenting organisation, shown on ``org``'s own page only when that
-    person has tipped for ``org`` — an org celebrates its own, not a stranger
-    who happens to be in first."""
+def national_top_three(org, series) -> list[Certificate]:
+    """The three people with the most points for ``series`` across every
+    consenting organisation, as far as ``org`` is concerned: only those who
+    tipped for it. An organisation celebrates its own, not a stranger who
+    happens to be in first."""
     from django.db.models import Sum, Value
     from django.db.models.functions import Coalesce
+
+    from accounts.models import User
 
     from .models import Tip
 
     if not org.is_public_listed or org.organisation_type_id is None or not org.season_id:
-        return None
+        return []
     pool = _consenting_orgs_for(series)
     if org.id not in {o.id for o in pool} or not _scope_is_final(pool, series):
-        return None
+        return []
     year = org.season.year
-    org_ids = [o.id for o in pool]
     rows = list(
         Tip.objects.filter(
-            org_id__in=org_ids, group__isnull=True,
+            org_id__in=[o.id for o in pool], group__isnull=True,
             match__round__series=series, match__round__competition__season__year=year,
             is_correct__isnull=False,
         ).values("user").annotate(points=Coalesce(Sum("points_awarded"), Value(0)))
-        .filter(points__gt=0).order_by("-points", "user")
+        .filter(points__gt=0).order_by("-points", "user")[:3]
     )
-    if not rows:
-        return None
-    top_user_id = rows[0]["user"]
-    if not Tip.objects.filter(user_id=top_user_id, org=org).exists():
-        return None
-    from accounts.models import User
-
-    champ = User.objects.get(id=top_user_id)
     state = season_state(org, series)
-    return Certificate(
-        org_name="GoodTip",
-        winner=(champ.display_name or champ.email.split("@")[0]),
-        series=series.name,
-        year=year,
-        closed_on=state.closed_on,
-        last_round_label=state.last_round_label,
-        user_id=champ.id,
-        scope=SCOPE_INDIVIDUAL_NATIONAL,
-    )
+    out = []
+    for place, row in enumerate(rows, start=1):
+        if not Tip.objects.filter(user_id=row["user"], org=org).exists():
+            continue
+        person = User.objects.get(id=row["user"])
+        out.append(Certificate(
+            org_name="GoodTip",
+            winner=(person.display_name or person.email.split("@")[0]),
+            series=series.name,
+            year=year,
+            closed_on=state.closed_on,
+            last_round_label=state.last_round_label,
+            user_id=person.id,
+            scope=SCOPE_INDIVIDUAL_NATIONAL,
+            place=place,
+        ))
+    return out
+
+
+def national_individual_champion(org, series) -> Certificate | None:
+    """First place of ``national_top_three``, or ``None``."""
+    return next((c for c in national_top_three(org, series) if c.place == 1), None)
+
+
+def certificate_progress(user, org) -> list[dict]:
+    """Per competition, how ``user`` stands against a certificate: where they
+    are and what it would take while the season runs, and what they can
+    download once it has ended."""
+    from tipping.services import leaderboard_for_org
+
+    earned = member_certificates(user, org)
+    out = []
+    for series in competitions_for(org):
+        board = [u for u in leaderboard_for_org(org, series=series) if u.points or u.tips_total]
+        me = next((u for u in board if u.id == user.id), None)
+        podium = [u for u in board if u.rank <= 3 and u.points > 0]
+        place = me.rank if me is not None and me in podium else None
+        out.append({
+            "series": series,
+            "final": season_state(org, series).final,
+            "rank": me.rank if me is not None else None,
+            "of": len(board),
+            "place": place,
+            "to_top3": (podium[-1].points - me.points + 1
+                        if me is not None and place is None and len(podium) >= 3 else None),
+            "certificates": [c for c in earned if c["cert"].series == series.name],
+        })
+    return out
+
+
+def member_certificates(user, org) -> list[dict]:
+    """Every certificate ``user`` can download from ``org`` right now, for the
+    leaderboard: their organisation's, each group's, and the national one."""
+    from orgs.models import Group, GroupMember
+
+    groups = list(Group.objects.filter(
+        id__in=GroupMember.objects.filter(user=user, group__org=org).values("group_id")))
+    out = []
+    for series in competitions_for(org):
+        for group in [None, *groups]:
+            for cert in placegetters(org, series, group=group):
+                if cert.user_id == user.id:
+                    out.append({"cert": cert, "where": group.name if group else org.name, "group": group})
+        for cert in national_top_three(org, series):
+            if cert.user_id == user.id:
+                out.append({"cert": cert, "where": "GoodTip nationwide", "national": True})
+    return out
 
 
 # ---------------------------------------------------------------------------

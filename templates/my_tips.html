@@ -1,270 +1,83 @@
 {% extends "app_base.html" %}
-{% load team_extras %}
 {% block title %}My tips, {{ org.name }}{% endblock %}
 {% block loader_task %}Fetching your tips{% endblock %}
 {% block nav_tips %}on{% endblock %}
-{% block body_class %}page-deep sheet-page{% endblock %}
+{% block body_class %}page-deep sheet-page page-dash page-tips{% endblock %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 
 {% block app_content %}
 {% comment %}
-=============================================================================
-HIERARCHY OF INFORMATION, top to bottom.
-=============================================================================
-Asked for in this order, and it is the order somebody actually reads in:
-
-  1. which comp        AquaFlow Water Co · AFL + NRL 2026 — "this should have
-                       similar size or larger than the My tips"
-  2. which screen      My tips, and what it is for
-  3. which room        the room switcher: whose round this is
-  4. how you are going the three numbers
-  5. which codes       the competition filter, full width
-  6. which round       the round stepper, full width
-  7. the round itself  the fixtures, two thirds, with your season beside them
-
-Everything above the split is a decision about what the page shows; everything
-below it is the page. They used to be interleaved — the round picker was a
-corner of the header, the competition filter was inside the two-thirds column
-with the fixtures, and the room switcher opened the page above its own title.
-=============================================================================
+MY TIPS, A BET HISTORY (client, 1 Nov 2026). In the dashboard's language: a
+dark summary, competitions down the side, a cream sheet of white tickets. Built
+by tipping.views.my_tips_view; each ticket is partials/_tip_ticket.html.
+The filters swap #tipsPage in place (hx-boost), so the numbers, the side column
+and the list always change together.
 {% endcomment %}
-<div class="gt-head is-centred is-orgfirst">
-  <div>
-    <div class="gh-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div>
-    <h1>My tips</h1>
-    <p class="gh-lead">Make your picks, earn points, support a cause.</p>
-  </div>
-</div>
+{% include "partials/room_switch.html" with noun="history" surface="light" align="centre" %}
 
-{% include "partials/room_switch.html" with noun="round" surface="dark" align="centre" %}
-
-<div class="gt-strip">
-  <div class="gsp">
-    <span class="gsp-ic"><svg><use href="#ic-trophy"/></svg></span>
-    <div>
-      <div class="gsp-lab">Season points</div>
-      <div class="gsp-num">{{ points }}</div>
-      <div class="gsp-sub">{% if points %}Banked so far{% else %}Keep tipping!{% endif %}</div>
+<div id="tipsPage" hx-boost="true" hx-target="#tipsPage" hx-select="#tipsPage" hx-swap="outerHTML show:none swap:500ms">
+  {% url 'tipping:my_tips' org.id as tips_url %}
+  <section class="tk-hero">
+    <div class="tk-hero-h">
+      <h1>My tips</h1>
+      <p>{{ org.name }}{% if chosen %} &middot; {{ chosen.name }}{% endif %}</p>
+      {% if summary.recent %}
+      <div class="tk-form" aria-label="Your last {{ summary.recent|length }} results">
+        <span>Last {{ summary.recent|length }}</span>
+        {% for o in summary.recent %}<i class="is-{{ o }}" title="{% if o == 'won' %}Correct{% else %}Wrong{% endif %}"></i>{% endfor %}
+      </div>
+      {% endif %}
     </div>
-  </div>
-  <div class="gsp">
-    <span class="gsp-ic"><svg><use href="#ic-doc"/></svg></span>
-    <div>
-      <div class="gsp-lab">Tips made</div>
-      <div class="gsp-num">{{ tips_this_round }} / {{ total_matches }}</div>
-      <div class="gsp-sub">This round</div>
+    <div class="tk-stats">
+      {% for st in stats %}
+      <a class="tk-stat is-{{ st.tone }}{% if st.key == show %} on{% endif %}" href="{{ tips_url }}{% if st.query %}?{{ st.query }}{% endif %}" data-veil-for="#tipsList"{% if chosen %} {% include "partials/_veil_attrs.html" with s=chosen %}{% endif %}>
+        <b>{{ st.value }}</b><span>{{ st.label }}</span>
+      </a>
+      {% endfor %}
     </div>
-  </div>
-  <div class="gsp">
-    <span class="gsp-ic"><svg><use href="#ic-target"/></svg></span>
-    <div>
-      <div class="gsp-lab">Completion</div>
-      <div class="gsp-num">{{ round_pct }}%</div>
-      <div class="gsp-sub">{% if round_pct == 100 %}All done{% elif round_pct >= 75 %}Almost there!{% else %}Round in progress{% endif %}</div>
-    </div>
-  </div>
-</div>
+  </section>
 
-{% url 'tipping:my_tips' org.id as tips_url %}
-{% comment %}
-THE COMPETITION FILTER, ACROSS THE PAGE. "It should be long, that is 3/3 of the
-size." It was inside the two-thirds column with the fixtures, which made a
-control that decides what the whole page is about look like a heading for one
-part of it.
-
-It scopes WHICH ROUNDS EXIST as well as which fixtures: an org on AFL and NRL
-has two round 3s, and the stepper below follows whichever codes are selected.
-{% endcomment %}
-{% comment %}
-NOT WRAPPED IN A .boardbar. "That white background should carry end to end,
-because it's currently half of 3/3, and content to be centred."
-
-.sfilter already IS a white card with its lead and chips centred inside it. Put
-inside the boardbar's flex row it sized to its content, so the card ended
-halfway across the page with the bar's own panel showing past it — two frames,
-one of them half-width. At page level it is a block and takes the full measure,
-which is what it was drawn to do.
-{% endcomment %}
-{% include "partials/series_filter.html" with base=tips_url %}
-
-{% comment %}
-THE ROUND STEPPER, ACROSS THE PAGE — "just like what we did with rounds, but for
-this have the numbers to be up to like 8, the latest being the one that will be
-default, so I can see the 25, 24, going downwards, and that option of dropdown
-again to be there."
-
-Eight numbers rather than the leaderboard's five, anchored on the newest round
-and walking backwards, with the dropdown beside them for a jump of any distance.
-The buttons carry round IDs, not numbers: with four codes running, "round 4" is
-four different Round rows and the URL has always named one. See
-tipping.views.my_tips_view, where the numbers and their anchors are worked out.
-{% endcomment %}
-<div class="boardbar boardbar-round boardbar-tips">
-  {% if multi_comp %}
-  {% comment %}
-  ALL COMPETITIONS: NO NUMBERS, because there is no number that means the same
-  thing in all of them. This organisation is the argument — AFL runs to 27
-  rounds, AFLW to 12, and both are being played this weekend, so AFL round 4 is
-  four months old while AFLW round 4 is tonight. A number stepper across them is
-  a control that cannot be right.
-
-  What IS shared is the position: the round each code is up to, then the one
-  before that in each. Every fixture card names its own code and round, so
-  nothing is ambiguous on screen.
-  {% endcomment %}
-  <div class="bb-round bb-round-pick">
-    <span class="bb-lab">Showing</span>
-    <span class="bb-multi">
-      {% if round_step == 0 %}The round in play in every competition
-      {% elif round_step == 1 %}One round back, in every competition
-      {% else %}{{ round_step }} rounds back, in every competition{% endif %}
-    </span>
-    <a href="?step={{ next_step }}{% if tips_keep %}&amp;{{ tips_keep }}{% endif %}"
-       class="bb-arrow {% if next_step is None %}is-off{% endif %}" aria-label="Later round">
-      <svg><use href="#ic-arrow-left"/></svg>
-    </a>
-    <a href="?step={{ prev_step }}{% if tips_keep %}&amp;{{ tips_keep }}{% endif %}"
-       class="bb-arrow {% if prev_step is None %}is-off{% endif %}" aria-label="Earlier round">
-      <svg><use href="#ic-arrow-right"/></svg>
-    </a>
-    <span class="bb-when">
-      {% for r in round_group %}<span class="bb-chip">{{ r.series.name }} R{{ r.round_number }}</span>{% endfor %}
-    </span>
-  </div>
-
-  {% else %}
-  {% comment %}
-  ONE COMPETITION: the eight-wide strip of numbers, because 26 and 25 mean
-  something inside one code. "Have the numbers to be up to like 8, the latest
-  being the one that will be default, so I can see the 25, 24, going downwards."
-  The buttons carry round IDs, not numbers — the URL has always named one.
-  {% endcomment %}
-  {% include "partials/round_strip.html" with strip=round_strip base=tips_url param="round" keep=tips_keep all_label="Latest round" %}
-
-  <div class="bb-round bb-round-pick">
-    <span class="bb-lab">Jump to</span>
-    <a href="?round={{ prev_round.id }}{% if tips_keep %}&amp;{{ tips_keep }}{% endif %}"
-       class="bb-arrow {% if not prev_round %}is-off{% endif %}" aria-label="Previous round">
-      <svg><use href="#ic-arrow-left"/></svg>
-    </a>
-    {% comment %}
-    A real form, so the dropdown works with no JavaScript at all: choose a round
-    and press enter. The script at the foot of this file only saves that press.
-    {% endcomment %}
-    <form method="get" class="bb-form" data-round-form>
-      {% for sl in active_slugs %}<input type="hidden" name="series" value="{{ sl }}">{% endfor %}
-      <select name="round" class="gt-select bb-select" aria-label="Choose a round">
-        {% for r in round_anchors %}
-        <option value="{{ r.id }}" {% if selected_round and r.id == selected_round.id %}selected{% endif %}>{{ r.label }}</option>
+  <div class="dash-layout">
+    {% if competitions %}
+    <aside class="dash-sports tk-side-menu" aria-label="Your competitions">
+      <div class="ds-head"><b>Competitions</b></div>
+      <ul class="ds-list">
+        <li><a class="ds-row{% if not chosen %} on{% endif %}" href="{{ tips_url }}{% if show_query %}?{{ show_query }}{% endif %}" data-veil-for="#tipsList">
+          <span class="ds-ic" aria-hidden="true">&#9733;</span><span class="ds-name">Everything</span></a></li>
+        {% for c in competitions %}
+        <li><a class="ds-row{% if chosen == c.series %} on{% endif %}" style="--code: {{ c.series.colour }}" title="{{ c.series.name }}"
+               href="{{ tips_url }}?series={{ c.series.slug }}{% if show_query %}&amp;{{ show_query }}{% endif %}" data-veil-for="#tipsList" {% include "partials/_veil_attrs.html" with s=c.series %}>
+          <span class="ds-logo" aria-hidden="true"><em>{% include "partials/_series_logo.html" with s=c.series %}</em></span>
+          <span class="ds-name">{{ c.series.name }}</span>
+          <span class="ds-n" title="{{ c.points }} points">{{ c.points }}</span></a></li>
         {% endfor %}
-      </select>
-      <button type="submit" class="bb-go">Go</button>
-    </form>
-    <a href="?round={{ next_round.id }}{% if tips_keep %}&amp;{{ tips_keep }}{% endif %}"
-       class="bb-arrow {% if not next_round %}is-off{% endif %}" aria-label="Next round">
-      <svg><use href="#ic-arrow-right"/></svg>
-    </a>
-    {% if selected_round %}
-    <span class="bb-when">
-      <svg><use href="#ic-clock"/></svg>
-      {% if selected_round.is_locked %}Locked {{ selected_round.lockout_at|date:"j M, g:i A" }}
-      {% else %}Locks {{ selected_round.lockout_at|date:"j M, g:i A" }}{% endif %}
-    </span>
-    {% endif %}
-  </div>
-  {% endif %}
-</div>
-
-{% comment %}
-TWO THIRDS AND ONE THIRD — "the current split that we should have is the table
-that showcases the results ... then this one which will take like 1/3, Your
-season."
-
-The fixtures are what the page is for and they carry match cards, team names and
-a reader's verdict; the column beside them is four short cards that are read
-once. `.gt-shell` alone gives the sidebar a fixed 320px, which on a wide screen
-leaves the fixtures more than two thirds and on a narrow one leaves them less.
-{% endcomment %}
-<div class="gt-shell gt-shell-thirds">
-  <div>
-    <div data-coach="tips-rounds">
-    {% include "partials/my_tips_round.html" with round=selected_round rows=rows state=state phase_counts=phase_counts total_all=total_all %}
-    </div>
-
-    <div class="gt-note">
-      <svg><use href="#ic-shield-check"/></svg>
-      Pending matches grade automatically when results land.
-    </div>
-  </div>
-
-  <aside class="gt-side">
-    <section class="gt-scard">
-      <div class="gsc-head"><svg><use href="#ic-trophy"/></svg><span>Your season</span></div>
-      <div class="gt-rankrow">
-        <div class="rk">
-          <small>Rank</small>
-          <b>{% if rank %}{{ rank }}{% else %}-{% endif %}</b>
-          <i>of {{ total_tippers }}</i>
-        </div>
-        <span class="shield"><svg><use href="#ic-shield-star"/></svg></span>
-        <div class="rk r">
-          <small>Percentile</small>
-          <b>{% if percentile %}{{ percentile }}%{% else %}-{% endif %}</b>
-          <i>of the field</i>
-        </div>
-      </div>
-      {% if percentile %}
-      <p class="gsc-note">{% if percentile >= 75 %}Top of the table stuff, keep it going.{% elif percentile >= 40 %}Right in the mix. A good round moves you up.{% else %}Plenty of season left to climb.{% endif %}</p>
-      <div class="pbar sm"><i style="width:{{ percentile }}%"></i></div>
-      {% endif %}
-    </section>
-
-    <section class="gt-scard">
-      <div class="gsc-head"><svg><use href="#ic-heart"/></svg><span>Your cause</span></div>
-      <div class="gt-cause">
-        <span class="gcz-ic"><svg><use href="#ic-heart"/></svg></span>
-        <div>
-          <b>{{ org.charity_display }}</b>
-          <small>{% if donation.raised %}${{ donation.raised|floatformat:0 }} raised so far{% else %}Make every tip count.{% endif %}</small>
-        </div>
-      </div>
-    </section>
-
-    {% if selected_round %}
-    <section class="gt-scard">
-      <div class="gsc-head"><svg><use href="#ic-calendar"/></svg><span>Round summary</span></div>
-      <div class="gsc-row"><span>Total matches</span><b>{{ total_matches }}</b></div>
-      <div class="gsc-row"><span>Tips submitted</span><b>{{ tips_this_round }}</b></div>
-      <div class="gsc-row"><span>Remaining</span><b {% if tips_remaining %}class="lime"{% endif %}>{{ tips_remaining }}</b></div>
-      {% if selected_round.is_locked %}
-        <div class="gsc-row"><span>Locked</span><b>{{ selected_round.lockout_at|date:"j M, g:i A" }}</b></div>
-      {% else %}
-        <div class="gsc-row"><span>Locks in</span><b class="lime">{{ selected_round.lockout_at|timeuntil }}</b></div>
-      {% endif %}
-    </section>
+      </ul>
+    </aside>
     {% endif %}
 
-    <section class="gt-quote">
-      <span class="qm">&ldquo;</span>
-      <p>Good tips. Good cause.<br>Great impact.</p>
-      <svg class="swoosh" viewBox="0 0 110 8"><path d="M2 6C25 2 85 2 108 5"/></svg>
-    </section>
-  </aside>
-</div>
+    <div class="dash-main">
+      <div class="tk-sheet" id="tipsList" data-veil-label="Loading your tips">
+        <nav class="tk-tabs" aria-label="Filter your tips">
+          {% for t in tabs %}
+          <a class="tk-tab is-{{ t.key }}{% if t.key == show %} on{% endif %}" href="{{ tips_url }}{% if t.query %}?{{ t.query }}{% endif %}" data-veil-for="#tipsList"{% if chosen %} {% include "partials/_veil_attrs.html" with s=chosen %}{% endif %}{% if t.key == show %} aria-current="true"{% endif %}>
+            {{ t.label }}<em>{{ t.count }}</em></a>
+          {% endfor %}
+        </nav>
+        {% if the_round %}
+        <p class="tk-roundnote">Showing {{ the_round.label }} only. <a href="{{ tips_url }}{% if chosen %}?series={{ chosen.slug }}{% endif %}">Show everything</a></p>
+        {% endif %}
 
-<script>
-/* The round dropdown submits itself on change. The form works without this —
-   choose and press enter — so this is the convenience and not the mechanism,
-   and the Go button is hidden only once the script that replaces it is running.
-   Delegated, because the bar is re-rendered whenever the competition filter
-   swaps the page. */
-(function () {
-  var form = document.querySelector("[data-round-form]");
-  if (!form) return;
-  form.classList.add("is-live");
-  form.addEventListener("change", function (e) {
-    if (e.target.name === "round") form.submit();
-  });
-})();
-</script>
+        {% if rows %}
+        {% include "partials/_tip_rows.html" %}
+        {% else %}
+        <div class="tk-empty">
+          <b>{% if show == "all" %}No tips here yet{% else %}Nothing under {{ show }} right now{% endif %}</b>
+          <span>Games you tip show up here, with how they went and the points you earned.</span>
+          <a class="tk-go" href="{% url 'dashboard' %}?org={{ org.id }}" hx-boost="false">Tip on the dashboard</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

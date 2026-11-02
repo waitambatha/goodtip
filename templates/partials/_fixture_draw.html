@@ -14,16 +14,16 @@ gt-fixture.js picks and un-picks it with no code of its own, and it posts
           hx-vals='{"selection":"{% if selection == 'draw' %}none{% else %}draw{% endif %}","view":"mytips"}'
           hx-target="#fxc-{{ match.id }}" hx-swap="outerHTML"
           aria-pressed="{% if selection == 'draw' %}true{% else %}false{% endif %}">
-    <span class="fxc-draw-x" aria-hidden="true">=</span><span class="fxc-name">Draw</span>
+    {% include "partials/_draw_face.html" %}<small class="fxc-draw-note">Pays as a win</small>
   </button>
 {% elif editable %}
   <label class="fxc-team fxc-draw{% if selection == 'draw' %} sel{% endif %}">
     <input type="radio" name="match_{{ match.id }}" value="draw" hidden{% if selection == 'draw' %} checked{% endif %}>
-    <span class="fxc-draw-x" aria-hidden="true">=</span><span class="fxc-name">Draw</span>
+    {% include "partials/_draw_face.html" %}<small class="fxc-draw-note">Pays as a win</small>
   </label>
 {% else %}
   <div class="fxc-team fxc-draw{% if selection == 'draw' %} sel{% elif match.result %} is-dim{% else %} is-locked-pick{% endif %}{% if match.result == 'draw' %} is-drawn{% endif %}">
-    <span class="fxc-draw-x" aria-hidden="true">=</span><span class="fxc-name">{% if match.result == 'draw' %}Drew{% else %}Draw{% endif %}</span>
+    {% include "partials/_draw_face.html" %}
   </div>
 {% endif %}
 </div>

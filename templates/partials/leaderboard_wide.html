@@ -17,9 +17,9 @@ name and last initial.
       <div class="lbw-row lbw-cols" aria-hidden="true"><span>#</span><span>Tipper</span><span>Organisation</span><span class="n">Correct</span><span class="n">Points</span></div>
       {% for r in board.rows %}
         {% if forloop.counter <= 50 or r.is_me %}
-        <div class="lbw-row{% if r.is_me %} is-me{% endif %}{% if r.rank == 1 %} is-top{% endif %}">
+        <div class="lbw-row{% if r.rank <= 3 %} is-p{{ r.rank }}{% endif %}{% if r.is_me %} is-me{% endif %}">
           <span class="lbw-rank">{{ r.rank }}</span>
-          <span class="lbw-name">{{ r.name }}{% if r.is_me %} <i>You</i>{% endif %}</span>
+          <span class="lbw-name">{{ r.name }}{% if r.rank <= 3 %}{% include "partials/_rank_badge.html" with place=r.rank kind="person" %}{% endif %}{% if r.is_me %} <i>You</i>{% endif %}</span>
           <span class="lbw-org">{{ r.org_name }}</span>
           <span class="n">{{ r.correct }}/{{ r.graded }}</span>
           <span class="n lbw-pts">{{ r.points }}</span>
@@ -40,9 +40,9 @@ name and last initial.
     <div class="lbw-table">
       <div class="lbw-row lbw-cols lbw-orgcols" aria-hidden="true"><span>#</span><span>Organisation</span><span class="n">Tippers</span><span class="n">Avg / tipper</span><span class="n">Points</span></div>
       {% for r in board.rows %}
-        <div class="lbw-row lbw-orgcols{% if r.is_mine %} is-me{% endif %}{% if r.rank == 1 %} is-top{% endif %}">
+        <div class="lbw-row lbw-orgcols{% if r.rank <= 3 %} is-p{{ r.rank }}{% endif %}{% if r.is_mine %} is-me{% endif %}">
           <span class="lbw-rank">{{ r.rank }}</span>
-          <span class="lbw-name">{{ r.name }}{% if r.is_mine %} <i>Yours</i>{% endif %}</span>
+          <span class="lbw-name">{{ r.name }}{% if r.rank <= 3 %}{% include "partials/_rank_badge.html" with place=r.rank kind="org" %}{% endif %}{% if r.is_mine %} <i>Yours</i>{% endif %}</span>
           <span class="n">{{ r.tippers }}</span>
           <span class="n lbw-pts">{{ r.avg }}</span>
           <span class="n">{{ r.points }}</span>

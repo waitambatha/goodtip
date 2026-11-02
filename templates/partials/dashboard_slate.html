@@ -276,7 +276,7 @@ Expects: c (the selected org card), games, open_games, org_series,
         once — pressing the club is the tip — and the MatchReader read sits
         behind a button rather than filling the card on every fixture.
         {% endcomment %}
-        {% include "partials/fixture_card.html" with match=g reader=g.reader selection=g.my_tip editable=g.can_tip lock_note=g.lock_note mode="form" %}
+        {% include "partials/fixture_card.html" with match=g reader=g.reader selection=g.my_tip editable=g.can_tip lock_note=g.lock_note lock_opens=g.lock_opens mode="form" %}
         {% endfor %}
         {% endfor %}
         {% if feed_more %}

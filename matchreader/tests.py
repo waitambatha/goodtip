@@ -118,3 +118,16 @@ class MatchReaderCopyTests(SimpleTestCase):
         result = self._explain(tier="Clear Edge")
         self.assertEqual(result["form"].count("."), 2)
         self.assertNotIn("while", result["form"])
+
+
+class FitLogisticTests(SimpleTestCase):
+    """The fit that replaced sklearn, which neither server has installed."""
+
+    def test_a_signal_that_predicts_gets_a_positive_coefficient(self):
+        from .training import fit_logistic
+
+        X = [[v] for v in (-0.8, -0.6, -0.4, -0.2, 0.2, 0.4, 0.6, 0.8)] * 5
+        y = [0, 0, 0, 1, 0, 1, 1, 1] * 5
+        intercept, coef = fit_logistic(X, y)
+        self.assertGreater(coef, 1)
+        self.assertAlmostEqual(intercept, 0, places=6)

@@ -1,0 +1,14 @@
+{% comment %}
+The medallion between the two sides. Before kick-off, the draw as a pick: a
+level scale. From kick-off, the score of the match, both numbers together
+(client, 1 Nov 2026: "side by side, so we know these are the scores of this
+match"). The ids are what the in-play poll updates. Expects: match.
+{% endcomment %}<span class="fxc-draw-face{% if match.phase != 'upcoming' %} is-score{% endif %}">
+  {% if match.phase == "upcoming" %}
+  <svg class="fxc-draw-scale" viewBox="0 0 32 24" aria-hidden="true"><path d="M16 3v18M10 21h12M5 6h22"/><path d="M5 6 1.500 14h7zM27 6l-3.500 8h7z"/></svg>
+  <span class="fxc-name">Draw</span>
+  {% else %}
+  <b class="fxc-board"><span id="livescore-{{ match.id }}-home">{{ match.home_score|default_if_none:"–" }}</span><i>–</i><span id="livescore-{{ match.id }}-away">{{ match.away_score|default_if_none:"–" }}</span></b>
+  <span class="fxc-name">{% if match.phase == "live" %}Live{% elif match.result == "draw" %}Drew{% elif match.result %}Full time{% else %}Awaiting{% endif %}</span>
+  {% endif %}
+</span>

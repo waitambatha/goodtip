@@ -207,13 +207,13 @@
     }
   }, true);
 
-  function all() { stories(); fitFixtures(); strips(); chipArrows(); newsPages(); }
+  function all() { stories(); fitFixtures(); chipArrows(); strips(); newsPages(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', all); else all();
   window.addEventListener('load', fitFixtures);
   window.addEventListener('resize', fitFixtures);
   document.body.addEventListener('htmx:afterSwap', function () {
     setTimeout(function () {
-      fitFixtures(); strips(); chipArrows();
+      fitFixtures(); chipArrows(); strips();
       if (keptScroll !== null) {
         var box = document.getElementById('roundFixtures');
         if (box) box.scrollTop = keptScroll;
