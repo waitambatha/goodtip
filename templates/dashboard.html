@@ -492,17 +492,7 @@ is the part members care about and the part that is still true.
     <div class="dng-pages" data-dng-track>
       {% for p in news_latest %}
       {% if forloop.counter0|divisibleby:12 %}<div class="dng-grid" data-dng-page>{% endif %}
-      {% with sl=p.card_slides.0 %}
-      <a class="dng-card" href="{{ p.get_absolute_url }}" style="--code: {{ p.code_colour }}; --fill: {{ p.code_fill }}">
-        <span class="dng-tags">{% for label, colour in p.tag_chips %}<i style="--tag: {{ colour }}">{{ label }}</i>{% endfor %}</span>
-        <span class="dng-pic" style="background-image:url('{% if sl.kind == 'scene' %}{% static sl.url %}{% else %}{{ sl.url }}{% endif %}'), url('{% static p.fallback_scenes.0 %}')"></span>
-        <span class="dng-b">
-          <small>{{ p.published_at|date:"j M Y" }}</small>
-          <b>{{ p.title|truncatechars:84 }}</b>
-          {% if p.excerpt %}<span>{{ p.excerpt|truncatechars:110 }}</span>{% endif %}
-        </span>
-      </a>
-      {% endwith %}
+      {% include "partials/_news_card.html" %}
       {% if forloop.counter|divisibleby:12 or forloop.last %}</div>{% endif %}
       {% endfor %}
     </div>

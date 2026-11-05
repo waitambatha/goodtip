@@ -122,9 +122,26 @@ class NewsPost(SeoFieldsMixin, models.Model):
         ("AFLW", "AFLW"),
         ("NRL", "NRL"),
         ("NRLW", "NRLW"),
+        ("EPL", "Premier League"),
+        ("LA-LIGA", "La Liga"),
+        ("SERIE-A", "Serie A"),
+        ("BUNDESLIGA", "Bundesliga"),
+        ("UCL", "Champions League"),
+        ("ALM", "A-League Men"),
+        ("ALW", "A-League Women"),
+        ("NBA", "NBA"),
+        ("WNBA", "WNBA"),
+        ("NBL", "NBL"),
+        ("NFL", "NFL"),
+        ("NHL", "NHL"),
+        ("MLB", "MLB"),
+        ("BBL", "Big Bash"),
+        ("F1", "Formula 1"),
         ("NEWS", "News"),
         ("BLOG", "Blog"),
     ]
+    # Tags whose code is not their competition's slug.
+    TAG_SLUGS = {"ALM": "a-league-men", "ALW": "a-league-women"}
 
     title = models.CharField(max_length=200)
     # Rich-formatted headline (bold/colour/font size etc) from the story editor.
@@ -271,29 +288,33 @@ class NewsPost(SeoFieldsMixin, models.Model):
         """The colour of the competition this story is about — its first
         competition tag (client, 28 Oct 2026: "if it's a blog of the NRL, let
         it have that colour") — or the brand's deep green for general news."""
-        from catalog.models import Series
-
-        for t in self.tag_list:
-            if t.lower() in Series.COLOURS:
-                return Series.COLOURS[t.lower()]
-        return "#1F3A2C"
+        colours = [b["colour"] for b in self.tag_badges if b["is_code"]]
+        return colours[0] if colours else "#1F3A2C"
 
     @property
-    def tag_chips(self) -> list:
-        """(label, colour) for every tag, each in its competition's colour."""
+    def tag_badges(self) -> list:
+        """Every tag as a badge: its label, its competition's colour and logo
+        (client, 2 Nov 2026), or the brand's green for News and Blog."""
         from catalog.models import Series
 
-        return [(label, Series.COLOURS.get(code, "#1F3A2C")) for code, label in self.tag_pairs]
+        labels = dict(self.TAG_CHOICES)
+        badges = []
+        for tag in self.tag_list:
+            slug = self.TAG_SLUGS.get(tag, tag.lower())
+            badges.append({
+                "label": labels.get(tag, tag),
+                "colour": Series.COLOURS.get(slug, "#1F3A2C"),
+                "logo": Series.LOGOS.get(slug, ""),
+                "is_code": slug in Series.COLOURS,
+            })
+        return badges
 
     @property
     def code_fill(self) -> str:
         """The story's colour as a CSS background: its competition's, or those
         of every competition it covers running into one another (client, 31
         Oct 2026: "the blog card match the colour... even if we have 3 or 4")."""
-        from catalog.models import Series
-
-        colours = [Series.COLOURS[t.lower()] for t in self.tag_list if t.lower() in Series.COLOURS]
-        colours = list(dict.fromkeys(colours)) or ["#1F3A2C"]
+        colours = list(dict.fromkeys(b["colour"] for b in self.tag_badges if b["is_code"])) or ["#1F3A2C"]
         return colours[0] if len(colours) == 1 else f"linear-gradient(115deg, {', '.join(colours)})"
 
     @property

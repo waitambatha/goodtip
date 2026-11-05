@@ -1,28 +1,94 @@
 {% extends "admin_base.html" %}
-{% block title %}Org members. Manage{% endblock %}
+{% block title %}Members, {{ org.name }} &middot; Manage{% endblock %}
 {% block nav_orgs %}on{% endblock %}
+{% block hero_eyebrow %}Organisations &middot; {{ org.name }}{% endblock %}
+{% block hero_title %}Members{% endblock %}
+{% block hero_lead %}Everyone in {{ org.name }}, who helps run it, and the link that brings more people in.{% endblock %}
+{% block admin_board %}
+<div class="gx-score"><b>{{ n_members }}</b><span>Members</span></div>
+<div class="gx-score"><b>{{ managers }}</b><span>Running it</span></div>
+{% endblock %}
 {% block admin_content %}
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;"><a href="{% url 'manage:orgs_list' %}" class="flink crumb-link">Orgs</a><span class="crumb-sep">/</span><h1 class="admin-h1" style="margin:0;">{{ org.name }} &middot; Members</h1></div>
-<div class="card" style="margin-bottom:16px;max-width:640px;">
-  <label style="font-size:13px;font-weight:700;color:var(--ink);display:block;margin-bottom:8px;">Org join link</label>
-  <div class="copy-field"><input id="orgJoin" type="text" readonly value="{{ join_url }}"><button type="button" class="abtn abtn-dark" data-copy="#orgJoin">Copy</button></div>
+{% include "manage/_org_nav.html" %}
+<div class="rd-tools">
+  <form class="gx-search om-search" method="get" role="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" name="q" value="{{ q }}" placeholder="Search {{ n_members }} member{{ n_members|pluralize }} by name or email" aria-label="Search members">{% if role %}<input type="hidden" name="role" value="{{ role }}">{% endif %}{% if sort != "new" %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}</form>
+  <div class="om-link"><span>Join link</span><input id="orgJoin" type="text" readonly value="{{ join_url }}" aria-label="Join link"><button type="button" class="gx-btn is-lime" data-copy="#orgJoin">Copy</button></div>
 </div>
-<div class="card"><div class="card-h" style="margin-bottom:10px;">Members</div>
-  <div class="tbl-scroll"><table class="atable compact"><thead><tr><th>Member</th><th>Role</th><th style="text-align:right;">Actions</th></tr></thead><tbody>
-  {% for m in members %}
+<div class="om-filters">
+  <nav class="rd-status" aria-label="Role">
+    <a class="{% if not role %}on{% endif %}" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}sort={{ sort }}">Everyone <i>{{ n_members }}</i></a>
+    <a class="{% if role == 'managers' %}on{% endif %}" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}role=managers&amp;sort={{ sort }}">Running it <i>{{ role_counts.managers }}</i></a>
+    <a class="{% if role == 'captains' %}on{% endif %}" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}role=captains&amp;sort={{ sort }}">Captains <i>{{ role_counts.captains }}</i></a>
+    <a class="{% if role == 'participants' %}on{% endif %}" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}role=participants&amp;sort={{ sort }}">Participants <i>{{ role_counts.participants }}</i></a>
+    <a class="{% if role_counts.suspended %}om-susp-tab {% endif %}{% if role == 'suspended' %} on{% endif %}" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}role=suspended&amp;sort={{ sort }}">Suspended <i>{{ role_counts.suspended }}</i></a>
+  </nav>
+  <nav class="rd-status om-sort" aria-label="Order">
+    <a class="{% if sort == 'new' %}on{% endif %}" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}{% if role %}role={{ role }}&amp;{% endif %}sort=new">Newest</a>
+    <a class="{% if sort == 'old' %}on{% endif %}" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}{% if role %}role={{ role }}&amp;{% endif %}sort=old">Oldest</a>
+    <a class="{% if sort == 'az' %}on{% endif %}" href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}{% if role %}role={{ role }}&amp;{% endif %}sort=az">A to Z</a>
+  </nav>
+</div>
+<div class="gx-tablewrap rd-wrap">
+  <table class="gx-table om-table" data-om-table>
+    <thead><tr><th scope="col">Member</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Posting</th><th scope="col">Joined</th><th scope="col">Actions</th></tr></thead>
+    <tbody>
+    {% for m in members %}
     <tr>
-      <td><b>{{ m.user.display_name }}</b><br><small style="color:var(--muted);">{{ m.user.email }}</small></td>
-      <td><span class="pill-role {% if m.is_league_owner %}owner{% elif m.is_manager %}manager{% elif m.is_captain %}captain{% endif %}">{{ m.get_role_display }}{% if m.is_league_owner %} &middot; Owner{% endif %}</span></td>
-      <td style="text-align:right;">
-        {% if not m.is_league_owner %}
-        <form method="post" action="{% url 'manage:org_members' org.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="action" value="promote"><input type="hidden" name="member_id" value="{{ m.id }}"><button class="abtn abtn-ghost abtn-sm" type="submit">{% if m.is_manager %}Make Participant{% else %}Make Manager{% endif %}</button></form>
-        <form method="post" action="{% url 'manage:org_members' org.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="member_id" value="{{ m.id }}"><button class="abtn abtn-ghost abtn-sm" type="submit" style="color:var(--danger);">Remove</button></form>
-        {% else %}<span style="color:var(--muted);">-</span>{% endif %}
-      </td>
+      <td class="is-name"><span class="mc-who"><span class="mc-av">{% if m.user.avatar %}<img src="{{ m.user.avatar.url }}" alt="" loading="lazy">{% else %}{{ m.user.display_name|slice:":1"|upper }}{% endif %}</span><b>{{ m.user.display_name }}</b></span></td>
+      <td class="is-email"><a href="mailto:{{ m.user.email }}">{{ m.user.email }}</a></td>
+      <td>{% for label in m.role_labels %}<span class="mc-role is-{{ label|lower }}">{{ label }}</span>{% endfor %}</td>
+      <td>{% if m.suspension %}<span class="om-susp"><b>Suspended</b><small>{% if m.suspension.ends_at %}Ends {{ m.suspension.ends_at|date:"j M Y, g:i a" }}{% else %}Until someone lifts it{% endif %}</small><small>Since {{ m.suspension.starts_at|date:"j M" }}{% if m.suspension.issued_by %}, by {{ m.suspension.issued_by.display_name }}{% endif %}</small>{% if m.suspension.reason %}<small class="om-why" title="{{ m.suspension.reason }}">“{{ m.suspension.reason|truncatechars:60 }}”</small>{% endif %}</span>{% else %}<span class="gx-pill is-ok"><i></i>Can post</span>{% endif %}</td>
+      <td class="is-date">{{ m.joined_at|date:"j M Y" }}<small>{{ m.joined_at|timesince }} ago</small></td>
+      <td>{% if not m.is_league_owner %}<div class="mc-actions">
+        <details class="mc-pop">
+          <summary class="gx-btn is-ghost">Change</summary>
+          <div class="mc-pop-back" data-mc-close></div>
+          <form class="mc-pop-card" method="post" action="{% url 'manage:org_members' org.id %}">{% csrf_token %}<input type="hidden" name="action" value="set_role"><input type="hidden" name="member_id" value="{{ m.id }}"><input type="hidden" name="back" value="{{ query }}{% if page.number > 1 %}&amp;page={{ page.number }}{% endif %}">
+            <header><span class="mc-av">{% if m.user.avatar %}<img src="{{ m.user.avatar.url }}" alt="">{% else %}{{ m.user.display_name|slice:":1"|upper }}{% endif %}</span><div><span class="mc-k">Change role</span><b>{{ m.user.display_name }}</b></div><button type="button" class="mc-x" data-mc-close aria-label="Close">&times;</button></header>
+            {% for value, label in role_choices %}
+            <button type="submit" name="role" value="{{ value }}" class="mc-opt is-{{ value }}{% if m.role == value %} is-now{% endif %}">
+              <b>{{ label }}</b>
+              <span>{% if value == "manager" %}Sets up the comp, invites people and runs the charity vote.{% elif value == "captain" %}Leads a side and keeps their people tipping.{% elif value == "both" %}Runs the comp and leads a side.{% else %}Tips, plays and climbs the ladder.{% endif %}</span>
+              {% if m.role == value %}<em>Current</em>{% endif %}
+            </button>
+            {% endfor %}
+          </form>
+        </details>
+        {% if m.suspension %}
+        <form method="post" action="{% url 'manage:org_members' org.id %}" data-confirm="{{ m.user.display_name }} can post in {{ org.name }} again straight away, and is told so." data-confirm-title="Lift the suspension?" data-confirm-ok="Lift it">{% csrf_token %}<input type="hidden" name="action" value="lift"><input type="hidden" name="sanction_id" value="{{ m.suspension.id }}"><input type="hidden" name="back" value="{{ query }}{% if page.number > 1 %}&amp;page={{ page.number }}{% endif %}"><button class="gx-btn is-lime" type="submit">Unsuspend</button></form>
+        {% else %}
+        <details class="mc-pop">
+          <summary class="gx-btn is-ghost">Suspend</summary>
+          <div class="mc-pop-back" data-mc-close></div>
+          <form class="mc-pop-card om-suspend" method="post" action="{% url 'manage:org_members' org.id %}">{% csrf_token %}<input type="hidden" name="action" value="suspend"><input type="hidden" name="member_id" value="{{ m.id }}"><input type="hidden" name="back" value="{{ query }}{% if page.number > 1 %}&amp;page={{ page.number }}{% endif %}">
+            <header><span class="mc-av">{% if m.user.avatar %}<img src="{{ m.user.avatar.url }}" alt="">{% else %}{{ m.user.display_name|slice:":1"|upper }}{% endif %}</span><div><span class="mc-k">Suspend from posting</span><b>{{ m.user.display_name }}</b></div><button type="button" class="mc-x" data-mc-close aria-label="Close">&times;</button></header>
+            <p class="om-note">They keep tipping and stay on the ladder; they just can't post in {{ org.name }}'s chat. They're told why and for how long.</p>
+            <label class="pfx-field"><span>What should they be told?</span><textarea name="reason" rows="3" placeholder="They see this. Keep it plain."></textarea></label>
+            <div class="pfx-field"><span>For how long</span>
+              <div class="pfx-seg">
+                <label><input type="radio" name="span" value="week" checked><span>A week</span></label>
+                <label><input type="radio" name="span" value="month"><span>A month</span></label>
+                <label><input type="radio" name="span" value="open"><span>Until I lift it</span></label>
+              </div>
+            </div>
+            <button type="submit" class="gx-btn is-danger is-block">Suspend {{ m.user.display_name }}</button>
+          </form>
+        </details>
+        {% endif %}
+        <form method="post" action="{% url 'manage:org_members' org.id %}" data-confirm="{{ m.user.display_name }} leaves {{ org.name }}. Their tips stay on the ladder." data-confirm-title="Remove {{ m.user.display_name }}?" data-confirm-ok="Remove" data-confirm-danger>{% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="member_id" value="{{ m.id }}"><input type="hidden" name="back" value="{{ query }}{% if page.number > 1 %}&amp;page={{ page.number }}{% endif %}"><button class="gx-btn is-danger" type="submit">Remove</button></form>
+      </div>{% else %}<span class="mc-quiet">Owner</span>{% endif %}</td>
     </tr>
-  {% empty %}
-    <tr><td colspan="3" style="text-align:center;color:var(--muted);">No members yet. Share the join link above.</td></tr>
-  {% endfor %}
-  </tbody></table></div>
+    {% empty %}
+    <tr><td colspan="6"><div class="gx-empty">{% if q or role %}<b>Nobody matches that</b><a href="?">Show everyone</a>{% else %}<b>No members yet</b><span>Share the join link above.</span>{% endif %}</div></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
 </div>
+{% if page.paginator.num_pages > 1 %}
+<nav class="rd-pager" aria-label="Pages">
+  {% if page.has_previous %}<a class="gx-btn is-ghost" href="?{% if query %}{{ query }}&amp;{% endif %}page={{ page.previous_page_number }}">Previous</a>{% endif %}
+  <span>{{ page.start_index }} to {{ page.end_index }} of {{ page.paginator.count }} &middot; page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a class="gx-btn is-ghost" href="?{% if query %}{{ query }}&amp;{% endif %}page={{ page.next_page_number }}">Next</a>{% endif %}
+</nav>
+{% endif %}
 {% endblock %}

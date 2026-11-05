@@ -1210,6 +1210,9 @@ class DashboardNewsDeckTests(TestCase):
             )
 
     def _body(self):
+        # The deck is on the public page; members got a filtered list on
+        # 2 Nov 2026.
+        self.client.logout()
         return self.client.get(reverse("news_index")).content.decode()
 
     def test_the_dashboard_leaves_news_to_its_page(self):

@@ -25,6 +25,21 @@ from orgs.services import (
 from .perms import get_managed_org_or_404, managed_orgs, org_admin_required
 
 
+def _org_tabs(mine, counts):
+    """Every organisation as a button, each with how much is waiting in it, so
+    "masterclass has three" is seen before anything is clicked."""
+    return [{"org": o, "n": counts.get(o.id, 0)} for o in mine.order_by("name")]
+
+
+def _busiest(request, mine, counts):
+    """With no ?org= the page opens on whichever organisation has the most
+    waiting, rather than alphabetically first with nothing to show."""
+    if request.GET.get("org") or request.POST.get("org") or not counts:
+        return _pick_org(request, mine)
+    best = max(counts, key=counts.get)
+    return mine.filter(pk=best).first() or _pick_org(request, mine)
+
+
 def _pick_org(request, mine):
     """Which organisation the page is about.
 
@@ -48,7 +63,13 @@ def _pick_org(request, mine):
 @org_admin_required
 def message_list(request):
     mine = managed_orgs(request.user)
-    org = _pick_org(request, mine)
+    counts = {
+        r["org_id"]: r["n"] for r in
+        MessageThread.objects.filter(org__in=mine, kind=MessageThread.KIND_RAISED)
+        .exclude(status=MessageThread.STATUS_CLOSED)
+        .values("org_id").annotate(n=Count("id")).order_by()
+    }
+    org = _busiest(request, mine, counts)
     if org is None:
         return render(request, "manage/messages.html", {"org": None, "orgs": mine})
 
@@ -80,6 +101,7 @@ def message_list(request):
 
     return render(request, "manage/messages.html", {
         "org": org, "orgs": mine, "threads": threads, "tab": tab,
+        "org_tabs": _org_tabs(mine, counts), "switch_what": "waiting for an answer",
         "open_count": MessageThread.objects.filter(
             org=org, kind=MessageThread.KIND_RAISED, status=MessageThread.STATUS_OPEN,
         ).count(),

@@ -35,9 +35,43 @@ class NewsPageDeckTests(TestCase):
         # behind the dots.
         self.assertNotIn("nd-list", html)
 
-    def test_a_member_gets_the_four_row_deck(self):
+    def _folded(self, html):
+        return html[html.index("data-nwgrid"):].count(" hidden>")
+
+    def test_a_member_gets_the_lead_story_and_every_other_behind_show_more(self):
+        """Client, 2 Nov 2026: the page rebuilt in the leaderboard's language."""
         self.client.force_login(self.user)
-        self._assert_four_row_deck(self.client.get(reverse("news_index")).content.decode())
+        html = self.client.get(reverse("news_index")).content.decode()
+        self.assertNotIn("data-news-deck", html)
+        self.assertEqual(html.count('class="nw-lead" hx-boost'), 1)
+        self.assertEqual(html.count('class="nw-card" hx-boost'), 13)
+        self.assertEqual(self._folded(html), 1)  # the lead and 12 show of 14
+        self.assertIn("data-nwmore", html)
+
+    def test_every_card_gives_a_glimpse_of_the_story(self):
+        """Client, 2 Nov 2026: more than a title, "see some context, then be
+        able to click to see more". A story with no teaser borrows its body."""
+        from .models import NewsPost
+
+        NewsPost.objects.all().delete()
+        NewsPost.objects.create(title="Older", slug="older", is_published=True, excerpt="The teaser itself")
+        NewsPost.objects.create(title="Newest", slug="newest", is_published=True, body="<p>From the body</p>")
+        self.client.force_login(self.user)
+        html = self.client.get(reverse("news_index")).content.decode()
+        self.assertEqual(html.count('class="nw-glimpse"'), 2)
+        self.assertIn("The teaser itself", html)
+        self.assertIn("From the body", html)
+        self.assertEqual(html.count("Read more"), 2)
+
+    def test_a_long_list_folds_behind_show_more(self):
+        from .models import NewsPost
+
+        for n in range(14, 20):
+            NewsPost.objects.create(title=f"Story {n}", slug=f"story-{n}", is_published=True)
+        self.client.force_login(self.user)
+        html = self.client.get(reverse("news_index")).content.decode()
+        self.assertEqual(self._folded(html), 7)
+        self.assertIn("data-nwmore", html)
 
     def test_a_visitor_gets_the_same_deck_with_the_filter_centred(self):
         html = self.client.get(reverse("news_index")).content.decode()

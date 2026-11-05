@@ -130,6 +130,7 @@ class OrgCreateForm(forms.ModelForm):
         queryset=Competition.objects.none(),
         widget=forms.CheckboxSelectMultiple,
         label="Competition(s)",
+        error_messages={"required": "Pick at least one competition to tip on."},
     )
     charity_method = forms.ChoiceField(
         choices=CHARITY_METHOD_CHOICES,

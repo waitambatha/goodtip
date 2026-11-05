@@ -1,90 +1,73 @@
 {% extends "admin_base.html" %}
-{% block title %}Overview. Manage{% endblock %}
+{% block title %}Overview &middot; Manage{% endblock %}
 {% block nav_overview %}on{% endblock %}
-{% block hero_title %}Manage{% endblock %}
-{% block hero_lead %}Run your leagues. Empower your community.{% endblock %}
+{% block hero_eyebrow %}Organisation admin{% endblock %}
+{% block hero_title %}Your <em>leagues</em>{% endblock %}
+{% block hero_lead %}What needs you first, then everything you run.{% endblock %}
+{% block admin_board %}
+<a class="gx-score" href="{% url 'manage:orgs_list' %}"><b>{{ org_count }}</b><span>Organisations</span></a>
+<div class="gx-score"><b>{{ member_count }}</b><span>Members</span></div>
+<div class="gx-score"><b>{{ round_count }}</b><span>Rounds</span></div>
+<div class="gx-score"><b>{{ tip_count }}</b><span>Tips</span></div>
+{% endblock %}
 {% block admin_content %}
-
-<div class="gt-stats">
-  <a class="gt-stat" href="{% url 'manage:orgs_list' %}">
-    <span class="gs-ic"><svg><use href="#ic-people"/></svg></span>
-    <span class="gs-body">
-      <span class="gs-num">{{ org_count }}</span>
-      <span class="gs-lab">Organisations</span>
-      <span class="gs-sub">The leagues you run</span>
-    </span>
-    <span class="gs-go"><svg><use href="#ic-arrow-right"/></svg></span>
+{% comment %}THE FRONT PAGE AS SHORTCUTS (client, 4 Nov 2026): a summary of everything the admin runs, every card a way in.{% endcomment %}
+<h2 class="ov-h">Shortcuts</h2>
+<div class="ox-short">
+  <a class="ox-tile" style="--c:#5AA9FF" href="{% url 'manage:approvals' %}">
+    <span class="ox-ic"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/></svg></span>
+    <b class="ox-n">{{ pending_count }}</b><span class="ox-l">Waiting to join</span><small>{% if pending_count %}Approve or decline{% else %}Nobody waiting{% endif %}</small>
   </a>
-  <div class="gt-stat">
-    <span class="gs-ic"><svg><use href="#ic-calendar"/></svg></span>
-    <span class="gs-body">
-      <span class="gs-num">{{ round_count }}</span>
-      <span class="gs-lab">Rounds</span>
-      <span class="gs-sub">Across all leagues</span>
-    </span>
-  </div>
-  <div class="gt-stat">
-    <span class="gs-ic"><svg><use href="#ic-match"/></svg></span>
-    <span class="gs-body">
-      <span class="gs-num">{{ match_count }}</span>
-      <span class="gs-lab">Matches</span>
-      <span class="gs-sub">Scheduled and played</span>
-    </span>
-  </div>
-  <div class="gt-stat">
-    <span class="gs-ic"><svg><use href="#ic-trophy"/></svg></span>
-    <span class="gs-body">
-      <span class="gs-num">{{ tip_count }}</span>
-      <span class="gs-lab">Tips</span>
-      <span class="gs-sub">Tips submitted</span>
-    </span>
-  </div>
+  <a class="ox-tile" style="--c:#F27BA6" href="{% url 'manage:messages' %}">
+    <span class="ox-ic"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+    <b class="ox-n">{{ open_thread_count }}</b><span class="ox-l">Messages raised</span><small>{% if open_thread_count %}Members want an answer{% else %}All answered{% endif %}</small>
+  </a>
+  <a class="ox-tile" style="--c:#F5A25D" href="{% url 'manage:prefect' %}">
+    <span class="ox-ic"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+    <b class="ox-n">{{ prefect_open_count|default:0 }}</b><span class="ox-l">Prefect flags</span><small>{% if prefect_open_count %}Posts to look at{% else %}All clear{% endif %}</small>
+  </a>
+  <a class="ox-tile" style="--c:#A78BFA" href="#locking">
+    <span class="ox-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+    <b class="ox-n">{{ open_rounds }}</b><span class="ox-l">Rounds open</span><small>{{ locking_soon|length }} lock this week</small>
+  </a>
+  <a class="ox-tile" style="--c:#34D399" href="{% url 'manage:orgs_list' %}">
+    <span class="ox-ic"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg></span>
+    <b class="ox-n">{{ org_count }}</b><span class="ox-l">Organisations</span><small>Search and filter them all</small>
+  </a>
+  <a class="ox-tile is-make" href="{% url 'orgs:create' %}">
+    <span class="ox-ic"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+    <span class="ox-l">New organisation</span><small>Set one up in a few steps</small>
+  </a>
 </div>
 
-<section class="gt-panel">
-  <div class="gt-panel-head">
-    <span class="gp-ic"><svg><use href="#ic-org"/></svg></span>
-    <div><h2>Recent organisations</h2></div>
-    <div class="gp-right">
-      <a href="{% url 'manage:orgs_list' %}" class="gt-pill">All organisations <svg><use href="#ic-arrow-right"/></svg></a>
-    </div>
-  </div>
+<header class="ox-head"><h2 class="ov-h">Your organisations</h2>{% if org_cards.more %}<a class="gx-btn is-ghost" href="{% url 'manage:orgs_list' %}">See all {{ org_count }}</a>{% endif %}</header>
+<div class="ox-orgs">
+  {% for c in org_cards.cards %}
+  <a class="ox-org" style="--c: {{ c.colour }}" href="{% url 'manage:org_home' c.org.id %}">
+    <span class="ox-org-top">
+      <span class="og-badge">{% if c.org.logo %}<img src="{{ c.org.logo.url }}" alt="">{% else %}{{ c.org.name|slice:":2"|upper }}{% endif %}</span>
+      {% if c.waiting %}<span class="ox-flag">{{ c.waiting }} waiting</span>{% endif %}
+    </span>
+    <b class="ox-org-n">{{ c.org.name }}</b>
+    <small class="ox-org-s">{{ c.org.sport_label|default:"No sport yet" }}</small>
+    <span class="ox-stats"><span><b>{{ c.members }}</b>members</span><span><b>{{ c.groups }}</b>groups</span><span><b>{{ c.open }}</b>open</span></span>
+  </a>
+  {% empty %}
+  <div class="gx-empty"><b>No organisations yet</b><a href="{% url 'orgs:create' %}">Create one</a></div>
+  {% endfor %}
+</div>
 
-  <div class="gt-tablewrap">
-    <table class="gt-table">
-      <thead><tr><th>Organisation</th><th>Sport</th><th>Charity</th><th>Created</th><th class="fit"></th></tr></thead>
-      <tbody>
-      {% for o in recent_orgs %}
-        <tr>
-          <td>
-            <span class="gt-namecell">
-              <span class="gt-rowic"><svg><use href="#ic-org"/></svg></span>
-              <span>
-                <a href="{% url 'manage:org_rounds' o.id %}">{{ o.name }}</a>
-                <small>ID: ORG-{{ o.id|stringformat:"05d" }}</small>
-              </span>
-            </span>
-          </td>
-          <td><span class="gt-with-ic"><svg><use href="#ic-flag"/></svg>{{ o.sport_label|default:"-" }}</span></td>
-          <td><span class="gt-with-ic"><svg><use href="#ic-heart"/></svg>{{ o.charity_display }}</span></td>
-          <td><span class="gt-with-ic"><svg><use href="#ic-calendar"/></svg>{{ o.created_at|date:"j M Y" }}</span></td>
-          <td class="fit"><a href="{% url 'manage:org_rounds' o.id %}" class="gt-go" aria-label="Open {{ o.name }}"><svg><use href="#ic-arrow-right"/></svg></a></td>
-        </tr>
-      {% empty %}
-        <tr><td colspan="5" class="gt-empty">No organisations yet, create your first one from the Organisations tab.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
+<section class="ov-panel ox-lock" id="locking">
+  <header><h2 class="ov-h">Locking this week</h2></header>
+  <div class="ox-lock-row">
+  {% for r in locking_soon %}
+  <a class="ov-lock" href="{% url 'manage:round_matches' r.org_id r.id %}" style="--k: {{ r.series.colour }}">
+    <span class="mc-logo">{% if r.series.logo %}<img src="{{ r.series.logo }}" alt="">{% else %}{{ r.series.name|slice:":3"|upper }}{% endif %}</span>
+    <span class="ov-lock-t"><b>{{ r.series.name }} &middot; round {{ r.round_number }}</b><small>{{ r.org.name }} &middot; in {{ r.lockout_at|timeuntil }}</small></span>
+  </a>
+  {% empty %}
+  <div class="gx-empty"><b>Nothing locks this week</b></div>
+  {% endfor %}
   </div>
 </section>
-
-<div class="gt-trust one">
-  <div class="gtr">
-    <span class="gtr-ic"><svg><use href="#ic-shield"/></svg></span>
-    <div>
-      <b>Secure. Organised. Built for impact.</b>
-      <p>Manage with confidence and keep your community first.</p>
-    </div>
-  </div>
-</div>
 {% endblock %}

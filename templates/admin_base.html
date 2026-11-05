@@ -37,11 +37,12 @@
   <script src="{% static 'js/gt-confirm.js' %}" defer></script>
   <script src="{% static 'js/gt-scenes.js' %}" defer></script>
   <script src="{% static 'js/gt-lists.js' %}" defer></script>
+  <link rel="stylesheet" href="{% static 'css/gt-admin-gx.css' %}">
   {% block extra_head %}{% endblock %}
   {% include "partials/_analytics.html" %}
 {% include "partials/_avatar_fallback.html" %}
 </head>
-<body class="app manage-app gt-v2 gt-sheet">
+<body class="app manage-app gt-v2 gt-sheet gx-page adx-page">
   {% include "public/partials/_icons.html" %}
 
   {# ---- same sticky nav as the app, wearing the Manage links ---- #}
@@ -136,11 +137,7 @@
   </div>
 
   {# ---- full-bleed stadium backdrop; the cream sheet sits on top of it ---- #}
-  <div class="page-backdrop" aria-hidden="true">
-    <div class="shot on" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
-    <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
-    <div class="wash"></div>
-  </div>
+  {% include "partials/page_scenes.html" %}
 
   <main class="app-main">
     {% if messages %}
@@ -170,20 +167,49 @@
     character what the nav chip three inches above it says, and a centred
     column with one thing hard right is not a layout, it is two layouts.
     {% endcomment %}
-    {% block admin_hero %}
-    <header class="gt-hero is-centred">
-      <div class="gh-shot" style="background-image:url('{% block hero_shot %}{% static 'img/scenes/stadium-panorama.jpg' %}{% endblock %}')"></div>
-      <div class="gh-veil"></div>
-      <div class="gh-mid">
-        <div class="gh-eyebrow is-title">{% block hero_eyebrow %}Organisation admin{% endblock %}</div>
-        <h1>{% block hero_title %}Manage{% endblock %}</h1>
-        <p>{% block hero_lead %}Run your leagues. Empower your community.{% endblock %}</p>
-      </div>
-    </header>
-    {% endblock %}
-
-    {% block admin_content %}{% endblock %}
+    {% comment %}
+    THE PITCH (client, 4 Nov 2026: the admin of an organisation should look
+    like the super admin). One frame for every page here: a hero, a tab row
+    in colour for the four places, and the page on a white sheet.
+    {% endcomment %}
+    {% with u=request.resolver_match.url_name %}
+    <div class="gx mc ad">
+      <svg class="gx-pitch" viewBox="0 0 1200 700" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
+        <ellipse cx="600" cy="350" rx="560" ry="320"/><ellipse cx="600" cy="350" rx="70" ry="70"/>
+        <rect x="530" y="280" width="140" height="140"/><line x1="600" y1="30" x2="600" y2="670"/>
+      </svg>
+      {% block admin_hero %}
+      <header class="gx-hero">
+        <div class="gx-hero-copy">
+          <p class="gx-kicker"><i aria-hidden="true"></i>{% block hero_eyebrow %}Organisation admin{% endblock %}</p>
+          <h1 class="gx-title">{% block hero_title %}Manage{% endblock %}</h1>
+          <p class="gx-lead">{% block hero_lead %}Run your leagues. Empower your community.{% endblock %}</p>
+        </div>
+        <div class="gx-board">{% block admin_board %}{% endblock %}</div>
+      </header>
+      {% endblock %}
+      <section class="gx-sheet">
+        <nav class="gx-tabs" aria-label="Admin sections">
+          <a class="gx-tab{% if u == 'overview' %} on{% endif %}" href="{% url 'manage:overview' %}">Overview</a>
+          <a class="gx-tab{% if u == 'approvals' %} on{% endif %}" href="{% url 'manage:approvals' %}">Approvals{% if pending_approval_count %} <em>{{ pending_approval_count }}</em>{% endif %}</a>
+          <a class="gx-tab{% if u == 'orgs_list' or u == 'org_rounds' or u == 'org_members' or u == 'round_matches' or u == 'org_home' or u == 'org_groups' or u == 'org_sports' %} on{% endif %}" href="{% url 'manage:orgs_list' %}">Organisations</a>
+          <a class="gx-tab{% if u == 'messages' or u == 'message_new' or u == 'message_thread' %} on{% endif %}" href="{% url 'manage:messages' %}">Messages</a>
+          <a class="gx-tab{% if u == 'prefect' or u == 'prefect_flag' %} on{% endif %}" href="{% url 'manage:prefect' %}">Prefect{% if prefect_open_count %} <em>{{ prefect_open_count }}</em>{% endif %}</a>
+        </nav>
+        <div class="gx-pane mc-pane ad-pane is-on">
+          {% block admin_content %}{% endblock %}
+        </div>
+      </section>
+    </div>
+    {% endwith %}
   </main>
+  <script>(function(){
+    document.addEventListener('click', function (e) {
+      if (e.target.closest && e.target.closest('[data-mc-close]')) { var d = e.target.closest('details'); if (d) d.open = false; return; }
+      document.querySelectorAll('details.mc-pop[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.querySelectorAll('details.mc-pop[open]').forEach(function (d) { d.open = false; }); });
+  })();</script>
   <script>(function(){
     var burger = document.querySelector('[data-sheet-open]');
     var sheet = document.getElementById('appSheet');

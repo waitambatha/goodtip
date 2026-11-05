@@ -1,0 +1,4 @@
+{% comment %}
+A story's tags as badges: each competition in its own colour with its own logo.
+Expects: post.
+{% endcomment %}<span class="sb-row">{% for b in post.tag_badges %}<i class="sb" style="--tag: {{ b.colour }}">{% if b.logo %}<span class="sb-logo"><img src="{{ b.logo }}" alt="" loading="lazy"></span>{% endif %}{{ b.label }}</i>{% endfor %}</span>

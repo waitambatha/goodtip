@@ -26,6 +26,10 @@ so we will have it be a table that we have in the ladder."
 Read-only on purpose: a role picker on every row makes a column of controls out
 of a column of facts. Everything that changes somebody is one card along.
 {% endcomment %}
+<div class="mg-tools">
+  <span class="mg-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search members by name or email" aria-label="Search members" data-mg-search></span>
+  <span class="mg-count" data-mg-count>{{ members|length }} member{{ members|length|pluralize }}</span>
+</div>
 <div class="gt-board gt-listwrap mb-board" data-coach="members-list">
   <div class="gb-head">
     <span>Member</span><span>Roles</span><span>Joined</span>
@@ -132,7 +136,12 @@ ladder, whose totals roll up into this one.
 </table>
 </div>
 {% else %}
-<p class="card-lead" style="margin:16px 0 0;">None yet. Add one for a site, branch or franchise that wants its own ladder and its own cause.</p>
+<div class="mg-empty">
+  <span class="mg-empty-ic" aria-hidden="true">{% include "orgs/partials/_ow_art.html" with art="org" %}</span>
+  <b>No organisations under {{ org.name }} yet</b>
+  <p>Add one for a site, branch or franchise that wants its own ladder and its own cause.</p>
+  <a href="{% url 'orgs:create' %}?parent={{ org.id }}" class="mg-empty-go">Add the first one &rarr;</a>
+</div>
 {% endif %}
 
 {% elif panel == "team" %}
@@ -238,6 +247,15 @@ that sends invitations, reached from two.
       <input id="inviteLink" type="text" readonly value="{{ invite_url }}">
       <button type="button" class="abtn abtn-dark" data-copy="#inviteLink">Copy</button>
     </div>
+    {% with share="Join "|add:org.name|add:" on GoodTip" %}
+    <div class="ow-fin-socials mg-socials">
+      <a class="ow-soc is-wa" href="https://wa.me/?text={{ share|urlencode }}%20{{ invite_url|urlencode }}" target="_blank" rel="noopener"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5a9.5 9.5 0 0 0-8.2 14.3L2.5 21.5l4.8-1.3A9.5 9.5 0 1 0 12 2.5zm0 17.3a7.8 7.8 0 0 1-4-1.1l-.3-.2-2.8.8.8-2.7-.2-.3A7.8 7.8 0 1 1 12 19.8z"/></svg></span>WhatsApp</a>
+      <a class="ow-soc is-fb" href="https://www.facebook.com/sharer/sharer.php?u={{ invite_url|urlencode }}" target="_blank" rel="noopener"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 21v-7.5H16l.4-3h-2.9V8.6c0-.9.3-1.5 1.5-1.5h1.5V4.4a20 20 0 0 0-2.2-.1c-2.2 0-3.7 1.3-3.7 3.8v2.4H8.1v3h2.5V21z"/></svg></span>Facebook</a>
+      <a class="ow-soc is-x" href="https://twitter.com/intent/tweet?text={{ share|urlencode }}&amp;url={{ invite_url|urlencode }}" target="_blank" rel="noopener"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.8 3h3l-6.6 7.6L22 21h-6.1l-4.8-6.2L5.6 21h-3l7.1-8.1L2.3 3h6.2l4.3 5.7zm-1 16.2h1.7L7.3 4.7H5.5z"/></svg></span>X</a>
+      <a class="ow-soc is-li" href="https://www.linkedin.com/sharing/share-offsite/?url={{ invite_url|urlencode }}" target="_blank" rel="noopener"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM3.3 9h3.4v11.5H3.3zm5.6 0h3.3v1.6a3.6 3.6 0 0 1 3.2-1.8c3.4 0 4.1 2.2 4.1 5.2v6.5h-3.4v-5.8c0-1.4 0-3.1-1.9-3.1s-2.2 1.5-2.2 3v5.9H8.9z"/></svg></span>LinkedIn</a>
+      <a class="ow-soc is-sms" href="sms:?&amp;body={{ share|urlencode }}%20{{ invite_url|urlencode }}"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z"/></svg></span>Text</a>
+    </div>
+    {% endwith %}
   </div>
 </div>
 {% endif %}

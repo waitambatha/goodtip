@@ -1,51 +1,89 @@
 {% extends "admin_base.html" %}
-{% block title %}Rounds. Manage{% endblock %}
+{% block title %}Rounds, {{ org.name }} &middot; Manage{% endblock %}
 {% block nav_orgs %}on{% endblock %}
+{% block hero_eyebrow %}Organisations &middot; {{ org.name }}{% endblock %}
+{% block hero_title %}Rounds{% endblock %}
+{% block hero_lead %}Every round {{ org.name }} tips, by competition. Open one to set its matches and results.{% endblock %}
+{% block admin_board %}
+<div class="gx-score"><b>{{ total }}</b><span>Rounds</span></div>
+{% for k, label, n in status_list %}{% if k == "open" or k == "upcoming" %}<a class="gx-score" href="?status={{ k }}{% if pick_series %}&amp;series={{ pick_series }}{% endif %}"><b>{{ n }}</b><span>{{ label }}</span></a>{% endif %}{% endfor %}
+{% endblock %}
 {% block admin_content %}
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;"><a href="{% url 'manage:orgs_list' %}" class="flink crumb-link">Orgs</a><span class="crumb-sep">/</span><h1 class="admin-h1" style="margin:0;">{{ org.name }} &middot; Rounds</h1></div>
-<div class="grid-app" style="grid-template-columns:1.4fr 1fr;gap:20px;align-items:start;">
-  <div class="card"><div class="card-h" style="margin-bottom:10px;">Rounds</div>
-    <div class="tbl-scroll"><table class="atable compact"><thead><tr><th>#</th><th>Series</th><th>Lockout</th><th>Status</th><th style="text-align:right;"></th></tr></thead><tbody>
-    {% for r in rounds %}
-      <tr>
-        <td class="r-rank">{{ r.round_number }}</td>
-        <td>{{ r.series }}<br><small style="color:var(--muted);">{{ r.get_stage_display }}</small></td>
-        <td style="color:var(--muted);">{{ r.lockout_at|date:"D j M &middot; g:i a" }}</td>
-        <td>
-          <form method="post" action="{% url 'manage:org_rounds' org.id %}" style="margin:0;">{% csrf_token %}
-            <input type="hidden" name="action" value="status"><input type="hidden" name="round_id" value="{{ r.id }}">
-            <select name="status" onchange="this.form.submit()" style="width:auto;font-size:12px;padding:6px 10px;">
-              <option value="upcoming" {% if r.status == 'upcoming' %}selected{% endif %}>Upcoming</option>
-              <option value="open" {% if r.status == 'open' %}selected{% endif %}>Open</option>
-              <option value="locked" {% if r.status == 'locked' %}selected{% endif %}>Locked</option>
-              <option value="complete" {% if r.status == 'complete' %}selected{% endif %}>Complete</option>
-            </select>
-          </form>
-        </td>
-        <td style="text-align:right;"><a href="{% url 'manage:round_matches' org.id r.id %}" class="flink" style="color:var(--forest);">Matches</a></td>
-      </tr>
-    {% empty %}
-      <tr><td colspan="5" style="text-align:center;color:var(--muted);">No rounds yet.</td></tr>
-    {% endfor %}
-    </tbody></table></div>
-  </div>
-  <div class="mini-form">
-    <div class="card-h" style="margin-bottom:14px;">Create round</div>
-    <form method="post" action="{% url 'manage:org_rounds' org.id %}">
-      {% csrf_token %}<input type="hidden" name="action" value="create">
-      <div class="fld"><label for="ar_num">Round number</label><input type="number" name="round_number" id="ar_num" required min="1" placeholder="15"></div>
-      <div class="fld"><label for="ar_series">Series</label>
-        <select name="series" id="ar_series" required>{% for s in org.available_series %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select>
+{% with org_tab="rounds" %}{% include "manage/_org_nav.html" %}{% endwith %}
+{% comment %}
+ROUNDS AS A DESK (client, 4 Nov 2026). Narrow by competition and by status,
+read twenty at a time, change a status from a small panel, and add a round from
+a button rather than a form that sits beside the list for good.
+{% endcomment %}
+<div class="rd-tools">
+  <span class="rd-spacer"></span>
+  <details class="mc-pop rd-new">
+    <summary class="gx-btn is-lime"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New round</summary>
+    <div class="mc-pop-back" data-mc-close></div>
+    <form class="mc-pop-card rd-form" method="post" action="{% url 'manage:org_rounds' org.id %}">{% csrf_token %}<input type="hidden" name="action" value="create"><input type="hidden" name="back" value="{{ back }}">
+      <header><div><span class="mc-k">{{ org.name }}</span><b>New round</b></div><button type="button" class="mc-x" data-mc-close aria-label="Close">&times;</button></header>
+      <div class="rd-grid">
+        <label>Competition<select name="series" required data-native>{% for s in org.available_series %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select></label>
+        <label>Round number<input type="number" name="round_number" required min="1" placeholder="15"></label>
+        <label>Match type<select name="stage" data-native><option value="regular">Regular round (1 pt)</option><option value="finals">Finals (2 pts)</option><option value="origin">State of Origin (4 pts)</option></select></label>
+        <label>Status<select name="status" data-native><option value="upcoming">Upcoming</option><option value="open">Open</option></select></label>
+        <label class="full">Tips lock at <small>local time</small><input type="datetime-local" name="lockout_at" required></label>
       </div>
-      <div class="fld"><label for="ar_stage">Match type</label>
-        <select name="stage" id="ar_stage"><option value="regular">Regular round (1 pt)</option><option value="finals">Finals (2 pts)</option><option value="origin">State of Origin (4 pts)</option></select>
-      </div>
-      <div class="fld"><label for="ar_lock">Lockout (local time)</label><input type="datetime-local" name="lockout_at" id="ar_lock" required></div>
-      <div class="fld"><label for="ar_status">Status</label>
-        <select name="status" id="ar_status"><option value="upcoming">Upcoming</option><option value="open">Open</option></select>
-      </div>
-      <button type="submit" class="abtn abtn-primary abtn-block">Create round</button>
+      <button type="submit" class="gx-btn is-lime is-block">Create round</button>
     </form>
-  </div>
+  </details>
 </div>
+
+<nav class="rd-series" aria-label="Competition">
+  <a class="rd-chip{% if not pick_series %} on{% endif %}" href="?{% if pick_status %}status={{ pick_status }}{% endif %}">All competitions <i>{{ total }}</i></a>
+  {% for s in series_list %}
+  <a class="rd-chip{% if pick_series == s.obj.id|stringformat:'s' %} on{% endif %}" style="--k: {{ s.obj.colour }}" href="?series={{ s.obj.id }}{% if pick_status %}&amp;status={{ pick_status }}{% endif %}">{% if s.obj.logo %}<img src="{{ s.obj.logo }}" alt="">{% endif %}{{ s.obj.name }} <i>{{ s.n }}</i></a>
+  {% endfor %}
+</nav>
+<nav class="rd-status" aria-label="Status">
+  <a class="{% if not pick_status %}on{% endif %}" href="?{% if pick_series %}series={{ pick_series }}{% endif %}">Any status <i>{{ status_total }}</i></a>
+  {% for k, label, n in status_list %}<a class="is-{{ k }}{% if pick_status == k %} on{% endif %}" href="?status={{ k }}{% if pick_series %}&amp;series={{ pick_series }}{% endif %}">{{ label }} <i>{{ n }}</i></a>{% endfor %}
+</nav>
+
+<div class="gx-tablewrap rd-wrap">
+  <table class="gx-table rd-table">
+    <thead><tr><th scope="col">Round</th><th scope="col">Competition</th><th scope="col">Tips lock</th><th scope="col">Matches</th><th scope="col">Status</th><th scope="col"></th></tr></thead>
+    <tbody>
+    {% for r in rounds %}
+    <tr style="--k: {{ r.series.colour }}">
+      <td class="rd-num"><b>{{ r.round_number }}</b></td>
+      <td class="is-name"><span class="mc-who"><span class="mc-logo">{% if r.series.logo %}<img src="{{ r.series.logo }}" alt="">{% else %}{{ r.series.name|slice:":3"|upper }}{% endif %}</span><span class="rd-comp"><b>{{ r.series.name }}</b><small>{{ r.get_stage_display }}</small></span></span></td>
+      <td class="is-date">{{ r.lockout_at|date:"D j M" }} &middot; {{ r.lockout_at|date:"g:i a" }}<small>{% if r.lockout_at > now %}in {{ r.lockout_at|timeuntil }}{% else %}{{ r.lockout_at|timesince }} ago{% endif %}</small></td>
+      <td><span class="rd-count">{{ r.n_matches }}</span></td>
+      <td>
+        <details class="mc-pop rd-st">
+          <summary class="rd-pill is-{{ r.status }}">{{ r.get_status_display }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <div class="mc-pop-back" data-mc-close></div>
+          <form class="mc-pop-card" method="post" action="{% url 'manage:org_rounds' org.id %}">{% csrf_token %}<input type="hidden" name="action" value="status"><input type="hidden" name="round_id" value="{{ r.id }}"><input type="hidden" name="back" value="{{ back }}">
+            <header><div><span class="mc-k">{{ r.series.name }} &middot; round {{ r.round_number }}</span><b>Set the status</b></div><button type="button" class="mc-x" data-mc-close aria-label="Close">&times;</button></header>
+            {% for k, label, n in status_list %}
+            <button type="submit" name="status" value="{{ k }}" class="mc-opt rd-opt is-{{ k }}{% if r.status == k %} is-now{% endif %}">
+              <b>{{ label }}</b><span>{% if k == "upcoming" %}Not open for tips yet.{% elif k == "open" %}Members can tip until it locks.{% elif k == "locked" %}Tips are closed; waiting on results.{% else %}Results in and points counted.{% endif %}</span>
+              {% if r.status == k %}<em>Current</em>{% endif %}
+            </button>
+            {% endfor %}
+          </form>
+        </details>
+      </td>
+      <td class="rd-go"><a class="gx-btn is-ghost" href="{% url 'manage:round_matches' org.id r.id %}">Matches<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6"><div class="gx-empty"><b>No rounds here</b><span>Try another competition or status, or add a round.</span></div></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page.paginator.num_pages > 1 %}
+<nav class="rd-pager" aria-label="Pages">
+  {% if page.has_previous %}<a class="gx-btn is-ghost" href="?{% if query %}{{ query }}&amp;{% endif %}page={{ page.previous_page_number }}">Newer</a>{% endif %}
+  <span>Page {{ page.number }} of {{ page.paginator.num_pages }} &middot; {{ page.paginator.count }} rounds</span>
+  {% if page.has_next %}<a class="gx-btn is-ghost" href="?{% if query %}{{ query }}&amp;{% endif %}page={{ page.next_page_number }}">Older</a>{% endif %}
+</nav>
+{% endif %}
 {% endblock %}

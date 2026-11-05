@@ -25,7 +25,9 @@ from orgs.models import (
     ChatFlag, Group, MemberSanction, Notification, PrefectAllowance,
 )
 
-from .org_views import _pick_org
+from django.db.models import Count
+
+from .org_views import _busiest, _org_tabs, _pick_org
 from .perms import managed_orgs, org_admin_required
 
 
@@ -38,7 +40,12 @@ SPANS = {"week": timedelta(days=7), "month": timedelta(days=30)}
 def prefect_queue(request):
     """What is waiting, worst first, with what has already been decided beside it."""
     mine = managed_orgs(request.user)
-    org = _pick_org(request, mine)
+    counts = {
+        r["org_id"]: r["n"] for r in
+        ChatFlag.objects.filter(org__in=mine, status=ChatFlag.STATUS_OPEN)
+        .values("org_id").annotate(n=Count("id")).order_by()
+    }
+    org = _busiest(request, mine, counts)
     if org is None:
         return render(request, "manage/prefect.html", {"org": None, "orgs": mine})
 
@@ -58,6 +65,7 @@ def prefect_queue(request):
 
     return render(request, "manage/prefect.html", {
         "org": org, "orgs": mine, "show": show, "flags": flags,
+        "org_tabs": _org_tabs(mine, counts), "switch_what": "waiting for review",
         "open_count": ChatFlag.objects.filter(org=org, status=ChatFlag.STATUS_OPEN).count(),
         "sanctions": (
             MemberSanction.objects.filter(org=org)

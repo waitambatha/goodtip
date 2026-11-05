@@ -1267,20 +1267,32 @@ class StoryReaderTests(TestCase):
         self.client.force_login(self.member)
         self.assertNotIn("rd-tease", self.client.get(self.url).content.decode())
 
-    def test_the_story_page_carries_every_social_account(self):
-        """"Make sure all the socials we have are there" — the same five, and
-        the same addresses, as the footer."""
-        html = self.client.get(self.url).content.decode()
-        for needle in (
-            "mailto:hello@goodtip.com.au",
-            "linkedin.com/company/good-tip-australia",
-            "facebook.com/profile.php?id=61593478288209",
-            "instagram.com/goodtip_mate",
-            "youtube.com/@GoodTip_Australia",
-        ):
-            self.assertIn(needle, html, needle)
-        self.assertIn("rd-social-row", html)
+    LONG = "<p>" + "A paragraph with plenty of words in it. " * 5 + "</p>"
 
+    def test_a_picture_sits_level_with_paragraph_one(self):
+        """Client, 2 Nov 2026: text two thirds, picture one third, same level."""
+        from unittest import mock
+
+        from admin_panel.views import _weave_pictures
+
+        post = NewsPost.objects.create(title="Woven", tags=["NRL"])
+        one = [{"kind": "image", "url": "/a.jpg", "alt": ""}]
+        with mock.patch.object(NewsPost, "card_slides", one):
+            woven = _weave_pictures(self.LONG + self.LONG, post)
+        self.assertEqual(woven.count("rd-row-t"), 1)
+        self.assertLess(woven.index("rd-row"), woven.index("<p>"))
+
+    def test_more_pictures_than_paragraphs_take_turns(self):
+        from unittest import mock
+
+        from admin_panel.views import _weave_pictures
+
+        post = NewsPost.objects.create(title="Woven", tags=["NRL"])
+        three = [{"kind": "image", "url": f"/{n}.jpg", "alt": ""} for n in range(3)]
+        with mock.patch.object(NewsPost, "card_slides", three):
+            woven = _weave_pictures(self.LONG, post)
+        self.assertEqual(woven.count("<figure"), 1)
+        self.assertEqual(woven.count("<img"), 3)
 
 class ConfirmAndBusyContractTests(TestCase):
     """The guarded-submit contract between gt-confirm.js and gt-busy.js.
@@ -1687,6 +1699,7 @@ class AttachingAPictureInTheEditorTests(TestCase):
         )
         post = NewsPost.objects.get()
 
+        self.client.logout()  # the turning card is the visitors' page
         html = self.client.get(reverse("news_index")).content.decode()
         frames = re.findall(
             r"""class="ndc-shot[^"]*"[^>]*background-image:url\('([^']+)'\)""", html,
@@ -1783,8 +1796,7 @@ class NewsListFilterTests(TestCase):
         )
         self.client.force_login(member)
         html = self._html(code="AFL")
-        self.assertIn("newsfilter", html)
-        self.assertIn('class="cf-chip on" data-code="afl"', html)
+        self.assertRegex(html, r'class="ds-row on"[^>]*href="[^"]*\?code=AFL"')
         self.assertIn("Finals race", html)
         self.assertNotIn("Origin preview", html)
 
@@ -2026,11 +2038,8 @@ class StoryCardMediaTests(TestCase):
 class StoryCardRenderTests(TestCase):
     """The card itself: order, the fusion band, one link, and "More"."""
 
-    def setUp(self):
-        self.user = User.objects.create_user(
-            email="card@example.com", password="x", display_name="Card",
-        )
-        self.client.force_login(self.user)
+    # Read on the public page: members got the list on 2 Nov 2026, the turning
+    # card stayed for visitors.
 
     def _card(self, **kw):
         kw.setdefault("title", "Two codes, one story")
@@ -2089,19 +2098,7 @@ class StoryCardRenderTests(TestCase):
     def test_the_news_page_renders_the_story_card(self):
         """One story card in the product. It was three, kept looking alike by
         hand, and only two of them ever got a change."""
-        from catalog.models import Season
-        from orgs.models import OrgMember, Organisation
-
-        # The deck lives on the dashboard a member with an organisation gets;
-        # somebody who has not joined one yet sees the "find your organisation"
-        # page instead, which has never carried it.
-        season = Season.objects.create(year=2097, label="2097")
-        org = Organisation.objects.create(name="Card Co", season=season)
-        OrgMember.objects.create(user=self.user, org=org)
-
         NewsPost.objects.create(title="Shared", tags=["NRL"])
-        # Since 27 Oct 2026 the deck is the News page's alone; the dashboard
-        # shows stories as strips between its fixtures.
         html = self.client.get(reverse("news_index")).content.decode()
         self.assertIn('<article class="nd-card', html)
         self.assertIn("ndc-more", html)

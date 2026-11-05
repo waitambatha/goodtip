@@ -1,0 +1,45 @@
+{% extends "admin_base.html" %}
+{% block title %}Groups, {{ org.name }} &middot; Manage{% endblock %}
+{% block hero_eyebrow %}Organisation &middot; {{ org.name }}{% endblock %}
+{% block hero_title %}Groups{% endblock %}
+{% block hero_lead %}The teams inside {{ org.root.name }}. Pick one to see who's in it.{% endblock %}
+{% block admin_board %}
+<div class="gx-score"><b>{{ n_groups }}</b><span>Groups</span></div>
+<div class="gx-score"><b>{{ n_members }}</b><span>Members</span></div>
+{% endblock %}
+{% block admin_content %}
+{% include "manage/_org_nav.html" %}
+{% if groups %}
+<div class="og-split">
+  <nav class="og-glist" aria-label="Groups">
+    {% for g in groups %}
+    <a class="og-gitem{% if current and g.id == current.id %} on{% endif %}" href="?group={{ g.id }}">
+      <span class="mc-av og-grp">{{ g.name|slice:":2"|upper }}</span>
+      <span class="ov-org-t"><b>{{ g.name }}</b><small>{{ g.n }} member{{ g.n|pluralize }}{% if g.approval_status == "pending" %} &middot; waiting{% endif %}</small></span>
+    </a>
+    {% endfor %}
+  </nav>
+  <section class="og-gpanel">
+    <header class="og-ghead">
+      <span class="mc-av og-grp is-big">{{ current.name|slice:":2"|upper }}</span>
+      <div><b>{{ current.name }}</b><small>{{ people|length }} member{{ people|length|pluralize }}{% if current.charity %} &middot; raising for {{ current.charity.name }}{% endif %}{% if current.created_by %} &middot; started by {{ current.created_by.display_name }}{% endif %}</small></div>
+      {% if current.approval_status == "approved" %}<span class="gx-pill is-ok"><i></i>Running</span>{% else %}<span class="gx-pill is-wait"><i></i>{{ current.get_approval_status_display }}</span>{% endif %}
+    </header>
+    <div class="gx-tablewrap"><table class="gx-table">
+      <thead><tr><th scope="col">Member</th><th scope="col">Email</th><th scope="col">Joined the group</th></tr></thead>
+      <tbody>
+      {% for p in people %}
+      <tr><td class="is-name"><span class="mc-who"><span class="mc-av">{% if p.user.avatar %}<img src="{{ p.user.avatar.url }}" alt="">{% else %}{{ p.user.display_name|slice:":1"|upper }}{% endif %}</span><b>{{ p.user.display_name }}</b></span></td>
+        <td class="is-email"><a href="mailto:{{ p.user.email }}">{{ p.user.email }}</a></td>
+        <td class="is-date">{{ p.joined_at|date:"j M Y"|default:"-" }}</td></tr>
+      {% empty %}
+      <tr><td colspan="3"><div class="gx-empty"><b>Nobody in {{ current.name }} yet</b></div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+</div>
+{% else %}
+<div class="gx-empty"><b>No groups in {{ org.root.name }}</b><span>Groups split an organisation into teams, each with its own ladder.</span></div>
+{% endif %}
+{% endblock %}

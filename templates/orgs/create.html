@@ -2,7 +2,7 @@
 {% load team_extras static %}
 {% block title %}Create an organisation &middot; GoodTip{% endblock %}
 {% block loader_task %}Opening the organisation builder{% endblock %}
-{% block body_class %}page-deep sheet-page wiz-page{% endblock %}
+{% block body_class %}page-deep sheet-page wiz-page ow-page{% endblock %}
 {% block page_backdrop %}
 {% comment %}Side imagery lives outside the sheet: .gt-sheet creates a
 stacking context, so a strip rendered inside it paints over the sheet.
@@ -11,60 +11,18 @@ stacking context, so a strip rendered inside it paints over the sheet.
 {% endblock %}
 
 {% block app_content %}
-{% comment %} Title row and the draft chip share a line: the chip is reassurance about the
-   thing the subtitle just promised, so it belongs beside it rather than buried
-   at the foot of the form. {% endcomment %}
-<div class="wiz-top">
-  <div>
-    {% comment %} Eyebrow and standfirst name the step actually in progress, so the top of
-       the page says what is happening now rather than repeating the page title.
-       Step {{ step }} of {{ last_step }} is here and not only in the rail because
-       the rail shows labels for the current step alone. {% endcomment %}
-    <div class="app-eyebrow">Step {{ step }} of {{ last_step }} &middot; {{ step_intro.eyebrow }}</div>
-    <h1 class="app-h1">Create an <span class="hl-lime">organisation</span></h1>
-    <p class="app-sub">{{ step_intro.sub }} We save as you go, so you can finish it later.</p>
+{% include "orgs/partials/_steps_rail.html" %}
+<div class="ow-stage" style="--c: {{ steps_rail.colour }}">
+<header class="ow-head">
+  <span class="ow-head-art">{% include "orgs/partials/_ow_art.html" with art=steps_rail.art %}</span>
+  <div class="ow-head-t">
+    <span class="ow-head-n">Step {{ steps_rail.n }} of <span data-step-total>{{ steps_rail.total }}</span>{% if parent_org %} &middot; part of {{ parent_org.name }}{% endif %}</span>
+    <h1>{{ steps_rail.label }}</h1>
+    <p>{{ step_intro.sub }}</p>
   </div>
-  {% comment %} Always present, but it does not claim a save that has not happened: an
-     untouched wizard has nothing saved, and a chip reading "Draft saved" over
-     an empty form is the kind of small lie that costs trust the first time
-     someone closes the tab and finds nothing waiting. {% endcomment %}
-  <div class="draft-chip{% if not draft.is_started %} idle{% endif %}" role="status">
-    <span class="dc-ic" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>
-      </svg>
-    </span>
-    <span class="dc-txt">
-      {% if draft.is_started %}<b>Draft saved</b><i>{{ draft_saved_label }}</i>
-      {% else %}<b>Autosave on</b><i>Saved as you go</i>{% endif %}
-    </span>
-  </div>
-</div>
-
-{% comment %}
-Progress rail. Steps already passed are links back — the wizard keeps every
-answer, so going back to change one costs nothing.
-{% endcomment %}
-<div class="wiz-rail" data-coach="org-steps" role="list">
-  {% for s in steps %}
-  <div class="wiz-step {% if s.current %}current{% elif s.done %}done{% endif %}" role="listitem" tabindex="0"
-       {% if s.current %}aria-current="step"{% endif %} aria-label="Step {{ s.n }}: {{ s.label }}, {{ s.sub }}">
-    <span class="wz-num">{% if s.done %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 13 4 4L19 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>{% else %}{{ s.n }}{% endif %}</span>
-    {% comment %}
-    Numbers-only fits every step in the box (see "six steps..." note below);
-    a step that isn't the current one still names itself on hover/focus, as
-    a small floating tooltip rather than inline text — that way glancing at
-    step 1 can still answer "what happens at step 4" without the rail ever
-    trying to hold six full labels in a row again.
-    {% endcomment %}
-    <span class="wz-text">
-      <span class="wz-label">{{ s.label }}</span>
-      <span class="wz-sub">{{ s.sub }}</span>
-    </span>
-  </div>
-  {% if s.connector %}<span class="wz-line {% if s.done %}done{% endif %}" aria-hidden="true"></span>{% endif %}
-  {% endfor %}
-</div>
+  <span class="ow-head-saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>{% if draft.is_started %}Draft saved {{ draft_saved_label }}{% else %}Saved as you go{% endif %}</span>
+</header>
+<div class="ow-main">
 
 {% if form.non_field_errors %}<div class="flash error" style="margin-bottom:16px;"><span>{{ form.non_field_errors|join:" " }}</span></div>{% endif %}
 
@@ -136,25 +94,29 @@ missed click and got submitted twice.
       <div><h2>First up — what kind of setup is this?</h2><p>It changes what we ask you for. Nothing here is set in stone.</p></div>
     </div>
     <div class="opt-grid cols2 formality-grid">
-      <label class="opt-card radio">
+      <label class="opt-card radio fm-card fm-formal">
         <input type="radio" name="formality" value="formal"
                {% if form.formality.value == 'formal' %}checked{% endif %}>
         <span class="oc-box"></span>
-        <span>
+        <span class="fm-top" aria-hidden="true"><span class="fm-art">{% include "orgs/partials/_ow_art.html" with art="formal" %}</span></span>
+        <span class="fm-body">
           <span class="oc-title">Formal</span>
-          <span class="oc-sub">A workplace, school, club or registered entity.</span>
-          <span class="oc-sub" style="margin-top:6px;">We'll ask you to confirm a work email so members know it's really you.</span>
+          <span class="fm-tag">A workplace, school, club or registered entity.</span>
+          <span class="fm-line"><i aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 13 4 4L19 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></i>We'll ask you to confirm a work email so members know it's really you.</span>
         </span>
+        <span class="fm-pick"><span class="fm-off">Choose formal</span><span class="fm-on"><i aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 13 4 4L19 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></i>Selected</span></span>
       </label>
-      <label class="opt-card radio">
+      <label class="opt-card radio fm-card fm-informal">
         <input type="radio" name="formality" value="informal"
                {% if form.formality.value == 'informal' %}checked{% endif %}>
         <span class="oc-box"></span>
-        <span>
+        <span class="fm-top" aria-hidden="true"><span class="fm-art">{% include "orgs/partials/_ow_art.html" with art="informal" %}</span></span>
+        <span class="fm-body">
           <span class="oc-title">Informal</span>
-          <span class="oc-sub">Mates, family, or a community group.</span>
-          <span class="oc-sub" style="margin-top:6px;">No work email, no paperwork — any address is fine.</span>
+          <span class="fm-tag">Mates, family, or a community group.</span>
+          <span class="fm-line"><i aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 13 4 4L19 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></i>No work email, no paperwork — any address is fine.</span>
         </span>
+        <span class="fm-pick"><span class="fm-off">Choose informal</span><span class="fm-on"><i aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 13 4 4L19 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></i>Selected</span></span>
       </label>
     </div>
     {% if form.formality.errors %}<div class="fld-err">{{ form.formality.errors|join:" " }}</div>{% endif %}
@@ -170,7 +132,7 @@ missed click and got submitted twice.
     <div class="fld" data-coach="org-name"><label for="id_name">Organisation name</label>
       <div class="fld-ic">
         <span class="fi-mark" aria-hidden="true"><svg style="stroke:currentColor;fill:none;stroke-width:1.8;"><use href="#ic-org"/></svg></span>
-        <input type="text" name="name" id="id_name" value="{{ form.name.value|default:'' }}" placeholder="{% if parent_org %}e.g. Finance{% else %}e.g. Acme Corp{% endif %}" autocomplete="off">
+        <input type="text" name="name" id="id_name" value="{{ form.name.value|default:'' }}" placeholder="{% if parent_org %}e.g. Finance{% elif draft.data.formality == 'informal' %}e.g. The Friday Footy Crew{% else %}e.g. Acme Corp{% endif %}" autocomplete="off">
       </div>
       <div class="hint">This is the name your members will see.</div>
       {% if form.name.errors %}<div class="fld-err">{{ form.name.errors|join:" " }}</div>{% endif %}
@@ -196,7 +158,7 @@ missed click and got submitted twice.
           {% endif %}
         </div>
         <div class="ol-body">
-          <div class="ol-title">Organisation logo <span>optional</span></div>
+          <div class="ol-title">Logo <span>optional</span></div>
           <p class="ol-hint">Helps members recognise you when they search. JPG, PNG, WEBP or SVG, under 5&nbsp;MB.</p>
           <div class="ol-actions">
             <label class="ol-pick" for="orgLogoFile">
@@ -214,9 +176,13 @@ missed click and got submitted twice.
         <input type="file" name="logo" id="orgLogoFile" accept="image/*" hidden>
       </div>
       {% if draft.data.logo_error %}<div class="fld-err">{{ draft.data.logo_error }}</div>{% endif %}
-      <div id="dupeHint" style="display:none;margin-top:8px;padding:12px 14px;border:1px solid rgba(180,120,0,.4);background:rgba(255,180,0,.08);border-radius:10px;font-size:14px;">
-        <b>These organisations already exist</b>, did you mean to join one?
-        <ul id="dupeHintList" style="margin:6px 0 0;padding-left:18px;"></ul>
+      <div id="dupeHint" class="ow-dupe" hidden>
+        <div class="ow-dupe-h">
+          <span class="ow-dupe-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+          <span><b>Already on GoodTip?</b><i>These look similar. If one is yours, ask to join it rather than starting a second.</i></span>
+        </div>
+        <ul id="dupeHintList" class="ow-dupe-list"></ul>
+        <a class="ow-dupe-more" id="dupeHintMore" hidden></a>
       </div></div>
 
     {% comment %}
@@ -224,6 +190,7 @@ missed click and got submitted twice.
     asking an informal group to pick from a list of one is pure friction —
     the form fills it in (see OrgCreateForm._clean_formality).
     {% endcomment %}
+    <div class="ow-divide" aria-hidden="true"><span>About it</span></div>
     <div class="fld" data-formal-only {% if draft.data.formality == 'informal' %}style="display:none;"{% endif %}><label for="id_organisation_type">Organisation type</label>
       <div class="fld-ic">
         <span class="fi-mark" aria-hidden="true">
@@ -231,9 +198,9 @@ missed click and got submitted twice.
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
           </svg>
         </span>
-      <select name="organisation_type" id="id_organisation_type">
-        <option value="">Choose your organisation type</option>
-        {% for gt in form.fields.organisation_type.queryset %}<option value="{{ gt.pk }}" data-slug="{{ gt.slug }}" {% if form.organisation_type.value|stringformat:'s' == gt.pk|stringformat:'s' %}selected{% endif %}>{{ gt.name }}</option>{% endfor %}
+      <select name="organisation_type" id="id_organisation_type" data-native>
+        <option value="">Choose a type</option>
+        {% for gt in form.fields.organisation_type.queryset %}{% if gt.slug != 'informal' %}<option value="{{ gt.pk }}" data-slug="{{ gt.slug }}" {% if form.organisation_type.value|stringformat:'s' == gt.pk|stringformat:'s' %}selected{% endif %}>{{ gt.name }}</option>{% endif %}{% endfor %}
       </select>
       </div>
       {% if form.organisation_type.errors %}<div class="fld-err">{{ form.organisation_type.errors|join:" " }}</div>{% endif %}
@@ -278,7 +245,7 @@ missed click and got submitted twice.
             <circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z"/>
           </svg>
         </span>
-        <select name="country" id="id_country">
+        <select name="country" id="id_country" data-native>
           <option value="">Choose a country</option>
           {% for co in form.fields.country.queryset %}<option value="{{ co.pk }}" {% if form.country.value|stringformat:'s' == co.pk|stringformat:'s' %}selected{% endif %}>{{ co.name }}</option>{% endfor %}
         </select>
@@ -287,14 +254,14 @@ missed click and got submitted twice.
       {% if form.country.errors %}<div class="fld-err">{{ form.country.errors|join:" " }}</div>{% endif %}
     </div>
 
-    <div class="fld" data-au-only><label for="id_state">State or territory <span style="color:var(--muted);font-weight:400;">(optional, skip if it's not nationally)</span></label>
+    <div class="fld" data-au-only><label for="id_state">State or territory <span class="ow-opt">Optional</span></label>
       <div class="fld-ic">
         <span class="fi-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
           </svg>
         </span>
-        <select name="state" id="id_state">
+        <select name="state" id="id_state" data-native>
           <option value="">We operate nationally</option>
           {% for st in form.fields.state.queryset %}<option value="{{ st.pk }}" {% if form.state.value|stringformat:'s' == st.pk|stringformat:'s' %}selected{% endif %}>{{ st.name }}</option>{% endfor %}
         </select>
@@ -464,18 +431,20 @@ missed click and got submitted twice.
       </span>
       <div>
         <h2>Will {% if form.name.value %}{{ form.name.value }}{% else %}your organisation{% endif %} be split into groups?</h2>
-        <p>A group is a team inside your organisation — Marketing, IT, the Melbourne office — each with its own ladder and its own wall. Everyone still tips the same fixtures, under the same rules, for the same charity.</p>
+        <p>{% if draft.data.formality == 'informal' %}A group is a smaller crew inside yours — the Tuesday lot, the cousins, the Brisbane mob — each{% else %}A group is a team inside your organisation — Marketing, IT, the Melbourne office — each{% endif %} with its own ladder and its own wall. Everyone still tips the same fixtures, under the same rules, for the same charity.</p>
       </div>
     </div>
     <div class="opt-grid cols2" style="margin-top:8px;">
       <label class="opt-card radio">
         <input type="radio" name="groups_enabled" value="no" {% is_checked form.groups_enabled 'no' %}>
         <span class="oc-box"></span>
+        <span class="oc-pic" aria-hidden="true">{% include "orgs/partials/_ow_art.html" with art="ladder" %}</span>
         <span><span class="oc-title">Not for now</span><span class="oc-sub">One ladder for everyone. Most organisations don't need this — five or ten people is a stronger comp together than split into smaller ones.</span></span>
       </label>
       <label class="opt-card radio">
         <input type="radio" name="groups_enabled" value="yes" {% is_checked form.groups_enabled 'yes' %}>
         <span class="oc-box"></span>
+        <span class="oc-pic" aria-hidden="true">{% include "orgs/partials/_ow_art.html" with art="ladders" %}</span>
         <span><span class="oc-title">Yes, switch them on</span><span class="oc-sub">Worth it once there are enough people that one ladder stops feeling personal. Members can start their own group, or ask, and you approve. Part of the {{ groups_plan_label }} plan and up.</span></span>
       </label>
     </div>
@@ -496,7 +465,7 @@ missed click and got submitted twice.
     50 people can have the group button but if they click on it it triggers an
     upgrade".
     {% endcomment %}
-    <p class="app-sub" style="margin-top:14px;">Groups come with {{ groups_plan_label }} (${{ groups_plan_price }}/year) and above; smaller plans run one ladder for everyone. This isn't final either way — an admin can switch groups on or off later from Settings, and nothing is ever lost by waiting.</p>
+    <p class="app-sub ow-note" style="margin-top:14px;">Groups come with {{ groups_plan_label }} (${{ groups_plan_price }}/year) and above; smaller plans run one ladder for everyone. This isn't final either way — an admin can switch groups on or off later from Settings, and nothing is ever lost by waiting.</p>
   </div>
   {% endif %}
 
@@ -519,15 +488,32 @@ missed click and got submitted twice.
     season's id as a hidden field instead of a question.
     {% endcomment %}
     {{ form.season }}
-    <div class="fld">
-      <label>Competitions{% if current_season %} <span style="color:var(--muted);font-weight:400;">&middot; {{ current_season }} season</span>{% endif %}</label>
-      <div class="opt-grid cols2">
-        {% for comp in form.fields.competitions.queryset %}
-        <label class="opt-card">
+    <div class="fld ow-comps" data-comps>
+      <div class="ow-comps-bar">
+        <label>Competitions{% if current_season %} <span class="ow-comps-season">{{ current_season }} season</span>{% endif %}</label>
+        <span class="ow-comps-count" data-comp-count aria-live="polite"></span>
+        <button type="button" class="ow-mini" data-comp-all>Select all</button>
+        <button type="button" class="ow-mini is-quiet" data-comp-none>Clear</button>
+      </div>
+      <div class="ow-comps-tools">
+        <span class="ow-comps-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search competitions" aria-label="Search competitions" data-comp-search></span>
+        <div class="ow-sportchips" role="tablist" aria-label="Filter by sport">
+          <button type="button" class="is-on" data-sport="">All sports <i>{{ form.fields.competitions.queryset|length }}</i></button>
+          {% for g in comp_groups %}<button type="button" data-sport="{{ g.slug }}" style="--sc: {{ g.colour }}">{{ g.name }} <i>{{ g.comps|length }}</i></button>{% endfor %}
+        </div>
+      </div>
+      <div class="ow-comp-all">
+      {% for g in comp_groups %}
+      <section class="ow-sportgrp" data-sport-group="{{ g.slug }}" style="--sc: {{ g.colour }}">
+        <div class="ow-sportgrp-h"><b>{{ g.name }}</b><button type="button" class="ow-mini is-quiet" data-group-all>Select all {{ g.name }}</button></div>
+        <div class="opt-grid ow-comp-grid">
+        {% for comp in g.comps %}
+        <label class="opt-card ow-comp" style="--k: {{ comp.series.all.0.colour|default:g.colour }}" data-comp-name="{{ comp.name|lower }}{% for s in comp.series.all %} {{ s.name|lower }}{% endfor %}">
           <input type="checkbox" name="competitions" value="{{ comp.pk }}" {% is_checked form.competitions comp.pk %}>
           <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
-          <span>
-            <span class="oc-title">{{ comp.name }}</span>
+          {% with lead=comp.series.all.0 %}<span class="ow-comp-logo" aria-hidden="true">{% if lead.logo %}<img src="{{ lead.logo }}" alt="" loading="lazy">{% else %}{{ comp.name|slice:":3"|upper }}{% endif %}</span>{% endwith %}
+          <span class="ow-comp-t">
+            <span class="oc-title">{{ comp.name }}<small class="ow-comp-sport">{{ g.name }}</small></span>
             {% comment %}
             A Competition already bundles men's, women's and any representative
             series (NRL = NRL + NRLW + State of Origin) — picking one gets all
@@ -537,15 +523,19 @@ missed click and got submitted twice.
             includes is what makes "you get both" something people can see
             rather than something they have to be told.
             {% endcomment %}
-            {% if comp.series.all %}
+            {% if comp.series.all|length > 1 %}
             <span class="oc-series">
-              {% for s in comp.series.all %}<span class="oc-series-chip">{{ s.name }}</span>{% endfor %}
+              {% for s in comp.series.all %}<span class="oc-series-chip" style="--k: {{ s.colour }}">{% if s.logo %}<img src="{{ s.logo }}" alt="" loading="lazy">{% endif %}{{ s.name }}</span>{% endfor %}
             </span>
             {% endif %}
           </span>
         </label>
         {% endfor %}
+        </div>
+      </section>
+      {% endfor %}
       </div>
+      <p class="ow-comps-none" data-comp-empty hidden>No competition matches that search.</p>
       {% if form.competitions.errors %}<div class="fld-err">{{ form.competitions.errors|join:" " }}</div>{% endif %}
     </div>
     <div class="fld">
@@ -603,8 +593,8 @@ missed click and got submitted twice.
       <div><h2>The charity</h2><p>Every fixture ties back to a cause. Choose how yours gets picked.</p></div>
     </div>
     <div class="opt-grid cols2" style="margin-bottom:8px;">
-      <label class="opt-card radio"><input type="radio" name="charity_method" value="pick" {% is_checked form.charity_method 'pick' %}><span class="oc-box"></span><span><span class="oc-title">I'll choose the charity</span><span class="oc-sub">Set it now for the whole organisation</span></span></label>
-      <label class="opt-card radio"><input type="radio" name="charity_method" value="vote" {% is_checked form.charity_method 'vote' %}><span class="oc-box"></span><span><span class="oc-title">Let the organisation vote</span><span class="oc-sub">Everyone nominates &amp; votes</span></span></label>
+      <label class="opt-card radio"><input type="radio" name="charity_method" value="pick" {% is_checked form.charity_method 'pick' %}><span class="oc-box"></span><span class="oc-pic" aria-hidden="true">{% include "orgs/partials/_ow_art.html" with art="charity" %}</span><span><span class="oc-title">I'll choose the charity</span><span class="oc-sub">Set it now for the whole organisation</span></span></label>
+      <label class="opt-card radio"><input type="radio" name="charity_method" value="vote" {% is_checked form.charity_method 'vote' %}><span class="oc-box"></span><span class="oc-pic" aria-hidden="true">{% include "orgs/partials/_ow_art.html" with art="ballot" %}</span><span><span class="oc-title">Let the organisation vote</span><span class="oc-sub">Everyone nominates &amp; votes</span></span></label>
     </div>
 
     <div data-when="pick" class="show" style="margin-top:14px;">
@@ -643,7 +633,7 @@ missed click and got submitted twice.
       the organisation adds there shows up in this picker for its own groups
       straight away.
       {% endcomment %}
-      <p class="hint" style="margin-top:14px;">
+      <p class="hint ow-note" style="margin-top:14px;">
         Can't see the cause you back? Create the organisation, then add it from
         Manage → Charities — it'll be ready for your next election.
       </p>
@@ -894,7 +884,8 @@ missed click and got submitted twice.
       that will bounce you back with an error.
       {% endcomment %}
       {% if step == last_step %}
-      <button type="submit" name="action" value="next" class="abtn abtn-primary abtn-lg">{% if duplicates %}Yes, create a separate one &rarr;{% elif parent_org %}Create organisation &rarr;{% else %}Create organisation &rarr;{% endif %}</button>
+      <span class="ow-gate" aria-hidden="true">Tick the agreement above to create it</span>
+      <button type="submit" name="action" value="next" class="abtn abtn-primary abtn-lg" data-busy-skip data-ow-launch>{% if duplicates %}Yes, create a separate one &rarr;{% elif parent_org %}Create organisation &rarr;{% else %}Create organisation &rarr;{% endif %}</button>
       {% elif step == verify_step %}
         {% if verification.is_verified %}
         <button type="submit" name="action" value="next" class="abtn abtn-primary abtn-lg" id="verifyContinueBtn">Continue &rarr;</button>
@@ -907,9 +898,191 @@ missed click and got submitted twice.
     </div>
   </div>
 </form>
+</div>
+</div>
+{% if step == last_step %}
+<div class="ow-launch" data-ow-launch-screen hidden role="status" aria-live="polite">
+  <div class="ow-launch-card">
+    <span class="ow-launch-ring" aria-hidden="true"><span class="ow-launch-art">{% include "orgs/partials/_ow_art.html" with art="org" %}</span></span>
+    <b>Setting up {{ draft.data.name|default:"your organisation" }}</b>
+    <ol>
+      <li>Creating your organisation</li>
+      <li>Building your ladder</li>
+      <li>Loading this season's fixtures</li>
+      <li>Linking your charity</li>
+    </ol>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block app_js %}
+(function () {
+  /* The competitions picker: search, a sport filter, select all (everything
+     showing, or one sport), and a running count. */
+  var box = document.querySelector('[data-comps]');
+  if (!box) return;
+  var tiles = Array.prototype.slice.call(box.querySelectorAll('.ow-comp'));
+  var search = box.querySelector('[data-comp-search]'), count = box.querySelector('[data-comp-count]');
+  var sport = '';
+  function shown() { return tiles.filter(function (t) { return !t.hidden; }); }
+  function tally() {
+    var n = tiles.filter(function (t) { return t.querySelector('input').checked; }).length;
+    count.textContent = n ? n + ' selected' : 'None selected yet';
+    count.classList.toggle('is-some', n > 0);
+    box.querySelectorAll('[data-sport-group]').forEach(function (g) {
+      var ins = g.querySelectorAll('.ow-comp:not([hidden]) input'); var all = ins.length && Array.prototype.every.call(ins, function (i) { return i.checked; });
+      var b = g.querySelector('[data-group-all]'); b.textContent = (all ? 'Clear ' : 'Select all ') + g.querySelector('b').textContent;
+    });
+  }
+  function filter() {
+    var q = (search.value || '').trim().toLowerCase();
+    tiles.forEach(function (t) {
+      var g = t.closest('[data-sport-group]').getAttribute('data-sport-group');
+      t.hidden = !!(sport && g !== sport) || !!(q && t.getAttribute('data-comp-name').indexOf(q) < 0);
+    });
+    box.querySelectorAll('[data-sport-group]').forEach(function (g) { g.hidden = !g.querySelector('.ow-comp:not([hidden])'); });
+    box.querySelector('[data-comp-empty]').hidden = shown().length > 0;
+    tally();
+  }
+  function set(list, on) { list.forEach(function (t) { var i = t.querySelector('input'); if (i.checked !== on) { i.checked = on; i.dispatchEvent(new Event('change', { bubbles: true })); } }); tally(); }
+  search.addEventListener('input', filter);
+  box.querySelectorAll('[data-sport]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      sport = b.getAttribute('data-sport');
+      box.querySelectorAll('[data-sport]').forEach(function (x) { x.classList.toggle('is-on', x === b); });
+      box.querySelector('[data-comp-all]').textContent = sport ? 'Select all ' + b.firstChild.textContent.trim() : 'Select all';
+      filter();
+    });
+  });
+  box.querySelector('[data-comp-all]').addEventListener('click', function () { set(shown(), true); });
+  box.querySelector('[data-comp-none]').addEventListener('click', function () { set(tiles, false); });
+  box.querySelectorAll('[data-group-all]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var mine = Array.prototype.slice.call(b.closest('[data-sport-group]').querySelectorAll('.ow-comp:not([hidden])'));
+      set(mine, !mine.every(function (t) { return t.querySelector('input').checked; }));
+    });
+  });
+  box.addEventListener('change', tally);
+  tally();
+})();
+(function () {
+  /* Create: a launch screen that ticks through what is being set up, in place
+     of the generic "Saving". */
+  var btn = document.querySelector('[data-ow-launch]'), screen = document.querySelector('[data-ow-launch-screen]');
+  if (!btn || !screen) return;
+  btn.closest('form').addEventListener('submit', function (e) {
+    if (e.submitter !== btn) return;
+    var terms = document.querySelector('[name="terms_accepted"]');
+    if (terms && !terms.checked) return;
+    screen.hidden = false;
+    requestAnimationFrame(function () { screen.classList.add('is-on'); });
+  });
+})();
+(function () {
+  /* Picking informal drops the verify step from the track there and then, and
+     the count with it, rather than only after Continue. */
+  var verify = document.querySelector('.ow-st[data-key="verify"]');
+  var total = document.querySelector('[data-step-total]');
+  if (!verify || !total) return;
+  var full = parseInt(total.textContent, 10);
+  document.querySelectorAll('input[name="formality"]').forEach(function (r) {
+    r.addEventListener('change', function () {
+      var informal = r.value === 'informal' && r.checked;
+      verify.hidden = informal;
+      total.textContent = informal ? full - 1 : full;
+    });
+  });
+})();
+(function () {
+  /* A field's error goes the moment the field is answered. */
+  document.addEventListener('change', function (e) {
+    var fld = e.target.closest && e.target.closest('.wiz-card .fld');
+    if (!fld) return;
+    fld.querySelectorAll('.fld-err').forEach(function (n) { n.remove(); });
+    fld.classList.remove('has-err');
+  });
+})();
+(function () {
+  /* DROPDOWNS (client, 3 Nov 2026: "the drop down design... work on it"). The
+     browser's own list cannot be styled, so each select gets a button and a
+     panel drawn here. The select stays in the form, hidden, and is what is
+     submitted; choosing fires its change event so the page's other scripts
+     (sub-categories, the state field) carry on as before. */
+  var openOne = null;
+  function close(box) { if (!box) return; box.classList.remove('is-open'); if (box._btn) box._btn.setAttribute('aria-expanded', 'false'); if (openOne === box) openOne = null; }
+  document.querySelectorAll('.ow-page .wiz-card select').forEach(function (sel) {
+    var fld = sel.closest('.fld') || sel.parentNode;
+    var box = document.createElement('div'); box.className = 'gs';
+    var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'gs-btn'; box._btn = btn;
+    btn.setAttribute('aria-haspopup', 'listbox'); btn.setAttribute('aria-expanded', 'false');
+    var lab = fld.querySelector('label'); if (lab) { lab.addEventListener('click', function (e) { e.preventDefault(); btn.focus(); }); }
+    var panel = document.createElement('div'); panel.className = 'gs-panel'; panel.setAttribute('role', 'listbox');
+    var search = null;
+    if (sel.options.length > 8) {
+      search = document.createElement('input'); search.type = 'search'; search.className = 'gs-search'; search.placeholder = 'Search'; search.setAttribute('aria-label', 'Search the list');
+      panel.appendChild(search);
+    }
+    var list = document.createElement('div'); list.className = 'gs-list'; panel.appendChild(list);
+    function paint() {
+      var o = sel.options[sel.selectedIndex];
+      btn.innerHTML = '<span class="gs-val' + (o && o.value ? '' : ' is-empty') + '"></span><i aria-hidden="true"></i>';
+      btn.firstChild.textContent = o ? o.text : '';
+      list.querySelectorAll('.gs-opt').forEach(function (r) { r.classList.toggle('is-on', r.getAttribute('data-v') === sel.value); r.setAttribute('aria-selected', r.getAttribute('data-v') === sel.value); });
+    }
+    Array.prototype.forEach.call(sel.options, function (o) {
+      if (!o.value && /^choose/i.test(o.text)) return;  /* a prompt, not a choice */
+      var r = document.createElement('button'); r.type = 'button'; r.className = 'gs-opt' + (o.value ? '' : ' is-blank'); r.setAttribute('role', 'option');
+      r.setAttribute('data-v', o.value); r.textContent = o.text;
+      r.addEventListener('click', function () {
+        sel.value = o.value; sel.dispatchEvent(new Event('change', { bubbles: true })); paint(); close(box); btn.focus();
+      });
+      list.appendChild(r);
+    });
+    if (search) search.addEventListener('input', function () {
+      var q = search.value.trim().toLowerCase();
+      list.querySelectorAll('.gs-opt').forEach(function (r) { r.hidden = !!q && r.textContent.toLowerCase().indexOf(q) < 0; });
+    });
+    btn.addEventListener('click', function () {
+      if (box.classList.contains('is-open')) { close(box); return; }
+      close(openOne); box.classList.add('is-open'); btn.setAttribute('aria-expanded', 'true'); openOne = box;
+      var r = btn.getBoundingClientRect(), need = Math.min(panel.scrollHeight || 330, 340) + 16;
+      var up = window.innerHeight - r.bottom < need && r.top > window.innerHeight - r.bottom;
+      box.classList.toggle('is-up', up);
+      panel.style.top = up ? 'auto' : (r.bottom - box.getBoundingClientRect().top + 8) + 'px';
+      panel.style.bottom = up ? (box.getBoundingClientRect().top - r.top + 8) + 'px' : 'auto';
+      setTimeout(function () { panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 30);
+      if (search) { search.value = ''; search.dispatchEvent(new Event('input')); search.focus(); }
+      var on = list.querySelector('.is-on'); if (on) on.scrollIntoView({ block: 'nearest' });
+    });
+    panel.addEventListener('keydown', function (e) {
+      var rows = Array.prototype.filter.call(list.querySelectorAll('.gs-opt'), function (r) { return !r.hidden; });
+      var i = rows.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') { e.preventDefault(); (rows[i + 1] || rows[0]).focus(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); (rows[i - 1] || rows[rows.length - 1]).focus(); }
+      else if (e.key === 'Escape') { close(box); btn.focus(); }
+    });
+    btn.addEventListener('keydown', function (e) { if (e.key === 'ArrowDown') { e.preventDefault(); btn.click(); var f = list.querySelector('.gs-opt:not([hidden])'); if (f && !search) f.focus(); } });
+    sel.addEventListener('change', paint);
+    sel.classList.add('gs-native'); sel.tabIndex = -1; sel.setAttribute('aria-hidden', 'true');
+    sel.parentNode.insertBefore(btn, sel.nextSibling);
+    box.appendChild(panel); fld.appendChild(box);
+    paint();
+  });
+  document.addEventListener('click', function (e) { if (openOne && !openOne.contains(e.target) && !e.target.closest('.gs-btn')) close(openOne); });
+})();
+(function () {
+  /* Levels travel left to right: forward slides in from the right, Back from the left. */
+  var now = {{ steps_rail.n|default:0 }}, was = 0;
+  try { was = +sessionStorage.getItem('gtJourneyLevel') || 0; sessionStorage.setItem('gtJourneyLevel', now); } catch (e) {}
+  var stage = document.querySelector('.ow-stage');
+  if (stage && was && was !== now) stage.classList.add(was > now ? 'go-back' : 'go-on');
+  /* The card beside the level spells the name as it is typed. */
+  var input = document.getElementById('id_name'), name = document.querySelector('[data-step-answer="name"]');
+  if (input && name) input.addEventListener('input', function () {
+    name.textContent = input.value.trim() || 'Basic details';
+  });
+})();
     /* ------------------------------------------------------------------
        THE PLAN FOLLOWS THE NUMBER.
 
@@ -1221,20 +1394,25 @@ missed click and got submitted twice.
       function esc(s){ var d = document.createElement('span'); d.textContent = s; return d.innerHTML; }
       function check(){
         var q = input.value.trim();
-        if (q.length < 2) { box.style.display = 'none'; return; }
+        if (q.length < 2) { box.hidden = true; return; }
         fetch('{% url "orgs:search_json" %}?q=' + encodeURIComponent(q), {credentials: 'same-origin'})
           .then(function(r){ return r.json(); })
           .then(function(data){
             var rows = data.results || [];
-            if (!rows.length) { box.style.display = 'none'; return; }
-            list.innerHTML = rows.map(function(r){
-              var who = esc(r.name) + (r.parent ? ' <small>part of ' + esc(r.parent) + '</small>' : '');
-              return '<li>' + who + ' <a href="{% url "orgs:search" %}?q=' +
-                     encodeURIComponent(r.name) + '">ask to join instead</a></li>';
+            if (!rows.length) { box.hidden = true; return; }
+            var searchUrl = '{% url "orgs:search" %}?q=';
+            list.innerHTML = rows.slice(0, 4).map(function(r){
+              var initials = esc((r.name || '?').replace(/[^A-Za-z0-9 ]/g, '').split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w[0]; }).join('').toUpperCase() || '?');
+              return '<li><span class="ow-dupe-mono" aria-hidden="true">' + initials + '</span>' +
+                     '<span class="ow-dupe-name"><b>' + esc(r.name) + '</b>' + (r.parent ? '<i>Under ' + esc(r.parent) + '</i>' : '') + '</span>' +
+                     '<a class="ow-dupe-join" href="' + searchUrl + encodeURIComponent(r.name) + '">Ask to join</a></li>';
             }).join('');
-            box.style.display = '';
+            var more = document.getElementById('dupeHintMore');
+            if (rows.length > 4) { more.hidden = false; more.href = searchUrl + encodeURIComponent(q); more.textContent = 'See all ' + rows.length + ' matches'; }
+            else { more.hidden = true; }
+            box.hidden = false;
           })
-          .catch(function(){ box.style.display = 'none'; });
+          .catch(function(){ box.hidden = true; });
       }
       input.addEventListener('input', function(){
         clearTimeout(timer);

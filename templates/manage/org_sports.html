@@ -1,0 +1,32 @@
+{% extends "admin_base.html" %}
+{% block title %}Sports, {{ org.name }} &middot; Manage{% endblock %}
+{% block hero_eyebrow %}Organisation &middot; {{ org.name }}{% endblock %}
+{% block hero_title %}Sports{% endblock %}
+{% block hero_lead %}What {{ org.name }} tips on. Switch a competition on and its games reach every member's dashboard; switch it off and nothing is deleted.{% endblock %}
+{% block admin_board %}<div class="gx-score"><b>{{ n_on }}</b><span>Switched on</span></div><div class="gx-score"><b>{{ rows|length }}</b><span>Available</span></div>{% endblock %}
+{% block admin_content %}
+{% include "manage/_org_nav.html" %}
+{% if inherited %}<p class="mc-lead">{{ org.name }} tips what {{ org.parent.name }} tips; change it there.</p>{% endif %}
+<div class="rd-tools"><label class="gx-search om-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Find a competition or sport" data-om-search aria-label="Find a competition"></label></div>
+<div class="gx-tablewrap rd-wrap"><table class="gx-table" data-om-table>
+  <thead><tr><th scope="col">Competition</th><th scope="col">Sport</th><th scope="col">Includes</th><th scope="col">On or off</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr style="--k: {{ r.colour }}">
+    <td class="is-name"><span class="mc-who"><span class="mc-logo">{% if r.logo %}<img src="{{ r.logo }}" alt="">{% else %}{{ r.comp.name|slice:":3"|upper }}{% endif %}</span><b>{{ r.comp.name }}</b></span></td>
+    <td>{{ r.comp.sport.name }}</td>
+    <td>{% for se in r.series %}<span class="mc-chip" style="--k: {{ se.colour }}">{{ se.name }}</span>{% endfor %}</td>
+    <td>{% if inherited %}{% if r.on %}<span class="gx-pill is-ok"><i></i>On</span>{% else %}<span class="gx-pill"><i></i>Off</span>{% endif %}{% else %}
+      <form method="post">{% csrf_token %}<input type="hidden" name="competition" value="{{ r.comp.pk }}"><button type="submit" class="mc-switch{% if r.on %} is-on{% endif %}" aria-pressed="{% if r.on %}true{% else %}false{% endif %}"><i></i><span>{% if r.on %}On{% else %}Off{% endif %}</span></button></form>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+<script>
+document.addEventListener('input', function (e) {
+  if (!e.target.matches || !e.target.matches('[data-om-search]')) return;
+  var q = e.target.value.trim().toLowerCase();
+  document.querySelectorAll('[data-om-table] tbody tr').forEach(function (r) { r.hidden = !!q && r.textContent.toLowerCase().indexOf(q) < 0; });
+});
+</script>
+{% endblock %}

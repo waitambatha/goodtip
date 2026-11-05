@@ -2,7 +2,7 @@
 {% block title %}Members, {{ org.name }}{% endblock %}
 {% block loader_task %}Loading your members{% endblock %}
 {% block nav_manage %}on{% endblock %}
-{% block body_class %}page-deep sheet-page{% endblock %}
+{% block body_class %}page-deep sheet-page mg-page{% endblock %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% block app_content %}
 {% comment %}
@@ -20,7 +20,8 @@ The same swap the leaderboard made, for the same reason: the comp's name is the
 only line here that differs between one organisation and the next, and "Members"
 labels a screen the nav has already named.
 {% endcomment %}
-<div class="app-head is-centred is-orgfirst">
+<div class="app-head is-centred is-orgfirst mg-hero">
+  <span class="mg-badge" aria-hidden="true">{% if org.logo %}<img src="{{ org.logo.url }}" alt="">{% else %}{{ org.name|slice:":2"|upper }}{% endif %}</span>
   <div>
     <div class="app-eyebrow">{{ org.name }}</div>
     <h1 class="app-h1">Members</h1>
@@ -106,4 +107,17 @@ where we have the table is where we will have that when we click."
 {% endif %}
 
 {% include "orgs/partials/_members_panel.html" %}
+{% endblock %}
+
+{% block app_js %}
+/* Find someone in a long list without scrolling for them. Delegated, because
+   the panel is swapped in by htmx. */
+document.addEventListener('input', function (e) {
+  if (!e.target.matches || !e.target.matches('[data-mg-search]')) return;
+  var q = e.target.value.trim().toLowerCase(), shown = 0;
+  var rows = e.target.closest('.ppanel').querySelectorAll('.gb-row');
+  rows.forEach(function (r) { var hit = !q || r.textContent.toLowerCase().indexOf(q) > -1; r.hidden = !hit; if (hit) shown++; });
+  var c = e.target.closest('.ppanel').querySelector('[data-mg-count]');
+  if (c) c.textContent = shown + ' of ' + rows.length;
+});
 {% endblock %}

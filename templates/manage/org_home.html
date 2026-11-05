@@ -1,0 +1,65 @@
+{% extends "admin_base.html" %}
+{% block title %}{{ org.name }} &middot; Manage{% endblock %}
+{% block hero_eyebrow %}Organisation{% endblock %}
+{% block hero_title %}{{ org.name }}{% endblock %}
+{% block hero_lead %}Pick a part of {{ org.name }} to open it.{% endblock %}
+{% block admin_board %}
+<a class="gx-score" href="{% url 'manage:org_members' org.id %}"><b>{{ n_members }}</b><span>Members</span></a>
+<a class="gx-score" href="{% url 'manage:org_groups' org.id %}"><b>{{ n_groups }}</b><span>Groups</span></a>
+<a class="gx-score" href="{% url 'manage:org_sports' org.id %}"><b>{{ n_comps }}</b><span>Competitions</span></a>
+<a class="gx-score" href="{% url 'manage:org_rounds' org.id %}"><b>{{ n_rounds }}</b><span>Rounds</span></a>
+{% endblock %}
+{% block admin_content %}
+{% include "manage/_org_nav.html" %}
+{% comment %}A card per part of the organisation (client, 4 Nov 2026): nothing listed in full here, so it reads the same at 20 members or 20,000.{% endcomment %}
+<div class="ox-menu">
+  <a class="ox-card" style="--c:#5AA9FF" href="{% url 'manage:org_members' org.id %}">
+    <span class="ox-ic"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+    <span class="ox-card-t"><b>Members</b><small>{{ n_managers }} running it{% if n_new_week %} &middot; {{ n_new_week }} new this week{% endif %}</small></span>
+    <b class="ox-big">{{ n_members }}</b>
+    <span class="ox-faces">{% for m in faces %}<span class="mc-av">{% if m.user.avatar %}<img src="{{ m.user.avatar.url }}" alt="">{% else %}{{ m.user.display_name|slice:":1"|upper }}{% endif %}</span>{% endfor %}</span>
+    <span class="ox-go">Manage members</span>
+  </a>
+  <a class="ox-card" style="--c:#A78BFA" href="{% url 'manage:org_groups' org.id %}">
+    <span class="ox-ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></span>
+    <span class="ox-card-t"><b>Groups</b><small>{% if org.root.groups_enabled %}Groups are on{% else %}Groups are off{% endif %}</small></span>
+    <b class="ox-big">{{ n_groups }}</b>
+    <span class="ox-chips">{% for g in group_names %}<span>{{ g }}</span>{% empty %}<span>No groups yet</span>{% endfor %}</span>
+    <span class="ox-go">See groups and their people</span>
+  </a>
+  <a class="ox-card" style="--c:#34D399" href="{% url 'manage:org_sports' org.id %}">
+    <span class="ox-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m12 7 4 3-1.5 5h-5L8 10z"/></svg></span>
+    <span class="ox-card-t"><b>Sports</b><small>What {{ org.name }} tips on</small></span>
+    <b class="ox-big">{{ n_comps }}</b>
+    <span class="ox-logos">{% for c in comps|slice:":8" %}{% with lead=c.series.all.0 %}<span class="mc-logo" title="{{ c.name }}">{% if lead.logo %}<img src="{{ lead.logo }}" alt="{{ c.name }}">{% else %}{{ c.name|slice:":3"|upper }}{% endif %}</span>{% endwith %}{% endfor %}{% if comps|length > 8 %}<span class="mc-logo">+{{ comps|length|add:"-8" }}</span>{% endif %}</span>
+    <span class="ox-go">Switch competitions on or off</span>
+  </a>
+  <a class="ox-card" style="--c:#F5A25D" href="{% url 'manage:org_rounds' org.id %}">
+    <span class="ox-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
+    <span class="ox-card-t"><b>Rounds</b><small>{{ n_open }} open now</small></span>
+    <b class="ox-big">{{ n_rounds }}</b>
+    <span class="ox-next">{% if next_round %}Next to lock: <b>{{ next_round.series.name }} round {{ next_round.round_number }}</b>, in {{ next_round.lockout_at|timeuntil }}{% else %}Nothing coming up{% endif %}</span>
+    <span class="ox-go">Open the rounds desk</span>
+  </a>
+  <a class="ox-card is-small" style="--c:#F27BA6" href="{% url 'manage:approvals' %}">
+    <span class="ox-ic"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/></svg></span>
+    <span class="ox-card-t"><b>Waiting to join</b><small>{% if pending %}Approve or decline{% else %}Nobody waiting{% endif %}</small></span>
+    <b class="ox-big">{{ pending }}</b>
+  </a>
+  <a class="ox-card is-small" style="--c:#60C6D8" href="{% url 'manage:messages' %}">
+    <span class="ox-ic"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+    <span class="ox-card-t"><b>Messages</b><small>{% if threads %}Members want an answer{% else %}All answered{% endif %}</small></span>
+    <b class="ox-big">{{ threads }}</b>
+  </a>
+  <a class="ox-card is-small" style="--c:#F2C94C" href="{% url 'orgs:console' org.id %}?tab=charity">
+    <span class="ox-ic"><svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></span>
+    <span class="ox-card-t"><b>Charity</b><small>{% if org.active_charity_vote %}A vote is open{% else %}This season's cause{% endif %}</small></span>
+    <b class="ox-big ox-word">{{ org.charity_display|default:"Not chosen" }}</b>
+  </a>
+  <a class="ox-card is-small" style="--c:#C9F24A" href="{% url 'orgs:console' org.id %}?tab=invite">
+    <span class="ox-ic"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg></span>
+    <span class="ox-card-t"><b>Invite people</b><small>Email invites or share the join link</small></span>
+    <b class="ox-big ox-word">Grow it</b>
+  </a>
+</div>
+{% endblock %}

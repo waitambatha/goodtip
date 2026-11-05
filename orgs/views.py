@@ -119,6 +119,15 @@ def _is_creator_admin(user, org, *, membership=None) -> bool:
     return is_creator_admin(user, org, membership=membership)
 
 
+def _back_or(request, default):
+    """Where a form posted from the Manage console goes back to: the console tab
+    it came from when it says so (a same-site `next`), otherwise `default`."""
+    nxt = request.POST.get("next", "")
+    if nxt and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}):
+        return redirect(nxt)
+    return redirect(default)
+
+
 def _is_member(user, org) -> bool:
     return OrgMember.objects.filter(user=user, org=org).exists()
 
@@ -499,6 +508,82 @@ def _step_intro(step: int, parent_org=None) -> dict:
     }
     eyebrow, sub = intros.get(step, (f"New organisation{where}", "A few short steps."))
     return {"eyebrow": f"{eyebrow}{where}", "sub": sub}
+
+
+# Each step's own colour and picture (client, 3 Nov 2026: "play around with
+# colours... icons that look realistic to what is at hand").
+STEP_LOOK = {
+    FORMALITY_STEP: ("you", "#7C3AED"),
+    DETAILS_STEP: ("org", "#0F766E"),
+    VERIFY_STEP: ("verify", "#2563EB"),
+    GROUPS_STEP: ("groups", "#C2410C"),
+    COMPETITION_STEP: ("tipping", "#15803D"),
+    CHARITY_STEP: ("charity", "#BE123C"),
+    LAST_STEP: ("review", "#B45309"),
+}
+
+
+def _steps(step: int, applies, answers=None) -> dict:
+    """Every step down the side, one at a time and numbered as THIS organisation
+    meets them (client, 3 Nov 2026: "step by step... do not group"): an
+    informal group has no verify step, so it never sees a number it skips.
+    `step` past the last one means every step is done."""
+    answers = answers or {}
+    rows, current = [], 0
+    for n, label, sub, fields in WIZARD_STEPS:
+        if not applies(n):
+            continue
+        rows.append({
+            "n": len(rows) + 1, "label": label, "sub": sub,
+            "key": fields[0] if fields else "verify",
+            "answer": answers.get(n, ""), "done": n < step, "current": n == step,
+            "art": STEP_LOOK.get(n, ("review", ""))[0], "colour": STEP_LOOK.get(n, ("", "#15803D"))[1],
+        })
+        if n == step:
+            current = len(rows)
+    done = sum(1 for r in rows if r["done"])
+    return {
+        "steps": rows, "total": len(rows), "n": current,
+        "label": rows[current - 1]["label"] if current else "",
+        "art": rows[current - 1]["art"] if current else "",
+        "colour": rows[current - 1]["colour"] if current else "#15803D",
+        "finished": step > LAST_STEP, "percent": round(100 * done / len(rows)) if rows else 0,
+    }
+
+
+def _level_may_apply(draft, step: int) -> bool:
+    """_step_applies, but undecided counts as yes: an informal group is the only
+    answer that rules verify out before a formal type has been chosen."""
+    data = draft.data or {}
+    if step == VERIFY_STEP and data.get("formality") != "informal" and not data.get("organisation_type"):
+        return True
+    return _step_applies(draft, step)
+
+
+def _step_answers(draft, verification=None) -> dict:
+    """What each finished step was answered with, for its row down the side.
+    Read loosely from the draft: nothing here is validated, and a value that
+    no longer resolves simply shows the step's own description instead."""
+    from catalog.models import Competition
+
+    data = draft.data or {}
+    competitions = list(
+        Competition.objects.filter(pk__in=[c for c in data.get("competitions") or [] if str(c).isdigit()])
+        .values_list("name", flat=True)
+    )
+    charity = ""
+    if data.get("charity_method") == "vote":
+        charity = "Members vote"
+    elif str(data.get("charity") or "").isdigit():
+        charity = Charity.objects.filter(pk=data["charity"]).values_list("name", flat=True).first() or ""
+    return {
+        FORMALITY_STEP: (data.get("formality") or "").capitalize(),
+        DETAILS_STEP: data.get("name") or "",
+        VERIFY_STEP: "Verified" if getattr(verification, "is_verified", False) else "",
+        GROUPS_STEP: {"yes": "Groups on", "no": "One ladder"}.get(data.get("groups_enabled"), ""),
+        COMPETITION_STEP: ", ".join(competitions[:2]) + (f" +{len(competitions) - 2}" if len(competitions) > 2 else ""),
+        CHARITY_STEP: charity,
+    }
 
 
 def _step_saved_message(form, step: int) -> str:
@@ -946,6 +1031,13 @@ def _render_wizard(request, draft, form, step, parent_org, *, errors=None, dupli
         for n, label, sub, _ in WIZARD_STEPS
     ]
     return render(request, "orgs/create.html", {
+        # Until the type settles whether there is a domain to verify, count the
+        # longest road: a total that drops by one reads as progress, one that
+        # grows reads as a trick.
+        "steps_rail": _steps(
+            step, lambda n: _level_may_apply(draft, n),
+            _step_answers(draft, active_work_verification(request.user)),
+        ),
         "form": form,
         "parent_org": parent_org,
         "draft": draft,
@@ -1009,6 +1101,7 @@ def _render_wizard(request, draft, form, step, parent_org, *, errors=None, dupli
             }
             for key in pricing.TIER_ORDER
         ],
+        "comp_groups": _comp_groups(form) if step == COMPETITION_STEP else [],
         "tipping_step": COMPETITION_STEP,
         "charity_step": CHARITY_STEP,
         # {"field": "domain"|"work_email"|"role"|None, "message": str}
@@ -1029,6 +1122,26 @@ def _render_wizard(request, draft, form, step, parent_org, *, errors=None, dupli
             if step == COMPETITION_STEP else None
         ),
     })
+
+
+def _comp_groups(form) -> list:
+    """The competitions on offer, sport by sport, for the picker's headings and
+    its sport filter (client, 3 Nov 2026: "in the picking of sports more can be
+    done")."""
+    groups = {}
+    qs = form.fields["competitions"].queryset.select_related("sport").prefetch_related("series")
+    for comp in qs:
+        g = groups.setdefault(comp.sport_id, {
+            "name": comp.sport.name, "slug": comp.sport.slug,
+            "colour": comp.sport.colour, "comps": [],
+        })
+        g["comps"].append(comp)
+    # The codes most Australian comps are built on come first; the rest follow
+    # by how much each one offers.
+    home = ["australian-rules", "rugby-league", "cricket", "football", "rugby-union", "basketball", "netball"]
+    return sorted(groups.values(), key=lambda g: (
+        home.index(g["slug"]) if g["slug"] in home else len(home), -len(g["comps"]), g["name"],
+    ))
 
 
 def _saved_label(draft):
@@ -1084,7 +1197,7 @@ def _draft_summary(form, draft) -> list:
     # an answer — "Charity" is always pink whether or not "Finals only" showed
     # up above it.
     rows = [
-        ("Group name", d.get("name", ""), "ic-people", "c1"),
+        ("Organisation name", d.get("name", ""), "ic-people", "c1"),
         (
             "Setup",
             {"formal": "Formal — a workplace, school, club or entity",
@@ -1096,7 +1209,9 @@ def _draft_summary(form, draft) -> list:
         ("Country", label_for("country", d.get("country")), "ic-pin", "c2"),
         ("Sub-category", labels_for("sub_categories", d.get("sub_categories")), "ic-sliders", "c1"),
         ("Described as", d.get("informal_label", ""), "ic-doc", "c2"),
-        ("State", label_for("state", d.get("state")) or "National", "ic-pin", "c2"),
+        # States are Australian; a New Zealand or Fijian group has none to show.
+        ("State", (label_for("state", d.get("state")) or "National")
+         if label_for("country", d.get("country")) in ("", "Australia") else "", "ic-pin", "c2"),
         ("Competitions", labels_for("competitions", d.get("competitions")), "ic-trophy", "c3"),
         ("Season", label_for("season", d.get("season")), "ic-calendar", "c3"),
         ("Expected size", d.get("team_size", ""), "ic-users", "c4"),
@@ -1130,10 +1245,25 @@ def org_created_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _can_manage(request.user, org):
         return HttpResponseForbidden()
+    slug = getattr(org.organisation_type, "slug", "")
+    invite_url = _invite_url(request, org)
+    # What a share says before the link, written for the person receiving it.
+    share_text = f"Join {org.name} on GoodTip: tip the {org.sport_label}" + (
+        f" and raise money for {org.charity_display}." if org.charity_id else "."
+    )
     return render(request, "orgs/created.html", {
+        "steps_rail": _steps(LAST_STEP + 1, lambda n: n != VERIFY_STEP or slug in VERIFY_REQUIRED_SLUGS),
+        # "AFL, NRL · 2026 · raising for Red Cross", leaving out whatever is
+        # missing rather than printing its separator on its own.
+        "lead": " · ".join(part for part in (
+            org.sport_label, str(org.season or ""),
+            f"raising for {org.charity_display}" if org.charity_display else "",
+        ) if part),
         "org": org,
-        "invite_url": _invite_url(request, org),
+        "invite_url": invite_url,
+        "share_text": share_text,
         "vote": org.active_charity_vote,
+        "competitions": list(org.competitions.prefetch_related("series")),
     })
 
 
@@ -1188,7 +1318,7 @@ def org_invite_view(request, org_id: int):
                     f"{skipped} of those {'is' if skipped == 1 else 'are'} "
                     f"already in {org.name}, so we skipped them.",
                 )
-            return redirect("orgs:invite", org_id=org.id)
+            return _back_or(request, reverse("orgs:invite", args=[org.id]))
 
     invitees = _invitees(request, org)
     return render(request, "orgs/invite.html", {
@@ -1801,7 +1931,7 @@ def members_view(request, org_id: int):
                     messages.info(request, f"{join_req.user.display_name}'s request was declined.")
             except ValueError as e:
                 messages.error(request, str(e))
-        return redirect("orgs:members", org_id=org.id)
+        return _back_or(request, reverse("orgs:members", args=[org.id]))
 
     members = (
         OrgMember.objects.filter(org=org)
@@ -2975,7 +3105,7 @@ def org_sports_view(request, org_id: int):
             org.competitions.add(comp)
             _sync_org_soon(org.pk)
             messages.success(request, f"{comp.name} added. Its games are on your members' dashboards now.")
-        return redirect(f"{reverse('orgs:sports', args=[org.pk])}#comp-{comp.pk if comp else ''}")
+        return _back_or(request, f"{reverse('orgs:sports', args=[org.pk])}#comp-{comp.pk if comp else ''}")
 
     sports = []
     for sport in Sport.objects.filter(is_active=True):
@@ -3304,6 +3434,39 @@ def org_charities_view(request, org_id: int):
     if not _can_manage(request.user, org):
         return HttpResponseForbidden()
 
+    # ---- SUPPORT ONE, OR PUT SEVERAL TO A VOTE (client, 4 Nov 2026): "a new
+    # season, a new charity: create it, then support it, or let the members
+    # vote on it against the others." Both change what the whole organisation
+    # raises for, so both are the creator admin's, as the election screen is.
+    action = request.POST.get("action") if request.method == "POST" else None
+    if action in {"support", "ballot"}:
+        from .services import create_charity_election, set_org_charity
+
+        if not _is_creator_admin(request.user, org):
+            return HttpResponseForbidden()
+        available = {c.pk: c for c in Charity.objects.available_to(org)}
+        live = org.charity_votes.filter(
+            group__isnull=True, status__in=("draft", "scheduled", "open", "tied"),
+        ).first()
+        if live is not None:
+            messages.error(request, "A charity vote is already under way. Finish it before changing the cause.")
+            return redirect("orgs:charity_vote" if live.status in ("open", "tied") else "orgs:election_setup", org_id=org.id)
+        if action == "support":
+            charity = available.get(int(request.POST.get("charity") or 0))
+            if charity is None:
+                messages.error(request, "That charity isn't on your list.")
+            else:
+                set_org_charity(org, charity)
+                messages.success(request, f"{org.name} now raises for {charity.name}.")
+            return redirect(f"{reverse('orgs:charities', args=[org.id])}?panel=list")
+        picked = [available[int(pk)] for pk in request.POST.getlist("charities") if pk.isdigit() and int(pk) in available]
+        if len(picked) < 2:
+            messages.error(request, "Pick at least two charities for members to choose between.")
+            return redirect(f"{reverse('orgs:charities', args=[org.id])}?panel=vote")
+        create_charity_election(org, picked)
+        messages.success(request, f"Ballot ready with {len(picked)} charities. Choose when it opens; nobody is told until then.")
+        return redirect("orgs:election_setup", org_id=org.id)
+
     form = OrgCharityForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         try:
@@ -3330,7 +3493,8 @@ def org_charities_view(request, org_id: int):
                     request,
                     f"{charity.name} was already on the list, so we've used that one.",
                 )
-            return redirect("orgs:charities", org_id=org.id)
+            # Straight on to what happens with it: support it, or ballot it.
+            return redirect(f"{reverse('orgs:charities', args=[org.id])}?panel=list&new={charity.pk}")
 
     available = Charity.objects.available_to(org).order_by("name")
     for charity in available:
@@ -3358,7 +3522,7 @@ def org_charities_view(request, org_id: int):
     # bookmarkable, the back button walks between them, and none of it needs
     # JavaScript. See orgs/members.html for the pattern.
     panel = request.GET.get("panel", "list")
-    if panel not in {"list", "add", "groups", "elections"}:
+    if panel not in {"list", "add", "groups", "elections", "vote"}:
         panel = "list"
     # A form that failed validation has something to say, so it wins over the
     # panel in the URL — otherwise submitting a bad charity bounces you back to
@@ -3411,6 +3575,11 @@ def org_charities_view(request, org_id: int):
         "panel_groups": nav_groups,
         "panel_group": panel_group,
         "elections": elections,
+        "can_choose": _is_creator_admin(request.user, org),
+        "vote_live": org.charity_votes.filter(
+            group__isnull=True, status__in=("draft", "scheduled", "open", "tied"),
+        ).first(),
+        "just_added": next((c for c in available if str(c.pk) == request.GET.get("new", "")), None),
     }
     # THE PANEL ALONE, for a card or a room press — "when I click the charities
     # card it loads not the whole page, just the part of display."
@@ -4610,3 +4779,96 @@ def _range_response(request, attachment):
     response["Content-Range"] = f"bytes {start}-{end}/{size}"
     response["Accept-Ranges"] = "bytes"
     return response
+
+
+# ===========================================================================
+# THE MANAGE CONSOLE (client, 3 Nov 2026): "when I click manage instead of a
+# drop-down, let it be a page" in the super admin's language — the pitch, a
+# scoreboard, a tab row in colour and tables whose columns each wear a tint.
+# One page, one tab at a time (?tab=), and every change made on it comes back
+# to the tab it was made on. It reuses the existing forms and endpoints, so the
+# rules about who may do what are exactly the ones the old pages enforced.
+# ===========================================================================
+CONSOLE_TABS = [
+    ("members", "Members", False), ("approvals", "Approvals", True), ("team", "Team", True),
+    ("sports", "Sports", True), ("groups", "Groups", False), ("charity", "Charity", False),
+    ("plan", "Plan", True), ("invite", "Invite", False),
+]
+
+
+@login_required
+def org_console_view(request, org_id: int):
+    from billing import pricing
+    from billing.services import current_subscription
+    from catalog.models import Sport
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    me = _membership(request.user, org)
+    if not (me and me.can_manage):
+        return HttpResponseForbidden()
+    is_admin = _is_creator_admin(request.user, org, membership=me)
+    tabs = [(k, label) for k, label, admin_only in CONSOLE_TABS
+            if is_admin or not admin_only
+            if not (k == "sports" and org.parent_id)]
+    keys = [k for k, _ in tabs]
+    tab = request.GET.get("tab") or "members"
+    if tab not in keys:
+        tab = "members"
+
+    members = list(
+        OrgMember.objects.filter(org=org).select_related("user")
+        .order_by("-is_league_owner", "role", "joined_at")
+    )
+    pending = list(
+        org.membership_requests.filter(status=MembershipRequest.STATUS_PENDING)
+        .select_related("user").order_by("created_at")
+    )
+    root = org.root
+    groups = list(
+        root.groups.select_related("charity").annotate(n=Count("memberships")).order_by("name")
+    )
+    pending_groups = [g for g in groups if g.approval_status == Group.APPROVAL_PENDING]
+    offered = {c.pk: c for c in fed_competitions() if c.season_id == org.season_id} if not org.parent_id else {}
+    chosen = set(org.competitions.values_list("pk", flat=True))
+
+    ctx = {
+        "org": org, "tab": tab, "tabs": tabs, "is_admin": is_admin,
+        "is_owner": me.is_league_owner,
+        "here": f"{reverse('orgs:console', args=[org.id])}?tab={tab}",
+        "members": members, "pending": pending, "pending_groups": pending_groups,
+        "groups": groups, "role_choices": OrgMember.ROLE_CHOICES,
+        "comp_count": len(chosen), "badge": {"approvals": len(pending) + len(pending_groups),
+                                             "members": len(members), "groups": len(groups)},
+    }
+    if tab == "members":
+        in_groups = {}
+        for gm in GroupMember.objects.filter(group__org=root).select_related("group"):
+            in_groups.setdefault(gm.user_id, []).append(gm.group.name)
+        for m in members:
+            m.group_names = in_groups.get(m.user_id, [])
+    if tab == "sports":
+        rows = []
+        for sport in Sport.objects.filter(is_active=True):
+            for c in sorted((c for c in offered.values() if c.sport_id == sport.id), key=lambda c: c.name):
+                series = list(c.series.all())
+                rows.append({"comp": c, "sport": sport, "series": series, "on": c.pk in chosen,
+                             "colour": series[0].colour if series else sport.colour,
+                             "logo": series[0].logo if series else ""})
+        ctx["sport_rows"] = rows
+        ctx["badge"]["sports"] = len(chosen)
+    if tab == "charity":
+        ctx["charities"] = list(Charity.objects.available_to(org).order_by("name"))
+        ctx["vote"] = org.active_charity_vote
+    if tab == "plan":
+        sub = current_subscription(org)
+        tier = getattr(sub, "tier", "") or ""
+        cfg = pricing.TIERS.get(tier, {}) if tier else {}
+        ctx["plan"] = {"sub": sub, "label": pricing.tier_label(tier) if tier else "",
+                       "price": cfg.get("price"), "seats": cfg.get("seat_limit"),
+                       "used": len(members)}
+    if tab == "invite":
+        ctx["invite_url"] = _invite_url(request, org)
+        ctx["email_form"] = InviteByEmailForm()
+    if request.headers.get("HX-Request") and request.GET.get("pane"):
+        return render(request, "orgs/console.html", ctx)
+    return render(request, "orgs/console.html", ctx)

@@ -2,7 +2,7 @@
 {% block title %}Sports, {{ org.name }}{% endblock %}
 {% block loader_task %}Opening sports{% endblock %}
 {% block nav_manage %}on{% endblock %}
-{% block body_class %}page-deep sheet-page{% endblock %}
+{% block body_class %}page-deep sheet-page mg-page{% endblock %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% comment %}
 WHAT YOUR ORGANISATION TIPS ON (client, 28 Oct 2026). The admin's own sports
@@ -13,37 +13,42 @@ their sports menu, can pin it and tip it. View: orgs.views.org_sports_view.
 {% endcomment %}
 {% block app_content %}
 <div class="osp">
-  <header class="osp-hero">
-    <p class="osp-k">{{ org.name }} &middot; {% if org.season %}{{ org.season }}{% endif %}</p>
-    <h1>What your members <em>tip on</em></h1>
-    <p class="osp-lead">Add a competition and its games are on everyone's dashboard straight away — fixtures, live scores, results and its ladder. Remove one and nothing is deleted.</p>
-    <p class="osp-count"><b>{{ chosen_count }}</b> competition{{ chosen_count|pluralize }} on</p>
+  <header class="app-head is-centred mg-hero">
+    <span class="mg-badge" aria-hidden="true">{% if org.logo %}<img src="{{ org.logo.url }}" alt="">{% else %}{{ org.name|slice:":2"|upper }}{% endif %}</span>
+    <div>
+      <div class="app-eyebrow">{{ org.name }}{% if org.season %} &middot; {{ org.season }} season{% endif %}</div>
+      <h1 class="app-h1">What your members tip on</h1>
+      <p class="app-sub">Switch a competition on and its games are on everyone's dashboard straight away: fixtures, live scores, results and its ladder. Switch one off and nothing is deleted.</p>
+    </div>
   </header>
-
   {% if sports %}
+  <nav class="osp-jump" aria-label="Jump to a sport">
+    <span class="osp-on-count"><b>{{ chosen_count }}</b> on</span>
+    {% for s in sports %}<a href="#sport-{{ s.sport.slug }}" style="--sc: {{ s.sport.colour }}">{{ s.sport.name }}</a>{% endfor %}
+  </nav>
   <div class="osp-grid">
     {% for s in sports %}
-    <section class="osp-card" id="sport-{{ s.sport.slug }}">
+    <section class="osp-card" id="sport-{{ s.sport.slug }}" style="--sc: {{ s.sport.colour }}">
       <header class="osp-card-h">
-        <span class="osp-emoji" aria-hidden="true">{{ s.sport.icon|default:"🏅" }}</span>
+        <span class="osp-logo" aria-hidden="true">{% if s.sport.logo %}<img src="{{ s.sport.logo }}" alt="">{% else %}{{ s.sport.name|slice:":2"|upper }}{% endif %}</span>
         <div><h2>{{ s.sport.name }}</h2><p>{{ s.sport.blurb }}</p>
-          {% if s.sport.draw_tips %}<span class="osp-tag">Home · Draw · Away</span>{% endif %}</div>
+          {% if s.sport.draw_tips %}<span class="osp-tag">Home &middot; Draw &middot; Away</span>{% endif %}</div>
       </header>
       <ul class="osp-comps">
         {% for row in s.comps %}
         <li class="osp-comp{% if row.on %} is-on{% endif %}" id="comp-{{ row.comp.pk }}" style="--code: {{ row.series.0.colour }}">
-          <span class="osp-dot" aria-hidden="true"></span>
+          <span class="osp-clogo" aria-hidden="true">{% if row.series.0.logo %}<img src="{{ row.series.0.logo }}" alt="">{% else %}{{ row.comp.name|slice:":3"|upper }}{% endif %}</span>
           <span class="osp-name">
             <b>{{ row.comp.name }}</b>
-            <small>{% for se in row.series %}{% if se.category == "womens" %}Women{% elif se.category == "representative" %}Representative{% else %}Men{% endif %}{% if not forloop.last %} + {% endif %}{% endfor %}{% if row.series.0.region %} &middot; {{ row.series.0.region }}{% endif %}</small>
+            <span class="osp-parts">{% for se in row.series %}<i style="--k: {{ se.colour }}">{% if row.series|length > 1 %}{{ se.name }}{% elif se.category == "womens" %}Women{% elif se.category == "representative" %}Representative{% else %}Men{% endif %}</i>{% endfor %}</span>
           </span>
           <form method="post">
             {% csrf_token %}<input type="hidden" name="competition" value="{{ row.comp.pk }}">
             {% if row.on %}
-            <button type="submit" class="osp-btn is-on" data-on="Added" data-off="Remove" title="Remove {{ row.comp.name }}">
-              <span class="osp-btn-on">&#10003; Added</span><span class="osp-btn-off">Remove</span></button>
+            <button type="submit" class="osp-btn is-on" title="Switch {{ row.comp.name }} off" aria-pressed="true">
+              <span class="osp-sw" aria-hidden="true"><i></i></span><span class="osp-btn-on">Added</span><span class="osp-btn-off">Remove</span></button>
             {% else %}
-            <button type="submit" class="osp-btn">+ Add</button>
+            <button type="submit" class="osp-btn" title="Switch {{ row.comp.name }} on" aria-pressed="false"><span class="osp-sw" aria-hidden="true"><i></i></span><span>Add</span></button>
             {% endif %}
           </form>
         </li>
@@ -53,7 +58,7 @@ their sports menu, can pin it and tip it. View: orgs.views.org_sports_view.
     {% endfor %}
   </div>
   {% else %}
-  <p class="osp-none">No sports are switched on for GoodTip right now.</p>
+  <div class="mg-empty"><b>No sports are switched on for GoodTip right now.</b></div>
   {% endif %}
 </div>
 {% endblock %}

@@ -1,0 +1,20 @@
+{% comment %}
+THE STEPS, LEFT TO RIGHT (client, 3 Nov 2026): every step its own stop on one
+line across the page, each in its own colour with a picture of what it is
+about. A finished step says what was answered. Built by orgs.views._steps.
+{% endcomment %}
+<nav class="ow-track" data-coach="org-steps" aria-label="Steps">
+  <ol>
+    {% for s in steps_rail.steps %}
+    <li class="ow-st{% if s.done %} is-done{% elif s.current %} is-now{% endif %}" data-key="{{ s.key }}" style="--c: {{ s.colour }}"{% if s.current %} aria-current="step"{% endif %}>
+      <span class="ow-st-art">{% include "orgs/partials/_ow_art.html" with art=s.art %}{% if s.done %}<i class="ow-st-tick"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 13 4 4L19 7" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i>{% endif %}</span>
+      <span class="ow-st-n">Step {{ s.n }}</span>
+      <b>{{ s.label }}</b>
+      <i{% if s.key == "name" %} data-step-answer="name"{% endif %}>{% if s.answer and s.done %}{{ s.answer }}{% else %}{{ s.sub }}{% endif %}</i>
+    </li>
+    {% endfor %}
+  </ol>
+  {% if not steps_rail.finished %}
+  <div class="ow-track-bar" aria-hidden="true"><span><i style="width: {{ steps_rail.percent }}%"></i></span><b>{{ steps_rail.percent }}% done</b></div>
+  {% endif %}
+</nav>

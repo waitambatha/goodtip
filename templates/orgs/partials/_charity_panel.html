@@ -33,10 +33,25 @@ tells two charities of similar name apart.
 </div>
 {% endif %}
 
-<div class="ppanel-head">
+{% if just_added %}
+<div class="chx-new">
+  <span class="chx-new-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></span>
+  <div><b>{{ just_added.name }} is on your list</b><span>What should {{ org.name }} do with it?</span></div>
+  {% if can_choose and not vote_live %}
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="support"><input type="hidden" name="charity" value="{{ just_added.pk }}"><button class="gx-btn is-lime" type="submit">Support it now</button></form>
+  <a class="gx-btn" href="?panel=vote&amp;with={{ just_added.pk }}">Let members vote</a>
+  {% endif %}
+  <a class="gx-btn is-ghost" href="?panel=list">Keep it for later</a>
+</div>
+{% endif %}
+<div class="ppanel-head chx-head">
   <div>
     <div class="card-h">Every cause {{ panel_org.name }} can pick from</div>
     <p class="card-lead" style="margin:4px 0 0;">Yours are usable straight away. We review each before it appears for other organisations, which changes nothing for you.</p>
+  </div>
+  <div class="chx-acts">
+    <a class="gx-btn is-lime" href="?panel=add"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add a new charity</a>
+    {% if can_choose and not vote_live %}<a class="gx-btn" href="?panel=vote">Start a members' vote</a>{% endif %}
   </div>
 </div>
 {% comment %}
@@ -57,7 +72,7 @@ the same thing on every screen in the product.
     </span>
     <span class="cht-web">{% if ch.website %}<a href="{{ ch.website }}" target="_blank" rel="noopener">{{ ch.domain|default:ch.website }}</a>{% else %}&mdash;{% endif %}</span>
     <span><span class="pill-role">{{ ch.is_approved|yesno:"Approved,In review" }}</span></span>
-    <span class="cht-act">{% if ch.can_edit %}<a class="abtn abtn-ghost abtn-sm" href="{% url 'orgs:charity_edit' org.id ch.id %}">Edit</a>{% endif %}</span>
+    <span class="cht-act">{% if can_choose and not vote_live %}{% if org.charity_id == ch.pk %}<span class="chx-now">Backing now</span>{% else %}<form method="post" class="chx-sup">{% csrf_token %}<input type="hidden" name="action" value="support"><input type="hidden" name="charity" value="{{ ch.pk }}"><button class="abtn abtn-ghost abtn-sm" type="submit" data-confirm="{{ org.name }} will raise for {{ ch.name }} from now on. Past donations stay with the charity they went to." data-confirm-title="Support {{ ch.name }}?" data-confirm-ok="Support it">Support</button></form>{% endif %}{% endif %}{% if ch.can_edit %}<a class="abtn abtn-ghost abtn-sm" href="{% url 'orgs:charity_edit' org.id ch.id %}">Edit</a>{% endif %}</span>
   </div>
   {% endfor %}
   {% for ch in vetted %}
@@ -68,7 +83,7 @@ the same thing on every screen in the product.
     </span>
     <span class="cht-web">{% if ch.website %}<a href="{{ ch.website }}" target="_blank" rel="noopener">{{ ch.domain|default:ch.website }}</a>{% else %}&mdash;{% endif %}</span>
     <span class="cht-from">GoodTip's list</span>
-    <span class="cht-act">{% if ch.can_edit %}<a class="abtn abtn-ghost abtn-sm" href="{% url 'orgs:charity_edit' org.id ch.id %}">Edit</a>{% endif %}</span>
+    <span class="cht-act">{% if can_choose and not vote_live %}{% if org.charity_id == ch.pk %}<span class="chx-now">Backing now</span>{% else %}<form method="post" class="chx-sup">{% csrf_token %}<input type="hidden" name="action" value="support"><input type="hidden" name="charity" value="{{ ch.pk }}"><button class="abtn abtn-ghost abtn-sm" type="submit" data-confirm="{{ org.name }} will raise for {{ ch.name }} from now on. Past donations stay with the charity they went to." data-confirm-title="Support {{ ch.name }}?" data-confirm-ok="Support it">Support</button></form>{% endif %}{% endif %}{% if ch.can_edit %}<a class="abtn abtn-ghost abtn-sm" href="{% url 'orgs:charity_edit' org.id ch.id %}">Edit</a>{% endif %}</span>
   </div>
   {% empty %}
   {% if not ours %}<div class="gb-empty">Nothing here yet.</div>{% endif %}
@@ -96,8 +111,31 @@ the same thing on every screen in the product.
     <div class="hint">We'll guess one from the name — change it if it's not right.</div>
     {% if form.website.errors %}<div class="fld-err">{{ form.website.errors|join:" " }}</div>{% endif %}
   </div>
-  <button type="submit" class="abtn abtn-primary">Add charity</button>
+  <button type="submit" class="gx-btn is-lime">Add charity</button>
+  <p class="chx-next">Once it's added you can support it straight away or put it to a members' vote.</p>
 </form>
+
+{% elif panel == "vote" %}
+<div class="ppanel-head">
+  <div>
+    <div class="card-h">A members' vote for {{ org.name }}</div>
+    <p class="card-lead" style="margin:4px 0 0;">Tick the charities to put on the ballot, two or more. Next you choose when it opens; members hear nothing until then.</p>
+  </div>
+  <a class="gx-btn is-ghost" href="?panel=add">Add a new charity first</a>
+</div>
+{% if vote_live %}
+<div class="gx-empty"><b>A vote is already under way</b><a href="{% if vote_live.status == 'open' or vote_live.status == 'tied' %}{% url 'orgs:charity_vote' org.id %}{% else %}{% url 'orgs:election_setup' org.id %}{% endif %}">Open it</a></div>
+{% elif not can_choose %}
+<div class="gx-empty"><b>Only the organisation's creator can start a vote</b></div>
+{% else %}
+<form method="post" class="chx-ballot">{% csrf_token %}<input type="hidden" name="action" value="ballot">
+  <div class="chx-pick">
+    {% for ch in ours %}{% include "orgs/partials/_charity_tick.html" %}{% endfor %}
+    {% for ch in vetted %}{% include "orgs/partials/_charity_tick.html" %}{% endfor %}
+  </div>
+  <div class="chx-foot"><span data-chx-count>Pick two or more</span><button class="gx-btn is-lime" type="submit">Build the ballot</button></div>
+</form>
+{% endif %}
 
 {% elif panel == "groups" %}
 <div class="ppanel-head">

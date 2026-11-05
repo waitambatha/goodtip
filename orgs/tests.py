@@ -4548,13 +4548,48 @@ class OrgOwnedCharityTests(TestCase):
         self.client.force_login(self.admin)
         url = reverse("orgs:charities", args=[self.org.id])
         resp = self.client.post(url, {"name": "Ronald McDonald House", "website": ""})
-        self.assertRedirects(resp, url)
         rmh = Charity.objects.get(name="Ronald McDonald House")
+        # Straight on to what happens with it: support it or ballot it.
+        self.assertRedirects(resp, f"{url}?panel=list&new={rmh.pk}")
         self.assertEqual(rmh.owner_org, self.org)
+        self.assertContains(self.client.get(resp.url), "Support it now")
 
         page = self.client.get(url)
         self.assertContains(page, "Ronald McDonald House")
         self.assertContains(page, "Lifeline")
+
+    def test_support_makes_it_the_organisations_cause(self):
+        self.client.force_login(self.admin)
+        url = reverse("orgs:charities", args=[self.org.id])
+        self.client.post(url, {"name": "Ronald McDonald House", "website": ""})
+        rmh = Charity.objects.get(name="Ronald McDonald House")
+        self.client.post(url, {"action": "support", "charity": rmh.pk})
+        self.org.refresh_from_db()
+        self.assertEqual(self.org.charity, rmh)
+        # Another org's own charity is not on this list, so it can't be backed.
+        theirs = self.add(self.other, name="Their Cause", by_user=self.admin)
+        self.client.post(url, {"action": "support", "charity": theirs.pk})
+        self.org.refresh_from_db()
+        self.assertEqual(self.org.charity, rmh)
+
+    def test_ballot_builds_a_draft_election_and_tells_nobody(self):
+        from .models import CharityVote
+
+        self.client.force_login(self.admin)
+        url = reverse("orgs:charities", args=[self.org.id])
+        rmh = self.add(self.org, name="Ronald McDonald House", by_user=self.admin)
+        # One is not a ballot.
+        self.client.post(url, {"action": "ballot", "charities": [rmh.pk]})
+        self.assertFalse(CharityVote.objects.filter(org=self.org).exists())
+        resp = self.client.post(url, {"action": "ballot", "charities": [rmh.pk, self.vetted.pk]})
+        self.assertRedirects(resp, reverse("orgs:election_setup", args=[self.org.id]), fetch_redirect_response=False)
+        vote = CharityVote.objects.get(org=self.org)
+        self.assertEqual(vote.status, CharityVote.STATUS_DRAFT)
+        self.assertEqual(vote.options.count(), 2)
+        # While it is under way the cause can't be changed from the list.
+        self.client.post(url, {"action": "support", "charity": rmh.pk})
+        self.org.refresh_from_db()
+        self.assertIsNone(self.org.charity)
 
     def test_non_admin_cannot_add(self):
         nobody = User.objects.create_user(email="cook@maccas.test", password="x", display_name="Cook")
@@ -7148,7 +7183,7 @@ class PrefectDecisionsTests(TestCase):
             reverse("manage:prefect_flag", args=[self.flag.id])
         ).content.decode()
         self.assertIn("haha get in here", body)
-        self.assertIn("pf-msg is-it", body)
+        self.assertIn("Flagged message", body)
 
 
 class ChatActionsAreOnePersonsBusinessTests(TestCase):
@@ -8537,3 +8572,44 @@ class SponsorshipApplicationTests(TestCase):
     def test_it_is_reachable_from_the_pricing_page(self):
         """The moment to catch is right after somebody reads the number."""
         self.assertContains(self.client.get("/pricing/"), self.URL)
+
+
+class OrganisationStepsTests(SimpleTestCase):
+    """Client, 3 Nov 2026: "step by step, and do not group the phases"."""
+
+    def _steps(self, step, *, verify=True, answers=None):
+        from .views import VERIFY_STEP, _steps
+
+        return _steps(step, lambda n: verify or n != VERIFY_STEP, answers)
+
+    def test_every_step_is_its_own_row(self):
+        from .views import WIZARD_STEPS
+
+        rail = self._steps(1)
+        self.assertEqual([r["label"] for r in rail["steps"]], [label for _n, label, *_ in WIZARD_STEPS])
+        self.assertEqual((rail["n"], rail["total"], rail["percent"]), (1, 7, 0))
+
+    def test_an_informal_group_never_sees_the_step_it_skips(self):
+        from .views import GROUPS_STEP
+
+        full = self._steps(GROUPS_STEP)
+        short = self._steps(GROUPS_STEP, verify=False)
+        self.assertEqual((full["total"], full["n"], full["label"]), (7, 4, "Groups"))
+        self.assertEqual((short["total"], short["n"]), (6, 3))
+        self.assertEqual([r["n"] for r in short["steps"]], [1, 2, 3, 4, 5, 6])
+
+    def test_a_finished_step_carries_its_answer(self):
+        from .views import DETAILS_STEP, GROUPS_STEP
+
+        rail = self._steps(GROUPS_STEP, answers={DETAILS_STEP: "Harbour Freight Co"})
+        row = next(r for r in rail["steps"] if r["key"] == "name")
+        self.assertTrue(row["done"])
+        self.assertEqual(row["answer"], "Harbour Freight Co")
+
+    def test_past_the_last_step_every_step_is_done(self):
+        from .views import LAST_STEP
+
+        rail = self._steps(LAST_STEP + 1)
+        self.assertTrue(rail["finished"])
+        self.assertEqual(rail["percent"], 100)
+        self.assertTrue(all(r["done"] for r in rail["steps"]))

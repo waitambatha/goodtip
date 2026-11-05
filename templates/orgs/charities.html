@@ -1,11 +1,12 @@
-{% extends "app_base.html" %}
+{% extends "orgs/console_page.html" %}
 {% block title %}Charities, {{ org.name }}{% endblock %}
 {% block loader_task %}Loading your charities{% endblock %}
-{% block body_class %}page-deep sheet-page{% endblock %}
-{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
-{% block nav_manage %}is-on{% endblock %}
 
-{% block app_content %}
+{% block mc_back_tab %}charity{% endblock %}
+{% block mc_crumbs %}<li aria-current="page">Charities</li>{% endblock %}
+{% block mc_title %}Charities <em>for {{ org.name }}</em>{% endblock %}
+{% block mc_lead %}Every cause your organisation can pick or put to a vote, and the ones you have added yourselves.{% endblock %}
+{% block mc_body %}
 {% comment %}
 MANAGE → CHARITIES.
 
@@ -95,8 +96,14 @@ are different answers depending on which room you are standing in.
   </a>
   <a class="pcard c-invite{% if panel == 'add' %} on{% endif %}" href="{{ ch_url }}?panel=add" hx-get="{{ ch_url }}?panel=add&amp;pane=panel" hx-target=".ppanel" hx-swap="outerHTML show:none" hx-push-url="true" data-panel-link data-coach="charity-add">
     <span class="pcard-ic" aria-hidden="true"><svg><use href="#ic-heart"/></svg></span>
-    <b>Add a charity</b><i>Yours</i>
+    <b>Add a new charity</b><i>Create one</i>
   </a>
+  {% if can_choose %}
+  <a class="pcard c-orgs{% if panel == 'vote' %} on{% endif %}" href="{{ ch_url }}?panel=vote" hx-get="{{ ch_url }}?panel=vote&amp;pane=panel" hx-target=".ppanel" hx-swap="outerHTML show:none" hx-push-url="true" data-panel-link>
+    <span class="pcard-ic" aria-hidden="true"><svg><use href="#ic-f-shield"/></svg></span>
+    <b>Members' vote</b><i>{% if vote_live %}Under way{% else %}Start one{% endif %}</i>
+  </a>
+  {% endif %}
   {% if groups_enabled %}
   <a class="pcard c-groups{% if panel == 'groups' %} on{% endif %}" href="{{ ch_url }}?panel=groups" hx-get="{{ ch_url }}?panel=groups&amp;pane=panel" hx-target=".ppanel" hx-swap="outerHTML show:none" hx-push-url="true" data-panel-link>
     <span class="pcard-ic" aria-hidden="true"><svg><use href="#ic-f-users"/></svg></span>
@@ -148,6 +155,11 @@ are different answers depending on which room you are standing in.
 </div>
 
 <script>
+document.addEventListener('change', function (e) {
+  var f = e.target.closest && e.target.closest('.chx-ballot'); if (!f) return;
+  var n = f.querySelectorAll('input[name=charities]:checked').length, out = f.querySelector('[data-chx-count]');
+  if (out) out.textContent = n < 2 ? (n ? '1 picked, pick one more' : 'Pick two or more') : n + ' charities on the ballot';
+});
 (function () {
   var sheet = document.getElementById("chSheet");
   if (!sheet) return;

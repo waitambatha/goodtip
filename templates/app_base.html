@@ -307,82 +307,9 @@ goodtip.css.
           are these — but they still have to be reachable in one hop, which a
           burger-only fallback would not give.
           {% endcomment %}
-          <div class="an-menu" data-anmenu>
-            <button type="button" class="an-menu-btn {% block nav_manage %}{% endblock %}" aria-expanded="false" aria-haspopup="true">
-              <svg class="an-ic" aria-hidden="true"><use href="#ic-f-sliders"/></svg>
-              <span>Manage</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-            </button>
-            <div class="an-menu-panel" hidden>
-              <a href="{% url 'orgs:members' primary_org.id %}">
-                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-users"/></svg></span>
-                <span class="mi-txt"><b>Members</b><i>Invites, join requests and roles</i></span>
-              </a>
-              {% if not primary_org.parent_id %}
-              <a href="{% url 'orgs:sports' primary_org.id %}">
-                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-trophy"/></svg></span>
-                <span class="mi-txt"><b>Sports</b><i>Add or remove what your members tip on</i></span>
-              </a>
-              {% endif %}
-              <a href="{% url 'orgs:settings' primary_org.id %}">
-                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-sliders"/></svg></span>
-                <span class="mi-txt"><b>Settings</b><i>Your organisation's details</i></span>
-              </a>
-              {# groups live inside a top-level organisation only #}
-              {% if not primary_org.parent_id %}
-              <a href="{% url 'orgs:groups' primary_org.id %}">
-                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-org"/></svg></span>
-                <span class="mi-txt"><b>Groups</b><i>The teams inside your organisation</i></span>
-              </a>
-              {% endif %}
-              {% comment %}
-              Charities moved out of the creation wizard and to here (Aug
-              2026). Adding a cause is an admin job done next to the list of
-              what already exists, not a free-text field offered to someone
-              ninety seconds into their first visit.
-              {% endcomment %}
-              {% comment %}
-              ONE ENTRY, NOT TWO — "on the manage dropdown remove charity
-              elections; that should be absorbed in the charity, that makes more
-              sense."
-
-              It does: a ballot is a choice BETWEEN the causes on that page, and
-              two menu items for one subject meant the result of an election and
-              the list it was drawn from were never on screen together. The
-              Charities screen now carries an Elections card holding every
-              ballot the room has held and the way into the next one, so nothing
-              left the product — it moved to where its subject already was.
-              {% endcomment %}
-              <a href="{% url 'orgs:charities' primary_org.id %}">
-                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-heart"/></svg></span>
-                <span class="mi-txt"><b>Charities</b><i>The causes, who backs what, and elections</i></span>
-              </a>
-              {% comment %}
-              Billing is narrower than the rest of this menu — a Team Manager
-              runs Members and Settings without ever seeing the bill, so this
-              is gated on ownership (primary_org_is_owner) rather than the
-              can-manage check that opens the Manage menu itself. Moved here
-              from a permanent card on the dashboard (client feedback, Aug
-              2026): checked rarely, but took space below the fixtures on
-              every visit either way.
-              {% endcomment %}
-              {% if primary_org_is_owner %}
-              <a href="{% url 'billing:plans' primary_org.id %}">
-                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-coins"/></svg></span>
-                <span class="mi-txt"><b>Plan</b><i>Choose or manage your season plan</i></span>
-              </a>
-              {% endif %}
-              <a href="{% url 'billing:season_summary' primary_org.id %}">
-                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-coins"/></svg></span>
-                <span class="mi-txt"><b>Season summary</b><i>Entries, donations and totals</i></span>
-              </a>
-              <a href="{% url 'tipping:certificates' primary_org.id %}">
-                <span class="mi-ic" aria-hidden="true"><svg><use href="#ic-f-trophy"/></svg></span>
-                <span class="mi-txt"><b>Champion certificates</b><i>Print or post your season champions</i></span>
-              </a>
-
-            </div>
-          </div>
+          {% comment %}One console instead of a dropdown (client, 3 Nov 2026): every
+          Manage destination is a tab on orgs:console.{% endcomment %}
+          <a href="{% url 'orgs:console' primary_org.id %}" class="{% block nav_manage %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-sliders"/></svg><span>Manage</span></a>
           {% endif %}
         {% endif %}
         {% if user.is_staff %}<a href="{% url 'manage:overview' %}" class="{% block nav_admin %}{% endblock %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Admin</span></a>{% endif %}

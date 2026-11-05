@@ -1,4 +1,4 @@
-{% extends "app_base.html" %}
+{% extends "orgs/console_page.html" %}
 {% block title %}Set up the election, {{ org.name }}{% endblock %}
 {% block loader_task %}Setting up the election{% endblock %}
 {% comment %}
@@ -7,8 +7,11 @@ Aug 2026) — these were the last screens without them. Outside the sheet,
 never inside it: the strips belong to the page background, and a sheet
 drawn over them is the whole point of the look.
 {% endcomment %}
-{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
-{% block app_content %}
+{% block mc_back_tab %}charity{% endblock %}
+{% block mc_crumbs %}<li aria-current="page">Charity election</li>{% endblock %}
+{% block mc_title %}Set up the <em>election</em>{% endblock %}
+{% block mc_lead %}Choose when the vote opens and closes. Every member is told when it starts.{% endblock %}
+{% block mc_body %}
 <div class="app-head">
   <div>
     <div class="app-eyebrow">{{ org.name }}</div>

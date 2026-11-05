@@ -61,7 +61,13 @@ def overview(request):
         "match_count": Match.objects.filter(round__org_id__in=org_ids).count(),
         "tip_count": Tip.objects.filter(org_id__in=org_ids).count(),
         "member_count": OrgMember.objects.filter(org_id__in=org_ids).count(),
-        "recent_orgs": mine.order_by("-created_at")[:5],
+        "org_cards": _org_cards(mine),
+        # What is live or about to be, so the front page starts with the work.
+        "open_rounds": Round.objects.filter(org_id__in=org_ids, status="open").count(),
+        "locking_soon": Round.objects.filter(
+            org_id__in=org_ids, status__in=("upcoming", "open"),
+            lockout_at__gte=timezone.now(), lockout_at__lte=timezone.now() + timedelta(days=7),
+        ).select_related("series", "org").order_by("lockout_at")[:6],
         "pending_count": MembershipRequest.objects.filter(
             org_id__in=org_ids, status=MembershipRequest.STATUS_PENDING,
         ).count(),
@@ -70,6 +76,33 @@ def overview(request):
             kind=MessageThread.KIND_RAISED,
         ).count(),
     })
+
+
+def _per_org(qs, field="org_id"):
+    return {r[field]: r["n"] for r in qs.values(field).annotate(n=Count("id")).order_by()}
+
+
+ORG_CARD_COLOURS = ["#5AA9FF", "#F27BA6", "#F5A25D", "#A78BFA", "#34D399", "#F2C94C", "#60C6D8", "#FB7185"]
+
+
+def _org_cards(orgs, limit=12):
+    """Each organisation the admin runs as a card: its people, its groups, what
+    is open and who is waiting. Counted per org in one query each, so a league
+    of 20,000 members costs the same as one of 20."""
+    orgs = list(orgs.order_by("name")[: limit + 1])
+    ids = [o.id for o in orgs]
+    members = _per_org(OrgMember.objects.filter(org_id__in=ids))
+    groups = _per_org(Group.objects.filter(org_id__in=ids))
+    open_r = _per_org(Round.objects.filter(org_id__in=ids, status="open"))
+    waiting = _per_org(MembershipRequest.objects.filter(org_id__in=ids, status=MembershipRequest.STATUS_PENDING))
+    cards = []
+    for i, o in enumerate(orgs[:limit]):
+        cards.append({
+            "org": o, "colour": ORG_CARD_COLOURS[o.id % len(ORG_CARD_COLOURS)],
+            "members": members.get(o.id, 0), "groups": groups.get(o.root.id if o.parent_id else o.id, 0),
+            "open": open_r.get(o.id, 0), "waiting": waiting.get(o.id, 0),
+        })
+    return {"cards": cards, "more": len(orgs) > limit}
 
 
 @org_admin_required
@@ -328,9 +361,42 @@ def org_rounds(request, org_id: int):
             r.status = request.POST["status"]
             r.save(update_fields=["status"])
             messages.success(request, "Status updated.")
+        # Back to the same filtered page the change was made from.
+        back = request.POST.get("back", "")
+        if back.startswith("?"):
+            return redirect(reverse("manage:org_rounds", args=[org.id]) + back)
         return redirect("manage:org_rounds", org_id=org.id)
-    rounds = Round.objects.filter(org=org).order_by("-round_number")
-    return render(request, "manage/org_rounds.html", {"org": org, "rounds": rounds})
+
+    # ROUNDS AS A DESK (client, 4 Nov 2026: "I have to scroll a million
+    # times"). 277 rounds on one page was the problem; now a competition and a
+    # status narrow it, and it is read twenty at a time.
+    from django.core.paginator import Paginator
+
+    every = Round.objects.filter(org=org)
+    by_series = {row["series"]: row["n"] for row in every.values("series").annotate(n=Count("id"))}
+    series = [
+        {"obj": s, "n": by_series[s.id]}
+        for s in Series.objects.filter(id__in=by_series).order_by("name")
+    ]
+    pick_series = request.GET.get("series", "")
+    pick_status = request.GET.get("status", "")
+    narrowed = every.filter(series_id=int(pick_series)) if pick_series.isdigit() else every
+    # Counted before the matches join, which would count a round once per match.
+    status_counts = {row["status"]: row["n"] for row in narrowed.values("status").annotate(n=Count("id"))}
+    rounds = narrowed.select_related("series").annotate(n_matches=Count("matches"))
+    if pick_status in dict(Round.STATUS_CHOICES):
+        rounds = rounds.filter(status=pick_status)
+    rounds = rounds.order_by("-lockout_at", "-round_number")
+    page = Paginator(rounds, 20).get_page(request.GET.get("page"))
+    query = "&".join(f"{k}={v}" for k, v in (("series", pick_series), ("status", pick_status)) if v)
+    return render(request, "manage/org_rounds.html", {
+        "org": org, "page": page, "rounds": page.object_list,
+        "series_list": series, "pick_series": pick_series, "pick_status": pick_status,
+        "status_list": [(k, label, status_counts.get(k, 0)) for k, label in Round.STATUS_CHOICES],
+        "status_total": sum(status_counts.values()), "total": every.count(),
+        "query": query, "back": "?" + "&".join(x for x in (query, f"page={page.number}") if x),
+        "now": timezone.now(),
+    })
 
 
 @org_admin_required
@@ -361,33 +427,120 @@ def round_matches(request, org_id: int, round_id: int):
         return redirect("manage:round_matches", org_id=org.id, round_id=round_obj.id)
     matches = round_obj.matches.select_related("home_team", "away_team").order_by("kickoff_at")
     # Teams from any series under the same sport (e.g. an AFL round can draw on AFL + AFLW).
-    teams = Team.objects.filter(series__sport=round_obj.series.sport).select_related("series")
+    # The round's own competition first: the rest of the sport after it.
+    teams = sorted(
+        Team.objects.filter(series__sport=round_obj.series.sport).select_related("series"),
+        key=lambda t: (t.series_id != round_obj.series_id, t.name),
+    )
     return render(request, "manage/round_matches.html", {
         "org": org, "round": round_obj, "matches": matches, "teams": teams,
+        "graded": sum(1 for m in matches if m.has_result),
     })
 
 
 @org_admin_required
 def org_members(request, org_id: int):
     org = get_managed_org_or_404(request.user, org_id)
+    from orgs.models import MemberSanction
+    from orgs.services import set_member_role
+    from .prefect_views import SPANS, _tell
+
     if request.method == "POST":
         action = request.POST.get("action")
-        if action == "remove":
-            OrgMember.objects.filter(org=org, id=int(request.POST["member_id"])).delete()
-            messages.success(request, "Member removed.")
-        elif action == "promote":
-            m = OrgMember.objects.filter(org=org, id=int(request.POST["member_id"])).first()
-            if m:
-                # Toggle between Participant and Manager+Captain.
-                m.role = OrgMember.ROLE_PARTICIPANT if m.is_manager else OrgMember.ROLE_BOTH
-                m.save(update_fields=["role"])
-        return redirect("manage:org_members", org_id=org.id)
-    members = OrgMember.objects.filter(org=org).select_related("user").order_by("joined_at")
+        member = OrgMember.objects.filter(org=org, id=int(request.POST.get("member_id") or 0)).select_related("user").first()
+        if member is None and action != "lift":
+            messages.error(request, "That member isn't in this organisation.")
+        elif action == "remove":
+            if member.is_league_owner:
+                messages.error(request, "The owner can't be removed.")
+            else:
+                member.delete()
+                messages.success(request, f"{member.user.display_name} was removed. Their tips stay on the ladder.")
+        elif action == "set_role":
+            # Change, then pick from every role (client, 4 Nov 2026), as the console does.
+            try:
+                set_member_role(member, request.POST.get("role"))
+                messages.success(request, f"{member.user.display_name} is now {member.get_role_display()}.")
+            except ValueError as e:
+                messages.error(request, str(e))
+        elif action == "suspend":
+            if member.is_league_owner:
+                messages.error(request, "The owner can't be suspended.")
+            else:
+                span = request.POST.get("span", "week")
+                ends = timezone.now() + SPANS[span] if span in SPANS else None
+                reason = (request.POST.get("reason") or "").strip()[:2000]
+                MemberSanction.objects.create(
+                    org=org, user=member.user, kind=MemberSanction.KIND_SUSPENSION,
+                    reason=reason, ends_at=ends, issued_by=request.user,
+                )
+                when = "until an admin lifts it" if ends is None else f"until {ends:%-d %B}"
+                _tell(member.user, org, f"You can't post in {org.name} for now",
+                      (reason + " " if reason else "") + f"This lasts {when}.")
+                messages.success(request, f"{member.user.display_name} is suspended {when}.")
+        elif action == "lift":
+            sanction = MemberSanction.objects.filter(
+                org=org, pk=int(request.POST.get("sanction_id") or 0), lifted_at__isnull=True,
+            ).select_related("user").first()
+            if sanction:
+                sanction.lifted_at = timezone.now()
+                sanction.lifted_by = request.user
+                sanction.save(update_fields=["lifted_at", "lifted_by"])
+                _tell(sanction.user, org, "You can post again", "An admin has lifted your suspension.")
+                messages.success(request, f"{sanction.user.display_name} can post again.")
+        back = request.POST.get("back", "")
+        url = reverse("manage:org_members", args=[org.id])
+        return redirect(f"{url}?{back}" if back and "//" not in back else url)
+    everyone = OrgMember.objects.filter(org=org)
+    members = everyone.select_related("user")
+    q = request.GET.get("q", "").strip()
+    role = request.GET.get("role", "")
+    if q:
+        members = members.filter(Q(user__display_name__icontains=q) | Q(user__email__icontains=q))
+    managing = Q(role__in=(OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH)) | Q(is_league_owner=True)
+    if role == "managers":
+        members = members.filter(managing)
+    elif role == "captains":
+        members = members.filter(role__in=(OrgMember.ROLE_CAPTAIN, OrgMember.ROLE_BOTH))
+    elif role == "participants":
+        members = members.filter(role=OrgMember.ROLE_PARTICIPANT, is_league_owner=False)
+    now = timezone.now()
+    live = MemberSanction.objects.filter(
+        org=org, kind=MemberSanction.KIND_SUSPENSION, lifted_at__isnull=True, starts_at__lte=now,
+    ).filter(Q(ends_at__isnull=True) | Q(ends_at__gt=now))
+    if role == "suspended":
+        members = members.filter(user_id__in=live.values("user_id"))
+    order = request.GET.get("sort", "new")
+    members = members.order_by({"az": "user__display_name", "old": "joined_at"}.get(order, "-joined_at"), "id")
+    from django.core.paginator import Paginator
+    from urllib.parse import urlencode
+
+    page = Paginator(members, 50).get_page(request.GET.get("page"))
+    page.object_list = list(page.object_list)
+    on_page = {m.user_id for m in page.object_list}
+    suspended = {}
+    for x in live.filter(user_id__in=on_page).select_related("issued_by", "group").order_by("-created_at"):
+        suspended.setdefault(x.user_id, x)
+    for m in page.object_list:
+        m.suspension = suspended.get(m.user_id)
     token = make_join_token(org.id)
     join_url = request.build_absolute_uri(reverse("join_org", args=[org.id, token]))
-    return render(request, "manage/org_members.html", {
-        "org": org, "members": members, "join_url": join_url,
+    keep = {k: v for k, v in (("q", q), ("role", role), ("sort", order if order != "new" else "")) if v}
+    ctx = _org_header(org)
+    ctx.update({
+        "org_tab": "members", "page": page, "members": page.object_list, "join_url": join_url,
+        "q": q, "role": role, "sort": order, "query": urlencode(keep),
+        "managers": everyone.filter(managing).count(),
+        "role_counts": {
+            "": ctx["n_members"],
+            "managers": everyone.filter(managing).count(),
+            "captains": everyone.filter(role__in=(OrgMember.ROLE_CAPTAIN, OrgMember.ROLE_BOTH)).count(),
+            "participants": everyone.filter(role=OrgMember.ROLE_PARTICIPANT, is_league_owner=False).count(),
+            "suspended": everyone.filter(user_id__in=live.values("user_id")).count(),
+        },
+        "role_choices": OrgMember.ROLE_CHOICES,
     })
+    return render(request, "manage/org_members.html", ctx)
 
 
 def _start_feed_check() -> None:
@@ -1174,7 +1327,22 @@ def news_index(request):
     from .news_deck import NEWS_PAGE_ROWS, NEWS_PAGE_STORIES, deal_news_deck
 
     deck = deal_news_deck(posts[:NEWS_PAGE_STORIES], rows=NEWS_PAGE_ROWS)
+    # Every tag with a story under it, for the side column.
+    from catalog.models import Series
+
+    every = list(NewsPost.live.only("tags", "tag"))
+    tag_filters = []
+    for tag, label in NewsPost.TAG_CHOICES:
+        count = sum(1 for p in every if tag in p.tag_list)
+        if count or tag == active_tag:
+            slug = NewsPost.TAG_SLUGS.get(tag, tag.lower())
+            tag_filters.append({
+                "tag": tag, "label": label, "count": count,
+                "colour": Series.COLOURS.get(slug, "#1F3A2C"), "logo": Series.LOGOS.get(slug, ""),
+            })
     return render(request, tpl, {
+        "tag_filters": tag_filters,
+        "news_total": len(every),
         "posts": posts,
         "active": "news",
         "news_tags": NewsPost.TAG_CHOICES,
@@ -1265,6 +1433,57 @@ def _story_preview(body: str):
     return readable, teased, True
 
 
+def _weave_pictures(body: str, post) -> str:
+    """Pair the story's pictures with its paragraphs (client, 2 Nov 2026): text
+    on the left two thirds, picture on the right third, level with each other.
+
+    The pictures spread evenly over the story's paragraphs, the first always
+    with paragraph one. With more pictures than paragraphs, a slot holds several
+    and they take turns. A story with none of its own gets one slot of its
+    sport's match-day shots, at the top.
+    """
+    from django.templatetags.static import static
+    from django.utils.html import format_html, format_html_join
+
+    fallback = static(post.fallback_scenes[0])
+    slides = post.card_slides
+    parts = re.split(r"(?<=</p>)", body)
+    # A paragraph worth a picture: real text, not a one-line subheading.
+    spots = [n for n, part in enumerate(parts) if len(strip_tags(part).strip()) >= 60]
+    if not spots or not slides:
+        return body
+    scenes = all(m["kind"] == "scene" for m in slides)
+    slots = 1 if scenes else min(len(slides), len(spots))
+    sets = [slides[n::slots] for n in range(slots)]
+    step = len(spots) / slots
+
+    def media(m, first):
+        cls = "on" if first else ""
+        if m["kind"] == "video":
+            return format_html(
+                '<video class="{}" src="{}" controls muted playsinline preload="metadata"></video>', cls, m["url"],
+            )
+        url = static(m["url"]) if m["kind"] == "scene" else m["url"]
+        return format_html(
+            '<img class="{}" src="{}" alt="{}" title="Press to expand" '
+            'onerror="this.onerror=null;this.src=\'{}\'">',
+            cls, url, m.get("alt", ""), fallback,
+        )
+
+    for n, pics in enumerate(sets):
+        at = spots[int(n * step)]
+        part = parts[at]
+        start = part.rfind("<p")
+        figure = format_html(
+            '<figure class="rd-fig" tabindex="0">{}</figure>',
+            format_html_join("", "{}", ((media(m, i == 0),) for i, m in enumerate(pics))),
+        )
+        parts[at] = (
+            f'{part[:start]}<div class="rd-row"><div class="rd-row-t">{part[start:]}</div>{figure}</div>'
+        )
+    return "".join(parts)
+
+
 def news_detail(request, slug: str):
     """Full story page. One template, signed in or not.
 
@@ -1292,7 +1511,10 @@ def news_detail(request, slug: str):
     # of a story is its headline slugified, so a queued announcement is
     # guessable, and "hidden from the list" is not the same as unpublished.
     post = get_object_or_404(NewsPost.live.all(), slug=slug)
-    more = NewsPost.live.exclude(pk=post.pk).prefetch_related("media")[:6]
+    # Stories on the same competition first, then the newest of the rest.
+    others = list(NewsPost.live.exclude(pk=post.pk).prefetch_related("media")[:30])
+    mine = set(post.tag_list) - {"NEWS", "BLOG"}
+    more = sorted(others, key=lambda p: not (mine & set(p.tag_list)))[:12]
     # The share card's picture: the SEO team's own og:image if they set one,
     # otherwise the story's featured image, which is right nearly every time.
     share_image = post.og_image or post.image
@@ -1314,6 +1536,8 @@ def news_detail(request, slug: str):
         shown, teased, gated = body, "", False
     else:
         shown, teased, gated = _story_preview(body)
+
+    shown = _weave_pictures(shown, post)
 
     return render(request, "news_reader.html", {
         "post": post, "more": more, "active": "news",
@@ -2042,3 +2266,98 @@ def page_revert(request, page_key: str):
         if n else "That page had no edits to remove.",
     )
     return redirect("admin:hq_pages")
+
+
+
+# ===========================================================================
+# ONE ORGANISATION, ITS OWN DASHBOARD (client, 4 Nov 2026: "when I click this
+# organisation... I should see everything of that organisation"). A front
+# page, its groups (and each group's people) and its sports, beside the
+# Members and Rounds pages that already existed. Settings is gone from here:
+# what it held was the sports, and Sports is this.
+# ===========================================================================
+def _org_header(org):
+    from orgs.models import GroupMember
+
+    root = org.root
+    return {
+        "org": org,
+        "n_members": OrgMember.objects.filter(org=org).count(),
+        "n_groups": root.groups.count(),
+        "n_comps": org.competitions.count(),
+    }
+
+
+@org_admin_required
+def org_home(request, org_id: int):
+    """One organisation's front page: a card for each part of it, nothing
+    listed in full. Members, groups, sports and rounds each open on their own."""
+    org = get_managed_org_or_404(request.user, org_id)
+    ctx = _org_header(org)
+    now = timezone.now()
+    rounds = Round.objects.filter(org=org)
+    everyone = OrgMember.objects.filter(org=org)
+    ctx.update({
+        "org_tab": "home",
+        "n_managers": everyone.filter(Q(role__in=(OrgMember.ROLE_MANAGER, OrgMember.ROLE_BOTH)) | Q(is_league_owner=True)).count(),
+        "n_new_week": everyone.filter(joined_at__gte=now - timedelta(days=7)).count(),
+        "faces": everyone.select_related("user").order_by("-joined_at")[:5],
+        "group_names": list(org.root.groups.order_by("name").values_list("name", flat=True)[:4]),
+        "comps": list(org.competitions.prefetch_related("series").order_by("name")),
+        "n_open": rounds.filter(status="open").count(),
+        "n_rounds": rounds.count(),
+        "next_round": rounds.filter(lockout_at__gte=now).select_related("series").order_by("lockout_at").first(),
+        "pending": MembershipRequest.objects.filter(org=org, status=MembershipRequest.STATUS_PENDING).count(),
+        "threads": MessageThread.objects.filter(org=org, status=MessageThread.STATUS_OPEN, kind=MessageThread.KIND_RAISED).count(),
+    })
+    return render(request, "manage/org_home.html", ctx)
+
+
+@org_admin_required
+def org_groups(request, org_id: int):
+    from orgs.models import GroupMember
+
+    org = get_managed_org_or_404(request.user, org_id)
+    ctx = _org_header(org)
+    groups = list(org.root.groups.select_related("charity", "created_by").annotate(n=Count("memberships")).order_by("name"))
+    pick = request.GET.get("group", "")
+    current = next((g for g in groups if str(g.id) == pick), groups[0] if groups else None)
+    people = []
+    if current:
+        people = list(GroupMember.objects.filter(group=current).select_related("user").order_by("user__display_name"))
+    ctx.update({"org_tab": "groups", "groups": groups, "current": current, "people": people})
+    return render(request, "manage/org_groups.html", ctx)
+
+
+@org_admin_required
+def org_sports(request, org_id: int):
+    from orgs.forms import fed_competitions
+
+    org = get_managed_org_or_404(request.user, org_id)
+    owner = org.root
+    offered = {c.pk: c for c in fed_competitions() if c.season_id == owner.season_id}
+    chosen = set(owner.competitions.values_list("pk", flat=True))
+    if request.method == "POST" and not org.parent_id:
+        comp = offered.get(int(request.POST.get("competition") or 0))
+        if comp is None:
+            messages.error(request, "That competition isn't available right now.")
+        elif comp.pk in chosen:
+            if len(chosen) == 1:
+                messages.error(request, "Keep at least one competition: members need something to tip.")
+            else:
+                owner.competitions.remove(comp)
+                messages.info(request, f"{comp.name} switched off. Nothing was deleted.")
+        else:
+            owner.competitions.add(comp)
+            messages.success(request, f"{comp.name} switched on. Its games are on members' dashboards now.")
+        return redirect("manage:org_sports", org_id=org.id)
+    rows = []
+    for c in sorted(offered.values(), key=lambda c: (c.sport.name, c.name)):
+        series = list(c.series.all())
+        rows.append({"comp": c, "on": c.pk in chosen, "series": series,
+                     "colour": series[0].colour if series else "#64748B",
+                     "logo": series[0].logo if series else ""})
+    rows.sort(key=lambda r: (not r["on"], r["comp"].sport.name, r["comp"].name))
+    ctx = _org_header(org)
+    ctx.update({"org_tab": "sports", "rows": rows, "n_on": len(chosen), "inherited": bool(org.parent_id)})
+    return render(request, "manage/org_sports.html", ctx)

@@ -28,7 +28,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
 {% for row in rows %}
   {% with m=row.match %}
   <div class="match-row" data-coach="round-matches">
-    <div class="match-meta"><span>{{ m.kickoff_at|date:"D j M &middot; g:i a" }}</span>{% if m.venue %}<span class="venue">{{ m.venue }}</span>{% endif %}</div>
+    <div class="match-meta"><span>{{ m.kickoff_at|date:"D j M" }} &middot; {{ m.kickoff_at|date:"g:i a" }}</span>{% if m.venue %}<span class="venue">{{ m.venue }}</span>{% endif %}</div>
     {% comment %}
     BUTTONS, NOT RADIOS (Aug 2026).
 

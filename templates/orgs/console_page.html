@@ -1,0 +1,37 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% comment %}
+EVERY PAGE THE MANAGE CONSOLE OPENS (client, 4 Nov 2026: "on the buttons where
+it takes us to something else... a lot has not been changed"). The console's
+pitch, a way back to the tab it came from, the page's own title in the hero,
+and its content on the white sheet. A page sets mc_back_tab, mc_kicker,
+mc_title, mc_lead and puts its content in mc_body.
+{% endcomment %}
+{% block nav_manage %}on{% endblock %}
+{% block body_class %}page-deep gx-page mc-page mc-sub{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/gt-admin-gx.css' %}">{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+{% block app_content %}
+<div class="gx mc">
+  <svg class="gx-pitch" viewBox="0 0 1200 700" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
+    <ellipse cx="600" cy="350" rx="560" ry="320"/><ellipse cx="600" cy="350" rx="70" ry="70"/>
+    <rect x="530" y="280" width="140" height="140"/><line x1="600" y1="30" x2="600" y2="670"/>
+  </svg>
+  <div class="gx-bar">
+    <a class="gx-back" href="{% url 'orgs:console' org.id %}?tab={% block mc_back_tab %}members{% endblock %}">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg><span>Back to the console</span>
+    </a>
+    <ol class="gx-crumbs"><li><a href="{% url 'orgs:console' org.id %}">{{ org.name }}</a></li>{% block mc_crumbs %}{% endblock %}</ol>
+  </div>
+  {% if messages %}<div class="mc-flash">{% for m in messages %}<p class="mc-msg is-{{ m.tags|default:'info' }}">{{ m }}</p>{% endfor %}</div>{% endif %}
+  <header class="gx-hero">
+    <div class="gx-hero-copy">
+      <p class="gx-kicker"><i aria-hidden="true"></i>{% block mc_kicker %}Manage{% endblock %}</p>
+      <h1 class="gx-title">{% block mc_title %}{% endblock %}</h1>
+      <p class="gx-lead">{% block mc_lead %}{% endblock %}</p>
+    </div>
+    <div class="gx-board">{% block mc_board %}{% endblock %}</div>
+  </header>
+  <section class="gx-sheet mc-subsheet"><div class="mc-pane">{% block mc_body %}{% endblock %}</div></section>
+</div>
+{% endblock %}

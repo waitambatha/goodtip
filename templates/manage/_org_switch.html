@@ -1,12 +1,17 @@
-{% comment %}
-Only shown to someone who runs more than one organisation. Asking which one
-every time would be noise for the majority who run exactly one.
-{% endcomment %}
+{% comment %}Which organisation this page is about, each with how much is waiting in it (client, 4 Nov 2026). Only for someone who runs more than one.{% endcomment %}
 {% if orgs|length > 1 %}
-<div class="card pad-lg" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-  <span style="font-size:13px;color:var(--muted);">Organisation</span>
-  {% for o in orgs %}
-  <a href="?org={{ o.id }}" class="gts-tab {% if o.id == org.id %}on{% endif %}">{{ o.name }}</a>
-  {% endfor %}
-</div>
+<section class="osw" aria-label="Organisations">
+  <header class="osw-head"><b>Your organisations</b>{% if org_tabs %}<span>The number is what's {{ switch_what }}</span>{% endif %}</header>
+  <div class="osw-grid">
+    {% if org_tabs %}{% for t in org_tabs %}
+    <a href="?org={{ t.org.id }}" class="osw-org{% if t.org.id == org.id %} on{% endif %}{% if t.n %} has-n{% endif %}"{% if t.org.id == org.id %} aria-current="page"{% endif %}>
+      <span class="og-badge">{% if t.org.logo %}<img src="{{ t.org.logo.url }}" alt="">{% else %}{{ t.org.name|slice:":2"|upper }}{% endif %}</span>
+      <span class="osw-name">{{ t.org.name }}</span>
+      {% if t.n %}<span class="osw-n" aria-label="{{ t.n }} {{ switch_what }}">{{ t.n }}</span>{% endif %}
+    </a>
+    {% endfor %}{% else %}{% for o in orgs %}
+    <a href="?org={{ o.id }}" class="osw-org{% if o.id == org.id %} on{% endif %}"><span class="og-badge">{{ o.name|slice:":2"|upper }}</span><span class="osw-name">{{ o.name }}</span></a>
+    {% endfor %}{% endif %}
+  </div>
+</section>
 {% endif %}

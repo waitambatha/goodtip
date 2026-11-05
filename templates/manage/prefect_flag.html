@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% block nav_prefect %}on{% endblock %}
+{% block hero_eyebrow %}Prefect &middot; {{ org.name }}{% endblock %}
 {% block hero_title %}Review{% endblock %}
 {% block hero_lead %}Read it in context, then decide.{% endblock %}
 {% block admin_content %}
@@ -14,134 +15,106 @@ Those are the same words and different events, and the only thing that separates
 them is the room around them. A review screen showing one line in isolation asks
 a person to make exactly the mistake Prefect is not trusted to make.
 {% endcomment %}
-<p class="pf-back"><a href="{% url 'manage:prefect' %}">&larr; Back to Prefect</a></p>
-
-<div class="pf-case">
-  <div class="pf-case-head">
-    <span class="pf-src {% if flag.raised_by %}is-member{% else %}is-prefect{% endif %}">
-      {% if flag.raised_by %}Reported by {{ flag.raised_by.display_name }}{% else %}Found by Prefect{% endif %}
-    </span>
-    <div>
-      <h2>{{ flag.author.display_name }}</h2>
-      <p>
-        in {% if thread.group %}{{ thread.group.name }}{% else %}{{ org.name }}{% endif %}
-        &middot; {{ flag.created_at|date:"j M Y, g:i a" }}
-        {% if flag.status != 'open' %}&middot; <b>{{ flag.get_status_display }}</b>{% endif %}
-      </p>
-    </div>
-  </div>
-
-  {% if not flag.raised_by %}
-  <p class="pf-why">
-    {% comment %}
-    Prefect says why, in words, every time. A score with no explanation is a
-    machine asking to be trusted; this feature is built on the opposite.
-    {% endcomment %}
-    Prefect reacted to
-    {% for t in flag.terms %}<b>“{{ t }}”</b>{% if not forloop.last %}, {% endif %}{% endfor %}
-    &mdash; {{ flag.category }}, strength {{ flag.score }}.
-    {% if flag.reason %}It also noted: {{ flag.reason }}.{% endif %}
-  </p>
-  {% elif flag.note %}
-  <p class="pf-why">{{ flag.raised_by.display_name }} said: “{{ flag.note }}”</p>
-  {% endif %}
-
-  {% if prior_flags %}
-  <p class="pf-prior">{{ flag.author.display_name }} has had {{ prior_flags }} earlier flag{{ prior_flags|pluralize }} actioned in this organisation.</p>
-  {% endif %}
-
-  <div class="pf-thread">
-    {% for m in before %}
-    <div class="pf-msg{% if m.id == flag.message.id %} is-it{% endif %}">
-      <b>{{ m.author.display_name }}</b>
-      <span>{{ m.body|default:"(an attachment)" }}</span>
-      <i>{{ m.created_at|date:"j M, g:i a" }}</i>
-    </div>
-    {% endfor %}
-    {% for m in after %}
-    <div class="pf-msg is-after">
-      <b>{{ m.author.display_name }}</b>
-      <span>{{ m.body|default:"(an attachment)" }}</span>
-      <i>{{ m.created_at|date:"j M, g:i a" }}</i>
-    </div>
-    {% endfor %}
-  </div>
+<div class="pfx-top">
+  <a class="og-back" href="{% url 'manage:prefect' %}?org={{ org.id }}" aria-label="Back to Prefect"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></a>
+  <span class="og-badge">{% if org.logo %}<img src="{{ org.logo.url }}" alt="">{% else %}{{ org.name|slice:":2"|upper }}{% endif %}</span>
+  <div class="og-name"><b>{{ org.name }}</b><small>{% if thread.group %}{{ thread.group.name }} &middot; {% endif %}{{ flag.created_at|date:"j M Y, g:i a" }}</small></div>
+  {% if flag.is_open %}<span class="gx-pill is-wait"><i></i>Waiting for you</span>{% else %}<span class="gx-pill is-ok"><i></i>{{ flag.get_status_display }}</span>{% endif %}
 </div>
 
-{% if flag.is_open %}
-<div class="pf-actions">
-  {% comment %}
-  NOT AN ISSUE IS FIRST, and it is the only one that is a single press. The most
-  likely correct answer to a flag from a word list is "that was fine", and the
-  screen should make the likely answer the easy one — otherwise a reviewer in a
-  hurry reaches for a consequence because it was nearer.
-  {% endcomment %}
-  <form method="post" action="{% url 'manage:prefect_clear' flag.id %}" class="pf-act pf-act-clear">
-    {% csrf_token %}
-    <h3>Not an issue</h3>
-    <p>Nothing happens to anyone. The flag is closed.</p>
-    {% if flag.terms %}
-    <label class="pf-learn">
-      <input type="checkbox" name="learn" value="1">
-      Teach Prefect that {% for t in flag.terms %}“{{ t }}”{% if not forloop.last %}, {% endif %}{% endfor %}
-      {{ flag.terms|pluralize:"is,are" }} fine in {{ org.name }}
-    </label>
-    <p class="pf-learn-note">
-      Only tick this if the WORDS are ordinary here &mdash; not just because
-      these two are friends. One is a fact about your organisation; the other is
-      a fact about two people, and Prefect can only learn the first.
-    </p>
-    {% endif %}
-    <button type="submit" class="abtn abtn-primary">Clear it</button>
-  </form>
+<div class="pfx">
+  <section class="pfx-case">
+    <header class="pfx-who">
+      <span class="mc-av pfx-av">{% if flag.author.avatar %}<img src="{{ flag.author.avatar.url }}" alt="">{% else %}{{ flag.author.display_name|slice:":1"|upper }}{% endif %}</span>
+      <div><b>{{ flag.author.display_name }}</b><small>wrote the message below</small></div>
+      <span class="pfx-src {% if flag.raised_by %}is-member{% else %}is-prefect{% endif %}">{% if flag.raised_by %}Reported by {{ flag.raised_by.display_name }}{% else %}Found by Prefect{% endif %}</span>
+    </header>
 
-  <form method="post" action="{% url 'manage:prefect_act' flag.id %}" class="pf-act">
-    {% csrf_token %}
-    <h3>Or do something about it</h3>
-    <label class="pf-field">
-      <span>What should they be told?</span>
-      <textarea name="reason" rows="3" placeholder="They see this. Keep it plain."></textarea>
-    </label>
-
-    <fieldset class="pf-field">
-      <legend>Where does it apply?</legend>
-      <label><input type="radio" name="scope" value="org" checked> All of {{ org.name }}</label>
-      {% if thread.group %}
-      <label><input type="radio" name="scope" value="group"> {{ thread.group.name }} only</label>
+    <div class="pfx-why">
+      {% if not flag.raised_by %}
+      <span class="pfx-k">Why it was flagged</span>
+      <div class="pfx-terms">{% for t in flag.terms %}<span>“{{ t }}”</span>{% endfor %}</div>
+      <p>{{ flag.category|capfirst }} &middot; strength {{ flag.score }}{% if flag.reason %} &middot; {{ flag.reason }}{% endif %}</p>
+      {% elif flag.note %}
+      <span class="pfx-k">What {{ flag.raised_by.display_name }} said</span>
+      <p>“{{ flag.note }}”</p>
+      {% else %}
+      <span class="pfx-k">Reported without a note</span>
       {% endif %}
-    </fieldset>
-
-    <fieldset class="pf-field">
-      <legend>How long, if you're suspending?</legend>
-      <label><input type="radio" name="span" value="week" checked> A week</label>
-      <label><input type="radio" name="span" value="month"> A month</label>
-      {% comment %}
-      "Or just till he feels." A real state, not a date a long way off — the two
-      are identical in a database and read very differently to the person
-      serving them.
-      {% endcomment %}
-      <label><input type="radio" name="span" value="open"> Until I lift it</label>
-    </fieldset>
-
-    <div class="pf-buttons">
-      <button type="submit" name="action" value="warn" class="abtn abtn-ghost">Send a warning</button>
-      <button type="submit" name="action" value="suspend" class="abtn abtn-dark">Suspend from posting</button>
-      <button type="submit" name="action" value="remove" class="abtn abtn-danger"
-              data-confirm="Remove {{ flag.author.display_name }}? This takes them out of the room entirely.">
-        Remove them
-      </button>
+      {% if prior_flags %}<p class="pfx-prior">{{ prior_flags }} earlier flag{{ prior_flags|pluralize }} against {{ flag.author.display_name }} {{ prior_flags|pluralize:"was,were" }} actioned here.</p>{% endif %}
     </div>
-    <p class="pf-learn-note">
-      Whatever you choose, {{ flag.author.display_name }} is told what happened and
-      why. Being managed out of a workplace comp without being told is not
-      something this product will do.
-    </p>
-  </form>
+
+    <span class="pfx-k pfx-k-room">The conversation, in {% if thread.group %}{{ thread.group.name }}{% else %}{{ org.name }}{% endif %}</span>
+    <div class="pfx-chat">
+      {% for m in before %}
+      <div class="pfx-msg{% if m.id == flag.message.id %} is-it{% endif %}{% if m.author_id == flag.author_id %} is-them{% endif %}">
+        <span class="pfx-msg-h"><b>{{ m.author.display_name }}</b><i>{{ m.created_at|date:"j M, g:i a" }}</i></span>
+        <span class="pfx-msg-b">{{ m.body|default:"(an attachment)" }}</span>
+        {% if m.id == flag.message.id %}<span class="pfx-tag">Flagged message</span>{% endif %}
+      </div>
+      {% endfor %}
+      {% for m in after %}
+      <div class="pfx-msg is-after{% if m.author_id == flag.author_id %} is-them{% endif %}">
+        <span class="pfx-msg-h"><b>{{ m.author.display_name }}</b><i>{{ m.created_at|date:"j M, g:i a" }}</i></span>
+        <span class="pfx-msg-b">{{ m.body|default:"(an attachment)" }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <aside class="pfx-decide">
+  {% if flag.is_open %}
+    {% comment %}Not an issue first and one press: the likeliest right answer to a word-list flag should be the easiest.{% endcomment %}
+    <form method="post" action="{% url 'manage:prefect_clear' flag.id %}" class="pfx-card is-clear">
+      {% csrf_token %}
+      <span class="pfx-step">1</span>
+      <h3>Not an issue</h3>
+      <p>Nothing happens to anyone. The flag closes.</p>
+      {% if flag.terms %}
+      <label class="pfx-check"><input type="checkbox" name="learn" value="1"><span>Teach Prefect that {% for t in flag.terms %}“{{ t }}”{% if not forloop.last %}, {% endif %}{% endfor %} {{ flag.terms|pluralize:"is,are" }} fine in {{ org.name }}</span></label>
+      <small>Only if the words are ordinary here, not just between these two.</small>
+      {% endif %}
+      <button type="submit" class="gx-btn is-lime is-block">Clear it</button>
+    </form>
+
+    <form method="post" action="{% url 'manage:prefect_act' flag.id %}" class="pfx-card is-act">
+      {% csrf_token %}
+      <span class="pfx-step">2</span>
+      <h3>Or do something about it</h3>
+      <label class="pfx-field"><span>What should they be told?</span><textarea name="reason" rows="3" placeholder="They see this. Keep it plain."></textarea></label>
+      <div class="pfx-field"><span>Where it applies</span>
+        <div class="pfx-seg">
+          <label><input type="radio" name="scope" value="org" checked><span>All of {{ org.name }}</span></label>
+          {% if thread.group %}<label><input type="radio" name="scope" value="group"><span>{{ thread.group.name }} only</span></label>{% endif %}
+        </div>
+      </div>
+      <div class="pfx-field"><span>If suspending, for how long</span>
+        <div class="pfx-seg">
+          <label><input type="radio" name="span" value="week" checked><span>A week</span></label>
+          <label><input type="radio" name="span" value="month"><span>A month</span></label>
+          <label><input type="radio" name="span" value="open"><span>Until I lift it</span></label>
+        </div>
+      </div>
+      <div class="pfx-btns">
+        <button type="submit" name="action" value="warn" class="gx-btn is-ghost">Send a warning</button>
+        <button type="submit" name="action" value="suspend" class="gx-btn">Suspend from posting</button>
+        <button type="submit" name="action" value="remove" class="gx-btn is-danger" data-confirm="Remove {{ flag.author.display_name }}? This takes them out of the room entirely.">Remove them</button>
+      </div>
+      <small>Whatever you choose, {{ flag.author.display_name }} is told what happened and why.</small>
+    </form>
+  {% else %}
+    <div class="pfx-card is-done">
+      <h3>{{ flag.get_status_display }}</h3>
+      <p>{% if flag.reviewed_by %}By {{ flag.reviewed_by.display_name }}{% endif %}{% if flag.reviewed_at %} on {{ flag.reviewed_at|date:"j M Y" }}{% endif %}.</p>
+      <a class="gx-btn is-ghost is-block" href="{% url 'manage:prefect' %}?org={{ org.id }}">Back to the queue</a>
+    </div>
+  {% endif %}
+    {% if history %}
+    <div class="pfx-card is-hist">
+      <h3>{{ flag.author.display_name }}'s record here</h3>
+      {% for h in history %}<p class="pfx-h"><b>{{ h.get_kind_display }}</b> {{ h.until_label }}{% if h.group %} &middot; {{ h.group.name }}{% endif %}</p>{% endfor %}
+    </div>
+    {% endif %}
+  </aside>
 </div>
-{% else %}
-<p class="pf-done">
-  {{ flag.get_status_display }}{% if flag.reviewed_by %} by {{ flag.reviewed_by.display_name }}{% endif %}
-  {% if flag.reviewed_at %}on {{ flag.reviewed_at|date:"j M Y" }}{% endif %}.
-</p>
-{% endif %}
 {% endblock %}

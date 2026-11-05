@@ -1,41 +1,57 @@
 {% extends "admin_base.html" %}
 {% load team_extras %}
-{% block title %}Matches. Manage{% endblock %}
+{% block title %}{{ round.series.name }} round {{ round.round_number }} &middot; Manage{% endblock %}
 {% block nav_orgs %}on{% endblock %}
+{% block hero_eyebrow %}{{ org.name }} &middot; {{ round.get_stage_display }}{% endblock %}
+{% block hero_title %}{{ round.series.name }} <em>round {{ round.round_number }}</em>{% endblock %}
+{% block hero_lead %}Tips lock {{ round.lockout_at|date:"D j M" }} &middot; {{ round.lockout_at|date:"g:i a" }}: enter a score and save to grade every tip on that match.{% endblock %}
+{% block admin_board %}
+<div class="gx-score"><b>{{ matches|length }}</b><span>Matches</span></div>
+<div class="gx-score"><b>{{ graded }}</b><span>Results in</span></div>
+<div class="gx-score"><b>{{ round.get_status_display }}</b><span>Status</span></div>
+{% endblock %}
 {% block admin_content %}
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;"><a href="{% url 'manage:org_rounds' org.id %}" class="flink crumb-link">Rounds</a><span style="color:var(--muted);">/</span><h1 class="admin-h1" style="margin:0;">{{ round.label }} &middot; Matches</h1></div>
-<div class="grid-app" style="grid-template-columns:1.4fr 1fr;gap:20px;align-items:start;">
-  <div>
-    <div class="card" style="margin-bottom:16px;"><div class="card-h" style="margin-bottom:10px;">Matches &amp; results</div>
-      {% for m in matches %}
-      <div style="padding:12px 0;border-top:1px solid var(--app-line);{% if forloop.first %}border-top:0;{% endif %}">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-          <div class="team-cell">{% crest m.home_team %}<b>{{ m.home_team.name }}</b> <span class="vs-mini">v</span> {% crest m.away_team %}<b>{{ m.away_team.name }}</b></div>
-          {% if m.has_result %}<span class="r-num">{{ m.home_score }} &ndash; {{ m.away_score }}</span>{% endif %}
-        </div>
-        <div style="font-size:12px;color:var(--muted);margin:4px 0 8px;">{{ m.kickoff_at|date:"D j M &middot; g:i a" }}{% if m.venue %} &middot; {{ m.venue }}{% endif %}</div>
-        <form method="post" action="{% url 'manage:round_matches' org.id round.id %}" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
-          {% csrf_token %}<input type="hidden" name="action" value="result"><input type="hidden" name="match_id" value="{{ m.id }}">
-          <div class="fld" style="margin:0;"><label>Home</label><input type="number" name="home_score" value="{{ m.home_score|default_if_none:'' }}" style="width:90px;" placeholder="0"></div>
-          <div class="fld" style="margin:0;"><label>Away</label><input type="number" name="away_score" value="{{ m.away_score|default_if_none:'' }}" style="width:90px;" placeholder="0"></div>
-          <button type="submit" class="abtn abtn-dark abtn-sm">Save &amp; grade</button>
-        </form>
+{% with org_tab="rounds" %}{% include "manage/_org_nav.html" %}{% endwith %}
+{% comment %}
+A ROUND AS A SCOREBOARD (client, 4 Nov 2026: "change the whole thing... to be
+much more efficient"). Each match a card with both sides and the score between
+them; adding a match opens from a button.
+{% endcomment %}
+<div class="rd-tools">
+  <a class="gx-btn" href="{% url 'manage:org_rounds' org.id %}?series={{ round.series_id }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>All {{ round.series.name }} rounds</a>
+  <span class="rd-spacer"></span>
+  <details class="mc-pop rd-new">
+    <summary class="gx-btn is-lime"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add match</summary>
+    <div class="mc-pop-back" data-mc-close></div>
+    <form class="mc-pop-card rd-form" method="post" action="{% url 'manage:round_matches' org.id round.id %}">{% csrf_token %}<input type="hidden" name="action" value="create">
+      <header><div><span class="mc-k">{{ round.series.name }} &middot; round {{ round.round_number }}</span><b>Add a match</b></div><button type="button" class="mc-x" data-mc-close aria-label="Close">&times;</button></header>
+      <div class="rd-grid">
+        <label>Home side<select name="home_team" required data-native>{% for t in teams %}<option value="{{ t.id }}">{{ t.name }}{% if t.series_id != round.series_id %} ({{ t.series }}){% endif %}</option>{% endfor %}</select></label>
+        <label>Away side<select name="away_team" required data-native>{% for t in teams %}<option value="{{ t.id }}">{{ t.name }}{% if t.series_id != round.series_id %} ({{ t.series }}){% endif %}</option>{% endfor %}</select></label>
+        <label>Kickoff <small>local time</small><input type="datetime-local" name="kickoff_at" required></label>
+        <label>Venue <small>optional</small><input type="text" name="venue" placeholder="e.g. MCG"></label>
       </div>
-      {% empty %}
-      <p class="app-sub" style="margin:0;">No matches yet, add one, or trigger a sync from the Sync tab.</p>
-      {% endfor %}
-    </div>
-  </div>
-  <div class="mini-form">
-    <div class="card-h" style="margin-bottom:14px;">Add match</div>
-    <form method="post" action="{% url 'manage:round_matches' org.id round.id %}">
-      {% csrf_token %}<input type="hidden" name="action" value="create">
-      <div class="fld"><label for="am_home">Home team</label><select name="home_team" id="am_home" required>{% for t in teams %}<option value="{{ t.id }}">{{ t.name }} [{{ t.series }}]</option>{% endfor %}</select></div>
-      <div class="fld"><label for="am_away">Away team</label><select name="away_team" id="am_away" required>{% for t in teams %}<option value="{{ t.id }}">{{ t.name }} [{{ t.series }}]</option>{% endfor %}</select></div>
-      <div class="fld"><label for="am_kick">Kickoff (local time)</label><input type="datetime-local" name="kickoff_at" id="am_kick" required></div>
-      <div class="fld"><label for="am_venue">Venue</label><input type="text" name="venue" id="am_venue" placeholder="Venue"></div>
-      <button type="submit" class="abtn abtn-primary abtn-block">Add match</button>
+      <button type="submit" class="gx-btn is-lime is-block">Add match</button>
     </form>
-  </div>
+  </details>
 </div>
+
+{% if matches %}
+<div class="mt-grid">
+  {% for m in matches %}
+  <form class="mt-card{% if m.has_result %} is-done{% endif %}" method="post" action="{% url 'manage:round_matches' org.id round.id %}" style="--k: {{ round.series.colour }}">
+    {% csrf_token %}<input type="hidden" name="action" value="result"><input type="hidden" name="match_id" value="{{ m.id }}">
+    <div class="mt-when"><span>{{ m.kickoff_at|date:"D j M" }} &middot; {{ m.kickoff_at|date:"g:i a" }}</span>{% if m.venue %}<span>{{ m.venue }}</span>{% endif %}{% if m.has_result %}<em>Result in</em>{% endif %}</div>
+    <div class="mt-row">
+      <span class="mt-side">{% crest m.home_team %}<b>{{ m.home_team.name }}</b></span>
+      <span class="mt-score"><input type="number" name="home_score" value="{{ m.home_score|default_if_none:'' }}" placeholder="0" aria-label="{{ m.home_team.name }} score"><i>&ndash;</i><input type="number" name="away_score" value="{{ m.away_score|default_if_none:'' }}" placeholder="0" aria-label="{{ m.away_team.name }} score"></span>
+      <span class="mt-side is-away"><b>{{ m.away_team.name }}</b>{% crest m.away_team %}</span>
+    </div>
+    <button type="submit" class="gx-btn{% if not m.has_result %} is-lime{% else %} is-ghost{% endif %} is-block">{% if m.has_result %}Update result{% else %}Save &amp; grade{% endif %}</button>
+  </form>
+  {% endfor %}
+</div>
+{% else %}
+<div class="gx-empty"><b>No matches yet</b><span>Add one, or let the fixture sync fill this round.</span></div>
+{% endif %}
 {% endblock %}

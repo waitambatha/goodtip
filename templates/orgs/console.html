@@ -1,0 +1,276 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}Manage {{ org.name }} &middot; GoodTip{% endblock %}
+{% block loader_task %}Opening your console{% endblock %}
+{% block nav_manage %}on{% endblock %}
+{% block body_class %}page-deep gx-page mc-page{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/gt-admin-gx.css' %}">{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+{% block app_content %}
+{% comment %}
+THE MANAGE CONSOLE (client, 3 Nov 2026): the super admin's pitch for the people
+who run an organisation. A scoreboard, then one white sheet with a tab row in
+colour; each tab is a link (?tab=) so it can be bookmarked and Back works, and
+htmx swaps just the sheet. Built by orgs.views.org_console_view.
+{% endcomment %}
+{% url 'orgs:console' org.id as console_url %}
+<div class="gx mc" id="mcConsole" hx-boost="true" hx-target="#mcConsole" hx-select="#mcConsole" hx-swap="outerHTML show:none">
+  <svg class="gx-pitch" viewBox="0 0 1200 700" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
+    <ellipse cx="600" cy="350" rx="560" ry="320"/><ellipse cx="600" cy="350" rx="70" ry="70"/>
+    <rect x="530" y="280" width="140" height="140"/><line x1="600" y1="30" x2="600" y2="670"/>
+  </svg>
+
+  {% if messages %}<div class="mc-flash">{% for m in messages %}<p class="mc-msg is-{{ m.tags|default:'info' }}">{{ m }}</p>{% endfor %}</div>{% endif %}
+
+  <header class="gx-hero">
+    <div class="gx-hero-copy">
+      <p class="gx-kicker"><i aria-hidden="true"></i>Manage{% if org.season %} &middot; {{ org.season }} season{% endif %}</p>
+      <h1 class="gx-title">{{ org.name }} <em>console</em></h1>
+      <p class="gx-lead">Everything about running {{ org.name }} in one place: your people, who's waiting, what you tip, your groups, your cause and your plan.</p>
+    </div>
+    <div class="gx-board">
+      <a class="gx-score{% if tab == 'members' %} is-on{% endif %}" href="{{ console_url }}?tab=members"><b>{{ badge.members }}</b><span>Members</span></a>
+      {% if is_admin %}<a class="gx-score{% if tab == 'approvals' %} is-on{% endif %}" href="{{ console_url }}?tab=approvals"><b>{{ badge.approvals }}</b><span>Waiting</span></a>{% endif %}
+      <a class="gx-score{% if tab == 'groups' %} is-on{% endif %}" href="{{ console_url }}?tab=groups"><b>{{ badge.groups }}</b><span>Groups</span></a>
+      {% if is_admin and not org.parent_id %}<a class="gx-score{% if tab == 'sports' %} is-on{% endif %}" href="{{ console_url }}?tab=sports"><b>{{ comp_count }}</b><span>Competitions on</span></a>{% endif %}
+    </div>
+  </header>
+
+  <section class="gx-sheet">
+    <nav class="gx-tabs" aria-label="Console sections">
+      {% for key, label in tabs %}
+      <a class="gx-tab{% if tab == key %} on{% endif %}" href="{{ console_url }}?tab={{ key }}"{% if tab == key %} aria-current="page"{% endif %}>{{ label }}{% if key == 'approvals' and badge.approvals %} <em>{{ badge.approvals }}</em>{% elif key == 'members' %} <em>{{ badge.members }}</em>{% elif key == 'groups' %} <em>{{ badge.groups }}</em>{% endif %}</a>
+      {% endfor %}
+    </nav>
+
+    <div class="gx-pane mc-pane is-on">
+    {% if tab == "members" %}
+      <div class="mc-tools">
+        <label class="gx-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search by name, email, role or group" data-mc-search aria-label="Search members"></label>
+        <span class="gx-pill is-ok" data-mc-count><i></i>{{ members|length }} member{{ members|length|pluralize }}</span>
+        <a class="gx-btn" href="{{ console_url }}?tab=invite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Invite people</a>
+      </div>
+      <div class="gx-tablewrap">
+        <table class="gx-table" data-mc-table>
+          <thead><tr><th scope="col">Member</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Groups</th><th scope="col">Joined</th></tr></thead>
+          <tbody>
+          {% for m in members %}
+          <tr>
+            <td class="is-name"><span class="mc-who"><span class="mc-av">{% if m.user.avatar %}<img src="{{ m.user.avatar.url }}" alt="" loading="lazy">{% else %}{{ m.user.display_name|slice:":1"|upper }}{% endif %}</span><b>{{ m.user.display_name }}</b></span></td>
+            <td class="is-email"><a href="mailto:{{ m.user.email }}">{{ m.user.email }}</a></td>
+            <td>{% for label in m.role_labels %}<span class="mc-role is-{{ label|lower }}">{{ label }}</span>{% endfor %}</td>
+            <td>{% for g in m.group_names %}<span class="mc-chip">{{ g }}</span>{% empty %}<span class="mc-quiet">None</span>{% endfor %}</td>
+            <td class="is-date">{{ m.joined_at|date:"j M Y" }}<small>{{ m.joined_at|timesince }} ago</small></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    {% elif tab == "approvals" %}
+      <h2 class="mc-h">People asking to join</h2>
+      {% if pending %}
+      <div class="gx-tablewrap"><table class="gx-table">
+        <thead><tr><th scope="col">Person</th><th scope="col">Email</th><th scope="col">Asked</th><th scope="col">Decide</th></tr></thead>
+        <tbody>
+        {% for r in pending %}
+        <tr>
+          <td class="is-name"><span class="mc-who"><span class="mc-av">{{ r.user.display_name|slice:":1"|upper }}</span><b>{{ r.user.display_name }}</b></span></td>
+          <td class="is-email">{{ r.user.email }}</td>
+          <td class="is-date">{{ r.created_at|date:"j M Y" }}<small>{{ r.created_at|timesince }} ago</small></td>
+          <td><div class="mc-actions">
+            <form method="post" action="{% url 'orgs:members' org.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ here }}"><input type="hidden" name="action" value="approve_request"><input type="hidden" name="request_id" value="{{ r.id }}"><button class="gx-btn is-lime" type="submit">Approve</button></form>
+            <form method="post" action="{% url 'orgs:members' org.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ here }}"><input type="hidden" name="action" value="decline_request"><input type="hidden" name="request_id" value="{{ r.id }}"><button class="gx-btn is-danger" type="submit">Decline</button></form>
+          </div></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      {% else %}
+      <div class="gx-empty"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg><b>Nobody waiting</b><span>Requests to join {{ org.name }} land here for you to approve.</span></div>
+      {% endif %}
+      {% if pending_groups %}
+      <h2 class="mc-h">Groups waiting for approval</h2>
+      <div class="gx-tablewrap"><table class="gx-table">
+        <thead><tr><th scope="col">Group</th><th scope="col">Started</th><th scope="col">Review</th></tr></thead>
+        <tbody>{% for g in pending_groups %}<tr>
+          <td class="is-name"><b>{{ g.name }}</b></td><td class="is-date">{{ g.created_at|date:"j M Y" }}</td>
+          <td><a class="gx-btn is-ghost" href="{% url 'orgs:groups' org.root.id %}" hx-boost="false">Review in Groups</a></td>
+        </tr>{% endfor %}</tbody>
+      </table></div>
+      {% endif %}
+
+    {% elif tab == "team" %}
+      <div class="mc-tools">
+        <div class="mc-headline"><h2 class="mc-h">Who does what</h2><p class="mc-lead">A Team Manager sets up the comp, invites people and runs the charity vote. A Captain leads a side.</p></div>
+        {% if is_owner %}
+        <details class="mc-nom">
+          <summary class="gx-btn is-lime"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Nominate a Team Manager</summary>
+          <form method="post" action="{% url 'orgs:members' org.id %}" hx-boost="false">{% csrf_token %}<input type="hidden" name="next" value="{{ here }}"><input type="hidden" name="action" value="nominate_manager">
+            <b>Who should help you run {{ org.name }}?</b>
+            <span>Enter a member's email. They become a Team Manager alongside you.</span>
+            <div class="mc-nom-row"><input type="email" name="email" required placeholder="their@email.com" class="mc-input" autocomplete="off"><button class="gx-btn" type="submit">Nominate</button></div>
+          </form>
+        </details>
+        {% endif %}
+      </div>
+      <div class="mc-tools">
+        <label class="gx-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Find a member" data-mc-search aria-label="Find a member"></label>
+        <span class="gx-pill is-ok" data-mc-count><i></i>{{ members|length }} member{{ members|length|pluralize }}</span>
+      </div>
+      <div class="gx-tablewrap"><table class="gx-table" data-mc-table>
+        <thead><tr><th scope="col">Member</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Change</th></tr></thead>
+        <tbody>
+        {% for m in members %}
+        <tr>
+          <td class="is-name"><span class="mc-who"><span class="mc-av">{% if m.user.avatar %}<img src="{{ m.user.avatar.url }}" alt="" loading="lazy">{% else %}{{ m.user.display_name|slice:":1"|upper }}{% endif %}</span><b>{{ m.user.display_name }}</b></span></td>
+          <td class="is-email">{{ m.user.email }}</td>
+          <td>{% for label in m.role_labels %}<span class="mc-role is-{{ label|lower }}">{{ label }}</span>{% endfor %}</td>
+          <td>
+            <details class="mc-pop">
+              <summary class="gx-btn is-ghost">Change</summary>
+              <div class="mc-pop-back" data-mc-close></div>
+              <form class="mc-pop-card" method="post" action="{% url 'orgs:members' org.id %}" hx-boost="false">{% csrf_token %}<input type="hidden" name="next" value="{{ here }}"><input type="hidden" name="action" value="set_role"><input type="hidden" name="member_id" value="{{ m.id }}">
+                <header><span class="mc-av">{% if m.user.avatar %}<img src="{{ m.user.avatar.url }}" alt="">{% else %}{{ m.user.display_name|slice:":1"|upper }}{% endif %}</span><div><span class="mc-k">Change role</span><b>{{ m.user.display_name }}</b></div><button type="button" class="mc-x" data-mc-close aria-label="Close">&times;</button></header>
+                {% for value, label in role_choices %}
+                <button type="submit" name="role" value="{{ value }}" class="mc-opt is-{{ value }}{% if m.role == value %} is-now{% endif %}">
+                  <b>{{ label }}</b>
+                  <span>{% if value == "manager" %}Sets up the comp, invites people and runs the charity vote.{% elif value == "captain" %}Leads a side and keeps their people tipping.{% elif value == "both" %}Runs the comp and leads a side.{% else %}Tips, plays and climbs the ladder.{% endif %}</span>
+                  {% if m.role == value %}<em>Current</em>{% endif %}
+                </button>
+                {% endfor %}
+              </form>
+            </details>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+
+    {% elif tab == "sports" %}
+      <div class="mc-tools">
+        <label class="gx-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search competitions or sports" data-mc-search aria-label="Search competitions"></label>
+        <span class="gx-pill is-ok" data-mc-count><i></i>{{ comp_count }} on</span>
+      </div>
+      <div class="gx-tablewrap"><table class="gx-table" data-mc-table>
+        <thead><tr><th scope="col">Competition</th><th scope="col">Sport</th><th scope="col">Includes</th><th scope="col">Status</th><th scope="col">Switch</th></tr></thead>
+        <tbody>
+        {% for r in sport_rows %}
+        <tr style="--k: {{ r.colour }}">
+          <td class="is-name"><span class="mc-who"><span class="mc-logo">{% if r.logo %}<img src="{{ r.logo }}" alt="">{% else %}{{ r.comp.name|slice:":3"|upper }}{% endif %}</span><b>{{ r.comp.name }}</b></span></td>
+          <td>{{ r.sport.name }}</td>
+          <td>{% for se in r.series %}<span class="mc-chip" style="--k: {{ se.colour }}">{{ se.name }}</span>{% endfor %}</td>
+          <td>{% if r.on %}<span class="gx-pill is-ok"><i></i>On</span>{% else %}<span class="gx-pill"><i></i>Off</span>{% endif %}</td>
+          <td><form method="post" action="{% url 'orgs:sports' org.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ here }}"><input type="hidden" name="competition" value="{{ r.comp.pk }}">
+            <button type="submit" class="mc-switch{% if r.on %} is-on{% endif %}" aria-pressed="{% if r.on %}true{% else %}false{% endif %}" title="{% if r.on %}Switch {{ r.comp.name }} off{% else %}Switch {{ r.comp.name }} on{% endif %}"><i></i><span>{% if r.on %}On{% else %}Add{% endif %}</span></button></form></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+
+    {% elif tab == "groups" %}
+      <div class="mc-tools">
+        <h2 class="mc-h" style="margin:0">Groups in {{ org.root.name }}</h2>
+        <a class="gx-btn" href="{% url 'orgs:groups' org.root.id %}" hx-boost="false">Manage groups</a>
+      </div>
+      {% if groups %}
+      <div class="gx-tablewrap"><table class="gx-table">
+        <thead><tr><th scope="col">Group</th><th scope="col">Members</th><th scope="col">Backs</th><th scope="col">Status</th><th scope="col">Started</th></tr></thead>
+        <tbody>{% for g in groups %}<tr>
+          <td class="is-name"><b>{{ g.name }}</b></td>
+          <td><b class="mc-num">{{ g.n }}</b></td>
+          <td>{{ g.charity.name|default:"Same as the organisation" }}</td>
+          <td>{% if g.approval_status == "approved" %}<span class="gx-pill is-ok"><i></i>Running</span>{% elif g.approval_status == "pending" %}<span class="gx-pill is-wait"><i></i>Waiting</span>{% else %}<span class="gx-pill is-no"><i></i>{{ g.get_approval_status_display }}</span>{% endif %}</td>
+          <td class="is-date">{{ g.created_at|date:"j M Y" }}</td>
+        </tr>{% endfor %}</tbody>
+      </table></div>
+      {% else %}
+      <div class="gx-empty"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><b>No groups yet</b><span>Split {{ org.root.name }} into teams, each with its own ladder.</span></div>
+      {% endif %}
+
+    {% elif tab == "charity" %}
+      <div class="mc-cause">
+        <div class="mc-card is-cause">
+          <span class="mc-k">Raising for</span>
+          <b>{{ org.charity_display|default:"Not chosen yet" }}</b>
+          {% if vote %}<span>A charity vote is open.</span><a class="gx-btn is-lime" href="{% url 'orgs:charity_vote' org.id %}" hx-boost="false">View the vote</a>
+          {% elif org.pending_election %}<span>Your members vote on the cause.</span><a class="gx-btn is-lime" href="{% url 'orgs:election_setup' org.id %}" hx-boost="false">Set up the election</a>{% endif %}
+        </div>
+        <div class="mc-cause-acts">
+          <a class="gx-btn is-lime" href="{% url 'orgs:charities' org.id %}?panel=add" hx-boost="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add a new charity</a>
+          <a class="gx-btn is-ghost" href="{% url 'orgs:charities' org.id %}" hx-boost="false">Support, vote or edit</a>
+        </div>
+      </div>
+      <div class="gx-tablewrap"><table class="gx-table">
+        <thead><tr><th scope="col">Charity</th><th scope="col">Website</th><th scope="col">Source</th></tr></thead>
+        <tbody>{% for c in charities %}<tr>
+          <td class="is-name"><b>{{ c.name }}</b></td>
+          <td class="is-email">{% if c.website %}<a href="{{ c.website }}" target="_blank" rel="noopener" hx-boost="false">{{ c.website|cut:"https://"|cut:"http://"|truncatechars:40 }}</a>{% else %}<span class="mc-quiet">None</span>{% endif %}</td>
+          <td>{% if c.owner_org_id == org.id %}<span class="gx-pill is-offer"><i></i>Added by you</span>{% else %}<span class="gx-pill is-ok"><i></i>GoodTip approved</span>{% endif %}</td>
+        </tr>{% endfor %}</tbody>
+      </table></div>
+
+    {% elif tab == "plan" %}
+      <div class="mc-plan">
+        <div class="mc-card is-plan">
+          <span class="mc-k">Your plan</span>
+          <b>{{ plan.label|default:"No plan chosen yet" }}</b>
+          {% if plan.price %}<span>${{ plan.price }} a year</span>{% endif %}
+          {% if plan.seats %}<div class="mc-meter"><i style="width: {% widthratio plan.used plan.seats 100 %}%"></i></div><span>{{ plan.used }} of {{ plan.seats }} places used</span>{% endif %}
+          <a class="gx-btn is-lime" href="{% url 'billing:plans' org.id %}" hx-boost="false">{% if plan.label %}Change plan{% else %}Choose a plan{% endif %}</a>
+        </div>
+        <a class="mc-card is-link" href="{% url 'billing:season_summary' org.id %}" hx-boost="false"><span class="mc-k">Money</span><b>Season summary</b><span>Entries, donations and totals.</span></a>
+        <a class="mc-card is-link" href="{% url 'tipping:certificates' org.id %}" hx-boost="false"><span class="mc-k">Winners</span><b>Champion certificates</b><span>Print or post your season champions.</span></a>
+      </div>
+
+    {% elif tab == "invite" %}
+      <div class="mc-invite">
+        <form class="mc-card mc-send" method="post" action="{% url 'orgs:invite' org.id %}" hx-boost="false">{% csrf_token %}<input type="hidden" name="next" value="{{ here }}">
+          <span class="mc-k">By email</span>
+          <b>Send invitations</b>
+          <p>We email each person a link to join {{ org.name }}.</p>
+          <label class="mc-field"><span>Email addresses</span>{{ email_form.emails }}<small>{{ email_form.emails.help_text }}</small></label>
+          <label class="mc-field"><span>A note <small>optional</small></span>{{ email_form.message }}</label>
+          <button class="gx-btn is-lime" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z"/></svg>Send invitations</button>
+        </form>
+        <div class="mc-card mc-share">
+          <span class="mc-k">By link</span>
+          <b>Share it anywhere</b>
+          <p>Anyone with this link can join {{ org.name }}.</p>
+          <div class="mc-link"><input id="inviteLink" type="text" readonly value="{{ invite_url }}" aria-label="Invite link"><button type="button" class="gx-btn" data-copy="#inviteLink">Copy</button></div>
+          {% with share="Join "|add:org.name|add:" on GoodTip" %}
+          <div class="mc-socials">
+            <a class="ow-soc is-wa" hx-boost="false" href="https://wa.me/?text={{ share|urlencode }}%20{{ invite_url|urlencode }}" target="_blank" rel="noopener"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z"/></svg></span>WhatsApp</a>
+            <a class="ow-soc is-fb" hx-boost="false" href="https://www.facebook.com/sharer/sharer.php?u={{ invite_url|urlencode }}" target="_blank" rel="noopener"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 21v-7.5H16l.4-3h-2.9V8.6c0-.9.3-1.5 1.5-1.5h1.5V4.4a20 20 0 0 0-2.2-.1c-2.2 0-3.7 1.3-3.7 3.8v2.4H8.1v3h2.5V21z"/></svg></span>Facebook</a>
+            <a class="ow-soc is-x" hx-boost="false" href="https://twitter.com/intent/tweet?text={{ share|urlencode }}&amp;url={{ invite_url|urlencode }}" target="_blank" rel="noopener"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.8 3h3l-6.6 7.6L22 21h-6.1l-4.8-6.2L5.6 21h-3l7.1-8.1L2.3 3h6.2l4.3 5.7z"/></svg></span>X</a>
+            <a class="ow-soc is-li" hx-boost="false" href="https://www.linkedin.com/sharing/share-offsite/?url={{ invite_url|urlencode }}" target="_blank" rel="noopener"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM3.3 9h3.4v11.5H3.3zm5.6 0h3.3v1.6a3.6 3.6 0 0 1 3.2-1.8c3.4 0 4.1 2.2 4.1 5.2v6.5h-3.4v-5.8c0-1.4 0-3.1-1.9-3.1s-2.2 1.5-2.2 3v5.9H8.9z"/></svg></span>LinkedIn</a>
+            <a class="ow-soc is-mail" hx-boost="false" href="mailto:?subject={{ share|urlencode }}&amp;body={{ invite_url|urlencode }}"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>Email</a>
+            <a class="ow-soc is-sms" hx-boost="false" href="sms:?&amp;body={{ share|urlencode }}%20{{ invite_url|urlencode }}"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z"/></svg></span>Text</a>
+          </div>
+          {% endwith %}
+        </div>
+      </div>
+    {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block app_js %}
+/* A role picker or the nominate form closes on Escape, on its x, or on a click
+   outside it; only one is ever open. */
+document.addEventListener('click', function (e) {
+  if (e.target.closest && e.target.closest('[data-mc-close]')) { var d = e.target.closest('details'); if (d) d.open = false; return; }
+  document.querySelectorAll('details.mc-pop[open], details.mc-nom[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+});
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.querySelectorAll('details.mc-pop[open], details.mc-nom[open]').forEach(function (d) { d.open = false; }); });
+document.addEventListener('toggle', function (e) {
+  if (e.target.matches && e.target.matches('details.mc-pop') && e.target.open) document.querySelectorAll('details.mc-pop[open]').forEach(function (d) { if (d !== e.target) d.open = false; });
+}, true);
+document.addEventListener('input', function (e) {
+  if (!e.target.matches || !e.target.matches('[data-mc-search]')) return;
+  var q = e.target.value.trim().toLowerCase(), rows = document.querySelectorAll('[data-mc-table] tbody tr'), n = 0;
+  rows.forEach(function (r) { var hit = !q || r.textContent.toLowerCase().indexOf(q) > -1; r.hidden = !hit; if (hit) n++; });
+  var c = document.querySelector('[data-mc-count]'); if (c && q) c.lastChild.textContent = n + ' of ' + rows.length;
+});
+{% endblock %}

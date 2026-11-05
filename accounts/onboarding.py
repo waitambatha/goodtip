@@ -107,9 +107,9 @@ TOURS = {
         # later screen than the one this tour opens on — and the tour runs
         # once, on arrival. The progress rail is on screen at every step, so
         # it is what this can actually count on.
-        ("org-steps", "A few short steps",
-         "Nothing here is permanent — the wizard keeps every answer, and a step "
-         "you have passed is a link back to change it."),
+        ("org-steps", "One step at a time",
+         "Finish a step and you move on to the next. Nothing is permanent: every "
+         "answer is kept, and Back returns you to any step you have passed."),
         ("org-name", "Name it the way people say it",
          "This is what members search for and what shows on the leaderboard. Your "
          "workplace or club's usual name is nearly always right."),

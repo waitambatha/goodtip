@@ -8,6 +8,7 @@ a template happened to draw.
 """
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 
 from catalog.models import Season
 from orgs.models import Message, MessageThread, OrgMember, Organisation
@@ -278,3 +279,54 @@ class OrgsDeskTests(Fixture):
         """
         r = self.client.get("/manage/orgs/", {"panel": "members"})
         self.assertContains(r, "2 members")
+
+
+class MemberDeskTests(Fixture):
+    """Admin → organisation → Members: change a role from a list of them,
+    suspend and unsuspend, and see who is suspended until when."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.owner)
+        self.url = f"/manage/org/{self.mine.id}/members/"
+        self.mo = OrgMember.objects.get(org=self.mine, user=self.member)
+
+    def test_change_sets_any_role(self):
+        self.client.post(self.url, {"action": "set_role", "member_id": self.mo.id, "role": OrgMember.ROLE_CAPTAIN})
+        self.mo.refresh_from_db()
+        self.assertEqual(self.mo.role, OrgMember.ROLE_CAPTAIN)
+        self.client.post(self.url, {"action": "set_role", "member_id": self.mo.id, "role": "emperor"})
+        self.mo.refresh_from_db()
+        self.assertEqual(self.mo.role, OrgMember.ROLE_CAPTAIN)
+
+    def test_suspend_shows_until_when_and_unsuspend_lifts_it(self):
+        from orgs.models import MemberSanction
+
+        self.client.post(self.url, {"action": "suspend", "member_id": self.mo.id, "span": "week", "reason": "Language"})
+        s = MemberSanction.objects.get(org=self.mine, user=self.member)
+        self.assertTrue(s.is_active)
+        page = self.client.get(self.url).content.decode()
+        self.assertIn("Suspended", page)
+        self.assertIn(f"Ends {timezone.localtime(s.ends_at):%-d %b %Y}", page)
+        self.assertIn("Unsuspend", page)
+        self.assertIn("Mo", self.client.get(self.url + "?role=suspended").content.decode())
+
+        self.client.post(self.url, {"action": "lift", "sanction_id": s.id})
+        s.refresh_from_db()
+        self.assertFalse(s.is_active)
+        self.assertEqual(s.lifted_by, self.owner)
+
+    def test_owner_cannot_be_suspended_or_removed(self):
+        from orgs.models import MemberSanction
+
+        me = OrgMember.objects.get(org=self.mine, user=self.owner)
+        self.client.post(self.url, {"action": "suspend", "member_id": me.id})
+        self.client.post(self.url, {"action": "remove", "member_id": me.id})
+        self.assertFalse(MemberSanction.objects.filter(user=self.owner).exists())
+        self.assertTrue(OrgMember.objects.filter(pk=me.pk).exists())
+
+    def test_another_orgs_member_is_out_of_reach(self):
+        theirs = OrgMember.objects.get(org=self.theirs, user=self.rival)
+        self.client.post(self.url, {"action": "set_role", "member_id": theirs.id, "role": OrgMember.ROLE_PARTICIPANT})
+        theirs.refresh_from_db()
+        self.assertEqual(theirs.role, OrgMember.ROLE_BOTH)

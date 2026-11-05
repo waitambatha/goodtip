@@ -34,7 +34,7 @@ that will not compile.
 {% if entries %}
 <p class="lad-note">{% if selected_series.name in "AFL AFLW NRL NRLW" %}Shaded rows are the finals places. {% endif %}{% if updated_at %}Updated {{ updated_at|timesince }} ago.{% endif %}</p>
 
-<div class="gt-listwrap" id="ladderTable" data-veil data-veil-label="Loading the ladder">
+<div class="gt-listwrap" id="ladderTable" data-veil data-veil-label="Loading the ladder" hx-boost="false">
   {# The competition's colour, on the table that is about it. #}
   <div class="gt-board ladder" data-coach="ladder-table"
        data-code="{{ selected_series.slug }}" data-cat="{{ selected_series.category }}">

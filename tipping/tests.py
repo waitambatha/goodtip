@@ -3326,6 +3326,14 @@ class LadderFilterLoadsInPlaceTests(TestCase):
         self.client.force_login(self.user)
         self.url = reverse("tipping:ladder", args=[self.org.id])
 
+    def test_a_clubs_stats_link_is_a_real_navigation(self):
+        """The page swaps #ladderPage in place; a club's page has none, so a
+        boosted link would land on an empty screen until it was reloaded."""
+        from django.template.loader import get_template
+
+        source = get_template("partials/ladder_table.html").template.source
+        self.assertIn('id="ladderTable" data-veil data-veil-label="Loading the ladder" hx-boost="false"', source)
+
     def test_the_page_carries_the_swap_target(self):
         body = self.client.get(self.url).content
         self.assertIn(b'id="ladderPane"', body)

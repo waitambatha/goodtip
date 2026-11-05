@@ -1,0 +1,10 @@
+{% load static %}{% comment %}One story as a card — the All news design (client, 5 Nov 2026), shared by the news page, the dashboard and the reader's Keep reading. Expects p.{% endcomment %}{% with sl=p.card_slides.0 %}
+<a class="nw-card" hx-boost="false" href="{{ p.get_absolute_url }}" style="--fill: {{ p.code_fill }}"{% if hide %} hidden{% endif %}>
+  <span class="nw-card-pic" style="background-image:url('{% if sl.kind == 'scene' %}{% static sl.url %}{% else %}{{ sl.url }}{% endif %}'), url('{% static p.fallback_scenes.0 %}')"></span>
+  <span class="nw-card-tags">{% include "partials/_story_badges.html" with post=p %}</span>
+  <span class="nw-card-b">
+    <b>{{ p.title }}</b>
+    <span class="nw-glimpse">{{ p.excerpt|default:p.body|striptags|truncatechars:190 }}</span>
+    <span class="nw-foot"><small>{{ p.published_at|date:"j M Y" }}</small><span class="nw-read">Read more <i aria-hidden="true">&rarr;</i></span></span>
+  </span>
+</a>{% endwith %}

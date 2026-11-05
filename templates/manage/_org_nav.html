@@ -1,0 +1,13 @@
+{% comment %}One organisation's own menu, on every page about it. Expects org, org_tab.{% endcomment %}
+<div class="og-bar">
+  <a class="og-back" href="{% url 'manage:orgs_list' %}" aria-label="All organisations"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></a>
+  <span class="og-badge">{% if org.logo %}<img src="{{ org.logo.url }}" alt="">{% else %}{{ org.name|slice:":2"|upper }}{% endif %}</span>
+  <div class="og-name"><b>{{ org.name }}</b><small>{% if org.parent_id %}Part of {{ org.parent.name }} &middot; {% endif %}{{ org.season }} season</small></div>
+  <nav class="og-tabs" aria-label="{{ org.name }}">
+    <a class="{% if org_tab == 'home' %}on{% endif %}" href="{% url 'manage:org_home' org.id %}">Dashboard</a>
+    <a class="{% if org_tab == 'members' %}on{% endif %}" href="{% url 'manage:org_members' org.id %}">Members</a>
+    <a class="{% if org_tab == 'groups' %}on{% endif %}" href="{% url 'manage:org_groups' org.id %}">Groups</a>
+    <a class="{% if org_tab == 'sports' %}on{% endif %}" href="{% url 'manage:org_sports' org.id %}">Sports</a>
+    <a class="{% if org_tab == 'rounds' %}on{% endif %}" href="{% url 'manage:org_rounds' org.id %}">Rounds</a>
+  </nav>
+</div>

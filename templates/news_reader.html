@@ -45,8 +45,6 @@ gradient over the whole article.
   <script src="{% static 'js/gt-scenes.js' %}" defer></script>
   <script src="{% static 'js/gt-share.js' %}" defer></script>
   <script src="{% static 'js/gt-slides.js' %}" defer></script>
-  {# the pictures inside the story cards at the foot of the page #}
-  <script src="{% static 'js/gt-news-cards.js' %}" defer></script>
   {% include "partials/_news_og.html" %}
   {% include "partials/_analytics.html" %}
 </head>
@@ -102,23 +100,9 @@ gradient over the whole article.
   {% if is_holding %}{% include "public/partials/_holding_programme.html" %}{% endif %}
 
   <main class="rd-main">
-    <article class="rd-art">
-      <header class="rd-head">
-        {% comment %}
-        Every code the story is filed under. A piece about AFLW and NRLW
-        carries both — see NewsPost.tags — and showing only the first would
-        put it back to looking like a story about one of them.
-        {% endcomment %}
-        <div class="rd-tags">{% include "partials/_news_tags.html" with post=post %}</div>
-        {% comment %}
-        HEADLINE ABOVE THE PICTURE. On a phone, picture-first means the first
-        two-thirds of the screen is a stock photograph and you scroll to find
-        out what the story is — the picture doing the job of a headline, which
-        is a job it cannot do.
-        {% endcomment %}
-        <h1 class="rd-title">{% if post.title_html %}{{ post.title_html|safe }}{% else %}{{ post.title }}{% endif %}</h1>
-        {% if post.excerpt_html %}<p class="rd-lead">{{ post.excerpt_html|safe }}</p>
-        {% elif post.excerpt %}<p class="rd-lead">{{ post.excerpt }}</p>{% endif %}
+  <div class="rd-box">
+    <article class="rd-art" style="--story: {{ post.code_fill }}">
+      <div class="rd-topline">
         <div class="rd-byline">
           {% if post.created_by %}
           <span class="rd-who">
@@ -133,55 +117,14 @@ gradient over the whole article.
             {{ post.published_at|date:"j F Y" }} &middot; {{ post.published_at|naturaltime }}
           </span>
         </div>
+              <div class="rd-tags">{% include "partials/_story_badges.html" with post=post %}</div>
+        {% include "partials/_news_share.html" with prefix="rd" %}
+      </div>
+      <header class="rd-head">
+        <h1 class="rd-title">{% if post.title_html %}{{ post.title_html|safe }}{% else %}{{ post.title }}{% endif %}</h1>
+        {% if post.excerpt_html %}<p class="rd-lead">{{ post.excerpt_html|safe }}</p>
+        {% elif post.excerpt %}<p class="rd-lead">{{ post.excerpt }}</p>{% endif %}
       </header>
-
-      {% comment %}
-      THE PICTURES AT THE TOP — the story's featured set, turning.
-
-      NOT CROPPED. This used to be a CSS background forced to 16:9 with
-      `cover`, and every featured picture on the site is 3:2 or 4:3 — so a
-      quarter of each one was cut off, and these are infographics: the part
-      that went was a heading, a label, a row of logos. The client's word for
-      it was "horrible". Each frame is a real <img> or <video> now, shown whole
-      on the deep green (object-fit: contain), in a frame whose height follows
-      the first picture's own shape up to a ceiling.
-
-      Real elements rather than backgrounds, which also means a real `alt`
-      instead of the role="img" workaround a background needed.
-
-      Up to three pictures and three videos (NewsMedia); gt-news-cards.js
-      turns them every three seconds, the same as the card. A story with no
-      pictures of its own still gets the rotating match-day shots.
-      {% endcomment %}
-      {% with fm=post.featured_media %}
-      {% if fm %}
-      <figure class="rd-hero rd-gallery{% if fm|length > 1 %} can-turn{% endif %}"
-              {% if fm|length > 1 %}data-card-shots data-every="3000"{% endif %}>
-        {% for m in fm %}
-        <div class="rd-frame ndc-shot{% if forloop.first %} on{% endif %}" data-shot>
-          {% if m.kind == "video" %}
-          <video src="{{ m.url }}" muted playsinline loop preload="metadata"{% if not forloop.first %} tabindex="-1"{% endif %}></video>
-          {% else %}
-          <img src="{{ m.url }}" alt="{{ m.alt }}"{% if not forloop.first %} loading="lazy"{% endif %}>
-          {% endif %}
-        </div>
-        {% endfor %}
-        {% if fm|length > 1 %}<span class="ndc-pips rd-pips" aria-hidden="true">{% for m in fm %}<i{% if forloop.first %} class="on"{% endif %}></i>{% endfor %}</span>{% endif %}
-      </figure>
-      {% else %}
-      {% comment %}
-      No picture on the post, so the slot rotates through the site's own
-      match-day shots rather than sitting as a flat green panel. Same markup
-      the heroes use, so gt-scenes.js drives it without extra wiring.
-      {% endcomment %}
-      <figure class="rd-hero rd-hero-shots" data-shots>
-        <div class="shot on" style="background-image:url('{% static 'img/scenes/mcg-match.jpg' %}')"></div>
-        <div class="shot" style="background-image:url('{% static 'img/scenes/stadium-lights-grass.jpg' %}')"></div>
-        <div class="shot" style="background-image:url('{% static 'img/scenes/aussie-crowd-flag.jpg' %}')"></div>
-      </figure>
-      {% endif %}
-      {% endwith %}
-
       <div class="rd-prose">{{ body_html|safe }}</div>
 
       {% if tease_html %}
@@ -248,7 +191,6 @@ gradient over the whole article.
       and a lead are a perfectly good thing to send someone, and the person
       who receives it gets the same first third.
       {% endcomment %}
-      {% include "partials/_news_share.html" with prefix="rd" %}
     </article>
 
     {% comment %}
@@ -265,45 +207,21 @@ gradient over the whole article.
     control. The addresses are the thing that must not drift, and they are one
     edit apart in the same repository.
     {% endcomment %}
-    <section class="rd-socials" aria-labelledby="rdSocialsH">
-      <h2 id="rdSocialsH">Follow GoodTip</h2>
-      <p>Every competition, every round, and where the money goes.</p>
-      <div class="rd-social-row">
-        <a class="rd-social s-email" href="mailto:hello@goodtip.com.au" aria-label="Email GoodTip">
-          <span class="rds-ic"><svg><use href="#s-mail"/></svg></span><span class="rds-lab">Email</span>
-        </a>
-        <a class="rd-social s-linkedin" href="https://www.linkedin.com/company/good-tip-australia/" target="_blank" rel="noopener" aria-label="GoodTip on LinkedIn">
-          <span class="rds-ic"><svg><use href="#s-linkedin"/></svg></span><span class="rds-lab">LinkedIn</span>
-        </a>
-        <a class="rd-social s-facebook" href="https://www.facebook.com/profile.php?id=61593478288209" target="_blank" rel="noopener" aria-label="GoodTip on Facebook">
-          <span class="rds-ic"><svg><use href="#s-facebook"/></svg></span><span class="rds-lab">Facebook</span>
-        </a>
-        <a class="rd-social s-instagram" href="https://www.instagram.com/goodtip_mate?igsh=MTZibnM2YWtyM3lrcg%3D%3D&amp;utm_source=qr" target="_blank" rel="noopener" aria-label="GoodTip on Instagram">
-          <span class="rds-ic"><svg><use href="#s-instagram"/></svg></span><span class="rds-lab">Instagram</span>
-        </a>
-        <a class="rd-social s-youtube" href="https://www.youtube.com/@GoodTip_Australia" target="_blank" rel="noopener" aria-label="GoodTip on YouTube">
-          <span class="rds-ic"><svg><use href="#s-youtube"/></svg></span><span class="rds-lab">YouTube</span>
-        </a>
-      </div>
-    </section>
-
     {% if more %}
-    <section class="rd-more">
-      <div class="rd-more-h">
-        <h2>More from GoodTip</h2>
-        <a href="{% url 'news_index' %}">All news &amp; blog &rarr;</a>
+    <section class="rd-next" aria-labelledby="rdNextH">
+      <div class="rd-next-h">
+        <h2 id="rdNextH">Keep reading</h2>
+        <a href="{% url 'news_index' %}">All news &amp; blog</a>
       </div>
-      {% comment %}
-      The same story card the dashboard deck and the news list render. It was
-      a third card shape written only for this row — which meant three cards
-      for one kind of thing, kept looking alike by hand, and only two of them
-      ever getting a change. See partials/_news_deck_card.html.
-      {% endcomment %}
-      <div class="rd-more-grid">
-        {% for p in more|slice:":3" %}{% include "partials/_news_deck_card.html" with p=p %}{% endfor %}
+      <div class="rd-next-grid" data-rdturn>
+        {% for p in more %}
+        {% include "partials/_news_card.html" %}
+        {% endfor %}
       </div>
     </section>
     {% endif %}
+  </div>
+
   </main>
 
   {% comment %}
@@ -315,5 +233,61 @@ gradient over the whole article.
   set of other pages a holding visitor must not be able to click into.
   {% endcomment %}
   {% if is_holding %}{% include "public/partials/_holding_footer.html" %}{% else %}{% include "public/partials/_footer.html" %}{% endif %}
+<script>
+/* A story's pictures. Press one to expand it, press again (or Escape) to put it
+   back. A slot holding several shows one at a time, turning until it is pointed
+   at or expanded. */
+document.addEventListener('click', function (e) {
+  var open = document.querySelector('.rd-fig.is-big');
+  if (open) { open.classList.remove('is-big'); return; }
+  var fig = e.target.closest && e.target.closest('.rd-fig');
+  if (fig && !e.target.closest('video')) fig.classList.add('is-big');
+});
+document.addEventListener('keydown', function (e) {
+  var open = document.querySelector('.rd-fig.is-big');
+  if (open && e.key === 'Escape') open.classList.remove('is-big');
+});
+/* Reaching a paragraph with a picture, the picture grows from a third to half. */
+(function () {
+  var art = document.querySelector('.rd-art'), rows = document.querySelectorAll('.rd-row');
+  if (!rows.length || !('IntersectionObserver' in window)) return;
+  var box = art && art.scrollHeight > art.clientHeight + 4 ? art : null;
+  var seen = new IntersectionObserver(function (items) {
+    items.forEach(function (i) { i.target.classList.toggle('is-near', i.isIntersecting); });
+  }, { root: box, rootMargin: '-30% 0px -30% 0px' });
+  rows.forEach(function (r) { seen.observe(r); });
+})();
+
+/* The stories below: three at a time, turning through them all. */
+document.querySelectorAll('[data-rdturn]').forEach(function (grid) {
+  var cards = Array.prototype.slice.call(grid.children), at = 0, size = 3;
+  function show() {
+    cards.forEach(function (c, i) {
+      var n = (i - at + cards.length) % cards.length;
+      c.hidden = n >= size;
+      c.classList.toggle('is-in', n < size);
+    });
+  }
+  show();
+  if (cards.length <= size) return;
+  setInterval(function () {
+    if (grid.matches(':hover')) return;
+    at = (at + size) % cards.length;
+    show();
+  }, 6000);
+});
+
+document.querySelectorAll('.rd-fig').forEach(function (fig) {
+  var shots = fig.querySelectorAll('img, video');
+  if (shots.length < 2) return;
+  var at = 0;
+  setInterval(function () {
+    if (fig.matches(':hover') || fig.classList.contains('is-big')) return;
+    shots[at].classList.remove('on');
+    at = (at + 1) % shots.length;
+    shots[at].classList.add('on');
+  }, 3500);
+});
+</script>
 </body>
 </html>
