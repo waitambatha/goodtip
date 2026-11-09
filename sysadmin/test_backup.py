@@ -92,6 +92,58 @@ class CopyEverythingTests(_TwoDatabases):
 
 
 @override_settings(STAGING_GATE=False)
+class SameRowOnBothSidesTests(_TwoDatabases):
+    """The 7 Nov 2026 outage. A live round that staging already holds under
+    its own id (same organisation, round number and series) was refused by the
+    database on every 15-second pass, forever, and the error lines filled the
+    disk and stopped both sites. It is adopted now, and nothing is retried."""
+
+    def setUp(self):
+        super().setUp()
+        from catalog.models import Series, Sport
+        from tipping.models import Round
+
+        for db in ("default", SRC):
+            sport, _ = Sport.objects.using(db).get_or_create(slug="dup-sport", defaults={"name": "Dup Sport"})
+            Series.objects.using(db).get_or_create(slug="dup-series", defaults={"name": "Dup Series", "sport": sport})
+        when = timezone.now() + timedelta(days=3)
+        self.live_round = Round.objects.using(SRC).create(
+            org=self.live_org, round_number=2, series=Series.objects.using(SRC).get(slug="dup-series"),
+            lockout_at=when,
+        )
+        self.staging_round = Round.objects.create(
+            org=self.org, round_number=2, series=Series.objects.get(slug="dup-series"), lockout_at=when,
+        )
+
+    def test_the_staging_copy_is_adopted_not_inserted_again(self):
+        from tipping.models import Round
+
+        backup._FAILED.clear()
+        with self.assertNoLogs("sysadmin.backup", level="INFO"):
+            backup.copy_everything(SRC)
+            backup.copy_everything(SRC)
+        self.assertEqual(Round.objects.filter(org=self.org, round_number=2).count(), 1)
+        rec = BackupRecord.objects.get(model_label="tipping.round", live_pk=str(self.live_round.pk))
+        self.assertEqual(rec.staging_pk, str(self.staging_round.pk))
+        self.assertFalse(backup._FAILED)
+
+    def test_a_row_that_fails_is_tried_once_per_process(self):
+        from unittest import mock
+
+        from django.db import IntegrityError
+
+        backup._FAILED.clear()
+        with mock.patch.object(backup, "_already_here", return_value=None), \
+                mock.patch("django.db.models.query.QuerySet.bulk_create", side_effect=IntegrityError("dup")) as bulk:
+            backup.copy_everything(SRC)
+            first = bulk.call_count
+            backup.copy_everything(SRC)
+        self.assertIn(("tipping.round", str(self.live_round.pk)), backup._FAILED)
+        # The second pass attempted nothing it had already failed on.
+        self.assertLessEqual(bulk.call_count - first, first)
+        backup._FAILED.clear()
+
+
 class DeleteRuleTests(_TwoDatabases):
     def setUp(self):
         super().setUp()

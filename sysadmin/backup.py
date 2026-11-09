@@ -441,6 +441,43 @@ def copy_everything(source: str, *, log=None) -> dict:
     return results
 
 
+# Rows that could not be inserted in this process, by (table, live id). The
+# watcher is one long-running process that copies every 15 seconds; a row that
+# fails is otherwise tried again on every pass, and each failed INSERT is an
+# ERROR in PostgreSQL's log and a line in the system log. That loop filled the
+# server's disk on 7 Nov 2026 (69 GB of the same handful of rounds) and took
+# both sites down. Tried once per process now; a restart tries again.
+_FAILED: set[tuple[str, str]] = set()
+
+
+def _unique_keys(model) -> list[list[str]]:
+    """Every set of columns that identifies a row of `model`, as attnames:
+    unique fields, unique_together and unconditional UniqueConstraints."""
+    meta = model._meta
+    keys = []
+    for f in meta.concrete_fields:
+        if f.unique and not f.primary_key:
+            keys.append([f.attname])
+    for group in meta.unique_together:
+        keys.append([meta.get_field(n).attname for n in group])
+    for c in meta.constraints:
+        if isinstance(c, models.UniqueConstraint) and c.fields and c.condition is None and not c.expressions:
+            keys.append([meta.get_field(n).attname for n in c.fields])
+    return keys
+
+
+def _already_here(model, data, keys):
+    """The staging row that is the same row as `data` by one of its unique
+    keys — the same round of the same organisation, say — or None."""
+    for key in keys:
+        if any(k not in data or data[k] is None for k in key):
+            continue
+        hit = model._base_manager.filter(**{k: data[k] for k in key}).values_list("pk", flat=True).first()
+        if hit is not None:
+            return hit
+    return None
+
+
 def _copy_table(model, source, mapper, pending, now, say) -> int:
     from .models import BackupRecord
 
@@ -500,7 +537,22 @@ def _copy_table(model, source, mapper, pending, now, say) -> int:
             new_objs.append((live_pk, {**data, **dict.fromkeys(file_atts, "")}))
 
     created = 0
+    keys = _unique_keys(model) if new_objs else []
     for live_pk, data in new_objs:
+        if (label, str(live_pk)) in _FAILED:
+            skipped += 1
+            continue
+        # ALREADY ON STAGING UNDER ITS OWN ID: adopt it rather than insert a
+        # second copy the database will refuse. The next pass then keeps it
+        # in step with live like any other backed-up row.
+        here = _already_here(model, data, keys)
+        if here is not None:
+            BackupRecord.objects.get_or_create(
+                model_label=label, staging_pk=str(here),
+                defaults={"live_pk": str(live_pk), "synced_at": now},
+            )
+            mapper.remember(model, live_pk, here)
+            continue
         obj = model(**data)
         try:
             with transaction.atomic():
@@ -517,6 +569,7 @@ def _copy_table(model, source, mapper, pending, now, say) -> int:
             created += 1
         except IntegrityError as exc:
             skipped += 1
+            _FAILED.add((label, str(live_pk)))
             logger.info("backup: %s live #%s not copied: %s", label, live_pk, exc)
 
     # Many-to-many tables made by Django itself, copied once both ends exist.
