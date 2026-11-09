@@ -450,29 +450,73 @@ def copy_everything(source: str, *, log=None) -> dict:
 _FAILED: set[tuple[str, str]] = set()
 
 
-def _unique_keys(model) -> list[list[str]]:
-    """Every set of columns that identifies a row of `model`, as attnames:
-    unique fields, unique_together and unconditional UniqueConstraints."""
+def _unique_keys(model) -> list[tuple[list[str], object]]:
+    """Every set of columns that identifies a row of `model`, as attnames,
+    with the condition under which it applies (None for always): unique
+    fields, unique_together and UniqueConstraints — conditional ones too, such
+    as a match's external id, unique per round only when it has one."""
     meta = model._meta
     keys = []
     for f in meta.concrete_fields:
         if f.unique and not f.primary_key:
-            keys.append([f.attname])
+            keys.append(([f.attname], None))
     for group in meta.unique_together:
-        keys.append([meta.get_field(n).attname for n in group])
+        keys.append(([meta.get_field(n).attname for n in group], None))
     for c in meta.constraints:
-        if isinstance(c, models.UniqueConstraint) and c.fields and c.condition is None and not c.expressions:
-            keys.append([meta.get_field(n).attname for n in c.fields])
+        if isinstance(c, models.UniqueConstraint) and c.fields and not c.expressions:
+            keys.append(([meta.get_field(n).attname for n in c.fields], c.condition))
     return keys
+
+
+def _row_meets(model, data, q) -> bool | None:
+    """Whether a row with `data` falls under a constraint's condition `q`.
+    Understands what the models here use — `field`, `field__exact`,
+    `field__isnull`, joined by AND/OR and negated — and answers None for
+    anything else, which the caller treats as "do not adopt"."""
+    from django.db.models import Q
+
+    results = []
+    for child in q.children:
+        if isinstance(child, Q):
+            r = _row_meets(model, data, child)
+        else:
+            lookup, want = child
+            name, _, op = lookup.partition("__")
+            try:
+                att = model._meta.get_field(name).attname
+            except Exception:  # noqa: BLE001
+                return None
+            if att not in data:
+                return None
+            have = data[att]
+            if op in ("", "exact"):
+                r = str(have) == str(want) if have is not None and want is not None else have is want
+            elif op == "isnull":
+                r = (have is None) == bool(want)
+            else:
+                return None
+        if r is None:
+            return None
+        results.append(r)
+    out = all(results) if q.connector == Q.AND else any(results)
+    return (not out) if q.negated else out
 
 
 def _already_here(model, data, keys):
     """The staging row that is the same row as `data` by one of its unique
-    keys — the same round of the same organisation, say — or None."""
-    for key in keys:
+    keys — the same round of the same organisation, say — or None. A key that
+    only applies under a condition only matches rows under that condition."""
+    for key, condition in keys:
         if any(k not in data or data[k] is None for k in key):
             continue
-        hit = model._base_manager.filter(**{k: data[k] for k in key}).values_list("pk", flat=True).first()
+        rows = model._base_manager.filter(**{k: data[k] for k in key})
+        if condition is not None:
+            # Only a row the rule covers can clash under it: an organisation's
+            # recap and a group's are different rows with the same org and round.
+            if _row_meets(model, data, condition) is not True:
+                continue
+            rows = rows.filter(condition)
+        hit = rows.values_list("pk", flat=True).first()
         if hit is not None:
             return hit
     return None

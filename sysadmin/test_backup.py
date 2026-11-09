@@ -127,6 +127,22 @@ class SameRowOnBothSidesTests(_TwoDatabases):
         self.assertEqual(rec.staging_pk, str(self.staging_round.pk))
         self.assertFalse(backup._FAILED)
 
+    def test_a_conditional_rule_adopts_only_rows_it_covers(self):
+        from tipping.models import Match, Round
+
+        from orgs.models import RoundRecap
+
+        # A match's external id is unique per round only when it has one.
+        rule = next(c for c in Match._meta.constraints if c.name == "uniq_match_external_per_round").condition
+        rows = {"round_id": self.staging_round.pk, "external_id": "EXT-1"}
+        self.assertTrue(backup._row_meets(Match, rows, rule))
+        self.assertFalse(backup._row_meets(Match, {**rows, "external_id": ""}, rule))
+        # An organisation's recap and a group's are different rows.
+        org_rule = next(c for c in RoundRecap._meta.constraints if c.name == "uniq_recap_per_org_round").condition
+        self.assertTrue(backup._row_meets(RoundRecap, {"group_id": None}, org_rule))
+        self.assertFalse(backup._row_meets(RoundRecap, {"group_id": 7}, org_rule))
+        self.assertIsInstance(Round.objects.first(), Round)
+
     def test_a_row_that_fails_is_tried_once_per_process(self):
         from unittest import mock
 
