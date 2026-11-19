@@ -22,10 +22,10 @@ leagues tipping the game.
 {% endcomment %}
 <div class="st-page" style="--board: {{ series.colour }}">
 <section class="cp-head club-head">
-  <a class="cp-back" href="{% url 'tipping:ladder' org.id %}?series={{ series.slug }}">Ladder</a>
+  <a class="cp-back" href="{% url 'tipping:ladder' org.id %}?series={{ series.slug }}" aria-label="Back to the {{ series.name }} ladder"><svg aria-hidden="true"><use href="#ic-arrow-left"/></svg><span>Ladder</span></a>
   <span class="st-crest">{% crest team %}</span>
   <h1>{{ team.name }}</h1>
-  <p>{{ series.name }} &middot; {{ org.season }}{% if entry %} &middot; Ladder position {{ entry.rank }}{% endif %}</p>
+  <p>{{ series.name }} &middot; {{ season_label }}{% if entry %} &middot; Ladder position {{ entry.rank }}{% endif %}</p>
 </section>
 
 <div class="tk-sheet lad-sheet">

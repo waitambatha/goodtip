@@ -98,7 +98,7 @@ Expects: menu (accounts.views._sports_menu), org.
     b.addEventListener('click', function (e) {
       e.stopPropagation();
       var btn = document.querySelector('.an-ctx-btn');
-      if (btn) { window.scrollTo({top: 0, behavior: 'smooth'}); setTimeout(function () { btn.click(); btn.focus(); }, 60); }
+      if (btn) { window.scrollTo({top: 0, behavior: 'smooth'}); document.querySelectorAll('.page-sheet, .page-sheet > .gx').forEach(function (f) { f.scrollTo({top: 0, behavior: 'smooth'}); }); setTimeout(function () { btn.click(); btn.focus(); }, 60); }
     });
   });
   /* Pop-overs on this page (the pin panel): one open at a time, closed by a
@@ -120,8 +120,50 @@ Expects: menu (accounts.views._sports_menu), org.
     if (b) { b.setAttribute('aria-expanded', String(!shut)); b.setAttribute('aria-label', shut ? 'Open the sports menu' : 'Fold the sports menu'); }
     try { localStorage.setItem('gtSportsShut', shut ? '1' : '0'); } catch (e) {}
   }
-  fold(box.classList.contains('is-shut'));
-  box.querySelector('[data-ds-fold]').addEventListener('click', function () { fold(!box.classList.contains('is-shut')); });
+  /* ON A PHONE (13 Nov 2026) the column is not a column: it sits above the
+     fixtures as one bar, "Sports · N on GoodTip", closed until pressed. The
+     desktop icon-rail fold means nothing at that width, so it is set aside
+     (not forgotten — the saved choice is untouched) and the same button, or
+     the bar itself, opens and closes the list instead. */
+  var phone = window.matchMedia('(max-width: 760px)');
+  function mobileOpen(open) {
+    box.classList.toggle('m-open', open);
+    var b = box.querySelector('[data-ds-fold]');
+    if (b) { b.setAttribute('aria-expanded', String(open)); b.setAttribute('aria-label', open ? 'Close the sports menu' : 'Open the sports menu'); }
+  }
+  if (phone.matches) { box.classList.remove('is-shut'); mobileOpen(false); }
+  else fold(box.classList.contains('is-shut'));
+  box.querySelector('.ds-head').addEventListener('click', function (e) {
+    if (!phone.matches) return;
+    e.preventDefault(); e.stopPropagation();
+    mobileOpen(!box.classList.contains('m-open'));
+  }, true);
+  box.querySelector('[data-ds-fold]').addEventListener('click', function () {
+    if (phone.matches) return;
+    fold(!box.classList.contains('is-shut'));
+  });
+  /* ALL SPORTS ON A PHONE IS ONE LINE (client, 14 Nov 2026: "on all sports I
+     want one line, no drop down ... where we have both the female and male
+     let them just follow each other"). The by-sport tree stays as it is for
+     the laptop column; on a phone its competitions — every sport, men's and
+     women's side by side — are laid out in one swipeable row instead. They
+     are the tree's own links (cloned, then given to htmx), so a press filters
+     the fixtures in place exactly as the column does. Built from the markup
+     rather than by CSS, because a closed <details> hides its contents from
+     any styling. */
+  if (phone.matches) {
+    var flat = document.createElement('div');
+    flat.className = 'ds-flat';
+    box.querySelectorAll('.ds-sports .ds-comp').forEach(function (a) {
+      if (a.classList.contains('is-off')) return;
+      flat.appendChild(a.cloneNode(true));
+    });
+    var tree = box.querySelector('.ds-sports');
+    if (tree && flat.children.length) {
+      tree.parentNode.insertBefore(flat, tree);
+      if (window.htmx) window.htmx.process(flat);
+    }
+  }
   /* Folded, a sport's icon opens the column rather than a dropdown nobody
      can see. */
   box.addEventListener('click', function (e) {

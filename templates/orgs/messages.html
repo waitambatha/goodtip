@@ -33,6 +33,7 @@ carried by every page on the site to serve one.
 {% endcomment %}
 <link rel="stylesheet" href="{% static 'css/gt-messages.css' %}">
 <script src="{% static 'js/gt-chat.js' %}" defer></script>
+<script src="{% static 'js/gt-typing.js' %}" defer></script>
 <script src="{% static 'js/gt-messages.js' %}" defer></script>
 <script src="{% static 'js/gt-voice.js' %}" defer></script>
 {% endblock %}
@@ -247,7 +248,8 @@ gt-messages.js and the .gtm-page media queries.
               data-find="{{ c.title|lower }} {{ c.subtitle|lower }} {{ c.preview|lower }}">
             <a href="{% url 'orgs:member_message_thread' c.org.id c.id %}"
                hx-get="{% url 'orgs:member_message_thread' c.org.id c.id %}?pane=room"
-               hx-target="[data-gtm-chat-slot]" hx-swap="innerHTML"
+               hx-target="[data-gtm-chat-slot]" hx-swap="innerHTML" data-veil-now
+               data-veil-for="[data-gtm-chat-slot]" data-veil-label="Opening {{ c.title }}"
                hx-push-url="{% url 'orgs:member_message_thread' c.org.id c.id %}" data-gtm-open>
               <span class="gtm-av {{ c.face }}" aria-hidden="true">
                 {% if c.avatar_user and c.avatar_user.avatar %}<img src="{{ c.avatar_user.avatar.url }}" alt="">
@@ -313,13 +315,13 @@ gt-messages.js and the .gtm-page media queries.
           <a class="gtm-dir{% if thread.kind == 'org' and thread.org_id == o.id %} on{% endif %}"
              data-gtm-open
              href="{% url 'orgs:message_room' o.id %}"
-             hx-get="{% url 'orgs:message_room' o.id %}?pane=room"
-             hx-target="[data-gtm-chat-slot]" hx-swap="innerHTML"
+             hx-get="{% url 'orgs:message_room' o.id %}?pane=room"{% if o.logo %} data-veil-logo="{{ o.logo.url }}"{% endif %}
+             hx-target="[data-gtm-chat-slot]" hx-swap="innerHTML" data-veil-now data-veil-for="[data-gtm-chat-slot]" data-veil-label="Opening {{ o.name }}"
              hx-push-url="{% url 'orgs:message_room' o.id %}">
             <span class="gtm-av org" aria-hidden="true"><svg><use href="#ic-f-org"/></svg></span>
             <span class="gtm-dir-txt">
               <b>{{ o.name }}</b>
-              <i>Everyone &middot; {{ o.members.count }} member{{ o.members.count|pluralize }}</i>
+              <i>Everyone &middot; {{ o.n_members }} member{{ o.n_members|pluralize }}</i>
             </span>
             <svg class="gtm-mem-go" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
           </a>
@@ -344,7 +346,7 @@ gt-messages.js and the .gtm-page media queries.
              data-gtm-open
              href="{% url 'orgs:message_group_room' g.org.id g.id %}"
              hx-get="{% url 'orgs:message_group_room' g.org.id g.id %}?pane=room"
-             hx-target="[data-gtm-chat-slot]" hx-swap="innerHTML"
+             hx-target="[data-gtm-chat-slot]" hx-swap="innerHTML" data-veil-now data-veil-for="[data-gtm-chat-slot]" data-veil-label="Opening {{ g.name }}"
              hx-push-url="{% url 'orgs:message_group_room' g.org.id g.id %}">
             <span class="gtm-av group" aria-hidden="true">{{ g.name|slice:":1"|upper }}</span>
             <span class="gtm-dir-txt">
@@ -354,7 +356,7 @@ gt-messages.js and the .gtm-page media queries.
               one: two organisations can both have a group called "Finance", and
               a list that names it only sometimes is a list you have to check.
               {% endcomment %}
-              <i>{{ g.org.name }} &middot; {{ g.memberships.count }} member{{ g.memberships.count|pluralize }}</i>
+              <i>{{ g.org.name }} &middot; {{ g.n_members }} member{{ g.n_members|pluralize }}</i>
             </span>
             <svg class="gtm-mem-go" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
           </a>

@@ -68,77 +68,18 @@ public heroes already use and there is no new script.
 is-centred is gone: a centred column beside a picture is a column that has lost
 an argument with it.
 {% endcomment %}
-<div class="dept-hero dh-noart">
-  <div class="dh-copy">
-    <div class="gh-eyebrow is-title">{{ org.name }}</div>
-    <h1 class="dh-word">Groups</h1>
-    {% if org.groups_enabled %}
-    <p class="dh-lead">Find your team inside {{ org.name }}, or start it if it isn't here yet. A group has its own ladder and its own wall — everyone still tips the same fixtures.</p>
-    {% else %}
-    <p class="dh-lead">Split {{ org.name }} into teams — Marketing, IT, Sales — each with its own ladder.</p>
-    {% endif %}
+{% comment %}
+GROUPS, IN THE CONSOLE'S LOOK (client, 17 Nov 2026: "borrow from the super
+admin ... a menu like tabs, I click it and I see the whole context in itself,
+independent ... and have that search").
 
-    {% if org.groups_enabled %}
-    <div class="dh-acts">
-      {% comment %}
-      Opens the picker rather than jumping to a form further down the page. The
-      form that used to live down there asked for a name, a kind and a
-      description as three separate optional-looking fields, which is three
-      decisions before you have made the one that matters.
-      {% endcomment %}
-      {% comment %}
-      LOCKED, NOT MISSING. An organisation whose plan does not include groups
-      still sees this button — greyed, disabled, with the reason and the way
-      out underneath (client: "don't just hide the option, they should see
-      what they're missing and get a clear upgrade path").
-
-      It can be reached in the first place because groups_enabled and the plan
-      are two different facts: every organisation that switched groups on
-      before the gate existed is still switched on, keeps the groups it has,
-      and finds this button locked when it goes to add the next one.
-      {% endcomment %}
-      {% if groups_gate %}
-      <button type="button" data-coach="groups-create" class="abtn abtn-primary abtn-lg dh-cta" data-group-open>
-        <svg class="cic" aria-hidden="true" viewBox="0 0 24 24"><path d="M11 5a1 1 0 1 1 2 0v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5Z"/></svg>
-        Create group
-      </button>
-      {% else %}
-      <button type="button" class="abtn abtn-primary abtn-lg dh-cta is-locked" disabled
-              aria-describedby="groupsLockNote">
-        <svg class="lk-pad" aria-hidden="true"><use href="#ic-lock"/></svg>
-        Create group
-      </button>
-      {% endif %}
-      {% if is_admin %}
-      <form method="post" action="{% url 'orgs:groups_toggle' org.id %}" data-busy="Switching off"
-            data-confirm="Every group and every tip in them stays exactly where it is. This only takes groups out of the nav."
-            data-confirm-title="Switch groups off?" data-confirm-ok="Switch off">
-        {% csrf_token %}
-        <button type="submit" class="abtn abtn-ghost abtn-lg dh-cta">Switch groups off for {{ org.name }}</button>
-      </form>
-      {% endif %}
-    </div>
-    {% if not groups_gate %}
-    <div id="groupsLockNote">{% include "billing/_groups_locked.html" %}</div>
-    {% endif %}
-    {% endif %}
-  </div>
-
-  {% comment %}
-  THE HERO PICTURE IS OFF FOR NOW (client, 22 Sep 2026: "on the groups, for
-  now remove the image").
-
-  Taken out of the markup rather than hidden in CSS, so the hero is genuinely
-  a single column and the copy uses the full width instead of sitting in a
-  1fr column with an empty one beside it.
-
-  EVERYTHING BEHIND IT IS STILL WIRED. orgs/hero_images.py still reads the
-  media library, groups_view still passes `hero_images`, and the tests still
-  cover both. Putting it back is this block again — the panel markup is in
-  the git history for 22 Sep — and nothing else has to be rebuilt.
-  {% endcomment %}
-</div>
-
+One tab row across the white sheet, one thing at a time:
+  All groups · Your groups · Waiting (admins, when any) · Start a group ·
+  Plan · Settings (admins)
+Each group is a pastel card. The Workplace plan prompt, which was squeezed
+into a corner of the old hero, has the Plan tab to itself. Tabs are switched
+in the page (the address keeps #tab), so nothing reloads.
+{% endcomment %}
 {% if not org.groups_enabled %}
 {% comment %}
 THE OFF STATE, WHICH IS THE DEFAULT AND USUALLY THE RIGHT ANSWER.
@@ -196,162 +137,197 @@ selling a switch for the sake of it.
 </div>
 
 {% else %}
-
-{% if is_admin and pending_count %}
-<div class="flash info" style="margin-bottom:18px;">
-  <span>{{ pending_count }} group{{ pending_count|pluralize }} waiting on you. They're marked below.</span>
-</div>
-{% endif %}
-
 {% if current_group %}
-<div class="flash success" style="margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
+<div class="grp-now">
   <span>You're tipping in <b>{{ current_group.name }}</b>. Your picks score on its ladder.</span>
   <form method="post" action="{% url 'orgs:leave_group_context' %}" data-busy="Switching">
     {% csrf_token %}
     <input type="hidden" name="next" value="{% url 'orgs:groups' org.id %}">
-    <button type="submit" class="abtn abtn-ghost abtn-sm">Tip for {{ org.name }} instead</button>
+    <button type="submit" class="gx-btn is-ghost">Tip for {{ org.name }} instead</button>
   </form>
 </div>
 {% endif %}
 
-{% comment %}
-SEARCH.
+<div class="grp2" data-grp2>
+  <nav class="gx-tabs grp-tabs" role="tablist" aria-label="Groups">
+    <button type="button" role="tab" class="gx-tab" data-grp-tab="all">All groups <em>{{ group_total }}</em></button>
+    <button type="button" role="tab" class="gx-tab" data-grp-tab="mine">Your groups <em>{{ my_count }}</em></button>
+    {% if is_admin and pending_count %}<button type="button" role="tab" class="gx-tab" data-grp-tab="waiting">Waiting <em class="is-warn">{{ pending_count }}</em></button>{% endif %}
+    <button type="button" role="tab" class="gx-tab" data-grp-tab="new">Start a group</button>
+    <button type="button" role="tab" class="gx-tab" data-grp-tab="plan">Plan</button>
+    {% if is_admin %}<button type="button" role="tab" class="gx-tab" data-grp-tab="settings">Settings</button>{% endif %}
+  </nav>
 
-Was a bare input with a Search button and a Clear link beside it, which meant a
-round trip to the server to answer "which of these is the Finance one?" — a
-question the browser already has every answer to, because every group is on the
-page. It filters as you type now.
+  <section class="grp-pane" data-grp-pane="all mine waiting">
+    <div class="grp-search" data-grp-search>
+      <form method="get" action="{% url 'orgs:groups' org.id %}" class="gx-search grp-search-form" role="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" name="q" value="{{ q }}" data-grp-input placeholder="Search groups in {{ org.name }}" aria-label="Search groups" autocomplete="off">
+        <button type="button" class="grp-search-x" data-grp-clear hidden aria-label="Clear search">&times;</button>
+      </form>
+      <p class="grp-search-count" data-grp-count hidden></p>
+    </div>
+    <p class="grp-none" data-grp-none hidden>No groups match that.</p>
+    <p class="grp-none" data-grp-empty-mine hidden>You're not in a group yet. Open <b>All groups</b> and join yours, or start it.</p>
+    <div class="grp-cards" data-coach="groups-list" data-grp-list>
+      {% for row in rows %}
+      <article class="grp-card tone-{{ row.tone }}{% if row.awaiting_approval %} is-pending{% endif %}{% if row.is_mine %} is-mine{% endif %}"
+               data-grp-item data-grp-name="{{ row.group.name|lower }}" data-grp-mine="{{ row.is_mine|yesno:'1,0' }}" data-grp-wait="{{ row.awaiting_approval|yesno:'1,0' }}"
+               style="--cc: {% cycle 'var(--cc-1)' 'var(--cc-2)' 'var(--cc-3)' 'var(--cc-4)' 'var(--cc-5)' %}">
+        <header class="grp-card-top">
+          <span class="grp-card-ic" aria-hidden="true"><svg><use href="#{{ row.icon }}"/></svg></span>
+          {% if row.awaiting_approval %}<span class="gx-pill is-wait"><i></i>Waiting</span>
+          {% elif current_group.id == row.group.id %}<span class="gx-pill is-ok"><i></i>You're tipping here</span>
+          {% elif row.is_mine %}<span class="gx-pill is-ok"><i></i>Your group</span>{% endif %}
+        </header>
+        <b class="grp-card-name">{{ row.group.name }}</b>
+        <span class="grp-card-meta">{% if row.group.kind_label %}{{ row.group.kind_label }}{% else %}Group{% endif %}{% if row.group.charity %} &middot; backs {{ row.group.charity.name }}{% endif %}</span>
+        <span class="grp-card-stat"><b>{{ row.members }}</b><span>member{{ row.members|pluralize }}</span></span>
+        {% if row.awaiting_approval %}
+        <p class="grp-card-note">Waiting for an admin{% if row.group.created_by %}, asked for by {{ row.group.created_by.display_name }}{% endif %}.</p>
+          {% if is_admin %}
+          <div class="grp-card-acts">
+            <form method="post" action="{% url 'orgs:groups' org.id %}" data-busy="Approving">
+              {% csrf_token %}<input type="hidden" name="group_id" value="{{ row.group.id }}">
+              <button type="submit" name="action" value="approve" class="gx-btn is-lime">Approve</button>
+            </form>
+            <form method="post" action="{% url 'orgs:groups' org.id %}" data-busy="Declining"
+                  data-confirm="The group and its request will be removed. Nobody has tipped in it yet."
+                  data-confirm-title="Decline this group?" data-confirm-ok="Decline" data-confirm-danger>
+              {% csrf_token %}<input type="hidden" name="group_id" value="{{ row.group.id }}">
+              <button type="submit" name="action" value="decline" class="gx-btn is-ghost">Decline</button>
+            </form>
+          </div>
+          {% endif %}
+        {% elif row.is_mine %}
+        <div class="grp-card-acts">
+          {% if current_group.id != row.group.id %}
+          <form method="post" action="{% url 'orgs:switch_group' org.id row.group.id %}" data-busy="Switching">
+            {% csrf_token %}<input type="hidden" name="next" value="{% url 'orgs:groups' org.id %}">
+            <button type="submit" class="gx-btn is-lime">Tip in {{ row.group.name }}</button>
+          </form>
+          {% endif %}
+          <a href="{% url 'orgs:group_charity_vote' org.id row.group.id %}" class="gx-btn is-ghost">{% if row.group.charity %}Our charity{% else %}Choose our charity{% endif %}</a>
+          <form method="post" action="{% url 'orgs:groups' org.id %}" data-busy="Leaving"
+                data-confirm="Your tips in this group stay on its ladder — leaving only takes you out of it."
+                data-confirm-title="Leave {{ row.group.name }}?" data-confirm-ok="Leave">
+            {% csrf_token %}<input type="hidden" name="group_id" value="{{ row.group.id }}">
+            <button type="submit" name="action" value="leave" class="grp-link">Leave</button>
+          </form>
+        </div>
+        {% else %}
+        <div class="grp-card-acts">
+          <form method="post" action="{% url 'orgs:groups' org.id %}" data-busy="Joining">
+            {% csrf_token %}<input type="hidden" name="group_id" value="{{ row.group.id }}">
+            <button type="submit" name="action" value="join" class="gx-btn">Join {{ row.group.name }}</button>
+          </form>
+        </div>
+        {% endif %}
+      </article>
+      {% empty %}
+      <div class="gx-empty grp-empty">
+        <b>{% if q %}No groups match "{{ q }}".{% else %}No groups yet.{% endif %}</b>
+        <span>{% if q %}Try a different word, or start it yourself.{% else %}Start the first one: Marketing, IT, whatever {{ org.name }} actually calls its teams.{% endif %}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
 
-The form is still a real GET form: pressing Enter with scripting off submits it
-and the server-side `q` filter answers exactly as before. The live filter is an
-enhancement on top, not the mechanism.
-{% endcomment %}
-{% comment %}
-THE WORKING AREA, AS ONE PANEL (client, 22 Sep 2026, against a reference
-design: "that section does not look like the image I shared").
-
-The search and the list were two loose blocks on the page ground. In the
-reference they sit inside one bordered panel below the hero, with a labelled
-header row between them — "Your groups" on the left, the count on the right,
-a rule running between. That grouping is what makes the page read as a hero
-plus a working area rather than as four stacked things.
-{% endcomment %}
-<div class="grp-panel">
-<div class="grp-search" data-grp-search>
-  <form method="get" action="{% url 'orgs:groups' org.id %}" class="grp-search-form" role="search">
-    <svg class="grp-search-ic" aria-hidden="true"><use href="#ic-search"/></svg>
-    <input type="search" name="q" value="{{ q }}" data-grp-input
-           placeholder="Search groups in {{ org.name }}" aria-label="Search groups"
-           autocomplete="off">
-    <button type="button" class="grp-search-x" data-grp-clear hidden aria-label="Clear search">&times;</button>
-    <button type="submit" class="grp-search-go">Search</button>
-  </form>
-  <p class="grp-search-count" data-grp-count hidden></p>
-  {% comment %}
-  The standing total lives in the list header below, beside "Your groups",
-  which is where the reference design puts it. It was briefly here as well
-  and the page showed "4 groups" twice in eleven lines.
-  {% endcomment %}
-</div>
-
-<div class="grp-listhead">
-  <span class="grp-listhead-ic" aria-hidden="true"><svg><use href="#ic-people"/></svg></span>
-  <span class="grp-listhead-t">Your groups</span>
-  <span class="grp-listhead-rule" aria-hidden="true"></span>
-  <span class="grp-listhead-n">{{ group_total }} group{{ group_total|pluralize }}</span>
-</div>
-
-<p class="grp-none" data-grp-none hidden>No groups match that.</p>
-<div class="grid-app g-3 grp-grid" data-coach="groups-list" data-grp-list>
-  {% for row in rows %}
-  <div class="card pad-lg dept-card{% if row.awaiting_approval %} is-pending{% endif %}"
-       data-grp-item data-grp-name="{{ row.group.name|lower }}">
-    <div class="dc-top">
-      <span class="dc-ic tone-{{ row.tone }}"><svg><use href="#{{ row.icon }}"/></svg></span>
-      <div class="dc-head">
-        <div class="dc-name">{{ row.group.name }}</div>
-        {% comment %} .dc-meta, not .app-sub. This page is `page-deep sheet-page`, where
-           .app-sub is coloured cream for the dark sheet behind — but this line sits
-           INSIDE a cream card, so it was cream-on-cream at a contrast ratio of
-           1.16:1, i.e. invisible. .dc-meta is the card's own muted colour and
-           already existed for exactly this. {% endcomment %}
-        <div class="dc-meta">
-          {% if row.group.kind_label %}{{ row.group.kind_label }} &middot; {% endif %}
-          {{ row.members }} member{{ row.members|pluralize }}
-          {% comment %}
-          Whose cause this group raises for. Worth a line here because it is
-          now a real difference between two groups in the same organisation —
-          a franchise's stores back their own local charities — and the
-          Groups page is where someone compares them.
-          {% endcomment %}
-          {% if row.group.charity %} &middot; {{ row.group.charity.name }}{% endif %}
+  <section class="grp-pane" data-grp-pane="new" hidden>
+    <div class="grp-hero is-new">
+      <span class="grp-hero-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+      <div>
+        <h2>Start a group</h2>
+        <p>A group is a team inside {{ org.name }}: Marketing, IT, a store, a site. It gets its own ladder and its own wall, and can back its own charity. Everyone still tips the same fixtures.</p>
+        <p class="grp-hero-note">{% if is_admin %}As an admin, a group you start goes live straight away.{% else %}An admin of {{ org.name }} approves it before it appears for everyone.{% endif %}</p>
+        <div class="dh-acts">
+          {% if groups_gate %}
+          <button type="button" data-coach="groups-create" class="gx-btn is-lime is-big" data-group-open>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Create group
+          </button>
+          {% else %}
+          {% comment %}Locked, but never dead (17 Nov 2026: "I click create a group and
+          nothing is happening"): it opens the reason and the way to upgrade.{% endcomment %}
+          <button type="button" class="gx-btn is-lime is-big is-locked" data-grp-open-pop="locked" aria-haspopup="dialog">
+            <svg aria-hidden="true"><use href="#ic-lock"/></svg>Create group
+          </button>
+          <p class="grp-hero-note">Groups aren't on {{ org.name }}'s plan yet. Press the button to see why, and what unlocks them.</p>
+          {% endif %}
         </div>
       </div>
     </div>
+  </section>
 
-    {% if row.awaiting_approval %}
-    <p class="card-lead" style="margin:12px 0 0;font-size:13px;">
-      Waiting for an admin{% if row.group.created_by %}, asked for by {{ row.group.created_by.display_name }}{% endif %}.
-    </p>
-      {% if is_admin %}
-      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
-        <form method="post" action="{% url 'orgs:groups' org.id %}" data-busy="Approving">
-          {% csrf_token %}
-          <input type="hidden" name="group_id" value="{{ row.group.id }}">
-          <button type="submit" name="action" value="approve" class="abtn abtn-primary abtn-sm">Approve</button>
-        </form>
-        <form method="post" action="{% url 'orgs:groups' org.id %}" data-busy="Declining"
-              data-confirm="The group and its request will be removed. Nobody has tipped in it yet."
-              data-confirm-title="Decline this group?" data-confirm-ok="Decline" data-confirm-danger>
-          {% csrf_token %}
-          <input type="hidden" name="group_id" value="{{ row.group.id }}">
-          <button type="submit" name="action" value="decline" class="abtn abtn-ghost abtn-sm">Decline</button>
-        </form>
-      </div>
-      {% endif %}
-
-    {% elif row.is_mine %}
-    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
-      {% if current_group.id != row.group.id %}
-      <form method="post" action="{% url 'orgs:switch_group' org.id row.group.id %}" data-busy="Switching">
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{% url 'orgs:groups' org.id %}">
-        <button type="submit" class="abtn abtn-primary abtn-sm">Tip in {{ row.group.name }}</button>
-      </form>
-      {% else %}
-      <span class="pill-role owner">You're tipping here</span>
-      {% endif %}
-      <a href="{% url 'orgs:group_charity_vote' org.id row.group.id %}" class="abtn abtn-ghost abtn-sm">
-        {% if row.group.charity %}Our charity{% else %}Choose our charity{% endif %}
-      </a>
-      <form method="post" action="{% url 'orgs:groups' org.id %}" data-busy="Leaving"
-            data-confirm="Your tips in this group stay on its ladder — leaving only takes you out of it."
-            data-confirm-title="Leave {{ row.group.name }}?" data-confirm-ok="Leave">
-        {% csrf_token %}
-        <input type="hidden" name="group_id" value="{{ row.group.id }}">
-        <button type="submit" name="action" value="leave" class="abtn abtn-ghost abtn-sm">Leave</button>
-      </form>
+  <section class="grp-pane" data-grp-pane="plan" hidden>
+    {% if groups_gate %}
+    <div class="grp-hero is-plan">
+      <span class="grp-hero-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg></span>
+      <div><h2>Your plan includes groups</h2><p>{{ org.name }} can have as many groups as it needs. Each has its own ladder and wall, and the organisation's main ladder keeps running underneath.</p></div>
     </div>
-
     {% else %}
-    <form method="post" action="{% url 'orgs:groups' org.id %}" style="margin-top:14px;" data-busy="Joining">
-      {% csrf_token %}
-      <input type="hidden" name="group_id" value="{{ row.group.id }}">
-      <button type="submit" name="action" value="join" class="abtn abtn-ghost abtn-sm">Join {{ row.group.name }}</button>
-    </form>
+    <div class="grp-plan" id="groupsLockNote">{% include "billing/_groups_locked.html" %}</div>
     {% endif %}
+  </section>
+
+  {% if is_admin %}
+  <section class="grp-pane" data-grp-pane="settings" hidden>
+    <div class="grp-hero is-settings">
+      <span class="grp-hero-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></span>
+      <div>
+        <h2>Groups for {{ org.name }}</h2>
+        <p>Switching groups off takes them out of the menu. Every group and every tip in them stays exactly where it is, and switching back on restores them.</p>
+        <div class="dh-acts">
+          <form method="post" action="{% url 'orgs:groups_toggle' org.id %}" data-busy="Switching off"
+                data-confirm="Every group and every tip in them stays exactly where it is. This only takes groups out of the nav."
+                data-confirm-title="Switch groups off?" data-confirm-ok="Switch off">
+            {% csrf_token %}
+            <button type="submit" class="gx-btn is-ghost is-big">Switch groups off for {{ org.name }}</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+</div>
+
+{% comment %}
+POP-UPS (17 Nov 2026: "ensure something pops up and tells me ... when it's
+not created, we want to know what's the reason"). One for the plan that
+doesn't include groups, opened by the locked Create button; one for the
+outcome of a create — made, sent for approval, refused by the plan, or
+refused for a reason the server gave — opened on arrival.
+{% endcomment %}
+{% if not groups_gate %}
+<div class="grp-pop" data-grp-pop="locked" role="dialog" aria-modal="true" aria-label="Groups aren't on this plan" hidden>
+  <div class="grp-pop-veil" data-grp-pop-close></div>
+  <div class="grp-pop-panel grp-plan">
+    <button type="button" class="grp-pop-x" data-grp-pop-close aria-label="Close">&times;</button>
+    {% include "billing/_groups_locked.html" %}
   </div>
-  {% empty %}
-  <div class="card pad-lg" style="grid-column:1/-1;text-align:center;">
-    <div class="card-h">{% if q %}No groups match "{{ q }}".{% else %}No groups yet.{% endif %}</div>
-    <p class="card-lead" style="margin-top:8px;">
-      {% if q %}Try a different word, or start it yourself.
-      {% else %}Start the first one — Marketing, IT, whatever {{ org.name }} actually calls its teams.{% endif %}
-    </p>
-  </div>
+</div>
+{% endif %}
+{% if messages %}
+<div class="grp-pop is-open" data-grp-pop="result" role="dialog" aria-modal="true" aria-label="Groups">
+  <div class="grp-pop-veil" data-grp-pop-close></div>
+  {% for m in messages %}
+    {% if "groups-locked" in m.extra_tags %}
+    <div class="grp-pop-panel grp-plan">
+      <button type="button" class="grp-pop-x" data-grp-pop-close aria-label="Close">&times;</button>
+      <p class="grp-pop-kicker">Your group wasn't created</p>
+      {% include "billing/_groups_locked.html" %}
+    </div>
+    {% else %}
+    <div class="grp-pop-panel grp-pop-msg is-{{ m.tags|default:'info' }}">
+      <button type="button" class="grp-pop-x" data-grp-pop-close aria-label="Close">&times;</button>
+      <span class="grp-pop-ic" aria-hidden="true">{% if m.level_tag == 'error' %}!{% else %}&#10003;{% endif %}</span>
+      <h2>{% if m.level_tag == 'error' %}{% if "groups-create" in m.extra_tags %}Your group wasn't created{% else %}That didn't work{% endif %}{% else %}Done{% endif %}</h2>
+      <p>{{ m }}</p>
+      <button type="button" class="gx-btn is-lime is-big" data-grp-pop-close>{% if m.level_tag == 'error' %}Try again{% else %}OK{% endif %}</button>
+    </div>
+    {% endif %}
   {% endfor %}
 </div>
-</div>{# /.grp-panel #}
+{% endif %}
 
 {% comment %}
 The create sheet. One question — which team is this — answered either by
@@ -510,43 +486,71 @@ submit is a form somebody will eventually find a way to submit.
      text. The HTML parser ends a script at the first closing tag it meets,
      even one written inside a JavaScript comment. */
 (function () {
-  var box   = document.querySelector('[data-grp-search]');
-  var input = document.querySelector('[data-grp-input]');
-  var list  = document.querySelector('[data-grp-list]');
-  if (!box || !input || !list) return;
-
-  var items = [].slice.call(list.querySelectorAll('[data-grp-item]'));
-  var clear = box.querySelector('[data-grp-clear]');
-  var count = box.querySelector('[data-grp-count]');
-  var none  = document.querySelector('[data-grp-none]');
-  if (!items.length) return;
+  /* GROUPS, ONE TAB AT A TIME (17 Nov 2026). All / Yours / Waiting share the
+     one card list and filter it; Start, Plan and Settings are panes of their
+     own. The tab lives in the address (#mine) so a reload or a form's
+     redirect lands back on it. The search filters within the open tab. */
+  var root = document.querySelector('[data-grp2]');
+  if (!root) return;
+  var tabs = [].slice.call(root.querySelectorAll('[data-grp-tab]'));
+  var panes = [].slice.call(root.querySelectorAll('[data-grp-pane]'));
+  var items = [].slice.call(root.querySelectorAll('[data-grp-item]'));
+  var input = root.querySelector('[data-grp-input]');
+  var clear = root.querySelector('[data-grp-clear]');
+  var count = root.querySelector('[data-grp-count]');
+  var none = root.querySelector('[data-grp-none]');
+  var noneMine = root.querySelector('[data-grp-empty-mine]');
+  var tab = 'all';
 
   function apply() {
-    var q = input.value.trim().toLowerCase();
-    var shown = 0;
+    var q = (input && input.value || '').trim().toLowerCase(), shown = 0;
     items.forEach(function (el) {
-      var hit = !q || (el.getAttribute('data-grp-name') || '').indexOf(q) !== -1;
-      el.hidden = !hit;
-      if (hit) shown++;
+      var inTab = tab === 'all' || (tab === 'mine' && el.getAttribute('data-grp-mine') === '1')
+                  || (tab === 'waiting' && el.getAttribute('data-grp-wait') === '1');
+      var hit = inTab && (!q || (el.getAttribute('data-grp-name') || '').indexOf(q) !== -1);
+      el.hidden = !hit; if (hit) shown++;
     });
     if (clear) clear.hidden = !q;
-    if (none)  none.hidden = !(q && shown === 0);
-    if (count) {
-      count.hidden = !q;
-      count.textContent = shown + ' of ' + items.length +
-        (items.length === 1 ? ' group' : ' groups');
-    }
+    if (count) { count.hidden = !q; count.textContent = shown + ' group' + (shown === 1 ? '' : 's') + ' match'; }
+    if (none) none.hidden = !(q && !shown);
+    if (noneMine) noneMine.hidden = !(tab === 'mine' && !q && !shown);
   }
 
-  input.addEventListener('input', apply);
-  if (clear) clear.addEventListener('click', function () {
-    input.value = ''; apply(); input.focus();
-  });
-  /* Escape clears rather than submitting an empty search. */
-  input.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && input.value) { e.preventDefault(); input.value = ''; apply(); }
-  });
-  apply();
-})();
+  function show(name, push) {
+    if (!tabs.some(function (t) { return t.dataset.grpTab === name; })) name = 'all';
+    tab = name;
+    tabs.forEach(function (t) { var on = t.dataset.grpTab === name; t.classList.toggle('on', on); t.setAttribute('aria-selected', on); });
+    panes.forEach(function (p) { p.hidden = p.dataset.grpPane.split(' ').indexOf(name) === -1; });
+    apply();
+    if (push) history.replaceState(null, '', '#' + name);
+  }
 
+  tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.grpTab, true); }); });
+  root.querySelectorAll('[data-grp-go]').forEach(function (b) { b.addEventListener('click', function () { show(b.dataset.grpGo, true); }); });
+  if (input) {
+    input.addEventListener('input', apply);
+    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
+  }
+  if (clear) clear.addEventListener('click', function () { input.value = ''; apply(); input.focus(); });
+  /* Forms post back to this page; keep the tab they came from. */
+  root.querySelectorAll('form[method="post"]').forEach(function (f) {
+    f.addEventListener('submit', function () {
+      var a = f.getAttribute('action') || location.pathname;
+      if (a.indexOf('#') < 0) f.setAttribute('action', a + '#' + tab);
+    });
+  });
+  show((location.hash || '').slice(1) || 'all', false);
+
+  /* The pop-ups: open, close on the veil, the x, a button or Escape. */
+  function closePops() { document.querySelectorAll('.grp-pop').forEach(function (p) { p.hidden = true; p.classList.remove('is-open'); }); document.body.classList.remove('grp-pop-on'); }
+  document.querySelectorAll('[data-grp-open-pop]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var p = document.querySelector('[data-grp-pop="' + b.getAttribute('data-grp-open-pop') + '"]');
+      if (p) { p.hidden = false; p.classList.add('is-open'); document.body.classList.add('grp-pop-on'); }
+    });
+  });
+  document.querySelectorAll('[data-grp-pop-close]').forEach(function (b) { b.addEventListener('click', closePops); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePops(); });
+  if (document.querySelector('.grp-pop.is-open')) document.body.classList.add('grp-pop-on');
+})();
 {% endblock %}

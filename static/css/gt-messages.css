@@ -1734,3 +1734,207 @@ html:not(.js) .chat-menu[hidden] { display: flex; }
   font-size: 19px; line-height: 1; padding: 7px 8px;
   font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", var(--body), sans-serif;
 }
+
+/* =========================================================================
+   THE CONVERSATION, REDRAWN (client, 5 Nov 2026: "that box where the
+   conversation is, either in the left or the right, looking good").
+   Theirs: white bubbles on the left with their face. Yours: GoodTip green on
+   the right, no face. The time and ticks sit inside the bubble's corner, a
+   picture fills the top of its bubble with the caption under it, and the ⋮
+   only shows when pointed at. Fixed colour pairs, so both themes read alike.
+   ========================================================================= */
+body.gt-app .gtm-chat .chat-list { display: flex; flex-direction: column; gap: 2px; padding: 16px 18px 20px; }
+body.gt-app .gtm-chat .chat-row { display: flex !important; align-items: flex-end; gap: 8px; max-width: 100%; margin-top: 2px; }
+body.gt-app .gtm-chat .chat-row:not(.tail) { margin-top: 12px; }
+body.gt-app .gtm-chat .chat-row.theirs { align-self: flex-start; }
+body.gt-app .gtm-chat .chat-row.mine { align-self: flex-end; flex-direction: row-reverse; }
+body.gt-app .gtm-chat .chat-av { width: 32px; height: 32px; flex: none; margin-bottom: 22px; border-radius: 50%; font-size: 12px; font-weight: 800; color: #10231A; background: #C9F24A; }
+body.gt-app .gtm-chat .chat-row.mine .chat-av { display: none; }
+body.gt-app .gtm-chat .chat-col { min-width: 0; max-width: min(560px, 72%); display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+body.gt-app .gtm-chat .chat-row.mine .chat-col { align-items: flex-end; }
+body.gt-app .gtm-chat .chat-row.mine .chat-head { display: none; }
+body.gt-app .gtm-chat .chat-head { display: flex; align-items: baseline; gap: 8px; padding: 0 6px; }
+body.gt-app .gtm-chat .chat-head .chat-who { padding: 0; border: 0; font-size: 12.5px; font-weight: 800; color: var(--m-ink); background: none; }
+body.gt-app .gtm-chat .chat-head .chat-when { font-size: 11px; color: var(--m-ink-3); }
+
+body.gt-app .gtm-chat .chat-bubble { position: relative; display: grid; gap: 4px; min-width: 88px; max-width: 100%; padding: 9px 13px 7px; border: 0 !important; border-radius: 18px 18px 18px 6px; color: #10231A !important; background: #FFFFFF !important; box-shadow: 0 1px 0 rgba(15,46,34,.08), 0 10px 20px -18px rgba(0,0,0,.55); }
+body.gt-app .gtm-chat .chat-row.mine .chat-bubble { border-radius: 18px 18px 6px 18px; color: #FFFFFF !important; background: #176B45 !important; }
+body.gt-app .gtm-chat .chat-row.tail .chat-bubble { border-top-left-radius: 8px; }
+body.gt-app .gtm-chat .chat-row.mine.tail .chat-bubble { border-top-left-radius: 18px; border-top-right-radius: 8px; }
+body.gt-app .gtm-chat .chat-bubble .chat-text { margin: 0; font-size: 15px; line-height: 1.45; color: inherit !important; overflow-wrap: anywhere; }
+body.gt-app .gtm-chat .chat-bubble a { color: #0B57D0; }
+body.gt-app .gtm-chat .chat-row.mine .chat-bubble a:not(.chat-quote) { color: #D8F7A0; }
+body.gt-app .gtm-chat .chat-bubble .chat-stamp { justify-self: end; display: inline-flex; align-items: center; gap: 5px; margin: 0; font-size: 11px; color: rgba(16,35,26,.6) !important; opacity: 1; }
+body.gt-app .gtm-chat .chat-row.mine .chat-bubble .chat-stamp { color: rgba(255,255,255,.82) !important; }
+body.gt-app .gtm-chat .chat-row.mine .chat-bubble .chat-tick, body.gt-app .gtm-chat .chat-row.mine .chat-bubble .chat-tick i { color: #D8F7A0; }
+body.gt-app .gtm-chat .chat-row.mine .chat-bubble .chat-tick.read, body.gt-app .gtm-chat .chat-row.mine .chat-bubble .chat-tick.read i { color: #C9F24A; }
+body.gt-app .gtm-chat .chat-bubble .chat-quote { display: grid; gap: 1px; padding: 6px 10px; border-radius: 10px; border-left: 3px solid #176B45; text-decoration: none; color: #10231A; background: #EEF4F0; }
+body.gt-app .gtm-chat .chat-row.mine .chat-bubble .chat-quote { border-left-color: #C9F24A; color: #FFFFFF; background: rgba(0,0,0,.18); }
+
+/* A picture fills the top of its bubble; the caption sits under it. */
+body.gt-app .gtm-chat .chat-bubble.has-files { padding-top: 4px; }
+body.gt-app .gtm-chat .chat-bubble.has-files .chat-files { display: grid; gap: 4px; margin: 0 -9px 2px; }
+body.gt-app .gtm-chat .chat-bubble .chat-shot { display: block; overflow: hidden; border-radius: 14px; }
+body.gt-app .gtm-chat .chat-bubble .chat-shot img { display: block; width: 100%; max-width: 420px; max-height: 360px; object-fit: cover; }
+body.gt-app .gtm-chat .chat-bubble .chat-clip { display: block; width: 100%; max-width: 420px; border-radius: 14px; }
+body.gt-app .gtm-chat .chat-bubble.has-files .chat-text { padding: 2px 0 0; }
+body.gt-app .gtm-chat .chat-bubble.has-files.no-text .chat-stamp { position: absolute; right: 14px; bottom: 10px; padding: 2px 8px; border-radius: 999px; color: #fff !important; background: rgba(0,0,0,.45); }
+body.gt-app .gtm-chat .chat-bubble .chat-file { color: inherit; }
+
+/* Reactions tuck under the bubble; the ⋮ shows when pointed at. */
+body.gt-app .gtm-chat .chat-reacts { margin-top: 0; padding: 0 4px; }
+body.gt-app .gtm-chat .chat-rowacts { align-self: center; }
+body.gt-app .gtm-chat .chat-row .chat-more { opacity: 0; }
+body.gt-app .gtm-chat .chat-row:hover .chat-more, body.gt-app .gtm-chat .chat-row.is-menu-open .chat-more, body.gt-app .gtm-chat .chat-more:focus-visible { opacity: 1; }
+@media (max-width: 720px) { body.gt-app .gtm-chat .chat-col { max-width: 84%; } body.gt-app .gtm-chat .chat-row .chat-more { opacity: 1; } }
+body.gt-app .gtm-chat .chat-bubble .chat-stamp, body.gt-app .gtm-chat .chat-bubble .chat-stamp * { white-space: nowrap; }
+body.gt-app .gtm-chat .chat-bubble { min-width: 120px; }
+body.gt-app .gtm-chat .chat-bubble.has-files { width: min(380px, 100%); }
+body.gt-app .gtm-chat .chat-bubble.has-files .chat-files { margin: 0 -9px 2px; }
+body.gt-app .gtm-chat .chat-bubble .chat-shot { width: 100% !important; max-width: none !important; height: auto !important; }
+body.gt-app .gtm-chat .chat-bubble .chat-shot img { width: 100% !important; max-width: none !important; height: auto !important; max-height: 380px; aspect-ratio: auto; }
+/* Your own messages: WhatsApp's soft green with dark text (9 Nov 2026). */
+body.gt-app .gtm-chat .chat-row.mine .chat-bubble { color: #10231A !important; background: #D9FDD3 !important; }
+body.gt-app .gtm-chat .chat-row.mine .chat-bubble .chat-stamp { color: rgba(16,35,26,.6) !important; }
+body.gt-app .gtm-chat .chat-row.mine .chat-bubble .chat-tick, body.gt-app .gtm-chat .chat-row.mine .chat-bubble .chat-tick i { color: #5B6B61; }
+body.gt-app .gtm-chat .chat-row.mine .chat-bubble .chat-tick.read, body.gt-app .gtm-chat .chat-row.mine .chat-bubble .chat-tick.read i { color: #0B7DD8; }
+body.gt-app .gtm-chat .chat-row.mine .chat-bubble a:not(.chat-quote) { color: #0B57D0; }
+body.gt-app .gtm-chat .chat-row.mine .chat-bubble .chat-quote { color: #10231A; background: rgba(16,35,26,.07); border-left-color: #176B45; }
+/* Opening a conversation wears the app's own loader (gt-veil.js), the same as
+   the Wall; the old bare spinner is retired so the two never stack (12 Nov 2026). */
+.gtm-chat.is-loading::after, .gtm-chat.is-loading::before { display: none !important; }
+
+/* All four filters on screen, always (13 Nov 2026): in the narrow left column
+   on a tablet the strip scrolled and "People" sat out of sight past the edge,
+   with nothing to say it was there. Wrap instead. */
+.gtm-tabs { flex-wrap: wrap; overflow-x: visible; row-gap: 6px; }
+
+/* =========================================================================
+   16 Nov 2026 — phone review of Messages
+   ========================================================================= */
+
+/* THE ⋮ NO LONGER SITS ON THE TIME. It is pinned to the row's top-right
+   corner, which is exactly where "3 days ago" ends, so on a phone (where it
+   always shows) the two printed over each other. The row's words now stop
+   short of it, and it sits centred down the row's right edge. */
+.gtm-conv:has(.gtm-kebab) .gtm-conv-txt { padding-right: 28px; }
+.gtm-conv .gtm-kebab { top: 50%; right: 4px; transform: translateY(-50%); }
+
+/* ALL FOUR FILTERS ON ONE LINE ON A PHONE. They wrapped, leaving "People"
+   alone on a second row. Each takes an equal share and the type tightens. */
+@media (max-width: 640px) {
+  .gtm-tabs { flex-wrap: nowrap; gap: 4px; }
+  .gtm-tabs > * { flex: 1 1 auto; min-width: 0; justify-content: center; padding-left: 8px !important; padding-right: 8px !important; font-size: 12.5px !important; white-space: nowrap; }
+}
+
+/* THE LIST CARRIES THE PAGE ON. On a phone the chat list scrolls inside its
+   panel; at its end the flick now carries on down the page rather than
+   stopping dead, and back up the same way. */
+@media (max-width: 900px) {
+  .gtm-nav-body { overscroll-behavior: auto !important; }
+}
+@media (max-width: 400px) {
+  .gtm-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+}
+
+/* THE ☺ BESIDE THE MESSAGE, NOT UNDER IT. A message nobody has reacted to
+   still gave the add-a-reaction button a line of its own, so every message
+   in a chat was two rows tall on a phone. Until there is a reaction to show,
+   the button sits in the gutter beside the bubble, under the ⋮; the first
+   reaction brings the row back, with the chips in it. */
+.chat-col { position: relative; }
+.chat-row:has(.chat-reacts:not(:has(.rx-chip))) .chat-rowacts { align-self: flex-start; margin-top: 2px; }
+.chat-reacts:not(:has(.rx-chip)) { position: absolute; bottom: 0; margin: 0; z-index: 3; }
+.chat-row.mine .chat-reacts:not(:has(.rx-chip)) { left: -36px; }
+.chat-row:not(.mine) .chat-reacts:not(:has(.rx-chip)) { right: -36px; }
+.chat-row.mine .chat-reacts:not(:has(.rx-chip)) .rx-menu { left: auto; right: -180px; }
+
+/* The chat's header and prompt each keep to one line on a phone. */
+@media (max-width: 640px) {
+  .gtm-chat-who i { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gtm-chat textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* NEW MESSAGE OPENS ABOVE THE TOP BAR. The sheet is fixed to the screen but
+   lives inside .app-main, which is its own layer (z-index 1) under the
+   sticky top bar (50) — so on a phone the bar covered the sheet's title and
+   its Close button. While a Messages sheet is open, the page's layer is
+   lifted above the bar. Scoped to these sheets so the ☰ menu (which also sets
+   sheet-open) is untouched. */
+body.sheet-open:has(.gtm-sheet:not([hidden])) .app-main { z-index: 60; }
+
+/* =========================================================================
+   THE MESSAGE BOX, WHATSAPP-SHAPED (16 Nov 2026)
+   [ ☺  type here …………………………  📎 ]  (●)
+   The emoji at the far left of the box, the words given the width, one
+   paperclip inside the box on the right that opens Photos & videos /
+   Document, and the mic — Send once there is something — on its own outside.
+   ========================================================================= */
+.gtm-composer .cc-row {
+  display: flex; align-items: flex-end; gap: 8px;
+  padding: 0; border: 0; border-radius: 0; background: none;
+}
+.gtm-composer .cc-row:focus-within { border-color: transparent; }
+.gtm-composer .cc-field {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: flex-end; gap: 2px;
+  padding: 3px 4px; border-radius: 24px;
+  background: var(--m-ground); border: 1px solid var(--m-line);
+}
+.gtm-composer .cc-field:focus-within { border-color: var(--m-accent-line); }
+.gtm-composer .cc-field textarea { padding: 9px 4px; }
+.gtm-composer .cc-emoji > summary { border-radius: 50%; }
+
+.cc-attach { position: relative; flex: none; }
+.cc-attach > summary {
+  width: 36px; height: 36px; display: grid; place-items: center; list-style: none;
+  cursor: pointer; border-radius: 50%; color: var(--m-ink-2); margin-bottom: 1px;
+  transition: transform .18s var(--ease, ease), color .15s;
+}
+.cc-attach > summary::-webkit-details-marker { display: none; }
+.cc-attach > summary:hover { color: var(--m-accent-ink); background: var(--m-panel-2); }
+.cc-attach[open] > summary { color: var(--m-accent-ink); transform: rotate(-45deg); }
+.cc-attach > summary svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.cc-attach-menu {
+  position: absolute; right: -4px; bottom: calc(100% + 10px); z-index: 30;
+  display: grid; gap: 4px; min-width: 210px; padding: 8px; border-radius: 16px;
+  background: var(--m-panel-2); border: 1px solid var(--m-line-2);
+  box-shadow: 0 26px 50px -22px rgba(0,0,0,.85);
+  animation: ccAttachIn .16s var(--ease, ease);
+}
+@keyframes ccAttachIn { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
+.cc-attach-opt {
+  position: relative; display: flex; align-items: center; gap: 12px; cursor: pointer;
+  padding: 8px 10px; border-radius: 12px; font: 700 14px/1.2 var(--body); color: var(--m-ink);
+}
+.cc-attach-opt:hover, .cc-attach-opt:focus-within { background: rgba(255,255,255,.08); }
+.cc-attach-ic { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: 50%; color: #fff; }
+.cc-attach-opt.is-media .cc-attach-ic { background: linear-gradient(135deg, #8B5CF6, #EC4899); }
+.cc-attach-opt.is-doc .cc-attach-ic { background: linear-gradient(135deg, #2563EB, #0EA5E9); }
+.cc-attach-ic svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.cc-attach-opt input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.gtm-composer .cc-send, .gtm-composer .cc-mic { margin-bottom: 2px; }
+@media (max-width: 640px) {
+  .gtm-composer { padding: 8px 10px 10px; }
+  .gtm-composer .cc-send, .gtm-composer .cc-mic { width: 44px; height: 44px; }
+}
+
+/* "SAM IS TYPING…" — above the message box, Wall and Messages alike. */
+.cc-typing {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 8px 6px;
+  font: 600 12.5px/1.2 var(--body); color: var(--m-ink-2);
+  animation: ccTypingIn .2s var(--ease, ease);
+}
+.cc-typing[hidden] { display: none; }
+@keyframes ccTypingIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.cc-typing-dots {
+  display: inline-flex; align-items: center; gap: 3px; padding: 7px 10px;
+  border-radius: 14px 14px 14px 4px; background: var(--m-panel-2, rgba(255,255,255,.1));
+}
+.cc-typing-dots i {
+  width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .35;
+  animation: ccTypingDot 1.2s infinite ease-in-out;
+}
+.cc-typing-dots i:nth-child(2) { animation-delay: .15s; }
+.cc-typing-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes ccTypingDot { 0%, 60%, 100% { opacity: .35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { :where(html:not(.gt-motion)) .cc-typing-dots i { animation: none; opacity: .7; } }

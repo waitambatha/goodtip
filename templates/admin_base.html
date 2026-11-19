@@ -119,20 +119,30 @@
     </div>
   </nav>
 
-  {# ---- mobile sheet ---- #}
+  {# ---- mobile sheet: the same menu as the member app (app_base.html) ---- #}
   <div class="app-sheet" id="appSheet">
-    <div class="sheet-panel">
-      <a href="{% url 'manage:overview' %}">Overview</a>
-      <a href="{% url 'manage:approvals' %}">Approvals{% if pending_approval_count %} ({{ pending_approval_count }}){% endif %}</a>
-      <a href="{% url 'manage:orgs_list' %}">Organisations</a>
-      <a href="{% url 'manage:prefect' %}">Prefect{% if prefect_open_count %} ({{ prefect_open_count }}){% endif %}</a>
-      {% if user.is_superuser %}<a href="/admin/">GoodTip HQ &rarr;</a>{% endif %}
-      <a href="{% url 'profile' %}">Profile</a>
-      <a href="{% url 'dashboard' %}">&larr; Back to app</a>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-label="Menu">
+      <div class="sheet-head">
+        <a href="{% url 'profile' %}" class="sheet-me">
+          {% if user.avatar %}<span class="an-avatar has-img"><img src="{{ user.avatar.url }}" alt=""></span>{% else %}<span class="an-avatar">{{ user.display_name|slice:":1"|upper }}</span>{% endif %}
+          <span class="sheet-me-txt"><b>{{ user.display_name }}</b><i>Organisation admin</i></span>
+        </a>
+        <button type="button" class="sheet-x" aria-label="Close menu" data-sheet-close><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      </div>
+      <div class="sheet-links" data-sheet-links>
+        <a href="{% url 'manage:overview' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-home"/></svg><span>Overview</span></a>
+        <a href="{% url 'manage:approvals' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-users"/></svg><span>Approvals</span>{% if pending_approval_count %}<span class="an-count">{{ pending_approval_count }}</span>{% endif %}</a>
+        <a href="{% url 'manage:orgs_list' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-org"/></svg><span>Organisations</span></a>
+        <a href="{% url 'manage:messages' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-mail"/></svg><span>Messages</span></a>
+        <a href="{% url 'manage:prefect' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Prefect</span>{% if prefect_open_count %}<span class="an-count">{{ prefect_open_count }}</span>{% endif %}</a>
+        {% if user.is_superuser %}<a href="/admin/"><svg class="an-ic" aria-hidden="true"><use href="#ic-shield-star"/></svg><span>GoodTip HQ</span></a>{% endif %}
+        <a href="{% url 'dashboard' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-arrow-left"/></svg><span>Back to app</span></a>
+      </div>
       <div class="sheet-theme">
         <span class="sheet-label">Colour</span>
         {% include "partials/_app_theme_switch.html" %}
       </div>
+      <a href="{% url 'accounts:logout' %}" class="sheet-logout"><svg class="an-ic" aria-hidden="true"><use href="#ic-logout"/></svg><span>Log out</span></a>
     </div>
   </div>
 
@@ -215,7 +225,8 @@
     var sheet = document.getElementById('appSheet');
     if (burger && sheet) {
       burger.addEventListener('click', function(){ sheet.classList.add('open'); });
-      sheet.addEventListener('click', function(e){ if (e.target === sheet) sheet.classList.remove('open'); });
+      sheet.addEventListener('click', function(e){ if (e.target === sheet || (e.target.closest && e.target.closest('[data-sheet-close]'))) sheet.classList.remove('open'); });
+      document.addEventListener('keydown', function(e){ if (e.key === 'Escape') sheet.classList.remove('open'); });
     }
     /* notifications bell */
     var bell = document.querySelector('[data-bell]');

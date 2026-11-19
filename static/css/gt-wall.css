@@ -203,3 +203,726 @@ html[data-theme="light"] body.gt-app .gwr-room[data-code] {
     --m-accent-line: rgba(255,255,255,.28);
   }
 }
+
+/* =========================================================================
+   POSTS AS MESSAGES (client, 5 Nov 2026). Each post is a bubble of its own —
+   others' on the left with their face, yours on the right in GoodTip green —
+   with Reply as a button under it, never a box attached to it. Recaps and
+   updates are full-width cards in the middle. Colours are fixed pairs that
+   read the same on the green and the light theme.
+   ========================================================================= */
+/* Every competition readable on the dark room: dark colours (A-League, NFL,
+   NHL…) are lifted for text and buttons, kept as they are for fills. */
+.gwr-chat[data-code], .gwr-room[data-code] {
+  --m-accent: color-mix(in srgb, var(--code) 78%, #fff);
+  --m-accent-ink: color-mix(in srgb, var(--code) 45%, #fff);
+}
+html[data-theme="light"] body.gt-app .gwr-chat[data-code],
+html[data-theme="light"] body.gt-app .gwr-room[data-code] { --m-accent: var(--code); --m-accent-ink: var(--code); }
+.gwr-chat[data-code] .gwr-head .gwr-av, .gwr-room[data-code] .gwr-av { background: var(--code); color: #fff; }
+
+.gwr-stream { display: flex; flex-direction: column; gap: 14px; padding: 18px 18px 22px; }
+.wl-row { position: relative; display: flex; align-items: flex-end; gap: 8px; max-width: 100%; --swipe: 0px; transform: translateX(var(--swipe)); transition: transform .22s ease; }
+.wl-row.swiping { transition: none; }
+.wl-row.theirs { align-self: flex-start; padding-right: 12%; }
+.wl-row.mine { align-self: flex-end; flex-direction: row-reverse; padding-left: 12%; }
+.wl-row.is-recap, .wl-row.is-system { align-self: stretch; }
+.wl-av { width: 34px; height: 34px; flex: none; overflow: hidden; display: grid; place-items: center; margin-bottom: 30px; border-radius: 50%; font-size: 12px; font-weight: 800; color: #10231A; background: #C9F24A; }
+.wl-av img { width: 100%; height: 100%; object-fit: cover; }
+.wl-col { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.wl-row.mine .wl-col { align-items: flex-end; }
+.wl-row.is-recap .wl-col, .wl-row.is-system .wl-col { flex: 1; }
+
+body.gt-app .gwr-stream .wl-bubble { position: relative; display: grid; gap: 6px; min-width: 120px; padding: 10px 14px 8px; border: 0; border-radius: 18px 18px 18px 6px; color: #10231A; background: #FFFFFF; box-shadow: 0 1px 0 rgba(15,46,34,.08), 0 10px 22px -18px rgba(0,0,0,.55); }
+body.gt-app .gwr-stream .wl-row.mine .wl-bubble { border-radius: 18px 18px 6px 18px; color: #FFFFFF; background: #176B45; }
+body.gt-app .gwr-stream .wl-row.is-recap .wl-bubble, body.gt-app .gwr-stream .wl-row.is-system .wl-bubble { border-radius: 20px; padding: 14px 16px 10px; box-shadow: inset 0 3px 0 var(--code, #C9F24A), 0 12px 26px -20px rgba(0,0,0,.6); }
+.wl-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.wl-who { font-size: 13px; font-weight: 800; color: #176B45; }
+.wl-row.mine .wl-head { display: none; }
+.wl-row.mine:has(.wl-tag) .wl-head { display: flex; } .wl-row.mine .wl-who { display: none; }
+.wl-gt { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; font-size: 10px; font-weight: 800; color: #10231A; background: #C9F24A; }
+.wl-row.is-recap .wl-who, .wl-row.is-system .wl-who { color: #10231A; }
+.wl-tag { padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .02em; color: #10231A; background: #EEF2EE; }
+.wl-tag.gpt-code[data-code] { color: #fff; background: var(--code-ink, #176B45); }
+.wl-row.is-recap[data-code] .wl-tag.gpt-code { color: #fff; background: var(--code-ink, #176B45); }
+.wl-row.mine .wl-tag { color: #10231A; background: #D8F7A0; }
+.wl-tag.is-pub { color: #0B3D91; background: #DCEBFF; }
+.wl-pick { justify-self: start; padding: 4px 10px; border-radius: 10px; font-size: 12.5px; font-weight: 700; color: #10231A; background: #FFF4D6; }
+.wl-pick .hit { color: #15803D; } .wl-pick .miss { color: #B42318; }
+.wl-text { margin: 0; font-size: 15px; line-height: 1.45; white-space: normal; overflow-wrap: anywhere; color: inherit; }
+.wl-stamp { justify-self: end; font-size: 11px; color: rgba(16,35,26,.6); }
+.wl-row.mine .wl-stamp { color: rgba(255,255,255,.8); }
+.wl-row.mine .wl-stamp .chat-edited { color: inherit; }
+
+.wl-under { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0 4px; }
+.wl-row.mine .wl-under { justify-content: flex-end; }
+.wl-under .gwp-reacts { display: flex; gap: 4px; margin: 0; padding: 0; }
+.wl-under .gwp-react { min-height: 28px; padding: 2px 8px; border-radius: 999px; font-size: 13px; }
+.wl-replybtn, .wl-threadbtn { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 12px; border: 0; border-radius: 999px; font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer; color: #10231A; background: #C9F24A; }
+.wl-threadbtn { color: var(--m-ink, #EAF7D8); background: color-mix(in srgb, var(--m-ink, #EAF7D8) 12%, transparent); }
+html[data-theme="light"] .wl-threadbtn { color: #10231A; background: rgba(16,35,26,.08); }
+.wl-replybtn svg, .wl-threadbtn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.wl-threadbtn[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+.wl-acts { align-self: center; }
+.wl-acts .chat-more { opacity: 0; }
+.wl-row:hover > .wl-acts .chat-more, .wl-reply:hover > .wl-acts .chat-more, .wl-acts .chat-more:focus-visible { opacity: 1; }
+
+/* The thread: the post's replies as small messages, indented under it. */
+.wl-thread { position: absolute; visibility: hidden; }
+.wl-thread:not([hidden]) { position: static; visibility: visible; flex-basis: 100%; display: grid; gap: 8px; margin: 2px 0 0 42px; padding: 10px 0 2px 14px; border-left: 2px solid color-mix(in srgb, var(--m-ink, #EAF7D8) 25%, transparent); }
+.wl-row:has(.wl-thread:not([hidden])) { flex-wrap: wrap; }
+.wl-row.mine .wl-thread:not([hidden]) { margin: 2px 42px 0 0; }
+.wl-reply { position: relative; display: flex; align-items: flex-end; gap: 8px; --swipe: 0px; transform: translateX(var(--swipe)); transition: transform .22s ease; }
+.wl-reply.mine { flex-direction: row-reverse; }
+.wl-rav { width: 28px; height: 28px; flex: none; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; font-size: 10.5px; font-weight: 800; cursor: pointer; color: #10231A; background: #BFE3CF; }
+.wl-rav.guest { background: #E5E7EB; }
+body.gt-app .gwr-stream .wl-rbubble { display: grid; gap: 4px; max-width: 520px; padding: 8px 12px 6px; border: 0; border-radius: 16px 16px 16px 5px; color: #10231A; background: #F2F6F3; }
+body.gt-app .gwr-stream .wl-reply.mine .wl-rbubble { border-radius: 16px 16px 5px 16px; color: #fff; background: #1F7A52; }
+.wl-rwho { font-size: 12px; font-weight: 800; color: #176B45; } .wl-reply.mine .wl-rwho { color: #D8F7A0; }
+.wl-rwho i { font-style: normal; font-weight: 600; opacity: .7; }
+.wl-rbubble .wl-text { font-size: 14px; }
+.wl-reply.mine .wl-stamp { color: rgba(255,255,255,.8); }
+.wl-rbubble .chat-quote { color: inherit; }
+.wl-row.will-reply .wl-bubble, .wl-reply.will-reply .wl-rbubble { box-shadow: 0 0 0 3px #C9F24A; }
+
+/* The composer while it is answering something. */
+.wl-quote { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; padding: 8px 10px; border-radius: 12px; background: color-mix(in srgb, #C9F24A 16%, transparent); }
+.wl-quote .ccq-bar { width: 4px; align-self: stretch; border-radius: 4px; background: #C9F24A; }
+.wl-quote .ccq-txt { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.wl-quote .ccq-txt small:first-child { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; opacity: .75; }
+.wl-quote .ccq-txt b { font-size: 13px; } .wl-quote [data-reply-quote] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; opacity: .85; }
+.gwr-composer.is-replying .gwr-compose-extra { display: none; }
+
+/* The pinned recap: a card, not a message. */
+.gwr-pinned { display: grid; gap: 8px; }
+body.gt-app .gwr-stream .wl-bubble { max-width: min(600px, 100%); }
+body.gt-app .gwr-stream .wl-row.is-recap .wl-bubble, body.gt-app .gwr-stream .wl-row.is-system .wl-bubble { max-width: none; width: 100%; }
+.wl-row.mine .wl-thread:not([hidden]) { justify-items: end; padding: 10px 14px 2px 0; border-left: 0; border-right: 2px solid color-mix(in srgb, var(--m-ink, #EAF7D8) 25%, transparent); }
+/* A room fills from the bottom, as a chat does. */
+.gwr-stream > :first-child { margin-top: auto; }
+/* Same colours in both themes: a light-theme rule was turning your own posts white. */
+html body.gt-app .gwr-stream .wl-bubble, html body.gt-app .gwr-stream .wl-rbubble { color: #10231A !important; background: #FFFFFF !important; }
+html body.gt-app .gwr-stream .wl-rbubble { background: #F2F6F3 !important; }
+html body.gt-app .gwr-stream .wl-row.mine > .wl-col > .wl-bubble { color: #FFFFFF !important; background: #176B45 !important; }
+html body.gt-app .gwr-stream .wl-reply.mine .wl-rbubble { color: #FFFFFF !important; background: #1F7A52 !important; }
+html[data-theme="light"] body.gt-app .gwr-stream .wl-bubble, html[data-theme="light"] body.gt-app .gwr-stream .wl-rbubble { box-shadow: 0 0 0 1px rgba(15,46,34,.1), 0 10px 22px -18px rgba(0,0,0,.4); }
+.gwr-pin { display: inline-flex; align-items: center; gap: 6px; }
+.gwr-pin svg, .gwr-pinmark { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.gwr-pinmark { margin-right: 5px; vertical-align: -2px; color: var(--m-accent-ink, #C9F24A); }
+
+/* =========================================================================
+   THE WALL, ROUND THREE (client, 9 Nov 2026): no buttons hanging under the
+   posts, a WhatsApp box at the bottom, a menu on every room, favourites,
+   and recaps with a photograph and a proper table.
+   ========================================================================= */
+/* Reactions only show once somebody has reacted; choosing one is in the menu. */
+.wl-under .gwp-react:not(:has(.c)) { display: none; }
+.wl-under .gwp-reacts:not(:has(.c)) { display: none; }
+.wl-under:not(:has(.c)):not(:has(.wl-threadbtn)) { display: none; }
+.wl-react-row { display: flex; gap: 4px; padding: 6px 6px 8px; margin-bottom: 4px; border-bottom: 1px solid rgba(16,35,26,.1); }
+.wl-react { width: 38px; height: 38px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; font-size: 21px; cursor: pointer; background: #F1F5F2; transition: transform .12s ease; }
+.wl-react:hover { transform: scale(1.18); }
+.wl-react.on { background: #D8F7A0; box-shadow: inset 0 0 0 2px #65A30D; }
+
+/* A picture in a post: first, full width of the bubble, caption under it. */
+.wl-shot { display: block; overflow: hidden; margin: 0 -8px 2px; border-radius: 14px; }
+.wl-shot img { display: block; width: 100%; max-width: 440px; max-height: 420px; object-fit: cover; }
+body.gt-app .gwr-stream .wl-bubble:has(.wl-shot) { width: min(420px, 100%); padding-top: 6px; }
+
+/* ---- the box ---- */
+.gwr-composer .wl-row-box { display: flex; align-items: flex-end; gap: 6px; padding: 6px 6px 6px 8px; border-radius: 26px; background: var(--m-panel-2, rgba(255,255,255,.06)); }
+.gwr-composer .wl-row-box textarea { flex: 1; min-width: 0; min-height: 40px; max-height: 150px; padding: 10px 6px; border: 0 !important; outline: 0; resize: none; font: inherit; font-size: 15px; color: var(--m-ink); background: transparent !important; box-shadow: none !important; }
+.gwr-composer .wl-tool, .gwr-composer .cc-emoji > summary { width: 40px; height: 40px; flex: none; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; list-style: none; cursor: pointer; color: var(--m-ink-2, #C8D6CE); background: transparent; }
+.gwr-composer .wl-tool::-webkit-details-marker { display: none; }
+.gwr-composer .wl-tool:hover, .gwr-composer .cc-emoji > summary:hover, .gwr-composer details[open] > .wl-tool { color: var(--m-accent-ink, #C9F24A); background: rgba(255,255,255,.08); }
+.gwr-composer .wl-tool svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.gwr-composer .wl-public input { position: absolute; opacity: 0; pointer-events: none; }
+.gwr-composer .wl-public:has(input:checked) { color: #10231A; background: #C9F24A; }
+body.gt-app .gwr-composer .gwr-send { width: 44px; height: 44px; flex: none; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; color: #10231A; background: var(--m-accent, #C9F24A); }
+body.gt-app .gwr-composer .gwr-send svg { width: 20px; height: 20px; }
+body.gt-app .gwr-composer .gwr-send span { display: none; }
+.gwr-composer .cc-emoji { position: relative; }
+.gwr-composer .cc-emoji-menu { position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 30; width: min(380px, 86vw); }
+.gwr-composer .cc-emoji-grid { max-height: 280px; }
+.gwr-composer.is-replying [data-wl-pickimage], .gwr-composer.is-replying .wl-picks, .gwr-composer.is-replying .wl-public { display: none; }
+html[data-theme="light"] .gwr-composer .wl-row-box { background: #FFFFFF; box-shadow: inset 0 0 0 1px rgba(15,46,34,.14); }
+html[data-theme="light"] .gwr-composer .wl-tool, html[data-theme="light"] .gwr-composer .cc-emoji > summary { color: #3B4C42; }
+html[data-theme="light"] .gwr-composer .wl-tool:hover, html[data-theme="light"] .gwr-composer .cc-emoji > summary:hover { color: #176B45; background: #EEF4F0; }
+
+.wl-picks { position: relative; }
+.wl-picks-menu { position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 30; width: min(320px, 80vw); max-height: 300px; overflow: auto; display: grid; gap: 6px; padding: 12px; border-radius: 18px; color: #10231A; background: #fff; box-shadow: 0 24px 50px -20px rgba(0,0,0,.6); }
+.wl-picks-menu b { font-size: 13px; } .wl-picks-menu p { margin: 0; font-size: 13px; color: #3B4C42; }
+.wl-picks-menu button { padding: 10px 12px; border: 0; border-radius: 12px; text-align: left; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; color: #10231A; background: #F1F5F2; }
+.wl-picks-menu button:hover { background: #D8F7A0; }
+.wl-attached { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+.wl-att-img { position: relative; display: block; }
+.wl-att-img img { display: block; width: 84px; height: 84px; object-fit: cover; border-radius: 14px; }
+.wl-att-pick { display: inline-flex; align-items: center; gap: 6px; padding: 6px 6px 6px 12px; border-radius: 999px; font-size: 13px; color: #10231A; background: #FFF4D6; }
+.wl-attached button { width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; font-size: 16px; line-height: 1; cursor: pointer; color: #fff; background: rgba(0,0,0,.6); }
+.wl-att-img button { position: absolute; top: -6px; right: -6px; }
+
+/* ---- the room list ---- */
+.gwr-filter { display: flex; gap: 6px; margin: 2px 0 10px; }
+.gwr-filter button { padding: 7px 14px; border: 0; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; color: var(--m-ink); background: rgba(255,255,255,.07); }
+.gwr-filter button.on { color: #10231A; background: #C9F24A; }
+html[data-theme="light"] .gwr-filter button { background: #EEF2EE; color: #10231A; }
+html[data-theme="light"] .gwr-filter button.on { background: #176B45; color: #fff; }
+.gwr-nofav { margin: 4px 2px 10px; font-size: 13px; line-height: 1.45; color: var(--m-ink-2); }
+.gtm-nav.is-favs .gwr-room:not(.is-fav), .gtm-nav.is-favs .gtm-sec-h { display: none; }
+.gwr-room { position: relative; }
+.gwr-room > a { padding-right: 34px !important; }
+.gwr-more { position: absolute; top: 50%; right: 4px; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; cursor: pointer; opacity: 0; transform: translateY(-50%); color: var(--m-ink-2); background: transparent; }
+.gwr-more svg { width: 16px; height: 16px; fill: currentColor; }
+.gwr-room:hover .gwr-more, .gwr-more:focus-visible { opacity: 1; }
+@media (hover: none) { .gwr-more { opacity: .7; } }
+.gwr-favmark { font-style: normal; color: #F2C94C; }
+.gwr-av.has-logo { padding: 4px; background: #fff !important; }
+.gwr-av.has-logo img { width: 100%; height: 100%; object-fit: contain; }
+.gwr-menu { position: fixed; z-index: 90; width: 220px; display: grid; gap: 2px; padding: 6px; border-radius: 16px; color: #10231A; background: #fff; box-shadow: 0 24px 50px -18px rgba(0,0,0,.6), 0 0 0 1px rgba(15,46,34,.08); }
+.gwr-menu form { margin: 0; }
+.gwr-menu button, .gwr-menu a { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 0; border-radius: 10px; text-align: left; text-decoration: none; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; color: #10231A !important; background: transparent; }
+.gwr-menu button:hover, .gwr-menu a:hover, .gwr-menu button:focus-visible, .gwr-menu a:focus-visible { background: #EEF4F0; outline: 0; }
+.gwr-menu svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.gwr-menu-star { width: 17px; text-align: center; color: #C99A06; }
+
+/* ---- the recap: a photograph, then a proper table ---- */
+.grc-pic { height: 150px; margin: 4px -16px 12px; background: #DDE6E0 center / cover no-repeat; box-shadow: inset 0 -60px 50px -40px rgba(0,0,0,.45); }
+.wl-row.is-recap .wl-bubble { overflow: hidden; }
+.grc-talk { display: none !important; }
+body.gt-app .gwr-stream .grc-board { display: grid; overflow: hidden; margin: 6px 0 4px; border-radius: 16px; background: #fff; box-shadow: 0 0 0 1px rgba(15,46,34,.1); }
+body.gt-app .gwr-stream .grc-bhead { display: grid; grid-template-columns: minmax(0, 1fr) 84px 92px; align-items: center; padding: 12px 16px; color: #fff; background: var(--rc, #176B45); }
+body.gt-app .gwr-stream .grc-bhead span { font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #fff; }
+body.gt-app .gwr-stream .grc-bhead span:nth-child(n+2) { text-align: right; }
+body.gt-app .gwr-stream .grc-brow { display: grid; grid-template-columns: minmax(0, 1fr) 84px 92px; align-items: center; padding: 11px 16px; color: #10231A; background: #fff; box-shadow: none !important; }
+body.gt-app .gwr-stream .grc-brow:nth-child(odd) { background: #F5F8F6; }
+body.gt-app .gwr-stream .grc-brow.lead { background: color-mix(in srgb, var(--rc, #176B45) 12%, #fff); }
+body.gt-app .gwr-stream .grc-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+body.gt-app .gwr-stream .grc-who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 800; color: #10231A; }
+body.gt-app .gwr-stream .grc-rank { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 9px; font-style: normal; font-size: 13px; font-weight: 800; color: #10231A; background: #E7EEE9; }
+body.gt-app .gwr-stream .grc-brow.lead .grc-rank { color: #fff; background: var(--rc, #176B45); }
+body.gt-app .gwr-stream .grc-pts { text-align: right; font-size: 15px; font-weight: 800; color: #15803D; }
+body.gt-app .gwr-stream .grc-tot { text-align: right; font: 400 19px/1 var(--display, inherit); color: #10231A; }
+body.gt-app .gwr-stream .grc-mv { font-size: 11.5px; font-weight: 800; }
+body.gt-app .gwr-stream .grc-mv.up { color: #15803D; } body.gt-app .gwr-stream .grc-mv.dn { color: #B42318; }
+body.gt-app .gwr-stream .grc-out { padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #3B4C42; background: #EEF2EE; }
+.wl-row.is-recap .wl-tag.gpt-code { color: #fff !important; background: var(--rc, #176B45) !important; }
+
+/* ---- 9 Nov 2026, second look ---- */
+/* Posts as narrow as WhatsApp's: yours on the right, everyone else's — and
+   GoodTip's recaps — on the left, never the full width of the room. */
+.wl-row.theirs, .wl-row.is-recap, .wl-row.is-system { align-self: flex-start; padding-right: 0; max-width: min(560px, 82%); }
+.wl-row.mine { padding-left: 0; max-width: min(520px, 78%); }
+body.gt-app .gwr-stream .wl-row.is-recap .wl-bubble, body.gt-app .gwr-stream .wl-row.is-system .wl-bubble { width: 100%; border-radius: 6px 20px 20px 20px; }
+.grc-pic { height: 190px; margin: -14px -16px 12px; border-radius: 6px 20px 0 0; }
+
+/* Pin and Favourite: white buttons, as the rest of the room's controls. */
+body.gt-app .gwr-head .gwr-pin { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 0; border-radius: 999px; font-size: 13px; font-weight: 800; color: #10231A; background: #FFFFFF; box-shadow: 0 6px 14px -10px rgba(0,0,0,.6); }
+body.gt-app .gwr-head .gwr-pin:hover { background: #EAF7D2; }
+body.gt-app .gwr-head .gwr-pin.on { color: #10231A; background: #C9F24A; }
+.gwr-head .gtm-chat-acts { display: flex; gap: 8px; }
+.gwr-head .gtm-chat-acts form { margin: 0; }
+
+/* A post's press menu: white, like the room menu. */
+body.gt-app .chat-menu[data-msg-menu] { color: #10231A; background: #FFFFFF; border: 0; border-radius: 16px; box-shadow: 0 24px 50px -18px rgba(0,0,0,.6), 0 0 0 1px rgba(15,46,34,.08); }
+body.gt-app .chat-menu[data-msg-menu] .chat-menu-item { color: #10231A; }
+body.gt-app .chat-menu[data-msg-menu] .chat-menu-item:hover, body.gt-app .chat-menu[data-msg-menu] .chat-menu-item:focus-visible { background: #EEF4F0; }
+body.gt-app .chat-menu[data-msg-menu] .chat-menu-item.is-danger { color: #B42318; }
+
+/* The room list: the colour shows on hover, not only once pressed. */
+.gwr-room > a { transition: background .15s ease, box-shadow .15s ease; }
+.gwr-room:hover > a { background: rgba(201,242,74,.10); box-shadow: inset 3px 0 0 #C9F24A; }
+.gwr-room[data-code]:hover > a { background: color-mix(in srgb, var(--code) 18%, transparent); box-shadow: inset 3px 0 0 var(--code); }
+html[data-theme="light"] .gwr-room:hover > a { background: #EEF4F0; }
+html[data-theme="light"] .gwr-room[data-code]:hover > a { background: color-mix(in srgb, var(--code) 12%, #fff); }
+
+/* The round's results. */
+.grc-results { display: grid; gap: 4px; margin: 4px 0 12px; }
+.grc-sec { margin-bottom: 4px; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #3B4C42; }
+.grc-game { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: #F5F8F6; }
+.grc-game.is-more { display: none; }
+.grc-results.is-open .grc-game.is-more { display: grid; }
+.grc-team { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.grc-team.is-away { justify-content: flex-end; text-align: right; }
+.grc-team b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; font-weight: 600; color: #3B4C42; }
+.grc-team.won b { font-weight: 800; color: #10231A; }
+.grc-crest { width: 26px; height: 26px; flex: none; display: grid; place-items: center; }
+.grc-crest img, .grc-crest svg { width: 26px; height: 26px; object-fit: contain; }
+.grc-crest > * { max-width: 26px; max-height: 26px; }
+.grc-score { min-width: 64px; padding: 4px 10px; border-radius: 8px; text-align: center; font-size: 14px; font-weight: 800; color: #fff; background: var(--rc, #176B45); }
+.grc-score i { margin: 0 4px; font-style: normal; opacity: .7; }
+.grc-moregames { justify-self: start; margin-top: 4px; padding: 6px 12px; border: 0; border-radius: 999px; font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer; color: #10231A; background: #E7EEE9; }
+/* Reaction counts under a post: small white pills, readable on both themes. */
+body.gt-app .wl-under .gwp-react { display: inline-flex; align-items: center; gap: 4px; min-height: 26px; padding: 2px 9px; border: 0; border-radius: 999px; font-size: 13px; color: #10231A; background: #FFFFFF; box-shadow: 0 4px 10px -8px rgba(0,0,0,.6); }
+body.gt-app .wl-under .gwp-react .c { font-size: 12px; font-weight: 800; color: #10231A; }
+body.gt-app .wl-under .gwp-react.on { background: #D8F7A0; }
+html[data-theme="light"] body.gt-app .wl-under .gwp-react { box-shadow: 0 0 0 1px rgba(15,46,34,.12); }
+body.gt-app .wl-under .gwp-react:not(:has(.c)) { display: none; }
+
+/* ---- Match by match: one card per game, swiped ---- */
+.grc-results { display: none !important; }
+.grc-games { margin: 6px 0 14px; }
+.grc-games-h { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.grc-games-h .grc-sec { margin: 0; }
+.grc-games-n { font-size: 12px; color: #3B4C42; }
+.grc-games-nav { margin-left: auto; display: flex; gap: 6px; }
+.grc-games-nav button { width: 30px; height: 30px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; font-size: 20px; line-height: 1; cursor: pointer; color: #10231A; background: #E7EEE9; }
+.grc-games-nav button:hover { color: #fff; background: var(--rc, #176B45); }
+.grc-track { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+.grc-track::-webkit-scrollbar { display: none; }
+.grc-card { scroll-snap-align: start; display: grid; gap: 10px; padding: 14px; border-radius: 16px; background: #F5F8F6; box-shadow: inset 0 3px 0 var(--rc, #176B45); }
+.grc-fix { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; }
+.grc-fix .grc-team b { white-space: normal; line-height: 1.2; font-size: 14px; }
+.grc-fix .grc-score { font-size: 18px; padding: 6px 12px; }
+.grc-story { margin: 0; font-size: 14px; line-height: 1.5; color: #10231A; }
+.grc-events { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.grc-events li { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #10231A; }
+.grc-events li.is-away { flex-direction: row-reverse; text-align: right; }
+.grc-events small { font-size: 11px; color: #5B6B61; }
+.grc-ev { width: 14px; height: 14px; flex: none; border-radius: 50%; background: #10231A; }
+.grc-ev.is-goal, .grc-ev.is-pen { background: radial-gradient(circle at 35% 35%, #fff 0 28%, #10231A 30%); }
+.grc-ev.is-own { background: #B42318; }
+.grc-ev.is-red { width: 11px; height: 15px; border-radius: 2px; background: #DC2626; }
+.grc-stats { display: grid; gap: 8px; }
+.grc-stat { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; color: #10231A; }
+.grc-stat > span:last-of-type { text-align: right; }
+.grc-stat em { font-style: normal; font-size: 11.5px; font-weight: 700; color: #3B4C42; text-align: center; }
+.grc-bar { grid-column: 1 / -1; height: 6px; overflow: hidden; border-radius: 999px; background: #D7DFDA; }
+.grc-bar b { display: block; height: 100%; border-radius: 999px; background: var(--rc, #176B45); }
+.grc-venue { font-size: 11.5px; color: #5B6B61; }
+.grc-dots { display: flex; justify-content: center; gap: 5px; margin-top: 8px; }
+.grc-dots i { width: 6px; height: 6px; border-radius: 50%; background: #CBD5CF; transition: width .2s ease; }
+.grc-dots i.on { width: 18px; border-radius: 999px; background: var(--rc, #176B45); }
+/* The table: five rows, then "Show the full table". */
+body.gt-app .gwr-stream .grc-brow.is-more { display: none; }
+body.gt-app .gwr-stream .grc-board.is-open .grc-brow.is-more { display: grid; }
+.grc-moretable { margin: 8px 12px 10px; }
+/* Long posts: a sensible height, then "Read more". */
+.wl-text[data-wl-clamp] { display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical; overflow: hidden; }
+.wl-text[data-wl-clamp].is-open { display: block; -webkit-line-clamp: unset; }
+.wl-more { justify-self: start; padding: 0; border: 0; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; color: #176B45; background: none; }
+.wl-row.mine .wl-more { color: #D8F7A0; }
+/* The carousel must never widen its card: every box on the way down may shrink. */
+body.gt-app .gwr-stream .wl-bubble { grid-template-columns: minmax(0, 1fr); }
+.gwr-stream .wl-col, .gwr-stream .gpt-recap, .grc-games, .grc-track { min-width: 0; max-width: 100%; }
+.grc-card { align-content: start; min-width: 0; }
+.gwr-stream { overflow-x: hidden; }
+.grc-track { align-items: start; }
+
+/* ---- Free club photos (Wikimedia Commons), credited ---- */
+.grc-pic { display: none !important; }
+.grc-gallery { margin: -14px -16px 12px; overflow: hidden; border-radius: 6px 20px 0 0; }
+.grc-gallery:not(:has(.grc-shot)) { display: none; }
+.grc-gtrack { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.grc-gtrack::-webkit-scrollbar { display: none; }
+.grc-shot { position: relative; margin: 0; scroll-snap-align: start; }
+.grc-shot img { display: block; width: 100%; height: 230px; object-fit: cover; }
+.grc-shot figcaption { position: absolute; left: 0; right: 0; bottom: 0; display: grid; gap: 2px; padding: 26px 14px 10px; background: linear-gradient(transparent, rgba(0,0,0,.72)); }
+.grc-shot figcaption b { font-size: 14px; color: #fff; }
+.grc-shot figcaption a, .grc-cardpic figcaption a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; text-decoration: none; color: rgba(255,255,255,.85) !important; }
+.grc-gallery .grc-dots { position: relative; margin: -16px 0 6px; z-index: 1; }
+.grc-gallery .grc-dots i { background: rgba(255,255,255,.55); }
+.grc-gallery .grc-dots i.on { background: #fff; }
+.grc-cardpic { position: relative; margin: -14px -14px 2px; overflow: hidden; border-radius: 16px 16px 0 0; }
+.grc-cardpic img { display: block; width: 100%; height: 150px; object-fit: cover; }
+.grc-cardpic figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 10px 6px; background: linear-gradient(transparent, rgba(0,0,0,.65)); }
+
+/* ---- Game recaps (9 Nov 2026) ---- */
+.grc-results.grc-list { display: grid !important; }
+.grc-games { display: none !important; }
+.grc-shot img { height: 340px; }
+@media (max-width: 720px) { .grc-shot img { height: 260px; } }
+.gm { display: grid; gap: 12px; }
+.gm-score { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 14px; border-radius: 16px; background: color-mix(in srgb, var(--rc, #176B45) 10%, #fff); }
+.gm-team { display: grid; justify-items: center; gap: 6px; text-align: center; }
+.gm-team b { font-size: 14px; font-weight: 700; line-height: 1.2; color: #3B4C42; }
+.gm-team.won b { font-weight: 800; color: #10231A; }
+.gm-team .grc-crest, .gm-team .grc-crest img, .gm-team .grc-crest svg { width: 44px; height: 44px; }
+.gm-team .grc-crest > * { max-width: 44px; max-height: 44px; }
+.gm-num { display: grid; justify-items: center; padding: 8px 14px; border-radius: 12px; font: 400 30px/1 var(--display, inherit); color: #fff; background: var(--rc, #176B45); }
+.gm-num i { margin: 0 6px; font-style: normal; opacity: .7; }
+.gm-num small { margin-top: 4px; font: 800 9.5px/1 inherit; letter-spacing: .1em; text-transform: uppercase; opacity: .8; }
+.gm-lead { margin: 0; font-size: 15.5px; font-weight: 600; line-height: 1.45; color: #10231A; }
+.gm-secs { display: grid; gap: 8px; }
+.gm-sec { padding: 10px 12px; border-radius: 12px; background: #F5F8F6; box-shadow: inset 3px 0 0 var(--rc, #176B45); }
+.gm-sec b { display: block; margin-bottom: 3px; font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--rc, #176B45); }
+.gm-sec p { margin: 0; font-size: 14px; line-height: 1.5; color: #10231A; }
+.gm-stats { padding: 4px 2px; }
+.gm-q { margin: 0; padding: 12px 14px; border-radius: 14px; font-size: 14.5px; font-weight: 700; color: #10231A; background: #FFF4D6; }
+
+/* ---- Your posts and replies: WhatsApp's soft green, not green on green ---- */
+html body.gt-app .gwr-stream .wl-row.mine > .wl-col > .wl-bubble { color: #10231A !important; background: #D9FDD3 !important; }
+html body.gt-app .gwr-stream .wl-reply.mine .wl-rbubble { color: #10231A !important; background: #E7F8D9 !important; }
+.wl-row.mine .wl-stamp, .wl-reply.mine .wl-stamp { color: rgba(16,35,26,.6) !important; }
+.wl-reply.mine .wl-rwho { color: #176B45 !important; }
+.wl-row.mine .wl-more { color: #176B45; }
+.wl-row.mine .wl-tag { background: #fff; }
+.gm-num { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; min-width: 96px; font-size: 30px; line-height: 1; }
+.gm-num i { margin: 0 6px; }
+.gm-num small { flex-basis: 100%; margin-top: 6px; text-align: center; font-family: inherit; font-size: 9.5px; font-weight: 800; line-height: 1; letter-spacing: .1em; text-transform: uppercase; opacity: .8; }
+/* Each part of a game recap in its own colour (client, 9 Nov 2026), so the
+   eye can find "Defence" or "Why they lost" without reading every heading. */
+.gm-sec { --sc: #176B45; --sb: #EEF6F1; background: var(--sb); box-shadow: inset 4px 0 0 var(--sc); }
+.gm-sec b { color: var(--sc); }
+.gm-sec:nth-child(7n+1) { --sc: #0B57D0; --sb: #EAF1FD; }   /* first half: blue */
+.gm-sec:nth-child(7n+2) { --sc: #7C3AED; --sb: #F3EEFE; }   /* second half: violet */
+.gm-sec:nth-child(7n+3) { --sc: #C2410C; --sb: #FDF0E8; }   /* attack: orange */
+.gm-sec:nth-child(7n+4) { --sc: #0F766E; --sb: #E7F6F4; }   /* defence: teal */
+.gm-sec:nth-child(7n+5) { --sc: #A16207; --sb: #FDF6E3; }   /* stand-outs: gold */
+.gm-sec:nth-child(7n+6) { --sc: #BE123C; --sb: #FDECEF; }   /* why they lost: red */
+.gm-sec:nth-child(7n+7) { --sc: #475569; --sb: #F1F4F7; }   /* where: slate */
+.gwr-chunk { display: flex; flex-direction: column; gap: 14px; }
+.gwr-earlier { align-self: center; padding: 8px 16px; border: 0; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; color: #10231A; background: #FFFFFF; box-shadow: 0 6px 14px -10px rgba(0,0,0,.6); }
+.gwr-earlier:hover { background: #EAF7D2; }
+
+/* =========================================================================
+   FINAL WHISTLE — GoodTip's AI (11 Nov 2026). Everything the AI writes —
+   a game's story and a round's wrap — wears one colour, indigo, and one
+   badge, so nobody mistakes it for a member talking: members are white,
+   you are soft green, the AI is indigo.
+   ========================================================================= */
+html body.gt-app .gwr-stream .wl-row.is-ai > .wl-col > .wl-bubble {
+  color: #1E1B4B !important;
+  background: linear-gradient(180deg, #F3F2FF 0%, #ECEBFF 100%) !important;
+  box-shadow: inset 0 0 0 1.5px #C7C4FF, 0 14px 30px -22px rgba(49, 46, 129, .7) !important;
+}
+.fw-brand { display: inline-flex; align-items: center; gap: 7px; padding: 3px 10px 3px 3px; border-radius: 999px; color: #fff; background: linear-gradient(120deg, #4338CA, #7C3AED); }
+.fw-brand b { font-size: 12.5px; font-weight: 800; letter-spacing: .01em; color: #fff; }
+.fw-brand em { padding: 1px 6px; border-radius: 6px; font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: .08em; color: #312E81; background: #E0E7FF; }
+.fw-mark { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; font-style: normal; font-size: 9.5px; font-weight: 900; letter-spacing: .02em; color: #312E81; background: #fff; }
+.wl-row.is-ai .wl-head .wl-gt, .wl-row.is-ai .wl-head > .wl-who { display: none; }
+.wl-row.is-ai .gm-lead, .wl-row.is-ai .gm-sec p, .wl-row.is-ai .grc-events li, .wl-row.is-ai .grc-stat { color: #1E1B4B; }
+.wl-row.is-ai .gm-score { background: #FFFFFF; box-shadow: inset 0 0 0 1px #DDDBFF; }
+.wl-row.is-ai .wl-stamp { color: #4C4A7A !important; }
+.fw-q { background: #FFFFFF !important; box-shadow: inset 4px 0 0 #7C3AED; color: #1E1B4B !important; }
+.wl-row.is-ai .grc-board { box-shadow: 0 0 0 1px #DDDBFF; }
+/* A standard height: the story folds, "Read more" opens it. */
+.fw-fold { position: relative; max-height: 430px; overflow: hidden; transition: max-height .3s ease; }
+.fw-fold.is-open { max-height: none; }
+.fw-fold:not(.is-open).has-more::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 90px; background: linear-gradient(transparent, #EDECFF); pointer-events: none; }
+.fw-more { justify-self: center; padding: 8px 18px; border: 0; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; color: #fff; background: linear-gradient(120deg, #4338CA, #7C3AED); }
+
+/* =========================================================================
+   MATCH RECAP by GoodTip AI — the redesign (11 Nov 2026).
+   The room uses its whole width: GoodTip AI's recaps span it, members'
+   posts and yours get room to breathe, and the write-up reads as an article
+   — a title and well-spaced paragraphs under the photos.
+   ========================================================================= */
+.gwr-stream { padding: 22px 26px 28px; gap: 18px; }
+.wl-row.theirs { max-width: 82%; }
+.wl-row.mine { max-width: 78%; }
+.wl-row.is-recap, .wl-row.is-system, .wl-row.is-story { align-self: stretch; max-width: 100%; }
+body.gt-app .gwr-stream .wl-bubble { max-width: 100%; }
+body.gt-app .gwr-stream .wl-row.theirs .wl-bubble, body.gt-app .gwr-stream .wl-row.mine .wl-bubble { max-width: 640px; }
+
+/* the AI's card: white to read, indigo to know who wrote it */
+html body.gt-app .gwr-stream .wl-row.is-ai > .wl-col > .wl-bubble {
+  overflow: hidden; padding: 0 !important; border-radius: 22px !important;
+  color: #1E1B4B !important; background: #FFFFFF !important;
+  box-shadow: 0 0 0 2px #6D5DF6, 0 22px 44px -28px rgba(49, 46, 129, .8) !important;
+}
+.wl-row.is-ai .fw-brand, .wl-row.is-ai .wl-head .wl-tag { display: none; }
+.wl-row.is-story .wl-head { display: none; }
+.mr-band { display: flex; align-items: center; gap: 14px; padding: 16px 22px; color: #fff; background: linear-gradient(115deg, #312E81 0%, #4F46E5 55%, #7C3AED 100%); }
+.mr-band-inline { margin: -10px -14px 12px; border-radius: 0; }
+.wl-row.is-recap:not(.is-story) .wl-head { display: block; padding: 0; }
+.wl-row.is-recap:not(.is-story) .wl-bubble > *:not(.wl-head):not(.wl-stamp) { margin-left: 18px; margin-right: 18px; }
+.wl-row.is-recap:not(.is-story) .wl-head .mr-band-inline { margin: 0; }
+.mr-spark { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 14px; background: rgba(255,255,255,.16); box-shadow: inset 0 0 0 1px rgba(255,255,255,.3); }
+.mr-spark svg { width: 24px; height: 24px; fill: #fff; }
+.mr-name { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.mr-name b { font: 400 26px/1 var(--display, inherit); letter-spacing: .02em; text-transform: uppercase; color: #fff; }
+.mr-name small { font-size: 12.5px; font-weight: 700; color: #E0E7FF; }
+.mr-comp { padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 800; color: #fff; background: var(--k, #4338CA); box-shadow: 0 0 0 2px rgba(255,255,255,.55); }
+
+.mr-gallery { margin: 0 !important; border-radius: 0 !important; }
+.mr-gallery .grc-shot img { height: 420px; }
+@media (max-width: 900px) { .mr-gallery .grc-shot img { height: 300px; } }
+.mr-gallery .grc-shot figcaption { padding: 30px 18px 12px; }
+
+.mr-score { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 18px; padding: 18px 26px; border-bottom: 1px solid #ECEBFF; background: #FAFAFF; }
+.mr-team { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.mr-team.is-away { justify-content: flex-end; text-align: right; }
+.mr-team b { font-size: 16px; font-weight: 700; line-height: 1.2; color: #4C4A7A; }
+.mr-team.won b { font-weight: 800; color: #1E1B4B; }
+.mr-team .grc-crest, .mr-team .grc-crest img, .mr-team .grc-crest svg { width: 40px; height: 40px; }
+.mr-team .grc-crest > * { max-width: 40px; max-height: 40px; }
+.mr-num { font: 400 40px/1 var(--display, inherit); color: #1E1B4B; white-space: nowrap; }
+.mr-num i { margin: 0 10px; font-style: normal; color: #A5A3D9; }
+
+.mr-article { padding: 22px 26px 6px; }
+.mr-title { margin: 0 0 14px; font: 400 26px/1.2 var(--display, inherit); color: #1E1B4B; }
+.mr-article p { max-width: 76ch; margin: 0 0 16px; font-size: 16px; line-height: 1.75; color: #2E2A5C; }
+.mr-label { display: block; margin-bottom: 8px; font-size: 11.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #6D5DF6; }
+.mr-moments { margin: 6px 0 18px; }
+.mr-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.mr-chip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 999px; font-size: 13.5px; font-weight: 700; color: #1E1B4B; background: #F1F0FF; }
+.mr-chip i { width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff 0 28%, #1E1B4B 30%); }
+.mr-chip.is-red i { width: 10px; height: 13px; border-radius: 2px; background: #DC2626; }
+.mr-chip.is-own i { background: #B42318; }
+.mr-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 0 0 20px; }
+.mr-stat { display: grid; gap: 6px; padding: 12px 14px; border-radius: 14px; background: #F7F7FF; box-shadow: inset 0 0 0 1px #ECEBFF; }
+.mr-stat em { font-style: normal; font-size: 12px; font-weight: 800; letter-spacing: .04em; color: #6B6894; }
+.mr-stat span { display: flex; justify-content: space-between; font-size: 18px; color: #1E1B4B; }
+.mr-bar { height: 6px; overflow: hidden; border-radius: 999px; background: #E3E1FA; }
+.mr-bar b { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #4F46E5, #7C3AED); }
+.mr-ask { margin: 4px 26px 22px; padding: 16px 18px; border-radius: 16px; background: linear-gradient(120deg, #EEF2FF, #F5F3FF); box-shadow: inset 4px 0 0 #6D5DF6; }
+.mr-ask p { margin: 0; font-size: 16.5px; font-weight: 700; line-height: 1.45; color: #1E1B4B; }
+.wl-row.is-story .fw-more { margin: 0 auto 14px; display: block; }
+.wl-row.is-story .fw-fold { max-height: 360px; }
+.wl-row.is-story .fw-fold:not(.is-open).has-more::after { background: linear-gradient(rgba(255,255,255,0), #fff); }
+.wl-row.is-story .wl-under { padding: 4px 6px 0; }
+/* The recap spans the room: its "⋮" sits over the card, not beside it. */
+.wl-row.is-story, .wl-row.is-recap { position: relative; }
+.wl-row.is-story > .wl-acts, .wl-row.is-recap > .wl-acts { position: absolute; top: 74px; right: 12px; z-index: 3; }
+.wl-row.is-story > .wl-acts .chat-more, .wl-row.is-recap > .wl-acts .chat-more { opacity: 1; color: #fff; background: rgba(30,27,75,.55); border-radius: 50%; }
+.wl-row.is-story > .wl-col, .wl-row.is-recap > .wl-col { flex: 1; width: 100%; }
+
+/* =========================================================================
+   12 Nov 2026 — back to the earlier size, the AI in its own full colour,
+   the member's photo beside their name, replies always on show (as X
+   threads them), and every photo shown whole.
+   ========================================================================= */
+/* the earlier size */
+.wl-row.theirs { max-width: min(560px, 82%); }
+.wl-row.mine { max-width: min(520px, 78%); }
+.wl-row.is-recap, .wl-row.is-story { align-self: flex-start; max-width: min(600px, 86%); }
+body.gt-app .gwr-stream .wl-row.theirs .wl-bubble, body.gt-app .gwr-stream .wl-row.mine .wl-bubble { max-width: 100%; }
+
+/* the AI: one deep indigo card, light words — nothing else on the Wall looks like it */
+html body.gt-app .gwr-stream .wl-row.is-ai > .wl-col > .wl-bubble {
+  color: #EEF0FF !important;
+  background: linear-gradient(160deg, #2E1A6B 0%, #3B2A8F 45%, #4C1D95 100%) !important;
+  box-shadow: 0 0 0 1.5px rgba(167, 139, 250, .55), 0 22px 44px -26px rgba(20, 10, 60, .9) !important;
+}
+.wl-row.is-ai .mr-band { background: rgba(255,255,255,.06); border-bottom: 1px solid rgba(255,255,255,.12); }
+.wl-row.is-ai .mr-name b { font-size: 22px; }
+.wl-row.is-ai .mr-score { background: rgba(255,255,255,.06); border-bottom: 1px solid rgba(255,255,255,.1); }
+.wl-row.is-ai .mr-team b { color: #C9C6F5; } .wl-row.is-ai .mr-team.won b { color: #FFFFFF; }
+.wl-row.is-ai .mr-num { color: #FFFFFF; font-size: 34px; } .wl-row.is-ai .mr-num i { color: #A5A3D9; }
+.wl-row.is-ai .mr-title { font-size: 22px; color: #FFFFFF; }
+.wl-row.is-ai .mr-article { padding: 18px 20px 4px; }
+.wl-row.is-ai .mr-article p { font-size: 15px; line-height: 1.7; color: #DCDBFA; }
+.wl-row.is-ai .mr-label { color: #C4B5FD; }
+.wl-row.is-ai .mr-chip { color: #FFFFFF; background: rgba(255,255,255,.1); }
+.wl-row.is-ai .mr-chip i { background: radial-gradient(circle at 35% 35%, #1E1B4B 0 28%, #fff 30%); }
+.wl-row.is-ai .mr-stat { background: rgba(255,255,255,.07); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+.wl-row.is-ai .mr-stat em { color: #C4B5FD; } .wl-row.is-ai .mr-stat span { color: #FFFFFF; }
+.wl-row.is-ai .mr-bar { background: rgba(255,255,255,.15); }
+.wl-row.is-ai .mr-bar b { background: linear-gradient(90deg, #A78BFA, #F0ABFC); }
+.wl-row.is-ai .mr-ask { margin: 4px 20px 18px; background: rgba(255,255,255,.1); box-shadow: inset 4px 0 0 #C4B5FD; }
+.wl-row.is-ai .mr-ask p { color: #FFFFFF; }
+.wl-row.is-ai .fw-fold:not(.is-open).has-more::after { background: linear-gradient(rgba(59,42,143,0), #3B2A8F); }
+.wl-row.is-ai .fw-more { color: #2E1A6B; background: #FFFFFF; }
+.wl-row.is-ai .wl-stamp { color: #C4B5FD !important; }
+/* the round recap in the same colour: its table stays white for the numbers */
+.wl-row.is-recap:not(.is-story) .wl-text, .wl-row.is-recap:not(.is-story) .grc-sec { color: #EEF0FF; }
+.wl-row.is-recap:not(.is-story) .grc-game { background: rgba(255,255,255,.08); }
+.wl-row.is-recap:not(.is-story) .grc-team b { color: #DCDBFA; } .wl-row.is-recap:not(.is-story) .grc-team.won b { color: #fff; }
+.wl-row.is-recap:not(.is-story) .grc-moregames { color: #2E1A6B; background: #fff; }
+
+/* a member's photo beside their name, inside the post */
+.wl-row.theirs > .wl-av { display: none; }
+.wl-head .wl-av { width: 30px; height: 30px; margin: 0; flex: none; font-size: 11px; }
+.wl-head { gap: 8px; }
+.wl-row.mine .wl-head .wl-av { display: none; }
+
+/* replies always on show, threaded like X: a line from the post down through each reply */
+.wl-thread { position: static !important; visibility: visible !important; display: grid !important; gap: 10px; flex-basis: 100%;
+  margin: 6px 0 0 22px !important; padding: 4px 0 2px 22px !important; border-left: 2px solid rgba(201, 242, 74, .35) !important; border-right: 0 !important; }
+.wl-row:has(.wl-thread) { flex-wrap: wrap; }
+.wl-row.mine .wl-thread { margin: 6px 22px 0 0 !important; padding: 4px 22px 2px 0 !important; border-left: 0 !important; border-right: 2px solid rgba(201, 242, 74, .35) !important; justify-items: end; }
+.wl-row.is-ai .wl-thread { border-left-color: rgba(167, 139, 250, .55) !important; }
+.wl-thread .wl-reply { position: relative; }
+.wl-thread .wl-reply::before { content: ""; position: absolute; left: -23px; top: 18px; width: 16px; height: 2px; background: rgba(201, 242, 74, .35); }
+.wl-row.mine .wl-thread .wl-reply::before { left: auto; right: -23px; }
+.wl-thread .wl-reply.is-more { display: none; }
+.wl-thread.is-open .wl-reply.is-more { display: flex; }
+.wl-morereplies { justify-self: start; padding: 6px 12px; border: 0; border-radius: 999px; font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer; color: #10231A; background: #C9F24A; }
+.wl-rhead { display: flex; align-items: center; gap: 8px; }
+.wl-rhead .wl-rav { width: 26px; height: 26px; font-size: 10px; }
+.wl-reply > .wl-rav { display: none; }
+
+/* every photo whole, end to end, whatever its shape */
+.grc-shot img, .mr-gallery .grc-shot img { height: 320px; object-fit: contain; background: #120B33; }
+.wl-shot img { width: 100%; height: auto; max-height: 460px; object-fit: contain; background: #0E1A14; }
+.grc-shot figcaption { background: linear-gradient(transparent, rgba(0,0,0,.6)); }
+.wl-row.is-ai .mr-name small, .mr-band .mr-name small { color: #DDD6FE !important; }
+.wl-row.is-ai .mr-name b { color: #FFFFFF !important; }
+
+/* =========================================================================
+   A WHITE ROOM (12 Nov 2026): the whole area the conversation sits in is
+   white, in both themes, so each kind of message shows its own colour —
+   GoodTip AI indigo, yours soft green, everyone else white with an outline.
+   ========================================================================= */
+html body.gt-app .gwr-chat .gtm-chat-body,
+html body.gt-app .gwr-chat .gwr-stage,
+html body.gt-app .gwr-chat[data-code] .gwr-stage,
+html body.gt-app .gwr-stream { background: #FFFFFF !important; }
+/* members' white bubbles need an edge on white */
+html body.gt-app .gwr-stream .wl-row.theirs > .wl-col > .wl-bubble { background: #F7F8FA !important; box-shadow: 0 0 0 1px #E3E7EC, 0 6px 14px -12px rgba(16,35,26,.35) !important; }
+html body.gt-app .gwr-stream .wl-row.mine > .wl-col > .wl-bubble { box-shadow: 0 0 0 1px #BFE8B5, 0 6px 14px -12px rgba(16,35,26,.35) !important; }
+html body.gt-app .gwr-stream .wl-rbubble { background: #F2F4F6 !important; box-shadow: 0 0 0 1px #E3E7EC !important; }
+html body.gt-app .gwr-stream .wl-reply.mine .wl-rbubble { background: #E7F8D9 !important; box-shadow: 0 0 0 1px #BFE8B5 !important; }
+/* the thread line, reactions and buttons in colours that read on white */
+.gwr-stream .wl-thread { border-left-color: #D5DBE2 !important; }
+.gwr-stream .wl-row.mine .wl-thread { border-right-color: #D5DBE2 !important; }
+.gwr-stream .wl-thread .wl-reply::before { background: #D5DBE2; }
+.gwr-stream .wl-row.is-ai .wl-thread { border-left-color: #C4B5FD !important; }
+.gwr-stream .wl-row.is-ai .wl-thread .wl-reply::before { background: #C4B5FD; }
+body.gt-app .gwr-stream .wl-under .gwp-react { box-shadow: 0 0 0 1px #E3E7EC; }
+.gwr-stream .wl-threadbtn { color: #10231A; background: #EEF2EE; }
+.gwr-stream .wl-av { color: #10231A; background: #DDF3B0; }
+.gwr-stream .wl-rhead .wl-rav { color: #10231A; background: #DDE7E1; }
+.gwr-stream .gwr-empty h3, .gwr-stream .gwr-empty p { color: #10231A; }
+.gwr-stream .gwr-pinned-lab { color: #3B4C42; }
+.gwr-stream .gwr-earlier { box-shadow: 0 0 0 1px #E3E7EC; }
+.gwr-stream .chat-more { color: #5B6B61; }
+.gwr-stream .wl-row.is-story > .wl-acts .chat-more, .gwr-stream .wl-row.is-recap > .wl-acts .chat-more { color: #fff; }
+/* A quoted reply, readable on any bubble. */
+.gwr-stream .chat-quote { display: grid; gap: 2px; padding: 6px 10px; border-radius: 10px; border-left: 3px solid #176B45; text-decoration: none; background: rgba(16,35,26,.06); }
+.gwr-stream .chat-quote b { font-size: 12px; color: #176B45 !important; }
+.gwr-stream .chat-quote span { font-size: 12.5px; color: #3B4C42 !important; }
+.gwr-stream .wl-row.is-ai .chat-quote { border-left-color: #C4B5FD; background: rgba(255,255,255,.1); }
+.gwr-stream .wl-row.is-ai .chat-quote b { color: #DDD6FE !important; } .gwr-stream .wl-row.is-ai .chat-quote span { color: #EEF0FF !important; }
+
+/* =========================================================================
+   12 Nov 2026 — light colours on the white room, a Round Recap you scroll
+   inside, and replies as their own messages (WhatsApp, not a tree).
+   ========================================================================= */
+/* GoodTip AI: soft lavender with dark words — its own colour, at home on white */
+html body.gt-app .gwr-stream .wl-row.is-ai > .wl-col > .wl-bubble {
+  color: #1E1B4B !important;
+  background: linear-gradient(180deg, #F6F4FF 0%, #EFEBFF 100%) !important;
+  box-shadow: 0 0 0 1px #D9D2FE, 0 14px 30px -24px rgba(76, 29, 149, .45) !important;
+}
+.wl-row.is-ai .mr-band { color: #2E1A6B; background: linear-gradient(115deg, #E9E3FF 0%, #E0E7FF 100%); border-bottom: 1px solid #DDD6FE; }
+.wl-row.is-ai .mr-name b { color: #2E1A6B !important; }
+.wl-row.is-ai .mr-name small, .mr-band .mr-name small { color: #5B4FA8 !important; }
+.wl-row.is-ai .mr-spark { background: #FFFFFF; box-shadow: 0 0 0 1px #DDD6FE; }
+.wl-row.is-ai .mr-spark svg { fill: #6D28D9; }
+.wl-row.is-ai .mr-comp { box-shadow: none; }
+.wl-row.is-ai .mr-score { background: #FFFFFF; border-bottom: 1px solid #EDE9FE; }
+.wl-row.is-ai .mr-team b { color: #5B5880; } .wl-row.is-ai .mr-team.won b { color: #1E1B4B; }
+.wl-row.is-ai .mr-num { color: #1E1B4B; } .wl-row.is-ai .mr-num i { color: #B4ACE8; }
+.wl-row.is-ai .mr-title { color: #1E1B4B; }
+.wl-row.is-ai .mr-article p { color: #34305E; }
+.wl-row.is-ai .mr-label { color: #6D28D9; }
+.wl-row.is-ai .mr-chip { color: #1E1B4B; background: #FFFFFF; box-shadow: 0 0 0 1px #E4DEFE; }
+.wl-row.is-ai .mr-chip i { background: radial-gradient(circle at 35% 35%, #fff 0 28%, #1E1B4B 30%); }
+.wl-row.is-ai .mr-stat { background: #FFFFFF; box-shadow: inset 0 0 0 1px #E9E4FE; }
+.wl-row.is-ai .mr-stat em { color: #6B6894; } .wl-row.is-ai .mr-stat span { color: #1E1B4B; }
+.wl-row.is-ai .mr-bar { background: #EDE9FE; }
+.wl-row.is-ai .mr-bar b { background: linear-gradient(90deg, #7C3AED, #A78BFA); }
+.wl-row.is-ai .mr-ask { background: #FFFFFF; box-shadow: inset 4px 0 0 #8B5CF6, 0 0 0 1px #E9E4FE; }
+.wl-row.is-ai .mr-ask p { color: #1E1B4B; }
+.wl-row.is-ai .fw-fold:not(.is-open).has-more::after { background: linear-gradient(rgba(240,236,255,0), #F0ECFF); }
+.wl-row.is-ai .fw-more { color: #FFFFFF; background: linear-gradient(120deg, #6D28D9, #8B5CF6); }
+.wl-row.is-ai .wl-stamp { color: #6B6894 !important; }
+.gwr-stream .wl-row.is-story > .wl-acts .chat-more, .gwr-stream .wl-row.is-recap > .wl-acts .chat-more { color: #2E1A6B; background: rgba(255,255,255,.85); box-shadow: 0 0 0 1px #DDD6FE; }
+.grc-shot img, .mr-gallery .grc-shot img { background: #EDE9FE; }
+/* the Round Recap's words and results on lavender */
+.wl-row.is-recap:not(.is-story) .wl-text, .wl-row.is-recap:not(.is-story) .grc-sec { color: #1E1B4B; }
+.wl-row.is-recap:not(.is-story) .grc-game { background: #FFFFFF; box-shadow: 0 0 0 1px #EDE9FE; }
+.wl-row.is-recap:not(.is-story) .grc-team b { color: #5B5880; } .wl-row.is-recap:not(.is-story) .grc-team.won b { color: #1E1B4B; }
+.wl-row.is-recap:not(.is-story) .grc-moregames { color: #FFFFFF; background: linear-gradient(120deg, #6D28D9, #8B5CF6); }
+
+/* THE ROUND RECAP SCROLLS INSIDE ITSELF: as tall as its words and the first
+   results, the full table a scroll away, the band staying in view. */
+html body.gt-app .gwr-stream .wl-row.is-recap:not(.is-story) > .wl-col > .wl-bubble {
+  max-height: 560px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #C4B5FD transparent;
+}
+.wl-row.is-recap:not(.is-story) .wl-head { position: sticky; top: 0; z-index: 2; }
+
+/* A REPLY IS ITS OWN MESSAGE: the quote of what it answers on top, the words below */
+.wl-row.is-reply .wl-q { margin-bottom: 2px; }
+.wl-row.is-reply .wl-q span { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.gwr-stream .wl-q.is-ai { border-left-color: #8B5CF6 !important; background: #F3F0FF !important; }
+.gwr-stream .wl-q.is-ai b { color: #6D28D9 !important; }
+.gwr-stream .wl-row.mine .chat-quote { background: rgba(255,255,255,.6); }
+@keyframes wlLit { 0% { box-shadow: 0 0 0 4px rgba(139, 92, 246, .55); } 100% { box-shadow: 0 0 0 4px rgba(139, 92, 246, 0); } }
+.wl-row.wl-lit > .wl-col > .wl-bubble { animation: wlLit 1.6s ease-out; }
+
+/* =========================================================================
+   ONE SIZE FOR EVERY GOODTIP AI CARD (12 Nov 2026): Match Recaps and Round
+   Recaps are the same width and the same height, always. What does not fit
+   scrolls inside the card; its band stays at the top while it does.
+   ========================================================================= */
+.wl-row.is-ai { width: min(600px, 100%); max-width: min(600px, 100%) !important; align-self: flex-start; }
+.wl-row.is-ai > .wl-col { width: 100%; }
+html body.gt-app .gwr-stream .wl-row.is-ai > .wl-col > .wl-bubble {
+  width: 100%; height: 640px; max-height: 640px !important;
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #C4B5FD transparent;
+}
+.wl-row.is-story .mr-band { position: sticky; top: 0; z-index: 3; }
+.wl-row.is-recap:not(.is-story) .wl-head { position: sticky; top: 0; z-index: 3; }
+/* scrolling replaces "Read more" */
+.wl-row.is-story .fw-fold { max-height: none !important; overflow: visible; }
+.wl-row.is-story .fw-fold::after { display: none !important; }
+.wl-row.is-story .fw-more { display: none !important; }
+@media (max-height: 760px) { html body.gt-app .gwr-stream .wl-row.is-ai > .wl-col > .wl-bubble { height: 70vh; max-height: 70vh !important; } }
+/* A fixed-height card must not squeeze its rows: each keeps its own height and the card scrolls. */
+html body.gt-app .gwr-stream .wl-row.is-ai > .wl-col > .wl-bubble { grid-auto-rows: max-content; align-content: start; }
+.wl-row.is-ai .grc-gallery, .wl-row.is-ai .mr-score, .wl-row.is-ai .mr-article, .wl-row.is-ai .gpt-recap { flex-shrink: 0; min-height: max-content; }
+
+/* Match recap score on a phone: two clubs and a 40px score in a card ~240px
+   wide overlapped ("Frema" under the 89). Crest over name, smaller score. */
+@media (max-width: 520px) {
+  .mr-score { gap: 8px; padding: 12px 12px; }
+  .mr-team, .mr-team.is-away { flex-direction: column; justify-content: center; text-align: center; gap: 4px; }
+  .mr-team.is-away { flex-direction: column-reverse; }
+  .mr-team b { font-size: 12.5px; overflow-wrap: anywhere; }
+  .mr-team .grc-crest, .mr-team .grc-crest img, .mr-team .grc-crest svg { width: 30px; height: 30px; }
+  .mr-num { font-size: 28px; }
+  .mr-num i { margin: 0 5px; }
+}
+
+/* =========================================================================
+   16 Nov 2026 — phone review of the Wall
+   ========================================================================= */
+
+/* SCROLL CARRIES ON PAST A CARD. A recap or Match Recap scrolls inside
+   itself; at its end the flick stopped dead ("do not be stagnant"). Now the
+   stream takes over at either end and keeps going to the posts above and
+   below. */
+html body.gt-app .gwr-stream .wl-row.is-recap:not(.is-story) > .wl-col > .wl-bubble,
+html body.gt-app .gwr-stream .wl-row.is-ai > .wl-col > .wl-bubble { overscroll-behavior: auto; }
+
+/* THE ROOM'S HEADER ON A PHONE. The Pinned and Favourite buttons took the
+   row, so the room's name was cut to "Engl…" and the line under it fell down
+   the screen a word at a time. On a phone they become round icon buttons (the
+   words stay for screen readers and in the tooltip); the name and its line
+   each keep to one line. */
+@media (max-width: 640px) {
+  .gwr-head { gap: 10px; }
+  .gwr-head .gtm-chat-who { flex: 1 1 auto; min-width: 0; }
+  .gwr-head .gtm-chat-who b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gwr-head .gtm-chat-who i { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
+  .gwr-head .gtm-chat-acts { flex: none; gap: 6px; }
+  body.gt-app .gwr-head .gwr-pin {
+    position: relative; width: 38px; height: 38px; padding: 0; justify-content: center;
+    font-size: 0; gap: 0;
+  }
+  body.gt-app .gwr-head .gwr-pin svg { width: 17px; height: 17px; }
+  body.gt-app .gwr-head .gwr-pin > span[aria-hidden] { font-size: 18px; line-height: 1; }
+}
+
+/* THE AI CARD'S BAND ON A PHONE. "MATCH RECAP" broke over two lines, its
+   byline over three, and a long competition name ("English Premier League")
+   took half the band. On a phone: one line each, and the competition's short
+   code (EPL) in the badge — the full name stays in its tooltip. */
+.mr-comp-short { display: none; }
+@media (max-width: 640px) {
+  .mr-band { gap: 10px; padding: 12px 14px; }
+  .mr-spark { width: 36px; height: 36px; border-radius: 11px; }
+  .mr-spark svg { width: 20px; height: 20px; }
+  .mr-name b { font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mr-name small { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mr-comp { flex: none; padding: 5px 10px; font-size: 11px; white-space: nowrap; }
+  .mr-comp .mr-comp-full { display: none; }
+  .mr-comp .mr-comp-short { display: inline; }
+}
+
+/* THE MESSAGE BOX'S PROMPT keeps to one line ("Message English Premier
+   League…" wrapped under itself in a one-line box). */
+.gwr textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

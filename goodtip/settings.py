@@ -166,6 +166,35 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Certificates are emailed automatically only for seasons whose last match is
+# on or after this date (tipping/certificate_mail.py): seasons that had already
+# finished when the feature shipped are left to the admin's "Send to winner".
+CERTIFICATE_AUTOSEND_SINCE = os.environ.get("CERTIFICATE_AUTOSEND_SINCE", "2026-11-17")
+
+# "Sam is typing…" (16 Nov 2026). Short-lived signals every worker must see:
+# the default cache is per process, and gunicorn runs several, so a typist
+# heard by one worker would be invisible to a reader polling another. A file
+# cache is shared by every process on the box and needs no service; each
+# checkout keeps its own, so staging's typists never show on live.
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    # Drawn certificates (tipping.certificates.cached_file): a PNG takes about
+    # a second to draw, so each is drawn once and kept — keyed on everything
+    # printed on it, so a changed name or photo draws a new one.
+    "certs": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": str(BASE_DIR / ".cache" / "certs"),
+        "TIMEOUT": 60 * 60 * 24 * 60,
+        "OPTIONS": {"MAX_ENTRIES": 6000},
+    },
+    "typing": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": str(BASE_DIR / ".cache" / "typing"),
+        "TIMEOUT": 10,
+        "OPTIONS": {"MAX_ENTRIES": 2000},
+    },
+}
 STATICFILES_DIRS = [BASE_DIR / "static"]
 # Django 5.1+ only reads STORAGES (the old STATICFILES_STORAGE is ignored).
 # Manifest storage gives content-hashed filenames, so nginx's long-lived

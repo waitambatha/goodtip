@@ -437,3 +437,31 @@ def competition_season(series, season, up_to_round=None):
         "best_defence": min(rows, key=lambda r: r["avg_against"] or 9999, default=None),
         "form_rounds": FORM_ROUNDS,
     }
+
+
+def club_palette(clubs):
+    """A distinct colour per club, the same in every chart on the page.
+
+    ASKED FOR (16 Nov 2026): "all those different teams ... are green ... let
+    each team have different shades of colours ... more distinct for
+    comparison." Clubs' own colours were tried first and do not separate:
+    half the AFL is navy, red or black (Geelong and Adelaide share a hex).
+    So each club gets a hue of its own instead, spaced evenly round the wheel
+    (eighteen clubs, twenty degrees apart), and alternate clubs darker and
+    lighter so the two nearest hues still separate. Keyed on the club's name
+    order, so a club keeps its colour whichever chart it appears in and
+    however the chart is sorted.
+    """
+    teams = sorted({c["team"] for c in clubs if c.get("team")}, key=lambda t: t.name)
+    n = len(teams) or 1
+    out = {}
+    for i, team in enumerate(teams):
+        hue = round((i * 360 / n + 200) % 360)
+        sat, light = (72, 42) if i % 2 == 0 else (62, 58)
+        out[team.id] = f"hsl({hue} {sat}% {light}%)"
+    return out
+
+
+def with_colours(rows, palette):
+    """``rows`` with each club's ``colour`` from ``club_palette``."""
+    return [dict(r, colour=palette.get(r["team"].id, "")) for r in rows]

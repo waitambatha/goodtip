@@ -11,132 +11,276 @@ stacking context, so a strip rendered inside it paints over the sheet.
 {% endblock %}
 
 {% block app_content %}
+{% comment %}
+PROFILE, IN THE CONTROL PLANE'S LOOK (client, 16 Nov 2026: "let it borrow
+from the super admin ... look at that design that we have in the super
+admin"; then: "I want the way I see one thing at a time ... organisations and
+groups, do not take me to it ... just the details about the organisation").
 
+A hero on the pitch (kicker, two-tone title, lead, score tiles), then one
+white sheet with tabs across its top — as HQ's sheets have — showing one
+section at a time. Organisations are a list and a details panel: choosing one
+shows who runs it, how big it is, what it tips and your place in it. Nothing
+there navigates away.
 
-<div class="app-head">
-  <div style="display:flex;align-items:center;gap:18px;">
-    <div>
+Classes are prf-*: .pf-card was already the pricing page's tilted card.
+Field names, ids and data-coach marks are unchanged.
+{% endcomment %}
+{% with first=user.display_name|default:"You" %}
+<div class="prf" data-prf>
+  <header class="prf-hero">
+    <div class="prf-pitch" aria-hidden="true"><i></i><i></i></div>
+    <a class="prf-back" href="{% url 'dashboard' %}"><svg aria-hidden="true"><use href="#ic-arrow-left"/></svg><span>Dashboard</span></a>
+    <div class="prf-hero-main">
       <form method="post" action="{% url 'profile' %}" enctype="multipart/form-data" id="avatarForm">
         {% csrf_token %}
-        <label class="avatar-edit" data-coach="profile-photo" title="Add or update your profile photo">
+        <label class="avatar-edit prf-avatar" data-coach="profile-photo" title="Add or update your profile photo">
           <span class="av-face" id="avFace">{% if user.avatar %}<img src="{{ user.avatar.url }}" alt="Your profile photo">{% else %}{{ user.display_name|slice:":1"|upper }}{% endif %}</span>
           <span class="av-badge" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
           <input type="file" name="avatar" id="avFile" accept="image/*" hidden>
+          <span class="sr-only">Change your profile photo</span>
         </label>
       </form>
-      {% if user.avatar %}
-      <form method="post" action="{% url 'profile' %}" style="text-align:center;">
+      <div class="prf-hero-txt">
+        <p class="prf-kicker"><i></i>Your profile</p>
+        <h1 class="prf-title">{{ first }}’s <em>account</em></h1>
+        <p class="prf-lead">{{ user.email }} &middot; member since {{ user.date_joined|date:"F Y" }}.</p>
+      </div>
+    </div>
+    <div class="prf-board">
+      <button type="button" class="prf-score" data-prf-go="orgs" style="--cc: var(--prf-c1)"><b>{{ memberships|length }}</b><span>Organisation{{ memberships|length|pluralize }}</span></button>
+      <button type="button" class="prf-score" data-prf-go="orgs" style="--cc: var(--prf-c2)"><b>{{ owner_count }}</b><span>You own</span></button>
+      <button type="button" class="prf-score" data-prf-go="twostep" style="--cc: var(--prf-c3)"><b>{% if user.two_factor_enabled %}ON{% else %}OFF{% endif %}</b><span>Two-step</span></button>
+      <button type="button" class="prf-score" data-prf-go="account" style="--cc: var(--prf-c4)"><b>{{ user.date_joined|date:"M y"|upper }}</b><span>Joined</span></button>
+    </div>
+  </header>
+
+  <section class="prf-sheet">
+    <nav class="prf-tabs" role="tablist" aria-label="Profile">
+      <button type="button" role="tab" class="prf-tab" data-prf-tab="account" style="--cc: var(--prf-c1)">Name &amp; photo</button>
+      <button type="button" role="tab" class="prf-tab" data-prf-tab="twostep" style="--cc: var(--prf-c3)">Two-step</button>
+      <button type="button" role="tab" class="prf-tab" data-prf-tab="password" style="--cc: var(--prf-c2)">Password</button>
+      {% if show_carry %}<button type="button" role="tab" class="prf-tab" data-prf-tab="tipping" style="--cc: var(--prf-c5)">Tipping</button>{% endif %}
+      <button type="button" role="tab" class="prf-tab" data-prf-tab="orgs" style="--cc: var(--prf-c4)">Organisations <em>{{ memberships|length }}</em></button>
+    </nav>
+
+    {# ---- Name and photo ---- #}
+    <div class="prf-panel" role="tabpanel" data-prf-panel="account" style="--cc: var(--prf-c1)">
+      <div class="prf-panel-h">
+        <span class="prf-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
+        <div><h2>Name &amp; photo</h2><p>How you appear on leaderboards, the Wall and in messages.</p></div>
+      </div>
+      <div class="prf-split">
+        <form method="post" action="{% url 'profile' %}" class="prf-form">
+          {% csrf_token %}
+          <div class="fld"><label for="id_display_name">Display name</label>
+            <input type="text" name="display_name" id="id_display_name" value="{{ form.display_name.value|default:user.display_name }}" autocomplete="name">
+            {% if form.display_name.errors %}<div class="fld-err">{{ form.display_name.errors|join:" " }}</div>{% endif %}</div>
+          <div class="fld"><label for="prfEmail">Email</label>
+            <div class="prf-locked"><input type="email" id="prfEmail" value="{{ user.email }}" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+            <small class="prf-note">Your sign-in address. It can't be changed here.</small></div>
+          <div class="prf-acts"><button type="submit" class="prf-btn">Save name</button></div>
+        </form>
+        <div class="prf-photo">
+          <span class="prf-photo-face">{% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{{ user.display_name|slice:":1"|upper }}{% endif %}</span>
+          <label for="avFile" class="prf-btn is-soft">{% if user.avatar %}Change photo{% else %}Add a photo{% endif %}</label>
+          {% if user.avatar %}
+          <form method="post" action="{% url 'profile' %}">
+            {% csrf_token %}
+            <button type="submit" name="remove_avatar" value="1" class="prf-link is-muted">Remove photo</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# ---- Two-step ---- #}
+    <div class="prf-panel" role="tabpanel" data-prf-panel="twostep" style="--cc: var(--prf-c3)" hidden>
+      <div class="prf-panel-h">
+        <span class="prf-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <div><h2 data-coach="profile-2fa">Two-step sign-in</h2><p>We email you a 6-digit code each time you sign in, so a stolen password isn't enough on its own.</p></div>
+      </div>
+      <div class="prf-stat"><b>{% if user.two_factor_enabled %}On{% else %}Off{% endif %}</b><span>{% if user.two_factor_enabled %}codes go to {{ user.email }}{% else %}your password alone signs you in{% endif %}</span></div>
+      <form method="post" action="{% url 'profile' %}" class="prf-acts is-left">
         {% csrf_token %}
-        <button type="submit" name="remove_avatar" value="1" class="avatar-remove">Remove photo</button>
+        <label class="tog-row prf-tog">
+          <input type="checkbox" name="two_factor_enabled" class="tog-input" {% if user.two_factor_enabled %}checked{% endif %}
+                 onchange="this.form.querySelector('[name=two_factor]').click()">
+          <span class="tog-track" aria-hidden="true"><span class="tog-knob"></span></span>
+          <span class="prf-tog-txt">Ask for a code when I sign in</span>
+        </label>
+        <button type="submit" name="two_factor" value="1" class="prf-btn prf-noscript">Save</button>
       </form>
+    </div>
+
+    {# ---- Password ---- #}
+    <div class="prf-panel" role="tabpanel" data-prf-panel="password" style="--cc: var(--prf-c2)" hidden>
+      <div class="prf-panel-h">
+        <span class="prf-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
+        <div><h2>Password</h2><p>Change the password you sign in with. You stay signed in here.</p></div>
+      </div>
+      {% if pwd_form.non_field_errors %}<div class="flash error" style="margin:0 0 12px;"><span>{{ pwd_form.non_field_errors|join:" " }}</span></div>{% endif %}
+      <form method="post" action="{% url 'profile' %}" class="prf-form prf-narrow">
+        {% csrf_token %}
+        <div class="fld"><div class="fld-labelrow"><label for="id_old_password">Current password</label><button type="button" class="pw-toggle" data-pw-toggle="id_old_password">Show</button></div><input type="password" name="old_password" id="id_old_password" autocomplete="current-password">
+          {% if pwd_form.old_password.errors %}<div class="fld-err">{{ pwd_form.old_password.errors|join:" " }}</div>{% endif %}</div>
+        <div class="fld"><div class="fld-labelrow"><label for="id_new_password1">New password</label><button type="button" class="pw-toggle" data-pw-toggle="id_new_password1">Show</button></div><input type="password" name="new_password1" id="id_new_password1" autocomplete="new-password">
+          {% if pwd_form.new_password1.errors %}<div class="fld-err">{{ pwd_form.new_password1.errors|join:" " }}</div>{% endif %}</div>
+        <div class="fld"><div class="fld-labelrow"><label for="id_new_password2">Confirm new password</label><button type="button" class="pw-toggle" data-pw-toggle="id_new_password2">Show</button></div><input type="password" name="new_password2" id="id_new_password2" autocomplete="new-password">
+          {% if pwd_form.new_password2.errors %}<div class="fld-err">{{ pwd_form.new_password2.errors|join:" " }}</div>{% endif %}</div>
+        <div class="prf-acts"><button type="submit" class="prf-btn">Change password</button></div>
+      </form>
+    </div>
+
+    {% comment %}
+    Only for someone who tips in more than one place: for anybody else this
+    setting can do nothing. It exists so "never ask me again", chosen
+    mid-confirm, is reversible somewhere obvious.
+    {% endcomment %}
+    {% if show_carry %}
+    <div class="prf-panel" role="tabpanel" data-prf-panel="tipping" style="--cc: var(--prf-c5)" hidden>
+      <div class="prf-panel-h">
+        <span class="prf-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h11"/><path d="m12 3 4 4-4 4"/><path d="M20 17H9"/><path d="m12 13-4 4 4 4"/></svg></span>
+        <div><h2 data-coach="profile-carry">Tipping in more than one group</h2><p>You're in several comps that tip the same games. We can put one set of picks into all of them.</p></div>
+      </div>
+      <form method="post" action="{% url 'profile' %}" class="prf-form prf-narrow">
+        {% csrf_token %}
+        <div class="opt-grid prf-opts">
+          {% for choice in carry_form.tip_carry_mode %}
+          <label class="opt-card radio">
+            {{ choice.tag }}
+            <span class="oc-box"></span>
+            <span><span class="oc-title">{{ choice.choice_label }}</span></span>
+          </label>
+          {% endfor %}
+        </div>
+        <small class="prf-note">Carrying never replaces a pick you've already made somewhere else; if it disagrees, we leave it alone and tell you.</small>
+        <div class="prf-acts"><button type="submit" class="prf-btn">Save</button></div>
+      </form>
+    </div>
+    {% endif %}
+
+    {# ---- Organisations: a list, and one organisation's details ---- #}
+    <div class="prf-panel" role="tabpanel" data-prf-panel="orgs" style="--cc: var(--prf-c4)" hidden>
+      {% if org_cards %}
+      <div class="prf-orgs" data-prf-orgs>
+        <ul class="prf-olist" aria-label="Your organisations">
+          {% for c in org_cards %}
+          <li><button type="button" class="prf-orow" data-prf-org="{{ c.org.id }}">
+            <span class="prf-ologo{% if c.org.logo %} has-logo{% endif %}" aria-hidden="true">{% if c.org.logo %}<img src="{{ c.org.logo.url }}" alt="">{% else %}{{ c.org.name|slice:":1"|upper }}{% endif %}</span>
+            <span class="prf-orow-txt"><b>{{ c.org.name }}</b><small>{{ c.members }} member{{ c.members|pluralize }} &middot; {{ c.m.role_labels|join:", " }}</small></span>
+            <svg class="prf-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+          </button></li>
+          {% endfor %}
+        </ul>
+
+        <div class="prf-odetail">
+          {% for c in org_cards %}
+          <article class="prf-oc" data-prf-org-panel="{{ c.org.id }}" hidden>
+            <button type="button" class="prf-oback" data-prf-org-back><svg aria-hidden="true"><use href="#ic-arrow-left"/></svg>All organisations</button>
+            <header class="prf-oc-h">
+              <span class="prf-ologo is-big{% if c.org.logo %} has-logo{% endif %}" aria-hidden="true">{% if c.org.logo %}<img src="{{ c.org.logo.url }}" alt="">{% else %}{{ c.org.name|slice:":1"|upper }}{% endif %}</span>
+              <div>
+                <h3>{{ c.org.name }}</h3>
+                <p>{{ c.kind }}{% if c.place %} &middot; {{ c.place }}{% endif %}</p>
+                <span class="prf-roles">{% for label in c.m.role_labels %}<span class="pill-role {{ label|lower }}">{{ label }}</span>{% endfor %}</span>
+              </div>
+            </header>
+
+            <div class="prf-tiles">
+              <div style="--cc: var(--prf-c1)"><b>{{ c.members }}</b><span>Members</span></div>
+              <div style="--cc: var(--prf-c5)"><b>{% if c.org.groups_enabled %}{{ c.groups }}{% else %}&ndash;{% endif %}</b><span>Groups</span></div>
+              <div style="--cc: var(--prf-c3)"><b>{{ c.m.joined_at|date:"M y"|upper }}</b><span>You joined</span></div>
+              <div style="--cc: var(--prf-c2)"><b>{{ c.competitions|length }}</b><span>Competition{{ c.competitions|length|pluralize }}</span></div>
+            </div>
+
+            <dl class="prf-facts">
+              <div><dt>Your role</dt><dd>{{ c.m.role_labels|join:", " }}</dd></div>
+              <div><dt>You joined</dt><dd>{{ c.m.joined_at|date:"j F Y" }}{% if c.m.invited_by %}, invited by {{ c.m.invited_by.display_name }}{% endif %}</dd></div>
+              <div><dt>Your groups</dt><dd>{% if c.my_groups %}{% for gm in c.my_groups %}<span class="prf-chip">{{ gm.group.name }}{% if gm.is_admin %} &middot; admin{% endif %}</span>{% endfor %}{% elif c.org.groups_enabled %}Not in a group yet{% else %}This organisation doesn't use groups{% endif %}</dd></div>
+              <div><dt>Tips</dt><dd>{% for name in c.competitions %}<span class="prf-chip">{{ name }}</span>{% empty %}No competitions yet{% endfor %}</dd></div>
+              <div><dt>Season</dt><dd>{{ c.org.season }}</dd></div>
+              <div><dt>Charity</dt><dd>{{ c.org.charity_display }}</dd></div>
+              <div><dt>Started</dt><dd>{{ c.org.created_at|date:"j F Y" }}{% if c.org.created_by %} by {{ c.org.created_by.display_name }}{% endif %}</dd></div>
+            </dl>
+          </article>
+          {% endfor %}
+          <p class="prf-opick" data-prf-org-hint>Choose an organisation to see its details.</p>
+        </div>
+      </div>
+      {% else %}
+      <p class="prf-note">You're not in any comps yet.</p>
       {% endif %}
     </div>
-    <div><h1 class="app-h1">{{ user.display_name }}</h1><p class="app-sub" style="margin:2px 0 0;">{{ user.email }}</p><p class="app-sub" style="margin:2px 0 0;font-size:12.5px;">Click the photo to add or update it.</p></div>
-  </div>
+  </section>
 </div>
+{% endwith %}
 
-<div class="grid-app g-2" style="align-items:start;margin-bottom:18px;">
-  <div class="card pad-lg">
-    <div class="card-h" style="margin-bottom:14px;">Account</div>
-    <form method="post" action="{% url 'profile' %}">
-      {% csrf_token %}
-      <div class="fld"><label for="id_display_name">Display name</label><input type="text" name="display_name" id="id_display_name" value="{{ form.display_name.value|default:user.display_name }}">
-        {% if form.display_name.errors %}<div class="fld-err">{{ form.display_name.errors|join:" " }}</div>{% endif %}</div>
-      <div class="fld"><label>Email</label><input type="email" value="{{ user.email }}" disabled style="opacity:.8;"></div>
-      <button type="submit" class="abtn abtn-primary">Save changes</button>
-    </form>
-  </div>
+<script>
+/* One section at a time; one organisation at a time. The tab is kept in the
+   address (#password, #orgs) so a reload or a form's redirect lands back on
+   it, and the password tab opens by itself when its form has errors. */
+(function () {
+  'use strict';
+  var root = document.querySelector('[data-prf]');
+  if (!root) return;
+  var tabs = [].slice.call(root.querySelectorAll('[data-prf-tab]'));
+  var panels = [].slice.call(root.querySelectorAll('[data-prf-panel]'));
+  function show(name, push) {
+    if (!panels.some(function (p) { return p.dataset.prfPanel === name; })) name = tabs[0].dataset.prfTab;
+    tabs.forEach(function (t) {
+      var on = t.dataset.prfTab === name;
+      t.classList.toggle('on', on); t.setAttribute('aria-selected', on);
+      if (on) { var bar = t.parentNode; bar.scrollLeft = t.offsetLeft - (bar.clientWidth - t.offsetWidth) / 2; }
+    });
+    markTabs();
+    panels.forEach(function (p) { p.hidden = p.dataset.prfPanel !== name; });
+    if (push) history.replaceState(null, '', '#' + name);
+  }
+  var bar = root.querySelector('.prf-tabs');
+  function markTabs() {
+    var more = bar.scrollWidth - bar.clientWidth > 4;
+    bar.classList.toggle('more-right', more && bar.scrollLeft + bar.clientWidth < bar.scrollWidth - 4);
+    bar.classList.toggle('more-left', more && bar.scrollLeft > 4);
+  }
+  bar.addEventListener('scroll', markTabs, { passive: true });
+  tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.prfTab, true); }); });
+  root.querySelectorAll('[data-prf-go]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      show(b.dataset.prfGo, true);
+      root.querySelector('.prf-sheet').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+  var start = (location.hash || '').slice(1);
+  {% if pwd_form.errors %}start = 'password';{% endif %}
+  show(start, false);
+  /* Forms post back to the same page; keep the tab they came from. */
+  root.querySelectorAll('.prf-panel form').forEach(function (f) {
+    f.addEventListener('submit', function () {
+      var p = f.closest('[data-prf-panel]');
+      if (p && f.getAttribute('action').indexOf('#') < 0) f.setAttribute('action', f.getAttribute('action') + '#' + p.dataset.prfPanel);
+    });
+  });
 
-  <div class="card pad-lg">
-    <div class="card-h" style="margin-bottom:14px;">Change password</div>
-    {% if pwd_form.non_field_errors %}<div class="flash error" style="margin-bottom:12px;"><span>{{ pwd_form.non_field_errors|join:" " }}</span></div>{% endif %}
-    <form method="post" action="{% url 'profile' %}">
-      {% csrf_token %}
-      <div class="fld"><div class="fld-labelrow"><label for="id_old_password">Current password</label><button type="button" class="pw-toggle" data-pw-toggle="id_old_password">Show</button></div><input type="password" name="old_password" id="id_old_password" autocomplete="current-password">
-        {% if pwd_form.old_password.errors %}<div class="fld-err">{{ pwd_form.old_password.errors|join:" " }}</div>{% endif %}</div>
-      <div class="fld"><div class="fld-labelrow"><label for="id_new_password1">New password</label><button type="button" class="pw-toggle" data-pw-toggle="id_new_password1">Show</button></div><input type="password" name="new_password1" id="id_new_password1" autocomplete="new-password">
-        {% if pwd_form.new_password1.errors %}<div class="fld-err">{{ pwd_form.new_password1.errors|join:" " }}</div>{% endif %}</div>
-      <div class="fld"><div class="fld-labelrow"><label for="id_new_password2">Confirm new password</label><button type="button" class="pw-toggle" data-pw-toggle="id_new_password2">Show</button></div><input type="password" name="new_password2" id="id_new_password2" autocomplete="new-password">
-        {% if pwd_form.new_password2.errors %}<div class="fld-err">{{ pwd_form.new_password2.errors|join:" " }}</div>{% endif %}</div>
-      <button type="submit" class="abtn abtn-primary">Change password</button>
-    </form>
-  </div>
-
-  <div class="card pad-lg">
-    <div class="card-h" data-coach="profile-2fa" style="margin-bottom:6px;">Two-step verification</div>
-    <p class="card-lead" style="margin:0 0 16px;font-size:14px;">
-      When this is on we email you a 6-digit code each time you sign in, so a
-      stolen password isn't enough on its own.
-    </p>
-    <form method="post" action="{% url 'profile' %}">
-      {% csrf_token %}
-      <label class="tog-row">
-        <input type="checkbox" name="two_factor_enabled" class="tog-input"
-               {% if user.two_factor_enabled %}checked{% endif %}>
-        <span class="tog-track" aria-hidden="true"><span class="tog-knob"></span></span>
-        <span class="tog-text">
-          <b>Ask for a code when I sign in</b>
-          <span>{% if user.two_factor_enabled %}On, codes go to {{ user.email }}{% else %}Off, your password alone signs you in{% endif %}</span>
-        </span>
-      </label>
-      <button type="submit" name="two_factor" value="1" class="abtn abtn-primary" style="margin-top:16px;">Save</button>
-    </form>
-  </div>
-
-  {% comment %}
-  Only shown to someone who tips in more than one place — for everybody else
-  this setting cannot do anything, and a preference with no effect is just a
-  question you have made somebody read.
-
-  It exists at all so "never ask me again", chosen mid-confirm, is reversible
-  somewhere obvious. A one-way door is a trap, not a preference.
-  {% endcomment %}
-  {% if show_carry %}
-  <div class="card pad-lg">
-    <div class="card-h" data-coach="profile-carry" style="margin-bottom:6px;">Tipping in more than one group</div>
-    <p class="card-lead" style="margin:0 0 16px;font-size:14px;">
-      You're in several comps that tip the same games. We can put one set of
-      picks into all of them so you don't have to tip the same match twice.
-    </p>
-    <form method="post" action="{% url 'profile' %}">
-      {% csrf_token %}
-      <div class="opt-grid">
-        {% for choice in carry_form.tip_carry_mode %}
-        <label class="opt-card radio">
-          {{ choice.tag }}
-          <span class="oc-box"></span>
-          <span><span class="oc-title">{{ choice.choice_label }}</span></span>
-        </label>
-        {% endfor %}
-      </div>
-      <p class="app-sub" style="margin:12px 0 0;font-size:13px;">
-        Carrying never replaces a pick you've already made somewhere else —
-        if it disagrees, we leave it alone and tell you.
-      </p>
-      <button type="submit" class="abtn abtn-primary" style="margin-top:16px;">Save</button>
-    </form>
-  </div>
-  {% endif %}
-</div>
-
-<div class="card pad-lg">
-  <div class="card-h" style="margin-bottom:12px;">Your comps</div>
-  {% if memberships %}
-  <div class="tbl-scroll">
-    <table class="atable"><tbody>
-      {% for m in memberships %}
-      <tr>
-        <td><b>{{ m.org.name }}</b><br><small style="color:var(--muted);">{{ m.org.sport_label }} &middot; {{ m.org.season }} &middot; {{ m.org.charity_display }}</small></td>
-        <td>{% for label in m.role_labels %}<span class="pill-role {{ label|lower }}">{{ label }}</span> {% endfor %}</td>
-        <td style="text-align:right;"><a href="{% url 'tipping:leaderboard' m.org.id %}" class="abtn abtn-ghost abtn-sm">View</a></td>
-      </tr>
-      {% endfor %}
-    </tbody></table>
-  </div>
-  {% else %}
-  <p class="app-sub" style="margin:0;">You're not in any comps yet. <a href="{% url 'orgs:create' %}" class="flink" style="color:var(--forest);font-weight:700;">Start a league</a>.</p>
-  {% endif %}
-</div>
+  var wrap = root.querySelector('[data-prf-orgs]');
+  if (!wrap) return;
+  var rows = [].slice.call(wrap.querySelectorAll('[data-prf-org]'));
+  var cards = [].slice.call(wrap.querySelectorAll('[data-prf-org-panel]'));
+  var hint = wrap.querySelector('[data-prf-org-hint]');
+  function pick(id) {
+    rows.forEach(function (r) { r.classList.toggle('on', r.dataset.prfOrg === id); });
+    cards.forEach(function (c) { c.hidden = c.dataset.prfOrgPanel !== id; });
+    if (hint) hint.hidden = !!id;
+    wrap.classList.toggle('is-open', !!id);
+  }
+  rows.forEach(function (r) { r.addEventListener('click', function () { pick(r.dataset.prfOrg); }); });
+  wrap.querySelectorAll('[data-prf-org-back]').forEach(function (b) { b.addEventListener('click', function () { pick(''); }); });
+  /* On a laptop the first organisation is open beside the list; on a phone
+     the list comes first and a choice opens one. */
+  if (window.matchMedia('(min-width: 861px)').matches && rows[0]) pick(rows[0].dataset.prfOrg);
+})();
+</script>
 
 {% comment %}
 THE PHOTO CROPPER (client, 13 Oct 2026: "when I select my image I can move

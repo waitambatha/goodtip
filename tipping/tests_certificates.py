@@ -124,9 +124,12 @@ class CertificateTests(CertFixture):
         self._finished_season()
         for u in (self.boss, self.cap):
             self.client.force_login(u)
-            resp = self.client.get(reverse("tipping:certificates", args=[self.org.id]))
+            # A manager lands in the console's Certificates tab; a captain on
+            # the same cards, on a page of their own (client, 17 Nov 2026).
+            resp = self.client.get(reverse("tipping:certificates", args=[self.org.id]), follow=True)
             self.assertEqual(resp.status_code, 200)
             self.assertContains(resp, "NRL")
+            self.assertContains(resp, "See the winners")
             detail = self.client.get(reverse("tipping:certificate_competition", args=[self.org.id, "NRL"]))
             self.assertEqual(detail.status_code, 200)
             self.assertContains(detail, "Ann Lee")
@@ -137,7 +140,7 @@ class CertificateTests(CertFixture):
         from PIL import Image
 
         self._finished_season()
-        self.client.force_login(self.boss)
+        self.client.force_login(self.ann)       # the winner downloads their own
         base = [self.org.id, "NRL", self.ann.id]
         pdf = self.client.get(reverse("tipping:certificate_file", args=base + ["pdf"]))
         self.assertEqual(pdf["Content-Type"], "application/pdf")
@@ -157,11 +160,26 @@ class CertificateTests(CertFixture):
 
     def test_the_top_three_get_a_certificate_and_only_they_do(self):
         self._finished_season(ann=3, bob=1)
-        self.client.force_login(self.boss)
+        self.client.force_login(self.bob)
         url = reverse("tipping:certificate_file", args=[self.org.id, "NRL", self.bob.id, "pdf"])
         self.assertEqual(self.client.get(url).status_code, 200)
+        self.client.force_login(self.boss)
         url = reverse("tipping:certificate_file", args=[self.org.id, "NRL", self.boss.id, "pdf"])
         self.assertEqual(self.client.get(url).status_code, 404)
+
+    def test_the_admin_sees_a_winners_certificate_but_cannot_download_it(self):
+        """Client, 17 Nov 2026: the admin monitors and sends; the certificate
+        is the winner's to download."""
+        self._finished_season(ann=3, bob=1)
+        self.client.force_login(self.boss)
+        url = reverse("tipping:certificate_file", args=[self.org.id, "NRL", self.bob.id, "png"])
+        self.assertEqual(self.client.get(url).status_code, 403)
+        shown = self.client.get(url, {"view": "1"})
+        self.assertEqual(shown.status_code, 200)
+        self.assertIn("inline", shown["Content-Disposition"])
+        page = self.client.get(reverse("tipping:certificate_competition", args=[self.org.id, "NRL"]))
+        self.assertContains(page, "Send to winner")
+        self.assertNotContains(page, "/pdf/")
 
     def test_a_placegetter_can_download_their_own(self):
         from .certificates import member_certificates
@@ -186,8 +204,8 @@ class CertificateTests(CertFixture):
     def test_finishing_outside_the_top_three_downloads_nothing(self):
         self._finished_season(ann=3, bob=1)
         self.client.force_login(self.boss)
-        page = self.client.get(reverse("tipping:my_certificates", args=[self.org.id]))
-        self.assertContains(page, "Certificates went to the top three")
+        page = self.client.get(reverse("tipping:my_certificate", args=[self.org.id, "NRL"]))
+        self.assertContains(page, "No certificate this season")
         self.assertNotContains(page, "/pdf/")
 
     def test_mid_season_the_panel_says_what_it_would_take(self):
@@ -200,15 +218,20 @@ class CertificateTests(CertFixture):
 
     def test_mid_season_there_is_no_file(self):
         self._tip(self.ann, self._match(1), 1)
-        self.client.force_login(self.boss)
+        self.client.force_login(self.ann)
         url = reverse("tipping:certificate_file", args=[self.org.id, "NRL", self.ann.id, "png"])
         self.assertEqual(self.client.get(url).status_code, 404)
+        page = self.client.get(reverse("tipping:my_certificate", args=[self.org.id, "NRL"]))
+        self.assertContains(page, "in line for a certificate")
+        self.assertNotContains(page, "Download to print")
 
     def test_the_leaderboard_points_the_captain_at_them(self):
         self._finished_season()
+        # Client, 17 Nov 2026: the members' page no longer links to the admin's.
         self.client.force_login(self.cap)
         resp = self.client.get(reverse("tipping:my_certificates", args=[self.org.id]))
-        self.assertContains(resp, reverse("tipping:certificates", args=[self.org.id]))
+        self.assertNotContains(resp, "Manage this organisation")
+        self.assertContains(resp, reverse("tipping:my_certificate", args=[self.org.id, "NRL"]))
 
 
 @override_settings(MEDIA_ROOT=temp_media())
@@ -249,7 +272,7 @@ class ChampionPhotoTests(CertFixture):
         photo = ChampionPhoto.objects.get(org=self.org, user=self.ann)
         self.assertEqual(Image.open(photo.image.path).size, (800, 800))
         resp = self.client.get(reverse("tipping:certificate_competition", args=[self.org.id, "NRL"]))
-        self.assertContains(resp, "a photo chosen for this certificate")
+        self.assertContains(resp, "Change photo")
         self.assertContains(resp, "Use profile photo")
 
     def test_the_profile_photo_is_in_the_certificate_itself(self):
@@ -259,7 +282,7 @@ class ChampionPhotoTests(CertFixture):
         buf = BytesIO()
         Image.new("RGB", (600, 600), (220, 20, 20)).save(buf, "JPEG")
         self.ann.avatar.save("ann.jpg", ContentFile(buf.getvalue()), save=True)
-        png = self.client.get(reverse("tipping:certificate_file", args=[self.org.id, "NRL", self.ann.id, "png"]))
+        png = self.client.get(reverse("tipping:certificate_file", args=[self.org.id, "NRL", self.ann.id, "png"]), {"view": "1"})
         r, g, b = Image.open(BytesIO(png.content)).convert("RGB").getpixel((560, 660))
         self.assertGreater(r, 180)
         self.assertLess(g, 60)
@@ -308,16 +331,17 @@ class SampleCertificateTests(CertFixture):
         page = self.client.get(
             reverse("tipping:certificate_competition", args=[self.org.id, "NRL"]), {"preview": "1"},
         )
-        self.assertContains(page, "Hide the sample")
-        self.assertContains(page, "with your name and profile photo")
+        self.assertContains(page, "SAMPLE")
         # Ann leads the board, but the preview is the viewer's own.
         self.assertEqual(sample_certificate(self.org, self.nrl, self.boss).winner, "Boss")
-        self.assertContains(page, reverse("tipping:certificate_sample_file", args=[self.org.id, "NRL", "pdf"]))
+        self.assertContains(page, reverse("tipping:certificate_sample_file", args=[self.org.id, "NRL", "png"]))
+        # Shown, never handed over (client, 17 Nov 2026).
+        self.assertNotContains(page, reverse("tipping:certificate_sample_file", args=[self.org.id, "NRL", "pdf"]))
 
     def test_without_the_switch_there_is_no_sample(self):
         page = self.client.get(reverse("tipping:certificate_competition", args=[self.org.id, "NRL"]))
-        self.assertNotContains(page, "Hide the sample")
-        self.assertContains(page, "Preview a sample certificate")
+        self.assertNotContains(page, "SAMPLE &middot;")
+        self.assertContains(page, "See how the certificate looks")
 
     def test_the_sample_downloads_and_says_sample(self):
         from PIL import Image
@@ -428,3 +452,68 @@ class CrossOrgCertificateTests(TestCase):
         self.assertEqual(cert_a.scope, "individual_national")
         # B never tipped with this person — B does not get to show their cert.
         self.assertIsNone(national_individual_champion(b, self.nrl))
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+                   CERTIFICATE_AUTOSEND_SINCE="2000-01-01")
+class CertificateEmailTests(CertFixture):
+    """Client, 17 Nov 2026: the winners get their certificate by email when the
+    season ends, both formats; the admin sees it went and can send it again."""
+
+    def test_the_top_three_are_emailed_once_with_both_formats(self):
+        from django.core import mail
+
+        from .certificate_mail import auto_send_due
+        from .models import CertificateDelivery
+
+        self._finished_season(ann=3, bob=1)
+        self.assertEqual(auto_send_due(), 2)
+        self.assertEqual(len(mail.outbox), 2)
+        names = [a[0] for a in mail.outbox[0].attachments]
+        self.assertTrue(any(n.endswith(".pdf") for n in names))
+        self.assertTrue(any(n.endswith(".png") for n in names))
+        self.assertEqual(CertificateDelivery.objects.filter(status="sent", trigger="auto").count(), 2)
+        # A second tick sends nothing more.
+        self.assertEqual(auto_send_due(), 0)
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_nothing_is_sent_mid_season(self):
+        from django.core import mail
+
+        from .certificate_mail import auto_send_due
+
+        self._tip(self.ann, self._match(1), 1)
+        self.assertEqual(auto_send_due(), 0)
+        self.assertEqual(mail.outbox, [])
+
+    @override_settings(CERTIFICATE_AUTOSEND_SINCE="2999-01-01")
+    def test_seasons_that_closed_before_the_cutoff_are_left_alone(self):
+        from django.core import mail
+
+        from .certificate_mail import auto_send_due
+
+        self._finished_season()
+        self.assertEqual(auto_send_due(), 0)
+        self.assertEqual(mail.outbox, [])
+
+    def test_the_admin_can_send_it_again_and_sees_the_log(self):
+        from django.core import mail
+
+        from .models import CertificateDelivery
+
+        self._finished_season(ann=3, bob=1)
+        self.client.force_login(self.boss)
+        url = reverse("tipping:certificate_send", args=[self.org.id, "NRL", self.ann.id])
+        self.client.post(url)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.ann.email])
+        row = CertificateDelivery.objects.get()
+        self.assertEqual((row.trigger, row.status, row.sent_by), ("manual", "sent", self.boss))
+        page = self.client.get(reverse("tipping:certificate_competition", args=[self.org.id, "NRL"]))
+        self.assertContains(page, f"Sent to {self.ann.email}")
+
+    def test_a_member_cannot_send_certificates(self):
+        self._finished_season(ann=3, bob=1)
+        self.client.force_login(self.bob)
+        url = reverse("tipping:certificate_send", args=[self.org.id, "NRL", self.ann.id])
+        self.assertEqual(self.client.post(url).status_code, 403)

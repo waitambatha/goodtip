@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
@@ -1209,6 +1209,92 @@ class CarryBeforeSaveTests(TestCase):
         )
         self.user.refresh_from_db()
         self.assertEqual(self.user.tip_carry_mode, U.CARRY_ALL)
+
+    def test_preview_is_204_once_always_carry_is_chosen(self):
+        """'Don't ask me again' means the sheet never asks again."""
+        from accounts.models import User as U
+
+        self.user.tip_carry_mode = U.CARRY_ALL
+        self.user.save(update_fields=["tip_carry_mode"])
+        resp = self.client.post(
+            reverse("tipping:carry_preview", args=[self.orgs["Work"].id]), self._slate(),
+        )
+        self.assertEqual(resp.status_code, 204)
+
+    def test_sheet_confirm_answers_json_and_clears_drafts(self):
+        """The sheet saves in place: JSON back, no flash left for the next page."""
+        from tipping.models import Tip, TipDraft
+
+        m = self._match("Work", "S-1")
+        TipDraft.objects.create(user=self.user, match=m, selection="home")
+        data = self._slate()
+        data["carry_answered"] = "1"
+        resp = self.client.post(
+            reverse("tipping:tip_confirm_upcoming", args=[self.orgs["Work"].id]), data,
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertTrue(body["ok"])
+        self.assertEqual(body["saved"], 2)
+        self.assertEqual(body["next"], "")
+        self.assertEqual(Tip.objects.filter(org=self.orgs["Work"]).count(), 2)
+        self.assertFalse(TipDraft.objects.exists())
+        dash = self.client.get(reverse("dashboard") + f"?org={self.orgs['Work'].id}")
+        self.assertNotContains(dash, "tips confirmed")
+
+    def test_draft_is_kept_and_dropped_when_it_matches_the_saved_tip(self):
+        from tipping.models import TipDraft
+
+        m = self._match("Work", "S-1")
+        url = reverse("tipping:tip_draft", args=[self.orgs["Work"].id])
+        self.assertEqual(self.client.post(url, {"match": m.id, "selection": "home"}).status_code, 204)
+        self.assertEqual(TipDraft.objects.get(user=self.user, match=m).selection, "home")
+        self.client.post(url, {"match": m.id, "selection": "away"})
+        self.assertEqual(TipDraft.objects.get(user=self.user, match=m).selection, "away")
+        # Back to nothing, which is what is saved: no draft left behind.
+        self.client.post(url, {"match": m.id, "selection": "none"})
+        self.assertFalse(TipDraft.objects.exists())
+
+    def test_draft_shows_as_selected_on_the_dashboard(self):
+        """Left unconfirmed, a pick is still there on the next visit."""
+        from tipping.models import TipDraft
+
+        m = self._match("Work", "S-1")
+        TipDraft.objects.create(user=self.user, match=m, selection="home")
+        dash = self.client.get(reverse("dashboard") + f"?org={self.orgs['Work'].id}")
+        html = dash.content.decode()
+        card = html[html.index(f'id="fxc-{m.id}"') - 900:html.index(f'id="fxc-{m.id}"') + 4000]
+        self.assertIn("is-draft", card)
+        self.assertIn(">Selected<", card)
+
+    def test_my_tips_ticket_changes_the_tip_in_place(self):
+        """Change it on My Tips: saved there, ticket back, draft gone, and the
+        dashboard shows the new pick as Picked."""
+        from tipping.models import Tip, TipDraft
+
+        m = self._match("Work", "S-1")
+        Tip.objects.create(user=self.user, match=m, org=self.orgs["Work"], selection="home")
+        TipDraft.objects.create(user=self.user, match=m, selection="home")
+        resp = self.client.post(
+            reverse("tipping:tip_save", args=[self.orgs["Work"].id, m.round_id, m.id]),
+            {"selection": "away", "view": "ticket"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, f'id="tk-{m.id}"')
+        self.assertContains(resp, "Tip changed to")
+        self.assertEqual(Tip.objects.get(user=self.user, match=m, org=self.orgs["Work"]).selection, "away")
+        self.assertFalse(TipDraft.objects.exists())
+        dash = self.client.get(reverse("dashboard") + f"?org={self.orgs['Work'].id}").content.decode()
+        self.assertIn('data-saved="away"', dash)
+
+    def test_draft_refuses_another_orgs_match(self):
+        from tipping.models import TipDraft
+
+        m = self._match("Mates", "S-1")
+        self.client.post(reverse("tipping:tip_draft", args=[self.orgs["Work"].id]),
+                         {"match": m.id, "selection": "home"})
+        self.assertFalse(TipDraft.objects.exists())
 
     def test_preview_refuses_a_non_member(self):
         other = User.objects.create_user(
@@ -2992,7 +3078,7 @@ class MyTipsAcrossEveryCompetitionTests(TestCase):
     def test_each_number_opens_the_tips_behind_it(self):
         self._played(self.afl, "Pies", "Dons", 3, correct=True, points=2)
         stats = {st["label"]: st["query"] for st in self._rows()["stats"]}
-        self.assertEqual(stats["Wrong"], "show=lost")
+        self.assertEqual(stats["Lost"], "show=lost")
         self.assertEqual(stats["Correct"], "show=won")
         self.assertEqual(stats["Points"], "")
 
@@ -3379,3 +3465,33 @@ class LadderFilterLoadsInPlaceTests(TestCase):
         self.client.force_login(other)
         r = self.client.get(self.url, {"pane": "table"})
         self.assertEqual(r.status_code, 403)
+
+
+class CertificateArtworkThreadSafetyTests(SimpleTestCase):
+    """Two certificates rendering at once used to share a half-read image and
+    500 ("unrecognized data stream contents"). The certificates page shows two
+    side by side, so this happened on an ordinary visit."""
+
+    def test_assets_load_once_and_whole_under_concurrency(self):
+        import threading
+
+        from tipping import certificates as certs
+
+        certs._assets.clear()
+        errors, got = [], []
+
+        def grab():
+            try:
+                img = certs._asset("champion_template.png")
+                img.convert("RGB").resize((40, 20))
+                got.append(id(img))
+            except Exception as e:  # noqa: BLE001
+                errors.append(repr(e))
+
+        threads = [threading.Thread(target=grab) for _ in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        self.assertEqual(errors, [])
+        self.assertEqual(len(set(got)), 1)

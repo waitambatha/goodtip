@@ -42,7 +42,7 @@ table always change together. The table itself is partials/ladder_table.html.
           {% if selected_series %}<span class="lad-logo" aria-hidden="true">{% include "partials/_series_logo.html" with s=selected_series %}</span>{% endif %}
           <div>
             <h1>{{ selected_series.name|default:"Ladder" }}</h1>
-            <p>{% if at_round %}As it stood after round {{ at_round }}{% else %}{{ org.season }} ladder{% endif %}</p>
+            <p>{% if at_round %}As it stood after round {{ at_round }}{% else %}{{ season_label }} ladder{% endif %}</p>
           </div>
           {% if selected_series %}<a class="lad-allstats" hx-boost="false" href="{% url 'tipping:comp_stats' org.id %}?series={{ selected_series.slug }}">Statistics</a>{% endif %}
         </header>

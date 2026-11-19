@@ -29,6 +29,8 @@ Expects: entries, thread, thread_org, can_pin.
      comp, not a trading floor.
      {% endcomment %}
      hx-trigger="every 12s[document.visibilityState==='visible']"
+     hx-vals='js:{v: (document.getElementById("gtmChatList") || {dataset: {}}).dataset.v || ""}'
+     data-v="{{ thread_version }}"
      hx-target="this" hx-swap="outerHTML">
   {% include "partials/_chat.html" with entries=entries thread=thread %}
 </div>

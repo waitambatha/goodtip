@@ -216,6 +216,8 @@ that they were not given that job.
 {% gta_can 'pages.edit' as may_pages %}
 {% gta_can 'seo.edit' as may_seo %}
 <nav id="nav-sidebar" class="gta-rail" aria-label="{% translate 'Admin sections' %}">
+  {# Django's own nav_sidebar.js still runs on this rail and wires a quick-filter box by id; without one it threw on every HQ page. Inert. #}
+  <input type="hidden" id="nav-filter" aria-hidden="true">
 
   <div class="gta-rail-top">
     <a href="{{ u_index }}" class="gta-brand">

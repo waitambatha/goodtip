@@ -451,3 +451,68 @@
     if (panel) panel.classList.remove('is-swapping');
   });
 })();
+
+/* ---------------------------------------------------------------------------
+ * COMPETITION CHIPS ON A PHONE (16 Nov 2026). On a phone the ladder, stats,
+ * leaderboard and My Tips competition list is one sideways row, and nothing
+ * said there was more: the fifth chip sat cut off at the edge. The chosen one
+ * is brought into view, and the row is marked while more lies past either
+ * edge so the CSS can fade that side.
+ * ------------------------------------------------------------------------- */
+(function () {
+  'use strict';
+  function mark(list) {
+    var more = list.scrollWidth - list.clientWidth > 4;
+    list.classList.toggle('more-right', more && list.scrollLeft + list.clientWidth < list.scrollWidth - 4);
+    list.classList.toggle('more-left', more && list.scrollLeft > 4);
+  }
+  function wire(root) {
+    (root || document).querySelectorAll('.tk-side-menu .ds-list, .mc-subsheet .pnav-opts, .mc-subsheet .pcards').forEach(function (list) {
+      var on = list.querySelector('.ds-row.on, .pnav-opt.on, .pcard.on');
+      if (on && list.scrollWidth > list.clientWidth) {
+        var item = on.parentElement === list ? on : on.parentElement;
+        list.scrollLeft = item.offsetLeft - list.offsetLeft - (list.clientWidth - item.offsetWidth) / 2;
+      }
+      mark(list);
+      if (!list.dataset.chipsWired) {
+        list.dataset.chipsWired = '1';
+        list.addEventListener('scroll', function () { mark(list); }, { passive: true });
+      }
+    });
+  }
+  document.addEventListener('DOMContentLoaded', function () { wire(); });
+  document.addEventListener('htmx:afterSettle', function (e) { wire(e.target); });
+  window.addEventListener('resize', function () { wire(); });
+})();
+
+
+/* The top bar's real height as --nav-h (17 Nov 2026), so the page frame can
+   reach exactly to the bottom of the screen on every device. */
+(function () {
+  'use strict';
+  function set() {
+    var nav = document.querySelector('.app-nav');
+    if (nav) {
+      document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px');
+      /* Messages and the Wall size their panes from --gt-navh. */
+      if (document.body) document.body.style.setProperty('--gt-navh', nav.offsetHeight + 'px');
+    }
+  }
+  set();
+  document.addEventListener('DOMContentLoaded', set);
+  window.addEventListener('resize', set);
+})();
+
+/* Phone menu: mark the link for the page you are on (longest matching path,
+   so /leagues/5/ladder/ beats /leagues/5/). */
+(function () {
+  'use strict';
+  var box = document.querySelector('[data-sheet-links]');
+  if (!box) return;
+  var here = location.pathname, best = null, bestLen = 0;
+  box.querySelectorAll('a[href]').forEach(function (a) {
+    var p = new URL(a.href, location.href).pathname;
+    if ((here === p || here.indexOf(p.replace(/\/?$/, '/')) === 0) && p.length > bestLen) { best = a; bestLen = p.length; }
+  });
+  if (best) best.setAttribute('aria-current', 'page');
+})();

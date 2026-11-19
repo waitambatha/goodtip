@@ -591,10 +591,26 @@ def _compose_group_digest(facts, rng) -> str | None:
     label = _round_label(facts["round"])
     leader = entries[0]
 
+    if all(round(e["avg_points"], 1) == 0 for e in entries):
+        # "Averaging 0 points a head" is a sentence about nothing (client,
+        # 9 Nov 2026). Say what is actually true: nobody is on the board yet.
+        busiest = max(entries, key=lambda e: e["participation"])
+        lines = [f"No group has a point on the board after {label} — all {len(entries)} are level on nothing."]
+        if busiest["participation"] > 0:
+            lines.append(f"{busiest['name']} was the busiest, {round(busiest['participation'] * 100)}% of the group tipping.")
+        return _clean_output(" ".join(lines))
+
     lines = [rng.choice([
         f"{leader['name']} leads the groups after {label}, averaging {_pts(round(leader['avg_points']))} a head.",
         f"{leader['name']} tops the group table after {label} on {_pts(round(leader['avg_points']))} a member.",
     ])]
+    # The rest of the table in a line, so the card is a standings report
+    # rather than one name.
+    rest = [e for e in entries[1:4]]
+    if rest:
+        lines.append("Behind them: " + ", ".join(
+            f"{e['name']} {round(e['avg_points'], 1):g}" for e in rest
+        ) + ".")
 
     movers = [e for e in entries if e is not leader and e.get("moved", 0) >= 1]
     if movers:

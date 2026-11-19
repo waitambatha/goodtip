@@ -81,7 +81,7 @@ Expects: entries (from orgs.views._thread_entries), thread.
         </div>
         {% endif %}
 
-        <div class="chat-bubble">
+        <div class="chat-bubble{% if e.attachments.all and not e.is_deleted %} has-files{% endif %}{% if not e.body %} no-text{% endif %}">
           {% if e.reply_to %}
           {% comment %}
           The quote is a LINK to the message it quotes, not a copy of it left
@@ -94,50 +94,11 @@ Expects: entries (from orgs.views._thread_entries), thread.
           </a>
           {% endif %}
 
-          {% if e.is_deleted %}
           {% comment %}
-          A DELETED MESSAGE LEAVES A MARK, it does not leave a gap.
-
-          The row stays so the replies that quote it still answer something,
-          and so the other side is told that a message they may have already
-          read has been taken back rather than finding the conversation
-          quietly one line shorter. Same convention as every chat app that
-          allows this, and for the same reason.
+          THE PICTURE FIRST, THE WORDS UNDER IT (client, 5 Nov 2026): "let the
+          image be in itself and then at the bottom we have the caption".
           {% endcomment %}
-          <p class="chat-text chat-gone">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>
-            This message was deleted
-          </p>
-          {% elif e.body %}
-          <p class="chat-text">{{ e.body|linebreaksbr }}</p>
-          {% endif %}
-
-          {% if e.can_edit %}
-          {% comment %}
-          THE EDITOR, IN PLACE OF THE BUBBLE'S TEXT rather than in a dialog.
-
-          Editing a line of a conversation is a small act and it belongs where
-          the line is — a modal over the thread hides the messages either side,
-          which are the whole reason anybody is rewording anything. Hidden
-          until the pencil is pressed; gt-chat.js does nothing but swap which
-          of the two is showing.
-
-          It is a real form with a real action, so it still works with no
-          JavaScript: the box is simply always open on such a browser.
-          {% endcomment %}
-          <form method="post" class="chat-edit" data-chat-edit hidden
-                action="{% url 'orgs:message_edit' thread.org_id thread.id e.id %}"
-                data-busy="Saving the change" data-busy-for="#msg-{{ e.id }} .chat-bubble">
-            {% csrf_token %}
-            <textarea name="body" rows="1" maxlength="2000" data-grow data-chat-edit-body
-                      aria-label="Edit this message">{{ e.body }}</textarea>
-            <div class="chat-edit-acts">
-              <button type="button" class="abtn abtn-ghost abtn-sm" data-chat-edit-cancel>Cancel</button>
-              <button type="submit" class="abtn abtn-dark abtn-sm">Save</button>
-            </div>
-          </form>
-          {% endif %}
-
+          {% if not e.is_deleted %}
           {% if e.attachments.all %}
           <div class="chat-files">
             {% for a in e.attachments.all %}
@@ -211,6 +172,51 @@ Expects: entries (from orgs.views._thread_entries), thread.
             {% endfor %}
           </div>
           {% endif %}
+          {% endif %}
+          {% if e.is_deleted %}
+          {% comment %}
+          A DELETED MESSAGE LEAVES A MARK, it does not leave a gap.
+
+          The row stays so the replies that quote it still answer something,
+          and so the other side is told that a message they may have already
+          read has been taken back rather than finding the conversation
+          quietly one line shorter. Same convention as every chat app that
+          allows this, and for the same reason.
+          {% endcomment %}
+          <p class="chat-text chat-gone">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>
+            This message was deleted
+          </p>
+          {% elif e.body %}
+          <p class="chat-text">{{ e.body|linebreaksbr }}</p>
+          {% endif %}
+
+          {% if e.can_edit %}
+          {% comment %}
+          THE EDITOR, IN PLACE OF THE BUBBLE'S TEXT rather than in a dialog.
+
+          Editing a line of a conversation is a small act and it belongs where
+          the line is — a modal over the thread hides the messages either side,
+          which are the whole reason anybody is rewording anything. Hidden
+          until the pencil is pressed; gt-chat.js does nothing but swap which
+          of the two is showing.
+
+          It is a real form with a real action, so it still works with no
+          JavaScript: the box is simply always open on such a browser.
+          {% endcomment %}
+          <form method="post" class="chat-edit" data-chat-edit hidden
+                action="{% url 'orgs:message_edit' thread.org_id thread.id e.id %}"
+                data-busy="Saving the change" data-busy-for="#msg-{{ e.id }} .chat-bubble">
+            {% csrf_token %}
+            <textarea name="body" rows="1" maxlength="2000" data-grow data-chat-edit-body
+                      aria-label="Edit this message">{{ e.body }}</textarea>
+            <div class="chat-edit-acts">
+              <button type="button" class="abtn abtn-ghost abtn-sm" data-chat-edit-cancel>Cancel</button>
+              <button type="submit" class="abtn abtn-dark abtn-sm">Save</button>
+            </div>
+          </form>
+          {% endif %}
+
 
           {% comment %}
           THE RECEIPT, ON YOUR OWN MESSAGES ONLY.

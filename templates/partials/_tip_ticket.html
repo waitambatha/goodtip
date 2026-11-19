@@ -5,13 +5,13 @@ product: the competition's tag, the two clubs either side of the score
 medallion. The side you picked is ringed green or red once it is decided.
 Expects: r ({match, tip, outcome, points}), m (r.match), org.
 {% endcomment %}
-<article class="tk is-{{ r.outcome }}" style="--code: {{ m.round.series.colour }}; --code-ink: {{ m.round.series.colour }}; --code-on: #fff">
+<article class="tk is-{{ r.outcome }}" id="tk-{{ m.id }}" data-busy-scope style="--code: {{ m.round.series.colour }}; --code-ink: {{ m.round.series.colour }}; --code-on: #fff">
   <div class="fxc-meta">
     <span class="fxc-code"><span class="fxc-code-logo" aria-hidden="true">{% include "partials/_series_logo.html" with s=m.round.series %}</span>{{ m.round.series.name }}</span>
     <span class="fxc-when">{{ m.kickoff_at|date:"g:i A" }}</span>
     <span class="fxc-rnd">{{ m.round.label }}</span>
     {% if m.phase == "live" %}{% include "components/_match_state.html" with match=m %}{% endif %}
-    <span class="tk-res is-{{ r.outcome }}">{% if r.outcome == "won" %}Correct{% elif r.outcome == "lost" %}Wrong{% elif r.outcome == "missed" %}{% if m.phase == "live" %}Not tipped{% else %}Missed{% endif %}{% else %}Pending{% endif %}</span>
+    <span class="tk-res is-{{ r.outcome }}">{% if r.outcome == "won" %}Correct{% elif r.outcome == "lost" %}Lost{% elif r.outcome == "missed" %}{% if m.phase == "live" %}Not tipped{% else %}Missed{% endif %}{% else %}Pending{% endif %}</span>
   </div>
 
   <div class="tk-match">
@@ -33,12 +33,38 @@ Expects: r ({match, tip, outcome, points}), m (r.match), org.
     {% else %}
     <span class="tk-pick">You didn't tip this one</span>
     {% endif %}
-    {% if r.outcome == "pending" and m.phase == "upcoming" %}
-    <a class="tk-change" href="{% url 'dashboard' %}?org={{ org.id }}" hx-boost="false">Change it</a>
+    {% if r.outcome == "pending" and m.phase == "upcoming" and not m.is_locked %}
+    <button type="button" class="tk-change" data-tk-change aria-expanded="false" aria-controls="tkp-{{ m.id }}">Change it</button>
     {% elif r.outcome == "won" %}
     <span class="tk-pts is-won">+{{ r.points }} {% if r.points == 1 %}point{% else %}points{% endif %}</span>
     {% elif r.outcome == "lost" %}
     <span class="tk-pts">0 points</span>
     {% endif %}
   </div>
+
+  {% comment %}
+  CHANGE IT HERE (client, 13 Nov 2026: "let me be able to change the tip from
+  My Tips, don't take me to the fixtures"). The sides are buttons that save on
+  the spot through tipping:tip_save and swap this ticket for the new one. The
+  saved tip is the same Tip the dashboard reads, and any unconfirmed draft for
+  the game is dropped with it, so the dashboard shows the change as Picked.
+  {% endcomment %}
+  {% if r.outcome == "pending" and m.phase == "upcoming" and not m.is_locked %}
+  <div class="tk-picker" id="tkp-{{ m.id }}" {% if not error %}hidden{% endif %}>
+    <p class="tk-picker-h">Pick again — it saves straight away</p>
+    <div class="tk-picker-row">
+      {% for side, label in m.tip_choices %}
+      <button type="button" class="tk-opt{% if r.tip.selection == side %} is-on{% endif %}"
+              hx-post="{% url 'tipping:tip_save' org.id m.round_id m.id %}"
+              hx-vals='{"selection": "{{ side }}", "view": "ticket"}'
+              hx-target="#tk-{{ m.id }}" hx-swap="outerHTML"
+              data-busy="Saving your tip" data-busy-for="#tk-{{ m.id }}"
+              {% if r.tip.selection == side %}aria-pressed="true" disabled{% endif %}>{{ label }}</button>
+      {% endfor %}
+    </div>
+    {% if error %}<p class="tk-picker-err" role="alert">{{ error }}</p>{% endif %}
+    <button type="button" class="tk-picker-x" data-tk-change>Cancel</button>
+  </div>
+  {% endif %}
+  {% if changed %}<p class="tk-changed" role="status">Tip changed to <b>{{ r.tip.pick_name }}</b> &#10003;</p>{% endif %}
 </article>

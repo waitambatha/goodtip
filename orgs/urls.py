@@ -89,6 +89,7 @@ urlpatterns = [
     path("messages/<int:thread_id>/file/<int:attachment_id>/", views.message_file,
          name="message_file"),
     path("<int:org_id>/wall/", views.wall_view, name="wall"),
+    path("<int:org_id>/typing/", views.typing_view, name="typing"),
     path("<int:org_id>/wall/recaps/", views.wall_recap_pref, name="wall_recap_pref"),
     path("<int:org_id>/wall/post/", views.wall_post_create, name="wall_post"),
     path("<int:org_id>/wall/<int:post_id>/react/", views.wall_react, name="wall_react"),
@@ -99,6 +100,9 @@ urlpatterns = [
     path("<int:org_id>/wall/reply/<int:reply_id>/edit/", views.wall_reply_edit,
          name="wall_reply_edit"),
     path("<int:org_id>/wall/<int:post_id>/reply/", views.wall_reply_create, name="wall_reply"),
+    # Final Whistle stories: one per game for everyone, answered per room.
+    path("<int:org_id>/wall/story/<int:story_id>/reply/", views.wall_story_reply, name="wall_story_reply"),
+    path("<int:org_id>/wall/story/<int:story_id>/react/", views.wall_story_react, name="wall_story_react"),
     path("<int:org_id>/wall/reply/<int:reply_id>/remove/", views.wall_reply_remove, name="wall_reply_remove"),
     # Where the user is. POST, because each one changes state that outlives
     # the request — a GET switcher would be followed by every link prefetcher

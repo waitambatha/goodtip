@@ -1,164 +1,116 @@
-{% load humanize %}{% comment %}
-One post on the Wall — a member's post, a GoodTip update or a round recap —
-with its reactions, its thread and its reply box. Its own file since the Wall
-became rooms (Sep 2026): the room's stream and the pinned recap above it render
-the same card, and a card written twice is a card that drifts.
+{% load humanize cache %}{% comment %}
+ONE POST ON THE WALL, AS A MESSAGE (client, 5 Nov 2026): "let it be a message
+in itself, then I have the option to reply to that specific message ... do not
+attach it, let it be a button."
+
+So a post is a chat bubble with nothing bolted under it. Replying is a button
+under the bubble, a swipe across it, or a press (a hold on touch) that opens its
+menu — all three fill the ONE composer at the foot of the room with a quote of
+the post, and the reply goes into this post's thread. The thread folds away
+under "N replies" so the room reads as posts, not as a column of reply boxes.
+
+Recaps and GoodTip updates are not anybody's message, so they stay full-width
+cards in the middle of the room, with the same Reply button.
+
+The row is [data-msg] so gt-chat.js treats it like a message: swipe, press
+menu, edit-in-place. Its id is "p<id>" so the composer can tell a reply to the
+post from a reply to one of its replies (plain ids) — see wall.html.
 
 Expects `p` (a WallPost from orgs.views._wall_posts_context), plus the page's
 `org`, `group`, `user` and `room`.
-
-data-chat-scope keeps the reply controls honest: picking a reply under one post
-has to fill in THAT post's box, and gt-chat.js looks for the composer inside
-the nearest scope.
-
-data-busy-scope makes THE CARD the thing that shows it is working. Replying,
-removing a reply and removing the post are ordinary form posts that reload the
-Wall, and until now the only sign any of them had landed was a spinner on a
-button — on a screen where nothing else moves for the length of a round trip
-(client, 19 Sep 2026: the loader belongs "on the part where we have the
-context ... not the whole page"). The veil covers this post and nothing else:
-the rooms list, the header and every other post stay legible and stay put.
 {% endcomment %}
-<article class="gt-post {% if p.kind == 'recap' %}is-recap{% elif p.kind == 'system' %}is-system{% endif %}" id="post-{{ p.id }}" data-chat-scope data-busy-scope{% if p.kind == 'recap' and p.recap %} data-code="{{ p.recap.round.series.slug }}"{% endif %}>
-  <div class="gpt-head">
-    {% if p.kind == 'member' and p.author %}
-      <span class="gpt-av">{% if p.author.avatar %}<img src="{{ p.author.avatar.url }}" alt="">{% else %}{{ p.author.display_name|slice:":2"|upper }}{% endif %}</span>
-      <span class="gpt-meta"><b>{{ p.author.display_name }}</b><small>{{ p.created_at|naturaltime }}</small></span>
-      {% comment %}
-      In the all-competitions room a post says which competition's room it was
-      written in, in that competition's colour — the same tag a recap wears.
-      Inside that room it would only repeat the room's own name.
-      {% endcomment %}
-      {% if p.series and not room.code %}<span class="gpt-tag gpt-code" data-code="{{ p.series.slug }}">{{ p.series.name }}</span>{% endif %}
-      {% if p.is_public %}<span class="gpt-tag pub" title="This post is on the public Wall too"><svg><use href="#ic-globe"/></svg> Public</span>{% endif %}
-    {% else %}
-      <span class="gpt-av sys">GT</span>
-      <span class="gpt-meta"><b>GoodTip</b><small>{{ p.created_at|naturaltime }}</small></span>
-      {% if p.kind == 'recap' %}
-        {% if p.recap %}<span class="gpt-tag gpt-code">{{ p.recap.round.series.name }}</span><span class="gpt-tag">{{ p.recap.round.label }} recap</span>{% else %}<span class="gpt-tag">Round recap</span>{% endif %}
-      {% else %}<span class="gpt-tag">Update</span>{% endif %}
-    {% endif %}
-    {% if p.can_edit %}
-    {% comment %}
-    REWORD YOUR OWN POST. Author only and member posts only — see
-    orgs/views.py _wall_posts_context. The editor itself is the hidden form
-    below, swapped in place of the text by gt-chat.js, exactly as in a chat
-    bubble: one gesture to learn, on both screens.
-    {% endcomment %}
-    <button type="button" class="gpt-edit" data-chat-edit-open="{{ p.id }}"
-            aria-label="Edit this post" title="Edit">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14.5 5.5 18.5 9.5"/></svg>
-    </button>
-    {% endif %}
-    {% if p.can_remove %}{# admins can also hide a recap/system card — recap spec §11 #}
-    <form method="post" action="{% url 'orgs:wall_remove' org.id p.id %}" class="gpt-x" data-busy="Removing the post" data-confirm="This removes the post and its replies for everyone in {% if group %}{{ group.name }}{% else %}the organisation{% endif %}. It cannot be undone." data-confirm-title="Remove this post?" data-confirm-ok="Remove post" data-confirm-danger>
-      {% csrf_token %}<button type="submit" title="{% if p.author_id == user.id %}Delete post{% else %}Hide post (admin){% endif %}">&times;</button>
-    </form>
-    {% endif %}
-  </div>
-  {% if p.tip %}
-  <span class="gpt-pick">&#9733; {{ p.tip.pick_text }}{% if p.tip.is_correct is not None %} &middot; {% if p.tip.is_correct %}<b class="hit">got it &#10003;</b>{% else %}<b class="miss">didn't land</b>{% endif %}{% endif %}</span>
-  {% endif %}
-  {% if p.body %}<p class="gpt-body">{{ p.body|linebreaksbr }}{% if p.edited_at %} <i class="chat-edited" title="Edited {{ p.edited_at|date:'l j F Y, g:i a' }}">edited</i>{% endif %}</p>{% endif %}
-  {% if p.can_edit %}
-  <form method="post" class="chat-edit" data-chat-edit hidden
-        action="{% url 'orgs:wall_edit' org.id p.id %}"
-        data-busy="Saving the change" data-busy-for="#post-{{ p.id }}">
-    {% csrf_token %}
-    <textarea name="body" rows="1" maxlength="500" data-grow data-chat-edit-body
-              aria-label="Edit this post">{{ p.body }}</textarea>
-    <div class="chat-edit-acts">
-      <button type="button" class="abtn abtn-ghost abtn-sm" data-chat-edit-cancel>Cancel</button>
-      <button type="submit" class="abtn abtn-dark abtn-sm">Save</button>
-    </div>
-  </form>
-  {% endif %}
-  {% if p.kind == 'recap' and p.recap %}
-    {% include "partials/wall_recap.html" with recap=p.recap post=p %}
-  {% endif %}
-  {% include "partials/wall_reactions.html" with post=p bar=p.reaction_bar %}
+<article class="wl-row{% if p.kind == 'recap' %} is-recap is-ai{% elif p.kind == 'system' %} is-system{% elif p.author_id == user.id %} mine{% else %} theirs{% endif %}"
+         id="post-{{ p.id }}" data-msg="p{{ p.id }}" data-busy-scope
+         data-author="{% if p.kind == 'member' and p.author %}{% if p.author_id == user.id %}You{% else %}{{ p.author.display_name }}{% endif %}{% elif p.kind == 'recap' %}GoodTip &middot; recap{% else %}GoodTip{% endif %}"
+         data-quote="{% if p.body %}{{ p.body|truncatechars:90 }}{% elif p.tip %}{{ p.tip.pick_text }}{% endif %}"
+         data-reply-url="{% url 'orgs:wall_reply' org.id p.id %}"
+         {% if p.kind == 'recap' and p.recap %} data-code="{{ p.recap.round.series.slug }}" style="--rc: {{ p.recap.round.series.colour }}"{% endif %}>
 
-  {% if p.thread %}
-  {% comment %}
-  THE THREAD. Each reply carries what a reply-to needs — its id, who wrote it,
-  one line of it — so the arrow beside it and a swipe across it can fill the
-  box below without a round trip. Same attributes and handler as a message
-  thread (static/js/gt-chat.js). A reply that answers another shows the quote,
-  and the quote is a link to what it answers.
-  {% endcomment %}
-  <div class="gpt-thread">
-    {% for r in p.thread %}
-    <div class="gpt-reply{% if r.is_mine %} mine{% endif %}" id="reply-{{ r.id }}"
-         data-msg="{{ r.id }}"
-         data-author="{% if r.is_mine %}You{% else %}{{ r.display_name }}{% endif %}"
-         data-quote="{{ r.quote }}">
-      <button type="button" class="gpr-av{% if r.is_guest %} guest{% endif %}" data-peek aria-expanded="false"
-              aria-label="About {{ r.display_name }}">{{ r.initials }}</button>
-      <div class="gpr-body">
-        <b>{{ r.display_name }}{% if r.is_guest %} <i>visitor</i>{% endif %}</b>
-        <small>{{ r.created_at|naturaltime }}</small>
-        {% if r.reply_to %}
-        <a class="chat-quote" href="#reply-{{ r.reply_to.id }}" data-jump="{{ r.reply_to.id }}">
-          <b>{{ r.reply_to.display_name }}</b>
-          <span>{{ r.reply_to.quote }}</span>
-        </a>
+
+  <div class="wl-col">
+    <div class="chat-bubble wl-bubble">
+      <div class="wl-head">
+        {% if p.kind == 'member' and p.author %}
+          <span class="wl-av" aria-hidden="true">{% if p.author.avatar %}<img src="{{ p.author.avatar.url }}" alt="">{% else %}{{ p.author.display_name|slice:":2"|upper }}{% endif %}</span>
+          <b class="wl-who">{% if p.author_id == user.id %}You{% else %}{{ p.author.display_name }}{% endif %}</b>
+          {% if p.series and not room.code %}<span class="wl-tag gpt-code" data-code="{{ p.series.slug }}">{{ p.series.name }}</span>{% endif %}
+          {% if p.is_public %}<span class="wl-tag is-pub" title="This post is on the public Wall too">Public</span>{% endif %}
+        {% else %}
+          {% if p.kind == 'recap' %}<span class="mr-band mr-band-inline"><span class="mr-spark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2l1.9 5.8L20 10l-6.1 2.2L12 18l-1.9-5.8L4 10l6.1-2.2z"/></svg></span><span class="mr-name"><b>Round Recap</b><small>by GoodTip AI</small></span></span>{% else %}
+          <span class="wl-gt" aria-hidden="true">GT</span>
+          <b class="wl-who">GoodTip</b>{% endif %}
+          {% if p.kind == 'recap' %}
+            {% if p.recap %}<span class="wl-tag gpt-code">{{ p.recap.round.series.name }}</span><span class="wl-tag">{{ p.recap.round.label }} &middot; round wrap</span>{% else %}<span class="wl-tag">Round recap</span>{% endif %}
+          {% else %}<span class="wl-tag">Update</span>{% endif %}
         {% endif %}
-        <p>{{ r.body|linebreaksbr }}{% if r.edited_at %} <i class="chat-edited" title="Edited {{ r.edited_at|date:'l j F Y, g:i a' }}">edited</i>{% endif %}</p>
-        {% if r.can_edit %}
-        <form method="post" class="chat-edit" data-chat-edit hidden
-              action="{% url 'orgs:wall_reply_edit' org.id r.id %}"
-              data-busy="Saving the change" data-busy-for="#reply-{{ r.id }}">
-          {% csrf_token %}
-          <textarea name="body" rows="1" maxlength="500" data-grow data-chat-edit-body
-                    aria-label="Edit this reply">{{ r.body }}</textarea>
-          <div class="chat-edit-acts">
-            <button type="button" class="abtn abtn-ghost abtn-sm" data-chat-edit-cancel>Cancel</button>
-            <button type="submit" class="abtn abtn-dark abtn-sm">Save</button>
-          </div>
-        </form>
-        {% endif %}
-        <div class="chat-peek" hidden>
-          <span class="cp-av">{{ r.initials }}</span>
-          <span class="cp-body">
-            <b>{{ r.display_name }}</b>
-            <small>{% if r.is_guest %}Visitor &middot; replied from the public Wall{% else %}Member &middot; {{ org.name }}{% endif %}</small>
-          </span>
+      </div>
+
+      {% if p.image %}
+      <a class="wl-shot" href="{{ p.image.url }}" target="_blank" rel="noopener"><img src="{{ p.image.url }}" alt="Picture from {% if p.author %}{{ p.author.display_name }}{% else %}GoodTip{% endif %}" loading="lazy"></a>
+      {% endif %}
+      {% if p.tip %}
+      <span class="wl-pick">&#9733; {{ p.tip.pick_text }}{% if p.tip.is_correct is not None %} &middot; {% if p.tip.is_correct %}<b class="hit">got it &#10003;</b>{% else %}<b class="miss">didn't land</b>{% endif %}{% endif %}</span>
+      {% endif %}
+      {% if p.body %}<p class="wl-text" data-wl-clamp>{{ p.body|linebreaksbr }}</p>{% endif %}
+      {% if p.can_edit %}
+      <form method="post" class="chat-edit" data-chat-edit hidden
+            action="{% url 'orgs:wall_edit' org.id p.id %}"
+            data-busy="Saving the change" data-busy-for="#post-{{ p.id }}">
+        {% csrf_token %}
+        <textarea name="body" rows="1" maxlength="500" data-grow data-chat-edit-body
+                  aria-label="Edit this post">{{ p.body }}</textarea>
+        <div class="chat-edit-acts">
+          <button type="button" class="abtn abtn-ghost abtn-sm" data-chat-edit-cancel>Cancel</button>
+          <button type="submit" class="abtn abtn-dark abtn-sm">Save</button>
         </div>
-      </div>
-      <div class="gpr-tools">
-        <button type="button" class="chat-replybtn" data-reply-to="{{ r.id }}"
-                aria-label="Reply to {{ r.display_name }}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 7 7v4"/></svg>
-        </button>
-        {% if r.can_edit %}
-        <button type="button" class="chat-editbtn" data-chat-edit-open="{{ r.id }}"
-                aria-label="Edit this reply" title="Edit">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14.5 5.5 18.5 9.5"/></svg>
-        </button>
-        {% endif %}
-        {% if r.can_remove %}
-        <form method="post" action="{% url 'orgs:wall_reply_remove' org.id r.id %}" class="gpr-x" data-busy="Removing the reply" data-confirm="The reply will be removed for everyone. It cannot be undone." data-confirm-title="Remove this reply?" data-confirm-ok="Remove reply" data-confirm-danger>
-          {% csrf_token %}<button type="submit" title="Remove reply">&times;</button>
-        </form>
-        {% endif %}
-      </div>
+      </form>
+      {% endif %}
+      {% if p.kind == 'recap' and p.recap %}
+        {% cache 3600 wallrecap p.id %}{% include "partials/wall_recap.html" with recap=p.recap post=p %}{% endcache %}
+      {% endif %}
+      <span class="wl-stamp" title="{{ p.created_at|date:'l j F Y, g:i a' }}">{{ p.created_at|naturaltime }}{% if p.edited_at %} &middot; <i class="chat-edited" title="Edited {{ p.edited_at|date:'l j F Y, g:i a' }}">edited</i>{% endif %}</span>
     </div>
-    {% endfor %}
-  </div>
-  {% endif %}
 
-  <form method="post" action="{% url 'orgs:wall_reply' org.id p.id %}" class="gpt-replybox" data-chat-form data-busy="Posting your reply">
-    {% csrf_token %}
-    <div class="cc-quote" data-reply-banner hidden>
-      <span class="ccq-bar" aria-hidden="true"></span>
-      <span class="ccq-txt"><b data-reply-who></b><small data-reply-quote></small></span>
-      <button type="button" class="ccq-x" data-reply-cancel aria-label="Reply to the post instead">&times;</button>
+    <div class="wl-under">
+      {% include "partials/wall_reactions.html" with post=p bar=p.reaction_bar %}
     </div>
-    <input type="hidden" name="reply_to" value="" data-reply-id>
-    <div class="gpr-row">
-      <span class="gpr-av mine">{% if user.avatar %}<img src="{{ user.avatar.url }}" alt="">{% else %}{{ user.display_name|slice:":2"|upper }}{% endif %}</span>
-      <textarea name="body" rows="1" maxlength="500" placeholder="Reply&hellip;" aria-label="Reply to {% if p.author %}{{ p.author.display_name }}{% else %}GoodTip{% endif %}" required data-grow data-chat-body></textarea>
-      <button type="submit" class="abtn abtn-dark abtn-sm">Reply</button>
+  </div>
+
+  {# What to do with this post: press the bubble, hold it on touch, or the dots. #}
+  <div class="chat-rowacts wl-acts">
+    <button type="button" class="chat-more" data-msg-more aria-label="What to do with this post" aria-haspopup="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+    </button>
+    <div class="chat-menu" data-msg-menu hidden role="menu">
+      <div class="wl-react-row" role="group" aria-label="React">
+        {% for r in p.reaction_bar %}
+        <button type="button" class="wl-react{% if r.mine %} on{% endif %}" data-wl-react
+                hx-post="{% url 'orgs:wall_react' org.id p.id %}" hx-vals='{"emoji": "{{ r.emoji }}"}'
+                hx-target="#reacts-{{ p.id }}" hx-swap="outerHTML" aria-label="React {{ r.glyph }}">{{ r.glyph }}</button>
+        {% endfor %}
+      </div>
+      <button type="button" class="chat-menu-item" role="menuitem" data-reply-to="p{{ p.id }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 7 7v4"/></svg>
+        Reply
+      </button>
+      {% if p.can_edit %}
+      <button type="button" class="chat-menu-item" role="menuitem" data-chat-edit-open="{{ p.id }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14.5 5.5 18.5 9.5"/></svg>
+        Edit
+      </button>
+      {% endif %}
+      {% if p.can_remove %}
+      <form method="post" class="chat-menu-danger" action="{% url 'orgs:wall_remove' org.id p.id %}" data-busy="Removing the post"
+            data-confirm="This removes the post and its replies for everyone in {% if group %}{{ group.name }}{% else %}the organisation{% endif %}. It cannot be undone."
+            data-confirm-title="Remove this post?" data-confirm-ok="Remove post" data-confirm-danger>
+        {% csrf_token %}
+        <button type="submit" class="chat-menu-item is-danger" role="menuitem">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg>
+          {% if p.author_id == user.id %}Delete{% else %}Hide (admin){% endif %}
+        </button>
+      </form>
+      {% endif %}
     </div>
-  </form>
+  </div>
+
 </article>

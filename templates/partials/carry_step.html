@@ -20,47 +20,22 @@ asking destroys a decision they cannot get back.
 {% endcomment %}
 <input type="hidden" name="carry_answered" value="1">
 
-<div class="cs-lede">
-  <span class="cs-badge">{{ total_changes }}</span>
-  <p>
-    You also tip in {{ total_rooms }} other
-    {% if total_rooms == 1 %}place{% else %}places{% endif %}{% if total_orgs > 1 %},
-    across {{ total_orgs }} organisations{% endif %}.
-    We can put these same picks there so you don't have to tip twice.
-  </p>
-</div>
+<p class="cs3-lede">
+  You also tip in {{ total_rooms }} other {% if total_rooms == 1 %}place{% else %}places{% endif %}{% if total_orgs > 1 %} across {{ total_orgs }} organisations{% endif %}.
+  Tick where these picks should go too, so you don't have to tip twice.
+</p>
 
 {% include "partials/_carry_rooms.html" %}
 
 {% comment %}
-"Don't ask again" in both directions. The client asked for the yes-forever
-half; the no-forever half matters as much, because somebody who keeps their
-comps deliberately separate should be able to stop being asked too.
-
-Note what "always" does NOT do: it never overwrites a contradicting pick.
-Switching the question off is not consent to have a deliberate different tip
-replaced — that stays an explicit act, here.
+ONE BOX, NOT A MENU (client, 13 Nov 2026: "carry forward and never ask me
+again ... like a checkbox"). Ticked, it sets tip_carry_mode to "all": from the
+next confirm on, picks go to every organisation and group without this step.
+It never overwrites a different pick made somewhere on purpose — switching the
+question off is not consent to that. "Never carry" lives in the profile.
 {% endcomment %}
-<details class="cs-remember">
-  <summary>
-    <svg class="cs-gear" aria-hidden="true"><use href="#ic-sliders"/></svg>
-    <span>Stop asking me every time</span>
-    <svg class="cs-chev" aria-hidden="true"><use href="#ic-chev-down"/></svg>
-  </summary>
-  <label class="cs-opt">
-    <input type="radio" name="remember" value="" checked>
-    <span class="oc-box"></span>
-    <span><b>Just this once</b><i>Ask me again next time.</i></span>
-  </label>
-  <label class="cs-opt">
-    <input type="radio" name="remember" value="all">
-    <span class="oc-box"></span>
-    <span><b>Always carry across</b><i>New picks go to every group automatically. Anywhere you've tipped differently is left alone.</i></span>
-  </label>
-  <label class="cs-opt">
-    <input type="radio" name="remember" value="none">
-    <span class="oc-box"></span>
-    <span><b>Never — keep my groups separate</b><i>Tips only count for the group you make them in.</i></span>
-  </label>
-  <p class="cs-fine">You can change this any time in your profile.</p>
-</details>
+<label class="cs3-always">
+  <input type="checkbox" name="remember" value="all"{% if auto_mode %} checked{% endif %}>
+  <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
+  <span><b>Always carry my tips to all of these</b><i>Don't ask me again. You can change this in your profile.</i></span>
+</label>

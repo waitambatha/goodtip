@@ -24,7 +24,7 @@ and the list always change together.
       {% if summary.recent %}
       <div class="tk-form" aria-label="Your last {{ summary.recent|length }} results">
         <span>Last {{ summary.recent|length }}</span>
-        {% for o in summary.recent %}<i class="is-{{ o }}" title="{% if o == 'won' %}Correct{% else %}Wrong{% endif %}"></i>{% endfor %}
+        {% for o in summary.recent %}<i class="is-{{ o }}" title="{% if o == 'won' %}Correct{% else %}Lost{% endif %}"></i>{% endfor %}
       </div>
       {% endif %}
     </div>

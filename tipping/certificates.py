@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import io
 import os
+import threading
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -81,15 +82,42 @@ FONTS = {
 # ---------------------------------------------------------------------------
 
 def competitions_for(org):
-    """The certificate-bearing competitions this organisation actually runs —
-    ones it has rounds for, in the spec's order."""
+    """Every competition this organisation has a season in — the ones it has
+    rounds for — the spec's four first, then the rest by name.
+
+    WIDENED 14 Nov 2026 (client: "when I download it I see the sport — NRL,
+    EPL, golf or whatever ... the admin decides which sports the organisation
+    tips"). It was the four in CERT_SERIES only, so an organisation tipping the
+    Premier League or golf had a leaderboard for it and no certificate."""
     from catalog.models import Series
 
-    have = set(
-        org.rounds.filter(series__name__in=CERT_SERIES).values_list("series__name", flat=True)
-    )
-    by_name = {s.name: s for s in Series.objects.filter(name__in=have)}
-    return [by_name[n] for n in CERT_SERIES if n in by_name]
+    # WIDENED AGAIN 17 Nov 2026 (client: "all sports that that organisation
+    # admin has allowed his people to tip should be there, so if he has
+    # allowed 16 different sports I should see it"): every competition the
+    # admin switched on (Sports & competitions — the organisation's own and,
+    # for a group, its parent's), plus any it already has rounds for.
+    have = set(org.rounds.values_list("series_id", flat=True))
+    for o in {org, getattr(org, "root", org)}:
+        have.update(o.competitions.values_list("series__id", flat=True))
+    have.discard(None)
+    found = list(Series.objects.filter(id__in=have, is_active=True))
+    first = {n: i for i, n in enumerate(CERT_SERIES)}
+    return sorted(found, key=lambda s: (first.get(s.name, len(first)), s.name))
+
+
+def is_cert_series(org, name: str) -> bool:
+    """Whether ``name`` is a competition ``org`` can issue certificates for."""
+    return any(s.name == name for s in competitions_for(org))
+
+
+def accent_for(series) -> str:
+    """The certificate's colour: the four agreed ones, else the competition's
+    own (catalog.Series.colour), else forest."""
+    name = getattr(series, "name", series)
+    if name in ACCENTS:
+        return ACCENTS[name]
+    colour = getattr(series, "colour", "") or ""
+    return colour if colour.startswith("#") and len(colour) in (4, 7) else FOREST
 
 
 @dataclass
@@ -181,7 +209,11 @@ class Certificate:
 
     @property
     def accent(self) -> str:
-        return ACCENTS.get(self.series, FOREST)
+        if self.series in ACCENTS:
+            return ACCENTS[self.series]
+        from catalog.models import Series
+
+        return accent_for(Series.objects.filter(name=self.series).first() or self.series)
 
     @property
     def closed_label(self) -> str:
@@ -408,15 +440,32 @@ ART_W, ART_H = 1672, 941
 SCALE = 1.5
 
 _assets = {}
+_assets_lock = threading.Lock()
 
 
 def _asset(name):
+    """The artwork, opened once per process and shared.
+
+    THREAD-SAFE (13 Nov 2026). The image used to go into the cache straight
+    from Image.open() and only then be load()ed, so a second request rendering
+    a certificate at the same moment picked up a half-read file and failed
+    ("unrecognized data stream", or an AssertionError inside PIL) — the page
+    of certificates renders two at once. It is now read completely under a
+    lock and only then published; every caller converts/resizes it, which
+    returns a new image and never writes to the shared one.
+    """
+    img = _assets.get(name)
+    if img is not None:
+        return img
     from PIL import Image
 
-    if name not in _assets:
-        _assets[name] = Image.open(os.path.join(ASSET_DIR, name))
-        _assets[name].load()
-    return _assets[name]
+    with _assets_lock:
+        img = _assets.get(name)
+        if img is None:
+            img = Image.open(os.path.join(ASSET_DIR, name))
+            img.load()
+            _assets[name] = img
+    return img
 
 
 def _font(key, size):
@@ -556,7 +605,13 @@ def _scene(cert: "Certificate", photo=None):
     d.text((cx, rule_y), label, font=pill_f, fill=(9, 40, 22), anchor="mm")
 
     label_f = _font("text_b", 32 * s)
-    centred("SEASON CHAMPION", label_f, 222, (255, 255, 255), 0.42 * 32 * s)
+    # The place actually earned (12 Nov 2026: second place was printing
+    # SEASON CHAMPION). Same design for 1st, 2nd and 3rd; the words say which.
+    if cert.scope == SCOPE_INDIVIDUAL_NATIONAL:
+        place_words = {1: "TOP TIPPER NATIONWIDE", 2: "SECOND NATIONWIDE", 3: "THIRD NATIONWIDE"}.get(cert.place, "TOP TIPPER NATIONWIDE")
+    else:
+        place_words = cert.place_label.upper()
+    centred(place_words, label_f, 222, (255, 255, 255), 0.42 * 32 * s)
 
     trophy = _asset("champion_trophy.png")
     tw, th = int(trophy.size[0] * 0.92 * s), int(trophy.size[1] * 0.92 * s)
@@ -608,9 +663,57 @@ def _scene(cert: "Certificate", photo=None):
 # ---------------------------------------------------------------------------
 
 def render_png(cert: Certificate, photo_field=None) -> bytes:
+    # compress_level 6, not optimize=True: optimize spent ~5s squeezing out
+    # 5% (client, 17 Nov 2026: "I need it to be as fast as possible").
     out = io.BytesIO()
-    _scene(cert, _load_photo(photo_field)).save(out, "PNG", optimize=True)
+    _scene(cert, _load_photo(photo_field)).save(out, "PNG", compress_level=6)
     return out.getvalue()
+
+
+def render_preview(cert: Certificate, photo_field=None) -> bytes:
+    """The picture shown on a page: the same drawing as a 1400px JPEG, about
+    a twentieth of the PNG's weight, so it appears at once. Downloads stay
+    the full-size PNG and PDF."""
+    out = io.BytesIO()
+    img = _scene(cert, _load_photo(photo_field)).convert("RGB")
+    img.thumbnail((1400, 1400))
+    img.save(out, "JPEG", quality=86, optimize=True, progressive=True)
+    return out.getvalue()
+
+
+#: Bump when the artwork or the drawing changes, so every cached file redraws.
+DRAWING_VERSION = "2026-11-17"
+
+
+def _cache_key(cert: Certificate, photo_field, kind: str) -> str:
+    import hashlib
+    from dataclasses import asdict
+
+    parts = {k: str(v) for k, v in asdict(cert).items()}
+    photo = ""
+    if photo_field:
+        name = getattr(photo_field, "name", "") or ""
+        try:
+            stamp = photo_field.storage.get_modified_time(name).timestamp() if name else ""
+        except Exception:  # noqa: BLE001 — a missing file just means no stamp
+            stamp = ""
+        photo = f"{name}@{stamp}"
+    raw = f"{DRAWING_VERSION}|{kind}|{sorted(parts.items())}|{photo}"
+    return "cert:" + hashlib.sha1(raw.encode()).hexdigest()
+
+
+def cached_file(cert: Certificate, photo_field, kind: str) -> bytes:
+    """``kind`` is "png", "pdf" or "preview": drawn once, then served from
+    the certs cache (settings.CACHES)."""
+    from django.core.cache import caches
+
+    store = caches["certs"]
+    key = _cache_key(cert, photo_field, kind)
+    body = store.get(key)
+    if body is None:
+        body = {"png": render_png, "pdf": render_pdf, "preview": render_preview}[kind](cert, photo_field)
+        store.set(key, body)
+    return body
 
 
 def render_pdf(cert: Certificate, photo_field=None) -> bytes:
@@ -632,3 +735,47 @@ def render_pdf(cert: Certificate, photo_field=None) -> bytes:
     c.showPage()
     c.save()
     return out.getvalue()
+
+
+def competition_cards(org, user=None) -> list[dict]:
+    """One card per competition for the certificate lists (client, 17 Nov
+    2026: the super admin's look, a card per sport, opening that sport alone).
+
+    For the admin (``user`` None): finished seasons first, each with its
+    champion. For a member: the competitions they tip most first, each with
+    where they stand and whether a certificate is theirs."""
+    from django.db.models import Count
+
+    from tipping.services import leaderboard_for_org
+
+    from .models import Tip
+
+    tips = {}
+    if user is not None:
+        tips = dict(
+            Tip.objects.filter(user=user, org=org).values_list("match__round__series_id")
+            .annotate(n=Count("id")).values_list("match__round__series_id", "n")
+        )
+    cards = []
+    for series in competitions_for(org):
+        state = season_state(org, series)
+        podium = placegetters(org, series) if state.final else []
+        card = {
+            "series": series, "state": state, "colour": series.colour or accent_for(series),
+            "champions": [c.winner for c in podium if c.place == 1],
+            "tips": tips.get(series.id, 0),
+        }
+        if user is not None:
+            board = [u for u in leaderboard_for_org(org, series=series) if u.points or u.tips_total]
+            me = next((u for u in board if u.id == user.id), None)
+            card.update({
+                "rank": me.rank if me else None, "of": len(board), "points": me.points if me else 0,
+                "won": next((c.place for c in podium if c.user_id == user.id), None),
+                "top3": bool(me and me.rank <= 3 and me.points > 0),
+            })
+        cards.append(card)
+    if user is not None:
+        cards.sort(key=lambda c: (-c["tips"], c["series"].name.lower()))
+    else:
+        cards.sort(key=lambda c: (not c["state"].final, c["series"].name.lower()))
+    return cards

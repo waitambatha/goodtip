@@ -22,7 +22,7 @@ belongs to two of them.
 {% url 'tipping:comp_stats' org.id as cs_url %}
 <div id="compPage" class="st-page" style="--board: {{ selected_series.colour|default:'#176B45' }}" hx-boost="true" hx-target="#compPage" hx-select="#compPage" hx-swap="outerHTML show:none swap:500ms">
 <section class="cp-head club-head">
-  <a class="cp-back" hx-boost="false" href="{% url 'tipping:ladder' org.id %}?series={{ selected_series.slug }}">Ladder</a>
+  <a class="cp-back" hx-boost="false" href="{% url 'tipping:ladder' org.id %}?series={{ selected_series.slug }}" aria-label="Back to the {{ selected_series.name }} ladder"><svg aria-hidden="true"><use href="#ic-arrow-left"/></svg><span>Ladder</span></a>
   {% if selected_series %}<span class="lad-logo" aria-hidden="true">{% include "partials/_series_logo.html" with s=selected_series %}</span>{% endif %}
   <h1>{{ selected_series.name }} statistics</h1>
   <p>Every club in the competition, side by side.</p>
@@ -62,7 +62,7 @@ belongs to two of them.
       {% for c in chart_attack %}
       <div class="spr">
         <span class="spr-lab">{{ c.team.name|truncatechars:16 }}</span>
-        <span class="spr-track"><i style="width:{{ c.bar_pct }}%"></i></span>
+        <span class="spr-track"><i style="width:{{ c.bar_pct }}%;{% if c.colour %}--board:{{ c.colour }}{% endif %}"></i></span>
         <span class="spr-val">{{ c.avg_for }}</span>
         <span class="spr-n">{{ c.scored }}</span>
       </div>
@@ -82,7 +82,7 @@ belongs to two of them.
       {% for c in chart_defence %}
       <div class="spr">
         <span class="spr-lab">{{ c.team.name|truncatechars:16 }}</span>
-        <span class="spr-track"><i style="width:{{ c.bar_pct }}%"></i></span>
+        <span class="spr-track"><i style="width:{{ c.bar_pct }}%;{% if c.colour %}--board:{{ c.colour }}{% endif %}"></i></span>
         <span class="spr-val">{{ c.avg_against }}</span>
         <span class="spr-n">{{ c.conceded }}</span>
       </div>

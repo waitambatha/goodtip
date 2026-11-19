@@ -11,6 +11,8 @@ urlpatterns = [
     path("<int:org_id>/tip/<int:round_id>/confirm/", views.tip_round_confirm, name="tip_confirm"),
     # Cross-round confirm for the dashboard's "everything still to play" slate.
     path("<int:org_id>/tip/confirm/", views.tip_confirm_upcoming, name="tip_confirm_upcoming"),
+    # One unconfirmed pick, remembered as it is made (TipDraft).
+    path("<int:org_id>/tip/draft/", views.tip_draft, name="tip_draft"),
     # Review what carrying this slate into your other groups would do, then
     # do it. Only ever reached when there IS somewhere else to carry to.
     path("<int:org_id>/tip/carry/", views.tip_carry_view, name="tip_carry"),
@@ -28,6 +30,7 @@ urlpatterns = [
     path("<int:org_id>/certificates/<str:series>/", views.certificate_competition_view, name="certificate_competition"),
     path("<int:org_id>/certificates/<str:series>/sample/<str:fmt>/", views.certificate_sample_file, name="certificate_sample_file"),
     path("<int:org_id>/certificates/<str:series>/<int:user_id>/photo/", views.certificate_photo, name="certificate_photo"),
+    path("<int:org_id>/certificates/<str:series>/<int:user_id>/send/", views.certificate_send, name="certificate_send"),
     path("<int:org_id>/certificates/<str:series>/<int:user_id>/<str:fmt>/", views.certificate_file, name="certificate_file"),
     # Beyond this organisation's own champion (12 Oct 2026): industry, the
     # whole of GoodTip, or whoever has the most points on it — only ever
@@ -39,6 +42,7 @@ urlpatterns = [
     # The detail behind each board: a member's own season, and a club's.
     path("<int:org_id>/leaderboard/me/", views.my_stats_view, name="my_stats"),
     path("<int:org_id>/leaderboard/certificates/", views.my_certificates_view, name="my_certificates"),
+    path("<int:org_id>/leaderboard/certificates/<str:series>/", views.my_certificate_view, name="my_certificate"),
     path("<int:org_id>/ladder/team/<int:team_id>/", views.team_stats_view, name="team_stats"),
     path("<int:org_id>/ladder/statistics/", views.comp_stats_view, name="comp_stats"),
 ]

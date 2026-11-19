@@ -1,0 +1,76 @@
+{% extends "app_base.html" %}
+{% block title %}{{ series.name }} certificate, {{ org.name }}{% endblock %}
+{% block loader_task %}Fetching your standing{% endblock %}
+{% block nav_board %}on{% endblock %}
+{% block body_class %}page-deep sheet-page page-dash page-tips page-board{% endblock %}
+{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
+
+{% block app_content %}
+{% comment %}
+ONE COMPETITION, FOR THE MEMBER (client, 17 Nov 2026): your points, your rank,
+whether you're in line for a certificate, and the certificate itself with its
+downloads only once the season is complete. Nobody downloads a certificate
+mid-season, and nobody downloads one that isn't theirs.
+{% endcomment %}
+<section class="cp-head" style="--board: {{ series.colour|default:'#176B45' }}">
+  <a class="cp-back" href="{% url 'tipping:my_certificates' org.id %}" aria-label="Back to all certificates"><svg aria-hidden="true"><use href="#ic-arrow-left"/></svg><span>Certificates</span></a>
+  <span class="lad-logo" aria-hidden="true">{% include "partials/_series_logo.html" with s=series %}</span>
+  <h1>{{ year }} {{ series.name }}</h1>
+  <p>{{ org.name }} &middot; {% if state.final %}season complete, closed {{ state.closed_on|date:"j M Y" }}{% else %}season in progress{% endif %}</p>
+</section>
+
+<div class="mc-wrap" style="--code: {{ series.colour|default:'#176B45' }}">
+  <div class="mc-stats">
+    <div><b>{% if me %}#{{ me.rank }}{% else %}&ndash;{% endif %}</b><span>Your rank{% if of %} of {{ of }}{% endif %}</span></div>
+    <div><b>{% if me %}{{ me.points }}{% else %}0{% endif %}</b><span>Points</span></div>
+    <div><b>{% if accuracy is not None %}{{ accuracy }}%{% else %}&ndash;{% endif %}</b><span>Correct tips</span></div>
+    <div><b>{% if me %}{{ me.correct_all }}<small>/{{ me.graded_all }}</small>{% else %}0{% endif %}</b><span>Right / graded</span></div>
+  </div>
+
+  {% if state.final and earned %}
+    {% for c in earned %}
+    <section class="mc-cert">
+      <header class="mc-verdict is-won">
+        {% include "partials/_rank_badge.html" with place=c.cert.place kind="person" %}
+        <div><b>You finished {{ c.word }}{% if c.where %} in {{ c.where }}{% endif %}.</b><span>{{ c.cert.place_label }}. Your certificate is ready{% if c.emailed %}, and we've emailed it to you as a PDF and an image{% endif %}.</span></div>
+      </header>
+      <div class="mc-cert-img">
+        {% if c.national %}
+        <img src="{% url 'tipping:certificate_scope_file' org.id c.cert.series 'individual' 'png' %}?view=1&amp;user={{ c.cert.user_id }}" alt="{{ c.cert.headline }}" width="1400" height="788" decoding="async">
+        {% else %}
+        <img src="{% url 'tipping:certificate_file' org.id c.cert.series c.cert.user_id 'png' %}?preview=1{% if c.group %}&amp;group={{ c.group.id }}{% endif %}" alt="{{ c.cert.headline }}" width="1400" height="788" decoding="async">
+        {% endif %}
+      </div>
+      <div class="mc-dl">
+        {% if c.national %}
+        <a class="mc-btn" href="{% url 'tipping:certificate_scope_file' org.id c.cert.series 'individual' 'pdf' %}?user={{ c.cert.user_id }}"><span class="dl-ic is-pdf">PDF</span>Download to print</a>
+        <a class="mc-btn is-soft" href="{% url 'tipping:certificate_scope_file' org.id c.cert.series 'individual' 'png' %}?user={{ c.cert.user_id }}"><span class="dl-ic is-png">PNG</span>Download to share</a>
+        {% else %}
+        <a class="mc-btn" href="{% url 'tipping:certificate_file' org.id c.cert.series c.cert.user_id 'pdf' %}{% if c.group %}?group={{ c.group.id }}{% endif %}"><span class="dl-ic is-pdf">PDF</span>Download to print</a>
+        <a class="mc-btn is-soft" href="{% url 'tipping:certificate_file' org.id c.cert.series c.cert.user_id 'png' %}{% if c.group %}?group={{ c.group.id }}{% endif %}"><span class="dl-ic is-png">PNG</span>Download to share</a>
+        {% endif %}
+      </div>
+    </section>
+    {% endfor %}
+
+  {% elif state.final %}
+    <section class="mc-verdict">
+      <div><b>No certificate this season.</b><span>{% if me %}You finished #{{ me.rank }} of {{ of }}. Certificates go to the top three.{% else %}You didn't tip {{ series.name }} this season.{% endif %}</span></div>
+    </section>
+
+  {% elif place %}
+    <section class="mc-verdict is-top">
+      {% include "partials/_rank_badge.html" with place=place kind="person" %}
+      <div><b>You're #{{ place }} right now, in line for a certificate.</b><span>Stay in the top three until the season ends. Your certificate unlocks then, and we'll email it to you.</span></div>
+    </section>
+
+  {% else %}
+    <section class="mc-verdict">
+      <div><b>Not eligible yet.</b><span>{% if me %}You're #{{ me.rank }} of {{ of }}; a certificate needs a top-three finish.{% if to_top3 %} You're {{ to_top3 }} point{{ to_top3|pluralize }} from third.{% endif %}{% else %}Tip {{ series.name }} and finish in the top three to earn one.{% endif %}</span></div>
+    </section>
+  {% endif %}
+
+  {% if not state.final %}<p class="mc-note">Downloads appear here when the {{ series.name }} season is complete.</p>{% endif %}
+  <p class="mc-note"><a href="{% url 'tipping:my_stats' org.id %}?comp={{ series.slug }}">Your full {{ series.name }} stats &rarr;</a></p>
+</div>
+{% endblock %}

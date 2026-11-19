@@ -1,0 +1,15 @@
+Hello {{ user.display_name }},
+
+The {{ cert.year }} {{ series.name }} season is over, and you finished it as
+{{ cert.place_label }} in {{ where }}.
+
+Your certificate is attached twice:
+- a PDF, ready to print (A4 landscape)
+- a PNG image, to share or post
+
+You can also find it any time on GoodTip: {{ page_url }}
+
+Congratulations.
+
+--
+Footy tipping, for good. · goodtip.com.au

@@ -29572,3 +29572,2331 @@ body.adx-page .pf-go { padding: 8px 14px; border-radius: 999px; font-size: 13px;
 /* The All news card, on the dashboard and under a story (5 Nov 2026). */
 .dng-grid .nw-card, .rd-next-grid .nw-card { height: 420px; }
 .dng-grid { align-items: stretch; }
+
+/* THE LEADERBOARD SHOWS 1–15, THE REST SCROLL (12 Nov 2026). The table keeps
+   one size however big the organisation; its column headings stay put. */
+#lbtable .gb-rows { max-height: calc(57px * 15); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.lbw-table { max-height: calc(52px * 16); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.lbw-table .lbw-cols { position: sticky; top: 0; z-index: 2; background: inherit; }
+
+/* =====================================================================
+   SELECTED vs PICKED, AND THE THREE-STEP CONFIRM (client, 13 Nov 2026)
+   Selected = chosen, not confirmed: a light wash of the competition's
+   colour and a dashed edge, chip "Selected". Picked = confirmed: the full
+   70% fill the side already had, the card's leading edge in the
+   competition colour, chip "Picked" in that colour.
+   ===================================================================== */
+.fxc .fxc-state.is-selected {
+  background: #fff; color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--code-ink, #1f6b28) 65%, transparent);
+}
+.fxc .fxc-state.is-tipped { background: var(--code, var(--deep)); color: #fff; }
+.fxc.is-pending-lock .fxc-state.is-tipped,
+.fxc:not([data-code]) .fxc-state.is-tipped { background: var(--deep); color: var(--lime); }
+.fxc[data-code].is-draft .fxc-team.sel {
+  background: color-mix(in srgb, var(--code) 16%, #fff);
+  border: 1.5px dashed color-mix(in srgb, var(--code-ink) 70%, transparent);
+}
+.fxc[data-code].is-confirmed { border-left-color: var(--code); box-shadow: inset 3px 0 0 var(--code); }
+.fxc[data-code].is-draft { border-left-color: color-mix(in srgb, var(--code) 45%, transparent); }
+.fxc .fxc-state.is-miss { background: #fbecec; color: #9a2b2b; }
+
+/* ---- the sheet ---- */
+.tipsheet.ts3 .ts-panel { width: min(560px, 100%); }
+.ts3-steps { display: flex; gap: 6px; list-style: none; margin: 0 0 10px; padding: 0; flex-wrap: wrap; }
+.ts3-steps li {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700;
+  color: var(--muted); padding: 4px 10px 4px 4px; border-radius: 100px; background: #f3f5f4;
+}
+.ts3-steps li[hidden] { display: none; }
+.ts3-steps li i {
+  font-style: normal; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  background: #fff; color: var(--muted); font-size: 11px; box-shadow: inset 0 0 0 1px rgba(15,46,34,.14);
+}
+.ts3-steps li.is-on { background: #e9f3ee; color: var(--forest); }
+.ts3-steps li.is-on i { background: var(--forest); color: #fff; box-shadow: none; }
+.ts3-steps li.is-past i { background: #cfe9d9; color: var(--forest); box-shadow: none; }
+
+.tipsheet.ts3 .ts-item { border-left: 3px solid var(--code); padding-left: 12px; margin: 8px 0; border-bottom: 0;
+  background: #fafbfa; border-radius: 10px; padding: 10px 12px; }
+.tipsheet.ts3 .tsi-pick { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.tipsheet.ts3 .tsi-yes { background: color-mix(in srgb, var(--code) 70%, #fff); color: var(--ink); }
+.tipsheet.ts3 .ts-item.is-new .tsi-yes { background: #fff; box-shadow: inset 0 0 0 1.5px var(--code); }
+.tipsheet.ts3 .ts-item.is-drop .tsi-yes { background: #f1f1f1; color: var(--muted); }
+.tipsheet.ts3 .tsi-pick em { font-style: normal; font-size: 11px; color: var(--muted); }
+.tipsheet.ts3 .ts-item.is-new .tsi-pick em { color: var(--forest); font-weight: 700; }
+.tipsheet.ts3 .ts-list { padding: 6px 22px 12px; }
+.tipsheet.ts3 #tsCarry { padding: 14px 22px; }
+.tipsheet.ts3 .ts-body[hidden] { display: none; }
+#tsNext.is-wait { opacity: .7; pointer-events: none; }
+
+.cs3-lede { font-size: 14px; color: var(--ink); line-height: 1.5; margin: 0 0 12px; }
+.cs3-always {
+  position: relative; display: flex; gap: 12px; align-items: flex-start; cursor: pointer;
+  margin-top: 14px; padding: 13px 14px; border-radius: 12px; background: #f4f8f6;
+  border: 1px solid rgba(15,46,34,.1);
+}
+.cs3-always input { position: absolute; opacity: 0; pointer-events: none; }
+.cs3-always .oc-box {
+  flex: none; width: 22px; height: 22px; border-radius: 6px; border: 2px solid rgba(15,46,34,.3);
+  background: #fff; display: grid; place-items: center; margin-top: 1px;
+}
+.cs3-always .oc-box svg { width: 15px; height: 15px; stroke: #fff; fill: none; stroke-width: 3.2; opacity: 0; }
+.cs3-always:has(input:checked) { background: #e9f3ee; border-color: rgba(31,107,40,.35); }
+.cs3-always:has(input:checked) .oc-box { background: var(--forest); border-color: var(--forest); }
+.cs3-always:has(input:checked) .oc-box svg { opacity: 1; }
+.cs3-always:has(input:focus-visible) { outline: 2px solid var(--forest); outline-offset: 2px; }
+.cs3-always b { display: block; font-size: 14px; color: var(--ink); }
+.cs3-always i { display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+.ts3-done { display: grid; place-items: center; min-height: 260px; padding: 28px 22px; text-align: center; }
+.ts3-load, .ts3-ok { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.ts3-load[hidden], .ts3-ok[hidden] { display: none; }
+.ts3-load b { font-size: 15px; color: var(--forest); }
+.ts3-ring { width: 58px; height: 58px; border-radius: 50%; position: relative;
+  background: conic-gradient(var(--forest) 0 25%, #dcebe3 25% 100%); animation: ts3spin 1s linear infinite; }
+.ts3-ring i { position: absolute; inset: 7px; border-radius: 50%; background: #fff; }
+@keyframes ts3spin { to { transform: rotate(360deg); } }
+.ts3-tick { width: 68px; height: 68px; border-radius: 50%; background: #e3f4ea; display: grid; place-items: center;
+  animation: ts3pop .45s cubic-bezier(.2,1.4,.4,1); }
+.ts3-tick svg { width: 34px; height: 34px; stroke: #1f6b28; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 30; stroke-dashoffset: 30; animation: ts3draw .5s .15s ease-out forwards; }
+@keyframes ts3pop { from { transform: scale(.6); opacity: 0; } }
+@keyframes ts3draw { to { stroke-dashoffset: 0; } }
+.ts3-ok b { font-family: var(--display); font-size: 24px; color: var(--ink); }
+.ts3-ok p { margin: 0; font-size: 14px; color: var(--muted); max-width: 380px; line-height: 1.5; }
+.ts3-notes { list-style: none; margin: 4px 0 0; padding: 0; font-size: 13px; color: var(--forest); }
+.ts3-notes li { padding: 3px 0; }
+.ts3-done.is-error .ts3-tick { background: #fbecec; }
+.ts3-done.is-error .ts3-tick svg { stroke: #9a2b2b; }
+
+/* My Tips — change a tip in place (13 Nov 2026) */
+button.tk-change { border: 0; cursor: pointer; }
+.tk.is-changing .tk-change { visibility: hidden; }
+.tk-picker { margin-top: 12px; padding: 14px; border-radius: 14px; background: color-mix(in srgb, var(--code) 8%, #fff);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--code) 35%, transparent); }
+.tk-picker[hidden] { display: none; }
+.tk-picker-h { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: #33443A; }
+.tk-picker-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.tk-opt { flex: 1 1 0; min-width: 0; min-height: 46px; padding: 10px 12px; border: 0; border-radius: 12px; cursor: pointer;
+  font: 800 14px/1.2 var(--body); color: #10231A; background: #fff; box-shadow: inset 0 0 0 1.5px rgba(15,46,34,.16);
+  overflow-wrap: anywhere; }
+.tk-opt:hover:not([disabled]) { box-shadow: inset 0 0 0 2px var(--code); }
+.tk-opt.is-on { background: color-mix(in srgb, var(--code) 70%, #fff); box-shadow: none; cursor: default; }
+.tk-picker-err { margin: 10px 0 0; font-size: 13px; color: #9a2b2b; }
+.tk-picker-x { margin-top: 10px; border: 0; background: transparent; font: 700 13px/1 var(--body); color: #4C5C52; cursor: pointer; text-decoration: underline; padding: 6px 0; }
+.tk-changed { margin: 10px 0 0; font-size: 13px; color: #1F7A36; }
+@media (max-width: 420px) { .tk-opt { flex-basis: 100%; } }
+
+/* ==========================================================================
+   PHONES, TABLETS, EVERY BROWSER — the 13 Nov 2026 pass
+   (client: "things looked well in my laptop browser but on others ... some
+   things were overflowing, others overlapping"). Found by a headless audit of
+   every signed-in and public page in Chromium, Firefox and WebKit at 360, 390,
+   412, 820, 1366 and 1920 wide.
+   ========================================================================== */
+
+/* THE BIG ONE. The dashboard's sheet kept two gutters for the side photos
+   (clamp(110px, 9vw, 190px) each) at every width — but the photos are
+   display:none from 1180px down. On a 360px phone that left the dashboard and
+   My Tips a 66px column down the middle of the screen. No photos, no gutters. */
+@media (max-width: 1180px) {
+  .page-dash .page-sheet { max-width: 100% !important; }
+}
+
+/* The competitions row: label centred with the buttons in a third column
+   pushed the buttons clean off a phone screen. On narrow screens the label
+   sits left and the buttons follow it, wrapping if they must. */
+@media (max-width: 640px) {
+  .crow-top { grid-template-columns: minmax(0, 1fr) auto; }
+  .crow-top .deck-k { grid-column: 1; text-align: left; font-size: 16px; letter-spacing: .1em; }
+  .crow-acts { grid-column: 2; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
+}
+@media (max-width: 380px) {
+  .crow-top { grid-template-columns: 1fr; }
+  .crow-acts { grid-column: 1; justify-self: start; justify-content: flex-start; }
+}
+
+/* "Pin a sport" hung off the left of a phone: it is anchored to the button's
+   right edge and is wider than the space to the button's left. On phones it
+   opens as a sheet across the screen instead. */
+@media (max-width: 640px) {
+  .pinx { position: fixed; top: 76px; left: 10px; right: 10px; width: auto; max-height: calc(100dvh - 96px); overflow-y: auto; }
+}
+
+/* The charity vote cards on the home page: the status pill kept its one-line
+   width and ran a few pixels past a 360px card. */
+.qb-state, .qb-state > span { min-width: 0; }
+.qb-state > span { overflow-wrap: anywhere; }
+
+/* Dashboard on a phone or tablet: fixtures first. The sports column came first
+   in the page and, stacked, stood thirteen sports deep between the welcome and
+   the games. The competitions row above the fixtures already filters on a
+   phone, so the full menu follows the fixtures there. (My Tips, the ladder and
+   the stats pages keep theirs on top: there it IS the filter.) */
+@media (max-width: 1180px) {
+  .dash-layout > .dash-sports:not(.tk-side-menu) { order: 0; }
+  .dash-layout > .dash-main { order: 1; }
+}
+
+/* My Tips: the outcome filters run as one swipeable row on a phone instead of
+   a column of single pills. */
+@media (max-width: 640px) {
+  .tk-tabs { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .tk-tabs::-webkit-scrollbar { display: none; }
+  .tk-tabs > * { flex: none; }
+  .tk-change { white-space: nowrap; }
+  .tk-foot { flex-wrap: wrap; }
+}
+
+/* Ladder header: logo | title | Statistics in three columns ran the button off
+   a phone. On a phone the button goes under the title. */
+@media (max-width: 520px) {
+  .lad-top { grid-template-columns: auto minmax(0, 1fr); text-align: left; justify-items: start; }
+  .lad-top > div { grid-column: 2; min-width: 0; }
+  .lad-top .lad-allstats { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; text-align: center; }
+}
+
+/* Leaderboard podium: fixed 84px and 148px faces in columns a third of a phone
+   wide spilled out of their cards and cut the names. Faces scale with the
+   column; names shrink and keep their ellipsis. */
+.lb-pod { min-width: 0; }
+@media (max-width: 640px) {
+  .lb-podium { gap: 6px; }
+  .lb-pod { padding: 12px 6px; }
+  .lb-pod-1 { padding: 18px 8px 16px; }
+  .lb-pod-av, .lb-pod-1 .lb-pod-av { width: min(84px, 100%); height: auto; aspect-ratio: 1; font-size: 26px; }
+  .lb-pod-1 .lb-pod-av { width: min(120px, 100%); font-size: 40px; }
+  .lb-pod .rb { width: 30px; height: 30px; }
+  .lb-pod-1 .rb { width: 42px; height: 42px; }
+  .lb-pod b { font-size: 13px; }
+  .lb-pod-1 b { font-size: 16px; }
+  .lb-pod em { font-size: 12.5px; }
+  .lb-pod-1 em { font-size: 14px; }
+}
+
+/* News card in the dashboard hero: the "All news" button sat on top of the
+   story's last lines on a phone. Give it its own room at the foot. */
+@media (max-width: 640px) {
+  .dbn-b { padding-bottom: 48px; }
+}
+
+/* A chosen option on a LIGHT card (profile's "Tipping in more than one group",
+   and every .sheet-page card — they are all #F6F4EA) was cream text on a pale
+   lime wash: the selected answer was the one you could not read. */
+.sheet-page .page-sheet .card .opt-card:has(input:checked) {
+  background: #EEF6D6; border-color: #7DA51C; box-shadow: 0 0 0 3px rgba(125,165,28,.18);
+}
+.sheet-page .page-sheet .card .opt-card:has(input:checked) .oc-title,
+.sheet-page .page-sheet .card .opt-card:has(input:checked) .ch-name { color: #10231A; }
+
+/* Organisation console, member tables: on a phone the table squeezed its
+   Email column to a few pixels and broke addresses one letter per line. The
+   wrapper already scrolls sideways, so the table keeps a readable width. */
+@media (max-width: 760px) {
+  .gx-tablewrap > .gx-table { width: max-content; min-width: 100%; }
+  .mc .gx-table td.is-email { word-break: normal; overflow-wrap: normal; }
+}
+
+/* HQ organisation desk: two columns of cards ran off a phone screen. */
+@media (max-width: 520px) {
+  .ox-menu { grid-template-columns: 1fr; }
+}
+.ox-card, .ox-tile, .ox-org { min-width: 0; }
+
+/* Top bar on a small phone: logo, bell, avatar, log out, menu and the
+   organisation switcher did not fit in 360px and the switcher ran off the
+   edge. Log out is also the last line of the menu sheet, so the bar drops its
+   copy below 420px and the switcher gets the room. */
+@media (max-width: 420px) {
+  .app-nav .an-inner > .an-logout, .app-nav .an-logout { display: none; }
+  .gt-app .an-ctx, .gt-v2 .an-ctx { min-width: 0; max-width: 46vw; }
+}
+
+/* Certificates on a phone: the card keeps a fixed 600:365 shape, which on a
+   300px-wide card is 182px tall — the "Final · closed" pill and View
+   Certificate were cut off its foot. On phones the card grows to fit. */
+@media (max-width: 560px) {
+  .cc-card { aspect-ratio: auto; min-height: 210px; padding: 20px 18px 18px; }
+  .cc-card h2 { max-width: 72%; font-size: 20px; }
+  .cc-foot { flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .cc-state { padding: 7px 14px 7px 10px; font-size: 12.5px; }
+  .cc-go { gap: 10px; font-size: 13.5px; }
+  .cc-go i { width: 40px; }
+}
+
+/* HQ organisation pages, stacked: a single 1fr column cannot shrink below
+   its longest group name, so the groups list and the panel beside it ran off
+   a phone. minmax(0, 1fr) lets them fit and the names wrap. */
+@media (max-width: 1000px) {
+  .og-split, .og-cols { grid-template-columns: minmax(0, 1fr); }
+  .og-glist, .og-gpanel { min-width: 0; }
+}
+.og-gitem { min-width: 0; overflow-wrap: anywhere; }
+
+/* Console stat tiles: 3 + 1 on a phone read as a mistake. Two by two. */
+@media (max-width: 520px) {
+  .gx-board { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .gx-board > .gx-score { min-width: 0; width: auto; }
+}
+@media (max-width: 520px) { .gx-board:empty { display: none !important; } }
+
+/* Fingers, not cursors: controls under ~24px tall were measured on phones —
+   the toast close, Show password, Remove photo, the room switcher's "more"
+   link and the trailer's chapter steps. Each gets a bigger hit area without
+   changing how it looks. */
+@media (max-width: 760px), (pointer: coarse) {
+  .gtt-x { min-width: 36px; min-height: 36px; display: inline-grid; place-items: center; }
+  .pw-toggle { padding: 10px 6px; margin: -10px -6px; }
+  .avatar-remove { padding: 10px 0; margin-top: 0; }
+  .rw-more { display: inline-flex; align-items: center; min-height: 40px; }
+  .tr-step { height: 28px; }
+}
+
+/* Labels at 9.5–10px on a phone are below what reads comfortably at arm's
+   length. Lift the small-caps tags and badges to 11px there. */
+@media (max-width: 640px) {
+  .gtt-eyebrow, .dbn-tag, .price-tag, .plk-tab-badge, .mc-logo, .tk-res, .fxc-state { font-size: 11px; }
+}
+
+/* The open menu covers everything. A notification toast (z-index above the
+   sheet) floated over the first two menu items on a phone — Dashboard and My
+   Tips could not be pressed until it was dismissed. While the menu is open,
+   toasts step aside; they are still in the bell. */
+body.sheet-open .gt-toasts { visibility: hidden; }
+
+/* LADDER ON A PHONE (13 Nov 2026). It was meant to scroll sideways, but the
+   board's later overflow:hidden won, so WON, LOST and — worst — POINTS sat
+   past the edge of a phone, clipped. On a phone only #, club, W, L and Pts are
+   shown anyway (Played, Drawn, Pct, Games left and Statistics are hidden), so
+   the grid gives exactly those five room and nothing has to scroll. */
+@media (max-width: 620px) {
+  .gt-board.ladder > * { min-width: 0 !important; }
+  .gt-board.ladder .lad-head,
+  .gt-board.ladder .lad-row { grid-template-columns: 30px minmax(0, 1fr) 30px 30px 40px !important; gap: 4px; }
+  .gt-board.ladder .lad-head > :is(.lad-d, .lad-pct, .lad-left, .lad-stats-h),
+  .gt-board.ladder .lad-row > :is(.lad-d, .lad-pct, .lad-left, .lad-stats, .lad-go) { display: none !important; }
+  .gt-board.ladder .lad-head .lad-num { font-size: 10.5px; letter-spacing: .02em; }
+}
+
+/* ROOM ON A PHONE. The page, the sheet, the panel and the card each kept
+   their desktop padding (20 + 22 + 18–28 a side), so on a 360px phone a
+   fixture card or the ladder got about 230px of the screen. Tighter gutters
+   below 520px; every surface keeps its rounded edge and its shadow. */
+@media (max-width: 520px) {
+  body.gt-app .app-main { padding-left: 8px; padding-right: 8px; }
+  body.sheet-page .page-sheet { padding-left: 10px; padding-right: 10px; }
+  .tk-sheet { padding: 12px 10px; }
+  .page-dash .dash-main > .card.pad-lg { padding: 14px 10px; }
+  .page-dash .deck-row { padding-left: 10px; padding-right: 10px; }
+}
+
+/* Ladder heads say W / L / PTS on a phone; the full word stays for screen
+   readers (the short form is aria-hidden). */
+.lad-abbr { display: none; }
+@media (max-width: 620px) {
+  .gt-board.ladder .lad-head .lad-full { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .gt-board.ladder .lad-head .lad-abbr { display: inline; }
+}
+
+/* Fixture sides on a phone: crest above the club, name in full. Side by side,
+   a 56px crest left "Ge…" and "Sy d…" of Geelong Cats and Sydney Swans. */
+
+
+/* The news card on a phone: the whole card is the link, so "Read the story"
+   goes, and the "All news" button no longer lands on top of it. */
+@media (max-width: 640px) {
+  .dbn-read { display: none; }
+  .dbn-ex { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+}
+
+/* Pricing, Enterprise: the two columns were set inline, which beat the rule
+   that stacks .fp-inner on a phone — the email card and Talk to us ran 86px
+   off a 390px screen. Same columns on a desktop, stacked below 760px. */
+.fp-inner.ent-split { grid-template-columns: 1.3fr 1fr; }
+@media (max-width: 760px) { .fp-inner.ent-split { grid-template-columns: minmax(0, 1fr); } }
+.email-cta { max-width: 100%; }
+.email-cta .ec-txt b { overflow-wrap: anywhere; }
+
+/* Last of the sub-11px type on a phone: the Won/Lost word under a finished
+   game's score, and the ladder's # and CLUB heads. */
+@media (max-width: 640px) {
+  .fxc-outcome i { font-size: 11px; }
+  .gt-board.ladder .lad-head > span { font-size: 10.5px; }
+}
+@media (max-width: 760px), (pointer: coarse) {
+  .tr-steps .tr-step { height: 28px; }
+}
+
+/* HQ Members: the join-link row kept the input's built-in width and pushed
+   Copy off a phone. The field shrinks; Copy always shows. */
+.om-link { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.om-link input { flex: 1 1 auto; min-width: 0; width: auto; }
+.om-link > span, .om-link > button { flex: none; }
+.om-link { flex-basis: min(380px, 100%); max-width: 100%; }
+
+/* ==========================================================================
+   PHONE FIXTURES, LOOKED AT IN A REAL PHONE-WIDTH BROWSER (13 Nov 2026,
+   client: "I'm looking at the view in iPhone 16, it does not look good").
+   ========================================================================== */
+@media (max-width: 760px) {
+  /* One scroll, the page's. The list had its own height cap (set by script)
+     and its own scrollbar, so a thumb on the fixtures scrolled the box and
+     the page felt stuck. */
+  #roundFixtures.fixtures, .page-dash .fixtures.gt-scroll {
+    max-height: var(--fx-six, calc(100dvh - 90px)) !important; overflow-y: auto !important; overscroll-behavior-y: auto;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  #roundFixtures.fixtures::-webkit-scrollbar { display: none; }
+}
+
+
+
+/* My Tips, ladder, leaderboard, stats on a phone: the competition list was a
+   tall panel filling the first screen before the content it filters. It
+   becomes one swipeable row of chips. */
+@media (max-width: 760px) {
+  .dash-sports.tk-side-menu { width: auto !important; padding: 10px; border-radius: 18px; }
+  .dash-sports.tk-side-menu .ds-head { display: none; }
+  .dash-sports.tk-side-menu .ds-list { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; margin: 0; padding: 2px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .dash-sports.tk-side-menu .ds-list::-webkit-scrollbar { display: none; }
+  .dash-sports.tk-side-menu .ds-list > li { flex: none; }
+  .dash-sports.tk-side-menu .ds-row { padding: 6px 12px 6px 6px; border-radius: 999px; gap: 8px; white-space: nowrap; min-height: 40px; }
+  .dash-sports.tk-side-menu .ds-row .ds-n { margin-left: 4px; }
+}
+/* Podium faces: the face wrapper shrank to nothing, so a member without a
+   photo lost their initial circle. */
+.lb-pod-face { display: flex; justify-content: center; width: 100%; }
+
+/* THE ORGANISATION MENU ON A PHONE. Its two columns (organisations | groups)
+   were squeezed into a 181px panel hung off the button: names broke mid-word
+   ("Aqua Flow Wate r Co"), two organisations fitted in the list and the groups
+   column sat out of sight. On a phone it opens as a full-width sheet,
+   organisations first and the chosen one's groups under them. */
+@media (max-width: 640px) {
+  .an-ctx .an-menu-panel {
+    position: fixed !important; top: 64px; left: 8px; right: 8px; width: auto !important; min-width: 0 !important;
+    max-height: calc(100dvh - 76px); overflow-y: auto; overscroll-behavior: contain;
+    display: flex !important; flex-direction: column; gap: 10px;
+  }
+  .an-ctx .an-menu-panel[hidden] { display: none !important; }
+  .an-ctx .an-ctx-col { width: 100% !important; min-width: 0 !important; max-width: none !important; border: 0 !important; }
+  .an-ctx .an-ctx-col-groups { border-top: 1px solid rgba(255,255,255,.1) !important; padding-top: 10px; }
+  .an-ctx .an-ctx-scroll { max-height: 38dvh; }
+  .an-ctx .an-ctx-row, .an-ctx .an-ctx-row * { overflow-wrap: normal; word-break: normal; }
+  .an-ctx .an-ctx-create { min-height: 0; }
+}
+@media (max-width: 640px) {
+  .an-ctx .an-menu-panel { top: 64px !important; left: 8px !important; right: 8px !important; bottom: auto !important; transform: none !important; margin: 0 !important; }
+}
+@media (max-width: 640px) {
+  .an-ctx .an-menu-panel { flex-direction: column !important; flex-wrap: nowrap !important; overflow-x: hidden !important; overflow-y: auto !important; height: auto !important; max-height: calc(100dvh - 76px) !important; }
+  .an-ctx .an-ctx-col { flex: none !important; }
+}
+
+/* MatchReader shows one label at a time — "Read the match" closed, "Hide the
+   read" open. (The phone rule above made both blocks.) */
+.fxc-why[aria-expanded="false"] .fxc-why-shut,
+.fxc-why[aria-expanded="true"] .fxc-why-open { display: none !important; }
+
+/* Pin a sport on a phone: a dimmed backdrop under the sheet. It is the
+   summary's own ::before, so a tap on it closes the panel — the button it
+   hangs from is under the sheet. */
+@media (max-width: 640px) {
+  .crow-pin[open] > summary::before { content: ""; position: fixed; inset: 0; z-index: 69; background: rgba(7,18,12,.55); cursor: default; }
+  .crow-pin[open] .pinx { z-index: 70; max-height: calc(100dvh - 140px); }
+}
+
+/* THE SPORTS MENU ON A PHONE IS ONE LINE (client, 14 Nov 2026: "make it one
+   row where I am scrolling sideways ... pick so I can see the changes on the
+   fixtures"). The opened list covered the whole screen and hid the fixtures
+   it was filtering. Now: every competition this organisation tips, as chips
+   in one swipeable row, right above the fixtures. Pressing one filters in
+   place (same hx-get as before) and the chip lights up. The full by-sport
+   tree is a desktop column; on a phone, Pin a sport covers adding more. */
+@media (max-width: 760px) {
+  .dash-layout > .dash-sports:not(.tk-side-menu) {
+    width: auto !important; max-height: none !important; overflow: visible !important;
+    padding: 8px 8px 8px 10px !important; margin-bottom: 10px; border-radius: 18px; position: static !important;
+  }
+  .dash-sports:not(.tk-side-menu) > .ds-head,
+  .dash-sports:not(.tk-side-menu) > .ds-cap,
+  .dash-sports:not(.tk-side-menu) > .ds-sports { display: none !important; }
+  .dash-sports:not(.tk-side-menu) > .ds-list {
+    display: flex !important; flex-wrap: nowrap; gap: 8px; margin: 0; padding: 2px 2px 4px;
+    overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .dash-sports:not(.tk-side-menu) > .ds-list::-webkit-scrollbar { display: none; }
+  .dash-sports:not(.tk-side-menu) > .ds-list > li { flex: none; scroll-snap-align: start; }
+  .dash-sports:not(.tk-side-menu) .ds-row {
+    display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; min-height: 40px;
+    padding: 5px 12px 5px 5px; border-radius: 999px; background: rgba(255,255,255,.07);
+  }
+  .dash-sports:not(.tk-side-menu) .ds-row.on { background: var(--lime); color: var(--deep); }
+  .dash-sports:not(.tk-side-menu) .ds-row.on .ds-name { color: var(--deep); }
+  .dash-sports:not(.tk-side-menu) .ds-row .ds-ic { width: 30px; height: 30px; display: grid; place-items: center; }
+  .dash-sports:not(.tk-side-menu) .ds-logo { width: 30px; height: 30px; }
+  .dash-sports:not(.tk-side-menu) .ds-name { font-size: 13.5px; font-weight: 700; }
+  .dash-sports:not(.tk-side-menu) .ds-n { margin-left: 2px; }
+  /* The competitions strip inside the fixtures card says the same thing a
+     second time on a phone; its Pin a sport / Rounds buttons stay. */
+  .page-dash .crow .crow-strip { display: none !important; }
+}
+
+/* ==========================================================================
+   PHONE TOP BAR: THE NAME, NOT A MONOGRAM (client, 13 Nov 2026: "the GoodTip
+   logo at the top can not be seen"). The bar fell back to "GT" because
+   profile, log out, bell, menu and the organisation chip were all competing
+   for the row. On a phone the profile and log out live in the menu sheet
+   (its header IS the profile, its last line is Log out), so the bar keeps
+   the wordmark, the bell, the menu and the organisation.
+   ========================================================================== */
+@media (max-width: 760px) {
+  .app-nav .an-right .an-profile, .app-nav .an-right .an-logout { display: none !important; }
+  .gt-v2 .an-inner .an-brand, .gt-v2 .an-inner.nav-tight .an-brand, .an-inner.nav-tight .an-brand {
+    font-size: 19px !important; letter-spacing: .01em !important; white-space: nowrap; flex: none;
+  }
+  .gt-v2 .an-inner .an-brand::before, .gt-v2 .an-inner .an-brand::after,
+  .an-inner.nav-tight .an-brand::before, .an-inner.nav-tight .an-brand::after { content: none !important; }
+  .gt-v2 .an-ctx, .an-ctx { min-width: 0; flex: 1 1 auto; }
+  .an-ctx .an-ctx-btn { max-width: 100%; }
+}
+@media (max-width: 380px) {
+  .gt-v2 .an-inner .an-brand, .an-inner.nav-tight .an-brand { font-size: 16px !important; }
+}
+
+/* Notification toasts on a phone sat pinned over the fixtures while you
+   scrolled. They come in at the foot, smaller, and go by themselves; the
+   bell keeps every one of them. */
+@media (max-width: 640px) {
+  .gt-toasts { top: auto !important; bottom: 14px; left: 10px !important; right: 10px !important; }
+  .gt-toast { animation: gtToastPhone 7s ease forwards; }
+  .gt-toast .gtt-msg { display: none; }
+}
+@keyframes gtToastPhone { 0% { opacity: 0; transform: translateY(12px); } 6%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(12px); visibility: hidden; pointer-events: none; } }
+
+/* ==========================================================================
+   FIXTURE CARD, PHONE DESIGN (client, 13 Nov 2026: "I do not like how the
+   fixtures look"). Calmer and shorter: one line for competition / round /
+   state, one for when, a quiet venue line, two clean team tiles, and
+   MatchReader as a text link rather than a coloured panel.
+   ========================================================================== */
+
+
+/* ==========================================================================
+   NEWS ON A PHONE (client, 13 Nov 2026: "its blogs, too thin and narrow").
+   ========================================================================== */
+@media (max-width: 560px) {
+  /* The banner's story: photo above, story below at full width, instead of
+     a photo taking half a 400px card and the words squeezed into the rest. */
+  .page-dash .dbn { height: auto !important; }
+  .page-dash .dbn-stage { position: relative !important; inset: auto !important; height: 330px; }
+  .page-dash .dbn-card { display: grid !important; grid-template-columns: 1fr !important; grid-template-rows: 150px 1fr; border-radius: 0 0 16px 16px !important; }
+  .page-dash .dbn-pic { position: relative !important; inset: auto !important; height: 150px; border-radius: 0 !important; }
+  .page-dash .dbn-b { padding: 12px 16px 50px !important; align-content: start !important; gap: 6px; }
+  .page-dash .dbn-b b { font-size: 17px !important; -webkit-line-clamp: 2 !important; }
+  .page-dash .dbn-ex { display: -webkit-box !important; -webkit-line-clamp: 2 !important; font-size: 13.5px; }
+  .page-dash .dbn-k { top: auto !important; bottom: 12px !important; left: 16px !important; right: 16px !important; flex-direction: row !important; align-items: center !important; }
+  .page-dash .dbn-k > span { font-size: 15px !important; color: #1B4735 !important; }
+  .page-dash .dbn-k a.dbn-all { align-self: center !important; }
+
+  /* The grid under the fixtures: one wide card at a time, swiped sideways,
+     with the next one peeking in — not two 160px columns. */
+  .dng-pages { grid-auto-columns: 84% !important; gap: 12px; scroll-snap-type: x mandatory; padding: 0 2px 6px; }
+  .dng-grid { display: contents !important; }
+  .dng-grid > * { scroll-snap-align: start; min-width: 0; }
+  .dng-dots { display: none; }
+}
+@media (max-width: 560px) {
+  .page-dash .dbn-card { background: #fff !important; }
+  .page-dash .dbn-b { background: #fff; }
+  .page-dash .dbn-b b { color: #10231A !important; }
+  .page-dash .dbn-b small { color: #5B695E !important; }
+  .page-dash .dbn-ex { color: #3D4B43 !important; }
+}
+@media (max-width: 560px) {
+  .page-dash .dbn { width: 100% !important; align-self: stretch; }
+  .page-dash .dbn-stage { width: 100%; }
+}
+
+/* ==========================================================================
+   FIXTURES, SLIMMER STILL (client, 14 Nov 2026: "make the tips narrow so we
+   can have more fixtures ... now it's big and fat, the up and down
+   fatness", and "that bar so I know I can scroll down").
+   Two short info lines, two slim team tiles (crest beside the name), the
+   form, and the read link — about 170px a game instead of ~300.
+   ========================================================================== */
+
+
+/* "There is more down here." A thin scrollbar where the phone shows one,
+   and on every phone a fade at the foot of the list with a hint, which
+   disappears behind the last game when you reach it. */
+@media (max-width: 760px) {
+  #roundFixtures.fixtures { scrollbar-width: thin !important; scrollbar-color: #9CC23A transparent; }
+  #roundFixtures.fixtures::-webkit-scrollbar { display: block !important; width: 4px; }
+  #roundFixtures.fixtures::-webkit-scrollbar-thumb { background: #9CC23A; border-radius: 4px; }
+  #roundFixtures.fixtures::after {
+    content: "Scroll for more games \2193"; position: sticky; bottom: 0; display: block; height: 46px; margin-top: -46px;
+    pointer-events: none; text-align: center; line-height: 62px; font: 800 11.5px/62px var(--body); letter-spacing: .04em; color: #1B4735;
+    background: linear-gradient(to bottom, rgba(245,241,232,0), #F5F1E8 70%);
+  }
+}
+/* The banner story on a phone: room for two lines of headline and two of
+   excerpt above the "News & blog / All news" foot, whatever the story. */
+@media (max-width: 560px) {
+  .page-dash .dbn-stage { height: 350px; }
+  .page-dash .dbn-b { padding-bottom: 60px !important; overflow: hidden; }
+}
+@media (max-width: 560px) {
+  .page-dash .dbn-more, .page-dash .dash-banner.dbn-is-big .dbn-more { display: none !important; }
+  .page-dash .dbn-b b { display: -webkit-box !important; -webkit-box-orient: vertical; -webkit-line-clamp: 2 !important; overflow: hidden; line-height: 1.25 !important; max-height: 2.5em; }
+  .page-dash .dbn-ex { line-height: 1.4 !important; max-height: 2.8em; overflow: hidden; }
+}
+/* One info line on a phone: competition · when · state. The round name and
+   the countdown come off (the list is already grouped by day and round). */
+
+
+/* A one-column dashboard must never be wider than the screen: 1fr cannot
+   shrink below its widest child, and the "Competitions" label had become
+   that child. */
+@media (max-width: 1180px) {
+  .dash-layout { grid-template-columns: minmax(0, 1fr) !important; }
+}
+.crow-top .deck-k { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+
+
+
+/* SIZES BACK UP (client, 14 Nov 2026: "data too small, let's make the size be
+   what it was"). The slimmer layout stays — one info line, crest beside the
+   name — at the type and crest sizes the cards had before. */
+
+
+
+/* Kept from the phone pass: the Competitions header, whose label was cut to
+   "CO…" beside Rounds and Pin a sport. */
+@media (max-width: 520px) {
+  .crow-top .deck-k { display: none !important; }
+  .crow-top { grid-template-columns: 1fr !important; }
+  .crow-acts { grid-column: 1 !important; justify-self: stretch !important; justify-content: space-between !important; }
+}
+
+/* ==========================================================================
+   THE PHONE FIXTURE IS THE LAPTOP FIXTURE (client, 14 Nov 2026: "make the
+   fixtures design look like what we have in the laptop view"). Same parts in
+   the same places, only narrower:
+     row 1  competition chip · date · round            [live badge]
+     row 2  stadium + venue                            [state chip]
+     teams  crest + name | hexagon (score / vs) | crest + name
+            form dots under each
+     MatchReader panel: badge beside "Read the match", subtitle, chevron
+   ========================================================================== */
+@media (max-width: 560px) {
+  .fxc .fxc-meta { display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 8px 8px !important; }
+  .fxc .fxc-meta .fxc-code { order: 0 !important; }
+  .fxc .fxc-meta .fxc-when { order: 1 !important; flex: 0 1 auto !important; margin: 0 !important; font-size: 14px; }
+  .fxc .fxc-meta .fxc-rnd { order: 2 !important; }
+  .fxc .fxc-meta > .ms { order: 3 !important; margin-left: auto !important; }
+  .fxc .fxc-meta .fxc-details { order: 4 !important; flex: 1 1 60% !important; min-width: 0; display: flex !important; flex-wrap: wrap; gap: 2px 10px; margin: 0 !important; }
+  .fxc .fxc-meta .fxc-state { order: 5 !important; margin-left: auto !important; }
+  .fxc .fxc-meta .fxc-venue { min-width: 0; }
+
+  .fxc .fxc-teams { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important; gap: 0 !important; align-items: start; }
+  .fxc .fxc-team { grid-template-columns: 40px minmax(0, 1fr) !important; text-align: left !important; justify-items: start !important; column-gap: 8px !important; padding: 8px 10px !important; min-height: 64px; align-items: center; }
+  .fxc .fxc-crest .crest { width: 40px !important; height: 36px !important; }
+  .fxc .fxc-name { font-size: 14px !important; line-height: 1.2; overflow-wrap: normal !important; word-break: normal !important; hyphens: auto; }
+  .fxc .fxc-drawcol { margin-top: 4px !important; }
+  .fxc-team.fxc-draw, .fxc-team.fxc-draw:hover, .fxc .fxc-drawcol .fxc-team { width: 74px !important; }
+  .fxc .fxc-draw-face { min-width: 0 !important; }
+  .fxc .fxc-v { align-self: center; padding: 0 4px; }
+  .fxc .fxc-form { justify-content: center; }
+
+  .fxc .fxc-why { display: flex !important; flex-direction: row !important; align-items: center !important; gap: 10px !important; text-align: left; }
+  .fxc .fxc-why-badge { flex: none; font-size: 9.5px; padding: 6px 9px; }
+  .fxc .fxc-why-text { flex: 1 1 auto; min-width: 0; }
+  .fxc .fxc-why .fxc-chev { flex: none; }
+}
+@media (max-width: 560px) {
+  .fxc .fxc-why { flex-wrap: nowrap !important; }
+  .fxc .fxc-meta .fxc-code { height: 32px !important; min-height: 0 !important; font-size: 13px !important; padding: 3px 12px 3px 3px !important; gap: 6px; }
+  .fxc .fxc-meta .fxc-code-logo { width: 26px !important; height: 26px !important; }
+  .fxc .fxc-meta .fxc-rnd { font-size: 12.5px; padding: 5px 9px; }
+  .fxc .fxc-meta .ms-badge.live { font-size: 11px; padding: 5px 10px; }
+  .fxc .fxc-draw-face { width: 72px !important; height: 56px !important; }
+  .fxc-team.fxc-draw, .fxc-team.fxc-draw:hover, .fxc .fxc-drawcol .fxc-team { width: 72px !important; }
+  .fxc .fxc-draw-face.is-score b, .fxc .fxc-draw-face.is-score strong { font-size: 18px !important; }
+  .fxc .fxc-draw-face .fxc-name { font-size: 10px !important; }
+}
+@media (max-width: 560px) {
+  .fxc .fxc-meta .fxc-code { order: 0 !important; }
+  .fxc .fxc-meta .fxc-when { order: 1 !important; }
+  .fxc .fxc-meta > .ms { order: 2 !important; margin-left: auto !important; }
+  .fxc .fxc-meta .fxc-state { order: 3 !important; margin-left: auto !important; }
+  .fxc .fxc-meta > .ms ~ .fxc-state { margin-left: 0 !important; }
+  .fxc.phase-live .fxc-meta .fxc-when { display: none !important; }
+  .fxc .fxc-meta .fxc-rnd { order: 4 !important; flex: none; }
+  .fxc .fxc-meta .fxc-details { order: 5 !important; flex: 1 1 0 !important; }
+  .fxc .fxc-meta .fxc-rnd + * { }
+  /* Force row 2 to start at the round tag. */
+  .fxc .fxc-meta::after { content: ""; order: 3; flex-basis: 100%; height: 0; }
+}
+@media (max-width: 560px) {
+  .fxc .fxc-meta .fxc-when { flex: 0 1 auto !important; width: auto !important; max-width: none !important; white-space: nowrap; }
+  .fxc .fxc-meta .fxc-details .fxc-count { flex: 1 1 100%; }
+}
+@media (max-width: 560px) {
+  /* As on the laptop: the tiles tuck under the hexagon's points, so each
+     keeps clear room on the side that meets it. */
+  .fxc .fxc-teams:has(.fxc-drawcol) .fxc-side-home .fxc-team { padding-right: 20px !important; }
+  .fxc .fxc-teams:has(.fxc-drawcol) .fxc-side-away .fxc-team { padding-left: 24px !important; }
+  /* Won / Lost under the club name rather than squeezing it. */
+  .fxc .fxc-team.has-outcome { grid-template-rows: auto auto !important; row-gap: 3px !important; }
+  .fxc .fxc-team.has-outcome .fxc-crest { grid-row: 1 / span 2 !important; }
+  .fxc .fxc-team.has-outcome .fxc-outcome { grid-column: 2 !important; grid-row: 2 !important; justify-self: start; margin: 0 !important; }
+}
+@media (max-width: 560px) {
+  .fxc .fxc-teams:has(.fxc-drawcol) .fxc-side-home .fxc-team { padding-right: 30px !important; }
+  .fxc .fxc-teams:has(.fxc-drawcol) .fxc-side-away .fxc-team { padding-left: 36px !important; }
+}
+
+/* ==========================================================================
+   PHONES, FLUID (client, 14 Nov 2026: "on iPhone 16 things overlapped, on
+   Samsung A55 also ... on new phones also there will be overlaps"). Nothing
+   below is tuned to one handset: sizes scale with the screen width (vw and
+   clamp), every track can shrink (minmax(0, …)), and lines wrap instead of
+   colliding. Checked at 360, 375, 384, 393, 412 and 440 wide.
+   ========================================================================== */
+@media (max-width: 760px) {
+  /* ---- top bar: GOODTIP · organisation ▾ · bell · + · ☰ (☰ last) ---- */
+  .app-nav .an-inner { gap: clamp(4px, 1.6vw, 10px) !important; }
+  .app-nav .an-inner > .an-brand { order: 0; flex: none; }
+  .app-nav .an-inner > .an-ctx { order: 1; flex: 1 1 auto !important; min-width: 0 !important; }
+  .app-nav .an-inner > .an-right { order: 2; flex: none; display: flex; align-items: center; gap: clamp(2px, 1vw, 6px); }
+  .app-nav .an-right .an-burger { order: 9; }
+  .an-ctx .an-ctx-btn { width: 100%; max-width: 100% !important; min-width: 0; padding: 6px 10px !important; }
+  .an-ctx .an-ctx-role, .an-ctx .an-ctx-group, .an-ctx .an-ctx-sep { display: none !important; }
+  .an-ctx .an-ctx-text { min-width: 0; }
+  .an-ctx .an-ctx-org { display: block; font-size: clamp(13px, 3.6vw, 15px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gt-v2 .an-inner .an-brand, .an-inner.nav-tight .an-brand { font-size: clamp(15px, 4.6vw, 19px) !important; }
+
+  .an-plus { position: relative; display: block; }
+  .an-plus > summary { list-style: none; cursor: pointer; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: var(--lime); background: rgba(200,241,53,.12); }
+  .an-plus > summary::-webkit-details-marker { display: none; }
+  .an-plus > summary svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.4; fill: none; stroke-linecap: round; }
+  .an-plus[open] > summary::before { content: ""; position: fixed; inset: 0; z-index: 69; }
+  .an-plus-panel { position: fixed; top: 64px; right: 8px; left: 8px; z-index: 70; display: grid; gap: 6px; padding: 10px; border-radius: 16px;
+    background: #0F2E22; box-shadow: 0 30px 60px -20px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.08); }
+  .an-plus-panel a { display: grid; gap: 2px; padding: 12px 14px; border-radius: 12px; text-decoration: none !important; color: #fff; background: rgba(255,255,255,.05); border: 1px dashed rgba(200,241,53,.35); }
+  .an-plus-panel b { font-size: 15px; } .an-plus-panel i { font-style: normal; font-size: 12.5px; color: rgba(232,228,213,.7); }
+}
+@media (min-width: 761px) { .an-plus { display: none !important; } }
+
+@media (max-width: 560px) {
+  /* ---- fixture card: the laptop's parts, fluid ---- */
+  .fxc .fxc-meta { gap: 6px clamp(4px, 1.6vw, 8px) !important; }
+  .fxc .fxc-meta .fxc-code { height: auto !important; padding: 3px clamp(8px, 2.6vw, 12px) 3px 3px !important; font-size: clamp(11px, 3.1vw, 13px) !important; }
+  .fxc .fxc-meta .fxc-code-logo { width: clamp(20px, 6vw, 26px) !important; height: clamp(20px, 6vw, 26px) !important; }
+  .fxc .fxc-meta .fxc-when { font-size: clamp(12px, 3.4vw, 14px) !important; white-space: normal !important; }
+  .fxc .fxc-meta .fxc-rnd { font-size: clamp(11px, 3vw, 12.5px) !important; }
+  .fxc .fxc-meta .fxc-venue, .fxc .fxc-meta .fxc-count { font-size: clamp(11.5px, 3.2vw, 13.5px) !important; }
+  .fxc .fxc-meta .fxc-venue img { width: clamp(22px, 7vw, 32px); height: auto; }
+  .fxc .fxc-meta .fxc-state, .fxc .fxc-meta .ms-badge.live { font-size: clamp(10px, 2.8vw, 11.5px) !important; white-space: nowrap; }
+  .fxc .fxc-meta > .ms { min-width: 0; }
+
+  /* Team: logo on top, name under it (client: "side by side the space is too
+     long"). The middle column is a fixed share of the card, never a fixed
+     pixel width, so the hexagon and the tiles cannot meet on a narrow phone. */
+  .fxc .fxc-teams { grid-template-columns: minmax(0, 1fr) clamp(52px, 17vw, 74px) minmax(0, 1fr) !important; column-gap: 0 !important; align-items: start !important; }
+  .fxc .fxc-teams > .fxc-v { justify-self: center; align-self: center; }
+  .fxc .fxc-team {
+    grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: auto auto !important;
+    justify-items: center !important; text-align: center !important; row-gap: 5px !important;
+    padding: 10px clamp(6px, 2.2vw, 10px) !important; min-height: 0 !important;
+  }
+  .fxc .fxc-teams:has(.fxc-drawcol) .fxc-side-home .fxc-team { padding-right: clamp(14px, 5vw, 22px) !important; }
+  .fxc .fxc-teams:has(.fxc-drawcol) .fxc-side-away .fxc-team { padding-left: clamp(14px, 5vw, 22px) !important; }
+  .fxc .fxc-crest .crest { width: clamp(36px, 11vw, 48px) !important; height: clamp(30px, 9vw, 40px) !important; }
+  .fxc .fxc-name { font-size: clamp(12.5px, 3.6vw, 15px) !important; line-height: 1.2; overflow-wrap: normal !important; word-break: normal !important; hyphens: auto; }
+  .fxc .fxc-team.has-outcome .fxc-crest { grid-row: auto !important; }
+  .fxc .fxc-team.has-outcome .fxc-outcome { grid-column: 1 !important; grid-row: auto !important; justify-self: center !important; }
+  .fxc .fxc-team .fxc-tick { position: absolute; top: 5px; right: 5px; }
+  .fxc .fxc-team { position: relative; }
+  .fxc .fxc-drawcol { width: 100% !important; margin-top: clamp(10px, 4vw, 18px) !important; justify-self: center; }
+  .fxc-team.fxc-draw, .fxc-team.fxc-draw:hover, .fxc .fxc-drawcol .fxc-team { width: 100% !important; padding: 0 !important; }
+  .fxc .fxc-draw-face { width: 100% !important; height: auto !important; aspect-ratio: 74 / 56; min-width: 0 !important; }
+  .fxc .fxc-draw-face.is-score b, .fxc .fxc-draw-face.is-score strong { font-size: clamp(13px, 4.2vw, 18px) !important; }
+  .fxc .fxc-draw-face .fxc-name { font-size: clamp(8px, 2.4vw, 10px) !important; }
+  .fxc .fxc-form { flex-wrap: wrap; justify-content: center; row-gap: 2px; }
+  .fxc .fxc-dots i { width: clamp(8px, 2.4vw, 10px) !important; height: clamp(8px, 2.4vw, 10px) !important; }
+
+  .fxc .fxc-why-badge { font-size: clamp(8.5px, 2.4vw, 9.5px) !important; padding: 5px clamp(6px, 2vw, 9px) !important; }
+  .fxc .fxc-why-text b { font-size: clamp(12.5px, 3.6vw, 14px) !important; }
+  .fxc .fxc-why-text small { font-size: clamp(11px, 3vw, 12.5px) !important; }
+
+  /* ---- the banner's story: bigger, and steady ---- */
+  .page-dash .dbn-stage { height: clamp(360px, 104vw, 440px) !important; }
+  .page-dash .dbn-card { grid-template-rows: clamp(170px, 50vw, 220px) 1fr !important; }
+  .page-dash .dbn-pic { height: clamp(170px, 50vw, 220px) !important; }
+  .page-dash .dbn-b b { font-size: clamp(16px, 4.8vw, 20px) !important; }
+  .page-dash .dbn-ex { font-size: clamp(13px, 3.6vw, 15px) !important; }
+  /* The flicker: cards slid 40px while cross-fading, over pictures that
+     re-composited each turn. On a phone they only fade, on their own layer. */
+  .page-dash .dbn-card { transform: none !important; transition: opacity .6s ease !important; will-change: opacity; backface-visibility: hidden; }
+  .page-dash .dbn-pic { transition: none !important; transform: none !important; }
+}
+
+/* Sports on a phone: your competitions, then every sport, each a swipeable
+   row; a pressed sport opens its competitions in a third row. */
+@media (max-width: 760px) {
+  .dash-sports:not(.tk-side-menu) > .ds-cap { display: block !important; margin: 6px 4px 4px; font-size: 10.5px; letter-spacing: .14em; }
+  .dash-sports:not(.tk-side-menu) > .ds-cap:first-of-type { margin-top: 0; }
+  .dash-sports:not(.tk-side-menu) > .ds-sports {
+    display: flex !important; flex-wrap: nowrap; gap: 8px; overflow-x: auto; padding: 2px 2px 4px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .dash-sports:not(.tk-side-menu) > .ds-sports::-webkit-scrollbar { display: none; }
+  .dash-sports:not(.tk-side-menu) .ds-sport { flex: none; }
+  .dash-sports:not(.tk-side-menu) .ds-sport > .ds-body { display: none !important; }
+  .dash-sports:not(.tk-side-menu) .ds-sport > summary {
+    display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; min-height: 40px; list-style: none;
+    padding: 5px 12px 5px 5px; border-radius: 999px; background: rgba(255,255,255,.07);
+  }
+  .dash-sports:not(.tk-side-menu) .ds-sport > summary::-webkit-details-marker { display: none; }
+  .dash-sports:not(.tk-side-menu) .ds-sport > summary .ds-chev { transition: transform .2s ease; }
+  .dash-sports:not(.tk-side-menu) .ds-sport.m-on > summary { background: rgba(200,241,53,.18); box-shadow: inset 0 0 0 1.5px var(--lime); }
+  .dash-sports:not(.tk-side-menu) .ds-sport.m-on > summary .ds-chev { transform: rotate(180deg); }
+  .ds-subrow { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; margin-top: 6px; padding: 8px 6px; border-radius: 14px;
+    background: rgba(0,0,0,.18); scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .ds-subrow[hidden] { display: none; }
+  .ds-subrow::-webkit-scrollbar { display: none; }
+  .ds-subrow .ds-comp { flex: none; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; min-height: 38px;
+    padding: 4px 12px 4px 4px; border-radius: 999px; background: rgba(255,255,255,.08); color: #fff; text-decoration: none; }
+  .ds-subrow .ds-comp.on { background: var(--lime); color: var(--deep); }
+  .ds-subrow .ds-comp.is-off { opacity: .55; }
+  .ds-subrow .ds-minilogo { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: #fff; overflow: hidden; }
+  .ds-subrow .ds-minilogo img { width: 80%; height: 80%; object-fit: contain; }
+  .ds-subrow .ds-add, .ds-subrow .ds-off { font-size: 11px; opacity: .8; }
+}
+@media (max-width: 560px) {
+  .fxc .fxc-name { display: block !important; -webkit-line-clamp: unset !important; max-height: none !important; overflow: visible !important; text-overflow: clip !important; white-space: normal !important; }
+}
+@media (max-width: 560px) {
+  .fxc .ms-badge.live .ms-label ~ .ms-ticker { display: none; }
+}
+
+/* ALL SPORTS IS ONE LINE (client, 14 Nov 2026: "no drop down ... where we have
+   both the female and male let them just follow each other"). On a phone the
+   by-sport tree flattens: every competition of every sport, men's and women's
+   side by side, in one swipeable row. No sport headers, no tabs, no panel. */
+@media (max-width: 760px) {
+  .dash-sports:not(.tk-side-menu) .ds-sport,
+  .dash-sports:not(.tk-side-menu) .ds-sport > .ds-body,
+  .dash-sports:not(.tk-side-menu) .ds-comps,
+  .dash-sports:not(.tk-side-menu) .ds-comps[hidden],
+  .dash-sports:not(.tk-side-menu) .ds-comps > li { display: contents !important; }
+  .dash-sports:not(.tk-side-menu) .ds-sport > summary,
+  .dash-sports:not(.tk-side-menu) .ds-tabs,
+  .dash-sports:not(.tk-side-menu) .ds-comp.is-off,
+  .dash-sports .ds-subrow { display: none !important; }
+  .dash-sports:not(.tk-side-menu) > .ds-sports .ds-comp {
+    flex: none; display: inline-flex !important; align-items: center; gap: 7px; white-space: nowrap; min-height: 40px;
+    padding: 5px 12px 5px 5px; border-radius: 999px; background: rgba(255,255,255,.07); color: #fff; text-decoration: none !important;
+  }
+  .dash-sports:not(.tk-side-menu) > .ds-sports .ds-comp.on { background: var(--lime); color: var(--deep); }
+  .dash-sports:not(.tk-side-menu) > .ds-sports .ds-minilogo { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: #fff; overflow: hidden; flex: none; }
+  .dash-sports:not(.tk-side-menu) > .ds-sports .ds-minilogo img { width: 80%; height: 80%; object-fit: contain; }
+  .dash-sports:not(.tk-side-menu) > .ds-sports .ds-name { font-size: 13.5px; font-weight: 700; }
+  .dash-sports:not(.tk-side-menu) > .ds-sports .ds-add { font-size: 11px; color: var(--lime); font-weight: 800; }
+
+  /* YOUR PINNED COMPETITIONS, one line again (the strip in the fixtures card,
+     hidden on phones in the last pass, is where pins live). */
+  .page-dash .crow .crow-strip { display: flex !important; align-items: center; min-width: 0; margin-top: 8px; }
+  .page-dash .crow .crow-chips { flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .page-dash .crow .crow-chips::-webkit-scrollbar { display: none; }
+  .page-dash .crow .crow-chips > * { flex: none; }
+  .page-dash .crow .crow-arrow { display: none !important; }
+
+  /* GOODTIP and the organisation chip never touch. */
+  .app-nav .an-inner > .an-brand { margin-right: clamp(6px, 2.6vw, 14px) !important; }
+}
+@media (max-width: 760px) {
+  .dash-sports:not(.tk-side-menu) > .ds-sports { display: none !important; }
+  .ds-flat { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .ds-flat::-webkit-scrollbar { display: none; }
+  .ds-flat .ds-comp { flex: none; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; min-height: 40px;
+    padding: 5px 12px 5px 5px; border-radius: 999px; background: rgba(255,255,255,.07); color: #fff; text-decoration: none !important; }
+  .ds-flat .ds-comp.on { background: var(--lime); color: var(--deep); }
+  .ds-flat .ds-minilogo { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: #fff; overflow: hidden; flex: none; }
+  .ds-flat .ds-minilogo img { width: 80%; height: 80%; object-fit: contain; }
+  .ds-flat .ds-name { font-size: 13.5px; font-weight: 700; }
+  .ds-flat .ds-n { margin-left: 2px; }
+  .ds-flat .ds-add { font-size: 11px; color: var(--lime); font-weight: 800; }
+}
+@media (min-width: 761px) { .ds-flat { display: none; } }
+
+/* A visible sideways scrollbar on the chip rows (client, 14 Nov 2026: "add
+   that scroll bar so people know you can scroll to the side"). Thin, lime on
+   a faint track, under each row: Your competitions, All sports, and the
+   pinned strip. iPhones draw their own overlay bar while scrolling, so each
+   row also fades at its right edge to show there is more. */
+@media (max-width: 760px) {
+  .dash-sports:not(.tk-side-menu) > .ds-list, .ds-flat, .page-dash .crow .crow-chips {
+    scrollbar-width: thin !important; scrollbar-color: var(--lime) rgba(255,255,255,.12) !important;
+    padding-bottom: 10px !important;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+            mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+  .dash-sports:not(.tk-side-menu) > .ds-list::-webkit-scrollbar, .ds-flat::-webkit-scrollbar, .page-dash .crow .crow-chips::-webkit-scrollbar { display: block !important; height: 5px; }
+  .dash-sports:not(.tk-side-menu) > .ds-list::-webkit-scrollbar-track, .ds-flat::-webkit-scrollbar-track, .page-dash .crow .crow-chips::-webkit-scrollbar-track { background: rgba(255,255,255,.12); border-radius: 5px; }
+  .dash-sports:not(.tk-side-menu) > .ds-list::-webkit-scrollbar-thumb, .ds-flat::-webkit-scrollbar-thumb, .page-dash .crow .crow-chips::-webkit-scrollbar-thumb { background: var(--lime); border-radius: 5px; }
+}
+
+/* ==========================================================================
+   MY TIPS ON A PHONE: the laptop ticket, fluid (14 Nov 2026). One head line
+   as on the laptop — competition chip · time · round, status on the right —
+   wrapping only if a phone is too narrow for it.
+   ========================================================================== */
+@media (max-width: 560px) {
+  .tk .fxc-meta { display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 6px clamp(4px, 1.6vw, 8px) !important; }
+  .tk .fxc-meta .fxc-code { order: 0 !important; height: auto !important; padding: 3px clamp(8px, 2.6vw, 12px) 3px 3px !important; font-size: clamp(11px, 3.1vw, 13px) !important; }
+  .tk .fxc-meta .fxc-code-logo { width: clamp(20px, 6vw, 26px) !important; height: clamp(20px, 6vw, 26px) !important; }
+  .tk .fxc-meta .fxc-when { order: 1 !important; flex: 0 1 auto !important; margin: 0 !important; font-size: clamp(12px, 3.4vw, 14px) !important; }
+  .tk .fxc-meta .fxc-rnd { order: 2 !important; font-size: clamp(11px, 3vw, 12.5px) !important; }
+  .tk .fxc-meta > .ms { order: 3 !important; margin-left: auto !important; min-width: 0; }
+  .tk .fxc-meta .tk-res { order: 4 !important; margin-left: auto !important; }
+  .tk .fxc-meta > .ms ~ .tk-res { margin-left: 0 !important; }
+  .tk .fxc-meta .ms-badge.live .ms-label ~ .ms-ticker { display: none; }
+  .tk .tk-team b { font-size: clamp(12.5px, 3.6vw, 15px) !important; }
+  .tk .tk-crest .crest { width: clamp(36px, 11vw, 48px) !important; height: clamp(32px, 10vw, 44px) !important; }
+  .tk .tk-foot { gap: 8px; }
+  .tk .tk-pick { font-size: clamp(13px, 3.6vw, 14.5px); }
+}
+/* The same sideways scrollbar as the dashboard rows: My Tips' competition
+   chips and its All / Correct / Lost / Missed / Pending tabs. */
+@media (max-width: 760px) {
+  .dash-sports.tk-side-menu .ds-list, .tk-tabs {
+    scrollbar-width: thin !important; scrollbar-color: var(--lime) rgba(15,46,34,.12) !important; padding-bottom: 10px !important;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+            mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+  .dash-sports.tk-side-menu .ds-list::-webkit-scrollbar, .tk-tabs::-webkit-scrollbar { display: block !important; height: 5px; }
+  .dash-sports.tk-side-menu .ds-list::-webkit-scrollbar-track, .tk-tabs::-webkit-scrollbar-track { background: rgba(15,46,34,.10); border-radius: 5px; }
+  .dash-sports.tk-side-menu .ds-list::-webkit-scrollbar-thumb, .tk-tabs::-webkit-scrollbar-thumb { background: #9CC23A; border-radius: 5px; }
+  .dash-sports.tk-side-menu .ds-list::-webkit-scrollbar-track { background: rgba(255,255,255,.12); }
+  .dash-sports.tk-side-menu .ds-list::-webkit-scrollbar-thumb { background: var(--lime); }
+}
+@media (max-width: 560px) {
+  .tk .fxc-meta .fxc-when { width: auto !important; flex: 0 0 auto !important; max-width: none !important; white-space: nowrap; }
+}
+@media (max-width: 560px) {
+  .tk .fxc-meta:has(.ms-live) .fxc-when { display: none !important; }
+  .tk .fxc-meta:has(.ms-live) .fxc-rnd { order: 1 !important; }
+}
+
+/* LEADERBOARD ON A PHONE (14 Nov 2026): the board switches — Your
+   organisation, Industry, National, Everyone, My stats, Certificates — wrapped
+   into three ragged rows. One swipeable row, with the same lime scrollbar as
+   every other chip row. */
+@media (max-width: 760px) {
+  .lb-tabs {
+    flex-wrap: nowrap !important; justify-content: flex-start !important; overflow-x: auto; gap: 8px;
+    padding-bottom: 10px; scrollbar-width: thin; scrollbar-color: #9CC23A rgba(15,46,34,.10); -webkit-overflow-scrolling: touch;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+            mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+  .lb-tabs > * { flex: none !important; white-space: nowrap; }
+  .lb-tabs::-webkit-scrollbar { display: block; height: 5px; }
+  .lb-tabs::-webkit-scrollbar-track { background: rgba(15,46,34,.10); border-radius: 5px; }
+  .lb-tabs::-webkit-scrollbar-thumb { background: #9CC23A; border-radius: 5px; }
+}
+/* Certificates for every competition: a card in the competition's own colour
+   where it is not one of the four with a designed palette. */
+.cc-card[style*="--cc-acc"] { --cc-a: var(--cc-acc); --cc-b: color-mix(in srgb, var(--cc-acc) 50%, #000); --cc-light: color-mix(in srgb, var(--cc-acc) 50%, #fff); }
+
+/* ==========================================================================
+   TABLES ON A PHONE SHOW EVERYTHING (client, 14 Nov 2026: "I want to see the
+   whole of the data for the tables even if it means I scroll sideways ...
+   we do not need a column wide when its content is not wide ... each content
+   seen and in full").
+   Every column is shown. Each is as wide as its widest cell (max-content),
+   names are never cut, and the table scrolls sideways under a lime bar when
+   it is wider than the phone. Rows share their column widths through
+   subgrid, so the figures still line up.
+   ========================================================================== */
+@media (max-width: 760px) {
+  .page-board .gt-board {
+    display: grid !important; grid-template-columns: max-content minmax(max-content, 1fr) max-content max-content max-content max-content;
+    overflow-x: auto !important; overflow-y: visible !important;
+    scrollbar-width: thin; scrollbar-color: #9CC23A rgba(15,46,34,.10); -webkit-overflow-scrolling: touch; padding-bottom: 8px;
+  }
+  .page-board .gt-board::-webkit-scrollbar { display: block; height: 5px; }
+  .page-board .gt-board::-webkit-scrollbar-track { background: rgba(15,46,34,.10); border-radius: 5px; }
+  .page-board .gt-board::-webkit-scrollbar-thumb { background: #9CC23A; border-radius: 5px; }
+  .page-board .gt-board > * { grid-column: 1 / -1; }
+  .page-board .gt-board .gb-rows { display: grid !important; grid-template-columns: subgrid; max-height: none !important; overflow: visible !important; }
+  .page-board .gt-board .gb-head, .page-board .gt-board .gb-row {
+    display: grid !important; grid-template-columns: subgrid !important; grid-column: 1 / -1; column-gap: 16px !important;
+  }
+  .page-board .h-correct, .page-board .h-acc, .page-board .h-behind,
+  .page-board .gb-correct, .page-board .gb-acc, .page-board .gb-behind { display: block !important; }
+  .page-board .gt-board .gb-name { white-space: nowrap !important; overflow: visible !important; text-overflow: clip !important; max-width: none !important; }
+  .page-board .gt-board .gb-who { min-width: max-content; }
+  .page-board .gt-board .gb-head > span, .page-board .gt-board .gb-row > span { white-space: nowrap; }
+  .page-board .gt-board .gb-empty { grid-column: 1 / -1; }
+
+  /* The wider boards (Industry, National, Everyone): the same treatment. */
+  .page-board .lbw-table { display: grid !important; grid-template-columns: max-content minmax(max-content, 1fr) max-content max-content max-content;
+    overflow-x: auto; scrollbar-width: thin; scrollbar-color: #9CC23A rgba(15,46,34,.10); padding-bottom: 8px; }
+  .page-board .lbw-table > * { grid-column: 1 / -1; }
+  .page-board .lbw-row, .page-board .lbw-row.lbw-cols, .page-board .lbw-row.lbw-orgcols { display: grid !important; grid-template-columns: subgrid !important; column-gap: 16px !important; }
+  .page-board .lbw-org, .page-board .lbw-row .n:not(.lbw-pts),
+  .page-board .lbw-cols span:nth-child(3), .page-board .lbw-cols span:nth-child(4) { display: block !important; }
+  .page-board .lbw-row > * { white-space: nowrap; overflow: visible !important; text-overflow: clip !important; max-width: none !important; }
+}
+/* Podium names in full: they wrap rather than end in "…". */
+.lb-pod b { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere; line-height: 1.15; }
+
+/* LADDER MOVEMENT UNDER THE RANK (16 Nov 2026). Rank and its movement badge
+   sat side by side, which needs ~55px. The column is 50px on a tablet and
+   30px on a phone, so the badge slid under the club crest. Below laptop width
+   the badge now stacks beneath the number, which fits any column from 32px. */
+@media (max-width: 900px) {
+  .gt-board.ladder .lad-row .gb-rank { flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0; font-size: 16px; }
+  .gt-board.ladder .lad-row .gb-rank .lad-move { margin: 0; padding: 0 4px; font-size: 9.5px; line-height: 1.5; letter-spacing: 0; white-space: nowrap; }
+  .gt-board.ladder .lad-head > :first-child { text-align: center; }
+}
+@media (max-width: 620px) {
+  .gt-board.ladder .lad-head,
+  .gt-board.ladder .lad-row { grid-template-columns: 34px minmax(0, 1fr) 30px 30px 40px !important; }
+}
+
+/* ============================================================================
+   LADDER, TEAM AND STATISTICS — phone, tablet and laptop (16 Nov 2026)
+   ========================================================================== */
+
+/* BACK, AS A BACK BUTTON. "Ladder" in a green ribbon read as a label, sat in
+   the middle of a phone header, and did not look like a way back. Now an
+   arrow and the page it returns to, on the left, at every width. */
+.cp-back {
+  position: absolute; top: 16px; left: 18px; z-index: 1;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 15px 8px 10px; border-radius: 999px; clip-path: none;
+  font: 800 13.5px/1 var(--body); text-decoration: none !important;
+  color: var(--board, #176B45) !important;
+  background: color-mix(in srgb, var(--board, #176B45) 10%, #fff);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--board, #176B45) 28%, #fff);
+}
+.cp-back svg { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.4; transition: transform .14s ease; }
+.cp-back:hover { color: #fff !important; background: var(--board, #176B45); transform: none; }
+.cp-back:hover svg { transform: translateX(-3px); }
+@media (max-width: 900px) {
+  .cp-back { position: static; justify-self: start; align-self: start; margin: -6px 0 2px -6px; }
+}
+
+/* LADDER HEADER ON A PHONE: centred — the competition's badge, its name and
+   season, then Statistics across the full width. */
+@media (max-width: 620px) {
+  .page-ladder .lad-top { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; gap: 8px; }
+  .page-ladder .lad-top .lad-logo,
+  .page-ladder .lad-top > div { grid-column: 1; justify-self: center; }
+  .page-ladder .lad-top .lad-logo { grid-row: 1; }
+  .page-ladder .lad-top > div { grid-row: 2; }
+  .page-ladder .lad-top .lad-allstats { grid-column: 1; grid-row: 3; justify-self: stretch; text-align: center; margin: 4px 0 0; }
+}
+
+/* THE ROUND STRIP ON A PHONE: Earlier, the five rounds and Later on one line;
+   which rounds they are underneath, larger and bolder. */
+@media (max-width: 620px) {
+  .page-ladder .rstrip {
+    display: grid !important; grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "prev nums next" "show show show" "all all all";
+    align-items: center; column-gap: 6px; row-gap: 8px; width: 100%;
+  }
+  .page-ladder .rstrip > .rs-step:not(.rs-nums ~ .rs-step) { grid-area: prev; }
+  .page-ladder .rstrip > .rs-nums { grid-area: nums; display: flex; flex-wrap: nowrap !important; gap: 4px; min-width: 0; }
+  .page-ladder .rstrip > .rs-nums ~ .rs-step { grid-area: next; }
+  .page-ladder .rstrip > .rs-showing {
+    grid-area: show; justify-self: center;
+    font-size: 14px !important; font-weight: 900 !important; letter-spacing: .08em; color: #10231A !important;
+  }
+  .page-ladder .rstrip > .rs-all { grid-area: all; justify-self: center; }
+  .page-ladder .rs-nums .rs-num { flex: 1 1 0; min-width: 0; padding-left: 0; padding-right: 0; text-align: center; }
+  .page-ladder .rstrip .rs-step { padding: 9px 10px; gap: 5px; font-size: 13px; white-space: nowrap; }
+}
+@media (max-width: 400px) {
+  .page-ladder .rstrip .rs-step > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+}
+
+/* EVERY COLUMN, SWIPED SIDEWAYS. Below laptop width the ladder and the
+   statistics table hid Played, Drawn, Pct, For, Against and more. Now all the
+   columns stay; the table scrolls sideways inside its card, with the rank and
+   the club pinned on the left so a row can still be read across. */
+@media (max-width: 900px) {
+  .page-ladder .gt-board.ladder,
+  .page-clubstats .gt-board.compstats { overflow-x: auto !important; overflow-y: hidden; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+  .page-ladder .gt-board.ladder .gb-rows,
+  .page-clubstats .gt-board.compstats .gb-rows { max-height: none !important; overflow: visible !important; }
+
+  .page-ladder .gt-board.ladder .lad-head,
+  .page-ladder .gt-board.ladder .lad-row {
+    grid-template-columns: 38px minmax(152px, 1fr) 48px 40px 40px 48px 52px 46px 50px 62px !important;
+    min-width: 616px; column-gap: 4px; padding-left: 0; padding-right: 10px;
+  }
+  .page-ladder .gt-board.ladder .lad-head > *,
+  .page-ladder .gt-board.ladder .lad-row > * { display: block !important; }
+  .page-ladder .gt-board.ladder .lad-row > .gb-rank { display: flex !important; }
+  .page-ladder .gt-board.ladder .lad-row > .gb-who { display: flex !important; }
+  .page-ladder .gt-board.ladder .lad-row > .lad-stats { display: inline-flex !important; justify-self: end; }
+  .page-ladder .gt-board.ladder .lad-head .lad-num,
+  .page-ladder .gt-board.ladder .lad-row .lad-num { text-align: center; }
+  .page-ladder .gt-board.ladder .lad-head .lad-stats-h { text-align: right; }
+
+  .page-clubstats .gt-board.compstats .gb-head,
+  .page-clubstats .gt-board.compstats .gb-row {
+    grid-template-columns: minmax(160px, 1fr) 50px 42px 52px 50px 62px 52px 132px 84px !important;
+    min-width: 700px; column-gap: 4px; padding-left: 0; padding-right: 10px;
+  }
+  .page-clubstats .gt-board.compstats .gb-head > *,
+  .page-clubstats .gt-board.compstats .gb-row > * { display: block !important; }
+  .page-clubstats .gt-board.compstats .gb-row > .gb-who { display: flex !important; }
+  .page-clubstats .gt-board.compstats .gb-row > .cs-form { display: flex !important; }
+  .page-clubstats .gt-board.compstats .gb-row > .lad-stats { display: inline-flex !important; }
+  .page-clubstats .gt-board.compstats .lad-stats span { display: inline !important; }
+
+  /* The pinned part: rank and club on the ladder, club on statistics. */
+  .page-ladder .gt-board.ladder :is(.lad-head, .lad-row) > :nth-child(-n+2),
+  .page-clubstats .gt-board.compstats :is(.gb-head, .gb-row) > :first-child {
+    position: sticky; z-index: 2; background: inherit !important; align-self: stretch; display: flex !important; align-items: center;
+  }
+  .page-ladder .gt-board.ladder :is(.lad-head, .lad-row) > :first-child { left: 0; justify-content: center; }
+  .page-ladder .gt-board.ladder :is(.lad-head, .lad-row) > :nth-child(2) { left: 42px; padding-right: 6px; box-shadow: 8px 0 8px -8px rgba(15,46,34,.28); }
+  .page-clubstats .gt-board.compstats :is(.gb-head, .gb-row) > :first-child { left: 0; padding-left: 12px; padding-right: 6px; box-shadow: 8px 0 8px -8px rgba(15,46,34,.28); }
+  .page-ladder .gt-board.ladder .lad-head,
+  .page-clubstats .gt-board.compstats .gb-head { background: var(--board); }
+}
+
+/* THE COMPETITION CHIPS SAY THERE IS MORE. gt-ui.js marks the row while chips
+   lie past an edge; that edge fades. */
+@media (max-width: 760px) {
+  .dash-sports.tk-side-menu .ds-list.more-right { -webkit-mask-image: linear-gradient(90deg, #000 82%, transparent); mask-image: linear-gradient(90deg, #000 82%, transparent); }
+  .dash-sports.tk-side-menu .ds-list.more-left { -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%); mask-image: linear-gradient(90deg, transparent, #000 18%); }
+  .dash-sports.tk-side-menu .ds-list.more-left.more-right { -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent); mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent); }
+}
+@media (max-width: 900px) {
+  .page-ladder .gt-board.ladder .gb-head.lad-head,
+  .page-clubstats .gt-board.compstats .gb-head { background: var(--board) !important; }
+  .page-ladder .gt-board.ladder .lad-head > :nth-child(-n+2),
+  .page-clubstats .gt-board.compstats .gb-head > :first-child { background: var(--board) !important; }
+  .page-ladder .gt-board.ladder .lad-row > :nth-child(-n+2),
+  .page-clubstats .gt-board.compstats .gb-row > :first-child { background: #fff !important; }
+  .page-ladder .gt-board.ladder .lad-row.in-finals > :nth-child(-n+2) { background: color-mix(in srgb, var(--board) 9%, #fff) !important; }
+  .page-ladder .gt-board.ladder .lad-row .lad-stats span,
+  .page-clubstats .gt-board.compstats .lad-stats span { display: inline !important; }
+  .page-ladder .gt-board.ladder .lad-row .lad-stats { padding: 6px 10px; }
+}
+@media (max-width: 900px) {
+  .page-ladder .gt-board.ladder > .gb-head.lad-head { min-width: 616px !important; }
+  .page-clubstats .gt-board.compstats > .gb-head { min-width: 700px !important; }
+  .page-ladder .gt-board.ladder > .gb-rows { min-width: 616px !important; }
+  .page-clubstats .gt-board.compstats > .gb-rows { min-width: 700px !important; }
+  .page-ladder .gt-board.ladder :is(.lad-head, .lad-row) { column-gap: 0 !important; }
+  .page-ladder .gt-board.ladder :is(.lad-head, .lad-row) > :nth-child(2) { left: 38px; padding-left: 4px; }
+}
+@media (max-width: 900px) {
+  .page-clubstats .gt-board.compstats { padding: 0 !important; }
+  .page-clubstats .gt-board.compstats :is(.gb-head, .gb-row) { column-gap: 0 !important; }
+  .page-clubstats .gt-board.compstats :is(.gb-head, .gb-row) > .num,
+  .page-clubstats .gt-board.compstats .gb-head > span:not(:first-child) { text-align: center; }
+}
+@media (max-width: 900px) {
+  .page-clubstats .gt-board.compstats .gb-head > span { white-space: nowrap; }
+  .page-clubstats .gt-board.compstats .cs-form { justify-content: center; }
+  .page-clubstats .gt-board.compstats .gb-row > .lad-stats { justify-self: end; }
+}
+
+/* ============================================================================
+   ONE STORY ON A PHONE (16 Nov 2026)
+   ========================================================================== */
+@media (max-width: 760px) {
+  /* Photo and words stacked, photo first. The scroll effect that widens a
+     photo as it nears (.is-near) set two columns after the phone rule had set
+     one, so the words were squeezed into a strip beside the picture. */
+  body.reader .rd-prose .rd-row,
+  body.reader .rd-prose .rd-row.is-near { grid-template-columns: minmax(0, 1fr) !important; gap: 14px; }
+  body.reader .rd-prose .rd-row > .rd-fig { order: -1; height: 230px; }
+
+  /* Ragged right, not justified: on a narrow column justification opens
+     rivers of space between the words. */
+  body.reader .rd-prose p,
+  body.reader .rd-prose li,
+  body.reader .rd-lead { text-align: left !important; hyphens: manual; }
+  body.reader .rd-prose { font-size: 16.5px; line-height: 1.65; }
+  body.reader .rd-lead { font-size: 15.5px; line-height: 1.5; padding: 14px 16px; }
+  body.reader .rd-title { font-size: clamp(24px, 7vw, 30px); line-height: 1.15; text-align: left; }
+
+  /* The top line fits: the byline keeps the date only, and Share becomes a
+     round button (its words stay for screen readers). Nothing runs past the
+     edge any more, so the story no longer scrolls sideways. */
+  body.reader .rd-art { overflow-x: hidden; overscroll-behavior: auto; }
+  body.reader .rd-topline { gap: 8px; }
+  body.reader .rd-topline .rd-byline { min-width: 0; overflow: hidden; }
+  body.reader .rd-topline .rd-when { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body.reader .rd-topline .shr-btn { width: 40px; height: 40px; padding: 0 !important; justify-content: center; border-radius: 50%; font-size: 0 !important; gap: 0; }
+  body.reader .rd-topline .shr-btn > span, body.reader .rd-topline .shr-btn .shr-chev { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  body.reader .rd-topline .shr-btn > svg:first-child { width: 18px; height: 18px; }
+}
+@media (max-width: 760px) {
+  body.reader .rd-topline { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; align-items: center; row-gap: 8px; }
+  body.reader .rd-topline .rd-byline { grid-column: 1 !important; grid-row: 1 !important; display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; white-space: nowrap; }
+  body.reader .rd-topline .rd-who { display: flex; align-items: center; gap: 8px; min-width: 0; flex: none; }
+  body.reader .rd-topline .rd-share { grid-column: 2 !important; grid-row: 1 !important; justify-self: end; }
+  body.reader .rd-topline .rd-tags { grid-column: 1 / -1 !important; grid-row: 2 !important; justify-self: start; display: flex; flex-wrap: nowrap; gap: 8px; }
+  body.reader .rd-topline .rd-tags > * { flex: none; }
+}
+@media (max-width: 760px) {
+  /* The share choices drop below the round button instead of sliding out
+     beside it — beside it they reserved 335px and squeezed the byline. */
+  body.reader .rd-topline .rd-share { position: relative; width: 40px; }
+  body.reader .rd-topline .shr-row { display: block; }
+  body.reader .rd-topline .shr-reveal {
+    position: absolute; top: calc(100% + 8px); right: 0; z-index: 20;
+    display: none; width: max-content; max-width: calc(100vw - 40px);
+    padding: 8px; border-radius: 16px; background: #fff;
+    box-shadow: 0 20px 40px -18px rgba(15,46,34,.55), 0 0 0 1px rgba(15,46,34,.08);
+  }
+  body.reader .rd-topline .shr-reveal.is-open { display: block; }
+  body.reader .rd-topline .shr-grid { flex-wrap: wrap; justify-content: flex-end; }
+}
+@media (max-width: 760px) {
+  /* Keep reading: each card as tall as its story, not a fixed 420px with a
+     blank third under a three-line summary. */
+  body.reader .rd-next .nw-card { height: auto !important; min-height: 0; }
+  body.reader .rd-next .nw-card .nw-foot { margin-top: 14px; }
+}
+
+
+
+/* ============================================================================
+   PROFILE, IN THE CONTROL PLANE'S LOOK (16 Nov 2026) — prf-*, not pf-*:
+   .pf-card is the pricing page's tilted card. Values copied from
+   gt-admin-gx.css (.gx-hero, .gx-score, .gx-sheet, .gx-tabs, .gx-hqcard).
+   One section at a time behind tabs; organisations as a list and a panel.
+   ========================================================================== */
+.prf {
+  --prf-c1: color-mix(in srgb, #5AA9FF 80%, #3B4656);
+  --prf-c2: color-mix(in srgb, #FF8FB4 80%, #3B4656);
+  --prf-c3: color-mix(in srgb, #FFB25C 80%, #3B4656);
+  --prf-c4: color-mix(in srgb, #C79BFF 80%, #3B4656);
+  --prf-c5: color-mix(in srgb, #3FD0C9 80%, #3B4656);
+  --prf-ink: #151C27; --prf-muted: #4A5464; --prf-quiet: #6A7380;
+  max-width: 1180px; margin: 0 auto; color: var(--prf-ink);
+}
+/* hero */
+.prf-hero { position: relative; isolation: isolate; overflow: hidden; margin: 0 0 22px; padding: 22px clamp(20px, 3vw, 40px) 30px; border-radius: 30px;
+  background: radial-gradient(120% 90% at 20% 0%, #1E5C34 0%, #123F25 45%, #0B2617 100%); box-shadow: 0 40px 80px -50px rgba(0,0,0,.9); }
+.prf-pitch { position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .5; }
+.prf-pitch::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.08); }
+.prf-pitch i:first-child { position: absolute; left: 50%; top: 50%; width: 260px; height: 260px; margin: -130px 0 0 -130px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.prf-pitch i:last-child { position: absolute; right: -60px; top: 50%; width: 220px; height: 300px; margin-top: -150px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); }
+.prf-back { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 22px; padding: 9px 16px 9px 12px; border-radius: 999px; font: 800 14px/1 var(--body); color: #fff !important; text-decoration: none !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }
+.prf-back:hover { background: rgba(255,255,255,.08); }
+.prf-back svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+.prf-hero-main { display: flex; align-items: center; gap: 24px; }
+.prf-hero-txt { flex: 1 1 auto; min-width: 0; }
+.prf-kicker { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 12px; font: 800 12px/1 var(--mark); letter-spacing: .2em; text-transform: uppercase; color: var(--lime); }
+.prf-kicker i { width: 9px; height: 9px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 0 4px rgba(200,241,53,.3); }
+.prf-title { margin: 0; font: 400 clamp(30px, 4.4vw, 60px)/.98 var(--display); letter-spacing: -.025em; color: #fff; overflow-wrap: break-word; }
+.prf-title em { font-style: normal; color: var(--lime); }
+.prf-lead { margin: 12px 0 0; font-size: 15.5px; line-height: 1.55; color: rgba(255,255,255,.72); overflow-wrap: anywhere; }
+.prf-avatar { flex: none; }
+.prf-avatar .av-face { width: 116px; height: 116px; font-size: 44px; box-shadow: 0 0 0 4px var(--lime), 0 20px 34px -16px rgba(0,0,0,.8); }
+.prf-avatar .av-badge { width: 36px; height: 36px; right: 2px; bottom: 2px; border-color: #123F25; }
+.prf-avatar:hover .av-badge { background: var(--lime); color: var(--deep); }
+.prf-board { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; margin-top: 22px; }
+.prf-score { min-width: 128px; padding: 14px 18px 13px; border: 0; border-radius: 18px; cursor: pointer; text-align: left; color: var(--prf-ink);
+  background: var(--cc); box-shadow: 0 18px 34px -18px rgba(0,0,0,.65), inset 0 -3px 0 rgba(21,28,39,.18); transition: transform .2s ease, box-shadow .2s ease; }
+.prf-score:hover { transform: translateY(-4px); box-shadow: 0 26px 40px -18px rgba(0,0,0,.75), inset 0 -3px 0 rgba(21,28,39,.18); }
+.prf-score b { display: block; font: 400 clamp(30px, 3vw, 42px)/1 var(--display); letter-spacing: -.02em; }
+.prf-score span { display: block; margin-top: 8px; font: 800 11px/1.2 var(--mark); letter-spacing: .16em; text-transform: uppercase; color: rgba(21,28,39,.78); }
+
+/* the sheet, its tabs and one panel at a time */
+.prf-sheet { overflow: hidden; margin: 0 0 18px; border-radius: 30px; background: #fff; color: var(--prf-ink); box-shadow: 0 50px 90px -50px rgba(0,0,0,.75); }
+.prf-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 10px 12px 0; border-bottom: 1px solid rgba(21,28,39,.08); background: #F7F8FA; scrollbar-width: none; }
+.prf-tabs::-webkit-scrollbar { display: none; }
+.prf-tab { position: relative; flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 13px 18px 15px; border: 0; border-radius: 14px 14px 0 0; cursor: pointer; background: none; font: 800 14px/1 var(--body); color: var(--prf-muted); white-space: nowrap; }
+.prf-tab:hover { color: var(--prf-ink); background: rgba(21,28,39,.04); }
+.prf-tab.on { color: var(--prf-ink); background: #fff; box-shadow: 0 1px 0 #fff, inset 0 0 0 1px rgba(21,28,39,.08); }
+.prf-tab.on::after { content: ""; position: absolute; left: 16px; right: 16px; bottom: 6px; height: 3px; border-radius: 3px; background: var(--cc); }
+.prf-tab em { font-style: normal; padding: 3px 8px; border-radius: 999px; font-size: 11.5px; color: var(--prf-ink); background: color-mix(in srgb, var(--cc) 35%, #fff); }
+.prf-panel { padding: clamp(18px, 2.6vw, 30px); background: linear-gradient(170deg, color-mix(in srgb, var(--cc) 14%, #fff), #fff 46%); animation: prfIn .22s ease; }
+.prf-panel[hidden] { display: none; }
+@keyframes prfIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.prf-panel-h { display: flex; align-items: flex-start; gap: 16px; margin: 0 0 22px; }
+.prf-panel-h h2 { margin: 2px 0 0; font: 400 clamp(22px, 2.2vw, 28px)/1.1 var(--display); color: var(--prf-ink); }
+.prf-panel-h p { margin: 6px 0 0; max-width: 60ch; font-size: 14px; line-height: 1.5; color: var(--prf-muted); }
+.prf-ic { flex: none; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 17px; color: var(--prf-ink); background: var(--cc); box-shadow: 0 12px 24px -12px color-mix(in srgb, var(--cc) 90%, #000); }
+.prf-ic svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.prf-split { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 32px; align-items: start; }
+.prf-form { display: grid; gap: 2px; margin: 0; }
+.prf-narrow { max-width: 520px; }
+.prf .fld label { color: var(--prf-ink); }
+.prf .fld input { background: #fff; border-color: rgba(21,28,39,.14); }
+.prf-locked { position: relative; }
+.prf-locked input { padding-right: 40px !important; color: var(--prf-muted) !important; background: #F4F6F9 !important; }
+.prf-locked svg { position: absolute; right: 13px; top: 50%; width: 17px; height: 17px; transform: translateY(-50%); fill: none; stroke: #7A8494; stroke-width: 2; }
+.prf-note { display: block; margin-top: 6px; font-size: 12.5px; line-height: 1.45; color: var(--prf-quiet); }
+.prf-acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 14px; }
+.prf-acts.is-left { justify-content: flex-start; }
+.prf-btn { display: inline-flex; align-items: center; justify-content: center; padding: 12px 22px; border: 0; border-radius: 999px; cursor: pointer; font: 800 14px/1 var(--body); color: #fff; background: #17202D; transition: transform .15s ease, background .15s ease; }
+.prf-btn:hover { transform: translateY(-1px); background: #0B111A; }
+.prf-btn.is-soft { color: var(--prf-ink); background: color-mix(in srgb, var(--cc) 35%, #fff); }
+.prf-btn.is-soft:hover { background: color-mix(in srgb, var(--cc) 50%, #fff); }
+.prf-link { padding: 0; border: 0; background: none; cursor: pointer; font: 700 13px/1.2 var(--body); color: var(--prf-quiet); }
+.prf-link:hover { text-decoration: underline; }
+.prf-photo { display: grid; justify-items: center; gap: 12px; padding: 20px; border-radius: 22px; background: #fff; box-shadow: inset 0 0 0 1px rgba(21,28,39,.07); }
+.prf-photo form { margin: 0; }
+.prf-photo-face { display: grid; place-items: center; width: 120px; height: 120px; overflow: hidden; border-radius: 50%; font: 800 44px/1 var(--mark); color: var(--deep); background: var(--lime); box-shadow: 0 0 0 4px color-mix(in srgb, var(--cc) 40%, #fff); }
+.prf-photo-face img { width: 100%; height: 100%; object-fit: cover; }
+
+.prf-stat { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin: 0 0 18px; }
+.prf-stat b { font: 400 56px/1 var(--display); letter-spacing: -.02em; }
+.prf-stat span { font: 800 11px/1.3 var(--mark); letter-spacing: .14em; text-transform: uppercase; color: var(--prf-quiet); }
+.prf-tog { gap: 12px; }
+.prf-tog-txt { font-weight: 700; font-size: 14.5px; color: var(--prf-ink); }
+.prf-noscript { display: none; }
+html.no-js .prf-noscript { display: inline-flex; }
+.prf-opts { margin: 0; }
+.prf .opt-card .oc-title { color: var(--prf-ink) !important; opacity: 1 !important; }
+.prf .opt-card:has(input:checked) { background: #F3FBD9 !important; box-shadow: inset 0 0 0 2px #9BC53D !important; }
+
+/* organisations: list | details */
+.prf-orgs { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 20px; align-items: start; }
+.prf-olist { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; max-height: 640px; overflow-y: auto; scrollbar-width: thin; }
+.prf-orow { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 14px; border: 0; border-radius: 16px; cursor: pointer; text-align: left; color: var(--prf-ink); background: #F4F6F9; transition: background .15s ease, box-shadow .15s ease; }
+.prf-orow:hover { background: #EAF0F7; }
+.prf-orow.on { background: #fff; box-shadow: inset 0 0 0 2px var(--cc), 0 12px 24px -18px rgba(21,28,39,.5); }
+.prf-orow-txt { display: grid; gap: 3px; min-width: 0; }
+.prf-orow-txt b { font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prf-orow-txt small { font-size: 12.5px; color: var(--prf-quiet); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prf-chev { width: 18px; height: 18px; fill: none; stroke: var(--prf-quiet); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.prf-ologo { display: grid; place-items: center; width: 42px; height: 42px; overflow: hidden; border-radius: 50%; font: 800 16px/1 var(--mark); color: #1E3A26; background: #DCEFD8; }
+.prf-ologo.is-big { width: 64px; height: 64px; border-radius: 20px; font-size: 26px; }
+.prf-ologo.has-logo { background: #fff; box-shadow: inset 0 0 0 1px rgba(21,28,39,.08); }
+.prf-ologo img { width: 100%; height: 100%; object-fit: contain; }
+
+.prf-odetail { min-width: 0; }
+.prf-opick { margin: 0; padding: 40px 20px; border-radius: 22px; text-align: center; font-weight: 700; color: var(--prf-quiet); background: #F7F8FA; }
+.prf-oc { padding: 22px; border-radius: 26px; border: 1px solid rgba(21,28,39,.07); background: linear-gradient(160deg, color-mix(in srgb, var(--cc) 22%, #fff), #fff 58%); animation: prfIn .22s ease; }
+.prf-oc[hidden] { display: none; }
+.prf-oback { display: none; }
+.prf-oc-h { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+.prf-oc-h h3 { margin: 0; font: 400 clamp(22px, 2.2vw, 28px)/1.1 var(--display); color: var(--prf-ink); overflow-wrap: anywhere; }
+.prf-oc-h p { margin: 4px 0 8px; font-size: 13.5px; color: var(--prf-muted); }
+.prf-roles { display: flex; flex-wrap: wrap; gap: 5px; }
+.prf-roles .pill-role { padding: 2px 9px; font-size: 10.5px; }
+.prf-roles .pill-role.manager { color: #1D4ED8; background: #E3ECFF; }
+.prf-roles .pill-role.captain { color: #8A5A00; background: #FFF1D6; }
+.prf-roles .pill-role.participant { color: #4A5464; background: #E6EAF0; }
+.prf-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+.prf-tiles > div { padding: 12px 14px; border-radius: 16px; background: var(--cc); box-shadow: inset 0 -3px 0 rgba(21,28,39,.16); }
+.prf-tiles b { display: block; font: 400 28px/1 var(--display); color: var(--prf-ink); }
+.prf-tiles span { display: block; margin-top: 6px; font: 800 10px/1.2 var(--mark); letter-spacing: .14em; text-transform: uppercase; color: rgba(21,28,39,.78); }
+.prf-facts { display: grid; gap: 0; margin: 0; border-radius: 18px; overflow: hidden; background: #fff; box-shadow: inset 0 0 0 1px rgba(21,28,39,.07); }
+.prf-facts > div { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 14px; padding: 13px 16px; border-top: 1px solid rgba(21,28,39,.06); }
+.prf-facts > div:first-child { border-top: 0; }
+.prf-facts dt { font: 800 11px/1.4 var(--mark); letter-spacing: .12em; text-transform: uppercase; color: var(--prf-quiet); }
+.prf-facts dd { margin: 0; font-size: 14px; line-height: 1.45; color: var(--prf-ink); }
+.prf-chip { display: inline-block; margin: 0 6px 6px 0; padding: 4px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: var(--prf-ink); background: #EEF1F5; }
+
+@media (max-width: 860px) {
+  .prf-orgs { grid-template-columns: minmax(0, 1fr); }
+  .prf-orgs.is-open .prf-olist, .prf-orgs:not(.is-open) .prf-odetail { display: none; }
+  .prf-olist { max-height: none; overflow: visible; }
+  .prf-oback { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 8px 14px 8px 10px; border: 0; border-radius: 999px; cursor: pointer; font: 800 13.5px/1 var(--body); color: var(--prf-ink); background: #fff; box-shadow: inset 0 0 0 1px rgba(21,28,39,.12); }
+  .prf-oback svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+  .prf-split { grid-template-columns: minmax(0, 1fr); }
+  .prf-photo { grid-row: 1; grid-auto-flow: column; justify-content: start; align-items: center; }
+  .prf-photo-face { width: 72px; height: 72px; font-size: 28px; }
+}
+@media (max-width: 640px) {
+  .prf-hero { padding: 16px 16px 22px; border-radius: 24px; }
+  .prf-back { margin-bottom: 16px; }
+  .prf-hero-main { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .prf-avatar .av-face { width: 88px; height: 88px; font-size: 34px; }
+  .prf-title { font-size: clamp(28px, 9vw, 40px); }
+  .prf-lead { font-size: 14px; }
+  .prf-board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .prf-score { min-width: 0; }
+  .prf-sheet { border-radius: 24px; }
+  .prf-tabs { padding: 8px 8px 0; }
+  .prf-tab { padding: 12px 14px 14px; font-size: 13.5px; }
+  .prf-panel { padding: 18px 16px 20px; }
+  .prf-panel-h { gap: 12px; }
+  .prf-ic { width: 44px; height: 44px; border-radius: 14px; }
+  .prf-stat b { font-size: 46px; }
+  .prf-acts .prf-btn { flex: 1 1 100%; padding: 14px 20px; }
+  .prf-photo { padding: 14px; }
+  .prf-oc { padding: 16px; border-radius: 22px; }
+  .prf-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .prf-facts > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+.prf-score b { white-space: nowrap; }
+.prf-photo .prf-btn { white-space: nowrap; }
+.prf-tabs.more-right { -webkit-mask-image: linear-gradient(90deg, #000 84%, transparent); mask-image: linear-gradient(90deg, #000 84%, transparent); }
+.prf-tabs.more-left { -webkit-mask-image: linear-gradient(90deg, transparent, #000 16%); mask-image: linear-gradient(90deg, transparent, #000 16%); }
+.prf-tabs.more-left.more-right { -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+@media (max-width: 640px) {
+  .prf-score b { font-size: clamp(26px, 8vw, 34px); }
+  .prf-photo { grid-auto-flow: row; grid-template-columns: auto 1fr; justify-items: start; }
+  .prf-photo-face { grid-row: span 2; }
+}
+
+/* A loader lifted over a region being swapped (gt-veil.js) leaves with one
+   fade rather than vanishing. */
+.busy-veil[data-lifted] { transition: opacity .2s ease; }
+.busy-veil.bv-leaving { opacity: 0; pointer-events: none; }
+/* Lifted, it keeps showing: moving the node would otherwise restart its
+   fade-in and blink. */
+.busy-veil[data-lifted] { animation: none !important; opacity: 1; transition: opacity .22s ease; }
+.busy-veil[data-lifted].bv-leaving { opacity: 0 !important; }
+
+/* ============================================================================
+   CERTIFICATES (17 Nov 2026) — the member's list and one competition (mc-*),
+   and the admin's winners page (ca-*). Calm white cards on the deep page.
+   ========================================================================== */
+.mc-list { display: grid; gap: 10px; max-width: 860px; margin: 18px auto 0; padding: 0; list-style: none; }
+.mc-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 20px; text-decoration: none !important; color: #10231A !important; background: #fff; box-shadow: inset 4px 0 0 var(--code, #176B45), 0 14px 30px -24px rgba(0,0,0,.8); transition: transform .15s ease, box-shadow .15s ease; }
+.mc-row:hover { transform: translateY(-2px); box-shadow: inset 4px 0 0 var(--code, #176B45), 0 20px 34px -22px rgba(0,0,0,.85); }
+.mc-row.has-cert { background: linear-gradient(100deg, color-mix(in srgb, var(--code) 12%, #fff), #fff 60%); }
+.mc-logo { width: 48px; height: 48px; display: grid; place-items: center; overflow: hidden; border-radius: 14px; background: #fff; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--code) 40%, #fff); }
+.mc-logo img, .mc-logo svg { max-width: 80%; max-height: 80%; }
+.mc-txt { display: grid; gap: 3px; min-width: 0; }
+.mc-txt b { font: 800 16.5px/1.2 var(--body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-txt small { font-size: 12.5px; color: #4E5F55; }
+.mc-pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; font: 800 12.5px/1 var(--body); color: #10231A; background: #EEF2EE; white-space: nowrap; }
+.mc-pill .rank-badge, .mc-pill svg { width: 20px; height: 20px; }
+.mc-pill.is-top { color: #5B3B00; background: #FFF1C9; }
+.mc-pill.is-won { color: #0B3A1F; background: var(--lime); }
+.mc-pill.is-quiet { color: #55655B; }
+.mc-chev { width: 18px; height: 18px; fill: none; stroke: #7A8A80; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.mc-empty { padding: 26px; border-radius: 20px; text-align: center; color: #4E5F55; background: #fff; }
+
+.mc-wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 16px; color: #10231A; }
+.mc-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.mc-stats > div { padding: 16px 18px; border-radius: 20px; background: #fff; box-shadow: inset 0 -4px 0 color-mix(in srgb, var(--code) 55%, #fff), 0 14px 30px -24px rgba(0,0,0,.8); }
+.mc-stats b { display: block; font: 400 34px/1 var(--display); color: #10231A; }
+.mc-stats b small { font-size: 18px; color: #55655B; }
+.mc-stats span { display: block; margin-top: 8px; font: 800 11px/1.2 var(--mark); letter-spacing: .12em; text-transform: uppercase; color: #5B6B61; }
+.mc-verdict { display: flex; align-items: center; gap: 16px; padding: 20px 22px; border-radius: 22px; background: #fff; box-shadow: 0 14px 30px -24px rgba(0,0,0,.8); }
+.mc-verdict b { display: block; font: 800 18px/1.3 var(--body); }
+.mc-verdict span { display: block; margin-top: 4px; font-size: 14.5px; line-height: 1.5; color: #4E5F55; }
+.mc-verdict .rank-badge, .mc-verdict > svg { flex: none; width: 52px; height: 52px; }
+.mc-verdict.is-top { background: linear-gradient(100deg, #FFF6DA, #fff 70%); }
+.mc-verdict.is-won { background: linear-gradient(100deg, color-mix(in srgb, var(--lime) 40%, #fff), #fff 70%); }
+.mc-cert { display: grid; gap: 14px; padding: 14px; border-radius: 26px; background: #fff; box-shadow: 0 20px 40px -28px rgba(0,0,0,.85); }
+.mc-cert .mc-verdict { box-shadow: none; }
+.mc-cert-img img { display: block; width: 100%; height: auto; border-radius: 16px; box-shadow: 0 10px 26px -18px rgba(0,0,0,.6); }
+.mc-dl { display: flex; flex-wrap: wrap; gap: 10px; }
+.mc-btn { flex: 1 1 220px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 13px 18px; border-radius: 999px; font: 800 14.5px/1 var(--body); text-decoration: none !important; color: #fff !important; background: #10231A; }
+.mc-btn.is-soft { color: #10231A !important; background: #EEF2EE; }
+.mc-btn .dl-ic { padding: 4px 7px; border-radius: 6px; font: 800 10.5px/1 var(--mark); letter-spacing: .06em; color: #10231A; background: var(--lime); }
+.mc-btn.is-soft .dl-ic { color: #fff; background: #2563EB; }
+.mc-note { margin: 0; text-align: center; font-size: 13.5px; color: rgba(255,255,255,.75); }
+.mc-note a { color: var(--lime) !important; font-weight: 800; }
+
+.ca-wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 18px; color: #10231A; }
+.ca-podium { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.ca-place { display: grid; gap: 12px; padding: 16px; border-radius: 24px; background: #fff; box-shadow: 0 20px 40px -28px rgba(0,0,0,.85); }
+.ca-place.is-1 { box-shadow: inset 0 0 0 3px #E8B931, 0 20px 40px -28px rgba(0,0,0,.85); }
+.ca-place header { display: flex; align-items: center; gap: 12px; }
+.ca-place header .rank-badge, .ca-place header > svg { width: 44px; height: 44px; flex: none; }
+.ca-place header b { display: block; font: 800 17px/1.2 var(--body); }
+.ca-place header span { font-size: 13px; color: #5B6B61; }
+.ca-img img { display: block; width: 100%; height: auto; border-radius: 14px; pointer-events: none; user-select: none; }
+.ca-status { font-size: 13px; line-height: 1.45; }
+.ca-ok { color: #166534; font-weight: 700; }
+.ca-bad { color: #B42318; font-weight: 700; }
+.ca-wait { color: #8A5A00; font-weight: 700; }
+.ca-acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.ca-acts form { margin: 0; display: flex; gap: 12px; align-items: center; }
+.ca-btn { padding: 11px 18px; border: 0; border-radius: 999px; cursor: pointer; font: 800 14px/1 var(--body); color: #fff; background: #10231A; }
+.ca-btn:hover { background: #000; }
+.ca-link { padding: 0; border: 0; background: none; cursor: pointer; font: 800 13.5px/1.2 var(--body); text-decoration: none; color: #176B45 !important; }
+.ca-link:hover { text-decoration: underline; }
+.ca-note { display: grid; gap: 6px; padding: 22px; border-radius: 22px; background: #fff; }
+.ca-note b { font: 800 18px/1.3 var(--body); }
+.ca-note span { font-size: 14.5px; line-height: 1.5; color: #4E5F55; }
+.ca-sample { position: relative; }
+.ca-sample img { display: block; width: 100%; height: auto; border-radius: 18px; pointer-events: none; }
+.ca-sample span { position: absolute; left: 14px; top: 14px; padding: 6px 12px; border-radius: 999px; font: 800 11px/1 var(--mark); letter-spacing: .12em; color: #fff; background: rgba(0,0,0,.6); }
+.ca-table { padding: 20px; border-radius: 24px; background: #fff; }
+.ca-table h2 { margin: 0 0 12px; font: 400 22px/1.2 var(--display); color: #10231A; }
+.ca-table h2 small { margin-left: 8px; font: 700 13px/1 var(--body); color: #55655B; }
+.ca-rows { display: grid; gap: 4px; }
+.ca-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) 80px 80px; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; font-size: 14.5px; background: #F5F8F5; }
+.ca-row.is-head { background: none; font: 800 11px/1 var(--mark); letter-spacing: .12em; text-transform: uppercase; color: #55655B; }
+.ca-row.is-top { background: color-mix(in srgb, var(--code, #176B45) 12%, #fff); }
+.ca-row > span:nth-child(n+3) { text-align: right; }
+.ca-rank { font-weight: 900; }
+.ca-who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.ca-pts { font-weight: 900; }
+.ca-log { display: grid; gap: 6px; }
+.ca-logrow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; font-size: 14px; background: #F5F8F5; }
+.ca-logrow small { font-size: 12.5px; color: #5B6B61; }
+.ca-dot { width: 10px; height: 10px; border-radius: 50%; }
+.ca-dot.is-ok, .ca-tag.is-ok { background: #22C55E; }
+.ca-dot.is-bad, .ca-tag.is-bad { background: #EF4444; }
+.ca-tag { padding: 5px 10px; border-radius: 999px; font: 800 11px/1 var(--mark); letter-spacing: .08em; text-transform: uppercase; color: #fff; }
+@media (max-width: 640px) {
+  .mc-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .mc-row .mc-chev { display: none; }
+  .mc-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mc-verdict { align-items: flex-start; }
+  .ca-podium { grid-template-columns: minmax(0, 1fr); }
+  .ca-row { grid-template-columns: 34px minmax(0, 1fr) 60px 56px; font-size: 13.5px; }
+  .ca-acts { flex-direction: column; align-items: stretch; }
+  .ca-btn { width: 100%; padding: 13px; }
+}
+.ca-back { max-width: 1180px; margin: 0 auto 10px; }
+.ca-back .cp-back { position: static; }
+@media (max-width: 640px) {
+  .mc-row { grid-template-columns: auto minmax(0, 1fr); row-gap: 8px; }
+  .mc-row .mc-logo { grid-row: span 2; align-self: start; }
+  .mc-row .mc-stand { grid-column: 2; justify-self: start; }
+  .mc-txt b { white-space: normal; }
+}
+
+/* Certificate cards (partials/_cert_cards.html): the competition's own logo
+   on white inside the pastel icon tile. */
+.gt-certcards .gt-certlogo { padding: 6px; }
+.gt-certcards .gt-certlogo em { display: grid; place-items: center; width: 100%; height: 100%; overflow: hidden; border-radius: 12px; background: #fff; }
+.gt-certcards .gt-certlogo img, .gt-certcards .gt-certlogo svg { max-width: 82%; max-height: 82%; object-fit: contain; }
+.gt-certcards .gx-hqcard { min-height: 230px; }
+.gt-certcards .gx-hqcard-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc .gx-back { margin-bottom: 18px; }
+.mc-hint { font-size: 13.5px; line-height: 1.45; color: #4A5464; }
+@media (max-width: 640px) {
+  .gt-certcards .gx-hqcard { min-height: 0; }
+}
+/* While a certificate preview loads, its frame holds the shape and shimmers
+   instead of standing as an empty white box. */
+.mc-cert-img, .ca-img { aspect-ratio: 1672 / 941; border-radius: 16px; background: linear-gradient(100deg, #EEF2EE 30%, #F8FAF8 50%, #EEF2EE 70%) 0 0 / 300% 100%; animation: certShimmer 1.2s linear infinite; overflow: hidden; }
+.mc-cert-img img, .ca-img img { width: 100%; height: 100%; object-fit: cover; }
+@keyframes certShimmer { to { background-position: -300% 0; } }
+.gt-certsearch { display: flex; width: 100%; max-width: 520px; margin: 0 0 16px; }
+.gt-certsearch input { flex: 1; min-width: 0; }
+.gt-certcards .gx-hqcard[hidden] { display: none; }
+.gt-certnone { margin: 0 0 14px; font-weight: 700; color: #4A5464; }
+
+/* ============================================================================
+   MANAGE SUB-PAGES ON A PHONE (17 Nov 2026, Charities first): "separation,
+   one thing at a time, not all moving down". The organisation and group
+   pickers are one row each, swiped sideways; the section cards become one
+   compact row of buttons, so the section you pick opens right under them.
+   ========================================================================== */
+@media (max-width: 760px) {
+  body.mc-sub.mc-sub .mc-subsheet .pnav-opts,
+  body.mc-sub.mc-sub .mc-subsheet .pcards {
+    display: flex !important; flex-wrap: nowrap !important; gap: 8px;
+    overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    margin-left: -4px; margin-right: -4px; padding: 2px 4px 6px;
+  }
+  body.mc-sub.mc-sub .mc-subsheet .pnav-opts::-webkit-scrollbar,
+  body.mc-sub.mc-sub .mc-subsheet .pcards::-webkit-scrollbar { display: none; }
+  body.mc-sub.mc-sub .mc-subsheet .pnav-opt { flex: none; white-space: nowrap; scroll-snap-align: start; }
+  body.mc-sub.mc-sub .mc-subsheet .pnav-row + .pnav-row { margin-top: 12px; padding-top: 12px; }
+  body.mc-sub.mc-sub .mc-subsheet .pcards { margin-bottom: 14px; }
+  body.mc-sub.mc-sub .mc-subsheet .pcard {
+    flex: none; display: inline-flex; align-items: center; gap: 8px; scroll-snap-align: start;
+    padding: 9px 14px 9px 9px; border-radius: 999px; white-space: nowrap;
+  }
+  body.mc-sub.mc-sub .mc-subsheet .pcard-ic { width: 30px; height: 30px; border-radius: 50%; }
+  body.mc-sub.mc-sub .mc-subsheet .pcard-ic svg { width: 16px; height: 16px; }
+  body.mc-sub.mc-sub .mc-subsheet .pcard b { font-size: 13.5px; }
+  body.mc-sub.mc-sub .mc-subsheet .pcard i { font: 800 12px/1 var(--body); padding: 3px 7px; border-radius: 999px; background: rgba(255,255,255,.7); }
+  body.mc-sub.mc-sub .mc-subsheet .mc-pane { padding: 16px; }
+}
+@media (max-width: 760px) {
+  body.mc-sub.mc-sub .mc-subsheet .pcards .pcard { flex-direction: row !important; grid-template-columns: none !important; height: auto !important; min-height: 0 !important; text-align: left; }
+  body.mc-sub.mc-sub .mc-subsheet .pcards .pcard > * { margin: 0 !important; }
+}
+@media (max-width: 760px) {
+  body.mc-sub.mc-sub .mc-subsheet :is(.pnav-opts, .pcards).more-right { -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+  body.mc-sub.mc-sub .mc-subsheet :is(.pnav-opts, .pcards).more-left { -webkit-mask-image: linear-gradient(90deg, transparent, #000 15%); mask-image: linear-gradient(90deg, transparent, #000 15%); }
+  body.mc-sub.mc-sub .mc-subsheet :is(.pnav-opts, .pcards).more-left.more-right { -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+}
+
+/* ============================================================================
+   CONSOLE-STYLE PAGES FIT BETWEEN THE SIDE PHOTOS (17 Nov 2026). Manage, its
+   sub-pages (Charities, Groups…) and the certificate pages were a fixed
+   1340px, so on a MacBook (1280–1512px) the green sheet ran up to ~145px over
+   the stadium photos either side — "the green box bigger than the outer
+   box". Like every other page (and like .adx-page already), the frame now
+   leaves the photos their width; below 1180px the photos are gone and the
+   sheet takes the screen.
+   ========================================================================== */
+@media (min-width: 1181px) {
+  body.mc-page .app-main {
+    max-width: min(1340px, calc(100vw - 2 * clamp(150px, 15vw, 260px) - 24px)) !important;
+    padding-left: 0 !important; padding-right: 0 !important;
+  }
+}
+.gx.mc .gx-pitch { max-width: 100%; }
+/* The hero answers to its own width, not the screen's: once the sheet is too
+   narrow for title and score tiles side by side, the tiles go under the title
+   — so a title is never squeezed into a column a few letters wide, at any
+   screen size. Words never break mid-word. */
+.gx.mc { container-type: inline-size; }
+.gx.mc .gx-title { overflow-wrap: normal; word-break: normal; hyphens: manual; }
+@container (max-width: 1100px) {
+  .gx.mc .gx-hero { grid-template-columns: minmax(0, 1fr) !important; align-items: start; }
+  .gx.mc .gx-board { justify-content: flex-start; flex-wrap: wrap; }
+}
+@container (max-width: 560px) {
+  .gx.mc .gx-board { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gx.mc .gx-score { min-width: 0; }
+}
+/* Table cells never break a word or an address mid-way; the table scrolls
+   sideways in its own frame (.gx-tablewrap) when it is wider than the sheet. */
+.gx.mc .gx-table :is(td, th) { overflow-wrap: normal; word-break: normal; }
+.gx.mc .gx-table td a { white-space: nowrap; }
+
+/* ============================================================================
+   THE FRAME AND THE MIRROR (17 Nov 2026). "The green box we can think of as
+   a frame and the centre as a mirror ... if content in it ends we do not have
+   anything scrolled down ... constant, be it tabs, laptops, all screen sizes."
+   - The page is exactly as tall as the screen under the top bar, or as its
+     content if that is longer: never a strip of nothing to scroll into.
+   - The frame (.page-sheet) always reaches the bottom of the screen, so a
+     short page on a tall tablet is a full frame, not a frame and a void.
+   - The gap under the frame equals the gap over it (it was 26px over, 72px
+     under, everywhere).
+   --nav-h is the top bar's real height, kept by gt-ui.js.
+   ========================================================================== */
+body:is(.sheet-page, .mc-page):not(.adx-page) .app-main {
+  display: flex; flex-direction: column;
+  min-height: calc(100dvh - var(--nav-h, 68px));
+  padding-top: var(--frame-gap, 26px) !important;
+  padding-bottom: var(--frame-gap, 26px) !important;
+  box-sizing: border-box;
+}
+body:is(.sheet-page, .mc-page):not(.adx-page) .app-main > .page-sheet { flex: 1 0 auto; width: 100%; box-sizing: border-box; }
+@media (max-width: 900px) { body:is(.sheet-page, .mc-page) { --frame-gap: 14px; } }
+/* Console-style pages: the green .gx IS the frame, so it fills the sheet. */
+body.mc-page .app-main > .page-sheet { display: flex; flex-direction: column; }
+body.mc-page .app-main > .page-sheet > .gx { flex: 1 0 auto; }
+/* No stray margin under the last thing in a frame. */
+.prf > :last-child, .mc-wrap > :last-child, .ca-wrap > :last-child { margin-bottom: 0; }
+
+/* ============================================================================
+   A FIXED FRAME, CONTENT SCROLLS INSIDE IT (17 Nov 2026): "let's have the up
+   and down be constant, then if the data in the inside box is more we just
+   scroll inside it." The page itself no longer scrolls: the frame is exactly
+   the screen under the top bar (less an even gap all round), and what is in
+   it scrolls within. Sticky bits inside (tab rows, the story's top line)
+   stick to the frame, which is what they should stick to.
+   ========================================================================== */
+body:is(.sheet-page, .mc-page):not(.adx-page) .app-main {
+  height: calc(100dvh - var(--nav-h, 68px));
+  min-height: 0 !important;
+  overflow: hidden;
+}
+body:is(.sheet-page, .mc-page):not(.adx-page) .app-main > .page-sheet {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin; scrollbar-color: rgba(200,241,53,.45) transparent;
+}
+/* Console-style pages: the green .gx is the frame, so it is the box that
+   scrolls; the sheet around it is just the gap. */
+body.mc-page .app-main > .page-sheet { overflow: hidden !important; }
+body.mc-page .app-main > .page-sheet > .gx {
+  flex: 1 1 auto; min-height: 0 !important;
+  overflow-y: auto !important; overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin; scrollbar-color: rgba(200,241,53,.45) transparent;
+}
+/* The flash messages above the frame take their own height first. */
+body:is(.sheet-page, .mc-page):not(.adx-page) .app-main > .flash-stack { flex: none; }
+
+/* ============================================================================
+   GROUPS, IN THE CONSOLE'S LOOK (17 Nov 2026) — templates/orgs/groups.html.
+   A tab row, one pane at a time; groups as HQ-style pastel cards.
+   ========================================================================== */
+.grp-now { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 16px; padding: 14px 16px; border-radius: 16px; font-size: 14.5px; color: #151C27; background: #ECFCCB; }
+.grp-now form { margin: 0; }
+.grp2 { display: grid; gap: 18px; }
+body.mc-sub .mc-subsheet .grp-tabs { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; margin: 0; padding: 6px; border-radius: 999px; background: #EEF1F5; scrollbar-width: none; }
+body.mc-sub .mc-subsheet .grp-tabs::-webkit-scrollbar { display: none; }
+body.mc-sub .mc-subsheet .grp-tabs .gx-tab { flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 0; border-radius: 999px; cursor: pointer; font: 800 14px/1 var(--body); color: #3B4656; background: transparent; box-shadow: none; white-space: nowrap; }
+body.mc-sub .mc-subsheet .grp-tabs .gx-tab:hover { color: #151C27; background: rgba(255,255,255,.7); }
+body.mc-sub .mc-subsheet .grp-tabs .gx-tab.on { color: #151C27; background: #fff; box-shadow: 0 6px 14px -8px rgba(21,28,39,.35); }
+body.mc-sub .mc-subsheet .grp-tabs .gx-tab em { font-style: normal; padding: 3px 8px; border-radius: 999px; font-size: 11.5px; color: #151C27; background: rgba(21,28,39,.08); }
+body.mc-sub .mc-subsheet .grp-tabs .gx-tab em.is-warn { background: #FFE2A8; }
+.grp-pane[hidden] { display: none !important; }
+.grp-pane { display: grid; gap: 14px; animation: grpIn .2s ease; }
+@keyframes grpIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.grp-search { display: grid; gap: 6px; }
+.grp-search .gx-search { max-width: 560px; }
+.grp-search-x { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); border: 0; background: none; font-size: 22px; line-height: 1; cursor: pointer; color: #6A7380; }
+.grp-search-count, .grp-none { margin: 0; font-size: 13.5px; font-weight: 700; color: #4A5464; }
+.grp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.grp-card { --cc: var(--cc-1, #5AA9FF); position: relative; display: grid; gap: 8px; align-content: start; padding: 20px; border-radius: 24px; color: #151C27;
+  border: 1px solid rgba(21,28,39,.07); background: linear-gradient(160deg, color-mix(in srgb, var(--cc) 22%, #fff), #fff 60%);
+  transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s ease; }
+.grp-card:hover { transform: translateY(-3px); box-shadow: 0 26px 44px -30px color-mix(in srgb, var(--cc) 85%, #000); }
+.grp-card[hidden] { display: none; }
+.grp-card.is-mine { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--cc) 70%, #fff); }
+.grp-card.is-pending { border-style: dashed; }
+.grp-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.grp-card-ic { display: grid; place-items: center; width: 50px; height: 50px; border-radius: 16px; color: #151C27; background: var(--cc); box-shadow: 0 12px 24px -12px color-mix(in srgb, var(--cc) 90%, #000); }
+.grp-card-ic svg { width: 24px; height: 24px; }
+.grp-card-name { margin-top: 4px; font: 400 23px/1.15 var(--display); color: #151C27; overflow-wrap: anywhere; }
+.grp-card-meta { font-size: 13.5px; line-height: 1.45; color: #4A5464; }
+.grp-card-stat { display: flex; align-items: baseline; gap: 8px; }
+.grp-card-stat b { font: 400 34px/1 var(--display); color: #151C27; }
+.grp-card-stat span { font: 800 11px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; color: #4A5464; }
+.grp-card-note { margin: 0; font-size: 13px; color: #8A5A00; }
+.grp-card-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.grp-card-acts form { margin: 0; }
+.grp-link { padding: 0; border: 0; background: none; cursor: pointer; font: 800 13.5px/1.2 var(--body); color: #3B4656; text-decoration: underline; text-underline-offset: 3px; }
+.grp-empty { display: grid; gap: 6px; padding: 28px; text-align: center; border-radius: 22px; background: #F7F8FA; grid-column: 1 / -1; }
+.grp-hero { display: flex; align-items: flex-start; gap: 20px; padding: clamp(20px, 3vw, 32px); border-radius: 26px; color: #151C27; background: linear-gradient(150deg, #EAF6D4, #fff 62%); box-shadow: inset 0 0 0 1px rgba(21,28,39,.06); }
+.grp-hero.is-plan { background: linear-gradient(150deg, #E3ECFF, #fff 62%); }
+.grp-hero.is-settings { background: linear-gradient(150deg, #FFF1D6, #fff 62%); }
+.grp-hero-ic { flex: none; display: grid; place-items: center; width: 58px; height: 58px; border-radius: 18px; color: #151C27; background: #C9F24A; }
+.grp-hero.is-plan .grp-hero-ic { background: #9CC4FF; }
+.grp-hero.is-settings .grp-hero-ic { background: #FFC981; }
+.grp-hero-ic svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.grp-hero h2 { margin: 2px 0 8px; font: 400 clamp(24px, 2.6vw, 32px)/1.1 var(--display); color: #151C27; }
+.grp-hero p { margin: 0 0 8px; max-width: 64ch; font-size: 15px; line-height: 1.55; color: #3B4656; }
+.grp-hero .grp-hero-note { font-size: 13.5px; color: #4A5464; }
+.grp-hero .dh-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.gx-btn.is-big { padding: 14px 22px; font-size: 15px; }
+.gx-btn.is-locked { opacity: .6; cursor: not-allowed; }
+.grp-plan .lock-prompt { max-width: none; margin: 0; padding: clamp(20px, 3vw, 32px); border-radius: 26px; }
+@media (max-width: 640px) {
+  .grp-cards { grid-template-columns: minmax(0, 1fr); }
+  .grp-hero { flex-direction: column; gap: 14px; }
+  .grp-hero .dh-acts .gx-btn, .grp-hero .dh-acts form, .grp-hero .dh-acts form .gx-btn { width: 100%; justify-content: center; }
+}
+
+/* THE PLAN CARD ON THE GROUPS PAGE (17 Nov 2026): "that green that looks like
+   yellow ... not quite visible ... find a different colour for that card."
+   Now a deep green card with white type: the price in lime, the padlock on a
+   lime tile, lime ticks on what you get, and buttons that read clearly. */
+.grp-plan .lock-prompt {
+  display: grid; gap: 16px;
+  color: #fff !important;
+  background: radial-gradient(120% 140% at 100% 0%, #1F6B41 0%, #0F3B27 55%, #0A2A1C 100%) !important;
+  border: 0 !important;
+  box-shadow: 0 30px 60px -36px rgba(0,0,0,.8) !important;
+}
+.grp-plan .lock-prompt .lk-head { display: flex; align-items: center; gap: 16px; }
+.grp-plan .lock-prompt .lk-ic {
+  flex: none; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 18px;
+  color: #0F2E22 !important; background: var(--lime) !important; box-shadow: 0 12px 24px -12px rgba(200,241,53,.7);
+}
+.grp-plan .lock-prompt .lk-ic svg { width: 26px; height: 26px; color: #0F2E22; fill: currentColor; stroke: currentColor; }
+.grp-plan .lock-prompt .lk-title { display: block; font: 400 clamp(22px, 2.4vw, 28px)/1.15 var(--display); color: #fff !important; }
+.grp-plan .lock-prompt .lk-plan {
+  display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 999px;
+  font: 800 13px/1 var(--body); color: #0F2E22 !important; background: var(--lime) !important;
+}
+.grp-plan .lock-prompt .lk-body { margin: 0; max-width: 70ch; font-size: 15.5px; line-height: 1.6; color: rgba(255,255,255,.88) !important; }
+.grp-plan .lock-prompt .lk-gets { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.grp-plan .lock-prompt .lk-gets li { position: relative; padding-left: 32px; font-size: 15px; line-height: 1.5; color: #fff !important; }
+.grp-plan .lock-prompt .lk-gets li::before {
+  content: ""; position: absolute; left: 0; top: 1px; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--lime) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230F2E22' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / 14px no-repeat;
+}
+.grp-plan .lock-prompt .lk-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.grp-plan .lock-prompt .lk-acts .abtn-primary { color: #0F2E22 !important; background: var(--lime) !important; border: 0 !important; font-weight: 800; }
+.grp-plan .lock-prompt .lk-acts .abtn-ghost { color: #fff !important; background: transparent !important; border: 1.5px solid rgba(255,255,255,.55) !important; }
+.grp-plan .lock-prompt .lk-acts .abtn-ghost:hover { background: rgba(255,255,255,.1) !important; }
+@media (max-width: 640px) { .grp-plan .lock-prompt .lk-acts .abtn { flex: 1 1 100%; justify-content: center; } }
+
+/* START A GROUP, in the plan card's deep green (17 Nov 2026). */
+.grp-hero.is-new { color: #fff; background: radial-gradient(120% 140% at 100% 0%, #1F6B41 0%, #0F3B27 55%, #0A2A1C 100%); box-shadow: 0 30px 60px -36px rgba(0,0,0,.8); }
+.grp-hero.is-new h2 { color: #fff; }
+.grp-hero.is-new p { color: rgba(255,255,255,.88); }
+.grp-hero.is-new .grp-hero-note { color: rgba(255,255,255,.72); }
+.grp-hero.is-new .grp-hero-ic { color: #0F2E22; background: var(--lime); box-shadow: 0 12px 24px -12px rgba(200,241,53,.7); }
+.grp-hero .gx-btn.is-locked { opacity: 1; cursor: pointer; }
+.grp-hero .gx-btn.is-locked svg { width: 18px; height: 18px; fill: currentColor; }
+
+/* THE POP-UPS on the Groups page (17 Nov 2026). */
+body:has([data-grp2]) .mc-flash { display: none; }
+.grp-pop { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: 20px; }
+.grp-pop[hidden] { display: none; }
+.grp-pop-veil { position: absolute; inset: 0; background: rgba(5,20,13,.62); backdrop-filter: blur(3px); }
+.grp-pop-panel { position: relative; width: min(620px, 100%); max-height: calc(100dvh - 40px); overflow-y: auto; border-radius: 26px; animation: grpPop .22s cubic-bezier(.2,.8,.2,1); }
+@keyframes grpPop { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+.grp-pop-panel + .grp-pop-panel { display: none; }
+.grp-pop-x { position: absolute; right: 14px; top: 12px; z-index: 2; width: 38px; height: 38px; border: 0; border-radius: 50%; cursor: pointer; font-size: 24px; line-height: 1; color: inherit; background: rgba(255,255,255,.14); }
+.grp-pop-panel.grp-plan .grp-pop-x { color: #fff; }
+.grp-pop-panel.grp-plan .lock-prompt { margin: 0; }
+.grp-pop-kicker { position: relative; z-index: 1; margin: 0 0 -6px; padding: 22px clamp(20px, 3vw, 32px) 0; font: 800 12px/1 var(--body); letter-spacing: .18em; text-transform: uppercase; color: var(--lime); background: transparent; }
+.grp-pop-panel.grp-plan:has(.grp-pop-kicker) { background: radial-gradient(120% 140% at 100% 0%, #1F6B41 0%, #0F3B27 55%, #0A2A1C 100%); }
+.grp-pop-panel.grp-plan:has(.grp-pop-kicker) .lock-prompt { box-shadow: none !important; background: transparent !important; }
+.grp-pop-msg { display: grid; justify-items: center; gap: 12px; padding: 34px 28px 28px; text-align: center; color: #151C27; background: #fff; box-shadow: 0 40px 80px -30px rgba(0,0,0,.6); }
+.grp-pop-msg .grp-pop-x { color: #151C27; background: #F1F3F6; }
+.grp-pop-msg h2 { margin: 0; font: 400 26px/1.15 var(--display); color: #151C27; }
+.grp-pop-msg p { margin: 0; max-width: 46ch; font-size: 15.5px; line-height: 1.55; color: #3B4656; }
+.grp-pop-ic { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%; font: 900 30px/1 var(--body); color: #0F2E22; background: var(--lime); }
+.grp-pop-msg.is-error .grp-pop-ic { color: #fff; background: #DC2626; }
+.grp-pop-msg .gx-btn { min-width: 160px; }
+body.mc-sub .mc-subsheet .grp-hero.is-new h2 { color: #fff !important; }
+body.mc-sub .mc-subsheet .grp-hero.is-new p { color: rgba(255,255,255,.9) !important; }
+body.mc-sub .mc-subsheet .grp-hero.is-new .grp-hero-note { color: rgba(255,255,255,.75) !important; }
+body.mc-sub .mc-subsheet .grp-hero .gx-btn.is-lime { color: #0F2E22 !important; background: var(--lime) !important; opacity: 1 !important; filter: none !important; }
+body.mc-sub .mc-subsheet .grp-plan .lock-prompt :is(.lk-title, .lk-gets li) { color: #fff !important; }
+body.mc-sub .mc-subsheet .grp-plan .lock-prompt .lk-body { color: rgba(255,255,255,.88) !important; }
+body.mc-sub .mc-subsheet .grp-plan .lock-prompt .lk-plan { color: #0F2E22 !important; }
+.grp-pop .grp-plan .lock-prompt :is(.lk-title, .lk-gets li) { color: #fff !important; }
+.grp-pop .grp-plan .lock-prompt .lk-body { color: rgba(255,255,255,.88) !important; }
+
+/* CREATE AN ORGANISATION, THE TIPPING STEP ON A PHONE (19 Nov 2026): "let it
+   be 2 by 2 — one row has 2 options", for the sport filter and for the
+   competitions themselves. The card stacks its logo over its name to fit. */
+@media (max-width: 640px) {
+  body.ow-page.ow-page.ow-page.ow-page .ow-sportchips { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  body.ow-page.ow-page.ow-page.ow-page .ow-sportchips > button { width: 100%; justify-content: space-between; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .opt-grid:has(.ow-comp) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .ow-comp { flex-direction: column; align-items: flex-start; gap: 10px; min-height: 0; padding: 14px 12px 14px; }
+  body.ow-page.ow-page.ow-page.ow-page .ow-comp-logo { width: 44px; height: 44px; border-radius: 12px; }
+  body.ow-page.ow-page.ow-page.ow-page .ow-comp-logo img { width: 32px; height: 32px; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .ow-comp .oc-title { font-size: 14.5px; }
+  body.ow-page.ow-page.ow-page.ow-page .ow-comp-t { width: 100%; }
+}
+@media (max-width: 640px) {
+  /* The cards flow into .ow-comp-all (the sport groups are display:contents),
+     so that is the grid that takes two columns. */
+  body.ow-page.ow-page.ow-page.ow-page .ow-comp-all { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  body.ow-page.ow-page.ow-page.ow-page .ow-comp-all .ow-comp { height: 100%; box-sizing: border-box; }
+}
+@media (max-width: 640px) {
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .ow-comp-all .ow-comp { display: flex !important; flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; padding: 14px 12px !important; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .ow-comp-all .ow-comp .oc-title { overflow-wrap: normal; word-break: normal; hyphens: manual; }
+}
+/* Every option list in the wizard is two to a row on a phone (19 Nov 2026:
+   "even those lists of approved charities, let them be like 2"): the charity
+   picker, pick-or-vote, and the rest. Each card stacks its badge over its
+   words so two fit side by side. */
+@media (max-width: 640px) {
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .opt-grid.cols2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .opt-grid.cols2 > .opt-card {
+    display: flex !important; flex-direction: column !important; align-items: flex-start !important; gap: 8px !important;
+    min-height: 0; height: 100%; box-sizing: border-box; padding: 14px 12px 14px !important;
+  }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .opt-grid.cols2 > .opt-card :is(.oc-title, b) { font-size: 14.5px; line-height: 1.25; overflow-wrap: normal; word-break: normal; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .opt-grid.cols2 > .opt-card :is(small, .oc-sub, span:not(.oc-title)) { font-size: 12.5px; overflow-wrap: anywhere; }
+}
+@media (max-width: 640px) {
+  /* The charity card's own row (badge | name and site) stacks too, and the
+     words keep clear of the round selector in the corner. */
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .ch-picker .ch-card { flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; width: 100%; min-width: 0; padding-right: 18px; box-sizing: border-box; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .ch-picker .ch-body { min-width: 0; width: 100%; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .ch-picker .ch-body > * { display: block; overflow: hidden; text-overflow: ellipsis; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .ch-picker .ch-body > :first-child { white-space: normal; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .ch-picker .ch-body > :not(:first-child) { white-space: nowrap; }
+}
+@media (max-width: 640px) {
+  /* Review step: short answers sit two to a row as small tiles (label above
+     value); long ones — name, setup, competitions, charity — take the row. */
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .wsum-list { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .wsum-row.wsum-wide { grid-column: 1 / -1; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .wsum-row:not(.wsum-wide) { display: flex !important; flex-direction: column !important; align-items: flex-start !important; gap: 8px; min-width: 0; margin: 0 !important; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .wsum-row:not(.wsum-wide) .wsum-l { min-width: 0; max-width: 100%; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .wsum-row:not(.wsum-wide) .wsum-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .wsum-row:not(.wsum-wide) .wsum-r { width: 100%; justify-content: space-between !important; min-width: 0; margin: 0 !important; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .wsum-row:not(.wsum-wide) .wsum-val { text-align: left !important; min-width: 0; overflow-wrap: anywhere; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .wsum-row.wsum-wide { margin: 0 !important; }
+}
+/* Review step: the competitions read back as chips, two to a row on phones. */
+.wsum-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 auto; min-width: 0; }
+.wsum-chip { padding: 5px 10px; border-radius: 999px; background: #fff; border: 1px solid #E2E8F0; font-size: 12.5px; font-weight: 600; color: #0F172A; line-height: 1.3; }
+@media (max-width: 640px) {
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .wsum-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .wsum-chip { white-space: normal; overflow-wrap: anywhere; text-align: center; display: flex; align-items: center; justify-content: center; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .wsum-row:has(.wsum-chips) .wsum-r { flex-direction: column; align-items: stretch; gap: 8px; width: 100%; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .wsum-row:has(.wsum-chips) .wsum-check { display: none; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .wsum-row:not(.wsum-wide) { justify-content: flex-start !important; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-card .wsum-row:not(.wsum-wide) .wsum-label { white-space: normal; overflow: visible; }
+}
+@media (max-width: 640px) {
+  /* Review footer: the "tick the agreement" hint gets its own line above the
+     buttons instead of squeezing the Create button into a circle. */
+  body.ow-page.ow-page.ow-page.ow-page .wiz-form:has([name=terms_accepted]) .wiz-nav { flex-wrap: wrap !important; row-gap: 8px; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-form:has([name=terms_accepted]:not(:checked)) .ow-gate { order: -1; flex: 1 0 100%; margin: 0; text-align: center; font-size: 12.5px; }
+  body.ow-page.ow-page.ow-page.ow-page .wiz-form:has([name=terms_accepted]) .wiz-nav [data-ow-launch] { flex: 1 1 auto; min-width: 0; width: auto !important; white-space: nowrap; }
+}
+@media (max-width: 640px) {
+  /* "You're live" page on phones: competition tags two to a row (season and
+     charity take a full row), and the What's-next cards as two-up tiles, the
+     odd one out spanning the row. */
+  .ow-fin-tags { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px !important; }
+  .ow-fin-tags .ow-fin-tag { min-width: 0; justify-content: flex-start; }
+  .ow-fin-next { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .ow-fin-next > :is(h2, .ow-fin-dash) { grid-column: 1 / -1; }
+  .ow-fin-next > .ow-next { flex-direction: column !important; align-items: flex-start !important; gap: 10px; margin: 0 !important; min-width: 0; }
+  .ow-fin-next > .ow-next:nth-last-child(2):nth-child(odd of .ow-next) { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .ow-fin-next > .ow-next:nth-last-child(2):nth-child(odd of .ow-next) { flex-direction: row !important; align-items: center !important; }
+}
+
+/* ---------- Find your organisation: white list, one fixed place for the action ----------
+   The panel and cards were cream, and each card's action floated after however
+   much name and detail it had, so "Ask to join" sat somewhere different on
+   every row. Now each card is the same three columns — icon, words, action —
+   with the action column right-aligned; on phones the cards are two-up tiles
+   and the action sits at the foot of every tile, full width. */
+body.page-deep .gt-listwrap:has(.bl-card) { background: #fff !important; border: 1px solid #E6EAEE; box-shadow: 0 10px 30px rgba(8,30,20,.18); }
+body.page-deep .gt-scroll:has(.bl-card) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+body.page-deep .bl-card.bl-card { background: #fff !important; border: 1px solid #E6EAEE; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,23,42,.04); margin: 0 !important; padding: 14px 16px !important; }
+body.page-deep .bl-card > .bl-row:first-child { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 0; }
+body.page-deep .bl-card .bl-name { color: #0F172A; overflow-wrap: anywhere; }
+body.page-deep .bl-card .bl-meta { color: #55655B; }
+body.page-deep .bl-card .bl-actions { justify-content: flex-end; flex-wrap: nowrap; }
+body.page-deep .bl-card .bl-actions form { margin: 0; }
+body.page-deep .bl-card .bl-ic { background: #F1F5F3; }
+body.page-deep .bl-card .bl-child { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-top: 10px; }
+.bl-short { display: none; }
+
+@media (max-width: 640px) {
+  body.page-deep .gt-scroll:has(.bl-card) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding-right: 0; }
+  body.page-deep .bl-card.bl-card { display: flex; flex-direction: column; padding: 12px !important; min-width: 0; }
+  body.page-deep .bl-card:has(.bl-child) { grid-column: 1 / -1; }
+  body.page-deep .bl-card > .bl-row:first-child { display: flex; flex-direction: column; align-items: stretch; gap: 8px; flex: 1 1 auto; }
+  body.page-deep .bl-card .bl-ic { width: 38px; height: 38px; border-radius: 11px; }
+  body.page-deep .bl-card .bl-name { font-size: 14px; line-height: 1.25; }
+  body.page-deep .bl-card .bl-meta { font-size: 12px; line-height: 1.35; }
+  body.page-deep .bl-card .bl-actions { margin-top: auto; flex-direction: column; align-items: stretch; gap: 6px; padding-top: 4px; }
+  body.page-deep .bl-card .bl-actions :is(.abtn, form, .pill-role) { width: 100%; justify-content: center; text-align: center; box-sizing: border-box; }
+  body.page-deep .bl-card .bl-actions form .abtn { width: 100%; }
+  body.page-deep .bl-card .bl-actions .abtn { min-height: 38px; white-space: normal; padding-left: 8px; padding-right: 8px; }
+  body.page-deep .bl-card .bl-actions .pill-role { display: flex; align-items: center; min-height: 38px; border-radius: 10px; }
+  .bl-long { display: none; }
+  .bl-short { display: inline; }
+}
+body.page-deep .gt-listwrap:has(.bl-card)::after { background: linear-gradient(rgba(255,255,255,0), #fff) !important; }
+body.page-deep .browse-sort .browse-sel { flex: none; }
+/* The shared custom dropdown (.ddx) draws its own chevron; the page's one sat on top of the label. */
+.browse-sel:has(> .ddx) > svg { display: none; }
+.browse-sel > .ddx { width: max-content; }
+.browse-sel .ddx-btn { background: #fff; padding: 9px 40px 9px 14px; font-size: 14px; font-weight: 700; }
+@media (max-width: 640px) { body.page-deep .bl-card .bl-actions > a.abtn-ghost { order: -1; } }
+body.page-deep .bl-card .bl-actions > a.abtn-ghost { order: -1; }
+body.page-deep .bl-card .bl-actions form { display: flex !important; }
+body.page-deep .bl-card .bl-actions .pill-role { min-width: 96px; justify-content: center; display: inline-flex; }
+body.page-deep .bl-card .bl-actions form .abtn { min-width: 96px; justify-content: center; }
+@media (min-width: 641px) { body.page-deep .bl-card .bl-row > .bl-actions { align-self: center !important; margin: 0 !important; } }
+
+/* ---------- Top bar: organisation switcher on phones ----------
+   Two organisations to a row as small tiles (name, your role, badge at the
+   foot), the one you are in lime with its tick in the corner. The list's
+   bottom fade now matches the panel's green instead of leaving a darker band
+   under the last visible row. */
+.an-ctx-panel .an-ctx-listwrap::after { background: linear-gradient(180deg, rgba(15,46,34,0), #0F2E22) !important; }
+@media (max-width: 640px) {
+  .an-ctx-panel .an-ctx-scroll[data-anctx-list] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 4px 4px 10px; }
+  .an-ctx-panel .an-ctx-scroll[data-anctx-list] > form { margin: 0; min-width: 0; display: flex; }
+  .an-ctx-panel .an-ctx-scroll[data-anctx-list] > form[hidden] { display: none; }
+  .an-ctx-panel .an-ctx-scroll[data-anctx-list] .an-ctx-row { position: relative; display: flex !important; flex-direction: column; align-items: flex-start !important; justify-content: flex-start; gap: 8px; min-width: 0; height: 100%; padding: 11px 12px !important; text-align: left; background: rgba(255,255,255,.06) !important; border: 1px solid rgba(255,255,255,.1); }
+  .an-ctx-panel .an-ctx-scroll[data-anctx-list] .an-ctx-row:hover { background: rgba(255,255,255,.11) !important; }
+  .an-ctx-panel .an-ctx-scroll[data-anctx-list] .an-ctx-row.on { background: var(--lime) !important; border-color: transparent; }
+  .an-ctx-panel .an-ctx-scroll[data-anctx-list] .an-ctx-row .mi-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; width: 100%; padding-right: 14px; }
+  .an-ctx-panel .an-ctx-scroll[data-anctx-list] .an-ctx-row .mi-txt b { font-size: 13.5px; line-height: 1.25; white-space: normal; overflow-wrap: anywhere; }
+  .an-ctx-panel .an-ctx-scroll[data-anctx-list] .an-ctx-row .mi-txt i { font-size: 11.5px; line-height: 1.3; }
+  .an-ctx-panel .an-ctx-scroll[data-anctx-list] .an-ctx-row .gt-role { margin: auto 0 0 !important; }
+  .an-ctx-panel .an-ctx-scroll[data-anctx-list] .an-ctx-row.on::after { position: absolute; top: 9px; right: 11px; margin: 0; }
+  .an-ctx-panel .an-ctx-scroll[data-anctx-list] { max-height: 44dvh; }
+}
+/* + menu: its options as two tiles side by side, each with a lime plus. One
+   option (a member who cannot make groups) takes the full row. */
+.an-plus-panel .ap-ic { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-bottom: 6px; border-radius: 9px; font-weight: 900; font-size: 17px; color: #10231A; background: var(--lime); }
+@media (max-width: 900px) {
+  .an-plus-panel:has(> a + a) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .an-plus-panel a { align-content: start; min-width: 0; }
+  .an-plus-panel b { line-height: 1.25; overflow-wrap: anywhere; }
+}
+
+/* ---------- Phone menu: links as two-up tiles ----------
+   Nine full-width rows left half the panel empty and made every link the same
+   long stripe. Tiles put the icon above the word, two to a row, and the page
+   you are on is filled lime (gt-ui.js marks it, aria-current). */
+.app-sheet .sheet-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 6px 0 4px; }
+.app-sheet .sheet-links > :is(a, .an-navlink) { position: relative; display: flex !important; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 10px !important; min-height: 78px !important; min-width: 0; padding: 12px !important; border-radius: 14px !important; background: color-mix(in srgb, currentColor 7%, transparent); border: 1px solid color-mix(in srgb, currentColor 12%, transparent); font-size: 14px; line-height: 1.2; }
+.app-sheet .sheet-links > :is(a, .an-navlink) .an-ic { width: 20px; height: 20px; }
+.app-sheet .sheet-links > a .an-count { position: absolute; top: 10px; right: 10px; margin: 0; }
+.app-sheet .sheet-links > a[aria-current="page"] { color: #10231A !important; background: var(--lime) !important; border-color: transparent; }
+.app-sheet .sheet-links > a[aria-current="page"] .an-ic { color: #10231A !important; opacity: 1; }
+
+/* ---------- Top bar, tablets and small laptops (761–1300px) ----------
+   The old "chip on a second strip" layout had decayed: the strip's flex basis
+   was overridden later, so the bell, avatar and menu sat beside the logo and
+   the organisation chip came after them, stretched across the rest of the
+   bar. One row instead, the same order as the phone and the wide laptop:
+   GOODTIP · organisation ▾ · (links, where they fit) · account cluster at the
+   far right. */
+@media (min-width: 761px) and (max-width: 1300px) {
+  .gt-v2 { --gt-navh: 68px; }
+  .gt-v2 .app-nav .an-inner { flex-wrap: nowrap !important; height: 68px !important; padding-bottom: 0 !important; }
+  .gt-v2 .app-nav .an-inner > .an-brand { order: 0; flex: none; }
+  .gt-v2 .app-nav .an-inner > .an-ctx { order: 1; flex: 0 1 auto !important; min-width: 0 !important; height: auto !important; margin: 0 0 0 8px !important; padding: 0 !important; align-self: center; }
+  .gt-v2 .app-nav .an-inner > .an-ctx .an-ctx-btn { max-width: 300px !important; }
+  .gt-v2 .app-nav .an-inner > .an-ctx .an-ctx-org { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gt-v2 .app-nav .an-inner > .an-ctx .an-menu-panel { top: calc(100% + 10px); }
+  .gt-v2 .app-nav .an-inner > .an-links { order: 2; }
+  .gt-v2 .app-nav .an-inner > .an-right { order: 3; margin-left: auto !important; }
+}
+/* The full wordmark where the links have gone to the menu and there is room. */
+@media (min-width: 761px) and (max-width: 1180px) {
+  .gt-v2 .an-inner:not(.nav-tight) .an-brand { font-size: 21px !important; letter-spacing: .01em; }
+  .gt-v2 .an-inner:not(.nav-tight) .an-brand::before, .gt-v2 .an-inner:not(.nav-tight) .an-brand::after { content: none !important; }
+}
+@media (min-width: 761px) and (max-width: 1300px) {
+  .gt-v2 .app-nav .an-ctx .an-menu-panel { left: 0; right: auto; width: max-content; min-width: min(560px, calc(100vw - 32px)); max-width: calc(100vw - 32px); }
+}
+/* Same for the bar's own menus: while the organisation switcher, the bell or
+   the + menu is open, toasts step aside rather than covering it. */
+body:has(.an-ctx-btn[aria-expanded="true"], .an-plus[open], .bell-panel.open) .gt-toasts { visibility: hidden; }
+/* Current organisation row: the badge sits at the right edge with the tick
+   after it, not floating mid-row. */
+.an-ctx-panel .an-ctx-row.on > .gt-role { margin-left: auto; }
+.an-ctx-panel .an-ctx-row.on:has(> .gt-role)::after { margin-left: 10px; }
+@media (max-width: 640px) { .an-ctx-panel .an-ctx-scroll[data-anctx-list] .an-ctx-row.on > .gt-role { margin-left: 0; } }
+
+/* ---------- Manage console on phones ----------
+   1) The nine tabs as a 3 × 3 grid, all visible, instead of a strip that hid
+      five of them off the right edge.
+   2) Every console table (members, approvals, team, competitions, groups,
+      charities) becomes two-up cards: the name on top, the details under it,
+      and the action — Change, Approve / Decline, the on/off switch — at the
+      foot of every card, where it was previously a sideways scroll away. */
+@media (max-width: 640px) {
+  .mc .gx-tabs { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; overflow: visible !important; padding: 10px !important; }
+  .mc .gx-tabs > .gx-tab { display: flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; margin: 0 !important; padding: 9px 6px !important; border-radius: 12px !important; font-size: 13px; text-align: center; white-space: nowrap; background: rgba(255,255,255,.35); }
+  .mc .gx-tabs > .gx-tab.on { background: #fff !important; box-shadow: 0 4px 12px -6px rgba(15,23,42,.35); }
+  .mc .gx-tabs > .gx-tab::before, .mc .gx-tabs > .gx-tab::after { display: none !important; }
+  .mc .gx-tabs::after, .mc .gx-tabs::before { display: none !important; }
+
+  .mc .gx-tablewrap { overflow: visible !important; border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+  .mc .gx-tablewrap::after, .mc .gx-tablewrap::before { display: none !important; }
+  .mc .gx-table { display: block; width: 100% !important; min-width: 0 !important; }
+  .mc .gx-table thead { display: none; }
+  .mc .gx-table tbody { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .mc .gx-table tr { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 12px; border-radius: 14px; background: #fff !important; border: 1px solid #E6EAEE; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+  .mc .gx-table tr[hidden] { display: none; }
+  .mc .gx-table td { display: block; min-width: 0; padding: 0 !important; border: 0 !important; background: transparent !important; font-size: 12.5px; color: #55655B; overflow-wrap: anywhere; position: static !important; }
+  .mc .gx-table td.is-name { color: #0F172A; font-size: 14px; }
+  .mc .gx-table td.is-name .mc-who { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .mc .gx-table td.is-name b { line-height: 1.25; }
+  .mc .gx-table td.is-email, .mc .gx-table td.is-email a { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .mc .gx-table td.is-date small { display: block; }
+  .mc .gx-table td:last-child:has(form, .gx-btn, details, .mc-actions) { margin-top: auto; padding-top: 6px !important; }
+  .mc .gx-table td :is(.gx-btn, .mc-switch, summary.gx-btn) { width: 100%; justify-content: center; box-sizing: border-box; }
+  .mc .gx-table td form { margin: 0; }
+  .mc .gx-table .mc-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .mc .gx-table .mc-chip, .mc .gx-table .mc-role { display: inline-flex; margin: 0 4px 4px 0; }
+  /* Competitions: the switch already says On / Add, so the separate status
+     pill is dropped on a phone. */
+  .mc .gx-table tr:has(.mc-switch) > td:nth-child(4) { display: none; }
+  .mc .gx-table tr:has(.mc-switch) { border-top: 3px solid var(--k, #E6EAEE); }
+}
+@media (max-width: 640px) {
+  .mc .gx-table .mc-chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
+  .mc .gx-tabs > .gx-tab { height: 38px; box-sizing: border-box; }
+  .mc .gx-tabs > .gx-tab em { line-height: 1; padding: 2px 6px; font-size: 11px; }
+}
+@media (max-width: 640px) {
+  .mc .gx-table td .gx-pill { max-width: 100%; box-sizing: border-box; white-space: normal; line-height: 1.25; }
+  .mc .mc-cause-acts { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .mc .mc-cause-acts > .gx-btn { width: 100%; justify-content: center; text-align: center; white-space: normal; line-height: 1.2; min-height: 44px; box-sizing: border-box; padding-left: 8px; padding-right: 8px; }
+  .mc .mc-plan { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .mc .mc-plan > .is-plan { grid-column: 1 / -1; }
+  .mc .mc-plan > .mc-card { margin: 0 !important; min-width: 0; }
+  .mc .mc-plan > .mc-card.is-link b { font-size: 17px; line-height: 1.2; }
+}
+@media (max-width: 640px) { .mc .gx-table td .gx-pill { font-size: 11.5px; padding: 5px 9px; gap: 5px; white-space: nowrap; } }
+/* Console certificates tab on phones: two cards to a row. */
+@media (max-width: 640px) {
+  .mc .gt-certcards { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  .mc .gt-certcards > .gx-hqcard { min-width: 0; margin: 0 !important; padding: 12px !important; display: flex; flex-direction: column; gap: 6px; }
+  .mc .gt-certcards .gx-hqcard-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .mc .gt-certcards .gx-hqcard-top .gx-pill { font-size: 11px; padding: 4px 8px; }
+  .mc .gt-certcards .gx-hqcard-ic { width: 34px !important; height: 34px !important; }
+  .mc .gt-certcards .gx-hqcard-name { font-size: 16px !important; line-height: 1.2; overflow-wrap: anywhere; }
+  .mc .gt-certcards .gx-hqcard-blurb, .mc .gt-certcards .gx-hqcard-line { font-size: 12px !important; line-height: 1.35; }
+  .mc .gt-certcards .gx-hqcard-stat b { font-size: 24px !important; }
+  .mc .gt-certcards .gx-hqcard-go { margin-top: auto; font-size: 13px; }
+}
+
+/* ---------- Season summary (billing/season_summary.html) ----------
+   The console's look: dark header, four scores, one white sheet with a
+   section per tab. White cards, generous spacing, and the competitions as
+   logo tiles. */
+.ss .ss-toprow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+.ss .ss-back { padding: 9px 16px 9px 12px; font-size: 14px; }
+.ss .ss-back svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.ss .ss-switch { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ss .ss-switch label { font: 800 11px/1 var(--gt-mark, sans-serif); letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.66); }
+.ss .ss-switch .ddx { min-width: 220px; max-width: 100%; }
+.ss .ss-switch select { min-width: 220px; padding: 9px 14px; border-radius: 999px; border: 0; font-weight: 700; }
+.ss .gx-score { font: inherit; cursor: pointer; text-align: left; }
+.ss .gx-score .ss-score-word { font-size: clamp(22px, 2.2vw, 30px) !important; line-height: 1.1; }
+.ss .gx-sheet .gx-pane { padding: clamp(18px, 3vw, 32px); }
+.ss .mc-h { margin: 0 0 14px; }
+
+.ss-raised { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px 24px; align-items: end; margin-bottom: 28px; padding: clamp(18px, 3vw, 28px); border-radius: 22px; background: #fff; border: 1px solid #E6EAEE; box-shadow: 0 18px 40px -30px rgba(15,46,34,.45); }
+.ss-raised-copy b { display: block; margin: 4px 0 6px; font: 400 clamp(22px, 2.4vw, 30px)/1.1 var(--display); color: #10231A; }
+.ss-raised-copy p { margin: 0; font-size: 14px; color: #55655B; }
+.ss-raised-num { text-align: right; }
+.ss-raised-num strong { display: block; font: 400 clamp(38px, 5vw, 56px)/1 var(--display); color: #176B45; letter-spacing: -.02em; }
+.ss-raised-num span { font-size: 13px; font-weight: 700; color: #55655B; }
+.ss-bar { grid-column: 1 / -1; height: 10px; border-radius: 999px; background: #EEF2EF; overflow: hidden; }
+.ss-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #176B45, #C8F135); }
+
+.ss-podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.ss-pod { display: grid; justify-items: center; gap: 6px; padding: 20px 14px; border-radius: 20px; text-align: center; background: #fff; border: 1px solid #E6EAEE; }
+.ss-pod.is-1 { background: linear-gradient(180deg, #F6FBE4, #fff); border-color: #C8F135; box-shadow: 0 18px 36px -26px rgba(118,150,20,.7); }
+.ss-medal { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; font: 400 20px/1 var(--display); color: #10231A; background: #E8ECEF; }
+.ss-pod.is-1 .ss-medal { background: #C8F135; }
+.ss-pod.is-2 .ss-medal { background: #DDE3E8; }
+.ss-pod.is-3 .ss-medal { background: #F1D9BE; }
+.ss-pod b { font-size: 16px; color: #10231A; overflow-wrap: anywhere; }
+.ss-pod > span:not(.ss-medal) { font-size: 13px; color: #55655B; }
+.ss-pod em { font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #176B45; }
+
+.ss-comps { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.ss-comp { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 12px 14px; border-radius: 16px; background: #fff; border: 1px solid #E6EAEE; }
+.ss-comp b { min-width: 0; font-size: 14px; line-height: 1.25; color: #10231A; overflow-wrap: anywhere; }
+.ss-logo { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: #F4F6F8; font-size: 11px; font-weight: 800; color: #10231A; }
+.ss-logo img { width: 28px; height: 28px; object-fit: contain; }
+
+.ss-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.ss-card { display: grid; align-content: start; gap: 8px; padding: clamp(18px, 2.4vw, 26px); border-radius: 22px; background: #fff; border: 1px solid #E6EAEE; box-shadow: 0 18px 40px -32px rgba(15,46,34,.45); }
+.ss-card b { font: 400 clamp(20px, 2vw, 26px)/1.15 var(--display); color: #10231A; }
+.ss-card p { margin: 0; font-size: 14px; line-height: 1.5; color: #55655B; }
+.ss-card.is-plan { border-top: 4px solid #C8F135; }
+.ss-card.is-esg { border-top: 4px solid #7FB3E8; }
+.ss-card.is-close, .ss-card.is-done { max-width: 560px; border-top: 4px solid #176B45; }
+.ss-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+
+@media (max-width: 760px) {
+  .ss .gx-board { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .ss .gx-score { min-width: 0 !important; }
+  .ss .ss-switch { flex: 1 1 100%; flex-direction: column; align-items: stretch; gap: 6px; }
+  .ss .ss-switch .ddx, .ss .ss-switch select { min-width: 0; width: 100%; }
+  .ss .gx-tabs { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 10px !important; overflow: visible !important; }
+  .ss .gx-tabs > .gx-tab { justify-content: center; margin: 0 !important; padding: 10px 6px !important; border-radius: 12px !important; font-size: 13.5px; }
+  .ss-raised { grid-template-columns: minmax(0, 1fr); }
+  .ss-raised-num { text-align: left; }
+  .ss-podium { gap: 8px; }
+  .ss-pod { padding: 14px 8px; }
+  .ss-pod b { font-size: 14px; }
+  .ss-comps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .ss-comp { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; }
+  .ss-cards { grid-template-columns: minmax(0, 1fr); }
+  .ss-acts .gx-btn { flex: 1 1 0; }
+}
+.ss-podium { display: flex !important; justify-content: center; } .ss-pod { flex: 1 1 0; min-width: 0; max-width: 240px; }
+
+/* ---------- Plans inside the console frame ----------
+   The white sheet holds everything: team size across the top, subscription and
+   custom pricing as two white cards beside each other, the five plans as a
+   grid (five across on a laptop, two to a row on a phone, never a sideways
+   strip), then the chosen plan's panel. Panes keep their colour as a top
+   rule rather than a left bar. */
+.pl-gx .pl-sheet { padding: clamp(16px, 2.6vw, 30px); }
+.pl-gx .pl-sheet > .flash { margin-bottom: 16px; }
+.pl-gx .plk-pane { border-radius: 20px; border: 1px solid #E6EAEE; box-shadow: 0 14px 30px -28px rgba(15,46,34,.5); border-top: 4px solid var(--tone); }
+.pl-gx .plk-pane::before { display: none; }
+.pl-gx .plk-pane.is-size { --tone: #4A90E2; }
+.pl-gx .plk-pick { margin-top: 22px; }
+.pl-gx .plk-pick .plk-tabs { display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; overflow: visible !important; padding: 12px 0 6px !important; }
+.pl-gx .plk-pick .plk-tabs::after, .pl-gx .plk-pick::after { display: none !important; }
+.pl-gx .plk-tab { flex: none !important; min-width: 0; min-height: 0 !important; padding: 20px 16px 18px !important; }
+.pl-gx .plk-panels { margin-top: 16px; }
+.pl-gx .pl-sheet > .app-sub { color: #55655B; }
+.pl-gx .pl-sheet > .app-sub a { color: #176B45; font-weight: 700; }
+
+@media (max-width: 760px) {
+  .pl-gx .gx-board { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .pl-gx .gx-score { min-width: 0 !important; }
+  .pl-gx .pl-sheet { padding: 12px; border-radius: 22px; }
+  .pl-gx .plk-strip { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .pl-gx .plk-strip > .plk-pane.is-size { grid-column: 1 / -1; }
+  .pl-gx .plk-strip > .plk-pane:not(.is-size) { padding: 14px 14px 12px; }
+  .pl-gx .plk-strip > .plk-pane:not(.is-size) .plk-pane-value { font-size: 17px; line-height: 1.2; }
+  .pl-gx .plk-strip > .plk-pane:not(.is-size) .plk-pane-sub { font-size: 12.5px; }
+  .pl-gx .plk-strip > .plk-pane:not(.is-size) :is(.plk-pane-foot, .plk-pane-acts) { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .pl-gx .plk-strip > .plk-pane:not(.is-size) .plk-pane-pill { display: none; }
+  .pl-gx .plk-pick .plk-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .pl-gx .plk-pick .plk-tabs > .plk-tab:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .pl-gx .plk-tab { padding: 16px 14px 18px !important; border-radius: 16px !important; }
+  .pl-gx .plk-tab-dot { margin-bottom: 6px !important; }
+  .pl-gx .plk-tab-price { font-size: 24px !important; }
+}
+@media (max-width: 760px) {
+  .pl-gx .gx-score .ss-score-word, .ss .gx-score .ss-score-word { font-size: clamp(19px, 5.6vw, 26px) !important; overflow-wrap: normal; word-break: normal; hyphens: none; }
+  .pl-gx .plk-strip > .plk-pane:not(.is-size) :is(.plk-pane-value, .plk-pane-label, .plk-pane-sub) { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; -webkit-line-clamp: unset !important; display: block; }
+  .pl-gx .plk-pick { margin-top: 10px; }
+  .pl-gx .plk-pick .plk-tabs { row-gap: 18px; padding-top: 14px !important; }
+}
+@media (max-width: 760px) { .pl-gx .plk-pick .plk-tabs { row-gap: 28px !important; } .pl-gx .plk-strip { margin-bottom: 0 !important; } .pl-gx .plk-pick { margin-top: 4px !important; } }
+/* Pane titles wrap at every width rather than clipping mid-word. */
+.pl-gx .plk-strip > .plk-pane :is(.plk-pane-value, .plk-pane-sub) { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; -webkit-line-clamp: unset !important; }
+.pl-gx .plk-strip > .plk-pane .plk-pane-value { line-height: 1.2; }
+.pl-gx .plk-tab-name { overflow-wrap: anywhere; line-height: 1.2; }
+@media (min-width: 761px) and (max-width: 1100px) {
+  .pl-gx .plk-strip, .pl-gx .plk-strip.is-js { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .pl-gx .plk-strip > .plk-pane { flex: none !important; }
+  .pl-gx .plk-strip > .plk-pane.is-size { grid-column: 1 / -1; }
+  .pl-gx .plk-pick .plk-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 26px; }
+}
+.pl-gx .plk-strip > .plk-pane { height: auto !important; max-height: none !important; overflow: visible; }
+.pl-gx .gx-score .ss-score-word { font-size: clamp(22px, 2.2vw, 30px) !important; line-height: 1.1; }
+.pl-gx .plk-strip, .pl-gx .plk-strip.is-js { height: auto !important; min-height: 0; align-items: stretch; }
+.pl-gx .plk { max-width: none !important; width: 100%; margin-left: 0 !important; margin-right: 0 !important; }
+
+/* ---------- HQ overview: organisation cards ----------
+   Competition logos in a row instead of the "AFL + NRL + ..." run-on, and two
+   cards to a row on a phone. */
+.ox-comps { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px; min-height: 30px; }
+.ox-comp { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: #F4F6F8; border: 1px solid #E6EAEE; font-size: 9px; font-weight: 800; color: #10231A; }
+.ox-comp img { width: 20px; height: 20px; object-fit: contain; }
+.ox-comp.is-more { width: auto; padding: 0 8px; font-size: 11.5px; color: #3B4656; }
+@media (max-width: 640px) {
+  .ox-orgs { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  .ox-org { min-width: 0; }
+  .ox-org .ox-org-n { font-size: 14.5px; line-height: 1.25; overflow-wrap: anywhere; }
+  .ox-org .ox-comp { width: 26px; height: 26px; border-radius: 8px; }
+  .ox-org .ox-comp img { width: 17px; height: 17px; }
+  .ox-org .ox-stats { gap: 4px !important; }
+  .ox-org .ox-stats > span { padding: 6px 2px !important; min-width: 0; font-size: 10.5px; }
+  .ox-org .ox-stats > span b { font-size: 16px; }
+}
+.ov-lock-t .ov-lock-when { display: block; margin-top: 4px; font-style: normal; font-size: 12px; font-weight: 700; color: #176B45; }
+@media (max-width: 640px) {
+  .ox-lock .ox-lock-row { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .ox-lock .ov-lock { flex-direction: column; align-items: flex-start !important; gap: 8px; min-width: 0; padding: 12px !important; margin: 0 !important; }
+  .ox-lock .ov-lock .ov-lock-t { min-width: 0; }
+  .ox-lock .ov-lock .ov-lock-t b { font-size: 13.5px; line-height: 1.25; overflow-wrap: anywhere; }
+  .ox-lock .ov-lock .ov-lock-t small { font-size: 12px; overflow-wrap: anywhere; }
+  .ox-lock { padding: 14px !important; }
+}
+.ov-lock .ov-lock-t b, .ov-lock .ov-lock-t small { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+
+/* ---------- HQ tables on phones ----------
+   Every .atable in the HQ area becomes two-up cards: the first cell (who /
+   what) on top, the details under it, and the last cell — the action or the
+   decision — at the foot of the card. Same pattern as the Manage console. */
+@media (max-width: 640px) {
+  body.adx-page :is(.atable-wrap, .table-wrap, .gt-tablewrap):has(> .atable) { overflow: visible !important; border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+  body.adx-page .atable { display: block; width: 100% !important; min-width: 0 !important; border: 0 !important; background: transparent !important; }
+  body.adx-page .atable thead { display: none; }
+  body.adx-page .atable tbody { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  body.adx-page .atable tr { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 12px; border-radius: 14px; background: #fff !important; border: 1px solid #E6EAEE; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+  body.adx-page .atable tr[hidden] { display: none; }
+  body.adx-page .atable td { display: block; min-width: 0; padding: 0 !important; border: 0 !important; background: transparent !important; font-size: 12.5px; text-align: left !important; white-space: normal !important; overflow-wrap: anywhere; color: #55655B; }
+  body.adx-page .atable td:first-child { color: #0F172A; font-size: 14px; }
+  body.adx-page .atable td:last-child:has(form, .abtn, .gx-btn, button, a.abtn) { margin-top: auto; padding-top: 6px !important; }
+  body.adx-page .atable td :is(.abtn, .gx-btn) { width: 100%; justify-content: center; box-sizing: border-box; margin: 0 0 6px 0 !important; }
+  body.adx-page .atable td form { display: block !important; margin: 0; }
+}
+/* HQ organisation list: two to a row on a phone, the badge above the name. */
+@media (max-width: 640px) {
+  body.adx-page .og-grid { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  body.adx-page .og-card { position: relative; flex-direction: column; align-items: flex-start !important; gap: 10px !important; min-width: 0; padding: 14px !important; }
+  body.adx-page .og-card b { font-size: 14px; line-height: 1.25; overflow-wrap: anywhere; padding-right: 18px; }
+  body.adx-page .og-card .og-arrow { position: absolute; top: 14px; right: 12px; }
+  body.adx-page .gt-panel-head .gp-right { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; }
+}
+body.adx-page .gt-panel-head .gt-select, body.adx-page .gt-panel-head .ddx-btn .ddx-val { color: #10231A !important; }
+@media (max-width: 640px) { body.adx-page .gt-panel-head .gp-right > * { min-width: 0 !important; width: 100% !important; max-width: 100%; box-sizing: border-box; margin: 0 !important; } body.adx-page .gt-panel-head .gp-right .gt-search input { min-width: 0; width: 100%; } }
+
+/* ---------- HQ organisation home on phones ----------
+   The organisation's own menu as a tidy 3-column grid, and the eight
+   dashboard cards two to a row with numbers scaled to fit. */
+@media (max-width: 640px) {
+  body.adx-page .og-tabs { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 6px !important; border-radius: 16px !important; overflow: visible !important; }
+  body.adx-page .og-tabs > a { display: flex; align-items: center; justify-content: center; min-width: 0; margin: 0 !important; padding: 9px 4px !important; border-radius: 11px !important; font-size: 13px; text-align: center; white-space: nowrap; }
+  body.adx-page :has(> .ox-card) { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  body.adx-page .ox-card { min-width: 0; margin: 0 !important; padding: 14px 12px !important; display: flex; flex-direction: column; gap: 8px; }
+  body.adx-page .ox-card .ox-card-t { gap: 8px !important; }
+  body.adx-page .ox-card .ox-card-t b { font-size: 14px; }
+  body.adx-page .ox-card .ox-card-t small { font-size: 11.5px; line-height: 1.3; }
+  body.adx-page .ox-card .ox-ic { width: 32px !important; height: 32px !important; border-radius: 10px !important; }
+  body.adx-page .ox-card .ox-big { font-size: 34px !important; line-height: 1 !important; margin: 4px 0 !important; }
+  body.adx-page .ox-card .ox-big.ox-word { font-size: 19px !important; line-height: 1.2 !important; overflow-wrap: anywhere; }
+  body.adx-page .ox-card .ox-logos { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px !important; }
+  body.adx-page .ox-card .ox-logos > * { width: auto !important; height: 34px !important; min-width: 0; }
+  body.adx-page .ox-card .ox-logos img { max-width: 22px; max-height: 22px; }
+  body.adx-page .ox-card .ox-chips { gap: 4px !important; }
+  body.adx-page .ox-card .ox-chips > * { font-size: 11.5px !important; padding: 4px 8px !important; }
+  body.adx-page .ox-card .ox-next { font-size: 12px; line-height: 1.4; }
+  body.adx-page .ox-card .ox-go { margin-top: auto !important; padding: 10px !important; font-size: 12.5px !important; gap: 6px; }
+  body.adx-page .ox-card .ox-faces > * { width: 30px !important; height: 30px !important; font-size: 12px !important; }
+}
+@media (max-width: 640px) { body.adx-page .og-bar { flex-wrap: wrap; } body.adx-page .og-bar > .og-tabs { flex: 1 1 100% !important; width: 100% !important; box-sizing: border-box; } }
+@media (max-width: 640px) {
+  body.adx-page .om-filters .rd-status { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 6px !important; border-radius: 16px !important; }
+  body.adx-page .om-filters .rd-status > a { display: flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; margin: 0 !important; padding: 9px 4px !important; border-radius: 11px !important; font-size: 12.5px; text-align: center; white-space: nowrap; }
+  body.adx-page .og-glist { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 8px !important; }
+  body.adx-page .og-glist > .og-gitem { flex-direction: column; align-items: flex-start !important; gap: 8px; min-width: 0; margin: 0 !important; padding: 12px !important; border-radius: 14px; background: #fff; border: 1px solid #E6EAEE; }
+  body.adx-page .og-glist > .og-gitem.on { border-color: #A78BFA; box-shadow: 0 0 0 2px rgba(167,139,250,.35); }
+  body.adx-page .og-glist > .og-gitem::before { display: none !important; }
+  body.adx-page .og-glist .ov-org-t b { white-space: normal !important; overflow-wrap: anywhere; font-size: 14px; }
+}
+@media (max-width: 640px) { body.adx-page .om-filters { display: grid !important; grid-template-columns: minmax(0, 1fr); gap: 8px; width: 100%; } body.adx-page .om-filters > nav { width: 100% !important; box-sizing: border-box; display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 6px !important; border-radius: 16px !important; } body.adx-page .om-filters > nav > a { display: flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; margin: 0 !important; padding: 9px 4px !important; border-radius: 11px !important; font-size: 12.5px; white-space: nowrap; } }
+@media (max-width: 640px) {
+  /* Every status filter in HQ (rounds, members) as an even grid. */
+  body.adx-page nav.rd-status { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 6px !important; border-radius: 16px !important; width: 100% !important; box-sizing: border-box; }
+  body.adx-page nav.rd-status > a { display: flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; margin: 0 !important; padding: 9px 4px !important; border-radius: 11px !important; font-size: 12.5px; white-space: nowrap; }
+  /* Round cards: "Round 53" as a label, "9 matches" in words. */
+  body.adx-page tr > td.rd-num b { display: inline-flex !important; width: auto !important; height: auto !important; padding: 4px 10px !important; border-radius: 999px !important; font-size: 12px !important; letter-spacing: .02em; }
+  body.adx-page tr > td.rd-num b::before { content: "Round "; font-weight: 700; }
+  body.adx-page tr > td .rd-count { display: inline !important; padding: 0 !important; border: 0 !important; background: none !important; font-size: 12.5px; font-weight: 700; color: #10231A; }
+  body.adx-page tr > td .rd-count::after { content: " matches"; font-weight: 500; color: #55655B; }
+  body.adx-page tr > td.rd-go { margin-top: auto; }
+}
+@media (max-width: 640px) { body.adx-page tr > td.rd-num b { display: inline-block !important; color: #fff !important; font-family: var(--body) !important; font-weight: 800 !important; } body.adx-page tr > td.rd-num b::before { content: "Round\00a0"; } }
+body.adx-page.adx-page.adx-page .ad-pane td.rd-num b { color: #fff !important; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+/* Results entry on phones and narrow tablets: each team's crest above its
+   name (whole words, never letter-by-letter), the two score boxes between. */
+@media (max-width: 760px) {
+  .mt-row { gap: 8px !important; align-items: start !important; }
+  .mt-side, .mt-side.is-away { flex-direction: column !important; align-items: center !important; justify-content: flex-start !important; gap: 6px !important; text-align: center !important; }
+  .mt-side.is-away b { order: 2; }
+  .mt-side b { overflow: visible !important; font-size: 12.5px !important; line-height: 1.25 !important; overflow-wrap: normal !important; word-break: normal !important; hyphens: auto; }
+  .mt-side .crest { width: 36px !important; height: 36px !important; }
+  .mt-score { align-self: center; margin-top: 0; }
+  .mt-score input { width: 52px !important; height: 52px !important; font-size: 22px !important; }
+}
+
+/* ---------- HQ Messages & Prefect on phones ----------
+   The organisation picker two to a row, the filters as an even grid, and
+   each Prefect flag as a card (who, why, terms, score) with Review at the
+   foot instead of a row that ran off the screen. */
+@media (max-width: 640px) {
+  body.adx-page .osw-grid { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  body.adx-page .osw-org { position: relative; flex-direction: column; align-items: flex-start !important; gap: 8px !important; min-width: 0; margin: 0 !important; padding: 12px !important; }
+  body.adx-page .osw-org .osw-name { font-size: 13.5px; line-height: 1.25; white-space: normal !important; overflow-wrap: anywhere; padding-right: 22px; }
+  body.adx-page .osw-org .osw-n { position: absolute; top: 10px; right: 10px; margin: 0 !important; }
+  body.adx-page :is(.pf-tabs, .msg-tabs) { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; width: 100%; }
+  body.adx-page :is(.pf-tabs > .pf-tab, .msg-tabs > .gts-tab) { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; margin: 0 !important; text-align: center; white-space: nowrap; }
+  body.adx-page .pf-list { display: grid !important; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  body.adx-page .pf-row { display: grid !important; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "src score" "txt txt" "terms terms" "go go"; gap: 8px 10px; align-items: center; min-width: 0; padding: 14px !important; overflow: hidden; }
+  body.adx-page .pf-row > .pf-src { grid-area: src; justify-self: start; }
+  body.adx-page .pf-row > .pf-score { grid-area: score; }
+  body.adx-page .pf-row > .pf-txt { grid-area: txt; min-width: 0; }
+  body.adx-page .pf-row > .pf-txt i { white-space: normal !important; }
+  body.adx-page .pf-row > .pf-terms { grid-area: terms; display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+  body.adx-page .pf-row > .pf-go { grid-area: go; width: 100%; justify-content: center; text-align: center; box-sizing: border-box; }
+}
+@media (max-width: 640px) { body.adx-page .osw-org .osw-name { display: block !important; -webkit-line-clamp: unset !important; overflow: visible !important; text-overflow: clip !important; } }
+@media (max-width: 640px) { body.adx-page .msg-tabs > .gts-tab:first-child { grid-column: 1 / -1; } body.adx-page .msg-bar .btn-primary { width: 100%; justify-content: center; box-sizing: border-box; } body.adx-page .msg-tabs > .gts-tab { padding: 10px 8px !important; } }

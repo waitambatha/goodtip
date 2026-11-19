@@ -118,6 +118,12 @@ class User(AbstractUser, OriginMixin):
     # pin follows them to their phone.
     pinned_series = models.JSONField(default=list, blank=True)
 
+    # THE WALL ROOMS THIS PERSON HAS STARRED, as Series slugs (client, 9 Nov
+    # 2026: "have a way of also having favourites"). Pins put a room at the top
+    # of the list (recap_codes); favourites are the ones the Favourites filter
+    # shows. Separate, as WhatsApp keeps them.
+    wall_favourites = models.JSONField(default=list, blank=True)
+
     def has_seen_tour(self, key: str) -> bool:
         return key in (self.onboarding_pages_seen or [])
 

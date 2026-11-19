@@ -289,8 +289,13 @@ def plans_view(request, org_id: int):
     package_claim = services.current_package_claim(org)
     has_packages = not package_claim and CustomPackage.objects.filter(is_active=True).exists()
 
+    member_count = OrgMember.objects.filter(org=org).count()
+    # The smallest plan that fits today's members, for the header tile (the
+    # slider below still recomputes it live as it moves).
+    fit_tier = next((t for t in tiers if (t.get("seat_limit") or 0) >= member_count), None)
     return render(request, "billing/plans.html", {
         "org": org,
+        "fit_tier": fit_tier,
         "tiers": tiers,
         "current": current,
         "period": _period_progress(sub_info) if sub_info else None,
@@ -298,7 +303,7 @@ def plans_view(request, org_id: int):
         **_custom_request_state(org, on_custom_plan=on_custom_plan),
         "on_custom_plan": on_custom_plan,
         # Where the "how many people will tip?" slider starts.
-        "member_count": OrgMember.objects.filter(org=org).count(),
+        "member_count": member_count,
         "stripe_configured": services.is_configured(),
         "stripe_test_mode": services.is_test_mode(),
         "first_billing_at": first_billing_at(),
@@ -940,8 +945,16 @@ def season_summary_view(request, org_id: int):
         OrgMember.objects.filter(user=request.user).select_related("org").order_by("org__name")
         if _admin_of(request.user, m.org, membership=m)
     ]
+    # The competitions as tiles with their logos (the first series' badge),
+    # rather than the "AFL + NRL + ..." run-on the header used to print.
+    comps = []
+    for c in org.competitions.prefetch_related("series").order_by("name"):
+        lead = next(iter(c.series.all()), None)
+        comps.append({"name": c.name, "logo": getattr(lead, "logo", "") or ""})
     return render(request, "billing/season_summary.html", {
         "org": org,
+        "comps": comps,
+        "member_count": org.members.count(),
         "panel_orgs": my_orgs,
         "panel_org": org,
         "summary": donations.donation_summary(org),

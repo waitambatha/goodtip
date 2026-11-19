@@ -24,7 +24,7 @@ making the same kind of claim with none of the same backing.
 {% url 'tipping:my_tips' org.id as tips_url %}
 <div id="statsPage" hx-boost="true" hx-target="#statsPage" hx-select="#statsPage" hx-swap="outerHTML show:none swap:500ms">
 <section class="cp-head">
-  <a class="cp-back" hx-boost="false" href="{% url 'tipping:leaderboard' org.id %}">Leaderboard</a>
+  <a class="cp-back" hx-boost="false" href="{% url 'tipping:leaderboard' org.id %}" aria-label="Back to the leaderboard"><svg aria-hidden="true"><use href="#ic-arrow-left"/></svg><span>Leaderboard</span></a>
   <h1>My stats</h1>
   <p>{{ org.name }}{% if selected_comp %} &middot; {{ selected_comp.name }}{% endif %}</p>
 </section>
@@ -144,7 +144,7 @@ stating rather than leaving the reader to infer from a slope.
       </svg>
       <div class="sp-donut-mid"><b>{{ chart_split.pct }}%</b><span>correct</span></div>
     </div>
-    <p class="sp-verdict">{{ stats.right }} right, {{ stats.missed }} missed.</p>
+    <p class="sp-verdict">{{ stats.right }} right, {{ stats.missed }} lost.</p>
     {% endif %}
   </section>
 

@@ -167,6 +167,9 @@
   'use strict';
 
   function refresh(form) {
+    /* The dashboard owns its own count (it knows what is confirmed and what
+       is only selected); this is the fallback for any other form slate. */
+    if (window.gtSlipRefresh) { window.gtSlipRefresh(); return; }
     var cards = form.querySelectorAll('.fxc');
     var picked = 0;
     cards.forEach(function (c) {
@@ -195,24 +198,60 @@
      * radio — so the button cannot disagree with the number beside it. */
     var review = document.getElementById('slipReview');
     if (review) review.hidden = picked === 0;
+    /* AND THE DOCK (12 Nov 2026). The dashboard's slip bar is folded away in
+       the redesign; the floating "tip sheet" pill is the one place a member
+       confirms from, so it has to come up on the first pick and go with the
+       last — it was left hidden, and there was no way to confirm at all. */
+    var dock = document.getElementById('slipDock');
+    if (dock) {
+      var num = document.getElementById('slipDockCount');
+      if (num) num.textContent = picked;
+      dock.hidden = picked === 0;
+    }
   }
 
   /* Draw a card as picked or not. One function for both directions, because
      the two are not symmetrical by accident — every property the pick sets has
      to be the property the un-pick clears, and keeping them apart is how a
-     card ends up un-picked but still wearing a green "Picked" chip. */
+     card ends up un-picked but still wearing a "Picked" chip.
+
+     SELECTED, NOT PICKED, UNTIL IT IS CONFIRMED (client, 13 Nov 2026). The
+     card carries what is actually saved in data-saved; a side that matches it
+     is "Picked" and wears the competition's colour, anything else is
+     "Selected" — chosen, waiting on the confirm. */
   function paint(card, team) {
     card.querySelectorAll('.fxc-team').forEach(function (t) { t.classList.remove('sel'); });
-    card.classList.toggle('is-picked', !!team);
     if (team) team.classList.add('sel');
+    var input = team && team.querySelector('input[type="radio"]');
+    var value = input ? input.value : '';
+    var saved = card.getAttribute('data-saved') || '';
+    var confirmed = !!team && value === saved;
+    card.classList.toggle('is-picked', !!team);
+    card.classList.toggle('is-confirmed', confirmed);
+    card.classList.toggle('is-draft', !!team && !confirmed);
     var chip = card.querySelector('.fxc-state');
     if (chip) {
-      chip.textContent = team ? 'Picked' : 'Open';
-      /* Keep the class in step with the word, or a pick keeps the grey
-         "Open" styling while claiming to be chosen — and an un-pick keeps the
-         green one while claiming not to be. */
-      chip.className = 'fxc-state ' + (team ? 'is-tipped' : 'is-open');
+      chip.textContent = !team ? 'Open' : (confirmed ? 'Picked' : 'Selected');
+      chip.className = 'fxc-state ' + (!team ? 'is-open' : (confirmed ? 'is-tipped' : 'is-selected'));
     }
+  }
+  window.gtPaintFixture = paint;
+
+  /* Every press is remembered on the server as a draft, so the selection is
+     still there after another page, a sign-out or a different device. Fire
+     and forget: a lost request costs a draft, never a tip. */
+  function remember(form, card, value) {
+    var url = form.getAttribute('data-draft-url');
+    var token = form.querySelector('input[name="csrfmiddlewaretoken"]');
+    if (!url || !token) return;
+    var body = new FormData();
+    body.append('csrfmiddlewaretoken', token.value);
+    body.append('match', card.id.replace('fxc-', ''));
+    body.append('selection', value);
+    try {
+      fetch(url, { method: 'POST', body: body, credentials: 'same-origin',
+                   headers: { 'X-Requested-With': 'XMLHttpRequest' }, keepalive: true });
+    } catch (err) { /* offline: the pick still stands on the page */ }
   }
 
   document.addEventListener('click', function (e) {
@@ -248,11 +287,14 @@
         if (none) none.checked = true;
         else input.checked = false;
         paint(card, null);
+        remember(form, card, 'none');
       } else {
         input.checked = true;
         paint(card, team);
+        remember(form, card, input.value);
       }
       refresh(form);
+      document.dispatchEvent(new CustomEvent('gt:slip-changed'));
     });
   });
 })();
@@ -302,3 +344,43 @@ document.addEventListener('submit', function (e) {
 window.addEventListener('pageshow', function () {
   document.querySelectorAll('.gt-switching').forEach(function (b) { b.remove(); });
 });
+
+/* My Tips: "Change it" opens the ticket's own picker in place (13 Nov 2026).
+ * Delegated, so a ticket htmx has just swapped in works the same. */
+document.addEventListener('click', function (e) {
+  var btn = e.target.closest && e.target.closest('[data-tk-change]');
+  if (!btn) return;
+  var tk = btn.closest('.tk');
+  var picker = tk && tk.querySelector('.tk-picker');
+  if (!picker) return;
+  var open = picker.hidden;
+  picker.hidden = !open;
+  tk.classList.toggle('is-changing', open);
+  var main = tk.querySelector('.tk-change');
+  if (main) main.setAttribute('aria-expanded', String(open));
+  if (open) { var first = picker.querySelector('.tk-opt:not([disabled])'); if (first) first.focus(); }
+  else if (main) main.focus();
+});
+
+/* SIX GAMES, THEN SCROLL (client, 14 Nov 2026: "only show 6 games, then the
+ * rest let one scroll ... so when I scroll the phone they can see the blogs
+ * down there"). On a phone the fixtures box is exactly as tall as its first
+ * six cards, measured from the cards themselves so it fits any phone and any
+ * card height; the rest scroll inside it and the page goes on to the news. */
+(function () {
+  var phone = window.matchMedia('(max-width: 760px)');
+  function size() {
+    var f = document.getElementById('roundFixtures');
+    if (!f) return;
+    if (!phone.matches) { f.style.removeProperty('--fx-six'); return; }
+    var cards = f.querySelectorAll('.fxc');
+    if (cards.length <= 6) { f.style.setProperty('--fx-six', 'none'); return; }
+    var top = f.getBoundingClientRect().top - f.scrollTop;
+    var h = cards[6].getBoundingClientRect().top - top - 4;
+    f.style.setProperty('--fx-six', Math.max(320, Math.round(h)) + 'px');
+  }
+  window.addEventListener('load', size);
+  document.addEventListener('DOMContentLoaded', size);
+  window.addEventListener('resize', size);
+  document.addEventListener('htmx:afterSettle', function () { setTimeout(size, 50); });
+})();

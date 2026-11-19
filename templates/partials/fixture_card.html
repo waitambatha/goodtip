@@ -39,10 +39,19 @@ when someone presses a side anyway (client, 14 Oct 2026). Graded fixtures
 (match.result set) are their own, already-informative state and carry none of
 this — a finished game is not "locked", it is over.
 {% endcomment %}
-<article class="fxc phase-{{ match.phase }}{% if selection %} is-picked{% endif %}{% if not editable %} is-locked{% endif %}{% if not editable and not match.result %} is-pending-lock{% endif %}"
+{% comment %}
+SELECTED AND PICKED ARE DIFFERENT THINGS (client, 13 Nov 2026: "when I select,
+let it read selected ... when I have confirmed, it says picked, and it's
+highlighted"). `draft` is set by the dashboard where the shown pick is a
+TipDraft — chosen, not confirmed — and `saved` is what is actually confirmed,
+so gt-fixture.js can tell the two apart as picks change. Other callers pass
+neither, and every pick they show is a confirmed one.
+{% endcomment %}
+<article class="fxc phase-{{ match.phase }}{% if selection %} is-picked{% if draft and editable %} is-draft{% else %} is-confirmed{% endif %}{% endif %}{% if not editable %} is-locked{% endif %}{% if not editable and not match.result %} is-pending-lock{% endif %}"
          data-code="{{ match.round.series.slug }}" data-cat="{{ match.round.series.category }}"
          style="--code: {{ match.round.series.colour }}; --code-ink: {{ match.round.series.colour }}; --code-on: #fff"
          {% if not editable and not match.result %}data-locked-msg="{% if round_locked %}{{ round_locked }}{% elif lock_note %}{{ lock_note }}{% else %}Locked — not open to tip yet.{% endif %}"{% endif %}
+         {% if mode == "form" and editable %}data-saved="{{ saved|default:'' }}"{% endif %}
          id="fxc-{{ match.id }}">
 
   {% if not editable and not match.result and match.phase == "upcoming" %}
@@ -74,9 +83,10 @@ this — a finished game is not "locked", it is over.
       {% if match.tip_correct %}
       <span class="fxc-state is-hit">Correct{% if match.tip_points %} &middot; +{{ match.tip_points }}{% endif %}</span>
       {% else %}
-      <span class="fxc-state is-miss">Missed</span>
+      <span class="fxc-state is-miss">Lost</span>
       {% endif %}
-    {% elif selection %}<span class="fxc-state is-tipped">Tipped</span>
+    {% elif selection and draft and editable %}<span class="fxc-state is-selected">Selected</span>
+    {% elif selection %}<span class="fxc-state is-tipped">Picked</span>
     {% elif round_locked or lock_note %}<span class="fxc-state is-shut">Locked</span>
     {% comment %}
     "Not tipped", not "No tip". The client read the two-word version as a label
@@ -150,7 +160,7 @@ this — a finished game is not "locked", it is over.
     explicit press writes this.
     {% endcomment %}
     {% if editable and mode != "htmx" %}
-    <input type="radio" name="match_{{ match.id }}" value="none" hidden data-no-tip>
+    <input type="radio" name="match_{{ match.id }}" value="none" hidden data-no-tip{% if draft == "none" %} checked{% endif %}>
     {% endif %}
     {% include "partials/_fixture_team.html" with team=match.home_team form=reader.home pick="home" side="home" %}
     {% if match.round.series.sport.draw_tips %}

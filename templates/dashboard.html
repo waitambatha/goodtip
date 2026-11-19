@@ -298,7 +298,7 @@ dashboard render. The form is inside the loop and already knows its org.
 {% endcomment %}
 <form method="post" action="{% url 'tipping:tip_confirm_upcoming' c.org.id %}" id="tipSlip"
       data-carry-url="{% url 'tipping:carry_preview' c.org.id %}"
-      data-busy="Saving your tips">
+      data-draft-url="{% url 'tipping:tip_draft' c.org.id %}">
       {% csrf_token %}
 
       {% include "partials/dashboard_slate.html" %}
@@ -328,7 +328,7 @@ dashboard render. The form is inside the loop and already knows its org.
       {% endcomment %}
       <div class="slip-dock" id="slipDock" hidden>
         <div class="slip-dock-in">
-          <span class="sd-count"><b id="slipDockCount">0</b> picked</span>
+          <span class="sd-count"><b id="slipDockCount">0</b> selected &middot; not confirmed yet</span>
           <button type="button" class="abtn abtn-primary" id="slipDockBtn">Confirm my tips</button>
         </div>
       </div>
@@ -339,78 +339,71 @@ dashboard render. The form is inside the loop and already knows its org.
       The list of picks is built from the form's own radios when it opens, so it
       can never disagree with what is about to be posted.
       {% endcomment %}
-      <div class="tipsheet" id="tipSheet" hidden aria-hidden="true">
+      <div class="tipsheet ts3" id="tipSheet" hidden aria-hidden="true">
         <div class="ts-veil" data-sheet-close></div>
         {% comment %}
-        data-busy-scope so the veil lands on THIS panel rather than the page.
-        The sheet is what you are looking at when you confirm, so it is what
-        should show the work — and covering its buttons is what stops a second
-        submission of a slate already being written.
+        THREE PLAIN STEPS (client, 13 Nov 2026: "let the first pop-up of
+        confirm be [showing] everything. Then I click next ... the list of
+        the groups ... check and uncheck ... then after confirming, we
+        finalize ... a nice loader ... says tips locked in").
+
+          1  Your picks       — every selection, then Next
+          2  Also tip in      — organisations and groups to carry them to,
+                                and "always do this, don't ask again"
+          3  Locked in        — a loader while it saves, then the receipt
+
+        Step 2 is fetched from tipping:carry_preview and skipped (straight
+        from Next to saving) for the many who tip in one place, or who have
+        already said always/never. The save is a fetch, not a page load, so
+        the loader and the receipt belong to the sheet; the no-JS path is
+        still a plain submit of this same form.
         {% endcomment %}
-        <div class="ts-panel" role="dialog" aria-modal="true" aria-labelledby="tsTitle" data-busy-scope>
-          {% comment %}
-          TWO STEPS, CARRY FIRST, PREVIEW LAST.
-
-          The order was the other way round and it put the small decision in
-          front of the big one: you checked a slate, it was written, and only
-          then were you asked whether it should also go to your other four
-          groups. Carrying is the question with the wider blast radius, so it
-          is asked first, on picks that have not been saved yet — and the
-          check-your-tips pane is the last thing you see before confirming,
-          which is what a confirmation is for.
-
-          Step 1 is skipped entirely for the majority who tip in one room:
-          the endpoint answers 204 and the sheet opens straight on step 2.
-          {% endcomment %}
-          <div class="ts-steps" id="tsSteps" hidden>
-            <span class="ts-step is-on" data-step-dot="carry">1 Where it goes</span>
-            <span class="ts-step" data-step-dot="review">2 Check your tips</span>
-          </div>
+        <div class="ts-panel" role="dialog" aria-modal="true" aria-labelledby="tsTitle">
           <header class="ts-head">
             <div>
-              <h3 id="tsTitle">Check your tips</h3>
-              {% comment %}
-              THE DENOMINATOR IS WHAT IS ON SCREEN.
-
-              tsCount is counted by the script from the fixtures actually in
-              the sheet; the total beside it used to be c.tips_total, which is
-              the round-in-play's fixture count and a different question
-              entirely. On wildcard weekend the sheet held the 2 finals games
-              and the header read "2 of 9 picked" — the 9 being a standard
-              home-and-away round that was not on screen at all. Two numbers
-              from two sources, presented as a fraction.
-
-              The round number goes the same way: in week mode the sheet spans
-              the current round of every competition, so naming one of them
-              would be picking at random. It shows only where there is a
-              single round to name.
-              {% endcomment %}
-              <p class="ts-sub"><b id="tsCount">0</b> of {{ slate_total }} picked{% if slate_round_no %} &middot; Round {{ slate_round_no }}{% endif %}</p>
+              <ol class="ts3-steps" id="tsSteps" aria-label="Steps">
+                <li class="is-on" data-step-dot="review"><i>1</i>Your picks</li>
+                <li data-step-dot="carry" id="tsStepCarry"><i>2</i>Also tip in</li>
+                <li data-step-dot="done"><i id="tsStepDoneNo">3</i>Locked in</li>
+              </ol>
+              <h3 id="tsTitle">Check your picks</h3>
+              <p class="ts-sub" id="tsSub"><b id="tsCount">0</b> pick<span id="tsCountP">s</span>{% if slate_round_no %} &middot; Round {{ slate_round_no }}{% endif %} <span id="tsNewNote"></span></p>
             </div>
             <button type="button" class="ts-x" data-sheet-close aria-label="Close">&times;</button>
           </header>
 
-          {# step 1 — filled in from tipping:carry_preview, hidden when empty #}
-          <div class="ts-body gt-scroll" id="tsCarry" hidden></div>
-
-          {% comment %}
-          Step 2 — built from the form's own radios, so it can never disagree
-          with what is about to be posted.
-          {% endcomment %}
+          {# step 1 — built from the form's own radios, so it matches what is posted #}
           <div class="ts-body gt-scroll" id="tsReview">
             <div class="ts-list" id="tsList"></div>
             <div class="ts-miss" id="tsMiss" hidden>
               <svg><use href="#ic-clock"/></svg>
-              <span><b id="tsMissN">0</b> match<span id="tsMissP">es</span> still without a tip. You can come back and fill them in until the round locks.</span>
+              <span><b id="tsMissN">0</b> match<span id="tsMissP">es</span> still without a tip. You can come back and fill them in until each game starts.</span>
+            </div>
+          </div>
+
+          {# step 2 — filled in from tipping:carry_preview #}
+          <div class="ts-body gt-scroll" id="tsCarry" hidden></div>
+
+          {# step 3 — the loader, then the receipt #}
+          <div class="ts-body ts3-done" id="tsDone" hidden aria-live="polite">
+            <div class="ts3-load" id="tsLoading">
+              <span class="ts3-ring" aria-hidden="true"><i></i></span>
+              <b>Locking in your tips&hellip;</b>
+            </div>
+            <div class="ts3-ok" id="tsOk" hidden>
+              <span class="ts3-tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>
+              <b id="tsOkTitle">Tips locked in</b>
+              <p id="tsOkText"></p>
+              <ul class="ts3-notes" id="tsOkNotes"></ul>
             </div>
           </div>
 
           <footer class="ts-foot">
-            <button type="button" class="abtn abtn-dark" data-sheet-close data-ts-cancel>Keep editing</button>
-            {# only rendered as usable once step 1 has been shown #}
-            <button type="button" class="abtn abtn-dark" id="tsBack" hidden>&larr; Back</button>
-            <button type="button" class="abtn abtn-primary" id="tsNext" hidden>Next: check your tips &rarr;</button>
-            <button type="submit" class="abtn abtn-primary" id="tsConfirm">Confirm and save &rarr;</button>
+            <button type="button" class="abtn abtn-ghost" data-sheet-close id="tsCancel">Keep editing</button>
+            <button type="button" class="abtn abtn-ghost" id="tsBack" hidden>&larr; Back</button>
+            <button type="button" class="abtn abtn-primary" id="tsNext">Next &rarr;</button>
+            <button type="submit" class="abtn abtn-primary" id="tsConfirm" hidden>Confirm tips</button>
+            <button type="button" class="abtn abtn-primary" data-sheet-close id="tsClose" hidden>Done</button>
           </footer>
         </div>
       </div>
@@ -610,7 +603,8 @@ any one card.
            bar lives inside #slipPanel, which htmx replaces whole. */
         var review = document.getElementById('slipReview');
         var allIn = document.getElementById('slipAllIn');
-        var dirty = signature() !== baseline;
+        var pending = changes();
+        var dirty = pending > 0;
         if (review) review.hidden = (n === 0 || !dirty);
         /* One or the other, never both and never neither-when-there-is-news. */
         if (allIn) {
@@ -630,8 +624,9 @@ any one card.
             done ? 'Change any pick until the round locks.'
                  : (open - n) + ' still to tip in this round.';
         }
-        dockRefresh(n);
+        dockRefresh(pending);
       }
+      window.gtSlipRefresh = slipRefresh;
 
       /* ---- what is actually unsaved ------------------------------------
          "If I have already confirmed my picks and we are into the weekend of
@@ -645,34 +640,26 @@ any one card.
          on teaches people to ignore the one that can, which on this screen is
          the one that decides whether a tip counts.
 
-         So the question the button answers is now "is anything here unsaved",
-         and the answer is this comparison: the selection as the SERVER drew it,
-         against the selection as it stands. The server's version is the
-         baseline because the dashboard's slate is a form — a rendered-checked
-         radio is a tip already stored, and until something is clicked the two
-         are identical by construction.
-
-         Re-baselined when the panel is REPLACED, not on every htmx settle: the
-         match-state poller swaps a block inside each card every thirty seconds
-         and would otherwise quietly adopt any unsaved change as saved, taking
-         the confirm away with it. Element identity is the test — hx-swap is
-         outerHTML, so a swapped panel is a different node. */
-      var panelSeen = null, baseline = '';
-      function signature(){
-        var parts = [];
+         So the question the button answers is "is anything here not
+         confirmed yet". */
+      /* Compared against data-saved on each card — what the server says is
+         CONFIRMED — rather than against whatever the page first drew. The
+         page now draws unconfirmed drafts too (TipDraft), so "as first
+         drawn" would count a draft from yesterday as saved and hide the very
+         confirm it is waiting for. Cards without data-saved cannot be tipped
+         and are not part of the question. */
+      function current(row){
+        var on = row.querySelector('input[type="radio"]:checked');
+        return on && on.value !== 'none' ? on.value : '';
+      }
+      function changes(){
+        var k = 0;
         rows().forEach(function(row){
-          var on = row.querySelector('input[type="radio"]:checked:not([data-no-tip])');
-          parts.push(row.id + '=' + (on ? on.value : ''));
+          if (!row.hasAttribute('data-saved')) return;
+          if (current(row) !== row.getAttribute('data-saved')) k++;
         });
-        return parts.join('|');
+        return k;
       }
-      function rebaseIfPanelReplaced(){
-        var panel = document.getElementById('slipPanel');
-        if (panel === panelSeen) return;
-        panelSeen = panel;
-        baseline = signature();
-      }
-      rebaseIfPanelReplaced();
 
       /* The docked confirm. ONE condition: you have picked something.
    
@@ -718,199 +705,213 @@ any one card.
       slipRefresh();
       /* Recount after a swap: the new round arrives with its own saved picks,
          and the bar would otherwise still be showing the previous round's. */
-      document.body.addEventListener('htmx:afterSettle', function(){
-        rebaseIfPanelReplaced();
-        slipRefresh();
-      });
+      document.body.addEventListener('htmx:afterSettle', function(){ slipRefresh(); });
 
-      /* ---- review sheet ----
-         Built from the form's own radios each time it opens, so the list shown
-         is exactly what the submit will post. */
+      /* ---- the confirm sheet: picks, then where else, then locked in ----
+         Built from the form's own radios each time it opens, so the list
+         shown is exactly what will be posted. */
       var sheet = document.getElementById('tipSheet');
       if (sheet) {
-        var tsList = document.getElementById('tsList');
-        var tsCount = document.getElementById('tsCount');
-        var tsMiss = document.getElementById('tsMiss');
-        var tsMissN = document.getElementById('tsMissN');
-        var tsMissP = document.getElementById('tsMissP');
-        var lastFocus = null;
+        var $ = function(id){ return document.getElementById(id); };
+        var tsList = $('tsList'), tsCarry = $('tsCarry'), tsReview = $('tsReview'), tsDone = $('tsDone');
+        var tsBack = $('tsBack'), tsNext = $('tsNext'), tsConfirm = $('tsConfirm'), tsClose = $('tsClose'), tsCancel = $('tsCancel');
+        var tsTitle = $('tsTitle'), tsSub = $('tsSub');
+        var lastFocus = null, carryLoad = null, carryHtml = '', busy = false;
 
-        /* The sheet's own elements are safe to hold: #tipSheet sits outside
-           #slipPanel precisely so a swap cannot detach them. Only the FIXTURE
-           rows are re-read, because those are what changes. */
-        /* WHAT A CONFIRMATION IS FOR.
+        function nameOf(el){ var s = el && el.querySelector('.fxc-name'); return s ? s.textContent.trim() : ''; }
 
-           This listed every fixture on screen and stamped "No tip" on the ones
-           without a pick, so a member who tipped three games out of nine was
-           shown nine rows, six of them telling them off. Reported as: "just
-           show what I have picked, stop showing me games and saying not
-           tipped — let me confirm what is currently there."
-
-           Right. A confirmation screen is for checking the thing you are about
-           to do. What is still untipped is not part of that decision, and the
-           count of it is already carried by the strip underneath — one line,
-           phrased as time you still have rather than as a list of omissions. */
         function buildSheet(){
           tsList.innerHTML = '';
-          var picked = 0, missing = 0;
+          var picked = 0, fresh = 0, missing = 0;
           rows().forEach(function(row){
-            var chosen = row.querySelector('input:checked');
-            if (!chosen) { missing++; return; }
-            var teams = row.querySelectorAll('.fxc-team:not(.fxc-draw)');  /* the two sides — not the Draw between them */
-            /* :not(.crest) matters, the crest tag emits its own <span> before
-               the name, and plain querySelector('span') returns that one (which
-               holds only an <img>), so the names came out blank. */
-            /* The card gives the name its own class now, so this no
-               longer has to guess which span is not the crest. */
-            function nameOf(el){
-              var s = el && el.querySelector('.fxc-name');
-              return s ? s.textContent.trim() : '';
-            }
-            var homeName = nameOf(teams[0]);
-            var awayName = nameOf(teams[1]);
-            var meta = row.querySelector('.fxc-when');
-            var venue = row.querySelector('.fxc-venue');
-
+            var tippable = row.hasAttribute('data-saved');
+            var value = current(row);
+            var saved = tippable ? row.getAttribute('data-saved') : value;
+            if (!value && !saved) { if (tippable) missing++; return; }
+            if (!tippable) return;
+            var teams = row.querySelectorAll('.fxc-team:not(.fxc-draw)');
+            var home = nameOf(teams[0]), away = nameOf(teams[1]);
+            var label = function(v){ return v === 'home' ? home : (v === 'draw' ? 'Draw' : away); };
+            var isNew = value !== saved;
+            if (value) picked++;
+            if (isNew) fresh++;
+            var meta = row.querySelector('.fxc-when'), comp = row.querySelector('.fxc-code');
             var item = document.createElement('div');
-            item.className = 'ts-item';
-
-            picked++;
-            var pickName = chosen.value === 'home' ? homeName : (chosen.value === 'draw' ? 'Draw' : awayName);
-
-            var vsLine = homeName + ' v ' + awayName;
-            var when = meta ? meta.textContent.trim() : '';
-            if (venue) when += ' · ' + venue.textContent.trim();
-
-            item.innerHTML =
-              '<div class="tsi-match"><b></b><small></small></div>' +
-              '<div class="tsi-pick"><span></span></div>';
-            item.querySelector('.tsi-match b').textContent = vsLine;
-            item.querySelector('.tsi-match small').textContent = when;
-            var badge = item.querySelector('.tsi-pick span');
-            badge.className = 'tsi-yes';
-            badge.textContent = pickName;
+            item.className = 'ts-item' + (isNew ? ' is-new' : ' is-kept') + (value ? '' : ' is-drop');
+            item.style.setProperty('--code', row.style.getPropertyValue('--code') || '#7b8f86');
+            item.innerHTML = '<div class="tsi-match"><b></b><small></small></div><div class="tsi-pick"><span class="tsi-yes"></span><em></em></div>';
+            item.querySelector('.tsi-match b').textContent = home + ' v ' + away;
+            item.querySelector('.tsi-match small').textContent =
+              (comp ? comp.textContent.trim() + ' · ' : '') + (meta ? meta.textContent.trim() : '');
+            item.querySelector('.tsi-yes').textContent = value ? label(value) : 'No tip';
+            item.querySelector('.tsi-pick em').textContent =
+              !value ? 'Taking back ' + label(saved) : (isNew ? (saved ? 'Changed from ' + label(saved) : 'New') : 'Already locked in');
             tsList.appendChild(item);
           });
-
-          if (tsCount) tsCount.textContent = picked;
-          if (tsMiss) {
-            tsMiss.hidden = missing === 0;
-            if (tsMissN) tsMissN.textContent = missing;
-            if (tsMissP) tsMissP.textContent = missing === 1 ? '' : 'es';
-          }
+          $('tsCount').textContent = picked;
+          $('tsCountP').textContent = picked === 1 ? '' : 's';
+          $('tsNewNote').textContent = fresh ? '· ' + fresh + ' to confirm' : '';
+          $('tsMiss').hidden = missing === 0;
+          $('tsMissN').textContent = missing;
+          $('tsMissP').textContent = missing === 1 ? '' : 'es';
         }
 
-        /* ---- the two steps ----
-           Step 1 (carry) is fetched, not pre-rendered: whether there is
-           anything to ask depends on the picks currently on screen, which
-           change every time somebody taps a team. The endpoint writes
-           nothing and answers 204 when there is nothing to carry, so the
-           common case — one room, nothing to ask — opens straight on the
-           review and never sees a spinner. */
-        var tsSteps   = document.getElementById('tsSteps');
-        var tsCarry   = document.getElementById('tsCarry');
-        var tsReview  = document.getElementById('tsReview');
-        var tsBack    = document.getElementById('tsBack');
-        var tsNext    = document.getElementById('tsNext');
-        var tsConfirm = document.getElementById('tsConfirm');
-        var tsTitle   = document.getElementById('tsTitle');
-        var tsSub     = document.querySelector('.ts-sub');
-        var hasCarry  = false;
+        function dots(which){
+          sheet.querySelectorAll('[data-step-dot]').forEach(function(d){
+            var k = d.getAttribute('data-step-dot');
+            d.classList.toggle('is-on', k === which);
+            d.classList.toggle('is-past', (which === 'carry' && k === 'review') || (which === 'done' && k !== 'done'));
+          });
+          $('tsStepCarry').hidden = !carryHtml;
+          $('tsStepDoneNo').textContent = carryHtml ? '3' : '2';
+        }
 
         function showStep(which){
-          var carry = which === 'carry';
-          tsCarry.hidden  = !carry;
-          tsReview.hidden = carry;
-          /* The buttons are the step indicator people actually read, so they
-             have to be exactly right: no Back on step one, no Confirm until
-             the last screen. A Confirm visible on step one is a member
-             saving without ever seeing their tips. */
-          tsNext.hidden    = !carry;
-          tsBack.hidden    = carry || !hasCarry;
-          tsConfirm.hidden = carry;
-          if (tsTitle) tsTitle.textContent = carry ? 'Where do these tips go?' : 'Check your tips';
-          if (tsSub) tsSub.hidden = carry;
-          if (tsSteps) {
-            tsSteps.querySelectorAll('[data-step-dot]').forEach(function(d){
-              d.classList.toggle('is-on', d.getAttribute('data-step-dot') === which);
-            });
-          }
-          (carry ? tsCarry : tsReview).scrollTop = 0;
+          tsReview.hidden = which !== 'review';
+          tsCarry.hidden  = which !== 'carry';
+          tsDone.hidden   = which !== 'done';
+          tsNext.hidden    = which !== 'review';
+          tsBack.hidden    = which !== 'carry';
+          tsConfirm.hidden = which !== 'carry';
+          tsCancel.hidden  = which !== 'review';
+          tsClose.hidden   = true;
+          tsTitle.textContent = which === 'review' ? 'Check your picks'
+                              : which === 'carry' ? 'Use these picks everywhere?' : 'Locking in';
+          tsSub.hidden = which !== 'review';
+          dots(which);
+          var body = which === 'review' ? tsReview : (which === 'carry' ? tsCarry : tsDone);
+          body.scrollTop = 0;
         }
 
         function loadCarry(){
-          /* Everything the confirm would post, so the plan is built from the
-             same picks the save will write. */
-          var data = new FormData(slip);
           var url = slip.getAttribute('data-carry-url');
           if (!url) return Promise.resolve('');
-          return fetch(url, {
-            method: 'POST',
-            body: data,
-            headers: {'X-Requested-With': 'XMLHttpRequest'},
-            credentials: 'same-origin'
-          }).then(function(r){
-            if (r.status === 204) return '';
-            if (!r.ok) return '';
-            return r.text();
-          }).catch(function(){
-            /* Offline, or the endpoint fell over. Carrying is an extra, not
-               the task — losing it must never cost somebody their tips, so
-               the sheet just goes straight to the review and the old
-               after-the-save screen picks the question up instead. */
-            return '';
-          });
+          return fetch(url, { method: 'POST', body: new FormData(slip), credentials: 'same-origin',
+                              headers: {'X-Requested-With': 'XMLHttpRequest'} })
+            .then(function(r){ return (r.status === 204 || !r.ok) ? '' : r.text(); })
+            /* Carrying is an extra, not the task: if it fails, the picks still save. */
+            .catch(function(){ return ''; });
         }
 
         function openSheet(){
           buildSheet();
           lastFocus = document.activeElement;
+          carryHtml = '';
+          tsCarry.innerHTML = '';
           sheet.hidden = false;
           sheet.setAttribute('aria-hidden', 'false');
           document.body.classList.add('sheet-open');
-          /* Open on the review immediately and move back to step 1 if the
-             fetch turns up work. Waiting on the network before showing
-             anything would put a blank sheet in front of every member for
-             the sake of a step most of them never see. */
-          hasCarry = false;
-          tsCarry.innerHTML = '';
-          if (tsSteps) tsSteps.hidden = true;
           showStep('review');
-          var first = sheet.querySelector('.ts-x');
-          if (first) first.focus();
-
-          loadCarry().then(function(html){
-            if (sheet.hidden) return;          /* they closed it meanwhile */
-            if (!html) return;
-            tsCarry.innerHTML = html;
-            /* The organisation/groups tree in there wires itself up from a
-               delegated handler in gt-ui.js, which cannot see markup that
-               arrives by innerHTML until something tells it to. */
-            document.dispatchEvent(new CustomEvent('gt:carry-rendered'));
-            hasCarry = true;
-            if (tsSteps) tsSteps.hidden = false;
-            showStep('carry');
-          });
+          /* Asked for in the background while the picks are being read, so
+             Next is usually instant. Nothing is saved by asking. */
+          carryLoad = loadCarry().then(function(html){ carryHtml = html || ''; dots('review'); return carryHtml; });
+          tsNext.focus();
         }
+
         function closeSheet(){
+          if (busy) return;
           sheet.hidden = true;
           sheet.setAttribute('aria-hidden', 'true');
           document.body.classList.remove('sheet-open');
-          /* Drop the carry answer with the sheet. Leaving those inputs in the
-             form would post a decision from a slate the member has since
-             edited. */
+          /* Drop the carry answer with the sheet: those inputs live in the
+             form, and must not post a decision about a slate since edited. */
           tsCarry.innerHTML = '';
-          hasCarry = false;
-          if (lastFocus) lastFocus.focus();
+          carryHtml = '';
+          if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
         }
 
-        tsNext.addEventListener('click', function(){ showStep('review'); });
-        tsBack.addEventListener('click', function(){ showStep('carry'); });
+        tsNext.addEventListener('click', function(){
+          tsNext.classList.add('is-wait');
+          carryLoad.then(function(html){
+            tsNext.classList.remove('is-wait');
+            if (sheet.hidden) return;
+            if (!html) { save(); return; }
+            if (!tsCarry.innerHTML) {
+              tsCarry.innerHTML = html;
+              document.dispatchEvent(new CustomEvent('gt:carry-rendered'));
+            }
+            showStep('carry');
+          });
+        });
+        tsBack.addEventListener('click', function(){ showStep('review'); });
 
-        /* Delegated from the form, which outlives the swap. #slipReview lives
-           inside #slipPanel, so a direct binding would be lost the first time
-           the round or the competition filter changed — leaving a Confirm
-           button that silently did nothing. */
+        /* THE SAVE. A fetch rather than a page load so the sheet can hold the
+           loader and then say plainly that it worked. Held on screen for a
+           moment even when the server is quick — a tick that flashes past
+           reads as a glitch, not as reassurance. */
+        function save(){
+          if (busy) return;
+          busy = true;
+          showStep('done');
+          $('tsLoading').hidden = false;
+          $('tsOk').hidden = true;
+          tsDone.classList.remove('is-error');
+          var started = Date.now();
+          var post = fetch(slip.action, { method: 'POST', body: new FormData(slip), credentials: 'same-origin',
+                                          headers: {'X-Requested-With': 'XMLHttpRequest'} })
+            .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); });
+          post.then(function(data){
+            var wait = Math.max(0, 1100 - (Date.now() - started));
+            setTimeout(function(){ done(data); }, wait);
+          }).catch(function(){
+            setTimeout(function(){ failed(); }, 600);
+          });
+        }
+
+        function done(data){
+          busy = false;
+          if (data.next) { window.location.href = data.next; return; }
+          /* What is on the page is now what is saved: every tippable card
+             takes its current pick as confirmed, and repaints as Picked. */
+          rows().forEach(function(row){
+            if (!row.hasAttribute('data-saved')) return;
+            row.setAttribute('data-saved', current(row));
+            if (window.gtPaintFixture) window.gtPaintFixture(row, row.querySelector('.fxc-team.sel'));
+          });
+          slipRefresh();
+          $('tsLoading').hidden = true;
+          $('tsOk').hidden = false;
+          sheet.querySelector('.ts3-tick svg').innerHTML = '<path d="m5 12.5 4.5 4.5L19 7.5"/>';
+          var n = data.saved || 0;
+          $('tsOkTitle').textContent = data.ok ? 'Tips locked in' : 'Nothing to change';
+          $('tsOkText').textContent = data.ok
+            ? (n ? n + ' tip' + (n === 1 ? '' : 's') + ' saved' : 'Your changes are saved') +
+              (data.cleared ? ', ' + data.cleared + ' taken back' : '') +
+              '. You can change any pick until that game starts.'
+            : ((data.notes && data.notes[0]) || 'Those games have already started.');
+          var ul = $('tsOkNotes'); ul.innerHTML = '';
+          (data.notes || []).forEach(function(t){
+            if (!/carried|replaced|kept the different|already up to date|already started/.test(t)) return;
+            var li = document.createElement('li'); li.textContent = t; ul.appendChild(li);
+          });
+          tsTitle.textContent = 'All done';
+          dots('done');
+          sheet.querySelectorAll('[data-step-dot]').forEach(function(d){ d.classList.add('is-past'); });
+          tsBack.hidden = tsConfirm.hidden = tsNext.hidden = tsCancel.hidden = true;
+          tsClose.hidden = false;
+          tsClose.focus();
+        }
+
+        function failed(){
+          busy = false;
+          $('tsLoading').hidden = true;
+          $('tsOk').hidden = false;
+          tsDone.classList.add('is-error');
+          sheet.querySelector('.ts3-tick svg').innerHTML = '<path d="M7 7l10 10M17 7 7 17"/>';
+          $('tsOkTitle').textContent = "That didn't save";
+          $('tsOkText').textContent = 'Your picks are still selected. Check your connection and try again.';
+          $('tsOkNotes').innerHTML = '';
+          tsBack.hidden = false;
+          tsBack.onclick = function(){ tsBack.onclick = null; tsDone.classList.remove('is-error'); showStep('review'); };
+          tsClose.hidden = false;
+        }
+
+        slip.addEventListener('submit', function(e){
+          if (sheet.hidden) return;   /* anything else posting this form, as before */
+          e.preventDefault();
+          save();
+        });
+
         slip.addEventListener('click', function(e){
           if (e.target.closest && e.target.closest('#slipReview')) openSheet();
         });
@@ -920,10 +921,10 @@ any one card.
         document.addEventListener('keydown', function(e){
           if (e.key === 'Escape' && !sheet.hidden) closeSheet();
         });
-        /* Keep focus inside the dialog while it's open. */
         sheet.addEventListener('keydown', function(e){
           if (e.key !== 'Tab') return;
-          var f = sheet.querySelectorAll('button, [href], input, select, textarea');
+          var f = Array.prototype.filter.call(sheet.querySelectorAll('button, [href], input, select, textarea'),
+                                              function(x){ return x.offsetParent !== null; });
           if (!f.length) return;
           var first = f[0], last = f[f.length - 1];
           if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }

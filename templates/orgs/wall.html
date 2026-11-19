@@ -37,6 +37,8 @@ gt-loader.js skips it before the splash can paint a frame.
 <link rel="stylesheet" href="{% static 'css/gt-messages.css' %}">
 <link rel="stylesheet" href="{% static 'css/gt-wall.css' %}">
 <script src="{% static 'js/gt-chat.js' %}" defer></script>
+<script src="{% static 'js/gt-typing.js' %}" defer></script>
+<script src="{% static 'js/gt-wall-chat.js' %}" defer></script>
 {% endblock %}
 
 {% block app_content %}
@@ -73,10 +75,19 @@ with no room chosen starts on the list.
     </header>
 
     <div class="gtm-nav-body gt-scroll">
+      {% comment %}All or just your favourites, as WhatsApp filters chats (client, 9 Nov 2026).{% endcomment %}
+      <div class="gwr-filter" role="tablist" aria-label="Show">
+        <button type="button" class="on" data-gwr-filter="all" role="tab" aria-selected="true">All</button>
+        <button type="button" data-gwr-filter="fav" role="tab" aria-selected="false">&#9733; Favourites</button>
+      </div>
+      <p class="gwr-nofav" data-gwr-nofav hidden>No favourites yet. Right-click a competition, or hold it on a phone, and choose Add to favourites.</p>
       <h2 class="gtm-sec-h">Competitions</h2>
       <ul class="gtm-list gwr-rooms">
         {% for r in rooms %}
-        <li class="gtm-conv gwr-room{% if r.slug == room.slug %} on{% endif %}"{% if r.code %} data-code="{{ r.code }}"{% endif %}>
+        {% if r.starts_pinned %}</ul><h2 class="gtm-sec-h">Pinned</h2><ul class="gtm-list gwr-rooms">{% endif %}
+        {% if r.starts_rest %}</ul><h2 class="gtm-sec-h">More competitions</h2><ul class="gtm-list gwr-rooms">{% endif %}
+        {% if r.starts_other %}</ul><h2 class="gtm-sec-h">Other competitions on GoodTip</h2><ul class="gtm-list gwr-rooms">{% endif %}
+        <li class="gtm-conv gwr-room{% if r.slug == room.slug %} on{% endif %}{% if r.fav %} is-fav{% endif %}" data-room="{{ r.slug }}"{% if r.code %} data-code="{{ r.code }}" style="--code: {{ r.colour }}; --code-ink: {{ r.colour }}; --code-on: #fff"{% endif %}>
           {% comment %}
           CHANGING ROOM WITHOUT RELOADING THE PAGE (client: "it flickers when
           I press"). A plain link reloaded everything — nav, rooms, header — to
@@ -91,11 +102,11 @@ with no room chosen starts on the list.
           {% endcomment %}
           <a href="?room={{ r.slug }}"{% if r.slug == room.slug %} aria-current="page"{% endif %}
              hx-get="?room={{ r.slug }}" hx-target=".gwr" hx-select=".gwr" hx-swap="outerHTML" hx-push-url="true"
-             data-veil-for=".gwr-stage" data-veil-label="Opening {{ r.name }}">
-            <span class="gtm-av gwr-av" aria-hidden="true">{{ r.mark }}</span>
+             data-veil-for=".gwr-stage" data-veil-label="Opening {{ r.name }}"{% if r.code %} data-veil-code="{{ r.code }}"{% if r.logo %} data-veil-logo="{{ r.logo }}"{% endif %}{% endif %}>
+            <span class="gtm-av gwr-av{% if r.logo %} has-logo{% endif %}" aria-hidden="true">{% if r.logo %}<img src="{{ r.logo }}" alt="" loading="lazy" onerror="var a=this.parentNode;a.classList.remove('has-logo');a.textContent='{{ r.mark }}'">{% else %}{{ r.mark }}{% endif %}</span>
             <span class="gtm-conv-txt">
               <span class="gtm-conv-top">
-                <b>{{ r.name }}</b>
+                <b>{% if r.pinned %}<svg class="gwr-pinmark" viewBox="0 0 24 24" aria-label="Pinned"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/></svg>{% endif %}{{ r.name }}{% if r.fav %} <i class="gwr-favmark" aria-label="Favourite">&#9733;</i>{% endif %}</b>
                 {% if r.latest %}<span class="gtm-when">{{ r.latest|naturaltime }}</span>{% endif %}
               </span>
               <span class="gtm-conv-bot">
@@ -104,6 +115,23 @@ with no room chosen starts on the list.
             </span>
             {% if r.recaps %}<span class="gwr-count" title="{{ r.recaps }} round recap{{ r.recaps|pluralize }}">{{ r.recaps }}</span>{% endif %}
           </a>
+          {% if r.code %}
+          {% comment %}The room's own menu: right-click, hold on a phone, or the dots.{% endcomment %}
+          <button type="button" class="gwr-more" data-gwr-more aria-label="Options for {{ r.name }}" aria-haspopup="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+          </button>
+          <div class="gwr-menu" data-gwr-menu hidden role="menu">
+            <form method="post" action="{% url 'orgs:wall_recap_pref' org.id %}" hx-post="{% url 'orgs:wall_recap_pref' org.id %}" hx-target=".gwr" hx-select=".gwr" hx-swap="outerHTML" hx-push-url="false">{% csrf_token %}
+              <input type="hidden" name="toggle" value="{{ r.slug }}"><input type="hidden" name="room" value="{{ room.slug }}">
+              <button type="submit" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/></svg>{% if r.pinned %}Unpin{% else %}Pin to the top{% endif %}</button>
+            </form>
+            <form method="post" action="{% url 'orgs:wall_recap_pref' org.id %}" hx-post="{% url 'orgs:wall_recap_pref' org.id %}" hx-target=".gwr" hx-select=".gwr" hx-swap="outerHTML" hx-push-url="false">{% csrf_token %}
+              <input type="hidden" name="fav" value="{{ r.slug }}"><input type="hidden" name="room" value="{{ room.slug }}">
+              <button type="submit" role="menuitem"><span class="gwr-menu-star" aria-hidden="true">{% if r.fav %}&#9734;{% else %}&#9733;{% endif %}</span>{% if r.fav %}Remove from favourites{% else %}Add to favourites{% endif %}</button>
+            </form>
+            <a href="?room={{ r.slug }}" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Open {{ r.name }}</a>
+          </div>
+          {% endif %}
         </li>
         {% endfor %}
       </ul>
@@ -111,14 +139,14 @@ with no room chosen starts on the list.
   </aside>
 
   {# ==================== RIGHT: the room ==================== #}
-  <section class="gtm-chat gwr-chat"{% if room.code %} data-code="{{ room.code }}"{% endif %}>
+  <section class="gtm-chat gwr-chat"{% if room.code %} data-code="{{ room.code }}" style="--code: {{ room.colour }}; --code-ink: {{ room.colour }}; --code-on: #fff"{% endif %}>
     <div class="gtm-chat-in">
       <header class="gtm-chat-head gwr-head">
         <a class="gtm-back" href="?room=" data-gwr-back aria-label="Back to the rooms"
            hx-get="?room=" hx-target=".gwr" hx-select=".gwr" hx-swap="outerHTML" hx-push-url="true" data-veil-skip>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
         </a>
-        <span class="gtm-av gwr-av" aria-hidden="true">{{ room.mark }}</span>
+        <span class="gtm-av gwr-av{% if room.logo %} has-logo{% endif %}" aria-hidden="true">{% if room.logo %}<img src="{{ room.logo }}" alt="" onerror="var a=this.parentNode;a.classList.remove('has-logo');a.textContent='{{ room.mark }}'">{% else %}{{ room.mark }}{% endif %}</span>
         <span class="gtm-chat-who">
           <b>{{ room.name }}</b>
           <i>{% if room.code %}Round recaps and chat for {{ room.name }}{% else %}Every competition, every recap{% endif %} &middot; {% if group %}{{ group.name }} only{% else %}{{ org.name }} only{% endif %}</i>
@@ -129,16 +157,22 @@ with no room chosen starts on the list.
           prefers opens first, on every Wall they are on. One tap here rather
           than a setting somewhere else.
           {% endcomment %}
-          <form method="post" action="{% url 'orgs:wall_recap_pref' org.id %}" data-busy="Saving"
-                data-busy-for=".gwr-chat">
+          {% if room.code %}
+          <form method="post" action="{% url 'orgs:wall_recap_pref' org.id %}" hx-post="{% url 'orgs:wall_recap_pref' org.id %}" hx-target=".gwr" hx-select=".gwr" hx-swap="outerHTML" hx-push-url="false">
             {% csrf_token %}
-            {% if room.is_default %}
-            <button type="submit" class="gwr-pin on" title="Opens first. Press to open all competitions first instead.">&#9733; Opens first</button>
-            {% else %}
-            {% if room.code %}<input type="hidden" name="codes" value="{{ room.slug }}">{% endif %}
-            <button type="submit" class="gwr-pin">&#9734; Open this first</button>
-            {% endif %}
+            <input type="hidden" name="toggle" value="{{ room.slug }}"><input type="hidden" name="room" value="{{ room.slug }}">
+            <button type="submit" class="gwr-pin{% if room.pinned %} on{% endif %}" title="{% if room.pinned %}Pinned to the top of your rooms. Press to unpin.{% else %}Pin this room to the top of your list{% endif %}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/></svg>{% if room.pinned %}Pinned{% else %}Pin{% endif %}
+            </button>
           </form>
+          <form method="post" action="{% url 'orgs:wall_recap_pref' org.id %}" hx-post="{% url 'orgs:wall_recap_pref' org.id %}" hx-target=".gwr" hx-select=".gwr" hx-swap="outerHTML" hx-push-url="false">
+            {% csrf_token %}
+            <input type="hidden" name="fav" value="{{ room.slug }}"><input type="hidden" name="room" value="{{ room.slug }}">
+            <button type="submit" class="gwr-pin{% if room.fav %} on{% endif %}" title="{% if room.fav %}In your favourites. Press to remove.{% else %}Add to your favourites{% endif %}">
+              <span aria-hidden="true">{% if room.fav %}&#9733;{% else %}&#9734;{% endif %}</span>{% if room.fav %}Favourite{% else %}Favourite{% endif %}
+            </button>
+          </form>
+          {% endif %}
         </div>
       </header>
 
@@ -157,8 +191,15 @@ with no room chosen starts on the list.
             {% include "orgs/partials/_wall_post.html" with p=pinned_recap %}
           </div>
           {% endif %}
+          <div class="gwr-chunk">
+          {% if has_more %}
+          {% comment %}Older posts load here, above, without leaving the room.{% endcomment %}
+          <button type="button" class="gwr-earlier" hx-get="?room={{ room.slug }}&amp;before={{ oldest|urlencode }}"
+                  hx-select=".gwr-chunk" hx-target="closest .gwr-chunk" hx-swap="afterbegin" data-veil-skip
+                  hx-on::before-request="this.textContent='Loading…'" hx-on::after-request="this.remove()">Load earlier posts</button>
+          {% endif %}
           {% for p in posts reversed %}
-            {% include "orgs/partials/_wall_post.html" with p=p %}
+            {% if p.is_story %}{% include "orgs/partials/_wall_story.html" with s=p %}{% elif p.is_reply %}{% include "orgs/partials/_wall_reply_row.html" with r=p %}{% else %}{% include "orgs/partials/_wall_post.html" with p=p %}{% endif %}
           {% empty %}
             {% if not pinned_recap %}
             <div class="gwr-empty">
@@ -167,6 +208,7 @@ with no room chosen starts on the list.
             </div>
             {% endif %}
           {% endfor %}
+          </div>
         </div>
         </div>
 
@@ -179,28 +221,78 @@ with no room chosen starts on the list.
         does (client, 19 Sep 2026: the loader on the posts, "not the whole
         page"). The composer itself stays visible and stays put.
         {% endcomment %}
-        <form method="post" action="{% url 'orgs:wall_post' org.id %}" class="gtm-composer gwr-composer"
-              data-busy="Posting" data-busy-for=".gwr-stage">
+        {% comment %}
+        ONE COMPOSER FOR POSTS AND REPLIES (client, 5 Nov 2026). Pressing Reply
+        on a post — or swiping it, or holding it — puts a quote of it above
+        this box, and what is written then goes into that post's thread. The
+        × on the quote turns it back into a new post.
+        {% endcomment %}
+        <form method="post" enctype="multipart/form-data" action="{% url 'orgs:wall_post' org.id %}" class="gtm-composer gwr-composer"
+              data-busy="Posting" data-busy-for=".gwr-stage" data-chat-form data-wl-composer
+              data-post-url="{% url 'orgs:wall_post' org.id %}"
+              data-typing-url="{% url 'orgs:typing' org.id %}" data-typing-ch="w{% if group %}{{ group.id }}{% else %}0{% endif %}:{{ room.slug }}">
           {% csrf_token %}
+  {# "Sam is typing…" — filled in by gt-typing.js. #}
+  <div class="cc-typing" data-typing-show hidden aria-live="polite">
+    <span class="cc-typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span data-typing-text></span>
+  </div>
           {% if room.code %}<input type="hidden" name="room" value="{{ room.slug }}">{% endif %}
-          <div class="gwr-compose-extra">
-            <select name="tip" class="gwr-pick" aria-label="Attach one of your picks (optional)">
-              <option value="">Attach a pick (optional)</option>
-              {% for t in my_tips %}
-              <option value="{{ t.id }}">{{ t.pick_text }}</option>
-              {% empty %}
-              <option value="" disabled>Tip this round and your picks appear here</option>
-              {% endfor %}
-            </select>
-            {% if can_share_public %}
-            <label class="gwr-share"><input type="checkbox" name="share_public" value="1"> Also on the public Wall</label>
-            {% endif %}
+          <div class="cc-quote wl-quote" data-reply-banner hidden>
+            <span class="ccq-bar" aria-hidden="true"></span>
+            <span class="ccq-txt"><small>Replying to</small><b data-reply-who></b><small data-reply-quote></small></span>
+            <button type="button" class="ccq-x" data-reply-cancel aria-label="Write a new post instead">&times;</button>
           </div>
-          <div class="cc-row">
-            <textarea name="body" rows="1" maxlength="500" data-grow data-coach="wall-composer"
-                      placeholder="Talk {% if room.code %}{{ room.name }}{% else %}footy{% endif %}&hellip;" aria-label="Write in {{ room.name }}"></textarea>
-            <button type="submit" class="gwr-send" aria-label="Post in {{ room.name }}">
-              <svg aria-hidden="true"><use href="#ic-send"/></svg><span>Post</span>
+          <input type="hidden" name="reply_to" value="" data-reply-id>
+          {% comment %}
+          THE BOX, AS WHATSAPP HAS IT (client, 9 Nov 2026): emoji, a picture
+          and your pick are buttons in the box itself, not a dropdown above it.
+          What has been added shows as a strip above the line you type on.
+          {% endcomment %}
+          <div class="wl-attached" data-wl-attached hidden>
+            <span class="wl-att-img" data-wl-imgprev hidden><img alt=""><button type="button" data-wl-clear="image" aria-label="Remove the picture">&times;</button></span>
+            <span class="wl-att-pick" data-wl-pickprev hidden>&#9733; <b data-wl-picktext></b><button type="button" data-wl-clear="tip" aria-label="Remove the pick">&times;</button></span>
+          </div>
+          <input type="hidden" name="tip" value="" data-wl-tip>
+          <input type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp" data-wl-image hidden>
+          <div class="cc-row wl-row-box">
+            <details class="cc-emoji" data-emoji>
+              <summary aria-label="Insert an emoji" title="Emoji">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.2 4.2 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg>
+              </summary>
+              <div class="cc-emoji-menu" data-emoji-menu data-emoji-src="{% static 'data/emoji.json' %}">
+                <div class="cc-emoji-find"><input type="search" data-emoji-search placeholder="Search emoji&hellip;" aria-label="Search emoji" autocomplete="off"></div>
+                <div class="cc-emoji-tabs" data-emoji-tabs role="tablist" aria-label="Emoji categories"></div>
+                <div class="cc-emoji-grid" data-emoji-grid role="group" aria-label="Emoji"></div>
+                <p class="cc-emoji-note" data-emoji-note>Loading emoji&hellip;</p>
+              </div>
+            </details>
+            <button type="button" class="wl-tool" data-wl-pickimage aria-label="Add a picture" title="Picture">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>
+            </button>
+            <details class="wl-picks">
+              <summary class="wl-tool" aria-label="Share one of your picks" title="Share a pick">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>
+              </summary>
+              <div class="wl-picks-menu">
+                <b>Share one of your picks</b>
+                {% for t in my_tips %}
+                <button type="button" data-wl-pick="{{ t.id }}">&#9733; {{ t.pick_text }}</button>
+                {% empty %}
+                <p>Tip this round and your picks show up here to share.</p>
+                {% endfor %}
+              </div>
+            </details>
+            {% if can_share_public %}
+            <label class="wl-tool wl-public" title="Also put this on the public Wall">
+              <input type="checkbox" name="share_public" value="1">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+            </label>
+            {% endif %}
+            <textarea name="body" rows="1" maxlength="500" data-grow data-chat-body data-coach="wall-composer"
+                      placeholder="Message {% if room.code %}{{ room.name }}{% else %}everyone{% endif %}&hellip;" aria-label="Write in {{ room.name }}"></textarea>
+            <button type="submit" class="gwr-send" aria-label="Send to {{ room.name }}">
+              <svg aria-hidden="true"><use href="#ic-send"/></svg>
             </button>
           </div>
         </form>
@@ -231,6 +323,44 @@ document.body.addEventListener('htmx:beforeRequest', function (e) {
 document.body.addEventListener('htmx:afterSettle', function (e) {
   if (e.detail.elt && e.detail.elt.classList && e.detail.elt.classList.contains('gwr')) gwrToBottom();
 });
+
+/* REPLYING FROM THE ONE COMPOSER. gt-chat.js fills the quote and the hidden
+   reply id ("p12" for the post itself, a plain id for one of its replies);
+   here the form is pointed at that post's thread as it is sent. */
+document.addEventListener('submit', function (e) {
+  var form = e.target.closest && e.target.closest('[data-wl-composer]');
+  if (!form) return;
+  var id = (form.querySelector('[data-reply-id]') || {}).value || '';
+  var host = null;
+  if (id.charAt(0) === 'p') host = document.getElementById('post-' + id.slice(1));
+  else if (id.charAt(0) === 's') host = document.getElementById('story-' + id.slice(1));
+  else if (id) { var r = document.getElementById('reply-' + id); host = r && r.closest('[data-reply-url]'); }
+  form.action = host ? host.getAttribute('data-reply-url') : form.getAttribute('data-post-url');
+}, true);
+/* While replying, the composer says so. */
+new MutationObserver(function () {
+  var f = document.querySelector('[data-wl-composer]'); if (!f) return;
+  var b = f.querySelector('[data-reply-banner]');
+  f.classList.toggle('is-replying', !!(b && !b.hidden));
+}).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
+
+/* "3 replies" opens and folds a post's thread. */
+document.addEventListener('click', function (e) {
+  var b = e.target.closest && e.target.closest('[data-wl-thread]');
+  if (!b) return;
+  var t = document.getElementById(b.getAttribute('data-wl-thread'));
+  if (!t) return;
+  t.hidden = !t.hidden;
+  b.setAttribute('aria-expanded', t.hidden ? 'false' : 'true');
+});
+/* Arriving at a reply (after posting one, or from a notification) opens its thread. */
+function wlOpenHash() {
+  var m = /^#reply-(\d+)$/.exec(location.hash); if (!m) return;
+  var r = document.getElementById('reply-' + m[1]); if (!r) return;
+  var t = r.closest('.wl-thread'); if (t) { t.hidden = false; var b = document.querySelector('[data-wl-thread="' + t.id + '"]'); if (b) b.setAttribute('aria-expanded', 'true'); }
+  r.scrollIntoView({ block: 'center' });
+}
+wlOpenHash();
 
 /* Text boxes grow with what you type, the composer's and every reply's.
    Delegated, so the boxes in a room swapped in later grow too. */

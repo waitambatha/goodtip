@@ -39,8 +39,14 @@ posts and still redirects.
       hx-post="{% url 'orgs:member_message_thread' thread_org.id thread.id %}"
       hx-encoding="multipart/form-data"
       hx-target="#gtmChatList" hx-swap="outerHTML"
-      data-chat-form data-gtm-composer>
+      data-chat-form data-gtm-composer
+      data-typing-url="{% url 'orgs:typing' thread_org.id %}" data-typing-ch="t{{ thread.id }}">
   {% csrf_token %}
+  {# "Sam is typing…" — filled in by gt-typing.js. #}
+  <div class="cc-typing" data-typing-show hidden aria-live="polite">
+    <span class="cc-typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span data-typing-text></span>
+  </div>
 
   {# Filled in by gt-chat.js when a message is picked; posted as reply_to. #}
   <div class="cc-quote" data-reply-banner hidden>
@@ -94,6 +100,7 @@ posts and still redirects.
   <input type="hidden" name="voice_seconds" value="0" data-rec-seconds>
 
   <div class="cc-row" data-rec-idle>
+    <div class="cc-field">
     {% comment %}
     EMOJI. A <details> rather than a scripted popover: it opens and closes on
     its own, it is keyboard reachable, and it needs no JavaScript to be
@@ -146,37 +153,43 @@ posts and still redirects.
       </div>
     </details>
 
-    {% comment %}
-    TWO ATTACH BUTTONS, NOT ONE — "the pin we have, let it be for docs and
-    files ... then something that looks like an image for images and very short
-    videos."
-
-    One paperclip that took everything meant the file picker opened on every
-    kind of file at once, so choosing a photo on a phone meant wading through a
-    document browser. Split, each button opens the picker already filtered to
-    what it is for, and the icons say which is which before you press.
-
-    Both post into the same `files` field, because the server has never cared
-    which button a file came from — it sorts images, video and documents by what
-    they are (see MessageAttachment.is_image / is_video).
-    {% endcomment %}
-    <label class="cc-clip" title="Attach a document or file">
-      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.2-9.19a3.66 3.66 0 1 1 5.18 5.18l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.5-8.48"/></svg>
-      <input type="file" name="files" multiple data-files
-             accept=".pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.rtf,.odt,.ods,.zip">
-      <span class="sr-only">Attach a document or file</span>
-    </label>
-
-    <label class="cc-clip cc-shot" title="Send a photo or a short video">
-      <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10.5" r="1.8"/><path d="m4 17 4.5-4.5a1.8 1.8 0 0 1 2.5 0L16 17"/><path d="m14 14.5 1.6-1.6a1.8 1.8 0 0 1 2.5 0L20 15"/></svg>
-      <input type="file" name="files" multiple data-files
-             accept=".png,.jpg,.jpeg,.gif,.webp,.heic,.mp4,.mov,.webm">
-      <span class="sr-only">Send a photo or a short video</span>
-    </label>
-
     <textarea name="body" rows="1" maxlength="2000" data-chat-body
               placeholder="{% if other %}Message {{ other.display_name|truncatechars:22 }}&hellip;{% elif thread.kind == 'group' %}Message {{ thread.group.name|truncatechars:22 }}&hellip;{% elif thread.kind == 'org' %}Message everyone in {{ thread_org.name|truncatechars:20 }}&hellip;{% else %}Write to the admins&hellip;{% endif %}"
               aria-label="Write a message"></textarea>
+
+    {% comment %}
+    ONE ATTACH BUTTON, INSIDE THE BOX, OPENING A SMALL MENU (client, 16 Nov
+    2026: "just like WhatsApp ... the picture and pinning things and media as
+    one, inside that chat text place, on the right ... something I press and
+    get access to media and all; the emoji out on the left, so we have space").
+
+    It was two buttons beside the emoji, which took a third of a phone's row
+    from the words. Now one paperclip at the right of the box opens the two
+    choices, each still opening the picker already filtered to what it is for
+    (an earlier ask: "the pin for docs and files ... an image for images and
+    very short videos"). Both post into the same `files` field — the server
+    sorts images, video and documents by what they are.
+    {% endcomment %}
+    <details class="cc-attach">
+      <summary aria-label="Attach a photo, video or file" title="Attach">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.2-9.19a3.66 3.66 0 1 1 5.18 5.18l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.5-8.48"/></svg>
+      </summary>
+      <div class="cc-attach-menu" role="menu">
+        <label class="cc-attach-opt is-media" role="menuitem">
+          <span class="cc-attach-ic"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10.5" r="1.8"/><path d="m4 17 4.5-4.5a1.8 1.8 0 0 1 2.5 0L16 17"/><path d="m14 14.5 1.6-1.6a1.8 1.8 0 0 1 2.5 0L20 15"/></svg></span>
+          <span>Photos &amp; videos</span>
+          <input type="file" name="files" multiple data-files
+                 accept=".png,.jpg,.jpeg,.gif,.webp,.heic,.mp4,.mov,.webm">
+        </label>
+        <label class="cc-attach-opt is-doc" role="menuitem">
+          <span class="cc-attach-ic"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></svg></span>
+          <span>Document</span>
+          <input type="file" name="files" multiple data-files
+                 accept=".pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.rtf,.odt,.ods,.zip">
+        </label>
+      </div>
+    </details>
+    </div>
 
     {% comment %}
     THE MICROPHONE, and the send button in the same slot.

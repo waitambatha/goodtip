@@ -292,6 +292,16 @@ class Match(models.Model):
         return last is not None and now - last > self.LIVE_STALE_AFTER
 
     @property
+    def tip_choices(self):
+        """(value, label) for every side that can be tipped here, in order —
+        a draw only where the sport counts one (Sport.draw_tips)."""
+        out = [("home", self.home_team.name)]
+        if self.round.series.sport.draw_tips:
+            out.append(("draw", "Draw"))
+        out.append(("away", self.away_team.name))
+        return out
+
+    @property
     def phase(self) -> str:
         """Which bucket this match belongs in: upcoming / live / complete.
 
@@ -545,3 +555,150 @@ class ChampionPhoto(models.Model):
 
     def __str__(self):
         return f"{self.user} · {self.series} · {self.org}"
+
+
+class MatchStory(models.Model):
+    """FINAL WHISTLE — GoodTip's AI write-up of one real game (client, 11 Nov
+    2026: "the AI produces data for one ... like a tank that has water, it's
+    just for the tap to be opened").
+
+    One per real game, for every competition GoodTip follows, whether or not
+    any organisation tips it: keyed on matchreader.HistoricalMatch, the
+    library's one-row-per-game table. Written when the game is final (the
+    jobs loop, generate_match_stories). Every organisation's and group's Wall
+    shows the stories of the competitions it has, the moment it opens them;
+    the conversation under a story belongs to each room on its own
+    (orgs.WallPost.story).
+    """
+    game = models.OneToOneField("matchreader.HistoricalMatch", on_delete=models.CASCADE, related_name="story")
+    # The facts: [{"minute","kind","player","side"}], [{"label","home","away","home_share"}], ...
+    events = models.JSONField(default=list, blank=True)
+    stats = models.JSONField(default=list, blank=True)
+    leaders = models.JSONField(default=list, blank=True)
+    raw = models.JSONField(default=dict, blank=True)
+    periods = models.JSONField(default=dict, blank=True)
+    venue = models.CharField(max_length=200, blank=True)
+    attendance = models.PositiveIntegerField(null=True, blank=True)
+    # Free photos of the two clubs (Wikimedia Commons), each with its credit.
+    photos = models.JSONField(default=list, blank=True)
+    # The write-up.
+    headline = models.TextField(blank=True)
+    sections = models.JSONField(default=list, blank=True)     # [[title, text], ...]
+    question = models.TextField(blank=True)
+    # When it goes up on the Walls: shortly after the final whistle.
+    published_at = models.DateTimeField(db_index=True)
+    written_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-published_at"]
+
+    def __str__(self):
+        return f"Match Recap: {self.game}"
+
+    @property
+    def title(self) -> str:
+        """The result in one line — the story's headline, without the goal list
+        the paragraphs below already tell."""
+        first = (self.headline or "").split(". ")[0].rstrip(".")
+        return first + "." if first else ""
+
+    @property
+    def paragraphs(self) -> list[str]:
+        """The write-up as an article (client, 11 Nov 2026: "a paragraph type
+        of view of the data, under the images, a well-spaced paragraph"). The
+        same facts as the sections, joined into short paragraphs that read."""
+        sec = {t: x for t, x in (self.sections or [])}
+        why = next((x for t, x in (self.sections or []) if t.startswith("Why ")), "")
+        out = []
+        first = sec.get("First half", "")
+        second = sec.get("Second half", "")
+        quarters = sec.get("By quarter", "")
+        if quarters:
+            out.append(f"Quarter by quarter it went {quarters.rstrip('.')}. {first} {second}".strip())
+        elif first or second:
+            out.append(f"{first} {second}".strip())
+        else:
+            rest = (self.headline or "")[len(self.title):].strip()
+            if rest:
+                out.append(rest)
+        attack, defence = sec.get("Attack", ""), sec.get("Defence", "")
+        if attack or defence:
+            d = defence
+            if d and not d[0].isupper():
+                d = d[0].upper() + d[1:]
+            out.append(" ".join(x for x in (attack, f"At the back, {d}" if d else "") if x))
+        stars = sec.get("Stand-outs", "")
+        tail = " ".join(x for x in (why, f"Stand-outs: {stars}" if stars else "") if x)
+        if tail:
+            out.append(tail)
+        where = sec.get("Where", "")
+        if where:
+            out.append(f"Played at {where[0].lower() + where[1:] if where[:3] == 'The' else where}")
+        return [p for p in out if p]
+
+
+class TipDraft(models.Model):
+    """A pick made on the dashboard and not confirmed yet (client, 13 Nov 2026:
+    "if I log out or go to another page ... the selections remain").
+
+    Written the moment a side is pressed, so thirty picks left unconfirmed are
+    still selected on the next visit — from another page, after a logout or on
+    another device — and all that is left is to confirm them. A draft is never
+    a tip: nothing is scored from it, and confirming (or taking the pick back
+    to what is saved) deletes it.
+
+    `selection` is "home", "away", "draw" or "none" — "none" being a confirmed
+    tip the member has un-picked but not yet confirmed taking back.
+    """
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                             related_name="tip_drafts")
+    match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name="drafts")
+    group = models.ForeignKey("orgs.Group", on_delete=models.CASCADE, null=True, blank=True,
+                              related_name="+")
+    selection = models.CharField(max_length=5)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["user", "match"])]
+
+    def __str__(self):
+        return f"{self.user_id} draft {self.match_id}={self.selection}"
+
+
+class CertificateDelivery(models.Model):
+    """Every time a certificate was emailed to its winner (client, 17 Nov 2026:
+    "once a season ends and I am the winner it should be sent to me ... the
+    admin ... should see the system auto sent the certificate to this email
+    and it was successful", and can send it again by hand).
+
+    One row per attempt, so a failure followed by a resend reads as exactly
+    that. The automatic job skips a certificate that already has a sent row;
+    the admin's "Send to winner" always tries again."""
+
+    TRIGGER_AUTO = "auto"
+    TRIGGER_MANUAL = "manual"
+    TRIGGER_CHOICES = [(TRIGGER_AUTO, "Automatic, at season end"), (TRIGGER_MANUAL, "Sent by an admin")]
+    STATUS_SENT = "sent"
+    STATUS_FAILED = "failed"
+    STATUS_CHOICES = [(STATUS_SENT, "Sent"), (STATUS_FAILED, "Failed")]
+
+    org = models.ForeignKey("orgs.Organisation", on_delete=models.CASCADE, related_name="certificate_deliveries")
+    series = models.ForeignKey("catalog.Series", on_delete=models.CASCADE, related_name="+")
+    group = models.ForeignKey("orgs.Group", on_delete=models.CASCADE, null=True, blank=True, related_name="+")
+    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="certificate_deliveries")
+    year = models.PositiveIntegerField()
+    place = models.PositiveSmallIntegerField()
+    email = models.EmailField()
+    trigger = models.CharField(max_length=10, choices=TRIGGER_CHOICES)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    error = models.CharField(max_length=300, blank=True)
+    sent_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["org", "series", "year"])]
+
+    def __str__(self):
+        return f"{self.user} · {self.series} {self.year} #{self.place} · {self.status}"

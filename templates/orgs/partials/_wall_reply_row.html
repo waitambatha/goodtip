@@ -1,0 +1,63 @@
+{% load humanize %}{% comment %}
+A REPLY, AS ITS OWN MESSAGE (client, 12 Nov 2026: "like WhatsApp — the message
+you're replying to on the top, your message below it"). It sits in the room in
+time order, on its writer's side, with a quote of what it answers at the top
+of the bubble; the quote jumps to the original.
+
+Expects `r` (a WallReply dressed by orgs.views._dress_reply) and org, user.
+{% endcomment %}
+<article class="wl-row is-reply {% if r.is_mine %}mine{% else %}theirs{% endif %}" id="reply-{{ r.id }}" data-msg="{{ r.id }}"
+         data-author="{% if r.is_mine %}You{% else %}{{ r.display_name }}{% endif %}" data-quote="{{ r.quote }}"
+         data-reply-url="{{ r.reply_url }}" data-busy-scope>
+  <div class="wl-col">
+    <div class="chat-bubble wl-bubble">
+      <div class="wl-head">
+        <span class="wl-av" aria-hidden="true">{% if r.author.avatar %}<img src="{{ r.author.avatar.url }}" alt="">{% else %}{{ r.initials }}{% endif %}</span>
+        <b class="wl-who">{% if r.is_mine %}You{% else %}{{ r.display_name }}{% endif %}</b>
+      </div>
+      <a class="chat-quote wl-q{% if r.q_ai %} is-ai{% endif %}" href="#{{ r.q_anchor }}" data-wl-jump="{{ r.q_anchor }}">
+        <b>{{ r.q_name }}</b><span>{{ r.q_text|truncatechars:110 }}</span>
+      </a>
+      <p class="wl-text" data-wl-clamp>{{ r.body|linebreaksbr }}</p>
+      {% if r.can_edit %}
+      <form method="post" class="chat-edit" data-chat-edit hidden action="{% url 'orgs:wall_reply_edit' org.id r.id %}"
+            data-busy="Saving the change" data-busy-for="#reply-{{ r.id }}">
+        {% csrf_token %}
+        <textarea name="body" rows="1" maxlength="500" data-grow data-chat-edit-body aria-label="Edit this reply">{{ r.body }}</textarea>
+        <div class="chat-edit-acts">
+          <button type="button" class="abtn abtn-ghost abtn-sm" data-chat-edit-cancel>Cancel</button>
+          <button type="submit" class="abtn abtn-dark abtn-sm">Save</button>
+        </div>
+      </form>
+      {% endif %}
+      <span class="wl-stamp" title="{{ r.created_at|date:'l j F Y, g:i a' }}">{{ r.created_at|naturaltime }}{% if r.edited_at %} &middot; <i class="chat-edited">edited</i>{% endif %}</span>
+    </div>
+  </div>
+  <div class="chat-rowacts wl-acts">
+    <button type="button" class="chat-more" data-msg-more aria-label="What to do with this reply" aria-haspopup="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+    </button>
+    <div class="chat-menu" data-msg-menu hidden role="menu">
+      <button type="button" class="chat-menu-item" role="menuitem" data-reply-to="{{ r.id }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 7 7v4"/></svg>
+        Reply
+      </button>
+      {% if r.can_edit %}
+      <button type="button" class="chat-menu-item" role="menuitem" data-chat-edit-open="{{ r.id }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14.5 5.5 18.5 9.5"/></svg>
+        Edit
+      </button>
+      {% endif %}
+      {% if r.can_remove %}
+      <form method="post" class="chat-menu-danger" action="{% url 'orgs:wall_reply_remove' org.id r.id %}" data-busy="Removing the reply"
+            data-confirm="The reply will be removed for everyone. It cannot be undone." data-confirm-title="Remove this reply?" data-confirm-ok="Remove reply" data-confirm-danger>
+        {% csrf_token %}
+        <button type="submit" class="chat-menu-item is-danger" role="menuitem">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg>
+          Delete
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</article>

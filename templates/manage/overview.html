@@ -49,7 +49,7 @@
       {% if c.waiting %}<span class="ox-flag">{{ c.waiting }} waiting</span>{% endif %}
     </span>
     <b class="ox-org-n">{{ c.org.name }}</b>
-    <small class="ox-org-s">{{ c.org.sport_label|default:"No sport yet" }}</small>
+    <span class="ox-comps" title="{{ c.org.sport_label }}">{% for b in c.comps.badges %}<span class="ox-comp">{% if b.logo %}<img src="{{ b.logo }}" alt="{{ b.name }}" loading="lazy">{% else %}{{ b.name|slice:":3"|upper }}{% endif %}</span>{% empty %}<small class="ox-org-s">No competitions yet</small>{% endfor %}{% if c.comps.more %}<span class="ox-comp is-more">+{{ c.comps.more }}</span>{% endif %}</span>
     <span class="ox-stats"><span><b>{{ c.members }}</b>members</span><span><b>{{ c.groups }}</b>groups</span><span><b>{{ c.open }}</b>open</span></span>
   </a>
   {% empty %}
@@ -63,7 +63,7 @@
   {% for r in locking_soon %}
   <a class="ov-lock" href="{% url 'manage:round_matches' r.org_id r.id %}" style="--k: {{ r.series.colour }}">
     <span class="mc-logo">{% if r.series.logo %}<img src="{{ r.series.logo }}" alt="">{% else %}{{ r.series.name|slice:":3"|upper }}{% endif %}</span>
-    <span class="ov-lock-t"><b>{{ r.series.name }} &middot; round {{ r.round_number }}</b><small>{{ r.org.name }} &middot; in {{ r.lockout_at|timeuntil }}</small></span>
+    <span class="ov-lock-t"><b>{{ r.series.name }}</b><small>Round {{ r.round_number }} &middot; {{ r.org.name }}</small><em class="ov-lock-when">Locks {{ r.lockout_at|date:"D j M" }} &middot; {{ r.lockout_at|time:"g:ia" }}</em></span>
   </a>
   {% empty %}
   <div class="gx-empty"><b>Nothing locks this week</b></div>

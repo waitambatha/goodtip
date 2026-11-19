@@ -1161,16 +1161,18 @@ class ConfirmOnlyWhenSomethingIsUnsavedTests(TestCase):
         cannot both be missing."""
         body = self._body()
         script = body[body.index("function slipRefresh"):body.index("var dockPicked")]
-        self.assertIn("signature() !== baseline", script)
+        self.assertIn("var dirty = pending > 0;", script)
         self.assertIn("review.hidden = (n === 0 || !dirty)", script)
         self.assertIn("allIn.hidden = !(n > 0 && !dirty)", script)
 
-    def test_the_baseline_is_only_retaken_when_the_panel_is_replaced(self):
-        """The match-state poller swaps a block inside every live card every
-        thirty seconds. Re-baselining on each htmx settle would quietly adopt
-        an unsaved change as saved and take the confirm away with it."""
+    def test_unsaved_is_measured_against_what_the_server_says_is_confirmed(self):
+        """Not against the page as first drawn: the page draws unconfirmed
+        drafts too, and those must still count as unsaved after a reload. So
+        every tippable card carries its confirmed pick in data-saved."""
+        self._confirm_everything()
         body = self._body()
-        self.assertIn("if (panel === panelSeen) return;", body)
+        self.assertEqual(body.count('data-saved="home"'), 3)
+        self.assertIn("current(row) !== row.getAttribute('data-saved')", body)
 
     def test_the_dock_goes_with_it(self):
         """The floating confirm is the same offer in a different place; it must

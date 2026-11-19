@@ -482,3 +482,59 @@ def rebuild_for_competition(competition: str, *, season) -> int:
             continue
         total += rebuild_ladder(series=series, season=season)
     return total
+
+
+def current_season_year(series):
+    """The season the competition is in NOW, as the results store labels it.
+
+    Sports do not agree on what to call a season. The AFL's 2026 is a calendar
+    year; the Premier League's "2026" is the one that STARTED in August 2026;
+    the NHL, NBA and NBL label theirs by the year it ENDS, so the season under
+    way in November 2026 is their "2027". Reading every ladder at the
+    organisation's season year (2026) therefore showed those three LAST
+    season's final table (client, 16 Nov 2026: "that is the whole point of
+    ladder, see the latest data").
+
+    So it is read off the data rather than a calendar: the season of the most
+    recent regular-season game already played. None when there are no results.
+    """
+    from django.utils import timezone
+
+    from matchreader.models import HistoricalMatch
+
+    return (
+        HistoricalMatch.objects.filter(
+            series=series, stage=HistoricalMatch.STAGE_REGULAR, kickoff_at__lte=timezone.now(),
+        )
+        .order_by("-kickoff_at")
+        .values_list("season", flat=True)
+        .first()
+    )
+
+
+def season_label(series, year) -> str:
+    """How a season reads on screen: "2026" for a calendar-year competition,
+    "2026-27" style for one that runs across New Year, whichever way its feed
+    numbers it.
+
+    Across New Year when the season began in the calendar year before its
+    label (the NHL's "2027" began in 2026), or when the competition's previous
+    season ran across New Year (the Premier League's did; the AFLW's, which
+    also starts in August, did not)."""
+    from django.db.models import Max, Min
+
+    from matchreader.models import HistoricalMatch
+
+    def span(y):
+        r = HistoricalMatch.objects.filter(series=series, season=y).aggregate(a=Min("kickoff_at"), b=Max("kickoff_at"))
+        return r["a"], r["b"]
+
+    first, _last = span(year)
+    if first is None:
+        return str(year)
+    start = first.year
+    prev_first, prev_last = span(year - 1)
+    crosses = start < year or (prev_first is not None and prev_last.year > prev_first.year)
+    if crosses:
+        return f"{start}\u2013{str(start + 1)[2:]}"
+    return str(start)

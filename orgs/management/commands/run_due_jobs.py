@@ -25,6 +25,11 @@ JOBS = [
     ("send_election_reminders", "vote reminders (a day out, an hour out)"),
     ("send_result_emails", "round scorecards and election outcomes"),
     ("generate_recaps", "AI round recaps"),
+    # Season certificates to the top three, both formats, once a season is final.
+    ("send_certificate_emails", "season certificates to their winners"),
+    # FINAL WHISTLE: one AI story per finished game, for every competition
+    # GoodTip follows, written once and shown on every Wall that has it.
+    ("generate_match_stories", "Final Whistle game stories"),
     # The waiting list's launch invitation, when the super admin has set a time.
     ("send_waitlist_invites", "waiting-list launch invitation, if scheduled and due"),
     # Housekeeping. Both are self-throttling no-ops on almost every tick, which

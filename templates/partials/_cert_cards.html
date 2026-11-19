@@ -1,0 +1,67 @@
+{% comment %}
+THE CERTIFICATE CARDS, in the super admin's look (client, 17 Nov 2026): one
+.gx-hqcard per competition, pastel like HQ's, the competition's own logo in
+the icon tile. Shared by the Manage console's Certificates tab (who = "admin")
+and the member's Leaderboard → Certificates (who = "member"); each card opens
+that one competition. Expects: cards (tipping.certificates.competition_cards),
+org, who.
+{% endcomment %}
+{% if cards|length > 4 %}
+<label class="gx-search gt-certsearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search competitions, e.g. NBA, Premier League" data-cert-search aria-label="Search competitions" autocomplete="off"></label>
+<p class="gt-certnone" data-cert-none hidden>No competition matches that.</p>
+{% endif %}
+<div class="gx-hq gt-certcards" data-cert-cards>
+  {% for c in cards %}
+  <a class="gx-hqcard{% if who == 'member' and c.won %} is-hot{% endif %}" data-find="{{ c.series.name|lower }} {{ c.series.short|lower }} {{ c.series.slug }}"
+     href="{% if who == 'admin' %}{% url 'tipping:certificate_competition' org.id c.series.name %}{% else %}{% url 'tipping:my_certificate' org.id c.series.name %}{% endif %}"
+     hx-boost="false"
+     style="--cc: {% cycle 'var(--cc-1)' 'var(--cc-2)' 'var(--cc-3)' 'var(--cc-4)' 'var(--cc-5)' %}">
+    <span class="gx-hqcard-top">
+      <span class="gx-hqcard-ic gt-certlogo" aria-hidden="true"><em>{% include "partials/_series_logo.html" with s=c.series %}</em></span>
+      {% if who == "member" and c.won %}<span class="gx-pill is-ok"><i></i>Certificate</span>
+      {% elif who == "member" and c.top3 and not c.state.final %}<span class="gx-pill is-wait"><i></i>Top 3 now</span>
+      {% elif c.state.final %}<span class="gx-pill is-ok"><i></i>Final</span>
+      {% else %}<span class="gx-pill"><i></i>In progress</span>{% endif %}
+    </span>
+    <b class="gx-hqcard-name">{{ c.series.name }}</b>
+    <span class="gx-hqcard-blurb">{% if c.state.final %}Season closed {{ c.state.closed_on|date:"j M Y" }}.{% else %}{{ c.state.reason|default:"Season in progress." }}{% endif %}</span>
+    {% if who == "admin" %}
+      {% if c.champions %}
+      <span class="gx-hqcard-stat"><b>{{ c.champions|length }}</b><span>champion{{ c.champions|length|pluralize }}</span></span>
+      <span class="gx-hqcard-line">{{ c.champions|join:", " }}</span>
+      {% else %}
+      <span class="gx-hqcard-stat"><b>&ndash;</b><span>{% if c.state.final %}no winner{% else %}not yet{% endif %}</span></span>
+      <span class="gx-hqcard-line">Winners appear when the season ends.</span>
+      {% endif %}
+      <span class="gx-hqcard-go">See the winners &rarr;</span>
+    {% else %}
+      <span class="gx-hqcard-stat"><b>{% if c.rank %}#{{ c.rank }}{% else %}&ndash;{% endif %}</b><span>{% if c.rank %}of {{ c.of }}{% else %}no rank yet{% endif %}</span></span>
+      <span class="gx-hqcard-line">{{ c.points }} point{{ c.points|pluralize }} &middot; {{ c.tips }} tip{{ c.tips|pluralize }}</span>
+      <span class="gx-hqcard-go">{% if c.won %}Open your certificate{% else %}See where you stand{% endif %} &rarr;</span>
+    {% endif %}
+  </a>
+  {% empty %}
+  <div class="gx-empty"><b>No competition here awards a certificate yet.</b></div>
+  {% endfor %}
+</div>
+<script>
+/* Search the cards as you type (client, 17 Nov 2026: "add a search so I can
+   search rather than scroll"). Matches the name, the short code and the slug,
+   so "epl", "premier" and "nba" all find theirs. */
+(function () {
+  document.querySelectorAll('[data-cert-search]').forEach(function (box) {
+    if (box.dataset.wired) return; box.dataset.wired = '1';
+    var wrap = box.closest('.gx-pane, .gx-sheet') || document;
+    var cards = wrap.querySelectorAll('[data-cert-cards] [data-find]');
+    var none = wrap.querySelector('[data-cert-none]');
+    box.addEventListener('input', function () {
+      var q = box.value.trim().toLowerCase(), shown = 0;
+      cards.forEach(function (c) {
+        var hit = !q || c.getAttribute('data-find').indexOf(q) !== -1;
+        c.hidden = !hit; if (hit) shown++;
+      });
+      if (none) none.hidden = shown > 0;
+    });
+  });
+})();
+</script>

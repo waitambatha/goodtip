@@ -36,3 +36,6 @@ htmlcov/
 .deploy.lock
 .demo_cert_seed_log.json
 .local_login.txt
+
+# Typing signals (settings.CACHES["typing"])
+/.cache/

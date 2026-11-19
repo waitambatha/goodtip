@@ -155,6 +155,9 @@
        attachment should open it, and a drag begun on one would swallow the
        tap that was actually intended. */
     if (e.target.closest('a, button, input, textarea, select')) return;
+    /* A swipe inside something that scrolls sideways — a recap's match
+       carousel — is for that, not for replying. */
+    if (e.target.closest('[data-no-swipe]')) return;
     drag = {
       row: row,
       x: e.touches[0].clientX,
@@ -183,7 +186,8 @@
         if (Math.abs(dy) > 12) drag = null;   /* it was a scroll */
         return;
       }
-      if (dx * drag.dir < 0) { drag = null; return; }   /* wrong way */
+      /* Either way replies (client, 9 Nov 2026: "I should also be able to
+         swipe left to reply"). The bubble follows the finger. */
       drag.live = true;
       drag.row.classList.add('swiping');
     }
@@ -254,7 +258,11 @@
 
   document.addEventListener('change', function (e) {
     var input = e.target.closest('[data-files]');
-    if (input) paintTray(input);
+    if (!input) return;
+    paintTray(input);
+    /* A choice made from the attach menu closes the menu. */
+    var menu = input.closest('.cc-attach');
+    if (menu) menu.open = false;
   });
 
   /* ---- The box itself ---------------------------------------------------- */
@@ -282,8 +290,10 @@
     /* Nothing to send is not a send. The box is not `required` (a file with
        no words is a real message), so without this an idle Enter would post
        an empty form and reload the page for nothing. */
-    var files = form.querySelector('[data-files]');
-    if (!box.value.trim() && !(files && files.files && files.files.length)) return;
+    var hasFiles = [].some.call(form.querySelectorAll('[data-files]'), function (f) {
+      return f.files && f.files.length > 0;
+    });
+    if (!box.value.trim() && !hasFiles) return;
     if (typeof form.requestSubmit === 'function') form.requestSubmit();
     else form.submit();
   });

@@ -6405,11 +6405,11 @@ class RoleIsVisibleWhereYouSwitchTests(TestCase):
         says Member over a nav still offering Manage would be worse than no
         badge at all."""
         admin_body = self._dash()
-        self.assertIn(reverse("orgs:members", args=[self.mine.id]), admin_body)
+        self.assertIn(reverse("orgs:console", args=[self.mine.id]), admin_body)
 
         self.client.post(reverse("orgs:switch_org", args=[self.theirs.id]))
         member_body = self._dash()
-        self.assertNotIn(reverse("orgs:members", args=[self.theirs.id]), member_body)
+        self.assertNotIn(reverse("orgs:console", args=[self.theirs.id]), member_body)
 
     def test_the_context_processor_answers_for_every_membership(self):
         """Computed from the memberships already fetched, so this must stay a
@@ -6574,7 +6574,8 @@ class ARoleInTheOrgIsWhatMakesYouItsAdminTests(TestCase):
     def test_the_manage_menu_is_on_the_bar_for_them(self):
         self.client.force_login(self.manager)
         body = self.client.get(reverse("dashboard")).content.decode()
-        self.assertIn(reverse("orgs:members", args=[self.org.id]), body)
+        # One Manage link to the console, phone and laptop alike (17 Nov 2026).
+        self.assertIn(reverse("orgs:console", args=[self.org.id]), body)
 
     def test_the_bill_still_belongs_to_the_owner_alone(self):
         """What this widened, and what it deliberately did not. Billing is
@@ -7812,15 +7813,15 @@ class GroupsPageHierarchyTests(TestCase):
         this test is for: the organisation's name leads, and it outranks the
         word "Groups".
         """
+        # 17 Nov 2026: the page took the console's look — the console hero
+        # names the organisation ("Groups in <org>"), and the sheet is a tab
+        # row showing one thing at a time.
         body = self.client.get(
             reverse("orgs:groups", args=[self.org.id])
         ).content.decode()
-        self.assertIn("dept-hero dh-noart", body)
-        self.assertIn("gh-eyebrow is-title", body)
-        self.assertLess(
-            body.index("gh-eyebrow is-title"), body.index("dh-word"),
-            "the organisation's name must come before the word Groups",
-        )
+        self.assertIn(f"Groups <em>in {self.org.name}</em>", body)
+        for tab in ("all", "mine", "new", "plan", "settings"):
+            self.assertIn(f'data-grp-tab="{tab}"', body)
 
     def test_the_hero_picture_is_off_but_its_source_still_works(self):
         """The image was removed from the page, not ripped out of the system.
@@ -8053,7 +8054,9 @@ class CharitiesPageIsCardsAndPanelsTests(TestCase):
 
     def test_the_manage_menu_points_at_charities_not_a_second_election_item(self):
         body = self.client.get(reverse("dashboard")).content.decode()
-        self.assertIn(reverse("orgs:charities", args=[self.org.id]), body)
+        # The menu is one Manage link now (17 Nov 2026); charities are a tab
+        # inside it, and there is still no second election item.
+        self.assertIn(reverse("orgs:console", args=[self.org.id]), body)
         self.assertNotIn(reverse("orgs:charity_vote", args=[self.org.id]), body)
 
 
@@ -8251,19 +8254,20 @@ class GroupsPlanGateTests(TestCase):
         body = self.client.get(reverse("orgs:groups", args=[org.id])).content.decode()
         self.assertIn(reverse("billing:plans", args=[org.id]), body)
 
-    def test_posting_the_create_form_anyway_lands_on_the_plans_page(self):
-        """The disabled control is not the enforcement. This is."""
+    def test_posting_the_create_form_anyway_is_refused_with_the_reason(self):
+        """The locked control is not the enforcement. This is. Since 17 Nov
+        2026 it lands back on Groups, where the reason opens in a pop-up with
+        the way to upgrade."""
         org = self._org(team_size=20)
         self.client.force_login(self.admin)
         resp = self.client.post(
             reverse("orgs:groups", args=[org.id]),
-            {"action": "create", "name": "Marketing"},
-        )
-        self.assertRedirects(
-            resp, reverse("billing:plans", args=[org.id]),
-            fetch_redirect_response=False,
+            {"action": "create", "name": "Marketing"}, follow=True,
         )
         self.assertFalse(Group.objects.filter(org=org).exists())
+        self.assertContains(resp, 'data-grp-pop="result"')
+        self.assertContains(resp, "Workplace")
+        self.assertContains(resp, reverse("billing:plans", args=[org.id]))
 
     def test_switching_groups_on_is_refused_too(self):
         org = self._org(team_size=20, groups_enabled=False)

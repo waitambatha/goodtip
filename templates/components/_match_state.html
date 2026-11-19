@@ -30,7 +30,7 @@ never more than one poll behind the sync, slow enough to stay cheap.
      {% if match.phase == "live" %}hx-get="{% url 'tipping:match_state' match.id %}"
      hx-trigger="every 30s" hx-swap="outerHTML"{% endif %}>
   {% if match.phase == "live" %}
-    <span class="ms-badge live"><i class="ms-dot"></i>Live{% if match.live_label %} <b class="ms-label">{{ match.live_label }}</b>{% endif %} <span class="ms-ticker" data-gt-since="{{ match.kickoff_at|date:'c' }}">{{ match.kickoff_at|timesince }}</span></span>
+    <span class="ms-badge live"><i class="ms-dot"></i>Live{% if match.live_label and match.live_label|lower != "live" %} <b class="ms-label">{{ match.live_label }}</b>{% endif %} <span class="ms-ticker" data-gt-since="{{ match.kickoff_at|date:'c' }}">{{ match.kickoff_at|timesince }}</span></span>
 
   {% elif match.phase == "complete" %}
     {% if match.score_line %}

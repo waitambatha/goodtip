@@ -311,7 +311,10 @@
     var shape = nextShape(code);
     var logo = el.getAttribute('data-veil-logo') || '';
     var colour = el.getAttribute('data-veil-colour') || '';
-    var timer = setTimeout(function () { show(scope, label(el), shape, code, logo, colour); }, logo ? 0 : SHOW_AFTER);
+    /* data-veil-now: show at once, as a room or a conversation opening does
+       (12 Nov 2026) — the loader is part of the move, not a sign of delay. */
+    var now = logo || (el.hasAttribute && el.hasAttribute('data-veil-now'));
+    var timer = setTimeout(function () { show(scope, label(el), shape, code, logo, colour); }, now ? 0 : SHOW_AFTER);
     pending.set(el, { timer: timer, scope: scope });
   });
 
@@ -337,7 +340,7 @@
      detached element and leaving a fresh one veiled forever. Sweeping after
      each settle is cheap and covers every such case. */
   document.body.addEventListener('htmx:afterSettle', function () {
-    document.querySelectorAll('.bv-scoped').forEach(function (v) {
+    document.querySelectorAll('.bv-scoped:not([data-lifted])').forEach(function (v) {
       var scope = v.parentElement;
       /* A veil whose scope was replaced by the swap is already off the screen
          — the new content is in its place — so it goes at once. Holding it for
@@ -426,6 +429,34 @@
     setTimeout(function () { show(scope, label(scope), fshape, fcode); }, SHOW_AFTER);
   });
 
+  /* BACK AFTER A FILTER LEFT THE LIST COVERED (client, 14 Nov 2026: "on My
+     Tips the data is not there and you have to reload — on the laptop too").
+     An in-place filter (hx-boost) shows a veil; htmx then saves the page for
+     the Back button WITH that veil in it, and Back puts it straight back,
+     over a list that is there underneath. Strip veils out of the snapshot as
+     it is saved, and sweep any that come back on a restore. */
+  function sweepAll(root) {
+    (root || document).querySelectorAll('.busy-veil').forEach(function (v) {
+      var scope = v.parentElement;
+      v.remove();
+      if (scope) scope.classList.remove('is-busy-scope');
+    });
+    (root || document).querySelectorAll('.is-busy-scope').forEach(function (s) { s.classList.remove('is-busy-scope'); });
+  }
+  document.body.addEventListener('htmx:beforeHistorySave', function (e) {
+    /* A loader lifted over an opening conversation is still on screen and
+       must stay there; it steps out of the snapshot (so Back never restores a
+       page wearing it) and comes straight back once the snapshot is taken. */
+    var keep = [].slice.call(document.querySelectorAll('.busy-veil[data-lifted]'));
+    keep.forEach(function (v) { v.remove(); });
+    sweepAll(e.detail && e.detail.historyElt);
+    if (keep.length) setTimeout(function () {
+      keep.forEach(function (v) { if (!v.dataset.gone) document.body.appendChild(v); });
+    }, 0);
+  });
+  document.body.addEventListener('htmx:historyRestore', function () { sweepAll(); });
+  window.addEventListener('popstate', function () { setTimeout(sweepAll, 0); });
+
   /* Back/forward can restore a page from cache with a veil still painted on
      it, which looks like a load that never finished. */
   window.addEventListener('pageshow', function (e) {
@@ -436,4 +467,75 @@
       if (scope) scope.classList.remove('is-busy-scope');
     });
   });
+
+  /* ONE LOADER, NO FLICKER (client, 16 Nov 2026: "when I click a chat ... it
+   * flickers, then it flickers again, and it flickers again").
+   *
+   * Opening a conversation or a Wall room replaces the very region its loader
+   * sits in. The loader went with the old content — and with a deliberate
+   * swap delay, the old content came back for half a second, faded out, the
+   * region stood empty, and only then did the new one fade in: a flash, the
+   * old screen, a blank, the new screen.
+   *
+   * Now, the moment before such a swap, the loader is lifted out of the
+   * region into a layer of its own, pinned over exactly the same rectangle.
+   * The new content goes in underneath it straight away; when it has settled
+   * and the loader has had its minimum time on screen, the loader fades out
+   * once and the conversation is simply there. */
+  var lifted = [];
+  /* Opening a conversation or a room keeps its loader up a little longer than
+     other loads (client, 16 Nov 2026: "too fast to even be known as a loader
+     ... quick, but not as quick"): long enough to be seen, short of a wait. */
+  var MIN_OPEN = 900;
+  window.__gtVeilLift = 1;
+
+  document.body.addEventListener('htmx:beforeSwap', function (evt) {
+    var target = evt.detail && evt.detail.target;
+    if (!target) return;
+    document.querySelectorAll('.bv-scoped:not([data-lifted])').forEach(function (v) {
+      var scope = v.parentElement;
+      if (!scope || !(target.contains(scope) || scope.contains(target))) return;
+      /* On a phone the conversation pane is hidden while the list shows, so
+         its loader had no size and nobody saw it. Then it covers the nearest
+         part of the page that is on screen, and the conversation is revealed
+         from under it. */
+      var box = scope;
+      var r = v.getBoundingClientRect();
+      if (!r.width || !r.height) r = box.getBoundingClientRect();
+      var radius = getComputedStyle(box).borderRadius;
+      if (!r.width || !r.height) {
+        var nav = document.querySelector('.app-nav');
+        var navBottom = nav ? Math.max(0, nav.getBoundingClientRect().bottom) : 0;
+        r = { left: 0, top: navBottom, width: window.innerWidth, height: window.innerHeight - navBottom };
+        radius = '0';
+      }
+      v.setAttribute('data-lifted', '');
+      v.style.position = 'fixed';
+      v.style.left = r.left + 'px';
+      v.style.top = r.top + 'px';
+      v.style.width = r.width + 'px';
+      v.style.height = r.height + 'px';
+      v.style.zIndex = '90';
+      if (radius) v.style.borderRadius = radius;
+      document.body.appendChild(v);
+      scope.classList.remove('is-busy-scope');
+      lifted.push(v);
+    });
+  });
+
+  function dropLifted() {
+    var now = Date.now();
+    lifted.slice().forEach(function (v) {
+      var shown = parseInt(v.dataset.shownAt || '0', 10);
+      var wait = Math.max(0, MIN_OPEN - (now - shown));
+      lifted.splice(lifted.indexOf(v), 1);
+      setTimeout(function () {
+        v.classList.add('bv-leaving');
+        setTimeout(function () { v.dataset.gone = '1'; v.remove(); }, 220);
+      }, wait);
+    });
+  }
+  document.body.addEventListener('htmx:afterSettle', dropLifted);
+  document.body.addEventListener('htmx:swapError', dropLifted);
+  document.body.addEventListener('htmx:responseError', dropLifted);
 })();

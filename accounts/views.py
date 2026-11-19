@@ -964,6 +964,16 @@ def dashboard_view(request):
             )
         }
         my_picks = {mid: t.selection for mid, t in my_tips.items()}
+        # Picks made and not confirmed yet (TipDraft) — drawn as selected, so
+        # leaving the page or signing out never loses them.
+        from tipping.models import TipDraft
+
+        my_drafts = dict(
+            TipDraft.objects.filter(
+                user=request.user, match__in=upcoming,
+                group=current_group(request, selected["org"]),
+            ).values_list("match_id", "selection")
+        )
         # MatchReader's read on each upcoming game. Attached here rather than
         # queried from the template so the work is visible and bounded: these
         # are the next few fixtures, not a whole season.
@@ -1004,6 +1014,12 @@ def dashboard_view(request):
             state = window.get(g.round_id, {"open": True, "waits_for": None})
             g.round_open = state["open"]
             g.can_tip = g.round_open and not g.is_locked
+            # What is CONFIRMED stays in saved_tip; what the card shows is the
+            # draft where one is waiting, for a game that can still be tipped.
+            g.saved_tip = g.my_tip or ""
+            g.draft = my_drafts.get(g.id) if g.can_tip else None
+            if g.draft is not None:
+                g.my_tip = None if g.draft == "none" else g.draft
             g.lock_note = ""
             g.lock_opens = state.get("opens_at")
             if not g.round_open and state["waits_for"] is not None:
@@ -1480,7 +1496,13 @@ def profile_view(request):
             update_session_auth_hash(request, user)
             messages.success(request, "Password changed.")
             return redirect("profile")
-    memberships = OrgMember.objects.filter(user=request.user).select_related("org")
+    memberships = list(
+        OrgMember.objects.filter(user=request.user)
+        .select_related("org", "org__season", "org__charity", "org__organisation_type",
+                        "org__state", "org__country", "org__created_by", "invited_by")
+    )
+    memberships.sort(key=lambda m: m.org.name.lower())
+    org_cards = _profile_org_cards(request.user, memberships)
     return render(request, "profile.html", {
         "form": form, "pwd_form": pwd_form, "memberships": memberships,
         "security_form": security_form,
@@ -1489,7 +1511,52 @@ def profile_view(request):
         # room, so it is only offered to people it can actually do something
         # for — which today is 5 accounts out of 55.
         "show_carry": len(_carry_rooms(request.user)) > 1,
+        "owner_count": sum(1 for m in memberships if m.is_league_owner),
+        "org_cards": org_cards,
     })
+
+
+def _profile_org_cards(user, memberships):
+    """Everything the profile shows about each organisation the user is in —
+    who runs it, how big it is, what it tips, and the user's own place in it
+    (client, 16 Nov 2026: "do not take me to it ... let it just have the
+    description of the organisation, details about the organisation ... the
+    members, my role, when I joined"). Four queries in all, whatever the
+    number of organisations."""
+    from django.db.models import Count
+
+    from orgs.models import Group, GroupMember, OrgMember as OM
+
+    org_ids = [m.org_id for m in memberships]
+    member_counts = dict(
+        OM.objects.filter(org_id__in=org_ids).values_list("org_id").annotate(n=Count("id")).values_list("org_id", "n")
+    )
+    group_counts = dict(
+        Group.objects.filter(org_id__in=org_ids).values_list("org_id").annotate(n=Count("id")).values_list("org_id", "n")
+    )
+    my_groups = {}
+    for gm in GroupMember.objects.filter(user=user, group__org_id__in=org_ids).select_related("group"):
+        my_groups.setdefault(gm.group.org_id, []).append(gm)
+    comps = {}
+    from orgs.models import Organisation
+    for org in Organisation.objects.filter(id__in=org_ids).prefetch_related("competitions"):
+        comps[org.id] = [c.name for c in org.competitions.all()]
+
+    cards = []
+    for m in memberships:
+        org = m.org
+        place = ", ".join(str(x) for x in (org.state, org.country) if x)
+        cards.append({
+            "m": m,
+            "org": org,
+            "members": member_counts.get(org.id, 0),
+            "groups": group_counts.get(org.id, 0),
+            "my_groups": sorted(my_groups.get(org.id, []), key=lambda gm: gm.group.name.lower()),
+            "competitions": comps.get(org.id, []),
+            "kind": str(org.organisation_type or org.informal_label or "Organisation"),
+            "place": place,
+        })
+    return cards
 
 
 # ---------------------------------------------------------------------------

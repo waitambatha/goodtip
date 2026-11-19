@@ -15,7 +15,28 @@ ordinary post body, and this adds the two things that make it worth pinning.
 
 Takes `recap` (a RoundRecap) and `post`.
 {% endcomment %}
-<div class="gpt-recap">
+{% load team_extras %}<div class="gpt-recap">
+  {% comment %}
+  THE ROUND'S RESULTS (client, 9 Nov 2026: "too short, let it be more
+  informed"). Read from the round's own graded games, so every recap — old
+  ones too — shows how the games went, winner in bold.
+  {% endcomment %}
+  {% comment %}The round's results, one line a game; each game has its own recap in the room.{% endcomment %}
+  {% with games=recap.round.matches.all %}
+  {% if games %}
+  <div class="grc-results grc-list">
+    <span class="grc-sec">Results</span>
+    {% for m in games %}{% if m.result %}
+    <div class="grc-game{% if forloop.counter > 6 %} is-more{% endif %}">
+      <span class="grc-team{% if m.result == 'home' %} won{% endif %}"><span class="grc-crest">{% crest m.home_team %}</span><b>{{ m.home_team.name }}</b></span>
+      <span class="grc-score">{% if m.home_score is not None %}{{ m.home_score }}<i>&ndash;</i>{{ m.away_score }}{% elif m.result == 'draw' %}Draw{% else %}FT{% endif %}</span>
+      <span class="grc-team is-away{% if m.result == 'away' %} won{% endif %}"><b>{{ m.away_team.name }}</b><span class="grc-crest">{% crest m.away_team %}</span></span>
+    </div>
+    {% endif %}{% endfor %}
+    {% if games|length > 6 %}<button type="button" class="grc-moregames" data-grc-more>Show all {{ games|length }} games</button>{% endif %}
+  </div>
+  {% endif %}
+  {% endwith %}
 
   {% if recap.leaderboard %}
   <div class="grc-board" role="table" aria-label="{{ recap.round.series.name }} standings after {{ recap.round.label }}">
@@ -25,7 +46,7 @@ Takes `recap` (a RoundRecap) and `post`.
       <span role="columnheader">Season</span>
     </div>
     {% for row in recap.leaderboard %}
-    <div class="grc-brow{% if forloop.first %} lead{% endif %}" role="row">
+    <div class="grc-brow{% if forloop.first %} lead{% endif %}{% if forloop.counter > 5 %} is-more{% endif %}" role="row">
       <span class="grc-who" role="cell">
         <i class="grc-rank">{{ row.rank }}</i>
         <b>{{ row.name }}</b>
@@ -49,18 +70,8 @@ Takes `recap` (a RoundRecap) and `post`.
       <span class="grc-tot" role="cell">{{ row.season_points }}</span>
     </div>
     {% endfor %}
+    {% if recap.leaderboard|length > 5 %}<button type="button" class="grc-moregames grc-moretable" data-grc-table>Show the full table ({{ recap.leaderboard|length }})</button>{% endif %}
   </div>
   {% endif %}
 
-  {% if recap.talking_points %}
-  <div class="grc-talk">
-    <span class="grc-tlab">Start something</span>
-    <div class="grc-chips">
-      {% for line in recap.talking_points %}
-      {# fills the reply box below rather than posting: the member still sends it #}
-      <button type="button" class="grc-chip" data-recap-starter data-post="{{ post.id }}">{{ line }}</button>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
 </div>

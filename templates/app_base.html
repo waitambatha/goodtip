@@ -377,6 +377,23 @@ goodtip.css.
         <a href="{% url 'profile' %}" class="an-iconbtn an-profile" title="Profile" aria-label="Profile">{% if user.avatar %}<span class="an-avatar has-img"><img src="{{ user.avatar.url }}" alt=""></span>{% else %}<span class="an-avatar">{{ user.display_name|slice:":1"|upper }}</span>{% endif %}</a>
         <a href="{% url 'accounts:logout' %}" class="an-iconbtn an-logout" title="Log out" aria-label="Log out"><svg aria-hidden="true"><use href="#ic-logout"/></svg></a>
         {% endif %}
+        {% comment %}
+        PHONE ONLY: "+" to start something (client, 14 Nov 2026: "a plus
+        button to start the create, where you can create an organisation or a
+        group based on an organisation"). Hidden above 760px, where the
+        organisation menu shows its own create rows.
+        {% endcomment %}
+        {% if current_org and not is_holding %}
+        <details class="an-plus" data-pop>
+          <summary class="an-iconbtn an-plus-btn" aria-label="Create">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </summary>
+          <div class="an-plus-panel" role="menu">
+            <a href="{% url 'orgs:create' %}" role="menuitem"><span class="ap-ic" aria-hidden="true">+</span><b>Create an organisation</b><i>Start your own competition</i></a>
+            {% if primary_org_is_admin %}<a href="{% url 'orgs:groups' current_org.id %}#new" role="menuitem"><span class="ap-ic" aria-hidden="true">+</span><b>Create a group</b><i>Inside {{ current_org.name }}</i></a>{% endif %}
+          </div>
+        </details>
+        {% endif %}
         <button class="an-burger" aria-label="Menu" aria-expanded="false" aria-controls="appSheet" data-sheet-open><svg><use href="#ic-menu"/></svg></button>
       </div>
     </div>
@@ -481,6 +498,7 @@ goodtip.css.
         {# ic-cross is the medical plus, not a dismiss glyph — this one is its own #}
         <button type="button" class="sheet-x" aria-label="Close menu" data-sheet-close><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
       </div>
+      <div class="sheet-links" data-sheet-links>
       {% if is_holding %}
       {# Same reasoning as the desktop bar above — shown, not wired. #}
       <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-home"/></svg><span>Dashboard</span></span>
@@ -489,11 +507,7 @@ goodtip.css.
       <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-chart"/></svg><span>Ladder</span></span>
       <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-msg"/></svg><span>The Wall</span></span>
       <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-mail"/></svg><span>Messages</span></span>
-      <span class="sheet-label">Manage</span>
-      <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-users"/></svg><span>Members</span></span>
-      <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-coins"/></svg><span>Season summary</span></span>
-      <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>Certificates</span></span>
-      <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-heart"/></svg><span>Charities</span></span>
+      <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-sliders"/></svg><span>Manage</span></span>
       <span class="an-navlink"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Admin</span></span>
       {% else %}
       <a href="{% url 'dashboard' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-home"/></svg><span>Dashboard</span></a>
@@ -505,15 +519,14 @@ goodtip.css.
         <a href="{% url 'news_index' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-doc"/></svg><span>News</span></a>
         <a href="{% url 'orgs:member_messages' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-mail"/></svg><span>Messages</span>{% if unread_message_count %}<span class="an-count">{{ unread_message_count }}</span>{% endif %}</a>
         {% if primary_org_is_admin %}
-          <span class="sheet-label">Manage</span>
-          <a href="{% url 'orgs:members' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-users"/></svg><span>Members</span></a>
-          <a href="{% url 'billing:season_summary' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-coins"/></svg><span>Season summary</span></a>
-          <a href="{% url 'tipping:certificates' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-trophy"/></svg><span>Certificates</span></a>
-          <a href="{% url 'orgs:charities' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-heart"/></svg><span>Charities</span></a>
+          {% comment %}One link, as on a laptop (client, 17 Nov 2026): everything —
+          members, certificates, charity, plan — is a tab inside the console.{% endcomment %}
+          <a href="{% url 'orgs:console' primary_org.id %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-sliders"/></svg><span>Manage</span></a>
         {% endif %}
       {% endif %}
       {% if user.is_staff %}<a href="{% url 'manage:overview' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Admin</span></a>{% endif %}
       {% endif %}
+      </div>
       {% comment %}
       The theme switch again, because the bar's copy is hidden at the widths
       where this panel exists — and a phone is where somebody is most likely to
@@ -973,6 +986,11 @@ goodtip.css.
        so does Escape and the X, and the page behind it does not scroll while
        it is open. It also closes on resize past the width where the bar gets
        its own row back, so the lock cannot outlive the panel. */
+    /* In its own scope (13 Nov 2026). These were top-level `var`s, i.e.
+       globals, and the dashboard's script declares its own `var sheet` for the
+       tip-confirm sheet — which silently repointed setSheet() at THAT element.
+       On the dashboard the menu button did nothing on a phone. */
+    (function(){
     var burger = document.querySelector('[data-sheet-open]');
     var sheet = document.getElementById('appSheet');
     if (burger && sheet) {
@@ -988,6 +1006,7 @@ goodtip.css.
       document.addEventListener('keydown', function(e){ if (e.key === 'Escape') setSheet(false); });
       window.addEventListener('resize', function(){ if (window.innerWidth > 1180) setSheet(false); });
     }
+    })();
 
     /* copy-to-clipboard buttons (invite links etc.) */
     document.querySelectorAll('[data-copy]').forEach(function(btn){

@@ -1,0 +1,91 @@
+{% load humanize cache team_extras %}{% comment %}
+FINAL WHISTLE — GoodTip's AI write-up of one game (client, 11 Nov 2026), on
+this room's Wall. The story itself (photos, facts, write-up) is the same for
+every organisation, so it is rendered once and cached; the reactions and the
+thread under it are this room's own (s.anchor, made on first reply/reaction).
+
+Expects `s` (a tipping.MatchStory from orgs.views._wall_posts_context, with
+.anchor, .reaction_bar, .thread) and the page's org, group, user, room.
+{% endcomment %}
+{% with g=s.game %}
+<article class="wl-row is-recap is-ai is-story" id="story-{{ s.id }}" data-msg="s{{ s.id }}" data-busy-scope
+         data-author="Match Recap · GoodTip AI" data-quote="{{ s.headline|truncatechars:90 }}"
+         data-reply-url="{% url 'orgs:wall_story_reply' org.id s.id %}"
+         data-code="{{ g.series.slug }}" style="--rc: {{ g.series.colour }}">
+  <div class="wl-col">
+    <div class="chat-bubble wl-bubble fw-card">
+      {% comment %}MATCH RECAP by GoodTip AI (client, 11 Nov 2026): said big and bold, so
+      nobody mistakes it for a member.{% endcomment %}
+      <header class="mr-band">
+        <span class="mr-spark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2l1.9 5.8L20 10l-6.1 2.2L12 18l-1.9-5.8L4 10l6.1-2.2z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg></span>
+        <span class="mr-name"><b>Match Recap</b><small>by GoodTip AI &middot; {{ s.published_at|naturaltime }}</small></span>
+        <span class="mr-comp" style="--k: {{ g.series.colour }}" title="{{ g.series.name }}"><span class="mr-comp-full">{{ g.series.name }}</span><span class="mr-comp-short" aria-hidden="true">{{ g.series.short|default:g.series.name }}</span></span>
+      </header>
+      {% cache 3600 mrstory s.id s.written_at %}
+      {% if s.photos %}
+      <div class="grc-gallery mr-gallery" data-grc-carousel data-no-swipe>
+        <div class="grc-gtrack" data-grc-track>
+          {% for ph in s.photos %}
+          <figure class="grc-shot">
+            <img src="{{ ph.thumb }}" alt="{{ ph.title }}" loading="lazy">
+            <figcaption><a href="{{ ph.page }}" target="_blank" rel="noopener">Photo: {{ ph.credit }} &middot; {{ ph.license }}</a></figcaption>
+          </figure>
+          {% endfor %}
+        </div>
+        {% if s.photos|length > 1 %}<div class="grc-dots" aria-hidden="true">{% for ph in s.photos %}<i></i>{% endfor %}</div>{% endif %}
+      </div>
+      {% endif %}
+      <div class="mr-score">
+        <span class="mr-team{% if g.home_score > g.away_score %} won{% endif %}"><span class="grc-crest">{% crest g.home_team %}</span><b>{{ g.home_team.name }}</b></span>
+        <span class="mr-num">{{ g.home_score }}<i>&ndash;</i>{{ g.away_score }}</span>
+        <span class="mr-team is-away{% if g.away_score > g.home_score %} won{% endif %}"><b>{{ g.away_team.name }}</b><span class="grc-crest">{% crest g.away_team %}</span></span>
+      </div>
+      <div class="mr-article fw-fold" data-fw-fold>
+        <h3 class="mr-title">{{ s.title }}</h3>
+        {% for para in s.paragraphs %}<p>{{ para }}</p>{% endfor %}
+        {% if s.events %}
+        <div class="mr-moments"><span class="mr-label">Key moments</span>
+          <div class="mr-chips">{% for e in s.events %}{% if forloop.counter <= 10 %}<span class="mr-chip is-{{ e.kind }}"><i aria-hidden="true"></i>{{ e.minute }} {{ e.player }}{% if e.kind == 'pen' %} (pen){% elif e.kind == 'own' %} (og){% elif e.kind == 'red' %} &middot; sent off{% endif %}</span>{% endif %}{% endfor %}</div>
+        </div>
+        {% endif %}
+        {% if s.stats %}
+        <div class="mr-stats">
+          {% for st in s.stats %}
+          <div class="mr-stat"><em>{{ st.label }}</em><span><b>{{ st.home }}</b><b>{{ st.away }}</b></span>
+            {% if st.home_share is not None %}<i class="mr-bar"><b style="width: {{ st.home_share }}%"></b></i>{% endif %}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% if s.question %}<div class="mr-ask"><span class="mr-label">Over to you</span><p>{{ s.question }}</p></div>{% endif %}
+      {% endcache %}
+    </div>
+
+    <div class="wl-under">
+      <div id="sreacts-{{ s.id }}">
+        {% if s.anchor %}{% include "partials/wall_reactions.html" with post=s.anchor bar=s.reaction_bar %}{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="chat-rowacts wl-acts">
+    <button type="button" class="chat-more" data-msg-more aria-label="What to do with this recap" aria-haspopup="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+    </button>
+    <div class="chat-menu" data-msg-menu hidden role="menu">
+      <div class="wl-react-row" role="group" aria-label="React">
+        {% for r in s.reaction_bar %}
+        <button type="button" class="wl-react{% if r.mine %} on{% endif %}" data-wl-react
+                hx-post="{% url 'orgs:wall_story_react' org.id s.id %}" hx-vals='{"emoji": "{{ r.emoji }}"}'
+                hx-target="#sreacts-{{ s.id }}" hx-swap="innerHTML" aria-label="React {{ r.glyph }}">{{ r.glyph }}</button>
+        {% endfor %}
+      </div>
+      <button type="button" class="chat-menu-item" role="menuitem" data-reply-to="s{{ s.id }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 7 7v4"/></svg>
+        Reply
+      </button>
+    </div>
+  </div>
+
+</article>
+{% endwith %}

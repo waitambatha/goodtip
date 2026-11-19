@@ -114,7 +114,8 @@ class WallRoomTests(TestCase):
         html = self.stream()
         self.assertIn("PINE-RECAP-BODY", html)
         self.assertNotIn("OAK-RECAP-BODY", html)
-        self.assertIn("Opens first", self.get())
+        # The saved room is a pin now (5 Nov 2026), and opens first.
+        self.assertIn(">Pinned<", self.get())
 
     def test_saving_a_room_to_open_first(self):
         r = self.client.post(
@@ -139,6 +140,113 @@ class WallRoomTests(TestCase):
         self.client.force_login(outsider)
         r = self.client.post(reverse("orgs:wall_recap_pref", args=[self.org.id]), {"codes": ["fl-men"]})
         self.assertEqual(r.status_code, 403)
+
+
+class WallPinsAndRepliesTests(TestCase):
+    """Pinning a room, and answering a post from the room's one composer
+    (client, 5 Nov 2026)."""
+
+    setUp = WallRoomTests.setUp
+    get = WallRoomTests.get
+
+    def test_pin_moves_a_room_to_the_top_and_unpin_puts_it_back(self):
+        pref = reverse("orgs:wall_recap_pref", args=[self.org.id])
+        self.client.post(pref, {"toggle": "fl-women"})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.recap_codes, ["fl-women"])
+        html = self.get("?room=all")
+        self.assertIn(">Pinned<", html)
+        self.assertLess(html.index('data-code="fl-women"'), html.index('data-code="fl-men"'))
+        self.client.post(pref, {"toggle": "fl-women"})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.recap_codes, [])
+        self.assertNotIn(">Pinned<", self.get("?room=all"))
+
+    def test_a_reply_from_the_composer_lands_in_the_posts_thread_and_room(self):
+        from .models import WallReply
+
+        post = WallPost.objects.get(body="MEMBER-POST-BODY")
+        url = reverse("orgs:wall_reply", args=[self.org.id, post.id])
+        resp = self.client.post(url, {"body": "First answer", "reply_to": f"p{post.id}", "room": "fl-men"})
+        first = WallReply.objects.get(body="First answer")
+        self.assertIsNone(first.reply_to)
+        self.assertEqual(resp.url, f"{self.url}?room=fl-men#reply-{first.id}")
+        self.client.post(url, {"body": "Answering the answer", "reply_to": str(first.id)})
+        self.assertEqual(WallReply.objects.get(body="Answering the answer").reply_to, first)
+        # The post shows a Reply button and its folded thread, not a reply box.
+        html = self.get("?room=all")
+        self.assertIn('data-reply-to="p%d"' % post.id, html)
+        # Replies show under the post, no dropdown (12 Nov 2026).
+        self.assertIn("First answer", html)
+        self.assertIn("Answering the answer", html)
+        self.assertNotIn("gpt-replybox", html)
+
+
+from django.test import override_settings  # noqa: E402
+
+from goodtip.testing import drop_temp_media, temp_media  # noqa: E402
+
+
+@override_settings(MEDIA_ROOT=temp_media("gt-wall-"))
+class WallBoxTests(TestCase):
+    """The WhatsApp box (client, 9 Nov 2026): a picture with a caption, a
+    shared pick, favourites, and recaps without "Start something"."""
+
+    setUp = WallRoomTests.setUp
+    get = WallRoomTests.get
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        drop_temp_media()
+
+    def png(self, name="shot.png"):
+        from io import BytesIO
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        buf = BytesIO()
+        Image.new("RGB", (40, 30), (20, 120, 60)).save(buf, "PNG")
+        return SimpleUploadedFile(name, buf.getvalue(), content_type="image/png")
+
+    def test_a_picture_with_a_caption_is_one_post(self):
+        url = reverse("orgs:wall_post", args=[self.org.id])
+        self.client.post(url, {"body": "Look at this", "image": self.png(), "room": "fl-men"})
+        post = WallPost.objects.get(body="Look at this")
+        self.assertTrue(post.image.name.startswith("wall/"))
+        html = self.get("?room=fl-men")
+        self.assertIn("wl-shot", html)
+        # The picture comes before the words.
+        self.assertLess(html.index("wl-shot"), html.index('data-wl-clamp>Look at this'))
+
+    def test_a_picture_alone_is_enough_and_a_fake_one_is_refused(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        url = reverse("orgs:wall_post", args=[self.org.id])
+        self.client.post(url, {"body": "", "image": self.png()})
+        self.assertTrue(WallPost.objects.exclude(image="").exists())
+        before = WallPost.objects.count()
+        fake = SimpleUploadedFile("evil.png", b"not a picture", content_type="image/png")
+        self.client.post(url, {"body": "", "image": fake})
+        self.assertEqual(WallPost.objects.count(), before)
+
+    def test_favourites_toggle_and_show_in_the_list(self):
+        pref = reverse("orgs:wall_recap_pref", args=[self.org.id])
+        self.client.post(pref, {"fav": "fl-men", "room": "fl-men"})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.wall_favourites, ["fl-men"])
+        self.assertIn("is-fav", self.get())
+        self.client.post(pref, {"fav": "fl-men"})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.wall_favourites, [])
+
+    def test_the_box_has_no_pick_dropdown_and_recaps_no_starters(self):
+        html = self.get("?room=fl-men")
+        self.assertNotIn("Attach a pick", html)
+        self.assertNotIn("Start something", html)
+        self.assertIn("data-emoji-menu", html)
+        self.assertIn("data-wl-pickimage", html)
 
 
 class RecapLabelTests(SimpleTestCase):

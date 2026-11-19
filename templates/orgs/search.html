@@ -64,7 +64,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
   <div class="gt-listwrap">
   <div class="gt-scroll">
   {% for row in browse %}
-  <div class="card" style="margin-bottom:10px;padding:16px 18px;">
+  <div class="card bl-card">
     <div class="bl-row">
       <span class="bl-ic" aria-hidden="true"><svg><use href="#{{ row.icon }}"/></svg></span>
       <div class="bl-main">
@@ -78,7 +78,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
         <form method="post" action="{% url 'orgs:request_join' row.org.id %}" style="display:inline;">{% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}"><button type="submit" data-coach="search-request" class="abtn abtn-primary abtn-sm">Ask to join</button></form>
         {% endif %}
         {% if row.can_manage %}
-        <a href="{% url 'orgs:create' %}?parent={{ row.org.id }}" class="abtn abtn-ghost abtn-sm">Start an organisation under this</a>
+        <a href="{% url 'orgs:create' %}?parent={{ row.org.id }}" class="abtn abtn-ghost abtn-sm"><span class="bl-long">Start an organisation under this</span><span class="bl-short">Start one under this</span></a>
         {% endif %}
       </div>
     </div>

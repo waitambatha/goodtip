@@ -223,11 +223,11 @@
     var mic = form.querySelector('[data-rec-start]');
     var send = form.querySelector('.cc-send');
     var text = bodyOf(form);
-    var files = form.querySelector('[data-files]');
+    var hasFiles = [].some.call(form.querySelectorAll('[data-files]'), function (f) {
+      return f.files && f.files.length > 0;
+    });
     if (!mic || !send) return;
-    var hasSomething =
-      (text && text.value.trim().length > 0) ||
-      (files && files.files && files.files.length > 0);
+    var hasSomething = (text && text.value.trim().length > 0) || hasFiles;
     /* No microphone in this browser (or no permission API at all) means the
        mic button can never do anything, so Send stays whatever the state. */
     var canRecord = !!(navigator.mediaDevices && window.MediaRecorder);
@@ -265,7 +265,9 @@
     if (!form) return;
     /* Nothing typed and nothing attached: Enter is not a way to post an empty
        message, and the server would reject it anyway. */
-    if (!box.value.trim() && !(form.querySelector('[data-files]') || {}).files) return;
+    if (!box.value.trim() && ![].some.call(form.querySelectorAll('[data-files]'), function (f) {
+      return f.files && f.files.length > 0;
+    })) return;
     e.preventDefault();
     if (typeof form.requestSubmit === 'function') form.requestSubmit();
     else form.submit();
@@ -441,13 +443,13 @@
      press elsewhere and on Escape. Left alone they stay open behind whatever
      you do next. */
   document.addEventListener('click', function (e) {
-    document.querySelectorAll('.cc-emoji[open], .rx-add[open]').forEach(function (d) {
+    document.querySelectorAll('.cc-emoji[open], .rx-add[open], .cc-attach[open]').forEach(function (d) {
       if (!d.contains(e.target)) d.open = false;
     });
   });
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
-    document.querySelectorAll('.cc-emoji[open], .rx-add[open]').forEach(function (d) { d.open = false; });
+    document.querySelectorAll('.cc-emoji[open], .rx-add[open], .cc-attach[open]').forEach(function (d) { d.open = false; });
   });
 
   /* ======================================================================

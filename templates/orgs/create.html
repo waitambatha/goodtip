@@ -688,7 +688,7 @@ missed click and got submitted twice.
     </div>
     <div class="wsum-list">
       {% for row in summary %}
-      <div class="wsum-row {{ row.band }}">
+      <div class="wsum-row {{ row.band }}{% if row.charity or row.charities or row.chips or row.value|stringformat:"s"|length > 20 %} wsum-wide{% endif %}">
         <span class="wsum-l">
           <span class="wsum-ic" aria-hidden="true"><svg style="stroke:currentColor;fill:none;stroke-width:1.8;"><use href="#{{ row.icon }}"/></svg></span>
           <span class="wsum-label">{{ row.label }}</span>
@@ -707,6 +707,8 @@ missed click and got submitted twice.
             <span class="wsum-chlist">
               {% for ch in row.charities %}{% include "components/_charity_card.html" with charity=ch %}{% endfor %}
             </span>
+          {% elif row.chips %}
+            <span class="wsum-chips">{% for it in row.chips %}<span class="wsum-chip">{{ it }}</span>{% endfor %}</span>
           {% else %}
             <span class="wsum-val">{{ row.value }}</span>
           {% endif %}

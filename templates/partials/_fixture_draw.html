@@ -14,12 +14,12 @@ gt-fixture.js picks and un-picks it with no code of its own, and it posts
           hx-vals='{"selection":"{% if selection == 'draw' %}none{% else %}draw{% endif %}","view":"mytips"}'
           hx-target="#fxc-{{ match.id }}" hx-swap="outerHTML"
           aria-pressed="{% if selection == 'draw' %}true{% else %}false{% endif %}">
-    {% include "partials/_draw_face.html" %}<small class="fxc-draw-note">Pays as a win</small>
+    {% include "partials/_draw_face.html" %}<small class="fxc-draw-note">Counts as correct</small>
   </button>
 {% elif editable %}
   <label class="fxc-team fxc-draw{% if selection == 'draw' %} sel{% endif %}">
     <input type="radio" name="match_{{ match.id }}" value="draw" hidden{% if selection == 'draw' %} checked{% endif %}>
-    {% include "partials/_draw_face.html" %}<small class="fxc-draw-note">Pays as a win</small>
+    {% include "partials/_draw_face.html" %}<small class="fxc-draw-note">Counts as correct</small>
   </label>
 {% else %}
   <div class="fxc-team fxc-draw{% if selection == 'draw' %} sel{% elif match.result %} is-dim{% else %} is-locked-pick{% endif %}{% if match.result == 'draw' %} is-drawn{% endif %}">

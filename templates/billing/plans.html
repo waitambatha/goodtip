@@ -14,10 +14,39 @@ theme and I am seeing it be cream": this template simply never declared a body
 class, so it fell through to the default cream page while its neighbours drew
 the deep sheet over the rotating strips.
 {% endcomment %}
-{% block body_class %}page-deep sheet-page page-plans{% endblock %}
+{% block body_class %}page-deep gx-page mc-page page-plans{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/gt-admin-gx.css' %}">{% endblock %}
+{% block nav_manage %}on{% endblock %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% block app_content %}
-<div class="app-head is-centred is-orgfirst"><div><div class="app-eyebrow">{{ org.name }} &middot; billing</div><h1 class="app-h1">Choose your plan</h1></div></div>
+{% comment %}
+PLANS, in the console's look (client, 19 Nov 2026: "streamline it ... extremely
+clean"). The same dark header as Manage and the season summary — back to
+Manage, the organisation's name, four scores — then everything below on one
+white sheet. The picker itself (slider, plan tiles, the chosen plan's panel
+and its Pay button) is unchanged in behaviour.
+{% endcomment %}
+{% url 'orgs:console' org.id as console_url %}
+<div class="gx mc pl-gx" id="plPage">
+  <svg class="gx-pitch" viewBox="0 0 1200 700" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
+    <ellipse cx="600" cy="350" rx="560" ry="320"/><ellipse cx="600" cy="350" rx="70" ry="70"/>
+    <rect x="530" y="280" width="140" height="140"/><line x1="600" y1="30" x2="600" y2="670"/>
+  </svg>
+  <header class="gx-hero">
+    <div class="gx-hero-copy">
+      <div class="ss-toprow"><a class="gx-btn is-glass ss-back" href="{{ console_url }}?tab=plan"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Manage</a></div>
+      <p class="gx-kicker"><i aria-hidden="true"></i>Plans{% if org.season %} &middot; {{ org.season }} season{% endif %}</p>
+      <h1 class="gx-title">{{ org.name }}</h1>
+      <p class="gx-lead">{% if current %}You are on {{ current.get_tier_display }}. Change it, or see the details of your subscription.{% else %}One flat fee for the whole organisation. Tipping stays free for everyone, and GoodTip gives a share of the fee to your charity.{% endif %}</p>
+    </div>
+    <div class="gx-board">
+      <div class="gx-score"><b>{{ member_count }}</b><span>Members today</span></div>
+      <div class="gx-score"><b class="ss-score-word">{% if current %}{{ current.get_tier_display }}{% else %}None{% endif %}</b><span>Current plan</span></div>
+      {% if fit_tier %}<div class="gx-score"><b class="ss-score-word">{{ fit_tier.label }}</b><span>Best fit</span></div>{% endif %}
+      <div class="gx-score"><b class="ss-score-word">{{ groups_min_label }}</b><span>Groups from</span></div>
+    </div>
+  </header>
+  <section class="gx-sheet pl-sheet">
 
 {% if not stripe_configured %}
 <div class="flash info" style="margin-bottom:18px;"><svg class="cic" style="width:18px;height:18px;stroke:#245b66;fill:none;flex:none;"><use href="#ic-lock"/></svg><span>Payments aren't switched on yet, your choice is saved and we'll confirm before charging.</span></div>
@@ -623,4 +652,6 @@ and then stopped. See templates/public/sponsorship.html.
   Is the fee what's stopping you? <a href="{% url 'sponsorship' %}">Apply for a sponsored place</a> &mdash;
   setting up, inviting your people and the Charity Vote are free either way.
 </p>
+  </section>
+</div>
 {% endblock %}

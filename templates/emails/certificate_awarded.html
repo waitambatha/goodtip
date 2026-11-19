@@ -1,0 +1,24 @@
+{% extends "emails/_base.html" %}
+{% block title %}Your certificate{% endblock %}
+{% block eyebrow %}Season certificate{% endblock %}
+{% block badge %}&#9733;{% endblock %}
+{% block preheader %}You finished the {{ cert.year }} {{ series.name }} season as {{ cert.place_label }}. Your certificate is attached.{% endblock %}
+{% block content %}
+  <p style="margin:0 0 14px;font-size:16px;color:#1A1A14;">Hello {{ user.display_name }},</p>
+  <p style="margin:0 0 20px;font-size:16px;line-height:1.6;color:#1A1A14;">
+    The {{ cert.year }} {{ series.name }} season is over, and you finished it in the top three of <b>{{ where }}</b>.
+  </p>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+    <tr><td style="background:#143326;border-radius:12px;padding:22px;text-align:center;">
+      <div style="color:#C8F135;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">{{ cert.year }} {{ series.name }}</div>
+      <div style="color:#ffffff;font-size:24px;font-weight:900;">{{ cert.place_label }}</div>
+    </td></tr>
+  </table>
+  <p style="margin:0 0 8px;font-size:15px;line-height:1.6;color:#1A1A14;">Your certificate is attached in both formats:</p>
+  <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#1A1A14;">
+    &bull; <b>PDF</b>, ready to print (A4 landscape)<br>
+    &bull; <b>PNG image</b>, to share or post
+  </p>
+  {% include "emails/_bits.html" with bit="button" url=page_url label="See it on GoodTip" %}
+  <p style="margin:18px 0 0;font-size:15px;color:#1A1A14;">Congratulations.</p>
+{% endblock %}

@@ -1,4 +1,5 @@
 import logging
+import re
 import threading
 from pathlib import Path
 from uuid import uuid4
@@ -9,7 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.db import connection, models
 from django.db.models import Count, Q
 from django.db.models.functions import Lower
-from django.http import Http404, HttpResponseForbidden, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 from django.urls import reverse
@@ -1237,6 +1238,13 @@ def _draft_summary(form, draft) -> list:
             row["charity"] = chosen_charity
         elif row["label"] == "On the ballot" and ballot_charities:
             row["charities"] = ballot_charities
+        elif row["label"] == "Competitions":
+            # One chip per competition instead of a comma run-on; the season
+            # has its own row, so "(2026)" is dropped from each name.
+            row["chips"] = [
+                re.sub(r"\s*\(\d{4}\)$", "", name)
+                for name in row["value"].split(", ")
+            ]
     return out
 
 
@@ -2163,7 +2171,7 @@ def notifications_read_all(request):
 # view checks membership, and posts never render anywhere public.
 # ---------------------------------------------------------------------------
 
-WALL_PAGE_SIZE = 50
+WALL_PAGE_SIZE = 20
 # How many opted-in posts feed the global strip / public rotator. Small on
 # purpose: it's a shop window, not a feed to page through.
 GLOBAL_WALL_SIZE = 12
@@ -2206,6 +2214,30 @@ def _attach_threads(posts, *, viewer=None):
     return posts
 
 
+def _dress_reply(r, request, org):
+    """What a reply needs to stand as its own message: which side it sits on,
+    what it may do, where its answer goes, and the quote of what it answers."""
+    viewer = request.user
+    r.is_mine = r.author_id == viewer.id
+    r.can_edit = r.is_mine
+    r.can_remove = r.is_mine or viewer.is_staff
+    post = r.post
+    if post.story_id:
+        r.reply_url = reverse("orgs:wall_story_reply", args=[org.id, post.story_id])
+    else:
+        r.reply_url = reverse("orgs:wall_reply", args=[org.id, post.id])
+    if r.reply_to_id:
+        r.q_name, r.q_text, r.q_anchor, r.q_ai = r.reply_to.display_name, r.reply_to.quote, f"reply-{r.reply_to_id}", False
+    elif post.story_id:
+        r.q_name, r.q_text, r.q_anchor, r.q_ai = "Match Recap · GoodTip AI", post.story.title, f"story-{post.story_id}", True
+    elif post.kind == post.KIND_RECAP:
+        r.q_name, r.q_text, r.q_anchor, r.q_ai = "Round Recap · GoodTip AI", (post.body or "")[:110], f"post-{post.id}", True
+    else:
+        who = post.author.display_name if post.author_id else "GoodTip"
+        r.q_name, r.q_text, r.q_anchor, r.q_ai = who, (post.body or "")[:110] or "a photo", f"post-{post.id}", False
+    return r
+
+
 def _global_wall_posts(limit=GLOBAL_WALL_SIZE):
     """Posts members chose to share beyond their own group — the cross-group
     feed behind the public rotator and the in-app 'across GoodTip' strip."""
@@ -2214,7 +2246,7 @@ def _global_wall_posts(limit=GLOBAL_WALL_SIZE):
     return list(WallPost.public_feed()[:limit])
 
 
-def _wall_posts_context(request, org, group=None, room=None):
+def _wall_posts_context(request, org, group=None, room=None, series_ids=None):
     """The feed, newest first, with per-post reaction state for the current user.
 
     `group=None` is the organisation's own wall and excludes every group post —
@@ -2222,30 +2254,102 @@ def _wall_posts_context(request, org, group=None, room=None):
     organisation, which is the opposite of what a group is for.
 
     `room` is a competition (a Series), or None for the all-competitions room.
-    A competition's room holds the posts written in it and the round recaps
-    for its rounds. GoodTip's own updates belong to every competition at once,
-    so they live in the all room, with everything else.
+    A competition's room holds the posts written in it, the round recaps for
+    its rounds, and — since 11 Nov 2026 — FINAL WHISTLE: GoodTip's one story
+    per finished game (tipping.MatchStory), written once for everyone and
+    shown to every organisation that has the competition. Its replies and
+    reactions are this room's own (WallPost.story anchors).
     """
+    from datetime import datetime
+
     from django.db.models import Q
+
+    from tipping.models import MatchStory
 
     from .models import WallPost, WallReaction
 
-    qs = WallPost.objects.filter(org=org, group=group, is_hidden=False)
+    qs = WallPost.objects.filter(org=org, group=group, is_hidden=False).exclude(kind=WallPost.KIND_GAME)
+    stories = MatchStory.objects.filter(published_at__lte=timezone.now())
+    # "Load earlier posts": the page opens on the newest WALL_PAGE_SIZE items
+    # and fetches older ones above on request, so a busy room stays light.
+    before = (request.GET.get("before") or "").strip()
+    if before:
+        try:
+            ts = datetime.fromisoformat(before.replace(" ", "+"))
+            qs = qs.filter(created_at__lt=ts)
+            stories = stories.filter(published_at__lt=ts)
+        except ValueError:
+            pass
     if room is not None:
         qs = qs.filter(
             Q(kind=WallPost.KIND_MEMBER, series=room)
             | Q(kind=WallPost.KIND_RECAP, recap__round__series=room)
         )
+        stories = stories.filter(game__series=room)
+    else:
+        stories = stories.filter(game__series_id__in=series_ids or [])
     posts = list(
-        # "recap" is the reverse OneToOne carrying the round's leaderboard and
-        # conversation starters — one join beats a query per card. Both series
-        # ride along because every card wears its competition.
         qs.select_related(
             "author", "series", "recap", "recap__round", "recap__round__series",
             "tip__match__home_team", "tip__match__away_team",
         )
-        [:WALL_PAGE_SIZE]
+        .prefetch_related("recap__round__matches__home_team", "recap__round__matches__away_team")
+        [:WALL_PAGE_SIZE + 1]
     )
+    # REPLIES AS THEIR OWN MESSAGES (client, 12 Nov 2026: "like WhatsApp ...
+    # the message you're replying to on the top, your message below it ...
+    # everybody will have each independently"). A reply is a message in the
+    # room, in time order, quoting what it answers — never a branch tucked
+    # under its parent.
+    from .models import WallReply
+    room_posts = WallPost.objects.filter(org=org, group=group, is_hidden=False)
+    if room is not None:
+        room_posts = room_posts.filter(
+            Q(kind=WallPost.KIND_MEMBER, series=room)
+            | Q(kind=WallPost.KIND_RECAP, recap__round__series=room)
+            | Q(kind=WallPost.KIND_GAME, story__game__series=room)
+        )
+    else:
+        room_posts = room_posts.filter(Q(story__isnull=True) | Q(story__game__series_id__in=series_ids or []))
+    replies_qs = WallReply.objects.filter(post__in=room_posts, is_approved=True, is_hidden=False)
+    if before:
+        try:
+            replies_qs = replies_qs.filter(created_at__lt=datetime.fromisoformat(before.replace(" ", "+")))
+        except ValueError:
+            pass
+    replies = list(
+        replies_qs.select_related("author", "reply_to", "reply_to__author", "post", "post__author", "post__story")
+        .order_by("-created_at")[:WALL_PAGE_SIZE + 1]
+    )
+    for r in replies:
+        r.is_story, r.is_reply, r.when = False, True, r.created_at
+    story_list = list(
+        stories.select_related("game__series", "game__home_team", "game__away_team")
+        .order_by("-published_at")[:WALL_PAGE_SIZE + 1]
+    )
+    for p in posts:
+        p.is_story, p.is_reply, p.when = False, False, p.created_at
+    for st in story_list:
+        st.is_story, st.is_reply, st.when = True, False, st.published_at
+    merged = sorted(posts + story_list + replies, key=lambda x: x.when, reverse=True)
+    request.wall_has_more = len(merged) > WALL_PAGE_SIZE
+    merged = merged[:WALL_PAGE_SIZE]
+    request.wall_oldest = merged[-1].when.isoformat() if merged else ""
+    posts = [x for x in merged if not x.is_story and not x.is_reply]
+    shown_stories = [x for x in merged if x.is_story]
+    for r in (x for x in merged if x.is_reply):
+        _dress_reply(r, request, org)
+    anchors = {
+        a.story_id: a for a in
+        WallPost.objects.filter(org=org, group=group, story__in=shown_stories)
+    }
+    for st in shown_stories:
+        st.anchor = anchors.get(st.id)
+    posts_and_anchors = posts + list(anchors.values())
+    for p in anchors.values():
+        p.is_story, p.when = False, p.created_at
+    request.wall_items = merged
+    posts = posts_and_anchors
 
     counts = (
         WallReaction.objects.filter(post__in=posts)
@@ -2259,6 +2363,9 @@ def _wall_posts_context(request, org, group=None, room=None):
     by_post = {}
     for row in counts:
         by_post.setdefault(row["post_id"], {})[row["emoji"]] = row["n"]
+    # Asked once per page: it used to be a query for every post on it (load
+    # test, 9 Nov 2026 — 47 of the page's 113 queries).
+    manages = _can_manage(request.user, org)
     for p in posts:
         p.reaction_bar = [
             {
@@ -2269,9 +2376,7 @@ def _wall_posts_context(request, org, group=None, room=None):
             }
             for key, glyph in WallReaction.EMOJI_CHOICES
         ]
-        p.can_remove = (
-            p.author_id == request.user.id or _can_manage(request.user, org)
-        )
+        p.can_remove = p.author_id == request.user.id or manages
         # Editing is the AUTHOR'S only, and only a member post has an author.
         # An admin gets the remove control above and not this one: taking a
         # post down is moderation, rewriting one under somebody else's name is
@@ -2280,7 +2385,13 @@ def _wall_posts_context(request, org, group=None, room=None):
         p.can_edit = (
             p.kind == p.KIND_MEMBER and p.author_id == request.user.id
         )
-    return _attach_threads(posts, viewer=request.user)
+    _attach_threads(posts, viewer=request.user)
+    blank = [{"emoji": k, "glyph": g, "count": 0, "mine": False} for k, g in WallReaction.EMOJI_CHOICES]
+    for item in request.wall_items:
+        if item.is_story:
+            a = item.anchor
+            item.reaction_bar = a.reaction_bar if a else blank
+    return request.wall_items
 
 
 def _can_see_wall_post(user, post) -> bool:
@@ -2361,8 +2472,17 @@ def _wall_rooms(request, org, group):
     from .models import RoundRecap, WallPost
 
     ids = set()
-    for comp in org.competitions.all():
+    for comp in org.competitions.prefetch_related("series"):
         ids.update(s.id for s in comp.series.all())
+    # Every other competition GoodTip runs has a room too (client, 16 Nov
+    # 2026: "I can not see the other sports"). Its Final Whistle stories are
+    # GoodTip's, not the organisation's, so a room for the Premier League is
+    # worth opening even where nobody here tips it. Listed after the
+    # organisation's own, under their own heading.
+    mine_ids = set(ids)
+    ids.update(
+        Series.objects.filter(is_active=True, sport__is_active=True).values_list("id", flat=True)
+    )
     recap_counts = dict(
         RoundRecap.objects.filter(org=org, group=group, post__is_hidden=False)
         .values_list("round__series_id").annotate(n=Count("id"))
@@ -2374,7 +2494,7 @@ def _wall_rooms(request, org, group):
     # is later. DISTINCT ON keeps it to one row per competition.
     base = WallPost.objects.filter(org=org, group=group, is_hidden=False)
     latest = {}
-    for row in (base.filter(kind=WallPost.KIND_MEMBER, series__isnull=False)
+    for row in (base.filter(kind__in=(WallPost.KIND_MEMBER, WallPost.KIND_GAME), series__isnull=False)
                 .order_by("series_id", "-created_at").distinct("series_id")
                 .values("series_id", "created_at", "body")):
         latest[row["series_id"]] = (row["created_at"], row["body"])
@@ -2385,7 +2505,19 @@ def _wall_rooms(request, org, group):
         sid = row["recap__round__series_id"]
         if sid not in latest or row["created_at"] > latest[sid][0]:
             latest[sid] = (row["created_at"], row["body"])
+    # The newest Final Whistle story in each competition counts as its newest line.
+    from tipping.models import MatchStory
+    for row in (MatchStory.objects.filter(game__series_id__in=ids, published_at__lte=timezone.now())
+                .order_by("game__series_id", "-published_at").distinct("game__series_id")
+                .values("game__series_id", "published_at", "headline")):
+        sid = row["game__series_id"]
+        if sid not in latest or row["published_at"] > latest[sid][0]:
+            latest[sid] = (row["published_at"], row["headline"])
     newest = base.order_by("-created_at").values("created_at", "body").first() or {}
+    if latest:
+        top = max(latest.values(), key=lambda v: v[0])
+        if not newest or top[0] > newest["created_at"]:
+            newest = {"created_at": top[0], "body": top[1]}
 
     slugs = {s.slug for s in series}
     saved = next((c for c in (request.user.recap_codes or []) if c in slugs), None)
@@ -2399,9 +2531,37 @@ def _wall_rooms(request, org, group):
         when, body = latest.get(s.id, (None, ""))
         rooms.append({
             "slug": s.slug, "code": s.slug, "name": s.name, "mark": _room_mark(s),
+            # Every competition's own colour, set on the room itself: several
+            # (A-League, WSL…) have no CSS token, and without one the room came
+            # out colourless with its text and Post button invisible.
+            "colour": s.colour, "logo": s.logo,
             "latest": when, "preview": body, "recaps": recap_counts.get(s.id, 0),
-            "is_default": saved == s.slug, "series": s,
+            "is_default": saved == s.slug, "series": s, "mine": s.id in mine_ids,
         })
+
+    # PINNED ROOMS (client, 5 Nov 2026: "the place where you can pin the chat,
+    # the way we have it in WhatsApp"). The member's pins, in the order they
+    # were pinned, sit at the top under All competitions; the first opens first.
+    pins = [c for c in (request.user.recap_codes or []) if c in slugs]
+    favs = set(request.user.wall_favourites or [])
+    for r in rooms[1:]:
+        r["pinned"] = r["slug"] in pins
+        r["fav"] = r["slug"] in favs
+    rooms = rooms[:1] + sorted(
+        rooms[1:], key=lambda r: (
+            pins.index(r["slug"]) if r["pinned"] else len(pins),
+            0 if (r["pinned"] or r["mine"] or r["recaps"]) else 1,
+            r["name"].lower(),
+        ),
+    )
+    if pins and len(rooms) > 1:
+        rooms[1]["starts_pinned"] = True
+        rest = next((r for r in rooms[1:] if not r["pinned"] and (r["mine"] or r["recaps"])), None)
+        if rest:
+            rest["starts_rest"] = True
+    other = next((r for r in rooms[1:] if not (r["pinned"] or r["mine"] or r["recaps"])), None)
+    if other:
+        other["starts_other"] = True
 
     raw = (request.GET.get("room") or "").strip()
     wanted = raw or saved or "all"
@@ -2418,10 +2578,17 @@ def wall_view(request, org_id: int):
         return HttpResponseForbidden()
     group = ctx.current_group(request, org)
     rooms, room, room_series, room_chosen = _wall_rooms(request, org, group)
-    posts = _wall_posts_context(request, org, group, room=room_series)
+    posts = _wall_posts_context(
+        request, org, group, room=room_series,
+        # The All room is this organisation's competitions, not all of GoodTip.
+        series_ids=[r["series"].id for r in rooms if r.get("series") and (r["mine"] or r["recaps"])],
+    )
     # The room's newest round recap is pinned above its chat (recap spec §2),
     # and so is not repeated in the chat below it.
-    pinned = next((p for p in posts if p.kind == WallPost.KIND_RECAP), None)
+    loading_earlier = bool(request.GET.get("before"))
+    pinned = None if loading_earlier else next(
+        (p for p in posts if not p.is_story and not getattr(p, "is_reply", False)
+         and p.kind == WallPost.KIND_RECAP), None)
     if pinned is not None:
         posts = [p for p in posts if p is not pinned]
     # No donation figures on the Wall — participants are out of the money
@@ -2434,6 +2601,8 @@ def wall_view(request, org_id: int):
         "room_chosen": room_chosen,
         "pinned_recap": pinned,
         "posts": posts,
+        "has_more": getattr(request, "wall_has_more", False),
+        "oldest": getattr(request, "wall_oldest", ""),
         "my_tips": _current_round_tips(request.user, org, group),
         "is_admin": _can_manage(request.user, org),
         # Only offer the public toggle where it can actually do something — in
@@ -2456,6 +2625,27 @@ def wall_recap_pref(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _is_member(request.user, org):
         return HttpResponseForbidden()
+    fav = (request.POST.get("fav") or "").strip()
+    if fav:
+        # Star or unstar one room for the Favourites filter.
+        favs = [c for c in (request.user.wall_favourites or []) if c != fav]
+        if fav not in (request.user.wall_favourites or []) and Series.objects.filter(slug=fav).exists():
+            favs.append(fav)
+        request.user.wall_favourites = favs
+        request.user.save(update_fields=["wall_favourites"])
+        back = (request.POST.get("room") or fav).strip()
+        return redirect(f"{reverse('orgs:wall', args=[org.id])}?room={back if re.fullmatch(r'[a-z0-9-]+', back) else fav}")
+    toggle = (request.POST.get("toggle") or "").strip()
+    if toggle:
+        # Pin or unpin one room, keeping the others in the order they were pinned.
+        codes = [c for c in (request.user.recap_codes or []) if c != toggle]
+        pinned = toggle not in (request.user.recap_codes or [])
+        if pinned and Series.objects.filter(slug=toggle).exists():
+            codes.append(toggle)
+        request.user.recap_codes = codes
+        request.user.save(update_fields=["recap_codes"])
+        back = (request.POST.get("room") or toggle).strip()
+        return redirect(f"{reverse('orgs:wall', args=[org.id])}?room={back if re.fullmatch(r'[a-z0-9-]+', back) else toggle}")
     wanted = request.POST.getlist("codes")
     codes = sorted(set(Series.objects.filter(slug__in=wanted).values_list("slug", flat=True)))
     request.user.recap_codes = codes
@@ -2496,9 +2686,14 @@ def wall_post_create(request, org_id: int):
         tip = Tip.objects.filter(
             pk=tip_id, user=request.user, org=org, group=group,
         ).first()
-    if body or tip:
+    image, image_error = _wall_image(request.FILES.get("image"))
+    if image_error:
+        messages.error(request, image_error)
+        url = reverse("orgs:wall", args=[org.id])
+        return redirect(f"{url}?room={room.slug}" if room else url)
+    if body or tip or image:
         post = WallPost.objects.create(
-            org=org, group=group, author=request.user, body=body, tip=tip,
+            org=org, group=group, author=request.user, body=body, tip=tip, image=image or "",
             series=room,
             kind=WallPost.KIND_MEMBER,
             # Opt-in, only honoured while the organisation is publicly listed,
@@ -2512,10 +2707,35 @@ def wall_post_create(request, org_id: int):
         )
         _notify_wall_post(post)
     else:
-        messages.error(request, "Say something — or at least attach a pick.")
+        messages.error(request, "Say something, add a picture or share a pick.")
     # Back to the room it was written in.
     url = reverse("orgs:wall", args=[org.id])
     return redirect(f"{url}?room={room.slug}" if room else url)
+
+
+WALL_IMAGE_MAX = 8 * 1024 * 1024
+WALL_IMAGE_TYPES = {"JPEG", "PNG", "GIF", "WEBP"}
+
+
+def _wall_image(upload):
+    """A picture for a Wall post: a real image (checked by opening it, not by
+    its name), at most 8 MB. Returns (file or None, error or None)."""
+    if not upload:
+        return None, None
+    if upload.size > WALL_IMAGE_MAX:
+        return None, "That picture is over 8 MB. Try a smaller one."
+    try:
+        from PIL import Image
+
+        with Image.open(upload) as im:
+            kind = im.format
+            im.verify()
+    except Exception:  # noqa: BLE001 — anything Pillow cannot open is not a picture
+        return None, "That file isn't a picture we can show."
+    if kind not in WALL_IMAGE_TYPES:
+        return None, "Pictures need to be JPG, PNG, GIF or WebP."
+    upload.seek(0)
+    return upload, None
 
 
 def _notify_wall_post(post):
@@ -2583,8 +2803,13 @@ def wall_reply_create(request, org_id: int, post_id: int):
     )
     _notify_wall_reply(reply)
     # Land on the reply just written rather than on the top of the post, so
-    # a long thread does not send the author back to hunt for their own line.
-    return redirect(reverse("orgs:wall", args=[org.id]) + f"#reply-{reply.id}")
+    # a long thread does not send the author back to hunt for their own line —
+    # and in the room it was written from, when the room's composer sent it.
+    room = (request.POST.get("room") or "").strip()
+    url = reverse("orgs:wall", args=[org.id])
+    if room and re.fullmatch(r"[a-z0-9-]+", room):
+        url += f"?room={room}"
+    return redirect(url + f"#reply-{reply.id}")
 
 
 @login_required
@@ -2705,6 +2930,57 @@ def wall_reply_remove(request, org_id: int, reply_id: int):
     else:
         return HttpResponseForbidden()
     return redirect("orgs:wall", org_id=org.id)
+
+
+def _org_series_ids(org) -> set:
+    """Every competition (Series) this organisation's Wall has a room for."""
+    ids = set()
+    for comp in org.root.competitions.prefetch_related("series"):
+        ids.update(s.id for s in comp.series.all())
+    return ids
+
+
+def _story_anchor(request, org, story_id):
+    """This room's conversation row for a Final Whistle story, made on first use.
+
+    The story is shared by every organisation; the thread under it is not —
+    each organisation and each group gets its own anchor, and so its own
+    replies and reactions."""
+    from tipping.models import MatchStory
+
+    from .models import WallPost
+
+    story = get_object_or_404(MatchStory.objects.select_related("game__series"), pk=story_id)
+    if story.game.series_id not in _org_series_ids(org):
+        raise Http404("That competition is not on this Wall.")
+    group = ctx.current_group(request, org)
+    anchor, _ = WallPost.objects.get_or_create(
+        org=org, group=group, story=story, kind=WallPost.KIND_GAME,
+        defaults={"series": story.game.series, "body": story.headline[:500]},
+    )
+    return anchor
+
+
+@login_required
+@require_POST
+def wall_story_reply(request, org_id: int, story_id: int):
+    """A reply under a Final Whistle story, in this room's own thread."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _is_member(request.user, org):
+        return HttpResponseForbidden()
+    anchor = _story_anchor(request, org, story_id)
+    return wall_reply_create(request, org_id, anchor.id)
+
+
+@login_required
+@require_POST
+def wall_story_react(request, org_id: int, story_id: int):
+    """A reaction to a Final Whistle story, counted in this room only."""
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _is_member(request.user, org):
+        return HttpResponseForbidden()
+    anchor = _story_anchor(request, org, story_id)
+    return wall_react(request, org_id, anchor.id)
 
 
 @login_required
@@ -3310,10 +3586,16 @@ def groups_view(request, org_id: int):
                 # their organisation's plan does not carry. Same sentence the
                 # disabled control shows, and it lands them on the plans
                 # screen rather than back where they started.
-                messages.info(request, groups_context(root)["groups_locked_blurb"])
-                return redirect("billing:plans", org_id=root.pk)
+                #
+                # 17 Nov 2026: back to Groups rather than off to the plans
+                # screen — the reason now opens there in a pop-up, with the
+                # way to upgrade in it ("when it's not created, we want to
+                # know what's the reason").
+                messages.warning(request, groups_context(root)["groups_locked_blurb"], extra_tags="groups-locked")
+                return redirect(reverse("orgs:groups", args=[root.pk]) + "#new")
             except ValueError as e:
-                messages.error(request, str(e))
+                messages.error(request, str(e), extra_tags="groups-create")
+                return redirect(reverse("orgs:groups", args=[root.pk]) + "#new")
             return redirect("orgs:groups", org_id=root.pk)
 
         group = get_object_or_404(Group, pk=request.POST.get("group_id"), org=root)
@@ -3392,6 +3674,7 @@ def groups_view(request, org_id: int):
         "is_admin": is_admin,
         "current_group": ctx.current_group(request, root),
         "pending_count": sum(1 for r in rows if r["awaiting_approval"]),
+        "my_count": sum(1 for r in rows if r["is_mine"]),
         # Pictures for the hero, from the product's own media library rather
         # than hardcoded in the template (client brief, 22 Sep 2026). Seeded on
         # the organisation so a given org opens on the same one every visit.
@@ -3978,6 +4261,26 @@ def _follow_context(request, thread) -> None:
         ctx.set_current_org(request, thread.org)
 
 
+def _thread_version(thread) -> str:
+    """Everything that changes what an open conversation shows, in one short
+    string: messages, edits, deletions, read receipts, reactions and the pin.
+    The twelve-second refresh sends the version it already has; when nothing
+    changed the server answers 204 and the page is left alone — no redraw, no
+    flicker, an open menu stays open (12 Nov 2026)."""
+    from django.db.models import Max
+
+    from .models import Message, MessageReaction
+
+    agg = Message.objects.filter(thread=thread).aggregate(
+        n=Count("id"), last=Max("id"), ed=Max("edited_at"), gone=Max("deleted_at"),
+    )
+    reads = Message.read_by.through.objects.filter(message__thread=thread).count()
+    rx = MessageReaction.objects.filter(message__thread=thread).count()
+    stamp = lambda d: int(d.timestamp()) if d else 0  # noqa: E731
+    return f"{agg['n']}.{agg['last'] or 0}.{stamp(agg['ed'])}.{stamp(agg['gone'])}.{reads}.{rx}.{thread.pinned_message_id or 0}"
+
+
+
 def _messages_context(request, org, thread):
     """Everything the two panels need, for both entry points."""
     from orgs.services import (
@@ -3986,14 +4289,25 @@ def _messages_context(request, org, thread):
     )
 
     show = "archived" if request.GET.get("show") == "archived" else "active"
-    rows = conversations_for(
+    # ONLY THE CONVERSATION PANEL is drawn when a conversation is opened, sent
+    # into or refreshed (12 Nov 2026). The sidebar — conversations, rooms,
+    # groups, contacts — is not on that response, so it is not built for it.
+    pane_only = request.GET.get("pane") in ("chat", "room") or (
+        request.method == "POST" and request.headers.get("HX-Request"))
+    rows = [] if pane_only else conversations_for(
         request.user, keep=thread.id if thread else None, show=show,
     )
-    my_orgs = [
+    my_orgs = [] if pane_only else [
         m.org for m in
         OrgMember.objects.filter(user=request.user)
         .select_related("org").order_by("org__name")
     ]
+    # Member counts for the directory rows in ONE query, not two per row (load
+    # test, 12 Nov 2026: 22 queries for eleven organisations).
+    from django.db.models import Count as _Count
+    org_sizes = dict(OrgMember.objects.filter(org__in=my_orgs).values_list("org_id").annotate(n=_Count("id")))
+    for o in my_orgs:
+        o.n_members = org_sizes.get(o.id, 0)
     # THE THREE TABS ARE DIRECTORIES, NOT FILTERS.
     #
     # ASKED FOR: "when I click Organisations I see the organisations that I am
@@ -4010,7 +4324,7 @@ def _messages_context(request, org, thread):
     # organisation → groups tree): the tab needs a flat list across every
     # organisation and a count of it, and a view that reaches into another
     # layer's cache breaks the moment that layer stops filling it.
-    my_groups = list(
+    my_groups = [] if pane_only else list(
         Group.objects.filter(
             approval_status=Group.APPROVAL_APPROVED,
             memberships__user=request.user,
@@ -4020,7 +4334,11 @@ def _messages_context(request, org, thread):
         .distinct()
         .order_by("org__name", "name")
     )
-    contacts, contacts_total, contacts_more = contacts_for(request.user)
+    from .models import GroupMember as _GM
+    group_sizes = dict(_GM.objects.filter(group__in=my_groups).values_list("group_id").annotate(n=_Count("id")))
+    for g in my_groups:
+        g.n_members = group_sizes.get(g.id, 0)
+    contacts, contacts_total, contacts_more = ([], 0, False) if pane_only else contacts_for(request.user)
     # The right-click / long-press menu belongs to a conversation, and the tabs
     # list things — so each row is matched to the conversation it would open, if
     # there is one already. Nothing is created; a row with nothing said in it
@@ -4033,9 +4351,9 @@ def _messages_context(request, org, thread):
     # it was simply off the edge, which is why "I have archived a chat and I do
     # not see it". It has its own line now, and a count, so it is visible
     # whether or not anybody thinks to scroll a row of tabs.
-    archived_count = len(
+    archived_count = 0 if pane_only else (len(
         conversations_for(request.user, keep=thread.id if thread else None, show="archived")
-    ) if show != "archived" else len(rows)
+    ) if show != "archived" else len(rows))
     ctx = {
         "org": org,
         "conversations": rows,
@@ -4104,6 +4422,7 @@ def _messages_context(request, org, thread):
         # like a puzzle.
         ctx["people_offset"] = len(people)
         ctx["people_q"] = ""
+    ctx["thread_version"] = _thread_version(thread) if thread is not None else ""
     return ctx
 
 
@@ -4200,6 +4519,9 @@ def member_message_thread_view(request, org_id: int, thread_id: int):
     # middle of typing. Same view and same context as the first paint, so the
     # markup that arrives cannot drift from the markup it replaces.
     if request.GET.get("pane") == "chat":
+        # Nothing new since the page last looked: say so, and draw nothing.
+        if request.GET.get("v") and request.GET.get("v") == _thread_version(thread):
+            return HttpResponse(status=204)
         return render(request, "orgs/partials/_room_stream.html",
                       _messages_context(request, org, thread))
 
@@ -4792,6 +5114,7 @@ def _range_response(request, attachment):
 CONSOLE_TABS = [
     ("members", "Members", False), ("approvals", "Approvals", True), ("team", "Team", True),
     ("sports", "Sports", True), ("groups", "Groups", False), ("charity", "Charity", False),
+    ("certificates", "Certificates", False),
     ("plan", "Plan", True), ("invite", "Invite", False),
 ]
 
@@ -4866,9 +5189,76 @@ def org_console_view(request, org_id: int):
         ctx["plan"] = {"sub": sub, "label": pricing.tier_label(tier) if tier else "",
                        "price": cfg.get("price"), "seats": cfg.get("seat_limit"),
                        "used": len(members)}
+    if tab == "certificates":
+        # Client, 17 Nov 2026: Certificates belong in Manage on a laptop too,
+        # in the console's own look — a card per competition, each opening
+        # that competition's winners.
+        from tipping.certificates import competition_cards
+        ctx["cert_cards"] = competition_cards(org)
     if tab == "invite":
         ctx["invite_url"] = _invite_url(request, org)
         ctx["email_form"] = InviteByEmailForm()
     if request.headers.get("HX-Request") and request.GET.get("pane"):
         return render(request, "orgs/console.html", ctx)
     return render(request, "orgs/console.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# "SAM IS TYPING…" (client, 16 Nov 2026: "that effect that someone is typing,
+# be it in iPhone or WhatsApp ... both in the wall and in the messaging, so if
+# I'm in a group of 20 I can see Sam is about to say something").
+#
+# A channel is one conversation: "t<thread id>" for Messages, or
+# "w<group id or 0>:<room>" for a Wall room. A typist POSTs every few seconds
+# while typing (and once with state=0 on send or clearing the box); readers
+# GET the channel every couple of seconds while the page is open. Each typist
+# is held for TYPING_TTL seconds, so a closed tab or a dropped connection
+# clears itself without a goodbye. Nothing is stored in the database.
+# ---------------------------------------------------------------------------
+TYPING_TTL = 6
+
+
+def _typing_channel_ok(request, org, ch):
+    """Whether ``request.user`` may see and signal typing in ``ch``."""
+    import re
+
+    from .models import MessageThread
+
+    m = re.fullmatch(r"t(\d+)", ch or "")
+    if m:
+        thread = MessageThread.objects.filter(pk=int(m.group(1)), org=org).first()
+        return thread is not None and thread.can_read(request.user)
+    if re.fullmatch(r"w\d+:[a-z0-9-]{1,60}", ch or ""):
+        return _is_member(request.user, org)
+    return False
+
+
+@login_required
+def typing_view(request, org_id: int):
+    import time
+
+    from django.core.cache import caches
+    from django.http import JsonResponse
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    ch = (request.POST.get("ch") if request.method == "POST" else request.GET.get("ch")) or ""
+    if not _typing_channel_ok(request, org, ch):
+        return HttpResponseForbidden()
+
+    store = caches["typing"]
+    key = f"typing:{org.pk}:{ch}"
+    now = time.time()
+    who = {k: v for k, v in (store.get(key) or {}).items() if v[1] > now}
+
+    if request.method == "POST":
+        me = str(request.user.pk)
+        if request.POST.get("state") == "1":
+            name = (getattr(request.user, "display_name", "") or "").strip() or "Someone"
+            who[me] = (name.split()[0][:24], now + TYPING_TTL)
+        else:
+            who.pop(me, None)
+        store.set(key, who, TYPING_TTL + 4)
+        return JsonResponse({"ok": True})
+
+    names = [v[0] for k, v in sorted(who.items(), key=lambda kv: kv[1][1]) if k != str(request.user.pk)]
+    return JsonResponse({"typing": names})

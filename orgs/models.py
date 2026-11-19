@@ -1055,9 +1055,11 @@ class WallPost(models.Model):
     KIND_MEMBER = "member"
     KIND_SYSTEM = "system"
     KIND_RECAP = "recap"
+    KIND_GAME = "game"
     KIND_CHOICES = [
         (KIND_MEMBER, "Member post"),
         (KIND_SYSTEM, "GoodTip update"),
+        (KIND_GAME, "Game recap"),
         (KIND_RECAP, "AI Group Recap"),
     ]
 
@@ -1096,6 +1098,15 @@ class WallPost(models.Model):
         "catalog.Series", on_delete=models.SET_NULL,
         null=True, blank=True, related_name="wall_posts",
     )
+    # A PICTURE WITH THE POST (client, 9 Nov 2026: "image icons ... in the chat
+    # box, just like WhatsApp"). Shown first, with the words under it as a
+    # caption. Member posts only; checked for type and size on the way in.
+    image = models.ImageField(upload_to="wall/%Y/%m/", blank=True)
+    # A FINAL WHISTLE STORY'S CONVERSATION IN THIS ROOM (11 Nov 2026). The story
+    # is written once for everyone (tipping.MatchStory); this row exists only
+    # once somebody here replies or reacts, and carries that room's thread.
+    story = models.ForeignKey("tipping.MatchStory", on_delete=models.CASCADE,
+                              null=True, blank=True, related_name="wall_anchors")
     created_at = models.DateTimeField(auto_now_add=True)
     # Stamped the first time its author changes it. Only ever a member post:
     # a recap or a system card has no author to edit it, which is what makes
@@ -1189,6 +1200,22 @@ class RoundRecap(models.Model):
     needs_review = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
+
+    # The match-day photograph a recap wears (client, 9 Nov 2026). The site's
+    # own pictures of the ground and the ball, never a team's or a player's,
+    # so there is no question of whose image it is. Varied by round number so
+    # a run of recaps does not repeat one picture.
+    SCENES = {
+        "afl": ["afl-ball-grass.jpg", "afl-goal-posts.jpg", "afl-ground.jpg", "mcg-match.jpg", "afl-posts-mcg.jpg", "afl-ball.jpg"],
+        "nrl": ["nrl-ball-grass.jpg", "nrl-goal-posts.jpg", "nrl-ground-dusk.jpg", "nrl-posts-sunset.jpg", "nrl-scoreboard.jpg", "nrl-players-fans.jpg"],
+        None: ["stadium-lights-grass.jpg", "stadium-panorama.jpg", "mcg-stadium.jpg", "aussie-crowd-flag.jpg"],
+    }
+    SCENE_FAMILY = {"afl": "afl", "aflw": "afl", "nrl": "nrl", "nrlw": "nrl", "state-of-origin": "nrl"}
+
+    @property
+    def scene(self) -> str:
+        pool = self.SCENES[self.SCENE_FAMILY.get(self.round.series.slug)]
+        return "img/scenes/" + pool[((self.round.round_number or 0) + (self.pk or 0)) % len(pool)]
     class Meta:
         # Two constraints, not one unique_together, for the same reason as Tip:
         # `group` is nullable and Postgres treats every NULL as distinct, so a

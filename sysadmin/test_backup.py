@@ -296,7 +296,11 @@ class RecordAndHistoryTests(_TwoDatabases):
     def test_editing_saves_through_the_new_form(self):
         resp = self.client.get(self._url("staging", "orgs.wallpost", self.real_post.pk))
         self.assertIsNotNone(resp.context["form"])
-        data = {k: v for k, v in resp.context["form"].initial.items() if v is not None}
+        from django.db.models.fields.files import FieldFile
+
+        # An empty picture field has nothing to post (WallPost.image, 9 Nov 2026).
+        data = {k: v for k, v in resp.context["form"].initial.items()
+                if v is not None and not (isinstance(v, FieldFile) and not v)}
         data["body"] = "Corrected"
         for name, field in resp.context["form"].fields.items():
             if name not in data and field.required:

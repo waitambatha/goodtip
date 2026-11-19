@@ -15,7 +15,7 @@ from billing.donations import donation_summary
 from catalog.models import GoodListConfig, OrganisationType, State
 from orgs.models import Group, OrgMember, Organisation
 from . import national_ladder
-from .models import LadderEntry, Match, Round, Team, Tip
+from .models import LadderEntry, Match, Round, Team, Tip, TipDraft
 from .services import (
     annotate_play_state, clear_tip, competition_filter, current_round,
     leaderboard_for_family, leaderboard_for_org, submit_tip, tip_window,
@@ -96,6 +96,18 @@ def tip_round_view(request, org_id: int, round_id: int):
     })
 
 
+def _render_ticket(request, org, match, *, error="", changed=False):
+    """One My Tips ticket, re-drawn after a change made on it."""
+    match = (Match.objects.select_related("round__series__sport", "home_team", "away_team")
+             .get(pk=match.pk))
+    tip = Tip.objects.filter(user=request.user, match=match, org=org,
+                             group=_group(request, org)).first()
+    r = {"match": match, "tip": tip, "outcome": "pending", "points": 0}
+    return render(request, "partials/_tip_ticket.html", {
+        "r": r, "m": match, "org": org, "error": error, "changed": changed and tip is not None,
+    })
+
+
 @login_required
 @require_POST
 def tip_save_partial(request, org_id: int, round_id: int, match_id: int):
@@ -108,6 +120,7 @@ def tip_save_partial(request, org_id: int, round_id: int, match_id: int):
     # re-saving it. A radio cannot return to "none" on its own, so without this
     # the only way out of a pick was to pick the other side — see clear_tip.
     undo = selection in (NO_TIP, "", None)
+    ticket = request.POST.get("view") == "ticket"
     try:
         if undo:
             clear_tip(user=request.user, match=match, org=org,
@@ -117,7 +130,14 @@ def tip_save_partial(request, org_id: int, round_id: int, match_id: int):
             submit_tip(user=request.user, match=match, org=org,
                        selection=selection, group=_group(request, org))
     except ValueError as e:
+        if ticket:
+            return _render_ticket(request, org, match, error=str(e))
         return HttpResponse(f"<span class='text-red-400 text-xs'>{e}</span>", status=400)
+    # A tip saved anywhere supersedes an unconfirmed pick on the dashboard for
+    # the same game, so the dashboard shows what was just saved, as Picked.
+    TipDraft.objects.filter(user=request.user, match=match, group=_group(request, org)).delete()
+    if ticket:
+        return _render_ticket(request, org, match, changed=True)
     if request.POST.get("view") == "mytips":
         # The whole card comes back, not just the picker: the chosen club is
         # now shown by the club's own row, so a swap that replaced only the
@@ -270,13 +290,67 @@ def tip_confirm_upcoming(request, org_id: int):
     else:
         messages.info(request, "Tap a team on each match to pick it, then press Confirm my tips.")
 
+    # Whatever was on the slate is now either saved or refused, so none of it
+    # is a draft any more. Every posted fixture goes, picks and take-backs.
+    posted = set(matches) | {m.id for m in _posted_clears(request, org)}
+    if posted:
+        TipDraft.objects.filter(user=request.user, match_id__in=posted,
+                                group=_group(request, org)).delete()
+
+    onward = None
     if saved:
         onward = _carry(request, org, {
             mid: sel for mid, sel in picks.items() if mid in matches
         })
-        if onward is not None:
-            return onward
+
+    # THE SHEET CONFIRMS IN PLACE (client, 13 Nov 2026: "a nice loader ... and
+    # then says tips locked in"). It posts with fetch and draws its own
+    # success, so the notes that would have been flashed on the next page are
+    # handed back here instead — read off the message queue, which also marks
+    # them used so they do not turn up again on the next page load.
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        from django.http import JsonResponse
+
+        notes = [str(m.message) for m in messages.get_messages(request)]
+        return JsonResponse({
+            "ok": bool(saved or cleared),
+            "saved": saved, "cleared": cleared, "skipped": skipped,
+            "notes": notes,
+            "next": onward.url if onward is not None else "",
+        })
+    if onward is not None:
+        return onward
     return redirect(f"{reverse('dashboard')}?org={org.id}")
+
+
+@login_required
+@require_POST
+def tip_draft(request, org_id: int):
+    """Remember one unconfirmed pick, the moment it is made. See TipDraft.
+
+    Fire-and-forget from the dashboard: always 204, and a draft that matches
+    what is already saved is deleted rather than stored, so taking a change
+    back leaves nothing behind to restore.
+    """
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_member(request.user, org):
+        return HttpResponseForbidden()
+    raw = request.POST.get("match", "")
+    selection = request.POST.get("selection", "")
+    if not raw.isdigit() or selection not in ("home", "away", "draw", NO_TIP):
+        return HttpResponse(status=204)
+    match = Match.objects.filter(pk=int(raw), round__org=org).first()
+    if match is None or match.is_locked:
+        return HttpResponse(status=204)
+    group = _group(request, org)
+    saved = (Tip.objects.filter(user=request.user, match=match, org=org, group=group)
+             .values_list("selection", flat=True).first())
+    if selection == (saved or NO_TIP):
+        TipDraft.objects.filter(user=request.user, match=match, group=group).delete()
+    else:
+        TipDraft.objects.update_or_create(user=request.user, match=match, group=group,
+                                          defaults={"selection": selection})
+    return HttpResponse(status=204)
 
 
 # ---------------------------------------------------------------------------
@@ -406,7 +480,9 @@ def carry_preview(request, org_id: int):
         return HttpResponseForbidden()
 
     mode = getattr(request.user, "tip_carry_mode", User.CARRY_ASK)
-    if mode == User.CARRY_NONE:
+    # Either answer already given for good — "never", or "always, don't ask
+    # me again" — means there is no question: the confirm acts on it.
+    if mode in (User.CARRY_NONE, User.CARRY_ALL):
         return HttpResponse(status=204)
 
     picks = _posted_picks(request, org)
@@ -587,7 +663,7 @@ def _readers_for(matches) -> dict:
 
 
 TIPS_PER_PAGE = 30
-TIP_TABS = (("all", "All"), ("won", "Correct"), ("lost", "Wrong"), ("missed", "Missed"), ("pending", "Pending"))
+TIP_TABS = (("all", "All"), ("won", "Correct"), ("lost", "Lost"), ("missed", "Missed"), ("pending", "Pending"))
 
 
 def _tip_history(user, org, group):
@@ -699,7 +775,7 @@ def my_tips_view(request, org_id: int):
             {"value": summary["points"], "label": "Points", "tone": "points", "key": "all", "query": tab_query("all")},
             {"value": strike, "label": "Strike rate", "tone": "strike", "key": "", "query": tab_query("all")},
             {"value": summary["won"], "label": "Correct", "tone": "won", "key": "won", "query": tab_query("won")},
-            {"value": summary["lost"], "label": "Wrong", "tone": "lost", "key": "lost", "query": tab_query("lost")},
+            {"value": summary["lost"], "label": "Lost", "tone": "lost", "key": "lost", "query": tab_query("lost")},
             {"value": summary["missed"], "label": "Missed", "tone": "missed", "key": "missed", "query": tab_query("missed")},
             {"value": summary["streak"], "label": "In a row", "tone": "streak", "key": "", "query": tab_query("won")},
         ],
@@ -805,6 +881,56 @@ def org_series(org):
     return ordered
 
 
+def ladder_series(org):
+    """Every competition with a ladder this season: the organisation's own
+    first, in its order, then the rest of GoodTip's switched-on competitions.
+
+    WIDENED 16 Nov 2026 (client: "on the ladder ... it's basically the
+    positions of teams, I should not have to add it ... I should see the
+    Premier League, Bundesliga and all"). A ladder is a fact about the
+    competition, not about the league reading it — LadderEntry is keyed to
+    (series, season), never to an organisation — so the Ladder and Statistics
+    pages offer every competition that has one, not only those this
+    organisation tips. Tipping, the leaderboard and the dashboard still follow
+    the organisation's own picks (org_series).
+    """
+    from catalog.models import Series
+    from data_sync.ladder import NO_LADDER
+
+    # Origin is a three-game series with no table; it stays out of a list of
+    # ladders even when the organisation tips it.
+    ordered = [s for s in org_series(org) if (s.name or "").strip().upper() not in NO_LADDER]
+    seen = {s.id for s in ordered}
+    have = set(
+        LadderEntry.objects.values_list("series_id", flat=True).distinct()
+    )
+    rest = [
+        s for s in Series.objects.filter(id__in=have - seen, is_active=True, sport__is_active=True)
+        .select_related("sport")
+    ]
+    rest.sort(key=lambda s: (getattr(s.sport, "sort_order", 100), s.sport.name, s.sort_order, s.name))
+    return ordered + rest
+
+
+def ladder_season(series, fallback):
+    """The Season a competition's ladder should show: the one it is in now
+    (data_sync.ladder.current_season_year), not the organisation's year — the
+    two differ for a competition whose feed labels seasons by the year they
+    end (NHL, NBA, NBL). Falls back to ``fallback`` when the results store has
+    nothing, or no Season row exists for that year yet."""
+    from catalog.models import Season
+    from data_sync.ladder import current_season_year
+
+    if series is None:
+        return fallback
+    year = current_season_year(series)
+    if year and year != getattr(fallback, "year", None):
+        found = Season.objects.filter(year=year).first()
+        if found is not None:
+            return found
+    return fallback
+
+
 def pick_series(options, wanted, *, default_to_first=False):
     """Resolve ?series= / ?comp= against a list of Series.
 
@@ -842,8 +968,9 @@ def ladder_view(request, org_id: int):
     if not _require_member(request.user, org):
         return HttpResponseForbidden()
 
-    ordered = org_series(org)
+    ordered = ladder_series(org)
     selected = pick_series(ordered, request.GET.get("series"), default_to_first=True)
+    season = ladder_season(selected, org.season)
 
     # THE LADDER AS IT STOOD, for any round of the season.
     #
@@ -861,20 +988,24 @@ def ladder_view(request, org_id: int):
 
     entries, rounds_available, at_round = [], [], None
     if selected:
-        rounds_available = season_rounds(series=selected, season=org.season)
+        rounds_available = season_rounds(series=selected, season=season)
         wanted = request.GET.get("round")
         if wanted and wanted.isdigit() and int(wanted) in rounds_available:
             at_round = int(wanted)
 
         if at_round is None:
             entries = list(
-                LadderEntry.objects.filter(series=selected, season=org.season)
+                LadderEntry.objects.filter(series=selected, season=season)
                 .select_related("team")
                 .order_by("rank")
             )
-        else:
+        if at_round is not None or (not entries and rounds_available):
+            # A past round — or a season the sync has not stored a table for
+            # yet (a competition that has just rolled into its next season),
+            # which is computed from its results rather than left blank.
             rows = ladder_standings(
-                series=selected, season=org.season, up_to_round=at_round,
+                series=selected, season=season,
+                up_to_round=at_round if at_round is not None else max(rounds_available),
             )
             teams = Team.objects.in_bulk([r["team_id"] for r in rows])
             # Shaped exactly like a LadderEntry so the template cannot tell
@@ -925,7 +1056,7 @@ def ladder_view(request, org_id: int):
     if prev_round is not None:
         before = {
             r["team_id"]: r["rank"]
-            for r in ladder_standings(series=selected, season=org.season, up_to_round=prev_round)
+            for r in ladder_standings(series=selected, season=season, up_to_round=prev_round)
         }
         for e in entries:
             was = before.get(e.team.id)
@@ -963,7 +1094,7 @@ def ladder_view(request, org_id: int):
         from matchreader.models import HistoricalMatch
 
         results_round = at_round if at_round is not None else max(rounds_available)
-        for hm in (HistoricalMatch.objects.filter(series=selected, season=org.season.year,
+        for hm in (HistoricalMatch.objects.filter(series=selected, season=season.year,
                                                   round_number=results_round)
                    .select_related("home_team", "away_team").order_by("kickoff_at")):
             margin = abs((hm.home_score or 0) - (hm.away_score or 0))
@@ -972,8 +1103,11 @@ def ladder_view(request, org_id: int):
                 "winner": "home" if hm.home_score > hm.away_score else "away" if hm.away_score > hm.home_score else "draw",
             })
 
+    from data_sync.ladder import season_label
+
     ctx = {
         "org": org,
+        "season_label": season_label(selected, season.year) if selected else str(org.season),
         "round_results": round_results,
         "results_round": results_round,
         "series_options": ordered,
@@ -1004,18 +1138,73 @@ def _code_chart(season, options) -> list[dict]:
 
 @login_required
 def my_certificates_view(request, org_id: int):
-    """Where a member stands against a certificate, competition by competition:
-    what it would take while the season runs, and the download once it has
-    ended (client, 2 Nov 2026). Top three only."""
+    """Every competition the organisation tips, as cards in the super admin's
+    look, the ones you tip most first (client, 17 Nov 2026); each opens your
+    standing and, once the season is over and you placed, your certificate."""
     from . import certificates as certs
 
     org = get_object_or_404(Organisation, pk=org_id)
     if not _require_member(request.user, org):
         return HttpResponseForbidden()
+    cards = certs.competition_cards(org, user=request.user)
     return render(request, "my_certificates.html", {
         "org": org,
-        "progress": certs.certificate_progress(request.user, org),
-        "can_certify": _can_certify(request.user, org),
+        "cards": cards,
+        "won": sum(1 for c in cards if c["won"]),
+        "top3": sum(1 for c in cards if c["top3"] and not c["state"].final),
+        "final": sum(1 for c in cards if c["state"].final),
+    })
+
+
+@login_required
+def my_certificate_view(request, org_id: int, series: str):
+    """One competition, for the member (client, 17 Nov 2026): "give me my
+    stats, my points, my rank, and if I am eligible for a certificate ... if
+    not, tell me not eligible yet, that I have to be in those positions and
+    currently I am in this." The certificate and its downloads appear only
+    once the season is complete and only to the person it names."""
+    from django.http import Http404
+
+    from catalog.models import Series
+
+    from . import certificates as certs
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _require_member(request.user, org):
+        return HttpResponseForbidden()
+    series_obj = get_object_or_404(Series, name=series)
+    if series_obj not in certs.competitions_for(org):
+        raise Http404
+    state = certs.season_state(org, series_obj)
+    board = [u for u in leaderboard_for_org(org, series=series_obj) if u.points or u.tips_total]
+    me = next((u for u in board if u.id == request.user.id), None)
+    podium = [u for u in board if u.rank <= 3 and u.points > 0]
+    place = me.rank if me is not None and me in podium else None
+    earned = []
+    if state.final:
+        earned = [c for c in certs.member_certificates(request.user, org) if c["cert"].series == series_obj.name]
+        _attach_photos(org, series_obj, [c["cert"] for c in earned])
+        from .models import CertificateDelivery
+
+        sent = set(CertificateDelivery.objects.filter(
+            org=org, series=series_obj, user=request.user, status=CertificateDelivery.STATUS_SENT,
+        ).values_list("group_id", flat=True))
+        for c in earned:
+            c["emailed"] = not c.get("national") and ((c["group"].id if c.get("group") else None) in sent)
+            c["word"] = {1: "first", 2: "second", 3: "third"}.get(c["cert"].place, "")
+    accuracy = round(100 * me.correct_all / me.graded_all) if me is not None and getattr(me, "graded_all", 0) else None
+    return render(request, "my_certificate.html", {
+        "org": org,
+        "series": series_obj,
+        "state": state,
+        "me": me,
+        "of": len(board),
+        "place": place,
+        "accuracy": accuracy,
+        "to_top3": (podium[-1].points - me.points + 1
+                    if me is not None and place is None and len(podium) >= 3 else None),
+        "earned": earned,
+        "year": org.season.year if org.season_id else "",
     })
 
 
@@ -1089,15 +1278,24 @@ def team_stats_view(request, org_id: int, team_id: int):
     if not _require_member(request.user, org):
         return HttpResponseForbidden()
     team = get_object_or_404(Team, pk=team_id)
+    season = ladder_season(team.series, org.season)
 
     entry = (
-        LadderEntry.objects.filter(series=team.series, season=org.season, team=team)
+        LadderEntry.objects.filter(series=team.series, season=season, team=team)
         .select_related("team")
         .first()
     )
-    st = team_season(team, team.series, org.season)
+    if entry is None:
+        # No stored table for this season yet: its place, from the results.
+        from data_sync.ladder import ladder_standings
+        rank = next((r["rank"] for r in ladder_standings(series=team.series, season=season)
+                     if r["team_id"] == team.id), None)
+        entry = SimpleNamespace(rank=rank) if rank else None
+    st = team_season(team, team.series, season)
+    from data_sync.ladder import season_label
     return render(request, "team_stats.html", {
         "org": org,
+        "season_label": season_label(team.series, season.year),
         "team": team,
         "series": team.series,
         "entry": entry,
@@ -1126,26 +1324,28 @@ def comp_stats_view(request, org_id: int):
     that need every club in front of you, because each of them is a comparison:
     who scores, who concedes, whether home advantage is real this season.
     """
-    from .stats import bars, competition_season
+    from .stats import bars, club_palette, competition_season, with_colours
 
     org = get_object_or_404(Organisation, pk=org_id)
     if not _require_member(request.user, org):
         return HttpResponseForbidden()
 
-    options = org_series(org)
+    options = ladder_series(org)
     selected = pick_series(options, request.GET.get("series"), default_to_first=True)
-    st = competition_season(selected, org.season) if selected else None
+    season = ladder_season(selected, org.season)
+    st = competition_season(selected, season) if selected else None
+    palette = club_palette(st["clubs"]) if st and st["clubs"] else {}
     return render(request, "comp_stats.html", {
         "org": org,
         "series_options": options,
         "selected_series": selected,
         "stats": st,
-        "chart_attack": bars(
+        "chart_attack": with_colours(bars(
             sorted(st["clubs"], key=lambda c: -(c["avg_for"] or 0)), key="avg_for",
-        ) if st and st["clubs"] else [],
-        "chart_defence": bars(
+        ), palette) if st and st["clubs"] else [],
+        "chart_defence": with_colours(bars(
             sorted(st["clubs"], key=lambda c: (c["avg_against"] or 9999)), key="avg_against",
-        ) if st and st["clubs"] else [],
+        ), palette) if st and st["clubs"] else [],
     })
 
 
@@ -1426,18 +1626,17 @@ def certificates_view(request, org_id: int):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _can_certify(request.user, org):
         return HttpResponseForbidden()
-    comps = [
-        {
-            "series": series,
-            "accent": certs.ACCENTS.get(series.name, certs.FOREST),
-            "state": certs.season_state(org, series),
-        }
-        for series in certs.competitions_for(org)
-    ]
+    # The list lives in the Manage console's Certificates tab (client, 17 Nov
+    # 2026), in the console's own look. A captain can manage certificates but
+    # not the console, so a captain gets the same cards on this page.
+    from orgs.models import OrgMember
+
+    me = OrgMember.objects.filter(user=request.user, org=org).first()
+    if me and me.can_manage:
+        return redirect(f"{reverse('orgs:console', args=[org.id])}?tab=certificates")
     return render(request, "certificates.html", {
         "org": org,
-        "comps": comps,
-        "year": org.season.year if org.season_id else "",
+        "cards": certs.competition_cards(org),
     })
 
 
@@ -1461,7 +1660,7 @@ def certificate_competition_view(request, org_id: int, series: str):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _can_certify(request.user, org):
         return HttpResponseForbidden()
-    if series not in certs.CERT_SERIES:
+    if not certs.is_cert_series(org, series):
         raise Http404
     series_obj = get_object_or_404(Series, name=series)
     if series_obj not in certs.competitions_for(org):
@@ -1474,14 +1673,31 @@ def certificate_competition_view(request, org_id: int, series: str):
     if not champions and preview and not state.final:
         sample = certs.sample_certificate(org, series_obj, request.user)
         _attach_photos(org, series_obj, [sample])
+    from .models import CertificateDelivery
+
+    board = [u for u in leaderboard_for_org(org, series=series_obj) if u.points or u.tips_total]
+    for u in board:
+        u.accuracy = round(100 * u.correct_all / u.graded_all) if getattr(u, "graded_all", 0) else None
+    deliveries = list(
+        CertificateDelivery.objects.filter(org=org, series=series_obj)
+        .select_related("user", "sent_by", "group")[:40]
+    )
+    last_sent = {}
+    for d in reversed(deliveries):
+        last_sent[(d.user_id, d.group_id)] = d
+    for c in champions:
+        c.delivery = last_sent.get((c.user_id, None))
     return render(request, "certificate_competition.html", {
+        "board": board[:10],
+        "board_size": len(board),
+        "deliveries": deliveries,
         "org": org,
         "series": series_obj,
         "state": state,
         "champions": champions,
         "sample": sample,
         "preview": preview,
-        "accent": certs.ACCENTS.get(series_obj.name, certs.FOREST),
+        "accent": certs.accent_for(series_obj),
         "year": org.season.year if org.season_id else "",
         "individual_national": certs.national_individual_champion(org, series_obj) if state.final else None,
     })
@@ -1592,7 +1808,7 @@ def certificate_sample_file(request, org_id: int, series: str, fmt: str):
     org = get_object_or_404(Organisation, pk=org_id)
     if not _can_certify(request.user, org):
         return HttpResponseForbidden()
-    if series not in certs.CERT_SERIES or fmt not in ("pdf", "png"):
+    if not certs.is_cert_series(org, series) or fmt not in ("pdf", "png"):
         raise Http404
     series_obj = get_object_or_404(Series, name=series)
     cert = certs.sample_certificate(org, series_obj, request.user)
@@ -1602,8 +1818,8 @@ def certificate_sample_file(request, org_id: int, series: str, fmt: str):
     else:
         body, ctype, name = certs.render_png(cert, photo), "image/png", cert.filename("png")
     resp = HttpResponse(body, content_type=ctype)
-    disposition = "inline" if request.GET.get("view") == "1" else "attachment"
-    resp["Content-Disposition"] = f'{disposition}; filename="{name}"'
+    # A sample is for looking at, not keeping: always shown, never handed over.
+    resp["Content-Disposition"] = f'inline; filename="{name}"'
     resp["Cache-Control"] = "private, max-age=60"
     return resp
 
@@ -1625,10 +1841,15 @@ def certificate_file(request, org_id: int, series: str, user_id: int, fmt: str):
     from . import certificates as certs
 
     org = get_object_or_404(Organisation, pk=org_id)
-    # Your own certificate is yours to download; the org side can fetch anyone's.
-    if not _can_certify(request.user, org) and request.user.id != user_id:
+    # Your own certificate is yours to download. The org side may SEE anyone's
+    # on its page (?view=1) but not download it (client, 17 Nov 2026: "he
+    # should not be able to download it ... let him just have share to the
+    # winner").
+    own = request.user.id == user_id
+    shown = request.GET.get("view") == "1" or request.GET.get("preview") == "1"
+    if not own and not (_can_certify(request.user, org) and shown):
         return HttpResponseForbidden()
-    if series not in certs.CERT_SERIES or fmt not in ("pdf", "png"):
+    if not certs.is_cert_series(org, series) or fmt not in ("pdf", "png"):
         raise Http404
     series_obj = get_object_or_404(Series, name=series)
     group = None
@@ -1639,12 +1860,14 @@ def certificate_file(request, org_id: int, series: str, user_id: int, fmt: str):
     if cert is None:
         raise Http404("No certificate — the season is not final, or this member did not finish in the top three.")
     photo = _champion_photo_field(org, series_obj, user_id)
-    if fmt == "pdf":
-        body, ctype, name = certs.render_pdf(cert, photo), "application/pdf", cert.filename("pdf")
+    if request.GET.get("preview") == "1":
+        body, ctype, name = certs.cached_file(cert, photo, "preview"), "image/jpeg", cert.filename("jpg")
+    elif fmt == "pdf":
+        body, ctype, name = certs.cached_file(cert, photo, "pdf"), "application/pdf", cert.filename("pdf")
     else:
-        body, ctype, name = certs.render_png(cert, photo), "image/png", cert.filename("png")
+        body, ctype, name = certs.cached_file(cert, photo, "png"), "image/png", cert.filename("png")
     resp = HttpResponse(body, content_type=ctype)
-    disposition = "inline" if request.GET.get("view") == "1" else "attachment"
+    disposition = "inline" if request.GET.get("view") == "1" or request.GET.get("preview") == "1" else "attachment"
     resp["Content-Disposition"] = f'{disposition}; filename="{name}"'
     resp["Cache-Control"] = "private, max-age=300"
     return resp
@@ -1667,7 +1890,7 @@ def certificate_scope_file(request, org_id: int, series: str, scope: str, fmt: s
     org = get_object_or_404(Organisation, pk=org_id)
     if not _require_member(request.user, org):
         return HttpResponseForbidden()
-    if series not in certs.CERT_SERIES or fmt not in ("pdf", "png") or scope != "individual":
+    if not certs.is_cert_series(org, series) or fmt not in ("pdf", "png") or scope != "individual":
         raise Http404
     series_obj = get_object_or_404(Series, name=series)
     top = certs.national_top_three(org, series_obj)
@@ -1675,7 +1898,7 @@ def certificate_scope_file(request, org_id: int, series: str, scope: str, fmt: s
     cert = next((c for c in top if str(c.user_id) == raw_user), None) if raw_user.isdigit() else (top[0] if top else None)
     if cert is None:
         raise Http404("No certificate — that wider field isn't final, or this person isn't in its top three.")
-    if not _can_certify(request.user, org) and request.user.id != cert.user_id:
+    if request.user.id != cert.user_id and not (_can_certify(request.user, org) and request.GET.get("view") == "1"):
         return HttpResponseForbidden()
     photo = getattr(User.objects.filter(id=cert.user_id).first(), "avatar", None)
     if fmt == "pdf":
@@ -1687,3 +1910,38 @@ def certificate_scope_file(request, org_id: int, series: str, scope: str, fmt: s
     resp["Content-Disposition"] = f'{disposition}; filename="{name}"'
     resp["Cache-Control"] = "private, max-age=300"
     return resp
+
+
+
+@login_required
+@require_POST
+def certificate_send(request, org_id: int, series: str, user_id: int):
+    """The admin's "Send to winner": email this placegetter their certificate
+    now, both formats, and log it (client, 17 Nov 2026: "if a winner did not
+    get an automated sending after the season it can be triggered")."""
+    from django.http import Http404
+
+    from catalog.models import Series
+    from orgs.models import Organisation
+
+    from . import certificates as certs
+    from .certificate_mail import send_certificate
+    from .models import CertificateDelivery
+
+    org = get_object_or_404(Organisation, pk=org_id)
+    if not _can_certify(request.user, org):
+        return HttpResponseForbidden()
+    series_obj = get_object_or_404(Series, name=series)
+    group = None
+    raw = request.POST.get("group", "")
+    if raw.isdigit():
+        group = get_object_or_404(Group, pk=int(raw), org=org)
+    cert = next((c for c in certs.placegetters(org, series_obj, group=group) if c.user_id == user_id), None)
+    if cert is None:
+        raise Http404("No certificate: the season isn't final, or this member isn't in the top three.")
+    row = send_certificate(org, series_obj, cert, group=group, trigger=CertificateDelivery.TRIGGER_MANUAL, by=request.user)
+    if row.status == CertificateDelivery.STATUS_SENT:
+        messages.success(request, f"Certificate sent to {row.email}, as a PDF and an image.")
+    else:
+        messages.error(request, f"It didn't send: {row.error or 'unknown error'}.")
+    return redirect("tipping:certificate_competition", org_id=org.id, series=series_obj.name)

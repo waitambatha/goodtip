@@ -89,7 +89,7 @@ def _org_cards(orgs, limit=12):
     """Each organisation the admin runs as a card: its people, its groups, what
     is open and who is waiting. Counted per org in one query each, so a league
     of 20,000 members costs the same as one of 20."""
-    orgs = list(orgs.order_by("name")[: limit + 1])
+    orgs = list(orgs.order_by("name").prefetch_related("competitions__series")[: limit + 1])
     ids = [o.id for o in orgs]
     members = _per_org(OrgMember.objects.filter(org_id__in=ids))
     groups = _per_org(Group.objects.filter(org_id__in=ids))
@@ -101,8 +101,20 @@ def _org_cards(orgs, limit=12):
             "org": o, "colour": ORG_CARD_COLOURS[o.id % len(ORG_CARD_COLOURS)],
             "members": members.get(o.id, 0), "groups": groups.get(o.root.id if o.parent_id else o.id, 0),
             "open": open_r.get(o.id, 0), "waiting": waiting.get(o.id, 0),
+            # Competition logos instead of the "AFL + NRL + ..." run-on: the
+            # first few as badges, the rest as a "+n".
+            "comps": _comp_badges(o),
         })
     return {"cards": cards, "more": len(orgs) > limit}
+
+
+def _comp_badges(org, shown=4):
+    comps = sorted(org.competitions.all(), key=lambda c: c.name)
+    badges = []
+    for c in comps[:shown]:
+        lead = next(iter(c.series.all()), None)
+        badges.append({"name": c.name, "logo": getattr(lead, "logo", "") or ""})
+    return {"badges": badges, "more": max(len(comps) - shown, 0), "count": len(comps)}
 
 
 @org_admin_required

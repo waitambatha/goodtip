@@ -1,107 +1,179 @@
 {% extends "app_base.html" %}
+{% load static %}
 {% block title %}Season summary, {{ org.name }}{% endblock %}
 {% block loader_task %}Building your season summary{% endblock %}
-{% comment %}
-The rotating side strips. Standard on every member page (client request,
-Aug 2026) — these were the last screens without them. Outside the sheet,
-never inside it: the strips belong to the page background, and a sheet
-drawn over them is the whole point of the look.
-{% endcomment %}
-{% comment %}
-THE GREEN SHEET, like every other member screen. Reported as "I am in green
-theme and I am seeing it be cream": this template simply never declared a body
-class, so it fell through to the default cream page while its neighbours drew
-the deep sheet over the rotating strips.
-{% endcomment %}
-{% block body_class %}page-deep sheet-page{% endblock %}
+{% block body_class %}page-deep gx-page mc-page ss-page{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'css/gt-admin-gx.css' %}">{% endblock %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% block nav_manage %}on{% endblock %}
 {% block app_content %}
-<div class="app-head is-centred is-orgfirst"><div><div class="app-eyebrow">{{ org.name }} &middot; {{ org.sport_label }} {{ org.season }}</div><h1 class="app-h1">Season summary</h1></div>
-  {% if subscription %}<a href="{% url 'billing:receipt' org.id %}" class="abtn abtn-ghost abtn-sm">Platform receipt</a>{% endif %}</div>
-
 {% comment %}
-THE ROOM NAVIGATOR — "so I can be able to move from one organisation and group
-summary without using the main menu."
-
-Only the organisations this person runs: the view's own guard is
-is_creator_admin, so a row for one they merely play in would be a door that
-answers 403. There is no per-group season summary — the donation pool is settled
-for the organisation — so this navigator has the one row rather than inventing a
-second that leads nowhere.
+SEASON SUMMARY, in the console's look (client, 19 Nov 2026: "too scattered ...
+make it extremely clean"). A dark header with the organisation's name and four
+scores, then one white sheet showing one section at a time: Overview (podium
+and money raised), Competitions (as logo tiles, not "AFL + NRL + ..."),
+Plan & reports, and Close the season. The organisation switcher is one
+dropdown instead of a wall of chips.
 {% endcomment %}
-{% if panel_orgs|length > 1 %}
-<div class="pnav pnav-rooms">
-  <div class="pnav-row">
-    <span class="pnav-lab">Organisation</span>
-    <div class="pnav-opts">
-      {% for o in panel_orgs %}
-      <a class="pnav-opt{% if o.id == panel_org.id %} on{% endif %}"
-         href="{% url 'billing:season_summary' o.id %}">{{ o.name }}</a>
-      {% endfor %}
+{% url 'orgs:console' org.id as console_url %}
+<div class="gx mc ss" id="ssPage">
+  <svg class="gx-pitch" viewBox="0 0 1200 700" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
+    <ellipse cx="600" cy="350" rx="560" ry="320"/><ellipse cx="600" cy="350" rx="70" ry="70"/>
+    <rect x="530" y="280" width="140" height="140"/><line x1="600" y1="30" x2="600" y2="670"/>
+  </svg>
+
+  {% if messages %}<div class="mc-flash">{% for m in messages %}<p class="mc-msg is-{{ m.tags|default:'info' }}">{{ m }}</p>{% endfor %}</div>{% endif %}
+
+  <header class="gx-hero">
+    <div class="gx-hero-copy">
+      <div class="ss-toprow">
+        <a class="gx-btn is-glass ss-back" href="{{ console_url }}?tab=plan"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Manage</a>
+        {% if panel_orgs|length > 1 %}
+        <div class="ss-switch">
+          <label for="ssOrg">Organisation</label>
+          <select id="ssOrg" onchange="location.href=this.value">
+            {% for o in panel_orgs %}<option value="{% url 'billing:season_summary' o.id %}"{% if o.id == panel_org.id %} selected{% endif %}>{{ o.name }}</option>{% endfor %}
+          </select>
+        </div>
+        {% endif %}
+      </div>
+      <p class="gx-kicker"><i aria-hidden="true"></i>Season summary{% if org.season %} &middot; {{ org.season }}{% endif %}</p>
+      <h1 class="gx-title">{{ org.name }}</h1>
+      <p class="gx-lead">{% if summary %}How the season went, what it raised for {{ summary.charity.name|default:org.charity_display }}, and closing it off.{% else %}Nothing has been raised for {{ org.charity_display|default:"a charity" }} yet this season. The summary fills in as the season runs.{% endif %}</p>
     </div>
-  </div>
+    <div class="gx-board">
+      <button type="button" class="gx-score" data-ss-go="overview"><b>${{ summary.raised|default:0|floatformat:0 }}</b><span>Raised</span></button>
+      <button type="button" class="gx-score" data-ss-go="comps"><b>{{ comps|length }}</b><span>Competitions</span></button>
+      <a class="gx-score is-cool" href="{{ console_url }}?tab=members"><b>{{ member_count }}</b><span>Members</span></a>
+      <button type="button" class="gx-score is-cool" data-ss-go="plan"><b class="ss-score-word">{% if subscription %}{{ subscription.get_tier_display }}{% else %}None{% endif %}</b><span>Plan</span></button>
+    </div>
+  </header>
+
+  <section class="gx-sheet">
+    <nav class="gx-tabs" aria-label="Season summary sections" role="tablist">
+      <button type="button" class="gx-tab on" role="tab" aria-selected="true" data-ss-tab="overview">Overview</button>
+      <button type="button" class="gx-tab" role="tab" aria-selected="false" data-ss-tab="comps">Competitions <em>{{ comps|length }}</em></button>
+      <button type="button" class="gx-tab" role="tab" aria-selected="false" data-ss-tab="plan">Plan &amp; reports</button>
+      <button type="button" class="gx-tab" role="tab" aria-selected="false" data-ss-tab="close">Close season</button>
+    </nav>
+
+    {# ---- Overview ---- #}
+    <div class="gx-pane mc-pane ss-pane is-on" data-ss-pane="overview">
+      {% if summary %}
+      <div class="ss-raised">
+        <div class="ss-raised-copy">
+          <span class="mc-k">Raised for</span>
+          <b>{{ summary.charity.name|default:org.charity_display }}</b>
+          <p>Funded by GoodTip from its own revenue, from the flat fee {{ org.name }} pays.</p>
+        </div>
+        <div class="ss-raised-num"><strong>${{ summary.raised|floatformat:0 }}</strong><span>given to charity</span></div>
+        <div class="ss-bar" aria-hidden="true"><i style="width: {{ summary.pct }}%"></i></div>
+      </div>
+      {% endif %}
+
+      <h2 class="mc-h">Final ladder &middot; top three</h2>
+      {% if podium %}
+      <div class="ss-podium">
+        {% for p in podium %}
+        <div class="ss-pod is-{{ forloop.counter }}">
+          <span class="ss-medal">{{ forloop.counter }}</span>
+          <b>{{ p.display_name }}</b>
+          <span>{{ p.points }} pts</span>
+          <em>{% if forloop.counter == 1 %}Champion{% elif forloop.counter == 2 %}Runner-up{% else %}Third{% endif %}</em>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="gx-empty"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/></svg><b>No ladder yet</b><span>The top three appear once tips are scored.</span></div>
+      {% endif %}
+    </div>
+
+    {# ---- Competitions ---- #}
+    <div class="gx-pane mc-pane ss-pane" data-ss-pane="comps" hidden>
+      <div class="mc-tools">
+        <h2 class="mc-h" style="margin:0">Competitions this season</h2>
+        <a class="gx-btn is-ghost" href="{{ console_url }}?tab=sports">Change competitions</a>
+      </div>
+      {% if comps %}
+      <div class="ss-comps">
+        {% for c in comps %}
+        <div class="ss-comp"><span class="ss-logo">{% if c.logo %}<img src="{{ c.logo }}" alt="" loading="lazy">{% else %}{{ c.name|slice:":3"|upper }}{% endif %}</span><b>{{ c.name }}</b></div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="gx-empty"><b>No competitions yet</b><span>Choose what {{ org.name }} tips from Manage.</span></div>
+      {% endif %}
+    </div>
+
+    {# ---- Plan & reports ---- #}
+    <div class="gx-pane mc-pane ss-pane" data-ss-pane="plan" hidden>
+      <div class="ss-cards">
+        <div class="ss-card is-plan">
+          <span class="mc-k">Your plan</span>
+          <b>{% if subscription %}{{ subscription.get_tier_display }}{% else %}No plan chosen yet{% endif %}</b>
+          <p>{% if subscription %}${{ subscription.price_aud|floatformat:0 }} a year for the {{ org.season }} season.{% else %}Creating {{ org.name }} was free. Choose a plan when you are ready.{% endif %}</p>
+          <div class="ss-acts">
+            <a class="gx-btn is-lime" href="{% url 'billing:plans' org.id %}">{% if subscription %}Change plan{% else %}Choose a plan{% endif %}</a>
+            {% if subscription %}<a class="gx-btn is-ghost" href="{% url 'billing:receipt' org.id %}">Platform receipt</a>{% endif %}
+          </div>
+        </div>
+        <div class="ss-card is-esg">
+          <span class="mc-k">Reporting</span>
+          <b>ESG report</b>
+          {% if esg_allowed %}
+          <p>The season's giving and participation as a PDF for your records.</p>
+          <div class="ss-acts"><a class="gx-btn" href="{% url 'billing:esg_report' org.id %}" hx-boost="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>Download PDF</a></div>
+          {% else %}
+          <p>Available on Pro plans and above, for owners.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# ---- Close the season ---- #}
+    <div class="gx-pane mc-pane ss-pane" data-ss-pane="close" hidden>
+      {% if disbursement %}
+      <div class="ss-card is-done">
+        <span class="mc-k">Settled</span>
+        <b>${{ disbursement.total_disbursed_aud|floatformat:0 }} to {{ disbursement.charity.name }}</b>
+        <p>Closed on {{ disbursement.disbursed_at|date:"j M Y" }}.</p>
+        <div class="ss-acts"><a href="{% url 'orgs:create' %}" class="gx-btn is-lime">Start a new season</a></div>
+      </div>
+      {% elif not summary %}
+      <div class="gx-empty"><b>Nothing to settle yet</b><span>Once the season has raised something, the owner closes it here.</span></div>
+      {% elif is_owner %}
+      <div class="ss-card is-close">
+        <span class="mc-k">Owner only</span>
+        <b>Close the season</b>
+        <p>Settles the donation pool for disbursement to {{ summary.charity.name|default:org.charity_display }}. This can't be undone.</p>
+        <form method="post" action="{% url 'billing:season_summary' org.id %}" class="ss-acts">{% csrf_token %}<button type="submit" class="gx-btn is-lime">Close &amp; disburse</button></form>
+      </div>
+      {% else %}
+      <div class="gx-empty"><b>The owner closes the season</b><span>They settle the donation pool for {{ summary.charity.name|default:org.charity_display }}.</span></div>
+      {% endif %}
+    </div>
+  </section>
 </div>
-{% endif %}
+{% endblock %}
 
-{% if not summary %}
-  <div class="card pad-lg" style="text-align:center;"><div class="card-h">Nothing to settle yet</div><p class="card-lead">This league hasn't raised anything for {{ org.charity_display }} yet this season.</p></div>
-{% else %}
-
-{% if podium %}
-<div class="app-eyebrow" style="margin-bottom:12px;">Final ladder &middot; top 3</div>
-<div class="podium" style="margin-bottom:26px;">
-  {% with a=podium.0 b=podium.1 c=podium.2 %}
-  {% if b %}<div class="pod second"><div class="medal">2</div><div class="pod-name">{{ b.display_name }}</div><div class="pod-meta">{{ b.points }} pts</div><span class="pod-chip">Runner-up</span></div>{% endif %}
-  {% if a %}<div class="pod first"><span class="crown"><svg class="cic"><use href="#ic-trophy"/></svg></span><div class="medal">1</div><div class="pod-name">{{ a.display_name }}</div><div class="pod-meta">{{ a.points }} pts</div><span class="pod-chip">Champion</span></div>{% endif %}
-  {% if c %}<div class="pod third"><div class="medal">3</div><div class="pod-name">{{ c.display_name }}</div><div class="pod-meta">{{ c.points }} pts</div><span class="pod-chip">Third</span></div>{% endif %}
-  {% endwith %}
-</div>
-{% endif %}
-
-<div class="grid-app g-2" style="align-items:start;">
-  <div class="card pad-lg">
-    <div class="card-h">Raised for {{ summary.charity.name|default:org.charity_display }}</div>
-    <div class="s-num num" style="font-size:34px;color:var(--forest);margin:10px 0 4px;">${{ summary.raised|floatformat:0 }}</div>
-    <div class="pbar" style="margin:6px 0 12px;"><i style="width:{{ summary.pct }}%"></i></div>
-    {% comment %}
-    One line, not a three-way split. The breakdown named a base pledge,
-    participant top-ups and an organisation match — none of which exist now
-    that GoodTip funds the donation from its own revenue. On a real season it
-    would have printed two rows of $0 under a total that came from somewhere
-    else entirely, which is worse than no breakdown at all.
-    {% endcomment %}
-    <div class="dbreak">
-      <div class="row total"><span>Given to charity</span><b>${{ summary.raised|floatformat:0 }}</b></div>
-    </div>
-    <p class="card-lead" style="margin:10px 0 0;">Funded by GoodTip from its own revenue, from the flat fee {{ org.name }} pays.</p>
-  </div>
-  <div class="card pad-lg">
-    <div class="card-h">Platform &amp; reporting</div>
-    <div class="dbreak">
-      {% if subscription %}<div class="row"><span>Plan</span><b>{{ subscription.get_tier_display }} &middot; ${{ subscription.price_aud|floatformat:0 }}</b></div>{% else %}<div class="row"><span>Plan</span><b><a href="{% url 'billing:plans' org.id %}" class="flink" style="color:var(--forest);font-weight:700;">choose a plan</a></b></div>{% endif %}
-      <div class="row"><span>Season</span><b>{{ org.sport_label }} {{ org.season }}</b></div>
-    </div>
-    {% if esg_allowed %}
-      <a href="{% url 'billing:esg_report' org.id %}" class="abtn abtn-dark abtn-block" style="margin-top:14px;"><svg class="cic" style="width:17px;height:17px;stroke:currentColor;fill:none;"><use href="#ic-doc"/></svg> Download ESG report (PDF)</a>
-    {% else %}
-      <p class="app-sub" style="font-size:12px;margin-top:12px;">ESG report export is available on Pro plans and above, for owners.</p>
-    {% endif %}
-  </div>
-</div>
-
-{% if disbursement %}
-  <div class="flash success" style="margin-top:16px;"><span>Settled ${{ disbursement.total_disbursed_aud|floatformat:0 }} for disbursement to {{ disbursement.charity.name }} on {{ disbursement.disbursed_at|date:"j M Y" }}.</span></div>
-  <a href="{% url 'orgs:create' %}" class="abtn abtn-primary" style="margin-top:14px;">Start a new season &rarr;</a>
-{% elif is_owner %}
-  <div class="card pad-lg" style="margin-top:16px;border-color:rgba(200,241,53,.4);">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
-      <div><div class="card-h">Close the season <span class="pill-role owner" style="vertical-align:middle;">Owner</span></div><p class="card-lead" style="margin-top:4px;">Settles the donation pool for disbursement to {{ summary.charity.name|default:org.charity_display }}. This can't be undone.</p></div>
-      <form method="post" action="{% url 'billing:season_summary' org.id %}">{% csrf_token %}<button type="submit" class="abtn abtn-primary">Close &amp; disburse</button></form>
-    </div>
-  </div>
-{% else %}
-  <p class="app-sub" style="margin-top:16px;">The League Owner will close the season and settle the donation pool.</p>
-{% endif %}
-{% endif %}
+{% block app_js %}
+(function () {
+  var root = document.getElementById('ssPage');
+  if (!root) return;
+  function show(key) {
+    root.querySelectorAll('[data-ss-tab]').forEach(function (t) { var on = t.getAttribute('data-ss-tab') === key; t.classList.toggle('on', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
+    root.querySelectorAll('[data-ss-pane]').forEach(function (p) { var on = p.getAttribute('data-ss-pane') === key; p.hidden = !on; p.classList.toggle('is-on', on); });
+    root.querySelectorAll('[data-ss-go]').forEach(function (s) { s.classList.toggle('is-on', s.getAttribute('data-ss-go') === key); });
+    try { history.replaceState(null, '', '#' + key); } catch (e) {}
+  }
+  root.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-ss-tab], [data-ss-go]');
+    if (!t) return;
+    show(t.getAttribute('data-ss-tab') || t.getAttribute('data-ss-go'));
+    if (t.hasAttribute('data-ss-go')) root.querySelector('.gx-sheet').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  function fromHash() { var k = (location.hash || '').slice(1); show(root.querySelector('[data-ss-pane="' + k + '"]') ? k : 'overview'); }
+  window.addEventListener('hashchange', fromHash);
+  fromHash();
+})();
 {% endblock %}

@@ -53,7 +53,7 @@ def refresh(*, full: bool = False, only: list[str] | None = None, log=None) -> d
     """Bring the library current. Returns {competition: rows read}."""
     from catalog.models import Season, Series
 
-    from .ladder import rebuild_ladder
+    from .ladder import current_season_year, rebuild_ladder
     from .models import SyncRun
     from .services import SyncError, get_sync_service
 
@@ -78,6 +78,15 @@ def refresh(*, full: bool = False, only: list[str] | None = None, log=None) -> d
                         season_obj = Season.objects.filter(year=season).first()
                         if season_obj is not None:
                             rebuild_ladder(series=series, season=season_obj)
+                    # The season the competition is actually in, when its feed
+                    # labels it differently from the calendar (the NHL's season
+                    # under way in Nov 2026 is its "2027"). Without this its
+                    # stored ladder stayed on last season's final table.
+                    current = current_season_year(series)
+                    if current and current not in seasons:
+                        current_obj = Season.objects.filter(year=current).first()
+                        if current_obj is not None:
+                            rebuild_ladder(series=series, season=current_obj)
                 run.matches_touched = read
             out[comp] = read
             if log:

@@ -11,12 +11,7 @@ preview and whatever I download must look like that image end to end") —
 one picture, drawn once in tipping/certificates.py, so the two cannot differ.
 {% endcomment %}
 
-<div class="gh-backrow">
-  <a class="abtn abtn-ghost gh-back" href="{% url 'tipping:certificates' org.id %}">
-    All competitions
-    <svg class="gh-back-ic" aria-hidden="true"><use href="#ic-arrow-right"/></svg>
-  </a>
-</div>
+<div class="ca-back"><a class="cp-back" href="{% url 'tipping:certificates' org.id %}" style="--board: {{ accent }}" aria-label="Back to all competitions"><svg aria-hidden="true"><use href="#ic-arrow-left"/></svg><span>All competitions</span></a></div>
 
 <div class="app-head is-centred is-orgfirst"><div>
   <div class="app-eyebrow">{{ org.name }} &middot; {{ year }} season</div>
@@ -25,72 +20,88 @@ one picture, drawn once in tipping/certificates.py, so the two cannot differ.
   {% else %}<span class="cert-state">Season in progress</span>{% endif %}
 </div></div>
 
+{% comment %}
+THE ADMIN'S VIEW (client, 17 Nov 2026): like a teacher seeing grades — who
+is first, second and third and on how many points, and the rest of the table
+under them. No downloads here: a certificate belongs to the person it names.
+The admin's job is to see it went out — the system emails it when the season
+ends — and to send it again if it didn't.
+{% endcomment %}
+<div class="ca-wrap" style="--code: {{ accent }}">
 {% if champions %}
-  {% for cert in champions %}
-  <h3 class="certdet-place">{{ cert.place_label }} &middot; {{ cert.winner }}</h3>
-  <div class="certdet-card">
-    <img class="certdet-img" src="{% url 'tipping:certificate_file' org.id cert.series cert.user_id 'png' %}?view=1" alt="{{ cert.headline }}: {{ cert.winner }}, {{ cert.org_name }}" width="2508" height="1412">
-  </div>
-  <div class="certdet-actions">
-    <div class="an-menu" data-anmenu>
-      <button type="button" class="abtn abtn-primary an-menu-btn" aria-expanded="false" aria-haspopup="true">
-        Download
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-      </button>
-      <div class="an-menu-panel dl-panel" hidden>
-        <span class="dl-head">Download as</span>
-        <a href="{% url 'tipping:certificate_file' org.id cert.series cert.user_id 'pdf' %}"><span class="dl-ic is-pdf" aria-hidden="true">PDF</span><span class="dl-txt"><b>PDF document</b><i>Print-ready &middot; A4 landscape</i></span></a>
-        <a href="{% url 'tipping:certificate_file' org.id cert.series cert.user_id 'png' %}"><span class="dl-ic is-png" aria-hidden="true">PNG</span><span class="dl-txt"><b>Image (PNG)</b><i>To share or post online</i></span></a>
+  <section class="ca-podium">
+    {% for cert in champions %}
+    <article class="ca-place is-{{ cert.place }}">
+      <header>
+        {% include "partials/_rank_badge.html" with place=cert.place kind="person" %}
+        <div><b>{{ cert.winner }}</b><span>{{ cert.place_label }}</span></div>
+      </header>
+      <div class="ca-img"><img src="{% url 'tipping:certificate_file' org.id cert.series cert.user_id 'png' %}?preview=1" alt="{{ cert.headline }}: {{ cert.winner }}" width="1400" height="788" decoding="async" loading="lazy" draggable="false" oncontextmenu="return false"></div>
+      <div class="ca-status">
+        {% if cert.delivery %}
+          {% if cert.delivery.status == "sent" %}<span class="ca-ok">Sent to {{ cert.delivery.email }} &middot; {{ cert.delivery.created_at|date:"j M, g:i a" }}{% if cert.delivery.trigger == "auto" %} &middot; automatically{% endif %}</span>
+          {% else %}<span class="ca-bad">Not delivered: {{ cert.delivery.error }}</span>{% endif %}
+        {% else %}<span class="ca-wait">Not sent yet</span>{% endif %}
       </div>
-    </div>
-    <form class="certdet-photo" method="post" enctype="multipart/form-data" action="{% url 'tipping:certificate_photo' org.id cert.series cert.user_id %}">
-      {% csrf_token %}
-      <label class="cert-photo-pick">
-        <input type="file" name="photo" accept="image/*" data-cert-photo>
-        <span>{% if cert.photo_url %}Change photo{% else %}Add a photo{% endif %}</span>
-      </label>
-      {% if cert.photo_is_custom %}<button type="submit" name="reset" value="1" class="cert-photo-reset">Use profile photo</button>{% endif %}
-    </form>
-  </div>
-  <p class="certdet-note">{{ cert.winner }} &middot; {% if cert.photo_is_custom %}a photo chosen for this certificate{% elif cert.photo_url %}from {{ cert.winner }}'s profile{% else %}no profile photo yet — add one above{% endif %}.</p>
-  {% endfor %}
-
-{% elif sample %}
-  <p class="certdet-note">Available once the {{ series.name }} leaderboard is final. {{ state.reason }} Here's a sample of how it will look, with your name and profile photo.</p>
-  <div class="certdet-card">
-    <img class="certdet-img" src="{% url 'tipping:certificate_sample_file' org.id sample.series 'png' %}?view=1" alt="Sample {{ sample.headline }}: {{ sample.winner }}, {{ sample.org_name }}" width="2508" height="1412">
-  </div>
-  <div class="certdet-actions">
-    <div class="an-menu" data-anmenu>
-      <button type="button" class="abtn abtn-primary an-menu-btn" aria-expanded="false" aria-haspopup="true">
-        Download
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-      </button>
-      <div class="an-menu-panel dl-panel" hidden>
-        <span class="dl-head">Download as</span>
-        <a href="{% url 'tipping:certificate_sample_file' org.id sample.series 'pdf' %}"><span class="dl-ic is-pdf" aria-hidden="true">PDF</span><span class="dl-txt"><b>PDF document</b><i>Print-ready &middot; A4 landscape</i></span></a>
-        <a href="{% url 'tipping:certificate_sample_file' org.id sample.series 'png' %}"><span class="dl-ic is-png" aria-hidden="true">PNG</span><span class="dl-txt"><b>Image (PNG)</b><i>To share or post online</i></span></a>
+      <div class="ca-acts">
+        <form method="post" action="{% url 'tipping:certificate_send' org.id cert.series cert.user_id %}">
+          {% csrf_token %}
+          <button type="submit" class="ca-btn">{% if cert.delivery and cert.delivery.status == "sent" %}Send again{% else %}Send to winner{% endif %}</button>
+        </form>
+        <form class="certdet-photo" method="post" enctype="multipart/form-data" action="{% url 'tipping:certificate_photo' org.id cert.series cert.user_id %}">
+          {% csrf_token %}
+          <label class="ca-link"><input type="file" name="photo" accept="image/*" data-cert-photo hidden>{% if cert.photo_url %}Change photo{% else %}Add a photo{% endif %}</label>
+          {% if cert.photo_is_custom %}<button type="submit" name="reset" value="1" class="ca-link">Use profile photo</button>{% endif %}
+        </form>
       </div>
-    </div>
-    <a class="abtn abtn-ghost" href="{% url 'tipping:certificate_competition' org.id series.name %}">Hide the sample</a>
-  </div>
-  <p class="certdet-note">A preview while the season runs. The real certificate appears here once the {{ series.name }} leaderboard is final.</p>
-
+    </article>
+    {% endfor %}
+  </section>
 {% elif not state.final %}
-  <a class="cert-season-link" href="{% url 'tipping:my_stats' org.id %}?comp={{ series.slug }}" style="max-width:1180px;margin-left:auto;margin-right:auto;">
-    <span class="cert-season-txt">
-      <b>Available once the {{ series.name }} leaderboard is final.</b>
-      <i>{{ state.reason }} See where you stand right now — rank, points, round by round.</i>
-    </span>
-    <span class="cert-season-go" aria-hidden="true">&rarr;</span>
-  </a>
-  <p class="certdet-actions">
-    <a class="abtn abtn-ghost" href="?preview=1">Preview a sample certificate</a>
-  </p>
-
+  <section class="ca-note">
+    <b>The season isn't complete yet.</b>
+    <span>{{ state.reason }} When it is, the top three get their certificates by email automatically, and you'll see each delivery here.</span>
+    {% if not preview %}<a class="ca-link" href="?preview=1">See how the certificate looks &rarr;</a>{% endif %}
+  </section>
+  {% if sample %}
+  <div class="ca-sample"><img src="{% url 'tipping:certificate_sample_file' org.id sample.series 'png' %}?view=1" alt="Sample {{ sample.headline }}" width="1400" height="788" decoding="async" draggable="false" oncontextmenu="return false"><span>SAMPLE &middot; for the look only</span></div>
+  {% endif %}
 {% else %}
-  <p class="cert-wait" style="text-align:center;">The season is final, but nobody scored a point in it, so there's no champion to certify.</p>
+  <section class="ca-note"><b>The season is final, but nobody scored a point in it.</b><span>There's no one to certify.</span></section>
 {% endif %}
+
+{% if board %}
+  <section class="ca-table">
+    <h2>{% if state.final %}Final table{% else %}The table right now{% endif %} <small>{{ board_size }} tipper{{ board_size|pluralize }}</small></h2>
+    <div class="ca-rows">
+      <div class="ca-row is-head"><span>#</span><span>Member</span><span>Points</span><span>Correct</span></div>
+      {% for u in board %}
+      <div class="ca-row{% if u.rank <= 3 and u.points %} is-top{% endif %}">
+        <span class="ca-rank">{{ u.rank }}</span>
+        <span class="ca-who">{{ u.display_name|default:u.email }}</span>
+        <span class="ca-pts">{{ u.points }}</span>
+        <span>{% if u.accuracy is not None %}{{ u.accuracy }}%{% else %}&ndash;{% endif %}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+
+{% if deliveries %}
+  <section class="ca-table">
+    <h2>Deliveries <small>every certificate email, newest first</small></h2>
+    <div class="ca-log">
+      {% for d in deliveries %}
+      <div class="ca-logrow">
+        <span class="ca-dot {% if d.status == 'sent' %}is-ok{% else %}is-bad{% endif %}" aria-hidden="true"></span>
+        <span><b>{{ d.user.display_name|default:d.user.email }}</b> &middot; #{{ d.place }}{% if d.group %} in {{ d.group.name }}{% endif %}<br><small>{{ d.email }} &middot; {% if d.trigger == "auto" %}automatic{% else %}sent by {{ d.sent_by.display_name|default:"an admin" }}{% endif %} &middot; {{ d.created_at|date:"j M Y, g:i a" }}{% if d.status != "sent" %} &middot; failed: {{ d.error }}{% endif %}</small></span>
+        <span class="ca-tag {% if d.status == 'sent' %}is-ok{% else %}is-bad{% endif %}">{{ d.get_status_display }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+</div>
 
 {% if individual_national %}
 {% comment %}
@@ -104,15 +115,12 @@ and only for the organisation (or person) that topped it.
   <div class="cert-beyond-grid">
     {% if individual_national %}
     <article class="cert-beyond-card">
-      <a class="cert-hero" href="{% url 'tipping:certificate_scope_file' org.id individual_national.series 'individual' 'png' %}?view=1" target="_blank" rel="noopener" title="Open full size">
-        <img src="{% url 'tipping:certificate_scope_file' org.id individual_national.series 'individual' 'png' %}?view=1" alt="{{ individual_national.headline }}" width="2508" height="1412">
+      <a class="cert-hero">
+        <img src="{% url 'tipping:certificate_scope_file' org.id individual_national.series 'individual' 'png' %}?view=1" alt="{{ individual_national.headline }}" width="1400" height="788" decoding="async">
       </a>
       <b class="cert-beyond-t">Top tipper nationwide</b>
       <span class="cert-beyond-s">{{ individual_national.winner }} has more points than anyone else tipping {{ individual_national.series }} on GoodTip.</span>
-      <div class="cert-actions">
-        <a class="cert-btn" href="{% url 'tipping:certificate_scope_file' org.id individual_national.series 'individual' 'pdf' %}">PDF (to print)</a>
-        <a class="cert-btn" href="{% url 'tipping:certificate_scope_file' org.id individual_national.series 'individual' 'png' %}">Image (PNG)</a>
-      </div>
+
     </article>
     {% endif %}
   </div>
