@@ -31900,3 +31900,12 @@ body.adx-page.adx-page.adx-page .ad-pane td.rd-num b { color: #fff !important; t
 }
 @media (max-width: 640px) { body.adx-page .osw-org .osw-name { display: block !important; -webkit-line-clamp: unset !important; overflow: visible !important; text-overflow: clip !important; } }
 @media (max-width: 640px) { body.adx-page .msg-tabs > .gts-tab:first-child { grid-column: 1 / -1; } body.adx-page .msg-bar .btn-primary { width: 100%; justify-content: center; box-sizing: border-box; } body.adx-page .msg-tabs > .gts-tab { padding: 10px 8px !important; } }
+
+/* Dashboard sports column: the page now scrolls inside its frame (.page-sheet),
+   so the old 84px offset — meant for clearing the nav when the WINDOW
+   scrolled — left a band of empty sheet above the column once it stuck. It
+   sticks flush with the top of the frame instead; the negative top cancels
+   the sheet's own top padding, which a sticky box otherwise stays inside. */
+@media (min-width: 761px) {
+  body.sheet-page .dash-layout > .dash-sports { top: calc(-1 * clamp(26px, 3vw, 44px)) !important; max-height: calc(100dvh - var(--nav-h, 68px) - 2 * var(--frame-gap, 26px)) !important; }
+}
