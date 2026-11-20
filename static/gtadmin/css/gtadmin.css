@@ -3079,3 +3079,5 @@ body.gta-shell ul.gta-leaves > li::marker { content: none; }
   body.gta-shell .gt-panel-head .gp-right { width: 100%; display: flex; gap: 8px; flex-wrap: wrap; }
   body.gta-shell .gt-panel-head .gp-right > *, body.gta-shell .gt-panel-head .gp-right select { flex: 1 1 140px; min-width: 0; max-width: 100%; }
 }
+/* Hub panels end with their last card on a phone, not at a fixed height. */
+@media (max-width: 760px) { body.gta-shell .gx-sheet { min-height: 0 !important; height: auto !important; } body.gta-shell .gx-sheet .gx-pane { min-height: 0 !important; } }
