@@ -3066,3 +3066,11 @@ body.gta-shell ul.gta-leaves > li::marker { content: none; }
   body.gta-shell .gx-plan-price b, body.gta-shell .gx-plan-price strong { font-size: clamp(24px, 7vw, 30px) !important; }
   body.gta-shell .gx-plan-price { white-space: nowrap; }
 }
+/* Panels with a wide table (Administrators) stay the width of the screen;
+   the table inside slides sideways and the panel's heading wraps. */
+@media (max-width: 760px) {
+  body.gta-shell .gt-panel { min-width: 0 !important; max-width: 100% !important; width: 100% !important; box-sizing: border-box; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  body.gta-shell .gt-panel-head { flex-wrap: wrap !important; min-width: 0; max-width: calc(100vw - 60px); position: sticky; left: 0; }
+  body.gta-shell .gt-panel-head .gp-sub { white-space: normal !important; }
+  body.gta-shell .gt-panel table { min-width: 560px; }
+}
