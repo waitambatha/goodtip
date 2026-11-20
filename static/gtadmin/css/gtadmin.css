@@ -2893,7 +2893,7 @@ html[data-theme="dark"] .gta-shell .object-tools a.addlink { color: #0C2417; bac
   html.gta-rail-open .gta-rail-scrim { display: block; }
   html.gta-rail-open, html.gta-rail-open body { overflow: hidden; }
 
-  .gta-burger { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--hairline-color); background: var(--gt-rail, #0F2E22); color: #fff; cursor: pointer; }
+  .gta-burger { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--hairline-color); background: #0F2E22; color: #fff; cursor: pointer; }
   .gta-burger svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
   body.gta-shell #header { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; justify-content: space-between !important; padding: 0 12px !important; gap: 8px !important; height: 62px !important; }
   body.gta-shell #header .gta-search { display: none !important; }
