@@ -31965,3 +31965,18 @@ html body .gtm { height: calc(var(--app-h, 100dvh) - var(--gt-navh, 68px)); }
 .og-table .og-trow .og-badge { width: 30px; height: 30px; min-width: 30px; border-radius: 9px; font-size: 11px; display: grid; place-items: center; }
 .og-table .og-trow .og-badge img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 @media (max-width: 760px) { body.adx-page .og-table { width: max-content !important; min-width: 100% !important; } }
+
+/* SWIPING UP AND DOWN ON A TABLE MOVES THE PAGE (client, 20 Nov 2026: "I
+   have to hold outside that section in order to scroll"). Table boxes scroll
+   sideways only; they had `overscroll-behavior: contain` on both axes, which
+   stopped an up/down swipe that started on the table from ever reaching the
+   page. Sideways stays contained, up/down passes through, and the box is
+   never a vertical scroller itself. */
+:is(.gx-tablewrap, .gt-tablewrap, .table-wrap, .atable-wrap) {
+  overscroll-behavior-y: auto !important;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+}
+@media (max-width: 760px) {
+  :is(.gx-tablewrap, .gt-tablewrap, .table-wrap, .atable-wrap) { overflow-y: hidden !important; }
+}
