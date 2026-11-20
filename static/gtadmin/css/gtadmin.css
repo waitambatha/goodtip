@@ -2918,3 +2918,27 @@ html[data-theme="dark"] .gta-shell .object-tools a.addlink { color: #0C2417; bac
   #changelist .actions { flex-wrap: wrap; }
   #toolbar #changelist-search, #changelist-search input[type="text"] { max-width: 100%; }
 }
+
+/* Django wraps the search box and its button in a <div> inside the form, so
+   the form's flex never reached the box and it shrank to a sliver. The
+   wrapper carries the flex instead. */
+#toolbar form#changelist-search > div { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; }
+#toolbar form#changelist-search > div > label { flex: none; }
+/* The "+" on Add buttons sits clear of the words. */
+.object-tools a.addlink { padding-right: 36px !important; background-position: right 14px center !important; }
+
+/* Inline tables inside an edit form (an organisation's members, its groups)
+   slide sideways on a phone instead of being clipped at the edge. */
+@media (max-width: 760px) {
+  .inline-group .tabular fieldset.module, .inline-group .tabular .module { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .inline-group .tabular table { min-width: max-content; }
+}
+
+/* THE GREEN VOID UNDER THE ADMIN ON A PHONE (client, 20 Nov 2026). Django's
+   base sets html, body and #container to `height: 100%` — one screen tall —
+   and lets the content overflow them. On a phone the browser bar slides away
+   while scrolling and the screen grows past that fixed height, and the strip
+   in between showed as empty green below the page. The page is now as tall
+   as what is on it, and never shorter than the screen. */
+html:has(> body.gta-shell), body.gta-shell { height: auto !important; min-height: 100%; }
+body.gta-shell #container { height: auto !important; min-height: 100vh; min-height: 100dvh; }
