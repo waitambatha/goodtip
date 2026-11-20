@@ -29,6 +29,7 @@ gradient over the whole article.
   <meta charset="UTF-8">
   {% include "partials/_motion.html" %}
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  {% include "partials/_avatar_fallback.html" %}
   <title>{{ post.meta_title|default:post.title }} &middot; GoodTip</title>
   <meta name="description" content="{{ post.meta_description|default:post.excerpt|default:post.title|truncatechars:150 }}">
   <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
@@ -106,7 +107,7 @@ gradient over the whole article.
         <div class="rd-byline">
           {% if post.created_by %}
           <span class="rd-who">
-            <span class="rd-av">
+            <span class="rd-av" data-initial="{{ post.created_by.display_name|slice:":1"|upper }}">
               {% if post.created_by.avatar %}<img src="{{ post.created_by.avatar.url }}" alt="">
               {% else %}{{ post.created_by.display_name|slice:":1"|upper }}{% endif %}
             </span>

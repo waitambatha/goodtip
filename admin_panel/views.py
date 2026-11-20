@@ -228,7 +228,13 @@ def _orgs_panel_context(request, mine, panel: str) -> dict:
             Sport.objects.filter(competitions__organisations__in=mine)
             .order_by("name").values_list("name", flat=True).distinct()
         )
-        return {"orgs": orgs.distinct(), "q": q, "sport": sport, "sports": sports}
+        orgs = list(orgs.distinct())
+        # Counted on their own: `mine` is already joined through the admin's
+        # own membership, so a Count over it would only ever see that one row.
+        counts = _per_org(OrgMember.objects.filter(org_id__in=[o.id for o in orgs]))
+        for o in orgs:
+            o.n_members = counts.get(o.id, 0)
+        return {"orgs": orgs, "q": q, "sport": sport, "sports": sports}
 
     if panel == "groups":
         return {

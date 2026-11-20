@@ -199,7 +199,12 @@
       el.classList.add('out');
       setTimeout(function () { el.remove(); }, 320);
     }
-    el.querySelector('.gtt-x').addEventListener('click', drop);
+    el.querySelector('.gtt-x').addEventListener('click', function () {
+      // Closed on purpose: never show this notice again on this device
+      // (client, 20 Nov 2026: "if I've closed it, let it not keep coming up").
+      if (spec.key) { try { localStorage.setItem('gtToastClosed:' + spec.key, '1'); } catch (e) {} }
+      drop();
+    });
     // Reading the message should not be a race — hovering holds it open, and
     // the countdown restarts when the pointer leaves.
     el.addEventListener('mouseenter', function () { if (timer) clearTimeout(timer); });
@@ -219,8 +224,13 @@
         cta: node.getAttribute('data-toast-cta'),
         url: node.getAttribute('data-toast-url'),
         icon: node.getAttribute('data-toast-icon'),
-        ms: parseInt(node.getAttribute('data-toast-ms') || '5000', 10)
+        ms: parseInt(node.getAttribute('data-toast-ms') || '5000', 10),
+        // The notice's identity. Without an explicit key it is its own words,
+        // so a changed notice (scheduled -> open) counts as a new one.
+        key: node.getAttribute('data-toast-key') ||
+             [node.getAttribute('data-toast-eyebrow'), node.getAttribute('data-toast-title'), node.getAttribute('data-toast-url')].join('|')
       };
+      try { if (localStorage.getItem('gtToastClosed:' + spec.key)) return; } catch (e) {}
       // Stagger, so two notices do not land on top of each other.
       setTimeout(function () { show(spec); }, 400 + i * 500);
     });

@@ -275,6 +275,32 @@
     veil.dataset.shownAt = String(Date.now());
     scope.classList.add('is-busy-scope');
     scope.appendChild(veil);
+
+    /* CENTRED ON WHAT IS ON SCREEN (client, 20 Nov 2026: "the loader is up
+       there ... nothing is happening down there"). A region taller than the
+       screen, or scrolled part-way, had its spinner in the middle of the
+       whole region — off the top, or below the fold — so the part being
+       looked at seemed frozen. The spinner goes to the middle of the
+       visible slice instead. */
+    /* A region that scrolls itself (the console's frame): absolute inset 0
+       covers its content from the top, which may be scrolled out of sight.
+       Cover the window onto it that is showing instead. */
+    var oy = getComputedStyle(scope).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && scope.scrollHeight > scope.clientHeight + 4) {
+      veil.style.top = scope.scrollTop + 'px';
+      veil.style.bottom = 'auto';
+      veil.style.height = scope.clientHeight + 'px';
+      return;
+    }
+    var nav = document.querySelector('.app-nav');
+    var navBottom = nav ? Math.max(0, nav.getBoundingClientRect().bottom) : 0;
+    var visTop = Math.max(at.top, navBottom), visBottom = Math.min(at.bottom, window.innerHeight);
+    if (visBottom - visTop > 60 && (at.top < navBottom - 4 || at.bottom > window.innerHeight + 4)) {
+      inner.style.position = 'absolute';
+      inner.style.left = '50%';
+      inner.style.top = ((visTop + visBottom) / 2 - at.top) + 'px';
+      inner.style.transform = 'translate(-50%, -50%)';
+    }
   }
 
   function clear(scope) {
@@ -503,6 +529,16 @@
       var r = v.getBoundingClientRect();
       if (!r.width || !r.height) r = box.getBoundingClientRect();
       var radius = getComputedStyle(box).borderRadius;
+      /* Lifted, it covers only the part of the region that is on screen, so
+         its spinner lands where the reader is looking. */
+      if (r.width && r.height) {
+        var nv = document.querySelector('.app-nav');
+        var nb = nv ? Math.max(0, nv.getBoundingClientRect().bottom) : 0;
+        var t = Math.max(r.top, nb), b = Math.min(r.bottom, window.innerHeight);
+        if (b - t > 60) r = { left: r.left, top: t, width: r.width, height: b - t };
+        var inn = v.querySelector('.bv-inner');
+        if (inn) { inn.style.position = ''; inn.style.top = ''; inn.style.left = ''; inn.style.transform = ''; }
+      }
       if (!r.width || !r.height) {
         var nav = document.querySelector('.app-nav');
         var navBottom = nav ? Math.max(0, nav.getBoundingClientRect().bottom) : 0;

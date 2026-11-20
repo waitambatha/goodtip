@@ -516,3 +516,62 @@
   });
   if (best) best.setAttribute('aria-current', 'page');
 })();
+
+/* THE REAL VISIBLE HEIGHT (client, 20 Nov 2026, on an Android phone: "when I
+   scroll down there's a whole green void at the bottom ... when I start
+   chatting the void again comes"). 100dvh is what the browser *thinks* the
+   screen is; with the address bar sliding and the keyboard open, a real
+   phone disagrees, and the framed pages ended short of the screen or floated
+   above the keyboard. --app-h is the height actually on screen, from the
+   visual viewport, kept current as the bar and the keyboard come and go.
+   The framed pages size themselves from it, and the page behind the frame
+   is pinned at the top so it can never be dragged past the frame. */
+(function () {
+  'use strict';
+  var root = document.documentElement, vv = window.visualViewport;
+  function framed() { return document.body && document.body.matches('.sheet-page, .mc-page, .gtm-page'); }
+  function apply() {
+    var h = vv ? vv.height : window.innerHeight;
+    root.style.setProperty('--app-h', Math.round(h) + 'px');
+    if (framed() && window.matchMedia('(max-width: 900px)').matches && (window.scrollY || root.scrollTop)) window.scrollTo(0, 0);
+  }
+  apply();
+  if (vv) { vv.addEventListener('resize', apply); vv.addEventListener('scroll', apply); }
+  window.addEventListener('resize', apply);
+  window.addEventListener('orientationchange', function () { setTimeout(apply, 250); });
+  document.addEventListener('htmx:afterSettle', apply);
+})();
+
+/* TAP A ROW, SEE THE WHOLE ROW (client, 20 Nov 2026: "you can just click and
+   be able to see the data of that specific person"). On a phone the console
+   and HQ tables slide sideways; tapping a row's first cell opens a sheet that
+   lists every column of that row under its heading, actions included. */
+(function () {
+  'use strict';
+  var mq = window.matchMedia('(max-width: 760px)');
+  var sheet;
+  function close() { if (sheet) { sheet.remove(); sheet = null; } }
+  function open(row) {
+    var table = row.closest('table');
+    var heads = [].map.call(table.querySelectorAll('thead th'), function (th) { return th.textContent.trim(); });
+    close();
+    sheet = document.createElement('div');
+    sheet.className = 'rowx';
+    var html = '<div class="rowx-back" data-rowx-close></div><div class="rowx-panel" role="dialog" aria-modal="true">' +
+      '<button type="button" class="rowx-x" aria-label="Close" data-rowx-close>&times;</button><dl>';
+    [].forEach.call(row.children, function (td, i) {
+      if (!td.innerHTML.trim()) return;
+      html += '<div class="rowx-row' + (i === 0 ? ' is-first' : '') + '"><dt>' + (heads[i] || '') + '</dt><dd>' + td.innerHTML + '</dd></div>';
+    });
+    sheet.innerHTML = html + '</dl></div>';
+    document.body.appendChild(sheet);
+  }
+  document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('[data-rowx-close]')) { close(); return; }
+    if (!mq.matches) return;
+    var td = e.target.closest && e.target.closest(':is(.mc .gx-table, body.adx-page .atable) tbody td:first-child');
+    if (!td || e.target.closest('a, button, form, details, input, select')) return;
+    open(td.parentElement);
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+})();

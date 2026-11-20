@@ -20,7 +20,11 @@ already failed are swept up once the page is parsed.
     if (!img || img.tagName !== 'IMG' || !/\/media\/avatars\//.test(img.getAttribute('src') || '')) return;
     var box = img.parentNode;
     img.remove();
-    if (box && box.classList) box.classList.add('av-gone');
+    if (!box || !box.classList) return;
+    // The person's initial where the page knows it, the person glyph otherwise.
+    var initial = box.getAttribute && box.getAttribute('data-initial');
+    if (initial) { box.textContent = initial; return; }
+    box.classList.add('av-gone');
   }
   document.addEventListener('error', function (e) { gone(e.target); }, true);
   document.addEventListener('DOMContentLoaded', function () {

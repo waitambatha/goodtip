@@ -1024,3 +1024,14 @@
     show(0);
   }
 })();
+
+/* The tab row's right-edge fade goes once the row is scrolled to its end. */
+(function () {
+  function watch(row) {
+    function upd() { row.classList.toggle('is-end', row.scrollLeft + row.clientWidth >= row.scrollWidth - 4); }
+    row.addEventListener('scroll', upd, { passive: true }); window.addEventListener('resize', upd); upd();
+  }
+  function init() { document.querySelectorAll('.gtm-tabs').forEach(function (r) { if (!r.__fade) { r.__fade = 1; watch(r); } }); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+  document.addEventListener('htmx:afterSettle', init);
+})();

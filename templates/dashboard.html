@@ -264,6 +264,7 @@ then we have that pulled up so we see those fixtures").
        data-toast-cta="{% if pe.status == 'scheduled' %}Reschedule{% else %}Set it up{% endif %}"
        data-toast-url="{% url 'orgs:election_setup' c.org.id %}"
        data-toast-icon="ic-vote"
+       data-toast-key="election-{{ pe.id }}-{{ pe.status }}"
        data-toast-ms="6000"
        hidden></div>
   {% endif %}{% endwith %}{% endif %}

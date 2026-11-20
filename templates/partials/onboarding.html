@@ -43,7 +43,10 @@ unchanged. Nothing here is required for any page to work.
 
 <script>
 (function () {
-  var root = document.getElementById('coach');
+  /* This include's own walkthrough: the element right before this script.
+     getElementById would find a leftover one from an earlier page first. */
+  var me = document.currentScript && document.currentScript.previousElementSibling;
+  var root = (me && me.classList && me.classList.contains('coach')) ? me : document.getElementById('coach');
   if (!root) return;
 
   /* MOVED TO THE BODY BEFORE ANYTHING ELSE.
@@ -58,7 +61,19 @@ unchanged. Nothing here is required for any page to work.
 
      Reparenting to the body puts it in the root stacking context, where its
      z-index means what it says. */
+  /* A walkthrough left behind by an earlier page (in-page navigation keeps
+     the body) would share these ids and swallow the buttons' clicks; there is
+     only ever one. */
+  [].slice.call(document.querySelectorAll('.coach')).forEach(function (old) { if (old !== root) old.remove(); });
   document.body.appendChild(root);
+
+  /* DONE ON THIS DEVICE, WHATEVER THE SERVER HEARD (client, 20 Nov 2026:
+     "once I say skip ... even if I go to another page and come back, it pops
+     up again"). The POST below can be lost — a tap on a link straight after
+     Skip cancels it — so the device remembers too, and never shows a
+     finished walkthrough again. */
+  var KEY = root.getAttribute('data-key') || '';
+  try { if (KEY && localStorage.getItem('gtTourDone:' + KEY)) { root.remove(); return; } } catch (e) {}
 
   /* The steps come from the server (accounts/onboarding.py), because a step
      that finds no target is dropped entirely — including its text — and the
@@ -145,7 +160,10 @@ unchanged. Nothing here is required for any page to work.
   }
 
   function done() {
+    if (root.hidden && root.getAttribute('data-done')) return;
+    root.setAttribute('data-done', '1');
     root.hidden = true;
+    try { if (KEY) localStorage.setItem('gtTourDone:' + KEY, '1'); } catch (e) {}
     /* Best-effort: the tour is over on screen whatever the server says, and a
        failed POST costs one repeat rather than a broken page. The key is what
        marks THIS page done — without it the server would have no idea which
@@ -153,12 +171,14 @@ unchanged. Nothing here is required for any page to work.
     var body = new FormData();
     body.append('csrfmiddlewaretoken', root.getAttribute('data-csrf'));
     body.append('key', root.getAttribute('data-key'));
+    /* keepalive: the request outlives the page, so leaving straight after
+       Skip no longer cancels it. */
     fetch(root.getAttribute('data-seen-url'), {
-      method: 'POST', body: body, credentials: 'same-origin'
+      method: 'POST', body: body, credentials: 'same-origin', keepalive: true
     }).catch(function () {});
   }
 
-  [].slice.call(document.querySelectorAll('[data-coach-skip]')).forEach(function (b) {
+  [].slice.call(root.querySelectorAll('[data-coach-skip]')).forEach(function (b) {
     b.addEventListener('click', done);
   });
   document.getElementById('coachNext').addEventListener('click', function () {

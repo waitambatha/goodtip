@@ -24,15 +24,25 @@ address and reloads to itself.
     </form>
   </div>
 
-  <div class="og-grid">
-    {% for o in orgs %}
-    <a class="og-card" href="{% url 'manage:org_home' o.id %}">
-      <span class="og-badge">{% if o.logo %}<img src="{{ o.logo.url }}" alt="">{% else %}{{ o.name|slice:":2"|upper }}{% endif %}</span>
-      <b>{{ o.name }}</b>
-      <svg class="og-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-    </a>
-    {% empty %}
-    <div class="gx-empty">{% if q or sport %}<b>Nothing matches that search.</b><a href="{% url 'manage:orgs_list' %}?panel=organisations">Clear filters</a>{% else %}<b>You don't run an organisation yet.</b><a href="{% url 'manage:orgs_list' %}?panel=create" data-panel="create">Create one</a>{% endif %}</div>
-    {% endfor %}
+  {% comment %}A table, not tiles (client, 20 Nov 2026: "let's just have it as tables ... neat, clean"). Tap a name to open the organisation.{% endcomment %}
+  {% if orgs %}
+  <div class="gx-tablewrap og-tablewrap">
+    <table class="gx-table og-table">
+      <thead><tr><th scope="col">Organisation</th><th scope="col">Members</th><th scope="col">Competitions</th><th scope="col">Charity</th><th scope="col">Started</th></tr></thead>
+      <tbody>
+      {% for o in orgs %}
+      <tr>
+        <td class="is-name"><a class="og-trow" href="{% url 'manage:org_home' o.id %}"><span class="og-badge">{% if o.logo %}<img src="{{ o.logo.url }}" alt="">{% else %}{{ o.name|slice:":2"|upper }}{% endif %}</span><b>{{ o.name }}</b></a></td>
+        <td><b class="mc-num">{{ o.n_members }}</b></td>
+        <td>{{ o.competitions.all|length }}</td>
+        <td>{{ o.charity.name|default:"Not chosen" }}</td>
+        <td class="is-date">{{ o.created_at|date:"j M Y" }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
   </div>
+  {% else %}
+  <div class="gx-empty">{% if q or sport %}<b>Nothing matches that search.</b><a href="{% url 'manage:orgs_list' %}?panel=organisations">Clear filters</a>{% else %}<b>You don't run an organisation yet.</b><a href="{% url 'manage:orgs_list' %}?panel=create" data-panel="create">Create one</a>{% endif %}</div>
+  {% endif %}
 </section>

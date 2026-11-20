@@ -170,6 +170,12 @@ gt-messages.js and the .gtm-page media queries.
         <button type="button" class="gtm-tab" role="tab" aria-selected="false" data-gtm-tab="person">
           People {% if count_people %}<i>{{ count_people }}</i>{% endif %}
         </button>
+        {% comment %}Archived is the last stop on the same row (client, 20 Nov 2026: "let it be in one row ... archive the last, because somebody archives something, they don't want to see it"). The row scrolls sideways; still a link, because it asks the server for a different list.{% endcomment %}
+        {% if show != 'archived' and archived_count %}
+        <a class="gtm-tab gtm-tab-arch" href="{% url 'orgs:member_messages' org.id %}?show=archived">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v3H3z"/><path d="M5 10v9h14v-9"/><path d="M10 14h4"/></svg>Archived <i>{{ archived_count }}</i>
+        </a>
+        {% endif %}
       </div>
 
       {% comment %}
@@ -189,11 +195,6 @@ gt-messages.js and the .gtm-page media queries.
       <a class="gtm-arch on" href="{% url 'orgs:member_messages' org.id %}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
         Back to your chats
-      </a>
-      {% elif archived_count %}
-      <a class="gtm-arch" href="{% url 'orgs:member_messages' org.id %}?show=archived">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v3H3z"/><path d="M5 10v9h14v-9"/><path d="M10 14h4"/></svg>
-        Archived <i>{{ archived_count }}</i>
       </a>
       {% endif %}
     </header>

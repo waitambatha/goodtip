@@ -1938,3 +1938,13 @@ body.sheet-open:has(.gtm-sheet:not([hidden])) .app-main { z-index: 60; }
 .cc-typing-dots i:nth-child(3) { animation-delay: .3s; }
 @keyframes ccTypingDot { 0%, 60%, 100% { opacity: .35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
 @media (prefers-reduced-motion: reduce) { :where(html:not(.gt-motion)) .cc-typing-dots i { animation: none; opacity: .7; } }
+
+/* ONE ROW, SCROLLED SIDEWAYS, ARCHIVED LAST (client, 20 Nov 2026). Overrides
+   the wrapping and the 2x2 grid above at every width: All, Organisations,
+   Groups, People, then Archived, in one line, with a soft fade at the right
+   edge so it is obvious there is more to swipe to. */
+html body .gtm-tabs { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; gap: 6px !important; scroll-snap-type: x proximity; -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); padding-right: 28px; }
+html body .gtm-tabs > * { flex: none !important; min-width: auto !important; white-space: nowrap; scroll-snap-align: start; }
+html body .gtm-tabs.is-end { -webkit-mask-image: none; mask-image: none; }
+.gtm-tab-arch { display: inline-flex; align-items: center; gap: 6px; text-decoration: none !important; opacity: .85; }
+.gtm-tab-arch svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
