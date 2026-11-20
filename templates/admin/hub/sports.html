@@ -45,6 +45,10 @@ feed is kept current here whether or not any organisation tips it
   <span><i class="sp-dot is-off"></i>{% translate "Off" %}</span>
 </div>
 
+{% comment %}A jump row: every sport on one line, swiped sideways on a phone, tap one to go straight to it (client, 20 Nov 2026).{% endcomment %}
+<nav class="gx-chips sp-jump" aria-label="{% translate 'Jump to a sport' %}">
+  {% for s in sports %}<a class="sp-jump-a{% if s.obj.is_active %} is-on{% endif %}" href="#sport-{{ s.obj.slug }}">{{ s.obj.name }} <i>{{ s.comps|length }}</i></a>{% endfor %}
+</nav>
 <div class="sp-grid">
   {% for s in sports %}
   <section class="sp-card{% if s.obj.is_active %} is-on{% endif %}" id="sport-{{ s.obj.slug }}">
