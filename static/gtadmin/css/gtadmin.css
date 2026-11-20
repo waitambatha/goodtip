@@ -3042,3 +3042,21 @@ body.gta-shell ul.gta-leaves > li::marker { content: none; }
   body.gta-shell .gx-row.gx-enq > :nth-child(6) { grid-column: 3; grid-row: 3; display: flex; gap: 6px; }
   body.gta-shell .gx-row.gx-enq > :nth-child(n+7) { display: none; }
 }
+
+/* Images & videos on a phone: a grid of thumbnails, three to a row, instead
+   of every picture full width (43,000px of scrolling). The file name stays,
+   one line; size and tags go — tap a tile for the full details. */
+@media (max-width: 760px) {
+  body.gta-shell .gta-media-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 6px !important; }
+  body.gta-shell .gta-media-tile { min-width: 0; border-radius: 12px !important; }
+  body.gta-shell .gta-media-tile > :first-child { aspect-ratio: 1 / 1 !important; height: auto !important; }
+  body.gta-shell .gta-media-tile :is(img, video) { width: 100%; height: 100%; object-fit: cover; }
+  body.gta-shell .gta-media-tile .gmt-meta { padding: 6px 7px !important; }
+  body.gta-shell .gta-media-tile .gmt-meta > :first-child { font-size: 11px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  body.gta-shell .gta-media-tile .gmt-meta > :not(:first-child) { display: none !important; }
+}
+@media (max-width: 760px) {
+  body.gta-shell .gta-media-tile .gmt-shot { aspect-ratio: 1 / 1 !important; height: auto !important; min-height: 0 !important; }
+  body.gta-shell .gta-media-tile .gmt-meta b { font-size: 11px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  body.gta-shell .gta-media-tile :is(.gmt-meta small, .gmt-tags) { display: none !important; }
+}
