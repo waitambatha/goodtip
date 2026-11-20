@@ -293,7 +293,11 @@ def database_table(request, db, label):
     return render(request, "admin/hub/database_table.html", _ctx(
         request, str(model._meta.verbose_name_plural).capitalize(),
         db=info, label=label, kind=kind, tracked=tracked, rows=rows, page=page, show=show, q=q,
-        counts=c, blurb=meta.blurb if meta else "", date_field=date_field, date_label=(date_field or "").replace("_", " ").capitalize(),
+        counts=c, blurb=meta.blurb if meta else "", date_field=date_field,
+        # The record column is named for what the table holds ("User",
+        # "Organisation", "Tip") — it used to be headed "Row", which says
+        # nothing (client, 20 Nov 2026).
+        row_label=str(model._meta.verbose_name).capitalize(), date_label=(date_field or "").replace("_", " ").capitalize(),
         has_comp=bool(spath), comps=comps, comp=comp, where=where, where_text=where_text,
         is_ian=backup.is_ian(request.user),
         back_url=reverse("admin:hq_database", args=[db]), back_label=f"the {info['label']} database",

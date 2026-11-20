@@ -59,10 +59,10 @@ sysadmin.database_views.database_table. Tabs and search are plain links/GET.
       <table class="gx-table">
         <thead><tr>
           <th scope="col">{% translate "ID" %}</th>
-          <th scope="col">{% translate "Row" %}</th>
+          <th scope="col">{{ row_label|default:_("Record") }}</th>
           {% if has_comp %}<th scope="col">{% translate "Competition" %}</th>{% endif %}
           {% if date_field %}<th scope="col">{{ date_label }}</th>{% endif %}
-          <th scope="col">{% translate "Label" %}</th>
+          <th scope="col">{% translate "Source" %}</th>
           <th scope="col" style="text-align:right">{% translate "Actions" %}</th>
         </tr></thead>
         <tbody>
