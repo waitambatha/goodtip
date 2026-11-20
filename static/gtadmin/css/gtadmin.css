@@ -2968,3 +2968,29 @@ body.gta-shell #container { height: auto !important; min-height: 100vh; min-heig
   body.gta-shell :is(.gd-tabs, .gx-tabs, .gx-chips, .gta-chipset, .gx-seg, .gx-run-chips, .gx-bridge-chips, .gta-media-filters, .gta-chips, .sp-chips) > * { flex: none !important; white-space: nowrap; scroll-snap-align: start; }
   body.gta-shell :is(.gd-tabs, .gx-tabs, .gx-chips, .gta-chipset, .gx-seg, .gx-run-chips, .gx-bridge-chips, .gta-media-filters, .gta-chips, .sp-chips).is-end { -webkit-mask-image: none; mask-image: none; }
 }
+
+@media (max-width: 760px) {
+  /* Score tiles fill the width, two to a row. */
+  body.gta-shell .gx-hero .gx-board { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; width: 100%; }
+  body.gta-shell .gx-hero .gx-board > * { min-width: 0 !important; width: auto !important; }
+  body.gta-shell .gx-hero .gx-board .gx-score b { font-size: clamp(26px, 8vw, 36px) !important; }
+}
+/* Admin's own lists never show the browser's bullet squares. */
+body.gta-shell ul.gta-leaves, body.gta-shell ul.gta-leaves > li { list-style: none !important; }
+body.gta-shell ul.gta-leaves > li::marker { content: none; }
+
+/* Admin tables on a phone, the same as the Manage console's: the box grows
+   with its rows (no box-inside-the-page scrolling), the first column stays
+   pinned while the rest slides sideways, and rows are compact and striped. */
+@media (max-width: 760px) {
+  body.gta-shell .gx-tablewrap { max-height: none !important; height: auto !important; overflow-x: auto !important; overflow-y: visible !important; border-radius: 14px; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+  body.gta-shell .gx-tablewrap::after, body.gta-shell .gx-tablewrap::before { display: none !important; }
+  body.gta-shell .gx-table { width: max-content !important; min-width: 100% !important; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+  body.gta-shell .gx-table :is(th, td) { padding: 10px 12px !important; vertical-align: middle; }
+  body.gta-shell .gx-table td { white-space: normal; max-width: 240px; }
+  body.gta-shell .gx-table :is(th, td):first-child { position: sticky; left: 0; z-index: 1; min-width: 150px; max-width: 46vw; box-shadow: 6px 0 8px -6px rgba(15,23,42,.18); background-clip: padding-box; }
+  body.gta-shell .gx-table thead th:first-child { z-index: 3; }
+  body.gta-shell .gx-table tbody tr:nth-child(odd) > td:first-child { background: #F3F6FB !important; }
+  body.gta-shell .gx-table tbody tr:nth-child(even) > td:first-child { background: #EDF2F8 !important; }
+  body.gta-shell .gx-table thead th:first-child { background: #DCE6F2 !important; }
+}
