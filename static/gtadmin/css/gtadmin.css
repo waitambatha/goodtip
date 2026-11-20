@@ -3074,3 +3074,8 @@ body.gta-shell ul.gta-leaves > li::marker { content: none; }
   body.gta-shell .gt-panel-head .gp-sub { white-space: normal !important; }
   body.gta-shell .gt-panel table { min-width: 560px; }
 }
+@media (max-width: 760px) {
+  body.gta-shell .gt-table td:first-child, body.gta-shell .gt-table th:first-child { white-space: nowrap; }
+  body.gta-shell .gt-panel-head .gp-right { width: 100%; display: flex; gap: 8px; flex-wrap: wrap; }
+  body.gta-shell .gt-panel-head .gp-right > *, body.gta-shell .gt-panel-head .gp-right select { flex: 1 1 140px; min-width: 0; max-width: 100%; }
+}
