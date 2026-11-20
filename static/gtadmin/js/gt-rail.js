@@ -127,3 +127,16 @@
   scrim.className = "gta-rail-scrim";
   document.addEventListener("DOMContentLoaded", function () { document.body.appendChild(scrim); });
 })();
+
+/* The fade on a sideways option row goes once it has been swiped to its end. */
+(function () {
+  "use strict";
+  var SEL = ".gd-tabs, .gx-tabs, .gx-chips, .gta-chipset, .gx-seg, .gx-run-chips, .gx-bridge-chips, .gta-media-filters, .gta-chips, .sp-chips";
+  function watch(row) {
+    if (row.__fade) return; row.__fade = 1;
+    function upd() { row.classList.toggle("is-end", row.scrollLeft + row.clientWidth >= row.scrollWidth - 4); }
+    row.addEventListener("scroll", upd, { passive: true }); window.addEventListener("resize", upd); upd();
+  }
+  function init() { document.querySelectorAll(SEL).forEach(watch); }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();

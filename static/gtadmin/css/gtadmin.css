@@ -2942,3 +2942,29 @@ html[data-theme="dark"] .gta-shell .object-tools a.addlink { color: #0C2417; bac
    as what is on it, and never shorter than the screen. */
 html:has(> body.gta-shell), body.gta-shell { height: auto !important; min-height: 100%; }
 body.gta-shell #container { height: auto !important; min-height: 100vh; min-height: 100dvh; }
+
+/* The band of empty green under the last card on a phone: 80px of the green
+   panel's own bottom padding, 40px of #content's, then the footer's. Trimmed
+   to one small even gap, so a page ends where its content does. */
+@media (max-width: 760px) {
+  body.gta-shell #content .gx { padding-bottom: 16px !important; margin-bottom: 0 !important; }
+  body.gta-shell #content { padding-bottom: 12px !important; }
+  body.gta-shell #footer { padding: 10px 16px 14px !important; }
+  body.gta-shell #footer .gta-foot { font-size: 12px; }
+}
+
+/* ROWS OF OPTIONS ON A PHONE: ONE LINE, SWIPED SIDEWAYS (client, 20 Nov
+   2026: "if it's options, have them in a one-row line that is scrollable to
+   the right"). Every tab row, segment switch and chip row in the admin stays
+   on a single line and scrolls; a soft fade at the right edge shows there is
+   more. */
+@media (max-width: 760px) {
+  body.gta-shell :is(.gd-tabs, .gx-tabs, .gx-chips, .gta-chipset, .gx-seg, .gx-run-chips, .gx-bridge-chips, .gta-media-filters, .gta-chips, .sp-chips) {
+    display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden;
+    gap: 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+    -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); padding-right: 26px !important;
+  }
+  body.gta-shell :is(.gd-tabs, .gx-tabs, .gx-chips, .gta-chipset, .gx-seg, .gx-run-chips, .gx-bridge-chips, .gta-media-filters, .gta-chips, .sp-chips)::-webkit-scrollbar { display: none; }
+  body.gta-shell :is(.gd-tabs, .gx-tabs, .gx-chips, .gta-chipset, .gx-seg, .gx-run-chips, .gx-bridge-chips, .gta-media-filters, .gta-chips, .sp-chips) > * { flex: none !important; white-space: nowrap; scroll-snap-align: start; }
+  body.gta-shell :is(.gd-tabs, .gx-tabs, .gx-chips, .gta-chipset, .gx-seg, .gx-run-chips, .gx-bridge-chips, .gta-media-filters, .gta-chips, .sp-chips).is-end { -webkit-mask-image: none; mask-image: none; }
+}
