@@ -103,3 +103,27 @@
     });
   });
 })();
+
+/* ON A PHONE THE MENU IS A DRAWER (client, 20 Nov 2026: "the admin, especially
+   in the mobile view, is completely distorted"). The icon strip that stood
+   down the left of every page is gone below 760px; the ☰ in the bar opens the
+   whole menu, labels and all, over the page, and a tap outside it, Escape or
+   choosing a page closes it. */
+(function () {
+  "use strict";
+  var root = document.documentElement;
+  function set(open) {
+    root.classList.toggle("gta-rail-open", open);
+    document.querySelectorAll("[data-rail-open]").forEach(function (b) { b.setAttribute("aria-expanded", String(open)); });
+  }
+  document.addEventListener("click", function (e) {
+    if (e.target.closest && e.target.closest("[data-rail-open]")) { set(!root.classList.contains("gta-rail-open")); return; }
+    if (!root.classList.contains("gta-rail-open")) return;
+    if (e.target.classList && e.target.classList.contains("gta-rail-scrim")) { set(false); return; }
+    if (e.target.closest && e.target.closest("#nav-sidebar a")) set(false);
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") set(false); });
+  var scrim = document.createElement("div");
+  scrim.className = "gta-rail-scrim";
+  document.addEventListener("DOMContentLoaded", function () { document.body.appendChild(scrim); });
+})();

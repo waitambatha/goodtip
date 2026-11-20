@@ -46,8 +46,11 @@ def send_login_code(user, code: str, purpose: str = LoginCode.PURPOSE_LOGIN) -> 
     if not user.email:
         return 0
     _echo_code_to_console(user, code, purpose)
+    # The code leads every subject, with "GoodTip" in it: an iPhone reads the
+    # code from Mail and offers it above the keyboard on the code screen, and
+    # the code first in the subject is what it finds most reliably.
     subject = (
-        "Confirm your email — GoodTip"
+        f"{code} is your GoodTip confirmation code"
         if purpose == LoginCode.PURPOSE_SIGNUP
         else f"{code} is your GoodTip sign-in code"
     )

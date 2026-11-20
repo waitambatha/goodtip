@@ -2872,3 +2872,49 @@ html[data-theme="dark"] .gta-shell .object-tools a.addlink { color: #0C2417; bac
 .gta-cpr-form button { grid-column: 1 / -1; justify-self: start; margin-top: 4px; }
 .gta-cpr-h2 { margin: 24px 0 10px; font-size: 16px; color: var(--body-loud-color); }
 @media (max-width: 760px) { .gta-cpr-forms { grid-template-columns: 1fr; } }
+
+/* ==========================================================================
+   PHONES (client, 20 Nov 2026). The icon strip leaves the page; the ☰ opens
+   the full menu as a drawer over it. The bar keeps only what matters on a
+   small screen — the menu button, the environment, and you — and the
+   dashboard's number cards sit two to a row.
+   ========================================================================== */
+.gta-burger { display: none; }
+.gta-rail-scrim { display: none; }
+@media (max-width: 760px) {
+  :root, html.gta-rail-collapsed { --gta-rail-w: 0px; }
+  body.gta-shell #container, body.gta-shell .main { padding-left: 0 !important; }
+
+  #nav-sidebar.gta-rail { width: min(320px, 86vw) !important; transform: translateX(-104%); transition: transform .22s ease; box-shadow: 0 0 40px rgba(0,0,0,.45); z-index: 60; }
+  html.gta-rail-open #nav-sidebar.gta-rail { transform: none; }
+  html.gta-rail-open #nav-sidebar .lbl, html.gta-rail-open #nav-sidebar .gta-rail-title, html.gta-rail-open #nav-sidebar .gta-word { display: revert !important; }
+  html.gta-rail-open #nav-sidebar a, html.gta-rail-open #nav-sidebar summary { justify-content: flex-start !important; padding: 11px 14px !important; }
+  .gta-rail-scrim { position: fixed; inset: 0; z-index: 55; background: rgba(6,20,14,.55); backdrop-filter: blur(2px); }
+  html.gta-rail-open .gta-rail-scrim { display: block; }
+  html.gta-rail-open, html.gta-rail-open body { overflow: hidden; }
+
+  .gta-burger { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--hairline-color); background: var(--gt-rail, #0F2E22); color: #fff; cursor: pointer; }
+  .gta-burger svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+  body.gta-shell #header { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; justify-content: space-between !important; padding: 0 12px !important; gap: 8px !important; height: 62px !important; }
+  body.gta-shell #header .gta-search { display: none !important; }
+  body.gta-shell #branding { order: 1 !important; margin: 0 !important; justify-content: flex-start !important; flex: 1 1 auto !important; }
+  body.gta-shell #user-tools { order: 3 !important; position: static !important; transform: none !important; display: flex !important; align-items: center !important; gap: 6px !important; margin: 0 0 0 auto !important; top: auto !important; padding: 0 !important; }
+  body.gta-shell #user-tools .gt-theme { transform: scale(.88); transform-origin: right center; }
+  body.gta-shell #branding { gap: 8px !important; min-width: 0; }
+  body.gta-shell #branding .gta-area { display: none; }
+  body.gta-shell #user-tools { margin-left: auto; }
+  body.gta-shell #user-tools .gta-acct-who, body.gta-shell #user-tools .gta-acct-chev { display: none; }
+  body.gta-shell #header .theme-toggle, body.gta-shell #header .gta-theme { transform: scale(.9); }
+
+  .gta-dash #content, #content { padding: 14px 12px 40px !important; }
+  .gd-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  .gd-kpis .gd-card { padding: 14px !important; min-width: 0; }
+  .gd-kpis .gd-card :is(b, strong, .gd-num) { font-size: clamp(26px, 8vw, 34px) !important; }
+  .gd-kpis .gd-card svg:not([class*="ic"]) { max-width: 100%; }
+
+  /* Django's own lists (changelists): the table slides sideways inside its
+     card with the first column pinned, instead of pushing the page wide. */
+  #changelist .results, #changelist-form .results { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  #changelist .actions { flex-wrap: wrap; }
+  #toolbar #changelist-search, #changelist-search input[type="text"] { max-width: 100%; }
+}
