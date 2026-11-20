@@ -2988,7 +2988,7 @@ body.gta-shell ul.gta-leaves > li::marker { content: none; }
   body.gta-shell .gx-table { width: max-content !important; min-width: 100% !important; border-collapse: separate; border-spacing: 0; font-size: 13px; }
   body.gta-shell .gx-table :is(th, td) { padding: 10px 12px !important; vertical-align: middle; }
   body.gta-shell .gx-table td { white-space: normal; max-width: 240px; }
-  body.gta-shell .gx-table :is(th, td):first-child { position: sticky; left: 0; z-index: 1; min-width: 150px; max-width: 46vw; box-shadow: 6px 0 8px -6px rgba(15,23,42,.18); background-clip: padding-box; }
+  body.gta-shell .gx-table :is(th, td):first-child { position: sticky; left: 0; z-index: 1; max-width: 46vw; box-shadow: 6px 0 8px -6px rgba(15,23,42,.18); background-clip: padding-box; }
   body.gta-shell .gx-table thead th:first-child { z-index: 3; }
   body.gta-shell .gx-table tbody tr:nth-child(odd) > td:first-child { background: #F3F6FB !important; }
   body.gta-shell .gx-table tbody tr:nth-child(even) > td:first-child { background: #EDF2F8 !important; }
@@ -3059,4 +3059,10 @@ body.gta-shell ul.gta-leaves > li::marker { content: none; }
   body.gta-shell .gta-media-tile .gmt-shot { aspect-ratio: 1 / 1 !important; height: auto !important; min-height: 0 !important; }
   body.gta-shell .gta-media-tile .gmt-meta b { font-size: 11px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
   body.gta-shell .gta-media-tile :is(.gmt-meta small, .gmt-tags) { display: none !important; }
+}
+/* Plans on a phone: names and prices fit their card. */
+@media (max-width: 760px) {
+  body.gta-shell .gx-plan-name { font-size: clamp(16px, 4.6vw, 20px) !important; overflow-wrap: anywhere; line-height: 1.15; }
+  body.gta-shell .gx-plan-price b, body.gta-shell .gx-plan-price strong { font-size: clamp(24px, 7vw, 30px) !important; }
+  body.gta-shell .gx-plan-price { white-space: nowrap; }
 }
