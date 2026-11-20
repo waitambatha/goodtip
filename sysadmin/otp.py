@@ -72,7 +72,7 @@ def is_verified(session) -> bool:
     return timezone.now() - when < SESSION_TTL
 
 
-def issue_and_send(user) -> bool:
+def issue_and_send(user, request=None) -> bool:
     """Email a fresh admin code. Returns whether it went.
 
     Failure is reported rather than swallowed: an admin staring at a code
@@ -87,7 +87,12 @@ def issue_and_send(user) -> bool:
         "admin_code",
         subject=f"{code} is your GoodTip admin code",
         to=user.email,
-        context={"user": user, "code": code, "ttl_minutes": int(LoginCode.TTL.total_seconds() // 60)},
+        context={
+            "user": user, "code": code, "ttl_minutes": int(LoginCode.TTL.total_seconds() // 60),
+            # One tap instead of six digits; only works in this signed-in
+            # session (accounts/code_links.py, sysadmin.views.admin_verify_link).
+            "link": _link(request, row, code),
+        },
     )
     if not sent:
         # In development mail is often not configured at all. The code is
@@ -95,6 +100,14 @@ def issue_and_send(user) -> bool:
         # an admin who cannot get in cannot fix the mail settings either.
         _echo_to_console(user, code)
     return sent
+
+
+def _link(request, row, code: str) -> str:
+    if request is None:
+        return ""
+    from accounts.code_links import make_url
+
+    return make_url(request, row, code, "sysadmin:admin_verify_link")
 
 
 def _echo_to_console(user, code: str) -> None:

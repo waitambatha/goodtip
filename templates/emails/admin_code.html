@@ -24,6 +24,10 @@ curiosity. The warning box says so plainly instead of offering the softer
   </p>
 
   {% include "emails/_bits.html" with bit="code" code=code minutes=ttl_minutes code_label="Your admin code" %}
+  {% if link %}
+  <p style="margin:14px 0 4px;font-size:13.5px;line-height:1.5;color:#4a4a41;text-align:center;">Or skip the code: tap below in the browser where you are signed in.</p>
+  {% include "emails/_bits.html" with bit="button" url=link label="Open the admin" %}
+  {% endif %}
 
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0 0;">
     <tr>

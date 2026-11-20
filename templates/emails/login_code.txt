@@ -5,7 +5,10 @@ finish setting up your account.{% else %}We received a request to sign in to you
 below to continue.{% endif %}
 
     {{ code }}
-
+{% if link %}
+Or skip the code and open this link on the device where you are signing in:
+{{ link }}
+{% endif %}
 This code expires in {{ minutes }} minutes.
 
 Did not request this? You can safely ignore this email. The code works only

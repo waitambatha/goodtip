@@ -36,7 +36,7 @@ def _echo_code_to_console(user, code: str, purpose: str) -> None:
     sys.stdout.flush()
 
 
-def send_login_code(user, code: str, purpose: str = LoginCode.PURPOSE_LOGIN) -> int:
+def send_login_code(user, code: str, purpose: str = LoginCode.PURPOSE_LOGIN, link: str = "") -> int:
     """Email a one-time code.
 
     Returns the number sent so the caller can tell the member the truth when
@@ -63,6 +63,8 @@ def send_login_code(user, code: str, purpose: str = LoginCode.PURPOSE_LOGIN) -> 
             "code": code,
             "purpose": purpose,
             "minutes": int(LoginCode.TTL.total_seconds() // 60),
+            # One tap instead of six digits — see accounts/code_links.py.
+            "link": link,
         },
     )
     return send_bulk([msg])

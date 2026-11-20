@@ -29,7 +29,7 @@ def admin_verify(request):
     # Issue on first arrival, not on every render — a reload should not
     # invalidate the code the person is currently typing in.
     if not request.session.get("admin_otp_sent"):
-        otp.issue_and_send(user)
+        otp.issue_and_send(user, request)
         request.session["admin_otp_sent"] = True
 
     error = ""
@@ -54,12 +54,43 @@ def admin_verify(request):
     })
 
 
+def admin_verify_link(request, token):
+    """The "Open the admin" button in the admin code email.
+
+    Works only for the staff member already signed in in THIS browser — the
+    same session the code screen is waiting in — so the link is never a way
+    into the control plane by itself. Checked before the code is tried, so a
+    link opened elsewhere (or by a mail scanner) never uses the code up.
+    """
+    from accounts.code_links import read
+    from accounts.models import LoginCode
+
+    user = request.user
+    if not user.is_authenticated or not (user.is_staff or user.is_superuser):
+        return redirect("/admin/login/")
+    if otp.is_verified(request.session):
+        return redirect(_target(request))
+    parsed = read(token, int(LoginCode.TTL.total_seconds()))
+    row = None
+    if parsed:
+        row = LoginCode.objects.filter(pk=parsed[0], purpose=LoginCode.PURPOSE_ADMIN, user=user).first()
+    if row is None or not row.verify(parsed[1]):
+        messages.error(request, "That link has expired or was already used. Enter the code, or send a new one.")
+        return redirect("sysadmin:admin_verify")
+    dest = _target(request)
+    request.session.pop("admin_otp_sent", None)
+    request.session.pop(otp.NEXT_KEY, None)
+    request.session.cycle_key()
+    otp.mark_verified(request.session)
+    return redirect(dest)
+
+
 @require_POST
 def admin_verify_resend(request):
     user = request.user
     if not user.is_authenticated or not (user.is_staff or user.is_superuser):
         return redirect("/admin/login/")
-    otp.issue_and_send(user)
+    otp.issue_and_send(user, request)
     messages.success(request, "A new code is on its way.")
     return redirect("sysadmin:admin_verify")
 

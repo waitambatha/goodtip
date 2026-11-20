@@ -11,5 +11,6 @@ urlpatterns = [
     # would have to be special-cased in two places instead of one.
     path("verify/", views.admin_verify, name="admin_verify"),
     path("verify/resend/", views.admin_verify_resend, name="admin_verify_resend"),
+    path("verify/link/<str:token>/", views.admin_verify_link, name="admin_verify_link"),
     path("verify/cancel/", views.admin_verify_cancel, name="admin_verify_cancel"),
 ]

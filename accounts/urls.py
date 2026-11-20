@@ -10,6 +10,7 @@ urlpatterns = [
     path("signup/photo/", views.welcome_photo_view, name="welcome_photo"),
     path("login/", views.login_view, name="login"),
     path("verify/", views.verify_view, name="verify"),
+    path("verify/link/<str:token>/", views.verify_link_view, name="verify_link"),
     path("logout/", views.logout_view, name="logout"),
     path("htmx/countdown/<int:org_id>/", views.dashboard_countdown_partial, name="dashboard_countdown"),
     path("dashboard/pin/", views.pin_series, name="pin_series"),

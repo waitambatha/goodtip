@@ -160,8 +160,10 @@ PENDING_NEXT_KEY = "pending_2fa_next"
 
 def _start_verification(request, user, purpose, next_url=""):
     """Park the sign-in and email a code. Returns the redirect to the code page."""
-    _, code = LoginCode.issue(user, purpose=purpose)
-    sent = send_login_code(user, code, purpose=purpose)
+    row, code = LoginCode.issue(user, purpose=purpose)
+    from .code_links import make_url
+    link = make_url(request, row, code, "accounts:verify_link")
+    sent = send_login_code(user, code, purpose=purpose, link=link)
     request.session[PENDING_USER_KEY] = user.pk
     request.session[PENDING_PURPOSE_KEY] = purpose
     request.session[PENDING_NEXT_KEY] = next_url or ""
@@ -246,23 +248,7 @@ def verify_view(request):
                     "Send yourself a new one.",
                 )
             elif row.verify(form.cleaned_data["code"]):
-                next_url = request.session.get(PENDING_NEXT_KEY) or ""
-                _clear_pending(request)
-                if purpose == LoginCode.PURPOSE_SIGNUP and not user.email_verified_at:
-                    user.email_verified_at = timezone.now()
-                    user.save(update_fields=["email_verified_at"])
-                # Backend is explicit because there's no authenticate() call
-                # on this path to have set one.
-                login(request, user, backend="accounts.backends.EmailBackend")
-                joined = _consume_pending_join(request)
-                if purpose == LoginCode.PURPOSE_SIGNUP:
-                    request.session[POST_SIGNUP_NEXT_KEY] = (
-                        next_url or post_join_redirect(joined).url
-                    )
-                    return redirect("accounts:welcome_photo")
-                if joined is not None:
-                    return post_join_redirect(joined)
-                return HttpResponseRedirect(next_url or reverse("dashboard"))
+                return _finish_verification(request, user, purpose)
             else:
                 left = max(0, LoginCode.MAX_ATTEMPTS - row.attempts)
                 messages.error(
@@ -285,6 +271,63 @@ def verify_view(request):
         # the same number the page auto-submits on.
         "code_length": LoginCode.CODE_LENGTH,
     })
+
+
+def _finish_verification(request, user, purpose):
+    """The code (typed, or arriving by its link) checked out: sign them in."""
+    next_url = request.session.get(PENDING_NEXT_KEY) or ""
+    _clear_pending(request)
+    if purpose == LoginCode.PURPOSE_SIGNUP and not user.email_verified_at:
+        user.email_verified_at = timezone.now()
+        user.save(update_fields=["email_verified_at"])
+    # Backend is explicit because there's no authenticate() call on this path
+    # to have set one.
+    login(request, user, backend="accounts.backends.EmailBackend")
+    joined = _consume_pending_join(request)
+    if purpose == LoginCode.PURPOSE_SIGNUP:
+        request.session[POST_SIGNUP_NEXT_KEY] = (
+            next_url or post_join_redirect(joined).url
+        )
+        return redirect("accounts:welcome_photo")
+    if joined is not None:
+        return post_join_redirect(joined)
+    return HttpResponseRedirect(next_url or reverse("dashboard"))
+
+
+@never_cache
+def verify_link_view(request, token):
+    """The "Sign in" button in a code email: the code, delivered by a tap.
+
+    Only completes the sign-in in the browser that is part-way through it (the
+    one that typed the password) — see accounts/code_links.py for why. The
+    session check comes BEFORE the code is tried, so a link opened anywhere
+    else, or fetched by a mail scanner, never uses the code up.
+    """
+    from .code_links import read
+
+    parsed = read(token, int(LoginCode.TTL.total_seconds()))
+    pending = request.session.get(PENDING_USER_KEY)
+    if parsed is None:
+        messages.error(request, "That sign-in link has expired. Enter the code from the email, or send yourself a new one.")
+        return redirect("accounts:verify" if pending else "accounts:login")
+    row_id, code = parsed
+    row = LoginCode.objects.filter(
+        pk=row_id, purpose__in=(LoginCode.PURPOSE_LOGIN, LoginCode.PURPOSE_SIGNUP)
+    ).select_related("user").first()
+    if row is None or not pending or int(pending) != row.user_id:
+        messages.info(
+            request,
+            "Open the link in the same browser where you entered your password, "
+            "or type the code from the email there.",
+        )
+        return redirect("accounts:verify" if pending else "accounts:login")
+    purpose = request.session.get(PENDING_PURPOSE_KEY, LoginCode.PURPOSE_LOGIN)
+    if row.purpose != purpose or not row.user.is_active:
+        return redirect("accounts:verify")
+    if not row.verify(code):
+        messages.error(request, "That sign-in link has already been used or has expired. Send yourself a new code.")
+        return redirect("accounts:verify")
+    return _finish_verification(request, row.user, purpose)
 
 
 def _clear_pending(request):

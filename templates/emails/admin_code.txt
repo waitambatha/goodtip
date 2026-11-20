@@ -4,7 +4,10 @@ Someone signed in to a GoodTip staff account and is trying to open the admin
 control panel. Enter the code below to continue.
 
     {{ code }}
-
+{% if link %}
+Or skip the code and open this link on the device where you are signing in:
+{{ link }}
+{% endif %}
 This code expires in {{ ttl_minutes }} minutes.
 
 If this was not you, do not enter the code. Someone holds the password to a

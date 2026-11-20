@@ -54,6 +54,9 @@ class AdminOTPMiddleware:
         ):
             if path == exempt:
                 return False
+        # The code email's one-tap link checks the code itself.
+        if path.startswith(reverse("sysadmin:admin_verify") + "link/"):
+            return False
         user = getattr(request, "user", None)
         if user is None or not user.is_authenticated:
             return False        # the admin's own login page handles these

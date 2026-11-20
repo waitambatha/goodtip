@@ -38,6 +38,11 @@ image in the message and it carries no information.
   {% else %}
     {% include "emails/_bits.html" with bit="code" code=code minutes=minutes code_label="Your sign-in code" %}
   {% endif %}
+  {% if link %}
+  {% comment %}One tap instead of six digits. Works only in the browser where the password was typed (accounts/code_links.py).{% endcomment %}
+  <p style="margin:14px 0 4px;font-size:13.5px;line-height:1.5;color:#4a4a41;text-align:center;">Or skip the code: tap below on the device where you are signing in.</p>
+  {% if purpose == "signup" %}{% include "emails/_bits.html" with bit="button" url=link label="Confirm my email" %}{% else %}{% include "emails/_bits.html" with bit="button" url=link label="Sign in to GoodTip" %}{% endif %}
+  {% endif %}
 
   {% comment %}
   One box, not two. "Did not request this?" and "we will never ask you for
