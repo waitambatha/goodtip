@@ -1310,7 +1310,15 @@ body.ff-lock { overflow: hidden; }
 .sb-chips { display: flex; gap: 5px; justify-content: center; flex-wrap: wrap; margin-top: 14px; min-height: 22px; }
 .sb-chip { font-family: var(--mark); font-weight: 600; font-size: 11px; letter-spacing: .06em; padding: 3px 9px; border: 1px solid rgba(200,241,53,.4); color: var(--lime); border-radius: 100px; opacity: 0; transform: translateY(6px); }
 .sb-chip.lit { opacity: 1; transform: none; transition: opacity .35s var(--ease), transform .35s var(--ease); }
-@media (max-width: 560px) { .scoreboard { grid-template-columns: 1fr; } }
+/* Phones: two figures a row, the third spans the width; every cell centred. */
+@media (max-width: 560px) {
+  .scoreboard { grid-template-columns: 1fr 1fr; margin-top: 36px; }
+  .scoreboard .sb-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 18px 10px 16px; }
+  .scoreboard .sb-cell:last-child { grid-column: 1 / -1; }
+  .scoreboard .sb-label { text-align: center; font-size: 11px; letter-spacing: .08em; margin-top: 10px; }
+  .scoreboard .sb-ring, .scoreboard .sb-ring svg { width: 68px; height: 68px; }
+  .scoreboard .sb-ring .pct { font-size: 17px; }
+}
 
 /* ---------- HERO image backdrop + crossfade ---------- */
 .hero.has-shots { background: var(--deep-2); }
@@ -3225,7 +3233,7 @@ section.hw .s2 .step-icon, section.hw .s3 .step-icon { background: #FFFFFF; }
 
 /* app forms */
 .fld { margin-bottom: 16px; }
-.fld > label { display: block; font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 7px; }
+.fld > label, .fld > .fld-labelrow > label { display: block; font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 7px; }
 .fld input, .fld select, .fld textarea { width: 100%; padding: 12px 14px; background: #fff; border: 1px solid var(--app-line); border-radius: 10px; font-family: var(--body); font-size: 15px; color: var(--ink); outline: none; transition: border-color .15s var(--ease), box-shadow .15s var(--ease); }
 .fld input:focus, .fld select:focus, .fld textarea:focus { border-color: var(--forest); box-shadow: 0 0 0 3px rgba(45,122,58,.12); }
 .fld .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
@@ -31980,3 +31988,23 @@ html body .gtm { height: calc(var(--app-h, 100dvh) - var(--gt-navh, 68px)); }
 @media (max-width: 760px) {
   :is(.gx-tablewrap, .gt-tablewrap, .table-wrap, .atable-wrap) { overflow-y: hidden !important; }
 }
+
+/* ---- Public pages on phones (21 Nov 2026) ----
+   Pricing plan cards are white, each tier its own card with a coloured
+   top edge, not a cream gradient. Hero buttons on public pages stack at one
+   full width so a long label never makes a mismatched pair. */
+@media (max-width: 800px) {
+  .tier-table-wrap .tier-table { background: transparent; border: 0; }
+  .tier-table-wrap .tier-table tbody tr { background: #fff; border: 1px solid rgba(15,46,34,.12); border-top: 4px solid var(--forest); border-radius: 14px; overflow: hidden; margin-bottom: 14px; box-shadow: 0 10px 24px -18px rgba(15,46,34,.35); }
+  .tier-table-wrap .tier-table tbody tr.is-popular { border-top-color: var(--lime); }
+  .tier-table-wrap .tier-table tbody tr td,
+  .tier-table-wrap .tier-table tbody tr:nth-of-type(n) td { background: #fff; }
+  .tier-table-wrap .tier-table tbody tr td:first-child { box-shadow: none; }
+}
+@media (max-width: 560px) {
+  .page-hero .hero-ctas, .hs-left .hero-ctas { flex-direction: column; align-items: stretch; }
+  .page-hero .hero-ctas > a, .hs-left .hero-ctas > a { width: 100%; justify-content: center; text-align: center; box-sizing: border-box; white-space: nowrap; font-size: 13px; letter-spacing: .06em; padding-left: 14px; padding-right: 14px; gap: 10px; }
+}
+/* Sponsorship and News: white ground under the hero, not cream. */
+.section.is-white.is-white { background: #fff; }
+.section.is-white + .section.is-white { border-top: 1px solid rgba(15,46,34,.08); }
