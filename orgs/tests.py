@@ -6264,17 +6264,14 @@ class MessageEditAndDeleteTests(TestCase):
         self.assertTrue(entry.can_remove)
 
 
-class MessagesFollowContextTests(TestCase):
-    """Opening a conversation moves you into its organisation.
+class MessagesNeverSwitchOrganisationTests(TestCase):
+    """Reading or answering a message leaves you where you were.
 
-    "When I click, let's say, Masterclass, the message should change now for
-    me to be into Masterclass — or an organisation and group — irrespective of
-    where I am currently."
-
-    Opening one always WORKED from anywhere; what did not happen is the bar
-    following you, so you could be reading the Masterclass room with "Net
-    Providers" written above it. On this screen that matters more than
-    elsewhere: the next thing you do is type into a room.
+    Client, 22 Nov 2026: "If I am in masterclass and I'm in the messages and I
+    reply to maybe a message or view or enter that message of another
+    organisation, it should not change automatically ... let me remain in the
+    organisation that I used the dropdown at the top." Reverses the Sep 2026
+    rule that opening a conversation moved you into it.
     """
 
     def setUp(self):
@@ -6298,43 +6295,127 @@ class MessagesFollowContextTests(TestCase):
 
         return (self.client.session.get(ORG_KEY), self.client.session.get(GROUP_KEY))
 
-    def test_opening_an_organisation_room_moves_you_into_it(self):
+    def _stand_in_b(self):
         self.client.post(reverse("orgs:switch_org", args=[self.b.id]))
-        self.assertEqual(self._where()[0], self.b.id)
+        self.assertEqual(self._where(), (self.b.id, None))
+
+    def test_opening_an_organisation_room_does_not_move_you(self):
+        self._stand_in_b()
         self.client.get(reverse("orgs:message_room", args=[self.a.id]), follow=True)
-        self.assertEqual(self._where()[0], self.a.id)
+        self.assertEqual(self._where(), (self.b.id, None))
 
-    def test_opening_a_group_room_steps_into_the_group(self):
-        self.client.post(reverse("orgs:switch_org", args=[self.b.id]))
+    def test_opening_a_group_room_does_not_step_into_the_group(self):
+        self._stand_in_b()
         self.client.get(
             reverse("orgs:message_group_room", args=[self.a.id, self.group.id]), follow=True,
         )
-        self.assertEqual(self._where(), (self.a.id, self.group.id))
+        self.assertEqual(self._where(), (self.b.id, None))
 
-    def test_a_direct_message_moves_the_organisation_but_not_the_group(self):
-        """A direct message is not a reason to step out of a group you are
-        tipping in — you are already in the right organisation."""
-        from .context import set_current_group
-
+    def test_a_group_room_in_your_own_organisation_does_not_change_where_you_tip(self):
+        self.client.post(reverse("orgs:switch_org", args=[self.a.id]))
         self.client.get(
             reverse("orgs:message_group_room", args=[self.a.id, self.group.id]), follow=True,
         )
-        self.assertEqual(self._where(), (self.a.id, self.group.id))
+        self.assertEqual(self._where(), (self.a.id, None))
+
+    def test_a_direct_message_does_not_move_you(self):
+        self._stand_in_b()
+        self.client.get(reverse("orgs:message_direct", args=[self.a.id, self.mate.id]), follow=True)
+        self.assertEqual(self._where(), (self.b.id, None))
+
+    def test_a_direct_message_keeps_the_group_you_are_tipping_in(self):
+        self.client.post(reverse("orgs:switch_group", args=[self.a.id, self.group.id]))
         self.client.get(reverse("orgs:message_direct", args=[self.a.id, self.mate.id]), follow=True)
         self.assertEqual(self._where(), (self.a.id, self.group.id))
 
-    def test_the_poll_does_not_write_the_session(self):
-        """The conversation refreshes every twelve seconds. Writing where you
-        are on each of those is a database write per viewer per tick to record
-        something that has not changed."""
+    def test_replying_does_not_move_you(self):
         from .services import org_room
 
         room = org_room(self.a)
-        self.client.post(reverse("orgs:switch_org", args=[self.b.id]))
+        self._stand_in_b()
+        self.client.post(
+            reverse("orgs:member_message_thread", args=[self.a.id, room.id]),
+            {"body": "On my way"}, follow=True,
+        )
+        self.assertTrue(room.messages.filter(body="On my way").exists())
+        self.assertEqual(self._where(), (self.b.id, None))
+
+    def test_the_poll_does_not_write_the_session(self):
+        from .services import org_room
+
+        room = org_room(self.a)
+        self._stand_in_b()
         self.client.get(
             reverse("orgs:member_message_thread", args=[self.a.id, room.id]) + "?pane=chat"
         )
-        self.assertEqual(self._where()[0], self.b.id)
+        self.assertEqual(self._where(), (self.b.id, None))
+
+    def test_another_organisations_wall_does_not_move_you(self):
+        self._stand_in_b()
+        self.assertEqual(self.client.get(reverse("orgs:wall", args=[self.a.id])).status_code, 200)
+        self.assertEqual(self._where(), (self.b.id, None))
+
+    def test_the_menu_still_points_at_the_organisation_you_picked(self):
+        from .services import org_room
+
+        room = org_room(self.a)
+        self._stand_in_b()
+        body = self.client.get(
+            reverse("orgs:member_message_thread", args=[self.a.id, room.id])
+        ).content.decode()
+        self.assertIn(reverse("tipping:my_tips", args=[self.b.id]), body)
+        self.assertNotIn(reverse("tipping:my_tips", args=[self.a.id]), body)
+
+    def test_the_dropdown_still_switches_from_inside_a_conversation(self):
+        """And lands on that organisation's inbox — the thread's id is a 404
+        under any other organisation."""
+        from .services import org_room
+
+        room = org_room(self.a)
+        self.client.post(reverse("orgs:switch_org", args=[self.a.id]))
+        resp = self.client.post(
+            reverse("orgs:switch_org", args=[self.b.id]),
+            {"next": reverse("orgs:member_message_thread", args=[self.a.id, room.id])},
+        )
+        self.assertEqual(resp["Location"], reverse("orgs:member_messages", args=[self.b.id]))
+        self.assertEqual(self._where(), (self.b.id, None))
+
+
+class AdminOpensWhereYouStandTests(TestCase):
+    """/manage/ follows the organisation picked at the top, not the busiest."""
+
+    def setUp(self):
+        from orgs.models import MessageThread
+
+        season = Season.objects.create(year=2091, label="2091")
+        self.me = get_user_model().objects.create_user(
+            email="boss@stand.com", password="x", display_name="Boss",
+        )
+        self.quiet = Organisation.objects.create(name="Zed Quiet", season=season, created_by=self.me)
+        self.busy = Organisation.objects.create(name="Alpha Busy", season=season, created_by=self.me)
+        for org in (self.quiet, self.busy):
+            OrgMember.objects.create(user=self.me, org=org, is_league_owner=True)
+        MessageThread.objects.create(
+            org=self.busy, kind=MessageThread.KIND_RAISED, subject="Help",
+            started_by=self.me, status=MessageThread.STATUS_OPEN,
+        )
+        self.client.force_login(self.me)
+        self.client.post(reverse("orgs:switch_org", args=[self.quiet.id]))
+
+    def test_messages_open_on_the_organisation_you_picked(self):
+        self.assertEqual(self.client.get(reverse("manage:messages")).context["org"], self.quiet)
+
+    def test_prefect_opens_on_the_organisation_you_picked(self):
+        self.assertEqual(self.client.get(reverse("manage:prefect")).context["org"], self.quiet)
+
+    def test_an_explicit_pick_still_wins(self):
+        resp = self.client.get(reverse("manage:messages") + f"?org={self.busy.id}")
+        self.assertEqual(resp.context["org"], self.busy)
+
+    def test_the_admins_list_switches_with_a_post(self):
+        body = self.client.get(reverse("manage:messages")).content.decode()
+        self.assertIn(f'data-switch-org="{reverse("orgs:switch_org", args=[self.busy.id])}"', body)
+        self.assertIn("data-switch-org-form", body)
 
 
 class RoleIsVisibleWhereYouSwitchTests(TestCase):
@@ -6696,10 +6777,9 @@ class OpeningARoomDoesNotReloadTheScreenTests(TestCase):
         self.assertIn("gtm-chat-in", body)
         self.assertNotIn("gtm-paper", body)
 
-    def test_reading_a_room_this_way_still_moves_you_into_it(self):
-        """_follow_context runs on the fragment path as well, or the sidebar
-        and the nav chip would describe a different organisation from the
-        conversation on screen."""
+    def test_reading_a_room_this_way_does_not_move_you(self):
+        """The fragment path follows the same rule as the full page: reading
+        is not switching."""
         from .context import ORG_KEY
 
         other = Organisation.objects.create(name="Elsewhere", season=self.season)
@@ -6708,7 +6788,7 @@ class OpeningARoomDoesNotReloadTheScreenTests(TestCase):
         self.client.get(
             reverse("orgs:message_room", args=[self.org.id]) + "?pane=room",
         )
-        self.assertEqual(self.client.session.get(ORG_KEY), self.org.id)
+        self.assertEqual(self.client.session.get(ORG_KEY), other.id)
 
 
 class SendingAMessageIsNotANavigationTests(TestCase):

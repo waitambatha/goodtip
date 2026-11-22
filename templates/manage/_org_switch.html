@@ -4,13 +4,13 @@
   <header class="osw-head"><b>Your organisations</b>{% if org_tabs %}<span>The number is what's {{ switch_what }}</span>{% endif %}</header>
   <div class="osw-grid">
     {% if org_tabs %}{% for t in org_tabs %}
-    <a href="?org={{ t.org.id }}" class="osw-org{% if t.org.id == org.id %} on{% endif %}{% if t.n %} has-n{% endif %}"{% if t.org.id == org.id %} aria-current="page"{% endif %}>
+    <a href="?org={{ t.org.id }}" data-switch-org="{% url 'orgs:switch_org' t.org.id %}" class="osw-org{% if t.org.id == org.id %} on{% endif %}{% if t.n %} has-n{% endif %}"{% if t.org.id == org.id %} aria-current="page"{% endif %}>
       <span class="og-badge">{% if t.org.logo %}<img src="{{ t.org.logo.url }}" alt="">{% else %}{{ t.org.name|slice:":2"|upper }}{% endif %}</span>
       <span class="osw-name">{{ t.org.name }}</span>
       {% if t.n %}<span class="osw-n" aria-label="{{ t.n }} {{ switch_what }}">{{ t.n }}</span>{% endif %}
     </a>
     {% endfor %}{% else %}{% for o in orgs %}
-    <a href="?org={{ o.id }}" class="osw-org{% if o.id == org.id %} on{% endif %}"><span class="og-badge">{{ o.name|slice:":2"|upper }}</span><span class="osw-name">{{ o.name }}</span></a>
+    <a href="?org={{ o.id }}" data-switch-org="{% url 'orgs:switch_org' o.id %}" class="osw-org{% if o.id == org.id %} on{% endif %}"><span class="og-badge">{{ o.name|slice:":2"|upper }}</span><span class="osw-name">{{ o.name }}</span></a>
     {% endfor %}{% endif %}
   </div>
 </section>

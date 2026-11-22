@@ -32,7 +32,7 @@ address and reloads to itself.
       <tbody>
       {% for o in orgs %}
       <tr>
-        <td class="is-name"><a class="og-trow" href="{% url 'manage:org_home' o.id %}"><span class="og-badge">{% if o.logo %}<img src="{{ o.logo.url }}" alt="">{% else %}{{ o.name|slice:":2"|upper }}{% endif %}</span><b>{{ o.name }}</b></a></td>
+        <td class="is-name"><a class="og-trow" href="{% url 'manage:org_home' o.id %}" data-switch-org="{% url 'orgs:switch_org' o.id %}"><span class="og-badge">{% if o.logo %}<img src="{{ o.logo.url }}" alt="">{% else %}{{ o.name|slice:":2"|upper }}{% endif %}</span><b>{{ o.name }}</b></a></td>
         <td><b class="mc-num">{{ o.n_members }}</b></td>
         <td>{{ o.competitions.all|length }}</td>
         <td>{{ o.charity.name|default:"Not chosen" }}</td>

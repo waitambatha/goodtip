@@ -459,7 +459,7 @@ gt-messages.js and the .gtm-page media queries.
         three tabs on the left. Open one and say something.
       </p>
       <div class="gtm-empty-acts">
-        <a class="gtm-empty-primary" href="{% url 'orgs:message_room' org.id %}">Open {{ org.name }}</a>
+        {% firstof current_org.id org.id as home_id %}<a class="gtm-empty-primary" href="{% url 'orgs:message_room' home_id %}">Open {% firstof current_org.name org.name %}</a>
         <button type="button" class="gtm-empty-ghost" data-gtm-new>Message one person &rarr;</button>
       </div>
     </div>

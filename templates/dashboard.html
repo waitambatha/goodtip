@@ -26,8 +26,10 @@ stacking context, so a strip rendered inside it paints over the sheet.
   <div class="card pad-lg" style="text-align:center;">
     <div class="card-h" style="font-size:20px;">You're not in an organisation yet</div>
     <p class="card-lead" style="margin:6px 0 18px;">Start your own, find your organisation, or ask an organisation manager for a join link.</p>
-    <a href="{% url 'orgs:create' %}" data-coach="create-org" class="abtn abtn-primary abtn-lg">Create an organisation</a>
-    <a href="{% url 'orgs:search' %}" data-coach="find-org" class="abtn abtn-ghost abtn-lg">Find your organisation</a>
+    <div class="dn-acts">
+      <a href="{% url 'orgs:create' %}" data-coach="create-org" class="abtn abtn-primary abtn-lg">Create an organisation</a>
+      <a href="{% url 'orgs:search' %}" data-coach="find-org" class="abtn abtn-ghost abtn-lg">Find your organisation</a>
+    </div>
   </div>
 
   {% if preview_round %}

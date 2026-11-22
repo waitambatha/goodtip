@@ -28,15 +28,21 @@ they do not use.
 {% endcomment %}
 {% block bodyclass %}{% if user.is_authenticated and user.is_staff and is_nav_sidebar_enabled and not is_popup %}gta-shell{% endif %}{% endblock %}
 
+{% comment %}
+Django's theme.js is deliberately not loaded: it would restore Light or Auto.
+See partials/_theme.html.
+{% endcomment %}
+{% block dark-mode-vars %}
+<link rel="stylesheet" href="{% static "admin/css/dark_mode.css" %}">
+{% include "partials/_theme.html" %}
+{% endblock %}
+
 {% block extrastyle %}
 {{ block.super }}
 {% include "partials/_fonts.html" %}
 <link rel="stylesheet" href="{% static 'css/admin.css' %}">
 <link rel="stylesheet" href="{% static 'gtadmin/css/gtadmin.css' %}">
-{% comment %}
-After gtadmin.css on purpose: it carries the theme switch's labelled pill,
-which has to out-rank the skin's own `#user-tools .theme-toggle` circle.
-{% endcomment %}
+{% comment %}After gtadmin.css on purpose: it out-ranks parts of that skin.{% endcomment %}
 <link rel="stylesheet" href="{% static 'css/gt-admin.css' %}">
 <script>
   /* Restore the menu's collapsed state before first paint. Doing this from a
@@ -60,6 +66,7 @@ not a table's, where the rules that use it fall back to the brand green.
 <script src="{% static 'gtadmin/js/gt-rail.js' %}" defer></script>
 <script src="{% static 'gtadmin/js/gt-palette.js' %}" defer></script>
 {% include "partials/_favicon.html" %}
+{% include "partials/_no_focus_zoom.html" %}
 {% endblock %}
 
 {% comment %}
@@ -72,7 +79,6 @@ follows the setting rather than guessing from the Host header.
 {% if user.is_authenticated and user.is_staff %}<button type="button" class="gta-burger" data-rail-open aria-label="Open the menu" aria-controls="nav-sidebar" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>{% endif %}
 <span class="gta-env{% if is_staging %} on{% endif %}">{% if is_staging %}Staging{% else %}Live{% endif %}</span>
 <span class="gta-area">Control plane</span>
-{% if user.is_anonymous %}{% include "admin/color_theme_toggle.html" %}{% endif %}
 {% endblock %}
 
 {% block welcome-msg %}{% endblock %}
@@ -97,7 +103,6 @@ only finds the word "Members" is worse than no box.
 {% endblock %}
 
 {% block userlinks %}
-{% include "admin/color_theme_toggle.html" %}
 {% comment %}
 THE ACCOUNT MENU.
 
@@ -232,6 +237,12 @@ that they were not given that job.
   </div>
 
   <div class="gta-rail-scroll">
+    {% comment %}On a phone the drawer is the menu, so leaving is at its top. Laptops have it in the account menu.{% endcomment %}
+    <form method="post" action="{% url 'admin:logout' %}" class="gta-rail-out">
+      {% csrf_token %}
+      <span><b>{% firstof user.display_name user.get_username %}</b><small>{% if user.is_superuser %}Superuser{% else %}Staff{% endif %}</small></span>
+      <button type="submit">{% translate 'Sign out' %}</button>
+    </form>
     <ul class="gta-nav">
       <li><a href="{{ u_index }}" class="gta-nav-a{% if request.path == u_index %} on{% endif %}" data-jump="Dashboard">
         <svg class="ic"><use href="#ic-home"/></svg><span class="lbl">Dashboard</span></a></li>

@@ -70,8 +70,13 @@ unchanged.
       <li class="nav-tuck"><a href="/privacy/" {% if active == 'privacy' %}aria-current="page"{% endif %}><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Privacy</span></a></li>
 
       <li class="nav-sep" aria-hidden="true"></li>
+      {% if user.is_authenticated and not is_holding %}
+      <li class="nav-auth"><a href="{% url 'accounts:logout' %}" class="nav-login"><svg class="nav-ic" aria-hidden="true"><use href="#ic-logout"/></svg><span>Sign out</span></a></li>
+      <li class="nav-auth"><a href="{% url 'dashboard' %}" class="btn-nav"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-home"/></svg><span>Dashboard</span></a></li>
+      {% else %}
       <li class="nav-auth"><a href="/login/" class="nav-login"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-login"/></svg><span>Log in</span></a></li>
       <li class="nav-auth"><a href="/signup/" class="btn-nav"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-people"/></svg><span>Sign up free</span></a></li>
+      {% endif %}
     </ul>
   </div>
 </nav>

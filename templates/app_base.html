@@ -8,18 +8,10 @@
   <title>{% block title %}GoodTip{% endblock %}</title>
   <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
   {% include "partials/_favicon.html" %}
+  {% include "partials/_no_focus_zoom.html" %}
   {% include "partials/_fonts.html" %}
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
-  <script>
-    /* The theme, before anything is painted. Restoring it from a deferred
-       script instead would mean every light-theme page load starts with a
-       full flash of the deep green. Same key and same attribute /admin/ and
-       the HQ shell use, so a choice carries between all three in both
-       directions — see partials/_app_theme_switch.html. */
-    try {
-      document.documentElement.dataset.theme = localStorage.getItem("theme") || "auto";
-    } catch (e) {}
-  </script>
+  {% include "partials/_theme.html" %}
   {# vendored: unpkg was a blocking third-party round-trip on every page load #}
   <script src="{% static 'js/htmx-1.9.12.min.js' %}" defer></script>
   <script src="{% static 'js/gt-ui.js' %}" defer></script>
@@ -41,12 +33,8 @@
 </head>
 {% comment %}
 `gt-app` marks the member app, and only the member app. /admin/, /manage/ and
-the HQ shell share this file's `app` and `gt-v2` classes and the same
-localStorage theme key, but their light palette is the one they are designed
-for and lives in gt-shell.css. The member app's light theme is a different
-palette on the same key, so every rule in it hangs off this class rather than
-off [data-theme="light"] alone — see THE MEMBER APP'S LIGHT THEME in
-goodtip.css.
+the HQ shell share this file's `app` and `gt-v2` classes, so rules meant for
+the member app alone hang off this class.
 {% endcomment %}
 <body class="app gt-app gt-v2 {% block body_class %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   {% include "public/partials/_icons.html" %}
@@ -356,13 +344,6 @@ goodtip.css.
           </div>
         </div>
         {% comment %}
-        The theme switch sits ahead of the icon set rather than among it: it is
-        a segmented control, not a 40px target, and dropping it into that
-        rhythm would break the thing the comment below is about. It disappears
-        at the widths where the bar is tight — the mobile menu carries a copy.
-        {% endcomment %}
-        {% include "partials/_app_theme_switch.html" %}
-        {% comment %}
         Three icon buttons on one rhythm — notifications, you, and the way out.
         Each is the same round 40px target with the same hover, so the corner
         reads as one set of controls instead of a bell, then a pill, then a
@@ -526,22 +507,15 @@ goodtip.css.
       {% endif %}
       {% if user.is_staff %}<a href="{% url 'manage:overview' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Admin</span></a>{% endif %}
       {% endif %}
-      </div>
       {% comment %}
-      The theme switch again, because the bar's copy is hidden at the widths
-      where this panel exists — and a phone is where somebody is most likely to
-      want the light one.
+      A tile with the others (client, 22 Nov 2026: "it needs to be there for
+      quick access"). It used to be pinned to the foot of the panel, which on
+      a real phone is behind the browser's own bar.
       {% endcomment %}
-      <div class="sheet-theme">
-        <span class="sheet-label">Colour</span>
-        {% include "partials/_app_theme_switch.html" %}
+      {% if is_holding %}<span class="an-navlink sheet-out"><svg class="an-ic" aria-hidden="true"><use href="#ic-logout"/></svg><span>Sign out</span></span>
+      {% else %}<a href="{% url 'accounts:logout' %}" class="sheet-out"><svg class="an-ic" aria-hidden="true"><use href="#ic-logout"/></svg><span>Sign out</span></a>{% endif %}
       </div>
       {# Profile is the header — a second row for it would point at the panel's own top #}
-      {% if is_holding %}
-      <span class="sheet-logout"><svg class="an-ic" aria-hidden="true"><use href="#ic-logout"/></svg><span>Log out</span></span>
-      {% else %}
-      <a href="{% url 'accounts:logout' %}" class="sheet-logout"><svg class="an-ic" aria-hidden="true"><use href="#ic-logout"/></svg><span>Log out</span></a>
-      {% endif %}
     </div>
   </div>
 

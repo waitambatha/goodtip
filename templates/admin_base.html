@@ -7,6 +7,7 @@
   <title>{% block title %}Manage &middot; GoodTip{% endblock %}</title>
   <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
   {% include "partials/_favicon.html" %}
+  {% include "partials/_no_focus_zoom.html" %}
   {% include "partials/_fonts.html" %}
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
   {% comment %}
@@ -16,17 +17,7 @@
   the hero stay exactly as they were.
   {% endcomment %}
   <link rel="stylesheet" href="{% static 'css/gt-shell.css' %}">
-  <script>
-    /* The theme, before first paint. This area shares the key and the
-       attribute with /admin/ and the HQ shell, and it always did — what it did
-       NOT do until now was restore it early or offer a way to change it, so a
-       Dark chosen in /admin/ arrived here as a half-applied palette with no
-       control anywhere to undo it. See gt-shell.css, "/manage/ ON THE DARK
-       PALETTE". */
-    try {
-      document.documentElement.dataset.theme = localStorage.getItem("theme") || "auto";
-    } catch (e) {}
-  </script>
+  {% include "partials/_theme.html" %}
   <script src="{% static 'js/gt-ui.js' %}" defer></script>
   {% comment %}
   Manage runs real work — syncing a round, emailing every member, deleting a
@@ -82,7 +73,6 @@
         <span hidden>{% block nav_messages %}{% endblock %}{% block nav_charity %}{% endblock %}</span>
       </div>
       <div class="an-right">
-        {% include "partials/_app_theme_switch.html" %}
         {% if user.is_superuser %}<a href="/admin/" class="an-backpill" title="GoodTip HQ (system admin)"><svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2"><use href="#ic-shield-star"/></svg><span>GoodTip HQ</span></a>{% endif %}
         <a href="{% url 'dashboard' %}" class="an-backpill" title="Back to app"><svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2"><use href="#ic-arrow-left"/></svg><span>Back to app</span></a>
         {% comment %}
@@ -137,12 +127,8 @@
         <a href="{% url 'manage:prefect' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-f-shield"/></svg><span>Prefect</span>{% if prefect_open_count %}<span class="an-count">{{ prefect_open_count }}</span>{% endif %}</a>
         {% if user.is_superuser %}<a href="/admin/"><svg class="an-ic" aria-hidden="true"><use href="#ic-shield-star"/></svg><span>GoodTip HQ</span></a>{% endif %}
         <a href="{% url 'dashboard' %}"><svg class="an-ic" aria-hidden="true"><use href="#ic-arrow-left"/></svg><span>Back to app</span></a>
+        <a href="{% url 'accounts:logout' %}" class="sheet-out"><svg class="an-ic" aria-hidden="true"><use href="#ic-logout"/></svg><span>Sign out</span></a>
       </div>
-      <div class="sheet-theme">
-        <span class="sheet-label">Colour</span>
-        {% include "partials/_app_theme_switch.html" %}
-      </div>
-      <a href="{% url 'accounts:logout' %}" class="sheet-logout"><svg class="an-ic" aria-hidden="true"><use href="#ic-logout"/></svg><span>Log out</span></a>
     </div>
   </div>
 
@@ -248,5 +234,27 @@
       btn.addEventListener('click', function(){ var t=document.querySelector(btn.getAttribute('data-copy')); if(!t)return; var v=t.value!==undefined?t.value:t.textContent; if(navigator.clipboard)navigator.clipboard.writeText(v); var o=btn.innerHTML; btn.innerHTML='Copied &#10003;'; setTimeout(function(){btn.innerHTML=o;},1500); });
     });
   })();</script>
+  {% comment %}
+  Picking from a list of your organisations is switching (client, 22 Nov
+  2026: "then it auto changes everything. That is me selecting it"). The
+  switch is a POST, so the link hands its click to this form; opened in a new
+  tab it is a plain link and switches nothing. Capture, so a row's own click
+  handler cannot navigate first.
+  {% endcomment %}
+  <form method="post" hidden data-switch-org-form>{% csrf_token %}<input type="hidden" name="next"></form>
+  <script>
+  (function () {
+    var form = document.querySelector('[data-switch-org-form]');
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[data-switch-org]');
+      if (!a || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      form.action = a.getAttribute('data-switch-org');
+      form.elements.next.value = a.pathname + a.search;
+      form.submit();
+    }, true);
+  })();
+  </script>
 </body>
 </html>

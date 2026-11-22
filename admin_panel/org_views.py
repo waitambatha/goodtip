@@ -13,6 +13,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
+from orgs.context import current_org
 from orgs.models import Message, MessageThread, OrgMember, Organisation
 from orgs.notifications import notify_new_message
 # The two ends of a thread read and write it the same way, so the logic lives
@@ -32,9 +33,11 @@ def _org_tabs(mine, counts):
 
 
 def _busiest(request, mine, counts):
-    """With no ?org= the page opens on whichever organisation has the most
-    waiting, rather than alphabetically first with nothing to show."""
-    if request.GET.get("org") or request.POST.get("org") or not counts:
+    """With no ?org= the page opens on the organisation picked at the top
+    (client, 22 Nov 2026: it "changes for me the organisation"). Only someone
+    standing in one they don't run gets the one with the most waiting. The
+    others' counts are on the switcher either way."""
+    if request.GET.get("org") or request.POST.get("org") or not counts or _standing_in(request, mine):
         return _pick_org(request, mine)
     best = max(counts, key=counts.get)
     return mine.filter(pk=best).first() or _pick_org(request, mine)
@@ -44,8 +47,9 @@ def _pick_org(request, mine):
     """Which organisation the page is about.
 
     Most people run exactly one, so asking every time would be noise. `?org=`
-    picks when there are several; otherwise the first. Always resolved against
-    `mine`, so the parameter cannot reach somebody else's organisation.
+    picks when there are several; otherwise the one picked at the top, or the
+    first if that is not one they run. Always resolved against `mine`, so the
+    parameter cannot reach somebody else's organisation.
     """
     requested = request.GET.get("org") or request.POST.get("org")
     if requested:
@@ -53,7 +57,13 @@ def _pick_org(request, mine):
         if org is None:
             raise Http404("No organisation matches the given query.")
         return org
-    return mine.first()
+    return _standing_in(request, mine) or mine.first()
+
+
+def _standing_in(request, mine):
+    """The organisation picked at the top, when it is one they run."""
+    here = current_org(request)
+    return mine.filter(pk=here.pk).first() if here else None
 
 
 # ---------------------------------------------------------------------------

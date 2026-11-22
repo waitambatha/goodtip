@@ -150,13 +150,14 @@ selling a switch for the sake of it.
 
 <div class="grp2" data-grp2>
   <nav class="gx-tabs grp-tabs" role="tablist" aria-label="Groups">
-    <button type="button" role="tab" class="gx-tab" data-grp-tab="all">All groups <em>{{ group_total }}</em></button>
-    <button type="button" role="tab" class="gx-tab" data-grp-tab="mine">Your groups <em>{{ my_count }}</em></button>
-    {% if is_admin and pending_count %}<button type="button" role="tab" class="gx-tab" data-grp-tab="waiting">Waiting <em class="is-warn">{{ pending_count }}</em></button>{% endif %}
-    <button type="button" role="tab" class="gx-tab" data-grp-tab="new">Start a group</button>
-    <button type="button" role="tab" class="gx-tab" data-grp-tab="plan">Plan</button>
-    {% if is_admin %}<button type="button" role="tab" class="gx-tab" data-grp-tab="settings">Settings</button>{% endif %}
+    <button type="button" role="tab" class="gx-tab" data-grp-tab="all" data-hint="Every group in {{ org.name }}."><svg class="grp-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span class="grp-tab-full">All groups</span><span class="grp-tab-short" aria-hidden="true">All</span> <em>{{ group_total }}</em></button>
+    <button type="button" role="tab" class="gx-tab" data-grp-tab="mine" data-hint="The groups you're in."><svg class="grp-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v1"/></svg><span class="grp-tab-full">Your groups</span><span class="grp-tab-short" aria-hidden="true">Mine</span> <em>{{ my_count }}</em></button>
+    {% if is_admin and pending_count %}<button type="button" role="tab" class="gx-tab" data-grp-tab="waiting" data-hint="New groups waiting for an admin to approve."><svg class="grp-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="grp-tab-full">Waiting</span><span class="grp-tab-short" aria-hidden="true">Waiting</span> <em class="is-warn">{{ pending_count }}</em></button>{% endif %}
+    <button type="button" role="tab" class="gx-tab" data-grp-tab="new" data-hint="Start a new group."><svg class="grp-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span class="grp-tab-full">Start a group</span><span class="grp-tab-short" aria-hidden="true">New</span></button>
+    <button type="button" role="tab" class="gx-tab" data-grp-tab="plan" data-hint="What your plan allows for groups."><svg class="grp-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19"/></svg><span class="grp-tab-full">Plan</span><span class="grp-tab-short" aria-hidden="true">Plan</span></button>
+    {% if is_admin %}<button type="button" role="tab" class="gx-tab" data-grp-tab="settings" data-hint="Switch groups on or off."><svg class="grp-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg><span class="grp-tab-full">Settings</span><span class="grp-tab-short" aria-hidden="true">Settings</span></button>{% endif %}
   </nav>
+  <p class="grp-tab-hint" data-grp-hint></p>
 
   <section class="grp-pane" data-grp-pane="all mine waiting">
     <div class="grp-search" data-grp-search>
@@ -500,6 +501,7 @@ submit is a form somebody will eventually find a way to submit.
   var count = root.querySelector('[data-grp-count]');
   var none = root.querySelector('[data-grp-none]');
   var noneMine = root.querySelector('[data-grp-empty-mine]');
+  var hint = root.querySelector('[data-grp-hint]');
   var tab = 'all';
 
   function apply() {
@@ -519,7 +521,7 @@ submit is a form somebody will eventually find a way to submit.
   function show(name, push) {
     if (!tabs.some(function (t) { return t.dataset.grpTab === name; })) name = 'all';
     tab = name;
-    tabs.forEach(function (t) { var on = t.dataset.grpTab === name; t.classList.toggle('on', on); t.setAttribute('aria-selected', on); });
+    tabs.forEach(function (t) { var on = t.dataset.grpTab === name; t.classList.toggle('on', on); t.setAttribute('aria-selected', on); if (on && hint) hint.textContent = t.dataset.hint; });
     panes.forEach(function (p) { p.hidden = p.dataset.grpPane.split(' ').indexOf(name) === -1; });
     apply();
     if (push) history.replaceState(null, '', '#' + name);

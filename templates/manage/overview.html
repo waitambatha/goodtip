@@ -43,7 +43,7 @@
 <header class="ox-head"><h2 class="ov-h">Your organisations</h2>{% if org_cards.more %}<a class="gx-btn is-ghost" href="{% url 'manage:orgs_list' %}">See all {{ org_count }}</a>{% endif %}</header>
 <div class="ox-orgs">
   {% for c in org_cards.cards %}
-  <a class="ox-org" style="--c: {{ c.colour }}" href="{% url 'manage:org_home' c.org.id %}">
+  <a class="ox-org" style="--c: {{ c.colour }}" href="{% url 'manage:org_home' c.org.id %}" data-switch-org="{% url 'orgs:switch_org' c.org.id %}">
     <span class="ox-org-top">
       <span class="og-badge">{% if c.org.logo %}<img src="{{ c.org.logo.url }}" alt="">{% else %}{{ c.org.name|slice:":2"|upper }}{% endif %}</span>
       {% if c.waiting %}<span class="ox-flag">{{ c.waiting }} waiting</span>{% endif %}

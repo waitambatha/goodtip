@@ -18,10 +18,19 @@ mc_title, mc_lead and puts its content in mc_body.
     <rect x="530" y="280" width="140" height="140"/><line x1="600" y1="30" x2="600" y2="670"/>
   </svg>
   <div class="gx-bar">
+    {% comment %}Members reach some of these (a vote); the console would refuse them, so their way back is the dashboard.{% endcomment %}
+    {% for o in nav_orgs %}{% if o.id == org.id %}
+    {% if o.nav_can_manage %}
     <a class="gx-back" href="{% url 'orgs:console' org.id %}?tab={% block mc_back_tab %}members{% endblock %}">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg><span>Back to the console</span>
     </a>
-    <ol class="gx-crumbs"><li><a href="{% url 'orgs:console' org.id %}">{{ org.name }}</a></li>{% block mc_crumbs %}{% endblock %}</ol>
+    {% else %}
+    <a class="gx-back" href="{% url 'dashboard' %}">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg><span>Dashboard</span>
+    </a>
+    {% endif %}
+    {% endif %}{% endfor %}
+    <ol class="gx-crumbs"><li>{{ org.name }}</li>{% block mc_crumbs %}{% endblock %}</ol>
   </div>
   {% if messages %}<div class="mc-flash">{% for m in messages %}<p class="mc-msg is-{{ m.tags|default:'info' }}">{{ m }}</p>{% endfor %}</div>{% endif %}
   <header class="gx-hero">

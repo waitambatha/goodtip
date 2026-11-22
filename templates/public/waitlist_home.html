@@ -13,17 +13,29 @@
 WHAT A WAITING-LIST MEMBER SEES WHEN THEY SIGN IN (client, 25 Sep 2026).
 
 Deliberately its own small world: no product navigation, no links into the
-system, no menu of pages that are not open. The bar has the wordmark and Sign
-out; the page shows their place, lets them correct their details, and says what
+system, no menu of pages that are not open. The bar has the wordmark and a Menu
+(client, 22 Nov 2026) of this page's own parts, the trailer and Sign out;
+the page shows their place, lets them correct their details, and says what
 happens next. The session behind it is the waiting-list one (accounts.waitlist),
 which cannot open the product. The only door out is the invitation, and that
 appears only once the site can actually be opened (can_open_pages).
 {% endcomment %}
 {% block nav %}
-<header class="wm-bar">
-  <a href="{% url 'coming_soon' %}" class="wordmark">GOOD<span>TIP</span><span class="dot">.</span></a>
-  <form method="post" action="{% url 'waitlist_signout' %}">{% csrf_token %}<button type="submit" class="wm-out"><span>Sign out</span><svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4.5h4a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5h-4M10 8l-4 4 4 4M6 12h9"/></svg></button></form>
-</header>
+<nav class="nav wm-top" data-open="false" aria-label="Waiting list">
+  <div class="nav-inner">
+    <a href="{% url 'coming_soon' %}" class="wordmark">GOOD<span>TIP</span><span class="dot">.</span></a>
+    <button class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-menu"><span></span><span></span><span></span></button>
+    <ul class="nav-links" id="nav-menu">
+      <li><a href="#wm-place"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-people"/></svg><span>Your place</span></a></li>
+      <li><a href="#wm-look"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-spark"/></svg><span>A look inside</span></a></li>
+      <li><a href="#wm-you"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-doc"/></svg><span>Your details</span></a></li>
+      <li><a href="#wm-then"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-lifebuoy"/></svg><span>What's next</span></a></li>
+      <li class="nav-sep" aria-hidden="true"></li>
+      <li class="nav-auth"><a href="{% url 'coming_soon' %}" class="nav-login"><svg class="nav-ic" aria-hidden="true"><use href="#ic-f-send"/></svg><span>Full trailer</span></a></li>
+      <li class="nav-auth"><form method="post" action="{% url 'waitlist_signout' %}">{% csrf_token %}<button type="submit" class="wm-signout"><svg class="nav-ic" aria-hidden="true"><use href="#ic-logout"/></svg><span>Sign out</span></button></form></li>
+    </ul>
+  </div>
+</nav>
 {% endblock %}
 
 {% block content %}
@@ -36,7 +48,7 @@ appears only once the site can actually be opened (can_open_pages).
     card carries the four steps; the first one not yet done is the lit one. "GoodTip
     is on" is done only for a visitor who can actually open the site.
     {% endcomment %}
-    <section class="wm-hero" style="--wm-photo:url('{% static 'img/stadium-night.jpg' %}')">
+    <section class="wm-hero" id="wm-place" style="--wm-photo:url('{% static 'img/stadium-night.jpg' %}')">
       <svg class="wm-scrib" viewBox="0 0 60 60" aria-hidden="true"><path d="M8 52 26 8M24 56 40 22M40 58 52 34"/></svg>
       <div class="wm-hero-l">
         <p class="wm-pill"><svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4.5" width="16" height="15" rx="2.5"/><path d="m8 12.5 3 3 5-6"/></svg><span>Waiting list</span></p>
@@ -87,7 +99,7 @@ appears only once the site can actually be opened (can_open_pages).
     row. These are recordings of the real app running against invented people
     (accounts/trailer.py). Nothing downloads until something is tapped.
     {% endcomment %}
-    <section class="wm-card wm-theatre" aria-labelledby="wm-reel-h">
+    <section class="wm-card wm-theatre" id="wm-look" aria-labelledby="wm-reel-h">
       <div class="wm-ch">
         <span class="wm-th-ico" aria-hidden="true"><svg class="wm-i wm-i-fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg></span>
         <div>
@@ -117,7 +129,7 @@ appears only once the site can actually be opened (can_open_pages).
     </section>
 
     <div class="wm-duo">
-      <section class="wm-card wm-details">
+      <section class="wm-card wm-details" id="wm-you">
         <div class="wm-ch">
           <span class="wm-ci" aria-hidden="true"><svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.8"/><path d="M4.5 20.5c.6-4 3.6-6 7.5-6s6.9 2 7.5 6"/></svg></span>
           <div>
@@ -144,7 +156,7 @@ appears only once the site can actually be opened (can_open_pages).
           </div>
           <div class="wm-actions">
             <button type="submit" class="tr-submit"><span>Save my details</span></button>
-            {% if saved == 'details' %}<p class="wl-ok wm-saved" role="status"><svg class="wm-i" viewBox="0 0 24 24"><path d="M5 12.5 10 17.5 19 7"/></svg><span>Saved.</span></p>{% endif %}
+            {% if saved == 'details' %}<p class="wl-ok wm-kept" role="status"><svg class="wm-i" viewBox="0 0 24 24"><path d="M5 12.5 10 17.5 19 7"/></svg><span>Saved.</span></p>{% endif %}
             {% if error %}<p class="wl-err wm-flash" role="alert">{{ error }}</p>{% endif %}
           </div>
         </form>
@@ -153,7 +165,7 @@ appears only once the site can actually be opened (can_open_pages).
           <span><svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9.5" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg><span>Your password is only for this page.<br>It doesn&rsquo;t open the app.</span></span>
         </div>
       </section>
-      <section class="wm-card wm-next">
+      <section class="wm-card wm-next" id="wm-then">
       <div class="wm-ch">
         <span class="wm-ci" aria-hidden="true"><svg class="wm-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4c3.5-.5 5.5.5 6 6-1.5 3-4 5.5-7 7l-6-6c1.5-3 4-5.5 7-7Z"/><circle cx="14.5" cy="9.5" r="1.6"/><path d="M8 13.5l-3.5 1 1.5 1.5M10.5 16l-1 3.5-1.5-1.5M6 18l-2 2"/></svg></span>
         <div>

@@ -22,6 +22,8 @@ def user_orgs(request):
     for m in memberships:
         m.org.nav_is_admin = _is_creator_admin(request.user, m.org, membership=m)
         m.org.nav_role = "Admin" if m.org.nav_is_admin else "Member"
+        # The console lets in anyone who can manage, which is wider than admin.
+        m.org.nav_can_manage = m.can_manage
 
     # Scheduled charity elections open lazily on any app page view, so members
     # get their popup/email even before the cron command is wired up.

@@ -45,11 +45,11 @@ same one its tab wears on the Plans page.
     {% if period %}
     <p class="app-sub bl-lede" data-bl-lede>{{ period.pct }}% through this season &middot; started {{ period.start|date:"j F Y" }}, renews {{ period.end|date:"j F Y" }}{% if period.days_left %} ({{ period.days_left }} day{{ period.days_left|pluralize }} left){% endif %}.</p>
     {% else %}
-    <p class="app-sub bl-lede" data-bl-lede>{{ org.name }} is on the <strong>{{ sub.get_tier_display }}</strong> plan, {{ sub.seat_limit_label }}. The first year's ${{ sub.price_aud|floatformat:0 }} has been paid, and it renews yearly.</p>
+    <p class="app-sub bl-lede" data-bl-lede>{{ org.name }} is on the <strong>{{ sub.get_tier_display }}</strong>{% if 'plan' not in sub.get_tier_display|lower %} plan{% endif %}, {{ sub.seat_limit_label }}. The first year's ${{ sub.price_aud|floatformat:0 }} has been paid, and it renews yearly.</p>
     {% endif %}
   {% elif sub and sub.is_scheduled %}
     <h2 class="bl-h2" data-bl-title>You're subscribed.</h2>
-    <p class="app-sub bl-lede" data-bl-lede>{{ org.name }} is on the <strong>{{ sub.get_tier_display }}</strong> plan. Your card is saved and nothing was charged today; the first yearly payment of ${{ sub.price_aud|floatformat:0 }} is taken on <strong>{{ sub.starts_at|date:"j F Y" }}</strong>.</p>
+    <p class="app-sub bl-lede" data-bl-lede>{{ org.name }} is on the <strong>{{ sub.get_tier_display }}</strong>{% if 'plan' not in sub.get_tier_display|lower %} plan{% endif %}. Your card is saved and nothing was charged today; the first yearly payment of ${{ sub.price_aud|floatformat:0 }} is taken on <strong>{{ sub.starts_at|date:"j F Y" }}</strong>.</p>
   {% else %}
     <h2 class="bl-h2" data-bl-title>Thanks, we're confirming it.</h2>
     <p class="app-sub bl-lede" data-bl-lede>Stripe is finishing up; your plan will show on the dashboard in a moment.</p>

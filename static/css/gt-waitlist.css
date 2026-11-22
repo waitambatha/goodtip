@@ -148,14 +148,6 @@ html.wl-lock { overflow: hidden; }
 .wm-i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .wm-i-fill { fill: currentColor; stroke: none; }
 
-/* top bar: light, wordmark and Sign out */
-.wm-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px clamp(18px, 4vw, 56px) 8px; background: #F6F4EC; }
-.wm-bar .wordmark { color: var(--deep); text-decoration: none; }
-.wm-bar .wordmark span { color: #0b5a37; }
-.wm-bar .wordmark .dot { color: #E5B800; }
-.wm-bar form { margin: 0; }
-.wm-out { display: inline-flex; align-items: center; gap: 9px; border: 1.5px solid var(--deep); color: var(--deep); background: #fff; border-radius: 999px; padding: 10px 18px; font: 700 14px/1 var(--body); cursor: pointer; transition: background .2s var(--ease), color .2s var(--ease); }
-.wm-out:hover { background: var(--deep); color: #fff; }
 .wm-wrap { width: min(1160px, 100%); margin: 0 auto; padding: 8px clamp(18px, 4vw, 40px) 46px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
 
 /* the hero: greeting on a stadium photo, two white tiles */
@@ -247,8 +239,8 @@ html.wl-lock { overflow: hidden; }
 .wm-dform { display: grid; gap: 12px; }
 .wm-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 4px; }
 .wm-actions .tr-submit { width: auto; margin: 0; padding: 0 36px; }
-.wm-saved { display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 9px 16px 9px 12px; border-radius: 999px; background: #EAF7BE; color: var(--deep); font-weight: 700; font-size: 14px; }
-.wm-saved .wm-i { width: 16px; height: 16px; stroke-width: 3; color: #0b5a37; }
+.wm-kept { display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 9px 16px 9px 12px; border-radius: 999px; background: #EAF7BE; color: var(--deep); font-weight: 700; font-size: 14px; }
+.wm-kept .wm-i { width: 16px; height: 16px; stroke-width: 3; color: #0b5a37; }
 
 /* what happens next */
 .wm-next-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
@@ -291,7 +283,7 @@ html.wl-lock { overflow: hidden; }
   .wm-grass { width: 130px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  :where(html:not(.gt-motion)) .wm-th, :where(html:not(.gt-motion)) .wm-stage-play, :where(html:not(.gt-motion)) .wm-replay, :where(html:not(.gt-motion)) .wm-out{ transition: none !important; }
+  :where(html:not(.gt-motion)) .wm-th, :where(html:not(.gt-motion)) .wm-stage-play, :where(html:not(.gt-motion)) .wm-replay{ transition: none !important; }
 }
 @media (max-width: 760px) {
   .wl { padding: 0; place-items: end center; }
@@ -306,4 +298,55 @@ html.wl-lock { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   :where(html:not(.gt-motion)) .wl-card, :where(html:not(.gt-motion)) .wl-scrim, :where(html:not(.gt-motion)) .wl-step, :where(html:not(.gt-motion)) .wl-dd, :where(html:not(.gt-motion)) .wl-side-photo, :where(html:not(.gt-motion)) .wl-tick svg{ animation: none !important; transition: none !important; }
   :where(html:not(.gt-motion)) .wl-tick svg{ stroke-dashoffset: 0; }
+}
+@media (max-width: 760px) { .wl-dd-list li { min-height: 48px; box-sizing: border-box; } }
+
+/* ---- The member page in GoodTip green (client, 22 Nov 2026) ----
+   "Green dominant ... where we have the cream, make it white." The ground is
+   deep green, every card is white, lime is the accent. The bar is the site's
+   own .nav with a Menu; Sign out lives in it. (The old .wm-bar shared its
+   name with the home page's 6px progress bar, which is what crushed it.) */
+body.page-waitlist { background: #072F1E; }
+body.page-waitlist .wm { background: radial-gradient(90% 34% at 100% 0%, rgba(207,249,58,.15), transparent 70%), radial-gradient(80% 30% at 0% 60%, rgba(45,122,58,.28), transparent 70%), #072F1E; }
+body.page-waitlist .wm-wrap { padding-top: 18px; }
+body.page-waitlist .wm-hero { box-shadow: 0 0 0 1px rgba(207,249,58,.22), 0 40px 70px -40px rgba(0,0,0,.8); }
+body.page-waitlist .wm-scrib { display: none; }
+body.page-waitlist .wm-card, body.page-waitlist .wm-progress { background: #fff; box-shadow: 0 30px 60px -40px rgba(0,0,0,.8); }
+body.page-waitlist .wm-step { background: #F2F7F3; box-shadow: none; }
+body.page-waitlist .wm-step-n { color: var(--lime); }
+body.page-waitlist .wm-ci { border-radius: 50%; background: var(--deep); color: var(--lime); }
+body.page-waitlist .wm-ci .wm-i { width: 24px; height: 24px; }
+body.page-waitlist .wm-th-ico { color: var(--lime); }
+body.page-waitlist :is(#wm-place, #wm-look, #wm-you, #wm-then) { scroll-margin-top: 78px; }
+body.page-waitlist .wm-foot { background: #05200F; }
+body.page-waitlist .wm-foot p { color: var(--lime); }
+.wm-top .nav-auth form { margin: 0; }
+.wm-top .wm-signout { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 9px 18px; border: 0; border-radius: 10px; background: var(--lime); color: var(--deep); font: 800 14px/1 var(--body); white-space: nowrap; cursor: pointer; }
+.wm-top .wm-signout .nav-ic { fill: none; stroke: currentColor; color: var(--deep); }
+@media (max-width: 1120px) { .wm-top .wm-signout { width: 100%; min-height: 50px; border-radius: 12px; margin-top: 10px; } }
+@media (max-width: 760px) {
+  .wm-top .wm-signout { margin-top: 0; }
+  body.page-waitlist .wm-wrap { padding: 14px 14px 28px; gap: 14px; }
+  body.page-waitlist .wm-hero { gap: 20px; padding: 24px 20px 92px; border-radius: 24px; }
+  body.page-waitlist .wm-pill { margin-bottom: 14px; }
+  body.page-waitlist .wm-h { font-size: 33px; }
+  body.page-waitlist .wm-lead { font-size: 15px; overflow-wrap: anywhere; }
+  body.page-waitlist .wm-tiles { width: 100%; gap: 10px; }
+  body.page-waitlist .wm-tile { flex: 1 1 100%; min-width: 0; padding: 14px 16px; border-radius: 18px; box-sizing: border-box; }
+  body.page-waitlist .wm-place { display: grid; grid-template-columns: 1fr auto; align-items: center; row-gap: 8px; }
+  body.page-waitlist .wm-place .wm-tile-k { justify-self: start; }
+  body.page-waitlist .wm-place .wm-num { grid-column: 2; grid-row: 1 / span 2; margin: 0; font-size: 52px; }
+  body.page-waitlist .wm-place .wm-of { grid-column: 1; font-size: 13.5px; }
+  body.page-waitlist .wm-progress { margin: -78px 10px 0; border-radius: 20px; }
+  body.page-waitlist .wm-card { padding: 18px 16px; border-radius: 22px; }
+  body.page-waitlist .wm-ch { flex-wrap: nowrap; gap: 12px; margin-bottom: 14px; }
+  body.page-waitlist .wm-ch > div { min-width: 0; flex: 1; }
+  body.page-waitlist .wm-ch h2 { font-size: 21px; }
+  body.page-waitlist .wm-ch p { font-size: 13px; }
+  body.page-waitlist .wm-ci { width: 40px; height: 40px; }
+  body.page-waitlist .wm-replay { display: none; }
+  body.page-waitlist .wm-actions .tr-submit { width: 100%; }
+  body.page-waitlist .wm-step { grid-template-columns: 32px minmax(0,1fr); padding: 13px 14px; border-radius: 14px; }
+  body.page-waitlist .wm-step-n { width: 32px; height: 32px; font-size: 14px; }
+  body.page-waitlist .wm-foot { padding: 44px 18px 22px; }
 }

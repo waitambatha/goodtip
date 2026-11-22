@@ -1,10 +1,12 @@
-{% extends "app_base.html" %}
+{% extends "orgs/console_page.html" %}
+{% load static %}
 {% block title %}Set up {{ group.name }}'s election{% endblock %}
 {% block loader_task %}Loading the charities{% endblock %}
-{% block body_class %}page-deep sheet-page{% endblock %}
-{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
-
-{% block app_content %}
+{% block mc_back_tab %}charity{% endblock %}
+{% block mc_crumbs %}<li aria-current="page">{{ group.name }}</li>{% endblock %}
+{% block mc_title %}Set up the <em>election</em>{% endblock %}
+{% block mc_lead %}Pick the charities {{ group.name }} votes between. One vote each, and nobody sees the tallies until it closes.{% endblock %}
+{% block mc_body %}
 {% comment %}
 Building one group's ballot. The options are the ORGANISATION's charities —
 vetted plus whatever it added — because a group votes on what its organisation
@@ -17,21 +19,10 @@ draft nobody ever came back to open left members with an election that never
 happened.
 {% endcomment %}
 
-<div class="app-head">
-  <div>
-    <div class="app-eyebrow">{{ org.name }} &middot; {{ group.name }}</div>
-    <h1 class="app-h1">Set up the election</h1>
-    <p class="app-sub">
-      Pick the charities {{ group.name }} votes between. Everyone in the group
-      gets one vote, and nobody sees the tallies until it closes.
-    </p>
-  </div>
-</div>
-
-<form method="post" style="max-width:760px;">
+<form method="post" class="gv gv-form">
   {% csrf_token %}
 
-  <label>Ballot options <span style="color:var(--muted);font-weight:400;">(pick at least 2)</span></label>
+  <h2 class="gv-h">Ballot options <span>(pick at least 2)</span></h2>
   {% if charities %}
   <div class="opt-grid cols2" style="margin-top:8px;">
     {% for ch in charities %}
@@ -72,7 +63,7 @@ happened.
     <div class="hint">Goes into the email and the in-app notice your group gets.</div>
   </div>
 
-  <button type="submit" class="abtn abtn-primary abtn-lg" style="margin-top:8px;">Start the election &rarr;</button>
-  <a href="{% url 'orgs:group_charity_vote' org.id group.id %}" class="abtn abtn-ghost" style="margin-top:8px;">Cancel</a>
+  <div class="gv-acts"><button type="submit" class="abtn abtn-primary abtn-lg">Start the election &rarr;</button>
+  <a href="{% url 'orgs:group_charity_vote' org.id group.id %}" class="abtn abtn-ghost">Cancel</a></div>
 </form>
 {% endblock %}

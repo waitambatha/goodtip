@@ -34,14 +34,10 @@ gradient over the whole article.
   <meta name="description" content="{{ post.meta_description|default:post.excerpt|default:post.title|truncatechars:150 }}">
   <script>document.documentElement.className = document.documentElement.className.replace('no-js','js');</script>
   {% include "partials/_favicon.html" %}
+  {% include "partials/_no_focus_zoom.html" %}
   {% include "partials/_fonts.html" %}
   <link rel="stylesheet" href="{% static 'css/goodtip.css' %}">
-  <script>
-    /* The theme before the first paint, same key as everywhere else, so a
-       member who reads in light mode does not get a flash of the deep green
-       on their way into a story. */
-    try { document.documentElement.dataset.theme = localStorage.getItem("theme") || "auto"; } catch (e) {}
-  </script>
+  {% include "partials/_theme.html" %}
   <script src="{% static 'js/gt-ui.js' %}" defer></script>
   <script src="{% static 'js/gt-scenes.js' %}" defer></script>
   <script src="{% static 'js/gt-share.js' %}" defer></script>

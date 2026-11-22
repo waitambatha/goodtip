@@ -1,10 +1,19 @@
-{% extends "app_base.html" %}
+{% extends "orgs/console_page.html" %}
+{% load static %}
 {% block title %}{{ group.name }}'s charity{% endblock %}
 {% block loader_task %}Opening the ballot{% endblock %}
-{% block body_class %}page-deep sheet-page{% endblock %}
-{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
-
-{% block app_content %}
+{% block mc_back_tab %}charity{% endblock %}
+{% block mc_crumbs %}<li aria-current="page">{{ group.name }}</li>{% endblock %}
+{% block mc_title %}{{ group.name }} <em>charity</em>{% endblock %}
+{% block mc_lead %}{% if group.charity %}
+        Chosen by this group. Everything {{ group.name }} raises goes to them.
+      {% elif inherited_charity %}
+        Right now {{ group.name }} backs {{ inherited_charity.name }} — {{ org.name }}'s
+        charity. Run a vote to choose your own.
+      {% else %}
+        This group hasn't chosen a cause yet.
+      {% endif %}{% endblock %}
+{% block mc_body %}
 {% comment %}
 A GROUP'S OWN CHARITY ELECTION.
 
@@ -23,23 +32,7 @@ Blind vote, exactly as the org-wide one: counts while open, tallies only once
 closed. That rule is implemented once, in views._ballot_context.
 {% endcomment %}
 
-<div class="app-head">
-  <div>
-    <div class="app-eyebrow">{{ org.name }} &middot; {{ group.name }}</div>
-    <h1 class="app-h1">{{ group.name }}'s charity</h1>
-    <p class="app-sub">
-      {% if group.charity %}
-        Chosen by this group. Everything {{ group.name }} raises goes to them.
-      {% elif inherited_charity %}
-        Right now {{ group.name }} backs {{ inherited_charity.name }} — {{ org.name }}'s
-        charity. Run a vote to choose your own.
-      {% else %}
-        This group hasn't chosen a cause yet.
-      {% endif %}
-    </p>
-  </div>
-</div>
-
+<div class="gv">
 {% if group.charity %}
 <div class="card pad-lg ch-current">
   <div class="ch-current-label">{{ group.name }} is backing</div>
@@ -176,4 +169,5 @@ closed. That rule is implemented once, in views._ballot_context.
   Ballot options come from {{ org.name }}'s charity list.
   {% if is_admin %}<a href="{% url 'orgs:charities' org.id %}">Add one &rarr;</a>{% endif %}
 </p>
+</div>
 {% endblock %}

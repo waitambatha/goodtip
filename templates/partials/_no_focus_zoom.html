@@ -1,0 +1,16 @@
+{% comment %}
+An iPhone zooms the whole page in when you tap a field whose text is under
+16px, and stays zoomed. maximum-scale=1 stops exactly that; on iOS, pinching
+still zooms. Only on iOS, because Android would obey it and lose pinch zoom,
+and Android does not zoom on focus in the first place.
+{% endcomment %}
+<script>
+(function () {
+  if (!/iP(hone|od|ad)/.test(navigator.userAgent) && !(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return;
+  function pin() {
+    var m = document.querySelector('meta[name="viewport"]');
+    if (m && !/maximum-scale/.test(m.content)) m.content += ', maximum-scale=1';
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', pin); else pin();
+})();
+</script>

@@ -672,16 +672,8 @@ class PageEditFlowTests(TestCase):
 
 
 class AdminThemeToggleTests(TestCase):
-    """The green/cream switch in /admin/.
-
-    Django ships this as one small icon that CYCLES auto -> light -> dark on
-    click. The client could not find it, which is what the first rewrite fixed
-    by labelling it — but cycling has the deeper problem that the control means
-    something different on every press, so it cannot be aimed: you want dark,
-    you press once, you get light.
-
-    Three segments answer both. Every option is visible, the one in use is
-    filled, and any of them is one click away.
+    """One theme, the green (client, 22 Nov 2026). Replaces the
+    Auto / Light / Dark switch and the tests that pinned its three buttons.
     """
 
     def setUp(self):
@@ -690,28 +682,26 @@ class AdminThemeToggleTests(TestCase):
         )
         sign_in_to_admin(self.client, self.admin)
 
-    def test_all_three_modes_are_on_screen_at_once(self):
+    def test_there_is_no_theme_to_choose(self):
         html = self.client.get(reverse("admin:index")).content.decode()
-        for mode in ("auto", "light", "dark"):
-            self.assertIn(f'data-set-theme="{mode}"', html)
-        for label in ("Auto", "Light", "Dark"):
-            self.assertIn(f"<span>{label}</span>", html)
+        self.assertNotIn('data-set-theme="', html)
+        self.assertNotIn('class="theme-toggle', html)
 
-    def test_nothing_cycles_each_button_sets_one_mode(self):
-        """The bug in the shipped control: pressing it is a guess."""
+    def test_the_green_is_stamped_whatever_was_saved(self):
         html = self.client.get(reverse("admin:index")).content.decode()
-        self.assertNotIn("cycleTheme", html)
-        # The attribute with a value is a button; bare occurrences are the
-        # script's own selectors.
-        self.assertEqual(html.count('data-set-theme="'), 3)
+        self.assertIn('document.documentElement.dataset.theme = "dark"', html)
+        self.assertNotIn('localStorage.getItem("theme")', html)
 
-    def test_it_writes_the_same_place_django_reads_from(self):
-        """Django's early-boot script restores the theme before first paint by
-        reading localStorage["theme"] and stamping data-theme. Write anywhere
-        else and the choice is forgotten on the next page."""
+    def test_djangos_own_script_cannot_restore_another(self):
         html = self.client.get(reverse("admin:index")).content.decode()
-        self.assertIn("localStorage.setItem('theme'", html)
-        self.assertIn("document.documentElement.dataset.theme", html)
+        self.assertNotIn("admin/js/theme.js", html)
+        self.assertIn("admin/css/dark_mode", html)
+
+    def test_the_app_and_manage_have_no_switch_either(self):
+        for name in ("dashboard", "manage:overview"):
+            html = self.client.get(reverse(name), follow=True).content.decode()
+            self.assertNotIn('data-set-theme="', html, name)
+            self.assertIn('document.documentElement.dataset.theme = "dark"', html, name)
 
     def test_the_stylesheet_that_shapes_it_is_loaded(self):
         html = self.client.get(reverse("admin:index")).content.decode()

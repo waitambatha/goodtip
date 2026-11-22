@@ -32422,3 +32422,243 @@ html body .gtm { height: calc(var(--app-h, 100dvh) - var(--gt-navh, 68px)); }
     min-height: 54px; padding: 10px 6px !important; font-size: 12.5px !important; letter-spacing: .03em !important; line-height: 1.2; white-space: normal;
   }
 }
+
+/* ---- Groups menu: one row, every choice in sight (client, 22 Nov 2026) ----
+   Was three to a row, wrapped inside an oval. Laptop keeps full names beside
+   an icon; phones get equal places, icon over a short name, count on the
+   icon's shoulder, and a line underneath saying what the open one is. */
+.grp-tab-ic { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.grp-tab-short { display: none; }
+.grp-tab-hint { display: none; }
+body.mc-sub .mc-subsheet .grp-search .gx-search.grp-search-form { padding: 0; border: 0; background: none; box-shadow: none; border-radius: 0; }
+body.mc-sub .mc-subsheet .grp-search .gx-search.grp-search-form input { width: 100%; min-width: 0; padding-left: 46px; text-align: left; }
+@media (max-width: 640px) {
+  body.mc-sub .mc-subsheet .grp2 { gap: 10px; min-width: 0; }
+  body.mc-sub .mc-subsheet .grp2 > .gx-tabs.grp-tabs {
+    display: flex !important; flex-wrap: nowrap !important; align-items: stretch; gap: 2px !important;
+    width: 100%; box-sizing: border-box; padding: 4px !important; border-radius: 16px; overflow: visible !important;
+  }
+  body.mc-sub .mc-subsheet .grp2 > .gx-tabs.grp-tabs > .gx-tab {
+    position: relative; flex: 1 1 0 !important; min-width: 0; height: 58px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    padding: 4px 0 !important; border-radius: 12px !important; background: transparent;
+    font-size: 11.5px; letter-spacing: 0; line-height: 1;
+  }
+  body.mc-sub .mc-subsheet .grp2 > .gx-tabs.grp-tabs > .gx-tab.on { color: #fff !important; background: #0F2E22 !important; box-shadow: none; }
+  body.mc-sub .mc-subsheet .grp2 > .gx-tabs.grp-tabs > .gx-tab.on .grp-tab-ic { stroke: #CFF93A; }
+  body.mc-sub .mc-subsheet .grp-tabs .grp-tab-ic { width: 20px; height: 20px; }
+  body.mc-sub .mc-subsheet .grp-tabs .grp-tab-full { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  body.mc-sub .mc-subsheet .grp-tabs .grp-tab-short { display: block; max-width: 100%; }
+  body.mc-sub .mc-subsheet .grp2 > .gx-tabs.grp-tabs > .gx-tab em {
+    position: absolute; top: 4px; left: calc(50% + 6px); min-width: 16px; box-sizing: border-box;
+    padding: 2px 4px; border-radius: 99px; font-size: 10px; line-height: 1.1; text-align: center; color: #0F2E22; background: #CFF93A;
+  }
+  body.mc-sub .mc-subsheet .grp2 > .gx-tabs.grp-tabs > .gx-tab em.is-warn { background: #FFE2A8; }
+  .grp-tab-hint { display: block; margin: 0; font-size: 13px; line-height: 1.3; text-align: center; color: #4A5464; }
+}
+@media (max-width: 359px) {
+  body.mc-sub .mc-subsheet .grp2 > .gx-tabs.grp-tabs > .gx-tab { font-size: 10.5px; }
+}
+/* Six places (Waiting showing) must still fit: by their words on a small
+   phone, and closer together on a laptop's sheet. */
+@media (max-width: 400px) {
+  body.mc-sub .mc-subsheet .grp2 > .gx-tabs.grp-tabs { gap: 0 !important; padding: 3px !important; }
+  body.mc-sub .mc-subsheet .grp2 > .gx-tabs.grp-tabs > .gx-tab { flex: 1 1 auto !important; padding: 4px 2px !important; font-size: 10.5px; }
+}
+@media (min-width: 641px) {
+  body.mc-sub .mc-subsheet .grp-tabs { gap: 2px; padding: 5px; }
+  body.mc-sub .mc-subsheet .grp-tabs .gx-tab { flex: 1 0 auto; justify-content: center; gap: 6px; padding: 10px 9px; font-size: 13px; }
+}
+/* Tablet: the short names, beside their icons. */
+@media (min-width: 641px) and (max-width: 900px) {
+  body.mc-sub .mc-subsheet .grp-tabs .grp-tab-full { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  body.mc-sub .mc-subsheet .grp-tabs .grp-tab-short { display: inline; }
+}
+
+/* ---- Forms on phones: they stay put (client, 22 Nov 2026) ----
+   gt-formfocus.js no longer lifts them. An open menu is exactly as wide as
+   its field, above what follows it, with rows big enough for a thumb. */
+@media (max-width: 760px) {
+  [data-form-shell] .ddx { min-width: 0; max-width: 100%; }
+  [data-form-shell] .ddx .ddx-menu:not(.is-fixed) {
+    left: 0 !important; right: 0 !important; width: auto !important; min-width: 0 !important; max-width: none !important;
+    max-height: min(340px, 48vh) !important; box-sizing: border-box; scroll-margin: 70px 0 14px;
+    overscroll-behavior: contain;
+  }
+  [data-form-shell] .ddx .ddx-opt { min-height: 48px; padding-top: 12px; padding-bottom: 12px; font-size: 15.5px; white-space: normal; animation: none !important; }
+  [data-form-shell] .ddx-val { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  [data-form-shell] :is(.field, .tmw-field, .tmw-pair > *):has(.ddx.open) { position: relative; z-index: 70; }
+}
+@media (max-width: 760px) {
+  main .gl-filterbar .ddx .ddx-menu { scroll-margin: 70px 0 14px; max-height: min(340px, 48vh); overscroll-behavior: contain; }
+  main .gl-filterbar .ddx .ddx-opt { min-height: 48px; }
+}
+
+/* ==========================================================================
+   EVERY REMAINING SCREEN, AT PHONE WIDTH (22 Nov 2026)
+   ========================================================================== */
+
+/* ---- sign out: a tile among the menu's choices ---- */
+.app-sheet .sheet-links > .sheet-out { color: #FFB4A6; }
+.app-sheet .sheet-links > .sheet-out .an-ic { opacity: 1; }
+
+/* ---- the admin's end of a conversation: every word readable ---- */
+body.adx-page .chat-page .chat-to { background: #fff !important; border: 1px solid #E4E8EE !important; }
+body.adx-page .chat-page .chat-to :is(.ct-who b) { color: #151C27 !important; }
+body.adx-page .chat-page .chat-to :is(.ct-lab, .ct-more, .ct-count, .ct-org, .ct-dot) { color: #56616E !important; }
+body.adx-page .chat-page .chat-top .gts-status.warn { color: #6B480C !important; background: #FFE7B3 !important; }
+body.adx-page .chat-page .chat-top .gts-status.ok { color: #1D5A25 !important; background: #DDF0D8 !important; }
+body.adx-page .chat-page .chat-row.mine .chat-bubble { background: #0F2E22 !important; color: #fff !important; }
+body.adx-page .chat-page .chat-row.mine .chat-bubble * { color: #fff !important; }
+body.adx-page .chat-page .chat-row.mine .chat-bubble :is(.chat-tick, .chat-tick *) { color: #CFF93A !important; }
+body.adx-page .chat-page .chat-more { width: 34px; height: 34px; border: 0 !important; border-radius: 50%; background: transparent !important; color: #56616E !important; display: grid; place-items: center; }
+body.adx-page .chat-page .chat-who { min-height: 28px; }
+@media (max-width: 640px) {
+  body.adx-page .chat-page .chat-card { padding: 12px !important; }
+  body.adx-page .chat-page .chat-close .abtn { width: 100%; justify-content: center; }
+}
+
+/* ---- round tipping: whole team names ---- */
+body.tip-page .match-row { background: #fff; }
+body.tip-page .pick .team > span:last-child { min-width: 0; overflow-wrap: normal; word-break: normal; hyphens: none; }
+body.tip-page .saved-tick:not(.show) { display: none; }
+@media (max-width: 620px) {
+  body.tip-page .match-row { padding: 12px; }
+  body.tip-page .match-meta { font-size: 12px; gap: 6px; flex-wrap: wrap; }
+  body.tip-page .pick { grid-template-columns: minmax(0,1fr) 22px minmax(0,1fr); gap: 4px; }
+  body.tip-page .pick button.team, body.tip-page .pick button.team.away {
+    flex-direction: column; justify-content: center; align-items: center; gap: 7px;
+    min-width: 0; min-height: 106px; padding: 10px 4px; text-align: center; font-size: 13.5px; line-height: 1.15;
+  }
+  body.tip-page .pick button.team > span:last-child { flex: none; width: 100%; max-width: 100%; text-align: center; }
+}
+
+/* ---- settings: competition tiles ---- */
+.ost-form { display: grid; gap: 14px; }
+.ost-head h2 { margin: 0 0 6px; font: 400 22px/1.1 var(--display); color: #151C27; }
+.ost-head p, .ost-fine, .ost-none { margin: 0; font-size: 13.5px; line-height: 1.45; color: #4A5464; }
+.ost-tools { display: flex; gap: 8px; }
+.ost-tools input { flex: 1; min-width: 0; box-sizing: border-box; height: 46px; padding: 0 16px; border: 1.5px solid #E1E6EC; border-radius: 999px; background: #F5F7FA; font: 600 15px/1 var(--body); color: #151C27; }
+.ost-tools button { flex: none; height: 46px; padding: 0 16px; border: 0; border-radius: 999px; background: #EEF1F5; color: #151C27; font: 800 14px/1 var(--body); cursor: pointer; }
+.ost-tools button em { font-style: normal; margin-left: 4px; }
+.ost-tools button[aria-pressed="true"] { background: #0F2E22; color: #CFF93A; }
+.ost-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.ost-tile { position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 12px; border: 1.5px solid #E4E8EE; border-radius: 16px; background: #fff; cursor: pointer; }
+.ost-tile[hidden] { display: none; }
+.ost-tile input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.ost-tile:has(input:checked) { border-color: #2A7337; background: #EFF9E6; }
+.ost-tile:has(input:focus-visible) { outline: 3px solid #2A7337; outline-offset: 2px; }
+.ost-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ost-logo { width: 34px; height: 34px; display: grid; place-items: center; overflow: hidden; border-radius: 10px; background: #fff; box-shadow: inset 0 0 0 1px #E4E8EE; color: #151C27; font: 800 11px/1 var(--body); }
+.ost-logo img { width: 26px; height: 26px; object-fit: contain; }
+.ost-state { padding: 5px 10px; border-radius: 99px; background: #EEF1F5; color: #3B4656; font: 800 11.5px/1 var(--body); }
+.ost-state::after { content: "Add"; }
+.ost-tile:has(input:checked) .ost-state { background: #0F2E22; color: #CFF93A; }
+.ost-tile:has(input:checked) .ost-state::after { content: "On"; }
+.ost-tile > b { font-size: 14.5px; line-height: 1.2; color: #151C27; }
+.ost-tile > small { font-size: 12px; line-height: 1.3; color: #4A5464; }
+.ost-save { position: sticky; bottom: 0; z-index: 3; padding: 10px 0; background: #fff; }
+.ost-save .gx-btn { width: 100%; }
+.ost-groups { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 14px 16px; border-radius: 16px; background: #F5F7FA; color: #151C27; text-decoration: none !important; }
+.ost-groups b { display: block; color: #151C27; }
+.ost-groups small { display: block; margin-top: 3px; font-size: 13px; color: #4A5464; }
+.ost-groups i { font-style: normal; color: #151C27; }
+@media (max-width: 640px) { .ost-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; } }
+
+/* ---- join request ---- */
+.jr { display: grid; gap: 16px; max-width: 640px; }
+.jr-top { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.jr-top .jr-face { flex: none; }
+.jr-id { display: grid; gap: 3px; min-width: 0; color: #4A5464; font-size: 13.5px; }
+.jr-id b { font: 400 21px/1.1 var(--display); color: #151C27; }
+.jr-id span { overflow-wrap: anywhere; }
+.jr-what { margin: 0; font-size: 14.5px; line-height: 1.5; color: #3B4656; }
+.jr-acts { display: flex; gap: 10px; }
+.jr-acts form { flex: 1; margin: 0; }
+.jr-acts .gx-btn { width: 100%; min-height: 50px; }
+.jr-all { justify-self: center; color: #2A7337; font-weight: 700; font-size: 14px; }
+
+/* ---- votes and election set-ups inside the console ---- */
+body.mc-sub .mc-subsheet .gv { max-width: 760px; }
+body.mc-sub .mc-subsheet .gv :is(.hint, .app-sub, .gv-h span, label) { color: #4A5464; }
+body.mc-sub .mc-subsheet .gv .hint a { color: #2A7337; }
+body.mc-sub .mc-subsheet .gv-h { margin: 0 0 10px; font: 400 19px/1.2 var(--display); color: #151C27; }
+body.mc-sub .mc-subsheet .gv-h span { font: 600 13px/1 var(--body); }
+body.mc-sub .mc-subsheet .gv-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+body.mc-sub .mc-subsheet .gv form > .hint { display: block; margin-top: 8px; }
+body.mc-sub .mc-subsheet :is(.opt-card, .vz-tile, .vote-card) { background: #fff; border-color: #E4E8EE; }
+body.mc-sub .mc-subsheet .opt-card:has(input:checked) { background: #EFF9E6; border-color: #2A7337; }
+body.mc-sub .mc-subsheet .opt-card .oc-box { border-color: #B4BDC8; background: #fff; }
+body.mc-sub .mc-subsheet .opt-card:has(input:checked) .oc-box { background: #2A7337; border-color: #2A7337; }
+@media (max-width: 640px) {
+  body.mc-sub .mc-subsheet .opt-card { align-items: center; padding: 12px; }
+  body.mc-sub .mc-subsheet form > :is(button.abtn, .abtn[type="submit"]) { width: 100%; justify-content: center; }
+  body.mc-sub .mc-subsheet .gv-acts > .abtn { flex: 1 1 100%; justify-content: center; box-sizing: border-box; }
+  body.mc-sub .mc-subsheet .vz-track { max-width: 100%; }
+  /* A table's headings mean nothing over a list of cards. */
+  body.mc-sub .mc-subsheet .ch-board .gb-head { display: none !important; }
+  body.mc-sub .mc-subsheet .ch-board .gb-row { background: #fff; box-shadow: inset 0 0 0 1px #E4E8EE; }
+}
+
+/* ---- receipt, subscription, boss progress, created ---- */
+body.receipt-page .receipt { background: #fff; }
+body.receipt-page .no-print .abtn { color: #CFF93A; border-color: rgba(207,249,58,.5); background: transparent; }
+.bl-actions .plk-btn.bl-btn-main, .bl-actions .plk-btn.bl-btn-main:visited { color: #fff !important; text-decoration: none !important; }
+body.boss-page :is(.card, .bp-card) { background: #fff; }
+body.boss-page .gt-listwrap { background: transparent; box-shadow: none; border: 0; padding: 0; }
+@media (max-width: 640px) {
+  body.boss-page .wiz-rail { display: grid; gap: 10px; justify-items: start; }
+  body.boss-page .wiz-rail .wz-line { display: none; }
+  body.boss-page .wiz-rail .wz-text { display: flex !important; flex-direction: column; }
+}
+body.ow-done .page-sheet, body.ow-page .page-sheet { background-color: #fff; }
+body.gt-app.page-deep .app-main .card.pad-lg { background-color: #fff; }
+
+/* ---- wizard: seven stops that do not sit on each other ---- */
+@media (max-width: 640px) {
+  body.ow-page.ow-page .ow-track { padding: 14px 6px 12px; }
+  body.ow-page.ow-page .ow-track ol { gap: 4px; }
+  body.ow-page.ow-page .ow-st { padding: 0; }
+  body.ow-page.ow-page .ow-st-art { width: min(38px, 100%); height: auto; aspect-ratio: 1; box-shadow: 0 0 0 1.5px #E5E7EB; }
+  body.ow-page.ow-page .ow-st.is-done .ow-st-art { box-shadow: 0 0 0 2px var(--c); }
+  body.ow-page.ow-page .ow-st.is-now .ow-st-art { transform: none; animation: none; margin-bottom: 6px; box-shadow: 0 0 0 2.5px var(--c); }
+  body.ow-page.ow-page .ow-st + .ow-st::before { display: none; }
+  body.ow-page.ow-page .ow-st-tick { width: 15px; height: 15px; right: -3px; bottom: -3px; box-shadow: 0 0 0 2px #fff; }
+  body.ow-page.ow-page .ow-st-tick svg { width: 9px; height: 9px; }
+  body.ow-page.ow-page .ow-st.is-now b { overflow: visible; max-width: none; white-space: nowrap; }
+}
+body.boss-page .gt-listwrap::before, body.boss-page .gt-listwrap::after { display: none !important; }
+body.ow-page.ow-page.ow-page .app-main > .page-sheet, body.ow-page.ow-page.ow-page .page-sheet, body.ow-done.ow-done.ow-done .page-sheet { background: #fff !important; }
+@media (max-width: 640px) {
+  body.mc-sub .mc-subsheet .gv .vz-live { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; }
+  body.mc-sub .mc-subsheet .gv .vz-tile { min-width: 0; padding: 10px 8px; }
+  body.mc-sub .mc-subsheet .gv .vz-tile small { font-size: 10.5px; line-height: 1.2; overflow-wrap: break-word; }
+}
+body.adx-page .ad-pane a.btn-ghost, body.adx-page .admin-main a.btn-ghost { color: #151C27 !important; border-color: #D5DCE4 !important; background: #fff !important; }
+@media (max-width: 640px) {
+  body.mc-sub .mc-subsheet .gv .vz-tile { padding: 10px 5px; }
+  body.mc-sub .mc-subsheet .gv .vz-tile small { font-size: 10px; letter-spacing: 0; text-transform: none; overflow-wrap: normal; }
+}
+/* No organisation yet: the games shown are white, not cream in cream in cream. */
+body.gt-app .page-sheet > .card:has(> .gt-listwrap .fxp), body.gt-app .page-sheet > .card:has(> .abtn), body.gt-app .page-sheet > .card.pad-lg { background: #fff; }
+body.gt-app .page-sheet > .card > .gt-listwrap:has(.fxp) { background: #fff; }
+body.gt-app .page-sheet > .card > .gt-listwrap:has(.fxp)::before, body.gt-app .page-sheet > .card > .gt-listwrap:has(.fxp)::after { display: none; }
+body.gt-app .fxp { background: #fff; }
+body.gt-app .fxp:nth-child(even) { background: #F4F8F5; }
+@media (max-width: 640px) {
+  body.gt-app .page-sheet > .card:has(> .gt-listwrap .fxp) { padding: 12px; }
+  body.gt-app .page-sheet > .card > .gt-listwrap:has(.fxp) { padding: 0; box-shadow: none; border: 0; }
+  body.gt-app .pick.pick-sm button.team, body.gt-app .pick.pick-sm button.team.away { text-align: center; justify-content: center; align-items: center; }
+  body.gt-app .pick.pick-sm button.team > span:last-child { text-align: center; overflow-wrap: normal; }
+}
+body.gt-app.gt-app.gt-app .app-main .page-sheet > .card:has(.fxp) { background: #fff !important; }
+/* Two buttons in a no-organisation card: apart, one row, left and right. */
+@media (max-width: 640px) {
+  body.gt-app .page-sheet > .card:has(> .abtn + .abtn), body.gt-app .page-sheet > .card div:has(> .abtn + .abtn) { column-gap: 10px; row-gap: 10px; }
+  body.gt-app .page-sheet > .card .abtn-lg + .abtn-lg { margin-left: 0; }
+}
+.dn-acts { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; }
+@media (max-width: 640px) {
+  .dn-acts { flex-wrap: nowrap; }
+  .dn-acts > .abtn { flex: 1 1 0; min-width: 0; box-sizing: border-box; justify-content: center; padding: 12px 6px; font-size: 13.5px; line-height: 1.2; text-align: center; white-space: normal; }
+}

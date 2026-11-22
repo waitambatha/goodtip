@@ -1,75 +1,73 @@
-{% extends "app_base.html" %}
+{% extends "orgs/console_page.html" %}
 {% load static %}
 {% block title %}Settings, {{ org.name }}{% endblock %}
 {% block loader_task %}Opening settings{% endblock %}
+{% block mc_back_tab %}sports{% endblock %}
+{% block mc_crumbs %}<li aria-current="page">Settings</li>{% endblock %}
+{% block mc_title %}Organisation <em>settings</em>{% endblock %}
+{% block mc_lead %}What {{ org.name }} tips on, and who runs it.{% endblock %}
+{% block mc_body %}
 {% comment %}
-The rotating side strips. Standard on every member page (client request,
-Aug 2026) — these were the last screens without them. Outside the sheet,
-never inside it: the strips belong to the page background, and a sheet
-drawn over them is the whole point of the look.
+IN THE CONSOLE'S LOOK (22 Nov 2026): was a cream column four screens long.
+Competitions are tiles, two to a row on a phone, with a search, an On filter
+and a save button that stays in reach. Competitions used to be frozen after
+the create wizard; this is the page that edits them.
 {% endcomment %}
-{% comment %}
-THE GREEN SHEET, like every other member screen. Reported as "I am in green
-theme and I am seeing it be cream": this template simply never declared a body
-class, so it fell through to the default cream page while its neighbours drew
-the deep sheet over the rotating strips.
-{% endcomment %}
-{% block body_class %}page-deep sheet-page{% endblock %}
-{% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
-{% block app_content %}
+<form method="post" action="{% url 'orgs:settings' org.id %}" data-busy="Saving" class="ost-form" data-st>
+  {% csrf_token %}
+  <header class="ost-head">
+    <h2 data-coach="settings-comps">What you tip on</h2>
+    <p>Members only see these. Each brings its women's competition with it: pick NRL and everyone gets NRL <b>and</b> NRL Women.</p>
+  </header>
+  <div class="ost-tools">
+    <input type="search" data-st-q placeholder="Search competitions" aria-label="Search competitions" autocomplete="off">
+    <button type="button" data-st-only aria-pressed="false">On <em data-st-n>{{ chosen_ids|length }}</em></button>
+  </div>
+  <div class="ost-grid">
+    {% for comp in competitions %}
+    <label class="ost-tile" data-st-item="{{ comp.name|lower }} {{ comp.season }}">
+      <input type="checkbox" name="competitions" value="{{ comp.pk }}" {% if comp.pk in chosen_ids %}checked{% endif %}>
+      <span class="ost-top">
+        {% with lead=comp.series.all.0 %}<span class="ost-logo">{% if lead.logo %}<img src="{{ lead.logo }}" alt="" loading="lazy">{% else %}{{ comp.name|slice:":2"|upper }}{% endif %}</span>{% endwith %}
+        <span class="ost-state" aria-hidden="true"></span>
+      </span>
+      <b>{{ comp.name }}</b>
+      <small>{{ comp.season }}{% if comp.series.all|length > 1 %} &middot; {% for s in comp.series.all %}{{ s.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}</small>
+    </label>
+    {% empty %}
+    <p class="ost-none">No competitions have a working feed right now.</p>
+    {% endfor %}
+  </div>
+  <p class="ost-none" data-st-none hidden>Nothing matches that.</p>
+  <p class="ost-fine">Taking one off deletes nothing. Its rounds, tips and ladder stay, and come straight back if you add it again.</p>
+  <div class="ost-save"><button type="submit" class="gx-btn is-lime is-big">Save competitions</button></div>
+</form>
 
-<div class="app-head is-centred is-orgfirst"><div>
-  <div class="app-eyebrow">{{ org.name }}</div>
-  <h1 class="app-h1">Settings</h1>
-  <p class="app-sub">What {{ org.name }} tips on, and who runs it.</p>
-</div></div>
-
-{% comment %}
-Competitions were chosen at step 3 of the create wizard and then frozen — the
-field existed in exactly one template and there was no edit path anywhere. An
-organisation that started on NRL and wanted AFL the next year had to ask
-support. This is that missing page.
-{% endcomment %}
-<div class="card pad-lg set-card">
-  <div class="card-h" data-coach="settings-comps" style="font-size:19px;">What you tip on</div>
-  <p class="card-lead" style="margin:8px 0 4px;">
-    Members only ever see fixtures from the competitions picked here. Each one
-    brings its women's competition with it — pick NRL and everyone gets NRL <b>and</b>
-    NRL Women, never one without the other.
-  </p>
-  <p class="card-lead" style="margin:0 0 18px;color:var(--muted);font-size:13px;">
-    Taking one off is not a delete. Its rounds, its tips and its ladder all
-    stay exactly where they are, and adding it back brings them straight back.
-  </p>
-
-  <form method="post" action="{% url 'orgs:settings' org.id %}" data-busy="Saving">
-    {% csrf_token %}
-    <div class="opt-grid">
-      {% for comp in competitions %}
-      <label class="opt-card">
-        <input type="checkbox" name="competitions" value="{{ comp.pk }}" {% if comp.pk in chosen_ids %}checked{% endif %}>
-        <span class="oc-box"><svg><use href="#ic-check"/></svg></span>
-        <span>
-          <span class="oc-title">{{ comp.name }}</span>
-          <span class="oc-sub">{{ comp.season }}{% if comp.series.all %} &middot; {% for s in comp.series.all %}{{ s.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}</span>
-        </span>
-      </label>
-      {% empty %}
-      <p class="card-lead">No competitions have a working feed right now.</p>
-      {% endfor %}
-    </div>
-    <button type="submit" class="abtn abtn-primary" style="margin-top:18px;">Save competitions</button>
-  </form>
-</div>
-
-<div class="card pad-lg set-card">
-  <div class="card-h" data-coach="settings-groups" style="font-size:19px;">Groups</div>
-  <p class="card-lead" style="margin:8px 0 16px;">
-    {% if org.groups_enabled %}Groups are on. Marketing, IT, Sales — each with its own ladder inside {{ org.name }}.
-    {% else %}Split {{ org.name }} into teams, each with its own ladder. Most organisations don't need this.{% endif %}
-  </p>
-  <a href="{% url 'orgs:groups' org.id %}" class="abtn abtn-ghost">
-    {% if org.groups_enabled %}Manage groups{% else %}See what groups do{% endif %} &rarr;
-  </a>
-</div>
+<a class="ost-groups" data-coach="settings-groups" href="{% url 'orgs:groups' org.id %}">
+  <span><b>Groups {% if org.groups_enabled %}are on{% else %}are off{% endif %}</b>
+  <small>{% if org.groups_enabled %}Teams inside {{ org.name }}, each with its own ladder.{% else %}Split {{ org.name }} into teams, each with its own ladder. Most don't need it.{% endif %}</small></span>
+  <i aria-hidden="true">&rarr;</i>
+</a>
+<script>
+(function () {
+  var f = document.querySelector('[data-st]');
+  if (!f) return;
+  var q = f.querySelector('[data-st-q]'), only = f.querySelector('[data-st-only]'), n = f.querySelector('[data-st-n]'), none = f.querySelector('[data-st-none]');
+  var items = [].slice.call(f.querySelectorAll('[data-st-item]'));
+  function draw() {
+    var t = q.value.trim().toLowerCase(), on = only.getAttribute('aria-pressed') === 'true', shown = 0, count = 0;
+    items.forEach(function (it) {
+      var c = it.querySelector('input').checked;
+      if (c) count++;
+      it.hidden = (t && it.getAttribute('data-st-item').indexOf(t) < 0) || (on && !c);
+      if (!it.hidden) shown++;
+    });
+    n.textContent = count; none.hidden = !!shown;
+  }
+  q.addEventListener('input', draw);
+  q.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
+  only.addEventListener('click', function () { only.setAttribute('aria-pressed', String(only.getAttribute('aria-pressed') !== 'true')); draw(); });
+  f.addEventListener('change', function (e) { if (e.target.name === 'competitions') n.textContent = f.querySelectorAll('input[name=competitions]:checked').length; });
+})();
+</script>
 {% endblock %}

@@ -1,0 +1,31 @@
+{% comment %}
+Self-contained: an error page cannot lean on the stylesheet, the database or a
+context processor, any of which may be why it is showing.
+{% endcomment %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+{% include "partials/_motion.html" %}
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>We dropped that one. GoodTip</title>
+<style>
+html{color-scheme:dark}
+body{margin:0;box-sizing:border-box;min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px;color:#E8E4D5;font:16px/1.55 Archivo,system-ui,sans-serif;background:radial-gradient(900px 500px at 50% -10%,#17402D,#072F1E 60%,#05200F)}
+main{width:100%;max-width:420px;text-align:center}
+.m{font-weight:900;font-size:26px;color:#fff;text-decoration:none}.m span{color:#CFF93A}
+.c{margin:34px 0 0;font-weight:900;font-size:88px;line-height:1;color:#CFF93A}
+h1{margin:14px 0 8px;font-size:26px;line-height:1.15;color:#fff}
+p{margin:0}.a{display:flex;gap:10px;margin-top:28px}
+.a a{flex:1;box-sizing:border-box;padding:15px 8px;border-radius:14px;font-weight:800;text-decoration:none;border:1.5px solid rgba(207,249,58,.5);color:#CFF93A}
+.a a.p{background:#CFF93A;color:#072F1E}
+</style>
+</head>
+<body><main>
+<a class="m" href="/">GOOD<span>TIP.</span></a>
+<div class="c">500</div>
+<h1>We dropped that one.</h1>
+<p>Something broke at our end. Give it a minute and try again.</p>
+<div class="a"><a href="/">Home</a><a class="p" href="/dashboard/">My dashboard</a></div>
+</main></body>
+</html>

@@ -3,7 +3,7 @@
 {% block title %}{{ round.label }} tips, {{ org.name }}{% endblock %}
 {% block loader_task %}Loading this round's games{% endblock %}
 {% block nav_tips %}on{% endblock %}
-{% block body_class %}page-deep sheet-page{% endblock %}
+{% block body_class %}page-deep sheet-page tip-page{% endblock %}
 {% block page_backdrop %}
 {% comment %}Side imagery lives outside the sheet: .gt-sheet creates a
 stacking context, so a strip rendered inside it paints over the sheet.
@@ -14,7 +14,7 @@ stacking context, so a strip rendered inside it paints over the sheet.
 {% block app_content %}
 <div class="app-head">
   <div>
-    <div class="app-eyebrow">{{ org.name }} &middot; {{ org.sport_label }}</div>
+    <div class="app-eyebrow">{{ org.name }}{% if round.series %} &middot; {{ round.series.name }}{% endif %}</div>
     <h1 class="app-h1">{{ round.label }}, your tips</h1>
     <p class="app-sub" data-coach="round-lock">{% if locked %}This round is locked, tips are final.{% else %}Tap a team to pick it. Saves the instant you choose, no submit button.{% endif %}</p>
   </div>

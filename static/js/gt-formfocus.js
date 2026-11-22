@@ -66,7 +66,17 @@
     return !!shell.querySelector('.gtf-veil, .gtf-done');
   }
 
+  /* NOT ON A PHONE (client, 22 Nov 2026: "let it not enlarge, let it not
+     have that expansion animation"). The keyboard takes half the screen, so
+     a lifted form lost its fields behind it and its menus off the edge.
+     There a form stays in the page. Tested on each focus, so a phone turned
+     on its side still counts; the second query is that phone. */
+  function phone() {
+    return window.matchMedia('(max-width: 760px), (max-height: 500px) and (pointer: coarse)').matches;
+  }
+
   function open(shell) {
+    if (phone()) return;
     if (shell.dataset.noFocus != null || (active && active.shell === shell)) return;
     if (active) close(active.shell, true);
 

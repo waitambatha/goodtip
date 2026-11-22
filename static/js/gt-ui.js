@@ -175,6 +175,15 @@
     });
     dd.addEventListener('gt:ddxclose', unplace);
 
+    /* On a phone the form stays in the page, so a menu opened low on the
+       screen brings itself into view, every option within a thumb's reach.
+       After the open transition: mid-way the menu is still 8px high of home. */
+    function reveal() {
+      setTimeout(function () {
+        if (dd.classList.contains('open')) menu.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }, 190);
+    }
+
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
       if (sel.disabled) return;
@@ -184,6 +193,7 @@
       if (dd.classList.contains('open')) {
         if (unplaceT) { clearTimeout(unplaceT); unplaceT = null; }
         if (needsFixed()) { menu.classList.add('is-fixed'); place(); }
+        else if (window.matchMedia('(max-width: 760px)').matches) reveal();
       } else {
         unplace();
       }

@@ -7,6 +7,7 @@ Aug 2026) — these were the last screens without them. Outside the sheet,
 never inside it: the strips belong to the page background, and a sheet
 drawn over them is the whole point of the look.
 {% endcomment %}
+{% block body_class %}page-deep sheet-page receipt-page{% endblock %}
 {% block page_backdrop %}{% include "partials/page_scenes.html" %}{% endblock %}
 {% block app_content %}
 <div style="display:flex;justify-content:flex-end;max-width:640px;margin:0 auto 14px;" class="no-print"><button type="button" class="abtn abtn-ghost abtn-sm" onclick="window.print()">Print / Save PDF</button></div>
@@ -16,7 +17,7 @@ drawn over them is the whole point of the look.
     <div class="receipt-meta">{% if sub.stripe_payment_intent_id %}Ref {{ sub.stripe_payment_intent_id }}<br>{% endif %}Issued {{ sub.paid_at|date:"j M Y"|default:"-" }}</div>
   </div>
   <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">Billed to<br><strong style="color:var(--ink);">{{ org.name }}</strong></div>
-  <div class="receipt-row"><span class="k">Platform subscription, {{ sub.get_tier_display }} plan</span><span>${{ sub.price_aud|floatformat:2 }}</span></div>
+  <div class="receipt-row"><span class="k">Platform subscription, {% with t=sub.get_tier_display %}{{ t }}{% if 'plan' not in t|lower %} plan{% endif %}{% endwith %}</span><span>${{ sub.price_aud|floatformat:2 }}</span></div>
   <div class="receipt-row"><span class="k">Seats</span><span>{{ sub.seat_limit_label }}</span></div>
   <div class="receipt-row"><span class="k">Season</span><span>{{ sub.season }}</span></div>
   <div class="receipt-total"><span>Total paid</span><span class="num">${{ sub.price_aud|floatformat:2 }} AUD</span></div>

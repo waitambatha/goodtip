@@ -1,0 +1,14 @@
+{% comment %}
+ONE THEME: THE GREEN (client, 22 Nov 2026: "remove the white theme ... let's
+just only remain with the green one").
+
+Stamped before first paint on the app, /manage/, the news reader and /admin/.
+"dark" is the attribute the green has always worn in the stylesheets. The
+saved key is overwritten as well, so a browser that had picked Light or Auto
+is not left holding it. The light rules still in the stylesheets can no
+longer match anything.
+{% endcomment %}
+<script>
+document.documentElement.dataset.theme = "dark";
+try { localStorage.setItem("theme", "dark"); } catch (e) {}
+</script>

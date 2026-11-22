@@ -61,7 +61,7 @@ update rather than a page jumping under you.
         see what you type.
         {% endcomment %}
         <i>
-          {% if other %}Direct message &middot; only the two of you
+          {% if other %}{% if current_org and thread_org.id != current_org.id %}{{ thread_org.name }} &middot; {% endif %}Direct message &middot; only the two of you
           {% elif thread.kind == 'group' %}{{ thread_org.name }} &middot; {{ people_total }} member{{ people_total|pluralize }}
           {% elif thread.kind == 'org' %}{{ thread_org.name }} &middot; everyone, {{ people_total }} member{{ people_total|pluralize }}
           {% else %}{{ thread_org.name }} &middot; only the admins can see this{% endif %}
