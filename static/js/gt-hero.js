@@ -33,6 +33,10 @@
   var forced = document.documentElement.classList.contains('gt-motion');
   var reduced = !forced && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reduced) return;   /* the template's own full text stands */
+  /* Phones (22 Nov 2026): typing left both buttons as empty boxes for several
+     seconds. There the words are present and the stylesheet's staggered
+     fade-up is the entrance. */
+  if (window.matchMedia('(max-width: 760px)').matches) return;
 
   function runs(node, out) {
     out = out || [];

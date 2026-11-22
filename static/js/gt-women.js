@@ -216,7 +216,10 @@
   if (reduce) {
     finished(0);
   } else {
-    prepare();
+    /* Phones (22 Nov 2026): the words stand, so there is no gap above the
+       card while they type; the sample round still plays. */
+    if (window.matchMedia('(max-width: 760px)').matches) typed = true;
+    else prepare();
     setTab(0);
     if ('IntersectionObserver' in window) {
       new IntersectionObserver(function (es) {

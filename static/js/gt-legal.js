@@ -87,6 +87,14 @@
   var body = scope.querySelector('.legal-body');
   var cards = [].slice.call(scope.querySelectorAll('.legal-card'));
   if (!body || !cards.length) return;
+  /* Phones (22 Nov 2026): clauses that take turns in a fixed panel move on
+     before they can be read. There the document is written out in full and
+     the menu is plain jump links. */
+  if (window.matchMedia('(max-width: 760px)').matches) {
+    scope.classList.add('lg-read');
+    cards.forEach(function (c) { c.classList.remove('reveal'); c.classList.add('in'); });
+    return;
+  }
 
   var links = {};
   scope.querySelectorAll('.legal-toc a[href^="#"]').forEach(function (a) {

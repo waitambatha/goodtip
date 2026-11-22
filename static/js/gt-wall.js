@@ -19,6 +19,22 @@
   var forced = document.documentElement.classList.contains('gt-motion');
   if (!forced && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
+  /* Phones (22 Nov 2026): the rotate-to-landscape demo is a desktop piece —
+     on a phone the mock sat empty under a tall gap while the words typed.
+     There the finished picture stays (every message, phone upright) and the
+     messages simply pop in one after another each time the section comes on
+     screen (.ww-inview, CSS in goodtip.css). */
+  if (window.matchMedia('(max-width: 760px)').matches) {
+    sec.classList.add('ww-mobile');
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (es) {
+        var e = es[es.length - 1];
+        sec.classList.toggle('ww-inview', e.isIntersecting);
+      }, { threshold: .25 }).observe(sec);
+    } else sec.classList.add('ww-inview');
+    return;
+  }
+
   var split = sec.querySelector('[data-ww-split]');
   var stage = sec.querySelector('[data-ww-stage]');
   var phone = sec.querySelector('[data-phone]');

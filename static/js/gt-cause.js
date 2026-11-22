@@ -23,6 +23,27 @@
   var tabs = [].slice.call(sec.querySelectorAll('[data-cpx-tabs] button'));
   var token = 0, inView = false, running = false, cur = 0;
 
+  /* Phones (22 Nov 2026): the turning plate is a desktop piece. On a phone
+     the big centred title ran off both edges and the plate turned on its own
+     while you were reading it. There the two tabs simply switch sets, the
+     cards are all showing, and the switch is a short fade (.cpx-tap). */
+  if (window.matchMedia('(max-width: 760px)').matches) {
+    sec.classList.add('cpx-js', 'cpx-tap');
+    faces.forEach(function (f, k) {
+      f.classList.toggle('on', k === 0);
+      cards(f).forEach(function (c) { c.classList.add('in'); });
+    });
+    tab(0);
+    tabs.forEach(function (b, k) {
+      b.addEventListener('click', function () {
+        if (k === cur) return;
+        faces[cur].classList.remove('on'); faces[k].classList.add('on');
+        cur = k; tab(k);
+      });
+    });
+    return;
+  }
+
   function wait(ms, t) { return new Promise(function (res) { setTimeout(function () { res(t === token); }, ms); }); }
   function cards(f) { return [].slice.call(f.querySelectorAll('.cpx-card')); }
 

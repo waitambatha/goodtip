@@ -33,6 +33,14 @@
     </div>
   </div>
 
+  {% comment %}
+  The way back to the public site on phones (client, 22 Nov 2026: "there is no
+  method of just going back to the main menu"). It is the public bar itself,
+  so the places and the look are the same; laptop and tablet do not show it.
+  A holding visitor is not offered pages that are closed to them — for them
+  the wordmark is still the way home.
+  {% endcomment %}
+  {% if not is_holding %}<div class="auth-nav">{% include "public/partials/_nav.html" %}</div>{% endif %}
   <div class="auth-stage">
 
     {% comment %}
@@ -138,6 +146,28 @@
   (function(){
     /* Sport loader is handled by gt-loader.js.
        Background + aside imagery rotation is handled by gt-scenes.js. */
+
+    /* the public menu on phones */
+    var nav = document.querySelector('.auth-nav .nav');
+    if (nav) {
+      var navBtn = nav.querySelector('.nav-toggle');
+      var setNav = function (open) {
+        nav.setAttribute('data-open', String(open));
+        navBtn.setAttribute('aria-expanded', String(open));
+        document.body.classList.toggle('nav-open', open);
+      };
+      navBtn.addEventListener('click', function () { setNav(nav.getAttribute('data-open') !== 'true'); });
+      document.addEventListener('click', function (e) {
+        if (nav.getAttribute('data-open') !== 'true' || e.target.closest('.nav-toggle')) return;
+        if (e.target.closest('.nav-links') && !e.target.closest('a')) return;
+        setNav(false);
+      });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setNav(false); });
+      window.addEventListener('resize', function () { if (window.innerWidth > 760) setNav(false); });
+      var onNavScroll = function () { nav.classList.toggle('scrolled', window.scrollY > 24); };
+      window.addEventListener('scroll', onNavScroll, { passive: true });
+      onNavScroll();
+    }
 
     /* display-name suggester */
     var gen = document.getElementById('genName');

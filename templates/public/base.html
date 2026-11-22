@@ -326,6 +326,101 @@
       setTimeout(sweep, 400);
     }
 
+    /* ---- Fair questions (.faqx) ----
+       Each row carried a down-chevron but the answer was always showing, so
+       tapping it did nothing and the arrow read as broken (raised by the
+       client). Now the row is a real dropdown: answer hidden until tapped,
+       chevron turns, one open at a time per list. Without JS (no html.js)
+       the CSS leaves every answer visible. */
+    document.querySelectorAll('.faqx-list').forEach(function (list) {
+      var rows = list.querySelectorAll('.faqx-row');
+      rows.forEach(function (row, i) {
+        var q = row.querySelector('.faqx-q'), a = row.querySelector('.faqx-a');
+        if (!q || !a) return;
+        a.id = a.id || ('faqx-a-' + Math.random().toString(36).slice(2, 8));
+        row.setAttribute('role', 'button');
+        row.setAttribute('tabindex', '0');
+        row.setAttribute('aria-controls', a.id);
+        row.setAttribute('aria-expanded', 'false');
+        function toggle() {
+          var open = row.getAttribute('aria-expanded') !== 'true';
+          rows.forEach(function (r) { r.setAttribute('aria-expanded', 'false'); });
+          row.setAttribute('aria-expanded', String(open));
+        }
+        row.addEventListener('click', function (e) { if (!e.target.closest('a')) toggle(); });
+        row.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+        });
+      });
+    });
+
+    /* ---- Long card stacks are swipe rows on phones ----
+       Each of these was three to six screens of stacked cards. Below 761px
+       the CSS (.gt-swipe) lays them sideways with the next card peeking;
+       this adds the dots that say where you are. */
+    if (window.matchMedia('(max-width: 760px)').matches) {
+      var swipe = function (row) {
+        if (row.classList.contains('gt-swipe')) return;
+        var cards = [].slice.call(row.children).filter(function (c) {
+          return !c.classList.contains('flow-conn') && getComputedStyle(c).position !== 'absolute';
+        });
+        if (cards.length < 2) return;
+        row.classList.add('gt-swipe');
+        var dots = document.createElement('div');
+        dots.className = 'gt-swipe-dots';
+        dots.setAttribute('aria-hidden', 'true');
+        cards.forEach(function (c, i) {
+          var d = document.createElement('i');
+          if (!i) d.className = 'on';
+          dots.appendChild(d);
+        });
+        row.parentNode.insertBefore(dots, row.nextSibling);
+        row.addEventListener('scroll', function () {
+          var max = row.scrollWidth - row.clientWidth;
+          var at = max > 0 ? Math.round(row.scrollLeft / max * (cards.length - 1)) : 0;
+          [].forEach.call(dots.children, function (d, i) { d.classList.toggle('on', i === at); });
+        }, { passive: true });
+      };
+      document.querySelectorAll('.step-flow, .bd-charts, .who-grid, .feature-grid2, .ladder-3, .ch-steps').forEach(function (row) {
+        swipe(row);
+        if (row.classList.contains('gt-swipe')) return;
+        // gt-board.js fills the charts in later.
+        var mo = new MutationObserver(function () {
+          if (row.children.length < 2) return;
+          mo.disconnect();
+          swipe(row);
+        });
+        mo.observe(row, { childList: true });
+      });
+    }
+
+    /* ---- Footer sections fold on phones ----
+       The footer ran over 1,100px on a phone. Below 761px each column's
+       heading becomes a button that opens its list; wider screens never see
+       the button behaviour (the CSS shows every list there). */
+    document.querySelectorAll('.footer .footer-col').forEach(function (col, i) {
+      var h = col.querySelector('h4'), ul = col.querySelector('ul');
+      if (!h || !ul) return;
+      ul.id = ul.id || ('ft-col-' + i);
+      var phone = window.matchMedia('(max-width: 760px)');
+      function arm() {
+        if (phone.matches) {
+          h.setAttribute('role', 'button'); h.setAttribute('tabindex', '0');
+          h.setAttribute('aria-controls', ul.id); h.setAttribute('aria-expanded', 'false');
+        } else {
+          ['role', 'tabindex', 'aria-controls', 'aria-expanded'].forEach(function (a) { h.removeAttribute(a); });
+        }
+      }
+      arm();
+      phone.addEventListener('change', arm);
+      function flip() {
+        if (window.innerWidth > 760) return;
+        h.setAttribute('aria-expanded', String(h.getAttribute('aria-expanded') !== 'true'));
+      }
+      h.addEventListener('click', flip);
+      h.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
+    });
+
     /* ---- FAQ accordions ---- */
     document.querySelectorAll('.faq-q').forEach(function (q) {
       q.addEventListener('click', function () {

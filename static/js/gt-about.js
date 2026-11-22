@@ -51,6 +51,21 @@
     if (!cards.length) return;
     var hold = parseInt(row.getAttribute('data-hold'), 10) || 4800;
 
+    /* Phones (22 Nov 2026): taking turns inside fixed heights left one huge
+       empty card waiting for its words and the others cut off mid-title.
+       There every card is open — words, scene and answer all showing — and
+       each one fades up as it comes on screen (.ab-static / .ab-seen). */
+    if (window.matchMedia('(max-width: 760px)').matches) {
+      row.classList.add('ab-static');
+      if ('IntersectionObserver' in window) {
+        var sio = new IntersectionObserver(function (es) {
+          es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('ab-seen'); sio.unobserve(e.target); } });
+        }, { threshold: .2 });
+        cards.forEach(function (c) { sio.observe(c); });
+      } else cards.forEach(function (c) { c.classList.add('ab-seen'); });
+      return;
+    }
+
     row.classList.add('ab-on');
     cards.forEach(function (c) {
       c.setAttribute('tabindex', '0');

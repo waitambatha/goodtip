@@ -5,7 +5,7 @@
 {% block loader_task %}Loading the pricing{% endblock %}
 {% block meta_description %}One price. All year. All four competitions. Priced by team size, nothing else.{% endblock %}
 {% block body_class %}page-pricing{% endblock %}
-{% block extra_head %}<script src="{% static 'js/gt-plans.js' %}" defer></script>{% endblock %}
+{% block extra_head %}{% endblock %}
 
 {% block content %}
 
@@ -62,7 +62,7 @@
     <p class="eyebrow reveal">Plans</p>
     <h2 class="section-heading reveal">Priced by team size. Nothing else.</h2>
     <p class="section-sub reveal">Every plan runs every competition, all year, with no per-sport upsells. Groups &mdash; a separate ladder per team or department &mdash; start at Workplace.</p>
-    <div class="tier-table-wrap reveal" data-plans>
+    <div class="tier-table-wrap tier-plain reveal">
       <table class="tier-table">
         <thead>
           <tr>
@@ -119,6 +119,9 @@
         </tbody>
       </table>
       {% comment %}
+      22 NOV 2026 (client): the animation is off. "Too much for people. They
+      just want the table to have the data." gt-plans.js is no longer loaded;
+      the plan details below stay as hidden source in case it comes back.
       3 OCT 2026 (client): the table stays, and each plan takes a turn — its
       row lights in the plan's colour and a card grows out of it with more
       detail, each plan arriving a different way (a 360 turn, a flip, a
