@@ -32662,3 +32662,31 @@ body.gt-app.gt-app.gt-app .app-main .page-sheet > .card:has(.fxp) { background: 
   .dn-acts { flex-wrap: nowrap; }
   .dn-acts > .abtn { flex: 1 1 0; min-width: 0; box-sizing: border-box; justify-content: center; padding: 12px 6px; font-size: 13.5px; line-height: 1.2; text-align: center; white-space: normal; }
 }
+
+/* ---- Fixture card: the score in the middle, the result readable (23 Nov 2026) ----
+   The score badge sat 18px low, so it was centred on nothing; and the Won /
+   Lost tag was 11px, faint, and hung half off the bottom of a team box sized
+   before the tag existed. The middle now centres on the team boxes, and a
+   finished game's boxes are tall enough to hold a solid, readable tag. */
+.fxc .fxc-teams { align-items: start !important; --fxt-h: 104px; }
+.fxc .fxc-teams:has(.fxc-outcome) { --fxt-h: 128px; }
+.fxc .fxc-teams > .fxc-side { height: auto !important; min-height: 0 !important; }
+.fxc .fxc-teams > .fxc-side > .fxc-team { height: var(--fxt-h) !important; min-height: 0 !important; box-sizing: border-box; overflow: visible; }
+.fxc .fxc-teams > :is(.fxc-drawcol, .fxc-v) { align-self: start !important; margin-top: calc(var(--fxt-h) / 2) !important; transform: translateY(-50%); }
+.fxc .fxc-team .fxc-outcome {
+  position: static !important; justify-self: center !important; align-self: center; margin: 2px 0 0 !important;
+  padding: 4px 12px !important; border-radius: 99px; opacity: 1 !important; box-shadow: none;
+}
+.fxc .fxc-team .fxc-outcome i { font: 800 12.5px/1.1 var(--body) !important; letter-spacing: .06em; text-transform: uppercase; opacity: 1 !important; }
+.fxc .fxc-team .fxc-outcome.is-won { background: #1F7A35 !important; }
+.fxc .fxc-team .fxc-outcome.is-won i, .fxc .fxc-team .fxc-outcome.is-won .fxc-pts { color: #fff !important; }
+.fxc .fxc-team .fxc-outcome.is-lost { background: #B42318 !important; }
+.fxc .fxc-team .fxc-outcome.is-lost i, .fxc .fxc-team .fxc-outcome.is-lost .fxc-pts { color: #fff !important; }
+.fxc .fxc-team .fxc-outcome.is-drew { background: #8A6206 !important; }
+.fxc .fxc-team .fxc-outcome.is-drew i { color: #fff !important; }
+.fxc .fxc-team.is-dim.has-outcome { opacity: 1 !important; }
+.fxc .fxc-team.is-dim.has-outcome :is(.fxc-crest, .fxc-name) { opacity: .7; }
+@media (max-width: 560px) {
+  .fxc .fxc-teams { --fxt-h: 100px; }
+  .fxc .fxc-teams:has(.fxc-outcome) { --fxt-h: 124px; }
+}
