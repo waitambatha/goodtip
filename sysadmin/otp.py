@@ -93,6 +93,7 @@ def issue_and_send(user, request=None) -> bool:
             # session (accounts/code_links.py, sysadmin.views.admin_verify_link).
             "link": _link(request, row, code),
         },
+        personal=True,
     )
     if not sent:
         # In development mail is often not configured at all. The code is

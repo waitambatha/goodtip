@@ -211,6 +211,14 @@ class AllowlistEmailBackend(BaseEmailBackend):
     An empty allowlist drops everything. That is the default on staging on
     purpose — the failure mode of a forgotten env var should be silence, not a
     send to the entire membership.
+
+    A PERSONAL CODE GOES THROUGH (23 Nov 2026). Staging's list was narrowed to
+    one address on 29 Oct, which also held every sign-in code, so nobody else
+    let past the gate could sign in ("we couldn't send your code"). A message
+    goodtip.mail.mark_personal flagged (a sign-in, admin, confirmation or
+    reset code) goes to its one routable recipient whatever the list says.
+    Anything to more than one person is judged by the list as before, and an
+    empty list still sends nothing at all.
     """
 
     def __init__(self, fail_silently=False, **kwargs):
@@ -259,10 +267,19 @@ class AllowlistEmailBackend(BaseEmailBackend):
         if not email_messages:
             return 0
 
+        from goodtip.mail import PERSONAL_HEADER
+
         permitted, blocked = [], []
         for message in email_messages:
             recipients = message.recipients()
-            if recipients and all(self._permitted(r) for r in recipients):
+            personal = (
+                (self.allow_all or self.allowed)
+                and len(recipients) == 1
+                and (getattr(message, "extra_headers", None) or {}).get(PERSONAL_HEADER)
+                and not recipients[0].strip().lower().endswith(UNROUTABLE_SUFFIXES)
+                and "@" in recipients[0]
+            )
+            if personal or (recipients and all(self._permitted(r) for r in recipients)):
                 permitted.append(message)
             else:
                 blocked.append(message)

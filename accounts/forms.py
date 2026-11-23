@@ -160,6 +160,21 @@ class RegisteredEmailPasswordResetForm(DjangoPasswordResetForm):
     per session, so the page can't be used to enumerate a list at speed.
     """
 
+    def send_mail(self, subject_template_name, email_template_name, context,
+                  from_email, to_email, html_email_template_name=None):
+        """Django's own, with the message marked as one person's reset link."""
+        from django.core.mail import EmailMultiAlternatives
+        from django.template import loader
+
+        from goodtip.mail import mark_personal
+
+        subject = "".join(loader.render_to_string(subject_template_name, context).splitlines())
+        body = loader.render_to_string(email_template_name, context)
+        msg = EmailMultiAlternatives(subject, body, from_email, [to_email])
+        if html_email_template_name is not None:
+            msg.attach_alternative(loader.render_to_string(html_email_template_name, context), "text/html")
+        mark_personal(msg).send()
+
     def clean_email(self):
         email = self.cleaned_data["email"]
         if not User.objects.filter(email__iexact=email, is_active=True).exists():

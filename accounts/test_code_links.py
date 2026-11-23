@@ -110,3 +110,20 @@ class _Req:
     """Enough of a request for make_url outside a view."""
     def build_absolute_uri(self, path):
         return "https://goodtip.test" + path
+
+
+class CodesReachStagingMembersTests(TestCase):
+    """On staging the allowlist is one address; a sign-in code must still
+    reach whoever asked for it (23 Nov 2026: Ian could not sign in)."""
+
+    def test_the_sign_in_code_gets_through_the_staging_allowlist(self):
+        from django.test import override_settings
+
+        user = User.objects.create_user(email="ian@bigcorp.example", password="Str0ng!pass", display_name="Ian")
+        with override_settings(
+            EMAIL_BACKEND="goodtip.email_backends.AllowlistEmailBackend",
+            EMAIL_ALLOWLIST_DELEGATE="django.core.mail.backends.locmem.EmailBackend",
+            EMAIL_ALLOWLIST="someone.else@gmail.com",
+        ):
+            self.client.post(reverse("accounts:login"), {"email": user.email, "password": "Str0ng!pass"})
+        self.assertEqual([m.to for m in mail.outbox], [["ian@bigcorp.example"]])

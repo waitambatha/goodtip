@@ -1430,6 +1430,7 @@ def _send_work_email_code(row, code: str) -> None:
             "email": row.email,
             "minutes": row.ttl_minutes,
         },
+        personal=True,
     )
     # send_bulk swallows and logs its own failures. That is deliberate here:
     # the row is already saved, so a provider hiccup must not destroy a code

@@ -128,6 +128,7 @@ def send_code(row: LaunchSignup, code: str) -> int:
             "code": code,
             "minutes": int(LaunchSignup.CODE_TTL.total_seconds() // 60),
         },
+        personal=True,
     )
     return send_bulk([msg])
 

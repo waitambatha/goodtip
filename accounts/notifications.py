@@ -66,5 +66,6 @@ def send_login_code(user, code: str, purpose: str = LoginCode.PURPOSE_LOGIN, lin
             # One tap instead of six digits — see accounts/code_links.py.
             "link": link,
         },
+        personal=True,
     )
     return send_bulk([msg])

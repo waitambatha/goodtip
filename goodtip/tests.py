@@ -451,6 +451,33 @@ class EmailAllowlistTests(SimpleTestCase):
     def test_scrubbed_domain_cannot_be_allowlisted_back_in(self):
         self.assertEqual(self.send("member42@staging.invalid"), 0)
 
+    # ---- personal codes (23 Nov 2026) ------------------------------------
+    def send_personal(self, *recipients):
+        from django.core.mail import EmailMessage, get_connection
+
+        from goodtip.mail import mark_personal
+
+        msg = EmailMessage("123456 is your GoodTip sign-in code", "body", "from@example.com", list(recipients))
+        msg.extra_headers["X-GoodTip-Personal"] = "code"  # what mark_personal sets
+        self.assertIs(mark_personal(msg), msg)
+        return get_connection().send_messages([msg])
+
+    def test_a_personal_code_reaches_an_unlisted_member(self):
+        self.assertEqual(self.send_personal("ian@bigcorp.example"), 1)
+
+    def test_a_personal_code_is_never_sent_to_a_scrubbed_address(self):
+        self.assertEqual(self.send_personal("member42@staging.invalid"), 0)
+
+    def test_the_flag_does_not_open_a_message_to_several_people(self):
+        self.assertEqual(self.send_personal("ian@bigcorp.example", "mate@bigcorp.example"), 0)
+
+    @override_settings(EMAIL_ALLOWLIST="")
+    def test_an_empty_list_still_sends_nothing_at_all(self):
+        self.assertEqual(self.send_personal("ian@bigcorp.example"), 0)
+
+    def test_ordinary_mail_to_an_unlisted_member_is_still_held(self):
+        self.assertEqual(self.send("ian@bigcorp.example"), 0)
+
     @override_settings(EMAIL_ALLOWLIST="")
     def test_empty_allowlist_blocks_everything(self):
         # The failure mode of a forgotten env var must be silence, not a send

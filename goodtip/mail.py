@@ -120,7 +120,21 @@ def scene_url(name: str) -> str:
         return ""
 
 
-def build(name: str, *, subject: str, to, context: dict, reply_to=None) -> EmailMultiAlternatives | None:
+# A message one person asked for, for that person alone: a sign-in, admin,
+# confirmation or reset code. Staging's allowlist lets these through to their
+# single recipient (goodtip.email_backends.AllowlistEmailBackend) so anyone let
+# past the gate can sign in, while anything addressed to many stays held.
+PERSONAL_HEADER = "X-GoodTip-Personal"
+
+
+def mark_personal(msg):
+    """Flag a single-recipient message as a personal code; returns it."""
+    if msg is not None and len(msg.to or []) == 1 and not (msg.cc or msg.bcc):
+        msg.extra_headers[PERSONAL_HEADER] = "code"
+    return msg
+
+
+def build(name: str, *, subject: str, to, context: dict, reply_to=None, personal=False) -> EmailMultiAlternatives | None:
     """Render one message from emails/<name>.html + emails/<name>.txt."""
     if isinstance(to, str):
         to = [to]
@@ -145,15 +159,15 @@ def build(name: str, *, subject: str, to, context: dict, reply_to=None) -> Email
         reply_to=reply_to,
     )
     msg.attach_alternative(html, "text/html")
-    return msg
+    return mark_personal(msg) if personal else msg
 
 
-def send_template(name: str, *, subject: str, to, context: dict, reply_to=None) -> bool:
+def send_template(name: str, *, subject: str, to, context: dict, reply_to=None, personal=False) -> bool:
     """Render and send a single templated email. Returns whether it went."""
     if not email_configured():
         logger.warning("Email not configured — %r to %s skipped.", name, to)
         return False
-    msg = build(name, subject=subject, to=to, context=context, reply_to=reply_to)
+    msg = build(name, subject=subject, to=to, context=context, reply_to=reply_to, personal=personal)
     if msg is None:
         return False
     try:
